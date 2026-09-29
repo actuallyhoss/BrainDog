@@ -8,9 +8,16 @@
   still open. They are the same for every track by design.
 
   AGENTS ARE THE RUNS ON THE THREAD'S PROJECT. A run in the kernel's `session` register carries a
-  project and no thread, so the section names the project rather than claiming the thread.
+  project and no thread, so the tile names the project rather than claiming the thread.
 
-  The update thread is FIRST. The health chip in the header is derived from the newest row of it, so
+  THE LOOK (SYSTEM §5, §6, §7). The title row says where the thread stands in one line: the newest update's health as a
+  dot and its word, then who said it and when. The main lane is a list-and-lane screen: the composer is a tile at its
+  head, where the update it writes will appear, and the thread follows on the ground with no box. The side lane holds
+  the one figure this screen has, the agents' time over the last day as swimlanes with the one line saying what they
+  mean, and the open tasks as a group on the ground, since an open count alone is no chart. Below 1100 the side lane
+  stacks under the thread, so on a phone the composer comes first.
+
+  The update thread is FIRST. The health in the title row is derived from the newest row of it, so
   putting the runs or the tasks above it would separate the claim from its evidence by a screen.
 -->
 <script lang="ts">
@@ -39,18 +46,22 @@
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Opened } from '$lib/record/track-live.ts';
   import type { RowWriter } from '$lib/record/rows-write.ts';
+  import AgentFace from '$lib/ui/AgentFace.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import { liveOf } from '$lib/ui/face.ts';
   import { actor } from '$lib/record/names.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Swimlanes from '$lib/viz/Swimlanes.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, opened } from '../../../lib/ui/screen.svelte.ts';
   import { healthChoices, healthSaid } from './health.ts';
+  import { lanesOf, lanesSaid } from './lanes.ts';
 
   /**
    * THIS THREAD IS THE RECORD'S, and nothing of the sample is mixed into it.
@@ -98,7 +109,21 @@
     ),
   );
 
-  const live = $derived(runs.filter((r) => workingAt(r, clock)).length);
+  /**
+   * THE AGENTS' LAST DAY ON THE PROJECT, AS LANES: each run from when its row was written to when it was last heard from,
+   * a run working now reaching the now line (`lanes.ts`). Read off the rows already in hand; nothing else is asked.
+   */
+  const lanes = $derived(
+    lanesOf(
+      runs.map((s) => ({
+        agent: String(s.fields.agent ?? ''),
+        created: s.created,
+        lastSeen: String(s.fields.last_seen ?? ''),
+        working: workingAt(s, clock),
+      })),
+      clock,
+    ),
+  );
 
   /**
    * THE SCREEN SAYING IT HAS SETTLED, and on a live record that is the read coming back.
@@ -136,21 +161,26 @@
    * date, and only the first two are anybody's to say: the author is whoever is signed in and the
    * date is now. A health is asked for rather than chosen on somebody's behalf, because the
    * declaration's own rule is that prose without a health is not an update.
+   *
+   * THE BOX IS ALWAYS THERE, as the tile at the head of the thread, so saying where a thread stands is never behind a
+   * press; its Post is the screen's one primary.
    */
   const bodyField = REGISTERS.updates?.fields.find((f) => f.id === 'body');
   const healthField = REGISTERS.updates?.fields.find((f) => f.id === 'health');
-  let composing = $state(false);
   let draft = $state('');
   let draftHealth = $state(String(healthField?.values?.[0] ?? ''));
+  let form = $state<HTMLFormElement>();
 
-  /* THE WORD BESIDE A WORKING RUN'S DOT (DSN-18), so the dot's colour is never the only sign. */
-  const trackWords = { working: 'Working now' };
+  /* THIS SCREEN'S OWN WORDS (DSN-18). `working` is the word beside a working run's face, so its ring is never the only
+     sign; `said` is the title row's line after the health. */
+  const trackWords = {
+    working: 'Working now',
+    say: 'Say where it stands',
+    said: (ago: string, who: string) => `said ${ago} by ${who}`,
+    unsaid: 'Nobody has said where this stands yet.',
+  };
   let posting = $state(false);
   let writer: RowWriter | null = null;
-
-  function startPost() {
-    if (fromRecord) composing = true;
-  }
 
   async function post(e: SubmitEvent) {
     e.preventDefault();
@@ -185,14 +215,22 @@
      * read is of the whole record, so reading again would walk five registers to learn one line
      * this answer already carries.
      *
-     * NOTHING SAYS SO IN A TOAST. The update appearing in the thread, with the health chip in the
-     * header moving to agree with it, is the receipt, which is why a note on a row has none either.
+     * NOTHING SAYS SO IN A TOAST. The update appearing in the thread, with the health in the title
+     * row moving to agree with it, is the receipt, which is why a note on a row has none either.
      */
     const held = got;
     if (held?.from === 'live')
       got = { ...held, thread: { ...held.thread, updates: [out.entry, ...held.thread.updates] } };
     draft = '';
-    composing = false;
+  }
+
+  /* ⌘↵ POSTS FROM THE BOX, the chord every other composer in the product takes. On the field, not the window: it acts
+     only on what is being typed here. */
+  function onkeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.altKey) {
+      e.preventDefault();
+      form?.requestSubmit();
+    }
   }
 </script>
 
@@ -201,8 +239,16 @@
      word the rest of the product had stopped using. -->
 <svelte:head><title>{titleOf(track && String(track.fields.name), REGISTERS.tracks?.name ?? '')}</title></svelte:head>
 
+<!-- THE TITLE ROW'S LINE: the health as its dot and word, and who said it and when. The health is a CLAIM SOMEBODY MADE
+     rather than a computed status, and the thread below says in full who said so. AND ONLY ONCE SOMEBODY HAS SAID ONE
+     (DSN-18): with no update the chip read "Update missing", a capsule standing for a value nobody gave. Off track is
+     the one that needs him, so it alone takes the red. -->
+{#snippet standing()}
+  {#if health.health}<span class="standing" data-needs={health.health === 'off_track' ? '' : undefined}><Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} /></span><span class="standing-by">{trackWords.said(since(String(health.asOf), clock), actorOf(String(health.by)))}</span>{:else}{trackWords.unsaid}{/if}
+{/snippet}
+
 {#if refused !== null}
-  <div class="page">
+  <div class="page gone">
     <!-- THE RECORD'S OWN SENTENCE. A record without the work pack has no `tracks` at all, and being
          told so is the honest answer to an address that names one. -->
     <Empty kind="error" heading title={refused} />
@@ -211,7 +257,7 @@
   <!-- Bars until the record has answered. -->
   <Waiting head />
 {:else if !track}
-  <div class="page">
+  <div class="page gone">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
          the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
          no filter ran, so "nothing matched" is about something that did not happen. It names the
@@ -230,46 +276,42 @@
     </Empty>
   </div>
 {:else}
-  <PageHead kicker={REGISTERS.tracks?.name ?? ''} back="/r/tracks" title={String(track.fields.name)} icon="rows">
-    {#snippet actions()}
-      <!-- The health, and it is a CLAIM SOMEBODY MADE rather than a computed status: the chip says
-           what the newest update said, and the thread below it says who said so and when. -->
-      <!-- AND ONLY ONCE SOMEBODY HAS SAID ONE (DSN-18). With no update the chip read "Update missing" beside the primary,
-           a capsule standing for a value nobody gave; the thread below says there is none yet, once. -->
-      {#if health.health}<Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} />{/if}
-      <Button weight="primary" onclick={startPost}>
-        <Icon name="plus" size="s" />
-        {copy.postUpdate}
-      </Button>
-    {/snippet}
-  </PageHead>
+  <PageHead
+    kicker={REGISTERS.tracks?.name ?? ''}
+    back="/r/tracks"
+    title={String(track.fields.name)}
+    icon="rows"
+    sentence={health.health || health.state === 'missing' ? standing : undefined}
+  />
 
   <div class="page">
     <section class="lane">
-      <Section title="What has been said" count={updates.length}>
-      {#if composing}
-        <!-- AT THE HEAD OF THE THREAD, WHERE THE UPDATE IT WRITES WILL APPEAR, so the gesture and
-             its outcome are in one place on the screen. The two labels are the declaration's own,
-             which is how the rest of this screen names things: a renamed field renames them. -->
-        <form class="composer" onsubmit={post}>
-          <label class="c-label" for="update-body">{bodyField ? labelOf(bodyField) : ''}</label>
-          <textarea id="update-body" class="c-area" rows="4" dir="auto" bind:value={draft}></textarea>
+      <!-- AT THE HEAD OF THE THREAD, WHERE THE UPDATE IT WRITES WILL APPEAR, so the gesture and its outcome are in one
+           place on the screen. The two labels are the declaration's own, which is how the rest of this screen names
+           things: a renamed field renames them. -->
+      <Tile icon="edit" title={trackWords.say} lead>
+        <form class="composer" bind:this={form} onsubmit={post}>
+          <label class="field-label" for="update-body">{bodyField ? labelOf(bodyField) : ''}</label>
+          <textarea id="update-body" class="c-area" rows="3" dir="auto" bind:value={draft} {onkeydown}></textarea>
           <!-- THE HEALTH AS PILLS, NOT THE BROWSER'S MENU (DSN-18, design brief §11.10): the choices are few and
                declared, so every one is on screen and the chosen one is `[data-on]`, as every segmented control is. -->
-          <p class="c-label" id="update-health">{healthField ? labelOf(healthField) : ''}</p>
-          <div class="segmented" role="group" aria-labelledby="update-health">
-            {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
-              <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
-            {/each}
-          </div>
           <div class="c-line">
-            <Button type="submit" weight="primary" disabled={posting || draft.trim() === ''}>
+            <div class="c-health">
+              <p class="field-label" id="update-health">{healthField ? labelOf(healthField) : ''}</p>
+              <div class="segmented" role="group" aria-labelledby="update-health">
+                {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
+                  <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
+                {/each}
+              </div>
+            </div>
+            <Button type="submit" weight="primary" kbd="⌘↵" disabled={posting || draft.trim() === ''}>
               {posting ? copy.writeMarkSaving : copy.post}
             </Button>
-            <Button weight="bare" onclick={() => (composing = false)}>{copy.editCancel}</Button>
           </div>
         </form>
-      {/if}
+      </Tile>
+
+      <Section title="What has been said" count={updates.length}>
       {#if updates.length === 0}
         <!-- Not an error, and not styled as one. Nobody has written about this thread yet, which is
              the ordinary state of one somebody started this morning. -->
@@ -304,47 +346,58 @@
     </section>
 
     <aside class="side">
-      <!-- A thread on no project has no agents to name, so the section is not drawn. -->
+      <!-- A thread on no project has no agents to name, so the tile is not drawn. -->
       {#if project}
-      <Section title="Agents on {project.fields.name}" count={runs.length}>
+      <Tile icon="session" title="Agents on {project.fields.name}" count={runs.length}>
       {#if runs.length === 0}
-        <p class="quiet">No agent has worked on {project.fields.name}.</p>
+        <p class="reading">No agent has worked on {project.fields.name}.</p>
       {:else}
-        <ul class="rows">
+        <!-- THE ONE FIGURE ON THIS SCREEN, AND ITS LINE (SYSTEM §6, §7): who was busy when over the last day, the now
+             line in `live`, and what that adds up to in words. Runs older than the day are still listed under it. -->
+        {#if lanes.lanes.length > 0}
+          <Swimlanes lanes={lanes.lanes} start={lanes.start} end={lanes.end} now={clock} subject="Agents on {project.fields.name}" />
+        {/if}
+        <p class="reading">{lanesSaid(lanes, String(project.fields.name))}</p>
+        <ul class="ledger ledger-lead">
           {#each runs.slice(0, DOM_CAP) as s (s.seq)}
+            {@const working = workingAt(s, clock)}
             <!-- NO DOOR TO A RUN'S JOB. Nothing answers with a run's tool calls, so a run on a record
-                 has no transcript to open; the door was drawn only on the sample's worked examples. -->
+                 has no transcript to open; the door was drawn only on the sample's worked examples. The face names no
+                 run, so it is not a second door inside the row's own. -->
             <li>
-              <a class="row" href={at(`/r/session/${s.seq}`)}>
-                <span class="dot" data-live={workingAt(s, clock)}></span>
-                <span class="row-main">
-                  <span class="row-title" dir="auto">{s.fields.doing}</span>
-                  <!-- THE DOT'S WORD BESIDE IT: a dot never stands alone (design brief §5, Status). -->
-                  <span class="row-sub">{workingAt(s, clock) ? `${trackWords.working} · ` : ''}{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
+              <a class="line line-tall" href={at(`/r/session/${s.seq}`)}>
+                <span class="line-mark"><AgentFace agent={String(s.fields.agent ?? '')} run="" live={liveOf(s.fields.state, !working)} /></span>
+                <span class="line-main">
+                  <span class="line-title" dir="auto">{s.fields.doing}</span>
+                  <!-- THE RING'S WORD BESIDE IT: a mark never stands alone (design brief §5, Status). -->
+                  <span class="line-detail">{working ? `${trackWords.working} · ` : ''}{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
                 </span>
               </a>
             </li>
           {/each}
         </ul>
         <CapLine shown={Math.min(runs.length, DOM_CAP)} total={runs.length} />
-        {#if live}<p class="quiet">{live} working right now.</p>{/if}
       {/if}
-      </Section>
+      </Tile>
       {/if}
 
+      <!-- A GROUP ON THE GROUND AND NOT A TILE: an open count on its own is no chart, and the done ones are not in hand
+           to draw progress against. Each task leads with its round check, drawn and not pressed: the row is the way to
+           the task, where it is ticked. -->
       <Section title="Still open" count={tasks.length}>
       {#if tasks.length === 0}
         <!-- `points at` is the schema's word for a `ref`, and the second half reassured the reader
              that nothing was wrong — the product explaining itself rather than saying the fact. -->
         <p class="quiet">{copy.threadNoTasks}</p>
       {:else}
-        <ul class="rows">
+        <ul class="ledger ledger-lead">
           {#each tasks as t (t.seq)}
             <li>
-              <a class="row" href={at(`/r/tasks/${t.seq}`)}>
-                <span class="row-main">
-                  <span class="row-title" dir="auto">{t.fields.what}</span>
-                  <span class="row-sub">{display('tasks', 'by', t.fields.by) ?? 'no date'}</span>
+              <a class="line line-tall" href={at(`/r/tasks/${t.seq}`)}>
+                <span class="line-mark"><span class="line-check" aria-hidden="true"></span></span>
+                <span class="line-main">
+                  <span class="line-title" dir="auto">{t.fields.what}</span>
+                  <span class="line-detail">{display('tasks', 'by', t.fields.by) ?? 'no date'}</span>
                 </span>
               </a>
             </li>
@@ -357,25 +410,124 @@
 {/if}
 
 <style>
+  /* THE WORK UNDER THE TITLE ROW: the page's gutter, and 12 between the lanes and between what stands in each. */
   .page {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: var(--sp-6);
+    gap: var(--sp-6) var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: 1560px;
   }
 
-  @media (width < 1000px) {
-    .page {
-      grid-template-columns: minmax(0, 1fr);
+  /* THE SIDE LANE FROM 1100: 360 beside the thread, both from the same top edge. */
+  @media (width >= 1100px) {
+    .page:not(.gone) {
+      grid-template-columns: minmax(0, 1fr) 360px;
     }
+  }
+
+  .gone {
+    padding-block-start: var(--inset);
   }
 
   .lane,
   .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
     min-inline-size: 0;
   }
+
+  /* ── The title row's line ──────────────────────────────────────────────── */
+
+  .standing {
+    display: inline-flex;
+    margin-inline-end: var(--sp-2);
+    vertical-align: -1px;
+  }
+
+  /* THE HEALTH READS AT THE SENTENCE'S SIZE, and off track, the one that needs him, reads in red (SYSTEM §5). */
+  .standing :global(.chip) {
+    color: var(--ink);
+    font-size: var(--t-md);
+    line-height: 24px;
+  }
+
+  .standing[data-needs] :global(.chip) {
+    color: var(--danger);
+  }
+
+  .standing-by {
+    color: var(--ink2);
+  }
+
+  /* ── The composer ──────────────────────────────────────────────────────── */
+
+  .composer {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  /* A FIELD: the `--s1` fill, radius 12 and no border, the ink ring when focused (SYSTEM §6, `controls.css`). 16PX AT
+     EVERY WIDTH, so a phone does not zoom into it, and it scrolls clear of the keyboard with the health and Post under
+     it still in view. */
+  .c-area {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: calc(var(--row-h-2) * 2);
+    padding: var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
+    line-height: var(--lh-body);
+    resize: vertical;
+    scroll-margin-block: calc(var(--sticky) + var(--sp-4)) var(--sp-9);
+  }
+
+  .c-area:focus-visible {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+  }
+
+  .c-area::placeholder {
+    color: var(--dim);
+  }
+
+  /* THE HEALTH AND POST ON ONE LINE UNDER THE FIELD, Post at the end; they wrap to two under a thumb. */
+  .c-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-4);
+  }
+
+  .c-health {
+    min-inline-size: 0;
+  }
+
+  .c-health .field-label {
+    margin-block-start: 0;
+  }
+
+  /* NO KEY CAP UNDER A THUMB: there is no keyboard to press it with. */
+  @media (pointer: coarse) {
+    .composer :global(.btn-kbd) {
+      display: none;
+    }
+
+    .composer :global(.btn:has(.btn-kbd)) {
+      padding-inline-end: var(--sp-4);
+    }
+  }
+
+  /* ── The thread ────────────────────────────────────────────────────────── */
 
   .thread {
     display: flex;
@@ -387,162 +539,98 @@
 
   /* UNBOXED. Each update was a card with its health painted down the leading edge, so a thread read
      as a stack of panels. Now they follow one another with a hairline between, and the health is
-     said once, on the chip, which is the last thing on a thread that should be shouted. */
+     said once, on the chip. */
   .update {
-    padding-block: var(--sp-4);
+    padding-block: var(--sp-3) var(--sp-4);
   }
 
   .update + .update {
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
+  /* THE HEAD OF AN UPDATE IS A ROW'S: the face, the author at the row's size, the health's dot and word, and the time
+     in meta at the end. */
   .u-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
-    margin-block-end: var(--sp-2);
+    min-block-size: var(--well-l);
+    margin-block-end: var(--sp-1);
   }
 
   .u-by {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 600;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
   }
 
   .u-at {
     margin-inline-start: auto;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Under the name rather than under the face, so the words line up with who said them. `28px` is
-     the disc `Face` draws at its default size. */
+  /* Under the name rather than under the face, so the words line up with who said them: the 24px face `Face` draws at
+     its default size, and the head's 12 after it. */
   .u-body {
-    padding-inline-start: calc(28px + var(--sp-3));
-    color: var(--ink);
-    font-size: var(--t-ui);
-    line-height: var(--lh-body);
+    margin: 0;
+    padding-inline-start: calc(24px + var(--sp-3));
     max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+    overflow-wrap: anywhere;
   }
 
   .foot {
-    margin-block-start: var(--sp-4);
+    margin-block: var(--sp-4) 0;
     max-inline-size: var(--measure);
     color: var(--dim);
-    font-size: var(--t-xs);
-    line-height: var(--lh-body);
-  }
-
-  /* UNBOXED, like every other list: rows on the page with a hairline between, reaching a step past
-     the text column so a row's words line up with the heading and its hover has room. */
-  .rows {
-    display: flex;
-    flex-direction: column;
-    margin: 0 calc(-1 * var(--sp-3)) var(--sp-4);
-    padding: 0;
-    list-style: none;
-  }
-
-  .rows li + li {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  /* A ROW AT THE HEIGHT OF A TWO-LINE ROW, the whole of it the target, and a wash only under a mouse. */
-  .row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--row-h-2);
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .row:hover {
-      background: var(--hover-wash);
-    }
-  }
-
-  .row-main {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-
-  .row-title {
-    font-size: var(--t-base);
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .row-sub {
-    color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
-  /* A run working now is the only one that gets the accent. An idle run is not news and a finished
-     one is history; painting all of them would make the colour mean "a run" rather than "working now". */
-  .dot {
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    flex: none;
-    border-radius: var(--r-pill);
-    background: var(--edge);
-  }
+  /* ── The side lane ─────────────────────────────────────────────────────── */
 
-  .dot[data-live='true'] {
-    background: var(--earn-fill);
+  /* THE LINE UNDER THE LANES: what the chart means, in the second ink (SYSTEM §6). */
+  .reading {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+    text-wrap: pretty;
   }
 
   .quiet {
-    margin-block-end: var(--sp-4);
+    margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
-  /* Unboxed, like the updates under it: a hairline between the box and the thread rather than a
-     card floating over a list that has none. */
-  .composer {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding-block: var(--sp-4);
-    border-block-end: 1px solid var(--line-soft);
+  /* THE RUNS INSIDE THE TILE KEEP TO THE TILE'S OWN WIDTH, so a row's wash stays inside the tile's padding. */
+  .side :global(.tile .ledger) {
+    margin-inline: calc(-1 * var(--sp-2));
   }
 
-  .c-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 600;
+  .side :global(.tile .ledger .line) {
+    padding-inline: var(--sp-2);
   }
 
-  /* 16PX IN THE FIELD AT EVERY WIDTH, so a phone does not zoom into it, and it scrolls clear of the keyboard with the
-     health and Post under it still in view. */
-  .c-area {
-    inline-size: 100%;
-    padding: var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
-    resize: vertical;
-    scroll-margin-block: calc(var(--sticky) + var(--sp-4)) var(--sp-9);
+  /* THE `live` RING ON A RUN'S FACE (SYSTEM §2): solid while it works, dashed once it has gone quiet. `AgentFace` draws
+     the ring only on a face that is a door to its run, and this one is not, because the whole row is that door. */
+  .line-mark :global(.agent-face:is([data-live='working'], [data-live='quiet'])) {
+    border-color: var(--live);
+    box-shadow: inset 0 0 0 1px var(--bg);
   }
 
-  .c-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3);
+  /* On a phone the lanes are rows of 60 (SYSTEM §9) through `rows.css`, and the update's text reads at 16. */
+  @media (width < 900px) {
+    .u-body {
+      font-size: var(--t-md);
+      line-height: 24px;
+    }
   }
 </style>

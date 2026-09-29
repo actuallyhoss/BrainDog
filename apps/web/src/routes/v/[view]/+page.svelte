@@ -155,6 +155,8 @@
      learns it on the way (`remote.ts` `learn`), which a plain read of `REGISTERS` would not notice. */
   const decl = $derived.by(() => (void got, register ? REGISTERS[register] : undefined));
   const filters = $derived(live ? live.filters : null);
+  /* WHETHER THE TITLE ROW HAS A LINE TO SAY: the snippet's own test, so the head draws no empty sentence. */
+  const saying = $derived(Boolean(filters?.length || narrowed || live?.search));
   /* THE COLUMNS THE VIEW KEPT, and the register's own where it kept none. The spoken id ends the
      row either way, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
   const columns = $derived(register ? keptColumns(columnsFor(register, undefined, (live?.columns ?? []).includes('seq')), live?.columns ?? []) : []);
@@ -272,8 +274,8 @@
       binding = true;
       return;
     }
-    /* AND `o`, which does what `Open {register}` in the header does, as the same key does one
-       route over on `/p/<slug>`. The button no longer prints the key; the `?` sheet lists it.
+    /* AND `o`, which does what the kicker's link over the title does, as the same key does one
+       route over on `/p/<slug>`. Nothing on screen prints the key; the `?` sheet lists it.
 
        `silenced` FIRST, because `o` is a bare letter and `Character keys: off` is what makes the
        whole bare namespace legal (19 §4). */
@@ -349,15 +351,52 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon={iconFor(decl.icon, 'rows')} kicker={decl.name} back={register ? `/r/${register}` : undefined} title={name} count={matched} {total}>
+  <!-- THE TITLE ROW'S LINE IS WHAT THE VIEW SHOWS, IN WORDS (SYSTEM §5): the predicate as the list says it, and what was
+       typed into the box, quoted as typed. Never red: a view the record does not flag as late needs nobody.
+
+       NO LINE AT ALL WHERE THE PREDICATE CANNOT BE WRITTEN AS CHIPS, which is the header's own rule applied to a shape
+       the sample could never produce: a printed predicate that is not the predicate is worse than none.
+
+       AND NO LINE WHERE THERE IS NO PREDICATE EITHER. `viewReader` answers `filters: []` for a view the record holds
+       with `filter: null`, which the kernel's own `ViewRow` header calls a view that shows the whole register, and `[]`
+       is truthy: this line drew the word Filter with an empty `.predicate-said` after it, so the whole line was the
+       label. The length is what is asked, not the array, and `extra` counts too so a `?f=` clause over an unfiltered
+       view is still written out. -->
+  {#snippet predicateLine()}
+    {#if filters?.length || narrowed || live?.search}
+      <span class="predicate">
+        {#if filters && filters.length + extra.length > 0}<span class="predicate-said">{readable([...filters, ...extra])}</span>{/if}
+        <!-- A SAVED VIEW REMEMBERS WHAT WAS IN THE BOX, and the record has stored it all along with
+             nothing reading it back. It is quoted as typed, like `q`, because it is text somebody typed. -->
+        {#if live?.search}<span class="predicate-q">{copy.matching} <code>{live.search}</code></span>{/if}
+        {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
+      </span>
+    {/if}
+  {/snippet}
+
+  <PageHead
+    icon={iconFor(decl.icon, 'rows')}
+    kicker={decl.name}
+    back={register ? `/r/${register}` : undefined}
+    title={name}
+    count={matched}
+    {total}
+    sentence={saying ? predicateLine : undefined}
+  >
     {#snippet actions()}
-      <!-- NO LEAVING GLYPH: the list is in this app, one step up, and an arrow out of the page said it
-           was somewhere else (design §2.9). -->
-      <Button weight="bare" href="/r/{register}">{copy.openUnfiltered(decl.name)}</Button>
+      <!-- THE TOOLBAR IS GLASS (SYSTEM §5). The list this view narrows is the kicker's link, one step up, so it is not a
+           pill here as well; `o` still opens it. "Narrow this view" (GAP-2) wherever the list has fields to narrow by,
+           and the way back to the view's own address once the address has narrowed it. -->
+      {#if fields.length}
+        <Button weight="glass" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.queryNarrowView}</Button>
+      {/if}
+      {#if narrowed}
+        <Button weight="glass" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
+      {/if}
       <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`
-           means by a page builder. It opened and worked on a phone. -->
+           means by a page builder. An icon circle, so its name is its label and its tooltip. -->
       <span class="bind-slot">
-        <Button weight="quiet" onclick={() => (binding = true)}>{copy.bindBlock}</Button>
+        <Button weight="glass" aria-label={copy.bindBlock} title={copy.bindBlock} aria-haspopup="dialog" onclick={() => (binding = true)}><Icon name="board" size="m" /></Button>
       </span>
     {/snippet}
   </PageHead>
@@ -370,43 +409,6 @@
   />
 
   <div class="page">
-    <!-- NO LINE AT ALL WHERE THE PREDICATE CANNOT BE WRITTEN AS CHIPS, which is the header's own
-         rule applied to a shape the sample could never produce: a printed predicate that is not the
-         predicate is worse than none.
-
-         AND NO LINE WHERE THERE IS NO PREDICATE EITHER. `viewReader` answers `filters: []` for a
-         view the record holds with `filter: null`, which the kernel's own `ViewRow` header calls a
-         view that shows the whole register, and `[]` is truthy: this line drew the word Filter with
-         an empty `.predicate-said` after it in a flex row, so the whole line was the label. The
-         sample could not reach it because every view in `VIEWS` ships at least one clause. The
-         length is what is asked, not the array, and `extra` counts too so a `?f=` clause over an
-         unfiltered view is still written out.
-
-         THE LINE ALSO CARRIES "Narrow this view" (GAP-2) wherever the list has fields to narrow by,
-         and over an unfiltered view it is that control alone: a control, never an empty label. -->
-    {#snippet narrow()}
-      {#if fields.length}
-        <Button weight="bare" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.queryNarrowView}</Button>
-      {/if}
-    {/snippet}
-    {#if filters?.length || narrowed || live?.search}
-      <!-- THE SENTENCE STANDS ON ITS OWN, with no "Filter" in front of it: under the view's name it
-           can only be what the view shows. -->
-      <p class="predicate">
-        {#if filters && filters.length + extra.length > 0}<span class="predicate-said">{readable([...filters, ...extra])}</span>{/if}
-        <!-- A SAVED VIEW REMEMBERS WHAT WAS IN THE BOX, and the record has stored it all along with
-             nothing reading it back. It is quoted as typed, like `q`, because it is text somebody typed. -->
-        {#if live?.search}<span class="predicate-q">{copy.matching} <code>{live.search}</code></span>{/if}
-        {#if q}<span class="predicate-q">{copy.matching} <code>{q}</code></span>{/if}
-        {@render narrow()}
-        {#if narrowed}
-          <Button weight="bare" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
-        {/if}
-      </p>
-    {:else if fields.length}
-      <p class="predicate">{@render narrow()}</p>
-    {/if}
-
     <!-- THE BUILDER OVER THE VIEW'S NARROWING, in the same sheet the list's filter opens in, with the count and Done
          pinned at its foot. The rows reach the address when the sheet closes. -->
     {#if fields.length && register}
@@ -514,8 +516,14 @@
     border-block-end-color: transparent;
   }
 
-  .predicate-q {
-    color: var(--dim);
+  /* THE BIND CONTROL IS AN ICON CIRCLE (SYSTEM §5): 36 across, its name its label and its tooltip. */
+  .bind-slot {
+    display: inline-flex;
+  }
+
+  .bind-slot :global(.btn) {
+    inline-size: var(--ctl-h);
+    padding: 0;
   }
 
   /* Authoring is a desktop surface (13 §10). */
@@ -532,44 +540,43 @@
     }
   }
 
+  /* THE LIST ON THE GROUND UNDER THE TITLE ROW, at the page's gutter. Nothing here is a tile: a saved view is a list. */
   .page {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* IT WRAPS, because the filter is a sentence now and a sentence is longer than the chip was. */
+  /* THE PREDICATE IN THE TITLE ROW'S LINE: the sentence's own size and ink, wrapping, because the filter is a sentence
+     now and a sentence is longer than the chip was. */
   .predicate {
-    display: flex;
+    display: inline-flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-2);
   }
 
   /* THE BODY FACE AND NO CHIP. It was `<code>` on `--sunk` in `--font-id`: a query, set in the face
-     this product keeps for ids, over a list a person came to read. The chip below is still right
+     this product keeps for ids, over a list a person came to read. The quote below is still right
      for `q`, which is text somebody typed and is quoted as typed. */
-  .predicate-said {
+  .predicate-said,
+  .predicate-q {
     color: var(--ink2);
-    font-size: var(--t-sm);
   }
 
-
   .predicate code {
-    padding: 2px var(--sp-2);
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    padding: 1px 6px;
+    background: var(--hover-wash);
     border-radius: var(--r-sm);
-    color: var(--ink2);
+    color: var(--ink);
     font-family: var(--font-id);
+    font-size: var(--t-sm);
   }
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+      padding: var(--sp-3) var(--gutter) var(--sp-8);
     }
   }
 </style>

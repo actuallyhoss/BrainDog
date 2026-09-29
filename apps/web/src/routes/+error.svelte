@@ -50,8 +50,10 @@
 </div>
 
 <style>
+  /* ON THE GROUND AND NOTHING ELSE, as the spoken-id resolver's not-found is (`[id]/+page.svelte`): the page's gutter,
+     12 from the top of the work where a title row would stand, and `Empty` keeping its own words to the measure. No
+     tile: a failure is a sentence, its request id and the two ways on, not a card. */
   .page {
-    padding: var(--sp-6) var(--sp-5);
-    max-inline-size: 900px;
+    padding: var(--inset) var(--gutter) var(--sp-8);
   }
 </style>

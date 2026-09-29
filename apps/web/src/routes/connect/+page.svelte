@@ -11,6 +11,16 @@
   here with nothing else open. It fits an iPhone's screen without scrolling, and on a phone Allow is the last button,
   full width, where a thumb already is.
 
+  THE LOOK IS THE ENTRY SCREENS' (SYSTEM §2, §6, `signin/Entry.svelte`): the lit ground, and on it one lead tile with
+  the mark and the name at its top, because a person arrives here from sign-in, often straight from it, and the brand
+  stays where it was. In the tile, the app's own face and the one heading, the sentence of what it asks, the two facts
+  as a label over its value (or the choice, where there is one), how long it lasts in the quiet ink, and the two
+  presses: Deny a quiet pill and Allow the one ink pill. No figure, so no chart.
+
+  THE HEADING IS THIS SCREEN'S OWN `h1` AND NOT `PageHead`'s. There is one in every state, which is what the head was
+  kept for; `PageHead` is the shell's title row, and on a surface drawn bare its phone bar carried a search circle
+  that opens a palette this surface does not mount, a button that did nothing.
+
   NOTHING HERE IS A FAILURE BUT A FAILED READ. No request in the address is a person who opened the page by hand, and a
   sign-in that ended is the host saying so; both are designed states and neither marks the screen refused.
 -->
@@ -26,9 +36,10 @@
   import { TONES } from 'braindog-render';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import PageHead from '$lib/ui/PageHead.svelte';
+  import Face from '$lib/ui/Face.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import Entry from '../signin/Entry.svelte';
   import { answer, choicesOf, readConsent, type Scope } from './consent.ts';
 
   const shell = $derived(page.data as unknown as Shell);
@@ -101,103 +112,141 @@
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
-<!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1`. -->
-<PageHead {title} />
-<div class="consent">
-  {#if request === null}
-    <Empty kind="no-data-yet" title={copy.consentNone} body={copy.consentNoneWhy} />
-  {:else if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
-    <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-  {:else if gone !== null}
-    <Empty kind="no-data-yet" title={copy.consentGone} body={gone} />
-  {:else if consent !== null}
-    <!-- `dir="auto"` ON WHAT THE APP WROTE: its name is its own, in whatever script it chose. -->
-    <p class="asks" dir="auto">{copy.consentAsks(consent.client_name, consent.redirect_host)}</p>
-    <form
-      class="choose"
-      onsubmit={(e) => {
-        e.preventDefault();
-        void send('approve');
-      }}
-    >
-      {#if choices.length === 0}
-        <p class="fact">{slugOf(page.url.pathname) === null ? copy.consentNotOwner : copy.consentNotOwnerHere}</p>
-      {:else}
-        <!-- ONE RECORD IS A FACT AND NOT A CHOICE: a single radio button chooses nothing. -->
-        {#if choices.length === 1}
-          <div class="fact-pair">
-            <p class="fact-label">{copy.consentRecord}</p>
-            <p class="fact">{choices[0]?.name}</p>
-          </div>
+<Entry>
+  <div class="consent">
+    <!-- THE ONE HEADING, IN EVERY STATE, and beside it the app's own face once the app is known: its initials on its own
+         hue in the rounded square a thing wears, so the name that asks is also a shape. `dir="auto"` on what the app
+         wrote: its name is its own, in whatever script it chose. -->
+    <header class="who">
+      {#if consent !== null}<Face name={consent.client_name} of="record" size="l" />{/if}
+      <h1 class="title" dir="auto">{title}</h1>
+    </header>
+
+    {#if request === null}
+      <div class="state"><Empty kind="no-data-yet" title={copy.consentNone} body={copy.consentNoneWhy} /></div>
+    {:else if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+    {:else if gone !== null}
+      <div class="state"><Empty kind="no-data-yet" title={copy.consentGone} body={gone} /></div>
+    {:else if consent !== null}
+      <p class="asks" dir="auto">{copy.consentAsks(consent.client_name, consent.redirect_host)}</p>
+      <form
+        class="choose"
+        onsubmit={(e) => {
+          e.preventDefault();
+          void send('approve');
+        }}
+      >
+        {#if choices.length === 0}
+          <p class="fact">{slugOf(page.url.pathname) === null ? copy.consentNotOwner : copy.consentNotOwnerHere}</p>
         {:else}
-          <fieldset class="pick">
-            <legend class="fact-label">{copy.consentRecord}</legend>
-            {#each choices as c (c.slug)}
-              <label class="option">
-                <input type="radio" name="record" value={c.slug} checked={record === c.slug} onchange={() => (picked = c.slug)} />
-                <span>{c.name}</span>
-              </label>
-            {/each}
-          </fieldset>
+          <!-- ONE RECORD IS A FACT AND NOT A CHOICE: a single radio button chooses nothing. -->
+          {#if choices.length === 1}
+            <div class="fact-pair">
+              <p class="fact-label">{copy.consentRecord}</p>
+              <p class="fact">{choices[0]?.name}</p>
+            </div>
+          {:else}
+            <fieldset class="pick">
+              <legend class="fact-label">{copy.consentRecord}</legend>
+              {#each choices as c (c.slug)}
+                <label class="option">
+                  <input type="radio" name="record" value={c.slug} checked={record === c.slug} onchange={() => (picked = c.slug)} />
+                  <span>{c.name}</span>
+                </label>
+              {/each}
+            </fieldset>
+          {/if}
+
+          {#if consent.offers.length === 1}
+            <div class="fact-pair">
+              <p class="fact-label">{copy.consentReach}</p>
+              <p class="fact">{copy.consentScope[consent.suggested]}</p>
+            </div>
+          {:else}
+            <fieldset class="pick">
+              <legend class="fact-label">{copy.consentReach}</legend>
+              {#each consent.offers as s (s)}
+                <label class="option">
+                  <input type="radio" name="scope" value={s} checked={scope === s} onchange={() => (chosenScope = s)} />
+                  <span>{copy.consentScope[s]}</span>
+                </label>
+              {/each}
+            </fieldset>
+          {/if}
+
+          <p class="lasts">{copy.consentLasts}</p>
         {/if}
 
-        {#if consent.offers.length === 1}
-          <div class="fact-pair">
-            <p class="fact-label">{copy.consentReach}</p>
-            <p class="fact">{copy.consentScope[consent.suggested]}</p>
-          </div>
-        {:else}
-          <fieldset class="pick">
-            <legend class="fact-label">{copy.consentReach}</legend>
-            {#each consent.offers as s (s)}
-              <label class="option">
-                <input type="radio" name="scope" value={s} checked={scope === s} onchange={() => (chosenScope = s)} />
-                <span>{copy.consentScope[s]}</span>
-              </label>
-            {/each}
-          </fieldset>
-        {/if}
-
-        <p class="lasts">{copy.consentLasts}</p>
-      {/if}
-
-      <!-- DENY FIRST IN THE DOCUMENT AND ALLOW LAST, so Allow is the trailing button at 1440 and the lowest one on a
-           phone, and the tab order matches what is seen. Deny needs no session: turning an app away hands it nothing. -->
-      <div class="acts">
-        <Button disabled={sending} onclick={() => void send('deny')}>{copy.consentDeny(consent.client_name)}</Button>
-        {#if choices.length > 0}
-          <Button weight="primary" type="submit" disabled={sending || record === null}>{copy.consentAllow(consent.client_name)}</Button>
-        {/if}
-      </div>
-      <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-      <p class="said" role="status" data-intent={said ? 'bad' : undefined}>
-        {#if said}<span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {said}{/if}
-      </p>
-      {#if signIn}
+        <!-- DENY FIRST IN THE DOCUMENT AND ALLOW LAST, so Allow is the trailing button at 1440 and the lowest one on a
+             phone, and the tab order matches what is seen. Deny needs no session: turning an app away hands it nothing. -->
         <div class="acts">
-          <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+          <Button disabled={sending} onclick={() => void send('deny')}>{copy.consentDeny(consent.client_name)}</Button>
+          {#if choices.length > 0}
+            <Button weight="primary" type="submit" disabled={sending || record === null}>{copy.consentAllow(consent.client_name)}</Button>
+          {/if}
         </div>
-      {/if}
-    </form>
-  {/if}
-</div>
+        <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+        <p class="said" role="status" data-intent={said ? 'bad' : undefined}>
+          {#if said}<span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {said}{/if}
+        </p>
+        {#if signIn}
+          <div class="acts">
+            <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+          </div>
+        {/if}
+      </form>
+    {/if}
+  </div>
+</Entry>
 
 <style>
+  /* THE COLUMN INSIDE THE ENTRY TILE (`Entry.svelte` draws the ground, the tile and the brand): everything on one start
+     edge, 16 apart. */
   .consent {
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-5) var(--gutter) var(--sp-7);
-    max-inline-size: var(--measure);
+    min-inline-size: 0;
   }
 
-  /* WHAT THE APP WROTE AND WHERE IT GOES BREAK ANYWHERE, so a long name or host never pushes the page sideways at 320. */
-  .asks {
+  /* THE APP'S FACE AND THE HEADING ON ONE LINE, as a tile's heading row is, so the facts and Allow stay within a
+     phone's first screen. */
+  .who {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  /* `t-title`, 28/34 at 600 (SYSTEM §3); the phone's large title below 900. */
+  .title {
+    min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
+    font-family: var(--font-ui);
+    font-size: var(--t-title);
+    font-weight: 600;
+    line-height: calc(34 / 28);
+    letter-spacing: -0.02em;
     overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  /* `Empty`'s own padding goes, because the column's gap already spaces it. */
+  .state :global(.empty) {
+    padding-block: 0;
+  }
+
+  /* WHAT THE APP WROTE AND WHERE IT GOES, THE SCREEN'S ONE SENTENCE: 16/24 in the second ink (SYSTEM §5), breaking
+     anywhere, so a long name or host never pushes the page sideways at 320. */
+  .asks {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-md);
+    line-height: 24px;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
   }
 
   .choose {
@@ -206,11 +255,11 @@
     gap: var(--sp-4);
   }
 
-  /* A LABEL ABOVE ITS VALUE, as a row page's facts are drawn on a phone, and no box around either. */
+  /* A LABEL ABOVE ITS VALUE, in meta over the body, and no box around either. */
   .fact-pair {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    gap: 2px;
   }
 
   .fact-label {
@@ -218,12 +267,16 @@
     padding: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
   }
 
   .fact {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 
@@ -259,18 +312,27 @@
     }
   }
 
+  /* HOW LONG IT LASTS AND HOW TO UNDO IT, in the quiet ink: read once, and then out of the way. */
   .lasts {
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    line-height: 18px;
+    text-wrap: pretty;
   }
 
+  /* DENY THEN ALLOW AT THE TRAILING EDGE, and each label may wrap: an app's name is as long as its maker made it. */
   .acts {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--sp-2);
+  }
+
+  .acts :global(.btn) {
+    max-inline-size: 100%;
+    white-space: normal;
+    text-align: center;
   }
 
   /* ON A PHONE, ONE BUTTON TO A LINE AND THE WHOLE WIDTH, with Allow at the bottom where the thumb is. */
@@ -286,10 +348,20 @@
     }
   }
 
+  /* THE PRESS'S ANSWER, when there is one: the intent's dot and the host's sentence in the intent's colour. It stays in
+     the document while it is empty, so the sentence is announced when it arrives. */
   .said {
     margin: 0;
     color: var(--tone, var(--ink2));
     font-size: var(--t-sm);
+    line-height: 18px;
     overflow-wrap: anywhere;
+  }
+
+  @media (width < 900px) {
+    .title {
+      font-size: var(--t-figure);
+      line-height: calc(36 / 30);
+    }
   }
 </style>

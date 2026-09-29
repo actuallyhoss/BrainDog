@@ -200,8 +200,11 @@
 {/if}
 
 <style>
+  /* ON THE GROUND AND NOTHING ELSE (SYSTEM §5): no tile and no chart, only the state, its glyph level with where a
+     title row's title would stand (12 from the top of the work, as the head's) and at the page's gutter, so an address
+     that led nowhere reads as a quiet screen of the app rather than a page of its own. `Empty` keeps its words at the
+     measure; the column is not capped here. */
   .page {
-    padding: var(--sp-8) var(--sp-6);
-    max-inline-size: 900px;
+    padding: var(--inset) var(--gutter) var(--sp-8);
   }
 </style>
