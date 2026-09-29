@@ -1,6 +1,5 @@
 /**
- * Exchange rates, polled, as a pack file: one public address, and which number in its answer is which currency
- * (`loop/research-m3-dynamic.md` section 3, brief B7; `loop/DIRECTION.md` sections 22 and 24).
+ * Exchange rates, polled, as a pack file: one public address, and which number in its answer is which currency.
  *
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `ratesPollPack` in `packages/seed/src/packs/rates-poll.ts` built the
  * whole pack in code, so the shell carried one use case (a daily call to a rates address) as TypeScript nobody outside
@@ -11,11 +10,11 @@
  *
  * NOTHING MOVED BUT THE FILE, AND THAT WAS PROVED RATHER THAN CLAIMED. While the builder was in the tree, every spec
  * below was filled from the file and built by the builder, and the two were held equal byte for byte. The builder
- * went on September 24th, once `apps/web/src/lib/record/rates-form.ts` filled this file instead. What each spec
- * changes was printed from the builder that day, before it was deleted, and is written out below as values, so the
+ * went once `apps/web/src/lib/record/rates-form.ts` filled this file instead. What each spec
+ * changes was printed from the builder on its last day, before it was deleted, and is written out below as values, so the
  * comparison outlived the thing it compared against.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `facafeed`: with no pack file and no `fill.ts` this file did not load,
+ * RED FIRST, MEASURED: with no pack file and no `fill.ts` this file did not load,
  * ERR_MODULE_NOT_FOUND, and with both written the re-export test failed on `packages/seed/src/packs/index.ts` and
  * `packages/seed/src/usecases/index.ts`, the two other names the seed still gave `ratesPollPack`.
  */
@@ -91,9 +90,9 @@ test('THE SEED NO LONGER OFFERS THE BUILDER UNDER A SECOND NAME', () => {
   assert.deepEqual(offering, []);
 });
 
-test("B7's DIRECTORY: packages/seed/src/packs holds only what a record is built from", () => {
+test("THE SEED'S DIRECTORY: packages/seed/src/packs holds only what a record is built from", () => {
   const here = readdirSync(new URL('../../packages/seed/src/packs/', import.meta.url)).sort();
-  /* `bank-hsbc-eg` AND `holdings` LEFT TOO, for packs/ (parity B1 step 2, September 25th). */
+  /* `bank-hsbc-eg` AND `holdings` LEFT TOO, for packs/. */
   assert.deepEqual(here, ['agents.ts', 'first-party.ts']);
 });
 
@@ -106,7 +105,7 @@ type Filled = { pack: string; summary: string; ingest: string; url: string; ever
  * Each spec the byte comparison held, with what the builder answered for it on the day it was deleted.
  *
  * WRITTEN OUT AND NOT RECOMPUTED, because a table computed by a second copy of `fill.ts` agrees with `fill.ts` by
- * construction. Checked the other way on September 24th: with `.slice(0, 32)` taken off the ingest name in `fill.ts`,
+ * construction. Checked the other way: with `.slice(0, 32)` taken off the ingest name in `fill.ts`,
  * the long id's row went red here and nowhere else in this file.
  */
 const FILLED: readonly [string, RatesSpec, Filled][] = [
@@ -237,8 +236,8 @@ test('ONE ROW A CURRENCY, quoted the way `fx` reads a rate: one of the base is w
 });
 
 test('A CURRENCY ASKED FOR TWICE IS ONE ROW, and the base asked for against itself is none', () => {
-  /* HELD HERE AND NOT ONLY BY THE BYTE COMPARISON ABOVE, because that comparison leaves with the builder. Measured by
-     the checker on September 24th: with the repeat guard taken out of `fill.ts`, the only test that went red was the
+  /* HELD HERE AND NOT ONLY BY THE BYTE COMPARISON ABOVE, because that comparison leaves with the builder. Measured the
+     other way: with the repeat guard taken out of `fill.ts`, the only test that went red was the
      byte comparison, so deleting `packages/seed/test/rates.test.ts` as planned would have left `USD, EGP` written
      twice a day with nothing here to say so. */
   const doc = fillRates(template(), { ...EXAMPLE, rates: [{ currency: 'USD', path: 'rates.USD' }, { currency: 'EGP', path: 'rates.EGP' }, { currency: 'egp', path: 'rates.X' }] });

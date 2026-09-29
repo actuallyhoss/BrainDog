@@ -1,28 +1,27 @@
 /**
- * What a person holds, as a pack file: the list that left Money at money-core 2.0.0, and what it cost together
- * (`loop/research-legacy-parity.md` brief B1, row 47; `loop/DIRECTION.md` sections 22, 24 and 27).
+ * What a person holds, as a pack file: the list that left Money at money-core 2.0.0, and what it cost together.
  *
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `holdingsPack` in `packages/seed/src/packs/holdings.ts` built it in
- * code, so the shell carried one person's kind of list as TypeScript, and the only thing that ever offered it was the
- * the old tool import. It is now `holdings.pack.json`, installed through the record's own `planPack` and `installPack`.
- * The builder went on 25 September, once the import resolved the pack by id from the catalogue (brief B2). What it built
- * is kept beside this file as `holdings-1.0.0.json`, written from it that day, because 1.0.0 is what a record that took
+ * code, so the shell carried one person's kind of list as TypeScript, and the only thing that ever offered it was an
+ * import. It is now `holdings.pack.json`, installed through the record's own `planPack` and `installPack`.
+ * The builder went once the import resolved the pack by id from the catalogue. What it built
+ * is kept beside this file as `holdings-1.0.0.json`, written from it on its last day, because 1.0.0 is what a record that took
  * money-core 2.0.0 was offered and is what the update below starts from. The first test holds the list in this file to
  * that one, so the two cannot say different things about a row.
  *
- * WHY 1.1.0 AND WHY A SCRIPT. The survey's row 47 read "no value figure, no page". A figure is one aggregation over one
+ * WHY 1.1.0 AND WHY A SCRIPT. 1.0.0 had no value figure and no page. A figure is one aggregation over one
  * field (`AGGREGATIONS` in `packages/kernel/src/metrics.ts`), and `product` multiplies a field by a NAMED FACTOR TABLE,
  * never by another field, so no declared figure says "how many times what one cost". `portfolio-bands` met the same
- * wall and answered it with a script, which is the shell's own answer (section 22) to a sum nobody can declare. So the
+ * wall and answered it with a script, which is the shell's own answer to a sum nobody can declare. So the
  * list gains `cost`, a rule starts `cost.js` whenever `qty` or `unit_cost` is written, the script writes the product
  * into `cost`, and `Holdings value` is a plain sum over it. A field, a rule, a script, three figures and a page are added
  * and nothing is taken away, so the step is a minor one by `first-party.ts`'s rule.
  *
  * AND WHY THE SCRIPT ALSO RUNS ONCE A DAY. The rule only hears a write to `qty` or `unit_cost`, and updating from 1.0.0
- * writes neither, so every row a record already held stayed uncosted until somebody edited it. Measured on September
- * 25th: 1.0.0, three rows, then this file, then the rule and the outbox drained. `cost` stayed undefined on all three,
+ * writes neither, so every row a record already held stayed uncosted until somebody edited it. Measured:
+ * 1.0.0, three rows, then this file, then the rule and the outbox drained. `cost` stayed undefined on all three,
  * and the figure read value 0 over rows 3 under the note "what was paid for 3 holding(s)", a wrong amount stated as a fact.
- * Every record the the old tool import set up before it resolved packs from the catalogue gets here that way, because
+ * Every record an import set up before it resolved packs from the catalogue gets here that way, because
  * that import installed 1.0.0. The pack grammar has no trigger for "installed", so the script also runs on
  * `every: 1d`, whose first run the kernel spreads inside fifteen minutes of the install, and with no row to work on it
  * costs every row whose `cost` is empty. A script reads one page of fifty (`bands.js` says the same), so a record
@@ -34,13 +33,13 @@
  * nothing, and the note says how many of how many holdings the sum covers, through a third figure, `holdings-costed`.
  * With none costed yet the reading is `rows: 0` over three held, and the tile reads "0 of 3". That note is what carries
  * it on a screen today. The web's `unsaidFigure`, which turns exactly this reading into a sentence, answered `false` for
- * this figure when probed on September 25th: it resolves the register and the figure from the build's own seed tables,
+ * this figure when probed: it resolves the register and the figure from the build's own seed tables,
  * and a pack's list is in neither.
  *
  * WHAT IT IS NOT, said here because the tile cannot say it at length: a valuation. What gold or a policy is worth today
  * is a rate away, and a rate is `fx`'s or a person's script's. This is what was paid.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH. With no file, seven of the eight failed ENOENT, and the eighth is the one that
+ * RED FIRST, MEASURED. With no file, seven of the eight failed ENOENT, and the eighth is the one that
  * holds a record with every first-party pack to having no `holdings` list, no `holdings-value` figure and no Holdings
  * page. With the file and a script that writes nothing, four failed: the costing, the figure, the page and the byte
  * comparison with `cost.js`, so the figure is the script's arithmetic and not a sum that happened to agree. The fixture
@@ -134,7 +133,7 @@ test('THE FILE DECLARES THE LIST 1.0.0 DID, with `cost` added, and a version abo
   const doc = file();
   const built = v100();
   assert.equal(doc.pack, 'holdings');
-  /* 1.2.0 IS MOD-20's, and adds one key: `holdings-value` is `sellable`, so a forecast's sell control offers it. 1.3.0
+  /* 1.2.0 adds one key: `holdings-value` is `sellable`, so a forecast's sell control offers it. 1.3.0
      adds a title, a `changes` line and a comment at the top of the script, and nothing a record reads differently. */
   assert.equal(doc.version, '1.3.0');
   assert.equal(doc.declarations.find((d) => d.metric === 'holdings-value')?.sellable, true);

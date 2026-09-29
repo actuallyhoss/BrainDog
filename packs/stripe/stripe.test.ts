@@ -1,7 +1,6 @@
 /**
  * Stripe, as a pack: the company's Stripe balance and the payouts on their way to the bank, arriving in Money's
- * accounts every hour instead of being typed in (`loop/research-legacy-parity.md` brief B4, row 57;
- * `loop/research-legacy-keeps.md` K7; `loop/DIRECTION.md` sections 22 and 24).
+ * accounts every hour instead of being typed in.
  *
  * WHY A SCRIPT AND NOT A PULL, MEASURED BELOW RATHER THAN ARGUED. Stripe's `/v1/balance` answers one entry per currency
  * under `available` and again under `pending`, and a pull's `map:` has no way to put the currency into the row's name:
@@ -14,7 +13,7 @@
  * the vault entry for one request and only if the entry says it opens `api.stripe.com` (`keyRefused` in
  * `packages/host/src/script.ts`). Nothing in the pack file is a key, and the last tests look at the serialised file.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH: with no `stripe.js` and no `stripe.pack.json` this file failed at its first
+ * RED FIRST, MEASURED: with no `stripe.js` and no `stripe.pack.json` this file failed at its first
  * read, ENOENT, before a single test ran.
  */
 

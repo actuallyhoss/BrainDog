@@ -1,13 +1,13 @@
 /**
- * A Roadmap page over dated tasks, as a pack (`loop/research-legacy-parity.md` rows 29 and 30, brief B9).
+ * A Roadmap page over dated tasks, as a pack.
  *
  * THE KIND EXISTED AND NO PAGE DREW IT. `roadmap` has been a block kind since the renderer's arithmetic landed, and the
  * record accepts it (`packages/kernel/src/declare.ts`), but no module, pack or use case declared a page with one, so a
- * person with dated tasks had a chart nobody could open. the old tool opens its roadmap from the nav; the first test
+ * person with dated tasks had a chart nobody could open. A roadmap belongs in the nav; the first test
  * below holds that at HEAD a record with Work installed answers no `roadmap` page at all.
  *
- * A PACK AND NOT A PAGE IN `packages/seed`, because a time axis over tasks is one way of working and not everybody's
- * (`loop/DIRECTION.md` sections 22 and 27). It lays nothing on Work's list: a roadmap reads the two fields every task
+ * A PACK AND NOT A PAGE IN `packages/seed`, because a time axis over tasks is one way of working and not everybody's.
+ * It lays nothing on Work's list: a roadmap reads the two fields every task
  * already carries, `by` the due day and `effort` how long, and the page is the whole of the pack.
  *
  * THE DRAG IS NOT THE PACK'S. A bar is dragged by the drawer (`packages/render/svelte/p/Roadmap.svelte`) and written by

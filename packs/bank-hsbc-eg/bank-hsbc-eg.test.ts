@@ -1,11 +1,10 @@
 /**
- * One bank's alert wordings as a pack file: HSBC Egypt's mails and texts read into Money's `transactions`
- * (`loop/research-legacy-parity.md` brief B1, rows 53 and 54; `loop/DIRECTION.md` sections 22, 24 and 27).
+ * One bank's alert wordings as a pack file: HSBC Egypt's mails and texts read into Money's `transactions`.
  *
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `bankHsbcEgPack` in `packages/seed/src/packs/bank-hsbc-eg.ts` built
- * it in code, so the shell carried one person's bank as TypeScript, which section 27 says nothing in `packages/` may do.
+ * it in code, so the shell carried one person's bank as TypeScript, which nothing in `packages/` may do.
  * It is now `bank-hsbc-eg.pack.json`, installed through the record's own `planPack` and `installPack`. The builder went
- * on 25 September, once the import resolved the pack by id from the catalogue (brief B2), and until then the first test
+ * once the import resolved the pack by id from the catalogue, and until then the first test
  * held the file to what it built, byte for byte in meaning; they were still equal when it was deleted. The file is the
  * only copy now.
  *
@@ -14,10 +13,10 @@
  * forwarded into the sample record, which carried the twelve patterns only so that they had something to forward into;
  * here the record is the one a person has when they install this pack, the first-party packs and then this file.
  *
- * EVERY LINE BELOW IS INVENTED, in the shapes `loop/research-bank-real.md` counted. The card digits, the account, the
+ * EVERY LINE BELOW IS INVENTED, in the shapes real bank alerts take. The card digits, the account, the
  * branch code, the merchants, the amounts and the references are made up, and none of them is anybody's.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH. With no file, twelve of the thirteen failed ENOENT, and the thirteenth is the
+ * RED FIRST, MEASURED. With no file, twelve of the thirteen failed ENOENT, and the thirteenth is the
  * one that holds a record with every first-party pack to leaving this bank's card alert `untriaged`, so nothing here
  * passes because money-core already reads the line. With `SIGNED_DEBIT` taken out of `bank-from-in`'s `none:` in the
  * file, two failed: the builder comparison, since removed, and the claims test on the line carrying both glued signs,
@@ -97,7 +96,7 @@ const BALANCE = `HSBC: 21AUG26 Your account ${ACCOUNT_LINE} available balance is
  * that is the card alerts' to read.
  */
 const CHARGE = 'HSBC: Your card ending 4471 was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.';
-const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from NILE REALTY on 29/08/26.';
+const CREDIT = 'HSBC: Your card ending 4471 was credited GBP 5,005.00 from ALDER REALTY on 29/08/26.';
 
 /* ── the record ──────────────────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -158,7 +157,7 @@ const text = (k: Kernel, body: string, sha256: string): Arrived => said<Arrived>
 
 /* ── the file ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-/* 1.4.0 IS MOD-20's (contracts §7.6), A MINOR STEP: two patterns added for a message that only prints a balance, which
+/* 1.4.0 IS A MINOR STEP (contracts §7.6): two patterns added for a message that only prints a balance, which
    write money-core 3.0.0's `balances`; the balance a `From HSBC:` line prints lands in 3.0.0's `balance_after`; and each
    merchant name loses its acquirer's prefix (`strip`). So the floor moves to 3.0.0, the first Money with both lists.
    1.3.1 IS KEPT BESIDE THIS FILE as `bank-hsbc-eg-1.3.1.json`, byte for byte as it shipped, because the tests that drive a
@@ -214,8 +213,8 @@ test('THE CARD ALERT BECOMES A ROW at exact: the merchant between `at` and the f
 });
 
 /**
- * TWO CHARGES OF ONE AMOUNT AT ONE SHOP ON ONE DAY ARE TWO ROWS, and one alert sent twice is one. `loop/research-bank-real.md`
- * found such a pair in a hundred real texts, and the near rule skipped the second as `transactions#N already says this.`;
+ * TWO CHARGES OF ONE AMOUNT AT ONE SHOP ON ONE DAY ARE TWO ROWS, and one alert sent twice is one. A hundred real texts
+ * held such a pair, and the near rule skipped the second as `transactions#N already says this.`;
  * the limits they print differ by exactly the charge, so `bank-card-used` reads the limit and compares it.
  */
 test('TWO CHARGES OF THE SAME AMOUNT AT THE SAME SHOP ON THE SAME DAY ARE TWO ROWS, told apart by the limit each leaves', async () => {
@@ -361,7 +360,7 @@ test('NO WORDING IS CLAIMED BY TWO PATTERNS, and a line with both glued signs is
 
 /**
  * ONE IN FOUR OF THE TEXTS A SHORTCUT FORWARDS IS NOT A MOVEMENT: verification codes, shop promotions, delivery notices
- * and the bank's own marketing (`loop/research-legacy-keeps.md` section 1). Measured before the catch-all with the
+ * and the bank's own marketing. Measured before the catch-all with the
  * four bodies below: all four `untriaged`, a badge of four for texts nobody has to read.
  */
 const NOT_THE_BANKS: Record<string, string> = {

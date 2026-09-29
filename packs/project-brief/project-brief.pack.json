@@ -1,9 +1,9 @@
 {
   "pack": "project-brief",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "title": "Project brief",
   "summary": "A line on what each project is, the plan for it, and what is in the way.",
-  "changes": "Nothing a person sees changed. Each version says what it changed in a line like this one.",
+  "changes": "Nothing a person sees changed: the note on the block it adds to a project's page is reworded.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -41,7 +41,7 @@
     {
       "page": "page.project",
       "after": "Where it stands",
-      "note": "The one line, the plan and what is in the way, on the project page itself, where the old tool shows them.",
+      "note": "The one line, the plan and what is in the way, on the project page itself, where a person reads about the project.",
       "block": {
         "kind": "cards",
         "heading": "The brief",

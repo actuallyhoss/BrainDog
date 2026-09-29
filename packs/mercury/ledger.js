@@ -23,10 +23,10 @@
  * A ROW SOMEBODY DELETED STAYS DELETED. The ledger is read with its deleted rows as well (`includeDeleted`, which a
  * script's list takes), for the transactions it holds no live row for, and one
  * whose row a person deleted is left out, where it used to be written anew the next hour because the list read live
- * rows only (M6). Voiding and deleting now both take a Mercury transaction out of the figures for good.
+ * rows only. Voiding and deleting now both take a Mercury transaction out of the figures for good.
  *
  * A ROW TYPED IN BY HAND BEFORE THE PACK IS TAKEN, NOT COUNTED BESIDE IT. A record kept by hand holds the last month
- * already, and the first run wrote all thirty days again beside it, so every figure counted them twice (M3). So before
+ * already, and the first run wrote all thirty days again beside it, so every figure counted them twice. So before
  * a transaction it holds no row for is written, the ledger is asked for a live row with no Mercury transaction that is
  * the same money: the same account, the same amount and direction, and a day on the bank's day or either side of it,
  * because a person types the day they paid and the bank posts the day it cleared. Exactly one is taken: it carries the

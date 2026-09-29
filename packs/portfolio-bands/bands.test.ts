@@ -1,7 +1,7 @@
 /**
- * The Products bands as a pack (`loop/research-legacy-keeps.md` section 8, K5; `loop/DIRECTION.md` section 24).
+ * The Products bands as a pack.
  *
- * THE RULE, AS THE SURVEY READ IT (section 3 of the same file). One bar in three bands. `now` is what every project
+ * THE RULE. One bar in three bands. `now` is what every project
  * takes today, retired ones that still pay included. `next` is the headroom `max(0, base - now)` on projects being
  * earned from or shipped, and `later` is the same headroom on projects being explored. A retired project adds no
  * headroom. The four fixture projects below are invented and built to land on $11,000 / $6,250 / $8,000 a month, one
@@ -11,21 +11,21 @@
  * `packages/kernel/src/metrics.ts`: sum, count, avg, min, max, distinct), so a `sum` over `revenue` says `now` and
  * nothing declared says `max(0, base - now)` row by row. The rows are also in the wrong place for a figure: `now` and
  * `base` are readings in `datapoints`, one row each, joined to a project by `thing`. A script lists both and does the
- * subtraction, which is the shell's own answer (section 22) to a sum nobody can declare.
+ * subtraction, which is the shell's own answer to a sum nobody can declare.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `bab716a5`. With no `bands.js` the file failed at its first read,
+ * RED FIRST, MEASURED. With no `bands.js` the file failed at its first read,
  * ENOENT. Then with a `bands.js` that did only what a declared figure can, a sum of every project's monthly revenue,
  * four of five failed, and the whole path said exactly why: the pack installed, the run was `ok`, and the record held
  * `now` and no `next` and no `later`, because nothing summed over one field can say them.
  *
- * AND RED AGAIN ON SEPTEMBER 25TH AGAINST `772c0be1`, for brief B5 of `loop/research-legacy-parity.md` (row 34): the pack compiled in
+ * AND RED AGAIN, when the pack compiled in
  * the two labels one importer writes and required that importer's use case. Three probes were run against the file
  * as it stood, and all three failed: its text held the import's label for the base case; on a record holding Portfolio and a
  * `datapoints` list from a pack of somebody else's, it was refused `OUT_OF_BOUNDS`, "portfolio-bands needs
  * usecase-founder ^1.0.0, and this record has none"; and there was no way to give it other names. The tests under
  * "The settings" and "What it leans on" are those probes, grown.
  *
- * 2.0.0 TAKES THE NAMES AS SETTINGS (`loop/finish/platform.md` PLT-12). 1.0.0 shipped a `fill` and a `fill.ts` that
+ * 2.0.0 TAKES THE NAMES AS SETTINGS. 1.0.0 shipped a `fill` and a `fill.ts` that
  * rewrote one line of the script before install, so a person needed TypeScript in the app to set the pack up. The two
  * sides are `list` settings now, the script reads them from `ctx.config`, and the checks `fill.ts` made run in the
  * script, where a setting a person changes later is checked as well.
@@ -187,8 +187,8 @@ test('the file reads clean as an add-on somebody opens from disk, takes its two 
   assert.deepEqual(Object.keys(config), ['now', 'base']);
   assert.deepEqual([config.now!.type, config.base!.type], ['list', 'list']);
   assert.deepEqual({ now: config.now!.default, base: config.base!.default }, EXAMPLE);
-  /* THE FIRST CUT COMPILED IN TWO LABELS, the the old tool import's names for the base case, as `git grep` found them at
-     `772c0be1`. They are not quoted here, so the same grep over `packs/` now answers nothing. The source names no
+  /* THE FIRST CUT COMPILED IN TWO LABELS, one importer's names for the base case, as `git grep` found them then.
+     They are not quoted here, so the same grep over `packs/` now answers nothing. The source names no
      measure at all: the example's names are the settings' defaults and nowhere else. */
   for (const name of [...(EXAMPLE.now as string[]), ...(EXAMPLE.base as string[])]) assert.equal(SOURCE.includes(name), false, `bands.js names ${name}`);
   assert.ok(SOURCE.includes(CHECKED), 'bands.js no longer reads its settings through measuresOf');

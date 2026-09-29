@@ -390,8 +390,6 @@ importers:
 
   packs/holdings: {}
 
-  packs/legacy-import: {}
-
   packs/launch-desk: {}
 
   packs/live-feed: {}

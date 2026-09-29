@@ -1,12 +1,11 @@
 /**
- * Mercury, pulled, as a pack file: the company's bank balances arriving on their own instead of being typed in
- * (`loop/research-m3-dynamic.md` section 3, brief B7; `loop/DIRECTION.md` sections 22 and 24).
+ * Mercury, pulled, as a pack file: the company's bank balances arriving on their own instead of being typed in.
  *
  * THE DOCUMENT WAS A FUNCTION IN `packages/seed`. `mercuryPack` in `packages/seed/src/packs/mercury.ts` built it in
  * code, so the shell carried one bank as TypeScript. It became `mercury.pack.json`, with the four things a person
  * supplied named under `fill` and filled by a function in this test that no stranger could run.
  *
- * WHY A BANK AND WHY THIS ONE. `loop/research-switch.md` names company cash (Mercury and Stripe pulls) as the one money
+ * WHY A BANK AND WHY THIS ONE. Company cash (Mercury and Stripe pulls) is the one money
  * figure the record cannot answer without somebody retyping it. A bank answers the Money page's question, what is in
  * the account today, in one request with no pagination, `GET /api/v1/accounts`, so `read.rows` is `accounts` and there
  * is no page loop. Mercury publishes 100 requests a minute and this asks once an hour.
@@ -21,23 +20,23 @@
  * is unique on `(channel, sha256)`, so replaying identical bytes proves nothing about the declaration. Every fixture
  * carries a `requestId`, and the only thing between the second run and a duplicate row is `dedupe:`.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 24TH AGAINST `facafeed`: with no pack file every test that fills it failed, and
+ * RED FIRST, MEASURED: with no pack file every test that fills it failed, and
  * with the file written the re-export test still failed on `packages/seed/src/packs/index.ts`, the barrel that gave
  * `mercuryPack` a second name.
  *
- * THE LEDGER CAME ON SEPTEMBER 25TH (`loop/research-legacy-parity.md` brief B4, row 56). The balances were half of
+ * THE LEDGER CAME SECOND. The balances were half of
  * what Mercury answers; the transactions, the part a person reads to know what the company spent on, stayed typed in,
  * because a pull cannot read a sign (the last section below, which still holds). `ledger.js` is a script beside the
- * pull, carried in the pack file byte for byte. Measured before it was in the file, against `772c0be1`: all six ledger
+ * pull, carried in the pack file byte for byte. Measured before it was in the file: all six ledger
  * tests below failed at their first read of the pack, "mercury.pack.json declares no script, so nothing in the pack
  * can write a transaction", the whole path on a self-host included.
  *
- * 1.2.0 COUNTS THE MONEY ONCE (`loop/finish/defects.md` DEF-3). A row typed in by hand before the pack is taken by the
+ * 1.2.0 COUNTS THE MONEY ONCE. A row typed in by hand before the pack is taken by the
  * transaction it stands for instead of being written beside it, and a transaction whose row a person deleted is not
  * written again. The tests after "A TRANSACTION A PERSON VOIDED" hold both, and the whole path holds them against the
  * record's own `list`. They were written from reading the code, before any of them had run.
  *
- * `mercury` 1.0.0 IS THE SAME PACK UNDER ITS OWN ID, WITH SETTINGS WHERE THE FILL WAS (`loop/finish/platform.md` PLT-12).
+ * `mercury` 1.0.0 IS THE SAME PACK UNDER ITS OWN ID, WITH SETTINGS WHERE THE FILL WAS.
  * The key's label and how often it asks are `grant` and `every` beside `book`, filled by the record's own door when it
  * is planned and installed, and read by the ledger from `ctx.config`. A setting holds no id, so a record holds one
  * Mercury, and `mercury-company` is yanked from the catalogue with the reason "Replaced by Mercury".
@@ -773,7 +772,7 @@ test('A CATEGORY SOMEBODY PINNED IS KEPT: the next hour moves the bank’s facts
   /* ONE WRITE. The Fenwick payment cleared, so its state moves; its category, its description and everything else
      a person set are not in the patch. Halden is unchanged and is not written at all.
 
-     CHECKED THE OTHER WAY ON SEPTEMBER 25TH. With `ledger.js` changed to look Mercury's category up for every
+     CHECKED THE OTHER WAY. With `ledger.js` changed to look Mercury's category up for every
      transaction and restate it on an update, this test and the whole path both went red: the patch carried
      `category: <Software>` here, and on the self-host the row the person had moved to Hosting was back under Software
      an hour later. A first attempt at that check changed only the update and left the lookup to new rows, and both
@@ -791,7 +790,7 @@ test('A TRANSACTION MERCURY CANCELS AFTER IT WAS HELD IS VOID, and a status nobo
 });
 
 test('A TRANSACTION A PERSON VOIDED STAYS VOID, because Mercury never sends one it cancelled and only a person voids a sent one', async () => {
-  /* THE CHECKER'S BREAK, MEASURED ON SEPTEMBER 25TH ON THE SELF-HOST PATH BELOW. A person voided the Fenwick payment,
+  /* THE BREAK, MEASURED ON THE SELF-HOST PATH BELOW. A person voided the Fenwick payment,
      which he had already typed in by hand before the pack arrived, and the next hour put it back to `cleared`, so the
      duplicate he had just taken out of every Ledger figure was counted again, and would be every hour for thirty days.
      `cancelled` and `failed` are the end of a Mercury transaction, so a held row that is void was made void either by
@@ -815,7 +814,7 @@ const haldenOn = (account: string): Record<string, Json> => ({
 });
 
 test('A TRANSACTION WHOSE ROW A PERSON DELETED IS NOT WRITTEN AGAIN, because the ledger is read with its deleted rows as well', async () => {
-  /* THE BREAK OF M6: he deleted the Fenwick row, and the next hour wrote it back, because the list read live rows
+  /* THE BREAK: he deleted the Fenwick row, and the next hour wrote it back, because the list read live rows
      only. The ledger is asked again, deleted rows included, about the transactions it holds no live row for. */
   const ops = rowOf('accounts', { name: OPS.name, kind: 'bank' });
   const deleted: Row = {
@@ -1000,7 +999,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed from the file, run on the hour, a
     );
 
     /* HE DELETES THE FENWICK ROW, AND THE NEXT HOUR LEAVES IT DELETED. Before 1.2.0 it was back an hour later, because
-       the ledger was read live rows only (`loop/finish/defects.md` M6); the record's own deleted rows are what say
+       the ledger was read live rows only; the record's own deleted rows are what say
        otherwise now. `deleted_at: true`, because the record stamps the time with its own clock. */
     said(await api.update({ register: 'transactions', seq: first[0]!.seq, patch: { deleted_at: true } }, owner));
     await hour();

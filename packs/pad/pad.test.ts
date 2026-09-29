@@ -1,13 +1,12 @@
 /**
- * The pad as a pack: a list of notes beside the work, and a second opinion from Slash written under each one
- * (`loop/research-dynamic-layouts.md` section 5 P7 and brief D6, `loop/DIRECTION.md` sections 22, 28 and 31).
+ * The pad as a pack: a list of notes beside the work, and a second opinion from Slash written under each one.
  *
- * NO NEW KIND AND NO CODE, which is the point of building it here. The survey measured every half of it as something a
+ * NO NEW KIND AND NO CODE, which is the point of building it here. Every half of it measured as something a
  * record already says: `capture` adds a note, `cards` draws the notes with the new `reply` role under each title, and
  * an automation on the notes list asks Slash and writes the answer back with `set`. So a launch desk, a study plan and
  * a founder's page install the same pad instead of three people drawing three.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH: with no `pad.pack.json` beside it this file failed at its first read, ENOENT,
+ * RED FIRST, MEASURED: with no `pad.pack.json` beside it this file failed at its first read, ENOENT,
  * before a single test ran; the first test below is what holds the fresh record to having no notes list of its own.
  *
  * Every note here is invented, and none of them is about anybody.
@@ -108,7 +107,7 @@ test('the same file passes as an add-on somebody opens from disk, and asks for n
 });
 
 test('the rule asks Slash only about a note with no reply, once per wording, and writes the answer back as the reply', () => {
-  /* THE RULE AS THE SURVEY WROTE IT, held here word by word because the three tests below only see its effects. */
+  /* THE RULE AS IT WAS DESIGNED, held here word by word because the three tests below only see its effects. */
   assert.deepEqual(RULE.on, { written: { register: 'notes', op: ['create', 'update'], fields: ['text', 'reply'] } });
   assert.equal(RULE.when, 'reply is empty');
   const [ask, set] = RULE.steps as [{ ask_slash: { question: string; as: string } }, { set: { field: string; to: string } }];
@@ -133,7 +132,7 @@ test('A NOTE WITH NO REPLY IS PUT TO SLASH, and what Slash answers is written un
 });
 
 test('AN EMPTY ANSWER FROM SLASH LEAVES THE REPLY EMPTY, never a mark under the note', async () => {
-  /* MEASURED ON 25 SEPTEMBER, BEFORE THE KERNEL'S FIX: the question acked `done` with no text wrote `—` as the reply.
+  /* MEASURED BEFORE THE KERNEL'S FIX: the question acked `done` with no text wrote `—` as the reply.
      `packages/slash`'s own pass refuses a blank answer before it acks, so this is a host that acks the outbox itself,
      which the kernel accepts. The run fills `{{vars.opinion}}` with the dash a hole in a sentence gets, and the `set`
      took the dash as the whole value. `once_per` had marked the note by then, so it was never asked again either. A
@@ -157,7 +156,7 @@ test('A NOTE WRITTEN WITH A REPLY QUEUES NOTHING: no run and no question', async
 });
 
 test('ASKING AGAIN IS REWORDING THE NOTE WITH ITS REPLY CLEARED; clearing the reply on the same words asks nothing', async () => {
-  /* MEASURED, AND IT IS NOT WHAT THE SURVEY SAID. P7 has "asking again is clearing the reply". A rule that asks Slash
+  /* MEASURED, AND IT IS NOT THE OBVIOUS READING, "asking again is clearing the reply". A rule that asks Slash
      about a row must declare `once_per` (`flow-lint.ts`: "asks about a row and declares no once_per"), and the marker
      `once_per` leaves is kept for good, so with `once_per: [entry]` a note is asked about once in its life and clearing
      its reply asks nothing ever again. Keyed on the entry and its text instead, a new wording is a new question, and
@@ -221,13 +220,13 @@ test('THE PAD\'S PAGE IS A SECTION ANY PAGE CAN COPY: a capture into notes, then
   sql.close();
 });
 
-test('MEASURED: first: 6, which the survey wrote on the cards, is refused on a cards block, so the pad says limit: 6', () => {
-  /* `first:` is read by feed, agents and steps (`block-keys.ts` `KEY_KINDS`), and D1 made the install refuse a key the
+test('MEASURED: first: 6, the obvious key for the cards, is refused on a cards block, so the pad says limit: 6', () => {
+  /* `first:` is read by feed, agents and steps (`block-keys.ts` `KEY_KINDS`), and the install refuses a key the
      kind does not read. The pad is cut to six by `limit:`, which draws the same six and says the count in `matched`. */
   const cards = PAGE.blocks.find((b) => b.kind === 'cards')!;
   const withFirst = { ...PAGE, blocks: PAGE.blocks.map((b) => (b === cards ? { ...b, limit: undefined, first: 6 } : b)) };
   const refused = validateDeclaration({ id: `page.${String(PAGE.page)}`, kind: 'page', body: JSON.parse(JSON.stringify(withFirst)) } as never) as Refusal | null;
-  assert.ok(refused, 'first: 6 on cards installed, so the pad could say it as the survey did');
+  assert.ok(refused, 'first: 6 on cards installed, so the pad could say it that way');
   assert.match(refused.fix, /first: is read by feed, agents and steps blocks/u);
   assert.equal(cards.limit, 6);
 });

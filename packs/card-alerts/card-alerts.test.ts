@@ -1,15 +1,15 @@
 /**
  * Card alerts as a pack file: a card alert naming the card's last four digits, read into Money's `transactions`, by
- * mail or by a text message a phone Shortcut posts (`loop/DIRECTION.md` section 22, `loop/finish/shell.md` USE-1).
+ * mail or by a text message a phone Shortcut posts.
  *
  * THE FOUR PATTERNS WERE money-core's OWN until 3.0.0, `MONEY_INGESTS` and their `-sms` twins in
  * `packages/seed/src/modules/money.ts`, spread into every first-party document by `INGESTS` in
  * `packages/seed/src/index.ts`. So every record set up with Money carried an English bank alert's wording and a text
- * door for it, whether its owner banked by card, by cash or not at all, and section 22 names exactly that ("a bank SMS
- * pattern") as a use case the shell may not carry. They are this file now, and a record takes them by installing it.
+ * door for it, whether its owner banked by card, by cash or not at all, and a bank SMS pattern is exactly the kind of use
+ * case the shell may not carry. They are this file now, and a record takes them by installing it.
  *
  * THE SAME READINGS, WITH ONE THING TAKEN OUT: THE CURRENCY FALLBACK. money-core's patterns fell back on `GBP` when a
- * message printed no code, which is a currency nobody chose written into every record (`loop/finish/rules.md` §13). On
+ * message printed no code, which is a currency nobody chose written into every record. On
  * a record the readers are wired into, `scanMoney` takes the code the bank prints beside the figure, so a message that
  * prints one reads as before, and one that prints none goes to a person instead of being filed in a currency guessed
  * for it.
@@ -55,7 +55,7 @@ const FOUR = ['ingest.bank-card-in', 'ingest.bank-card-in-sms', 'ingest.bank-car
 
 const DIGITS = '4471';
 const CHARGE = `Your card ending ${DIGITS} was debited GBP 42.99 at FENWICK CLOUD on 18/09/26. If this was not you, call us.`;
-const CREDIT = `Your card ending ${DIGITS} was credited GBP 5,005.00 from NILE REALTY on 29/08/26.`;
+const CREDIT = `Your card ending ${DIGITS} was credited GBP 5,005.00 from ALDER REALTY on 29/08/26.`;
 
 const planOf = async (api: Api, doc: unknown): Promise<Diff> =>
   said<{ diff: Diff }>(await api.planPack({ doc, source: { kind: 'local' } } as never, owner)).diff;
@@ -158,7 +158,7 @@ test('A CHARGE AND A CREDIT BECOME ROWS at exact, each in its own direction, on 
   const back = mail(k, CREDIT, 'credit');
   assert.deepEqual([back.state, back.ingest, back.confidence], ['matched', 'bank-card-in', 'exact'], back.reason);
   const paid = k.get(back.wrote[0]!)!.fields;
-  assert.deepEqual([paid.what, paid.direction, paid.on, paid.amount], ['NILE REALTY', 'in', '2026-08-29', { amount: 500_500, currency: 'GBP' }]);
+  assert.deepEqual([paid.what, paid.direction, paid.on, paid.amount], ['ALDER REALTY', 'in', '2026-08-29', { amount: 500_500, currency: 'GBP' }]);
 
   assert.equal(k.count('transactions'), before + 2);
   sql.close();
@@ -185,7 +185,7 @@ test('A MESSAGE NAMING BOTH VERBS IS CLAIMED BY NEITHER, and a refund, a PIN rem
   const before = k.count('transactions');
   /* A WRONG SIGN AT exact IS THE WORST THIS LAYER CAN DO, since nothing downstream doubts an exact row, so each pattern
      refuses the other's verb and a message carrying both lands untriaged, where a person reads it. */
-  const both = mail(k, `Your card ending ${DIGITS} was debited GBP 42.99 at FENWICK CLOUD on 18/09/26, and credited GBP 1.00 from NILE REALTY on 18/09/26.`, 'both');
+  const both = mail(k, `Your card ending ${DIGITS} was debited GBP 42.99 at FENWICK CLOUD on 18/09/26, and credited GBP 1.00 from ALDER REALTY on 18/09/26.`, 'both');
   assert.deepEqual([both.state, both.ingest], ['untriaged', null]);
 
   for (const [what, body] of [

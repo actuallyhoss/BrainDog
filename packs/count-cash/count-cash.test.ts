@@ -1,8 +1,7 @@
 /**
- * Count the cash: a person says what is actually in the box or the account, and the record writes the difference
- * (`loop/research-legacy-parity.md` brief B4, row 42; `loop/DIRECTION.md` sections 22 and 24).
+ * Count the cash: a person says what is actually in the box or the account, and the record writes the difference.
  *
- * THE BRIEF SAID A MANUAL AUTOMATION THAT ASKS A PERSON FOR THE AMOUNT, AND THE GRAMMAR CANNOT SAY IT. Measured in the
+ * THE OBVIOUS SHAPE IS A MANUAL AUTOMATION THAT ASKS A PERSON FOR THE AMOUNT, AND THE GRAMMAR CANNOT SAY IT. Measured in the
  * first test below rather than read: `ask_person` offers a closed list of at least two answers (`flow-lint.ts`, "A
  * choice is between at least two, each once"), and `decide` refuses anything else, so a person asked "how much is in
  * the box?" can only pick an amount somebody wrote into the automation beforehand. Deciding 412.37 on a question that
@@ -15,7 +14,7 @@
  * transaction, the count kept as a balance check (1.1.0), and the difference kept on the count. Nothing in `packages/`
  * changed for it. The day `ask_person` takes an amount, the form becomes a question and the rest stays.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH: with no `count.js` and no `count-cash.pack.json` this file failed at its first
+ * RED FIRST, MEASURED: with no `count.js` and no `count-cash.pack.json` this file failed at its first
  * read, ENOENT, before a single test ran.
  */
 
@@ -229,8 +228,8 @@ test('THE WHOLE PATH ON A SELF-HOST: a person writes a count, and the record wri
     assert.deepEqual(ledger().map((t) => t.what), ['Cash count difference', 'Cash count difference', 'Stamps']);
     assert.deepEqual(checks().at(-1)?.slice(1, 4), [41_000, 'GBP', '2026-09-29']);
 
-    /* A PERSON EDITS AN OLD COUNT'S NOTE, AND NOTHING RUNS. Four counts, four runs. Checked the other way on
-       September 25th: with the rule widened to `op: [create, update]`, this edit was one run more. The script's own
+    /* A PERSON EDITS AN OLD COUNT'S NOTE, AND NOTHING RUNS. Four counts, four runs. Checked the other way:
+       with the rule widened to `op: [create, update]`, this edit was one run more. The script's own
        write of the difference was never one, rule or no rule, because the kernel does not start a rule twice on one row
        in one chain; the edit is what `op: [create]` is for. */
     said(await api.update({ register: 'cash_counts', seq: api.kernel.get(short.id)!.seq!, patch: { note: 'Recounted with the till roll.' } }, owner));

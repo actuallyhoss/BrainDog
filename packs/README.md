@@ -133,9 +133,6 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `live-feed` | Figures polled from a stats address every hour. | The same, as the smallest example of a poll. |
 | `launch-desk` | A desk for launching a thing in parts, with each part's next step, a calendar and a price check. | A whole set of pages and example rows for one use case, built on other add-ons. |
 
-`legacy-import` is not an add-on: it is an import adapter, a map and a script that `braindog import` loads, and the
-catalogue tool passes over it.
-
 ## How the packs here reach a record
 
 `node tools/catalogue/from-packs.mjs` publishes every `packs/<folder>/<folder>.pack.json` into

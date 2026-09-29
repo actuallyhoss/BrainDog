@@ -1,23 +1,22 @@
 /**
  * The project brief as a pack: a one-line summary, the plan and what is in the way, laid on Portfolio's projects by
- * `extends` and drawn on a page of its own (`loop/research-legacy-keeps.md` section 2 and brief K3,
- * `loop/DIRECTION.md` section 24).
+ * `extends` and drawn on a page of its own.
  *
- * THE THREE FIELDS WERE ONE NOTE. the old tool keeps `oneLiner`, `plan[]` and `blockers[]` on every project, and his record
- * at rev 966 held a one-liner on 25 of 26 projects and a blocker on 24. BrainDog's import had nowhere to put them and
- * wrote all three into `note` as markdown, so an agent asking "what is in the way on bake" read the whole note to find
- * one line. At HEAD `things` has no `summary`, and a write carrying one is `FIELD_UNKNOWN`; the first test holds that.
+ * THE THREE FIELDS WERE ONE NOTE. A founder's tracker commonly keeps a one-liner, a plan and blockers on every
+ * project, and a record imported from one holds them on nearly every project. BrainDog's import had nowhere to put them
+ * and wrote all three into `note` as markdown, so an agent asking "what is in the way on marrow" read the whole note to
+ * find one line. At HEAD `things` has no `summary`, and a write carrying one is `FIELD_UNKNOWN`; the first test holds that.
  *
- * A PACK AND NOT A FIELD IN `packages/seed`, because section 24 says the the old tool features are dynamic: data on the
- * record's primitives, never code in the shell that knows about him. Everything here is the pack file and the record's
+ * A PACK AND NOT A FIELD IN `packages/seed`, because a feature like this is dynamic: data on the
+ * record's primitives, never code in the shell that knows about one person. Everything here is the pack file and the record's
  * own install path, `planPack` then `installPack`, the road a person takes from the app.
  *
- * ON EACH PROJECT'S OWN PAGE, AND ON ONE PAGE OVER EVERY PROJECT. The brief asked for a section on a project, and a
+ * ON EACH PROJECT'S OWN PAGE, AND ON ONE PAGE OVER EVERY PROJECT. The brief belongs in a section on a project, and a
  * second template `for: things` could not give it one: two templates over one list share one slug per row, so a brief
  * template took `/p/marrow` or `/p/marrow-2` by which was installed last. So the pack adds one block to Portfolio's
- * `project` page through `adds` (`loop/finish/gaps.md` GAP-9), which the kernel lays after "Where it stands" each time
- * the page is read and never writes into Portfolio's declaration. `/p/briefs` stays beside it, which is the shape Sam
- * Brain's agent index has: one line per project, with what is in the way.
+ * `project` page through `adds`, which the kernel lays after "Where it stands" each time
+ * the page is read and never writes into Portfolio's declaration. `/p/briefs` stays beside it, which is the shape an
+ * agent's index of projects takes: one line per project, with what is in the way.
  */
 
 import { test } from 'node:test';

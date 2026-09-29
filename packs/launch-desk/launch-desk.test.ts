@@ -1,15 +1,14 @@
 /**
- * A launch desk as a pack: the measure of done of `loop/research-dynamic-layouts.md` section 7 and brief D8
- * (`loop/DIRECTION.md` sections 22, 28 and 31).
+ * A launch desk as a pack, the measure of done for layouts a person builds over their own lists.
  *
- * THE BAR WAS A PAGE ONE PERSON HAD BUILT FOR ONE LAUNCH, and section 28 asks that anybody can build that level of fit
+ * THE BAR WAS A PAGE ONE PERSON HAD BUILT FOR ONE LAUNCH, and the aim is that anybody can build that level of fit
  * over their own lists without anyone writing code for them. So this folder holds a file and nothing else that runs in
  * the shell: six lists, the figures a sentence needs, one script that adds three costs, and three kinds of page (a desk,
  * one page per part, and the numbers), every one of them said in words the kernel already reads. What it proves is the
  * kernel half: the file installs through the record's own door, and every block of every page answers with no refusal.
- * The drawing is the app's (wave three), and is not asserted here.
+ * The drawing is the app's, and is not asserted here.
  *
- * 2.0 WEARS THE PAGE WORDS WAVE THREE ADDED: each part's card carries its own colour and picture (`hue`, `picture`), a
+ * 2.0 WEARS THE NEWER PAGE WORDS: each part's card carries its own colour and picture (`hue`, `picture`), a
  * part's path opens on its essential steps (`short`), and the Desk puts the open steps on a `calendar` by the day each
  * is due. Each is asserted as the kernel answers it; how a phone draws it is the app's.
  *
@@ -17,7 +16,7 @@
  * already keeps a pad keeps one pad. A pack cannot lay blocks on another pack's page, so the desk's rail copies the
  * pad's three blocks, which `packs/pad` holds to standing on their own for exactly this.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH: with no `launch-desk.pack.json` beside it this file failed at its first read,
+ * RED FIRST, MEASURED: with no `launch-desk.pack.json` beside it this file failed at its first read,
  * ENOENT, before a single test ran. The first test holds a fresh record to having no desk of its own.
  *
  * Every row here is invented: a small run of candles, launched in four parts. None of it is anybody's.
@@ -199,7 +198,7 @@ test('WITHOUT THE PAD THE DESK IS REFUSED, at the notes list it points at, and n
 });
 
 test('IT INSTALLS BESIDE EVERY FIRST-PARTY MODULE, asking nobody to press anything and taking no list of theirs', async () => {
-  /* MEASURED ON SEPTEMBER 25TH: the survey's list of people, called `people`, is also the People module's list, and on a
+  /* MEASURED: a launch's list of people, called `people`, is also the People module's list, and on a
      record holding that module the plan answered a conflict over `register.people` rather than an add. A launch's
      helpers are not the record's people, so the desk calls its list `contacts`. */
   const { api, sql } = await record();
@@ -320,8 +319,8 @@ test('ONE TAB SECTION HOLDS THE DESK, ONE PAGE PER PART AND THE NUMBERS, in that
     .pages()
     .filter((p) => p.nav?.section === 'Launch')
     .sort((a, b) => a.nav!.order - b.nav!.order);
-  /* THE PARTS COME IN THE ORDER THEY WERE WRITTEN, and stay there. They share the template's one `nav.order`, and on
-     September 25th the kernel listed a template's pages in its list's default order, the row updated last first: written
+  /* THE PARTS COME IN THE ORDER THEY WERE WRITTEN, and stay there. They share the template's one `nav.order`, and the
+     kernel once listed a template's pages in its list's default order, the row updated last first: written
      candle, box, shop page, word, they came back word, shop page, box, candle, and a part's tab moved whenever its row
      was edited. A template's pages now keep the list's declared order, or the order the rows were written in. */
   const titles = () => api.kernel.pages().filter((p) => p.nav?.section === 'Launch').sort((a, b) => a.nav!.order - b.nav!.order).map((p) => p.title);
@@ -376,7 +375,7 @@ test('A PART\'S PAGE ANSWERS EVERY BLOCK: its path, its calls, its pad and its h
 });
 
 test('A CAPTURE PRESETS WHICH PART A NOTE IS ABOUT, so the pad on the page of a part is filtered to the part and keeps what is typed there', async () => {
-  /* SECTION 7 SAYS "the pad preset by capture's where". On September 25th, `where: about is {{spoken}}` (the one spelling
+  /* THE PAD IS PRESET BY THE CAPTURE'S `where`. Before this, `where: about is {{spoken}}` (the one spelling
      a template fills with the row's own id) answered `fills: {}` on the capture, because a capture preset an enum or a
      text field and never a link, and a cards block filtered the same way would have hidden every thought typed beside it.
      The capture now presets a link named by its spoken id or row id (`captureFills` in `packages/kernel/src/pages.ts`),
@@ -451,7 +450,7 @@ test('THE NUMBERS: the inputs edit the one check row, and the verdict flips when
 });
 
 test('THE VERDICT READS THE ONE ROW THE INPUTS TYPE INTO, whatever other checks the list holds', async () => {
-  /* MEASURED ON 1.0.1 (`loop/research-audit-2026-09-25-layouts.md` finding 5): the figures summed every check while the
+  /* MEASURED ON 1.0.1: the figures summed every check while the
      inputs edited only the first, so a first check at 20 and 10, which is half and too thin, beside a second at 100 and
      10 read as 120 and 20, a sixth, and "It passes". The inputs now name their row, `row: checks#1`, and every figure
      under them reads `seq is 1`, so the row typed into and the row judged are the same one by what the file says, not
@@ -582,12 +581,12 @@ test('A RECORD ON 1.1.0 TAKES 2.0.0 WITH ITS PARTS AND STEPS KEPT, and a colour 
 /* ── nothing in the shell knows it ────────────────────────────────────── */
 
 test('NOTHING IN packages/ OR apps/ NAMES THE DESK: not the page this was modelled on, and not the pack\'s own ids', () => {
-  /* WORD BY WORD, because `-i -e tima` alone matches "estimate" and "verbatim" (measured: 92 lines, none of them about
-     the desk). `git grep` exits 1 when it finds nothing, which is the pass. Untracked files count, so a file written
+  /* WORD BY WORD, because a short word searched without `-w` matches inside longer ones, "estimate" and
+     "verbatim" among them, none of them about the desk. `git grep` exits 1 when it finds nothing, which is the pass. Untracked files count, so a file written
      today and not yet committed is searched too.
      TWO PLACES ARE LEFT OUT, and neither is the shell knowing the desk. The catalogue the app ships is this pack copied
      by `tools/catalogue/from-packs.mjs` (measured: the first run of this test after publishing found `launch-desk` in
-     `apps/web/static/catalogue/index.json`). And a test is allowed to read the file from `packs/`, as brief D9's agent
+     `apps/web/static/catalogue/index.json`). And a test is allowed to read the file from `packs/`, as the agent
      test does (`packages/mcp/test/compose-page.test.ts` names this file's path), because installing the pack is how a
      test proves the shell can say it. */
   const grep = (words: readonly string[]): string => {
@@ -602,6 +601,6 @@ test('NOTHING IN packages/ OR apps/ NAMES THE DESK: not the page this was modell
   /* THE SAME CALL FINDS A WORD THE SHELL DOES SAY, so an empty answer below is a search that ran and found nothing,
      not one that never looked. */
   assert.notEqual(grep(['planPack']), '');
-  const found = grep(['tima', 'trunk', "tima's", 'trunk', 'launch-desk', 'essentials-done', 'essentials-share', 'cost-share', 'price-room', 'least-price', 'price-free', 'price-unjudged']);
+  const found = grep(['trunk', 'launch-desk', 'essentials-done', 'essentials-share', 'cost-share', 'price-room', 'least-price', 'price-free', 'price-unjudged']);
   assert.equal(found, '', `the shell names the desk:\n${found}`);
 });

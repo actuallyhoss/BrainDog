@@ -1,21 +1,20 @@
 /**
  * Live numbers, polled, as a pack file: one JSON address, a key named by its label in the vault, and which number in
- * the answer is which measure (`loop/research-legacy-parity.md` row 45 and brief B5; `loop/DIRECTION.md` sections
- * 22, 24 and 27).
+ * the answer is which measure.
  *
  * WHY A FILE AND NOT THE BUILDER IT REPEATS. `pollPack` in `packages/seed/src/usecases/founder-poll.ts` builds the
  * same declaration in code, and it requires the founder's use case, because that is where `datapoints` is declared
  * there. A record whose readings come from any other pack could not use it, and a feed that one person polls became
  * a use case compiled into the seed. This is the same declaration as a file anybody can read, with what a person
  * supplies named under `fill`. It names no pack it requires: it writes a list called `datapoints`, from whichever pack
- * declares it, and the last test holds the plan to refusing it on a record where no pack does. His own feeds are two
- * fills of it in the setup file he keeps beside his export, never files in the repository, so the only host the pack
+ * declares it, and the last test holds the plan to refusing it on a record where no pack does. A person's own feeds are
+ * fills of it in the setup file kept beside an export, never files in the repository, so the only host the pack
  * file names is `stats.example.com`.
  *
- * RED FIRST, MEASURED ON SEPTEMBER 25TH AGAINST `772c0be1`: with no `fill.ts` and no pack file this file did not load,
- * ERR_MODULE_NOT_FOUND on `./fill.ts`, which is the brief's red ("at HEAD the pack does not exist").
+ * RED FIRST, MEASURED: with no `fill.ts` and no pack file this file did not load,
+ * ERR_MODULE_NOT_FOUND on `./fill.ts`, the red of a pack that does not exist yet.
  *
- * THE KEY IS WHAT THE LAST TESTS ARE ABOUT, because a feed behind a key is the case the survey left unmeasured. The
+ * THE KEY IS WHAT THE LAST TESTS ARE ABOUT, because a feed behind a key is the case nothing else measures. The
  * address is a stand-in that answers 401 to a request without `Authorization: Bearer <key>` and 200 with it, and the
  * request goes through `sendAction` from `packages/host/src/actions.ts`, the loop both hosts send through, so the
  * header the address sees is the one a real host would send.
@@ -90,7 +89,7 @@ test('IT REQUIRES NO PACK BY NAME, and names no host but the example', () => {
  * THE DECLARATION IS THE ONE THE IMPORT FILES TODAY, BUT FOR ITS NAME. The setup file's `polls` are `PollSpec`s, which
  * `apps/cli/src/import.ts` hands to `pollPack`, so a spec that fills this file and builds the same poll there is the
  * proof that moving the import onto this file changes what is polled in nothing but the ingest's name and the pack's.
- * The spec is the synthetic setup's own poll (`packs/legacy-import/test/synthetic.ts`), with a project and a key.
+ * The spec is a synthetic setup file's poll, with a project and a key.
  */
 test('A SETUP FILE’S POLL FILLS IT AS IT STANDS, and the poll is the one the builder in the seed makes', () => {
   const setup: FeedSpec = {
