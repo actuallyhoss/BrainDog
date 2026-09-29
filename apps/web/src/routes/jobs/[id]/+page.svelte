@@ -1,16 +1,24 @@
 <!--
   One run: `/jobs/<id>`, its transcript while a machine works on it and after (`loop/finish/agents.md` AGT-23, C13).
 
-  THE TRANSCRIPT IS THE RUNNER'S DISTILLATION, one row per line it sent: a tool call with its result folded onto the
-  same row, what Claude said as prose, its thinking folded away, and the end. The header's status is read from the last
-  line (`headerStatus` in `lib/record/jobs.ts`), so the two never disagree for a poll.
+  THE TITLE ROW SAYS WHERE IT STANDS: the outcome as a dot and its word, then where it runs and since when, or how
+  long, where and in how many turns it ran. The word is red only for a failure or a machine gone quiet. The status is
+  read from the last line (`headerStatus` in `lib/record/jobs.ts`), so the sentence and the transcript never disagree
+  for a poll.
+
+  ONE TILE, "THIS RUN": its facts as a list, and once it has called tools, the tools it called as bars, busiest in ink,
+  with the line saying what that means. Nothing here is guessed: a fact the record did not send is not listed.
+
+  THE TRANSCRIPT IS ON THE GROUND, NOT IN A TILE (SYSTEM §6): the runner's distillation, one row per line it sent, each
+  with a well for its kind and the time it came in Geist Mono. A tool call carries its result folded onto the same row,
+  what Claude said is prose, its thinking is folded away, and the end says how it ended.
 
   IT ASKS EVERY `POLL_MS` WHILE THE RUN IS LIVE AND NEVER ONCE IT HAS ENDED. Each ask names the last line it holds, so
   the record answers only what is new; a full page means more are waiting, and it asks again at once rather than
   waiting a beat per page. Leaving the screen stops the asking.
 
-  STOP IS HERE WHILE THE RUN IS LIVE, and on a phone it sits at the foot of the screen, no taller than `--sticky`, where
-  a thumb finds it while the transcript scrolls. It stops a waiting run at once and flags a running one, which its
+  STOP IS HERE WHILE THE RUN IS LIVE, a quiet pill and never red, and on a phone it floats on glass at the foot of the
+  screen, no taller than `--sticky`, where a thumb finds it while the transcript scrolls. It stops a waiting run at once and flags a running one, which its
   machine reads within seconds; the status says "Stopping" until the machine has stopped.
 
   AN ID NAMING NO RUN SAYS SO, as an empty screen and not a failure: nothing failed, the address names nothing here.
@@ -44,9 +52,16 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Money from '$lib/ui/Money.svelte';
+  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
+  import Bars from '$lib/viz/Bars.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
+  import { outcomeOf, runTail, toolsOf, toolsSaid, words as runWords } from '../charts.ts';
 
   const id = $derived(String(route.params.id ?? ''));
   const base = $derived(apiBase(route.url));
@@ -155,11 +170,43 @@
 
   const title = $derived(row ? runName(row) : words.run1);
   const args = $derived(row ? Object.entries(row.args).filter(([, v]) => v !== '') : []);
+
+  /* WHAT THE RUN CALLED, from its own transcript, and when each line came in. */
+  const tally = $derived(toolsOf(steps));
+  const sentAt = $derived(new Map(events.map((e) => [e.seq, e.ts])));
+  /* RED ONLY FOR A FAILURE OR A MACHINE GONE QUIET: those are the two that need him. */
+  const red = $derived(said !== null && (said.tone === 'bad' || (lost && live)));
+  const outcome = $derived(status === null ? null : outcomeOf({ status }));
+
+  const STAMP = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+  const stampOf = (iso: string | undefined): string => {
+    const t = iso === undefined ? Number.NaN : Date.parse(iso);
+    return Number.isFinite(t) ? STAMP.format(t) : '';
+  };
+
+  /** A line's well: a tool call, prose, thinking, the start, the end as it went, a limit, a note or an error. */
+  function iconFor(s: { kind: string; status: JobStatus | null; tool: unknown }): IconName {
+    if (s.kind === 'tool') return 'code';
+    if (s.kind === 'think') return 'learning';
+    if (s.kind === 'start') return 'play';
+    if (s.kind === 'limit') return 'stop';
+    if (s.kind === 'note') return 'info';
+    if (s.kind === 'error') return 'alert';
+    if (s.kind === 'end') return s.status === 'ok' ? 'check' : s.status === 'cancelled' ? 'stop' : 'alert';
+    return 'doc';
+  }
 </script>
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
-<PageHead {title} kicker={words.heading} back="/jobs" />
+<!-- WHERE THE RUN STANDS, AS THE TITLE ROW'S SENTENCE: the outcome's dot and word, then where and since when or how
+     long. A live region, so a run that ends is heard to end. One line of markup, so no space lands before a stop. -->
+{#snippet sentence()}{#if status !== null && said !== null}<span class="state" data-intent={said.tone ?? undefined} data-outcome={outcome} role="status"
+      >{#if said.tone}<span class="dot glyph" role="img" aria-label={TONES[said.tone].label}>{TONES[said.tone].glyph}</span>{:else}<span class="dot" aria-hidden="true"
+        ></span>{/if}{#if red}<span class="state-word" data-needs>{said.word}</span>{:else}<span class="state-word">{said.word}</span>{/if}{runTail(status, lost, row)}</span
+    >{/if}{/snippet}
+
+<PageHead {title} kicker={words.heading} back="/jobs" sentence={status !== null && said !== null ? sentence : undefined} />
 
 <div class="page">
   {#if route.data.refused}
@@ -176,84 +223,102 @@
   {:else if status === null || said === null}
     <Waiting rows={4} />
   {:else}
-    <p class="state" data-intent={said.tone ?? undefined} role="status">
-      {#if live}<span class="pulse" aria-hidden="true"></span>{/if}
-      {#if said.tone}<span class="glyph" role="img" aria-label={TONES[said.tone].label}>{TONES[said.tone].glyph}</span>{/if}
-      {said.word}
-    </p>
-
-    {#if row}
-      <dl class="facts">
-        <div class="fact">
-          <dt>{words.machine}</dt>
-          <dd>{row.runner ?? words.noMachine}</dd>
-        </div>
-        <div class="fact">
-          <dt>{words.started}</dt>
-          <dd>{since(startedAt(row), now)}</dd>
-        </div>
-        {#if row.turns !== null}
-          <div class="fact">
-            <dt>{words.turnsLabel}</dt>
-            <dd>{row.turns}</dd>
-          </div>
-        {/if}
-        {#if row.ms !== null}
-          <div class="fact">
-            <dt>{words.took}</dt>
-            <dd>{duration(row.ms)}</dd>
-          </div>
-        {/if}
-        {#if args.length}
-          <div class="fact">
-            <dt>{words.args}</dt>
-            <dd>{args.map(([, v]) => v).join(', ')}</dd>
-          </div>
-        {/if}
-      </dl>
-    {/if}
-
-    {#if steps.length === 0}
-      <p class="none">{words.empty}</p>
-    {:else}
-      <ol class="transcript">
-        {#each steps as s (s.seq)}
-          <li class="step" data-kind={s.kind}>
-            {#if s.kind === 'tool' && s.tool}
-              <!-- A TOOL ROW: its name on its own line on a phone and in a fixed track from 640 up, what it was called
-                   with beside it, and the result folded under it once the result has come. -->
-              <div class="call">
-                <span class="call-name">{s.tool.name}</span>
-                <code class="call-input">{s.text}</code>
+    {#if row || tally.calls > 0}
+      <Tile icon="session" title={runWords.runTitle}>
+        {#if row}
+          <!-- THE FACTS ARE A PURE LIST, meta words over their values, two to a line where there is room. -->
+          <dl class="facts">
+            <div class="fact">
+              <dt>{words.machine}</dt>
+              <dd>{row.runner ?? words.noMachine}</dd>
+            </div>
+            <div class="fact">
+              <dt>{words.started}</dt>
+              <dd>{since(startedAt(row), now)}</dd>
+            </div>
+            {#if row.ms !== null}
+              <div class="fact">
+                <dt>{words.took}</dt>
+                <dd class="num">{duration(row.ms)}</dd>
               </div>
-              {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
-              {#if s.tool.out}
-                <details class="out" data-failed={s.tool.out.failed ? '' : undefined}>
-                  <summary class="out-head tap">{s.tool.out.failed ? words.failed : words.result}</summary>
-                  <pre class="out-text">{s.tool.out.text}</pre>
-                  {#if s.tool.out.cut !== null}<p class="cut">{words.cutAt(s.tool.out.cut)}</p>{/if}
-                </details>
-              {/if}
-            {:else if s.kind === 'think'}
-              <details class="out">
-                <summary class="out-head tap">{words.thinking}</summary>
-                <p class="think">{s.text}</p>
-              </details>
-            {:else if s.kind === 'out'}
-              <pre class="out-text">{s.text}</pre>
-            {:else if s.kind === 'end' && s.status !== null}
-              {@const ended = statusOf(s.status)}
-              <p class="end" data-intent={ended.tone ?? undefined}>
-                <span class="end-word">{ended.word}</span>{#if s.text}. {s.text}{/if}
-              </p>
-            {:else}
-              <p class="say">{s.text}</p>
-              {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
             {/if}
-          </li>
-        {/each}
-      </ol>
+            {#if row.turns !== null}
+              <div class="fact">
+                <dt>{words.turnsLabel}</dt>
+                <dd class="num">{row.turns}</dd>
+              </div>
+            {/if}
+            {#if row.cost_minor !== null && row.cost_currency !== null}
+              <div class="fact">
+                <dt>{runWords.cost}</dt>
+                <dd><Money minor={row.cost_minor} currency={row.cost_currency} /></dd>
+              </div>
+            {/if}
+            {#if args.length}
+              <div class="fact fact-wide">
+                <dt>{words.args}</dt>
+                <dd>{args.map(([, v]) => v).join(', ')}</dd>
+              </div>
+            {/if}
+          </dl>
+        {/if}
+        {#if tally.calls > 0}
+          <Bars items={tally.items} subject={runWords.toolsSubject} />
+          <p class="reading">{toolsSaid(tally)}</p>
+        {/if}
+      </Tile>
     {/if}
+
+    <Section title={runWords.transcript} count={steps.length}>
+      {#if steps.length === 0}
+        <p class="none">{words.empty}</p>
+      {:else}
+        <ol class="transcript">
+          {#each steps as s (s.seq)}
+            {@const ended = s.kind === 'end' && s.status !== null ? statusOf(s.status) : null}
+            <li class="step" data-kind={s.kind}>
+              <IconWell name={iconFor(s)} size="l" tone={s.kind === 'error' || ended?.tone === 'bad' ? 'danger' : undefined} />
+              <div class="step-body">
+                {#if s.kind === 'tool' && s.tool}
+                  <!-- A TOOL ROW: its name on its own line on a phone and in a fixed track from 640 up, what it was
+                       called with beside it, and the result folded under it once the result has come. -->
+                  <div class="call">
+                    <span class="call-name">{s.tool.name}</span>
+                    <code class="call-input">{s.text}</code>
+                  </div>
+                  {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
+                  {#if s.tool.out}
+                    <details class="out" data-failed={s.tool.out.failed ? '' : undefined}>
+                      <summary class="out-head tap">{s.tool.out.failed ? words.failed : words.result}</summary>
+                      <pre class="out-text">{s.tool.out.text}</pre>
+                      {#if s.tool.out.cut !== null}<p class="cut">{words.cutAt(s.tool.out.cut)}</p>{/if}
+                    </details>
+                  {/if}
+                {:else if s.kind === 'think'}
+                  <details class="out">
+                    <summary class="out-head tap">{words.thinking}</summary>
+                    <p class="think">{s.text}</p>
+                  </details>
+                {:else if s.kind === 'out'}
+                  <pre class="out-text">{s.text}</pre>
+                {:else if ended !== null}
+                  <p class="end" data-intent={ended.tone ?? undefined}>
+                    {#if ended.tone}<span class="glyph" role="img" aria-label={TONES[ended.tone].label}>{TONES[ended.tone].glyph}</span>{/if}<span
+                      class="end-word">{ended.word}</span
+                    >{#if s.text}. {s.text}{/if}
+                  </p>
+                {:else}
+                  <p class="say">{s.text}</p>
+                  {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
+                {/if}
+              </div>
+              <!-- THE MINUTE IT CAME IN, in Geist Mono as a feed's times are (SYSTEM §3). -->
+              {#if sentAt.get(s.seq)}<time class="step-at" datetime={sentAt.get(s.seq)}>{stampOf(sentAt.get(s.seq))}</time>{/if}
+            </li>
+          {/each}
+        </ol>
+      {/if}
+    </Section>
 
     {#if live || stopFix}
       <div class="stop-bar">
@@ -270,73 +335,74 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--sp-5);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
     /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), and each line of prose keeps `--measure` below. */
     max-inline-size: var(--page-max);
   }
 
+  /* ── the sentence ── */
+
   .state {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
+    display: inline;
+  }
+
+  .state-word {
     color: var(--ink);
-    font-size: var(--t-base);
     font-weight: 500;
   }
 
-  .state[data-intent='info'] .glyph {
-    color: var(--info);
-  }
-
-  .state[data-intent='warn'] .glyph {
-    color: var(--warn);
-  }
-
-  .state[data-intent='bad'] .glyph {
-    color: var(--danger);
-  }
-
-  /* THE PULSE IS THE LIVE RUN'S DOT, and the word beside it says what it means (design-brief §10). */
-  .pulse {
+  /* THE OUTCOME DOT, as the list draws it: done in ink, running in the live hue, a look in amber, failed in red, and
+     waiting or stopped in the quiet ink. It holds still: nothing pulses (SYSTEM §8). */
+  .dot {
     display: inline-block;
-    inline-size: 8px;
-    block-size: 8px;
+    inline-size: 6px;
+    block-size: 6px;
+    margin-inline-end: var(--sp-2);
+    overflow: hidden;
     border-radius: var(--r-pill);
-    background: var(--info);
-    animation: run-pulse 1.6s var(--ease-out) infinite;
+    background: var(--dim);
+    color: transparent;
+    text-indent: 100%;
+    white-space: nowrap;
+    vertical-align: 0.2em;
   }
 
-  @keyframes run-pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-
-    50% {
-      opacity: 0.35;
-    }
+  .state[data-outcome='done'] .dot {
+    background: var(--ink);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .pulse {
-      animation: none;
-    }
+  .state[data-intent='info'] .dot {
+    background: var(--live);
   }
 
-  /* LABEL ABOVE VALUE ON A PHONE, a label column at 16ch from 640 up (design-brief §5). */
+  .state[data-intent='warn'] .dot {
+    background: var(--warn);
+  }
+
+  .state[data-intent='bad'] .dot {
+    background: var(--danger);
+  }
+
+  /* ── this run ── */
+
+  /* META WORDS OVER THEIR VALUES, as many to a line as fit, and the arguments across the whole line. */
   .facts {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-2);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+    gap: var(--sp-3) var(--sp-4);
     margin: 0;
   }
 
   .fact {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .fact-wide {
+    grid-column: 1 / -1;
   }
 
   .fact dt {
@@ -347,16 +413,20 @@
   .fact dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
+    font-weight: 500;
     overflow-wrap: anywhere;
   }
 
-  @media (min-width: 640px) {
-    .fact {
-      grid-template-columns: 16ch minmax(0, 1fr);
-      gap: var(--sp-3);
-    }
+  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6). */
+  .reading {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
+
+  /* ── the transcript, on the ground ── */
 
   .none {
     margin: 0;
@@ -373,16 +443,46 @@
     list-style: none;
   }
 
+  /* A WELL, THE LINE, AND ITS TIME AT THE RIGHT. The time drops under the line on a phone, where the width is the line's. */
   .step {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    padding-block: var(--sp-2);
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--sp-3);
+    padding-block: var(--sp-3);
     min-inline-size: 0;
   }
 
   .step + .step {
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .step-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    padding-block-start: 6px;
+  }
+
+  .step-at {
+    padding-block-start: 7px;
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  @media (width < 640px) {
+    .step {
+      grid-template-columns: var(--well-l) minmax(0, 1fr);
+    }
+
+    .step-at {
+      grid-column: 2;
+      padding-block-start: 0;
+    }
   }
 
   /* A TOOL'S NAME ON ITS OWN LINE ON A PHONE, and in a fixed track beside its input from 640 up, so the calls read
@@ -402,7 +502,7 @@
 
   .call-name {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-row);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
@@ -420,7 +520,8 @@
   .end {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     max-inline-size: var(--measure);
@@ -433,7 +534,7 @@
   .step[data-kind='note'] .say,
   .step[data-kind='start'] .say,
   .step[data-kind='limit'] .say {
-    color: var(--dim);
+    color: var(--ink2);
     font-size: var(--t-sm);
   }
 
@@ -441,16 +542,17 @@
     color: var(--danger);
   }
 
+  .end .glyph {
+    margin-inline-end: var(--sp-2);
+    vertical-align: 0.15em;
+  }
+
   .end-word {
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .end[data-intent='bad'] .end-word {
     color: var(--danger);
-  }
-
-  .end[data-intent='warn'] .end-word {
-    color: var(--warn);
   }
 
   .out {
@@ -463,6 +565,7 @@
     align-items: center;
     inline-size: fit-content;
     min-block-size: var(--ctl-h-sm);
+    font-weight: 500;
     cursor: pointer;
   }
 
@@ -470,11 +573,13 @@
     color: var(--danger);
   }
 
+  /* WHAT A TOOL ANSWERED, AS IT CAME: monospace on the tile's own white, rounded as a field is, scrolling inside
+     itself rather than the page. */
   .out-text {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-sm);
-    background: var(--s2);
+    border-radius: var(--r-md);
+    background: var(--bg);
     color: var(--ink);
     font-family: var(--font-id);
     font-size: var(--t-sm);
@@ -490,8 +595,7 @@
     font-size: var(--t-sm);
   }
 
-  /* STOP, AT THE FOOT WHILE THE RUN IS LIVE: sticky on a phone, no taller than `--sticky`, and in the flow from 900 up
-     where the whole screen is in reach. */
+  /* STOP, AT THE FOOT WHILE THE RUN IS LIVE: in the flow from 900 up, where the whole screen is in reach. */
   .stop-bar {
     display: flex;
     flex-wrap: wrap;
@@ -506,18 +610,32 @@
     max-inline-size: var(--measure);
   }
 
-  /* ABOVE THE TAB BAR, NOT UNDER IT: below 900 the shell's scroller runs to the bottom of the window and `TabBar` is
-     fixed over its last `--tabbar`, so a bar stuck to 0 was drawn behind it, as the automation screen's footer says. */
+  /* ABOVE THE TAB BAR, NOT UNDER IT, AND ON GLASS: below 900 the shell's scroller runs to the bottom of the window and
+     `TabBar` floats over its last `--tabbar`, so the bar sticks just above it as chrome does (SYSTEM §4, level 2). */
   @media (width < 900px) {
     .stop-bar {
       position: sticky;
-      inset-block-end: var(--tabbar);
+      inset-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-2));
       z-index: var(--z-raise);
       min-block-size: var(--sticky);
       max-block-size: var(--sticky);
-      background: var(--bg);
-      border-block-start: 1px solid var(--line-soft);
+      padding-inline: var(--sp-3);
+      background: var(--glass);
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+      border-radius: var(--r-lg);
+      box-shadow: var(--glass-edge), var(--e2);
       overflow: hidden;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .dot {
+      background: CanvasText;
+    }
+
+    .stop-bar {
+      border: 1px solid CanvasText;
     }
   }
 </style>

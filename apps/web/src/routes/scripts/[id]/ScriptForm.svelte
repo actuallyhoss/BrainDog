@@ -3,9 +3,10 @@
   (`loop/finish/shell.md` SCR-3).
 
   THE HEADER FIRST, THEN THE SOURCE, THEN WHAT A RUN WOULD DO. The header is what the owner approves (what starts it,
-  where it fetches from, which keys it sends, which lists it reads and writes), so it is a form of pickers and never
-  text a person has to get the grammar of right. The source is a monospace box with tab handling and no editor
-  dependency. What a trial answered sits beside the source at 900px and up, and under it on a phone, full width.
+  where it fetches from, which keys it sends, which lists it reads and writes), so it is a group of pickers on the
+  ground and never text a person has to get the grammar of right. The source is a tile holding a monospace field, with
+  tab handling and no editor dependency; what a trial answered is a tile of its own, beside the source at 900px and up
+  and under it on a phone, full width. A field inside a tile is a field (the tile's inner fill), never a tile.
 
   ONE PRIMARY. The owner's is "Save and turn on", which files the change and accepts it in one press; anyone else's is
   "Send to Decide", which files it for the owner. "Try it" runs the draft once and writes nothing.
@@ -23,6 +24,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
 
   let {
@@ -244,33 +246,35 @@
   </Section>
 
   <div class="work">
-    <Section title={words.source}>
-      {#if !found && draft.source === ''}<p class="help">{words.notFound}</p>{/if}
-      <label class="label" for="script-source">{words.sourceLabel}</label>
-      <textarea
-        id="script-source"
-        class="code"
-        aria-describedby="script-source-help"
-        aria-invalid={faultAt('source') ? 'true' : undefined}
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        wrap="off"
-        data-wrong={faultAt('source') ? '' : undefined}
-        bind:value={draft.source}
-        onkeydown={onSourceKey}
-      ></textarea>
-      <p class="help" id="script-source-help" class:wrong={faultAt('source') !== null}>{faultAt('source') ?? words.sourceHelp}</p>
+    <Tile icon="code" title={words.source}>
+      <div class="box">
+        {#if !found && draft.source === ''}<p class="help">{words.notFound}</p>{/if}
+        <label class="label" for="script-source">{words.sourceLabel}</label>
+        <textarea
+          id="script-source"
+          class="code"
+          aria-describedby="script-source-help"
+          aria-invalid={faultAt('source') ? 'true' : undefined}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          wrap="off"
+          data-wrong={faultAt('source') ? '' : undefined}
+          bind:value={draft.source}
+          onkeydown={onSourceKey}
+        ></textarea>
+        <p class="help" id="script-source-help" class:wrong={faultAt('source') !== null}>{faultAt('source') ?? words.sourceHelp}</p>
 
-      {#if draft.door !== ''}
-        <label class="label" for="script-input">{words.input}</label>
-        <textarea id="script-input" class="code code-sm" autocomplete="off" autocapitalize="off" spellcheck="false" wrap="off" bind:value={input}></textarea>
-        <p class="help">{words.inputHelp}</p>
-      {/if}
-    </Section>
+        {#if draft.door !== ''}
+          <label class="label" for="script-input">{words.input}</label>
+          <textarea id="script-input" class="code code-sm" autocomplete="off" autocapitalize="off" spellcheck="false" wrap="off" bind:value={input}></textarea>
+          <p class="help">{words.inputHelp}</p>
+        {/if}
+      </div>
+    </Tile>
 
-    <Section title={words.tried}>
-      <div aria-live="polite">
+    <Tile icon="play" title={words.tried}>
+      <div class="box" aria-live="polite">
         {#if tried === null}
           <p class="help">{words.triedNone}</p>
         {:else if tried.kind === 'not-run' || tried.kind === 'held'}
@@ -294,7 +298,7 @@
           <p class="help">{tried.spent}</p>
         {/if}
       </div>
-    </Section>
+    </Tile>
   </div>
 
   {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
@@ -333,11 +337,19 @@
     border: 0;
   }
 
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink (SYSTEM §6, fields). */
   .label {
     padding: 0;
-    color: var(--ink);
+    color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
+  }
+
+  /* A TILE'S OWN LINES, closer together than the tile's gap: a label sits on its field, the help under it. */
+  .box {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
   .sub {
@@ -358,10 +370,11 @@
     color: var(--danger);
   }
 
+  /* A FIELD WITH A FAULT IN IT: a red edge drawn inside it, since a field has no border to colour (SYSTEM §6). */
   .field[data-wrong],
   .lines[data-wrong],
   .code[data-wrong] {
-    border-color: var(--danger);
+    box-shadow: inset 0 0 0 1.5px var(--danger);
   }
 
   .switch-line {
@@ -375,6 +388,7 @@
     font-size: var(--t-base);
   }
 
+  /* A FIELD IS THE INNER FILL WITH NO BORDER, rounded 12, on the ground and inside a tile alike (SYSTEM §6). */
   .lines,
   .code {
     box-sizing: border-box;
@@ -382,7 +396,7 @@
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font-size: var(--t-md);
@@ -398,7 +412,6 @@
   /* THE SOURCE KEEPS ITS LINES. It scrolls sideways inside its own box, never the page, and holds its indentation. */
   .code {
     min-block-size: calc(var(--sp-9) * 4);
-    background: var(--sunk);
     font-family: var(--font-id);
     white-space: pre;
     overflow-x: auto;
@@ -409,11 +422,11 @@
     min-block-size: var(--sp-9);
   }
 
+  /* FOCUS IS THE 2PX INK RING OFFSET 2, as on every other field (SYSTEM §6). */
   .lines:focus-visible,
   .code:focus-visible {
-    outline: 1px solid var(--ink2);
-    outline-offset: -1px;
-    box-shadow: 0 0 0 3px var(--focus-halo);
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
   }
 
   .picks {
@@ -436,7 +449,7 @@
      the source the wider, so a trial is read beside the lines that made it. */
   .work {
     display: grid;
-    gap: var(--sp-6);
+    gap: var(--inset);
     min-inline-size: 0;
   }
 
@@ -444,7 +457,6 @@
     .work {
       grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
       align-items: start;
-      gap: var(--sp-6);
     }
   }
 
@@ -475,7 +487,7 @@
   .log {
     margin: 0;
     padding: var(--sp-3);
-    background: var(--sunk);
+    background: var(--s1);
     border-radius: var(--r-md);
     color: var(--ink2);
     font-family: var(--font-id);

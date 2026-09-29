@@ -86,7 +86,7 @@
 
 <style>
   .page {
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 </style>
