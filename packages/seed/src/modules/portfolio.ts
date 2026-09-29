@@ -119,10 +119,12 @@ export const THINGS: Fields[] = [
      an invoice whose terms ran out 38 days ago. Portage started in May of this year and has earned nothing
      either year. Tallow earned in the year before and nothing since, which is what "park it or retire it"
      looks like as a pair of numbers, and it is out of every figure below because it is out of play. */
-  { name: 'Kiln', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
-  { name: 'Marlow & Co', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
-  { name: 'Portage', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
-  { name: 'Tallow', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
+  /* AND WHAT EACH ONE IS, IN A LINE, since portfolio 1.6.0: the words under a project's name on the Overview's cards, so a
+     list of names says which is the type family and which is the client's site without opening any of them. */
+  { name: 'Kiln', about: 'A variable type family, licensed direct', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['git.kiln.example/type/kiln-type', 'git.kiln.example/type/kiln-site'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'] },
+  { name: 'Marlow & Co', about: 'A brand system and site, made for a client', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['git.marlow.example/brand/marlow-site'], folders: ['/Users/studio/Clients/marlow'] },
+  { name: 'Portage', about: 'A newsletter, and the site it sends from', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'] },
+  { name: 'Tallow', about: 'A display face that never shipped', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git.kiln.example/type/tallow'] },
 ];
 
 /**
@@ -154,6 +156,10 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
     scopes: { repos: 'repos', folders: 'folders' },
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
+      /* WHAT IT IS, IN A LINE, SINCE portfolio 1.6.0: "a variable type family, licensed direct". Drawn under the name on
+         the Overview's cards, where a column of bare names said nothing to somebody who had not opened each one. Text
+         and optional, so every project already written stays valid and an importer fills it where its source says. */
+      { id: 'about', label: 'About', type: 'text', search: true },
       { id: 'lane', label: 'Status', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], index: true, required: true },
       /**
        * WHAT IT EARNS, OVER WHICH TWELVE MONTHS, AND WHAT THE TWELVE BEFORE THEM EARNED.
@@ -227,7 +233,10 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   /* ── the portfolio, over Projects alone ─────────────────────────────────────
      Every figure here reads the projects list and nothing else, so the Overview works on a record that keeps only
      projects: a student's passion projects, a founder's apps, a team's products, or one new project and its plan. */
-  'projects-live': counted('projects-live', 'In play', LIVE),
+  /* REMEMBERED EACH NIGHT, SINCE portfolio 1.6.0, so the tile draws how many are in play over twelve weeks as a line
+     (`trend: 12w` on the Overview), the way Cash now and Open tasks do. A record draws the line once it has run a
+     night; before that the tile is the figure alone. */
+  'projects-live': { ...counted('projects-live', 'In play', LIVE), snapshot: { grain: 'day', into: 'series.projects-live' } },
   /* WHAT NEEDS A PERSON: a project somebody, or its agent, said is at risk or off track. */
   'projects-need-you': counted('projects-need-you', 'Need you', `${LIVE}, health is at_risk or off_track`, { lte: 0 }),
   'projects-with-agent': counted('projects-with-agent', 'With an agent', `${LIVE}, agent is set`),
@@ -237,6 +246,11 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   'projects-retired': counted('projects-retired', 'Finished', 'lane is retired'),
   /* HOW THE PROJECTS IN PLAY ARE GOING, as parts of one whole, with the ones nobody has said about as their own part. */
   'projects-by-health': { ...counted('projects-by-health', 'How they are going', LIVE), group_by: 'health' },
+  /* EVERY PROJECT BY ITS STATUS, SINCE portfolio 1.6.0: one track cut into earning, building, parked and finished, so the
+     Overview says in one line where the projects are before it lists any of them. Over every project and not only
+     those in play, because a strip of the whole is what says how much of it is parked. `lane` is required, so no
+     project is in no part. */
+  'projects-by-lane': { ...counted('projects-by-lane', 'Where they are', 'lane is set'), group_by: 'lane' },
 
   /* ── what they earn ───────────────────────────────────────────────────────
      OVER PROJECTS ALONE, AND THAT IS NOT A PREFERENCE. The Portfolio pack needs no other list, and
@@ -308,6 +322,9 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     target: { gte: 0 },
     window: '12m',
     compare: 'none',
+    /* REMEMBERED EACH NIGHT, SINCE portfolio 1.6.0, for the Earning tile's line: what the projects say they earn moves
+       when somebody writes a new year onto one, and the line is where that shows. */
+    snapshot: { grain: 'day', into: 'series.projects-earning' },
   },
 
   'projects-earning-before': {
@@ -483,6 +500,53 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+
+  /* ── this month so far, on one project ───────────────────────────────────
+     WHAT CAME IN, WHAT WENT OUT AND WHAT WAS KEPT SINCE THE FIRST OF THE MONTH, SINCE money-core 3.2.0: the three
+     figures a project page leads its money with, beside the twelve months under them. The clauses of the two by-month
+     figures above, cut at the first of this month instead of thirteen months back and added up whole rather than by
+     month, so the month in the chart and these three are one set of rows. Filed with Money by the list they read, and
+     left off the page on a record that keeps no Money (`projectTemplate`).
+
+     KEPT IS ONE FIGURE AND NOT A SUBTRACTION ON THE PAGE, for the reason `projects-earning-change` gives: the amount is
+     signed by its direction (`LOOKUPS.sign`) and added up once, so money in one currency and out in another is answered
+     as parts or converted at the record's rates, never subtracted as two bare numbers. */
+  'project-in-month': {
+    metric: 'project-in-month',
+    name: 'In this month',
+    source: 'register.transactions',
+    where: 'thing is {{it}}, state is cleared, transfer is false, direction is in, on at least bom',
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'project-out-month': {
+    metric: 'project-out-month',
+    name: 'Out this month',
+    source: 'register.transactions',
+    where: 'thing is {{it}}, state is cleared, transfer is false, direction is out, on at least bom',
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'project-kept-month': {
+    metric: 'project-kept-month',
+    name: 'Kept this month',
+    source: 'register.transactions',
+    where: 'thing is {{it}}, state is cleared, transfer is false, on at least bom',
+    value: { sum: { product: ['amount', { lookup: 'sign', by: 'direction' }] } },
+    lookups: { sign: LOOKUPS.sign! },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
 };
 
 /**
@@ -517,17 +581,47 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     requires: ['register.things'],
     pack: 'portfolio',
     blocks: [
+      /* THE OPENING SENTENCE, SAID FROM THE FIGURES, SINCE portfolio 1.6.0: the line under the page's title, and the one
+         thing read before any tile. Two notes on the one figure, so exactly one of them draws: how many projects somebody
+         said are not going well, or that none is. `project(s) are` is settled by the count before it, so one project
+         "is" and two "are". Words from the figures only: which project is sliding and why is an agent's reading, and it
+         arrives as a question in Decide, not as a sentence a page makes up. */
       {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'projects-need-you', gt: 0 },
+        body: '{{projects-need-you}} project(s) in play are at risk or off track.',
+      },
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'projects-need-you', is: 0 },
+        body: 'Nothing needs you. Every project in play is on track, or nobody has said otherwise.',
+      },
+      {
+        /* IN PLAY CARRIES ITS TWELVE WEEKS AS A LINE, SINCE portfolio 1.6.0, read from the figure's own nightly series. */
         kind: 'stat',
         lead: true,
         heading: 'Right now',
         span: 12,
         cells: [
-          { metric: 'projects-live', label: 'In play', note: '{{projects-with-agent}} with an agent' },
+          { metric: 'projects-live', label: 'In play', trend: '12w', note: '{{projects-with-agent}} with an agent' },
           { metric: 'projects-need-you', label: 'Need you', note: 'at risk or off track' },
           { metric: 'projects-aim-30d', label: 'Aiming within 30 days', note: '{{projects-past-aim}} past their day' },
           { metric: 'projects-parked', label: 'Parked', note: '{{projects-retired}} finished' },
         ],
+      },
+      {
+        /* WHERE THEY ARE, AS ONE TRACK, SINCE portfolio 1.6.0: every project by its status, earning, building, parked and
+           finished, the parts of one whole with each labelled on the track. It reads Projects alone, as every block on
+           this page does. */
+        kind: 'split',
+        heading: 'Where they are',
+        span: 12,
+        source: 'metric.projects-by-lane',
+        empty: 'No project is written down yet.',
       },
       {
         /* THE QUEUE: what somebody said is not going well, what is next, and who said it last, so a person sees whether
@@ -558,11 +652,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'No project is in play.',
       },
       {
-        /* WHAT EACH ONE EARNS, AS BARS, because the question a person asks of a portfolio after "what
-           needs me" is "which of these is carrying the others". A total says the studio earned
-           GBP 22,600 and hides that one project is 81 per cent of it. Two columns, so the bar is the
-           name against the money and nothing else. */
-        kind: 'bar',
+        /* WHAT EACH ONE EARNS, because the question a person asks of a portfolio after "what needs me" is "which of
+           these is carrying the others". A total says the studio earned GBP 22,600 and hides that one project is 81 per
+           cent of it. Two columns, so each part is the name against the money and nothing else.
+
+           ONE TRACK CUT INTO PARTS, SINCE portfolio 1.6.0, where it was a bar a project: the question is a share of one
+           whole, and a split says "81 per cent" by its length where bars side by side only say which is longest. The
+           rows, the order, the empty line and the heading are the bar's. */
+        kind: 'split',
         heading: 'What each one earns',
         span: 8,
         source: 'register.things',
@@ -590,7 +687,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         heading: 'Earning',
         span: 4,
         cells: [
-          { metric: 'projects-earning', label: 'Earned in a year', note: '{{projects-earning-before}} the year before, from {{projects-earning-said}} of {{projects-live}} in play' },
+          { metric: 'projects-earning', label: 'Earned in a year', trend: '12w', note: '{{projects-earning-before}} the year before, from {{projects-earning-said}} of {{projects-live}} in play' },
           { metric: 'projects-earning-change', label: 'Against that year' },
         ],
       },
@@ -600,8 +697,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.things',
         where: LIVE,
+        /* EACH CARD WEARS THE PROJECT'S OWN MARK IN ITS OWN HUE, SINCE portfolio 1.6.0, the identity the list declares
+           (`identity: { mark, accent }`), and says what the project is under its name (`about`, drawn as the quieter
+           line under a title). Neither is a fact, so the three facts below are unchanged. */
         columns: [
           { field: 'name', as: 'title' },
+          { field: 'mark', as: 'mark' },
+          { field: 'hue', as: 'hue' },
+          { field: 'about', as: 'reply' },
           { field: 'progress', label: 'How far along', as: 'ring' },
           { field: 'health', label: 'Health', as: 'fact' },
           /* NO LABEL, as the project page's first column carries none: a personal record renames
@@ -719,6 +822,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * `parked` and `retired` projects get no page. A rail with a page for something nobody is working
    * on is a rail you stop reading.
    */
+  /**
+   * THE SHAPE OF IT SINCE portfolio 1.6.0, AS THE BOARD FOR A PROJECT DRAWS IT (`loop/design/SCREENS.md`, Project page): the
+   * open work tallied by priority above the list of it, what came in, went out and was kept this month beside the twelve
+   * months, the dated work as a strip of weeks above the plan's time axis, and what it runs on as cards in the rail with
+   * what each costs and when it renews. Twenty-one blocks, so a use case can add three of its own under the ceiling of
+   * twenty-four a page may declare (`usecases/founder.ts` adds exactly three).
+   */
   project: {
     page: 'project',
     title: '{{name}}',
@@ -768,6 +878,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'governance.open',
         where: 'about is {{spoken}}',
         limit: 3,
+        /* ONE TILE A QUESTION, SINCE portfolio 1.6.0, led by what its recommended answer shows, the ways to answer under
+           it: a decision about a project is read as its options, not as a line in a list. */
+        tiles: true,
       },
       {
         /* WHERE IT STANDS, as whoever works on it last said: how it is going, what is next, how far along, and the agent
@@ -786,6 +899,22 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         limit: 1,
         empty: 'Nobody has said where {{name}} stands yet.',
+      },
+      {
+        /* WHAT IS OPEN ON IT, COUNTED BY HOW SOON IT MATTERS, SINCE portfolio 1.6.0: urgent, high, normal and low as a
+           tally above the list, so "one of them is urgent" is read before any row. A count of the rows by the first
+           column, over Open's own clauses (`project-open`), and a task nobody gave a priority is counted as unset rather
+           than left out, so the chips add up to Open. Over Work's tasks, which a project page always has. */
+        kind: 'chips',
+        heading: 'Open, by priority',
+        span: 12,
+        source: 'register.tasks',
+        where: 'thing is {{name}}, state is not backlog or done or dropped',
+        columns: [{ field: 'priority' }],
+        /* THE ROWS IT COUNTS IN THE ORDER THE LIST BELOW READS THEM, so a reader that draws the rows and one that only
+           counts them are handed the same rows in the same order. */
+        order: [{ field: 'by', dir: 'asc' }],
+        empty: 'Nothing is open on {{name}}.',
       },
       {
         /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last.
@@ -809,7 +938,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'todo',
         heading: 'What is open',
         span: 5,
-        columns: [{ field: 'what' }, { field: 'by' }],
+        /* ITS PRIORITY AND THE AGENT ON IT AS THE LINE UNDER EACH TASK, SINCE portfolio 1.6.0, the two facts a todo row
+           draws after its due day: "high · claude" says which one to look at and whether anybody already is. */
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'priority' }, { field: 'agent' }],
         source: 'register.tasks',
         where: 'thing is {{name}}, state is open or doing',
         order: [{ field: 'by', dir: 'asc' }],
@@ -844,6 +975,21 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing about {{name}} has changed yet.',
       },
       {
+        /* ITS DATES AS WEEKS, SINCE portfolio 1.6.0: this month and the next as a grid of days, each day naming the tasks
+           due on it, then the days that hold anything as a list. The same tasks the plan below draws on its time axis,
+           read first, because "what is due when" is asked before "how long each takes". Only when a task has a day. */
+        kind: 'calendar',
+        heading: 'Dates',
+        span: 12,
+        source: 'register.tasks',
+        where: 'thing is {{name}}, by is set, state is not done or dropped',
+        columns: [{ field: 'what' }, { field: 'by' }],
+        back: 0,
+        ahead: 1,
+        when: { metric: 'project-dated:{{name}}', gt: 0 },
+        empty: 'Nothing on {{name}} is due this month or next.',
+      },
+      {
         /* ITS PLAN ON A TIME AXIS: each task in play with a day, as a window as long as its effort ending on that day, or a
            line on the day where it has no effort. Drawn only when the project has such a task (`project-dated`), so a
            project nobody has planned in days says nothing about a plan rather than showing an empty axis. */
@@ -863,12 +1009,27 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'No task on {{name}} has a day yet.',
       },
       {
+        /* THIS MONTH SO FAR, SINCE portfolio 1.6.0: what came in, what went out and what was kept since the first, beside
+           the twelve months it is the newest of. Three figures over Money's transactions, so a record that keeps no Money
+           has neither this nor the chart (`projectTemplate` takes a row of figures out whole when every one of them
+           reads a list the record does not hold). */
+        kind: 'stat',
+        heading: 'This month so far',
+        span: 5,
+        cells: [
+          { metric: 'project-in-month:{{name}}', label: 'In' },
+          { metric: 'project-out-month:{{name}}', label: 'Out' },
+          { metric: 'project-kept-month:{{name}}', label: 'Kept' },
+        ],
+      },
+      {
         /* ITS MONEY MONTH BY MONTH, in and out, from what moved in the twelve months to now, with what was left each month
            as a line. Read from Money's transactions, so a record that keeps no Money has the page without it
-           (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does. */
+           (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does.
+           SEVEN BESIDE THE MONTH'S FIVE, SINCE portfolio 1.6.0. */
         kind: 'series',
         heading: 'Money by month',
-        span: 12,
+        span: 7,
         series: [
           { metric: 'project-in-by-month:{{name}}', label: 'Money in' },
           { metric: 'project-out-by-month:{{name}}', label: 'Money out', dir: 'out' },
@@ -880,9 +1041,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       {
         kind: 'table',
         heading: 'Money',
-        /* EIGHT, beside the 4 that keeps it running: `floorFor` gives a table two twelfths a column so its cells do not
-           truncate, so three columns need six, and eight leaves the description room. */
-        span: 8,
+        /* THE WHOLE WIDTH, SINCE portfolio 1.6.0, when what keeps it running moved to the rail as cards. It was eight
+           beside that block's four. */
+        span: 12,
         source: 'register.obligations',
         where: 'thing is {{name}}',
         /* THE AMOUNT CARRIES ITS OWN SIGN, because this block holds money in and money out, and a column of unsigned
@@ -898,15 +1059,23 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing owed either way on {{name}}.',
       },
       {
-        kind: 'spec',
+        /* WHAT KEEPS IT RUNNING, AS CARDS IN THE RAIL, SINCE portfolio 1.6.0: one card a service, its name, what it costs
+           a cycle and which cycle, the day it renews, and what the service's own note says about it ("the only copy of
+           the binaries"). It was a two-column spec in the main column, which had no room for the renewal day; in the rail
+           it is looked up beside the figures, as what the project runs on below it is. */
+        kind: 'cards',
         heading: 'Keeping it alive',
-        /* Two cells, not three. A third column pushes this block's own floor to six, and six beside
-           the eight the money table needs is fourteen of twelve — the row would wrap and leave a
-           gap. The renewal date is what the Renewals page is for. */
-        span: 4,
-        columns: [{ field: 'name' }, { field: 'cost' }],
+        span: 12,
+        area: 'rail',
         source: 'register.services',
         where: 'thing is {{name}}',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'cost', as: 'figure' },
+          { field: 'cycle', label: 'Every', as: 'fact' },
+          { field: 'note', label: 'Note', as: 'fact' },
+          { field: 'renews', label: 'Renews', as: 'when' },
+        ],
         /* WHAT RENEWS FIRST, FIRST. With no order the record listed the newest six and the sample the oldest. */
         order: [{ field: 'renews', dir: 'asc' }],
         limit: 6,
@@ -1039,8 +1208,11 @@ export function projectTemplate(holds: Iterable<string>): SeedPage {
   const linesGone = (series: unknown): boolean => Array.isArray(series) && series.some((line) => figureGone((line as { metric?: unknown } | null)?.metric));
   const page = PORTFOLIO_PAGES.project!;
   const blocks: Record<string, unknown>[] = [];
+  /* A ROW OF FIGURES EVERY ONE OF WHICH READS A LIST THE RECORD DOES NOT HOLD GOES WHOLE, as a block over such a list
+     does: made up from the tasks instead, it would say At a glance's figures a second time under a heading about money. */
+  const cellsGone = (cells: unknown): boolean => Array.isArray(cells) && cells.length > 0 && cells.every((c) => figureGone((c as { metric?: unknown } | null)?.metric));
   for (const block of page.blocks as Record<string, unknown>[]) {
-    if (gone(block.source) || linesGone(block.series)) {
+    if (gone(block.source) || linesGone(block.series) || cellsGone(block.cells)) {
       const before = blocks.at(-1);
       /* ONLY WITHIN ONE COLUMN: a main block's width given to a rail block before it would widen the wrong column. */
       if (before && before.area === block.area && typeof before.span === 'number' && typeof block.span === 'number')

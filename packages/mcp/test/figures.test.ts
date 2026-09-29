@@ -114,7 +114,7 @@ test('record_index names every figure money-core declares, and resources/list ev
      way `project-owed` and the two project walks are: an address is offered only if reading it answers bare. */
   assert.deepEqual(
     offered.map((u) => u.slice('braindog:metric/'.length)).sort(),
-    declared.filter((id) => !['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash'].includes(id)).sort(),
+    declared.filter((id) => !['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'project-in-month', 'project-out-month', 'project-kept-month'].includes(id)).sort(),
   );
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();

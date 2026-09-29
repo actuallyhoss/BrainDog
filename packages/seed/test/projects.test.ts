@@ -202,3 +202,75 @@ test('PROJECTS INSTALLS ALONE: a record with only projects, its Overview opens a
   assert.deepEqual(names(block(overview, 'In play').rows), ['Learn to bind books']);
   assert.deepEqual(block(overview, 'Needs you').rows, []);
 });
+
+/* ── the new look (portfolio 1.6.0, `loop/design/SCREENS.md`) ──────────────── */
+
+test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS ONE TRACK, and each card says what its project is', async () => {
+  const k = await seeded();
+  const overview = opened(k, 'portfolio');
+
+  /* EXACTLY ONE OPENING SENTENCE DRAWS, the one its figure says: two projects on the sample are at risk or off track. */
+  const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
+  assert.equal(leads.length, 2, 'the Overview declares its two opening sentences');
+  assert.deepEqual(leads.map((b) => b.drawn !== false), [true, false], 'one sentence and not both, or neither');
+  assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-need-you\}\} project\(s\) in play are at risk or off track\.$/u);
+
+  /* EVERY PROJECT IS A PART OF WHERE THEY ARE, parked and finished among them. */
+  const lanes = block(overview, 'Where they are').readings?.[0]?.reading?.groups ?? [];
+  assert.equal(lanes.reduce((n, g) => n + Number(g.value), 0), THINGS.length, 'a project is in no part');
+  assert.deepEqual(Object.fromEntries(lanes.map((g) => [g.key, g.value])), Object.fromEntries([...new Set(THINGS.map((t) => String(t.lane)))].map((lane) => [lane, THINGS.filter((t) => t.lane === lane).length])));
+
+  /* WHAT EACH ONE EARNS IS ONE TRACK, over the rows the Earning tile adds up. */
+  const earns = overview.blocks.find((b) => b.heading === 'What each one earns')!;
+  assert.equal(earns.kind, 'split');
+  assert.deepEqual(earns.refusals, []);
+
+  /* A CARD CARRIES THE PROJECT'S LINE, MARK AND HUE, read off the project's own row. */
+  const cards = block(overview, 'In play');
+  const kiln = cards.rows.find((r) => r.fields.name === 'Kiln')!;
+  const sample = THINGS.find((t) => t.name === 'Kiln')!;
+  assert.deepEqual([kiln.fields.about, kiln.fields.mark, kiln.fields.hue], [sample.about, sample.mark, sample.hue]);
+  assert.ok(THINGS.every((t) => typeof t.about === 'string' && t.about !== ''), 'a sample project says nothing about what it is');
+});
+
+test('A PROJECT PAGE TALLIES ITS OPEN WORK BY PRIORITY, SAYS THIS MONTH’S MONEY, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {
+  const k = await seeded();
+  /* THE SAMPLE MOVED NO MONEY ON KILN THIS MONTH, so two movements are written today, one each way, and the month's
+     figures are asked about money that is there rather than three noughts that agree with anything. */
+  const kilnRow = k.get(`things#${THINGS.findIndex((t) => t.name === 'Kiln') + 1}`)!;
+  const account = k.get('accounts#1')!;
+  const moved = (direction: 'in' | 'out', minor: number) =>
+    k.create('transactions', { what: `Kiln, ${direction}`, on: TODAY, direction, amount: { amount: minor, currency: 'GBP' }, account: account.id, thing: kilnRow.id, state: 'cleared' } as never, { actor: 'p_test' });
+  assert.ok(moved('in', 50_000).ok && moved('out', 12_000).ok);
+  const page = opened(k, 'kiln');
+  const glance = Object.fromEntries((block(page, 'At a glance').readings ?? []).map((r) => [r.metric, r.reading?.value]));
+
+  /* THE TALLY ADDS UP TO OPEN, because it counts Open's own rows by priority and a task with none is counted too. */
+  const tally = block(page, 'Open, by priority');
+  assert.equal(tally.kind, 'chips');
+  assert.equal(tally.matched, glance['project-open:Kiln'], 'the tally is over other rows than Open');
+
+  /* KEPT IS IN LESS OUT, TO THE MINOR UNIT, because it is one figure over the same rows, signed by direction. */
+  const month = Object.fromEntries((block(page, 'This month so far').readings ?? []).map((r) => [r.metric.split(':')[0], r.reading?.value ?? 0]));
+  assert.deepEqual(month, { 'project-in-month': 50_000, 'project-out-month': 12_000, 'project-kept-month': 38_000 });
+
+  /* WHAT IT RUNS ON IS CARDS IN THE RAIL, what renews first first, and the dates are weeks above the plan. */
+  const alive = page.blocks.find((b) => b.heading === 'Keeping it alive')!;
+  assert.deepEqual([alive.kind, (alive as { area?: string }).area], ['cards', 'rail']);
+  const renews = alive.rows.map((r) => String(r.fields.renews ?? '')).filter((d) => d !== '');
+  assert.deepEqual(renews, [...renews].sort());
+  const headings = page.blocks.map((b) => b.heading);
+  assert.ok(headings.indexOf('Dates') >= 0 && headings.indexOf('Dates') < headings.indexOf('The plan'), 'the weeks come before the plan');
+  assert.equal((page.blocks.find((b) => b.heading === 'Waiting on you') as { tiles?: boolean }).tiles, true, 'the questions are not tiles');
+});
+
+test('A PROJECT PAGE ON A RECORD WITH NO MONEY HAS NO MONTH OF MONEY, rather than At a glance said a second time', async () => {
+  const { projectTemplate } = await import('../src/modules/portfolio.ts');
+  const team = projectTemplate(['things', 'tasks', 'people']);
+  const headings = (team.blocks as { heading?: string }[]).map((b) => b.heading);
+  assert.ok(!headings.includes('This month so far'), 'a row of money figures was made up from the tasks instead');
+  assert.ok(!headings.includes('Money by month') && !headings.includes('Keeping it alive'));
+  assert.ok(headings.includes('Open, by priority') && headings.includes('Dates'), 'what a record without Money still has');
+  /* AND A FULL RECORD'S PAGE LEAVES A USE CASE THREE BLOCKS UNDER THE CEILING OF TWENTY-FOUR. */
+  assert.ok((projectTemplate(['things', 'tasks', 'people', 'obligations', 'transactions', 'services']).blocks as unknown[]).length <= 21);
+});

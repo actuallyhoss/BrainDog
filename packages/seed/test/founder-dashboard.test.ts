@@ -116,11 +116,15 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     undefined,
     'Waiting on you',
     'Where it stands',
+    /* PORTFOLIO 1.6.0'S TEMPLATE: the open work tallied by priority, its dates as weeks, and this month's money. */
+    'Open, by priority',
     'Handed back or blocked',
     'What is open',
     'Agents',
     'What changed',
+    'Dates',
     'The plan',
+    'This month so far',
     'Money by month',
     'Money',
     'Keeping it alive',
@@ -138,6 +142,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   assert.equal(blocks[1]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
   assert.notEqual(blocks[2]!.drawn, false, 'and nothing is open, so that one is');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
-  assert.equal((blocks[13] as unknown as { document?: boolean }).document, true);
-  assert.deepEqual(blocks[18]!.measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
+  /* FOUND BY HEADING, since the template's blocks move with each version and a place in the list says nothing. */
+  const headed = (heading: string) => blocks.find((b) => b.heading === heading)!;
+  assert.equal((headed('Notes') as unknown as { document?: boolean }).document, true);
+  assert.deepEqual(headed('The numbers').measures?.map((m) => [m.name, m.latest?.value]), [['Installs', 7]]);
 });

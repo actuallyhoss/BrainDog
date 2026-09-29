@@ -13,6 +13,7 @@ import { NOW, installSeed } from '@braindog/seed';
 
 import { page } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';
+import { drawerOf } from '../page/kinds/index.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
 
@@ -80,6 +81,13 @@ for (const slug of ['portfolio', 'kiln', 'marlow-co', 'portage'])
         return;
       }
       if (kb.kind === 'note' || kb.kind === 'code') return;
+      /* A KIND WITH ITS OWN DRAWER (a calendar) keeps the record's answer whole and fills no `entries`: its rows are there. */
+      if (drawerOf(kb.kind)) {
+        const rows = (wb.answer as { rows?: { fields: Record<string, unknown> }[] } | undefined)?.rows ?? [];
+        const name = (r: { fields: Record<string, unknown> }) => String(r.fields.name ?? r.fields.what ?? r.fields.doing ?? r.fields.label ?? '');
+        assert.deepEqual(rows.map(name), (kb.rows ?? []).map(name), `${at}: the rows, in order`);
+        return;
+      }
       assert.equal(wb.total, kb.matched, `${at}: how many matched`);
       const said = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => String(r.fields.name ?? r.fields.what ?? r.fields.doing ?? r.fields.label ?? ''));
       if (kb.kind === 'section') return;

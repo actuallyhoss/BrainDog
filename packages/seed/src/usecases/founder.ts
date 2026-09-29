@@ -150,8 +150,15 @@ export const FOUNDER = {
      organisation and on a project says `panel: reporting`, so the key a project sends its numbers with is drawn by
      that name and not by the heading's English. A page somebody arranged in their own record keeps its arrangement:
      the update is offered, never forced. In the same unreleased version, the voice says more of the record its own
-     way, Home's empty lines and Decide's among them (PGS-24), each a new setting a person can change at /packs. */
-  version: '1.8.0',
+     way, Home's empty lines and Decide's among them (PGS-24), each a new setting a person can change at /packs.
+
+     1.9.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.6.0'S TEMPLATE, built to the new look (`loop/design/SCREENS.md`,
+     Project page): its open work tallied by priority, what came in, went out and was kept this month beside the money
+     by month, its dated work as weeks above the plan, its questions as tiles and what it runs on as cards in the rail.
+     1.8.0 is on `origin/master`, so a record on it is offered this only through a new version. Blocks added and nothing
+     taken away, so a minor step; the template is twenty-one blocks, so the three this page adds under it land exactly
+     on the ceiling of twenty-four. */
+  version: '1.9.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

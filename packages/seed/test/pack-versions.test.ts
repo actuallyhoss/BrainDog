@@ -132,6 +132,34 @@ const DECLARED: Record<string, Version> = {
       "Books keep money that is not one person's apart. A `books` list, an optional book on every list that holds money, a page per book under Money with its own walk, and one Cash now per book once there are two; a late invoice answered Chase it is stamped chased, a repeating line answered It stopped is ended, a stale balance is a digest line and not a question, and an account or book that rows point at cannot be deleted. One list, fields, figures, a page and two automations added and nothing taken away, so the step is a minor one -> e174c8e1ad7deb1f",
     ],
   },
+  /**
+   * A VERSION AND NOT A RESET, because 3.1.0 is on `origin/master` and records hold it. Three ids are gained, the month's
+   * figures a project page reads, which are Money's by the list they read; the rest moved inside declarations 3.1.0
+   * already held.
+   */
+  'money-core@3.2.0': {
+    holds: `
+      metric.arriving-30d metric.book-cash metric.books-held metric.cash-accounts metric.cash-as-of metric.cash-by-book
+      metric.cash-now metric.chasing metric.days-late-in metric.due-30d metric.every-month-by-category metric.every-month-in
+      metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.leaving-30d metric.net-by-month metric.out-30d metric.out-by-month
+      metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-to-you metric.project-in-by-month metric.project-in-month
+      metric.project-kept-month metric.project-out-by-month metric.project-out-month metric.project-owed metric.received-30d
+      metric.runway-days metric.spent-30d metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '02e1f91a8c99d21c',
+    history: [
+      "`page.money` is built to the new look: it opens with a sentence said from `cash-now` and `runway-days`, Cash ahead sits beside the next thirty days, its questions are tiles, and what is paid in parts is one track a plan over `register.installments`; `runway-days`, `arriving-30d` and `leaving-30d` are remembered each night so their tiles draw twelve weeks as a line, and a project page's month is read from the new `project-in-month`, `project-out-month` and `project-kept-month` -> 02e1f91a8c99d21c",
+    ],
+  },
   'portfolio@1.5.0': {
     holds: `
       metric.projects-aim-30d metric.projects-by-health metric.projects-earning metric.projects-earning-before
@@ -142,6 +170,25 @@ const DECLARED: Record<string, Version> = {
     declares: 'e034fa8da981b2ea',
     history: [
       "A project page leads with the questions waiting on it, draws what changed on it, its plan on a time axis when its tasks have days and its money month by month, signs the amount on its Money table, drops the agent code block, and every money figure on `page.portfolio` is in the record's own currency with its target a setting -> e034fa8da981b2ea",
+    ],
+  },
+  /**
+   * A VERSION AND NOT A RESET, because 1.5.0 is on `origin/master` and records hold it. One id is gained,
+   * `metric.projects-by-lane`, which no fingerprint could be set again for; the rest moved inside declarations 1.5.0
+   * already held, which the history line says.
+   */
+  'portfolio@1.6.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-by-health metric.projects-by-lane metric.projects-earning metric.projects-earning-before
+      metric.projects-earning-change metric.projects-earning-said metric.projects-live metric.projects-need-you metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '229b3838334777f4',
+    history: [
+      "`page.portfolio` is built to the new look: it opens with a sentence said from `projects-need-you`, draws every project's status as one track over the new `projects-by-lane`, draws what each earns as a split where it was a bar, and its cards wear the project's mark, hue and the new `about` line of `register.things`; `projects-live` and `projects-earning` are remembered each night, so In play and Earning draw twelve weeks as a line -> 229b3838334777f4",
     ],
   },
   'money-core@1.1.0': { declares: '5cb37a57b9de3499' },

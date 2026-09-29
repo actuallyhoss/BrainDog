@@ -1451,6 +1451,10 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
     home: 2,
+    /* REMEMBERED EACH NIGHT, SINCE money-core 3.2.0, so Lasts until draws how the days it lasts have moved over twelve
+       weeks. A night the money lasts past the year has no value and writes no point, so the line is drawn only across
+       the nights it did not, which is when it matters. */
+    snapshot: { grain: 'day', into: 'series.runway-days' },
   },
 
   /**
@@ -1473,6 +1477,8 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
+    /* REMEMBERED EACH NIGHT, SINCE money-core 3.2.0, for the tile's twelve-week line, as Cash now is. */
+    snapshot: { grain: 'day', into: 'series.arriving-30d' },
   },
 
   'leaving-30d': {
@@ -1486,6 +1492,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     target: {},
     window: '30d',
     compare: 'none',
+    snapshot: { grain: 'day', into: 'series.leaving-30d' },
   },
 
   /**
@@ -2130,6 +2137,18 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
     pack: 'money-core',
     blocks: [
       {
+        /* THE OPENING SENTENCE, SAID FROM THE FIGURES, SINCE money-core 3.2.0: the line under the page's title. What
+           there is, and the day count the walk below goes under in, read from the same two figures the tiles draw, so
+           the sentence and the tiles cannot disagree. Only while the walk goes under inside the year it reads
+           (`runway-days` has no value otherwise), because that is the one fact on this page that needs somebody; a
+           record whose money lasts the year has its figures and no sentence. The count settles `day(s)`. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'runway-days', gt: 0 },
+        body: 'You have {{cash-now}}, and on what is due to come and go it runs out in {{runway-days}} day(s).',
+      },
+      {
         /* WHAT YOU HAVE, THEN HOW LONG IT LASTS, THEN WHAT MOVES IN THE NEXT THIRTY DAYS. The figures after it read the one walk
            "Cash ahead" and "The next 30 days" draw below (`CASH_LEGS`), so a tile and the chart under it cannot give two
            answers about the same month. Cash now carries its twelve weeks as a line.
@@ -2143,10 +2162,11 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         heading: 'What you have',
         span: 12,
         cells: [
+          /* EVERY TILE CARRIES ITS TWELVE WEEKS AS A LINE, SINCE money-core 3.2.0, from each figure's own nightly series. */
           { metric: 'cash-now', label: 'Cash now', trend: '12w', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
-          { metric: 'runway-days', label: 'Lasts until' },
-          { metric: 'arriving-30d', label: 'Coming in, 30 days' },
-          { metric: 'leaving-30d', label: 'Going out, 30 days' },
+          { metric: 'runway-days', label: 'Lasts until', trend: '12w' },
+          { metric: 'arriving-30d', label: 'Coming in, 30 days', trend: '12w' },
+          { metric: 'leaving-30d', label: 'Going out, 30 days', trend: '12w' },
         ],
         when: { metric: 'books-held', lt: 2 },
       },
@@ -2200,6 +2220,9 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            a book is answered here too, and not only in Decide. */
         where: 'list is obligations or transactions or accounts or recurring or installments or balances or categories or books',
         limit: 3,
+        /* ONE TILE A QUESTION, SINCE money-core 3.2.0, led by what its recommended answer shows, the ways to answer under
+           it, so "let it read the bank's texts?" is read as its options and not as a line in a list. */
+        tiles: true,
       },
       {
         /* HOW LONG THE MONEY LASTS: cash remembered up to today, then the walk from Cash now, a repeating row
@@ -2208,7 +2231,9 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            arithmetic over the same walk, and nothing is written. Every movement is in the fold under it. */
         kind: 'forecast',
         heading: 'Cash ahead',
-        span: 12,
+        /* EIGHT, BESIDE THE NEXT THIRTY DAYS' FOUR, SINCE money-core 3.2.0: the line ahead and the arithmetic of its first
+           month read side by side, as one question. Eight is the narrowest a walk stays legible at. */
+        span: 8,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
         recorded: 'cash-now',
@@ -2238,26 +2263,12 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            so a leg in one and not the other cannot become two answers about the same thirty days. */
         kind: 'bridge',
         heading: 'The next 30 days',
-        span: 5,
+        span: 4,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
         from: CASH_LEGS,
         horizon: 30,
         empty: 'Nothing dated in the next 30 days.',
-      },
-      {
-        /* WHERE THIS MONTH'S MONEY WENT, BY WHAT IT WAS FOR, from what moved and not from what was promised: the clauses
-           of `spent-by-category-month`, cleared and not between your own accounts. What no category holds is said last
-           and opens those rows, so the hole is a job and not a gap. */
-        kind: 'split',
-        heading: "Where this month's money went",
-        span: 7,
-        source: 'register.transactions',
-        where: 'state is cleared, transfer is false, direction is out, on at least bom',
-        columns: [{ field: 'category' }, { field: 'amount' }],
-        limit: 6,
-        unset: 'Uncategorised',
-        empty: 'Nothing has gone out this month.',
       },
       {
         /* WHAT FALLS DUE IN THE NEXT THIRTY DAYS, ACROSS MONEY'S LISTS THAT HOLD A DUE DAY, overdue first and then by
@@ -2315,6 +2326,36 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         span: 12,
         body: 'Money you owe has gone past its date: {{overdue}} in all.',
         when: { metric: 'overdue', gt: 0 },
+      },
+      {
+        /* WHERE THIS MONTH'S MONEY WENT, BY WHAT IT WAS FOR, from what moved and not from what was promised: the clauses
+           of `spent-by-category-month`, cleared and not between your own accounts. What no category holds is said last
+           and opens those rows, so the hole is a job and not a gap. AFTER WHAT IS COMING, SINCE money-core 3.2.0, and
+           beside what is being paid in parts, the two things this month is spending on. */
+        kind: 'split',
+        heading: "Where this month's money went",
+        span: 7,
+        source: 'register.transactions',
+        where: 'state is cleared, transfer is false, direction is out, on at least bom',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 6,
+        unset: 'Uncategorised',
+        empty: 'Nothing has gone out this month.',
+      },
+      {
+        /* WHAT IS BEING PAID IN PARTS, ONE TRACK A PLAN, SINCE money-core 3.2.0: the parts paid against every part of the
+           plan, "3 of 8", read off the list's own status, where a part that is paid is done (`installments.done`). A
+           plan is the parts that share its `plan`, so no plan is a row anybody has to keep in step with its parts. A
+           cancelled part is out of both counts, as it is out of the walk, and money coming in by parts is not what this
+           asks, so only what goes out is drawn. */
+        kind: 'progress',
+        heading: 'Instalments',
+        span: 5,
+        source: 'register.installments',
+        where: 'direction is out, state is not cancelled',
+        columns: [{ field: 'plan' }, { field: 'state' }],
+        limit: 6,
+        empty: 'Nothing is being paid in parts.',
       },
       {
         /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in

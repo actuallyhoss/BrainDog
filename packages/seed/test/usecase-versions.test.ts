@@ -464,6 +464,23 @@ const DECLARED: Record<string, Version> = {
       "CHECK pass repair round 1 renamed `page.home-founder`'s Working now columns from `as` to `label`, the shape every other table on the page already used (`agent`, `doing`, `last_seen`) -> 51db7a7065cc95c7",
     ],
   },
+  /** THE SAME IDS AS 1.8.0, and a version because 1.8.0 is on `origin/master` (`bfe14e39`): what moved is inside `page.project`. */
+  'founder@1.9.0': {
+    holds: `
+      metric.datapoints-30d
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear setting.voice_no_questions
+      setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits
+      setting.voice_working_now
+    `,
+    declares: 'fa99bd60f9e8a1cb',
+    history: [
+      "`page.project` takes portfolio 1.6.0's project template: the open work tallied by priority, the month's money in, out and kept beside the money by month, the dated work as weeks above the plan, the questions as tiles and what it runs on as cards in the rail -> fa99bd60f9e8a1cb",
+    ],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
@@ -562,6 +579,25 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.project` takes Projects' rail and opening sentence -> 53410df0154d63a0",
       "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_add_first`, `setting.voice_coming_up`, `setting.voice_fills_with`, `setting.voice_inbox_clear`, `setting.voice_no_questions`, `setting.voice_nothing_now`, `setting.voice_nothing_waiting`, `setting.voice_overdue`, `setting.voice_pen_waits` and `setting.voice_working_now` -> aae35cd290866704",
+    ],
+  },
+  /** THE SAME IDS AS 2.7.0, and a version because 2.7.0 is on `origin/master` (`bfe14e39`): what moved is inside `page.project`. */
+  'team@2.8.0': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.one_tasks
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear
+      setting.voice_no_questions setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_working_now
+    `,
+    declares: '1102c3039476f0ab',
+    history: [
+      "`page.project` takes portfolio 1.6.0's project template: the open tickets tallied by priority above the list of them, their dates as weeks above the plan, and the questions about the project as tiles -> 1102c3039476f0ab",
     ],
   },
   'guide@1.2.0': {

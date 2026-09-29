@@ -276,11 +276,25 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `planShared` held the whole batch built People and Work beside Portfolio as though Projects were not coming, and
  *   left out Met in, Project and Owner for good. A record holding a pack at its offered version is offered no change,
  *   so this step is what lets such a record take the update and have the links put back, and nothing else moves.
+ * - portfolio 1.6.0: the Overview is built to the new look (`loop/design/SCREENS.md`, Projects). It opens with one
+ *   sentence said from how many projects need you, draws every project's status as one track (`projects-by-lane`), draws
+ *   what each earns as one track cut into parts where it was a bar a project, and In play and Earning carry twelve
+ *   weeks as a line (`snapshot` on `projects-live` and `projects-earning`). A project says what it is in a line
+ *   (`about`), which its card draws under its name beside its own mark and hue. A field, a figure and blocks added and
+ *   nothing taken away, so the step is a minor one. The project page moves with it, though no pack holds that page
+ *   (`crossPack`): the open work tallied by priority, the month's money in, out and kept, the dates as weeks, the
+ *   questions as tiles and what it runs on as cards in the rail.
+ * - money-core 3.2.0: Money is built to the new look (`loop/design/SCREENS.md`, Money). It opens with one sentence said
+ *   from what there is and when the walk goes under, each of the three tiles beside Cash now carries twelve weeks as a
+ *   line (`snapshot` on `runway-days`, `arriving-30d` and `leaving-30d`), Cash ahead sits beside the next thirty days,
+ *   the questions are tiles, and what is paid in parts is one track a plan. Three figures a project page reads are
+ *   Money's by the list they read: `project-in-month`, `project-out-month` and `project-kept-month`. Figures and blocks
+ *   added and nothing taken away, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.5.0',
+  portfolio: '1.6.0',
   people: '2.3.1',
-  'money-core': '3.1.0',
+  'money-core': '3.2.0',
   estate: '2.0.0',
   work: '1.9.1',
 };

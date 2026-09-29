@@ -61,8 +61,12 @@ export const TEAM = {
      column, and one sentence said from its figures first (PGS-22, through `projectTemplate` in `../modules/
      portfolio.ts`, which this page's `page.project` already calls). And the voice says more of the record its own
      way, Home's empty lines, the Inbox's and the pen's line among them (PGS-24). Each is a new setting a person can
-     change at /packs, so a minor step. */
-  version: '2.7.0',
+     change at /packs, so a minor step.
+     2.8.0: a project's page takes Portfolio 1.6.0's template, built to the new look: the open tickets tallied by
+     priority above the list of them, their dates as weeks above the plan, and the questions about it as tiles. A team
+     keeps no money or services, so the month's money and what it runs on are left off as before. 2.7.0 is on
+     `origin/master`, so the change is a version and not a reset. */
+  version: '2.8.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

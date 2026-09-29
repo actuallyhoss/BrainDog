@@ -668,6 +668,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
   const headings = (page.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.deepEqual(headings, [
+    /* THE OPENING SENTENCE, SINCE money-core 3.2.0, which carries no heading: it is the line under the page's title. */
+    undefined,
     'What you have',
     'What you have, by book',
     'Accounts',
@@ -675,11 +677,12 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Waiting on you',
     'Cash ahead',
     'The next 30 days',
-    "Where this month's money went",
     'Coming up',
     'Being chased',
     'Late to you',
     'Late to pay',
+    "Where this month's money went",
+    'Instalments',
     'In and out, by month',
     'Every month',
     'What moved',
@@ -698,6 +701,40 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   const ahead = (page.blocks as { heading?: string; horizons?: unknown; knobs?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
   assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
   assert.ok(!(ahead.knobs as string[]).includes('leave'), '`leave` is a second control over the streams `count` moves');
+});
+
+/**
+ * THE NEW LOOK'S MONEY (money-core 3.2.0, `loop/design/SCREENS.md`): a sentence said from two figures the tiles draw,
+ * every tile beside Cash now carrying twelve weeks as a line, and one track a plan for what is paid in parts.
+ */
+test('MONEY OPENS WITH ONE SENTENCE WHILE THE WALK GOES UNDER INSIDE THE YEAR, and what is paid in parts is one track a plan', async () => {
+  const k = await seeded();
+  const out = k.page('money');
+  assert.ok(out.ok, sayOf(out));
+  const blocks = (out.value as { blocks: readonly (DrawnBlock & { kind: string; lead?: boolean; drawn?: boolean; values?: Record<string, unknown> })[] }).blocks;
+
+  /* THE SENTENCE IS THE FIRST BLOCK, AND DRAWS EXACTLY WHEN THE WALK GOES UNDER, from the same two figures as the tiles. */
+  const lead = blocks[0]!;
+  assert.deepEqual([lead.kind, lead.lead], ['note', true]);
+  const runway = reading(k, 'runway-days');
+  assert.ok(runway !== null && runway > 0, 'the sample walk goes under inside the year, which is the case the sentence is for');
+  assert.notEqual(lead.drawn, false, 'the walk goes under and the page says nothing');
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-now', 'runway-days']);
+  assert.equal(lead.values?.['runway-days'], runway);
+
+  /* EVERY TILE BESIDE CASH NOW DRAWS ITS TWELVE WEEKS, and each figure remembers its nights so there is a line to draw. */
+  const hero = (MONEY_PAGES.money!.blocks as { kind: string; cells?: { metric: string; trend?: string }[] }[]).find((b) => b.kind === 'stat')!;
+  for (const c of hero.cells ?? []) {
+    assert.equal(c.trend, '12w', `${c.metric} draws no line`);
+    assert.equal((MONEY_METRICS[c.metric] as { snapshot?: { into: string } }).snapshot?.into, `series.${c.metric}`, `${c.metric} remembers no night`);
+  }
+
+  /* ONE TRACK A PLAN: the parts that go out and are not cancelled, which the host counts paid against all by `plan`. */
+  const parts = blockOf(k, 'money', 'Instalments');
+  const leaving = INSTALLMENTS.filter((r) => r.direction === 'out' && r.state !== 'cancelled');
+  assert.equal(parts.matched, leaving.length);
+  assert.deepEqual([...new Set(parts.rows.map((r) => String(r.fields.plan)))], [...new Set(leaving.map((r) => String(r.plan)))]);
+  assert.equal(parts.rows.filter((r) => r.fields.state === 'paid').length, leaving.filter((r) => r.state === 'paid').length, 'the paid parts are what the track fills with');
 });
 
 test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a link and not a need', async () => {

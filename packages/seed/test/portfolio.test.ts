@@ -55,7 +55,9 @@ test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a figure and in a 
      draws revenue" was answered by the cards alone and the block that puts one project's money
      against another's could be deleted with this file still green. */
   const draws = (kind: string) => blocks.filter((b) => b.kind === kind && (b.columns ?? []).some((c) => c.field === 'revenue'));
-  assert.equal(draws('bar').length, 1, 'no bar on the Overview puts one project’s money against another’s, so the page says a total and nothing under it');
+  /* A SPLIT SINCE portfolio 1.6.0, one track cut into each project's share, where it was a bar a project: the same two
+     columns over the same rows, drawn as parts of one whole. */
+  assert.equal(draws('split').length, 1, 'no track on the Overview puts one project’s money against another’s, so the page says a total and nothing under it');
   assert.equal(draws('cards').length, 1, 'the In play cards do not say what a project earns, so the money on the page is a total nobody can attribute');
 
   /* EVERY ONE OF THEM STILL READS PROJECTS ALONE. The pack needs nothing (`first-party.test.ts` holds
