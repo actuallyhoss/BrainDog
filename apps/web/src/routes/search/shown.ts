@@ -63,3 +63,54 @@ export function shownState(q: string, answer: Found | null, answeredFor: string 
   if (answer.from === 'refused') return 'refused';
   return held === 0 ? 'none' : 'hits';
 }
+
+/** A list that matched, as much of it as the sentence and the tile read: its name and how many matched in it. */
+export type Matched = { kind: string; total: number };
+
+/**
+ * The list most of the matches are in, or `null` when two share the top.
+ *
+ * A TIE HAS NO "MOST". Naming the first of two equal lists would be the order the record answered in, said as a fact
+ * about where the matches are, so a tie highlights nothing and the words leave the claim out.
+ */
+export function topOf<T extends Matched>(groups: readonly T[]): T | null {
+  let top: T | null = null;
+  let tied = false;
+  for (const g of groups) {
+    if (top === null || g.total > top.total) {
+      top = g;
+      tied = false;
+    } else if (g.total === top.total) tied = true;
+  }
+  return tied ? null : top;
+}
+
+const AND = new Intl.ListFormat('en-GB', { style: 'long', type: 'conjunction' });
+
+const matches = (n: number): string => (n === 1 ? '1 match' : `${n.toLocaleString('en')} matches`);
+
+/**
+ * THE TITLE ROW'S SENTENCE, from the answer and nothing else: how many matched, in how many lists, and which list
+ * holds most of them. `null` when there is nothing to say, so an empty answer is the empty state and not a sentence.
+ */
+export function sentenceOf(q: string, found: { total: number; groups: readonly Matched[] }): string | null {
+  const said = q.trim();
+  if (found.total <= 0 || found.groups.length === 0 || said === '') return null;
+  const head = `${matches(found.total)} for “${said}”`;
+  if (found.groups.length === 1) return `${head} in ${found.groups[0]!.kind}.`;
+  const top = topOf(found.groups);
+  const lists = `${found.groups.length} lists`;
+  return top ? `${head} in ${lists}; most in ${top.kind}.` : `${head} in ${lists}.`;
+}
+
+/** The reading line under the tile's bars: how many of the matches the top list holds, or the spread when two tie. */
+export function whereSaid(found: { total: number; groups: readonly Matched[] }): string {
+  const top = topOf(found.groups);
+  if (!top) {
+    const most = Math.max(...found.groups.map((g) => g.total));
+    const tied = found.groups.filter((g) => g.total === most).map((g) => g.kind);
+    return `${AND.format(tied)} hold ${most.toLocaleString('en')} each, of ${found.total.toLocaleString('en')}.`;
+  }
+  const n = top.total.toLocaleString('en');
+  return `${n} of ${found.total.toLocaleString('en')} ${top.total === 1 ? 'is' : 'are'} in ${top.kind}.`;
+}

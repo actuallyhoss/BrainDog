@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { shownState } from './shown.ts';
+import { sentenceOf, shownState, topOf, whereSaid } from './shown.ts';
 
 const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
 const answered = (total: number) => ({ from: 'live' as const, value: { hits: [], total, groups: [] } });
@@ -52,4 +52,29 @@ test('the screen draws the arm this module names, rather than asking the answer 
      stale verdict back on the screen. */
   assert.doesNotMatch(page, /\{:else if found\.total === 0\}/u);
   assert.doesNotMatch(page, /\{:else if !answer\}/u);
+});
+
+/* ── the sentence and the tile ─────────────────────────────────────────── */
+
+const g = (kind: string, total: number) => ({ kind, total });
+
+test('the sentence counts the answer, names the list most of it is in, and names none on a tie', () => {
+  assert.equal(sentenceOf('renewal', { total: 9, groups: [g('Tasks', 6), g('People', 3)] }), '9 matches for “renewal” in 2 lists; most in Tasks.');
+  assert.equal(sentenceOf('renewal', { total: 8, groups: [g('Tasks', 4), g('People', 4)] }), '8 matches for “renewal” in 2 lists.');
+  assert.equal(sentenceOf(' kiln ', { total: 1, groups: [g('Projects', 1)] }), '1 match for “kiln” in Projects.');
+  assert.equal(sentenceOf('kiln', { total: 0, groups: [] }), null, 'nothing matched is the empty state, not a sentence');
+  assert.equal(sentenceOf('', { total: 3, groups: [g('Tasks', 3)] }), null);
+});
+
+test('the top list is the strictly largest one, and a tie at the top is no top', () => {
+  assert.deepEqual(topOf([g('A', 1), g('B', 5), g('C', 2)]), g('B', 5));
+  assert.equal(topOf([g('A', 5), g('B', 5), g('C', 2)]), null);
+  assert.equal(topOf([]), null);
+});
+
+test('the reading under the bars says how many the top list holds, or which lists share it', () => {
+  assert.equal(whereSaid({ total: 9, groups: [g('Tasks', 6), g('People', 3)] }), '6 of 9 are in Tasks.');
+  assert.equal(whereSaid({ total: 3, groups: [g('Tasks', 1), g('People', 1), g('Pages', 1)] }), 'Tasks, People and Pages hold 1 each, of 3.');
+  assert.equal(whereSaid({ total: 4, groups: [g('Tasks', 1), g('People', 3)] }), '3 of 4 are in People.');
+  assert.equal(whereSaid({ total: 3, groups: [g('Tasks', 1), g('People', 2)] }).startsWith('2 of 3 are'), true);
 });

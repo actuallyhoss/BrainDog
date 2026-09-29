@@ -1,10 +1,11 @@
 <!--
   What Slash spent, on `/usage` (`loop/finish/agents.md` AGT-29; the page's Slash section, `contracts.md` X44).
 
-  TWO ALLOWANCES, APART. His asks against his cap first, then the background work's own month (the daily look, an
+  TWO ALLOWANCES, APART. His asks against his cap, then the background work's own month (the daily look, an
   automation's question, a digest's prose, a pattern drafted for the inbox), because one never spends the other
-  (`contracts.md` §7.5 and X41). Under them, the asks by day as bars, then each day's lines: what was asked, when, what it
-  cost and a link to what it filed. The rules are `slash-asks.ts`, which the tests hold; this draws what they answer.
+  (`contracts.md` §7.5 and X41). Each is a tile with its ring and the line that reads it (SYSTEM §6, §7), and the asks by
+  day are a third, as bars. Under the tiles, on the ground, each day's lines: what was asked, when, what it cost and a
+  link to what it filed. The rules are `slash-asks.ts`, which the tests hold; this draws what they answer.
 
   RUNNING OUT SAYS SO, and `SlashOut` offers the two ways on beside the sentence.
 
@@ -12,15 +13,12 @@
   count, so the page mounts this for the owner and it draws nothing on a host without Slash. A failed read draws nothing
   either: the page's own read above already says when the record cannot be reached, and this is one section of it.
 
-  ONE COLUMN AT 390. The meters stack, the bars are the `bar` kind every page uses (label, bar, figure on one row), and a
-  line's question wraps above its cost rather than pushing the figure off the edge.
+  ONE COLUMN AT 390. The tiles stack, and a line's question wraps above its cost rather than pushing the figure off the edge.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type SlashAsked, type SlashStatus } from '@braindog/client';
-  import type { Block as Drawn } from 'braindog-render';
-  import { Block } from 'braindog-render/svelte';
   import { apiBase, at } from '$lib/at.ts';
   import {
     asksLine,
@@ -36,10 +34,23 @@
   } from '$lib/ui/slash-asks.ts';
   import Section from '$lib/ui/Section.svelte';
   import SlashOut from '$lib/ui/SlashOut.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Bars from '$lib/viz/Bars.svelte';
+  import Ring from '$lib/viz/Ring.svelte';
 
   /* `month` is the page's `YYYY-MM`, and the page mounts this on the current month only: the status door says this
      month's count and nothing of a month gone. */
   let { month }: { month: string } = $props();
+
+  /* THIS SECTION'S OWN WORDS FOR ITS TILES. The sentences are `slash-asks.ts`'s. */
+  const said = {
+    asks: 'Your asks',
+    background: 'Background work',
+    of: (cap: number) => `of ${cap.toLocaleString('en-GB')}`,
+    backgroundExact: (used: number, cap: number) => `${used.toLocaleString('en-GB')} of ${cap.toLocaleString('en-GB')} background asks this month`,
+    busiest: (label: string, n: number) => `Busiest ${label === 'Today' || label === 'Yesterday' ? label.toLowerCase() : `on ${label}`}, with ${n === 1 ? '1 ask' : `${n.toLocaleString('en-GB')} asks`}.`,
+    asksSubject: 'Asks by day',
+  } as const;
 
   let status = $state<SlashStatus | null>(null);
   let rows = $state<SlashAsked[] | null>(null);
@@ -60,34 +71,64 @@
 
   const spent = $derived(rows ? spentIn(rows, month) : null);
   const mine = $derived(status ? asksLine(status) : null);
-  const share = (used: number, cap: number): string => `${cap <= 0 ? 100 : Math.round(Math.min(1, used / cap) * 1000) / 10}%`;
-  const bars = $derived<Drawn | null>(
-    spent && spent.days.length > 0
-      ? { type: 'block', kind: 'bar', rows: spent.days.map((d) => ({ cells: [d.label, String(d.asks)] })), raw: '', start: 0, end: 0 }
-      : null,
+
+  /** A ring's tone: ink with room, amber from 80%, red once it is spent (SYSTEM §2). */
+  const toneOf = (used: number, cap: number): 'ink' | 'warn' | 'danger' => (cap <= 0 || used >= cap ? 'danger' : used >= cap * 0.8 ? 'warn' : 'ink');
+
+  /* THE BACKGROUND ALLOWANCE, EXACT WHERE THE HOST SAYS IT (`status.background`), and counted from the ledger's list
+     against the engine's figure where it does not, which is what this section always drew. */
+  const background = $derived(
+    status?.background
+      ? { used: status.background.used, cap: status.background.cap, line: said.backgroundExact(status.background.used, status.background.cap) }
+      : spent
+        ? { used: spent.background, cap: BACKGROUND_ASKS_MONTH, line: backgroundLine(spent) }
+        : null,
   );
+
+  /* THE ASKS BY DAY, newest first as the lines below are, the busiest day in ink and the rest greys. */
+  const busiest = $derived(spent && spent.days.length > 0 ? spent.days.reduce((a, b) => (b.asks > a.asks ? b : a)) : null);
+  const bars = $derived(spent ? spent.days.map((d) => ({ label: d.label, value: d.asks, tone: busiest && d.day === busiest.day ? 'ink' : undefined })) : []);
 </script>
 
 {#if status && spent}
   <Section title={words.title}>
-    <ul class="spent-meters">
+    <div class="spent-tiles">
       {#if mine}
-        <li class="spent-meter" data-near={metered(status) && status.asks.used >= status.asks.cap * 0.8 ? '' : undefined}>
-          <span class="spent-meter-line num">{mine}</span>
+        <Tile icon="slash" title={said.asks}>
           {#if metered(status)}
-            <span class="spent-bar" aria-hidden="true"><span class="spent-fill" style:inline-size={share(status.asks.used, status.asks.cap)}></span></span>
+            <div class="spent-ring">
+              <Ring value={status.asks.used} max={status.asks.cap} tone={toneOf(status.asks.used, status.asks.cap)} size={112} label={said.of(status.asks.cap)} summary={mine} />
+            </div>
+          {:else}
+            <p class="spent-figure num">{status.asks.used.toLocaleString('en-GB')}</p>
           {/if}
-        </li>
+          <p class="spent-reading">{mine}</p>
+        </Tile>
       {/if}
-      <li class="spent-meter" data-near={spent.background >= BACKGROUND_ASKS_MONTH * 0.8 ? '' : undefined}>
-        <span class="spent-meter-line num">{backgroundLine(spent)}</span>
-        <span class="spent-bar" aria-hidden="true"><span class="spent-fill" style:inline-size={share(spent.background, BACKGROUND_ASKS_MONTH)}></span></span>
-      </li>
-    </ul>
+
+      {#if background}
+        <Tile icon="observe" title={said.background}>
+          <div class="spent-ring">
+            <Ring value={background.used} max={background.cap} tone={toneOf(background.used, background.cap)} size={112} label={said.of(background.cap)} summary={background.line} />
+          </div>
+          <p class="spent-reading">{background.line}</p>
+        </Tile>
+      {/if}
+
+      <!-- ONLY WHEN HE ASKED ANYTHING: a day of background work alone is a zero bar, and bars of zeroes say nothing. -->
+      {#if busiest && busiest.asks > 0}
+        <Tile icon="history" title={words.byDay}>
+          <Bars items={bars} subject={said.asksSubject} />
+          <p class="spent-reading">{said.busiest(busiest.label, busiest.asks)}{#if !spent.whole}{' '}{words.partial}{/if}</p>
+        </Tile>
+      {/if}
+    </div>
+
+    {#if !spent.whole && !(busiest && busiest.asks > 0)}<p class="spent-said spent-gap">{words.partial}</p>{/if}
 
     {#if atCap(status)}
       <div class="spent-out">
-        <p class="spent-said spent-warn">{words.out(resetsWords(status.asks.resets))}</p>
+        <p class="spent-said" data-needs>{words.out(resetsWords(status.asks.resets))}</p>
         <SlashOut />
       </div>
     {/if}
@@ -95,157 +136,160 @@
     {#if spent.days.length === 0}
       <p class="spent-said">{words.none}</p>
     {:else}
-      <h3 class="spent-h">{words.byDay}</h3>
-      {#if bars}<Block block={bars} />{/if}
-      {#if !spent.whole}<p class="spent-said">{words.partial}</p>{/if}
       {#each spent.days as d (d.day)}
-        <div class="spent-day">
-          <h3 class="spent-h">{d.label}</h3>
-          <ul class="spent-list">
+        <section class="spent-day" aria-label={d.label}>
+          <h3 class="spent-h">{d.label}<span class="spent-h-n num">{d.lines.length}</span></h3>
+          <ul class="ledger spent-list">
             {#each d.lines as l (l.id)}
-              <li class="spent-row">
-                <span class="spent-top">
-                  <span class="spent-what" dir="auto">{l.what}</span>
-                  <span class="spent-cost num">{costSaid(l.cost, l.background)}</span>
-                </span>
-                <span class="spent-meta">
-                  <span>{l.refused ? `${l.when}, ${words.refused}` : l.when}</span>
-                  {#if l.href}<a class="spent-filed" href={at(l.href)}>{words.filed}</a>{/if}
-                </span>
+              <li>
+                <div class="line line-tall spent-row">
+                  <span class="line-main">
+                    <span class="line-title spent-what" dir="auto">{l.what}</span>
+                    <span class="line-detail">{l.refused ? `${l.when}, ${words.refused}` : l.when}</span>
+                  </span>
+                  <span class="line-when spent-cost">{costSaid(l.cost, l.background)}</span>
+                  {#if l.href}<a class="spent-filed tap" href={at(l.href)}>{words.filed}</a>{/if}
+                </div>
               </li>
             {/each}
           </ul>
-        </div>
+        </section>
       {/each}
     {/if}
   </Section>
 {/if}
 
 <style>
-  /* THE PAGE'S METERS, REDRAWN HERE because that page's rules are scoped to it: the line, a thin bar under it, the bar
-     hidden from a screen reader, which has the line. */
-  .spent-meters {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    margin: 0 0 var(--sp-3);
-    padding: 0;
-    list-style: none;
+  /* THE TILES, 12 apart: one column on a phone, and as many as fit from there, each at least a ring's width and its line. */
+  .spent-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: var(--inset);
+    margin-block-end: var(--sp-5);
   }
 
-  .spent-meter {
+  .spent-ring {
     display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
+    justify-content: center;
   }
 
-  .spent-meter-line {
+  /* THE FIGURE (SYSTEM §3), for his asks on his own key, where there is no cap for a ring to measure against. */
+  .spent-figure {
+    margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
-    font-weight: 500;
+    font-size: var(--t-figure);
+    font-weight: 600;
+    line-height: 34px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
-  .spent-bar {
-    display: block;
-    block-size: 4px;
-    border-radius: var(--r-pill);
-    background: var(--line-soft);
-    overflow: hidden;
-  }
-
-  .spent-fill {
-    display: block;
-    block-size: 100%;
-    border-radius: var(--r-pill);
-    background: var(--ink2);
-  }
-
-  .spent-meter[data-near] .spent-fill {
-    background: var(--warn);
+  /* THE ONE LINE THAT READS THE CHART, at the foot of its tile. */
+  .spent-reading {
+    margin: auto 0 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .spent-out {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-3);
+    margin-block-end: var(--sp-5);
   }
 
   .spent-said {
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  .spent-warn {
-    color: var(--warn);
+  .spent-gap {
+    margin-block-end: var(--sp-4);
+  }
+
+  /* OUT OF ASKS NEEDS HIM: the words carry it, in red at 500 so the colour is never a hairline (SYSTEM §2). */
+  .spent-said[data-needs] {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  /* EACH DAY UNDER A META HEADING, as the palette heads its groups, and its lines on the ground under it. */
+  .spent-day + .spent-day {
+    margin-block-start: var(--sp-4);
   }
 
   .spent-h {
-    margin: var(--sp-4) 0 var(--sp-1);
-    color: var(--ink);
-    font-size: var(--t-sm);
-    font-weight: 600;
-  }
-
-  .spent-day {
     display: flex;
-    flex-direction: column;
-  }
-
-  .spent-list {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A LIST WITHOUT BOXES, a hairline between rows: the question and its cost on the first line, when and what it filed
-     under it. */
-  .spent-row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    padding-block: var(--sp-2);
-    border-block-end: 1px solid var(--line-soft);
-  }
-
-  .spent-top {
-    display: flex;
-    flex-wrap: wrap;
     align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-1) var(--sp-4);
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
+  }
+
+  .spent-h-n {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A LINE: the question and when over each other, the cost at the end, and the way to what it filed after it. */
+  .spent-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
   .spent-what {
-    min-inline-size: 0;
-    color: var(--ink);
-    font-size: var(--t-ui);
     overflow-wrap: anywhere;
   }
 
   .spent-cost {
-    color: var(--dim);
-    font-size: var(--t-sm);
     white-space: nowrap;
-  }
-
-  .spent-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   .spent-filed {
     display: inline-flex;
     align-items: center;
-    min-block-size: 44px;
+    min-block-size: var(--ctl-h-sm);
     color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .spent-filed:hover {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* ON A PHONE THE COST AND THE LINK SIT UNDER THE QUESTION, so a long one wraps rather than pushing them off. */
+  @media (width < 640px) {
+    .spent-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .spent-row .line-main {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
+
+    .spent-row .line-when {
+      grid-column: 1;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
+
+    .spent-filed {
+      grid-column: 2;
+      grid-row: 2;
+    }
   }
 </style>

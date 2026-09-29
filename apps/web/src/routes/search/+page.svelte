@@ -10,9 +10,12 @@
   spans the record; this keeps each list whole with its own count, because a person who has come here
   has already decided the ranked answer was not the one they wanted.
 
-  AND THE SAME RESULT (design SYS-13). A hit is the palette's `Result`: its glyph, its title and one
-  line saying where it sits. It was a title with a row number a column away from it, which is an id
-  where a person reads and a thousand pixels between two halves of one thing at 1440.
+  GROUPED UNDER META HEADINGS, AS THE PALETTE GROUPS THEM (SYSTEM §6). Each list that matched is a
+  quiet heading in the meta step with its count, and its rows sit on the ground under it: a 32px well
+  with the glyph of what it is, the title, and one line saying where it sits or why it matched. The
+  row is drawn here and not through the palette's `Result`, which is an option inside glass; here it
+  is a link on the ground. When the matches span two lists or more, one tile says where they are, as
+  bars, with the line that reads them.
 
   THE ANSWER IS THE RECORD'S, through `search-live.ts`, and a record that turns the search away says why.
 
@@ -30,18 +33,22 @@
   import type { SearchResult } from '$lib/record/api.ts';
   import { searcher, type Found, type Searcher } from '$lib/record/search-live.ts';
   import { shownState } from './shown.ts';
+  import { sentenceOf, topOf, whereSaid } from './shown.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
-  import Result from '$lib/palette/Result.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Bars from '$lib/viz/Bars.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
   /* THIS SCREEN'S OWN WORDS, beside it rather than in the copy aggregate, which this unit does not hold. */
   const words = {
     showAll: (n: number) => `Show all ${n.toLocaleString('en')}`,
+    where: 'Where it matched',
+    whereSubject: 'Matches by list',
   } as const;
 
   const q = $derived(route.url.searchParams.get('q') ?? '');
@@ -81,6 +88,12 @@
      about the words in the box, so it waits. `shown.ts` says which arm, and is where the rule is
      held to a test. */
   const shown = $derived(shownState(q, answer, answeredFor));
+
+  /* THE SENTENCE AND THE TILE ARE THE ANSWER'S, and only once the answer on screen has hits: a verdict or a wait says
+     nothing about where anything matched. `top` is the list with strictly the most, and no list on a tie. */
+  const sentence = $derived(shown === 'hits' ? (sentenceOf(q, found) ?? undefined) : undefined);
+  const top = $derived(topOf(found.groups));
+  const bars = $derived(found.groups.map((g) => ({ label: g.kind, value: g.total, tone: g === top ? 'ink' : undefined })));
 
   /* TEN A LIST. Enough to recognise the one you meant, few enough that nine matching lists is a page
      rather than a scroll, and every list carries the way to its own remainder. */
@@ -145,11 +158,13 @@
 
 <svelte:head><title>{titleOf(q || copy.search)}</title></svelte:head>
 
-<PageHead icon="search" title={copy.search} count={q ? found.total : undefined} />
+<PageHead title={copy.search} count={q ? found.total : undefined} {sentence} />
 
 <div class="page">
-  <label class="field">
-    <Icon name="search" size="s" />
+  <!-- THE FIELD ON THE GROUND, first under the sentence: 44 tall on the soft well, the glyph inside the label and the
+       input taking the rest. It is the fallback when the rail's Ask was not enough, so it is here on every visit. -->
+  <label class="field field-lg search-field">
+    <Icon name="search" size="m" />
     <!-- A NAME, NOT A PLACEHOLDER: the placeholder disappears the moment somebody types, taking the
          accessible name with it. Every search box in the product has the same shape. -->
     <input
@@ -183,140 +198,93 @@
       {/snippet}
     </Empty>
   {:else}
-    {#each found.groups as group}
-      {@const all = isWhole(group.kind)}
-      <Section title={group.kind} count={group.total}>
-        <!--
-          EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own (design DSN-10).
+    <div class="results" data-split={found.groups.length >= 2 ? '' : undefined}>
+      <!-- WHERE IT MATCHED, ONLY WHEN THERE IS A WHERE: a single list is its own heading already. The list holding
+           most is the ink bar and the rest are greys; a tie at the top highlights none. First in the order a phone
+           reads, and beside the lists from a desk's width. -->
+      {#if found.groups.length >= 2}
+        <div class="side">
+          <Tile icon="search" title={words.where} count={found.total.toLocaleString('en')}>
+            <Bars items={bars} subject={words.whereSubject} />
+            <p class="reading">{whereSaid(found)}</p>
+          </Tile>
+        </div>
+      {/if}
 
-          This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null`
-          by construction, because `/decide` is not a filtered list. So with fourteen matching
-          decisions the page drew *Decide 14*, ten rows, and nothing: four rows dropped in silence, on
-          the screen built because the palette dropped rows in silence.
+      <div class="groups">
+        {#each found.groups as group, gi (group.kind)}
+          {@const all = isWhole(group.kind)}
+          <section class="group" aria-labelledby="search-group-{gi}">
+            <div class="group-head">
+              <h2 class="group-title" id="search-group-{gi}">
+                {group.kind}<span class="group-count num">{group.total.toLocaleString('en')}</span>
+              </h2>
+              <!--
+                EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own (design DSN-10).
 
-          A list's rest is that list, filtered by what was typed, which also holds the rows past the
-          record's ceiling on a search. The decisions and the pages are all in hand, so theirs opens
-          here, and the count on the button is what it will draw.
-        -->
-        {#snippet aside()}
-          {#if group.href && group.total > PER_LIST}
-            <Button weight="bare" href={group.href}>{words.showAll(group.total)}</Button>
-          {:else if !group.href && !all && group.hits.length > PER_LIST}
-            <Button weight="bare" onclick={() => openGroup(group.kind)}>{words.showAll(group.hits.length)}</Button>
-          {/if}
-        {/snippet}
-        <ul class="hits">
-          {#each all ? group.hits : group.hits.slice(0, PER_LIST) as hit (hit.href)}
-            <li>
-              <!-- THE PALETTE'S RESULT, AND WHY IT IS HERE AS ITS LINE. `nordhaven` draws four services
-                   named after none of it, because `services.provider` is declared searchable, and the
-                   reason is what makes that readable. A row the record sends with nothing beside its
-                   title says the list it is in, which is what a person calls it (design SYS-3). -->
-              <a class="hit" href={at(hit.href)}>
-                <Result icon={hit.icon} title={hit.title} line={hit.why ?? (hit.detail || hit.kind)} />
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </Section>
-    {/each}
+                This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null`
+                by construction, because `/decide` is not a filtered list. So with fourteen matching
+                decisions the page drew *Decide 14*, ten rows, and nothing: four rows dropped in silence, on
+                the screen built because the palette dropped rows in silence.
+
+                A list's rest is that list, filtered by what was typed, which also holds the rows past the
+                record's ceiling on a search. The decisions and the pages are all in hand, so theirs opens
+                here, and the count on the button is what it will draw.
+              -->
+              {#if group.href && group.total > PER_LIST}
+                <Button weight="bare" size="sm" href={group.href}>{words.showAll(group.total)}</Button>
+              {:else if !group.href && !all && group.hits.length > PER_LIST}
+                <Button weight="bare" size="sm" onclick={() => openGroup(group.kind)}>{words.showAll(group.hits.length)}</Button>
+              {/if}
+            </div>
+            <ul class="ledger ledger-lead hits">
+              {#each all ? group.hits : group.hits.slice(0, PER_LIST) as hit (hit.href)}
+                <li>
+                  <!-- THE ROW SAYS WHY IT IS HERE. `nordhaven` draws four services named after none of it, because
+                       `services.provider` is declared searchable, and the reason is what makes that readable. A row
+                       the record sends with nothing beside its title says the list it is in, which is what a person
+                       calls it (design SYS-3). -->
+                  <a class="line line-tall hit" href={at(hit.href)}>
+                    <IconWell name={hit.icon} size="l" />
+                    <span class="line-main">
+                      <span class="line-title" dir="auto">{hit.title}</span>
+                      <span class="line-detail" dir="auto">{hit.why ?? (hit.detail || hit.kind)}</span>
+                    </span>
+                  </a>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      </div>
+    </div>
   {/if}
 </div>
 
 <style>
-  /**
-   * ROWS ON THE PAGE WITH A HAIRLINE BETWEEN THEM AND NOTHING AROUND THEM (design brief §5).
-   *
-   * At desktop width the rows reach a step past the text column on both sides, so a title lines up
-   * with the heading above it and the hover wash has somewhere to be. On a phone they do not: that
-   * step put every divider 4px from the screen's edge while the field and the words sat on the 16px
-   * gutter, and a phone has no hover for the step to make room for.
-   */
-  .hits {
-    margin: 0 calc(-1 * var(--sp-3));
-    padding: 0;
-    list-style: none;
-  }
-
-  .hits > li + li {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  /* A TABLE ROW WITH A FINE POINTER, 44px WITH A COARSE ONE, AND 56px ON A PHONE, where `Result`
-     draws the title over its line. What the row shows is `Result`'s; this is only the link around it. */
-  .hit {
-    display: flex;
-    align-items: center;
-    min-block-size: var(--table-row-h);
-    padding: var(--sp-1) var(--sp-3);
-    color: var(--ink);
-    text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .hit:hover {
-      background: var(--hover-wash);
-    }
-  }
-
-  @media (pointer: coarse) {
-    .hit {
-      min-block-size: var(--tap);
-    }
-  }
-
-  @media (width < 640px) {
-    .hits {
-      margin-inline: 0;
-    }
-
-    .hit {
-      min-block-size: var(--row-h-2);
-      padding-inline: 0;
-    }
-  }
-
   .page {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
-  /* The register's own search field, which is where this shape comes from: one box, one icon
-     inside the label, and the input taking the rest. */
-  .field {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    max-inline-size: 44ch;
-    padding: 0 var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--dim);
+  /* THE FIELD IS `controls.css`'s: the soft well with no border, 44 tall at `field-lg`, radius 12, and the ink ring on
+     the wrapper while the input inside it has focus. As wide as the palette, since it is the palette's question asked
+     again. */
+  .search-field {
+    max-inline-size: 640px;
   }
 
-  .field-input {
-    flex: 1;
-    min-inline-size: 0;
-    min-block-size: var(--ctl-h);
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--ink);
-    font: inherit;
-    /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is (design brief §5), so a phone
-       does not zoom the page when the field is pressed. */
+  /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is (design brief §5), so a phone does not zoom the page
+     when the field is pressed. */
+  .search-field .field-input {
     font-size: var(--t-md);
   }
 
-  /* The ring is not deleted, it MOVES to the box that looks like the field: `.field:focus-within`
-     below tints the border, so the state change is still visible and belongs to the right element.
-     `css-rules` caught this the moment the route existed, which is the gate doing its job: the
-     first version stripped the outline with no reason beside it. */
+  /* The ring is not deleted, it MOVES to the box that looks like the field (`controls.css`, `.field:focus-within`). */
   .field-input:focus-visible {
     /* focus-ok: the caret indicates focus, and `.field:focus-within` carries the state change for
        the box the reader actually sees. */
@@ -324,5 +292,89 @@
     box-shadow: none;
   }
 
-  /* `.field:focus-within` is `controls.css`'s, shared with every field. */
+  /* ONE COLUMN, the tile first and the lists under it. From a desk's width the lists take the room and the tile stands
+     beside them, held in view while they scroll. Measured on the page's own width, so a docked panel narrows it too. */
+  .results {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+    align-items: start;
+  }
+
+  @container (inline-size >= 820px) {
+    .results[data-split] {
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+      column-gap: var(--sp-6);
+    }
+
+    .results[data-split] .side {
+      position: sticky;
+      inset-block-start: calc(var(--inset) + 56px);
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .results[data-split] .groups {
+      grid-column: 1;
+      grid-row: 1;
+    }
+  }
+
+  /* THE ONE LINE THAT READS THE CHART, under it (SYSTEM §6). */
+  .reading {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  /* A META HEADING OVER EACH LIST, AS THE PALETTE HEADS ITS GROUPS (SYSTEM §6): the meta step at 500 in the lowest text
+     ink, its count beside it, and the way to the rest at the far end. */
+  .group-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--ctl-h-sm);
+    margin-block-end: var(--sp-1);
+  }
+
+  .group-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
+  }
+
+  .group-count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .group-head :global(.btn) {
+    margin-inline-start: auto;
+  }
+
+  /* A HIT IS A ROW ON THE GROUND: its well, its title over its line, and the rounded wash under the pointer. The shared
+     card layout under 640 puts the words under the lead; a hit keeps its well beside both lines at every width. */
+  .hit {
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
+  }
+
+  @media (width < 640px) {
+    .hit .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+  }
 </style>

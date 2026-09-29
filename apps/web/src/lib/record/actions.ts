@@ -370,6 +370,12 @@ export type Allowed = {
   binding: string | null;
   slash: string | null;
   extra: string | null;
+  /**
+   * Slash's credits this month as the host counted them, the numbers behind `slash`: what the plan includes, what is
+   * used, and what packs hold on top. `null` when the host does not count them. Added for a chart of the month and for
+   * Settings, which says the same figures; `slash` stays the sentence.
+   */
+  credits: { included: number; used: number; packs: number } | null;
 };
 
 /**
@@ -393,6 +399,11 @@ export type UsageView = {
   actions: Named[];
   groups: Group[];
   weeks: { label: string; runs: number }[];
+  /**
+   * The month's runs by UTC day, oldest first, one entry per day that has any: what `weeks` folds, kept so a chart can
+   * draw the days themselves. A day with no entry had no runs counted, and a day after `through` has not happened.
+   */
+  days: { day: string; runs: number }[];
   records: Allowed[];
 };
 
@@ -428,6 +439,23 @@ export function weeksOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[
     out.push({ label: words.week(`${start} ${name}`, `${stop} ${name}`), runs });
   }
   return out;
+}
+
+/**
+ * The month's days with runs, oldest first: the same days `weeksOf` folds, kept whole for a chart of the days.
+ *
+ * ONLY WHAT WAS COUNTED. A day outside `month`, or after `through`, is dropped, and a day with no runs is not made up:
+ * a chart draws a missing day as nothing counted, which is what the ledger said.
+ */
+export function daysOf(days: readonly ({ day: string } & Pick<Totals, 'runs'>)[], month: string, through?: string): UsageView['days'] {
+  const last = through?.slice(0, 7) === month ? through.slice(0, 10) : null;
+  const by = new Map<string, number>();
+  for (const d of days) {
+    const day = d.day.slice(0, 10);
+    if (day.slice(0, 7) !== month || (last !== null && day > last) || !(d.runs > 0)) continue;
+    by.set(day, (by.get(day) ?? 0) + d.runs);
+  }
+  return [...by].sort(([a], [b]) => a.localeCompare(b)).map(([day, runs]) => ({ day, runs }));
 }
 
 const sortNamed = (rows: Named[]): Named[] => rows.sort((a, b) => Number(a.faint) - Number(b.faint) || b.runs - a.runs || a.name.localeCompare(b.name));
@@ -481,6 +509,7 @@ export function usageFromActions(rows: readonly ActionRow[], month: string, from
     actions: sortNamed(actions),
     groups: groupsOf(scoped),
     weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
+    days: daysOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records: [],
   };
 }
@@ -523,6 +552,9 @@ function amountOf(key: MeterKey, n: number): string {
 
 /** A share as a person says it: "Less than 1%" for a little, never "0%" for something. */
 const shareWords = (share: number): string => (share > 0 && share < 0.01 ? 'Less than 1%' : `${Math.floor(share * 100)}%`);
+
+/** A meter's share as the meters' own sentences say it, for a page that says it again: "82%", "Less than 1%". */
+export const shareSaid = (share: number): string => shareWords(share);
 
 /** How far into its allowance a meter is before the page says the limit is near: the Directory's `NOTICE_AT`. */
 const NEAR = 0.8;
@@ -572,6 +604,7 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean): Allowe
     binding: top !== undefined && top.share > 0 ? words.meterNoun[top.k] : null,
     slash,
     extra,
+    credits: r.slash ? { included: r.slash.included, used: r.slash.used, packs: r.slash.packs } : null,
   };
 }
 
@@ -615,6 +648,7 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
     actions: sortNamed(actions),
     groups: groupsOf(scoped),
     weeks: weeksOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
+    days: daysOf([...days].map(([day, runs]) => ({ day, runs })), month, through),
     records,
   };
 }

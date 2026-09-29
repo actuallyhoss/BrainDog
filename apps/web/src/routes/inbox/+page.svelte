@@ -11,12 +11,18 @@
   several are filed or archived at once, and Esc clears the selection. A row leads with its subject,
   then who sent it and the first words of what they said, then when (rule 7).
 
-  ARRIVALS THAT ARE ALIKE ARE DRAWN TOGETHER, by the kernel's own shape (`shapes.ts`), and at three or more
-  alike the group offers to ask Slash for a pattern, which files a `pattern` proposal on Decide. The cursor
-  walks the rows in the order they are drawn, so `j` never jumps between groups.
+  ARRIVALS SIT ON THE GROUND, GROUPED BY THE DAY THEY CAME (SYSTEM §6, "Lists are neither"): Today, Yesterday, then
+  each day by name, newest first, with no box round them. The cursor walks the rows in the order they are drawn, so
+  `j` never jumps between days. A row leads with a round check that selects it, and its verbs show on the cursor row
+  with the keys that do the same.
 
-  AND WHAT LEFT IT IS STILL HERE. Waiting, Filed and Archived are one series of the same arrivals, led by the record's
-  "Filed by rules this week" line, with the pattern proposals that wait on Decide above what waits. Every filing and
+  WHAT IS ALIKE IS LEARNED ONCE. Arrivals that share the kernel's own shape (`shapes.ts`) are gathered above the days,
+  one row a sender: at three or more alike the row offers to ask Slash for a pattern, which files a `pattern` proposal
+  on Decide, and any group can be made into a rule by hand. The proposals already waiting on Decide lead the screen,
+  since one accepted pattern files every arrival like its samples from then on. Arrives, learned once, filed.
+
+  AND WHAT LEFT IT IS STILL HERE. Waiting, Filed and Archived are one series of the same arrivals, chosen in the
+  toolbar. The record's tally is the title row's sentence and the one tile, "Who filed it". Every filing and
   archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back` (MOD-26).
 -->
 <script lang="ts">
@@ -39,6 +45,9 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Stacked from '$lib/viz/Stacked.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { ALIKE, SAMPLES_MOST, groupsOf, type Group } from './shapes.ts';
   import { builderPath } from '$lib/pattern/draft.ts';
@@ -47,19 +56,29 @@
   import Face from '$lib/ui/Face.svelte';
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
+  import { daysOf, sentenceOf, whoFiledOf } from './days.ts';
 
   /**
    * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
    * sentence here that named the allowance would be wrong the day the door moves it.
    */
   const words = {
-    alike: (n: number) => `${n} alike`,
     askPattern: 'Ask Slash for a pattern',
     asking: 'Slash is drafting a pattern',
     unfiled: 'Slash drafted nothing to decide from these.',
     unreached: 'BrainDog could not reach Slash. Nothing was drafted.',
-    tally: (ruled: number, waiting: number) => `Filed by rules this week: ${ruled} · waiting: ${waiting}`,
     series: 'Show',
+    whoFiled: 'Who filed it',
+    byRulesWeek: 'filed by rules this week',
+    learn: 'Could file themselves',
+    learnWhy: 'Messages alike from one sender are learned once, as a rule, and the rest are filed as they arrive.',
+    alikeFrom: (n: number, from: string) => `${n} alike from ${from}`,
+    newest: (subject: string, when: string) => `Newest: ${subject} · ${when}`,
+    patternWhy: 'Drafted by Slash, waiting on Decide',
+    file: 'File',
+    archive: 'Archive',
+    fileNamed: (subject: string) => `File “${subject}”`,
+    archiveNamed: (subject: string) => `Archive “${subject}”`,
     waiting: 'Waiting',
     filed: 'Filed',
     archived: 'Archived',
@@ -90,11 +109,14 @@
   let refused = $state<string | null>(null);
   let unrouted = $state(false);
   const INBOX = $derived(live?.items ?? []);
-  /* THE SHAPE OF EVERY ARRIVAL READ, by id, replaced whole so that the groups follow it. `shown` is the rows in the order
-     the groups draw them, which is the order the cursor walks and the next row opens in. */
+  /* THE SHAPE OF EVERY ARRIVAL READ, by id, replaced whole so that the groups follow it. */
   let shapes = $state.raw<ReadonlyMap<string, string>>(new Map());
   const groups = $derived(groupsOf(INBOX.slice(0, DOM_CAP), shapes));
-  const shown = $derived(groups.flatMap((g) => g.items));
+  /* THE ROWS BY DAY, and the alike groups that could be learned once. `shown` is the rows in the order the days draw
+     them, which is the order the cursor walks and the next row opens in. */
+  const days = $derived(daysOf(INBOX.slice(0, DOM_CAP), Date.now()));
+  const alike = $derived(groups.filter((g) => g.items.length > 1));
+  const shown = $derived(days.flatMap((d) => d.items));
   const place = $derived(new Map(shown.map((item, i) => [item.id, i])));
   const clock = $derived(Date.now());
   const answered = $derived(live !== null);
@@ -137,6 +159,10 @@
   type View = 'waiting' | Series;
   let view = $state<View>('waiting');
   let tally = $state<Tally | null>(null);
+  /* THE SENTENCE AND THE TILE, from the record's tally and nothing counted here. The oldest arrival drawn decides the
+     red: what has waited more than two days needs him. */
+  const sentence = $derived(sentenceOf(tally, INBOX.at(-1)?.arrived ?? null, clock));
+  const whoFiled = $derived(whoFiledOf(tally));
   let patterns = $state<Pattern[]>([]);
   let series = $state<{ state: Series; items: SettledItem[]; cursor: number | null } | null>(null);
   let seriesFix = $state<string | null>(null);
@@ -354,6 +380,10 @@
 
   /* ── a selection ─────────────────────────────────────────────────────────── */
   let picked = $state(new Set<string>());
+  /* SELECTING, ON A PHONE: nothing hovers there to reveal the checks, so `Select` shows them at a thumb's size, as
+     Decide's does. At a desk the checks are always drawn and `x` picks the cursor's row. */
+  let selecting = $state(false);
+  const picking = $derived(picked.size > 0 || selecting);
   function toggle(id: string) {
     const next = new Set(picked);
     if (!next.delete(id)) next.add(id);
@@ -451,15 +481,11 @@
 <svelte:head><title>{titleOf(said('inbox'))}</title></svelte:head>
 <svelte:window {onkeydown} />
 
-<PageHead icon="inbox"
-  title={said('inbox')}
-  count={answered && !unrouted && !refused ? INBOX.length : undefined}
-  atLeast={live !== null && live.cursor !== null}
-/>
-
-{#snippet fileInto()}
+{#snippet fileInto(where: 'bar' | 'row')}
+  <!-- THE LIST A FILING GOES INTO, a pill in the toolbar, where it stays in view while the list scrolls. A phone's head
+       scrolls away with the page, so there the open row and the selection's bar carry it too. -->
   {#if lists.length > 0}
-    <label class="file-into">
+    <label class="file-into" data-where={where}>
       <span class="file-label">{copy.inboxFileInto}</span>
       <select class="file-select" value={target} disabled={busy} onchange={(e) => choose(e.currentTarget.value)}>
         {#each lists as list (list.id)}<option value={list.id}>{list.name}</option>{/each}
@@ -467,6 +493,47 @@
     </label>
   {/if}
 {/snippet}
+
+{#snippet toolbar()}
+  {#if answered && !unrouted && !refused}
+    <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be
+         seen and put back rather than vanishing from the screen it left. The chosen one is the white pill. -->
+    <div class="segmented series" role="group" aria-label={words.series}>
+      {#each segments as s (s.v)}
+        <button
+          type="button"
+          class="segment"
+          aria-pressed={view === s.v}
+          data-on={view === s.v ? '' : undefined}
+          onclick={() => show(s.v)}
+        >{s.label}{#if s.n}<span class="segment-n num">{s.n}</span>{/if}</button>
+      {/each}
+    </div>
+    {#if view === 'waiting'}
+      {@render fileInto('bar')}
+      {#if INBOX.length > 0}
+        <span class="select-toggle">
+          <Button
+            aria-pressed={selecting}
+            onclick={() => {
+              selecting = !selecting;
+              if (!selecting) picked = new Set();
+            }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
+          >
+        </span>
+      {/if}
+    {/if}
+  {/if}
+{/snippet}
+
+<PageHead
+  title={said('inbox')}
+  count={answered && !unrouted && !refused ? INBOX.length : undefined}
+  atLeast={live !== null && live.cursor !== null}
+  sentence={sentence?.text}
+  needs={sentence?.needs}
+  actions={toolbar}
+/>
 
 <div class="page">
   {#if refused}
@@ -477,45 +544,48 @@
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     {#if !answered}<Waiting />{/if}
   {:else}
-    <!-- THE ONE LINE OF CONTEXT, the record's own numbers: what the rules did this week without anybody, and what waits
-         on somebody. Absent until the record answers with them, never a guessed zero. -->
-    {#if tally && tally.ruled !== null}<p class="tally">{words.tally(tally.ruled, tally.waiting)}</p>{/if}
-
-    <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be
-         seen and put back rather than vanishing from the screen it left. -->
-    <div class="segmented series" role="group" aria-label={words.series}>
-      {#each segments as s (s.v)}
-        <button
-          type="button"
-          class="segment"
-          aria-pressed={view === s.v}
-          data-on={view === s.v ? '' : undefined}
-          onclick={() => show(s.v)}
-        >{s.label}{#if s.n}<span class="segment-n">{s.n}</span>{/if}</button>
-      {/each}
-    </div>
-
-    {#if view !== 'waiting'}
-      {@render settledSeries()}
-    {:else}
-      {#if patterns.length > 0}
-        <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
-             more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
-        <Section title={words.patterns} count={patterns.length}>
-          <ul class="ledger">
-            {#each patterns as p (p.id)}
-              <li>
-                <a class="line pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
-                  <span class="line-main"><span class="line-title">{p.title}</span></span>
-                  <Icon name="decide" size="s" />
-                </a>
-              </li>
-            {/each}
-          </ul>
-        </Section>
+    <div class="inbox" data-split={whoFiled ? '' : undefined}>
+      <!-- WHO FILED IT, the record's own tally as one tile: what rules filed this week is the figure, and the bar is the
+           whole, with what still waits for a person in ink. Absent until the record answers with a weekly count,
+           never a guessed zero. First on a phone, and beside the list from a desk's width. -->
+      {#if whoFiled}
+        <div class="side">
+          <Tile icon="inbox" title={words.whoFiled}>
+            <p class="figure num">{whoFiled.figure.toLocaleString('en-GB')}<span class="figure-unit">{words.byRulesWeek}</span></p>
+            <Stacked parts={whoFiled.parts} subject={words.whoFiled} />
+            <p class="reading">{whoFiled.reading}</p>
+          </Tile>
+        </div>
       {/if}
-      {@render waitingSeries()}
-    {/if}
+
+      <div class="main">
+        {#if view !== 'waiting'}
+          {@render settledSeries()}
+        {:else}
+          {#if patterns.length > 0}
+            <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
+                 more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
+            <Section title={words.patterns} count={patterns.length}>
+              <ul class="ledger ledger-lead">
+                {#each patterns as p (p.id)}
+                  <li>
+                    <a class="line line-tall pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
+                      <IconWell name="decide" size="l" />
+                      <span class="line-main">
+                        <span class="line-title">{p.title}</span>
+                        <span class="line-detail">{words.patternWhy}</span>
+                      </span>
+                      <span class="pattern-go" aria-hidden="true"><Icon name="chevron" size="m" /></span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </Section>
+          {/if}
+          {@render waitingSeries()}
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -531,43 +601,52 @@
       <Empty kind="no-data-yet" compact title={words.noneArchived} body={words.noneArchivedWhy} />
     {/if}
   {:else}
-    <ul class="ledger arrivals">
-      {#each series.items as item (item.id)}
-        {@const s = item.settled}
-        {@const who = s ? actor(s.by, me || null) : null}
-        <!-- WHO SETTLED IT, IN PLACE: the face and the name of the person or the agent's run that filed or archived it,
-             and the list a filing went into, linked to its row. A rule's filing is said to be a rule's and offers no Put
-             back, since the record keeps a rule's filing to its list. -->
-        <li class="arrival">
-          <div class="line line-tall settled-line">
-            <span class="line-main">
-              <span class="line-title">{item.subject}</span>
-              <span class="line-detail settled-detail">
-                {#if who}<Face name={who.name} you={who.kind === 'you'} kind={who.kind} size="s" />{/if}
-                {#if series.state === 'matched'}
-                  {#if s?.row}
-                    <span>{words.filedIn}
-                      {#if s.row.seq !== null && !s.row.archived}<a class="settled-list" href={at(`/r/${encodeURIComponent(s.row.register)}/${s.row.seq}`)}>{listOf(s.row.register)}</a>{:else}{listOf(s.row.register)}{/if}
-                      {words.by(who?.name ?? '')}</span>
-                  {:else}
-                    <span>{who ? words.filedBy(who.name) : words.byRule}</span>
+    {@const state = series.state}
+    <!-- THE SAME ROWS, BY THE DAY EACH WAS SETTLED, led by whoever settled it: the face of the person or the agent's run,
+         or the glyph of what happened when a rule did it. A rule's filing is said to be a rule's and offers no Put
+         back, since the record keeps a rule's filing to its list. -->
+    <div class="days">
+      {#each daysOf(series.items.map((i) => ({ ...i, arrived: i.settled?.at ?? i.arrived })), clock) as d (d.day)}
+        <Section title={d.label} count={d.items.length}>
+          <ul class="ledger ledger-lead arrivals">
+            {#each d.items as item (item.id)}
+              {@const s = item.settled}
+              {@const who = s ? actor(s.by, me || null) : null}
+              <li>
+                <div class="line line-tall settled-line">
+                  <span class="line-mark">
+                    {#if who}<Face name={who.name} you={who.kind === 'you'} kind={who.kind} size="l" />{:else}<IconWell name={state === 'matched' ? 'check' : 'archive'} size="l" />{/if}
+                  </span>
+                  <span class="line-main">
+                    <span class="line-title">{item.subject}</span>
+                    <span class="line-detail settled-detail">
+                      {#if state === 'matched'}
+                        {#if s?.row}
+                          <span>{words.filedIn}
+                            {#if s.row.seq !== null && !s.row.archived}<a class="settled-list" href={at(`/r/${encodeURIComponent(s.row.register)}/${s.row.seq}`)}>{listOf(s.row.register)}</a>{:else}{listOf(s.row.register)}{/if}
+                            {words.by(who?.name ?? '')}</span>
+                        {:else}
+                          <span>{who ? words.filedBy(who.name) : words.byRule}</span>
+                        {/if}
+                      {:else}
+                        <span>{who ? words.archivedBy(who.name) : words.archivedPlain}</span>
+                      {/if}
+                      <span class="from">{item.from}</span>
+                    </span>
+                  </span>
+                  <span class="line-when">{since(s?.at ?? item.arrived, clock)}</span>
+                  {#if s}
+                    <span class="settled-verb">
+                      <Button size="sm" disabled={backing !== null} onclick={() => putBack(item.id, s.row?.version ?? null)}>{words.putBack}</Button>
+                    </span>
                   {/if}
-                {:else}
-                  <span>{who ? words.archivedBy(who.name) : words.archivedPlain}</span>
-                {/if}
-                <span class="from">{item.from}</span>
-              </span>
-            </span>
-            <span class="line-when">{since(s?.at ?? item.arrived, clock)}</span>
-          </div>
-          {#if s}
-            <div class="settled-actions">
-              <Button disabled={backing !== null} onclick={() => putBack(item.id, s.row?.version ?? null)}>{words.putBack}</Button>
-            </div>
-          {/if}
-        </li>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        </Section>
       {/each}
-    </ul>
+    </div>
     {#if series.cursor !== null}
       <div class="older">
         <Button weight="quiet" onclick={loadOlderSeries} disabled={seriesOlder}>{copy.olderEntries}</Button>
@@ -595,80 +674,101 @@
       {/snippet}
     </Empty>
   {:else}
-    <ul class="ledger arrivals" data-picking={picked.size > 0 ? '' : undefined}>
-      {#each groups as group (group.shape)}
-        <!-- A GROUP OF ONE IS DRAWN AS A ROW AND NOTHING MORE. Two or more alike are led by who they are from and how
-             many there are, and the rows follow. -->
-        {#if group.items.length > 1}
-          <li class="shape">
-            <span class="shape-from">{group.items[0]?.from}</span>
-            <span class="shape-n">{words.alike(group.items.length)}</span>
-          </li>
-        {/if}
-        {#each group.items as item (item.id)}
-        {@const i = place.get(item.id) ?? -1}
-        <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
-          <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
-               sender's domain led the row in a column of its own and was said again under the
-               subject (DESIGN-SYSTEM D5). -->
-          <button
-            type="button"
-            id="arrival-{item.id}"
-            class="line line-tall"
-            aria-expanded={open === item.id}
-            onclick={() => {
-              cursor = i;
-              open = open === item.id ? null : item.id;
-            }}
-          >
-            <span class="line-main">
-              <span class="line-title">{item.subject}</span>
-              <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
-            </span>
-            <span class="line-when">{since(item.arrived, clock)}</span>
-          </button>
-          <button
-            type="button"
-            class="pick"
-            role="checkbox"
-            aria-checked={picked.has(item.id)}
-            aria-label={item.subject}
-            data-on={picked.has(item.id) ? '' : undefined}
-            onclick={() => toggle(item.id)}
-          >{#if picked.has(item.id)}<Icon name="check" size="s" />{/if}</button>
-
-          {#if open === item.id}
-            <div class="body">
-              <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
-              <p class="raw">{item.body}</p>
-
-              <!-- FILING IS THE PRIMARY, and the rule offer follows it at the ordinary weight. -->
-              <div class="actions">
-                {@render fileInto()}
-                <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
-                <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
+    {#if alike.length > 0}
+      <!-- LEARNED ONCE. Each sender with two or more alike is one row: how many, from whom, and the newest of them.
+           Asking Slash waits for the record's threshold for a pattern, since it spends a model call; making the rule by
+           hand (PLT-10, contracts X43) is offered for any group, because pointing at two alike messages costs nothing
+           and already shows what the rule would read. Both are quiet: filing is the screen's one primary. -->
+      <Section title={words.learn} count={alike.length}>
+        <p class="why">{words.learnWhy}</p>
+        <ul class="ledger ledger-lead">
+          {#each alike as group (group.shape)}
+            {@const newest = group.items[0]}
+            <li>
+              <div class="line line-tall alike-line">
+                <IconWell name="learning" size="l" />
+                <span class="line-main">
+                  <span class="line-title">{words.alikeFrom(group.items.length, newest?.from ?? '')}</span>
+                  {#if newest}<span class="line-detail">{words.newest(newest.subject, since(newest.arrived, clock))}</span>{/if}
+                </span>
+                <span class="alike-verbs">
+                  {#if group.items.length >= ALIKE}
+                    <Button size="sm" disabled={asking !== null} onclick={() => askPattern(group)}>
+                      {asking === group.shape ? words.asking : words.askPattern}
+                    </Button>
+                  {/if}
+                  <Button size="sm" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{patternWords.fromInbox}</Button>
+                </span>
               </div>
-              <!-- NO RULE OFFER ON ONE ARRIVAL. A rule is made from alike messages, so it is offered on the
-                   group's row below, which opens the pattern builder with the group as its samples. -->
-            </div>
-          {/if}
-        </li>
-        {/each}
-        <!-- THE GROUP'S OWN ROW OF ACTIONS, under its last arrival. Asking Slash waits for the record's threshold for a
-             pattern, since it spends a model call; making the rule by hand (PLT-10, contracts X43) is offered for any
-             group, because pointing at two alike messages costs nothing and already shows what the rule would read. -->
-        {#if group.items.length > 1}
-          <li class="shape-actions">
-            {#if group.items.length >= ALIKE}
-              <Button disabled={asking !== null} onclick={() => askPattern(group)}>
-                {asking === group.shape ? words.asking : words.askPattern}
-              </Button>
-            {/if}
-            <Button weight="quiet" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{patternWords.fromInbox}</Button>
-          </li>
-        {/if}
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {/if}
+
+    <div class="days">
+      {#each days as d (d.day)}
+        <Section title={d.label} count={d.items.length}>
+          <ul class="ledger arrivals" data-picking={picking ? '' : undefined}>
+            {#each d.items as item (item.id)}
+              {@const i = place.get(item.id) ?? -1}
+              <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
+                <!-- THE LEADING MARK IS THE CHECK THAT SELECTS IT: a 20px ring, ink with its tick once picked. -->
+                <button
+                  type="button"
+                  class="pick line-check tap"
+                  role="checkbox"
+                  aria-checked={picked.has(item.id)}
+                  aria-label={item.subject}
+                  data-on={picked.has(item.id) ? '' : undefined}
+                  onclick={() => toggle(item.id)}
+                ><Icon name="check" size="s" /></button>
+                <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
+                     sender's domain led the row in a column of its own and was said again under the
+                     subject (DESIGN-SYSTEM D5). -->
+                <button
+                  type="button"
+                  id="arrival-{item.id}"
+                  class="line line-tall"
+                  aria-expanded={open === item.id}
+                  onclick={() => {
+                    cursor = i;
+                    open = open === item.id ? null : item.id;
+                  }}
+                >
+                  <span class="line-main">
+                    <span class="line-title">{item.subject}</span>
+                    <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
+                  </span>
+                  <span class="line-when">{since(item.arrived, clock)}</span>
+                </button>
+                <!-- THE ROW'S VERBS, WITH THE KEYS THAT DO THE SAME: shown on the cursor row and under the pointer, and
+                     left out of the tab order, since `e` and Delete are the keyboard's way and the open row's buttons
+                     are a tab away. -->
+                <span class="line-verbs arrival-verbs">
+                  <Button size="sm" kbd="e" tabindex={-1} aria-label={words.fileNamed(item.subject)} disabled={busy} onclick={() => ((cursor = i), settle(item, 'file'))}>{words.file}</Button>
+                  <Button size="sm" weight="bare" kbd="Delete" tabindex={-1} aria-label={words.archiveNamed(item.subject)} disabled={busy} onclick={() => ((cursor = i), settle(item, 'archive'))}>{words.archive}</Button>
+                </span>
+
+                {#if open === item.id}
+                  <div class="body">
+                    <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
+                    <p class="raw">{item.body}</p>
+
+                    <!-- FILING IS THE PRIMARY, and archiving follows it in words. -->
+                    <div class="actions">
+                      {@render fileInto('row')}
+                      <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
+                      <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
+                    </div>
+                  </div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </Section>
       {/each}
-    </ul>
+    </div>
     <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
     {#if live && live.cursor !== null}
       <div class="older">
@@ -678,13 +778,13 @@
     {#if olderFix}<p class="foot">{olderFix}</p>{/if}
 
     {#if picked.size > 0}
-      <!-- THE SELECTION'S BAR, stuck to the foot of the view after the list, so opening it moves nothing. -->
+      <!-- THE SELECTION'S BAR: glass chrome floating at the foot of the view, so opening it moves nothing. -->
       <div class="batch" role="region" aria-label={copy.inboxSelected(picked.size)}>
-        <span class="batch-n">{copy.inboxSelected(picked.size)}</span>
-        {@render fileInto()}
+        <span class="batch-n num">{copy.inboxSelected(picked.size)}</span>
+        {@render fileInto('row')}
         <Button weight="primary" disabled={busy} onclick={() => settlePicked('file')}>{copy.inboxFileSelected(picked.size)}</Button>
-        <Button disabled={busy} onclick={() => settlePicked('archive')}>{copy.inboxArchiveSelected(picked.size)}</Button>
-        <Button weight="bare" onclick={() => (picked = new Set())}>{copy.clearSelection}</Button>
+        <Button weight="bare" disabled={busy} onclick={() => settlePicked('archive')}>{copy.inboxArchiveSelected(picked.size)}</Button>
+        <Button weight="bare" onclick={() => ((picked = new Set()), (selecting = false))}>{copy.clearSelection}</Button>
       </div>
     {/if}
   {/if}
@@ -692,25 +792,15 @@
 
 <style>
   .page {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
   }
 
-  /* THE ONE LINE OF CONTEXT under the head: quiet, and the numbers in it keep their width as they change. */
-  .tally {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* THE SERIES SITS AT ITS OWN WIDTH, a set of three pills and not a bar across the page. */
-  .series {
-    inline-size: fit-content;
-    max-inline-size: 100%;
-  }
+  /* ── the toolbar ──────────────────────────────────────────────────────── */
 
   .segment-n {
     margin-inline-start: var(--sp-2);
@@ -718,118 +808,243 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A pattern is a row that opens its question: the title, and the glyph of where it goes. */
-  .pattern {
-    display: flex;
+  /* THE LIST A FILING GOES INTO, as a glass pill in the toolbar: its word in the quiet ink, and the select inside it
+     drawn as words with the house chevron, so the two read as one control. */
+  .file-into {
+    display: inline-flex;
     align-items: center;
-    gap: var(--sp-3);
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  .pattern .line-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  /* A FILED OR ARCHIVED ARRIVAL IS READ, NOT OPENED: its row is text, and Put back is the one thing it does. */
-  .settled-line {
-    display: grid;
-    cursor: default;
-  }
-
-  .settled-detail {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: var(--sp-2);
-  }
-
-  .settled-list {
-    color: var(--ink);
-    text-decoration: underline;
-    text-decoration-color: var(--line);
-    text-underline-offset: 3px;
-  }
-
-  .settled-actions {
-    display: flex;
-    align-items: center;
-    padding: var(--sp-2) var(--sp-3) 0;
-  }
-
-  /* An arrival is its row, the box that selects it, and its body when open. */
-  .arrival {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    scroll-margin-block: var(--sp-7);
-  }
-
-  .arrivals > li + li {
-    border-block-start: 1px solid var(--line);
-  }
-
-  /* A GROUP'S HEAD IS A QUIET LABEL, not a row: it opens nothing, so it is not drawn as one. */
-  .shape {
-    display: flex;
-    align-items: baseline;
     gap: var(--sp-2);
-    padding: var(--sp-4) var(--sp-3) var(--sp-2);
-    font-size: var(--t-xs);
+    box-sizing: border-box;
+    min-block-size: var(--ctl-h);
+    max-inline-size: 100%;
+    padding-inline-start: var(--sp-4);
+    border-radius: var(--r-pill);
   }
 
-  .shape-from {
-    min-inline-size: 0;
-    overflow: hidden;
-    color: var(--ink2);
-    font-weight: 500;
-    text-overflow: ellipsis;
+  .file-into[data-where='bar'] {
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge);
+  }
+
+  /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the pills in it drop their own. */
+  :global(.head[data-under]) .file-into[data-where='bar'],
+  :global(.head[data-under]) .series {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .file-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
     white-space: nowrap;
   }
 
-  .shape-n {
-    flex: none;
-    color: var(--dim);
+  .file-select {
+    min-block-size: var(--ctl-h);
+    max-inline-size: 24ch;
+    background-color: transparent;
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+  }
+
+  .file-into[data-where='bar'] .file-select {
+    padding-inline-start: 0;
+  }
+
+  /* IN THE OPEN ROW AND THE SELECTION'S BAR the select is a field, the soft well beside its word, and it is drawn only
+     on a phone, where the toolbar has scrolled away with the page. */
+  .file-into[data-where='row'] {
+    display: none;
+    padding-inline-start: 0;
+  }
+
+  .file-into[data-where='row'] .file-select {
+    background-color: var(--s1);
+    border-radius: var(--r-md);
+  }
+
+  /* `Select` IS A PHONE'S AND A THUMB'S, for the reason `selecting` gives. */
+  .select-toggle {
+    display: none;
+  }
+
+  /* ── the layout ───────────────────────────────────────────────────────── */
+
+  /* ONE COLUMN, the tile first and the list under it. From a desk's width the list takes the room and the tile stands
+     beside it, held in view while the list scrolls. Measured on the page's own width, so a docked panel narrows it. */
+  .inbox {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+    align-items: start;
+  }
+
+  @container (inline-size >= 860px) {
+    .inbox[data-split] {
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+      column-gap: var(--sp-6);
+    }
+
+    .inbox[data-split] .side {
+      position: sticky;
+      inset-block-start: calc(var(--inset) + 56px);
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .inbox[data-split] .main {
+      grid-column: 1;
+      grid-row: 1;
+    }
+  }
+
+  .main,
+  .days {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  /* THE FIGURE (SYSTEM §3, `t-figure`), with what it counts beside it in the meta step. */
+  .figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-figure);
+    font-weight: 600;
+    line-height: 34px;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
 
-  /* A group reads as one block: no rule between its head and its first row, or between its last row and its actions. */
-  .arrivals > .shape + li,
-  .arrivals > li + .shape-actions {
-    border-block-start: 0;
+  .figure-unit {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
+    letter-spacing: 0;
   }
 
-  /* THE GROUP'S ACTIONS WRAP as the open row's do, and on a phone each is a full-width button under its group. */
-  .shape-actions {
+  /* THE ONE LINE THAT READS THE CHART (SYSTEM §6). */
+  .reading {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .why {
+    margin: 0 0 var(--sp-2);
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  /* ── patterns and what could be learned ──────────────────────────────── */
+
+  /* A PATTERN IS A ROW THAT OPENS ITS QUESTION: the well, the question over where it waits, and the way there. */
+  .pattern {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+  }
+
+  .pattern-go {
+    display: inline-flex;
+    color: var(--dim);
+  }
+
+  .alike-line {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+  }
+
+  .alike-verbs {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3) var(--sp-4);
+    justify-content: flex-end;
+    gap: 6px;
   }
 
-  .arrivals[data-picking] > li {
-    scroll-margin-block-end: var(--sp-9);
+  /* ── an arrival ───────────────────────────────────────────────────────── */
+
+  /**
+   * AN ARRIVAL IS ITS CHECK, ITS ROW, ITS VERBS, AND ITS BODY WHEN OPEN. The check and the row are two buttons side by
+   * side, so the wash is the list item's, round the lot: the cursor row and a hovered one take `--hover-wash`, and a
+   * picked one `--selected` (SYSTEM §6). The row button draws no fill of its own, or the two would stack.
+   */
+  .arrival {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    padding-inline-start: var(--sp-3);
+    border-radius: var(--r-md);
+    scroll-margin-block: var(--sp-7);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  /* The row is a `<button>`, at every width: it opens and closes. */
-  .line {
+  .arrival[data-cursor] {
+    background: var(--hover-wash);
+  }
+
+  .arrival:has(.pick[data-on]) {
+    background: var(--selected);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .arrival:hover {
+      background: var(--hover-wash);
+    }
+
+    /* The hairlines either side of a washed row step aside, as the shared rows' do. */
+    .arrival:hover > .line::after,
+    .arrival:hover + .arrival > .line::after {
+      opacity: 0;
+    }
+  }
+
+  .arrival:has(.pick[data-on]) > .line::after,
+  .arrival:has(.pick[data-on]) + .arrival > .line::after {
+    opacity: 0;
+  }
+
+  .arrival > .pick {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+
+  /* The row is a `<button>`, at every width: it opens and closes. SUBJECT AND DETAIL, THEN WHEN. */
+  .arrival > .line {
+    grid-column: 2;
+    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr) 9ch;
     inline-size: 100%;
-    border: 0;
-    border-radius: var(--r-sm);
     background: none;
+    border: 0;
     font: inherit;
     cursor: pointer;
   }
 
-  /* SUBJECT AND DETAIL, THEN WHEN. The `seq` column the rows share held the sender's domain here. */
-  .arrival .line {
-    grid-template-columns: minmax(0, 1fr) 9ch;
+  .arrival > .line-verbs {
+    grid-column: 3;
+    grid-row: 1;
+    padding-inline-end: var(--sp-3);
   }
 
-  .arrival[data-open] .line-title {
-    font-weight: 500;
+  /* An open row says its verbs in full in its body, so the row's own go. */
+  .arrival[data-open] > .line-verbs {
+    display: none;
   }
 
   /* THE CURSOR IS THE FOCUS RING, and only while it is the keyboard's. */
@@ -847,52 +1062,16 @@
     margin-inline: var(--sp-2);
   }
 
-  /* THE SELECTION BOX, at the trailing edge, where it is wanted and keeping its space where it is not. */
-  .pick {
-    display: grid;
-    place-items: center;
-    inline-size: 16px;
-    block-size: 16px;
-    margin: var(--sp-3) var(--sp-3) 0 0;
-    padding: 0;
-    background: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--on-ink);
-    cursor: pointer;
-    visibility: hidden;
-  }
-
-  .pick[data-on] {
-    background: var(--on);
-    border-color: var(--on);
-  }
-
-  .arrival:hover .pick,
-  .arrival[data-cursor] .pick,
-  .pick:focus-visible,
-  .arrivals[data-picking] .pick {
-    visibility: visible;
-  }
-
-  @media (pointer: coarse) {
-    .pick {
-      display: none;
-    }
-
-    .arrival {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  /* THE BODY SITS UNDER THE SUBJECT, on the page's own ground: space opens it, not a slab. */
+  /* THE BODY SITS UNDER THE SUBJECT, on the ground: space opens it, not a slab. */
   .body {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
+    grid-row: 2;
     padding: 0 var(--sp-3) var(--sp-5);
   }
 
   .raw {
     max-inline-size: var(--measure);
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-ui);
     line-height: 1.6;
@@ -902,47 +1081,45 @@
     overflow-wrap: anywhere;
   }
 
-  /* The list a filed email goes into sits beside the button that files it, at the height of every control here. */
-  .file-into {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .file-label {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    white-space: nowrap;
-  }
-
-  /* THE HOUSE FIELD, not the system's grey box. */
-  .file-select {
-    min-block-size: var(--ctl-h);
-    max-inline-size: 100%;
-    padding: 0 var(--sp-2);
-    background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-ui);
-  }
-
-  @media (pointer: coarse) {
-    .file-select {
-      min-block-size: var(--tap);
-    }
-  }
-
   /* THEY WRAP. A row of actions that does not fit is wrapped, never cut. */
   .actions {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
-    display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
   }
 
+  /* ── a filed or archived arrival ─────────────────────────────────────── */
+
+  /* READ, NOT OPENED: its row is text, led by who settled it, and Put back is the one thing it does. */
+  .settled-line {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    cursor: default;
+  }
+
+  .settled-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--sp-2);
+  }
+
+  .settled-list {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 3px;
+  }
+
+  .settled-verb {
+    display: inline-flex;
+  }
+
+  /* ── the selection's bar ─────────────────────────────────────────────── */
+
+  /* GLASS CHROME, FLOATING (SYSTEM §4, level 2): the strong glass for legibility over the rows passing under it, its
+     hairline pair and the floating shadow, and a pill's ends. */
   .batch {
     position: sticky;
     inset-block-end: var(--sp-4);
@@ -953,17 +1130,18 @@
     gap: var(--sp-2) var(--sp-3);
     inline-size: fit-content;
     max-inline-size: 100%;
-    margin-inline-start: auto;
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s2);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--e2);
+    margin-inline: auto;
+    padding: 6px 6px 6px var(--sp-4);
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-lg);
+    box-shadow: var(--glass-edge), var(--e2);
   }
 
   .batch-n {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -974,14 +1152,54 @@
     justify-content: center;
   }
 
-  .older :global(.btn) {
-    min-block-size: var(--ctl-h);
+  .foot {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-align: center;
   }
 
-  .foot {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    text-align: center;
+  @media (forced-colors: active) {
+    .batch,
+    .file-into[data-where='bar'] {
+      border: 1px solid CanvasText;
+    }
+  }
+
+  /* ── a thumb ─────────────────────────────────────────────────────────── */
+
+  @media (width < 900px), (pointer: coarse) {
+    .select-toggle {
+      display: inline-flex;
+    }
+  }
+
+  /**
+   * UNDER A THUMB THE CHECKS SHOW ONLY WHILE SELECTING, at a thumb's size, reached through the 44px square `.tap`
+   * draws round each (`::before`, which the layout gate measures). Otherwise the
+   * row takes the whole width, and a tap opens it. The row's verbs are the open row's buttons here.
+   */
+  @media (pointer: coarse) {
+    .arrival {
+      grid-template-columns: auto minmax(0, 1fr);
+      padding-inline-start: 0;
+    }
+
+    .arrival > .pick {
+      display: none;
+      position: relative;
+      inline-size: 24px;
+      block-size: 24px;
+      margin-inline: var(--sp-3) 0;
+    }
+
+    .arrivals[data-picking] .arrival > .pick {
+      display: inline-grid;
+    }
+
+    .arrival > .line-verbs {
+      display: none;
+    }
   }
 
   @media (width < 900px) {
@@ -992,45 +1210,20 @@
     .batch {
       inset-block-end: calc(var(--tabbar) + var(--sp-3));
     }
+
+    .file-into[data-where='row'] {
+      display: flex;
+    }
   }
 
-  /* ON A CARD THE TIME SITS BESIDE THE SUBJECT, where the row's first line has room for it. */
+  /* AT 390 AN ARRIVAL IS ONE CARD: the time beside the subject, two lines of what was said under it, and File and
+     Archive full-width pills under the body, with the list it files into a full-width field above them. */
   @media (width < 640px) {
-    .shape-actions {
-      flex-direction: column;
+    .arrival > .line-verbs {
+      display: none;
     }
 
-    .shape-actions :global(.btn) {
-      inline-size: 100%;
-    }
-
-    /* AT 390 AN ARRIVAL IS ONE CARD, and File and Archive are full-width pills under what it said, with the list it
-       files into as a full-width field above them: a thumb reaches every one without aiming. */
-    .actions {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .actions :global(.btn),
-    .settled-actions :global(.btn) {
-      inline-size: 100%;
-    }
-
-    .file-into {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .file-select {
-      inline-size: 100%;
-    }
-
-    .settled-actions {
-      padding: var(--sp-2) var(--sp-3) var(--sp-3);
-    }
-
-    .arrival .line {
+    .arrival > .line {
       grid-template-columns: minmax(0, 1fr) auto;
     }
 
@@ -1051,6 +1244,62 @@
       -webkit-line-clamp: 2;
       line-clamp: 2;
       overflow: hidden;
+    }
+
+    .actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .actions :global(.btn) {
+      inline-size: 100%;
+    }
+
+    .file-into[data-where='row'] {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+    }
+
+    .file-into[data-where='row'] .file-select {
+      max-inline-size: none;
+      inline-size: 100%;
+    }
+
+    /* THE LEAD AND THE WORDS KEEP THEIR COLUMNS on a card: the shared card layout would put the words under the lead. */
+    .pattern,
+    .alike-line,
+    .settled-line {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    }
+
+    .pattern .line-main,
+    .alike-line .line-main,
+    .settled-line .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .alike-verbs {
+      grid-column: 2 / -1;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
+
+    .settled-line .line-when {
+      grid-column: 3;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    .settled-verb {
+      grid-column: 2 / -1;
+      grid-row: 2;
+    }
+
+    .batch {
+      inline-size: auto;
+      margin-inline: 0;
     }
   }
 </style>
