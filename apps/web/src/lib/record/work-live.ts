@@ -35,6 +35,13 @@ export type Work = {
   /** Every project a task can be filed under, and every person one can be held by, by name. */
   projects: Named[];
   people: Named[];
+  /**
+   * WHEN EACH TASK LAST CHANGED, by number, as the record stamps it (`updated_at`), so Work can say what has not moved
+   * in months. A host older than the stamp on its rows answers without it, and then this is the day each was added,
+   * which `movedFrom` says, so the screen words it as that and never as a change nobody made.
+   */
+  moved: Record<number, string>;
+  movedFrom: 'updated' | 'created';
 };
 
 /* A SENTENCE `where` GOES OUT AS THE JSON TEXT OF THE SENTENCE (`carried` in `lib/data/record.ts` says why). */
@@ -109,12 +116,20 @@ export async function readWork(base: string, io?: Fetch, now: number = Date.now(
   if (shape.owner && people) refs.set(shape.owner.to, people.map);
   const seen = new Set<number>();
   const rows: Entry[] = [];
+  const moved: Record<number, string> = {};
+  let stamped = false;
   for (const r of [...open, ...(Array.isArray(done) ? done : [])]) {
     if (r.seq === null || seen.has(r.seq)) continue;
     seen.add(r.seq);
     rows.push(entryOf(TASKS, r, refs));
+    const at = (r as RecordRow & { updated_at?: unknown }).updated_at;
+    if (typeof at === 'string' && at !== '') stamped = true;
+    moved[r.seq] = typeof at === 'string' && at !== '' ? at : r.created_at;
   }
-  return { ok: true, value: { now, decl, shape, rows, projects: projects?.named ?? [], people: people?.named ?? [] } };
+  return {
+    ok: true,
+    value: { now, decl, shape, rows, projects: projects?.named ?? [], people: people?.named ?? [], moved, movedFrom: stamped ? 'updated' : 'created' },
+  };
 }
 
 /**
