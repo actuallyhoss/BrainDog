@@ -25,7 +25,7 @@ installed: [
       ] }
   ]
 
-# MOVED HERE FROM `lint` ON SEPTEMBER 22ND 2026. The register the rule writes into belongs to another
+# MOVED HERE FROM `lint`. The register the rule writes into belongs to another
 # pack, and only a record knows who owns what: the `lint` runner overlays `owners` from the batch
 # alone, so the same pack was ACCEPTED there, and on a fresh record it answers `REGISTER_UNKNOWN`
 # because `invoices` does not exist. `once_per` is here because the kernel's install asks for one on

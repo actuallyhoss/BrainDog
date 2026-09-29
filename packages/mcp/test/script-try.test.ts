@@ -1,6 +1,5 @@
 /**
- * `script_try`: a draft script run now, in the sandbox, answering the writes it would make and writing none of them
- * (`loop/research-shell-scripts.md` section 7 and the remainder of Brief 6).
+ * `script_try`: a draft script run now, in the sandbox, answering the writes it would make and writing none of them.
  *
  * THREE PLACES, ONE FILE, because they are one feature and each half is only worth anything with the others. The run
  * itself is `packages/host/src/script-try.ts`, driven here through the real QuickJS sandbox with `send` standing in

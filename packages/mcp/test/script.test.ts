@@ -1,5 +1,5 @@
 /**
- * Authoring a script over MCP (`loop/research-shell-scripts.md` section 7, Brief 6): the grammar an agent reads before
+ * Authoring a script over MCP: the grammar an agent reads before
  * it writes one, and the `propose` it files it with.
  *
  * `script_try` IS BUILT, AND NOT HERE AND NOT AS A TOOL. It is `propose` on a script change that carries `"try"`, which
@@ -63,10 +63,10 @@ test('braindog:grammar/script IS LISTED AND READS, and answers the grammar', asy
 });
 
 test('ITS EXAMPLES ARE NOBODY\'S USE CASE, a rate fetch against api.example.com in USD and EUR', async () => {
-  /* EVERY AGENT THAT WRITES A SCRIPT READS THIS FIRST, so its examples are what agents copy. Until B10 of
-     `loop/research-legacy-parity.md` the first one fetched the owner's gold price from `api.goldapi.io` in Egyptian
-     pounds under a `goldapi` key, and the second read a bank message that said `debited EGP`: his use case, shipped as
-     the core's idea of a script (DIRECTION section 22). Read over the wire, because that is what an agent is served. */
+  /* EVERY AGENT THAT WRITES A SCRIPT READS THIS FIRST, so its examples are what agents copy. The first one once
+     fetched a gold price from `api.goldapi.io` in Egyptian pounds under a `goldapi` key, and the second read a bank
+     message that said `debited EGP`: one person's use case, shipped as the core's idea of a script. Read over the
+     wire, because that is what an agent is served. */
   const { sql, mcp } = await record();
   const read = await mcp.read('braindog:grammar/script', agent);
   assert.ok(read.ok, JSON.stringify(read));
@@ -120,7 +120,7 @@ test('ITS HEADER IS THE ONE THE KERNEL READS, and both examples install', async 
 });
 
 test('A SCRIPT FILED THROUGH propose CARRIES THE RECORD\'S OWN CALLS OUT LINE, and waits for its key', async () => {
-  /* BRIEF 6 SAID THIS WOULD BE RED, and it was green before this file: the change shape takes any declaration with an id,
+  /* THIS WAS EXPECTED TO BE RED, and it was green before this file: the change shape takes any declaration with an id,
      a kind and a body (`govern.ts` `shapeFault`), and `script-egress.test.ts` in the kernel already reads a script's
      egress into the approval lines. So this holds it over the wire an agent uses, with a proposer that tries to
      write its own friendlier line. */

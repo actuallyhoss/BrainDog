@@ -13,15 +13,15 @@
  * money is for, what comes round without anybody deciding again, what is being paid off in parts, and
  * what the whole position was on a night nobody was looking.
  *
- * MONEY-CORE 3.0.0 IS ONE PAGE OVER THE SAME LISTS (`loop/finish/modules.md` R-M, C12). The page leads with the money
+ * MONEY-CORE 3.0.0 IS ONE PAGE OVER THE SAME LISTS. The page leads with the money
  * there is, rolled forward from each account's newest balance through what has moved since; then how long it lasts and
  * what comes in and goes out over thirty days, which are the same walk the forecast draws; then the past, read from
  * `transactions`, which is where money that moved lives. Repeating money has one home, `recurring`, walked at every
  * cadence. Every list id, enum value and figure id a record already holds stays (`declare/src/index.ts`, `ID_RENAMED`),
  * because a pack update may rename a word and never an id.
  *
- * MONEY-CORE 3.1.0 KEEPS MONEY THAT IS NOT ONE PERSON'S APART, AND SAYS WHAT ITS RULES AND AGENTS DID
- * (`loop/finish/modules.md` MOD-10, C12). A person who keeps their own money and a company's in one record read one
+ * MONEY-CORE 3.1.0 KEEPS MONEY THAT IS NOT ONE PERSON'S APART, AND SAYS WHAT ITS RULES AND AGENTS DID.
+ * A person who keeps their own money and a company's in one record read one
  * Cash now over both, which is a number about nobody. `books` is the list of those separate sets, every list that holds
  * money may say which book a row is in, and each book is a page of its own under Money. A question a rule asks is
  * answered where it is asked: "Chase it" stamps the day on the bill (`MONEY_AUTOMATIONS`), and "It stopped" ends a
@@ -193,7 +193,7 @@ const HAND_TRANSACTIONS: Fields[] = [
      engine reads these rows with no write path: the browser's sample (`apps/web/src/lib/record/data.ts`,
      `entriesOf`) fills each field's default, so untyped, both legs were `transfer: false` there
      while the record held them true, and `test/money-ledger.test.ts`, which counts from this array,
-     expected GBP 12,428.02 spent against the record's GBP 8,428.02. Measured on 24 September.
+     expected GBP 12,428.02 spent against the record's GBP 8,428.02 (measured).
      TYPED, THE MARK IS THE SEED'S SAY AND THE KERNEL LEAVES IT: a create carrying a mark other than
      the default pins it (`packages/kernel/src/pairs.ts`, `markPinned`), so these two carry no
      `_pair` in the record, and the test says so rather than expecting one. */
@@ -288,7 +288,7 @@ export const RECURRING_ITEMS: Fields[] = [
 
 /**
  * One row an instalment, which is what `docs/08-METRICS-AND-ANALYTICS.md` §2.3 walks and what the
- * importer writes from the old tool's `obligations.schedule` (`loop/research-switch.md` §4).
+ * importer writes from a payment plan's schedule.
  *
  * NOT ONE ROW A PLAN. A plan with a total and a count is a number somebody has to divide, and the thing
  * a person and a forecast both want is the dated amount: which payment falls on which day, which have
@@ -342,7 +342,7 @@ export const INSTALLMENTS: Fields[] = [
  * remembers ONE figure a day into `series.cash-now`, which is how a sparkline under a tile is drawn. A
  * money snapshot is the four figures together, on one row, so "the 14th" is a position a person can
  * read across rather than four series a person has to line up by date, and so a note can be written
- * against the night rather than against a number. the old tool writes exactly this, nightly.
+ * against the night rather than against a number. An importer can write exactly this, nightly.
  *
  * WORKED BACK FROM THE ROWS, as `cashSeries` is: the cash is the same walk, and the book each night is
  * every obligation that had not been settled by then. A live record has no such history to show, and
@@ -403,7 +403,7 @@ export const SNAPSHOTS: Fields[] = snapshotRows();
  *
  * IT IS THE ONE THING THAT TELLS A SECOND CHARGE FROM A RESEND. Two card alerts in a hundred real bank texts
  * carried the same amount, merchant and day a few minutes apart, and the near rule skipped the second as already
- * said, although the limits they print differ by exactly the charge (`loop/research-bank-real.md`). The same alert
+ * said, although the limits they print differ by exactly the charge. The same alert
  * sent again prints the same figure, so a pattern that reads this and names it in its `dedupe:` files two charges
  * and still files one resend once (the bank pack's own test under `packs/`). Not indexed: the register is at the ceiling of
  * eight, and the dedupe that reads it has already narrowed to one account, one amount and three days.
@@ -438,8 +438,8 @@ type MoneyRegister = SeedRegister & {
  *
  * OPTIONAL, because a record that keeps one set of money has no book at all, and every row it already holds stays
  * valid through the update. A CONSTANT, BECAUSE EVERY SUCH LIST DECLARES IT, so none of them can call it something
- * else or point it somewhere else. A pack that files into a book fills it on every row it writes (`loop/finish/modules.md`
- * MOD-20, `{{config:book}}`), because a book page reads the field on each list and the grammar of `where` cannot follow
+ * else or point it somewhere else. A pack that files into a book fills it on every row it writes (`{{config:book}}`),
+ * because a book page reads the field on each list and the grammar of `where` cannot follow
  * a transaction to its account's book.
  */
 const BOOK = { id: 'book', label: 'Book', type: 'ref', to: 'books' } as const;
@@ -466,7 +466,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
     one: 'item',
     holds: 'the bills you are to pay and the invoices you are to be paid, each with a day and a currency',
     title: 'what',
-    /* THE DAY IT FALLS DUE, on the one screen that had no room for it (`loop/finish/design.md` §5). A card shows three
+    /* THE DAY IT FALLS DUE, on the one screen that had no room for it. A card shows three
        declared fields, and a bill's card that leaves out its due day leaves out the one fact a person scanning a list of
        bills is looking for. Which way the money goes is the sign on the amount, which the card draws from the row. */
     mobile: ['what', 'amount', 'due'],
@@ -570,8 +570,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
        * HOW OFTEN A BILL SAID IT CAME ROUND, KEPT ON ITS ROWS AND WALKED NO MORE, SINCE money-core 3.0.0.
        *
        * What repeats lives in `recurring`, and the cash walk reads it there at every cadence. A bill that also said
-       * `repeats` was the same money twice: the the old tool import writes each repeating stream as a bill carrying
-       * `repeats` and as a row of `recurring` (`packs/legacy-import/adapter.ts`), so a walk over both counted every
+       * `repeats` was the same money twice: an import can write each repeating stream as a bill carrying
+       * `repeats` and as a row of `recurring`, so a walk over both counted every
        * salary and every rent twice. So the walk takes a bill once, on its due day, when it does not repeat, and leaves
        * a repeating one to its row in `recurring`. The field stays, because rows hold it and an id is for ever.
        */
@@ -597,8 +597,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * `transactions.account` is required and every balance check names one, so deleting an account left each of its
      * payments pointing at nothing: a ledger row nobody could reconcile, and a Cash now that no longer knew where the
      * money had been. The record now refuses the delete and says which lists still point at it and how many rows
-     * (`packages/kernel/src/referenced.ts`); the person moves or deletes those first. Declared here in the workflow after
-     * the kernel learned the key, as `loop/finish/contracts.md` X14 settles.
+     * (`packages/kernel/src/referenced.ts`); the person moves or deletes those first. Declared here in the workflow once
+     * the kernel learned the key.
      */
     delete: 'refuse_while_referenced',
     pack: 'money-core',
@@ -633,8 +633,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
   },
 
   /* `holdings` WAS DECLARED HERE FROM 1.5.0 TO 1.8.0. money-core 2.0.0 gave it to a pack of its own, now the file
-     `packs/holdings/holdings.pack.json`, and its reasons went with it: what one person holds is not what everybody's Money is for
-     (`loop/DIRECTION.md` section 22). */
+     `packs/holdings/holdings.pack.json`, and its reasons went with it: what one person holds is not what everybody's Money is for. */
   /**
    * WHAT ONE CURRENCY IS WORTH IN ANOTHER, AND ON WHICH DAY (`08 §2.5`). Money in more than one currency is added up in the
    * record's home currency only when there is a rate for every other one, as of the day each amount is about; without one
@@ -758,8 +757,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      *
      * `where: state is cleared`, THE SAME CLAUSE EVERY LEDGER FIGURE COUNTS BY, because a row the figures never count
      * cannot be the other half of a move they do. Without it a void or pending credit paired with the cleared payment
-     * beside it and hid that payment: the audit of the kernel's pairing measured Spent at GBP 0.00 against 250.00 for
-     * both (`loop/research-batch-fifty-eight-audit.md` finding 2), and a pending row is what a bank alert writes first.
+     * beside it and hid that payment: measured, Spent read GBP 0.00 against 250.00 for both, and a pending row is what a bank alert writes first.
      * `done:` is not the answer, since it holds `void` too. THE TREE AND NOT THE SENTENCE, because the kernel matches it
      * on every write and takes it only in that form (`pairs.ts`, `pairsFault`). When a pending credit clears, the update
      * is looked at again and it pairs then.
@@ -767,8 +765,7 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * `party is empty` AND `settles is empty`, BECAUSE A MOVE BETWEEN YOUR OWN ACCOUNTS HAS NOBODY ON THE OTHER SIDE AND
      * DISCHARGES NO PROMISE. Without them a coincidence of amount was a transfer: rent out of one account and a client
      * paying the same 15,000.00 into another a day later both left Spent and Received, and so did a friend's instant
-     * transfer repaying a dinner and a refund landing on another account (`loop/research-batch-sixty-one-audit.md`
-     * findings 1 and 6, M4 and M5). A row that names who it was with, or the obligation it paid, is a payment to or from
+     * transfer repaying a dinner and a refund landing on another account. A row that names who it was with, or the obligation it paid, is a payment to or from
      * somebody, and one such leg keeps the pair apart. Both are fields the kernel reads again on an update, so naming
      * Omar on a repayment the record had paired undoes the pair (`test/money-pairs.test.ts`).
      *
@@ -776,25 +773,25 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * keeps the bill in Obligations so the forecast holds it, the import writes its two legs bare and the record pairs
      * them, and then Reconcile sets `settles` on the bank leg. At 2.2.0 that one field parted the pair: Spent and
      * Received each read 9,500.00 high, on top of the purchases the bill paid, already in Spent on the card
-     * (`loop/research-batch-sixty-three-audit.md` finding 3, F4; `test/money-card-bill.test.ts`). So a leg that settles
+     * (`test/money-card-bill.test.ts`). So a leg that settles
      * something is still a leg while the record holds it as one. `transfer` is read on the stored row, the mark the
      * pairing itself wrote, so the clause keeps a pair and never starts one.
      *
      * WHY NOT THE CARD ITSELF. The bank leg of a card bill and a rent payment that settles its obligation are the same row
      * field for field, and so are their partners; what differs is the obligation's payee or the kind of the account the
      * money went to, and both are a hop through a ref that `where` here cannot take (`pairs.ts`, `pairsFault`). Dropping
-     * `settles` from the clause altogether would pair the rent that M4 writes already reconciled with the client beside
+     * `settles` from the clause altogether would pair a rent written already reconciled with the client beside
      * it (`test/money-pairs.test.ts`).
      *
-     * WHAT THE CLAUSE COSTS, measured on 24 September and held in `test/money-card-bill.test.ts`: which was written first
+     * WHAT THE CLAUSE COSTS, measured and held in `test/money-card-bill.test.ts`: which was written first
      * decides. A bank leg reconciled while it holds no pair never gains one, as at 2.2.0: reconciled before the card's
      * leg arrives, reconciled on the bank alert while still pending and cleared afterwards, or reconciled and then parted
      * for a moment by a mistyped amount on the card's leg or a third row of the same sum, and each leaves the bill counted
      * both ways after the ledger is back as it was. And two bare rows
      * the record paired by coincidence, rent and a client's payment of the same sum, no longer part when the rent is
-     * reconciled; naming the client still parts them, as it parts the dinner and the repayment in M5.
+     * reconciled; naming the client still parts them, as it parts the dinner and the repayment.
      *
-     * NOT `category is empty`, which the audit proposed. A real ledger, read on 24 September through the route the
+     * NOT `category is empty`, the obvious repair. A real ledger, read through the route the
      * import reads, files both legs of both its moves since 13 July under a category called Transfers, and the import
      * carries the category over, so that clause would have unpaired every move in it. "A category whose direction is
      * `both`" is what a category could say, and it needs a hop through the ref that `where` refuses (`via`,
@@ -805,13 +802,13 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      * goes into the note) and a bank text never does, and on that ledger a move between two of one's own accounts and a
      * friend's repayment carry descriptions that differ only in the word for which way the money went, so no field this
      * register holds, the description included, tells the rent and the client from a move until a person names one
-     * side. That is the M4 and M5 rows as the audit wrote them, and the M5 test holds the bare dinner and repayment
+     * side. That is the rent-and-client and dinner rows in `test/money-pairs.test.ts`, and the dinner test holds the bare dinner and repayment
      * paired on purpose, so the day that changes is seen. `within` stays 4d: the coincidences measured sit one and two
      * days apart, the card on that ledger is paid off with the card's leg a day before the bank's, and a window short
-     * enough to part M4 would lose that move and any sent before a weekend.
+     * enough to part the rent and the client would lose that move and any sent before a weekend.
      *
      * WHAT CANNOT PAIR: a move between currencies, the most common one on that ledger (dollars out of one account and
-     * another currency into a second, finding 5, M3). `abs(amount)` compares the currency as well as the size, and
+     * another currency into a second). `abs(amount)` compares the currency as well as the size, and
      * nothing in `pairs:` can say "the same value at the day's rate", so both legs are counted until a person marks them.
      */
     pairs: {
@@ -1138,7 +1135,7 @@ export const MONEY_HOME_SETTING = {
 } as const;
 
 /**
- * THE FORMAT OF EVERY MONEY FIGURE, AND IT NAMES NO CURRENCY, SINCE money-core 3.0.0 (`loop/finish/modules.md` C1).
+ * THE FORMAT OF EVERY MONEY FIGURE, AND IT NAMES NO CURRENCY, SINCE money-core 3.0.0.
  *
  * Every figure here said `money.GBP`, read off the sample's rows, because until then the record refused a money figure
  * whose format named no currency. So a record in Egyptian pounds read "no more than £50,000.00" under figures about its
@@ -1156,8 +1153,7 @@ const MONEY = 'money';
  *
  * A MONEY CEILING STARTS EMPTY, SINCE money-core 3.0.0, and empty is no target: the figure has no verdict until a person
  * types a sum. The sums that were here, GBP 50,000.00 owed in thirty days among them, were one studio's sizes in one
- * currency, and a pack cannot know either the size or the currency of the record it lands on (`loop/finish/modules.md`
- * C1). The sum a person types is held in the record's home currency (`liveTarget` in `packages/kernel/src/declare.ts`).
+ * currency, and a pack cannot know either the size or the currency of the record it lands on. The sum a person types is held in the record's home currency (`liveTarget` in `packages/kernel/src/declare.ts`).
  * A number of days is no currency's, so its default stays the figure's own.
  */
 export const MONEY_TARGET_SETTINGS: Readonly<Record<string, { setting: string; type: 'money' | 'number'; label: string }>> = {
@@ -1222,9 +1218,8 @@ export function targetConfigOf(declarations: readonly Decl[]): Record<string, De
  * before the line that makes it.
  *
  * REPEATING MONEY IS WALKED FROM `recurring` ALONE, SINCE money-core 3.0.0. The obligations leg walked `repeats` while
- * `recurring` sat out, and each was right about half the record: the sample wrote its streams as bills, and the Sam
- * Brain import writes each stream twice, as a bill that repeats monthly and as a line in `recurring`
- * (`packs/legacy-import/adapter.ts`). Walking both counts every stream twice on that record; walking only bills left a
+ * `recurring` sat out, and each was right about half the record: the sample wrote its streams as bills, and an
+ * import could write each stream twice, as a bill that repeats monthly and as a line in `recurring`. Walking both counts every stream twice on that record; walking only bills left a
  * salary typed into `recurring` out of every walk. So a bill is walked once, on its day, and a stream is walked where it
  * is a stream.
  */
@@ -1298,7 +1293,7 @@ const CASH_LEGS: Leg[] = [
  *
  * `ends` EMPTY, OR ON OR AFTER TODAY, which is the other side of `recurring-ended`'s `ends before today`. That rule moves
  * a line that has ended to `ended` on the hourly sweep, and until it has, `state is live` alone counted the line at its
- * full monthly share (`loop/finish/defects.md` M2). A line's last day is its own, so a line ending today still counts.
+ * full monthly share. A line's last day is its own, so a line ending today still counts.
  *
  * THE TREE AND NOT THE SENTENCE, because the sentence joins its conditions with a comma or with a comma and `or`, never
  * both (`packages/where/src/sentence.ts`, `conditionsOf`), and this is two conditions and a choice between two more. The
@@ -1539,7 +1534,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
    * IT READS `recurring`, SINCE money-core 3.0.0, AND IT READ `obligations.repeats`. The case for `recurring` was
    * always good (a repeating item has `next_due` that moves and `ends` that stops it, and the importer writes that
    * list) and it was held back because no use case seeded `recurring`, so the figure answered zero on every demo
-   * record. Nothing is written as an example any more (`loop/finish/modules.md` C11), so a demo record is not a reason,
+   * record. Nothing is written as an example any more, so a demo record is not a reason,
    * and the walk reads `recurring` too: the figure, the split under it and Cash ahead now read one list.
    *
    * A LINE THAT HAS ENDED IS OUT, ON ITS OWN DAY AND NOT ONLY WHEN THE SWEEP MOVES IT (`LIVE_LINES`).
@@ -2008,8 +2003,7 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * THE MONTHLY FIGURES FILTER ON `ends` AS WELL, SINCE money-core 3.0.0 (`LIVE_LINES`), in the tree
    * form, because the sentence cannot join a choice to the other clauses. A block or a list a person
    * filters by hand reads the sentence, so the row is moved too: `ends is empty` alone would drop
-   * exactly the rows still running, because the importer writes `ends` only when it is ahead
-   * ("It ended before the export" in `packs/legacy-import/adapter.ts`).
+   * exactly the rows still running, because an importer writes `ends` only when it is ahead.
    *
    * SO THE ROW IS MOVED WHERE IT IS. `rulesAboutTime` (`packages/kernel/src/index.ts`) sweeps
    * hourly every rule whose `when:` names a relative day and which declares `once_per`, so this one
@@ -2091,7 +2085,7 @@ const BOOK_LEGS: Leg[] = CASH_LEGS.filter((leg) => BOOKED.has(leg.register)).map
  * WHAT FALLS DUE THIS WEEK, AS ONE BLOCK A USE CASE'S HOME TAKES, SINCE money-core 3.0.0.
  *
  * It was the second block of money-core's own `home` page, which retired with the house Home: a record's Home is its
- * use case's `home-<id>` page, else the default Home, which names no list (`loop/finish/modules.md` C8). The founder's
+ * use case's `home-<id>` page, else the default Home, which names no list. The founder's
  * Home takes this block by reference (`usecases/founder.ts`), so the window, the columns and the order stay one
  * declaration and cannot drift from each other.
  */
@@ -2114,17 +2108,14 @@ export const DUE_THIS_WEEK: Readonly<Record<string, unknown>> = {
 
 export const MONEY_PAGES: Record<string, SeedPage> = {
   /**
-   * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM (`loop/DIRECTION.md` §2, `research-modules.md`
-   * §2.1). It leads with the money there is, then how long it lasts, then what comes in and goes out;
+   * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then what comes in and goes out;
    * which way an amount goes is a property of the row, never the frame of the page.
    *
-   * "i want the headlines to be the money i have, not the money im due/owed" (the owner, in Sam
-   * Brain's own Money screen). So the hero figure is Cash now, read from the accounts, and every walk
-   * on this page starts from that same figure rather than from a balance typed into the page.
+   * "i want the headlines to be the money i have, not the money im due/owed" (the owner). So the hero figure is Cash
+   * now, read from the accounts, and every walk on this page starts from that same figure rather than from a balance typed into the page.
    *
-   * ONE PAGE, SINCE money-core 3.0.0, AND IT WAS THREE: Overview, Ledger, and the house Home (`loop/finish/modules.md`
-   * MOD-4). Overview looked ahead over bills, Ledger looked back over payments, and a person asking what happened to
-   * their money had to know which of the two answered it. A page holds no rows, so the two that retire take nothing
+   * ONE PAGE, SINCE money-core 3.0.0, AND IT WAS THREE: Overview, Ledger, and the house Home. Overview looked ahead
+   * over bills, Ledger looked back over payments, and a person asking what happened to their money had to know which of the two answered it. A page holds no rows, so the two that retire take nothing
    * with them. IT NEEDS NO PEOPLE: who a row is with is a link (`LINKS` in `packs/first-party.ts`), and no block here
    * reads it, so Money installs and draws on a record with People off.
    */

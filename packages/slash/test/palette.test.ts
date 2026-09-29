@@ -237,7 +237,7 @@ test('a rowset row with nothing behind it is dropped and counted, and the rest a
 
   assert.equal(out.ok, true);
   const body = record.filed[0]?.body as { rows: Record<string, unknown>[]; from: string[][]; dropped: number };
-  /* THE ROW IS ITS FIELDS AND NOTHING ELSE, so accepting it writes no citation into the record (S3). */
+  /* THE ROW IS ITS FIELDS AND NOTHING ELSE, so accepting it writes no citation into the record. */
   assert.deepEqual(body.rows, [{ what: 'Chase the rent' }]);
   assert.deepEqual(body.from, [['obligations#7']]);
   assert.equal(body.dropped, 1);

@@ -14,7 +14,7 @@
  *
  * AND A FIFTH, WHICH `secret-grep` DOES NOT FOLLOW BY NAME: the proof that a new address is somebody's own mailbox.
  * The shared contract names it `link` in the `mail` that carries it out and `token` in the `invite.proved` call
- * that spends it (`loop/finish/contracts.md` §2.6), so neither spelling is one of the four above. It opens less
+ * that spends it, so neither spelling is one of the four above. It opens less
  * than they do (it makes nobody a person on its own: the invitation it was minted for has to come back beside it),
  * it is spent once, and it dies in a day.
  */
@@ -89,7 +89,7 @@ export type AuthCall =
 export type AuthFlow = AuthCall['flow'];
 
 /**
- * Closing an account (`POST /account/close`, OPS-21), a union beside `AuthCall` as `SignupCall` is, because it has no
+ * Closing an account (`POST /account/close`), a union beside `AuthCall` as `SignupCall` is, because it has no
  * `/auth/*` row and `router-groups` holds every arm of `AuthCall` to exactly one.
  *
  * BY PERSON ID, BECAUSE THE DOOR HAS ALREADY ASKED EVERYTHING. `serveAccount` read the session, and the close door
@@ -105,7 +105,7 @@ export type AccountClosed = { passkeys: number; sessions: number; records: numbe
 export type Suspended = { person: string; suspended_at: string | null };
 
 /**
- * A stranger asking for a record of their own (`loop/finish/ops.md` §4.0 C, OPS-17). The Worker's alone: a self-host is
+ * A stranger asking for a record of their own. The Worker's alone: a self-host is
  * made by its operator and has nobody to sign up.
  *
  * A UNION BESIDE `AuthCall` AND NOT THREE MORE ARMS IN IT, because `serveAuth` (`packages/host/src/auth.ts`) switches

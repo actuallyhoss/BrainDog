@@ -8,7 +8,7 @@
  * in `NOTICE` beside this file, and they travel with the data.
  *
  * Copied from lucide-static 1.47.0 exactly as `core.ts` says, with the same three rewrites. Work's
- * glyphs come first, then the families research-modules §1.3 lists, then the neighbours a declaration
+ * glyphs come first, then the families the plan lists, then the neighbours a declaration
  * is likely to reach for next. Sparkle glyphs are left out on purpose (19 §6).
  */
 

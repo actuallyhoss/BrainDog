@@ -3,7 +3,7 @@
   Drawn to the same tree as `html.ts`'s `feed`; `src/parity.test.ts` compiles this file and compares
   the two.
 
-  The count leads each row, as it does on the old tool's `You.svelte`, because the number is the part
+  The count leads each row, because the number is the part
   that decides whether a row is worth reading. A new row is told apart by words as well as by the
   accent: the group's head says how many are new, and a line says where the read ones begin.
 -->
@@ -20,7 +20,7 @@
   const nodes = (v: string | undefined) => inline(v ?? '', opts);
 </script>
 
-<!-- A RUN'S FACE (agents C11), as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
+<!-- A RUN'S FACE, as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
      the agent face, and a feed line's actor is a run wherever `sessions.live` names one. -->
 {#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
     class="cards-face cards-run"

@@ -1,6 +1,6 @@
 /**
  * The Kennel: the registry every BrainDog reads add-ons and use cases from, as rules with no storage in them
- * (`loop/finish/platform.md` §4.0 K, `docs/14-KENNEL-AND-COMMUNITY.md` §1).
+ * (`docs/14-KENNEL-AND-COMMUNITY.md` §1).
  *
  * THE HOSTS ONLY READ AND WRITE. The Cloud keeps the Kennel in R2 (`apps/worker/src/kennel.ts`) and a self-host proxies
  * it (`apps/selfhost/src/kennel.ts`). Each hands this module what it read and writes back what this module answers, so
@@ -288,7 +288,7 @@ export async function acceptSubmission(state: KennelState, text: string, identit
 
   if (typeof doc.title !== 'string' || doc.title.trim() === '')
     return no('PACK_MALFORMED', 'The Kennel lists a file under its title, and this one has none. Add a title and submit it again.', { at: 'title' });
-  /* THE MANIFEST'S CLOSED LIST IS THE KENNEL'S TO HOLD, NOT THE RECORD'S (`platform.md` R2): a record reads the keys it
+  /* THE MANIFEST'S CLOSED LIST IS THE KENNEL'S TO HOLD, NOT THE RECORD'S: a record reads the keys it
      knows and stays lenient, so an update it already holds never breaks, and the registry is where a key nobody reads is
      said by name. A use case keeps its own list, which its door already holds. */
   if (file.kind === 'pack') {

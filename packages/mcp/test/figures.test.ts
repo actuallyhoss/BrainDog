@@ -1,5 +1,5 @@
 /**
- * A figure is read with tools alone, whatever pack declared it (audit sixty-two finding 2, probe M1).
+ * A figure is read with tools alone, whatever pack declared it.
  *
  * WHAT WENT WRONG. When the `money` tool left the core (`48ac43a1`), the figures it read stayed reachable as
  * `braindog:metric/<id>`, and only there. The probe installed money-core as it ships, with two accounts in two
@@ -31,7 +31,7 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 /** The seven the removed tool read, `late-in` among them, which no page draws. */
 const FORMER = ['cash-now', 'received-30d', 'spent-30d', 'in-30d', 'out-30d', 'late-in', 'overdue'];
 
-/** M1's record: money-core through the owner's door as it ships, and CIB in EGP beside Payoneer in USD. */
+/** The probe's record: money-core through the owner's door as it ships, and CIB in EGP beside Payoneer in USD. */
 async function money() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
@@ -56,7 +56,7 @@ async function called(api: unknown, name: string, args: Record<string, unknown>)
   return { isError: result.isError === true, text: result.content.map((c) => c.text).join('') };
 }
 
-test('M1 A TOOLS-ONLY AGENT READS A FIGURE: get of its id answers the reading, one amount per currency and no sum', async () => {
+test('A TOOLS-ONLY AGENT READS A FIGURE: get of its id answers the reading, one amount per currency and no sum', async () => {
   const { sql, api } = await money();
   const got = await called(api, 'get', { spoken: 'cash-now' });
   assert.equal(got.isError, false, got.text);
@@ -66,7 +66,7 @@ test('M1 A TOOLS-ONLY AGENT READS A FIGURE: get of its id answers the reading, o
   sql.close();
 });
 
-test('M1 AND THE ONE NO PAGE DRAWS: get of every figure the removed tool read answers it', async () => {
+test('AND THE ONE NO PAGE DRAWS: get of every figure the removed tool read answers it', async () => {
   const { sql, api } = await money();
   for (const id of FORMER) {
     const got = await called(api, 'get', { spoken: id });
@@ -121,7 +121,7 @@ test('record_index names every figure money-core declares, and resources/list ev
 });
 
 /**
- * AND IT IS CHEAP AGAIN, which is the checker's point about `4c707131`: with no list to take, `record_index` drew every
+ * AND IT IS CHEAP AGAIN, which a review of `4c707131` pointed out: with no list to take, `record_index` drew every
  * page the caller may open, which runs each block, and then read every figure it found. Measured over this record with
  * 500 rows of obligations, averaged over 20 calls on a busy machine: `boot` and `version` alone took 20 to 30 ms, the
  * drawn list 110 to 177 ms (5 pages run, 18 figures read), and the record's list with each id read again through

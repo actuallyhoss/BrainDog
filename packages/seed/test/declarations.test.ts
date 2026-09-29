@@ -1,7 +1,7 @@
 /**
  * THE DECLARATION KEYS THE APP READS, AND THE KERNEL DOES NOT, SURVIVE AN INSTALL AND A READ.
  *
- * `loop/research-phase1-map.md` 2.14: `label`, `index`, `search` and `deadline` on a field, and
+ * `label`, `index`, `search` and `deadline` on a field, and
  * `icon`, `one`, `holds`, `mobile` and `identity` on a register, are drawn by the browser and are in
  * neither the kernel's `RegisterDecl` nor its `FieldDecl`. They survived only because `declare.ts`
  * never rejects a key it does not know, which is a property nothing asserted. The moment the app

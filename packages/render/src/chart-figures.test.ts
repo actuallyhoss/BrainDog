@@ -1,6 +1,6 @@
 /**
  * Money on a chart: a bar's value grouped (`£11,200`, never `11200`) and an axis label compact (`£31k`),
- * each keeping the unit and the sign the figure was written with (design SYS-2; contracts §8.3).
+ * each keeping the unit and the sign the figure was written with.
  */
 
 import { test } from 'node:test';

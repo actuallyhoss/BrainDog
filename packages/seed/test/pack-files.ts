@@ -5,9 +5,9 @@
  * `packages/host` and `packages/kernel` import it as they already import `money-core-earlier.ts`.
  *
  * WHY THE FILES AND NOT A BUILDER. `bankHsbcEgPack()` and `holdingsPack()` in `packages/seed/src/packs` built both
- * documents in code, so the shell carried one person's bank and one person's kind of list as TypeScript
- * (`loop/research-legacy-parity.md` brief B1). The builders are gone and the files are what a person installs:
- * the the old tool import resolves them by id from the catalogue (`packs/legacy-import`). A test that installs the
+ * documents in code, so the shell carried one person's bank and one person's kind of list as TypeScript.
+ * The builders are gone and the files are what a person installs:
+ * an import resolves them by id from the catalogue. A test that installs the
  * bank or the holdings pack therefore installs the file, read fresh each call so no test hands the next one a copy it
  * changed.
  *
@@ -15,7 +15,7 @@
  * gave the bank's twelve patterns to `bank-hsbc-eg` and, from 2.0.0, `holdings` to `holdings`. The tests that prove a
  * handover keeps a token and a row (`door-hold`, `plan-handover-shown`, `handover-used`, `bank-pack`,
  * `holdings-pack`, `hands-first-party`) drive that mechanism, which `declare` still has, and they now make the `hands`
- * themselves with `handingAsShipped`. Checked on 25 September against the last document that carried it:
+ * themselves with `handingAsShipped`. Checked against the last document that carried it:
  * `handingAsShipped(firstPartyDocument('money-core')).hands` was the shipped `hands`, key for key and in order.
  */
 

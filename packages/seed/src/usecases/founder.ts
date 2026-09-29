@@ -1,16 +1,15 @@
 /**
  * Solo founder: one or several organisations, the money across them, and the numbers each project
- * reports or is polled for (`loop/research-spark.md` §4; the owner's own case, brain.example.com).
+ * reports or is polled for.
  *
  * IT BUILDS ON FIVE FIRST-PARTY MODULES. Projects, People, Money, Estate and Work are installed first, and
  * this pack adds what they do not hold: the organisations a founder runs, and datapoints, one number from
  * one project at one moment, written by the project itself over the API or by a poll the record runs.
  *
  * ESTATE IS ONE OF THEM SINCE 1.4.0, AND IT WAS NOT BEFORE. A founder running several companies holds
- * domains, hosting and subscriptions, which is what Estate's services are. Without it the owner's own
+ * domains, hosting and subscriptions, which is what Estate's services are. Without it an owner's
  * import (23 domains and the hosting behind them) had no list to land in, and the importer left all of
- * them out in one skip line, read once, with the fix a second install from Add-ons that nothing asked for
- * (`loop/research-switch.md` section 3, ranked gap 5).
+ * them out in one skip line, read once, with the fix a second install from Add-ons that nothing asked for.
  */
 
 /*
@@ -40,7 +39,7 @@ const numbers = (where: string | null, empty: string, line: string) => {
 };
 
 /**
- * WHERE A BUTTON ON A DECLARED PAGE OPENS THE NEW-ACTION SHEET (`loop/finish/contracts.md` X57). A path of this
+ * WHERE A BUTTON ON A DECLARED PAGE OPENS THE NEW-ACTION SHEET. A path of this
  * BrainDog, which the app puts under the record's own address (`at` in `apps/web/src/lib/at.ts`), and the preset ids
  * are `PRESETS` in `apps/web/src/lib/record/action-draft.ts`: `numbers` is a door writing to this list, `watch` a
  * scheduled read of one number.
@@ -140,20 +139,20 @@ export const FOUNDER = {
      changed on it, its plan on a time axis and its money by month, over the same registers this use case already
      lists (`transactions` joins `HOLDS` so the money series draws).
 
-     1.7.0 BECAUSE HOME LEADS WITH THE MONEY THERE IS AND NOT WITH WHO OWES WHOM (MOD-18): What you have, by book
+     1.7.0 BECAUSE HOME LEADS WITH THE MONEY THERE IS AND NOT WITH WHO OWES WHOM: What you have, by book
      once there are two, Lasts until, the numbers of the week as lines, then what is due, lapsing and working now.
      `page.home-founder` now requires `register.books`, which money-core 3.1.0 holds, so it is a minor step as
      1.5.0 was. Datapoints are called Numbers, the lists are Lists, and an organisation's page lists its projects.
 
-     1.8.0 BECAUSE THE PAGES ARE LAID OUT AND NAME THEIR PANELS (PGS-22): the Dashboard and a project's page open with
+     1.8.0 BECAUSE THE PAGES ARE LAID OUT AND NAME THEIR PANELS: the Dashboard and a project's page open with
      one sentence said from their figures and keep a rail beside the main column, and "Send numbers here" on an
      organisation and on a project says `panel: reporting`, so the key a project sends its numbers with is drawn by
      that name and not by the heading's English. A page somebody arranged in their own record keeps its arrangement:
      the update is offered, never forced. In the same unreleased version, the voice says more of the record its own
-     way, Home's empty lines and Decide's among them (PGS-24), each a new setting a person can change at /packs.
+     way, Home's empty lines and Decide's among them, each a new setting a person can change at /packs.
 
-     1.9.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.6.0'S TEMPLATE, built to the new look (`loop/design/SCREENS.md`,
-     Project page): its open work tallied by priority, what came in, went out and was kept this month beside the money
+     1.9.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.6.0'S TEMPLATE, built to the new look:
+     its open work tallied by priority, what came in, went out and was kept this month beside the money
      by month, its dated work as weeks above the plan, its questions as tiles and what it runs on as cards in the rail.
      1.8.0 is on `origin/master`, so a record on it is offered this only through a new version. Blocks added and nothing
      taken away, so a minor step; the template is twenty-one blocks, so the three this page adds under it land exactly
@@ -179,7 +178,7 @@ export const FOUNDER = {
     nothing_needs_you: 'Nothing needs your call',
     since_away: 'While you were building',
     lists: 'Lists',
-    /* THE REST OF THE LINES, direct and about the work (PGS-24): a call to make, what shipped, what reports a number. */
+    /* THE REST OF THE LINES, direct and about the work: a call to make, what shipped, what reports a number. */
     working_now: 'Agents at work',
     coming_up: 'Due soon',
     overdue: 'Late',
@@ -269,7 +268,7 @@ export const FOUNDER = {
         compare: 'none',
       },
       {
-        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/research-spark.md` S13): the money across every organisation and
+        /* HOME, AS THIS USE CASE ANSWERS IT: the money across every organisation and
            the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
            already.
 

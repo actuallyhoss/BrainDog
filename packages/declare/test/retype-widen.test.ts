@@ -1,7 +1,7 @@
 /**
- * A closed list opened to text on a record that holds rows (`loop/research-shell-seed-next.md` N2, Brief 2B).
+ * A closed list opened to text on a record that holds rows.
  *
- * N2 MEASURED BOTH REFUSALS. One money-core step up whose `holdings.kind` was `text` in place of the four-value `enum`
+ * BOTH REFUSALS, MEASURED. One money-core step up whose `holdings.kind` was `text` in place of the four-value `enum`
  * answered `FIELD_TYPE_CHANGED` with the fix "Retire the field and add a new one", from `declare` and again from the
  * kernel. Every stored value was already valid text, so nothing was protected, and the fix would have split one column
  * into two. `updates.by` (`packages/seed/src/modules/work.ts`) could not become open text on any record holding an update.

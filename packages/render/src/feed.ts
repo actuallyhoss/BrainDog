@@ -26,7 +26,7 @@ const isBy = (s: string): s is FeedBy => (FEED_BY as readonly string[]).includes
 
 /**
  * The renderer's own words, here for the reason `CARDS_NONE` is in `cards.ts`: it cannot import the
- * app's `copy.ts`. The two empty sentences are two facts, as the old tool's `You.svelte` draws them: a
+ * app's `copy.ts`. The two empty sentences are two different facts, and each gets its own: a
  * mark with nothing past it, and no mark at all.
  */
 export const FEED_GROUPS: Record<FeedBy, string> = { agent: 'Agents', rule: 'Rules', you: 'You' };

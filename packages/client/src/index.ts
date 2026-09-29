@@ -589,7 +589,7 @@ const NAMES = new Set(ROUTES.map((r) => r.name));
  *
  * THE REASON IS KEPT IN `detail`, NEVER IN `fix`. `fix` is the one sentence a person reads, and a socket's
  * message ("fetch failed", "502 with a body that is not JSON") is not one; a screen folds `detail` under
- * Details (design.md SYS-8), so the technical reason is there for whoever needs it and is never content.
+ * Details, as the design system asks, so the technical reason is there for whoever needs it and is never content.
  */
 const unreachable = (why: string): Refusal => ({
   code: 'UNREACHABLE',
@@ -665,9 +665,9 @@ export type Reading = { ask_id: string; predicate: SlashWhere | null; q: string 
  * `slashStatus`'s answer, `Status` in `packages/slash/src/types.ts` key for key, and written by hand for `Reading`'s reason.
  *
  * `source` IS THE OWNER'S ONE CHOICE, "Included" or "Your own key", and `tier` is the name it is stored under (`a` and `b`),
- * readable for one workflow while every reader moves to `source` (`loop/finish/contracts.md` §3.2). `provider` is said only
+ * readable for one release while every reader moves to `source`. `provider` is said only
  * on his own key. `asks.capped` is `false` there: his asks are listed and not held to a cap, so a page draws the count
- * without "of" (`agents.md` §5 item 7). OPTIONAL HERE for that same workflow, because a host a release behind answers
+ * without "of". OPTIONAL HERE for that same release, because a host a release behind answers
  * without them, and a reader treats a missing `source` as what `tier` says.
  */
 export type SlashTier = 'a' | 'b' | 'byo';
@@ -704,8 +704,8 @@ export type SlashSettings = {
 };
 
 /**
- * What a settings save may carry (`contracts.md` §3.2). `source: 'key'` wants a `provider`, a `model` and a `grant_id`;
- * `base_url` is `https:` on the public internet, and left out it is the provider's own. `tier` is kept for one workflow.
+ * What a settings save may carry. `source: 'key'` wants a `provider`, a `model` and a `grant_id`;
+ * `base_url` is `https:` on the public internet, and left out it is the provider's own. `tier` is kept for one release.
  * The door refuses any other key with `FIELD_UNKNOWN`.
  */
 export type SlashSettingsPatch = Partial<{
@@ -852,7 +852,7 @@ export function createClient(options: ClientOptions) {
    * that request. A POST here would be answered 405.
    */
   /**
-   * An account door (`/account/email`, `/account/email/confirm`; GAP-7): the person's and not a record's, so at the
+   * An account door (`/account/email`, `/account/email/confirm`): the person's and not a record's, so at the
    * origin's root whatever record `base` names, with the browser's cookie and never a bearer, as `hostDoor`'s rule.
    */
   async function accountDoor<T>(path: 'email' | 'email/confirm', args: Record<string, unknown>): Promise<Result<T>> {
@@ -925,7 +925,7 @@ export function createClient(options: ClientOptions) {
     /**
      * Pass 2 of `46 §5.5`: what Slash answers about the rows pass 1 found. `askId` is `Reading.ask_id`, and with it the
      * engine re-projects the predicate it already drafted rather than asking the model for a second one. The door is
-     * still `/api/slash/propose`; the method was `slashPropose` until `contracts.md` X42 named it for what it gives.
+     * still `/api/slash/propose`; the method was `slashPropose` until it was renamed for what it gives.
      */
     slashAnswer: (question: string, askId?: string) =>
       hostDoor<SlashProposal>('slash/propose', askId === undefined ? { question } : { question, ask_id: askId }),
@@ -1252,7 +1252,7 @@ export function createClient(options: ClientOptions) {
     quietHours: () => call<Answer<'quietHours'>>('quietHours'),
     setQuietHours: (quiet: { from: string; to: string } | 'off' | null) => call<Answer<'setQuietHours'>>('setQuietHours', { quiet }),
 
-    /* A PERSON'S OWN NAME AND SIGN-IN ADDRESS (GAP-7). The name is a record method, DATA, a person only; the address is
+    /* A PERSON'S OWN NAME AND SIGN-IN ADDRESS. The name is a record method, DATA, a person only; the address is
        the account's: a link mailed to the new one, then pressed from a sign-in in the last fifteen minutes. */
     renamePerson: (name: string) => call<Answer<'renamePerson'>>('renamePerson', { name }),
     changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),

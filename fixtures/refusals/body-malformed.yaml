@@ -5,7 +5,7 @@ fix:       Send a JSON object as the body.
 call:      { "method": "create", "args": [] }
 principal: { "kind": "person", "level": "owner" }
 
-# NO `at:`, BECAUSE THE ROUTER GIVES NONE. This said `at: body` until 2026-09-22, when
+# NO `at:`, BECAUSE THE ROUTER GIVES NONE. This once said `at: body`, until
 # `packages/host/test/refusals-rpc.test.ts` drove it for the first time and `serveApi` answered
 # `{ code, fix }` with no address. `41 §6` makes `at` optional, and a refusal with nothing to point at
 # carries none; whether the router should say `body` is a change to the router and not to this file.

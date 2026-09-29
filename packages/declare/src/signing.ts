@@ -1,5 +1,5 @@
 /**
- * Author keys and signatures for a catalogue (`loop/research-marketplace.md` §2, "Integrity").
+ * Author keys and signatures for a catalogue.
  *
  * AN AUTHOR SIGNS WHAT A CATALOGUE LISTS, NOT THE BYTES OF A FILE. The signed text names the kind, the id, the version and
  * the checksum of the file's canonical JSON, so the index cannot be edited to point a signed version at another file, and

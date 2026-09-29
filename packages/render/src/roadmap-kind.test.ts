@@ -267,7 +267,7 @@ test('EVERY YEAR A DATE CAN SAY IS DRAWN AT A NUMBER, never at NaN', () => {
 test('A CLOCK THAT IS NOT A DATE COSTS TODAY\'S LINE AND NOTHING ELSE', () => {
   /* `roadmapToday` guards `toISOString` against a host clock that is `NaN` or past what a `Date` holds, and no test
      asked it to: with the guard taken out every test in this package stayed green while `now: NaN` threw a
-     RangeError out of `toHTML`, taking the paragraph above the fence with it (measured by the checker). */
+     RangeError out of `toHTML`, taking the paragraph above the fence with it (measured). */
   for (const now of [Number.NaN, Number.POSITIVE_INFINITY, 9e15]) {
     const html = toHTML(parse(`Before\n\n${FENCE}`), { now });
     assert.match(html, /Before/u, `now: ${now}`);
@@ -280,7 +280,7 @@ test('A ROW SKIPPED FOR ITS EFFORT IS NOT TOLD ITS DATE IS WRONG', () => {
   /* The sentence under the drawing said "because the date does not read" for every skipped row, and a row is also
      skipped when its date is a good day and its effort is not a number of days: `2 days`, or `1,200 d` as the web's
      `display()` groups a four-figure effort. `Glaze | 2026-09-20 | 2 days` was told its date did not read, which
-     sends the author to fix the one cell that was right (measured by the checker). */
+     sends the author to fix the one cell that was right (measured). */
   const html = toHTML(parse('```roadmap | X\nGlaze | 2026-09-20 | 2 days\nFine | 2026-09-12 | 2\n```'), { now: NOW });
   const said = /<p class="roadmap-skipped">([^<]*)<\/p>/u.exec(html)?.[1] ?? '';
   assert.match(said, /Glaze/u);

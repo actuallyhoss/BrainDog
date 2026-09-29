@@ -180,7 +180,7 @@ const SUM_LEAST = 2;
 /**
  * The totals over the rows read: every money field per currency, and every whole-number field, per register.
  *
- * CODE ADDS AND THE MODEL CITES (`loop/finish/agents.md` §2.7, S13). "How much did I spend on software this month" has
+ * CODE ADDS AND THE MODEL CITES. "How much did I spend on software this month" has
  * its answer in no single row, so under rule 1 it could never be said, and a model asked to add twelve amounts is the
  * one place a figure would be typed with nothing behind it. The total is worked out here, handed to the model as a brace
  * it may quote, and drawn from the same numbers.
@@ -353,7 +353,7 @@ export const cite = (
 
     if (colon < 0) {
       /* A BARE ID IS A FIGURE THE RECORD READ FOR THIS ASK, OR IT IS NOTHING. It was refused before hosts read figures,
-         because no path in the projection matched it, so "why is runway four months" had nothing to cite (S13). */
+         because no path in the projection matched it, so "why is runway four months" had nothing to cite. */
       if (pathFault(inner, allowed) && allowed.figures?.has(inner) !== true) return no('PROPOSAL_UNCITED', NAME_IT, { at: whole });
       addPath(inner, add);
       continue;

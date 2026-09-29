@@ -1,31 +1,30 @@
 /**
- * An agent composes a launch desk from a description, over MCP, and the owner's accept installs it
- * (`loop/research-dynamic-layouts.md` section 6 brief D9, section 7, `loop/DIRECTION.md` sections 11, 22 and 28).
+ * An agent composes a launch desk from a description, over MCP, and the owner's accept installs it.
  *
  * THE TOOL CALLS A MODEL WOULD MAKE, IN THE ORDER IT WOULD MAKE THEM, against a real record: read the page grammar,
  * try the desk whole over sample rows with a part page drawn over one part, file its lists, let the owner accept, read
  * a schema, file the pages, and read them back installed. Nothing here calls the kernel to install anything; the only
  * writes that are not `propose` are the owner's presses in Decide and the rows she types in.
  *
- * FROM THE DECLARATION BRIEF D8 SHIPS, `packs/launch-desk/launch-desk.pack.json`, read as it is on disk each run, with
+ * FROM THE DECLARATION THE LAUNCH DESK SHIPS, `packs/launch-desk/launch-desk.pack.json`, read as it is on disk each run, with
  * the pad's list of notes from `packs/pad/pad.pack.json`, which the desk requires. `declarationOf` turns a pack's
  * declaration into a change's the way `readPack` stores it. Which blocks to look at is found by heading, never by
  * position, so the pack may grow a block without this file being told.
  *
- * RED BEFORE WAVE ONE, MEASURED. This file and the two pack files, run on September 25th against `6eda2f46` (the
- * survey's commit, the last before wave one), failed at the lists: accepting them was refused `DECLARATION_INVALID` at
+ * RED BEFORE THE LAYOUT WORDS, MEASURED. This file and the two pack files, run against a record that did not yet read
+ * them, failed at the lists: accepting them was refused `DECLARATION_INVALID` at
  * `steps`, "steps says its rows are steps. Say which ref field names the row each belongs to and which bool field says
- * it is done, as { of: thing, done: done }.", since `steps: { order }` is itself a wave-one word. With `order` taken
+ * it is done, as { of: thing, done: done }.", since `steps: { order }` is itself one of those words. With `order` taken
  * off, each page's preview was refused whole, one sentence each, since the lint answers its first fault only: the desk
  * `ENUM_VALUE_UNKNOWN "page.desk.blocks[8]: \"next\" is not a role on a card."`, the part template the same for
  * `"reply"`, and Numbers `KIND_UNKNOWN "page.numbers.blocks[1]: kind \"inputs\" is not a kind this build draws, and no
  * block declares it."`. With those taken off too, the previews drew, and `layout` was NOT refused: it came back in the
  * page's keys, unread. `area`, `box`, `tiles` and `range` were refused on their blocks only, `DECLARATION_INVALID "area:
  * is not a key this record reads."`, and `about is {{name}}` on the queue `FIELD_UNKNOWN "governance has no field
- * called about."`. So the brief's red line, that the preview refused `layout`, `area`, `next`, `range` and `inputs`, was
- * right for four of the five and wrong for `layout`, which was admitted silently (the survey's finding 1).
+ * called about."`. So of `layout`, `area`, `next`, `range` and `inputs`, the preview refused four, and `layout` was
+ * admitted silently.
  *
- * THREE THINGS THE BRIEF ASSUMED THAT THE RECORD DID NOT DO, measured here on September 25th. Two are fixed, and the
+ * THREE THINGS THIS FLOW NEEDS THAT THE RECORD DID NOT DO, measured here. Two are fixed, and the
  * third is still worked around in the open:
  *   1. FIXED: a page could not be tried before its lists existed. `previewPage` holds one page to the install's lint,
  *      and the lint refuses a `requires` naming a list nobody installed, so the lists were filed and accepted before
@@ -221,11 +220,11 @@ test('THE GRAMMAR AN AGENT READS FIRST NAMES inputs AMONG THE KINDS, so the one 
 });
 
 /**
- * AND THE REST OF WAVE ONE'S WORDS, SAID BEFORE ANY REFUSAL. `braindog:grammar/page` (`packages/record/src/grammar.ts`)
+ * AND THE REST OF THE LAYOUT WORDS, SAID BEFORE ANY REFUSAL. `braindog:grammar/page` (`packages/record/src/grammar.ts`)
  * lists the kinds from the renderer, so `inputs` arrived with it, and its page, block and card-role lines were written
- * before wave one: measured on September 25th, split into words, it held `inputs` and none of `layout`, `sticky`,
+ * before the layout words: measured then, split into words, it held `inputs` and none of `layout`, `sticky`,
  * `area`, `tabs`, `lead`, `first`, `next`, `reply`, `range`, `tiles` or `box`, nor an option's `shows` and
- * `about`. A model that reads the grammar and not the survey wrote none of them. Desk 2.0 adds the words it wears:
+ * `about`. A model that reads only the grammar wrote none of them. Desk 2.0 adds the words it wears:
  * `short` on its path, `hue` and `picture` on a part's card, and its `calendar` with `back` and `ahead`.
  */
 test('THE GRAMMAR SAYS EVERY WORD THE DESK USES, so a model can write it before its first refusal', async () => {
@@ -252,7 +251,7 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
   assert.equal(early.refusal?.code, 'DEPENDENCY_UNRESOLVED', JSON.stringify(early));
   assert.match(early.refusal?.fix ?? '', /register\.parts/);
 
-  /* THE WHOLE PACK AS ONE TRIED BUNDLE is more than one preview takes (`loop/finish/contracts.md` §2.4), so it is refused
+  /* THE WHOLE PACK AS ONE TRIED BUNDLE is more than one preview takes (`PREVIEW_DECLARATIONS_MOST`), so it is refused
      on its size, at the declarations, in a sentence that says how to split it. */
   const everything = [...LISTS, ...PAGES];
   const triedAll = (await mcp.call('propose', triedBundle('Add the launch desk?', everything, 'metric.essentials', true), agent)) as Out;

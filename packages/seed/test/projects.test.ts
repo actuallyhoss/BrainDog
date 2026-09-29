@@ -203,7 +203,7 @@ test('PROJECTS INSTALLS ALONE: a record with only projects, its Overview opens a
   assert.deepEqual(block(overview, 'Needs you').rows, []);
 });
 
-/* ── the new look (portfolio 1.6.0, `loop/design/SCREENS.md`) ──────────────── */
+/* ── the new look (portfolio 1.6.0) ─────────────────────────────────────────── */
 
 test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS ONE TRACK, and each card says what its project is', async () => {
   const k = await seeded();

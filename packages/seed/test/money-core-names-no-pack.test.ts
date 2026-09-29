@@ -1,10 +1,9 @@
 /**
- * money-core, the pack every Money record holds, names no other pack (`loop/research-legacy-parity.md` brief B1,
- * `loop/DIRECTION.md` sections 22 and 27).
+ * money-core, the pack every Money record holds, names no other pack.
  *
  * WHY THIS FILE EXISTS. From 1.8.0 to 2.4.0 money-core's document carried `hands`, naming `bank-hsbc-eg` for twelve
  * ingests and `holdings` for one list, so the core pack every person installs knew one person's bank and one person's
- * kind of list by id. Both packs are files in `packs/` now and the the old tool import resolves them from the catalogue
+ * kind of list by id. Both packs are files in `packs/` now and an import resolves them from the catalogue
  * by id, so nothing is left that needs the core to know them. A handover is still something a pack can declare; this
  * holds that money-core does not.
  *
@@ -12,7 +11,7 @@
  * `hands` (who takes what it stops declaring) and the `pack` a declaration's body says it belongs to. A text search of
  * the document would not do: `people` is a pack id and also the list money-core's `who` points at.
  *
- * RED FIRST, MEASURED ON 25 SEPTEMBER against the tree before the handover was dropped: `hands` named `bank-hsbc-eg`
+ * RED FIRST, MEASURED against the tree before the handover was dropped: `hands` named `bank-hsbc-eg`
  * twelve times and `holdings` once, and the test failed on exactly those two ids.
  */
 

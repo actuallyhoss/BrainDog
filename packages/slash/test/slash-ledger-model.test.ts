@@ -1,15 +1,15 @@
 /**
  * Every `call` row names the model the host sent, and every count it holds is a whole number an `INTEGER` column keeps.
- * Two follow-ups to wave 48's "the ledger names the model the host used", which its checker found half done.
+ * Two follow-ups to "the ledger names the model the host used", which a review found half done.
  *
- * WAVE 48 NAMED THE HOST'S MODEL ON `answer` ROWS ONLY. The host maps the package's routing name onto `SLASH_MODEL` on the
+ * THE HOST'S MODEL WAS NAMED ON `answer` ROWS ONLY. The host maps the package's routing name onto `SLASH_MODEL` on the
  * way out and says what it sent on its reply and on a marked throw (`packages/host/src/slash.ts`, `endpointInference`),
  * and `answer.ts` read that name back. `propose.ts` did not: the drafting `read` row and the `propose` row were both written
  * under `ran.model`, which `core.run` takes from the template. So on one self-host with `SLASH_MODEL=llama3`, an
  * automation's row read `llama3` and a person's read and proposal, sent to the same endpoint as the same `llama3`, read
  * `glm-5.3-flash`, a model nothing was asked of.
  *
- * THE COUNT WAS CLAMPED BELOW AND NOT ABOVE. Wave 48's `counted` made a count whole and not negative, and `1e300` is both:
+ * THE COUNT WAS CLAMPED BELOW AND NOT ABOVE. The first `counted` made a count whole and not negative, and `1e300` is both:
  * `Number.isInteger(1e300)` is true, so it passed, and SQLite stored it as a REAL in `tokens_in INTEGER NOT NULL`, with
  * `neurons` on tier `a` a REAL of the same size.
  *
@@ -125,7 +125,7 @@ test('(3) A READ THAT REACHED NOTHING KEEPS THE TEMPLATE NAME, because a refused
   }
 });
 
-/* 1e300 IS WHOLE AND NOT NEGATIVE, so wave 48's clamp let it through. It is the body's `usage` a provider or anything
+/* 1e300 IS WHOLE AND NOT NEGATIVE, so the first clamp let it through. It is the body's `usage` a provider or anything
    between it and this host wrote, and nothing checks it but `counted`. Tier `a` with no `SLASH_MODEL`, so the row is
    under `glm-5.3-flash`, which has a rate, and `neurons` is computed from the count as well. */
 test('(4) A COUNT OF 1e300 REACHES THE LEDGER AS A WHOLE NUMBER UNDER THE CEILING, in an INTEGER column, and so do its neurons', async () => {

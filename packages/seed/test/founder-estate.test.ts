@@ -1,7 +1,7 @@
 /**
- * A founder's record holds its Estate (`founder.ts`, `loop/research-switch.md` section 3, ranked gap 5).
+ * A founder's record holds its Estate (`founder.ts`).
  *
- * THE OWNER'S 23 DOMAINS AND THE HOSTING BEHIND THEM HAD NOWHERE TO GO. Solo founder installed Projects, People, Money
+ * AN IMPORTED RECORD'S 23 DOMAINS AND THE HOSTING BEHIND THEM HAD NOWHERE TO GO. Solo founder installed Projects, People, Money
  * and Work, so a founder record held no `services` list, and the importer left every domain out in one skip line that
  * was read once. A founder running several companies holds domains, hosting and subscriptions, which is what Estate
  * is, so Estate is one of the modules a founder's record is made with.

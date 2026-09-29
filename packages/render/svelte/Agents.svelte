@@ -16,7 +16,7 @@
   const nodes = (v: string | undefined) => inline(v ?? '', opts);
 </script>
 
-<!-- A RUN'S FACE (agents C11), as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
+<!-- A RUN'S FACE, as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
      the agent face, and this block groups its lines by who did them, which is a run wherever `sessions.live` names one. -->
 {#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a
     class="cards-face cards-run"

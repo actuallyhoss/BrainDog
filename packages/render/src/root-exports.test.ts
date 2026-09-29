@@ -1,9 +1,9 @@
 /**
- * What a host can name from `braindog-render` itself. Wave two added five forms (a lead card, next and
+ * What a host can name from `braindog-render` itself. One change added five forms (a lead card, next and
  * reply, a path of steps, tiles with option visuals, a range against spend) and the thirty-fourth kind,
  * `inputs`, and every one of their plans was reachable only as `braindog-render/src/path.ts` and the
  * like: the Svelte drawers import by module path, so nothing inside the package noticed. A host is not
- * inside the package. The one that wires `inputs` has to hand `Block` an `OnInput`, and on 25 September
+ * inside the package. The one that wires `inputs` has to hand `Block` an `OnInput`, and before this
  * it could not name that type from the root at all. `tsc` holds the type below; the runtime names are
  * held here, by identity, so a re-export of a copy would fail too.
  */

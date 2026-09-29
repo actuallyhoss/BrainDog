@@ -104,7 +104,7 @@ const VERBS_FOR: Record<string, Verb[]> = {
  * The name the host says it sent the model under, read structurally off its reply or its throw, or nothing.
  *
  * THE PACKAGE ASKS BY ROUTING NAME AND THE HOST MAPS IT, so the name `core.run` holds is the template's and not what ran.
- * Measured on 23 September through the self-host with `SLASH_MODEL=llama3`: every `answer` row read `glm-5.3-flash`.
+ * Measured through the self-host with `SLASH_MODEL=llama3`: every `answer` row read `glm-5.3-flash`.
  * The host's `endpointInference` now says `model` on both (`packages/host/src/slash.ts`); an adapter that says nothing
  * keeps the template's name, which is what every row carried before.
  */
@@ -116,7 +116,7 @@ export const nameIn = (source: unknown): string | undefined => {
 /**
  * `engine`, and the name the host said it sent the last call under, off the reply or off the throw.
  *
- * WAVE 48 READ THIS NAME FOR `answer` AND NOT HERE, so one self-host wrote two names for one model: with `SLASH_MODEL=llama3`
+ * THIS NAME WAS ONCE READ FOR `answer` AND NOT HERE, so one self-host wrote two names for one model: with `SLASH_MODEL=llama3`
  * an automation's row read `llama3`, and the palette's `read` and `propose` rows, sent to the same endpoint as the same
  * `llama3`, read `glm-5.3-flash` (`test/slash-ledger-model.test.ts`). A throw is read as a reply is, because the host's
  * marked throws say the name too and a plain one says none, which leaves the template's.
@@ -307,7 +307,7 @@ type Read = Drew & {
  *
  * `RECORD_UNAVAILABLE` BECAUSE THE ONLY THING LEFT TO GO WRONG IS THE RECORD. Once a model has answered, what remains of a
  * read is the rows projection and what remains of a proposal is the citation check and the filing, and a throw out of any
- * of them used to reach `finally` with the hold still pending, which `release` deletes (SPK-1, `test/slash-settles.test.ts`).
+ * of them used to reach `finally` with the hold still pending, which `release` deletes (`test/slash-settles.test.ts`).
  * A code the ports already list, and not one of Slash's own, because a new one is an amendment to `30 §6`.
  */
 const UNSETTLED = 'RECORD_UNAVAILABLE';
@@ -320,10 +320,10 @@ export type Palette = {
 export const palette = (core: Core, record: RecordApi, fallback: Inference): Palette => {
   /**
    * Tier `a` is metered here, `byo` by the host, and tier `b` by nobody, because tier `b` is the owner's own key and asks
-   * on it are listed and not capped (`loop/finish/agents.md` §5 item 7). THAT HOLDS ONLY BECAUSE BOTH PASSES GO THERE: a
+   * on it are listed and not capped. THAT HOLDS ONLY BECAUSE BOTH PASSES GO THERE: a
    * host hands the own key's adapter as `inference` as well as `byok`, so pass one drafts on it too. Before it did, pass
    * one drafted on the host's model on every tier, and five reads on `b` at `ask_cap: 1` made five calls on the operator's
-   * key (`loop/research-batch-thirty-one-audit.md` §3). `byo` still drafts and proposes on the host's own endpoint, so
+   * key. `byo` still drafts and proposes on the host's own endpoint, so
    * the host counts it, in `packages/host/src/slash.ts` `slashGuardedEngine`, where the money is seen spent.
    */
   const spent = (): Refusal | null => {
@@ -566,7 +566,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const earlier =
       askId === undefined
         ? undefined
-        : /* `slash_call` IS THE LEDGER'S NAME SINCE C15 (`loop/finish/contracts.md` §7.2): `call.ts` renames the table
+        : /* `slash_call` IS THE LEDGER'S NAME: `call.ts` renames the table
              `call` to it at build, idempotently. */
           core.sql.one<{ question: string; predicate: string | null }>(
             "SELECT question, predicate FROM slash_call WHERE id = ? AND kind = 'read'",
@@ -856,7 +856,7 @@ const DIGITS = /[0-9]+/gu;
  * Whether one proposed row's fields hold only what its sources hold, and no citation text.
  *
  * A BRACE IN A FIELD IS REFUSED, because it would be written into the row on accept, which is the defect the rowset shape
- * exists to end (S3). A MONEY VALUE IS ONE A ROW HOLDS, exactly, by `cite`'s rule for a quoted amount. A RUN OF DIGITS IN
+ * exists to end. A MONEY VALUE IS ONE A ROW HOLDS, exactly, by `cite`'s rule for a quoted amount. A RUN OF DIGITS IN
  * A WORD IS ONE ITS SOURCES SAY, so "Chase invoice 42" stands over a row titled "Invoice 42" and a due date copied from
  * its source stands, while a date or a number the model worked out has nothing behind it.
  */

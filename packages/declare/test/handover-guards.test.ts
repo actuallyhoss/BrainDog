@@ -1,9 +1,9 @@
 /**
- * A handover to a pack whose file does not declare what it was handed (`loop/research-batch-thirty-four-audit.md` §7).
+ * A handover to a pack whose file does not declare what it was handed.
  *
  * THE RECEIVING PACK'S FIRST INSTALL READ THE HANDED LIST AS ITS OWN, AND DROPPED IT. `plan` hands a declaration on to a
  * pack that is not installed, and that pack's first install takes over what its file declares. A handed id its file
- * does not declare met the retire loop as the pack's own, so the audit's probe (`h2.mts`, money-core 2.0.0 handing
+ * does not declare met the retire loop as the pack's own, so a probe (money-core 2.0.0 handing
  * `register.holdings` with one row to a `notes-pack` that declares only `jots`) measured:
  *
  *     notes-pack install:      WOULD_ORPHAN "notes-pack installs away register.holdings, and there are 1 rows in it. Move them first."
@@ -46,7 +46,7 @@ type Api = Awaited<ReturnType<typeof createRecordApi>>;
 /**
  * money-core at `version`, without `holdings` and handing it to `to`, or DECLARING it again when `to` is null.
  *
- * THE DECLARING ONE IS 1.8.0's DOCUMENT UNDER A LATER NUMBER, which until 23 September was simply the shipped file. Since
+ * THE DECLARING ONE IS 1.8.0's DOCUMENT UNDER A LATER NUMBER, which was once simply the shipped file. Since
  * money-core 2.0.0 the shipped file has no `holdings`, so "the giver declaring it again" has to be built: `asMoneyCore180`
  * puts back the body 1.8.0 carried, byte for byte, and drops the handover of that one list.
  */
@@ -59,7 +59,7 @@ const moneyCore = (version: string, to: string | null): Doc => {
   return d;
 };
 
-/** A pack that has nothing to do with holdings: the audit's `notes-pack`, declaring one list of its own. */
+/** A pack that has nothing to do with holdings: the probe's `notes-pack`, declaring one list of its own. */
 const notesPack = (): Doc => ({
   pack: 'notes-pack',
   version: '1.0.0',
@@ -81,7 +81,7 @@ async function put(api: Api, doc: unknown): Promise<{ diff: Diff; out: Out }> {
  * the list to notes-pack.
  *
  * 1.8.0 FIRST BECAUSE IT IS THE LAST THAT DECLARES THE LIST: on today's money-core the record has no `holdings`, and all
- * four tests here went red at the `create` below on 23 September, before notes-pack was ever planned.
+ * four tests here went red at the `create` below, before notes-pack was ever planned.
  */
 async function handed(rows: number) {
   const sql = openSqlite();
@@ -154,7 +154,7 @@ test('A RECEIVER THAT DOES DECLARE IT still takes it over, and a pack already in
   /* THE BODY AS IT WAS HANDED, 1.8.0's, and not the shipped holdings pack's. That one has no `gold`, the row here is gold,
      and a take-over that keeps a value the body lacks leaves the list the record's own (`handover.test.ts`), so the
      `pack_id` read below is null and says nothing about whether notes-pack took it. Measured with the shipped body in
-     place on 23 September: `actual: null, expected: 'notes-pack'`. */
+     place: `actual: null, expected: 'notes-pack'`. */
   const doc = notesPack();
   doc.declarations.push({ ...structuredClone(HOLDINGS_1_8_0), pack: 'notes-pack' });
   const took = await put(api, doc);

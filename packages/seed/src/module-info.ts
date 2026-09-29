@@ -1,7 +1,7 @@
 /**
  * The modules this build ships, as a person knows them, read off their own manifests and documents: a name, a line about
  * what each is for, its version, the lists and pages it brings, what it cannot install without, and the words the first
- * run hears it in (shell.md USE-3).
+ * run hears it in.
  *
  * IT REPLACES A HAND COPY. `apps/web/src/lib/record/modules.ts` wrote the six modules out again, a third time beside the
  * seed and the first run's lexicon, and had drifted: it said Money was at 1.4.0 and brought one list, when the pack it
@@ -17,7 +17,7 @@
  * into its packs is not work to repeat on every screen that wants a module's name.
  *
  * NOT UNDER `packs/`, because that folder holds only what a record is built from (`agents.ts`, `first-party.ts`), and
- * this is a module's own card for a screen (`packs/rates-poll/rates-poll.test.ts`, "B7's DIRECTORY").
+ * this is a module's own card for a screen (the directory test in `packs/rates-poll/rates-poll.test.ts`).
  */
 
 import { FIRST_PARTY_LISTS } from '@braindog/declare';

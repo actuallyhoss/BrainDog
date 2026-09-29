@@ -1,7 +1,7 @@
 /**
  * The agents pack: it installs through the pack path, each register refuses what the plan says it
  * refuses, a project's skill hides the global one of the same name, no key row holds a value, and a
- * run in a demo project's folder is placed in that project (`loop/research-agent-path.md` §5.2, §6).
+ * run in a demo project's folder is placed in that project.
  */
 
 import { test } from 'node:test';

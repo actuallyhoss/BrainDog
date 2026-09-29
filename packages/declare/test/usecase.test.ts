@@ -1,6 +1,6 @@
 /**
  * A use case as a file: what it must say, the refusals at the path that is wrong, and its voice kept as
- * the settings of the pack it carries (`loop/research-spark.md` §2.1, §2.2).
+ * the settings of the pack it carries.
  */
 
 import { test } from 'node:test';
@@ -100,7 +100,7 @@ test('EVERY VOICE KEY FITS A SETTING NAME', () => {
   for (const key of VOICE_KEYS) assert.match(`voice_${key}`, /^[a-z][a-z0-9_]{0,31}$/);
 });
 
-test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY KEY (S8)', async () => {
+test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY KEY', async () => {
   const labels = { books: 'Shelf', 'books.state': 'Where it is', 'books.state.to_read': 'Up next', people: 'Readers' };
   const u = value<UseCase>(normaliseUseCase(DOC({ labels })));
   assert.deepEqual(u.labels, labels);

@@ -9,7 +9,7 @@ document: |
   Owed to us | GBP 4,100.00 | three invoices | 2 3 3 4 | chased twice
   ```
 
-# NO `at:`, AND THAT IS THE FINDING, TWICE OVER. A fence is not refused, it DEGRADES: `parse()`
+# NO `at:`, AND THAT IS THE POINT, TWICE OVER. A fence is not refused, it DEGRADES: `parse()`
 # answers with the `Degraded` envelope at `packages/render/src/parse.ts:59-68`, whose whole shape is
 # `{ type, code, fix, raw, info, start, end }`. There is no `at`, so this fixture's old
 # `at: blocks[0].rows[2]` named a key nothing here can carry.

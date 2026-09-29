@@ -1,5 +1,5 @@
 /**
- * A door goes where the patterns naming it go (`loop/research-batch-forty-two-audit.md` finding 4 (c)).
+ * A door goes where the patterns naming it go.
  *
  * A HANDED PATTERN ARRIVED NAMING A DOOR THAT WAS GONE. `hands` passes on only what the record uses (`Installed.used`):
  * a pattern that has filed a row, and a webhook door that holds a token. The door a pattern names through `door:` is

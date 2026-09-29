@@ -162,7 +162,7 @@ function figureParts(text: string): FigureParts | null {
 const grouped = (digits: string): string => digits.replace(/^0+(?=\d)/u, '').replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
 
 /**
- * A BAR'S VALUE, GROUPED: `11200` is drawn `11,200` and `£11,200.00` is drawn `£11,200` (design SYS-2).
+ * A BAR'S VALUE, GROUPED: `11200` is drawn `11,200` and `£11,200.00` is drawn `£11,200`.
  *
  * A bar is read against the bars beside it, so a zero minor part is noise down the whole column and is
  * dropped; a minor part that is not zero is part of the amount and stays. The unit, the sign and a code
@@ -181,7 +181,7 @@ const COMPACT = ['', 'k', 'm', 'bn', 'tn'] as const;
 
 /**
  * AN AXIS LABEL, COMPACT: `£31,240.55` is drawn `£31k`, `−£1,600.00` is `−£1.6k`, `GBP 850.40` is
- * `GBP 850` (design SYS-2; contracts §8.3, "how money is written").
+ * `GBP 850`.
  *
  * An axis label says where a scale reaches, not what an amount is, and the amounts themselves are in the
  * chart's numbers beside it. So it keeps one decimal below ten of a step (`£1.6k`) and whole steps above

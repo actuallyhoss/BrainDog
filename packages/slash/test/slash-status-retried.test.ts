@@ -1,10 +1,10 @@
 /**
  * A provider's refusal by status is not an answer, and an answer the host could not read has a code of its own and the
- * name of the model the host sent. Three follow-ups to wave 47's "A model that answered is counted".
+ * name of the model the host sent. Three follow-ups to "A model that answered is counted".
  *
- * `loop/research-worker-spark.md` §6 Q8, ITS DEFAULT TAKEN FOR THE OWNER. Wave 47 marked every throw after `send` resolved
+ * WHICH THROWS ARE ANSWERS. An earlier build marked every throw after `send` resolved
  * as `answered`, a status that is not `ok` among them, so a 429, a 502, a 503 or a 401 spent an ask and the package's
- * refusal ended the run on the first rung, where before wave 47 each was retried uncounted. The default: a non-2xx status
+ * refusal ended the run on the first rung, where before that each was retried uncounted. The default: a non-2xx status
  * is not an answer (retried, uncounted); the size, the parse and the timeout after a 200 are (counted, final), since those
  * are what a provider bills. The rungs here are the ladder's, called in turn as `serveAsks` would call them, because the
  * package's half of the rule is what it settles each one as.
@@ -35,7 +35,7 @@ const GOOD = (): Response =>
     status: 200,
   });
 
-/** The audit's endpoint: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
+/** The probe's endpoint: a 200 whose completion is 70,000 characters, reporting 16,000 completion tokens. */
 const AT_LENGTH = (): Response =>
   new Response(
     JSON.stringify({ choices: [{ message: { content: JSON.stringify({ answer: 'x'.repeat(70_000) }) } }], usage: { prompt_tokens: 415, completion_tokens: 16_000 } }),
@@ -83,8 +83,8 @@ test('(1) A 503 AND THEN A GOOD 200 IS ONE COUNTED ASK: the 503 is `UNREACHABLE`
     /* `UNREACHABLE` IS THE ONE CODE `serveAsks`'s `RETRIED` ASKS AGAIN, so the ladder reaches the second rung. */
     assert.equal(codeOf(first), 'UNREACHABLE', fixOf(first));
     /* ONE FULL STOP, AND IT IS THE HOST'S. The status sentence already ends in one, and this is the sentence the ladder
-       acks as the run's error: measured on 23 September, once the status was a plain throw again, the run read
-       "did not answer: The Slash endpoint answered 503..", which is the sentence wave 47 had hidden by marking it. */
+       acks as the run's error: measured once the status was a plain throw again, the run read
+       "did not answer: The Slash endpoint answered 503..", which is the sentence the marking had hidden. */
     assert.equal(fixOf(first), 'rule.rate asked Slash at step 1, and the model did not answer: The Slash endpoint answered 503.');
     assert.deepEqual(second, { ok: true, value: { text: '4.25' } });
     assert.deepEqual(

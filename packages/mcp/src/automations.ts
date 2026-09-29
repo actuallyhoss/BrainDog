@@ -1,6 +1,6 @@
 /**
- * What an automation may say, once, for an agent about to write one (`loop/research-shell-automations.md` sections 3 to 5,
- * Brief D). Served at `braindog:grammar/automations`, never in a tool description, so the turn budget
+ * What an automation may say, once, for an agent about to write one. Served at `braindog:grammar/automations`, never
+ * in a tool description, so the turn budget
  * `test/budget.test.ts` holds does not move for it.
  *
  * WHY HERE AND NOT IN THE RECORD, FOR THE SCRIPT GRAMMAR'S REASON (`grammars/script.ts`). The lint is the kernel's

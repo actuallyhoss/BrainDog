@@ -1,7 +1,7 @@
 /**
  * What every agent is told before it has called anything.
  *
- * `loop/research-agent-path.md` §1.4 is the text, word for word. It goes out in `initialize` and
+ * The text is ten rules. It goes out in `initialize` and
  * again with every `tools/list`, because a client that skips the first still reads the second. One
  * rule to a line, plain ASCII: a rule an agent can quote back is a rule it followed.
  *
@@ -9,14 +9,14 @@
  * never a credential, the handoff, the refusal that teaches. A tool description says when to reach
  * for that tool; these say how to behave with all of them.
  *
- * ONE SENTENCE IS NOT §1.4's: "Read the Home page for what leads", on the first rule. It is what
- * the `money` tool's place is taken by (`loop/research-m3-dynamic.md` section 3, B6). That tool read
+ * ONE SENTENCE WAS ADDED LATER: "Read the Home page for what leads", on the first rule. It is what
+ * the `money` tool's place is taken by. That tool read
  * seven figures of one pack by id; the Home page is the one a record's own packs declare as what
  * leads (`packages/seed/src/modules/money.ts` declares money-core's, and a use case overrides it),
  * and `braindog:page/home` answers it with every block run. A record whose packs declare no Home has
  * no such page and the resource list does not offer one, so the sentence costs that record nothing
  * but its tokens. ON THE FIRST RULE AND NOT A LINE OF ITS OWN, because a line costs its newline:
- * measured by `test/budget.test.ts` on 24 September, the rules were 392 of their 400 and the
+ * measured by `test/budget.test.ts`, the rules were 392 of their 400 and the
  * sentence as an eleventh line made them 401, red; appended to the line that already says where to
  * start, 400. There is nothing left under that ceiling now, and the next sentence here has to be
  * paid for by cutting one.

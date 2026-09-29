@@ -140,7 +140,7 @@ export const ulid = (ms: number): string => {
  * The store's version, kept in the `slash_meta` row and never in `PRAGMA user_version`.
  *
  * THE ROW AND NOT THE PRAGMA, because a Durable Object's authorizer refuses the pragma (`SQLITE_AUTH`, measured in workerd
- * on 22 September, `apps/worker/test/slash-in-do.test.ts`), so on the Worker it would read 0 for ever and a change keyed
+ * by `apps/worker/test/slash-in-do.test.ts`), so on the Worker it would read 0 for ever and a change keyed
  * on it would run on every build. `dir_meta` carries the directory's version the same way (`packages/record/src/directory.ts`).
  *
  * 1 WAS THE TWO TABLES `46 §4.1` NAMED `settings` AND `call`, with no version anywhere. 2 is the same columns under
@@ -191,7 +191,7 @@ const CALL_COLUMNS = 'id, ts, kind, tier, model, tokens_in, tokens_out, neurons,
  * What version 1 left that version 2 does not keep: its two index names, and the two codes the ledger wrote while the
  * assistant was called Spark.
  *
- * THE CODES ARE RENAMED HERE, ONCE, and no longer on every build. A ledger written before `loop/DIRECTION.md` section 31
+ * THE CODES ARE RENAMED HERE, ONCE, and no longer on every build. A ledger written before the assistant was renamed Slash
  * holds a hold in flight as `SPARK_PENDING`, which `release` finds by its code and would never have found, so it stayed
  * counted against the month, and a refused ask as `SPARK_BUDGET_SPENT`, which is history. Version 1 ran the rename with the
  * tables on every build, over a partial index kept so that it cost nothing; with a version row the step runs once, reads
@@ -317,7 +317,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        rate table holds the four the corpus routes to, and a BYO name is not one of them.
        AND "OFF TIER `a`" IS THE HOST'S TO WIDEN, because "not our money" was false on one host. On the Worker with no
        endpoint every call goes to Workers AI on the operator's account, `byo` included, and
-       `loop/research-batch-sixty-audit.md` finding 4 read `{ tier: byo, tokens_in: 700, tokens_out: 60, neurons: 0 }`
+       a probe read `{ tier: byo, tokens_in: 700, tokens_out: 60, neurons: 0 }`
        there for a call the platform billed. That host passes the tiers it pays for (`priced`); every other keeps `a`. */
     const rate = Object.hasOwn(MODELS, row.model) ? MODELS[row.model as ModelId] : undefined;
     const neurons =
@@ -340,7 +340,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
       JSON.stringify(row.read ?? []),
       row.filed ?? null,
     ] as const;
-    /* A NEW ID IS INSERTED, AND A HELD ONE IS SETTLED ONLY WHEN THIS LEDGER MINTED IT (`defects.md` S14). The row
+    /* A NEW ID IS INSERTED, AND A HELD ONE IS SETTLED ONLY WHEN THIS LEDGER MINTED IT. The row
        `reserve` wrote is overwritten by the outcome, and a call settled the moment its model answered is overwritten by
        the exit that follows (`propose.ts`, `jobs.ts`), so a row still reads as one row per model call, with `ts` the
        moment it was settled. It was `INSERT OR REPLACE` on whatever id it was handed, so a caller passing an id it had not
@@ -450,8 +450,8 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        called nothing: a record with no lists answers `nothing` without a model, and billing it is the
        meter `propose`'s zero-rows arm already refuses to be. The other tried and reached nothing: an
        `answer` whose model was `UNREACHABLE`, which `answer.ts` settles under `-` because the host
-       asks an `UNREACHABLE` again up to the ladder's eighth rung, and finding 6 of
-       `loop/research-batch-forty-two-audit.md` put an outage at half the default cap spent on
+       asks an `UNREACHABLE` again up to the ladder's eighth rung, and a probe
+       put an outage at half the default cap spent on
        asks that reached no model. `read`'s and `propose`'s own `UNREACHABLE` rows keep the model's
        name and still count. Under `-`, that `answer` row keeps the prompt estimate in `tokens_in`
        and gets 0 neurons on tier `a`, because `account` finds no rate for `-` in `MODELS`; under
@@ -472,7 +472,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
     /* THE CHECK AND THE COUNT WERE TWO STEPS WITH A MODEL BETWEEN THEM. `spent()` read `asksUsed()`, and the row that
        count reads was written after the model answered, so every ask in flight passed the check against the same number:
        ten `read`s sent together at `ask_cap: 2`, over a model answering in 20 ms, made ten model calls and `status()` read
-       10 of 2 (`loop/research-batch-twenty-eight-audit.md` §1, `test/cap-concurrent.test.ts`). The hold is a real row,
+       10 of 2 (`test/cap-concurrent.test.ts`). The hold is a real row,
        written in the same synchronous step as the check, so the next ask's count already includes it. It is a row and not
        a counter in memory because both hosts build a Slash per request, and a counter would be one per request.
        IT IS `error · SLASH_PENDING` AND NOT A NEW STATUS because the `46 §4.1` CHECK admits four, and a new one is a

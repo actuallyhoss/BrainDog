@@ -2,7 +2,7 @@
  * Cash ahead on `/p/money` turns on the forecast's later controls, and its instalments say which plan each part is in.
  *
  * WHAT WAS MISSING. The controls for growth, rate drift and counting a plan in or out were built in the renderer, the
- * kernel and the browser's walk (brief B6 of `loop/research-legacy-parity.md`), and no page declared them: Cash ahead
+ * kernel and the browser's walk, and no page declared them: Cash ahead
  * asked for four knobs, and its instalments leg named no `group`, so every part of the proofing press reached the chart
  * as its own one-off, `Proofing press, 5 of 8`, which the count control does not offer.
  *

@@ -19,8 +19,7 @@ answers: [
     { "body": { "object": "error", "items": [] } }
   ]
 
-# `via: pull` WAS MINTED FOR THESE SEVEN ON SEPTEMBER 20TH 2026, and until then they said `rpc`,
-# which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
+# `via: pull` IS THE SURFACE OF THESE SEVEN, and not `rpc`, which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
 # `PULL_` code is raised inside a scheduled connector run, by the runner the Worker's alarm and the
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,

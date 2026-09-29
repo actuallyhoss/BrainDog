@@ -268,7 +268,7 @@ function matchFolded(folded: string, entries: readonly (readonly [string, Json])
  * `lookup`'s second rule, asked only when no row's value is a whole token: DIGITS PRINTED BEHIND STARS ARE THE
  * TAIL OF A LONGER VALUE, and they answer the one row whose value ends in them, or `'ambiguous'` for two or more.
  *
- * WHY IT EXISTS. `loop/research-bank-real.md`, *The three that did not read*, item 3: his bank prints one EGP
+ * WHY IT EXISTS. A real bank prints one EGP
  * account as stars and four digits in its InstaPay messages and as a branch code, three stars and the last three
  * of those four in its `From HSBC:` lines. The whole-token rule could read one family or the other, never both,
  * so whichever `last4` he typed, one family went to review with the account unread.
@@ -287,11 +287,11 @@ function matchFolded(folded: string, entries: readonly (readonly [string, Json])
  * kernel). The card patterns read their account `after: 'ending '` with no end, so the slice runs to the end of the
  * message, and a star anywhere in it named an account: `SUMUP *44 KIOSK`, `*** 1 of 2 ***` and `Ref ***-30` each
  * filed an unregistered card's spend at `exact` against a registered account ending in those digits, where the
- * parent sent all three to review (`loop/research-batch-twenty-one-audit.md`, finding 1). A star past the first
+ * parent sent all three to review. A star past the first
  * token is prose.
  *
- * AND A TAIL IS AT LEAST THREE DIGITS, the shortest the bank was measured printing (`loop/research-bank-real.md`).
- * `***-8` and `***27` each filed at `exact` against the one row ending in them (the same audit, finding 2).
+ * AND A TAIL IS AT LEAST THREE DIGITS, the shortest the bank was measured printing. Shorter, `***-8` and `***27`
+ * each filed at `exact` against the one row ending in them.
  */
 function matchMaskedTail(folded: string, entries: readonly (readonly [string, Json])[]): Json[] | 'ambiguous' {
   let answer: Json | undefined;

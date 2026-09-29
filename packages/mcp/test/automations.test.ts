@@ -1,6 +1,5 @@
 /**
- * Automations, edited by an agent over MCP and by a person on a canvas, one definition (`loop/research-shell-automations.md`
- * section 5 and Brief D, `loop/DIRECTION.md` section 22).
+ * Automations, edited by an agent over MCP and by a person on a canvas, one definition.
  *
  * WHAT WAS MEASURED BEFORE ANY OF THIS. The runner had landed (94ba1ad8, 48b55fc5) and nothing outside the kernel could
  * see it: `resources/read braindog:automation/chase` answered `ROUTE_UNKNOWN` over the wire, a `propose` of a rule change
@@ -94,7 +93,7 @@ type RunView = { id: string; state: string; trigger: string; actor: string; say:
 type One = { id: string; rule: string; name: string; trigger: string; path: string; enabled: boolean; open: number; body: unknown; runs: RunView[] };
 type Row = { id: string; trigger: string; path: string; register: string | null; next: string | null; open: number; last: { state: string } | null; month: { runs: number } };
 
-/* ── the red the brief asked for ───────────────────────────────────────── */
+/* ── what was red before any of this ───────────────────────────────────── */
 
 test('resources/read braindog:automation/chase ANSWERS THE DEFINITION AND ITS RUNS, each step with its outcome', async () => {
   const { sql, api } = await record();
@@ -219,7 +218,7 @@ test('THE DRY RUN SAYS THE PATH THE KERNEL TAKES, for every shape of trigger, si
 
 test('WHAT THE DRY RUN SAYS OF A STEP THAT WAITS ON SOMEBODY ELSE IS WHAT A REAL RUN DOES IN THIS BUILD', async () => {
   /* THE RECORD'S SENTENCE IS A COPY OF A FACT IN `flow.ts`, so it is held to a run of the real runner here. It went red
-     the day Brief C built `ask_person`, as it said it would: the run read `waiting` where `failed` was expected. So an
+     the day `ask_person` was built, as it said it would: the run read `waiting` where `failed` was expected. So an
      ask of a person is said as the question Decide shows and the wait the runner arms, and the grammar no longer lists
      it; a `call` parks the run on its answer, and an ask of Slash, which this host does not answer, is refused at
      install. */
@@ -344,8 +343,8 @@ test('A DRY RUN OF A BODY NESTED PAST ANY CEILING IS REFUSED, not a blown stack 
   sql.close();
 });
 
-test('D3: A DRY RUN OF A BODY WHOSE VALUE NESTS PAST ANY DEPTH IS REFUSED, and `said` on its own does not throw either', async () => {
-  /* THE DEPTH CAP ABOVE BOUNDS `if` NESTING, AND NOTHING ELSE. Measured red first (audit thirty-six, finding 8): a
+test('A DRY RUN OF A BODY WHOSE VALUE NESTS PAST ANY DEPTH IS REFUSED, and `said` on its own does not throw either', async () => {
+  /* THE DEPTH CAP ABOVE BOUNDS `if` NESTING, AND NOTHING ELSE. Measured red first: a
      40 KB body off the wire with a 20,000-deep array in one `notify.say`, sent through the READ+ `dryRun`, threw
      `RangeError: Maximum call stack size exceeded` out of `words` in `automations.ts`, which was `JSON.stringify`. */
   const sql = openSqlite();
@@ -409,7 +408,7 @@ test('automationRun AND cancelRun ARE AN OWNER\'S IN A BROWSER, like installPack
   sql.close();
 });
 
-test('THE THREE ARE ROUTED IN THE GROUPS THE BRIEF NAMES, served by both hosts\' one table, and typed in the client', async () => {
+test('THE THREE ARE ROUTED IN THEIR GROUPS, served by both hosts\' one table, and typed in the client', async () => {
   const { sql, api } = await record();
   const group = (name: string) => ROUTES.find((r) => r.name === name);
   assert.deepEqual(

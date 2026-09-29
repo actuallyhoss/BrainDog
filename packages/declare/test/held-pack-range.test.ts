@@ -2,7 +2,7 @@
  * An update that would make a held pack's `requires` false is refused, naming the held pack and what it needs.
  *
  * ONLY THE INSTALLING PACK'S OWN `requires` WAS ASKED (`needs` in `plan`), so the pack being updated was never checked
- * against what the packs already on the record ask of it. Measured on 23 September on a record at money-core 1.8.0
+ * against what the packs already on the record ask of it. Measured on a record at money-core 1.8.0
  * holding `bank-hsbc-eg` 1.0.0, which asks for money-core `^1.8.0`: money-core 2.0.0 planned with no conflict and no
  * unmet requirement, installed, and left the record holding a pack whose requirement was false of the money-core it
  * then had. Nothing in the plan named `bank-hsbc-eg`, and nothing offered 1.0.1, the version that takes 2.0.0.

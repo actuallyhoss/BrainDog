@@ -1,5 +1,5 @@
 /**
- * A use case's record as it is made (`loop/research-spark.md` S10 and S13): the modules carry the use case's
+ * A use case's record as it is made: the modules carry the use case's
  * example rows or none, People goes in without Projects, a relative day in an example is counted from the day
  * the record is made, and the Home a use case declares opens with every block readable.
  */
@@ -138,7 +138,7 @@ test("A PERSON'S MONEY IS HELD TO A PERSON'S SUMS, not a studio's, and a founder
   assert.deepEqual(targetOf(null, 'out-30d'), { setting: 'most_out_30d' });
   /* EACH TARGET IS A SETTING A PERSON CHANGES LATER; a number of days starts at the use case's own. */
   const configOf = (u: ReturnType<typeof useCase> | null) => (moduleDocument(u ?? null, 'money-core', { today: TODAY, examples: true }) as { config: Record<string, { type: string; default?: unknown }> }).config;
-  /* IN THE PLAIN WORDS, since MOD-23: a person is not "owed by" anybody, they have bills to pay. */
+  /* IN THE PLAIN WORDS: a person is not "owed by" anybody, they have bills to pay. */
   assert.deepEqual(configOf(useCase('personal')).most_out_30d, { type: 'money', label: 'Most to pay in 30 days', note: 'Held to this as soon as it is saved.' });
   assert.deepEqual(configOf(useCase('personal')).most_days_late?.default, 3);
   assert.equal(configOf(useCase('founder')).most_out_30d?.default, undefined);
@@ -154,7 +154,7 @@ type Drawn = { heading?: string; kind: string; rows?: Row[]; refusals?: unknown[
 test("A USE CASE'S HOME OPENS, every block readable, with its headings in the record's voice", async () => {
   const student = await made('student');
   const home = value<{ blocks: Drawn[] }>(student.k.page(homePageOf('usecase-student'))).blocks;
-  /* THE CAPTURE FIRST, SINCE STUDENT 1.3.0, and no example row under anything (`loop/finish/modules.md` MOD-17, C11). */
+  /* THE CAPTURE FIRST, SINCE STUDENT 1.3.0, and no example row under anything. */
   assert.deepEqual(home.map((b) => b.heading), ['Add homework', 'Due this week', 'This week', 'Study streak', 'Coming up']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(home[1]!.rows?.length ?? 0, 0, 'a new student record has nothing due');
@@ -163,7 +163,7 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
   const founder = await made('founder');
   const blocks = value<{ blocks: Drawn[] }>(founder.k.page(homePageOf('founder'))).blocks;
   /* WHAT IS DUE AND WHAT IS LAPSING SIT UNDER THE FIGURES SINCE FOUNDER 1.5.0 (`founder-home.test.ts`), AND HOME LEADS
-     WITH WHAT YOU HAVE SINCE 1.7.0 (`loop/finish/modules.md` MOD-18): the money there is, by book once there are two
+     WITH WHAT YOU HAVE SINCE 1.7.0: the money there is, by book once there are two
      or by organisation, then the week's numbers, then what is due, lapsing and working now. `page.home-founder` holds
      one pair of blocks each for "what you have" and "Numbers this week", gated by `when` on how many books there are
      and whether a project has reported, so a record with one book and no report draws the first of each pair; the

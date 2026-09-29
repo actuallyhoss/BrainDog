@@ -117,7 +117,7 @@ export function resolveDay(word: string, nowMs: number): string | null {
    *
    * IT WAS TAUGHT TO ONE OF THE TWO PARSERS. The browser's compiler learned it and this one, which
    * is what the MCP surface and every agent actually talk to, went on answering `null` — so the two
-   * `where` implementations disagreed in a NEW direction one commit after an audit filed them for
+   * `where` implementations disagreed in a NEW direction one commit after they were fixed for
    * disagreeing in the old one. `50 §1` says there should not be two; while there are, a fix that
    * lands on one of them is half a fix.
    *
@@ -154,7 +154,7 @@ export type SentenceDeps = {
    *
    * AND EVERY ROW BEARING IT, WHEN MORE THAN ONE DOES. The kernel's lookup was `LIMIT 1` with no
    * order, so over two rows titled Kiln `thing is Kiln` answered the first Kiln's two jobs and left
-   * the second Kiln's job out without a word (`loop/research-batch-twenty-two-audit.md` §2). A
+   * the second Kiln's job out without a word. A
    * single id is still an answer, so a caller that knows titles are unique need not build a list.
    */
   refByTitle?: (register: string, title: string) => string | readonly string[] | null;
@@ -164,7 +164,7 @@ export type SentenceDeps = {
    * ABSENT IS THE OLD TRUST, where a row id went through unread: a context that has no rows to ask
    * (a test's page deps) cannot tell a real id from a made-up one. The kernel gives it, because an
    * id naming no row answered `ok 0` in both forms and a row of another list did the same, where a
-   * spoken id for either is refused (§4 of the same audit).
+   * spoken id for either is refused.
    */
   refById?: (id: string) => string | null;
   /**
@@ -350,8 +350,8 @@ const QUOTES: readonly (readonly [string, string])[] = [
  * A CLOSING MARK WRITTEN TWICE IS ONE MARK OF THE VALUE AND CLOSES NOTHING, read left to right, so `"a"", b"` is the one
  * value `a", b`. Without it a value holding all four closing marks, each followed by a space, a comma or its end, had no
  * pair that could hold it, and `' ” ’ ", or state is open, or what is x` filled into a template's `what is {{what}}` read
- * as three conditions, one of them `state is open`: a one-row page drew all 24 open obligations on the seed
- * (`loop/research-audit-2026-09-25-layouts.md` §3). `quoteValue` doubles only for such a value, and `unquoted` reads
+ * as three conditions, one of them `state is open`: a one-row page drew all 24 open obligations on the seed.
+ * `quoteValue` doubles only for such a value, and `unquoted` reads
  * the doubling by this same rule, so the cut and the value can never disagree about where a quote ends.
  */
 function quoteEnd(text: string, at: number): number {
@@ -445,8 +445,8 @@ export function unquoted(value: string): string | null {
  *
  * AND `in`, `starts` AND `ends`, WHICH ONLY THE BROWSER READS THERE. `apps/web/src/lib/record/where.ts` names them as
  * operators it does not read, so it refused `what is in stock` with *"in" is not an operator this build reads* while
- * the kernel matched the text: 3,445 of the audit's fuzz disagreements were this one rule
- * (`loop/research-audit-2026-09-25-layouts.md` §16). Quoted, both engines read the words as the value.
+ * the kernel matched the text: 3,445 of a fuzz run's disagreements were this one rule.
+ * Quoted, both engines read the words as the value.
  */
 const GRAMMAR_START = /^(?:not|empty|set|present|between|in|starts|ends|(?:more|less)\s+than|at\s+(?:least|most))(?:\s|$)/i;
 
@@ -503,9 +503,9 @@ export function quoteValue(value: string): string {
  * keeps the operator for a caller who knows the stored value; the sentence refuses and names `is`,
  * which already reads both types in their words.
  *
- * A `secret` IS THE THIRD, and the worst of them (`loop/research-batch-fifty-eight-audit.md` §8).
+ * A `secret` IS THE THIRD, and the worst of them.
  * Its column holds the id of a grant in the vault, never the secret, and `TEXTUAL` no longer admits it,
- * so the JSON form refuses the same question. K4:
+ * so the JSON form refuses the same question.
  * `token contains a` compiled to `{ field: token, contains: a }` and a kernel `list` answered `ok`,
  * matching or missing rows on the letters of an id nobody is shown. It has no `is` to be pointed
  * at either, since `is` would compare the same id, so its refusal names `is set` and `is empty`,
@@ -525,8 +525,8 @@ const HELD_INSTEAD: Record<string, string> = {
  * operators, and the ones no sentence could say.
  *
  * `compile` and `evaluate` have answered `gt gte lt lte between` since the grammar was written, and
- * `operatorAllowed` orders seven types by them. Measured through a kernel `list` on 24 September
- * (`loop/research-m4-app.md`, brief 6): `n is at least 100` over an `int` was `VALUE_MALFORMED`, the
+ * `operatorAllowed` orders seven types by them. Measured through a kernel
+ * `list`: `n is at least 100` over an `int` was `VALUE_MALFORMED`, the
  * words handed to `resolve` as the value of an `is`; `n more than 100` and `n between 1 and 5` were
  * `MATCH_OP_UNSUPPORTED`; and over a `money` field the first came back `MONEY_LITERAL_NEEDS_CURRENCY`
  * for a sentence that had never got as far as a number. So "is this bill past a hundred pounds", the
@@ -1053,7 +1053,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
     /**
      * THE JSON FORM HAS RUN THIS LEAF ALL ALONG, AND THE SENTENCE REFUSED IT.
      *
-     * Measured before this branch (`loop/research-living-in-it.md` §6): `{field: what, contains:
+     * Measured before this branch: `{field: what, contains:
      * UBER}` as a rule fired on "UBER *TRIP 1234" in either case, and a list over a `document` found
      * its row, while `what contains uber` answered `MATCH_OP_UNSUPPORTED`. The grid's search box
      * compiles every word it is given to this same leaf, so the one filter the record builds most
@@ -1084,8 +1084,8 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
         .slice(2 * (after + 1))
         .join('');
 
-      /* A QUOTE THAT CLOSES AND THEN HAS MORE WORDS AFTER IT IS TWO TEXTS, NOT ONE HOLDING QUOTE MARKS
-         (audit fifty-eight §9, K3). `what contains "uber" or "lyft"` starts and ends with a straight
+      /* A QUOTE THAT CLOSES AND THEN HAS MORE WORDS AFTER IT IS TWO TEXTS, NOT ONE HOLDING QUOTE MARKS.
+         `what contains "uber" or "lyft"` starts and ends with a straight
          quote, so the pair below took everything between the outer two and searched for the one text
          `uber" or "lyft`, which no row holds: parsed, ran, matched nothing. A mark followed by a space
          is where the quote closed. One followed by a letter closes nothing, so `'Joe's cafe'` still
@@ -1148,7 +1148,7 @@ export function parseWhere(text: string | undefined, schema: Schema, deps: Sente
          one would be searched for literally: `what contains not uber` would answer the rows that say
          "not uber", the opposite of what was meant, and `uber or lyft` would look for all three words
          in a row. Quoting says the words are text, so the refusal names the quote.
-         IN ANY CASE, as the `or` check below it always was (audit fifty-eight §9, K2): `what contains
+         IN ANY CASE, as the `or` check below it always was: `what contains
          not uber` was refused while `what contains Not uber` compiled to the text `Not uber` and
          answered the rows that say it, the opposite of what was meant, from one capital letter. */
       if (/^not(\s|$)/i.test(bare)) {

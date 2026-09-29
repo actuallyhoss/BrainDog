@@ -1,6 +1,6 @@
 /**
  * Every first-party pack's `hands` sends each pattern and the door it names to one pack
- * (`loop/research-batch-forty-seven-audit.md` finding 4; `declare`'s `hands-names-door.test.ts` holds the rule).
+ * (`declare`'s `hands-names-door.test.ts` holds the rule).
  *
  * THE PLAN USED TO HAND A DOOR WITH ITS PATTERN WHATEVER `hands` SAID, so a `hands` that named the pattern and not its
  * door installed and nobody learned it was short a line. `installFault` now refuses one, at `hands.<pattern>`, and this

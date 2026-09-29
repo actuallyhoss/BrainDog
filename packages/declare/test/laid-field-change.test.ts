@@ -1,6 +1,6 @@
 /**
- * A pack may change a field it laid on another pack's list, and no field it did not lay (`loop/finish/defects.md` DEF-7
- * and L3). Before it, project-brief's next version could not relabel its own `summary`: the list it extends is staged
+ * A pack may change a field it laid on another pack's list, and no field it did not lay. Before it, project-brief's
+ * next version could not relabel its own `summary`: the list it extends is staged
  * with no pack, so the plan saw `summary` as the list's and refused `PROVIDES_CONFLICT`.
  *
  * THE RECORD'S OWN PATH, for `pack-extends.test.ts`'s reason: which pack laid which field is read off the `pack` row's

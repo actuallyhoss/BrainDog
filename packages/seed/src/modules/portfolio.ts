@@ -213,7 +213,7 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
 /** A project somebody is working on: the ones with a page. */
 const LIVE = 'lane is building or earning';
 
-/** A money figure, in the record's own currency (`loop/finish/modules.md` C1). */
+/** A money figure, in the record's own currency. */
 const MONEY = 'money';
 
 /** A count of projects, which is all the Overview's figures are. */
@@ -263,8 +263,8 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      statement, read off the project's own row.
 
      ONE CURRENCY, OR NO NUMBER, AND THE RECORD'S, SINCE portfolio 1.5.0. `format: 'money'` is added
-     up in the record's home currency when one is set, else in the one currency the rows are in
-     (`loop/finish/modules.md` C1); it named sterling before, which is one studio's currency and not
+     up in the record's home currency when one is set, else in the one currency the rows are in;
+     it named sterling before, which is one studio's currency and not
      the person's. A sum over rows in two currencies is converted at the record's own dated rates, or
      comes back as one amount per currency with no total at all (`kernel/src/metrics.ts`); it is never
      the two added together, which is the arithmetic the whole money type exists to refuse.
@@ -276,21 +276,21 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
      comparison is the diff below.
 
      AND OVER THE PROJECTS THAT HAVE SAID, WHICH IS WHY ALL FOUR CARRY `revenue is set`: THE OVERVIEW
-     TOLD AN IMPORTED RECORD IT EARNED NOTHING. Driven on a self-host at Sam's size,
-     21 registers and his 26 projects imported through the owner's own door plus the founder pack's
+     TOLD AN IMPORTED RECORD IT EARNED NOTHING. Driven on a self-host at a real record's size,
+     21 registers and 26 projects imported through an import door plus the founder pack's
      one example project: 27 projects, 14 of them in play, and not one annual figure on any of them,
-     because the the old tool adapter (`packs/legacy-import/adapter.ts`) files a project's monthly revenue as a READING and has no
+     because the importer filed a project's monthly revenue as a READING and had no
      year to write. `projects-earning` answered `value: 0, rows: 14, held: 27, met: true`, so the
      Earning tile drew "Earned in a year GBP 0.00" with "GBP 0.00 the year before", in the GOOD tone
      and linked into the list, in the same block row as a bar correctly drawing "No project in play
-     says what it earns". His record held a monthly figure for three of those projects at the time.
+     says what it earns". That record held a monthly figure for three of those projects at the time.
 
      THE IMPORTER IS NOT THE THING TO CHANGE, AND THE ARGUMENT IS ALREADY IN THIS TREE. `estate-year`
      multiplies a service's `cost` by its cycle and is called "Cost per YEAR": a subscription is a
      standing commitment, so twelve of a monthly one is a rate that will be paid. This field is
      "Earned IN a year": a total that happened. Twelve times a monthly figure is a run rate and not a
      total, so an importer writing it here would be putting a forecast in a field the page reads as
-     history, and one of the three monthly figures on his record is a salary, where twelve of it
+     history, and one of the three monthly figures on that record is a salary, where twelve of it
      asserts a year of employment nothing in the export states. Nor can these figures read the
      reading: `datapoints` is declared by the `usecase-founder` use case, so a figure over it would
      make Portfolio install a use case and would shut the Overview on a record that keeps only
@@ -568,7 +568,7 @@ const PROJECT = { field: 'name', label: 'Project', width: 'minmax(14ch,1fr)' } a
 
 export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
   /**
-   * THE PORTFOLIO, LEADING WITH WHAT NEEDS YOU (`loop/research-modules.md` §2.5, `loop/DIRECTION.md` §3). "Which of my
+   * THE PORTFOLIO, LEADING WITH WHAT NEEDS YOU. "Which of my
    * projects are moving, which need a call, and where my agents are": the figures, the queue of projects somebody said
    * are at risk or off track with who said so, every project in play as a card, what agents hold, what is coming up, and
    * the parked and finished ones folded away. Every block reads Projects alone, so it opens on any record that keeps them.
@@ -677,7 +677,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
 
            AND HOW MANY PROJECTS IT IS A TOTAL OF, because the pair on its own reads GBP 0.00 against
            GBP 0.00 on every record that has not filled the field in, which is every imported one.
-           Driven at his size the tile said "Earned in a year GBP 0.00, GBP 0.00 the year before" in
+           Driven at a real record's size the tile said "Earned in a year GBP 0.00, GBP 0.00 the year before" in
            the good tone over 14 projects in play, none of which had stated a year; it now says "0 of
            14 in play" on the same line, which is the only part of that tile a person could act on.
            The count is in the note rather than a third tile: a portfolio's headline is what it earns,
@@ -795,7 +795,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * product's own thesis stated back at it: the record is the coordinator, and it is better than a
    * model because it cannot be persuaded (23 §12).
    *
-   * WHAT NEEDS A PERSON COMES FIRST, SINCE portfolio 1.5.0 (`loop/finish/modules.md` MOD-13): after the figures, the
+   * WHAT NEEDS A PERSON COMES FIRST, SINCE portfolio 1.5.0: after the figures, the
    * questions a rule or an agent asked about this project, answered where they are shown; then where it stands, the work
    * handed back and what is open; the agents on it beside what changed on it; its plan on a time axis when its tasks
    * have days; its money month by month and row by row, and what keeps it running; and what is written about it.
@@ -803,7 +803,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * Spans read left to right, 7 beside 5 and 8 beside 4, and every block is one column at a phone's width, in this
    * order.
    *
-   * A RAIL FOR WHAT IS LOOKED UP AND NOT READ, SINCE PGS-22 (`loop/finish/pages.md`): the figures and what the project
+   * A RAIL FOR WHAT IS LOOKED UP AND NOT READ: the figures and what the project
    * runs on sit in a rail four twelfths wide (`area: rail`), and the main column opens with one sentence said from the
    * figures. A span in either column is a share of that column. At a phone's width the rail comes after the main
    * column, so the sentence is still the first thing read.
@@ -823,7 +823,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * on is a rail you stop reading.
    */
   /**
-   * THE SHAPE OF IT SINCE portfolio 1.6.0, AS THE BOARD FOR A PROJECT DRAWS IT (`loop/design/SCREENS.md`, Project page): the
+   * THE SHAPE OF IT SINCE portfolio 1.6.0, AS THE BOARD FOR A PROJECT DRAWS IT: the
    * open work tallied by priority above the list of it, what came in, went out and was kept this month beside the twelve
    * months, the dated work as a strip of weeks above the plan's time axis, and what it runs on as cards in the rail with
    * what each costs and when it renews. Twenty-one blocks, so a use case can add three of its own under the ceiling of
@@ -1091,10 +1091,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         body: '{{note}}',
         empty: 'Nothing is written about {{name}} yet. Its note is on the project.',
       },
-      /* THE PAGE ENDS WITH WHAT RUNS ON IT (agents.md AGT-10), IN THE RAIL: its own keys, tools and skills, then the
+      /* THE PAGE ENDS WITH WHAT RUNS ON IT, IN THE RAIL: its own keys, tools and skills, then the
          ones that apply everywhere, faint beneath, one above the other at the rail's width. `panel: actions` names the
          host panel a section draws under it, so `BlockSlot.svelte` attaches the scheduled actions list (Resume, Pause)
-         here without matching English text (`loop/finish/contracts.md` X5). A record without the agents pack, or with
+         here without matching English text. A record without the agents pack, or with
          none of a kind, says so through each block's own `empty:` rather than refusing: `runs_on` reads a list only
          where the record holds it. */
       {
@@ -1115,7 +1115,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            Resume and Pause, so a card for each as well would say every action twice.
 
            EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark or the globe
-           for everywhere (agents C8), and the kernel answers the project's own first and the global ones after them.
+           for everywhere, and the kernel answers the project's own first and the global ones after them.
            `used_by` is the run that last opened a key or called a tool, `S47`, which the card draws as that run's face,
            and `used_at` when anybody last did; a skill has no use the record counts, so it names neither. */
         kind: 'cards',

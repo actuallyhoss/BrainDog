@@ -7,7 +7,7 @@ document: |
   Cash | GBP 28,320.00
   ```
 
-# NO `at:`, AND THAT IS THE FINDING. A fence is not refused, it DEGRADES: `parse()` answers with the
+# NO `at:`, AND THAT IS THE POINT. A fence is not refused, it DEGRADES: `parse()` answers with the
 # `Degraded` envelope at `packages/render/src/parse.ts:59-68`, whose whole shape is
 # `{ type, code, fix, raw, info, start, end }`. There is no `at`, so this fixture's old
 # `at: blocks[0].kind` named a key nothing here can carry, and `40 §6`'s table promises the same

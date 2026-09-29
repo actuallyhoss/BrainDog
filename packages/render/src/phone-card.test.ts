@@ -1,6 +1,6 @@
 /**
  * A table row as a phone card: the lead, the figure and at most two unlabelled values, never "#", a
- * missing mark or an id (design-brief §5 and §6, "Tables"). `cardPlan` decides once per table which
+ * missing mark or an id. `cardPlan` decides once per table which
  * columns may be drawn; `cardCells` decides per row which of them have something to say.
  */
 

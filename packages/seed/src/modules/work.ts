@@ -235,7 +235,7 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
        weeks on the Overview count every finished task and not only the ones somebody dated. */
     finished: 'done_on',
     /* WHO HOLDS A TASK, SO "HAND TO" CAN GIVE IT TO SOMEBODY IN ONE PRESS: a person by Owner, an agent by Agent, and a
-       task an agent takes is Doing (GAP-11). */
+       task an agent takes is Doing. */
     hand: { person: 'owner', agent: 'agent', taken: 'doing' },
     pack: 'work',
     fields: [
@@ -458,7 +458,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
  * The script that closes a task's follow-ups when the task is done: every step `Part of` it that is still open, doing
  * or blocked moves to done, with a line in its note naming the task it closed with.
  *
- * MEASURED BEFORE IT (`loop/research-living-in-it.md` §5, `probe-cascade.test.ts`, and on a self-host with Work in
+ * MEASURED BEFORE IT (`probe-cascade.test.ts`, and on a self-host with Work in
  * `apps/selfhost/test/follow-ups.test.ts`): a parent moved to done left its child open, so the Overview kept drawing a
  * step of work that was over. A dropped step is left alone, because somebody decided it was not worth doing, and a step
  * in review is left alone, because it waits on a person who has not looked yet.
@@ -516,10 +516,9 @@ const workScript = (script: string, title: string, source: string): Record<strin
 /**
  * WORK'S AUTOMATIONS: two rules and the two scripts they start, in the pack document's own form (the kind first).
  *
- * A RULE STARTS A SCRIPT THROUGH A `script` STEP, and nothing about tasks is in the kernel (`loop/DIRECTION.md`
- * section 22): the kernel queues the script's run (`startScript` in `packages/kernel/src/flow.ts`), the host runs it in
- * its sandbox, and its writes land through the ordinary write path as `script:<id>@v<n>`. `32-PARITY §5` wrote the
- * cascade as one rule on the child that hops to its parent with `via:`, which this build refuses at install
+ * A RULE STARTS A SCRIPT THROUGH A `script` STEP, and nothing about tasks is in the kernel: the kernel queues the
+ * script's run (`startScript` in `packages/kernel/src/flow.ts`), the host runs it in its sandbox, and its writes land
+ * through the ordinary write path as `script:<id>@v<n>`. `32-PARITY §5` wrote the cascade as one rule on the child that hops to its parent with `via:`, which this build refuses at install
  * (`MATCH_OP_UNSUPPORTED`), and a rule on the child is evaluated when the child is written, not when its parent is.
  *
  * NOT INTO `RULES`, which holds the older `register:` and `then:` form that `installSeed` runs over rows already
@@ -556,7 +555,7 @@ export const WORK_AUTOMATIONS: Record<string, unknown>[] = [
 const DESCRIPTION = { field: 'what', width: 'minmax(20ch,1fr)' } as const;
 
 /**
- * BY TIER, THEN BY THE DAY IT FALLS DUE (decisions C30, the old tool's board rule). The record sorts an enum by the order
+ * BY TIER, THEN BY THE DAY IT FALLS DUE, the order a board of work is read in. The record sorts an enum by the order
  * its values were declared in, so `urgent` comes before `low`, and a task with no tier sorts after every tier, as an
  * empty value always does. BOTH KEYS SAY `asc` because an order that says no direction is read descending, which would
  * put Low first and the latest day at the top.
@@ -568,7 +567,7 @@ const TIER_THEN_DUE = [
 
 export const WORK_PAGES: Record<string, SeedPage> = {
   /**
-   * WORK LEADS WITH WHAT IS IN PLAY AND WHAT WAITS ON YOU (`loop/DIRECTION.md` §3, `research-modules.md` §2.2). "What I
+   * WORK LEADS WITH WHAT IS IN PLAY AND WHAT WAITS ON YOU. "What I
    * have to do next, what my agents are doing, and what's stuck": the figures, the queue a person works from, what is
    * due, how the work moved week by week, where it sits, and what agents took. The board is its own page beside it.
    *
@@ -637,8 +636,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
            and who changed it last: the two facts the 1.5.0 table carried. `todo` is `cells: 4, optional: 2` in
            `braindog-render`'s `kinds.ts`, and both renderers draw the third and fourth cells as one quiet line
            joined by a dot (`src/todo.ts`). THE KIND WIDENED IN c6e2a331 AND THIS BLOCK DID NOT: it kept two columns,
-           so the page padded every row to `title | detail |  | ` and the line stayed empty, measured on 22 September
-           (`loop/research-batch-twenty-eight-audit.md` finding 3, held by `test/waiting-due.test.ts`). `changed` is
+           so the page padded every row to `title | detail |  | ` and the line stayed empty (measured, and held by
+           `test/waiting-due.test.ts`). `changed` is
            not a field of tasks; the kernel reads it from each row's history. */
         kind: 'todo',
         heading: 'Waiting on you',

@@ -1,7 +1,7 @@
 /**
- * What a `script` declaration may contain, said once, for an agent about to write one (`loop/research-shell-scripts.md`
- * section 7 and Brief 6). It is served at `braindog:grammar/script` and is never in a tool description, so the turn
- * budget `test/budget.test.ts` holds is untouched by it.
+ * What a `script` declaration may contain, said once, for an agent about to write one. It is served at
+ * `braindog:grammar/script` and is never in a tool description, so the turn budget `test/budget.test.ts` holds is
+ * untouched by it.
  *
  * WHY IT IS HERE AND NOT BESIDE THE OTHER TWO. `braindog:grammar/page` and `braindog:grammar/proposals` are the record's
  * (`packages/record/src/grammar.ts`, reached through `arrangement`), because the page grammar reads the render package's
@@ -20,7 +20,7 @@
  * (`startAtDoor` in `kernel/src/script.ts`). And it said 32 MB of memory as though every host held it: that is the
  * QuickJS sandbox's `HEAP_BYTES`, the self-host's, and a Cloud run is a Worker held to what the platform gives one.
  *
- * ITS EXAMPLES ARE NOBODY'S USE CASE (DIRECTION section 22). The second was a bank message read into a transaction;
+ * ITS EXAMPLES ARE NOBODY'S USE CASE. The second was a bank message read into a transaction;
  * it is a webhook's JSON now, which is what a door hands a script, and its amount is taken in minor units as sent.
  */
 

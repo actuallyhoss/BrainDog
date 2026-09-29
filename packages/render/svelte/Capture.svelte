@@ -7,8 +7,8 @@
   cannot act is absent rather than greyed out (`19 §6`). A disabled input was ruled out by name,
   because it reads as a record that is broken rather than as a page that cannot write.
 
-  THE BUTTON IS INSIDE THE FIELD'S EDGE AND APPEARS ONCE THERE IS TEXT, which is the old tool's Work
-  line: an Add beside an empty field is a button that does nothing when pressed, and it is the same
+  THE BUTTON IS INSIDE THE FIELD'S EDGE AND APPEARS ONCE THERE IS TEXT, because
+  an Add beside an empty field is a button that does nothing when pressed, and it is the same
   question `captureSubmit` answers at the press, so three spaces neither show an Add nor send a row
   with no title. Enter sends too, because it is a form, and the field empties once the host has the
   line; whether the write lands is the host's to say, beside the row it adds.

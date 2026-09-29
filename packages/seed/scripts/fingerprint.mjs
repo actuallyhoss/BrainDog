@@ -4,7 +4,7 @@
  *
  * WRITTEN BECAUSE THE GUARD WAS HAND-FED THREE TIMES IN TWO DAYS. Every one of those entries reached the file the same
  * way: an agent computed the fingerprint, wrote it into a report, and a caller copied it across. `portfolio@1.4.0` came
- * in that way on 21 September in `a89bc072`, sixteen characters and fifteen ids, none of which the caller could check
+ * in that way in `a89bc072`, sixteen characters and fifteen ids, none of which the caller could check
  * without running the pack code themselves. The guard already knows all of it, and a value a reviewer cannot recompute
  * is a value a reviewer is waving through.
  *

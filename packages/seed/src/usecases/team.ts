@@ -1,6 +1,5 @@
 /**
- * Team board: a product team's tickets, who holds each one, the cycle it is in, and the work agents took
- * (`loop/research-spark.md` §4).
+ * Team board: a product team's tickets, who holds each one, the cycle it is in, and the work agents took.
  *
  * THE TICKETS ARE WORK'S TASKS. Since tasks carry an owner, an agent, a priority, a status to check and a done day, a
  * team's board is Work's list in a team's words: Tasks is called Tickets, and Open, Doing and To check read To do, In
@@ -58,9 +57,9 @@ export const TEAM = {
      ticket can be ticked done, and a new list, Cycle days, holds how many tickets were open each morning. Agent work
      reads the runs the record knows are live rather than the `session` list.
      2.7.0: a project's page takes Projects' new layout, its figures and what it runs on in a rail beside the main
-     column, and one sentence said from its figures first (PGS-22, through `projectTemplate` in `../modules/
+     column, and one sentence said from its figures first (through `projectTemplate` in `../modules/
      portfolio.ts`, which this page's `page.project` already calls). And the voice says more of the record its own
-     way, Home's empty lines, the Inbox's and the pen's line among them (PGS-24). Each is a new setting a person can
+     way, Home's empty lines, the Inbox's and the pen's line among them. Each is a new setting a person can
      change at /packs, so a minor step.
      2.8.0: a project's page takes Portfolio 1.6.0's template, built to the new look: the open tickets tallied by
      priority above the list of them, their dates as weeks above the plan, and the questions about it as tiles. A team
@@ -87,7 +86,7 @@ export const TEAM = {
     nothing_needs_you: 'No call is waiting on you',
     since_away: 'What the team and its agents did',
     lists: 'Team lists',
-    /* THE REST OF THE LINES, brisk and shared (PGS-24): a ticket, a call, the team and its agents. */
+    /* THE REST OF THE LINES, brisk and shared: a ticket, a call, the team and its agents. */
     working_now: 'On it now',
     coming_up: 'Due soon',
     overdue: 'Slipping',
@@ -99,7 +98,7 @@ export const TEAM = {
     add_first: 'File the first one',
     pen_waits: 'When there is a way to fit this to how the team works, it waits here until you keep it or say no.',
   },
-  /* SETTINGS A TEAM CAN CHANGE (S8): call Tickets "Issues" (and one of them is then an issue), or a teammate a "Member", at
+  /* SETTINGS A TEAM CAN CHANGE: call Tickets "Issues" (and one of them is then an issue), or a teammate a "Member", at
      /packs/usecase-team. Work's tasks are the team's tickets, and their statuses are said as a team says them. */
   labels: {
     tasks: 'Tickets',
@@ -198,7 +197,7 @@ export const TEAM = {
         ],
       },
       {
-        /* HOME, AS A TEAM ANSWERS IT (S13): what agents suggest, what is moving and who is on it, what is stuck, what is
+        /* HOME, AS A TEAM ANSWERS IT: what agents suggest, what is moving and who is on it, what is stuck, what is
            due, and how far the cycle has come, with no place on the rail. */
         page: 'home-team',
         title: 'Team',
@@ -259,7 +258,7 @@ export const TEAM = {
                that are doing or in review carry no due day at all, so every screenshot of this page was clean. Giving
                the in-progress ticket a date three days out draws `Write the release notes` twice as well, which is
                what `test/team-home-twice.test.ts` plants rather than trusting the sample. `79f17031` made the same
-               move on the Work pack's Overview, and `loop/research-usability-2026-09-21.md` finding 15 says what the
+               move on the Work pack's Overview, and a usability pass said what the
                overlap costs: the first reading is that the board is double-counting. */
             heading: 'Due this week',
             span: 12,

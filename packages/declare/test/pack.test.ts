@@ -244,7 +244,7 @@ test('and it says what a pack would DO, before anybody has to read the file', as
     'made runs for the project studio and sends the key "hook key".',
     /* ONCE, AT THE END, NOT UNDER EVERY KEYED LINE. Four actions here send a key, and four copies
        of one sentence about the record is a list people stop reading, which costs exactly the
-       thing the sentence is for (`research-scheduled-actions.md` §2.7). The project's line stays
+       thing the sentence is for. The project's line stays
        its own, because it names a project and says the key is not confined to it. */
     'Keys are not kept per project yet, so any action in this record can send any key it names.',
   ]);

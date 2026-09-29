@@ -71,7 +71,7 @@ test('a pattern Slash derived is always needs-review, whatever the model said', 
   const { slash, record, inference } = build();
   inference.say(ingest());
   await slash.proposePattern(SAMPLES, OWNER);
-  /* FILED AS THE DECLARATION IT INSTALLS AS, on the channel the samples came by (`loop/finish/defects.md` A7): a bare
+  /* FILED AS THE DECLARATION IT INSTALLS AS, on the channel the samples came by: a bare
      body has no id, and the kernel refuses it at every accept. */
   const filed = record.filed[0]?.body['ingest'] as { id: string; kind: string; body: { channel: string; writes: { confidence: string }; on_conflict: string } };
   assert.equal(filed.kind, 'ingest');

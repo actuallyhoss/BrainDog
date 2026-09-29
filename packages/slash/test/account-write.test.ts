@@ -1,9 +1,9 @@
 /**
  * What `account` writes, and what it leaves alone.
  *
- * WHY THIS FILE EXISTS. Wave thirty's backlog read `account` as `INSERT OR REPLACE` for every caller and asked whether a read
+ * WHY THIS FILE EXISTS. `account` once read as `INSERT OR REPLACE` for every caller, which raised whether a read
  * or a proposal could overwrite the owner's settings (tier, cap, model) or reset the month's counter. Measured, it cannot:
- * `account` names one table, `slash_call`, and settles by `slash_call.id` alone, and since `defects.md` S14 only an id the
+ * `account` names one table, `slash_call`, and settles by `slash_call.id` alone, and only an id the
  * ledger itself minted settles over a row that is there. Every id it is handed is either the hold `reserve` wrote
  * for that same model call or a fresh `mint()` (`src/propose.ts`, `src/jobs.ts`), and the `ask_id` a pass 2 quotes is only
  * ever read with a `SELECT`, never passed back as the id of a new row. The settings singleton is written in two places, both
@@ -11,7 +11,7 @@
  * `configure`. So there is nothing to split, and these tests pin the behaviour that makes the question answerable by reading.
  *
  * THEY WERE SEEN TO FAIL, against two mutations of `src/call.ts` made for the purpose and then reverted. With `account` made
- * to also write `INSERT OR REPLACE INTO settings (singleton, updated_at)`, the clobber the backlog feared, the first two fail
+ * to also write `INSERT OR REPLACE INTO settings (singleton, updated_at)`, the clobber that was feared, the first two fail
  * with `ask_cap` back at 80 and the byo owner's `tier` and `model` back at `a` and null. With `release` made to delete by id
  * alone, so that it removes the settled row and not only the hold, all three fail: the quoted pass 2 finds no read row,
  * drafts again, and makes a model call nobody asked for. Both were measured when the tables were `settings` and `call`.
@@ -148,8 +148,8 @@ test('ONE ROW PER MODEL CALL, and pass 2 on an ask_id does not replace the read 
     assert.equal(quoted?.question, 'what is still open');
     assert.match(quoted?.predicate ?? '', /"obligations"/);
 
-    /* The meter counts reads and pattern presses on tier a (AGT-26: a pattern press is metered as one ask), never a
-       propose: one question is one ask, whatever passes it took (`contracts.md` §7.5), so the two proposals above
+    /* The meter counts reads and pattern presses on tier a (a pattern press is metered as one ask), never a
+       propose: one question is one ask, whatever passes it took, so the two proposals above
        add nothing past the reads that drafted them. Three, and nothing held is left counted. */
     assert.equal(slash.status().asks.used, 3);
     assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE code = 'SLASH_PENDING'")?.n, 0);

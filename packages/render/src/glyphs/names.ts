@@ -34,7 +34,7 @@ const APP = [
   'tag', 'bell', 'session', 'drag', 'arrowUp', 'arrowDown', 'grid', 'edit', 'trash', 'archive', 'eye', 'download',
   'refresh', 'star', 'ban', 'info', 'ask', 'more', 'keyboard', 'code', 'observe', 'history', 'lock', 'key',
   'learning', 'skill', 'plug', 'globe',
-  /* The rail's places by their own names (SYSTEM §12.2 "Glyphs", from `loop/design/bento/ICONS.md`). */
+  /* The rail's places by their own names, as the design system's glyph list gives them. */
   'today', 'work', 'projects', 'activity', 'slash',
 ] as const;
 

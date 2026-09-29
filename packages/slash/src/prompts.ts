@@ -108,7 +108,7 @@ Every anchor string is copied verbatim from a sample. An anchor that is not in a
 writes: { register, confidence: "needs-review" }. on_conflict: "skip". No regular expressions.`;
 
 /**
- * The system message of `answer`, an automation's question (`loop/research-infer-ask.md` §4).
+ * The system message of `answer`, an automation's question.
  *
  * A SYSTEM OF ITS OWN, BECAUSE `SYSTEM`'S FIRST TWO RULES MAKE THIS JOB IMPOSSIBLE. Rule 1 forbids a digit, and a rule
  * that asked for `shape: number` wants exactly one; rule 2 wants every claim pinned to a row with `{{ref:…}}`, and a
@@ -174,7 +174,7 @@ const PREDICATE_SCHEMA = {
 const ROWSET_MOST = 200;
 
 /**
- * Each body kind's own schema (`loop/finish/agents.md` §2.7, rewrite 6).
+ * Each body kind's own schema.
  *
  * ONE OPEN OBJECT FOR EVERY KIND WAS HOW A PROPOSAL FAILED AT ACCEPT. `body: { type: 'object' }` let an option arrive with
  * no `id`, which the kernel requires when it files (`checkBody` in `govern.ts`), and let a rowset row carry its citation as

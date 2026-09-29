@@ -11,7 +11,7 @@
  * would do for one ask at a time, and two asks awaiting the model together would cross, one person's key opened in the
  * other's name. An argument is scoped to its call by construction, and this measures that it is.
  *
- * RED BEFORE THE REPAIR, measured on 22 September: `read` ignored its third argument, so the first case saw the draft on
+ * RED BEFORE THE REPAIR: `read` ignored its third argument, so the first case saw the draft on
  * the engine's adapter (`fallback 1, per call 0`) and the second saw both drafts there.
  */
 

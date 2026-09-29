@@ -1,12 +1,12 @@
 /**
- * `client.list` TAKES `includeDeleted`, AND A DELETED ROW IT LISTS SAYS IT IS DELETED (backlog IMP-1, wave fifty-three).
+ * `client.list` TAKES `includeDeleted`, AND A DELETED ROW IT LISTS SAYS IT IS DELETED.
  *
  * The client's `list` declared `register`, `where`, `limit`, `cursor` and `order`, so asking it for deleted rows was a
  * type error, and it sends a read as a GET, where an argument the host's table did not declare arrived as the text
  * "true" and the kernel answered live rows only. The CLI's import worked round both by sending its own POST
  * (`apps/cli/src/import.ts`, `listWithDeleted`). This is the declared door that replaces it.
  *
- * THE ROW CARRIES ITS MARKER, AND THAT IS THE HALF A CALLER ACTS ON. Audit fifty-two's findings 2 and 7 were about a
+ * THE ROW CARRIES ITS MARKER, AND THAT IS THE HALF A CALLER ACTS ON. Two defects before it were about a
  * deleted row that came back looking live (a ref named and then refused, a `log` answer that dropped `deleted_at`); a
  * list that hands a deleted row back without `deleted_at` would be the same defect on a third door. The import keys on
  * it to leave a row he threw away alone.

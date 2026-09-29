@@ -1,9 +1,9 @@
 /**
  * A pattern's `call` row, and the proposal it returns, name the model the host sent and not the template's.
  *
- * WAVE 49 GAVE `naming` TO THREE OF THE FOUR `core.run` SITES. The drafting `read`, the `propose` and the automation's
+ * `naming` WENT TO THREE OF THE FOUR `core.run` SITES FIRST. The drafting `read`, the `propose` and the automation's
  * `answer` rows all read the name the host says it sent (`test/slash-ledger-model.test.ts`). `proposePattern` in
- * `src/jobs.ts` is the fourth and was left on `ran.model`, which `core.run` takes from the template. Audit fifty §4
+ * `src/jobs.ts` is the fourth and was left on `ran.model`, which `core.run` takes from the template. A probe
  * measured it through the host's real `endpointInference` with `model: 'llama3'` and read one row:
  * `{"kind":"pattern","model":"glm-5.3-flash","tokens_in":1000000,...,"code":"PROPOSAL_SCHEMA"}`. No door reaches
  * `proposePattern` today (`slash-ask.ts` leaves it out on purpose), so no stored row is wrong; the day one does, every
@@ -12,8 +12,8 @@
  * THE HOST'S REAL `endpointInference`, REACHED BY A RELATIVE PATH as `slash-ledger-model.test.ts` reaches it, because
  * what the host says it sent is the host's decision and a hand-written double would test the double.
  *
- * RED ON 23 SEPTEMBER, BEFORE THE REPAIR: four tests, one passes, three fail. Case 1 read `glm-5.3-flash` on the row and
- * on the proposal it returned; case 2, the audit's probe, read `glm-5.3-flash` on a `PROPOSAL_SCHEMA` row; case 3 read
+ * RED BEFORE THE REPAIR: four tests, one passes, three fail. Case 1 read `glm-5.3-flash` on the row and
+ * on the proposal it returned; case 2, the probe, read `glm-5.3-flash` on a `PROPOSAL_SCHEMA` row; case 3 read
  * `glm-5.3-flash` on the row a reply that was not JSON left. Case 4 passed before and after, which is its job: an adapter
  * that names nothing keeps the template's name.
  */
@@ -82,7 +82,7 @@ test('(1) A PATTERN FILED ON A HOST WITH SLASH_MODEL IS UNDER THAT NAME, on the 
   }
 });
 
-test('(2) A PATTERN ANSWERED WITHOUT AN INGEST BODY IS UNDER THE NAME THE HOST SENT, the audit fifty §4 probe', async () => {
+test('(2) A PATTERN ANSWERED WITHOUT AN INGEST BODY IS UNDER THE NAME THE HOST SENT, the probe', async () => {
   const { sql, slash, rows } = build(host(said('{"flagged":false}', { prompt_tokens: 1e300, completion_tokens: 1 }), 'llama3'));
   try {
     const out = await slash.proposePattern(SAMPLES, OWNER);

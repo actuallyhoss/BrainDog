@@ -1,12 +1,11 @@
 /**
- * What a host offers to install by proposal: the first-party packs and the starter use cases
- * (`loop/research-spark.md` S12).
+ * What a host offers to install by proposal: the first-party packs and the starter use cases.
  *
  * THE HOST'S, BECAUSE THE RECORD NAMES NO USE CASE. The record reads this list to tell an agent what is on offer
  * and to plan what a `pack` or `arrange` proposal would install; it never installs from it until the owner accepts.
  * The self-host and the Worker hand in this one list, so an update carries progress forward on both.
  *
- * NO EXAMPLE ROWS, FROM ANYTHING ON OFFER (`loop/finish/modules.md` C11). A first-party pack carries none, because its
+ * NO EXAMPLE ROWS, FROM ANYTHING ON OFFER. A first-party pack carries none, because its
  * own examples are the sample studio's and would land in somebody else's record; a module installed for a use case
  * carries none, exactly as onboarding installs it (`moduleDocument` in `install.ts`); and a use case's pack is offered
  * without its own, so a record an agent arranges holds only what somebody wrote. What a use case forms around what the
@@ -34,7 +33,7 @@ export type SeedCatalogueEntry = {
   summary: string;
   modules: readonly string[];
   /**
-   * The words a person uses for what it keeps, which the first run listens for (shell.md USE-3): a pack's from its
+   * The words a person uses for what it keeps, which the first run listens for: a pack's from its
    * manifest, a use case's its own `signals`.
    */
   signals?: readonly string[];
@@ -129,7 +128,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     signals: u.signals,
     version,
     /* THE LISTS THE RECORD HOLDS, so an update keeps a list the older version declared (`useCaseDocument`), and none of
-       the use case's example rows (C11). */
+       the use case's example rows. */
     doc: ({ holds }) => {
       const doc = useCaseDocument(u.usecase, today(), holds);
       return doc ? withoutRows(doc) : null;

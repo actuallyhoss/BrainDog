@@ -1,5 +1,5 @@
 /**
- * The starter use cases and the arranger (`loop/research-spark.md` §3, §4): each carried pack installs on
+ * The starter use cases and the arranger: each carried pack installs on
  * an empty record once its modules are in, the voice lands in the record as settings, and sentences a
  * person could type land on the use case they describe, the same way every time.
  */
@@ -68,7 +68,7 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
     const { k, sql } = await record();
     for (const id of modulesFor(u)) if (id !== 'agents') value(await put(k, firstPartyDocument(id)));
     value(await put(k, doc));
-    /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW (`loop/finish/modules.md` C11), so only a pack that seeds is counted. */
+    /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW, so only a pack that seeds is counted. */
     const seeded = new Set(((doc.seeds ?? []) as { register: string }[]).map((s) => s.register));
     for (const list of listsOf(u)) if (seeded.has(list.id)) assert.ok(k.count(list.id) >= 1, `${u.usecase}: ${list.id} has its example row`);
     const settings = value<{ values: Record<string, unknown>; config: Record<string, { label?: string }> }>(k.packConfig(`usecase-${u.usecase}`));
@@ -192,7 +192,7 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
   );
 });
 
-test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS (S8)', () => {
+test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS', () => {
   let some = 0;
   for (const u of USE_CASES) {
     const declared = [...modulesFor(u).filter((id) => id !== 'agents').map((id) => firstPartyDocument(id)), useCaseDocument(u.usecase)]

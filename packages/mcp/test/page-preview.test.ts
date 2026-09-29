@@ -1,6 +1,6 @@
 /**
  * An agent sees its page drawn before it proposes it: `propose` with `"try"` on a page change answers the record's
- * `previewPage` and files nothing (M4 wave three brief 3).
+ * `previewPage` and files nothing.
  *
  * BY `script_try`'S ROUTE AND NOT A TOOL OF ITS OWN, because a tool costs tokens against the ceiling `docs/10-MCP.md`
  * measured, and the smallest one that could say this measured 102 against 3 the last time anything asked. A page an

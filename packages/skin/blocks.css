@@ -8,7 +8,7 @@
  * THE ONE RULE OF THIS FILE: no colour is written here. Every value is a semantic role a theme maps
  * (13 §2.1), and the four intents reach the DOM only through the one mapping block below.
  *
- * The motif, stated once so it stays consistent (SYSTEM §1, §6): ON A DECLARED PAGE EVERY BLOCK IS A
+ * The motif, stated once so it stays consistent: ON A DECLARED PAGE EVERY BLOCK IS A
  * TILE, opaque, and nothing inside it is another tile. The tile is `PageBody`'s; what is drawn in it
  * is here. Rows sit on the tile with a hairline between them and a rounded wash under the pointer;
  * a field, a key cap and a chart's track are the second surface (`--s1`) cut into it. Content is
@@ -93,7 +93,7 @@
     --tone-fill: var(--info-fill);
   }
 
-  /* AN INTENT ON A ROW OR A FIGURE IS A DOT, NOT A SYMBOL (DESIGN-BRIEF 4.1). The renderer still emits
+  /* AN INTENT ON A ROW OR A FIGURE IS A DOT, NOT A SYMBOL. The renderer still emits
      the glyph with its name for a screen reader; what is drawn is one 6px mark in the intent's fill,
      and the word beside it (a date, a state) carries the meaning in text. */
   .glyph {
@@ -116,7 +116,7 @@
      has been paid for. `measure` for prose; the room for tables; its own content for short drawn
      blocks (13 §4.1). */
 
-  /* THE CHART RAMP (SYSTEM §2): the greys a chart draws every series but the one in ink with, darkest first, mixed from
+  /* THE CHART RAMP: the greys a chart draws every series but the one in ink with, darkest first, mixed from
      the ink into the tile so each step holds in both schemes. Declared on the block because a custom property resolves
      its own `var()`s where it is declared, and every chart is inside one. */
   .block {
@@ -130,7 +130,7 @@
     max-inline-size: var(--measure);
   }
 
-  /* A HEADING IS A NAME, in ink and in sentence case, at a tile heading's step (SYSTEM §6). */
+  /* A HEADING IS A NAME, in ink and in sentence case, at a tile heading's step. */
   .block-head {
     display: flex;
     align-items: center;
@@ -143,7 +143,7 @@
 
   /* ── panel: note, quote ─────────────────────────────────────────────────── */
 
-  /* AN INLINE CALLOUT (DESIGN-BRIEF 4.9): the second surface and nothing else. No stripe down the
+  /* AN INLINE CALLOUT: the second surface and nothing else. No stripe down the
      leading edge, no tinted ground and no border; the intent is the mark at top left. The transparent
      edge is for forced colours, which draw it. */
   .panel {
@@ -156,7 +156,7 @@
     font-size: var(--t-base);
   }
 
-  /* A NOTE THAT IS ITS WHOLE TILE IS THE TILE'S WORDS, not a well inside the tile (SYSTEM §4: no tile in a tile). */
+  /* A NOTE THAT IS ITS WHOLE TILE IS THE TILE'S WORDS, not a well inside the tile (no tile in a tile). */
   .block-slot > .block-panel > .panel {
     padding: 0;
     background: none;
@@ -211,7 +211,7 @@
     color: var(--dim);
   }
 
-  /* `note lead` IS THE PAGE'S SENTENCE, said from its figures: the line under the title (SYSTEM §5), 16/24 in the
+  /* `note lead` IS THE PAGE'S SENTENCE, said from its figures: the line under the title, 16/24 in the
      second ink, on the ground and not in a tile (`PageBody`). A tone keeps its mark in the gutter. */
   .block[data-kind='note'][data-form='lead'] .panel {
     max-inline-size: var(--measure);
@@ -236,14 +236,14 @@
     grid-template-columns: repeat(var(--cells), minmax(0, 1fr));
   }
 
-  /* NO BOX AND NO RULES BETWEEN THE FIGURES (DESIGN-BRIEF 4.6): the tile is the box, and space separates the stats. A
+  /* NO BOX AND NO RULES BETWEEN THE FIGURES: the tile is the box, and space separates the stats. A
      board's lanes keep their hairline further down, because a lane is a column and not a figure. */
   .grid:has(> .cell) {
     gap: var(--sp-5);
   }
 
   /**
-   * A STAT (SYSTEM §6): the label in the meta ink, the figure, and the reading line under it.
+   * A STAT: the label in the meta ink, the figure, and the reading line under it.
    *
    * `fit-content(100%)` puts the glyph immediately after the label rather than at the far edge of the cell, because a
    * tone belongs to the thing it qualifies, and lets a label longer than its cell wrap rather than push the grid past
@@ -331,7 +331,7 @@
     font-size: max(var(--t-xs), 0.5em);
   }
 
-  /* THE READING LINE: what the figure means, under it (SYSTEM §6). */
+  /* THE READING LINE: what the figure means, under it. */
   .cell-note {
     grid-area: note;
     color: var(--ink2);
@@ -344,7 +344,7 @@
     color: var(--ink);
   }
 
-  /* A STAT'S TREND IS ITS SPARKLINE, TOP RIGHT, 120 by 32 with no axes (SYSTEM §7), on the label's line and never
+  /* A STAT'S TREND IS ITS SPARKLINE, TOP RIGHT, 120 by 32 with no axes, on the label's line and never
      wider than half its cell. Every cell of a strip with a trend in it takes the sparkline's height on that line, so
      the figures of one strip stay on one line whichever of them has one. */
   .cell:has(> .cell-trend) {
@@ -367,7 +367,7 @@
   }
 
   /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`, a card's): 2px of ink with
-     round joins and a 3px dot on the last point (SYSTEM §7), the dot in the figure's tone when it has one. */
+     round joins and a 3px dot on the last point, the dot in the figure's tone when it has one. */
   .trend-line,
   .cards-trend-line {
     fill: none;
@@ -384,7 +384,7 @@
     stroke-linecap: round;
   }
 
-  /* `stat lead`: the first figure is the screen's one lead figure (SYSTEM §3, `t-lead`), and the others stay the size
+  /* `stat lead`: the first figure is the screen's one lead figure (`t-lead`), and the others stay the size
      they are, so the lead reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than
      running into the next one: a balance in the millions, in pounds with its code, is wider than a quarter of the page
      at the lead size. */
@@ -397,7 +397,7 @@
     letter-spacing: -0.025em;
   }
 
-  /* A LONG LEAD ALSO TAKES THE FIT EVERY LONG FIGURE TAKES (design SYS-9: no stat figure is ever cut): the smaller of the
+  /* A LONG LEAD ALSO TAKES THE FIT EVERY LONG FIGURE TAKES (no stat figure is ever cut): the smaller of the
      two, and never past either. No floor, unlike the fit below: only a figure too long for its cell steps down. */
   .block[data-form='lead'] .cell:first-child .cell-figure[data-fit] {
     font-size: min(clamp(var(--t-figure), 10cqi, var(--t-lead)), calc(100cqi / (var(--chars) * 0.64)));
@@ -454,7 +454,7 @@
   }
 
   /**
-   * UNDER 480px OF BLOCK, A STAT IS ROWS: THE LABEL ON THE LEFT AND THE FIGURE ON THE RIGHT (design SYS-9).
+   * UNDER 480px OF BLOCK, A STAT IS ROWS: THE LABEL ON THE LEFT AND THE FIGURE ON THE RIGHT.
    *
    * Tiles side by side in a phone's width either cut a figure or step it down until it no longer reads as the answer.
    * In a row the figure's track never goes narrower than the figure's longest unbreakable run: the label keeps its one
@@ -609,7 +609,7 @@
   /**
    * THE TINT IS THE HOVER WASH PAINTED OVER THE COLUMN, as a background-image layer over whatever
    * ground the column has, so the drop target reads against the columns beside it without a second
-   * strength of any tint, and never in the brand's red, which a block does not wear (design D-1).
+   * strength of any tint, and never in the brand's red, which a block does not wear.
    */
   .board-col[data-drop] {
     background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
@@ -662,7 +662,7 @@
   }
 
   /**
-   * A BOARD IN A NARROW SLOT IS A GROUPED LIST (design SYS-9): each lane's heading with its count, then its cards as
+   * A BOARD IN A NARROW SLOT IS A GROUPED LIST: each lane's heading with its count, then its cards as
    * rows with a hairline between them, and no box round any of them.
    *
    * Stacked on a phone, the lanes kept everything that made them columns (the design review found three screens of
@@ -864,7 +864,7 @@
   }
 
   /* The line takes what the figure leaves, down to a width at which it is still a shape, and no wider than a
-     sparkline is (SYSTEM §7). Its line and dot are the stat's (`.trend-line`). */
+     sparkline is. Its line and dot are the stat's (`.trend-line`). */
   .cards-trend {
     flex: 1 1 6rem;
     min-inline-size: 5rem;
@@ -921,7 +921,7 @@
     margin: 0;
   }
 
-  /* A LABEL AND ITS VALUE READ AS A PAIR (DESIGN-SYSTEM APPENDIX C9). They sat at opposite edges of a
+  /* A LABEL AND ITS VALUE READ AS A PAIR. They sat at opposite edges of a
      340px card, so "Kind" and "Method" were 300px apart and a two-line "Next" was right-aligned prose.
      The labels share a column the width of the longest one, and the value starts beside it. */
   .cards-facts {
@@ -947,7 +947,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* WHERE A ROW APPLIES, AS A CHIP (agents C8): drawn by `packages/render/svelte/p/Table.svelte` and `Cards.svelte` in a
+  /* WHERE A ROW APPLIES, AS A CHIP: drawn by `packages/render/svelte/p/Table.svelte` and `Cards.svelte` in a
      column `as: scope`, the render package's twin of `lib/ui/ScopeChip.svelte`. A pill on the wash, the project's mark
      in its own hue or the globe, then the name. */
   .scope-chip {
@@ -1036,7 +1036,7 @@
     font-size: var(--t-lg);
   }
 
-  /* A CARD'S `hue` IS ITS MARK'S COLOUR AND NOTHING ELSE (pages C4, 05 §5's one identity accent): the renderer writes
+  /* A CARD'S `hue` IS ITS MARK'S COLOUR AND NOTHING ELSE (05 §5's one identity accent): the renderer writes
      `--hue` on the card only for a whole number from 0 to 359, and the mark is drawn in the identity formula every
      other mark in the app uses (`IdentityMark.svelte`). Never the card's edge, its ground or its ring, so a hue never
      reads as a tone. Asked of the card's own attribute and not of the inherited property, because `--hue` inherits: a
@@ -1058,7 +1058,7 @@
   }
 
   /* ── section: a heading for the blocks after it ──────────────────────────
-     ON THE GROUND IT IS A GROUP'S HEADING (SYSTEM §6): the title at `--t-group`, its count in the meta ink, the fold at
+     ON THE GROUND IT IS A GROUP'S HEADING: the title at `--t-group`, its count in the meta ink, the fold at
      the end of the line, and a hairline under it, with the tiles after it. IN A BOXED SECTION IT IS THAT TILE'S HEADING
      ROW, the glyph in its well and the name at `--t-row`, because the box is one tile. */
 
@@ -1201,7 +1201,7 @@
   }
 
   /* ── feed: what happened, grouped by who did it ──────────────────────────
-     the old tool's "Since you last looked": a list without a box, the count leading every row, and
+     "Since you last looked": a list without a box, the count leading every row, and
      full ink only on what is new. The block is its own container, so a narrow slot moves the time
      under the words without a breakpoint. */
 
@@ -1356,8 +1356,7 @@
     container-type: inline-size;
   }
 
-  /* A QUESTION IS A SECTION OF ITS TILE, with a hairline between one and the next, and not a card inside the tile
-     (SYSTEM §4). */
+  /* A QUESTION IS A SECTION OF ITS TILE, with a hairline between one and the next, and not a card inside the tile. */
   .queue-card {
     display: grid;
     gap: var(--sp-2);
@@ -1448,7 +1447,7 @@
     grid-column: 1;
   }
 
-  /* AN ANSWER IS A PILL (design D-2, and design.md §4's Decide row, MOD-25), the shape `QueueAnswer.svelte` already
+  /* AN ANSWER IS A PILL, the shape `QueueAnswer.svelte` already
      gave the answerable queue, so the read-only renderer's options and the ones on Home are one drawing. A long option
      wraps inside its pill rather than pushing the card sideways at 390. */
   .queue-act {
@@ -1861,7 +1860,7 @@
 
   /* ── rows: spec, params ─────────────────────────────────────────────────── */
 
-  /* ROWS ON THE TILE, like the ledger and the table (SYSTEM §6): a hairline between each and the rounded wash under
+  /* ROWS ON THE TILE, like the ledger and the table: a hairline between each and the rounded wash under
      the pointer. EVERY LIST OF ROWS HANGS A STEP INTO THE TILE'S PADDING (these, `.list` and `.table-region`), so
      its words start on the heading's edge and its wash has room round them. The overflow stays clipped so a value that
      will not wrap cannot widen the page. */
@@ -1982,7 +1981,7 @@
 
   /* A CHECKBOX IS ITS OWN SIZE AT THE START OF ITS TRACK. It is drawn by `controls.css`, an ink fill
      when ticked like every checked control, and no longer asks the browser for a fill in the brand's
-     red (design D-1). */
+     red. */
   .inputs-check {
     justify-self: start;
     inline-size: 18px;
@@ -2223,7 +2222,7 @@
   }
 
   /**
-   * ONE DOT A CHIP, AND IT LEADS (design SYS-9). A toned chip carries two marks: the glyph slot before the figure, which
+   * ONE DOT A CHIP, AND IT LEADS. A toned chip carries two marks: the glyph slot before the figure, which
    * draws a dot in the tone when its name has no drawing, and the tone's own glyph after the word, which is the one with
    * a name for a screen reader. Both drew, and "• 2 clients •" read as a run of bullets with a stray one at the end.
    *
@@ -2257,7 +2256,7 @@
   }
 
   /**
-   * AN ITEM IS NAMED AREAS, AND THE TITLE ALWAYS HAS ITS LINE (design SYS-9): the marker, the title and the state on the
+   * AN ITEM IS NAMED AREAS, AND THE TITLE ALWAYS HAS ITS LINE: the marker, the title and the state on the
    * first line, and the detail and the quiet line (a task's due date and who changed it) each under the title, from its
    * start, so a long detail never crowds the title at any width. The title keeps 16ch, `min()` so a narrower slot
    * still fits. ROW GAP IS ZERO and the lines under the title carry their own 4px, so an item without a detail keeps no
@@ -2278,7 +2277,7 @@
     border-block-end: 1px solid var(--line);
   }
 
-  /* A ROW WITH A LINE UNDER ITS TITLE IS THE TALL ROW (SYSTEM §6: 44 with one line, 56 with two). */
+  /* A ROW WITH A LINE UNDER ITS TITLE IS THE TALL ROW (44 with one line, 56 with two). */
   .list > .item:has(> :is(.item-detail, .item-meta):not(:empty)) {
     min-block-size: var(--row-h-2);
   }
@@ -2344,7 +2343,7 @@
     font-weight: 500;
   }
 
-  /* A TASK'S TITLE IS A LINE OF TEXT, NOT A ROW OF BOXES (MOD-25, `p-work-1440.png`). As a flex container every inline
+  /* A TASK'S TITLE IS A LINE OF TEXT, NOT A ROW OF BOXES. As a flex container every inline
      part of it (a link, a chip, the working dot) became a flex item that shrank to its longest word, so a title with a
      link in it stood one word a line and the quiet line under it ran into the words. Set as text it wraps as a
      sentence does, and a word longer than the track breaks rather than pushing out of it. The working dot keeps its
@@ -2375,7 +2374,7 @@
     text-align: end;
   }
 
-  /* A TASK'S CHECK IS A 20px ROUND BOX (SYSTEM §6). */
+  /* A TASK'S CHECK IS A 20px ROUND BOX. */
   .item-marker {
     display: inline-flex;
     align-items: center;
@@ -2403,7 +2402,7 @@
   }
 
   /* A TICKED BOX IS AN INK FILL WITH THE GROUND SHOWING THROUGH AS THE TICK, as every checked control in the product is
-     (`controls.css`). Red means danger and nothing else, and a done task is not in danger (design D-1). */
+     (`controls.css`). Red means danger and nothing else, and a done task is not in danger. */
   .item-marker[data-done='yes'] {
     background-color: var(--on);
     border-color: var(--on);
@@ -2939,7 +2938,7 @@
     border-block-end-color: transparent;
   }
 
-  /* Hover is a POINTER affordance and nothing more (SYSTEM §6, the rounded wash). It is deliberately weaker than the
+  /* Hover is a POINTER affordance and nothing more (the rounded wash). It is deliberately weaker than the
      focus band below, which is the one that carries state. */
   :is(.rowgroup .tr, .rows > .row, .list > .item):hover {
     background: var(--hover-wash);
@@ -2952,7 +2951,7 @@
   }
 
   /* THE KEYBOARD'S PLACE IS THE FOCUS RING EVERY CONTROL WEARS, in `--focus-in` and never the brand's
-     red (design D-1), and only while the grid has focus: at rest the caret row is the raised surface
+     red, and only while the grid has focus: at rest the caret row is the raised surface
      and nothing louder. Inset, because the rows are packed and a ring outside one would sit on the
      next. */
   .table-region:focus-within .rowgroup .tr[data-focused] {
@@ -3033,7 +3032,7 @@
   }
 
   /* ── the visible fence ──────────────────────────────────────────────────
-     A QUIET NOTE, NOT AN ALARM (05 §3; design SYS-9). Nothing on it failed, so it has no border, no red
+     A QUIET NOTE, NOT AN ALARM (05 §3). Nothing on it failed, so it has no border, no red
      and no warning glyph: the reason first, as the parser's plain sentence, then what was written,
      small, in the identifier face, in `--dim` on the sunk ground. The source WRAPS inside its column
      rather than scrolling like a `.media` code block, so a long line never pushes a phone page
@@ -3137,7 +3136,7 @@
   }
 
   /**
-   * A DOCUMENT'S HEADINGS SIT UNDER THE PAGE'S OWN (design SYS-9). A document is drawn inside a page that already has a
+   * A DOCUMENT'S HEADINGS SIT UNDER THE PAGE'S OWN. A document is drawn inside a page that already has a
    * title and section titles, so its `#` is a section title's size at most and never the display face: `h1` is a
    * section title (`--t-md` semibold), `h2` the body step, and `h3` and `h4` the label step in the quiet ink. It had
    * margins and nothing else, so a note's `#` took the skin's heading size and face and sat larger than the page it
@@ -3281,7 +3280,7 @@
     }
   }
 
-  /* A PATH'S VIEW SWITCH (PGS-13): "<label> · Everything" as a segmented control, `packages/render/svelte/Path.svelte`'s
+  /* A PATH'S VIEW SWITCH: "<label> · Everything" as a segmented control, `packages/render/svelte/Path.svelte`'s
      own markup. The stones under it already reach 44px through `.tap`; this is the switch above them. */
   .path-switch {
     display: flex;

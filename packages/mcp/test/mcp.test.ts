@@ -77,17 +77,17 @@ const refusal = (r: unknown) => {
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
 test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
-  /* `research-agent-path` §1.5: the eight of `10-MCP` §3 less what no token can use, plus `context`,
+  /* The eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
-     discovering. `activity` is the fifteenth, and it is the one thing an agent could reach in Sam
-     Brain (`brain_audit`) and nowhere here: see `activity.test.ts` for the rest of that comparison.
-     `triage` is the sixteenth, the one tool the ceiling was raised for (contracts §6.1).
+     discovering. `activity` is the fifteenth, a record-wide log, the one thing agents coming from
+     other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
+     `triage` is the sixteenth, the one tool the ceiling was raised for.
 
-     `money` WAS THE SIXTEENTH UNTIL 24 SEPTEMBER, and it read seven of money-core's figure ids by name, so the
-     core knew one use case (`loop/research-m3-dynamic.md` B6, DIRECTION sections 22 and 24). A pack's figures are named
+     `money` WAS ONCE THE SIXTEENTH, and it read seven of money-core's figure ids by name, so the
+     core knew one use case. A pack's figures are named
      by `record_index` and read by `get`, whatever pack declared them, and its pages through the resources, like any
-     other pack's (`figures.test.ts`, audit sixty-two finding 2). */
+     other pack's (`figures.test.ts`). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
     ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
@@ -141,7 +141,7 @@ test('a row is addressed the way a person says it, and made and read and changed
 /**
  * DELETING WORKED AND NOTHING SAID SO, which is the same thing as not having it.
  *
- * the old tool hands its agents a `brain_task_delete` (`loop/research-switch.md` §1). Here a delete is
+ * Other records hand their agents a delete tool. Here a delete is
  * `deleted_at` through `update`, on the same verb and the same permission, and the tool list said
  * only "null clears a field": an agent reading it had no way to reach a verb the record has had all
  * along. The repair is a clause, not a sixteenth tool, and this test holds the clause to the truth.
@@ -500,7 +500,7 @@ test('MEET ANSWERS THROUGH THE RECORD: refused where People is switched off, the
   const { mcp, api, sql } = await agent();
   const token: CallContext = {
     principal: { kind: 'token', id: 't', scope: 'propose', person: 'p_1', level: 'owner' },
-    session: { client_id: 'c-1', host: 'dev-pc', repo: 'braindog' },
+    session: { client_id: 'c-1', host: 'work-pc', repo: 'braindog' },
   };
   const rows = () => sql.all('SELECT 1 FROM entry').length;
 
@@ -525,7 +525,7 @@ test('CONTEXT AND HANDOFF ANSWER THROUGH THE RECORD, and context names the run t
   const { mcp, sql } = await agent();
   const token: CallContext = {
     principal: { kind: 'token', id: 't', scope: 'write', person: 'p_1', level: 'owner' },
-    session: { client_id: 'c-1', host: 'dev-pc', repo: 'braindog' },
+    session: { client_id: 'c-1', host: 'work-pc', repo: 'braindog' },
   };
   const handed = value<{ fields: { next: string } }>(await mcp.call('handoff', { next: 'Run the gates.', doing: 'Step 8' }, token));
   assert.equal(handed.fields.next, 'Run the gates.');

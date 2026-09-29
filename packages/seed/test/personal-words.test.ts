@@ -1,6 +1,5 @@
 /**
- * Personal brings its own words for the people in a life, through `extends`, in place of relabelling a studio's
- * (`loop/research-shell-next.md` Brief V, L2 in `loop/research-shell-leftovers.md`).
+ * Personal brings its own words for the people in a life, through `extends`, in place of relabelling a studio's.
  *
  * AN AGENT TOLD "FAMILY" WAS REFUSED. Personal gave People's studio values a person's words (`client` read as Family,
  * `registrar` as Landlord), so the screen said Family and the list did not have it. Driven on a record made the way
@@ -85,7 +84,7 @@ const roleOf = (k: Kernel): { values: string[] } => {
 
 const WORDS = ['family', 'friend', 'landlord', 'tradesperson', 'adviser'];
 
-test('L2: a Personal record takes family and landlord as roles, and still takes client', async () => {
+test('a Personal record takes family and landlord as roles, and still takes client', async () => {
   const { k, sql } = await made('personal');
   value(k.create('people', { name: 'Mum', role: 'family' }, { actor: 'p_1' }));
   value(k.create('people', { name: 'Harbour Lettings', role: 'landlord' }, { actor: 'p_1' }));
@@ -114,9 +113,9 @@ const STUDIO = ['client', 'contractor', 'accountant', 'registrar'];
 
 /* THE WORDS A HOUSEHOLD IS OFFERED, as the form draws them: each value by the record's label for it, else its own.
    Run against 1.5.0 the household was offered client, contractor, accountant, registrar, collaborator, other, family,
-   friend, landlord, tradesperson, adviser. THE OWNER'S CALL (wave forty-seven): relabel the studio's values in a
+   friend, landlord, tradesperson, adviser. THE OWNER'S CALL: relabel the studio's values in a
    household's words rather than hide them, because a hidden value leaves a row that holds one with a word the form no
-   longer knows. The studio's values stay on the list, since the L2 case above still writes `client`. */
+   longer knows. The studio's values stay on the list, since the first test above still writes `client`. */
 test("a household's People picker offers none of the studio's words, and no word twice", async () => {
   const { k, sql } = await made('personal');
   const read = k.packConfig('usecase-personal');

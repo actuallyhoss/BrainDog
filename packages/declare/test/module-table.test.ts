@@ -1,5 +1,5 @@
 /**
- * The first-party modules and the lists each one owns, kept in one table (`loop/research-shell-seed-next.md` N4, Brief 2B).
+ * The first-party modules and the lists each one owns, kept in one table.
  *
  * THE SAME FACT WAS WRITTEN TWICE, AND THE TWO COPIES DISAGREED. `FIRST_PARTY_LISTS` in `index.ts` held fifteen lists and
  * `MODULE_LISTS` in `usecase.ts` held the same fifteen plus Agents' four. The first is what `readPackFile` reads to stop a
@@ -30,7 +30,7 @@ const addOn = (register: string) => ({
 });
 
 test('AN ADD-ON DECLARING AN AGENTS LIST IS REFUSED, naming the Agents module', async () => {
-  /* THE PROBE N4 RAN: `skills` and `credentials` answered ok, `holdings` did not. */
+  /* WHAT A PROBE MEASURED BEFORE: `skills` and `credentials` answered ok, `holdings` did not. */
   for (const list of ['skills', 'credentials', 'learnings', 'tools']) {
     const r = (await readPackFile(addOn(list))) as Out;
     assert.equal(r.ok, false, `an add-on declaring ${list} was read as fine`);

@@ -1,22 +1,22 @@
 /**
  * `holdings` as a pack of its own (`packs/holdings/holdings.pack.json`), and a record that held it under money-core getting there.
  *
- * WHY THIS FILE EXISTS. What a person holds is not what everybody's Money is for, and `gold` among its kinds was the one
- * use case §22 named by name (`loop/DIRECTION.md` section 22, `loop/research-seed-roles.md` Brief H). So the list leaves
+ * WHY THIS FILE EXISTS. What a person holds is not what everybody's Money is for, and `gold` among its kinds was one
+ * person's use case by name. So the list leaves
  * money-core for a pack of its own, and ships without `gold`. `packages/declare/test/handover.test.ts` drives the
  * handover over one gold row and a pack body made up for that test; this file drives it with the pack this product ships
- * and the rows an imported record holds, which is the case the brief asks to be true before anything else.
+ * and the rows an imported record holds, which is the case that has to be true before anything else.
  *
  * WHAT A RECORD THAT HELD GOLD KEEPS. The pack cannot see a row, so the handover keeps everything the record's list had
  * that the pack does not declare, as the record's own addition: where rows were written under it, `gold` stays a kind,
  * every lot keeps it, and nobody is asked to relabel a row. A record that never held the list is offered no `gold`.
  *
- * THE PACK IS ITS FILE, AT 1.1.0, AND THE HANDOVER IS THE ONE THAT SHIPPED. The builder that made 1.0.0 left `src` on
- * 25 September and the import now resolves `holdings` from the catalogue, which offers the file (`pack-files.ts`).
+ * THE PACK IS ITS FILE, AT 1.1.0, AND THE HANDOVER IS THE ONE THAT SHIPPED. The builder that made 1.0.0 left `src`
+ * and the import now resolves `holdings` from the catalogue, which offers the file (`pack-files.ts`).
  * money-core stopped handing the list under 2.4.0 (`money-core-names-no-pack.test.ts`), so the update a record on 1.8.0
  * took is today's money-core with the `hands` it carried until then, and the last test drives the update it gets now.
  *
- * THE FILE IS 1.3.0 NOW: 1.2.0 gave `holdings-value` `sellable: true` (MOD-20), then the catalogue generator raised it
+ * THE FILE IS 1.3.0 NOW: 1.2.0 gave `holdings-value` `sellable: true`, then the catalogue generator raised it
  * again to 1.3.0 once the add-on carried its own `title` and its cost script opened with a comment saying what it
  * does (`from-packs.mjs`'s own `changes` line on the file says so); nothing the pack writes moved with either step.
  */

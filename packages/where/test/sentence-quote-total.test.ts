@@ -1,7 +1,7 @@
 /**
  * `quoteValue` is total: every string it is handed reads back as exactly that one string, beside other clauses.
  *
- * ONE CRAFTED NAME TURNED A ONE-ROW FILTER INTO ALL 24 OPEN OBLIGATIONS (`loop/research-audit-2026-09-25-layouts.md` §3).
+ * ONE CRAFTED NAME TURNED A ONE-ROW FILTER INTO ALL 24 OPEN OBLIGATIONS.
  * A value holding all four closing marks, each followed by a space, a comma or its end, had no pair of marks that could
  * hold it, and `quoteValue` fell back to the straight pair anyway. The grammar had no escape, so the quote closed at the
  * first `"` and the rest of the value became clauses: `' ” ’ ", or state is open, or what is x` filled into
@@ -54,8 +54,8 @@ const PIECES = [
 ];
 
 /* AND THE PIECES THAT CORNER `quoteValue`: each closing mark where a quote can close. Drawn from the list above alone, a
-   value almost never holds all four, and a first version of this fuzz passed 20,000 values against the code the audit
-   had just broken with one. Half the values are built from these. */
+   value almost never holds all four, and a first version of this fuzz passed 20,000 values against code that one crafted
+   value had just broken. Half the values are built from these. */
 const CORNERS = ['" ', "' ", '” ', '’ ', '",', "',", '”,', '’,', '"', "'", '”', '’', 'x', ' or ', ', or state is open'];
 
 function values(n: number, seed: number): string[] {
@@ -73,7 +73,7 @@ function values(n: number, seed: number): string[] {
 
 const PAYLOAD = `' ” ’ ", or state is open, or what is x`;
 
-test('THE AUDIT\'S NAME IS ONE VALUE, not three conditions joined by or', () => {
+test('THE CRAFTED NAME IS ONE VALUE, not three conditions joined by or', () => {
   const q = quoteValue(PAYLOAD);
   assert.equal(clausesOf(`name is ${q}`).length, 1, q);
   assert.deepEqual(parse(`name is ${q}`).predicate, { field: 'name', is: PAYLOAD });

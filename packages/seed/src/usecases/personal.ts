@@ -1,6 +1,6 @@
 /**
  * Personal: one person's life admin. Their money, the bills coming up, what they are saving for, the projects they do
- * for the love of it, and the goals and habits they keep (`loop/DIRECTION.md` §11, the owner's first use case).
+ * for the love of it, and the goals and habits they keep.
  *
  * IT BUILDS ON MONEY, NOT BESIDE IT. Money's accounts and bills are the same lists a business keeps, spoken in a
  * person's words through labels ("Bills", not "Money"). Money needs Projects and People, so those come too, and
@@ -19,10 +19,9 @@
  * WHAT A PERSON SPENDS IS MONEY'S LEDGER, SINCE 2.0.0. Personal kept its own `spending` and `budgets` lists beside
  * Money's, so a purchase an import or a bank message wrote into the ledger never reached the budget, and a person's
  * month was two lists that disagreed. Money's `transactions` hold what moved and its `categories` hold the most a month
- * on each (`budget`), so Budget left reads `spent-by-category-month` against those rows (`loop/finish/modules.md`
- * MOD-17). What Money does not hold stays this pack's: savings goals, goals and habits, and the steps of a project.
+ * on each (`budget`), so Budget left reads `spent-by-category-month` against those rows. What Money does not hold stays this pack's: savings goals, goals and habits, and the steps of a project.
  *
- * NOTHING IS WRITTEN AS AN EXAMPLE, AND NO SUM IS IN A CURRENCY (`loop/finish/modules.md` C11, §6.7). A Personal record
+ * NOTHING IS WRITTEN AS AN EXAMPLE, AND NO SUM IS IN A CURRENCY. A Personal record
  * used to arrive holding a stranger's month, every row in pounds. It now holds only what the person said: a pay day is a `recurring` row formed
  * from a sentence that names pay, in the currency the sentence names (`payDayRow`).
  */
@@ -105,10 +104,10 @@ export const PERSONAL = {
      1.7.1: Home's empty title loses its full stop, as every other title already has; a record is offered the words
      only when the version goes up.
      2.0.0: the `spending` and `budgets` lists and the Spending page went, since Money's ledger and categories carry
-     them; every money figure is in the record's own currency; Home is rebuilt over Money (`loop/finish/modules.md`
-     MOD-17). Major, because two lists and a page go. No record holds Personal to lose their rows (modules.md O6).
+     them; every money figure is in the record's own currency; Home is rebuilt over Money.
+     Major, because two lists and a page go. No record holds Personal to lose their rows.
      2.1.0: the voice says more of the record its own way, Home's empty lines and Decide's and the Inbox's among them
-     (PGS-24). Each is a new setting a person can change at /packs, so a minor step. */
+    . Each is a new setting a person can change at /packs, so a minor step. */
   version: '2.1.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
@@ -131,7 +130,7 @@ export const PERSONAL = {
     nothing_needs_you: 'Nothing needs you right now',
     since_away: 'Since you last looked',
     lists: 'My lists',
-    /* THE REST OF THE LINES, warm and plain (PGS-24): a bill, a plan, something you are saving toward. */
+    /* THE REST OF THE LINES, warm and plain: a bill, a plan, something you are saving toward. */
     overdue: 'Running late',
     nothing_now: 'Nothing needs you right now. Enjoy your day.',
     nothing_due: 'No bill or plan falls due in the next two weeks.',
@@ -157,8 +156,8 @@ export const PERSONAL = {
      each word twice, once under its own value and once over a studio's. 1.6.0 relabels the studio's five again, to
      words that are none of Personal's own, so each word is offered once (the header). The case for keeping them is a Personal record
      made before 1.5.0 reading as it did, and there is no such record to protect: production has none
-     (`loop/STATUS.md`: `/auth/methods` says `firstRun: true`), and the owner's own record comes from the import, which
-     proposes a founder's setup and not Personal (`loop/research-shell-next.md` Brief V). So no migration moves a
+     (`/auth/methods` says `firstRun: true`), and a record that comes from an import is
+     proposed a founder's setup and not Personal. So no migration moves a
      `client` row to `family`: there are no rows it would move. */
   labels: {
     obligations: 'Bills',
@@ -185,7 +184,7 @@ export const PERSONAL = {
        twice. Relabelled and not hidden, by the owner's call: a hidden value leaves a row that holds one reading a word
        the form no longer offers.
        NO `registrar` LABEL SINCE 1.7.0, AND THERE WAS ONE reading it Agency: People 2.0.0 no longer offers the value
-       (`test/lists-opened.test.ts`), so the label named a value Personal does not install and S8 in
+       (`test/lists-opened.test.ts`), so the label named a value Personal does not install and the label test in
        `test/usecases.test.ts` went red on exactly this line. A PERSONAL RECORD CAN HOLD ONE: the picker offered the
        value raw as Registrar before 1.6.0 and as Agency in 1.6.0. Such a record keeps the value on its list and the row
        keeps its word, because the plan lays back a value a row holds, but from 1.7.0 that row reads the raw word. */
@@ -369,7 +368,7 @@ export const PERSONAL = {
         source: 'register.put_by',
         value: { sum: 'amount' },
         group_by: 'saving',
-        /* IN THE RECORD'S OWN CURRENCY, never a literal one (`loop/finish/modules.md` C1). */
+        /* IN THE RECORD'S OWN CURRENCY, never a literal one. */
         format: 'money',
         target: { gte: 0 },
         window: '30d',
@@ -386,7 +385,7 @@ export const PERSONAL = {
         compare: 'none',
       },
       {
-        /* HOME, AS THIS USE CASE ANSWERS IT (`loop/finish/modules.md` MOD-17): what I have, the bills falling due this
+        /* HOME, AS THIS USE CASE ANSWERS IT: what I have, the bills falling due this
            week, what is left of the budget, my projects with the next step on each, and my goals, then the house Home's
            own three (what needs you, what is coming up, and what changed), so a person's Home loses nothing the house
            one says. No `nav`, because Home is on the rail already. Every block is a whole row, so at 390 the page stacks
@@ -571,7 +570,7 @@ export const PERSONAL = {
         ],
       },
     ],
-    /* NO `seeds` SINCE 2.0.0 (`loop/finish/modules.md` C11): every one was an example, in pounds, that a person then had
+    /* NO `seeds` SINCE 2.0.0: every one was an example, in pounds, that a person then had
        to find and clear. */
   },
 };
@@ -658,8 +657,8 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 const NUM = String.raw`(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,3}))?(k)?`;
 
 /**
- * EVERY CURRENCY BY THE SYMBOL IT IS WRITTEN WITH, read from the runtime's own `Intl` and not from a table in source
- * (`loop/finish/modules.md` C10): "€" is EUR, "$" is USD, "CA$" is CAD. The first currency to claim a symbol keeps it.
+ * EVERY CURRENCY BY THE SYMBOL IT IS WRITTEN WITH, read from the runtime's own `Intl` and not from a table in source:
+ * "€" is EUR, "$" is USD, "CA$" is CAD. The first currency to claim a symbol keeps it.
  */
 let symbols: Map<string, string> | null = null;
 function symbolTable(): Map<string, string> {

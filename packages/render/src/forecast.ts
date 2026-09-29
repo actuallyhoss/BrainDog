@@ -10,7 +10,7 @@
  * movement left out is every occurrence of it. The walk the host made is the baseline, and a knob
  * never reaches the record or the address.
  *
- * AND THE FIVE THE OLD TOOL'S FORECAST HAD THAT THIS ONE DID NOT (brief B6 of `loop/research-legacy-parity.md`) ARE
+ * AND THE FIVE LONGER-RANGE CONTROLS ARE
  * THE SAME KIND OF ARITHMETIC, which is what keeps them equal in both engines: the kernel's walk and the browser's
  * both reach this file as rows, so a control applied here is applied to either. Spending and money in grow by a
  * percentage a year from today; a converted step moves with a yearly drift in its pair; a stream or a plan is counted
@@ -319,7 +319,7 @@ function writtenIn(minor: number, currency: string, home: string | null): string
  * knows no name for it.
  *
  * SENTENCE CASE, the last word lower: English gives `US Dollar` and `British Pound`, and every label in the product is
- * in sentence case (design brief §9). A name of one word, `Euro`, stays as it is, because it begins the label.
+ * in sentence case. A name of one word, `Euro`, stays as it is, because it begins the label.
  */
 export function currencyName(code: string): string {
   let name: string | undefined;
@@ -832,7 +832,7 @@ export const FORECAST_COUNT_OUT = 'Money out';
 export const FORECAST_SELL_NOTE = 'empty keeps them';
 export const forecastPerYear = (n: number): string => `${n}% a year`;
 /**
- * The drift knob for one pair, each currency by its name and never its code (design brief §1):
+ * The drift knob for one pair, each currency by its name and never its code:
  * `The US dollar against the Egyptian pound moves by`.
  */
 export const forecastDrift = (pair: string): string => {

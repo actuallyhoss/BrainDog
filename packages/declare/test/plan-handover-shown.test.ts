@@ -1,13 +1,12 @@
 /**
- * What Decide shows the owner for a declaration an update hands to another pack (`loop/research-batch-thirty-four-audit.md`
- * §8, the presenter half).
+ * What Decide shows the owner for a declaration an update hands to another pack: the presenter half.
  *
  * `plan` CARRIES `to` AND THE ARRANGER DROPPED IT. `diff.retires` names the pack a handed declaration goes to, and the
  * plan an arrangement files for Decide copied each retire as `{ id, rows }` and nothing else, so a door money-core hands
  * to `bank-hsbc-eg` and keeps live was filed exactly as a door it retires. The owner approving the update read "retires"
  * for a door that goes on answering his Shortcut, under a pack he never chose.
  *
- * Driven as the audit measured it: every first-party pack in, money-core at 1.7.0 with the twelve HSBC Egypt doors its
+ * Driven as it was measured: every first-party pack in, money-core at 1.7.0 with the twelve HSBC Egypt doors its
  * own, a token minted for one of them, then money-core's current document proposed as an update by an agent. The record
  * names what it uses (`handover-used.test.ts`), so the door with the token is handed, and with it `bank-from-out-sms`,
  * the door that pattern names (`door-follows-patterns.test.ts`). Ten retire.
@@ -61,7 +60,7 @@ const CATALOGUE: CatalogueEntry[] = [
   { id: 'bank-hsbc-eg', kind: 'pack', title: 'HSBC Egypt', summary: 'HSBC Egypt.', modules: ['money-core'], doc: () => bankHsbcEgFile() },
 ];
 
-/** A record at money-core 1.7.0 with one HSBC door holding a token, as the audit's `hands.mts phantom` drew it. */
+/** A record at money-core 1.7.0 with one HSBC door holding a token, as the probe drew it. */
 async function recordAt170() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW), catalogue: CATALOGUE });

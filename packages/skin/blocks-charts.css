@@ -12,11 +12,11 @@
  * The one rule of `blocks.css` holds here too: no colour is written, every value is a role a theme
  * maps, and an intent reaches the DOM only through the map in `blocks.css`.
  *
- * THE MARKS (SYSTEM §7). One series is highlighted in ink and the rest are the greys of the ramp `blocks.css` mixes
+ * THE MARKS. One series is highlighted in ink and the rest are the greys of the ramp `blocks.css` mixes
  * from it on every block (`--ramp-1` to `--ramp-3`), darkest first. A colour is a meaning and only one: `--earn` for
  * money in, `--warn` for a crossing below a line the owner set (with its glyph, so never by colour alone), `--live`
  * for now and for what is running, and an intent through the map. NOTHING IN A CHART IS RED unless it is the late part
- * or what needs him, because the brand's red is the one loud thing on a screen (design D-1).
+ * or what needs him, because the brand's red is the one loud thing on a screen.
  *
  * Bars have a 3px radius, lines are 2px with round joins and a 3px dot on the last point, a projection or a threshold
  * is dashed, and every label on a chart is `--t-xs` in the meta ink. A track, a zero rule and a counted-empty cell
@@ -374,7 +374,7 @@
     display: none;
   }
 
-  /* An error in ink with the intent's mark, never a red headline (DESIGN-SYSTEM rule 8). */
+  /* An error in ink with the intent's mark, never a red headline. */
   .bridge-warn {
     display: flex;
     align-items: baseline;
@@ -985,7 +985,7 @@
   }
 
   /* THE READOUT FLOATS OVER THE CHART, so it is the product's floating surface: glass-strong at the second level,
-     as a menu is (SYSTEM §6), and the forecast's is the same. */
+     as a menu is, and the forecast's is the same. */
   .lines-readout,
   .forecast-readout {
     position: absolute;
@@ -1100,7 +1100,7 @@
   }
 
   /* ── forecast: the cash walk as a line ────────────────────────────────────
-     The balance is the ink: solid where it was remembered, dashed where it is walked, a projection (SYSTEM §7).
+     The balance is the ink: solid where it was remembered, dashed where it is walked, a projection.
      Stems stand on the zero rule, up in `earn` and down in the ramp's grey. The crossing is the warn
      intent with its glyph; the lowest point a dim dot; the baseline a faint mark once a knob moved.
      Every word sits in HTML over the chart, placed along it by `--at`. */
@@ -1316,7 +1316,7 @@
   }
 
   /* A SELL DAY IS A FIELD, drawn by `controls.css` as every bare date is, and was left at the browser's width and type
-     size (defects P10). Sixteen pixels, because every input is sixteen at every width (design brief §3). The `font`
+     size. Sixteen pixels, because every input is sixteen at every width (design brief §3). The `font`
      shorthand resets the tabular figures `controls.css` gives every bare date, so they are said again after it. */
   .forecast-date {
     justify-self: start;
@@ -1342,7 +1342,7 @@
     font-size: var(--t-xs);
   }
 
-  /* EVERYTHING A KNOB OFFERS TO PRESS IS A PILL, the quiet button a tile holds (SYSTEM §6): the second surface with
+  /* EVERYTHING A KNOB OFFERS TO PRESS IS A PILL, the quiet button a tile holds: the second surface with
      no edge. A stream that is counted is that pill in ink; one left out is only its hairline, in the meta ink and
      struck, so on and off differ in shape and words and not only in shade. */
   .forecast-chip,
@@ -1431,7 +1431,7 @@
   }
 
   /* A SIGNED FIGURE IS ONE WORD. The design review found a chip at 390 with its minus at the end of one line and its
-     figure on the next (design SYS-9): the amount could break wherever the chip ran out of room. Now the label gives
+     figure on the next: the amount could break wherever the chip ran out of room. Now the label gives
      way instead. */
   .forecast-chip-amount {
     flex: none;
@@ -1621,7 +1621,7 @@
   }
 
   /* ── roadmap: dated work on one time axis ─────────────────────────────────
-     NO RULE DREW THIS KIND, so a shipped pack's roadmap put its names under the chart in a heap (defects P2) and the
+     NO RULE DREW THIS KIND, so a shipped pack's roadmap put its names under the chart in a heap and the
      marks took the weak paints `src/roadmap.ts` gives a page with no stylesheet. A window is a wash of the one series
      inside a line of it, so the name drawn over it stays readable; a date is a stem in `--dim`, a tone in its intent;
      today is a dashed ink line. The names sit in HTML over the box, placed by `--at` across and by their track or
@@ -1666,7 +1666,7 @@
     fill-opacity: 1;
   }
 
-  /* A WINDOW IS AN AREA OF THE INK AT 8% INSIDE A LINE OF IT (SYSTEM §7), so the name drawn over it stays readable. */
+  /* A WINDOW IS AN AREA OF THE INK AT 8% INSIDE A LINE OF IT, so the name drawn over it stays readable. */
   .roadmap-bar {
     fill: color-mix(in srgb, var(--ink) 8%, transparent);
     fill-opacity: 1;
@@ -1690,7 +1690,7 @@
     stroke: var(--tone);
   }
 
-  /* NOW IS THE ONE LIVE LINE ON A CHART (SYSTEM §2, §7). */
+  /* NOW IS THE ONE LIVE LINE ON A CHART. */
   .roadmap-today {
     stroke: var(--live);
     stroke-width: 1.5px;
@@ -1915,8 +1915,8 @@
   /* ── heat: twelve weeks by weekday, four washes of the one series ─────────
      The cells arrive week by week, Monday first, and flow down seven rows and across `--weeks` columns, so no cell
      carries a position. A GAP AND A ZERO ARE NOT THE SAME DAY (`days.ts`): a day nobody wrote is an outline, a day
-     counted empty is the second surface, and a busy day is one of the ramp's four steps up to the ink (SYSTEM §7:
-     greys with one ink highlight). A day still to come is not drawn at all. Today is outlined in the ink. */
+     counted empty is the second surface, and a busy day is one of the ramp's four steps up to the ink (greys with
+     one ink highlight). A day still to come is not drawn at all. Today is outlined in the ink. */
   .block[data-kind='heat'] {
     container-type: inline-size;
   }

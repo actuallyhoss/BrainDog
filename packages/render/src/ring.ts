@@ -7,7 +7,7 @@
  * the arcs laid end to end as `split` cuts its track (`split.ts`), in the same four neutral steps, so a ring and a
  * split over the same rows show the same shares in the same order.
  *
- * NO VALUE IS WORDS ONLY (`research-modules.md`, the kind's row). `progress` draws an empty track for a goal with
+ * NO VALUE IS WORDS ONLY. `progress` draws an empty track for a goal with
  * nothing saved, and that is right there, because a track with no fill still has its row of words beside it. A dial
  * with no arc in a 64px square reads as zero at a glance, which is a claim about a value nobody wrote. So a value
  * that does not read draws no ring, while a written `0` draws the ring with nothing on it.

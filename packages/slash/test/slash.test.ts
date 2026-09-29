@@ -54,7 +54,7 @@ test('status is the included source on tier a, the routing table model, and a ca
   });
 });
 
-/* HIS OWN KEY (`loop/finish/agents.md` AGT-21): the source, the provider and the model he chose, and his asks listed with no
+/* HIS OWN KEY: the source, the provider and the model he chose, and his asks listed with no
    cap beside them. A save of nothing reads what is saved, for Settings' form, and writes nothing. */
 test('on his own key status says so, lists his asks uncapped, and a save of nothing reads the setup back unchanged', () => {
   const { sql, slash } = build();
@@ -96,8 +96,8 @@ test('the meter counts tier a asks in this month, reads and patterns alike, and 
   put('read', 'a', '2026-11-02T00:00:00.000Z');
   put('read', 'a', '2026-11-13T00:00:00.000Z');
   put('pattern', 'a', '2026-11-05T00:00:00.000Z');
-  /* A PROPOSE NO LONGER COUNTS on its own: one question is one ask, whatever passes it took
-     (`contracts.md` §7.5), and the `read` its pass 1 or its drafting read already wrote is that ask. */
+  /* A PROPOSE NO LONGER COUNTS on its own: one question is one ask, whatever passes it took,
+     and the `read` its pass 1 or its drafting read already wrote is that ask. */
   put('propose', 'a', '2026-11-06T00:00:00.000Z');
   /* Not this month, not this tier: two rows that must not be counted. */
   put('read', 'a', '2026-10-30T00:00:00.000Z');

@@ -2,12 +2,12 @@
  * money-core 2.0.0: `holdings` leaves for a pack of its own, and the two packs that require money-core still install.
  *
  * WHY A MAJOR STEP. `first-party.ts` asks a major step for a list taken away, and `holdings` is one, so the version moves
- * from 1.8.0 to 2.0.0 (`loop/research-seed-roles.md` Brief H). The list is handed, not dropped (`hands`), so a record
+ * from 1.8.0 to 2.0.0. The list is handed, not dropped (`hands`), so a record
  * that holds rows in it keeps them; `holdings-pack.test.ts` drives that. What this file holds is the rest of the step.
  *
- * R5 MEASURED THE COST OF THE STEP BEFORE IT WAS TAKEN, AND THIS FILE DRIVES IT. Two shipped packs required money-core
+ * THE COST OF THE STEP WAS MEASURED BEFORE IT WAS TAKEN, AND THIS FILE DRIVES IT. Two shipped packs required money-core
  * with a caret on 1.x, `bank-hsbc-eg` at `^1.8.0` and every Mercury pack at `^1.0.0`, and the range grammar has no `||`.
- * So at 2.0.0 neither installs, and the owner's own import proposes the bank pack. Both ranges are widened to
+ * So at 2.0.0 neither installs, and an import may propose the bank pack. Both ranges are widened to
  * `>=1.x.0 <3.0.0` in the same change, each with a version step of its own, and both are planned here on a record at
  * 1.8.0 and on one at 2.0.0.
  *
@@ -30,8 +30,8 @@ import { bankHsbcEgFile, bankHsbcEgFile13 } from './pack-files.ts';
 /**
  * The Mercury pack as it ships, with the marks that say what a person fills taken off.
  *
- * THE FILE AND NOT A BUILDER, SINCE THE BUILDER IS GONE. Mercury was a function in `src/packs/mercury.ts` until
- * September 24th (`loop/research-m3-dynamic.md` B7), and this test asked it for a document. What is planned below is
+ * THE FILE AND NOT A BUILDER, SINCE THE BUILDER IS GONE. Mercury was a function in `src/packs/mercury.ts` once,
+ * and this test asked it for a document. What is planned below is
  * now the file a person installs, `packs/mercury/mercury.pack.json`, so the range and version asserted here are the
  * ones a record is actually handed. Its fill changes the names, the host and the key label and never the range or the
  * version, so the file as it ships answers every question this test asks.
@@ -66,7 +66,7 @@ test('money-core IS ON 2.0.0 OR LATER AND DECLARES NO HOLDINGS, and the 2.0.0 th
 });
 
 /**
- * NO FIRST-PARTY PACK SAYS GOLD, which is what `loop/DIRECTION.md` section 22 measured against the tree: a `holdings`
+ * NO FIRST-PARTY PACK SAYS GOLD, which was measured against the tree: a `holdings`
  * register with gold in its kinds, shipped to every record set up with Money. Asked of the documents a record installs,
  * so a word in a comment is not counted and a word in a `holds:` sentence is.
  */
@@ -112,25 +112,26 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
   /* MERCURY'S WIDER RANGE WAS A PATCH STEP, 1.0.1, AND THE REASON IS WHAT A RECORD HOLDS. Not one of its declarations
      moved: the bytes a record stages are the bytes it staged, and only which Money they may sit beside is wider.
      `first-party.ts`'s rule asks a minor step for something added and a major one for something taken away, and this
-     is neither. It is 1.1.0 now by that same rule, because parity B4 (`e6d73bbd`) added to it: a ledger script that
+     is neither. It is 1.1.0 now by that same rule, because `e6d73bbd` added to it: a ledger script that
      files Mercury's transactions, and a `mercury_id` field it `extends` transactions with. That is something added, so
      minor, and the range did not move with it, which is what the loop below still holds. bank-hsbc-eg is a minor step
-     instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range (one door, several patterns;
-     wave forty-two), and 1.2.0 since `bank-card-used` reads and compares the limit its alert prints; the range did not
+     instead, 1.1.0, because its five twin doors gained `door:` on top of the wider range (one door, several patterns),
+     and 1.2.0 since `bank-card-used` reads and compares the limit its alert prints; the range did not
      move with it. The widening to `<4.0.0` beside money-core 3.0.0 is a patch step on each, 1.3.1 and 1.1.1, by the
      same reason as Mercury's 1.0.1: no declaration moved.
 
-     Mercury is 1.2.0 since DEF-3, a minor step for its ledger script counting money once, and the range did not
+     Mercury is 1.2.0, a minor step for its ledger script counting money once, and the range did not
      move with it. bank-hsbc-eg's FLOOR MOVES TO money-core 3.0.0 AT 1.4.0, because `bank-balance` and its webhook
      twin read balances and `balance_after`, which exist only from 3.0.0. Mercury's floor moves to 3.1.0 at 1.3.0 for
-     the same reason, over the `book` setting money-core 3.1.0's books add. The file is `mercury` 1.0.0 since PLT-12, a
-     new id with the settings where its fill was, and the range it carried as mercury-company 1.3.0 carried over.
+     the same reason, over the `book` setting money-core 3.1.0's books add. The file is `mercury` 1.0.0, a
+     new id with the settings where its fill was, and the range it carried as mercury-company 1.3.0 carried over;
+     1.0.1 rewords two comments in its ledger script and moves no range.
 
      bank-hsbc-eg IS 1.5.0 NOW, another minor step, because two new twin doors, `bank-ipn-out` and its
      `bank-ipn-out-sms` twin, gained `door: 'bank-from-out-sms'` beside the five already there; the range did not
      move with them either. */
   assert.equal(bankHsbcEgFile().version, '1.5.0');
-  assert.equal(mercuryFile().version, '1.0.0');
+  assert.equal(mercuryFile().version, '1.0.1');
   for (const [name, doc] of [['bank-hsbc-eg', bankHsbcEgFile()], ['mercury', mercuryFile()]] as const) {
     const range = (doc.requires as { packs: Record<string, string> }).packs['money-core']!;
     assert.deepEqual(
@@ -142,17 +143,17 @@ test('EACH RANGE MOVED WITH A VERSION OF ITS OWN, and neither admits a money-cor
 });
 
 /**
- * THE HALF OF R5 THAT WAS READ AND NOT DRIVEN, DRIVEN, AND NOW CLOSED. Only the installing pack's own `requires` was
+ * THE HALF OF THE COST THAT WAS READ AND NOT DRIVEN, DRIVEN, AND NOW CLOSED. Only the installing pack's own `requires` was
  * checked (`packages/declare/src/index.ts`, `needs`), so a record already holding a pack that requires money-core
  * `^1.8.0` took money-core 2.0.0 without a word and was left holding a pack whose requirement was no longer met.
  *
- * MEASURED 23 SEPTEMBER: the update installed, nothing in its plan named `bank-hsbc-eg`, and `^1.8.0` was false of the
+ * MEASURED: the update installed, nothing in its plan named `bank-hsbc-eg`, and `^1.8.0` was false of the
  * version the record then held. `f507cff5` taught `plan` the held packs' ranges (`dependents`), and it still installed
  * here, because this plan is built from `kernel.packs()` as the record builds it, and that answered each pack's id and
- * version and no `requires` (audit forty-two, finding 1). With `packs()` reading each range off the stored manifest, the
+ * version and no `requires`. With `packs()` reading each range off the stored manifest, the
  * plan names the dependent it would strand and the update is refused before anything lands.
  */
-test('THE HOLE R5 READ IS CLOSED: a record holding a pack on ^1.8.0 is refused money-core 2.0.0, naming that pack', async () => {
+test('THE HOLE IN THE RANGE CHECK IS CLOSED: a record holding a pack on ^1.8.0 is refused money-core 2.0.0, naming that pack', async () => {
   const { k, sql } = await onMoney(asMoneyCore180);
   const old = { ...bankHsbcEgFile(), version: '1.0.0', requires: { format: 1, primitives: 1, packs: { 'money-core': '^1.8.0' } } };
   await put(k, old);

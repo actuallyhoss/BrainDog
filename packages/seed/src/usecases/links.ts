@@ -39,8 +39,8 @@ export type LinkIo = {
   link: (register: string, seq: number, field: string, spoken: string | readonly string[]) => Promise<boolean>;
 };
 
-/* NO PERSONAL OR STUDENT ENTRY SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0: neither carries an example row any more
-   (`loop/finish/modules.md` C11), so there is nothing of theirs to link. */
+/* NO PERSONAL OR STUDENT ENTRY SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0: neither carries an example row any more,
+   so there is nothing of theirs to link. */
 const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
   guide: [
     { register: 'steps', title: 'Write one sentence about what this is and who it is for', field: 'milestone', to: 'milestones', target: 'Say what it is and who it is for' },

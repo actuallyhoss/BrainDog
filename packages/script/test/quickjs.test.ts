@@ -1,7 +1,7 @@
 /**
  * `runInQuickJs`, held to its budgets from outside the sandbox.
  *
- * Every assertion here is one of Brief 1's red-first cases or a sibling of one. The host is a double
+ * Every assertion here is one of the sandbox's red-first cases or a sibling of one. The host is a double
  * that records what reached it, because "never reaches the host function" is a claim about the
  * host's side of the boundary and can only be checked there. Nothing here opens a socket.
  */
@@ -122,7 +122,7 @@ test('waiting on the host is not CPU: a slow answer inside wall_ms is a normal r
 /* THE HANDLER IS NOT A CLOCK. QuickJS asks the interrupt handler after a count of interpreted
    instructions, and a loop that hands a 5 MB object to `ctx.write` two hundred times runs only a
    few thousand of them: nearly all its time is the copy across the boundary and the host's
-   `JSON.parse`. Audit thirty-two measured this exact script, at the default limits, answer clean
+   `JSON.parse`. A probe measured this exact script, at the default limits, answer clean
    with 1,048,577,600 bytes queued and `cpu_ms: 6777` in its own usage. */
 test('time spent inside ctx.write is the script\'s CPU and is refused at cpu_ms', async () => {
   const t = performance.now();
@@ -138,7 +138,7 @@ test('time spent inside ctx.write is the script\'s CPU and is refused at cpu_ms'
 });
 
 /* The same shape through `ctx.log`: the log is cut to 8 KB, but each call copied the whole 8 MB
-   onto the host first, and the audit's thousand of them were refused only after 16,930 ms against
+   onto the host first, and a probe's thousand of them were refused only after 16,930 ms against
    a cpu_ms of 1,000. */
 test('time spent inside ctx.log is refused at cpu_ms, although the log itself is cut', async () => {
   const t = performance.now();
@@ -188,8 +188,8 @@ test('a host answer that arrives past wall_ms is refused, not handed on to the s
 });
 
 /* READING A THROWN ERROR RUNS THE SCRIPT'S CODE. `ctx.dump` of a thrown object calls its getters,
-   and the host read it outside every CPU slice, so the handler checked only the deadline. The
-   audit's probe spun for its whole 3,000 ms wall_ms and was metered at `cpu_ms: 12`. */
+   and the host read it outside every CPU slice, so the handler checked only the deadline. A
+   probe spun for its whole 3,000 ms wall_ms and was metered at `cpu_ms: 12`. */
 test('a getter that spins while the host reads the thrown error is the script\'s CPU', async () => {
   const t = performance.now();
   const a = await runInQuickJs(
@@ -208,7 +208,7 @@ test('a getter that spins while the host reads the thrown error is the script\'s
 
 /* QUICKJS THROWS null WHEN IT CANNOT ALLOCATE EVEN THE ERROR. Many small objects fill the heap in
    pieces too small for any single one to be refused, and the exception that ends the run is the
-   bare `null` the engine throws when "out of memory" itself will not fit. Audit thirty-two saw it
+   bare `null` the engine throws when "out of memory" itself will not fit. A probe saw it
    answered `{ code: null, why: 'p threw: null' }`, which says the script chose to throw. */
 test('running out of memory through many small objects is OUT_OF_BOUNDS, not the script\'s throw', async () => {
   const a = await runInQuickJs(

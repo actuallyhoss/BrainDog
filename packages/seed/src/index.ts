@@ -208,7 +208,7 @@ export const ruleDeclarations = (): Declaration[] =>
  *
  * THEY ARE IN `packDocument()` AND SO ARE HERE. The Work pack is split out of `packDocument()` (`packs/first-party.ts`),
  * so that is the only place Work can declare them, and `test/pack.test.ts` holds `installSeed` and `packDocument()` to
- * installing the same declarations. Added to the document alone on 24 September, three of its tests went red: the
+ * installing the same declarations. Added to the document alone, three of its tests went red: the
  * document held 93 declarations where the seed's own lists count 89, and the record the pack made held
  * `rule.close_follow_ups`, `rule.start_with_parent` and their two scripts where the one the seed made did not.
  */
@@ -230,8 +230,8 @@ export type ModuleIngest = IngestDecl & { pack?: string };
  * THE LAST TWO LEFT AT money-core 3.0.0. money-core carried a card alert's two wordings, `bank-card-out` and
  * `bank-card-in`, and since 1.7.0 their webhook twins `-sms`, and this spread all four into `packDocument()`, every
  * first-party document and the sample. So every record set up with Money held an English bank alert's wording and a
- * text door for it, whether its owner banked by card, by cash or not at all, which `loop/DIRECTION.md` section 22 names
- * as a use case the shell may not carry ("a bank SMS pattern"). They are `packs/card-alerts` now, a file a record
+ * text door for it, whether its owner banked by card, by cash or not at all, and a bank SMS pattern is a use case the shell may
+ * not carry. They are `packs/card-alerts` now, a file a record
  * installs when it wants them, as one Egyptian bank's six went to `packs/bank-hsbc-eg` at money-core 1.8.0.
  *
  * THE LIST STAYS, AND EMPTY, because it is still the one road from a module into a record for a pattern that names no
@@ -523,8 +523,7 @@ const option = (id: string, label: string, because: string, recommended = false)
 
 /**
  * The sample's governance rows: its open questions and the decisions it shows, with the same
- * questions, options, recommended option and reasons as the web's sample, which is test-only since
- * `loop/DIRECTION.md` §26 and lives in `apps/web/src/lib/record/fixtures/sample.ts`.
+ * questions, options, recommended option and reasons as the web's sample, which is test-only and lives in `apps/web/src/lib/record/fixtures/sample.ts`.
  *
  * THE IDS ARE THE RECORD'S, NOT THE SAMPLE'S. `suggestion` and `decision` are counters that start at
  * 1 and move only when `propose` and `decide` allocate from them, so SG27 or D41 could only be

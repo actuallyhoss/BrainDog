@@ -82,7 +82,7 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
 });
 
 /**
- * WORK'S OVERVIEW LEADS WITH WHAT TO DO, AS LISTS THAT TICK (`loop/research-modules-next.md` brief 3). It drew every
+ * WORK'S OVERVIEW LEADS WITH WHAT TO DO, AS LISTS THAT TICK. It drew every
  * list as a `table`, so a task could be finished from the Board and from a project's page, which declares a `todo` over
  * the same register, and not from Work's own Overview: the tick the host already wires onto a `todo` row had nothing
  * on this page to land on.
@@ -91,7 +91,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const k = await seeded();
   const page = opened(k, 'work');
   const headings = page.blocks.map((b) => b.heading);
-  /* THE CAPTURE LINE COMES FIRST (MOD-12), so a task is written down before anything is read. */
+  /* THE CAPTURE LINE COMES FIRST, so a task is written down before anything is read. */
   assert.deepEqual(headings.slice(0, 4), ['What needs doing?', 'Right now', 'Today', 'This week'], headings.join(', '));
 
   /* PAST ITS DATE IS TODAY'S, because it is still the next thing to do. The sample's is four days late. */
@@ -153,7 +153,7 @@ test('AN AGENT TAKES A TASK, SPLITS IT, HANDS IT BACK AND A PERSON FINISHES IT, 
 
   /* HAND BACK: the agent finishes its part and it waits on a person, with what the agent said as the reason.
      UNTIL WORK 1.6.0 THE QUEUE ALSO NAMED WHO CHANGED IT, in a Changed by column, and this asserted `agent:claude`
-     there. The queue is a `todo` now so that it can be ticked, a `todo` draws the task and one detail, and the brief
+     there. The queue is a `todo` now so that it can be ticked, a `todo` draws the task and one detail, and the design
      gives that detail to the note. Who handed it back is still on the row's history, not on this page. */
   assert.ok(k.update('tasks', ref, { state: 'review', note: 'New key issued and the old one revoked. Check the deploy.' }, agent).ok);
   overview = opened(k, 'work');

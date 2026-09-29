@@ -5,7 +5,7 @@
  * card they meant. `40f2a29c`'s tie-break was made to hold the Solo founder card to that, and nothing held the other
  * five: Small business's summary, "What you are owed and what you owe, what you run on, the people involved and the
  * work.", heard no signal of any use case, so `arrange` answered `pick: null` and the first run proposed nothing for
- * the one card the owner had just read (`loop/research-batch-forty-seven-audit.md` §6). The other five proposed
+ * the one card the owner had just read. The other five proposed
  * themselves, so this is one card's words and not the arranger.
  *
  * EVERY CARD AND NOT A LIST OF THEM, so a seventh card is held to it the day it is added, and so is a summary rewritten

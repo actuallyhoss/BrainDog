@@ -72,8 +72,8 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
       },
       /* NEITHER IS REQUIRED SINCE 1.1.0. A name somebody holds whose renewal day or price nobody has looked up yet is still
          a name they hold, and a guessed day is worse than a blank one: a blank sends somebody to find out, a guess stops them.
-         the old tool's 23 domains carry no price at all, and most of its hosting no renewal day, so requiring both left the
-         whole estate out of the import. A blank day reminds nobody and a blank cost adds nothing to a sum. */
+         An imported register of 23 domains carried no price at all, and most of its hosting no renewal day, so requiring
+         both left the whole estate out of the import. A blank day reminds nobody and a blank cost adds nothing to a sum. */
       { id: 'renews', type: 'day', index: true, deadline: true, remind: ['-30d', '-7d', '0d'] },
       { id: 'cost', type: 'money' },
       /* INDEXED, WHICH IS WHY IT IS ON THE SCREEN. A column of amounts on unstated periods cannot be read:
@@ -89,7 +89,7 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
          taken out, which is what `labelOf` would have produced with no label here at all. */
       { id: 'points_at', label: 'Points at', type: 'text' },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
-      /* A NOTE, SINCE 1.2.0, AND IT IS NOT `points_at` WITH MORE ROOM. the old tool's domain register carries prose on most
+      /* A NOTE, SINCE 1.2.0, AND IT IS NOT `points_at` WITH MORE ROOM. An imported domain register carried prose on most
          of its rows: a standing conflict between two registers, the open task behind a site that resolves nowhere, the
          whole clearance search behind a purchase. With nine fields and none of them prose, the import left every one of
          those in the export, because the only text beside the name says where it sends traffic and filing the reason a
@@ -101,7 +101,7 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
 };
 
 /**
- * A MONEY FIGURE IN THE RECORD'S OWN CURRENCY, SINCE estate 2.0.0 (`loop/finish/modules.md` C1). `money.GBP` judged every
+ * A MONEY FIGURE IN THE RECORD'S OWN CURRENCY, SINCE estate 2.0.0. `money.GBP` judged every
  * reading in pounds, so a household paying its bills in another currency read its own services as somebody else's money.
  * `money` is added up in the record's home currency when one is set, else in the one currency the rows are in, else one
  * amount per currency, which is the currency somebody chose and never the pack author's.

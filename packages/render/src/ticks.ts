@@ -7,7 +7,7 @@
  * you leave the screen to use it. The box is the control now, and this file is the part of that
  * with an answer worth asserting.
  *
- * TWO RULES, and both come out of `loop/REWORK.md` section 1 rather than out of taste:
+ * TWO RULES, and both come out of how people actually used the record rather than out of taste:
  *
  *   1. A CHANGED ROW DOES NOT LEAVE THE SCREEN. Of eighty-five human writes over thirteen days in
  *      the record this product is modelled on, thirteen reversed the write immediately before them

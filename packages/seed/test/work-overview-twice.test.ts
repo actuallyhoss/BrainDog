@@ -1,7 +1,7 @@
 /**
  * Work's Overview drawing one ticket under two headings.
  *
- * `loop/research-usability-2026-09-21.md` finding 15 measured this on the team pack's Home, where
+ * A usability pass measured this on the team pack's Home, where
  * `Blocked` and `Due this week` overlap by construction and the team lead's first reading is that
  * the board is double-counting. The same overlap is in the Work pack's own Overview, and it is
  * bigger: driven at 390 and at 1440 against the sample record, `/p/work` drew 21 rows and four
@@ -27,7 +27,7 @@
  *
  * AND WHAT WAS GIVEN UP, said here because a test that stops asking a question should say so. 1.5.0 put the due day on
  * `Waiting on you` so that holding a ticket back from `Due soon` did not take its date off the screen. A `todo` draws
- * two cells, the task and one detail, and the brief gives that detail to the reason it waits, the note. The queue is
+ * two cells, the task and one detail, and the design gives that detail to the reason it waits, the note. The queue is
  * still in the order it falls due, which the second test holds.
  */
 

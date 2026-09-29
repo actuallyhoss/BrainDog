@@ -1,7 +1,7 @@
 /**
  * `lookup`'s one rule that `enum` does not share: DIGITS PRINTED BEHIND STARS ARE THE TAIL OF A LONGER VALUE.
  *
- * WHY THIS FILE EXISTS. `loop/research-bank-real.md`, *The three that did not read*, item 3: his bank prints one
+ * WHY THIS FILE EXISTS. A real bank prints one
  * EGP account two ways, as stars and four digits in the InstaPay messages and as a branch code, three stars and the
  * last three of those four in the `From HSBC:` lines. `lookup` answered only the row whose value is a WHOLE TOKEN
  * in the slice, so whichever `last4` he typed, one family of his messages went to review with the account unread.
@@ -71,9 +71,9 @@ test('THE PACKAGE\'S OWN `lookup` READS A MASK ITS ANCHOR SWALLOWED, because the
   assert.deepEqual(read(bare, 'your account 518 was debited', [SAVINGS]), { values: [], note: 'exact' });
 });
 
-/* `loop/research-batch-twenty-one-audit.md` findings 1 and 2. The card patterns read `after: 'ending '` with no end, so
+/* A STAR PAST THE FIRST TOKEN, AND A TAIL TOO SHORT. The card patterns read `after: 'ending '` with no end, so
    the slice is the rest of the message, and a star in a merchant descriptor, a footer or a reference named an account.
-   Measured red before the repair: P1 to P3 answered `studio`, `company` and `tax` at `exact`, and the two short tails
+   Measured red before the repair: the three lines below answered `studio`, `company` and `tax` at `exact`, and the two short tails
    answered the one row ending in them. */
 const STUDIO = { id: 'a_studio', value: '2044' };
 const COMPANY = { id: 'a_company', value: '4471' };

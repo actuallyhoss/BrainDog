@@ -152,10 +152,10 @@ test('WALKS OF ONE GROUP READ ONE SET OF KNOBS: the horizon, lateness and what i
   assert.equal(knobsIn(usd, { ...held, horizon: null }, 'USD').horizon, 60, 'no horizon chosen is the walk’s own');
 });
 
-/* ── the controls the old tool's forecast has: growth, a rate drift, what counts, holdings sold ─────────────────── */
+/* ── the longer-range controls: growth, a rate drift, what counts, holdings sold ──────────────────────────────── */
 
 /**
- * A USD salary walked into EGP beside EGP rent, the case brief B6 names: EGP 5,000.00 today, the salary worth
+ * A USD salary walked into EGP beside EGP rent, the case these controls exist for: EGP 5,000.00 today, the salary worth
  * EGP 48,500.00 on the 1st and rent of EGP 50,000.00 on the 2nd, a year of each. EGP 1,500.00 short a month, so the
  * walk goes under on the fourth rent, 2 January. Each salary step says it was USD converted into EGP (`of`); rent says
  * nothing, because it was never converted.
@@ -263,7 +263,7 @@ test('THE NEW KNOBS ARE READ FROM THE ROW, SHARED BY A GROUP, AND UNTOUCHED THEY
   assert.deepEqual(knobsIn(m, { horizon: null, late: 0, spend: {}, leave: [] }, 'EGP'), { horizon: 365, late: 0, spend: 0, leave: [] }, 'a group made before these knobs holds none of them');
 });
 
-/* A CHECKER'S MUTATIONS SURVIVED BOTH OF THESE: drift taken by the day money was due, and an `of` row attached to a
+/* MUTATIONS SURVIVED BOTH OF THESE: drift taken by the day money was due, and an `of` row attached to a
    step with another row between them, each left every test above green. */
 test('PAID LATE, A CONVERTED STEP GROWS BY THE DAY IT WAS DUE AND DRIFTS BY THE DAY IT ARRIVES', () => {
   const m = forecastModel(DRIFTING)!;

@@ -21,7 +21,7 @@
  *    needs a fill.
  *
  * One 24 box, round caps and joins, stroked in `currentColor` by whoever draws it. The stroke width is
- * the drawer's, and steps up with size (research-modules §1.3), so the data carries none.
+ * the drawer's, and steps up with size, so the data carries none.
  */
 
 export const CORE = {

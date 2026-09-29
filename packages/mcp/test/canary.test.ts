@@ -1,5 +1,5 @@
 /**
- * Canaries planted in a real record, and looked for in every answer of every MCP tool (DEF-1).
+ * Canaries planted in a real record, and looked for in every answer of every MCP tool.
  *
  * THE SAME SWEEP `apps/selfhost/test/canary.test.ts` MAKES OF THE ROUTES, made of the tools. `TOOLS` is read when the
  * test runs, so a tool added later is swept the day it lands. Every tool is called through `handle`, the dispatcher

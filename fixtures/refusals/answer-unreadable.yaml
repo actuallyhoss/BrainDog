@@ -10,8 +10,8 @@ replies: [
 
 # THE FIFTH `via: ask` AND THE FIRST THAT IS NOT THE PALETTE'S. The other four are a person's
 # question, driven through `propose`; this one is an automation's, raised by `answer` when a rule's
-# `ask_slash` step reaches a model and the host cannot read what came back. Admitted to `30 §6` on
-# September 23rd 2026 where wave 47 had borrowed `PROPOSAL_SCHEMA`. It is still an `ask`, because
+# `ask_slash` step reaches a model and the host cannot read what came back. Admitted to `30 §6` in
+# place of a borrowed `PROPOSAL_SCHEMA`. It is still an `ask`, because
 # the input is still a question plus the model's reply, and `40 §6` gives the row the one key this
 # needs: `answer:`, the `Ask` the kernel's `infer.ask` row carries, in place of `ask:`.
 #

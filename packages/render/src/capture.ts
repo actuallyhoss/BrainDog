@@ -5,7 +5,7 @@
  * without a DOM, and two drawers that each worked it out would be two answers.
  *
  * WHAT IT IS FOR. A capture is the one-line add: one field, and the Add button inside its edge once
- * there is something in it to add. the old tool's Work leads with one ("What needs doing?"), and the
+ * there is something in it to add. A work page earns it at the top ("What needs doing?"), and the
  * register grid has had its own since the grid's add landed (`apps/web` `inheritedFrom`). This is the
  * same line as a block, so any page can lead with it rather than one route owning it.
  *

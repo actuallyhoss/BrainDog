@@ -7,7 +7,7 @@
  * through `sendAction`. The split is not a preference. `runPull` raises `PULL_ORIGIN_REFUSED` and
  * `PULL_REQUEST_REFUSED` WITH an address (`fetch.page[1]` for a redirect off the base), and the send
  * loop a non-paging action runs raises the same two codes as `{ code, fix }` with nowhere to put
- * one. Measured on September 22nd 2026: `pull-origin-refused.yaml`, handed to this file in a
+ * one. Measured: `pull-origin-refused.yaml`, handed to this file in a
  * connector's shape, answered `at: fetch.page[1]` where the fixture claims none. A runner that drove
  * the family through one surface would have called two correct fixtures wrong. So this file takes
  * the fixtures whose `raises:` is here, which is what every runner so far has followed, and the

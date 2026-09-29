@@ -1,6 +1,5 @@
 /**
- * A list that leaves one pack for another with its rows (`loop/research-shell-seed-next.md` N1 and Brief 1A,
- * `loop/DIRECTION.md` §22).
+ * A list that leaves one pack for another with its rows.
  *
  * EITHER ORDER WAS REFUSED, AND "MOVE THEM FIRST" HAD NOWHERE TO MOVE THEM TO. Driven through `createRecordApi` with
  * every first-party pack installed and one `holdings` row written, before `hands` existed:
@@ -45,12 +44,12 @@ type Api = Awaited<ReturnType<typeof createRecordApi>>;
 /**
  * money-core as it ships (without `holdings` since 2.0.0), handing the list to `to` when there is one and to nobody when not.
  *
- * FROM THE SHIPPED DOCUMENT AND NOT A RE-VERSIONED COPY OF IT. Until 23 September this took money-core 1.8.0, dropped the
- * list and called the result 2.0.0; since then the shipped 2.0.0 is that document, handing `register.holdings` to
- * `holdings`. Since money-core stopped naming other packs (parity B1 step 2) it hands nothing else, so the one entry
+ * FROM THE SHIPPED DOCUMENT AND NOT A RE-VERSIONED COPY OF IT. This once took money-core 1.8.0, dropped the
+ * list and called the result 2.0.0; now the shipped 2.0.0 is that document, handing `register.holdings` to
+ * `holdings`. Since money-core stopped naming other packs it hands nothing else, so the one entry
  * this file varies is the whole of `hands`.
  *
- * READ AGAIN AT 3.0.0 (MOD-4): 3.0.0 still declares no `holdings` and hands nothing, and the `holdings` pack asks for
+ * READ AGAIN AT 3.0.0: 3.0.0 still declares no `holdings` and hands nothing, and the `holdings` pack asks for
  * money-core `>=2.0.0`, which 3.0.0 is. So a record on 1.8.0 updating straight to 3.0.0 takes the same step 2.0.0 was.
  */
 const moneyCore = (to: string | null): Doc => {
@@ -65,8 +64,8 @@ const moneyCore = (to: string | null): Doc => {
 
 /**
  * The `holdings` pack as it shipped at 1.0.0 (`packs/holdings/holdings-1.0.0.json`), under another id or with other `requires` when a
- * guard below needs one. Its kinds carry no `gold`, which is the case `loop/research-shell-seed-next.md` §3A walks (§22
- * takes gold out of the shipped values), and `commodity` in its place.
+ * guard below needs one. Its kinds carry no `gold`, since gold is not one of the shipped values, and `commodity` in
+ * its place.
  *
  * THE PACK THAT SHIPS, NOT A BODY CUT OUT OF money-core. This used to clone money-core's list and strip `gold` by hand,
  * which proved the handover for a pack nobody ships. Built from `shippedHoldings()`, the first two tests below are the
@@ -94,7 +93,7 @@ async function put(api: Api, doc: unknown): Promise<{ diff: Diff; out: Out }> {
  * Every first-party pack installed through the record, money-core AS 1.8.0, and one row of gold in `holdings`.
  *
  * 1.8.0 BECAUSE IT IS THE LAST money-core THAT DECLARES THE LIST. With today's documents the record has no `holdings` at
- * all, the `create` below is refused, and every test in this file went red at that line on 23 September, before any
+ * all, the `create` below is refused, and every test in this file went red at that line, before any
  * handover was tried. `asMoneyCore180` rebuilds 1.8.0 byte for byte (`seed/test/money-core-major.test.ts` holds its
  * fingerprint to the recorded one).
  */
@@ -178,8 +177,8 @@ test('GUARDS: a drop without hands still orphans, and a pack hands did not name 
 });
 
 /**
- * A HANDOVER TO A PACK THE RECORD ALREADY HAS WAS A LIST THAT PACK COULD NEVER LET GO OF. Measured by the checker on
- * 22 September: money-core 2.0.0 handing `register.holdings` to `work`, which is installed and does not declare it,
+ * A HANDOVER TO A PACK THE RECORD ALREADY HAS WAS A LIST THAT PACK COULD NEVER LET GO OF. Measured:
+ * money-core 2.0.0 handing `register.holdings` to `work`, which is installed and does not declare it,
  * went through, and from then on every update of `work`, and a reinstall of the same file, was `WOULD_ORPHAN`
  * ("work upgrades away register.holdings"), because the list now sat under a pack whose own file never named it. Any
  * pack's file could do that to any installed pack. The taking-over path is for a pack that is not installed yet, so a

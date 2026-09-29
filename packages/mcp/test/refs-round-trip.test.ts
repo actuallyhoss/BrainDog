@@ -1,13 +1,13 @@
 /**
  * Every ref an agent is handed, sent back through every tool that writes a row.
  *
- * THE SHAPE THIS FILE IS WRITTEN AGAINST IS A ROUND TRIP CLOSED AT SOME TOOLS AND NOT OTHERS. Audit fifty-two found
- * it three times in one commit (`loop/research-batch-fifty-two-audit.md` sections 1, 2 and 7): `create` and `update`
+ * THE SHAPE THIS FILE IS WRITTEN AGAINST IS A ROUND TRIP CLOSED AT SOME TOOLS AND NOT OTHERS. It was found three
+ * times in one commit: `create` and `update`
  * took `LN8` because this package qualified it on the way in, and `propose`'s `rowset` did not, so the owner pressed
  * accept on a skill whose `because` read back `["LN6"]` and was told `because[0] takes a row id or a spoken id`. A
  * task read while its project was live and sent back after the project went was refused `thing names things#5, and
- * there is no such row`, for a value the task already held. Each repair before it had been as wide as the case its
- * audit measured.
+ * there is no such row`, for a value the task already held. Each repair before it had been as wide as the one case
+ * it was measured on.
  *
  * SO NEITHER SIDE IS A HAND LIST. The tools that answer a ref are found by calling every tool in `TOOLS` and reading
  * which answers carry a row with a ref field set, the ref fields read from the record's own schema. The tools that
@@ -271,7 +271,7 @@ test('every ref any tool answers goes back through every tool that writes a row,
 test('a list of refs holding a deleted row goes back through update, and a copy of it is refused at the element', async () => {
   /* THE LIST HALF OF WHAT A FIELD ALREADY HOLDS WAS DRIVEN BY NOTHING ABOVE. The round trip deletes a project, which
      only a single `thing` points at, so `holds` answering `held === id` for an array as well passed all three tests
-     here; measured by the checker, and then this case made to fail on that mutation. skills#5 cites its learning in
+     here; measured by mutation, and then this case made to fail on that mutation. skills#5 cites its learning in
      `because`, a `list<ref>`, and the learning is what goes.
 
      READ BEFORE THE DELETE, because a read after it answers the gone learning as its row id

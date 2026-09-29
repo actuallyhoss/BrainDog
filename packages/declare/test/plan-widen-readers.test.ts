@@ -1,7 +1,7 @@
 /**
  * The plan names the same readers of a widening the kernel's `stranded` refuses, including the two it once passed over.
  *
- * `loop/research-batch-thirty-six-audit.md` §1 found three readers the refusal never asked: a figure resent with only its
+ * There were three readers the refusal never asked: a figure resent with only its
  * `name` changed, a run-path rule whose steps are written as `then:`, and an automation started by arrivals at a door
  * writing the list. `misreadsOf` asks with `sentencesOver` as the kernel does, so the `then:` walk reaches both, and it
  * made the other two choices the kernel made: a reader the update sends with other bytes was "the update's own" and

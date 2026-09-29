@@ -114,7 +114,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     requires: ['register.people'],
     blocks: [
       {
-        /* CARDS, with a face for each person, as the old tool draws people: a table of four columns read
+        /* CARDS, with a face for each person, rather than a table of four columns read
            as a directory. Each card still opens the person's row. Their role, and the projects they were
            met in, because most people here arrive from an agent's commit rather than by hand, and the
            newest first, because the person met yesterday is the one somebody is asking about.
@@ -140,7 +140,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * ONE PAGE PER PERSON, since People 2.2.0: who they are, the projects they were met in, and what is written about them.
    * Only what the rows say: nothing here works out anything about a person that nobody wrote down.
    *
-   * NOT THE MONEY OR THE WORK BETWEEN YOU, WHICH THE BRIEF ASKS FOR, because a block of People's over `transactions`,
+   * NOT THE MONEY OR THE WORK BETWEEN YOU, WHICH WAS ASKED FOR, because a block of People's over `transactions`,
    * `obligations` or `tasks` makes People lean on those lists: `@braindog/declare` counts every block's `source` a page
    * reads (`pointsAt` in `packages/declare/src/index.ts`) and refuses the install `REGISTER_UNRESOLVED` while the list is
    * not held. A record is made with People before Money and Work (`MODULE_ORDER` in `usecases/index.ts`), and a student's

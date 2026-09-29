@@ -1,6 +1,5 @@
 /**
- * New project guide: someone starting something who wants to be walked through it
- * (`loop/research-spark.md` §4).
+ * New project guide: someone starting something who wants to be walked through it.
  *
  * IT NEEDS NO FIRST-PARTY MODULE. Work's tasks point at Projects and carry no order or milestone, and a
  * person starting a podcast has no portfolio yet, so the guide carries its own four lists: the milestones
@@ -48,7 +47,7 @@ export const GUIDE = {
      beside it, the next three steps to tick and what helps. A milestone says whether it is passed, which the record
      keeps in step with its status, and what it comes after.
      1.4.0: the voice says more of the record its own way, Home's empty lines, the add verb and the pen's line among
-     them (PGS-24). Each is a new setting a person can change at /packs, so a minor step. */
+     them. Each is a new setting a person can change at /packs, so a minor step. */
   version: '1.4.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
@@ -71,7 +70,7 @@ export const GUIDE = {
     nothing_needs_you: 'Nothing is waiting on you',
     since_away: 'What you have done so far',
     lists: 'Your notes',
-    /* THE REST OF THE LINES, patient and one step at a time (PGS-24): a step, a milestone, the project taking shape. */
+    /* THE REST OF THE LINES, patient and one step at a time: a step, a milestone, the project taking shape. */
     coming_up: 'Next steps',
     overdue: 'Running late',
     nothing_now: 'Nothing is waiting on you. Take the next step when you are ready.',
@@ -83,7 +82,7 @@ export const GUIDE = {
     add_first: 'Write the first one',
     pen_waits: 'When there is a way to help this project along, it waits here until you keep it or say no.',
   },
-  /* SETTINGS A PERSON CAN CHANGE (S8): a writer may call Milestones "Drafts", a band may call Steps "Rehearsals". */
+  /* SETTINGS A PERSON CAN CHANGE: a writer may call Milestones "Drafts", a band may call Steps "Rehearsals". */
   labels: {
     milestones: 'Milestones',
     steps: 'Steps',
@@ -270,7 +269,7 @@ export const GUIDE = {
         steps: [{ set: { field: 'passed', to: 'false' } }],
       },
       {
-        /* HOME, AS THE GUIDE ANSWERS IT (S13): the way from the idea to keeping it going with where you are on it, the
+        /* HOME, AS THE GUIDE ANSWERS IT: the way from the idea to keeping it going with where you are on it, the
            decision waiting on you and what is suggested, the next three steps, what is stuck and what helps. */
         page: 'home-guide',
         title: 'Your project',

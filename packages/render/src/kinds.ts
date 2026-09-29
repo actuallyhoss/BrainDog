@@ -151,9 +151,9 @@ export type KindSpec = {
  * pack, which is the whole reason the primitive layer exists (05 §2).
  *
  * THE THIRTY-FOURTH, `inputs`, AND FIVE FORMS CAME TOGETHER, for one reason: a person building a desk of their own
- * (`loop/research-dynamic-layouts.md`, DIRECTION 28) needed a card that names its next step, a path, a decision drawn
+ * needed a card that names its next step, a path, a decision drawn
  * as what its options are, a budget as ranges, an opening sentence and a few numbers to type into, and the kernel
- * answered every one of them (wave one) while this table could draw none: a fence of `steps path` degraded as
+ * answered every one of them while this table could draw none: a fence of `steps path` degraded as
  * `"steps" takes no word after it`, and a `next` column as a column this build did not know (measured). Each form is
  * a word on a kind that already existed, so a drawer that does not know the word yet still draws the kind; only
  * `inputs` is new, because nothing here took typed input from a page except `capture`'s one line.
@@ -226,7 +226,7 @@ const TABLE = {
 
      TWO FACTS AND NOT ONE, because what was lost was two. Work's Waiting on you said when each task fell due and
      who changed it last at 1.5.0, and on a `todo` of two cells both went, since a four-cell row written into a
-     page degraded whole as DIALECT_ARITY (measured 22 September). A third cell alone would have made that page
+     page degraded whole as DIALECT_ARITY (measured). A third cell alone would have made that page
      choose again, or join the two upstream into one string, and a joined string cannot be formatted per field:
      the due day is a date and the change is an actor and an age, and `display()` knows each only by its field.
 

@@ -1,10 +1,10 @@
 /**
  * `@braindog/script`: a person's script, run in a sandbox that holds nothing but `ctx`.
  *
- * `loop/research-shell-scripts.md` is the design and this package is its Brief 1: the contract
+ * This package is the sandbox half of scripts: the contract
  * types, the ceilings, the prelude that builds `ctx` inside the sandbox, and the QuickJS runner the
  * self-host binds. It knows no kernel, no host and no network. Everything a script can reach is
- * a function the caller hands in as a `CtxHost`, and every rule in section 5 of that design is
+ * a function the caller hands in as a `CtxHost`, and every sandbox rule is
  * enforced on THIS side of the boundary, before the host function is called, so a script that
  * rewrites its own `ctx` has rewritten nothing that decides anything.
  *
@@ -14,7 +14,7 @@
  * build. The record never imports it: the kernel is rank 7 to this package's 12 (`31-STACK`), so it
  * holds the answer's shape structurally (`kernel/src/script-run.ts`) and its own ceilings.
  *
- * NO NEW REFUSAL CODE. Section 5 of the design says the existing ones cover a script, and for every
+ * NO NEW REFUSAL CODE. The existing ones cover a script, and for every
  * rule this package enforces one does. A script that throws its own error is not a rule of ours
  * being broken, so it carries `code: null` rather than a code invented for it, which is the same line
  * `packages/ports` draws around `INTERNAL`: a crash report is not a refusal.
@@ -23,7 +23,7 @@
 /* ── The ceilings ─────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * What a declaration may ask for at most, section 5 of the design. A declaration over one is
+ * What a declaration may ask for at most. A declaration over one is
  * refused before anything runs rather than clamped, because a clamped limit is a script that
  * behaves differently from what its author read in the install diff.
  *
@@ -53,7 +53,7 @@ export const SOURCE_BYTES = 64 * 1024;
 /**
  * THE SANDBOX'S WHOLE MEMORY, AND IT IS A WASM MAXIMUM BECAUSE THE QUICKJS LIMIT IS NOT A CAP.
  *
- * The design read `runtime.setMemoryLimit` as hard. Measured on quickjs-ng 0.32.0 on September 22nd:
+ * The design read `runtime.setMemoryLimit` as hard. Measured on quickjs-ng 0.32.0:
  * a single 100 MB `Uint8Array` or string is refused under a 32 MB limit, and a hundred 1 MB strings
  * or arrays pushed one at a time are not. `computeMemoryUsage` reported 104,956,678 bytes used
  * against a `malloc_limit` of 33,554,432, and the run finished. So the QuickJS limit is kept for the
@@ -75,7 +75,7 @@ export type ScriptLimits = {
 /* ── The declaration ──────────────────────────────────────────────────────────────────────────── */
 
 /**
- * The part of a `script` declaration the sandbox enforces. `runs:` (the trigger) is Brief 2's and is
+ * The part of a `script` declaration the sandbox enforces. `runs:` (the trigger) is the host's and is
  * not here, because a sandbox that knew why it was started could start behaving differently for it.
  */
 export type ScriptDecl = {
@@ -166,7 +166,7 @@ export const WITH_CONFIG = `(function (ctx, config) {
   return Object.freeze({ ...ctx, config: deep(settings) });
 })`;
 
-/** A write the run asked for. Nothing is applied here; Brief 3 applies them after the run, together. */
+/** A write the run asked for. Nothing is applied here; the host applies them after the run, together. */
 export type ScriptWrite =
   | { op: 'create'; register: string; fields: Json }
   | { op: 'update'; spoken: string; patch: Json; version: number };
@@ -180,7 +180,7 @@ export type ScriptUsage = {
   cpu_ms: number;
 };
 
-/** The existing codes this package can answer, section 5 of the design. */
+/** The existing codes this package can answer. */
 export type ScriptRefusalCode =
   | 'DECLARATION_INVALID'
   | 'OUT_OF_BOUNDS'
@@ -194,9 +194,9 @@ export type ScriptRefusal = {
 };
 
 /**
- * WHAT A RUN ANSWERS. A refused run carries its usage and log as well, which is wider than the
- * brief's `{ refused }`: section 2 of the design meters a refused run as a run, because it did spend
- * the sandbox's time, and a refusal with no usage would leave Brief 3 nothing to meter it by.
+ * WHAT A RUN ANSWERS. A refused run carries its usage and log as well, which is wider than a
+ * bare `{ refused }`: a refused run is metered as a run, because it did spend
+ * the sandbox's time, and a refusal with no usage would leave the host nothing to meter it by.
  * It carries NO writes, ever. A half-run that left half a ledger is the thing this shape prevents.
  */
 export type ScriptAnswer =

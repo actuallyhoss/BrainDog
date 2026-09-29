@@ -6,7 +6,7 @@
  * the dashboard draws, marked `polled`, dated the moment the answer arrived.
  *
  * IT IS AN ORDINARY PACK, so it is installed the way every pack is: planned, and approved once by the owner, whose
- * plan names the host, how often, and the key it sends (`loop/DIRECTION.md` §0b). Nothing here calls anything; the
+ * plan names the host, how often, and the key it sends. Nothing here calls anything; the
  * runner does, from the declaration, and refuses a private or local address as it refuses every other.
  *
  * ONE POLL PER ADDRESS. Its `map` is a list, one map a measure, so three measures at one address are one request

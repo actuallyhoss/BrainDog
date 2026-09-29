@@ -1,8 +1,7 @@
 /**
  * `<field> contains <text>` in the sentence form, the one text test a person can say.
  *
- * THE JSON FORM HAS RUN IT ALL ALONG AND THE SENTENCE REFUSED IT. Measured at HEAD before this file
- * (`loop/research-living-in-it.md` §6): a rule `{ field: what, contains: UBER }` fired on
+ * THE JSON FORM HAS RUN IT ALL ALONG AND THE SENTENCE REFUSED IT. Measured before this file: a rule `{ field: what, contains: UBER }` fired on
  * "UBER *TRIP 1234" in either case, and a list over a `document` field found its row, while
  * `parseWhere('what contains uber')` answered `MATCH_OP_UNSUPPORTED ... contains is not something a
  * filter can say`. A page's `where:`, the chip line and a sentence-form rule are all written in the
@@ -194,10 +193,10 @@ test('A COMMA INSIDE THE QUOTES BELONGS TO THE TEXT, and a quote nobody closed i
   assert.match(cut.bad[0]!.fix, /not closed/);
 });
 
-/* ── audit fifty-eight, §8 and §9 ────────────────────────────────────────── */
+/* ── secrets, `not` and quotes ──────────────────────────────────────────── */
 
-test('A SECRET IS REFUSED LIKE A REF, because its column holds a grant id and not the secret (§8)', () => {
-  /* K4: `token contains a` parsed to `{ field: token, contains: a }` and a kernel `list` answered
+test('A SECRET IS REFUSED LIKE A REF, because its column holds a grant id and not the secret', () => {
+  /* `token contains a` parsed to `{ field: token, contains: a }` and a kernel `list` answered
      `ok`, matching or missing rows on the letters of a grant id nobody is ever shown. */
   const schema: Schema = { register: 'keys', fields: { what: { type: 'text' }, token: { type: 'secret' } } };
   const out = parseWhere('token contains a', schema, deps);
@@ -233,8 +232,8 @@ test('THE KERNEL REFUSES `contains` OVER A SECRET where it answered ok (§8)', a
   sql.close();
 });
 
-test('`not` IS A GRAMMAR WORD IN ANY CASE, as `or` already was (§9)', () => {
-  /* K2: `what contains Not uber` compiled to `{ contains: 'Not uber' }`, the rows that say it, which
+test('`not` IS A GRAMMAR WORD IN ANY CASE, as `or` already was', () => {
+  /* `what contains Not uber` compiled to `{ contains: 'Not uber' }`, the rows that say it, which
      is the opposite of what was meant, while the lower-case spelling was refused. */
   for (const text of ['what contains Not uber', 'what contains NOT uber', 'what contains Not']) {
     const said = refused(text);
@@ -246,8 +245,8 @@ test('`not` IS A GRAMMAR WORD IN ANY CASE, as `or` already was (§9)', () => {
   assert.deepEqual(good('what contains "Not uber"'), { field: 'what', contains: 'Not uber' });
 });
 
-test('A QUOTED TEXT FOLLOWED BY MORE WORDS IS REFUSED, not read as one text holding two quote marks (§9)', () => {
-  /* K3: `what contains "uber" or "lyft"` starts and ends with a straight quote, so it compiled to the
+test('A QUOTED TEXT FOLLOWED BY MORE WORDS IS REFUSED, not read as one text holding two quote marks', () => {
+  /* `what contains "uber" or "lyft"` starts and ends with a straight quote, so it compiled to the
      one text `uber" or "lyft`, which no row holds. */
   for (const text of ['what contains "uber" or "lyft"', 'what contains "uber" "lyft"', 'what contains “uber” or lyft', "what contains 'uber' or 'lyft'"]) {
     const said = refused(text);

@@ -2,7 +2,7 @@
  * `, or` between conditions in the sentence form: the grammar's `any`, which no sentence could reach.
  *
  * THE TREE HAS HAD `{ any: [...] }` SINCE THE GRAMMAR WAS WRITTEN AND THE SENTENCE STOPPED AT ONE FIELD.
- * Probed on 24 September with brief 6's redo in place (`loop/research-m4-wave-two.md`, brief 7):
+ * Probed with the ordered words already in place:
  * `state is open, or due before today` was refused `FIELD_UNKNOWN`, the words `or due` read as a field
  * name, and `state is open or due before today` was refused `ENUM_VALUE_UNKNOWN`, the words `due before
  * today` read as a state. `state is open or doing` already read as one field's `in`, so "open or

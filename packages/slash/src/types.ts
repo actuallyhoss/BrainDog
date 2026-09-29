@@ -73,7 +73,7 @@ export type ModelRate = { in: number; out: number };
 
 /**
  * The four templates this package calls. `46 §4.5` describes eight and names no automation's question; `answer` is
- * `loop/research-infer-ask.md` §4's, and the other five of the eight have no caller here yet.
+ * an automation's question, and the other five of the eight have no caller here yet.
  */
 export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer';
 
@@ -108,8 +108,8 @@ export type CallContext = { principal: Principal };
  * `secret` fields are already labels (`30 §9` rule 3).
  *
  * `project` TAKES TWO ARGUMENTS WITH THE BUDGET INSIDE THE FIRST. `46 §4.6` as drafted called a
- * three-argument form and `45 D1` exports a two-argument one; `AUDIT-interface-B` IB-4 settled it
- * on the record's shape, and this is that shape.
+ * three-argument form and `45 D1` exports a two-argument one; the record's shape
+ * settled it, and this is that shape.
  */
 export interface RecordApi {
   project(args: ProjectQuery & { budget: { tokens: number } }, ctx: CallContext): Promise<Result<Projection>>;
@@ -199,16 +199,16 @@ export type Tier = 'a' | 'b' | 'byo';
 /**
  * The monthly ask limit a record starts with, and the one `ask_cap` is held to until its owner sets another.
  *
- * NAMED ONCE, HERE, because the site's price list and the Settings row both say it (`loop/finish/contracts.md` §7.5, X41):
+ * NAMED ONCE, HERE, because the site's price list and the Settings row both say it:
  * a number written in three places is three numbers the day one of them moves.
  */
 export const ASK_CAP_DEFAULT = 80;
 
 /**
  * The asks a month Slash's background work may spend on the included model: the daily look, an automation's question,
- * digest prose and a pattern drafted for the inbox, apart from the asks a person makes (`loop/finish/agents.md` §5 item 6).
+ * digest prose and a pattern drafted for the inbox, apart from the asks a person makes.
  *
- * THE NAME AND NOT YET THE COUNT. The meter that holds background work to it is the model-job meter (PLT-9), and the
+ * THE NAME AND NOT YET THE COUNT. The meter that holds background work to it is the model-job meter, and the
  * ledger's count that would tell a person's ask from a background one is `call.ts`'s; this is the number both read.
  */
 export const BACKGROUND_ASKS_MONTH = 60;
@@ -219,7 +219,7 @@ export const BACKGROUND_ASKS_MONTH = 60;
  * THE OWNER'S WORD FOR THE CHOICE, AND THE TIER IS THE STORE'S. `slash_settings` keeps a tier under its `46 §4.1` CHECK, so
  * `included` is stored as `a` and `key` as `b`, and a record a self-host keeps on `byo` reads as `included`: that is the
  * host's own endpoint with a model name typed for it, and nothing of the owner's is sent. `tier` stays readable beside it
- * for one workflow (`loop/finish/contracts.md` §3.2).
+ * for one release.
  */
 export type Source = 'included' | 'key';
 
@@ -236,7 +236,7 @@ export type Provider = (typeof PROVIDERS)[number];
  */
 export type Setup = Settings & { source: Source; provider: Provider | null; base_url: string | null };
 
-/** What an owner may change, as the settings door hands it on (`loop/finish/contracts.md` §3.2). `tier` still works. */
+/** What an owner may change, as the settings door hands it on. `tier` still works. */
 export type SetupPatch = Partial<{
   source: Source;
   tier: Tier;
@@ -248,8 +248,8 @@ export type SetupPatch = Partial<{
 }>;
 
 /**
- * `capped` IS WHETHER THE MONTH'S ASKS STOP AT `cap`. On his own key they are listed and not capped (`loop/finish/agents.md`
- * §5 item 7), so `used` is still the count and `cap` is the limit that would apply on the included model.
+ * `capped` IS WHETHER THE MONTH'S ASKS STOP AT `cap`. On his own key they are listed and not capped,
+ * so `used` is still the count and `cap` is the limit that would apply on the included model.
  */
 export type Status = {
   source: Source;

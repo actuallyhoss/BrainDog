@@ -1,6 +1,6 @@
 /**
  * What each version of a module this build ships changed, in the words a person reads on its detail page
- * (`apps/web/src/lib/market/listing.ts`, platform §4.0 L).
+ * (`apps/web/src/lib/market/listing.ts`).
  *
  * A MODULE HAS NO CATALOGUE FILE, so nothing publishes its `changes` line the way the Kennel publishes an add-on's. The
  * notes live here instead, newest first, one entry for each version a record could have been given. The long record of
@@ -11,7 +11,7 @@
  * bumped there and not named here draws on the page with no notes, which says less than it should and nothing false.
  *
  * NOT UNDER `packs/`, because that folder holds only what a record is built from (`agents.ts`, `first-party.ts`), and
- * this is words for a screen (`packs/rates-poll/rates-poll.test.ts`, "B7's DIRECTORY").
+ * this is words for a screen (the directory test in `packs/rates-poll/rates-poll.test.ts`).
  */
 
 import type { FirstPartyId } from './packs/first-party.ts';

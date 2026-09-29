@@ -1,8 +1,8 @@
 /**
  * Two closed lists the core shipped are opened: `people.role` stops offering `registrar`, and `updates.by` stops naming
- * four agent vendors (`loop/research-m3-dynamic.md` B9).
+ * four agent vendors.
  *
- * WHY BOTH ARE HERE. `loop/DIRECTION.md` section 22 says the shell ships primitives and never one person's use case, and
+ * WHY BOTH ARE HERE. The shell ships primitives and never one person's use case, and
  * a closed list is where a use case hides in plain sight. `registrar` is a role only a studio that holds domains has, and
  * the Personal use case already had to relabel it Agency to make it read. `claude`, `codex`, `cursor` and `you` were the
  * only authors an update could have, so a thread written by Gemini, by a teammate or by a script was refused

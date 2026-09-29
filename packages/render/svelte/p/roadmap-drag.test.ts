@@ -1,10 +1,10 @@
 /**
  * A roadmap's bars dragged with a pointer: the drawer's half, which is where the pointer is and what it means.
  *
- * THE ARITHMETIC CAME A WAVE BEFORE THE GESTURE. `dragPatch` in `src/roadmap.ts` turns a drop into the two fields a
+ * THE ARITHMETIC CAME BEFORE THE GESTURE. `dragPatch` in `src/roadmap.ts` turns a drop into the two fields a
  * task keeps, and at HEAD nothing called it but its own test: `git grep -l dragPatch -- apps packages/render/svelte`
- * found nothing, and this drawer's header said the drag was "the next wave's". So a roadmap drew every bar and none of
- * them moved (`loop/research-legacy-parity.md` row 30, brief B9).
+ * found nothing, and this drawer's header said the drag was still to come. So a roadmap drew every bar and none of
+ * them moved.
  *
  * WHAT IS PROVED HERE, AND WHAT IS NOT. A server render has no pointer, so the markup is proved two ways: with no
  * callback it is the chart it was, which is what keeps `roadmap-parity.test.ts` meaning something, and with one every

@@ -2,7 +2,7 @@
  * THE PRELUDE: the JavaScript that builds `ctx` inside the sandbox, from host functions.
  *
  * It is a string because it runs on the other side of the boundary, in QuickJS on the self-host and
- * as a module beside the source in a Dynamic Worker on Cloud (section 3 of the design). One text on
+ * as a module beside the source in a Dynamic Worker on Cloud. One text on
  * both hosts is what lets one fixture suite speak for both.
  *
  * IT IS ONE FUNCTION EXPRESSION, NOT A SCRIPT THAT SETS GLOBALS. The runner evaluates it, calls it
@@ -22,8 +22,7 @@
  * always as a third argument, because the host function takes a number and `quickjs.ts` reads a
  * missing one as `0`, a conflict on every row. It used to send `Number(version)` whatever came in,
  * so no version reached the record as `NaN` and was refused with a fix no script could follow,
- * `null` crossed as that `0`, and a typo crossed as the same `NaN` as no version at all (audit
- * thirty-four, finding 6). A version given that is not a whole number now stops the run here,
+ * `null` crossed as that `0`, and a typo crossed as the same `NaN` as no version at all. A version given that is not a whole number now stops the run here,
  * where the sentence can name the call that was wrong. This is a courtesy to the author and not a
  * check: a script that goes around it can only choose not to compare, which it may do anyway.
  */

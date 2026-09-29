@@ -152,7 +152,7 @@ function runEnd(text: string, i: number): number {
  * whether the three letters before a digit are a code, so it answers here; `scanInts` and `scanDecimals` pass
  * nothing and a letter before a digit still refuses it.
  *
- * AND A REFUSED NUMBER IS REFUSED WHOLE, which is `loop/research-batch-eighteen-audit.md` section 2. This walked
+ * AND A REFUSED NUMBER IS REFUSED WHOLE. This walked
  * on one character at a time after a refusal, so the first separator inside the figure started a fresh number
  * behind it: `EGP2500.00` read as `00` and `EGP1,284.50` as `284.50`, both in the fallback currency, and
  * `INV1250.75` gave the integer 75. The tail of a figure that could not start is never a figure anybody sent.
@@ -297,7 +297,7 @@ function codeBefore(text: string, pos: number, table: CurrencyTable): { code: st
  * May the three capitals glued to the digit at `at` be read as that figure's currency?
  *
  * THE TABLE `@braindog/record` WIRES IS EVERY CODE `Intl` KNOWS, AND MANY OF THEM ARE ORDINARY CAPITALS.
- * `loop/research-batch-twenty-audit.md` section 6 measured what asking the table alone did, with EGP declared:
+ * Measured, asking the table alone did this with EGP declared:
  * `Flight MAD2031` read as MAD 2,031.00, `voucher TOP20` as TOP 20.00, `Promo ALL2026` as ALL 2,026,
  * `at CAD1 PETROL` as CAD 1.00, `Seat BAM12.` as BAM 12.00 and `Ref PEN15` as PEN 15.00. Each is a flight,
  * a voucher, a seat or a reference, and each became an amount in a currency nobody spent.

@@ -1,10 +1,10 @@
 /**
  * Work's Waiting on you draws when each task falls due and who changed it last, under the reason it waits.
  *
- * `loop/research-batch-twenty-eight-audit.md` finding 3. Commit c6e2a331 widened `todo` to four cells, the last two
+ * Commit c6e2a331 widened `todo` to four cells, the last two
  * drawn as one quiet line under the title, and said that Waiting on you got its due day back. It did not: the block
  * still declared two columns, `what` and `note`, so the page projected `title | detail |  | ` and the line under every
- * waiting task stayed empty. Measured on 22 September by walking the seed's pages: `Waiting on you columns
+ * waiting task stayed empty. Measured by walking the seed's pages: `Waiting on you columns
  * ["what","note"]` beside `render todo kind: {"cells":4,"optional":2}`.
  *
  * WHAT IS DRAWN IS WHAT THE COLUMNS NAME, in order (`apps/web/src/lib/record/blocks.ts`, the projection from the

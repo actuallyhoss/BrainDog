@@ -3,7 +3,7 @@
  *
  * WHY THIS FILE EXISTS. `635bff96` let a number start after three capitals the table holds, so `EGP2500.00` read
  * as EGP 2,500.00. The table `@braindog/record` wires is every code `Intl.supportedValuesOf('currency')` names,
- * and `loop/research-batch-twenty-audit.md` section 6 measured what that let in with EGP declared: `Flight MAD2031`
+ * and a measurement of what that let in with EGP declared found: `Flight MAD2031`
  * gave MAD 2,031.00, `voucher TOP20` TOP 20.00, `Promo ALL2026` ALL 2,026, `at CAD1 PETROL` CAD 1.00,
  * `Seat BAM12.` BAM 12.00, and `Ref PEN15` PEN 15.00. Before `635bff96` each of those lines read its EGP figures
  * and nothing else, and that is what every row below expects again.
@@ -31,9 +31,9 @@ const egp = (amount: number): Money => ({ amount, currency: 'EGP' });
 
 type Row = [input: string, want: Money[]];
 
-/* The six the audit printed, and two references with a code inside them. `Card ending 4417` and `OTP is 4417.`
+/* The six that were measured, and two references with a code inside them. `Card ending 4417` and `OTP is 4417.`
    are the declared currency reading a bare integer, which is how the record wires this function and is not
-   what this file is about; they are kept so the rows are the audit's lines whole. */
+   what this file is about; they are kept so the rows are the measured lines whole. */
 const identifiers: Row[] = [
   ['Flight MAD2031 charged EGP 1,500.00', [egp(150_000)]],
   ['Promo ALL2026 applied, paid 99.00', [egp(9_900)]],

@@ -7,15 +7,14 @@ answers: [
     { "status": 200, "headers": { "content-length": "2000001" }, "body": "{}" }
   ]
 
-# NO `at:`, AND THAT IS THE FINDING. This one is raised by `refuse(code, fix)` at
+# NO `at:`, AND THAT IS THE POINT. This one is raised by `refuse(code, fix)` at
 # `packages/host/src/actions.ts:326`, whose whole envelope is `{ code, fix }`: an action's outcome is
 # recorded on a run, not returned to a caller with a path into their input. This fixture used to
 # claim `at: source`, which named a key nothing here can carry, so a reader was being told to expect
 # a field the envelope has no room for. Adding one is a change to `ActionAnswer`, and that is a
 # decision rather than a repair.
 
-# `via: pull` WAS MINTED FOR THESE SEVEN ON SEPTEMBER 20TH 2026, and until then they said `rpc`,
-# which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
+# `via: pull` IS THE SURFACE OF THESE SEVEN, and not `rpc`, which no RPC call could make true. `40 §6`'s `rpc` runner seeds a record and makes a `call:`; a
 # `PULL_` code is raised inside a scheduled connector run, by the runner the Worker's alarm and the
 # self-host's timer drive, and is written onto that run's ack as `result.error`. Nothing a `call:`
 # can express reaches it. The eighth `via` has its row in `40 §6` with `connect/test` as its runner,

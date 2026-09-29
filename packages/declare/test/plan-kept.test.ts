@@ -2,7 +2,7 @@
  * `plan` over a record whose owner changed a declaration a pack wrote first, asked of `plan` itself rather than through a
  * record (`packages/record/test/pack-update-kept.test.ts` drives the same rule end to end, from `setDeclaration`).
  *
- * A KEPT DECLARATION WAS CHECKED AGAINST WHAT THE UPDATE RETIRES AND NEVER AGAINST WHAT IT CHANGES. The checker of
+ * A KEPT DECLARATION WAS CHECKED AGAINST WHAT THE UPDATE RETIRES AND NEVER AGAINST WHAT IT CHANGES. A review of
  * `9b0d8184` measured it: an owner edits `metric.spent-30d`, a later money-core drops the `transfer` field from
  * `register.transactions`, the plan says no conflicts and installs, and from then on the figure refuses every read with
  * `FIELD_UNKNOWN`, because its `where` still says `transfer is false`. The pack's own figures were rewritten by the same
@@ -101,7 +101,7 @@ async function refusedWith(next: Pack, diff: Diff): Promise<string> {
   return said.fix;
 }
 
-/* ── the checker's case, and its neighbours ─────────────────────────────── */
+/* ── the reviewed case, and its neighbours ──────────────────────────────── */
 
 test('a kept figure whose where reads a field the update takes off its list is refused, in the sentence that keeps the edit', async () => {
   const installed = await recordWith({ 'metric.spent-30d': renamed });

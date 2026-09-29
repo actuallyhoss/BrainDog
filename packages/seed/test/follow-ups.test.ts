@@ -1,12 +1,12 @@
 /**
  * Work's follow-ups close all the way down, through the pack's own rule and the pack's own script, now that a
- * rule-started script's writes carry the chain that started them (audit sixty-four, finding 2).
+ * rule-started script's writes carry the chain that started them.
  *
- * WHY THIS FILE EXISTS. Audit sixty-four found that a `script` step laundered a rule's write: the script writes as
+ * WHY THIS FILE EXISTS. A `script` step laundered a rule's write: the script writes as
  * `script:<id>@v<n>`, so a rule whose script wrote the row that fired it started itself again on every run, at depth 0
- * (`packages/kernel/test/script-chain.test.ts`, L1). The repair gives those writes the depth of the run that queued the
- * script plus one, bounded by `SCRIPT_CHAIN_CEILING` in `packages/kernel/src/flow.ts`, and the audit named the risk in
- * so many words: Work's `close_follow_ups` closes ONE LEVEL PER RUN, each level's close starting the rule on the level
+ * (`packages/kernel/test/script-chain.test.ts`). The repair gives those writes the depth of the run that queued the
+ * script plus one, bounded by `SCRIPT_CHAIN_CEILING` in `packages/kernel/src/flow.ts`, and the risk is
+ * plain: Work's `close_follow_ups` closes ONE LEVEL PER RUN, each level's close starting the rule on the level
  * below, so a bound that is too low stops a follow-up tree closing part of the way down. Under `CHAIN_CEILING` (3) a
  * tree five levels deep left its fifth open. `apps/selfhost/test/follow-ups.test.ts` drives one level on a real host;
  * this drives the depth.

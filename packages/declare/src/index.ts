@@ -40,7 +40,7 @@ export const egressOf = (
 ): Egress | null => (decl.kind === 'ingest' || decl.kind === 'script' ? egressOfBody(decl.body, nameOf, opensOf) : null);
 export type { Egress };
 
-/* A use case: a pack with a front, its modules, signals and voice (`loop/research-spark.md` §2.1). */
+/* A use case: a pack with a front, its modules, signals and voice. */
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
 export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type ExampleLink, type ModuleId, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
@@ -100,7 +100,7 @@ export type Manifest = {
    * The declarations this version stops declaring and gives to another pack, by id: `{ 'register.holdings': 'holdings' }`.
    * Absent when it hands nothing.
    *
-   * WITHOUT IT A LIST WITH ROWS COULD NEVER LEAVE A PACK (`loop/research-shell-seed-next.md` N1). The owner's update
+   * WITHOUT IT A LIST WITH ROWS COULD NEVER LEAVE A PACK. The owner's update
    * dropping it was `WOULD_ORPHAN`, and the pack declaring it was `PROVIDES_CONFLICT` for as long as the owner held it,
    * so both orders were refused and "move them first" had nowhere to move them to.
    *
@@ -114,7 +114,7 @@ export type Manifest = {
    * Fields and enum values this pack lays on lists other packs own, by list id: `{ 'register.people': { values: { role:
    * ['family'] } } }`. Absent when it lays nothing.
    *
-   * WITHOUT IT EVERY FIRST-PARTY LIST WAS THE ONLY PLACE A FIELD COULD LIVE (`loop/research-shell-next.md` M1). A pack
+   * WITHOUT IT EVERY FIRST-PARTY LIST WAS THE ONLY PLACE A FIELD COULD LIVE. A pack
    * declaring `register.things` with one more field was `PROVIDES_CONFLICT`, rightly, and a pack that carried the same
    * wish under a key of its own installed `ok` and dropped it without a word, so `domain` was then `FIELD_UNKNOWN` on
    * the first write. A household's roles, a domain on a project and an importer's fields had nowhere to go.
@@ -130,7 +130,7 @@ export type Manifest = {
    * Blocks this pack adds to pages other packs declare: `[{ page: 'page.project', block: { kind: 'cards', ... }, after:
    * 'Where it stands' }]`. Absent when it adds none.
    *
-   * WITHOUT IT A PACK COULD ONLY DRAW ON A PAGE OF ITS OWN (`loop/finish/gaps.md` GAP-9). project-brief laid a one-line
+   * WITHOUT IT A PACK COULD ONLY DRAW ON A PAGE OF ITS OWN. project-brief laid a one-line
    * summary, a plan and blockers on every project and drew them on a Briefs page, because the project page is
    * Portfolio's and a second template over projects fought it for each project's address.
    *
@@ -150,7 +150,7 @@ export type Extension = { fields?: Record<string, Json>[]; values?: Record<strin
 export type PageAddition = { page: string; block: Record<string, Json>; after?: string; note?: string };
 
 /**
- * Who holds a list's rows, as its `hand:` says (GAP-11): the link field a person is handed a row by, the text field
+ * Who holds a list's rows, as its `hand:` says: the link field a person is handed a row by, the text field
  * holding the name an agent signs with, and the state a row an agent takes moves to. Either holder may be absent.
  */
 export type Hand = { person: string | null; agent: string | null; taken: string | null };
@@ -200,7 +200,7 @@ export type Installed = {
    * It is the one thing that tells a field a pack laid from a field the list declares itself, because the list a pack
    * extends is staged with no pack and reads as the record's own from then on. Without it a pack could never change a
    * field it had laid: its next version, changing that field in any way, was refused `PROVIDES_CONFLICT` as though the
-   * list's own pack had declared it (`loop/finish/defects.md` L3). Optional for the reason `requires` is, and a row
+   * list's own pack had declared it. Optional for the reason `requires` is, and a row
    * without it laid nothing a plan can see.
    */
   packs: { id: string; version: string; requires?: Readonly<Record<string, string>>; laid?: Readonly<Record<string, readonly string[]>> }[];
@@ -211,13 +211,13 @@ export type Installed = {
    * asked only of a list a plan would take a value off (`laidBack`). `null` when the record cannot say for that list.
    *
    * `held` COUNTS A DELETED ROW, AND `binned` SAYS HOW MANY OF THEM ARE. A deleted row holds its values until the purge,
-   * as the kernel's `WOULD_ORPHAN` counts it: wave forty-nine's first query left the bin out, and People 2.0.0 took
+   * as the kernel's `WOULD_ORPHAN` counts it: the first query left the bin out, and People 2.0.0 took
    * `registrar` off a list whose one registrar row was deleted, so the row's restore, and every edit after it, was
    * `ENUM_VALUE_UNKNOWN` "role has no value registrar" (`test/stays-holding.test.ts`).
    *
    * WHAT DECIDES WHETHER A VALUE AN UPDATE TAKES OFF STAYS. `rows` stood in for it, so a Personal record whose three
    * People rows were all Family was filed as keeping Agency, and Decide said the list "holds 3 rows that may use it"
-   * when none did (`loop/research-batch-forty-eight-audit.md` §4, `test/stays-holding.test.ts`).
+   * when none did (`test/stays-holding.test.ts`).
    *
    * OPTIONAL, as `used` is: a caller that cannot count keeps every value on a list that holds rows, which is the side of
    * the line where no later edit is refused `ENUM_VALUE_UNKNOWN`.
@@ -256,7 +256,7 @@ export type Installed = {
    *
    * WHAT DECIDES WHETHER A `hands` ENTRY IS HANDED OR RETIRED. money-core 1.8.0 handed all twelve HSBC Egypt doors on
    * every record that updated, so a record that had never seen an Egyptian bank ended with twelve live patterns under
-   * `bank-hsbc-eg`, a pack it never installed, reported as on (`loop/research-batch-thirty-four-audit.md` §8). A handover
+   * `bank-hsbc-eg`, a pack it never installed, reported as on. A handover
    * keeps what somebody relies on, a list's rows or the address his Shortcut posts to, and a door nobody used has none.
    *
    * OPTIONAL, as `detached` is: a caller that cannot say gets every entry handed, which is what `plan` did before it asked.
@@ -301,8 +301,8 @@ export type Diff = {
    * version satisfies that range, and `was` whether the version held now does. Reported here, and refused by `install`
    * as `PACK_REQUIRED` when this plan turns a true requirement false.
    *
-   * THE MIRROR OF `requires.packs`, which asks only what the pack being planned needs of the others. Measured on 23
-   * September: a record at money-core 1.8.0 holding bank-hsbc-eg 1.0.0 (`^1.8.0`) planned money-core 2.0.0 with nothing
+   * THE MIRROR OF `requires.packs`, which asks only what the pack being planned needs of the others. Measured: a
+   * record at money-core 1.8.0 holding bank-hsbc-eg 1.0.0 (`^1.8.0`) planned money-core 2.0.0 with nothing
    * unmet, installed it, and was left holding a pack whose requirement was false (`held-pack-range.test.ts`).
    *
    * EMPTY WHEN `Installed.packs` CARRIES NO `requires`, because there is no range to read.
@@ -339,7 +339,7 @@ export type Diff = {
    *
    * `by` IS THE MIRROR: `id` is a list the owner changed and kept, and `by` is a declaration this version stages that
    * reads `field` as the pack's list has it and the owner's does not (taken off, `retyped`, `relabelled`, or without
-   * `value`). The audit of batch twenty measured it on `fx.source`: a plan with no conflicts, then `FIELD_UNKNOWN`.
+   * `value`). Measured on `fx.source`: a plan with no conflicts, then `FIELD_UNKNOWN`.
    *
    * `changed` WITH `field` AND NOTHING ELSE is a list the owner added `field` to, and this version brings a field of its
    * own under the same id. Two fields cannot share an id, and the rows already written under the owner's would be read
@@ -347,8 +347,7 @@ export type Diff = {
    *
    * `handed` IS A DECLARATION ANOTHER PACK HANDED THIS ONE THAT THIS PACK'S FILE DOES NOT DECLARE, on its first install;
    * `pack` is this pack, which holds it already. Planned as this pack's own retire, it orphaned the rows of the list a
-   * stranger's `hands` had put under its name, or dropped an empty one without a word
-   * (`loop/research-batch-thirty-four-audit.md` §7, `handover-guards.test.ts`).
+   * stranger's `hands` had put under its name, or dropped an empty one without a word (`handover-guards.test.ts`).
    */
   conflicts: {
     id: string;
@@ -388,7 +387,7 @@ export type Diff = {
    *
    * `body` IS THE LIST AS IT WILL BE LIVE, as JCS text, for a list this pack owns: `install` stages it as the pack's body
    * of the list, in place of the file's, and the next update meets the value as the pack's and lays it back again while
-   * the list holds rows. Staged with no pack, as it was until audit forty-four's finding 2, it read as changed in the
+   * the list holds rows. Staged with no pack, as it once was, it read as changed in the
    * app, and every later update of the pack was filed for Decide as keeping the owner's edit. A list the owner added to
    * has no `body` here, because the value is laid into its `kept[].rebased`.
    */
@@ -404,15 +403,15 @@ export type Diff = {
    * and the list reads as the record's own from then on. The owning pack's next update keeps the additions through
    * `detached()` and `rebased`, the road the owner's own additions already take (`pack-extends.test.ts`).
    *
-   * NOT UNDER THE LIST'S OWN PACK, which audit forty-four's finding 2 was first answered with: staged under Portfolio,
+   * NOT UNDER THE LIST'S OWN PACK, which was the first answer tried: staged under Portfolio,
    * Portfolio's next minor planned Projects as a plain change and installed it without `domain`, under a row holding
    * one. `detached()` is the only thing a plan is handed that says which fields are the list's own, and only while the
-   * row has no pack. So that finding's other half, Decide saying a rebased list's update is not taken, is the
+   * row has no pack. So the other half, Decide saying a rebased list's update is not taken, is the
    * arranger's to fix: a `kept` entry with `rebased` is an update that installs.
    *
    * WHAT TURNING THE EXTENDING PACK OFF OR TAKING IT OUT DOES: NOTHING TO THE LIST. Its fields and values stay and are
-   * the record's own. Rows hold values in them, and a field taken off the rows that hold it is the break M2 measured for
-   * a value (`loop/research-shell-next.md`): an edit to a row's `note` refused over a field the edit never touched. A
+   * the record's own. Rows hold values in them, and a field taken off the rows that hold it is the break measured for
+   * a value: an edit to a row's `note` refused over a field the edit never touched. A
    * person who wants one gone takes it off the list, which asks the question a pack cannot, whether anything uses it.
    */
   extends: { id: string; adds: string[]; body?: string; refusal?: Refusal }[];
@@ -432,7 +431,7 @@ export type Diff = {
   /**
    * Every scheduled action that would leave the record: a `pull`, a `call` or a `poll`, with the host it
    * calls, how often, and the key it sends by label. `line` is the diff's own sentence for it, and it
-   * reads `CALLS OUT <host> · every <n> · grant "<label>"` (`04 §7`, `loop/DIRECTION.md` §0b).
+   * reads `CALLS OUT <host> · every <n> · grant "<label>"` (`04 §7`).
    */
   calls_out: {
     ingest: string;
@@ -544,7 +543,7 @@ export type Host = {
   reload: () => void;
   /**
    * Retire declarations. `by` is who, when the caller knows better than the host's own bound caller; a host writes the
-   * `declare` line under it, or under its bound caller when it is left out (`loop/research-batch-thirty-two-audit.md` §8).
+   * `declare` line under it, or under its bound caller when it is left out.
    */
   retire: (ids: readonly string[], by?: { actor: string; suggestion?: string }) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
@@ -993,7 +992,7 @@ const DEMANDS = ['required', 'required_when'];
  * A pack's `extends`, read: each list it lays fields and values on, or the refusal naming the part that is wrong.
  *
  * EVERY KEY IS ASKED FOR, AND ONE NOTHING READS IS REFUSED. The defect this key exists to close was a key that installed
- * and did nothing (M1), so `{ field: … }` for `fields`, or a list name without its kind, is a sentence and not a no-op.
+ * and did nothing, so `{ field: … }` for `fields`, or a list name without its kind, is a sentence and not a no-op.
  * What the list is like is not asked here, because only the record knows: `plan` asks it, and `install` refuses it.
  */
 function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>): Result<Record<string, Extension>> {
@@ -1438,13 +1437,13 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     }
     /* BUT ONE THIS PACK WROTE AND THE OWNER THEN CHANGED IS KEPT, and left out of what is staged. Both were `null` to the
        test below, so an owner who had moved one block on Money was refused every later money-core update, and the
-       refusal told them to retire their own Money page (`loop/research-pack-update-edited.md`). The superseded row says
+       refusal told them to retire their own Money page. The superseded row says
        whose the declaration was; a row somebody wrote from nothing has no such row and stays a conflict, because the
        pack's pages would then read a stranger's figure under their own name. */
     const edited = already.pack_id === null ? installed.detached?.[decl.id] : undefined;
     if (edited?.was === mine) {
       /* EXCEPT A LIST THIS VERSION CHANGES. Kept, it lacks whatever the update adds to it, and nothing else notices: the
-         checker's probe kept an edited `register.fx` under a version adding a `spread` field and a metric summing it, and
+         probe kept an edited `register.fx` under a version adding a `spread` field and a metric summing it, and
          the install went through with the metric summing a field the list did not have. The kernel took `sum: 'nosuch'`
          as well. One comparison with the body the edit started from closes it. */
       if (decl.kind !== 'register' || edited.body === decl.canonical) {
@@ -1452,8 +1451,8 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
         continue;
       }
       /* UNLESS ALL THE OWNER DID WAS ADD. The arm above locked a list against its pack for good the moment somebody added
-         a field to it: `loop/research-shell-seed.md` M1 measured `domains` on `register.things` refusing every later
-         portfolio that touched `things`, and §22 makes adding a field the ordinary way a record grows. An edit that is
+         a field to it: `domains` on `register.things` was measured refusing every later portfolio that touched
+         `things`, and adding a field is the ordinary way a record grows. An edit that is
          the body it started from plus fields and enum values that body lacks has nothing the update could undo, so the
          update's body is staged as the pack's and the additions are laid over it as the owner's row. */
       const over = rebased(edited.body, already.body, decl.body);
@@ -1492,7 +1491,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
     }
     if (already.body !== decl.canonical) {
       const rows = decl.id.startsWith('register.') ? (installed.rows[decl.id.slice('register.'.length)] ?? 0) : 0;
-      /* AND A VALUE IT TAKES OFF A CLOSED LIST THAT HOLDS ROWS IS LAID BACK, after the update's own (M2). Taken off, a row
+      /* AND A VALUE IT TAKES OFF A CLOSED LIST THAT HOLDS ROWS IS LAID BACK, after the update's own. Taken off, a row
          holding it could not be edited at all: People 2.0.0 without `registrar` planned clean, and the next edit to that
          row's `note` was `ENUM_VALUE_UNKNOWN` over a field the edit never touched (`update-keeps-value.test.ts`). */
       /* AND ON A LIST WITH NO LIVE ROWS, WHEN THE RECORD CAN COUNT, because a row in the bin holds its values too. */
@@ -1533,8 +1532,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
        goes to, and `pack` in its body says the same thing, because the kernel reads the same bytes as the same version
        and keeps the owner it had: a restage of the unchanged body left money-core owning the list. The line still sits
        among the retires, since this pack no longer declares it, and names where it went, which is what the owner reads:
-       the plan he approved for money-core 1.8.0 said twelve ingests retire and never which pack to install for them
-       (`loop/research-batch-thirty-two-audit.md` §3). */
+       the plan he approved for money-core 1.8.0 said twelve ingests retire and never which pack to install for them. */
     /* BUT ONLY TO A PACK THE RECORD DOES NOT HAVE YET. Handed to an installed pack whose file does not declare it, the
        list sat under that pack's name and every later update of it, a reinstall of the same file included, was
        `WOULD_ORPHAN` (`handover.test.ts`), so one pack's `hands` could stop another from ever updating. Taking over
@@ -1556,12 +1554,12 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
   /* A DOOR GOES WHERE THE PATTERNS NAMING IT GO. money-core's plan handed `ingest.bank-ipn-in-sms`, which names `door:
      bank-from-out-sms`, and retired the door, since it held no token and filed nothing: every text reached it through
      the pattern. So the handed pattern arrived naming a door that was gone, the declaration the kernel's `doorFault`
-     refuses at install (`loop/research-batch-forty-two-audit.md` finding 4 (c), `door-follows-patterns.test.ts`). The
+     refuses at install (`door-follows-patterns.test.ts`). The
      door is handed to the pack its pattern goes to, whatever `used` says of the door itself. */
   /* BUT ONLY WHERE `hands` SENDS THE DOOR THERE TOO. Handed to whichever pack a pattern went to, `banky` 1.1.0 handing only
      `ingest.bank-twin` to `teller` handed `teller` its `ingest.bank-door` as well, and `teller` 1.0.0, which names a door
      of its own, was then the `{ handed: true }` conflict `install` refuses, and could not install at all
-     (`loop/research-batch-forty-seven-audit.md` finding 4, `hands-names-door.test.ts`). Two patterns going to two packs
+     (`hands-names-door.test.ts`). Two patterns going to two packs
      left the door with whichever was read last. Where `hands` says nothing of the door, or names another pack, the door
      is not handed here, and `installFault` tells the author the line to add (`handsDoorFault`). */
   const doorsTo = new Map<string, Set<string>>();
@@ -1608,7 +1606,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
      still drawing that tile. The conflict above hid it until now. Every edit of this pack's declarations is asked, kept
      or not shipped any more, because the owner's page reads the figure either way. */
   /* AND ONE THAT READS A FIELD THIS VERSION TAKES OFF A LIST THAT STAYS, which the loop above could not see because the
-     list is not gone. The checker of `9b0d8184` measured it: an edited `spent-30d`, a money-core without `transfer`, a
+     list is not gone. A review of `9b0d8184` measured it: an edited `spent-30d`, a money-core without `transfer`, a
      plan with no conflicts, and then `FIELD_UNKNOWN` on every read of the figure, because its `where` still says
      `transfer is false`. A retyped field is the same failure one step later: a sum over a field that is now text. */
   const moved = new Map<string, { fields: Map<string, Record<string, unknown>>; moved: Moved[] }>();
@@ -1651,7 +1649,7 @@ export async function plan(given: Pack, installed: Installed): Promise<Diff> {
 
   /* AND THE MIRROR: A LIST THE OWNER CHANGED AND THIS VERSION KEEPS, read by something this version stages. The loop above
      asks the owner's declarations about the pack's lists and never the pack's declarations about the owner's list. The
-     audit of batch twenty measured the gap on a real record: the owner retired `fx.source`, the update added a figure
+     gap was measured on a real record: the owner retired `fx.source`, the update added a figure
      counting it, the plan said no conflicts, and the figure answered `FIELD_UNKNOWN` on every read. A kept list's pack
      body is the one the edit started from (a changed one is the conflict above), so the difference between the two is
      exactly what the owner did, and only what this version stages is asked: a pack declaration it leaves as it was was
@@ -2153,7 +2151,7 @@ const counts = (back: { holding?: Record<string, number>; binned?: Record<string
  *
  * ONLY A VALUE A ROW HOLDS, when `holders` can count them (`Installed.holding`), a deleted row included, and `holding`
  * and `binned` are those counts for each one laid back. A value no row holds goes, which is what the update asked; laid
- * back on the list's row count alone, three Family rows kept Agency on Personal's People (audit forty-eight, §4).
+ * back on the list's row count alone, three Family rows kept Agency on Personal's People.
  * `rows` is the live count, and a list with none keeps a value only where the record counted a holder in the bin.
  *
  * ONLY ON A FIELD THAT IS STILL A CLOSED LIST OF THE SAME TYPE. A field the update takes off or retypes is `retypes`'
@@ -2542,8 +2540,8 @@ function misreadsOf(pack: Pack, installed: Installed, unstaged: ReadonlySet<stri
       if (!SENTENCE_KINDS.has(reader.kind) || gone.has(reader.id)) continue;
       const theirs = sent.get(reader.id);
       /* A READER THIS VERSION REWRITES IS ASKED IN THE WORDS IT SENDS, as `stranded` now asks it. Skipped as "the
-         update's own", a figure renamed with its words kept planned clean and the kernel refused it at staging
-         (`loop/research-batch-thirty-six-audit.md` §1), so the owner met the refusal after the press. */
+         update's own", a figure renamed with its words kept planned clean and the kernel refused it at staging, so the
+         owner met the refusal after the press. */
       let body: Record<string, unknown>;
       if (theirs !== undefined && !unstaged.has(reader.id) && theirs.canonical !== reader.body) body = theirs.body;
       else
@@ -2735,8 +2733,8 @@ function warningsOf(pack: Pack): { at: string; say: string }[] {
  * The refusal `install` gives this plan before it stages anything, other than a conflict, a stale plan or an approval,
  * or `null`. It is for the arranger to ask of every pack it files, so no plan is filed that the accept then refuses.
  *
- * ONE LIST, AND `install` READS IT TOO. `planAll` asked `unresolvedFault` and `conflictFault` and neither of the refusals
- * wave forty-four added, `dependents` and `extends[].refusal`, so audit forty-four's finding 3 filed an arrangement that
+ * ONE LIST, AND `install` READS IT TOO. `planAll` asked `unresolvedFault` and `conflictFault` and neither of the later
+ * refusals, `dependents` and `extends[].refusal`, so it filed an arrangement that
  * the accept refused `PACK_REQUIRED`, and one laying `domain` twice that it refused `PROVIDES_CONFLICT` half-way through
  * (`plan-all-refusals.test.ts`). Kept in one function, what the arranger asks and what the install refuses cannot drift.
  */
@@ -2751,7 +2749,7 @@ export function installFault(pack: Pack, diff: Diff): Refusal | null {
  *
  * THE AUTHOR'S TO SAY, NOT THE PLAN'S TO GUESS. The plan handed such a door with its pattern unasked, and the receiver's
  * first install then met a declaration its file did not declare, `{ handed: true }`, which `install` refuses
- * (`loop/research-batch-forty-seven-audit.md` finding 4). Left to retire, the pattern arrives under its new pack naming a
+ * (`hands-names-door.test.ts`). Left to retire, the pattern arrives under its new pack naming a
  * door that is gone, which the kernel's `doorFault` refuses. Either way the file is what is wrong, and one line fixes it,
  * so the line is what is said. `DECLARATION_INVALID` at `hands.<pattern>`, since it is `hands` that reads wrong.
  */
@@ -2933,7 +2931,7 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
     );
 
   /* A TEXT SETTING IS A VALUE A PERSON CHOSE AFTER `normalise` LOOKED, so the colour rule is asked again of every body a
-     setting filled. It sat in `install` after the approvals until the checker of this list found `installFault` answering
+     setting filled. It sat in `install` after the approvals until a review of this list found `installFault` answering
      `null` for a chosen `shade: '#ff00aa'` that the accept refused (`plan-all-refusals.test.ts`). */
   const filled = filledWith(pack, diff.config);
   for (const d of filled.declarations) {
@@ -2957,7 +2955,7 @@ export type StagedDeclaration = { id: string; kind: string; body: Json; pack?: s
  *
  * LIFTED OUT OF `install` SO THE ARRANGER LINTS WHAT IS STAGED. `planAll` linted each pack's file bodies, and only when
  * pages rode along, so an arrangement of two packs the kernel would not hold together was filed and the accept installed
- * the first and refused the second (`loop/research-batch-forty-seven-audit.md` finding 1). The file is not the batch: a
+ * the first and refused the second. The file is not the batch: a
  * kept value's body, a rebased list, a handover and what `extends` lays are all staged in its place or beside it.
  */
 export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
@@ -2985,7 +2983,7 @@ export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
      next update drops what was laid (`Diff['extends']` says what was measured). */
   const laid = diff.extends.flatMap((e) => (e.body === undefined ? [] : [{ id: e.id, kind: 'register', body: JSON.parse(e.body) as Json }]));
   /* AND A VALUE THAT STAYS ON A LIST THIS PACK OWNS IS STAGED AS THE PACK'S BODY OF IT, in place of the file's. Staged with
-     no pack after the file's, as it was until audit forty-four's finding 2, the list read as changed in the app from
+     no pack after the file's, as it once was, the list read as changed in the app from
      then on: People 2.1.0 was planned as `kept` with a rebased body, and Decide said "Keeps People as you changed it.
      This update's version of it is not taken" of an update nobody's edit stood in and that installed its `pronouns`.
      Under the pack, the next update meets the value as the pack's and `laidBack` keeps it again while rows are there. */
@@ -3003,7 +3001,7 @@ export function stagedBatch(pack: Pack, diff: Diff): StagedDeclaration[] {
  * written: it is `installed` with what `install` stages laid on it, in `install`'s order, and what it retires taken out.
  *
  * WHAT THE ARRANGER CARRIED FORWARD WAS EACH PACK'S FILE AND `{ id, version }`, so the pack after it was planned against
- * a record the one before would not leave (audit forty-four, finding 3). Without `requires`, `base` 2.0.0 after `leaf`
+ * a record the one before would not leave. Without `requires`, `base` 2.0.0 after `leaf`
  * 1.1.0 read no range and planned clean where it would have been refused; without what `extends` laid, a second pack
  * laying `domain` on the same list was planned against a list with no `domain`, filed, and refused half-way at accept.
  *
@@ -3066,7 +3064,7 @@ export function plannedState(installed: Installed, pack: Pack, diff: Diff): Inst
  *
  * TWO WAITS, AND THE ORDER GIVEN OTHERWISE. A pack waits for one whose update it needs, where the held version does not
  * meet its range and the coming one does. And a pack waits for a held pack that leans on it when its own update breaks
- * that pack's range and that pack's update takes it: audit forty-four measured `base` 2.0.0 then `leaf` 1.1.0 filed and
+ * that pack's range and that pack's update takes it: measured, `base` 2.0.0 then `leaf` 1.1.0 filed and
  * refused `PACK_REQUIRED` at accept, and the same two the other way round installed. A pack both would have to wait
  * for is a pair no order installs, and is left in the order given, where `installFault` names the refusal.
  */
@@ -3154,7 +3152,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   const fault = installFault(pack, diff);
   if (fault) return { ok: false, refusal: fault };
 
-  /* WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS, OR NOTHING IS ARMED (`loop/research-scheduled-actions.md` §5).
+  /* WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS, OR NOTHING IS ARMED.
      A new action, or a new host, key or field on one, installs only beside the exact lines the plan printed for it.
      An action that is the same as the installed one was approved already and asks for nothing. Nothing is written
      before this, so a missing or different approval leaves the record as it was, the rest of the pack included. */

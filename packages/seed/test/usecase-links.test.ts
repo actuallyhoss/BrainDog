@@ -50,7 +50,7 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
   assert.ok(counted > 0);
   assert.deepEqual(exampleLinks('usecase-guide'), exampleLinks('guide'));
   assert.deepEqual(exampleLinks('business'), []);
-  /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0 (C11), so nothing of theirs links. */
+  /* PERSONAL AND STUDENT CARRY NO EXAMPLE ROW SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0, so nothing of theirs links. */
   assert.deepEqual(exampleLinks('personal'), []);
   assert.deepEqual(exampleLinks('student'), []);
 });

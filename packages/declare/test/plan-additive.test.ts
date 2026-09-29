@@ -1,11 +1,10 @@
 /**
- * A field an owner or an agent added to a pack's list, and the pack's next version that changes the same list
- * (`loop/research-shell-seed.md` M1 and brief A, `loop/research-shell-schema.md` B4, `loop/DIRECTION.md` §22).
+ * A field an owner or an agent added to a pack's list, and the pack's next version that changes the same list.
  *
- * EVERY LATER UPDATE OF THE LIST WAS REFUSED. The checker's run through `createRecordApi`: every first-party pack
+ * EVERY LATER UPDATE OF THE LIST WAS REFUSED. A run through `createRecordApi`: every first-party pack
  * installed, `domains` appended to `register.things` by `setDeclaration`, then portfolio one minor step up with a
  * `launched` field of its own. The plan answered `conflicts [{"id":"register.things","pack":"(this record)","changed":
- * true}]` and the install `PROVIDES_CONFLICT`, "leave portfolio at 1.4.0". §22 says adding a field is the ordinary way a
+ * true}]` and the install `PROVIDES_CONFLICT`, "leave portfolio at 1.4.0". Adding a field is the ordinary way a
  * record grows, so one added field locked the list's pack for good.
  *
  * SO AN EDIT THAT ONLY ADDS IS REBASED. When the owner's list is the body the edit started from plus fields and enum
@@ -14,8 +13,8 @@
  * the update brings under the owner's own name all stay conflicts.
  *
  * THE FIRST TEST IS THE RECORD'S OWN PATH, not a hand-built `Installed`: a probe that wrote the edited row without the
- * superseded pack row reached the "written from nothing" arm and quoted the wrong refusal, which is how the first draft
- * of M1 came to be wrong.
+ * superseded pack row reached the "written from nothing" arm and quoted the wrong refusal, which is how the first
+ * account of this lock came to be wrong.
  */
 
 import { test } from 'node:test';
@@ -91,7 +90,7 @@ test('a field added to Projects through setDeclaration survives a portfolio upda
   const row = k.get(made.id)!;
   assert.deepEqual([row.fields.domains, row.fields.launched], [['acme.example'], '2026-09-01']);
 
-  /* AND THE ONE AFTER THAT, which is the lock M1 measured: not one update let through, every update. */
+  /* AND THE ONE AFTER THAT, which is the lock measured: not one update let through, every update. */
   const again = portfolio(2, [LAUNCHED, { id: 'stage', type: 'text' }]);
   const second = said<{ diff: Diff }>(await api.planPack({ doc: again, source: { kind: 'local' } } as never, owner));
   assert.deepEqual(second.diff.conflicts, []);
@@ -219,7 +218,7 @@ test('an owner who took a field off, retyped one or renamed the list is still re
   }
 });
 
-/* THE TWO GUARDS A REBASE STILL OWES THE ROWS AND THE OWNER'S PAGES. The checker of this change removed each in turn and
+/* THE TWO GUARDS A REBASE STILL OWES THE ROWS AND THE OWNER'S PAGES. A review of this change removed each in turn and
    the five tests above stayed green, so a rebase that forgot either would have gone through unnoticed. */
 
 test('a field the update retypes under rows is still a retype when the owner only added to the list', async () => {

@@ -7,6 +7,6 @@ tamper: not-brainl
 
 # `not-brainl` IS A SEVENTH VERB, AND `40 §6` LISTS SIX. The verb replaces the `#dogl` header with
 # the start of an HTML page, which is what a download saves when the link it followed answered with
-# an error page. `truncate`, cutting the last line mid-row, was proposed for this code and measured
-# on 22 September 2026: the last line of a signed export is its `dog_sig` row, which no manifest
+# an error page. `truncate`, cutting the last line mid-row, was proposed for this code and measured:
+# the last line of a signed export is its `dog_sig` row, which no manifest
 # hashes, so the import answers `SIGNATURE_INVALID` at `dog_sig` before any reader parses a row.

@@ -1,9 +1,9 @@
 /**
  * A pack update that opens a closed list to text, planned over a figure whose words only the closed list could read.
  *
- * THE BACKLOG SAID THE KERNEL REFUSES THIS AT INSTALL AND ONLY THE PLAN WAS SILENT. Measured, the pack path refuses
+ * IT WAS THOUGHT THE KERNEL REFUSES THIS AT INSTALL AND ONLY THE PLAN WAS SILENT. Measured, the pack path refuses
  * nothing either. `stranded` (`837b01c7`) parses each reader's sentence against the list as it stands and again with
- * only the opened fields changed, and refuses a word that moves (`loop/research-batch-thirty-four-audit.md` §1), but
+ * only the opened fields changed, and refuses a word that moves, but
  * only `install` and a filed change ask it: `installPack` stages through `stageInstall`, which runs `unreadable` and
  * `lintBatch` and stops there. `mini` 1.0.0 to 1.1.0 through the record's own `planPack` and `installPack`, three
  * projects one per lane: the plan named no retype and no conflict, the install answered ok, and `lane is earning money`

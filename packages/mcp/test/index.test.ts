@@ -171,7 +171,7 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
   sql.close();
 });
 
-test('THE SURVEY WAS RIGHT ABOUT BOTH: credentials is not a tool, and skill is a template that needs a name', async () => {
+test('CREDENTIALS IS NOT A TOOL, and skill is a template that needs a name', async () => {
   /* A vault tool could only ever refuse, because the vault needs a person in a browser and an agent
      holding a token is neither, and a tool that always refuses is a tool an agent spends its turns
      discovering. A skill is read by name at `braindog:skill/<name>`, and a template is fetched when

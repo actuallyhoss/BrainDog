@@ -1,5 +1,5 @@
 /**
- * `ctx.update`'s version, as the prelude hands it to the host: audit thirty-four, finding 6.
+ * `ctx.update`'s version, as the prelude hands it to the host.
  *
  * THE RECORD'S WRITE PATH HAS TWO ANSWERS FOR A VERSION: a whole number is compared with the row's, and no version
  * writes without comparing. The prelude used to send `Number(version)` whatever came in, so a missing version crossed

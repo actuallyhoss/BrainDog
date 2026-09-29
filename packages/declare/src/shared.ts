@@ -1,5 +1,5 @@
 /**
- * A use case as a file somebody hands to somebody else (`loop/research-spark.md` §5, S14).
+ * A use case as a file somebody hands to somebody else.
  *
  * WHAT GOES OUT. `exportUseCase` builds the file from the parts of a record's arrangement a person chose to share: the
  * modules it builds on, its own lists and pages, its voice and labels, and the example rows they picked. It never

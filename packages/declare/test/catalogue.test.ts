@@ -237,7 +237,7 @@ test('a signed version verifies on fetch, a tampered index does not, and later v
   assert.equal(trustOf(known, 'Halden', { ...v.signature!, key_id: other.key_id }).kind, 'changed');
 });
 
-/* ── PLT-2: what a marketplace shows (loop/finish/platform.md §4.0 C) ────── */
+/* ── what a marketplace shows ───────────────────────────────────────────── */
 
 const codeOf = (r: unknown): string | null => {
   const x = r as { ok: boolean; refusal?: { code: string } };

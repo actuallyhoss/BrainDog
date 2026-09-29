@@ -1,12 +1,12 @@
 /**
- * Small business: the first-party setup onboarding made before use cases existed (`loop/research-spark.md` §4).
+ * Small business: the first-party setup onboarding made before use cases existed.
  *
  * IT CARRIES NO LIST. Its modules are whichever first-party packs the sentence names, which is what onboarding
  * already did, and it speaks in the house voice but for three lines of Home that name what a business is owed and
- * owes (PGS-24). It is in the catalogue so the arranger can say "this reads like a business" as plainly as it says
+ * owes. It is in the catalogue so the arranger can say "this reads like a business" as plainly as it says
  * "student".
  *
- * ITS PACK IS ONE PAGE, ITS HOME, SINCE 1.2.0 (MOD-18). Money's own Home retired with money-core 3.0.0, and a record
+ * ITS PACK IS ONE PAGE, ITS HOME, SINCE 1.2.0. Money's own Home retired with money-core 3.0.0, and a record
  * whose use case declares no `home-<id>` falls back to the house Home, which leads with nothing a business asks
  * first. Because its modules are whatever the sentence named, the page reads only what the record answers across
  * every list it holds (`figures.home`, `deadlines`, `governance.open`, `sessions.live`, `activity`), and so installs
@@ -32,8 +32,7 @@ export const BUSINESS_EXAMPLES = [
 /**
  * THE SUMMARY IS SAID IN WORDS ITS OWN SIGNALS HOLD, because an owner who types a card's words back has chosen it.
  * "What you are owed and what you owe, what you run on, the people involved and the work." heard no signal of any use
- * case, so the first run proposed nothing for the card the owner had just read (`loop/research-batch-forty-seven-audit.md`
- * §6); typed back now, it hears clients, hosting and subscriptions, and no other card hears a word of it
+ * case, so the first run proposed nothing for the card the owner had just read; typed back now, it hears clients, hosting and subscriptions, and no other card hears a word of it
  * (`test/card-summary-proposes-itself.test.ts`). The summary moved and the signals did not: with "owed" as a signal,
  * "track what my brother owed me for the holiday", which proposes nothing today, proposed Small business (measured).
  * Neither is in a pack, since Small business carries none, so the version stays.
@@ -41,7 +40,7 @@ export const BUSINESS_EXAMPLES = [
 export const BUSINESS = {
   usecase: 'business',
   /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step.
-     1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them (PGS-24), each a new setting a
+     1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them, each a new setting a
      person can change at /packs. */
   version: '1.3.1',
   title: 'Small business',

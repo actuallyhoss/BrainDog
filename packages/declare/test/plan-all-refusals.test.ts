@@ -1,10 +1,9 @@
 /**
- * An arrangement planned pack by pack, each against the record as the ones before it leave it
- * (`loop/research-batch-forty-four-audit.md` finding 3).
+ * An arrangement planned pack by pack, each against the record as the ones before it leave it.
  *
  * THE ARRANGER FILED WHAT THE ACCEPT REFUSED, HALF-WAY. `planAll` in `@braindog/record` asked each pack `unresolvedFault`
  * and `conflictFault`, and neither `dependents` nor `extends[].refusal`, and carried `{ id, version }` and the pack's
- * file forward as the state the next pack is planned against. The audit measured, through `propose` and `decide`:
+ * file forward as the state the next pack is planned against. Measured through `propose` and `decide`:
  *
  *     base 2.0.0, leaf 1.1.0     filed   accept PACK_REQUIRED "leaf 1.0.0 needs base ^1.0.0 ... Update leaf ... first"
  *     leaf 1.1.0, base 2.0.0     filed   accept ok
@@ -51,7 +50,7 @@ const list = (id: string) => ({ register: id, name: id, title: 'name', fields: [
 const BASE = (version: string) => doc('base', version, {}, { declarations: [list('bases')] });
 const LEAF = (version: string, range: string) => doc('leaf', version, { base: range }, { declarations: [list('leaves')] });
 
-/** base 1.0.0 and leaf 1.0.0 on `^1.0.0`, as `arrange-held.mts` held them. */
+/** base 1.0.0 and leaf 1.0.0 on `^1.0.0`, as the probe held them. */
 async function held(): Promise<Installed> {
   const rows: Installed['declarations'] = [];
   for (const [p, id] of [
@@ -108,7 +107,7 @@ test('a leaf that needs the new base waits for it, and a pair no order installs 
 });
 
 /*
- * A COLOUR A SETTING PUTS INTO A BODY IS ONE MORE REFUSAL THE DIFF ALONE DECIDES. The checker of this change found it
+ * A COLOUR A SETTING PUTS INTO A BODY IS ONE MORE REFUSAL THE DIFF ALONE DECIDES. A review of this change found it
  * left in `install` after the approvals, so `installFault` answered `null` for a pack whose chosen `shade: '#ff00aa'`
  * the accept then refused `COLOUR_OUTSIDE_THEME` (`config.test.ts` drives the install half).
  */

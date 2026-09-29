@@ -1,6 +1,6 @@
 /**
- * A catalogue of shared use cases and add-ons: the local, file-shaped seed of the add-on index
- * (`loop/research-marketplace.md` §2, S12, and §3's `publish`, `search`, `version` and `diff`).
+ * A catalogue of shared use cases and add-ons: the local, file-shaped seed of the add-on index, with its `publish`,
+ * `search`, `version` and `diff`.
  *
  * A CATALOGUE IS A FOLDER OF FILES, never a service. `index.json` names every entry and its versions, and each version is
  * the file itself, kept byte for byte as it was published: a use case at `usecases/<id>/<version>.usecase.json`, an add-on
@@ -21,7 +21,7 @@
  * version may carry its author's signature (`signing.ts`); one that does is verified on every fetch, and a reader says
  * which key signed it, or that nothing did.
  *
- * WHAT A MARKETPLACE SHOWS IS WORKED OUT, NOT WRITTEN (`loop/finish/platform.md` §4.0 C). An entry's categories come
+ * WHAT A MARKETPLACE SHOWS IS WORKED OUT, NOT WRITTEN. An entry's categories come
  * from what its file declares (`categoriesOf`), its publisher from who the catalogue knows published it, a version's
  * notes from the file's own `changes`, and a preview of its pages from the record's own answer in a scratch record
  * (`tools/catalogue/from-packs.mjs`), never from an author's screenshot. A pack whose manifest says `unlisted: true`
@@ -97,7 +97,7 @@ const ID = /^[a-z][a-z0-9-]{0,62}$/u;
 /**
  * THREE NUMBERS WITH NO LEADING ZERO. `01.0.0` read as 1.0.0 and was a different string, so an index could list one
  * version twice under two spellings: `publishTo` let it in beside 1.0.0, and the check for an unsigned version after
- * signed ones skipped the signed twin as not earlier (defects S13).
+ * signed ones skipped the signed twin as not earlier.
  */
 const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/u;
 
@@ -175,7 +175,7 @@ export type CatalogueEntry = {
 
 /**
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
- * stays lenient and reads what it knows. `unlisted` is decisions.md C41's flag: a pack named for one person or one bank.
+ * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
  */
 export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'hands', 'adds', 'note', 'unlisted'] as const;
 
@@ -558,7 +558,7 @@ export function readCatalogue(doc: unknown): Result<CatalogueIndex> {
       if (v.signature !== undefined && !isSignature(v.signature))
         return bad(`entries[${i}].versions`, `A version of ${str(e.id)} in this catalogue carries a signature that is not one.`);
       /* ONE LISTING PER VERSION. A second one beside a signed version could be the unsigned twin a reader is handed, so
-         an index that lists a version twice is not read at all (defects S13). */
+         an index that lists a version twice is not read at all. */
       if (versions.some((w) => w.version === v.version))
         return bad(`entries[${i}].versions`, `${str(e.id)} ${str(v.version)} is listed twice in this catalogue, and a version is published once.`);
       versions.push(versionRead(v));
@@ -607,7 +607,7 @@ export const revokedNotice = (statements: KeyStatements, title: string, version:
  *
  * AN EQUAL VERSION IS NOT A NEWER ONE. When the entry lists `version` more than once, which `readCatalogue` refuses and
  * only an entry built by hand can hold, every signed twin counts as before it, so an unsigned twin of a signed version
- * is said as stripped rather than passed (defects S13). A version listed once never counts its own signature.
+ * is said as stripped rather than passed. A version listed once never counts its own signature.
  */
 export async function keysSignedBefore(entry: Pick<CatalogueEntry, 'kind' | 'id' | 'versions'>, version: string): Promise<string[]> {
   const keys: string[] = [];
@@ -723,7 +723,7 @@ export async function publishTo(
         : `${title} ${s.version} is already in this catalogue, and a published version never changes. Publish this file as a later version.`,
       { at: 'version' },
     );
-  /* AN EQUAL VERSION IS NOT A LATER ONE, however it is spelled (defects S13). */
+  /* AN EQUAL VERSION IS NOT A LATER ONE, however it is spelled. */
   if (was && compareVersions(s.version, was.latest) <= 0)
     return no('ALREADY_KNOWN', `${title} ${was.latest} is already in this catalogue, so this file needs a later version than ${s.version}.`, { at: 'version' });
 

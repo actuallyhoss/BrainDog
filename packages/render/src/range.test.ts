@@ -1,6 +1,5 @@
 /**
  * The figures a `progress range` draws that it computed itself: the total line, and the one scale every row sits on
- * (`loop/research-audit-2026-09-25-layouts.md` findings 4 and 10).
  *
  * WHAT WAS MEASURED BEFORE ANY OF THIS WAS WRITTEN. The total took the first cell of each column as its template and
  * rounded the sum to that cell's decimals, so rows of 100, 0.4 and 0.4 drew a total of 101, and the launch desk's
@@ -60,7 +59,7 @@ const row = (spent: string, low: string, high: string) => ({ spent, low, high })
 /* ── the total ────────────────────────────────────────────────────────────── */
 
 test('THE TOTAL IS DRAWN TO THE PLACE OF ITS FINEST FIGURE, not rounded to whichever row came first', () => {
-  /* The audit's case C: a whole first row and two lines of 0.4. It drew 101, 101 and 201. */
+  /* A whole first row and two lines of 0.4. It drew 101, 101 and 201. */
   assert.deepEqual(rangePlan([row('100', '100', '200'), row('0.4', '0.4', '0.4'), row('0.4', '0.4', '0.4')]).total, { spent: '100.8', low: '100.8', high: '200.8' });
 
   /* THE LAUNCH DESK'S OWN LINES, as its Numbers page wrote them. It drew `181 spent 251 to 421`. */
@@ -84,7 +83,7 @@ test('THE TOTAL KEEPS ITS SIGN, ITS GROUPING AND ITS EMPTY ROWS under the new ar
 /* ── one scale, one unit ──────────────────────────────────────────────────── */
 
 test('MONEY BESIDE PLAIN NUMBERS IS REFUSED WITH A SENTENCE, never drawn on one scale', () => {
-  /* The audit's case A: money spent, and the low and the high written as pence in int fields. */
+  /* Money spent, and the low and the high written as pence in int fields. */
   const mixed = rangePlan([row('£120.50 GBP', '10,000', '30,000'), row('£50.00 GBP', '4,000', '8,000')]);
   assert.equal((mixed as { refused?: string | null }).refused, RANGE_MIXED);
   assert.deepEqual(
@@ -101,7 +100,7 @@ test('MONEY BESIDE PLAIN NUMBERS IS REFUSED WITH A SENTENCE, never drawn on one 
     ['£50.00 GBP spent', '4,000 to 8,000'],
   ]);
   assert.deepEqual(mixed.total, { spent: MISSING, low: MISSING, high: MISSING });
-  /* NOR IS A ROW CALLED OVER BY COMPARING THE TWO UNITS. Checked by the checker after the repair: `£120.50` beside a high
+  /* NOR IS A ROW CALLED OVER BY COMPARING THE TWO UNITS. Checked after the fix: `£120.50` beside a high
      of 100 still came back `bad`, 120.5 read against 100 plain, while 10,000 pence would have been under. A tone the host
      wrote still wins. */
   const across = rangePlan([row('£120.50', '50', '100'), { ...row('£1.00', '50', '100'), tone: 'warn' }]);

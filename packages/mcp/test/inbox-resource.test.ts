@@ -1,12 +1,12 @@
 /**
- * The inbox as a resource: `braindog:inbox` and `braindog:inbox/{state}` (`loop/research-legacy-keeps.md` section 8, K1).
+ * The inbox as a resource: `braindog:inbox` and `braindog:inbox/{state}`.
  *
  * WHAT WAS MEASURED BEFORE ANY OF THIS. `resources/read braindog:inbox` answered `ROUTE_UNKNOWN` over the wire, and MCP
  * had no inbox verb at all. The tool list is at its ceiling (`budget.test.ts`), and a resource costs it nothing, so the
  * inbox is two addresses and no tool.
  *
  * THE TOOL LAYER DECIDES NOTHING. Who may read the inbox is the record's call: today the owner, and every token refused
- * (his pick P2 is whether that changes). An agent asking is answered with the record's own sentence, word for word, and
+ * (whether that changes is an open question). An agent asking is answered with the record's own sentence, word for word, and
  * the address is not listed to a caller it would refuse.
  */
 
@@ -27,7 +27,7 @@ const agent: CallContext = {
   session: { host: 'kiln-mbp', repo: 'kiln', agent: 'claude' },
 };
 
-/** One skipped text between two untriaged ones, as K1's red run asked for. */
+/** One skipped text between two untriaged ones, as the first red run asked for. */
 async function record() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
@@ -81,7 +81,7 @@ test('braindog:inbox/skipped ANSWERS WHAT WAS SKIPPED, which is where a wrong sk
 test("AN AGENT IS ANSWERED WITH THE RECORD'S OWN SENTENCE, and the address is not listed to it", async () => {
   const { sql, api } = await record();
   const direct = await api.inbox(undefined, agent);
-  assert.ok(!direct.ok && 'refusal' in direct, 'the record let a token read the inbox; P2 has been picked, and this test is stale');
+  assert.ok(!direct.ok && 'refusal' in direct, 'the record let a token read the inbox; if tokens may now read it, this test is stale');
   for (const uri of ['braindog:inbox', 'braindog:inbox/skipped']) {
     const no = refusalOf(await readOver(api, uri, agent));
     assert.equal(no.code, 'FORBIDDEN');

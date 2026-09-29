@@ -1,14 +1,14 @@
 /**
- * `answer`: Slash's job for an automation's `ask_slash` step (`loop/research-infer-ask.md` §4, Brief B).
+ * `answer`: Slash's job for an automation's `ask_slash` step.
  *
  * WHY THIS FILE EXISTS. The kernel queues an `infer.ask` row with the rule's question, the shape it wants and the `about:`
  * fields of the run's row, and holds whatever comes back to that shape (`packages/kernel/src/flow.ts`, `ask` and
  * `answerStep`). Nothing in this package could answer it: `PromptId` had three jobs, `core.run` always sent `SYSTEM`,
  * whose rule 1 is "Never type a digit" and whose rule 2 demands a citation, and nothing wrote a `call` row for the
  * question, so a clock rule at the fifteen-minute floor would have been 96 model calls a day on the owner's key with
- * `status()` reading 0 (§3 items 2 and 3).
+ * `status()` reading 0.
  *
- * RED BEFORE THE BUILD, measured on 23 September: nine of nine failed, the first on "createSlash has no answer" and the
+ * RED BEFORE THE BUILD: nine of nine failed, the first on "createSlash has no answer" and the
  * other eight on `slash.answer is not a function`, because `createSlash` returned `read`, `propose`, `proposePattern`,
  * `configure` and `status` and nothing else.
  *
@@ -202,7 +202,7 @@ test('(6) A MODEL THAT DID NOT ANSWER IS UNREACHABLE, with one settled row and n
       [['read', 'error', 'UNREACHABLE']],
     );
     /* AND IT IS NOT AN ASK. `answer` settles an `UNREACHABLE` row under `-`, which `asksUsed` passes over, so a host
-       retrying through an outage does not spend the cap (`loop/research-batch-forty-two-audit.md` finding 6). This read
+       retrying through an outage does not spend the cap. This read
        1 before that change and reads 0 after it. Under `-` the row carries the prompt estimate in `tokens_in` and no
        neurons, since `MODELS` has no rate for `-`. */
     assert.equal(slash.status().asks.used, 0);
@@ -255,9 +255,9 @@ test('an ask the kernel could not have sent is refused before a hold is written 
   }
 });
 
-/* THE PAYLOAD THE KERNEL QUEUES TODAY CARRIES NO `rule` (`flow.ts` `ask()` enqueues `run`, `step`, `question`, `shape`,
-   `choices`, `about`), and Brief A adds it. Deleting the rule check in `malformed` left every other case here green on 23
-   September, so this is the case that holds it: answered, the ledger row would read `rule.undefined step 2`. */
+/* THE PAYLOAD AN OLDER KERNEL QUEUED CARRIED NO `rule` (`flow.ts` `ask()` enqueued `run`, `step`, `question`, `shape`,
+   `choices`, `about`), and a newer one adds it. Deleting the rule check in `malformed` left every other case here green,
+   so this is the case that holds it: answered, the ledger row would read `rule.undefined step 2`. */
 test('A JOB WITH NO RULE, OR A STEP THAT IS NOT A COUNT, is refused before a hold is written or a model is called', async () => {
   const { sql, inference, slash, rows } = build();
   try {
@@ -275,7 +275,7 @@ test('A JOB WITH NO RULE, OR A STEP THAT IS NOT A COUNT, is refused before a hol
 });
 
 /* A BLANK SENTENCE FITS `{ type: 'string' }`, so the schema passes it, and `answerStep` holds only `number` and `choice`
-   to a shape. Deleting the blank check, or the trim before it, left every other case here green on 23 September. */
+   to a shape. Deleting the blank check, or the trim before it, left every other case here green. */
 test('A TEXT ANSWER THAT IS ONLY WHITESPACE IS PROPOSAL_SCHEMA and is metered, because a model was called', async () => {
   const { sql, inference, slash, rows } = build();
   try {
@@ -305,7 +305,7 @@ test('ON TIER `b` THE ANSWER IS THE HOST\'S MODEL, handed in for this job, and i
 
     assert.deepEqual(out, { ok: true, value: { text: 'Rent looks steady.' } });
     assert.deepEqual([inference.seen.length, hosts.seen.length], [0, 1]);
-    /* THE INCLUDED MODEL'S NAME AND NOT THE OWNER'S (Q4's default): tier `b`'s own key is never opened unattended. */
+    /* THE INCLUDED MODEL'S NAME AND NOT THE OWNER'S, by default: tier `b`'s own key is never opened unattended. */
     assert.equal(hosts.seen[0]?.model, 'glm-5.3-flash');
     /* `kind = 'read' AND tier IN ('b', 'byo')` is what `slashGuardedEngine`'s `drafted()` counts in `packages/host`. */
     assert.deepEqual(

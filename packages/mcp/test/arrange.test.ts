@@ -1,5 +1,5 @@
 /**
- * Arranging a BrainDog over MCP (`loop/research-spark.md` S12), from an agent's side, over a real record.
+ * Arranging a BrainDog over MCP, from an agent's side, over a real record.
  *
  * READS ARE RESOURCES AND THE TOOL LIST STAYS AT FOURTEEN. How the record is arranged, one page's declaration and
  * the two grammars are fetched when wanted, and `propose` carries the three new bodies. What is held: each read is

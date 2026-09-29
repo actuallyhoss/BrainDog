@@ -1,6 +1,6 @@
 /**
  * The first-party packs one at a time: `portfolio`, `people`, `money-core`, `estate` and `work`, each
- * as a document `@braindog/declare` reads (docs/04-PACKS.md §6, `loop/research-modules.md` §5).
+ * as a document `@braindog/declare` reads (docs/04-PACKS.md §6).
  *
  * SPLIT FROM THE STARTER, NOT WRITTEN BESIDE IT. Every declaration and every seed here is taken from
  * `packDocument()`, so the five documents and the combined one cannot say different things about a
@@ -41,7 +41,7 @@ const SUMMARIES: Record<FirstPartyId, string> = {
 
 /**
  * THE WORDS A PERSON USES FOR WHAT EACH PACK KEEPS, which the first run listens for in the sentence it is told
- * (`apps/web/src/lib/shape.ts`, shell.md USE-3). They are the manifest's, the way a use case's `signals` are its own, so
+ * (`apps/web/src/lib/shape.ts`). They are the manifest's, the way a use case's `signals` are its own, so
  * the first run reads a first-party pack exactly as it reads anything else in the catalogue, and a pack from the Kennel
  * that says what it is for can be offered on the same terms.
  *
@@ -121,7 +121,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   declarations added and nothing taken away, so the step is a minor one.
  * - money-core 1.8.0: one Egyptian bank's wordings leave for a pack of their own, now a file under `packs/`.
  *   Six mail patterns and their six `-sms` twins read one bank in one country, and every record set up as Personal,
- *   Founder or Small business carried them (`loop/DIRECTION.md` section 22). The two generic card wordings stay. Twelve
+ *   Founder or Small business carried them, which is a use case the shell may not carry. The two generic card wordings stay. Twelve
  *   ingests taken away and no list and no field, so by the rule above the step is a minor one, as 1.4.0's two figures
  *   were. A record on 1.7.0 that updates keeps those of the twelve it uses: the update hands them to the bank's pack
  *   (`hands`) rather than retiring them, and that pack takes them over when it installs. One it
@@ -134,19 +134,19 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   updated to 1.8.0 before the handover existed lost the twelve, and there the owner installs the pack and mints again.
  *   Both handovers were taken out of the document under 2.4.0, the last entry below.
  * - money-core 2.0.0: `holdings` leaves for a pack of its own, `packs/holdings`, and `gold` leaves with it.
- *   What one person holds is not what everybody's Money is for, and gold among the list's kinds was the use case
- *   `loop/DIRECTION.md` section 22 named by name. A list taken away, so by the rule above the step is major, the first
+ *   What one person holds is not what everybody's Money is for, and gold among the list's kinds was a use case
+ *   the shell may not carry. A list taken away, so by the rule above the step is major, the first
  *   this pack has taken. The list is HANDED, not retired (`hands`), so a record holding rows in it
  *   keeps every row, its id and its history, and the holdings pack takes it over when it installs, keeping `gold` as the
  *   record's own kind where rows were written under it (`test/holdings-pack.test.ts`). An empty list on a record that
  *   says what it uses is retired instead, and the pack declares it afresh. The two packs that require money-core had
- *   caret ranges on 1.x, which no 2.0.0 satisfies and which the range grammar cannot widen with `||`
- *   (`loop/research-seed-roles.md` R5), so the bank's pack and every Mercury pack widen to `<3.0.0` in the same change,
+ *   caret ranges on 1.x, which no 2.0.0 satisfies and which the range grammar cannot widen with `||`,
+ *   so the bank's pack and every Mercury pack widen to `<3.0.0` in the same change,
  *   each with a version step of its own (`test/money-core-major.test.ts`).
  * - money-core 2.1.0: a transaction says what the bank said was left after it moved, `available`, as a card alert prints
- *   its available limit. Two card alerts in a hundred of his texts had the same amount, merchant and day, and the near
- *   rule skipped the second as already said although their limits differ by exactly the charge
- *   (`loop/research-bank-real.md`); the bank's pack at 1.2.0 reads the limit into this field and names it in its `dedupe:`,
+ *   its available limit. Two card alerts in a hundred real bank texts had the same amount, merchant and day, and the near
+ *   rule skipped the second as already said although their limits differ by exactly the charge;
+ *   the bank's pack at 1.2.0 reads the limit into this field and names it in its `dedupe:`,
  *   so two charges file and one alert sent twice files once. One field added and nothing taken away, so the step is a
  *   minor one, and a new version rather than a reset because 2.0.0 shipped with the deploy of 23 September at 08:02 UTC.
  *   2.1.0 SHIPPED AS THAT AND NOTHING MORE, with the deploy of `bab716a5` at 23:27 UTC on 23 September. `baf7048a` put
@@ -157,32 +157,30 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   was with or the obligation it paid. Both are marked `transfer` and each names the other in `_pair`
  *   (`test/money-pairs.test.ts`). A void or pending row pairs with nothing, since no figure counts it and pairing one
  *   hid the cleared payment beside it; a row with a Who or a Settles pairs with nothing, since rent and a client's
- *   payment of the same sum a day apart were paired and left both Spent and Received
- *   (`loop/research-batch-sixty-one-audit.md` findings 1 and 6). Before any of it, two such rows written by the import
+ *   payment of the same sum a day apart were paired and left both Spent and Received.
+ *   Before any of it, two such rows written by the import
  *   were GBP 4,000.00 of "Spent, 30 days" until a person marked them. Nothing is added to the ids a record holds and
  *   nothing is taken away, so the step is a minor one.
  * - money-core 2.3.0: a reconciled card bill stays a move. At 2.2.0 setting `settles` on the bank leg of a card bill,
  *   which is what Reconcile does, parted a pair the record had made, and EGP 9,500.00 read as spent and as received on
- *   top of the purchases the bill paid (`loop/research-batch-sixty-three-audit.md` finding 3). `pairs.where` now lets a
+ *   top of the purchases the bill paid. `pairs.where` now lets a
  *   leg that settles something stay paired while it holds the mark, and still refuses it as the start of a new pair, so
  *   rent written already reconciled is not paired with a client's payment (`test/money-card-bill.test.ts`). Nothing is
  *   added and nothing is taken away, so the step is a minor one. A version and not a reset because 2.2.0 is on
- *   `origin/master` (`814ca32c`): CI run `35940058225` for `e0e98bbe` passed, and deploy run `35941293759` was carrying
- *   it out at 01:04 UTC on 24 September, while this was written.
+ *   `origin/master` (`814ca32c`) and deployed.
  * - money-core 2.4.0: a repeating row in Money says the last day it moves money on. `obligations` gains `ends`, a day,
- *   and the obligations leg of both walks on `page.money` names it, so a line the old tool says ends on 10 November stops
+ *   and the obligations leg of both walks on `page.money` names it, so a line an import says ends on 10 November stops
  *   walking on the 10th instead of every month to the horizon (`test/money-ends.test.ts`). The engines learned the end in
  *   `5d4bbf8b`, and the import writes it only where the list declares it, so until this step it wrote it nowhere. One
  *   field added and nothing taken away, so the step is a minor one. A version and not a reset because 2.3.0 is on
- *   `origin/master` (`5dc5a7c6`) and deploy run `36010768543`, for `6da640cc`, carried it out at 14:09 UTC on
- *   24 September.
+ *   `origin/master` (`5dc5a7c6`) and deployed.
  * - money-core 2.5.0: Cash ahead turns on the forecast's later controls, and an instalment says which plan it is in.
  *   The installments leg both walks on `page.money` read names `group: 'plan'`, so every part of the proofing press
  *   reaches the chart as one plan and the count control can take it in or out whole, where each part was its own
- *   one-off; Cash ahead's `knobs` add `grow`, `drift` and `count` to the first four (`test/money-forecast-knobs.test.ts`,
- *   brief B6 of `loop/research-legacy-parity.md`). No list, field or id moves, so the step is a minor one. A version
+ *   one-off; Cash ahead's `knobs` add `grow`, `drift` and `count` to the first four (`test/money-forecast-knobs.test.ts`).
+ *   No list, field or id moves, so the step is a minor one. A version
  *   and not a reset because 2.4.0 is on `origin/master` (`7fa92aa4`).
- * - estate 1.2.0: a service carries a note. the old tool's domains carry the reason each name is held and what is
+ * - estate 1.2.0: a service carries a note. An imported domain register carried the reason each name is held and what is
  *   unresolved about it, and Services had no field that holds prose, so the import left every note in the export. One
  *   field added and nothing taken away, so the step is a minor one. It moves the version rather than riding on 1.1.0
  *   because a record on 1.1.0 is told about the field only through an update, and without one the importer would be
@@ -204,11 +202,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   on 21 September at 16:23 UTC, came after `79f17031` set it. Still under 1.6.0, because nothing has deployed since:
  *   a seventh list, No due day, holds a task of yours with no due day, which none of the six could, so every task in
  *   play is under exactly one list.
- * - people 2.0.0: `role` stops offering `registrar`, a role only a studio that holds domains has (M3 B9, DIRECTION
- *   sections 22 and 24). Taking a value away is a major step. A record whose rows hold it keeps it as its own word.
+ * - people 2.0.0: `role` stops offering `registrar`, a role only a studio that holds domains has, and a use case the
+ *   shell may not carry. Taking a value away is a major step. A record whose rows hold it keeps it as its own word.
  * - work 1.7.0: `updates.by` opens from a closed list of four agent vendors to text, a widening, so an update by any
- *   author lands (M3 B9). Nothing is taken away, so the step is a minor one.
- * - work 1.8.0: a task's follow-ups close with it and start in its project (W59-1). Two rules and the two scripts they
+ *   author lands. Nothing is taken away, so the step is a minor one.
+ * - work 1.8.0: a task's follow-ups close with it and start in its project. Two rules and the two scripts they
  *   start (`WORK_AUTOMATIONS` in `modules/work.ts`): moving a task to done closes every step `Part of` it still open,
  *   doing or blocked, and a step created with a parent and no project takes the parent's project and thread. Four ids
  *   are added and nothing is taken away, so the step is a minor one. A version and not a reset because 1.7.0 is on
@@ -219,18 +217,18 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   (`person: owner, agent: agent, taken: doing`), so `ROLE_KEYS` drops only the `person` part on a record with no
  *   People and a task still hands to an agent. Blocks and a field are added and nothing is taken away, so the step is
  *   a minor one.
- * - money-core 2.4.0, NO STEP: `hands` is gone, so the core pack names no other pack (`loop/research-legacy-parity.md`
- *   brief B1, `test/money-core-names-no-pack.test.ts`). It gave the bank's twelve patterns and `holdings` to the two
+ * - money-core 2.4.0, NO STEP: `hands` is gone, so the core pack names no other pack
+ *   (`test/money-core-names-no-pack.test.ts`). It gave the bank's twelve patterns and `holdings` to the two
  *   packs that are now files under `packs/`, which is the core knowing one person's bank and one person's list by id.
  *   No declaration and no setting changed, and those are what `test/pack-versions.test.ts` fingerprints, so the
  *   version stays. WHAT A RECORD LOSES, measured through `declare`'s plan: one still on 1.7.0 updating now retires the
  *   twelve instead of handing them, so a Shortcut token minted there stops opening its door until the owner installs
  *   the bank's pack and mints again; one on 1.5.0 to 1.8.0 holding rows in `holdings` is refused `WOULD_ORPHAN` rather
- *   than losing them. The survey that brief rests on found no record on a money-core before 1.8.0. The handover itself
+ *   than losing them. A survey found no record on a money-core before 1.8.0. The handover itself
  *   is still `declare`'s, and its tests make their own `hands` (`test/pack-files.ts`).
  * - money-core 3.0.0, THE CARD ALERTS' PART OF IT: the two card wordings, `bank-card-out` and `bank-card-in`, and their
  *   two `-sms` twins leave for `packs/card-alerts`, so a record set up with Money carries no bank's wording and no text
- *   door it did not ask for (`loop/DIRECTION.md` section 22). Four ingests taken away. With no `hands` since the 2.4.0
+ *   door it did not ask for. Four ingests taken away. With no `hands` since the 2.4.0
  *   entry above, a record updating retires the four, so a Shortcut token minted for a twin stops opening its door until
  *   the owner installs `card-alerts` and mints again.
  * - money-core 3.0.0, THE REST OF IT: one page called Money in place of Overview, Ledger and the house Home, which
@@ -276,7 +274,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `planShared` held the whole batch built People and Work beside Portfolio as though Projects were not coming, and
  *   left out Met in, Project and Owner for good. A record holding a pack at its offered version is offered no change,
  *   so this step is what lets such a record take the update and have the links put back, and nothing else moves.
- * - portfolio 1.6.0: the Overview is built to the new look (`loop/design/SCREENS.md`, Projects). It opens with one
+ * - portfolio 1.6.0: the Overview is built to the new look. It opens with one
  *   sentence said from how many projects need you, draws every project's status as one track (`projects-by-lane`), draws
  *   what each earns as one track cut into parts where it was a bar a project, and In play and Earning carry twelve
  *   weeks as a line (`snapshot` on `projects-live` and `projects-earning`). A project says what it is in a line
@@ -284,7 +282,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   nothing taken away, so the step is a minor one. The project page moves with it, though no pack holds that page
  *   (`crossPack`): the open work tallied by priority, the month's money in, out and kept, the dates as weeks, the
  *   questions as tiles and what it runs on as cards in the rail.
- * - money-core 3.2.0: Money is built to the new look (`loop/design/SCREENS.md`, Money). It opens with one sentence said
+ * - money-core 3.2.0: Money is built to the new look. It opens with one sentence said
  *   from what there is and when the walk goes under, each of the three tiles beside Cash now carries twelve weeks as a
  *   line (`snapshot` on `runway-days`, `arriving-30d` and `leaving-30d`), Cash ahead sits beside the next thirty days,
  *   the questions are tiles, and what is paid in parts is one track a plan. Three figures a project page reads are
@@ -309,7 +307,7 @@ type Body = Record<string, unknown>;
  * pack again once that list is there puts the field back. Work's tasks and threads say which project they are for and
  * who holds them the same way, so a homework list installs Work with no Projects and no People. Money says who a bill,
  * a payment, a repeating item or an instalment is with the same way since money-core 3.0.0, so Money installs and
- * draws on a record with People off (`loop/finish/modules.md` C12).
+ * draws on a record with People off.
  */
 const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party'], work: ['owner', 'thing'] };
 

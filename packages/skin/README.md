@@ -13,7 +13,7 @@ tokens.css   the @layer statement, the faces, the scale, spacing, radius, motion
 base.css     element defaults: box sizing, body face, headings, links, tabular figures, Arabic
 a11y.css     the focus ring, forced colours, the target floor
 house.css    GENERATED — do not edit. `pnpm theme`. The palette, and beside it the glass, the ground's
-             light, the row washes and the shadows (loop/design/SYSTEM.md §2, §4)
+             light, the row washes and the shadows
 blocks.css   the block markup contract both apps draw against; blocks-charts.css carries its chart kinds
 mark.ts      the artwork, as path data
 ```
@@ -33,7 +33,7 @@ overrides or the target floor**. That is the mechanical form of "a theme is data
 
 Import order therefore matters exactly once: `tokens.css` first, because it carries the statement.
 
-## Where SYSTEM's tokens live
+## Where the design system's tokens live
 
 The colours are generated, everything else is `tokens.css`. `--sunk` is the ground, `--bg` the tile, `--s1` tile-2
 (and `--s2`, `--s3` step further from the tile: down in light, up in dark). `--glass`, `--glass-strong`,

@@ -1,6 +1,6 @@
 /**
- * A use case as a file somebody shares: what `exportUseCase` writes, and what `readShared` lets in
- * (`loop/research-spark.md` S14). The credentials here are built when the test runs, so no file in the tree holds one.
+ * A use case as a file somebody shares: what `exportUseCase` writes, and what `readShared` lets in. The credentials
+ * here are built when the test runs, so no file in the tree holds one.
  */
 
 import { test } from 'node:test';

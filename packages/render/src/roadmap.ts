@@ -4,7 +4,7 @@
  * A roadmap is dated work on one time axis: a window from a start day to an end day is a bar, and a
  * row with no start is a single date drawn as a stem with its label above. The arithmetic here came
  * before the kind, so both drawers would have one answer; `toHTML` draws it (`html.ts`) and so does its
- * Svelte twin (`svelte/p/Roadmap.svelte`), and the pointer drag is the next wave's.
+ * Svelte twin (`svelte/p/Roadmap.svelte`), and the pointer drag is the drawer's own.
  *
  * A ROW IS A TASK: `title | by | effort`, the two fields a task already carries (`work.ts` in the
  * seed). `by` is the last day and `effort` how long, so `roadmapRow` turns them into the window drawn,
@@ -23,7 +23,7 @@
  * behind months of empty track. Today's line is simply absent when today is outside the span.
  *
  * POSITIONS ARE MEASURED FROM THE START EDGE, in the `0 0 1000 100` box every chart shares. How a time
- * axis reads in a right-to-left layout is still open (`research-modules.md` §8 risk 9), so this plan
+ * axis reads in a right-to-left layout is still open, so this plan
  * does not decide it: a drawer that mirrors draws each mark at `1000 - x - width` and each line at
  * `1000 - x`, and the packing, the bands and the label lines are unchanged, because none of them
  * depends on which edge is first.

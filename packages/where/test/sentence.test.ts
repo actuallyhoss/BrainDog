@@ -462,7 +462,7 @@ test('A LIST OF SOMETHING OTHER THAN TEXT IS ASKED ABOUT IN THAT SOMETHING, not 
   assert.equal(bad('flags has maybe').code, 'VALUE_MALFORMED');
 
   /* A `list<text>` IS UNCHANGED, which is the half that always worked and the half most lists are. */
-  assert.deepEqual(good('handles has @sam'), { field: 'handles', has: '@sam' });
+  assert.deepEqual(good('handles has @studio'), { field: 'handles', has: '@studio' });
   assert.deepEqual(good('tags has urgent'), { field: 'tags', has: 'urgent' });
 });
 
@@ -494,9 +494,9 @@ test('AND AN ELEMENT THE SENTENCE HAS NO LITERAL FOR IS REFUSED, not compiled in
   /* AND THE ONES THAT ARE WORDS STAY WORDS, which is what makes the line above a narrowing rather
      than a ban on lists. `url` and `email` are stored as the characters somebody typed. */
   for (const element of ['text', 'document', 'url', 'email'])
-    assert.deepEqual(parseWhere('bag has sam@client.example', withField(element), deps).predicate, {
+    assert.deepEqual(parseWhere('bag has studio@example.com', withField(element), deps).predicate, {
       field: 'bag',
-      has: 'sam@client.example',
+      has: 'studio@example.com',
     });
 });
 
@@ -661,7 +661,7 @@ test('a ref is read by the id an agent is handed, and by its row id, before its 
    * `thing is things#1` WAS REFUSED `REF_UNKNOWN`, "there is no things called things#1", on the one
    * project an agent had just been told was things#1: `context` and every `list` answer hand out that
    * id, and this branch asked only `refByTitle`. The row id was refused the same way while the tree
-   * form kept it and answered 14 rows (`loop/research-mcp-parity.md` §3). The lookup is a callback,
+   * form kept it and answered 14 rows. The lookup is a callback,
    * as the title one is, because only the record knows what `things#1` holds.
    */
   const ids: Record<string, { register: string; id: string | null }> = {

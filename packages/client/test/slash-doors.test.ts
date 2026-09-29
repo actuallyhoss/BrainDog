@@ -1,6 +1,6 @@
 /**
  * `slashStatus`, `slashSettings`, `slashAnswer`, `slashAsks` and `slashPattern`: the doors beside `slashRead`, and what each
- * hands back. `slashAnswer` was `slashPropose` until `loop/finish/contracts.md` X42 renamed it; its door did not move.
+ * hands back. `slashAnswer` was `slashPropose` until a rename; its door did not move.
  *
  * THE SAME RULE AS THE ASK, FOR THE SAME REASON. `packages/host/src/slash-ask.ts` answers every `authorization` header
  * 403 `NEEDS_BROWSER_SESSION`, so a member that sent the bearer this client holds would never be answered at all. What

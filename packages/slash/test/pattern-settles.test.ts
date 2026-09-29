@@ -1,11 +1,11 @@
 /**
  * A pattern call that reached a model settles its `call` row, whatever the record does with the filing after it answered.
- * `loop/research-batch-fifty-four-audit.md` finding 7, the fourth `core.run` site.
+ * The fourth `core.run` site.
  *
  * `538bc705` SETTLED THREE AND LEFT THIS ONE. The drafting read, the proposal and the automation's answer each write their
  * row the moment the model answers and overwrite it by the same id on the way out (`test/slash-settles.test.ts`).
  * `proposePattern` in `src/jobs.ts` runs the model, then awaits `record.propose`, and writes its only row after that
- * returns. A filing that threw left no row at all: the audit's P1 read "model calls: 1; call rows: []", on the same double
+ * returns. A filing that threw left no row at all: a probe read "model calls: 1; call rows: []", on the same double
  * as `slash-settles.test.ts` case 5 with `propose` rejecting. `pattern-model.test.ts` notes that no door reaches
  * `proposePattern` today, so no stored row is missing; the day one does, a record that falls over while filing is a
  * model call nobody can see.

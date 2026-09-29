@@ -1,7 +1,7 @@
 /**
- * A value an update takes off a closed list, while the list holds rows (`loop/research-shell-next.md` M2 and Brief K).
+ * A value an update takes off a closed list, while the list holds rows.
  *
- * NOTHING SAID NO, AND THE ROW COULD NOT BE EDITED AFTERWARDS. The survey's probe, People 1.0.0 with a row holding
+ * NOTHING SAID NO, AND THE ROW COULD NOT BE EDITED AFTERWARDS. A probe, People 1.0.0 with a row holding
  * `role: registrar`, then People as 2.0.0 with `registrar` taken off `role`:
  *
  *     WITH ROW people 2.0.0 without registrar: ok
@@ -14,7 +14,7 @@
  * every move that sheds a studio word from a first-party list: `registrar` out of People first.
  *
  * SO THE VALUE STAYS, BY LIST AND NOT BY ROW. The plan is handed a row count per list (`census()`), not per value, and
- * counting values is an edit to the record's `installedState`, which another brief holds. By list is the conservative
+ * counting values is an edit to the record's `installedState`, a larger change. By list is the conservative
  * side of the line: a record keeps a word nobody used, which costs one entry in a picker, where the other side is the
  * refused edit above. A list with no rows loses the value, as it always did.
  */
@@ -75,7 +75,7 @@ const people = (version: string, more: Field[] = []): Doc => {
   return d;
 };
 
-test('M2: People 2.0.0 without registrar keeps it on a list whose rows may hold it, and a row holding it can still be edited', async () => {
+test('People 2.0.0 without registrar keeps it on a list whose rows may hold it, and a row holding it can still be edited', async () => {
   const { api, close } = await recordOf(FIRST_PARTY.map((id) => (id === 'people' ? peopleBefore() : firstPartyDocument(id))));
   const row = said<{ id: string }>(api.kernel.create('people', { name: 'Nordhaven', role: 'registrar' }, { actor: 'p_1' }));
   const diff = await put(api, people('2.0.0'));
@@ -157,7 +157,7 @@ test('the value is laid back after the update’s own values, with the label the
 
 /* ONE ROW, UNDER THE PACK, and not the pack's body then the kept list with no pack after it. Staged with no pack the list
    read as changed in the app, and the next update of the pack was filed for Decide as keeping the owner's edit
-   (`loop/research-batch-forty-four-audit.md` finding 2, `pack-extends.test.ts`). */
+   (`pack-extends.test.ts`). */
 test('install stages the list with the value kept as the pack’s own body of it, in one row', async () => {
   const next = await packOf(DOC('1.1.0', WITHOUT_EARNING()));
   const diff = await plan(next, await recordAt(5));

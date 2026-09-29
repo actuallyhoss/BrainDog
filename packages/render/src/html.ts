@@ -740,7 +740,7 @@ function amount(value: string, o: RenderOptions): string {
 }
 
 /**
- * A run's face (agents C11), mirroring `Cards.svelte`'s `runFace` snippet: the kind's glyph on a disc washed in the
+ * A run's face, mirroring `Cards.svelte`'s `runFace` snippet: the kind's glyph on a disc washed in the
  * run's hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a
  * door to the run's page.
  */

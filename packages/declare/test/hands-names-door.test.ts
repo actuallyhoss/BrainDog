@@ -1,10 +1,9 @@
 /**
- * A door is handed with the pattern naming it only where `hands` sends it to the same pack
- * (`loop/research-batch-forty-seven-audit.md` finding 4).
+ * A door is handed with the pattern naming it only where `hands` sends it to the same pack.
  *
  * THE DOOR WENT WHERE THE PATTERN WENT, WHATEVER `hands` SAID OF IT. `door-follows-patterns.test.ts` made a door follow
  * a handed pattern, so money-core's SMS door stopped retiring from under the patterns it hands to `bank-hsbc-eg`. It also
- * handed a door no `hands` entry named: measured by the audit's `door-unasked.mts`, `banky` 1.1.0 handing only
+ * handed a door no `hands` entry named: measured, `banky` 1.1.0 handing only
  * `ingest.bank-twin` to `teller` planned `ingest.bank-door` to `teller` as well, and `teller` 1.0.0, whose twin names a
  * door of its own, then met `{ id: 'ingest.bank-door', handed: true }`, the conflict `install` refuses, so it could not
  * install at all. What the author meant is the author's to say, so the plan hands only what `hands` names and

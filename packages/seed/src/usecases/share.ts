@@ -1,6 +1,6 @@
 /**
  * The built-in use cases as the files they would be if somebody shared them, and what a card shows of one
- * (`loop/research-spark.md` S14, the browse screen).
+ * (the browse screen).
  *
  * ONE INSTALL PATH FOR A BUILT-IN AND A SHARED FILE. The browse screen installs Student the way it installs a file from
  * somebody else: the file goes to the record's `planUseCase`, the owner reads the plan, and each pack goes in through
@@ -22,7 +22,7 @@ type Body = Record<string, unknown>;
 /**
  * The modules browse installs for a use case: the ones it names, and nothing it does not.
  *
- * NO HOUSE SETUP FOR A USE CASE THAT NAMES NONE (`loop/finish/modules.md` MOD-17). Small business carries no pack and
+ * NO HOUSE SETUP FOR A USE CASE THAT NAMES NONE. Small business carries no pack and
  * names no module, and this used to hand it five (Projects, People, Money, Services and Work), so a bakery picked from
  * Browse arrived with a studio's rail. It is whichever modules the person's sentence names, as onboarding reads it
  * (`claimedBy` in `install.ts`), and from Browse that is none until they add one.
@@ -32,7 +32,7 @@ export const modulesToInstall = (u: UseCase): readonly string[] => u.modules;
 /**
  * A built-in use case as a shared file's document, with no example rows. `null` for an id that is not one.
  *
- * NOTHING IN IT IS WRITTEN AS AN EXAMPLE (`loop/finish/modules.md` C11). Browse installs this file as it is, so the
+ * NOTHING IN IT IS WRITTEN AS AN EXAMPLE. Browse installs this file as it is, so the
  * pack's own rows used to land in the record, a type foundry's projects in a student's among them. The file carries no
  * `seeds` and so no `links` between them; the first run puts in only the rows formed from what the person said, and
  * their links (`fileFor` in `apps/web/src/routes/start/accept.ts`). `today` still dates anything left relative.

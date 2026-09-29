@@ -3,8 +3,7 @@
  *
  * THE KERNEL'S CASCADE DOES NOT REACH HERE. `packages/kernel/src/erase.ts` walks the record's own tables, and Slash's store
  * sits beside them (in the same SQLite on the Worker, in a file of its own on the self-host) and is named nowhere in that
- * walk, so an erased person's name stayed in `question` for as long as the ledger kept the ask (`loop/finish/agents.md`
- * §2.7, S14). Each host calls this after the record's own `erase` has answered, over the SQLite it handed `createSlash`,
+ * walk, so an erased person's name stayed in `question` for as long as the ledger kept the ask. Each host calls this after the record's own `erase` has answered, over the SQLite it handed `createSlash`,
  * and the caller has already refused what the record refuses: a subject too short, a caller who is not the owner.
  *
  * THE KERNEL'S RULE, READ FROM ITS SOURCE AND NOT IMPORTED, because `46 §1` closes this package's imports at `ports`,
@@ -12,7 +11,7 @@
  * becomes the literal `--erased--`, so a reader can tell removed from never there (`02 §10`). What stays is every row's
  * existence, time, kind, tier, model, counts and status: the month's meter and the account of what was spent.
  *
- * WHICH COLUMNS HOLD A PERSON'S WORDS, as `loop/finish/contracts.md` §7.2 asks each new store's owner to say:
+ * WHICH COLUMNS HOLD A PERSON'S WORDS, as each new store's owner is asked to say:
  * `slash_call.question`, the question as it was typed; `slash_call.predicate`, the drafted filter, which carries the values
  * a question named; and the `predicate` of each trace in `slash_call.read`. `slash_settings` holds a tier, a model name, a
  * grant id and a cap, and `slash_meta` a version, and neither holds anybody's words.

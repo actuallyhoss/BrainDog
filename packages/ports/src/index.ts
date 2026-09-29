@@ -47,8 +47,8 @@ export interface Clock {
  * jumped to the first would have been reading half the port.
  *
  * There is no lint rule in this repository to catch the class, and one duplicate does not earn a
- * gate. The backlog carries the question of whether a duplicate exported declaration in a package's
- * `src` is worth a check of its own.
+ * gate. Whether a duplicate exported declaration in a package's
+ * `src` is worth a check of its own is an open question.
  */
 export interface Scheduler {
   /** When the alarm is currently set for, or `null` if it is not set. */
@@ -141,7 +141,7 @@ export type Conflict = {
  *
  * *"The type `Refusal` (with `RefusalCode`) is a type-only export of `@braindog/ports`, the lowest
  * shared package, because `where` raises one and sits below the kernel."* It did not exist. `code`
- * was `string`, so a refusal could carry any word at all, and it did: the first audit found **51 of
+ * was `string`, so a refusal could carry any word at all, and it did: the first count found **51 of
  * the 99 emitted, 48 emitted by nothing, and 24 more outside the registry entirely** — 32 of those
  * occurrences being `DECLARATION_INVALID`, the catch-all this build leans on hardest.
  *
@@ -200,7 +200,7 @@ const PACK = [
   'FIELD_TYPE_CHANGED', 'PROVIDES_MISMATCH', 'PLAN_STALE', 'THEME_VALUE_INVALID', 'INTENT_INSEPARABLE',
   'THEME_LADDER_ORDER', 'PACK_MALFORMED', 'PROVIDES_CONFLICT', 'REMOTE_ASSET', 'SECRET_IN_PACK',
   'WOULD_ORPHAN',
-  /* The 2026-09-08 audit's six: a caller naming a declaration this record has not got. The family is
+  /* Six codes for a caller naming a declaration this record has not got. The family is
      named for what its codes are ABOUT and not for the moment they are raised — `TRANSITION_ILLEGAL`
      above has said "one code, two moments" since the first draft — which is why a page read at 7am
      belongs here rather than under a family whose first line is "refused before any row is written". */
@@ -274,8 +274,8 @@ const DIALECT = [
 /** Slash — 6. */
 const SLASH = [
   'PROPOSAL_UNCITED', 'PROPOSAL_NO_ROWS', 'PROPOSAL_SCHEMA', 'PREDICTION_UNMEASURABLE', 'SLASH_BUDGET_SPENT',
-  /* 2026-09-23: a model that answered an automation's question with a 200 the host could not read, too large, not
-     JSON or broken off, or that ran out the clock. Wave 47 raised `PROPOSAL_SCHEMA` for it, which is output read and
+  /* A model that answered an automation's question with a 200 the host could not read, too large, not
+     JSON or broken off, or that ran out the clock. An earlier build raised `PROPOSAL_SCHEMA` for it, which is output read and
      failing its schema; here nothing was read, and the ask was still paid for (`packages/slash/src/answer.ts`). */
   'ANSWER_UNREADABLE',
 ] as const;
@@ -284,9 +284,9 @@ const SLASH = [
 const CONNECTOR = [
   'PULL_AUTH_REJECTED', 'PULL_PROVIDER_UNAVAILABLE', 'PULL_REQUEST_REFUSED', 'PULL_EXPECT_FAILED',
   'PULL_SHAPE_MISMATCH', 'PULL_ORIGIN_REFUSED', 'PULL_LEASE_EDGE',
-  /* Scheduled actions, 2026-09-15: `call` and `poll` refused where they are declared. An origin that is
+  /* Scheduled actions: `call` and `poll` refused where they are declared. An origin that is
      not https, a host built from data, no key named, an interval under the floor, and a url or body
-     that computes rather than substitutes (`loop/DIRECTION.md` §0b, `25 §3.1`). */
+     that computes rather than substitutes (`25 §3.1`). */
   'ACTION_NOT_HTTPS', 'ACTION_HOST_COMPUTED', 'ACTION_GRANT_MISSING', 'ACTION_INTERVAL_TOO_SHORT',
   'ACTION_EVALUATES',
 ] as const;

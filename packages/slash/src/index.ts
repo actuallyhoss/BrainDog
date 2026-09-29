@@ -19,9 +19,9 @@
  *       here is an object with a `complete()` method and nothing else.
  *
  * WHAT IS BUILT HERE AND WHAT IS NOT. `46 §2` describes eleven methods; this is five of them, the
- * five the interface audits agree on, and `answer`, which `46 §2` does not name and
- * `loop/research-infer-ask.md` §4 does. `triage`, `embed` and `analyseDraft` have no
- * caller in this tree yet, and `AUDIT-interface-B` IB-60 is explicit that tier A `triage` has no
+ * five every caller needs, and `answer`, which `46 §2` does not name and an automation's
+ * `ask_slash` step needs. `triage`, `embed` and `analyseDraft` have no
+ * caller in this tree yet, and tier A `triage` has no
  * dispatcher at all: no outbox kind carries it and no record step calls it. The tier C dispatcher
  * (`jobs`) is the other half: it waits on `job.<id>` declarations, which `packages/kernel/src/flow.ts`'s
  * runner reads, not on this package's own dispatch. The record's JOBS methods exist, in
@@ -125,12 +125,12 @@ const SOURCES: readonly Source[] = ['included', 'key'];
  * `priced` NAMES THE TIERS WHOSE CALLS THE HOST PAYS FOR IN NEURONS, and the ledger prices those rows and no others.
  * Unset is `['a']`, which is `46 §4.1`: a customer's key and a self-host endpoint are billed by whoever owns them. The
  * package cannot see that for itself, because what answers tier `byo` is whatever `SlashDeps.inference` is, and on the
- * Worker with no endpoint that is Workers AI on the operator's account (`loop/research-batch-sixty-audit.md` finding 4).
+ * Worker with no endpoint that is Workers AI on the operator's account.
  *
  * `tiers` NAMES THE TIERS THE HOST RUNS AT ALL, and unset is all three. A tier outside it is refused at `configure`, and
  * one already stored is read as `a`, the included model, with the row left as it was saved (`call.ts` `settings`). The
  * Worker names `a` and `b`, the included model and his own key: `byo` asks the host's endpoint for a model the owner
- * typed, and the Cloud has no endpoint but its included model (C15 in `loop/finish/agents.md`).
+ * typed, and the Cloud has no endpoint but its included model.
  *
  * Arguments and not fields of `SlashDeps` because `SlashDeps` is the ports, and neither of these is a port.
  */
@@ -186,7 +186,7 @@ const providerOf = (value: unknown): Provider | null =>
  * change when `project` grows a way to ask.
  */
 export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash {
-  /* NO PRAGMA, BECAUSE A DURABLE OBJECT REFUSES IT. Measured in workerd on 22 September: `PRAGMA user_version = 1` threw
+  /* NO PRAGMA, BECAUSE A DURABLE OBJECT REFUSES IT. Measured in workerd: `PRAGMA user_version = 1` threw
      `not authorized: SQLITE_AUTH` out of the object's authorizer, so on the Worker every ask answered 500 before a model
      was called (`apps/worker/test/slash-in-do.test.ts`), until the statement was wrapped. The store's version is a row
      now (`STORE_VERSION`, `slash_meta`), so nothing here asks the pragma at all. */
@@ -290,7 +290,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
 
     const typed = patch.model === undefined ? before.model : patch.model;
     /* TRIMMED ON THE WAY IN, because the name goes on the wire as stored: `  llama3:8b \n` saved ok and was then asked for
-       as exactly that, which no provider serves (`apps/web/src/lib/ui/slash-model.ts` measured it on 22 September). */
+       as exactly that, which no provider serves (`apps/web/src/lib/ui/slash-model.ts` measured it). */
     const model = typed === null ? null : typed.trim();
     if (tier !== 'a' && (model === null || model === ''))
       return no('VALUE_MALFORMED', 'Name the model your key or your endpoint answers with.', { at: 'model' });

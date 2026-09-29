@@ -1,20 +1,19 @@
 /**
  * money-core declares `pairs:` on `transactions`, so the kernel marks a transfer's two legs and the ledger stops counting
- * money that only moved (`loop/research-living-in-it.md` section 7, W57-4).
+ * money that only moved.
  *
  * UNTIL THIS, A PERSON MARKED BOTH LEGS OR NOBODY DID. Every Ledger figure says `transfer is false` and the field defaults
- * to false, and his import writes a move between two of his accounts as two ordinary rows (section 4.1). W57-1 built the
+ * to false, and an import writes a move between two of one person's accounts as two ordinary rows. The kernel has the
  * register option in the kernel's write path (`packages/kernel/src/pairs.ts`); a register that does not declare it is
  * paired by nothing, so the build did nothing for Money until the pack said it.
  *
- * THE DECLARATION IS `on: [abs(amount)]` AND NOT `on: [currency, abs(amount)]` as the brief first spelled it, because
+ * THE DECLARATION IS `on: [abs(amount)]` AND NOT `on: [currency, abs(amount)]` as it was first spelled, because
  * `transactions` has no `currency` field: the currency is inside the money, and `abs()` on a money compares size and
  * currency together. A GBP 4,000.00 leg and an EGP 4,000.00 leg are not one transfer, and the second test below says so.
  *
- * AND IT SAYS `where: state is cleared`, because every Ledger figure counts only cleared rows and the audit of the
- * kernel's pairing (`loop/research-batch-fifty-eight-audit.md` finding 2) measured what a void or pending row does as a
- * partner: it hides the real payment beside it, and Spent read GBP 0.00 against 250.00. The third test is that finding
- * against this pack's own declaration.
+ * AND IT SAYS `where: state is cleared`, because every Ledger figure counts only cleared rows, and a void or pending
+ * row as a partner hides the real payment beside it: measured, Spent read GBP 0.00 against 250.00. The third test holds
+ * that against this pack's own declaration.
  *
  * RED FIRST, AT `bab716a5` with this file and no declaration: the two legs came back with `transfer` false and no
  * `_pair`, and "Spent, 30 days" counted the leg leaving the current account as GBP 4,000.00 spent.
@@ -125,17 +124,17 @@ test('THE SAME ACCOUNT, ANOTHER CURRENCY, OR TWO EQUALLY NEAR LEGS IS NOT A TRAN
 
   /* A SECOND EQUAL CREDIT ON THE SAME DAY IS AS NEAR AS THE FIRST, and the kernel does not guess which of two equal legs
      was the move (`pairs.ts`, `nearestOf`): the pair it had comes apart and all three are counted, which is the side a
-     mistake should fall on. This pack's first draft, written against W57-1's kernel, said the third row "finds nobody
-     left to pair with" and checked only the third row, which still passes; measured against `974319fb` on 24 September,
+     mistake should fall on. This pack's first draft said the third row "finds nobody
+     left to pair with" and checked only the third row, which still passes; measured against `974319fb`,
      the payment and the first credit had lost their `_pair` as well, which is what is checked here. */
   const again = row('FROM CURRENT AGAIN', 'in', reserve);
   for (const e of [paid, leg, again]) assert.equal(marked(e), false, `${String(e.fields.what)} stayed marked beside a tie`);
 });
 
 test("A VOID OR PENDING CREDIT IS NOBODY'S PARTNER, so the cleared payment beside it stays in Spent", async () => {
-  /* THE AUDIT'S P4 AND P4b, ON money-core AS IT SHIPS, EACH ON A RECORD OF ITS OWN. Both credits on one record sat a
+  /* A VOID CREDIT AND A PENDING ONE, ON money-core AS IT SHIPS, EACH ON A RECORD OF ITS OWN. Both credits on one record sat a
      day either side of the payment, and two equally near legs are a tie the kernel does not break, so with `where:`
-     taken out the payment still came back unmarked and the test passed for the wrong reason. Measured on 24 September;
+     taken out the payment still came back unmarked and the test passed for the wrong reason. Measured:
      apart, each credit is the payment's one nearest leg, and without `where:` both cases go red. */
   for (const state of ['void', 'pending'] as const) {
     const k = await moneyCore();
@@ -174,7 +173,7 @@ test('THE SAMPLE RECORD PAIRS NOTHING IN ITS LEDGER, and its three typed marks s
   assert.deepEqual(marked, ['COMPANY CARD, AUGUST BILL', ...LEGS].sort());
 });
 
-/* ── audit sixty-one, findings 1, 5 and 6 ─────────────────────────────────────────────────────────────────────────── */
+/* ── moves that are not moves: rent and a client, a repaid dinner, a refund ─────────────────────────────────────── */
 
 /** CIB and HSBC in pounds and a card, the three EGP accounts his ledger moves between, and people to name as Who. */
 function hisAccounts(k: Kernel): Record<'CIB' | 'HSBC' | 'Card', Entry> {
@@ -187,8 +186,8 @@ const egpRow = (k: Kernel, what: string, on: number, direction: 'in' | 'out', mi
   value<Entry>(k.create('transactions', { what, on: day(on), direction, amount: { amount: minor, currency: 'EGP' }, account: account.id, state: 'cleared', ...more }, OWNER));
 const pairOf = (k: Kernel, e: Entry): unknown => k.get(e.id)!.fields._pair ?? null;
 
-test("M4: RENT TO THE LANDLORD AND A CLIENT'S PAYMENT OF THE SAME ROUND SUM A DAY LATER ARE NOT ONE MOVE, once either says who it was with", async () => {
-  /* THE AUDIT'S M4 (`loop/research-batch-sixty-one-audit.md` section 1), with the one thing a person writes on these two
+test("RENT TO THE LANDLORD AND A CLIENT'S PAYMENT OF THE SAME ROUND SUM A DAY LATER ARE NOT ONE MOVE, once either says who it was with", async () => {
+  /* RENT AND A CLIENT'S PAYMENT OF ONE SUM, with the one thing a person writes on these two
      rows and never on a move between his own accounts: who the other side was. Only the client's row names anybody,
      because one leg that cannot be a leg is enough to keep the pair apart. */
   const k = await moneyCore();
@@ -211,7 +210,7 @@ test("M4: RENT TO THE LANDLORD AND A CLIENT'S PAYMENT OF THE SAME ROUND SUM A DA
   for (const e of [paid, client]) assert.equal(k2.get(e.id)!.fields.transfer, false, `${String(e.fields.what)} was marked beside a settled rent`);
 });
 
-test('M5: A FRIEND REPAYING DINNER INTO THE OTHER BANK STOPS BEING A MOVE THE MOMENT HIS NAME IS ON IT, and a refund that names the shop is never one', async () => {
+test('A FRIEND REPAYING DINNER INTO THE OTHER BANK STOPS BEING A MOVE THE MOMENT HIS NAME IS ON IT, and a refund that names the shop is never one', async () => {
   const k = await moneyCore();
   const a = hisAccounts(k);
   const dinner = egpRow(k, 'ZOOBA DINNER', -9, 'out', 150_000, a.Card);
@@ -235,8 +234,8 @@ test('M5: A FRIEND REPAYING DINNER INTO THE OTHER BANK STOPS BEING A MOVE THE MO
 });
 
 test("HIS OWN MOVES STILL PAIR, FILED UNDER A CATEGORY: the card paid off from HSBC, as his ledger holds it on 24 and 25 August", async () => {
-  /* THE REPAIR THE AUDIT PROPOSED, `category is empty`, WOULD HAVE UNDONE THIS. Read on 24 September from the old tool's
-     `/api/money/txn` (the route his import reads): both real moves between his own accounts since 13 July, EGP
+  /* THE OBVIOUS REPAIR, `category is empty`, WOULD HAVE UNDONE THIS. Read from a real ledger through the route
+     its import reads: both real moves between his own accounts since 13 July, EGP
      63,313.46 on 2 August and EGP 48,000.27 on 24 and 25 August, carry the category Transfers on both legs, and his
      import carries the category over. So a category cannot be what keeps a row out, and this is his second move, the
      card's leg landing a day before the bank's. */

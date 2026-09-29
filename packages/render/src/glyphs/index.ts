@@ -3,7 +3,7 @@
  *
  * THIS ENTRY IMPORTS `core.ts` AND NOTHING ELSE WITH PATHS IN IT. The set arrives through `loadSet`, a
  * dynamic import, so a bundler splits it into its own chunk and the shell's entry carries only the
- * glyphs the shell draws (research-modules §1.3). A static re-export of `SET` from here would undo that
+ * glyphs the shell draws. A static re-export of `SET` from here would undo that
  * silently: every file would still typecheck and the entry chunk would carry all 251.
  *
  * Path data from Lucide, ISC License; see `NOTICE` beside this file.

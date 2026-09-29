@@ -1,7 +1,7 @@
 /**
  * `createSlash` over storage that refuses a pragma, which is what a Durable Object's storage is.
  *
- * WHY A WRAPPER AND NOT WORKERD. The fault was measured in workerd (`loop/research-spark-seam.md` §4):
+ * WHY A WRAPPER AND NOT WORKERD. The fault was measured in workerd:
  * a bare DO SQLite ran `CREATE TABLE IF NOT EXISTS` and answered `not authorized: SQLITE_AUTH` to
  * `PRAGMA user_version = 1`, and the real `createSlash` bundled by wrangler threw that same sentence
  * out of its constructor. `node:sqlite` has no authorizer, which is how every test in this package
@@ -78,8 +78,8 @@ test('createSlash builds on storage whose authorizer refuses PRAGMA, and the eng
 });
 
 /**
- * The two codes the ledger wrote under the old name, as a build before the rename left them (`loop/DIRECTION.md`
- * section 31, `loop/research-slash-rename.md` section 2.2). Written out as literals because they are what that build's
+ * The two codes the ledger wrote under the old name, as a build before the rename
+ * from Spark left them. Written out as literals because they are what that build's
  * rows hold.
  */
 const OLD_PENDING = 'SPARK_PENDING';

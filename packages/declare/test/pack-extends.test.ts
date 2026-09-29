@@ -1,6 +1,5 @@
 /**
- * A pack that lays fields and enum values on a list another pack owns, through `extends` (`loop/research-shell-next.md`
- * Brief P, M1 and L1, `loop/DIRECTION.md` §22).
+ * A pack that lays fields and enum values on a list another pack owns, through `extends`.
  *
  * TWO WAYS IN, AND BOTH WERE SHUT OR SILENT. Driven through `createRecordApi` on a record holding every first-party pack,
  * before `extends` existed:
@@ -90,7 +89,7 @@ const domains = (version = '1.0.0', alone = false, extend: Record<string, unknow
       }),
 });
 
-test('M1: extends beside a page installs, and a row is then written with the field it lays on Projects', async () => {
+test('extends beside a page installs, and a row is then written with the field it lays on Projects', async () => {
   const { api, close } = await recordOf();
   said(await put(api, domains()));
   const things = listOf(api, 'things');
@@ -100,7 +99,7 @@ test('M1: extends beside a page installs, and a row is then written with the fie
   close();
 });
 
-test('M1: extends alone is a pack that changes something, and installs', async () => {
+test('extends alone is a pack that changes something, and installs', async () => {
   const { api, close } = await recordOf();
   said(await put(api, domains('1.0.0', true)));
   assert.ok(listOf(api, 'things').body.fields.some((f) => f.id === 'domain'));
@@ -115,7 +114,7 @@ test('the plan names what each pack lays on whose list, before anybody presses I
   close();
 });
 
-test("L1 STAYS REFUSED: a module's list declared whole by another pack is still two owners of one list", async () => {
+test("STILL REFUSED: a module's list declared whole by another pack is still two owners of one list", async () => {
   const { api, close } = await recordOf();
   const things = (structuredClone(firstPartyDocument('portfolio')) as unknown as Doc).declarations.find((d) => d.register === 'things' && Array.isArray(d.fields)) as { fields: Field[] };
   const whole = {
@@ -146,7 +145,7 @@ test("Portfolio's next minor keeps the field extends laid on Projects, and the r
   said(await put(api, domains()));
   const made = said<{ id: string }>(api.kernel.create('things', { name: 'acme.example', lane: 'earning', domain: 'https://acme.example/' }, { actor: 'p_1' }));
   /* STAGED WITH NO PACK, so it reads as the record's own from here and a later uninstall of Portfolio cannot take it.
-     NOT UNDER PORTFOLIO, which audit forty-four's finding 2 was first answered with and which this test then measured:
+     NOT UNDER PORTFOLIO, which was the first answer tried and which this test then measured:
      Projects under Portfolio took the next minor as a plain change, and the list came out ending `tags, launched` with
      `domain` gone under a row holding one. Nothing a plan is handed says which of a list's fields another pack laid,
      and `detached()` says it only while the row has no pack. */
@@ -256,7 +255,7 @@ const peopleAt = (version: string, more: Field[] = []): Doc => {
 };
 
 /*
- * AUDIT FORTY-FOUR'S FINDING 2 AS IT WAS MEASURED: every first-party pack, a row holding `role: registrar`, People 2.0.0
+ * THE VALUE KEPT AS IT WAS MEASURED: every first-party pack, a row holding `role: registrar`, People 2.0.0
  * without `registrar`, then People 2.1.0 with a `pronouns` field. The value 2.0.0 kept was staged with no pack, so 2.1.0
  * found People "changed in the app" and planned it as `kept` with a rebased body, which Decide says as "Keeps People as
  * you changed it. This update's version of it is not taken". Nobody changed it, and the update was taken.

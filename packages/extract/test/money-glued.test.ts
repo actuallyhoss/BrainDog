@@ -1,7 +1,7 @@
 /**
  * A currency code written against its figure, with no space between them.
  *
- * WHY THIS FILE EXISTS. `loop/research-batch-eighteen-audit.md` section 2 drove `scanMoney` over a code glued to
+ * WHY THIS FILE EXISTS. A measurement drove `scanMoney` over a code glued to
  * its number and it answered garbage in the fallback currency: `EGP2500.00` came back as GBP 0.00 and
  * `EGP1,284.50` as GBP 284.50. The letter before the first digit refused the number its start, as it should for an
  * identifier like `INV1250`, and the tokenizer then walked on one character at a time and started a fresh number
@@ -33,7 +33,7 @@ const money = (amount: number, currency: string): Money => ({ amount, currency }
 type Row = [input: string, want: Money[], declared?: string];
 
 const rows: Row[] = [
-  /* The two the audit printed, and the line that carried the first of them. */
+  /* The two that were measured, and the line that carried the first of them. */
   ['EGP2500.00', [money(250_000, 'EGP')], 'GBP'],
   ['EGP1,284.50', [money(128_450, 'EGP')], 'GBP'],
   ['327 EGP2500.00', [money(32_700, 'EGP'), money(250_000, 'EGP')], 'GBP'],

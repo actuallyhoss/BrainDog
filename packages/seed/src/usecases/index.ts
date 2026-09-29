@@ -1,5 +1,5 @@
 /**
- * The starter use cases, and the arranger that proposes one (`loop/research-spark.md` §3, tier A).
+ * The starter use cases, and the arranger that proposes one.
  *
  * DETERMINISTIC, BECAUSE A FRESH SELF-HOST HAS NO MODEL (19 §6). The arranger counts the signals each use
  * case listens for in what the person wrote, ranks the use cases by that count, and says which phrases
@@ -41,7 +41,7 @@ function checked(doc: unknown): UseCase {
  * declarations and the settings of the document `useCaseDocument` builds below and refuses a word that moved with the
  * version left alone. It was written because nothing did: renaming the founder's thirty-day tile with `FOUNDER.version`
  * left at 1.3.2 kept all 182 tests in this package green, and the only thing holding that version up was a comment
- * arguing for it (`loop/research-batch-three-audit.md` finding 6). Raising a version there means giving the new one its
+ * arguing for it. Raising a version there means giving the new one its
  * own entry in that file; rewording a label under a version nobody has released means appending a line that says which
  * change moved it, the way `test/pack-versions.test.ts` has asked of the first-party packs since `5ccb06ad`.
  */
@@ -109,8 +109,7 @@ export function signalsIn(said: string, signals: readonly string[]): Span[] {
  * A TIE GOES TO THE LONGER THING SAID, because a long phrase is a specific one and a short word is one
  * any sentence uses. Catalogue order alone gave every one-to-one tie to Personal, and the Solo founder
  * card's own summary, "The organisations you run, the money across them, and the numbers your projects
- * report.", typed back, was Personal: "money" against "organisations" (`loop/research-first-sign-in.md`
- * §3, friction 3). Now it is 13 letters to 5 and Solo founder.
+ * report.", typed back, was Personal: "money" against "organisations". Now it is 13 letters to 5 and Solo founder.
  *
  * NOT THE WORD HEARD FIRST, WHICH WAS TRIED. It fixed the summary and sent "I want to start an Etsy shop
  * and have no idea where to begin" to Small business, because "shop" comes before "where to begin"
@@ -160,7 +159,7 @@ export const MODULE_ORDER = ['portfolio', 'people', 'money-core', 'estate', 'wor
  * The packs to install for a use case: its own modules and any the sentence named, the first-party ones in install order
  * and then any other catalogue pack in the order it was named.
  *
- * A CATALOGUE PACK IS KEPT, since a use case may stand on any pack (`@braindog/declare` `MODULES`, shell.md USE-3). It
+ * A CATALOGUE PACK IS KEPT, since a use case may stand on any pack (`@braindog/declare` `MODULES`). It
  * goes after the first-party ones because it may point at their lists and they never point at its.
  */
 export function modulesFor(u: UseCase, named: readonly string[] = []): string[] {

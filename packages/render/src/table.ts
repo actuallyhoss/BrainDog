@@ -164,7 +164,7 @@ export function ariaSort(
 /**
  * Where the tone's glyph goes: the column that declares it carries the tone, and it is the column the
  * tone is ABOUT. On a register that is its deadline, so the dot sits beside the date that made the
- * row late or close (design DSN-7). It sat in the state column, and a red dot beside "Open" or a
+ * row late or close. It sat in the state column, and a red dot beside "Open" or a
  * green one beside "Cancelled" said something the word beside it contradicted.
  *
  * A table that declares none keeps it at the head of its first VALUE, which is not always its first

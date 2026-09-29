@@ -1,5 +1,5 @@
 /**
- * A use case: what one kind of person needs a BrainDog to be, as a file (`loop/research-spark.md` §2.1).
+ * A use case: what one kind of person needs a BrainDog to be, as a file.
  *
  * IT IS A PACK WITH A FRONT. The registers, pages and example rows a use case adds are an ordinary pack
  * document named `usecase-<id>`, installed through `plan` and `install` like a stranger's add-on. What
@@ -11,7 +11,7 @@
  * line at `/packs/<id>`, and switching the pack off puts the house voice back. No new declaration kind
  * and no kernel change: the display reads `packConfig` and falls back to `copy.ts` for a key left out.
  *
- * LABELS ARE SETTINGS TOO (S8). A use case may rename a list, a field or one value of a field, its own or a
+ * LABELS ARE SETTINGS TOO. A use case may rename a list, a field or one value of a field, its own or a
  * first-party module's, and each word is a text setting, `label_<list>[__<field>[__<value>]]`, which the
  * display reads in place of the declaration's word and a person can change like a voice line. A list's singular and
  * the line saying what it holds are words too, `list:one` and `list:holds`, kept as `one_<list>` and `holds_<list>`,
@@ -37,8 +37,8 @@ import { no, ok } from '@braindog/ports';
  * The lines a voice may replace, in the order the display meets them: the spine's four names, Home's headings and its
  * empty lines, Decide's and the Inbox's empty lines, the add verb, and the pen's empty line.
  *
- * WIDER THAN THE HEADINGS, BECAUSE A TONE IS MORE THAN ITS HEADINGS (`loop/DIRECTION.md` §11: a student's record should not
- * talk like an accounts department). The first keys named only the rail and Home's bands, so every empty line, the verb on a
+ * WIDER THAN THE HEADINGS, BECAUSE A TONE IS MORE THAN ITS HEADINGS: a student's record should not talk like an
+ * accounts department. The first keys named only the rail and Home's bands, so every empty line, the verb on a
  * list's add button and the pen's line still spoke the house voice on a record set up for a student. Each key here is a
  * sentence the house voice already says, read through `said()` in the web with that sentence as the fallback.
  */
@@ -63,7 +63,7 @@ export const VOICE_TAB_CHARS = 12;
 /**
  * The audiences a form suggests for who a use case is for. Said on the proposal and used to group a catalogue.
  *
- * SUGGESTIONS AND NOT A CLOSED LIST (shell.md USE-3). A shared use case is written by somebody we have not met, for
+ * SUGGESTIONS AND NOT A CLOSED LIST. A shared use case is written by somebody we have not met, for
  * people we did not think of: "a choir", "an allotment society". The starters use these five words, and `alongside` in the
  * seed reads `individual` to know which use cases may sit beside each other, so an audience outside them is only ever
  * said and grouped by, never refused.
@@ -74,7 +74,7 @@ export type Audience = string;
 /**
  * The first-party packs this build ships, which own the lists in `MODULE_LISTS`. The seed's test holds this to its own list.
  *
- * NOT THE PACKS A USE CASE MAY NAME (shell.md USE-3). A use case may stand on any pack in the catalogue, a shared add-on
+ * NOT THE PACKS A USE CASE MAY NAME. A use case may stand on any pack in the catalogue, a shared add-on
  * as much as Money, so `modules` is checked for the shape of a pack id and nothing else, and a pack the host cannot find
  * is refused at install by name, where the person can do something about it.
  */
@@ -86,7 +86,7 @@ export type ModuleId = (typeof MODULES)[number];
  * one of these unless it installs that module (`readShared`), because the record reads some of them as the module's own:
  * `boot` names members to whoever may read People. Held equal to the modules' manifests by `packages/seed`'s tests.
  *
- * THE ONE TABLE OF WHICH MODULE OWNS WHICH LIST (`loop/research-shell-seed-next.md` N4). There was a second, written out by
+ * THE ONE TABLE OF WHICH MODULE OWNS WHICH LIST. There was a second, written out by
  * hand in `index.ts` as `FIRST_PARTY_LISTS`, and it had left Agents out: an add-on declaring `skills` or `credentials` was
  * read as fine by `readPackFile` while a use case declaring the same list was refused by `readShared`, and the add-on then
  * collided at install on any record with Agents. Moving a list between modules is an edit here and nowhere else.

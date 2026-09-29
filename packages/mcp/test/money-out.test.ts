@@ -1,5 +1,5 @@
 /**
- * The core MCP server knows no use case's figure ids (`loop/research-m3-dynamic.md` section 3, B6).
+ * The core MCP server knows no use case's figure ids.
  *
  * WHAT WAS THERE. A sixteenth tool, `money`, read seven figures the money-core pack declares, by id, out of a constant
  * in `src/index.ts` (`MONEY_FIGURES`), and on a record without that pack its refusal told the agent to install

@@ -41,13 +41,13 @@
    */
   type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
 
-  /* A BLOCK OF RUNS COMES WITH ITS RUNS (agents C11): the host hands one a row, which the `who` face is drawn from. */
+  /* A BLOCK OF RUNS COMES WITH ITS RUNS: the host hands one a row, which the `who` face is drawn from. */
   let { block, opts = {} }: { block: Block; opts?: RenderOptions & { scope?: ScopeCells | undefined; runs?: readonly (RunCell | null)[] | undefined } } = $props();
 
   const L = $derived(cardLayout(block.rows[0]?.cells ?? []));
   const rows = $derived(block.rows.slice(1));
 
-  /* WHERE A ROW APPLIES IS A FACT THAT IS DRAWN AS A CHIP (agents C8): a fact in a column the host names as a scope. */
+  /* WHERE A ROW APPLIES IS A FACT THAT IS DRAWN AS A CHIP: a fact in a column the host names as a scope. */
   const scoped = (i: number): boolean => opts.scope?.columns.includes(i) ?? false;
 
   const label = (i: number): string => L.labels[i] ?? '';
@@ -61,7 +61,7 @@
      beside its name. The mark is hidden from a screen reader, which reads the name. -->
 {#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}<span class="scope-mark" style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{m.mark}</span>{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
-<!-- A RUN'S FACE (agents C11), as `apps/web`'s `AgentFace` draws one: the kind's glyph on a disc washed in the run's
+<!-- A RUN'S FACE, as `apps/web`'s `AgentFace` draws one: the kind's glyph on a disc washed in the run's
      hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a door to
      the run's page. The hue is written on the drawing alone, so the card's own `--hue` is left as it was. -->
 {#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}<a

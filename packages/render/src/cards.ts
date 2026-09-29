@@ -233,7 +233,7 @@ export function runGlyphOf(agent: string | null): string {
 }
 
 /**
- * A run's face, or null where the card is not for a run (agents C11).
+ * A run's face, or null where the card is not for a run.
  *
  * A RUN IS NAMED TWO WAYS. The host hands one a row for a block of runs (`sessions.live`), whose `who` cell says the
  * agent by name; and a `who` cell that is itself a run (`S42`) is one wherever it stands, though nothing then says

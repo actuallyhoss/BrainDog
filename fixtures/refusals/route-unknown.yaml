@@ -5,6 +5,6 @@ fix:       Call one of the methods this record publishes.
 call:      { "method": "frobnicate", "args": {} }
 principal: { "kind": "person", "level": "owner" }
 
-# NO `at:`, BECAUSE THE ROUTER GIVES NONE. This said `at: method` until 2026-09-22, when
+# NO `at:`, BECAUSE THE ROUTER GIVES NONE. This once said `at: method`, until
 # `packages/host/test/refusals-rpc.test.ts` drove it and `serveApi` answered with `allowed:`, the
 # list of method names, and no address. `allowed:` is the more useful half and has no fixture key.

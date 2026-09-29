@@ -1,7 +1,7 @@
 /**
  * The storage port, and the guard both of its adapters put in front of their driver (`37 §2.4`, `§5`, `30 §13`).
  *
- * TWO DRIVERS, TWO SETS OF CEILINGS, AND THE LOWER ONE IS PRODUCTION'S. Measured on 24 September 2026, local workerd
+ * TWO DRIVERS, TWO SETS OF CEILINGS, AND THE LOWER ONE IS PRODUCTION'S. Measured on local workerd
  * through Miniflare against Node 24.13.0: a Durable Object refuses a 101st bound parameter, a statement past 100,000
  * UTF-8 bytes, a `LIKE ?` or `GLOB ?` pattern past 50 bytes and a sixth compound term, and `node:sqlite` answers all of
  * them. So without a guard a statement that the self-host and every test in this tree serve can fail on the Worker,
@@ -270,7 +270,7 @@ export function guardScript(sql: string): void {
  * SQLite's fixed sentences, and the code each one is.
  *
  * SUBSTRING MATCHES ON THE DRIVER'S OWN TEXT, because workerd exposes no numeric code. Every fragment was produced on
- * Node 24.13.0 or on local workerd on 24 September 2026. The workerd transaction refusal is its current sentence,
+ * Node 24.13.0 or on local workerd. The workerd transaction refusal is its current sentence,
  * "To execute a transaction, please use the state.storage.transaction() or state.storage.transactionSync() APIs
  * instead of ...", which is not the `cannot execute transaction-related statements` that `37 §5.8` had recorded.
  * And the DO answers an unknown virtual-table module with `not authorized: SQLITE_AUTH`, not `no such module`, so that

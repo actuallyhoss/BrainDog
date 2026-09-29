@@ -1,5 +1,5 @@
 /**
- * A job kind as the people and the machines that decide on it read one (`loop/finish/agents.md` C13, C14).
+ * A job kind as the people and the machines that decide on it read one.
  *
  * THE LINT IS THE KERNEL'S AND IS NOT COPIED. `jobFault` asks `validateDeclaration`, which dispatches a `job` to
  * `jobBody` in the kernel's `jobs.ts`, so a pack checked here, a shared file checked in the Kennel and a change checked

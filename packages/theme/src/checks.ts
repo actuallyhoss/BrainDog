@@ -145,7 +145,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      control, which is the same SC 1.4.11 requirement at the same floor as `edge`. It was drawn at
      the call site as a mix of the accent and `sunk` and measured 1.33:1 against `s3` in dark. */
   out.push(...pairsAgainstSurfaces(built.id, p, ['edge', 'accent-edge'], floors.edge, 'D', scheme));
-  /* `live-fill` IS A MARK LIKE THE FOUR: the ring's arc and the running bar (SYSTEM §2), at the same floor. */
+  /* `live-fill` IS A MARK LIKE THE FOUR: the ring's arc and the running bar, at the same floor. */
   const fills = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill', 'live-fill'];
   out.push(...pairsAgainstSurfaces(built.id, p, fills, floors.intentFill, 'D', scheme));
 
@@ -229,10 +229,10 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
 
   /* H · the surface ladder is monotonic in RELATIVE LUMINANCE, not in L*.
 
-     2026-09-29, SYSTEM'S SHAPE (loop/design/SYSTEM.md §2, §12.1). `sunk` is the ground and the lowest surface in both
+     2026-09-29, THE DESIGN SYSTEM'S SHAPE. `sunk` is the ground and the lowest surface in both
      schemes, and `bg`, the tile, sits above it. `s1` to `s3` are the steps inside a tile, and they step AWAY FROM THE
      TILE, one way the whole length: up in dark, and down in light, where the tile is white and has nothing above it,
-     and never down onto the ground. It asked "ascending in both schemes" until SYSTEM's light tile-2 became a grey in
+     and never down onto the ground. It asked "ascending in both schemes" until the design system's light tile-2 became a grey in
      a white tile, which that rule could not hold. The four rows are the four steps, as before. */
   const lum = SURFACES.map((s) => relLuminance(rgb(p[s])));
   const away = scheme === 'dark' ? 1 : -1;
@@ -519,7 +519,7 @@ export function checkElevation(built: Built): Finding[] {
           fix: `theme: elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
         });
       }
-    /* 2026-09-29: LEVEL 3 MAY EQUAL LEVEL 2, AND LEVEL 2 MUST STILL CLEAR LEVEL 1. SYSTEM §4 has three levels, the
+    /* 2026-09-29: LEVEL 3 MAY EQUAL LEVEL 2, AND LEVEL 2 MUST STILL CLEAR LEVEL 1. The design system has three levels, the
        ground, tiles and chrome, and puts the sheet (`--e3`) at chrome's level, so the one step that may be flat is
        the last. A ladder that goes DOWN is still refused at either step. */
     for (let i = 1; i < alphas.length; i++)

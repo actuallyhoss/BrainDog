@@ -7,7 +7,7 @@
  * is two answers to one question; a night written twice is a line with a step in it that nothing
  * happened on. Every one of those is a refusal or a factor table here rather than a convention.
  *
- * AND money-core 3.0.0's SHAPE (`loop/finish/modules.md` MOD-4): one page called Money over the same lists, cash rolled
+ * AND money-core 3.0.0's SHAPE: one page called Money over the same lists, cash rolled
  * forward from each account's newest balance, what repeats walked from `recurring` at every cadence, and every money
  * figure in the currency the record chose. The card alerts are `packs/card-alerts` now, and their tests went with them.
  */
@@ -541,9 +541,9 @@ test('RENAMING A SETTING LABEL KEEPS THE CEILING A PERSON SAVED, because the key
  * WHAT REPEATS HAS ONE HOME, `recurring`, AND THE WALK READS IT THERE, SINCE money-core 3.0.0.
  *
  * The walk read `obligations.repeats` and left `recurring` out, so a salary typed into Repeating never reached Cash
- * ahead; and the the old tool import writes each stream as a bill that repeats and as a line of `recurring`, so walking
+ * ahead; and an import may write each stream as a bill that repeats and as a line of `recurring`, so walking
  * both would count it twice. A bill is walked once, on its day, when it does not say it repeats; a bill that does keeps
- * the word on its row and is walked from its line instead (`loop/finish/modules.md` C12).
+ * the word on its row and is walked from its line instead.
  */
 test('WHAT REPEATS IS WALKED FROM ONE LIST AT EVERY CADENCE, and a bill that says it repeats is kept and walked no more', async () => {
   const k = await seeded();
@@ -704,7 +704,7 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
 });
 
 /**
- * THE NEW LOOK'S MONEY (money-core 3.2.0, `loop/design/SCREENS.md`): a sentence said from two figures the tiles draw,
+ * THE NEW LOOK'S MONEY (money-core 3.2.0): a sentence said from two figures the tiles draw,
  * every tile beside Cash now carrying twelve weeks as a line, and one track a plan for what is paid in parts.
  */
 test('MONEY OPENS WITH ONE SENTENCE WHILE THE WALK GOES UNDER INSIDE THE YEAR, and what is paid in parts is one track a plan', async () => {
@@ -760,7 +760,7 @@ test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a l
  * WHAT `ends` COSTS THE MONTHLY FIGURES, AND THE TWO THINGS THAT KEEP IT OUT OF THEM.
  *
  * A line whose last day has passed was counted at its full monthly share for ever, because the figures read
- * `state is live` and nothing moved the row (`loop/finish/defects.md` M2). Since money-core 3.0.0 two things stop it:
+ * `state is live` and nothing moved the row. Since money-core 3.0.0 two things stop it:
  *
  *   1. THE FIGURES FILTER ON `ends` THEMSELVES, empty or on or after today (`LIVE_LINES`), in the tree form, because
  *      the sentence joins its conditions with a comma or with a comma and `or`, never both. The last lines of this
@@ -769,8 +769,7 @@ test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a l
  *      swept hourly by `rulesAboutTime` because its `when:` names a relative day and it declares `once_per`, so a list
  *      a person filters by hand reads it right too.
  *
- * `ends is empty` ALONE WOULD BE WORSE THAN NOTHING: the importer skips a stream that ended before the export ("It
- * ended before the export" in `packs/legacy-import/adapter.ts`) and writes `ends` only when it is still ahead, so
+ * `ends is empty` ALONE WOULD BE WORSE THAN NOTHING: an importer skips a stream that ended before the export and writes `ends` only when it is still ahead, so
  * every row carrying an `ends` at all is a schedule still running.
  */
 test('A SCHEDULE STOPS COUNTING THE DAY AFTER ITS LAST, before the hourly sweep ends it, and the sweep ends it', async () => {
@@ -785,7 +784,7 @@ test('A SCHEDULE STOPS COUNTING THE DAY AFTER ITS LAST, before the hourly sweep 
 
   /* THE SAMPLE HIDES THE SHAPE because its one stopped row was hand-set to `ended`. This is the
      shape a real record has: the importer writes `ends` only when it is ahead and skips a stream
-     that stopped before the export ("It ended before the export" in `packs/legacy-import/adapter.ts`), so what a record accumulates
+     that stopped before the export, so what a record accumulates
      is live rows whose end day goes past while nothing writes to them. */
   const stopped = k.create(
     'recurring',
@@ -843,7 +842,7 @@ test('A SCHEDULE STOPS COUNTING THE DAY AFTER ITS LAST, before the hourly sweep 
  * NO MONEY FIGURE NAMES A CURRENCY, SINCE money-core 3.0.0, AND NO MONEY TARGET NAMES A SUM.
  *
  * Every figure said `money.GBP`, read off the sample's rows, and every ceiling was a sterling sum, so a record in
- * Egyptian pounds read "no more than £50,000.00" under figures about its own money (`loop/finish/modules.md` C1). A
+ * Egyptian pounds read "no more than £50,000.00" under figures about its own money. A
  * `money` figure is added up in the record's home currency, else the one currency its rows are in, else one amount per
  * currency; and a ceiling is a setting that starts empty, which is no verdict until a person types one.
  */
@@ -862,7 +861,7 @@ test('EVERY MONEY FIGURE IS IN THE CURRENCY THE RECORD CHOSE, and every money ce
     assert.equal(config[said.setting]!.default, undefined, `${said.setting} starts at a sum nobody typed`);
   }
 
-  /* THE FIGURES THE CONTRACT NAMES, and the two Home leads with, in order (`loop/finish/contracts.md` §4.3a). */
+  /* THE FIGURES THE CONTRACT NAMES, and the two Home leads with, in order. */
   for (const id of ['cash-now', 'runway-days', 'arriving-30d', 'leaving-30d', 'in-by-month', 'out-by-month', 'net-by-month', 'spent-by-category-month', 'every-month-in', 'every-month-out', 'owed-to-you', 'owed-by-you'])
     assert.ok(MONEY_METRICS[id], `${id} is not declared`);
   const home = Object.values(MONEY_METRICS).filter((m) => m.home !== undefined).sort((a, b) => a.home! - b.home!).map((m) => m.metric);
@@ -890,7 +889,7 @@ test('EVERY MONEY FIGURE IT DECLARES COMES BACK IN THE CURRENCY ITS OWN ROWS CAR
 });
 
 /**
- * THE LISTS money-core 3.0.0 ADDS TO, as the contract names them (`loop/finish/contracts.md` §4.3a): a list of balance
+ * THE LISTS money-core 3.0.0 ADDS TO, as the contract names them: a list of balance
  * checks, the balance a bank message prints, the day money on its way lands, how a category matches, three more
  * cadences, and bills called what they are. Every id a record already holds stays.
  */

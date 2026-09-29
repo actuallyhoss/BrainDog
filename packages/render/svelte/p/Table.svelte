@@ -83,7 +83,7 @@
     /** Where a row's link goes, as the host serves it: `RenderOptions.href`, which this primitive is not otherwise handed. */
     href?: RenderOptions['href'];
     /**
-     * WHERE A ROW APPLIES, AS A CHIP (agents C8). The columns that hold a project's name or the word for everywhere,
+     * WHERE A ROW APPLIES, AS A CHIP. The columns that hold a project's name or the word for everywhere,
      * each name's mark and hue, and the globe's path, all the host's: a cell there draws the project's mark in its hue
      * beside the name, or the globe beside "Everywhere". Absent, every cell is its words, as it always was.
      */

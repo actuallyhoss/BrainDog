@@ -1,10 +1,10 @@
 /**
- * A founder's Home says what is due this week and what is lapsing (`loop/research-living-in-it.md` 3.1, W58-1).
+ * A founder's Home says what is due this week and what is lapsing.
  *
- * THE OWNER'S OWN RECORD IS A FOUNDER'S, AND ITS HOME HAD NEITHER LIST. A live record draws `home-<use case>` when it
+ * A FOUNDER'S HOME HAD NEITHER LIST. A live record draws `home-<use case>` when it
  * declares one and Money's `home` only when it does not, so the "Due this week" table Money declares was drawn on no
  * founder record at all, and no Home anywhere had a lapsing list, although Estate has been one of a founder's modules
- * since 1.4.0 and `services` carries a `lapsing` state. Section 3.1's probe printed the three headings the page had:
+ * since 1.4.0 and `services` carries a `lapsing` state. A probe printed the three headings the page had:
  * `{{config:voice_right_now}}`, `Latest numbers`, `Organisations`. This file is that probe kept as a test.
  */
 
@@ -27,7 +27,7 @@ const day = (n: number): string => dayOf(Date.parse(`${TODAY}T00:00:00Z`) + n * 
 
 type Block = { kind: string; heading?: string; source?: string; where?: string; columns?: unknown; order?: unknown; limit?: number; empty?: string };
 
-/** The blocks `home-founder` declares, read off the use case the way section 3.1's probe read them. */
+/** The blocks `home-founder` declares, read off the use case the way the probe read them. */
 const declared = (): Block[] => {
   const decls = (useCase('founder')!.pack?.declarations ?? []) as { page?: string; blocks?: Block[] }[];
   const home = decls.find((d) => d.page === 'home-founder');

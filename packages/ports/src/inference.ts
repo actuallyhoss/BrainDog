@@ -38,7 +38,7 @@
  *
  * NO CALL PASSES `tools`, AND THE BAN IS THE TYPE RATHER THAN A RULE. `37 §10` sketched
  * `complete(req: { …; tools?: ToolDef[]; … })` returning `{ text; toolCalls?; usage }`, and the
- * iteration-1 audits settle against it: *"No Slash inference passes `tools`. Every call is
+ * slash spec settles against it: *"No Slash inference passes `tools`. Every call is
  * schema-constrained structured output; retrieval is `project()`"* (`46 #9`, amending `11 §6`'s
  * "tool-call headroom"). So `tools` and `toolCalls` are gone from the port, and `schema` is
  * REQUIRED where the sketch had it optional. A field that exists and must never be set is a field

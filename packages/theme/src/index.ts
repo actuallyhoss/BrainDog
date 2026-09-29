@@ -29,7 +29,7 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Se
  * cream in light, warm olive-black in dark. On a screen it read as khaki, the colour of a form.
  * Hue 165 at the same capped chroma is near-black glass in dark and a clean pale grey in light.
  *
- * FOUR · 2026-09-16, THE LAVENDER AND THE MINT GO (loop/DESIGN-BRIEF.md 4.1). An indigo accent and a
+ * FOUR · 2026-09-16, THE LAVENDER AND THE MINT GO. An indigo accent and a
  * tinted ground were the two things that made the app read as a theme rather than a product: indigo
  * is the colour every generated dashboard reaches for, and hue 165 put a mint cast on every
  * surface. The ground is now a barely warm grey (hue 75, chroma capped at 0.004 in the profile).
@@ -88,15 +88,8 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Se
  * above the 7:1 AAA floor and the difference is not one a reader can see, which is the real reason
  * this line should never have been a scoreboard.
  *
- * IT IS WRITTEN OUT HERE BECAUSE OF HOW IT GOT WRONG. `loop/DIRECTION.md` §17 records the owner
- * asking twice for PostHog to be read from its source, and what the tree held afterwards was two
- * contrast ratios in this comment and nothing else: no token values, no file paths, no comparison
- * of the two schemes. A number that agrees with a direction does not discharge it. The read that
- * was actually asked for is `loop/research-site-reference.md`, and `apps/site/DESIGN-NOTES.md` is
- * the second pass over the same sources.
- *
- * EIGHT · 2026-09-25, THE GROUND GOES COOL (`loop/finish/design.md` D-3). Hue 75 made the dark
- * ground a brown-black and the light one a cream, and the direction asks for a near-black cool
+ * EIGHT · 2026-09-25, THE GROUND GOES COOL. Hue 75 made the dark
+ * ground a brown-black and the light one a cream, and the product asks for a near-black cool
  * ground. `neutralHue` moves to 260, a slate, under the same 0.004 chroma cap
  * `HOUSE_PROFILE.groundC` already holds: the cap is what keeps a cool ground from turning into the
  * mint §FOUR removed. Solved when it was chosen, dark `bg` is #121314 and `sunk` #0B0C0E, light
@@ -108,10 +101,10 @@ import { build, HIGH_CONTRAST_PROFILE, HOUSE_NEUTRAL_HUE, HOUSE_PROFILE, type Se
  * since 2026-09-21 (`theme.test.ts` holds it within two degrees of the mark). The lightness and
  * chroma argument in §SEVEN is unchanged by that.
  *
- * NINE · 2026-09-29, loop/design/SYSTEM.md. The seed does not move: the accent is the mark and stays the mark (D-1),
- * and 260 is already SYSTEM's slate, whose surfaces and inks measure 254 to 263. What moved is the profile
- * (`HOUSE_PROFILE` in `build.ts`), which now carries SYSTEM's ground, tile, inks, line, intents and `live` as aims,
- * and the radius, which is SYSTEM §4's: key caps 6, fields and menus 12, tiles and the rail 22 (`tokens.css`).
+ * NINE · 2026-09-29, THE DESIGN SYSTEM. The seed does not move: the accent is the mark and stays the mark,
+ * and 260 is already the design system's slate, whose surfaces and inks measure 254 to 263. What moved is the profile
+ * (`HOUSE_PROFILE` in `build.ts`), which now carries the design system's ground, tile, inks, line, intents and `live` as aims,
+ * and the radius, which is the design system's: key caps 6, fields and menus 12, tiles and the rail 22 (`tokens.css`).
  */
 export const HOUSE_SEED: Seed = {
   accent: 'oklch(0.575 0.215 27)',

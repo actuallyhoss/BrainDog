@@ -1,15 +1,14 @@
 /**
- * `activity`: the record's log as a tool, which is the one thing the old tool's agents have and this
- * package's agents did not.
+ * `activity`: the record's log as a tool, which agents coming from other records expect and this
+ * package's agents did not have.
  *
- * MEASURED AGAINST `loop/research-switch.md` §1. Of that server's twenty-one tools, nineteen have a
- * path here already: `brain_get/set/patch/log`, the four task tools and `brain_skills`,
- * `brain_credentials` and `brain_learnings` are `get`, `create`, `update`, `log` and `list` over the
- * register they name; `brain_suggestions` and `brain_suggest_new` are `governance` and `propose`;
- * `brain_session_update` is `handoff`; `brain_sessions` is inside `context` (`live.same_repo` and
- * `live.elsewhere`); and `money_inbox` maps to a route the record refuses to every token on purpose.
- * `brain_audit` was the one with no path at all: `history` takes a row, and an agent picking up after
- * another session does not know which row to ask about. That is what this tool is for.
+ * MEASURED AGAINST A TYPICAL AGENT TOOLSET. Reading, writing and patching a row, logging on it, the
+ * task, skill, credential and learning tools are `get`, `create`, `update`, `log` and `list` over the
+ * register they name; suggestions are `governance` and `propose`; a session update is `handoff`;
+ * the list of live sessions is inside `context` (`live.same_repo` and `live.elsewhere`); and an
+ * inbox read maps to a route the record refuses to every token on purpose. A record-wide audit log
+ * was the one with no path at all: `history` takes a row, and an agent picking up after another
+ * session does not know which row to ask about. That is what this tool is for.
  *
  * AND IT IS SHAPED THE WAY A ROW IS. A line of the log carried `register` and `seq` apart, so the
  * address every other tool takes had to be assembled by the model. It carries `spoken` here, with the

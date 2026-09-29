@@ -2,9 +2,9 @@
  * A repeating line in Money carries the last day it moves money on, and the Money page's cash walk stops on it.
  *
  * WHAT WENT WRONG. `5d4bbf8b` taught both engines an end day for a leg (`Leg.ends` in `packages/kernel/src/forecast.ts`)
- * and taught the the old tool import to write one, but only where `obligations` declares the field, and money-core 2.3.0
- * declared none. So on every record the import sent nothing, and a bill the old tool says ends on 10 November walked
- * 10 December and every month to the horizon on the page he reads to decide what to shut down. The field was one half
+ * and taught an import to write one, but only where `obligations` declares the field, and money-core 2.3.0
+ * declared none. So on every record the import sent nothing, and a bill the source says ends on 10 November walked
+ * 10 December and every month to the horizon on the page a person reads to decide what to shut down. The field was one half
  * of the repair and the leg naming it was the other; neither was in the pack.
  *
  * money-core 2.4.0 declares `ends` on `obligations` and names it on the cash legs both `/p/money` walks share
@@ -17,7 +17,7 @@
  * SINCE money-core 3.0.0 REPEATING MONEY IS WALKED FROM `recurring` ALONE, which has always carried `ends`. The walk's
  * obligations leg reads a bill once and leaves out one that says it repeats, so a stream is never walked twice
  * (`CASH_LEGS`), and the leg that names `ends` is the recurring one. `obligations` keeps its `ends`, which nothing is
- * taken away from, and the the old tool import writes a repeating line and its end to `recurring`.
+ * taken away from, and an import writes a repeating line and its end to `recurring`.
  */
 
 import { test } from 'node:test';
@@ -110,7 +110,7 @@ test('a monthly line ending on 10 November walks 10 September, October and Novem
 
   const made = k.create('recurring', { ...HOSTING, ends: '2026-11-10' }, OWNER);
   assert.ok(made.ok, sayOf(made));
-  /* THE END IS INCLUSIVE, because the old tool's `ends_on` is the last payday: see `Leg.ends`. */
+  /* THE END IS INCLUSIVE, because an imported end day is the last payday: see `Leg.ends`. */
   assert.deepEqual(walked(k, 'Cash ahead', HOSTING.what), ['2026-09-10 -4500', '2026-10-10 -4500', '2026-11-10 -4500']);
   assert.deepEqual(walked(k, 'The next 30 days', HOSTING.what), ['2026-09-10 -4500']);
 
@@ -118,8 +118,8 @@ test('a monthly line ending on 10 November walks 10 September, October and Novem
   value(k.create('obligations', { ...HOSTING_BILL, ends: '2026-11-10' }, OWNER));
   assert.deepEqual(walked(k, 'Cash ahead', HOSTING_BILL.what), []);
 
-  /* CLEARED, THE ROW IS A MONTHLY LINE WITH NO END AGAIN, which is what the import sends the night the old tool takes an
-     end away (`packs/legacy-import/test/import-null-clears.test.ts`). The kernel must take `null` as the clear. */
+  /* CLEARED, THE ROW IS A MONTHLY LINE WITH NO END AGAIN, which is what an import sends the night the source takes an
+     end away. The kernel must take `null` as the clear. */
   const cleared = k.update('recurring', made.value.id, { ends: null }, { ...OWNER, version: made.value.version });
   assert.ok(cleared.ok, sayOf(cleared));
   assert.equal(Object.hasOwn(cleared.value.fields, 'ends') ? cleared.value.fields.ends : null, null);

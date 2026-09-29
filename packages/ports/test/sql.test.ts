@@ -1,15 +1,15 @@
 /**
  * The SQL guard, the driver-message map, the capability probe and the boot refusal (`37 §5.2`, `§5.3`, `§5.8`).
  *
- * THE DURABLE OBJECT IS THE CEILING AND `node:sqlite` IS THE HOST THAT DOES NOT HAVE ONE. Measured on 24 September
- * 2026, local workerd through Miniflare from wrangler 4.129.0, against Node 24.13.0: the DO refuses a 101st bound
+ * THE DURABLE OBJECT IS THE CEILING AND `node:sqlite` IS THE HOST THAT DOES NOT HAVE ONE. Measured on
+ * local workerd through Miniflare from wrangler 4.129.0, against Node 24.13.0: the DO refuses a 101st bound
  * parameter, a statement of 100,001 bytes, a `LIKE ?` pattern of 51 bytes and a sixth compound term, and `node:sqlite`
  * answers every one of them. So a statement the self-host serves today can fail on the Worker tomorrow, and nothing
  * between the two says so. The first test below runs each pair through a bare `node:sqlite` port first, to show the
  * pass it is taking away, and then through `guarded`, which must answer N and refuse N+1 with the DO's own code.
  *
- * THE BYTE CEILING IS 100,000 ALLOWED AND 100,001 REFUSED, which `37 §5.3` said and the hardening survey
- * (`loop/research-hardening.md` §0 item 6, §2.5) contradicted. The survey's probe padded `'SELECT 1 AS n /*'` with
+ * THE BYTE CEILING IS 100,000 ALLOWED AND 100,001 REFUSED, which `37 §5.3` said and an earlier hardening
+ * survey contradicted. The survey's probe padded `'SELECT 1 AS n /*'` with
  * `N - 17` characters and closed it with `*` and `/`, which is N + 1 bytes: its "99,999" was 100,000 and passed, its
  * "100,000" was 100,001 and failed. Padded exactly, the DO answers 99,999 and 100,000 and refuses 100,001 with
  * `statement too long: SQLITE_TOOBIG`, and in two-byte characters it answers 100,000 and refuses 100,002.
@@ -138,7 +138,7 @@ test('THE BYTE CEILING COUNTS UTF-8, SO A STATEMENT UNDER 100,000 CHARACTERS CAN
   const astral = `SELECT '${'😀'.repeat(25_000)}' AS v`;
   assert.equal(bytes(astral), 100_014, 'four bytes a pair, not six');
   /* THE COUNT IS ASSERTED, NOT ONLY THE REFUSAL. Scoring a pair as six bytes (two lone surrogates) refuses this
-     statement just the same, and the checker's mutation of it passed every test until the number was read back. */
+     statement just the same, and a mutation of it passed every test until the number was read back. */
   assert.throws(() => guard(astral, []), /statement is 100014 bytes;/);
   assert.doesNotThrow(() => guard(`SELECT '${'😀'.repeat(20_000)}' AS v`, []), '80,014 bytes, which six a pair would refuse');
   const lone = `SELECT '${String.fromCharCode(0xd800).repeat(33_400)}' AS v`;
@@ -147,7 +147,7 @@ test('THE BYTE CEILING COUNTS UTF-8, SO A STATEMENT UNDER 100,000 CHARACTERS CAN
 });
 
 test('A VALUE THAT IS NOT A PARAM NEVER REACHES A DRIVER, BECAUSE BOTH DRIVERS BIND IT AS SOMETHING', () => {
-  /* Measured on local workerd, 24 September 2026, `SELECT ? AS v`: `true` answered the TEXT 'true', `undefined` NULL,
+  /* Measured on local workerd, `SELECT ? AS v`: `true` answered the TEXT 'true', `undefined` NULL,
      `new Date(0)` its toString() in the machine's own time zone, `{}` the TEXT '[object Object]', `[]` the empty
      string, `NaN` NULL. None was refused, which `37 §5.3` step 4 said they would be. `node:sqlite` throws on `true` and
      `undefined` and binds a Date as NULL. Two hosts, three answers, and the one the Worker gives writes a wrong row. */

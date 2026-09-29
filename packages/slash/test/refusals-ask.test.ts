@@ -2,7 +2,7 @@
  * The `via: ask` runner: five fixtures, four driven through the palette's two passes and one
  * through an automation's `answer`.
  *
- * `40 §6` minted `ask` on September 21st 2026 for the four codes this package raises when a model
+ * `40 §6` minted `ask` for the four codes this package raises when a model
  * answers, and gave it `slash/test` as its runner. Until this file, the four fixtures were checked
  * by `tools/gates/refusal-fixtures.mjs` for naming a file that still says their code, and by nothing
  * for whether the palette answers them with the `at` they claim. That is the gap every runner in
@@ -12,11 +12,11 @@
  * four `raises:` point. `cite.test.ts` already calls `cite('{{pct:-46.3}}')` and gets this code; what
  * nothing asserted was that the palette, handed a reply carrying that span, refuses the proposal with
  * the same address rather than filing it. A fixture is a claim about a surface a person meets, and
- * the palette is that surface until a host action reaches it (`loop/STATUS.md` records that none does
+ * the palette is that surface until a host action reaches it (none does
  * yet), so the palette is what the fixture is driven against.
  *
- * AND `answer` FOR THE ONE CODE ONLY `answer` RAISES. `ANSWER_UNREADABLE` was admitted on September
- * 23rd 2026 for an automation's question the model answered with a 200 the host could not read, and
+ * AND `answer` FOR THE ONE CODE ONLY `answer` RAISES. `ANSWER_UNREADABLE` was admitted later
+ * for an automation's question the model answered with a 200 the host could not read, and
  * `propose` cannot reach it: the palette answers a marked throw as `UNREACHABLE`, like any other. It
  * was the gate's one finding on that date, `refusal-fixtures` naming it as a code with no fixture,
  * and a fixture this file drove through `propose` would have been a `TypeError` in `propose.ts`, which
@@ -74,7 +74,7 @@ const family: Fixture[] = familyOf('ask');
 
 /* THE COUNT IS ASSERTED SO THAT A SIXTH CANNOT ARRIVE UNDRIVEN. `40 §6`'s table says the ask family
    is five: the four the palette raises, and `ANSWER_UNREADABLE`, which only an automation's `answer`
-   does. The fifth arrived on September 23rd 2026 and found out here, as 5 against 4, that nothing
+   does. The fifth arrived later and found out here, as 5 against 4, that nothing
    drove it; a sixth finds out the same way that it needs an `ask:` or an `answer:`, rather than
    joining a family nothing runs. */
 test('every ask fixture in the corpus is driven here, and there are five of them', () => {
@@ -161,7 +161,7 @@ for (const fixture of family) {
 
       /* AND AN AUTOMATION'S ASK THAT REACHED A MODEL IS ON THE METER, which is what `30 §6` says
          separates `ANSWER_UNREADABLE` from `UNREACHABLE`: a provider bills the 200 it served.
-         `loop/research-batch-forty-six-audit.md` finding 4 measured the same throw settled under
+         A probe measured the same throw settled under
          `-`, which no count reads, so a clock rule spent a model's time without spending its
          allowance. The palette's four are not asserted here, because whether a refused proposal is
          counted is not what any of their fixtures claims. */

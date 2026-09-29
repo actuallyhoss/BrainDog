@@ -5,7 +5,7 @@ fix:       Check the network and the record's address.
 call:      { "method": "boot", "args": {} }
 principal: { "kind": "person", "level": "owner" }
 
-# NO `at:`, BECAUSE THE CLIENT GIVES NONE. This said `at: base` until 2026-09-22, when
+# NO `at:`, BECAUSE THE CLIENT GIVES NONE. This once said `at: base`, until
 # `packages/client/test/refusals-rpc.test.ts` drove it and `unreachable()` answered `{ code, fix }`.
 #
 # AND THE FIX THE CLIENT SENDS IS NOT A SENTENCE. With Node's `fetch` failing, it reads "The record

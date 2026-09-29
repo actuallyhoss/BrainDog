@@ -1,7 +1,7 @@
 /**
  * Totals and figures: the two kinds of number Slash may now say, and only by citing them.
  *
- * WHAT THIS HOLDS (`loop/finish/agents.md` §2.7, S13, and AGT-22). "How much did I spend on software this month" is
+ * WHAT THIS HOLDS. "How much did I spend on software this month" is
  * answered from a total code worked out over the rows read, quoted as `{{sum:…}}`; "why is runway four months" is
  * answered from the figure the record keeps, read for the ask and quoted by its id. Neither is typed by the model, a
  * total over a register the record cut short is never offered, and every brace in the answer is kept on its body as

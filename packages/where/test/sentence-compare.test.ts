@@ -2,7 +2,7 @@
  * `at least`, `at most`, `more than`, `less than` and `between` in the sentence form.
  *
  * THE STRUCTURED FORM HAS COMPILED `gt gte lt lte between` ALL ALONG AND NO SENTENCE COULD SAY THEM.
- * Measured on 24 September at `facafeed` (`loop/research-m4-app.md`, brief 6): through a kernel
+ * Measured through a kernel
  * `list`, `n is at least 3` was refused `VALUE_MALFORMED` over an `int`, `n more than 3` and
  * `n between 1 and 5` were refused `MATCH_OP_UNSUPPORTED`, and over a `money` field the first came
  * back `MONEY_LITERAL_NEEDS_CURRENCY` because the words `at least 100` had been handed to `compile`
@@ -103,7 +103,7 @@ test('AN ORDER BELONGS TO A NUMBER, A MONEY, A QUANTITY AND A DAY, and to nothin
 });
 
 test('A TEXT THAT STARTS WITH AN ORDERED WORD IS STILL A TEXT, after `is`', () => {
-  /* THE CHECKER OF THE FIRST ATTEMPT FOUND IT: `what is more than coffee` was `{ field: 'what', is:
+  /* A REVIEW OF THE FIRST ATTEMPT FOUND IT: `what is more than coffee` was `{ field: 'what', is:
      'more than coffee' }` before the words were taught, and the first attempt refused it as an order a
      text cannot be asked. A merchant, a note or a title is free to begin with any words, and a text
      field is never ordered, so after `is` the words are the value it was always read as. The bare
@@ -184,7 +184,7 @@ test('A MONEY NUMBER CARRIES ITS CURRENCY, and is read in the currency\'s own un
     ],
   });
 
-  /* THE BRIEF'S NOTE, AS A TEST: a bare number over money is refused with the compiler's own code,
+  /* A BARE NUMBER OVER MONEY, AS A TEST: a bare number over money is refused with the compiler's own code,
      here at parse, so a rule's lint sees it too rather than installing a condition that never holds. */
   assert.equal(refused('amount at least 100').code, 'MONEY_LITERAL_NEEDS_CURRENCY');
   assert.equal(refused('amount is at least 100').code, 'MONEY_LITERAL_NEEDS_CURRENCY');

@@ -1,8 +1,8 @@
 /**
  * `runInQuickJs`: one run of one script, in QuickJS compiled to WebAssembly, on the self-host.
  *
- * Section 4 of the design is the argument for QuickJS over `node:vm` and `isolated-vm`. This file is
- * the half of it that has to hold: the script gets a fresh interpreter with no globals but the
+ * QuickJS was chosen over `node:vm` and `isolated-vm` for isolation. This file is
+ * the half of that choice that has to hold: the script gets a fresh interpreter with no globals but the
  * language's own, `ctx` is the only door, and three budgets stop it from outside.
  *
  * THE THREE BUDGETS, AND WHICH MECHANISM HOLDS EACH.
@@ -147,7 +147,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   /* THE ONE WITNESS THAT THE HEAP RAN OUT. Many small objects fill the heap in pieces no single
      allocation of which is refused, and when the engine then cannot allocate even its "out of
      memory" error it throws a bare `null`, which is also what `throw null` in a script looks like.
-     Audit thirty-two saw 300,000 pushed objects answered as the script's own throw. The runtime's
+     A probe saw 300,000 pushed objects answered as the script's own throw. The runtime's
      own usage is no help afterwards: the objects die with the frame that held them, and it read
      96,798 bytes. What does not die is the fact that emscripten asked this memory to grow past its
      maximum and was told no, and emscripten asks through the object it was handed, so the refusal
@@ -173,7 +173,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
    * THE TWO TIME BUDGETS, ASKED BY THE CLOCK RATHER THAN BY THE INTERPRETER. QuickJS calls the
    * interrupt handler after a count of interpreted instructions, so time that is not interpretation
    * (a 5 MB object copied across in `ctx.write`, a native `JSON.stringify` inside the engine) never
-   * reaches it. Audit thirty-two measured two hundred such writes answered clean at `cpu_ms: 6777`
+   * reaches it. A probe measured two hundred such writes answered clean at `cpu_ms: 6777`
    * against a limit of 200. So the handler, every host function, every settle after a host await
    * and the end of the run all ask this same question.
    */
@@ -466,7 +466,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
     if ('error' in outcome && outcome.error !== undefined) {
       /* INSIDE inVm, BECAUSE READING THE ERROR RUNS THE SCRIPT. Read outside it, a thrown object
          whose `message` getter spun had no slice to be measured against, so the handler checked
-         only the deadline: the audit's probe spun its whole 3,000 ms wall_ms and was metered at
+         only the deadline: a probe spun its whole 3,000 ms wall_ms and was metered at
          `cpu_ms: 12` under a limit of 100. */
       const thrown = outcome.error;
       const message = inVm(() => errorText(vm, thrown));

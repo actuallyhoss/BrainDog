@@ -62,7 +62,7 @@ export type Role =
   | 'accent-ink'
   | 'focus-in'
   | 'focus-out'
-  /* An agent working right now (loop/design/SYSTEM.md §2): its ring, its running bar, the "now" line, Slash's
+  /* An agent working right now: its ring, its running bar, the "now" line, Slash's
      suggestion lines. NOT AN INTENT: it is a state, never a row's verdict, so check F does not hold it apart from
      `info`. `live` is solved as text, `live-fill` as a mark. */
   | 'live'
@@ -72,7 +72,7 @@ export type Palette = Record<Role, string>;
 
 /**
  * The generated values that are not colours a theme may set: the glass chrome, the ground's light, the row washes
- * and the arrival tint (SYSTEM §2, §12.1). They carry alpha, which the dialect refuses in a role (`parseColour`: "No
+ * and the arrival tint. They carry alpha, which the dialect refuses in a role (`parseColour`: "No
  * alpha"), and a theme has no key for them, the same as elevation. Emitted beside the palette in every scheme block.
  */
 export const CHROME = [
@@ -124,7 +124,7 @@ export type Profile = {
   /**
    * WHERE A ROLE WANTS TO SIT, AND THE FLOOR STILL DECIDES WHERE IT DOES.
    *
-   * A design (loop/design/SYSTEM.md §2) names its inks, its line, its intents and `live` as colours, and a generator
+   * A design names its inks, its line, its intents and `live` as colours, and a generator
    * that only solves for a ratio lands wherever the ratio lands. An aimed role starts at its aim and is moved along
    * lightness only, holding its hue and chroma, and only as far as its floor on the worst surface asks. So the aim is
    * met exactly wherever the floor allows it, and missed by the least lightness where it does not, and nothing is
@@ -135,7 +135,7 @@ export type Profile = {
    * as it always has.
    */
   aim?: Record<Scheme, Partial<Record<AimRole, Aim>>>;
-  /** The chrome this profile paints: SYSTEM's glass, or opaque, which is what high contrast asks for. */
+  /** The chrome this profile paints: the design system's glass, or opaque, which is what high contrast asks for. */
   chrome: 'glass' | 'opaque';
   /** The chroma ladder the separability search walks, and the contrast grid it walks it against. */
   chromaLadder: number[];
@@ -169,22 +169,22 @@ export type Profile = {
 
 /**
  * The house's neutral hue, a slate. `HOUSE_SEED` spends it, and a record's own palette keeps it (`record.ts`), because
- * in SYSTEM the ground is the product's and the colour is the record's.
+ * in the design system the ground is the product's and the colour is the record's.
  */
 export const HOUSE_NEUTRAL_HUE = 260;
 
 export type AimRole =(typeof INKS)[number] | 'line' | (typeof INTENTS)[number] | 'live' | 'live-fill' | 'arrive';
 
 /**
- * loop/design/SYSTEM.md §2, as the generator reads it: every colour it names, in OKLCH, measured off its hex.
+ * The design system's colours, as the generator reads them: every colour it names, in OKLCH, measured off its hex.
  *
  * The inks and the line carry no hue: they take the seed's neutral hue, as the surfaces do, so a record or a pack with
- * its own ground still gets inks leaning with it. The intents and `live` carry SYSTEM's hues, which are not the intent
- * anchors (`INTENT_HUE`): SYSTEM's amber is 52 in light and 65 in dark where the anchor is 75, and its green 155 where
+ * its own ground still gets inks leaning with it. The intents and `live` carry the design system's hues, which are not the intent
+ * anchors (`INTENT_HUE`): the design system's amber is 52 in light and 65 in dark where the anchor is 75, and its green 155 where
  * the anchor is 145. The anchors stay what identity hues are steered away from; these are what gets painted. Both
  * sit well over `HUE_FLOOR` from `danger`.
  *
- * `faint` aims at `dim`. SYSTEM has no fourth ink ("ink-3 is the lowest text ink"), and `faint` never carries a word
+ * `faint` aims at `dim`. The design system has no fourth ink ("ink-3 is the lowest text ink"), and `faint` never carries a word
  * here (css-rules' `faint-on-text`), so it is `dim`'s colour held to its own floor.
  */
 const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
@@ -218,10 +218,10 @@ const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
 
 export const HOUSE_PROFILE: Profile = {
   id: 'house',
-  /* 2026-09-29, SYSTEM'S OWN FLOORS (loop/design/SYSTEM.md §2: "every text pair clears 4.5:1 ... ink-3 is the lowest
+  /* 2026-09-29, THE DESIGN SYSTEM'S OWN FLOORS ("every text pair clears 4.5:1 ... ink-3 is the lowest
      text ink"). This was [14, 9, 6.5, 4.5], a ramp pushed to "the most the validator will accept", and at those floors
-     SYSTEM's ink-2 and ink-3 cannot exist: ink-2 measures 6.84:1 on the ground and ink-3 4.20:1. The ramp now sits
-     where SYSTEM draws it (`aim` below) and these are the floors under it: ink at 13, which SYSTEM's ink clears on the
+     the design system's ink-2 and ink-3 cannot exist: ink-2 measures 6.84:1 on the ground and ink-3 4.20:1. The ramp now sits
+     where the design system draws it (`aim` below) and these are the floors under it: ink at 13, which the design system's ink clears on the
      lightest dark surface with room, ink-2 at 6.5, and ink-3 at AA. */
   ink: [13, 6.5, 4.5, 4.5],
   edge: 3,
@@ -255,9 +255,9 @@ export const HOUSE_PROFILE: Profile = {
    * mint.
    */
   /**
-   * 2026-09-29, SYSTEM'S GROUND, TILE AND TILE-2 (loop/design/SYSTEM.md §2, §12.1). `sunk` is the ground, the page
-   * itself; `bg` is the tile; `s1` is tile-2, the well inside a tile. Each rung carries SYSTEM's own chroma, a cool
-   * slate at the seed's neutral hue, which the old flat cap of 0.004 could not reach (SYSTEM's dark tile-2 is 0.0185).
+   * 2026-09-29, THE DESIGN SYSTEM'S GROUND, TILE AND TILE-2. `sunk` is the ground, the page
+   * itself; `bg` is the tile; `s1` is tile-2, the well inside a tile. Each rung carries the design system's own chroma, a cool
+   * slate at the seed's neutral hue, which the old flat cap of 0.004 could not reach (the design system's dark tile-2 is 0.0185).
    *
    * THE LIGHT LADDER TURNS OVER AT THE TILE. The tile is white, so nothing can sit above it, and tile-2 is a grey
    * inside it: `s1`, `s2` and `s3` step DOWN from `bg` in light, toward the ground and never onto it, and UP from `bg`
@@ -265,7 +265,7 @@ export const HOUSE_PROFILE: Profile = {
    *
    * `s2` AND `s3` KEEP THEIR STEPS, AND THE STEPS ARE SMALL BECAUSE TWO FLOORS MEET THERE. In dark, `s3` is the
    * lightest surface, so it is where the accent fill (check R, 3:1) and ink-3 (check A, 4.5:1) are both measured. At
-   * L 0.275 the brand red still clears 3:1 and SYSTEM's ink-3 still clears AA, so it is the ceiling, and `s2` is
+   * L 0.275 the brand red still clears 3:1 and the design system's ink-3 still clears AA, so it is the ceiling, and `s2` is
    * halfway. In light they share the gap between tile-2 and the ground.
    */
   ladder: {
@@ -331,9 +331,9 @@ export const HIGH_CONTRAST_PROFILE: Profile = {
     light: { sunk: 0.955, bg: 1, s1: 0.985, s2: 0.975, s3: 0.965 },
   },
   groundC: { dark: 0.012, light: 0.005 },
-  /* SYSTEM's colours are where high contrast starts too; its higher floors decide how far each one moves. */
+  /* The design system's colours are where high contrast starts too; its higher floors decide how far each one moves. */
   aim: SYSTEM_AIM,
-  /* SYSTEM: "High contrast makes glass opaque." */
+  /* The design system: "High contrast makes glass opaque." */
   chrome: 'opaque',
   intentFill: 4.5,
   mark: { dark: { L: 0.78, C: 0.13 }, light: { L: 0.46, C: 0.11 } },
@@ -412,7 +412,7 @@ export type Built = {
   mark: Record<Scheme, { L: number; C: number }>;
   /** The elevation ladder, three levels, fixed geometry, alphas per scheme (28 §1). */
   elevation: Record<Scheme, [string, string, string]>;
-  /** The glass, the ground's light and the washes, per scheme (SYSTEM §2). Not roles: see `CHROME`. */
+  /** The glass, the ground's light and the washes, per scheme. Not roles: see `CHROME`. */
   chrome: Record<Scheme, Chrome>;
   radius: { sm: number; md: number; lg: number };
   space: number;
@@ -523,7 +523,7 @@ function ground(
  * The lightest or darkest of the five, by relative luminance: what a foreground role is solved against.
  *
  * READ OFF THE COLOURS, NOT OFF THE NAMES. It was `sunk` in light and `s3` in dark by name, which held while the
- * ladder climbed in both schemes. SYSTEM's light ladder turns over at the tile, and a name-based answer would be one
+ * ladder climbed in both schemes. The design system's light ladder turns over at the tile, and a name-based answer would be one
  * ladder change away from solving every ink against the wrong surface.
  */
 const extreme = (g: Record<string, string>, darkest: boolean) =>
@@ -532,9 +532,9 @@ const extreme = (g: Record<string, string>, darkest: boolean) =>
 /**
  * The worst ground a foreground role ever sits on. Solve there and every other surface follows.
  *
- * THE FIVE SURFACES, AND NOT A ROW'S WASH OVER THEM, which is an open question rather than an oversight. SYSTEM's
+ * THE FIVE SURFACES, AND NOT A ROW'S WASH OVER THEM, which is an open question rather than an oversight. The design system's
  * light wash is darker than its ground, so a selected row's ink-3 meta reads at about 4.0:1 on it. Solving on the
- * washed ground was measured on 2026-09-29 and moves six of SYSTEM's light values (red to #CA0717, amber to #512300),
+ * washed ground was measured on 2026-09-29 and moves six of the design system's light values (red to #CA0717, amber to #512300),
  * which is a design decision about the wash and not the generator's to take.
  */
 const worstOf = (scheme: Scheme, g: Record<string, string>) => extreme(g, scheme === 'light');
@@ -626,9 +626,9 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   /* 1.55, not 1.35. With no shadow anywhere in the system a border IS the boundary, so it has to be
      seen rather than merely found — a thin olive hairline that says "this is a card", not a
      suggestion of one. Flat and confident beats soft and vague. */
-  /* 2026-09-16, back to a hairline (loop/DESIGN-BRIEF.md 4.1): space separates groups now, so a
+  /* 2026-09-16, back to a hairline: space separates groups now, so a
      line only has to be findable, and 1.55 drew a box around everything. */
-  /* 2026-09-29: SYSTEM's line is aimed, and has no floor to be moved by. It measures 1.24:1 on the tile in both
+  /* 2026-09-29: the design system's line is aimed, and has no floor to be moved by. It measures 1.24:1 on the tile in both
      schemes. */
   const line = hex(place('line', null, () => solveL(1.35, Cink, nHue, rgb(g.bg), dir)));
 
@@ -737,7 +737,7 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
             }
     return found;
   };
-  /* THE AIMS ARE NOT ALWAYS SEPARABLE AS WRITTEN, AND SYSTEM'S ARE NOT. Measured on 2026-09-29, its amber and its red
+  /* THE AIMS ARE NOT ALWAYS SEPARABLE AS WRITTEN, AND THE DESIGN SYSTEM'S ARE NOT. Measured on 2026-09-29, its amber and its red
      are delta-E 4.0 apart to a deuteranope in light and 8.1 in dark, and its green and amber 9.9 to a protanope in
      dark, against check F's floor of 10. So the aimed intents are walked AWAY FROM THE GROUND along lightness, which
      only ever adds contrast, in steps of 0.01, cheapest move first by the profile's own weights (`danger` the
@@ -848,11 +848,11 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
 }
 
 /**
- * SYSTEM §2 and §4's translucent paints, each an OKLCH colour or white or black, at an alpha.
+ * The design system's translucent paints, each an OKLCH colour or white or black, at an alpha.
  *
- * `SHADE` is SYSTEM's cool near-black, rgb(16 24 40): the colour of a light-scheme shadow, of the hairline outside
+ * `SHADE` is the design system's cool near-black, rgb(16 24 40): the colour of a light-scheme shadow, of the hairline outside
  * glass and of the wash under a hovered row. The dark scheme's shadows and outer hairline are plain black and its
- * washes and inner edges plain white, as SYSTEM writes them.
+ * washes and inner edges plain white, as the design system writes them.
  */
 type Paint = 'white' | 'black' | Required<Aim>;
 const SHADE: Paint = { L: 0.2099, C: 0.0341, H: 263.4 };
@@ -877,8 +877,8 @@ const GLASS: Record<Scheme, Record<'glass' | 'glass-strong' | 'glass-rim' | 'gla
     wash: ['white', 0.06],
   },
 };
-/* `backdrop-filter: blur(24px) saturate(n)`: tokens.css owns the blur, and the saturation is the one part SYSTEM
-   varies by scheme. */
+/* `backdrop-filter: blur(24px) saturate(n)`: tokens.css owns the blur, and the saturation is the one part the design
+   system varies by scheme. */
 const SATURATE: Record<Scheme, number> = { light: 1.6, dark: 1.4 };
 
 const channels = (hexColour: string) => {
@@ -889,10 +889,10 @@ const paint = (p: Paint, alpha: number) =>
   `rgb(${p === 'white' ? '255 255 255' : p === 'black' ? '0 0 0' : channels(toHex(quantise(p)))} / ${alpha})`;
 
 /**
- * The arrival tint, at SYSTEM's `arrive` and held inside the surface band.
+ * The arrival tint, at the design system's `arrive` and held inside the surface band.
  *
  * IT IS OPAQUE AND A ROW'S TEXT SITS ON IT, so it may be no further from the inks than the worst surface is: every
- * ink is proven on that surface and so, by luminance, on this. SYSTEM's own values are inside the band in the house
+ * ink is proven on that surface and so, by luminance, on this. The design system's own values are inside the band in the house
  * ladders; high contrast's darker `s3` moves the dark one down to meet it.
  */
 function arrival(p: Palette, profile: Profile, scheme: Scheme): string {
@@ -912,9 +912,9 @@ function arrival(p: Palette, profile: Profile, scheme: Scheme): string {
 }
 
 /**
- * The chrome of one scheme. SYSTEM's glass where the profile paints glass; opaque where it does not, which is high
+ * The chrome of one scheme. The design system's glass where the profile paints glass; opaque where it does not, which is high
  * contrast: the glass becomes the tile, the inner edge goes and the outer one is `edge`, the proven boundary, and the
- * ground loses its light. The wash stays SYSTEM's: a stronger one would take more contrast from the words on it.
+ * ground loses its light. The wash stays the design system's: a stronger one would take more contrast from the words on it.
  */
 function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
   const g = GLASS[scheme];
@@ -928,15 +928,15 @@ function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
     'glass-sat': String(SATURATE[scheme]),
     'ground-glow': glass ? paint(...g['ground-glow']) : paint('white', 0),
     'hover-wash': wash,
-    /* SYSTEM: "hover and selection fill of a row". One wash; a chosen row is told from a hovered one by staying. */
+    /* The design system: "hover and selection fill of a row". One wash; a chosen row is told from a hovered one by staying. */
     selected: wash,
     'arrived-wash': arrival(p, profile, scheme),
   };
 }
 
 /**
- * SYSTEM §4's depth, three levels and no more: the ground (none), tiles (`--e1`), and chrome and floating things
- * (`--e2`). `--e3` is the sheet, which SYSTEM puts at level 2 too, so it is `--e2`'s value under the name the sheets
+ * The design system's depth, three levels and no more: the ground (none), tiles (`--e1`), and chrome and floating things
+ * (`--e2`). `--e3` is the sheet, which the design system puts at level 2 too, so it is `--e2`'s value under the name the sheets
  * already read. In dark a tile has no shadow and is told from the ground by its fill, which is a shadow of no alpha
  * rather than `none`, so check I can still read the level.
  *

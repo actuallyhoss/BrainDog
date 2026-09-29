@@ -27,7 +27,7 @@
   body {
     margin: 0;
     color: var(--ink);
-    /* THE GROUND AND ITS LIGHT (loop/design/SYSTEM.md §2): the page is the ground, and one soft light falls on it
+    /* THE GROUND AND ITS LIGHT: the page is the ground, and one soft light falls on it
        from the top of the window. The only gradient in the product, and it is painted here and nowhere else. */
     background: var(--ground-light), var(--sunk);
     font-family: var(--font-ui);
@@ -42,7 +42,7 @@
 
   h1, h2, h3, h4 {
     margin: 0;
-    /* GEIST, NOT POPPINS (SYSTEM §3: Geist for every word). Poppins stays declared in tokens.css for the
+    /* GEIST, NOT POPPINS (Geist for every word). Poppins stays declared in tokens.css for the
        wordmark's own use, and nothing in the base reaches for it. */
     font-family: var(--font-ui);
     font-weight: 600;
@@ -55,8 +55,8 @@
   }
 
   /* A LINK IS INK WITH A QUIET UNDERLINE, AND IT WAS THE ACCENT. Red underlined words ("Open Money
-     for the rest", "Browse add-ons") sat beside red overdue dots and read as the same fact (design
-     SYS-1). The underline is what says "link", so it carries the affordance at 40% of the ink and
+     for the rest", "Browse add-ons") sat beside red overdue dots and read as the same
+     fact. The underline is what says "link", so it carries the affordance at 40% of the ink and
      firms up under the pointer; the colour says nothing a sentence has not already said. */
   a {
     color: var(--link);

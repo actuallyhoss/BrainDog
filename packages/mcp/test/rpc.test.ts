@@ -111,7 +111,7 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['search', { q: 'invoice' }, ['search'], { q: 'invoice' }],
   ['history', { spoken: 'obligations#41' }, ['history'], { register: 'obligations', seq: 41 }],
   ['activity', { limit: 5 }, ['recentHistory'], { limit: 5 }],
-  /* NO `money` ROW: the tool that read seven of one pack's figures by id left the core (B6), and those figures are
+  /* NO `money` ROW: the tool that read seven of one pack's figures by id left the core, and those figures are
      `braindog:metric/<id>` like every other pack's (`money-out.test.ts`). */
   ['governance', { status: 'all' }, ['governance'], { status: 'all' }],
   ['propose', { question: 'Keep it?', body_kind: 'options', body: {} }, ['propose'], { question: 'Keep it?', body_kind: 'options', body: {} }],

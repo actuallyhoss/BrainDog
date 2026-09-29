@@ -272,14 +272,14 @@ const DECLARED: Record<string, Version> = {
       'Raised for three HSBC wordings, `ingest.bank-card-used`, `ingest.bank-ipn-out` and `ingest.bank-ipn-in`, and for `metric.spent-30d` and `metric.received-30d` counting thirty days rather than thirty-one -> 54bd8171345118f2',
       'Before any release, `ingest.bank-from-out` for the debit half of the `From HSBC:` line, which the `MON` token of `43 §4.3` made declarable -> c1e04509fe953ee1',
       'Still before any release, and CI had not run: `ingest.bank-from-out` asks for its hyphen against a digit, because a spaced one filed a transfer in as OUT at exact, the new `ingest.bank-from-unsure` holds that line for a person with no direction, and `ingest.bank-ipn-out` reads a purchase payee after `from` as well as `to` -> f8aab69dc2a8d7b0',
-      /* AN ID GAINED UNDER A LABEL, which the guard answers with "raise the version", and it was not raised. Measured on
-         22 September before writing this: `gh run list --workflow deploy.yml` showed every deploy since `aeef01c5`
+      /* AN ID GAINED UNDER A LABEL, which the guard answers with "raise the version", and it was not raised. Measured before
+         writing this: `gh run list --workflow deploy.yml` showed every deploy since `aeef01c5`
          introduced 1.6.0 as `skipped`, because no `ci` run on master had completed, so no record anywhere has been
          offered 1.6.0 and there is no record on it to strand. Raising to 1.7.0 would also have put a version nobody
          shipped between 1.5.0 and this one. If a deploy has succeeded by the time this is read, this line is wrong and
          the id belongs to 1.7.0. */
       /* THE LAST SENTENCE ABOVE IS NOT RIGHT, and 1.7.0 was asked for on the strength of it and not raised. Measured
-         on 22 September at 07:30 UTC: the last successful deploy is `8bbf469e` at 16:23 UTC on the 21st, before
+         later: the last successful deploy is `8bbf469e` at 16:23 UTC on the 21st, before
          `aeef01c5` set 1.6.0, and the one run not yet finished is `ci` on `d9e43931`, which has `3bc64513` behind it. A
          deploy ships a whole commit, so every build that can now reach a record carries `ingest.bank-from-in` under
          1.6.0, and no record can hold a 1.6.0 without it. What a first successful deploy does change is the next line:
@@ -289,7 +289,7 @@ const DECLARED: Record<string, Version> = {
   },
   /**
    * A VERSION AND NOT A RESET, AS THE LINE ABOVE ASKS FOR AN ID GAINED. Eight ids arrive, so 1.6.0 cannot be set again
-   * whatever its release state. Measured on 22 September with `gh run list --workflow deploy.yml`: every deploy since
+   * whatever its release state. Measured with `gh run list --workflow deploy.yml`: every deploy since
    * `aeef01c5` set 1.6.0 is still `skipped`, so no record holds 1.6.0 and a record on 1.5.0 is offered 1.7.0 directly.
    */
   'money-core@1.7.0': {
@@ -311,7 +311,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '9b29858e7ee11345',
     history: [
-      'Raised for the eight webhook twins his iOS Shortcut posts a bank SMS to, `ingest.bank-from-out-sms` and the seven beside it, each the reading of its mail pattern behind `verify: { kind: path }`, matching nothing until an owner mints its token -> 9b29858e7ee11345',
+      'Raised for the eight webhook twins an iOS Shortcut posts a bank SMS to, `ingest.bank-from-out-sms` and the seven beside it, each the reading of its mail pattern behind `verify: { kind: path }`, matching nothing until an owner mints its token -> 9b29858e7ee11345',
     ],
   },
   'money-core@1.8.0': {
@@ -408,7 +408,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '4640c85c0ef44586',
     history: [
-      '`register.transactions` declares `pairs:`, the move `baf7048a` put under the shipped 2.1.0: both cleared legs of a move between two accounts are marked `transfer`, and a leg naming who it was with (`party`) or the obligation it paid (`settles`) pairs with nothing, so rent and a client paying the same sum a day later stay in Spent and Received (audit sixty-one, M4 and M5) -> 4640c85c0ef44586',
+      '`register.transactions` declares `pairs:`, the move `baf7048a` put under the shipped 2.1.0: both cleared legs of a move between two accounts are marked `transfer`, and a leg naming who it was with (`party`) or the obligation it paid (`settles`) pairs with nothing, so rent and a client paying the same sum a day later stay in Spent and Received -> 4640c85c0ef44586',
     ],
   },
   /**
@@ -432,7 +432,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '8ad733c726f4fd0b',
     history: [
-      '`register.transactions` keeps a reconciled card bill paired: `pairs.where` reads `settles is empty or transfer is true`, so a leg that settles an obligation stays the leg of a move it already is and still starts none, where at 2.2.0 setting `settles` on the bank leg parted the pair and EGP 9,500.00 read as spent and as received (audit sixty-three, finding 3, F4) -> 8ad733c726f4fd0b',
+      '`register.transactions` keeps a reconciled card bill paired: `pairs.where` reads `settles is empty or transfer is true`, so a leg that settles an obligation stays the leg of a move it already is and still starts none, where at 2.2.0 setting `settles` on the bank leg parted the pair and EGP 9,500.00 read as spent and as received -> 8ad733c726f4fd0b',
     ],
   },
   /**
@@ -456,7 +456,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '47e60867f14c18d0',
     history: [
-      '`register.obligations` gains `ends`, the last day a repeating row moves money on, and the obligations leg of both walks on `page.money` names it, so a bill the old tool says ends on 10 November stops walking on the 10th where at 2.3.0 it walked every month to the horizon, because the import writes an end only where the list declares one (`5d4bbf8b`) -> 47e60867f14c18d0',
+      '`register.obligations` gains `ends`, the last day a repeating row moves money on, and the obligations leg of both walks on `page.money` names it, so a bill an import says ends on 10 November stops walking on the 10th where at 2.3.0 it walked every month to the horizon, because the import writes an end only where the list declares one (`5d4bbf8b`) -> 47e60867f14c18d0',
     ],
   },
   /**
@@ -479,7 +479,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'c98b58b3df5eaca1',
     history: [
-      'The installments leg both walks on `page.money` read names `group: plan`, so each part of a plan reaches the chart as that plan and the count control can take the proofing press in or out whole, where every part was its own one-off; Cash ahead\'s knobs add `grow`, `drift` and `count` to horizon, late, spend and leave (brief B6) -> c98b58b3df5eaca1',
+      'The installments leg both walks on `page.money` read names `group: plan`, so each part of a plan reaches the chart as that plan and the count control can take the proofing press in or out whole, where every part was its own one-off; Cash ahead\'s knobs add `grow`, `drift` and `count` to horizon, late, spend and leave -> c98b58b3df5eaca1',
     ],
   },
   'money-core@3.0.0': {
@@ -551,11 +551,11 @@ const DECLARED: Record<string, Version> = {
     declares: '1e1996952c4dce03',
     history: [
       '`page.work` leads with what to do as six lists that tick, Today, This week, Waiting on you, With an agent, After this week and Later, cut by state, then agent, then day so no task falls under two; its Waiting on you, Due soon and With an agent tables, which nobody could tick from the Overview, are gone -> 93dcbade382b5e4a',
-      /* THE SAME VERSION, BECAUSE 1.6.0 HAS NOT SHIPPED. Measured on 22 September with `gh run list --workflow deploy`:
+      /* THE SAME VERSION, BECAUSE 1.6.0 HAS NOT SHIPPED. Measured with `gh run list --workflow deploy`:
          the last successful deploy is still `8bbf469e` at 16:23 UTC on the 21st, and `7e796bbe`, which set 1.6.0, is
          not behind it. Every deploy since was skipped. */
       'Still before any release: `page.work` gains a seventh list, No due day, `state is open or doing, agent is empty, by is empty`, because a task of yours with no due day was under none of the six and `by is empty or after +7d` is refused. Done lately goes back to the full width to make room -> bc6a8f4d4c3319ab',
-      'Still before any release, since every deploy since 1.6.0 was skipped: Waiting on you on `page.work` declares `what, note, by, changed`, so a todo row carries its due day and who changed it last as the third and fourth cells `c6e2a331` widened the kind to (`loop/research-batch-twenty-eight-audit.md` finding 3) -> 1e1996952c4dce03',
+      'Still before any release, since every deploy since 1.6.0 was skipped: Waiting on you on `page.work` declares `what, note, by, changed`, so a todo row carries its due day and who changed it last as the third and fourth cells `c6e2a331` widened the kind to -> 1e1996952c4dce03',
     ],
   },
   'work@1.7.0': {
@@ -588,7 +588,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'e4126747e977dddd',
     history: [
-      'A task\'s follow-ups close with it and start in its project (W59-1): `rule.close_follow_ups` starts `script.close_follow_ups` when a task moves to done, which closes every step `Part of` it still open, doing or blocked, and `rule.start_with_parent` starts `script.start_with_parent` when a task is created with a parent, which gives it the parent\'s project and thread -> e4126747e977dddd',
+      'A task\'s follow-ups close with it and start in its project: `rule.close_follow_ups` starts `script.close_follow_ups` when a task moves to done, which closes every step `Part of` it still open, doing or blocked, and `rule.start_with_parent` starts `script.start_with_parent` when a task is created with a parent, which gives it the parent\'s project and thread -> e4126747e977dddd',
     ],
   },
   'work@1.9.0': {
@@ -801,7 +801,7 @@ test('EACH FIRST-PARTY PACK DECLARES WHAT ITS VERSION SAYS, and one that changed
  * WRITTEN BECAUSE THE GUARD THIS REPLACES WAS ANSWERED FIVE TIMES IN SEVEN HOURS AND NEVER ONCE REFUSED ANYTHING a
  * person had to think about. Every rule the comments above claim is enforced is exercised here with the smallest entry
  * that breaks it, so that a rule quietly dropped from `wrong()` takes a test with it rather than going unnoticed until
- * the next audit reads the diff.
+ * the next review reads the diff.
  */
 test('THE GUARD REFUSES AN ENTRY WITH NO REASON BESIDE ITS FINGERPRINT, and names which rule the entry broke', () => {
   const live = { holds: ['page.portfolio', 'register.things'], declares: 'aaaaaaaaaaaaaaaa', current: true };

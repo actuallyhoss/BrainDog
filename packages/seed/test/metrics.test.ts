@@ -147,7 +147,7 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
 }
 
 /**
- * CASH ROLLED FORWARD, BY HAND (money-core 3.0.0 `cash-now`, `modules.md` C3). It is not a sum over one list, so it is
+ * CASH ROLLED FORWARD, BY HAND (money-core 3.0.0 `cash-now`). It is not a sum over one list, so it is
  * read here the way the declaration says in words, over rows listed whole and filtered with `evaluate`: per account the
  * latest statement on or before today (its own `balance` on `as_of`, or a check list's row about it, the account's own
  * winning a tie), then every admitted move after that day and on or before today, money out taken off. An account
@@ -316,7 +316,7 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
 });
 
 test('COST PER YEAR READS ON A REAL RECORD, from the declaration the seed installed and nothing the host hands in', async () => {
-  /* The September 16th QA pass saw every real record answer LOOKUP_UNKNOWN for estate-year: the
+  /* A QA pass saw every real record answer LOOKUP_UNKNOWN for estate-year: the
      tests read the seed's bodies, and a record reads the row it installed. So this reads the row. */
   const { k, sql } = await seeded();
   const multiplied = Object.keys(METRICS).filter((m) => {

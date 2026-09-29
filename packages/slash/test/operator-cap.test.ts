@@ -1,21 +1,21 @@
 /**
- * The package's half of audit sixty's findings 4 and 5: whose neurons a tier spends is the host's to say, and one throw
+ * The package's half of two faults: whose neurons a tier spends is the host's to say, and one throw
  * from a model that was reached is settled the same way whichever path made the call.
  *
- * `loop/research-batch-sixty-audit.md` FINDING 4. `account` priced tier `a` alone, on `46 §4.1`'s "not our money". On the
- * Worker with no endpoint, tier `byo` goes to the included model, Workers AI on the operator's account, and the audit's S3
+ * WHOSE NEURONS. `account` priced tier `a` alone, on `46 §4.1`'s "not our money". On the
+ * Worker with no endpoint, tier `byo` goes to the included model, Workers AI on the operator's account, and a probe
  * read `{ tier: byo, tokens_in: 700, tokens_out: 60, neurons: 0 }` for a call the platform billed. The package cannot know
  * which model a host's `byo` reaches, so the host names the tiers it pays for in neurons (`SlashOptions.priced`) and the
  * default stays tier `a`, which is what every other host still means.
  *
- * FINDING 5. A binding that threw after it was called is a model reached, and the Worker now marks the throw `reached`.
+ * ONE THROW, ONE PRICE. A binding that threw after it was called is a model reached, and the Worker now marks the throw `reached`.
  * `read` kept the model's name on every throw, priced the prompt estimate and counted the ask; `answer` settled the same
  * throw under `-`, unpriced and uncounted, and the host's ladder asked it again up to the eighth rung with nobody counting.
  * Both paths now settle a marked throw under the model's name, priced by one rule and counted, so the ladder's rungs are
- * spent from `ask_cap` like any other call. An unmarked throw on `answer` still means "not reached" and keeps `-`, which
- * is audit forty-two's finding 6 (`slash-answered-counted.test.ts` case 4 holds it).
+ * spent from `ask_cap` like any other call. An unmarked throw on `answer` still means "not reached" and keeps `-`
+ * (`slash-answered-counted.test.ts` case 4 holds it).
  *
- * RED BEFORE THE REPAIR, MEASURED ON 24 SEPTEMBER: 4 tests, 1 pass, 3 fail. Case 1 read `neurons: 0` for the `byo` row,
+ * RED BEFORE THE REPAIR: 4 tests, 1 pass, 3 fail. Case 1 read `neurons: 0` for the `byo` row,
  * case 3 read `{ model: '-', neurons: 0 }` and `asks.used` 1 where the read beside it read 2, and case 4 read three
  * `UNREACHABLE` answers at `ask_cap: 2` where the third should have been `SLASH_BUDGET_SPENT`. Case 2 passed before and
  * after, which is its job: a host that names nothing keeps `46 §4.1`.
@@ -32,7 +32,7 @@ import { fakeRecord, fixedClock, NOW, OWNER, openSqlite } from './double.ts';
 const RATE: Ask = { rule: 'rate', step: 0, question: 'What rate applies to Gold?', shape: 'number' };
 const FLASH = MODELS['glm-5.3-flash'];
 
-/** A reply the included model would give, with the counts Workers AI reported in the audit's probe. */
+/** A reply the included model would give, with the counts Workers AI reported in a probe. */
 const answering = (text: string): Inference => ({
   complete: async () => ({ text, usage: { in: 700, out: 60 }, model: 'glm-5.3-flash' }),
 });

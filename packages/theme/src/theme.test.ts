@@ -126,7 +126,7 @@ for (const built of [HOUSE, HIGH_CONTRAST]) {
   });
 
   for (const scheme of ['dark', 'light'] as const) {
-    /* SYSTEM's shape (loop/design/SYSTEM.md §2): the ground is the lowest surface, the tile sits above it, and the
+    /* The design system's shape: the ground is the lowest surface, the tile sits above it, and the
        steps inside a tile go away from the tile, up in dark and down in light, where the tile is white. */
     test(`theme.${built.id} ${scheme}: the ground is lowest and the steps inside a tile go one way`, () => {
       const lum = SURFACES.map((s) => relLuminance(parseColour(built.schemes[scheme][s])));
@@ -354,7 +354,7 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 114 rows per scheme, counted here and n
    * 114. The table is spelled out per letter so that a change to any one check has to be argued for
    * here, in the same commit, instead of quietly moving a total.
    *
-   * 104 UNTIL 2026-09-29, when SYSTEM's `live` arrived: `live-fill` is a mark and joins the four fills in D, and
+   * 104 UNTIL 2026-09-29, when the design system's `live` arrived: `live-fill` is a mark and joins the four fills in D, and
    * `live` is read as text and joins the four intents in G. Five surfaces each, ten rows.
    */
   const PER_CHECK: Record<string, number> = {
@@ -482,7 +482,7 @@ test('CHECK J CAN FAIL, which is more than either of its previous forms could', 
 
 test('and a near-white surface giving up almost all of its chroma does NOT fail', () => {
   // White carries none of the chroma it is asked for: all of it lost, and correctly so, because at white there is
-  // no chroma to have. As a fraction that reads as a catastrophe; as an amount it is 0.005. SYSTEM's house tile asks
+  // no chroma to have. As a fraction that reads as a catastrophe; as an amount it is 0.005. The design system's house tile asks
   // for none, so the fixture is high contrast's, whose white tile asks for its ladder's 0.005.
   assert.deepEqual(refusals(checkScheme(HIGH_CONTRAST, 'light')).filter((f) => f.check === 'J'), []);
   assert.ok((HIGH_CONTRAST.clipped.light.bg ?? 0) > 0, 'the fixture must actually clip there for this to mean anything');
@@ -738,9 +738,9 @@ test('THE COLOUR GRAMMAR REFUSES WHAT ITS OWN SENTENCE SAYS IT REFUSES', () => {
   assert.equal(typeof parseColour('oklch(0.5 0.1 200)').r, 'number');
 });
 
-/* ── loop/design/SYSTEM.md, as the generator lands it ────────────────────── */
+/* ── the design system's colours, as the generator lands them ─────────────── */
 
-test('SYSTEM §2 LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
+test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
   /* Every exact value here is one no floor had to move. What is not here moved, and says why below. */
   const exact: Record<'light' | 'dark', Partial<Record<keyof Palette, string>>> = {
     light: { sunk: '#E9ECF0', bg: '#FFFFFF', s1: '#F2F4F7', ink: '#101318', ink2: '#4A505B', line: '#E3E7EC', earn: '#157A48', live: '#4F4FD8' },
@@ -752,13 +752,13 @@ test('SYSTEM §2 LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
 });
 
 test('AND WHERE IT CANNOT, THE ROLE SITS ON ITS FLOOR RATHER THAN UNDER IT', () => {
-  /* SYSTEM's ink-3 and red are 4.20:1 and 4.19:1 on its own light ground, so each is darkened to 4.5 and no further. */
+  /* The design system's ink-3 and red are 4.20:1 and 4.19:1 on its own light ground, so each is darkened to 4.5 and no further. */
   const sunk = fromHex(HOUSE.schemes.light.sunk);
   for (const role of ['dim', 'danger'] as const) {
     const c = contrast(fromHex(HOUSE.schemes.light[role]), sunk);
     assert.ok(c >= 4.5 && c < 4.6, `light ${role} is ${c.toFixed(2)}:1 on the ground, not on its floor`);
   }
-  /* SYSTEM's amber and red are delta-E 4.0 apart to a deuteranope in light, so the amber text walks darker until the
+  /* The design system's amber and red are delta-E 4.0 apart to a deuteranope in light, so the amber text walks darker until the
      four intents clear check F; the red, the dearest to move, holds. */
   const four = INTENTS.map((k) => fromHex(HOUSE.schemes.light[k]));
   for (let i = 0; i < 4; i++)
@@ -780,7 +780,7 @@ test('TEXT ON THE CHROME CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
   /* Glass over the ground or a tile, and the arrival tint, are things a word sits on, and none of them is one of the
      five surfaces the checks walk. Each is held here against every ink's own floor.
 
-     THE ROW WASH IS NOT, AND THAT IS AN OPEN QUESTION FOR SYSTEM RATHER THAN A PASS. Its light wash is darker than its
+     THE ROW WASH IS NOT, AND THAT IS AN OPEN QUESTION FOR THE DESIGN SYSTEM RATHER THAN A PASS. Its light wash is darker than its
      ground, so a selected row's ink-3 meta measures about 4.0:1 on it (`build.ts`, `worstOf`). */
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['light', 'dark'] as const) {
@@ -798,7 +798,7 @@ test('TEXT ON THE CHROME CLEARS THE SAME FLOORS AS TEXT ON A SURFACE', () => {
     }
 });
 
-test('SYSTEM §2 AND §4 CHROME: glass in the house, opaque in high contrast', () => {
+test('THE DESIGN SYSTEM CHROME: glass in the house, opaque in high contrast', () => {
   assert.equal(HOUSE.chrome.light.glass, 'rgb(255 255 255 / 0.66)');
   assert.equal(HOUSE.chrome.dark.glass, 'rgb(30 34 43 / 0.62)');
   assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(255 255 255 / 0.6)'); // lifts toward white on the ground (build.ts GLASS)
@@ -806,7 +806,7 @@ test('SYSTEM §2 AND §4 CHROME: glass in the house, opaque in high contrast', (
   assert.equal(HOUSE.elevation.light[0], '0 1px 1px rgb(16 24 40 / 0.03), 0 8px 24px -12px rgb(16 24 40 / 0.12)');
   assert.equal(HOUSE.elevation.dark[1], '0 16px 40px -12px rgb(0 0 0 / 0.6)');
   for (const scheme of ['light', 'dark'] as const) {
-    assert.equal(HOUSE.elevation[scheme][2], HOUSE.elevation[scheme][1], 'a sheet is at level 2 (SYSTEM §4)');
+    assert.equal(HOUSE.elevation[scheme][2], HOUSE.elevation[scheme][1], 'a sheet is at level 2');
     assert.equal(HIGH_CONTRAST.chrome[scheme].glass, HIGH_CONTRAST.schemes[scheme].bg, 'high-contrast glass is not opaque');
     assert.equal(HIGH_CONTRAST.chrome[scheme]['glass-strong'], HIGH_CONTRAST.schemes[scheme].bg);
   }
@@ -815,7 +815,7 @@ test('SYSTEM §2 AND §4 CHROME: glass in the house, opaque in high contrast', (
     assert.equal(css.split(`--${name}:`).length - 1, 12, `--${name} is not in every scheme block`);
 });
 
-test('CHECK H AND CHECK I HOLD SYSTEM’S SHAPE, and still refuse the wrong one', () => {
+test('CHECK H AND CHECK I HOLD THE DESIGN SYSTEM’S SHAPE, and still refuse the wrong one', () => {
   /* A light tile-2 above the white tile is a ladder turned back on itself. */
   const turned: Built = { ...HOUSE, schemes: { ...HOUSE.schemes, light: { ...HOUSE.schemes.light, s2: '#FFFFFF' } } };
   assert.ok(refusals(checkScheme(turned, 'light')).some((f) => f.check === 'H'));

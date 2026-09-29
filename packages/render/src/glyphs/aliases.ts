@@ -40,7 +40,7 @@ export const SHELL = {
   money: 'banknote',
   board: 'kanban',
   rows: 'rows-3',
-  /* The plan names these three (research-modules §1.3). */
+  /* The plan names these three. */
   obligation: 'receipt',
   thing: 'box',
   session: 'bot',
@@ -62,7 +62,7 @@ export const SHELL = {
   observe: 'activity',
   learning: 'lightbulb',
   skill: 'zap',
-  /* The rail's places, named as `loop/design/bento/ICONS.md` names them. `activity` is Lucide's own name
+  /* The rail's places, named as the design system names them. `activity` is Lucide's own name
      and needs no entry. `slash` is the ask field's rounded square with a stroke through it. */
   today: 'sun',
   work: 'square-check',
@@ -70,7 +70,7 @@ export const SHELL = {
   slash: 'square',
 } as const satisfies Record<string, CoreGlyph>;
 
-/** The plan's short names (research-modules §1.3) where Lucide's name is longer or different. */
+/** The plan's short names where Lucide's name is longer or different. */
 export const SPELLINGS = {
   invoice: 'receipt-text',
   card: 'credit-card',

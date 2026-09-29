@@ -1,10 +1,10 @@
 /**
  * What naming an answer's refs costs, and who it is told to.
  *
- * A REQUEST PER DISTINCT REF, ONE AFTER ANOTHER (audit fifty-two, finding 6). `nameOf` asked `get` for every row id a
+ * A REQUEST PER DISTINCT REF, ONE AFTER ANOTHER. `nameOf` asked `get` for every row id a
  * ref field held, so the cost of an answer grew with its page: measured here on the seed with 120 learnings added,
  * each superseding the one before, `list learnings` answered 127 rows after 126 calls to the surface (`list`, two
- * `schema`, 123 `get`), the 126 the audit measured. Over `braindog mcp` each call is an HTTP request from the command
+ * `schema`, 123 `get`). Over `braindog mcp` each call is an HTTP request from the command
  * line to the host (`apps/cli/src/surface.ts`), in series, before the agent reads a line. Now each register the refs
  * point into is read with its ids 64 at a time, and the same list asks six times.
  *
@@ -13,7 +13,7 @@
  * of 101 parameters threw `too many SQL variables`, so the 127 learnings below were an internal error for the whole
  * `list` in production. The record here refuses the same way, so a read too wide goes red on a laptop too.
  *
- * AND NOTHING IS KEPT PAST THE ANSWER. The attempt held in wave fifty-two kept names across messages keyed by what
+ * AND NOTHING IS KEPT PAST THE ANSWER. An earlier attempt kept names across messages keyed by what
  * `whoami` said, and `whoami` says nothing of `ctx.levels`, so a token held to `append` on one register could be told
  * the names of its rows. With the reads batched, a cache across messages would save four calls of those five, so
  * there is none: every read is asked with the caller's own context, and the record decides what it may be told. The
@@ -85,7 +85,7 @@ const thingsOf = (rows: Row[]): unknown[] => rows.map((r) => r.fields.thing).fil
 
 test('a list of 127 learnings, each superseding the last, reads each register its refs point into and not each ref, and names every ref', async () => {
   const { api, surface, asked } = await counted();
-  /* THE AUDIT'S SHAPE: 120 learnings through the record, each superseding the one before, beside the seed's seven. */
+  /* THE MEASURED SHAPE: 120 learnings through the record, each superseding the one before, beside the seed's seven. */
   let previous: string | undefined;
   for (let i = 0; i < 120; i++) {
     const made = await api.create(
@@ -203,7 +203,7 @@ const observed = (sql: ReturnType<typeof doSqlite>, kind: string): string[] =>
   sql.all<{ subject: string; n: number }>('SELECT subject, sum(n) AS n FROM observation WHERE kind = ? GROUP BY subject ORDER BY subject', kind).map((r) => `${r.subject} ${String(r.n)}`);
 
 test('ten lists of tasks and ten of learnings count no scan of a primary key', async () => {
-  /* AUDIT FIFTY-FIVE, FINDING 2, ITS N1. `namesIn` reads the rows a page's refs point into as `list` where `id` is in
+  /* A NAMING READ IS NO SCAN. `namesIn` reads the rows a page's refs point into as `list` where `id` is in
      them, and the record counted each read as `query.scan` of `<list>.id`, because the declaration indexes no field
      named `id`. Measured after fe741dfa on this shape: `things.id 20, learnings.id 10, tasks.id 10, people.id 10,
      tracks.id 10`, and none of them a scan, since `id` is the row's primary key. */
@@ -221,10 +221,10 @@ test('ten lists of tasks and ten of learnings count no scan of a primary key', a
 });
 
 test('a hundred lists of each, then the weekly look, drafts no index for things.id', async () => {
-  /* ITS N2. Two hundred naming reads of `things` in a day is the detector's threshold, and it drafted "things.id was
+  /* AND SO NO INDEX IS DRAFTED FOR ONE. Two hundred naming reads of `things` in a day is the detector's threshold, and it drafted "things.id was
      scanned 200 times in thirty days, and an index would pay for itself": a model call on a proposal nobody can
      accept, and three of those marked incorrect suspend the whole analyser. The governors want a record with a habit,
-     so the seed's events are spread over three weeks by SQL, as the audit's probe did. */
+     so the seed's events are spread over three weeks by SQL. */
   const { api, surface, sql } = await counted();
   const events = sql.all<{ rowid: number }>('SELECT rowid FROM event ORDER BY rowid');
   events.forEach(({ rowid }, i) =>

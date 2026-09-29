@@ -6,7 +6,7 @@
  * revision still works: `handle` answers its `initialize`, and the session id it may look for is never
  * minted or echoed, which is what that binding asks of a server that speaks only the stateless shape.
  *
- * THE ORDER IS THE ARGUMENT (`loop/research-agent-path.md` §1.3, §1.7). Every step before the bearer reads
+ * THE ORDER IS THE ARGUMENT. Every step before the bearer reads
  * only the request line and the headers, so a stranger's body is never parsed:
  *
  *   1. POST only: 405, `Allow: POST`. GET and DELETE are how earlier revisions opened a stream and ended a session.
@@ -79,8 +79,8 @@ export function gate(request: Request): Response | null {
  * Step 4. One word and nothing else: a 401 says only that the credential did not work.
  *
  * AND, WHEN THE HOST HAS ONE, WHERE TO GET ONE. `metadataUrl` is the protected resource's metadata (RFC 9728 §5.1),
- * `https://<host>/.well-known/oauth-protected-resource`, and an MCP client that holds no token starts OAuth from it
- * (`loop/finish/agents.md` C4). The host builds the address from its own configured name, never from the request, so
+ * `https://<host>/.well-known/oauth-protected-resource`, and an MCP client that holds no token starts OAuth from it.
+ * The host builds the address from its own configured name, never from the request, so
  * the header cannot be steered by a caller; without it the challenge is the bare `Bearer` it always was.
  */
 export const unauthorized = (metadataUrl?: string): Response =>

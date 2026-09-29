@@ -1,11 +1,10 @@
 /**
- * A choice an update takes off a closed list stays only where a row holds it (`loop/research-batch-forty-eight-audit.md`
- * finding 4).
+ * A choice an update takes off a closed list stays only where a row holds it.
  *
  * THE LIST'S ROW COUNT STOOD IN FOR THE HOLDERS. `plan` laid a value back whenever `installed.rows[list] > 0`, so a
  * Personal record whose three People rows were all Family was filed as keeping Agency (Personal's word for `registrar`),
  * and Decide said "People keeps the choice Agency for Role, which this update takes off, because it holds 3 rows that
- * may use it" (`decide-personal.mts` and `keeps-people.mts` in the audit's probes). None of the three held it. The
+ * may use it". None of the three held it. The
  * reason for keeping a value, that a row holding it could not be edited once it went, is a reason only for a row that
  * holds it.
  *
@@ -223,7 +222,7 @@ test('ONE REGISTRAR ROW OF TWO: registrar stays, counted as one holder of two ro
 
 /* ── a deleted row holds its values until the purge ── */
 
-/* THE QUERY THE BUILDER HANDED OFF LEFT DELETED ROWS OUT, and its checker measured what that costs: the registrar row in
+/* THE FIRST QUERY LEFT DELETED ROWS OUT, and a review measured what that costs: the registrar row in
    the bin was not counted, registrar went, and the row's restore and every edit after it were `ENUM_VALUE_UNKNOWN`. The
    kernel counts a deleted row as holding what it holds (`orphan-deleted.test.ts`, `WOULD_ORPHAN` "a deleted one a
    restore brings back"), because a restore brings it back for thirty days. */

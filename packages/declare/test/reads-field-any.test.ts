@@ -1,7 +1,7 @@
 /**
  * A kept figure whose `where` names a field after `, or` still reads that field, and `plan` has to see it.
  *
- * THE SENTENCE LEARNED `, or` (M4 wave two brief 7) AND `readsField` STILL SPLIT IT ON THE COMMA ALONE. Each piece is
+ * THE SENTENCE LEARNED `, or` AND `readsField` STILL SPLIT IT ON THE COMMA ALONE. Each piece is
  * asked which field it begins with, and the piece after the comma began with the word `or`, which names no field, so the
  * field after it was never counted. Measured before the repair, with the owner's `spent-30d` edited to
  * `direction is out, or transfer is true` and money-mini 1.1.0 taking `transfer` off the list: `diff.conflicts` was `[]`,

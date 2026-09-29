@@ -15,7 +15,7 @@
  * this package does with an answer and nothing about whether a model gives a good one. This asks the model itself, twice
  * per question as the palette does (the predicate, then the answer on the same ask), and scores what came back against
  * `questions.ts`: did the predicate parse, did the answer parse, and did it cite exactly the rows it should. It costs
- * money and differs run to run, so it is not named `*.test.ts` and CI never runs it (`loop/finish/agents.md` AGT-30).
+ * money and differs run to run, so it is not named `*.test.ts` and CI never runs it.
  *
  * THE ENGINE IS THE SHIPPED ONE. `createSlash` from `src/`, over a real SQLite from `test/double.ts`, on the included
  * tier with its cap raised past the sixty calls a full run makes. Only the adapter is this file's: the same request shape

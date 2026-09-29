@@ -1,10 +1,10 @@
 /**
- * What `context` teaches an agent arriving from the old tool, and that every form it teaches works.
+ * What `context` teaches an agent arriving from another record, and that every form it teaches works.
  *
- * TWO HABITS HAD A PATH AND NO SENTENCE (`loop/research-mcp-parity.md` §4). `brain_log` was called 49
- * times across his repos with no entity at all, and the path here is `log` on the agent's own session
- * row; 166 of 167 `brain_task_add` calls set a lane, and the lane here is the `agent` field, empty for
- * his own. Neither is said anywhere an agent reads, so an agent looking for "the log" or "the lane"
+ * TWO HABITS HAD A PATH AND NO SENTENCE. Agents log notes about no row at all, and the path here is
+ * `log` on the agent's own session row; nearly every task an agent adds sets a lane, and the lane here
+ * is the `agent` field, empty for the person's own. Neither is said anywhere an agent reads, so an
+ * agent looking for "the log" or "the lane"
  * found neither and made one up. The tool list was the wrong home: it is paid in every turn and
  * measured 2,565 tokens of a 2,600 ceiling (`budget.test.ts`), so the sentences ride on `context`'s
  * answer, which an agent reads once per session.
@@ -123,10 +123,9 @@ test("outside any project, the project sentence names no row, so copying it read
   assert.equal(rows.length, 0, `the example in "${project}" is a real project with ${rows.length} tasks`);
 });
 
-/* WHAT AN AGENT READS MOST (`loop/research-agent-first-day.md`, brief 51-A). The survey drove the
-   sixteen tools as the old tool's daily flow uses them, 837 calls over his repos, and these answers were
-   the ones read most and said least. Each test below was red against the code it was written for, and
-   says what it measured then. */
+/* WHAT AN AGENT READS MOST. A survey drove the sixteen tools as an agent's daily flow uses them, and
+   these answers were the ones read most and said least. Each test below was red against the code it
+   was written for, and says what it measured then. */
 
 type Shaped = { spoken: string; version: number; updated_at?: string; fields?: Record<string, unknown> };
 const valueOf = <T>(r: { ok: boolean; value?: unknown }): T => {
@@ -199,7 +198,7 @@ test("a learning's refs are named by prefix as its rows are, and the prefixed id
 });
 
 test("a list of refs is named one by one, and the prefixed list writes back", async () => {
-  /* THE CHECKER'S CASE, because no test above reaches a `list` of `ref`: with the list branch of the
+  /* THE MUTATION'S CASE, because no test above reaches a `list` of `ref`: with the list branch of the
      naming pass cut out, all five still passed. skills#5's `because` is that field on the seed, and it
      points at learnings, so its values are prefixed and have to be qualified on the way back too. */
   const mcp = await seeded();
@@ -224,14 +223,14 @@ test('search names a learning LN<n>, as create and context do', async () => {
 
 test('context says a note patch replaces the note and log is the append, and both do what it says', async () => {
   /* MEASURED BEFORE: `update tasks#3 {note}` left `note` as the one line sent, the import's text only
-     in `history`, and nothing an agent reads said so. the old tool's agents sent 89 `brain_task_update`
-     calls that were `{id, note}` alone, which is the append here, not the patch. */
+     in `history`, and nothing an agent reads said so. Agents often send an update that is `{id, note}`
+     alone, meaning an append, which here is `log`, not the patch. */
   const mcp = await seeded();
   const lines = valueOf<Briefing>(await mcp.call('context', {}, agent)).teach ?? [];
   const said = lines.find((l) => /\blog\b/.test(l) && /\bnote\b/.test(l) && /replaces/.test(l));
   assert.ok(said, `nothing says a note patch replaces the note: ${JSON.stringify(lines)}`);
 
-  /* tasks#27 AND NOT THE SURVEY'S tasks#3: the survey ran over an imported export, and on the seed
+  /* tasks#27 AND NOT tasks#3: the first measurement ran over an imported record, and on the seed
      tasks#3 has no note to lose, while tasks#27 carries "Once the first one is live." */
   const before = valueOf<Shaped>(await mcp.call('get', { spoken: 'tasks#27' }, agent));
   assert.equal(typeof before.fields!.note, 'string', 'tasks#27 has no note on the seed');

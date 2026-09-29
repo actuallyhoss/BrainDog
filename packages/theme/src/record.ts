@@ -83,7 +83,7 @@ export function recordTheme(
 
   const seed: Seed = {
     accent: hex,
-    /* 2026-09-29, THE HOUSE SLATE AND NOT 110. SYSTEM's ground is the product's (loop/design/SYSTEM.md §2), and the
+    /* 2026-09-29, THE HOUSE SLATE AND NOT 110. The design system's ground is the product's, and the
        house profile now carries its chroma, up to 0.02 in dark, which at hue 110 is khaki. The accent is the record's. */
     neutralHue: opts.neutralHue ?? HOUSE_NEUTRAL_HUE,
     space: 4,

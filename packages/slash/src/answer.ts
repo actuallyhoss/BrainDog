@@ -1,5 +1,5 @@
 /**
- * `answer`: one automation's question to Slash, in the shape its rule asked for (`loop/research-infer-ask.md` §4).
+ * `answer`: one automation's question to Slash, in the shape its rule asked for.
  *
  * WHAT IT IS FOR. A rule's `ask_slash` step parks its run and queues an `infer.ask` row: the question, filled with the
  * run's row; the shape (`text`, `number` or `choice`); and the `about:` fields the rule named. A host leases the row, hands
@@ -19,7 +19,7 @@
  *
  * ON HIS OWN KEY THE QUESTION GOES TO HIS KEY. The host hands `answer` an adapter over the key he picked, opened in the
  * rule's name (`apps/worker/src/slash.ts` `workerSlashAnswers`), because he chose where Slash's questions go and a rule's
- * question is one of them (`loop/finish/agents.md` AGT-21). Installing the rule is his consent to its question being
+ * question is one of them. Installing the rule is his consent to its question being
  * asked with nobody signed in, as it always was for the included model's key.
  */
 
@@ -128,8 +128,8 @@ const shapeLine = (ask: Ask): string =>
 /**
  * An ask the kernel could not have sent, refused before anything is held or called.
  *
- * THE RULE IS CHECKED BECAUSE EVERY SENTENCE NAMES IT, and the payload the kernel queued before Brief A carried no `rule`
- * at all (§3 item 9): answered, every refusal would have read `rule.undefined`. The rest are the lint's own checks, made
+ * THE RULE IS CHECKED BECAUSE EVERY SENTENCE NAMES IT, and the payload an older kernel queued carried no `rule`
+ * at all: answered, every refusal would have read `rule.undefined`. The rest are the lint's own checks, made
  * again because a host hands this a JSON payload and not a type.
  */
 const malformed = (ask: Ask): Result<{ text: string }> | null => {
@@ -222,12 +222,12 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          keeps a row's values out of this ledger; the rule and the step are what a person reading it can look up. */
       /* A MODEL NOT REACHED IS SETTLED UNDER `-`, THE LEDGER'S MARK FOR A ROW THAT CALLED NOTHING, and every count passes
          over it: the tier `a` count here (`asksUsed`), his own key's list, and the host's for `byo`. Settled under the model's name,
-         `loop/research-batch-forty-two-audit.md` finding 6 measured three `ECONNREFUSED` answers at `ask_cap: 3` leave the
+         three `ECONNREFUSED` answers were measured at `ask_cap: 3` leave the
          fourth `SLASH_BUDGET_SPENT` on tiers `a` and `b`, and the host asks an `UNREACHABLE` again up to the ladder's
          eighth rung. The row stays, so an outage is still in the ledger. `PROPOSAL_SCHEMA` keeps the model's name,
          because there the model did answer and was paid for. */
       /* AND A MODEL THAT ANSWERED WITH WHAT THE HOST COULD NOT READ KEEPS ITS NAME, with the provider's own count where
-         the body held one. `loop/research-batch-forty-six-audit.md` finding 4 measured the self-host serve four
+         the body held one. A probe measured the self-host serve four
          completions of 16,000 tokens each for one question, the ledger holding four rows under `-` with `tokens_out` 0,
          and `ask_cap` seeing none of them. */
       /* THE CASTS ARE FOR THE COMPILER, which narrows both to their first value here because it cannot see the closure
@@ -235,7 +235,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       const reached = heard as Heard | null;
       const refusedBy = stopped as Stopped | null;
       const used = (sent as string | undefined) ?? reached?.model ?? ran.model;
-      /* ONE BINDING THROW HAD TWO PRICES UNTIL THIS LINE. `loop/research-batch-sixty-audit.md` finding 5, its probe S4:
+      /* ONE BINDING THROW HAD TWO PRICES UNTIL THIS LINE. Measured:
          the Worker's included model threw after `AI.run` was called, and a person's read settled it under
          `glm-5.3-flash`, priced 9 neurons on the prompt estimate and counted, while this path settled the same throw
          under `-`, priced 0 and uncounted, and the host's ladder asked it again up to the eighth rung with nobody
@@ -267,7 +267,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
            called; each host answers its own over it on his own key (`apps/worker/src/slash.ts`, `apps/selfhost/src/slash.ts`). */
         if (code === 'UNREACHABLE' && (unsent as boolean))
           return no('FORBIDDEN', `rule.${ask.rule} asked Slash at step ${step}: ${sentence(lost)}`, { at: 'grant' });
-        /* A STATUS NO RETRY MENDS ENDS THE RUN, UNCOUNTED. `loop/research-batch-forty-nine-audit.md` finding 4 measured
+        /* A STATUS NO RETRY MENDS ENDS THE RUN, UNCOUNTED. Measured before it:
            a 400, a 401 and a 404 each asked eight times over about four hours on the owner's key, ending "could not be
            reached" about a provider that answered every time. Any code but `UNREACHABLE` is one `serveAsks` acks `done`.
            `PULL_REQUEST_REFUSED` IS BORROWED, from the family whose row in `30 §6` reads "a 4xx the declaration did not
@@ -277,7 +277,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
           account('error', STOPPED);
           return no(STOPPED, stoppedSentence(ask, step, refusedBy));
         }
-        /* `ANSWER_UNREADABLE`, A CODE OF ITS OWN IN `30 §6`, where wave 47 borrowed `PROPOSAL_SCHEMA`. That code is
+        /* `ANSWER_UNREADABLE`, A CODE OF ITS OWN IN `30 §6`, where an earlier build borrowed `PROPOSAL_SCHEMA`. That code is
            output that was read and failed its schema, and a caller branching on it would look at the question's shape
            for a fault that is in the size or the framing of the reply: the host never got as far as the schema. Any code
            but `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops on this sentence and the ladder does not ask
@@ -292,7 +292,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
         }
         account('error', code);
         /* `sentence` AND NOT A FULL STOP OF OUR OWN, because the host's status throw ends in one: a 503 read "answered
-           503.." as the run's error once Q8's default made it a plain throw again (`test/slash-status-retried.test.ts`). */
+           503.." as the run's error once a status became a plain throw again (`test/slash-status-retried.test.ts`). */
         if (code === 'UNREACHABLE')
           return no('UNREACHABLE', `rule.${ask.rule} asked Slash at step ${step}, and the model did not answer${lost === '' ? '.' : `: ${sentence(lost)}`}`);
         return no('PROPOSAL_SCHEMA', `Slash's answer to rule.${ask.rule} at step ${step} was not ${wanted(ask)}, so the run stopped there.`, {

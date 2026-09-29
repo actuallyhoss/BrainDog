@@ -1,9 +1,9 @@
 /**
- * The accent and the alarm, held apart by a number (finish unit GAP-5, `loop/research-app-colours.md`).
+ * The accent and the alarm, held apart by a number.
  *
  * THE ACCENT SHARES DANGER'S HUE BY DESIGN, SO THE DISTANCE BETWEEN THEM IS A MEASUREMENT AND NOT A
- * FEELING (DIRECTION §14). §19 put the accent on the mark's own hue, 27, which is where `danger` is
- * anchored, and said what keeps the two apart: the alarm a step richer in chroma, an error a filled
+ * FEELING. The accent sits on the mark's own hue, 27, which is where `danger` is
+ * anchored, and what keeps the two apart is the alarm a step richer in chroma, an error a filled
  * chip with a glyph, primary actions in ink, and the accent spent rarely. `theme.test.ts` holds the
  * chroma half. This file holds the distance, so it cannot shrink without a red line naming the pair.
  *
@@ -12,18 +12,16 @@
  * alpha themes, as a reader with normal vision sees it and as each of the three dichromats does
  * (Brettel 1997, the simulation check F already uses).
  *
- * TWO FLOORS, AND THE SECOND IS WHY THIS FILE EXISTS. The first is 2.5 for normal vision: the ROADMAP's
- * M4 line reads "2.54 ΔE2000 today", and that figure is the light house `--accent` against the light
- * `--danger-fill`, reproduced by hand from this package's own formulas on 25 September. The same pair,
- * worked the same way through the deuteranope's simulation, came to about 1.7, and through the
- * tritanope's to about 2.0, so a 2.5 floor on every reading would be red on its first run for a fact no
- * palette value can move today: the research file's section 2 sets out the window the light chip has
- * to sit in. The simulated floor is therefore 1.5, under the hand reading by more than the arithmetic's
- * error, and it still goes red if the chip and the accent drift toward each other.
+ * TWO FLOORS, AND THE SECOND IS WHY THIS FILE EXISTS. The first is 2.5 for normal vision: the tightest
+ * pair reads 2.54 ΔE2000, the light house `--accent` against the light `--danger-fill`, worked by hand from
+ * this package's own formulas. The same pair, worked the same way through the deuteranope's simulation, came
+ * to about 1.7, and through the tritanope's to about 2.0, so a 2.5 floor on every reading would be red on its
+ * first run for a fact no palette value can move today, given the window the light chip has to sit in. The
+ * simulated floor is therefore 1.5, under the hand reading by more than the arithmetic's error, and it still
+ * goes red if the chip and the accent drift toward each other.
  *
  * THE READINGS ARE PRINTED, NOT ONLY CHECKED. Each one is a diagnostic line in the test output, so the
- * first CI run gives the integrator the measured table the research file and `loop/DESIGN-SYSTEM.md`
- * section 1.3 are waiting for, and the hand figures above can be replaced by measured ones.
+ * CI run gives a measured table, and the hand figures above can be replaced by measured ones.
  */
 
 import { test } from 'node:test';
@@ -33,10 +31,10 @@ import { deltaE2000, fromHex, rgbToCielab, separation, type Deficiency } from '.
 import type { Built, Role, Scheme } from './build.ts';
 import { ALPHA, HOUSE } from './index.ts';
 
-/** Normal vision, from the ROADMAP's 2.54 reading of the tightest pair. */
+/** Normal vision, from the 2.54 reading of the tightest pair. */
 const FLOOR = 2.5;
 
-/** Each simulated dichromat, argued in `loop/research-app-colours.md` section 2. */
+/** Each simulated dichromat, under the hand readings of about 1.7 and 2.0 by more than the arithmetic's error. */
 const FLOOR_SIMULATED = 1.5;
 
 type Vision = 'normal' | Deficiency;
@@ -72,8 +70,7 @@ for (const built of THEMES)
           assert.ok(
             got >= floor,
             `in ${built.id} ${scheme}, --${a} ${p[a]} and --${b} ${p[b]} are ${got.toFixed(2)} apart ` +
-              `(${vision} vision), under the floor of ${floor}. The accent has moved toward the alarm: ` +
-              `loop/research-app-colours.md section 2 says what may move instead.`,
+              `(${vision} vision), under the floor of ${floor}. The accent has moved toward the alarm.`,
           );
         }
       });

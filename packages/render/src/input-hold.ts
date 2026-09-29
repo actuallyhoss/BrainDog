@@ -26,7 +26,7 @@ export const leftHold = (hold: InputHold, value: string): InputHold => ({ ...hol
  * WHILE THE BOX IS BEING TYPED INTO, WHAT WAS TYPED. The host writes after a pause and reads the page again, and the
  * value it read came back into the box: a price written as `1250` was reformatted to `EGP 1,250.00` under the cursor
  * of somebody still typing, and a write the record refused as stale put the other person's figure over theirs, with
- * the sentence beside the box about a text that was no longer in it (audit of September 25th, §17).
+ * the sentence beside the box about a text that was no longer in it.
  *
  * ONCE IT IS LEFT, WHAT WAS TYPED UNTIL THE RECORD ANSWERS SOMETHING NEW. Dropping the text on leaving would lose it
  * in exactly the case it matters, a conflict read back while the box was focused; keeping it forever would hide a

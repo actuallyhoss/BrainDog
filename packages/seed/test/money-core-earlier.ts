@@ -6,7 +6,7 @@
  * moved on, and the only way to have one is to build the 1.8.0 document back out of today's.
  *
  * BUILT, NOT A FIXTURE FILE, because 1.8.0 and 2.0.0 differ by one declaration. `register.holdings` below is the body
- * 1.8.0 shipped, read out of `firstPartyDocument('money-core')` on 23 September before `holdings` left.
+ * 1.8.0 shipped, read out of `firstPartyDocument('money-core')` before `holdings` left.
  *
  * NEAR 1.8.0 SINCE 3.0.0, NOT BYTE FOR BYTE. Until 3.0.0 the rebuild read `8bcd20187c61cf1b`, the fingerprint
  * `pack-versions.test.ts` recorded for `money-core@1.8.0`, and `money-core-major.test.ts` held it there. 3.0.0 took pages,
@@ -68,7 +68,7 @@ const usd = (minor: number): { amount: number; currency: string } => ({ amount: 
  * FOURTEEN ROWS OF THE SHAPE AN IMPORTED RECORD'S `holdings` TAKES ON money-core 1.8.0: eleven lots of gold under the
  * kind `gold`, a certificate and two policies. EVERY VALUE IS INVENTED. The first version of this list copied a real
  * record's holdings, lots, costs, dates, policy numbers and cover included, into a tree anybody can read, and it was
- * replaced on September 25th with rows of the same kinds, count and currencies, which is all the tests beside it read.
+ * replaced with rows of the same kinds, count and currencies, which is all the tests beside it read.
  *
  * ONE ROW A LOT AND NOT ONE ROW A METAL, because that is what an import writes and because lots are bought at different
  * prices on different days. Adding them into one "units of gold" row loses the only thing that makes a cost a cost,
@@ -95,8 +95,7 @@ export const HELD_AT_1_8_0: readonly Held[] = [
  * Today's money-core document less what 2.1.0 and 2.2.0 added, which is `available` and `pairs:` on
  * `register.transactions`, so the two rebuilds below stay as near the releases they name as today's document allows.
  * Measured when each landed, before 3.0.0: without this step the 1.8.0 rebuild's fingerprint moved off the one
- * `pack-versions.test.ts` recorded for 1.8.0 (`pairs:` alone read `7e991afc1e7d11aa` against `8bcd20187c61cf1b` on
- * 24 September). `pairs:` is taken off whole, so its `where:` gaining `party` and `settles` at 2.2.0, and `settles`
+ * `pack-versions.test.ts` recorded for 1.8.0 (`pairs:` alone read `7e991afc1e7d11aa` against `8bcd20187c61cf1b`). `pairs:` is taken off whole, so its `where:` gaining `party` and `settles` at 2.2.0, and `settles`
  * loosened to `settles is empty or transfer is true` at 2.3.0, needed nothing here: the 1.8.0 rebuild still read
  * `8bcd20187c61cf1b` after 2.3.0 landed. It stopped reading it at 3.0.0, which took away more than these steps put back
  * (see the top of this file). What 2.4.0 added is taken off first, by `before240` below.
@@ -116,7 +115,7 @@ function asShipped(doc: unknown): Doc {
  * the obligations leg of each walk `page.money` draws. Every release before 2.4.0 is built on top of this.
  *
  * TAKEN OFF BY ID AND KEY, NOT BY POSITION, so the fields and the leg's keys keep the order the release carried them in,
- * which is what a fingerprint hashes. Measured on 24 September, before 3.0.0: `asMoneyCore230` read `8ad733c726f4fd0b`
+ * which is what a fingerprint hashes. Measured before 3.0.0: `asMoneyCore230` read `8ad733c726f4fd0b`
  * after 2.4.0 landed, the value `pack-versions.test.ts` holds for 2.3.0, and the 1.8.0 rebuild still read
  * `8bcd20187c61cf1b`. Neither does since 3.0.0; `money-ends.test.ts` reads 2.3.0 from a fixture file instead.
  */

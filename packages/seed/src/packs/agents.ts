@@ -1,9 +1,9 @@
 /**
  * The agents pack: what an agent finds out, the skills it uses, the keys it is handed, and the tools
- * it runs, each at a project or everywhere (`loop/research-agent-path.md` §5.2).
+ * it runs, each at a project or everywhere.
  *
- * IT REQUIRES `things` AND NOTHING ELSE. Every module can be switched off, People included
- * (`loop/DIRECTION.md` §9), so no field here points at a person. A row applies to a project or to
+ * IT REQUIRES `things` AND NOTHING ELSE. Every module can be switched off, People included,
+ * so no field here points at a person. A row applies to a project or to
  * everywhere, and a record without People loses nothing this pack holds.
  *
  * A KEY'S ROW IS AN INDEX. `value` names the grant the vault sealed a key into, and only the vault
@@ -121,8 +121,8 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
       /* For a key that is not in the vault: where a person finds it. */
       { id: 'where', label: 'Kept at', type: 'text', max: 280 },
       { id: 'origin', label: 'Came from', type: 'text', max: 280 },
-      /* WHAT A PERSON WROTE ABOUT THE KEY, AND NEVER THE KEY. Added in 1.2.0 because the old tool's key register carries a
-         note on 83 of his 91 rows and Keys had nowhere to put one, so the import left every one of them behind. A text
+      /* WHAT A PERSON WROTE ABOUT THE KEY, AND NEVER THE KEY. Added in 1.2.0 because an imported key register carried a
+         note on 83 of its 91 rows and Keys had nowhere to put one, so the import left every one of them behind. A text
          field goes through the kernel's credential check like `opens` does, so a note shaped like a key is refused. */
       { id: 'note', label: 'Note', type: 'text' },
       { id: 'verified', label: 'Last known to work', type: 'day' },
@@ -212,12 +212,12 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
 };
 
 /**
- * The pack's pages (`loop/research-agent-path.md` §7): the agents home at `/p/agents`, and a page per skill with its
+ * The pack's pages: the agents home at `/p/agents`, and a page per skill with its
  * versions.
  *
  * THE HOME READS TOP DOWN IN THE ORDER A PERSON ACTS ON IT: what is waiting on them, who is working, what the brain
  * learned, how it has grown, and then what it holds. Until 1.3.0 it was a grid of cards per list, each of the same
- * weight, with nothing to say which came first (`loop/finish/agents.md` §3 item 4).
+ * weight, with nothing to say which came first.
  *
  * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
  * record without People could not take this pack. The people an agent meets are on the People page.
@@ -267,7 +267,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          `agents` block and not a `feed`, because a feed groups by the kind of actor and would put every run under one
          head; this groups by who, and `first:` folds each run's rest into one line with its count, so a busy run
          cannot push the others off the page (`agentRows` in `packages/kernel/src/pages.ts`). `list is skills` is the
-         word the record gives an event's list over `activity` (`loop/finish/contracts.md` §11 X6).
+         word the record gives an event's list over `activity`.
 
          IT DOES NOT SAY "SINCE YOU LAST LOOKED", because only a `feed` reads `since:` (`KEY_KINDS` in
          `packages/kernel/src/block-keys.ts`), and a heading promising a mark the block cannot draw would be untrue. */
@@ -381,7 +381,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         versions: 5,
         empty: 'One version so far.',
       },
-      /* THE LEARNINGS THIS VERSION TOOK IN, each a card that opens its row (GAP-12). `id is {{because}}` and not a note:
+      /* THE LEARNINGS THIS VERSION TOOK IN, each a card that opens its row. `id is {{because}}` and not a note:
          `because` holds row ids, which `fill` writes into a sentence as `id is A or B`, so the cards are the lessons
          themselves and never the ids. A version drafted by Slash lists them in `because` when it is taken on Decide. */
       { kind: 'cards', heading: 'Learnings behind this version', span: 12, source: 'register.learnings', where: 'id is {{because}}', columns: [{ field: 'lesson', as: 'title' }, { field: 'confirmed_on', as: 'when' }], limit: 8, empty: 'No learning is written into this version yet.' },
@@ -409,7 +409,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
  * WHAT A PROJECT RUNS ON IS NOT HERE ANY MORE. Until 1.3.0 this file exported three blocks the seed spliced into the
  * project template, which only a record built by the seed's installer ever got. It is now the `runs_on` source the
  * record computes (`packages/kernel/src/pages.ts`), which reads whichever of these lists exist, and one block on the
- * portfolio module's project template draws it on every record (`loop/finish/agents.md` §3 item 1).
+ * portfolio module's project template draws it on every record.
  */
 
 export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, SeedRegister>; pages: typeof AGENTS_PAGES; metrics: typeof AGENTS_METRICS } = {

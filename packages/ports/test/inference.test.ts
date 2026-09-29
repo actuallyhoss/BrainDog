@@ -179,7 +179,7 @@ test('a request carrying a key the port does not define is refused by the adapte
   const ai = one();
 
   /* TWO BANS IN ONE GUARD, and both of them are type bans that a cast walks straight through.
-     `tools` is the one the audits settle (`46 #9`, `11 §6`): every Slash call is schema-constrained
+     `tools` is the one the slash spec settles (`46 #9`, `11 §6`): every Slash call is schema-constrained
      structured output, retrieval is `project()`, and the ban is meant to be structural rather than
      a rule somebody remembers at review. A credential is the other (`46 §2` #3): the adapter is
      built by the host with the key already closed over, so a key arriving in a REQUEST is a key

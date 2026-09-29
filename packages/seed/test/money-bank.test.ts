@@ -2,8 +2,7 @@
  * What money-core's `Spent, 30 days` counts, on the sample record.
  *
  * THIS FILE USED TO HOLD HSBC EGYPT'S THREE WORDINGS, read by the patterns the sample record carried for them. Those
- * tests moved to `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` with the pack file (`loop/research-legacy-parity.md`
- * brief B1), where they stand on the record a person has once the pack is installed rather than on the sample. The one
+ * tests moved to `packs/bank-hsbc-eg/bank-hsbc-eg.test.ts` with the pack file, where they stand on the record a person has once the pack is installed rather than on the sample. The one
  * test left is about money-core's own figure, which arrived in the same commit (`aeef01c5`) and reads no bank.
  */
 

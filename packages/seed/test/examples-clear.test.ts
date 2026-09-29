@@ -87,7 +87,7 @@ test('ONLY UNTOUCHED EXAMPLES ARE CLEARED: one linked to another example goes, o
   /* A real row naming the example project keeps it; an edited example is kept. */
   const mine = value<{ id: string }>(k.create('tasks', { what: 'My own task', state: 'open', [link.id]: project.id }, w));
   const track = exampleIn(k, 'tracks')!;
-  /* A note on the write keeps it off the grace-window fold (`packages/kernel/src/index.ts` write, decision C26): a
+  /* A note on the write keeps it off the grace-window fold (`packages/kernel/src/index.ts` write): a
      bare correction in a row's first three minutes folds into its `create` line and reads as never touched, so an
      edit meant to be seen here carries the note a real edit would. */
   value(k.update('tracks', track.id, { name: 'Launch the yearly plan' }, { ...w, note: 'Renamed the track.' }));
@@ -120,7 +120,7 @@ const recordHost = (k: Kernel): Host => ({
   },
 });
 
-/* A sentence forms the plan whatever `examples` says; without one the use case's own examples come only when asked (C11). */
+/* A sentence forms the plan whatever `examples` says; without one the use case's own examples come only when asked. */
 async function guideRecord(said: string | null, examples = false): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'my-podcast', name: 'My podcast', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'maker@example.test', name: 'Ada' } }).ok);

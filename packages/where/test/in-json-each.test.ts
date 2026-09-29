@@ -20,7 +20,7 @@ import { guard, SqlError } from '@braindog/ports';
 
 import { compile, evaluate, type Predicate, type Schema } from '../src/index.ts';
 
-/* ── OPS-5: the fixture ──────────────────────────────────────────────── */
+/* ── the fixture ───────────────────────────────────────────────────── */
 
 const SCHEMA: Schema = {
   register: 'jobs',
@@ -101,7 +101,7 @@ const throughGuard = (where: Predicate): void => {
   guard(`SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql}) ORDER BY updated_at DESC, id DESC LIMIT ?`, ['jobs', ...c.params, 51]);
 };
 
-/* ── OPS-5: the shape ────────────────────────────────────────────────── */
+/* ── the shape ─────────────────────────────────────────────────────── */
 
 test('A 300-VALUE `in` ON A TEXT FIELD IS ONE PARAMETER, and so is its `not_in`', () => {
   const values = words(300);
@@ -148,7 +148,7 @@ test('A LONG `in` OVER AN INSTANT BINDS AT MOST TWO, the bare days and the momen
   assert.equal(compile({ field: 'at', in: moments(80) }, SCHEMA).params.length, 1);
 });
 
-/* ── OPS-5: the rows do not move ─────────────────────────────────────── */
+/* ── the rows do not move ──────────────────────────────────────────── */
 
 test('THE LONG FORM ANSWERS THE ROWS THE CHAIN DID, in both renderings, for every type that takes it', () => {
   /* Text, with the one real value at the far end of the list. */
@@ -179,7 +179,7 @@ test('INSIDE A `none:` A ROW WITH NOTHING IN THE FIELD STAYS, which is the `IS N
   assert.deepEqual(both({ none: [{ field: 'n', not_in: [...numbers(80), 3] }] }), ['a']);
 });
 
-/* ── OPS-5: money keeps its chunks, and its ceiling ──────────────────── */
+/* ── money keeps its chunks, and its ceiling ───────────────────────── */
 
 test('A LONG MONEY `in` STILL CHUNKS, two parameters a value, and answers the same rows', () => {
   const c = compile({ field: 'fee', in: [...fees(70), { amount: 24_000, currency: 'EUR' }] }, SCHEMA);

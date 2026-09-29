@@ -4,8 +4,8 @@
  * WHY THIS FILE EXISTS. `POST /api/slash/read` is the one route that reaches the engine, and it calls `read` and nothing else
  * (`packages/host/src/slash-ask.ts`). The meter counted `kind = 'propose'` rows alone while `read` writes `kind = 'read'`, so
  * `ask_cap` could not be reached through the product: measured before the repair, an owner who set the cap to 2 was answered
- * on five asks out of five, five model calls on the owner's own key, and `status()` said 0 of 2 after every one of them
- * (`loop/research-spark-seam.md` §4). The door already names `SLASH_BUDGET_SPENT` as the answer once the month's
+ * on five asks out of five, five model calls on the owner's own key, and `status()` said 0 of 2 after every one of them.
+ * The door already names `SLASH_BUDGET_SPENT` as the answer once the month's
  * asks are used, so that is the refusal asserted here, with no model call behind it.
  *
  * WHAT IS NOT COUNTED IS ASSERTED TOO. A record with no lists answers `nothing` without calling a model, and a meter that bills

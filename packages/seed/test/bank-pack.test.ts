@@ -3,12 +3,11 @@
  *
  * WHY THIS FILE EXISTS. money-core 1.7.0 declared sixteen ingests and twelve of them read one bank in one country:
  * `From HSBC:` lines, InstaPay transfers, a credit card alert that prints four digits after three stars. Every record set
- * up as Personal, Founder or Small business therefore carried them (`loop/research-shell-seed.md` M2), which is what
- * `loop/DIRECTION.md` section 22 says the core must not ship. The tests below hold the three things the move has to
+ * up as Personal, Founder or Small business therefore carried them, which is a use case the core must not ship. The tests below hold the three things the move has to
  * get right at once: money-core stops declaring them, the pack declares exactly them, and a record that already had
  * them from money-core reaches the same readings through the update and one install, with nothing refused.
  *
- * THE PACK IS ITS FILE AND THE HANDOVER IS THE ONE THAT SHIPPED. The builder left `src` on 25 September, and money-core
+ * THE PACK IS ITS FILE AND THE HANDOVER IS THE ONE THAT SHIPPED. The builder left `src`, and money-core
  * stopped handing the twelve under 2.4.0 (`money-core-names-no-pack.test.ts`). So the updates below are money-core with
  * the `hands` it carried from 1.8.0 until then (`handingAsShipped`), which is the update a record on 1.7.0 was offered,
  * and one test more drives the update it is offered now.
@@ -189,7 +188,7 @@ test('A RECORD ON 1.7.0 UPDATES WITHOUT A REFUSAL, then takes the pack, and ends
   assert.deepEqual(bank.adds.map((a) => a.id).sort(), [...HSBC, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
 
   const after = k.declarations().filter((d) => d.kind === 'ingest');
-  /* PLUS THE PACK'S CATCH-ALL SINCE 1.3.0 (K2) AND THE BALANCE READING SINCE 1.4.0: a text no other door took is
+  /* PLUS THE PACK'S CATCH-ALL SINCE 1.3.0 AND THE BALANCE READING SINCE 1.4.0: a text no other door took is
      skipped as not the bank's, not queued. */
   assert.deepEqual(after.map((d) => d.id).sort(), [...before, 'ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'].sort());
   const NEW_BANK = ['ingest.bank-balance', 'ingest.bank-balance-sms', 'ingest.bank-not-mine-sms'];
@@ -211,8 +210,8 @@ const usedOf = (sql: NodeSql, tokens: readonly string[] = []): string[] =>
   [...new Set([...sql.all<{ ingest_id: string }>('SELECT DISTINCT ingest_id FROM ingest_receipt').map((r) => `ingest.${r.ingest_id}`), ...tokens])].sort();
 
 /**
- * money-core 1.8.0 HANDED ALL TWELVE ON EVERY RECORD THAT UPDATED, used or not (`loop/research-batch-thirty-four-audit.md`
- * §8). Measured by the audit's `hands.mts phantom`: after the update all twelve were live under `bank-hsbc-eg`, a pack
+ * money-core 1.8.0 HANDED ALL TWELVE ON EVERY RECORD THAT UPDATED, used or not. Measured by driving the
+ * update: after the update all twelve were live under `bank-hsbc-eg`, a pack
  * the owner never installed, `packStates` listed it as on at version `null`, a token minted for one of its doors, and a
  * fresh record on the same version had none of them. What the handover is for is a door somebody uses: a token his
  * Shortcut already posts to, or a pattern that has filed his money. A door nobody used has nothing to keep.
@@ -289,7 +288,7 @@ test('A HANDED LIST WITH ROWS IS HANDED THOUGH `used` NAMES NOTHING, and an empt
   for (const rows of [0, 1]) {
     const { k, sql } = await record();
     /* ON 1.8.0, THE LAST money-core THAT DECLARES THE LIST. On today's the record has no `holdings`, and the 0-row case
-       read `[undefined, undefined]` on 23 September because there was no retire to read. */
+       read `[undefined, undefined]` because there was no retire to read. */
     for (const id of FIRST_PARTY) await put(k, id === 'money-core' ? asMoneyCore180(firstPartyDocument(id)) : firstPartyDocument(id));
     for (let i = 0; i < rows; i++)
       value(k.create('holdings', { label: 'Gold', kind: 'gold', qty: 1, unit_cost: { amount: 480000, currency: 'EGP' } }, { actor: 'p_seed' }));

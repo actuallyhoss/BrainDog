@@ -11,7 +11,7 @@
 
   /* THE RING IS INK, AND IT WAS THE BRAND'S RED. The red sits at danger's own hue, so a focused
      control looked like a refused one, and the owner's verdict on the whole product was that it
-     read as a warning (design D-1, SYS-1). `--focus-in` is the generated ink that the theme's
+     read as a warning. `--focus-in` is the generated ink that the theme's
      checks hold at 3:1 against every declared surface (`packages/theme/src/checks.ts`, check E),
      so it is a ring in every palette a record installs, and the 2px offset leaves a gap of the
      element's own ground between the ring and a filled control, which is what `--focus-out` names.

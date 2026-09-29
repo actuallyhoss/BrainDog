@@ -1,9 +1,9 @@
 /**
- * The four ways past `03df6e3d`'s check that its checker and `loop/research-batch-twenty-audit.md` finding 2 found: an
+ * The four ways past `03df6e3d`'s check that review found: an
  * update that installs clean and then fails on every read of something the owner kept.
  *
  * THE MIRROR FIRST. `03df6e3d` asks an owner's kept figure about the fields the update takes off a list; it never asks
- * the update's own figures about the fields the OWNER took off a kept list. The audit's probe retired `fx.source` in the
+ * the update's own figures about the fields the OWNER took off a kept list. A probe retired `fx.source` in the
  * app, offered a money-core that added `{ count: 'source' }` over `register.fx`, and heard a plan with no conflicts, an
  * accept that answered `ok`, and `FIELD_UNKNOWN: fx has no field called source` on every read after.
  *
@@ -229,7 +229,7 @@ test('a removed value no kept where names is kept, and the update goes ahead', a
   await takes(next, await plan(next, installed));
 });
 
-/* ── what the checker of this file found ────────────────────────────────── */
+/* ── what a review of this file found ───────────────────────────────────── */
 
 test('the mirror says writes when what the update stages is an ingest', async () => {
   const installed = await recordWith({ 'register.transactions': retired('note') });

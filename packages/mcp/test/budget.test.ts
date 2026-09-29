@@ -8,8 +8,8 @@
  * are inside the turn.
  *
  * 2,600 AND NOT 44's 1,800. That ceiling was set for eight tools; the agent path needs fourteen,
- * because `context`, `handoff` and `meet` are what an agent does every session
- * (`loop/research-agent-path.md` §1.5). A test and not a gate, on purpose.
+ * because `context`, `handoff` and `meet` are what an agent does every session. A test and not a
+ * gate, on purpose.
  *
  * AND THE CEILING IS THE ARBITER, WHICH IS WHY THE HEADROOM IS SMALL. Doc 44 §7 records 2,311 with
  * 289 to spare; this run measured 2,555 before `activity` was added, so the spare was 45 and the
@@ -17,7 +17,7 @@
  * were saying something the schema beside them, or the instructions above them, already said. The
  * figure now is 2,565. A tool that cannot be paid for is a tool that does not go in.
  *
- * 2,760, RAISED ONCE FOR `triage`, AND IT NEVER MOVES AGAIN (`loop/finish/contracts.md` §6.1, X2). The list measured
+ * 2,760, RAISED ONCE FOR `triage`, AND IT NEVER MOVES AGAIN. The list measured
  * 2,544 by this estimator before it, 56 under 2,600, and the tool could not be paid for out of descriptions three passes
  * had already cut: an agent given the inbox reach files or sets aside an arrival, which is a write of its own and rides
  * on no other tool's answer. Counted by hand with this estimator over the tool as `tools/list` serialises it, by

@@ -20,7 +20,7 @@ const raw = (body: string): any => ({ id: 'r', ts: '2026-09-19T12:00:00Z', chann
 /**
  * THE CEILINGS ARE `43 §7`'S AND CI HOLDS THEM AS WRITTEN; ANYWHERE ELSE THEY ARE DOUBLED. Each run is timed on the wall
  * clock, and on a machine running every workspace's tests at once a run is also timed waiting for a core, so the p99
- * there is the machine's load as much as this code (`loop/finish/defects.md` T1: these fail loaded and pass alone).
+ * there is the machine's load as much as this code (these fail loaded and pass alone).
  * Doubled off CI, where nothing else runs, and CI's ceiling is still the one a regression has to clear.
  */
 const SLACK = process.env.CI ? 1 : 2;

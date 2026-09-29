@@ -1,7 +1,7 @@
 /**
- * The forms a built dashboard draws (`loop/research-dynamic-layouts.md` §6, D5), each as fence rows both drawers read.
+ * The forms a built dashboard draws, each as fence rows both drawers read.
  *
- * WHAT WAS MEASURED BEFORE ANY OF THIS WAS WRITTEN, against the tree wave one left: `isKind('inputs')` was false while
+ * WHAT WAS MEASURED BEFORE ANY OF THIS WAS WRITTEN, against the tree before them: `isKind('inputs')` was false while
  * the kernel already answered an `inputs` block; ` ```steps path ` degraded as `"steps" takes no word after it`; and
  * `cardFault(['title', 'next'])` said `a column called "next"`, so a card the kernel had just answered `nexts` for
  * could not be written as a fence at all. The new modules are imported inside the tests that need them, so a run
@@ -315,7 +315,7 @@ test('A CHOICE THE RECORD DOES NOT HOLD IS NEVER SHOWN AS THE ONE IT DOES, blank
 /**
  * WHAT A PERSON TYPED STAYS IN THE BOX until the record hands it a value it did not hold when they stopped.
  *
- * THE RED (audit of September 25th, §17): the box's value was the record's value and nothing else, so the page read
+ * THE RED: the box's value was the record's value and nothing else, so the page read
  * again after a write pushed `EGP 1,250.00` into a box the person was still typing `1250.7` into, and after a conflict
  * it pushed the other person's figure over theirs. The rule is a pure function so the test does not need a browser:
  * Svelte's `set_value` writes whatever the attribute answers, and leaves the box alone when the answer is what it holds.

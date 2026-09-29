@@ -1,7 +1,7 @@
 /**
- * What a use case installs, made for one record on one day (`loop/research-spark.md` S10 and S13).
+ * What a use case installs, made for one record on one day.
  *
- * NOTHING IS INSTALLED AS AN EXAMPLE (`loop/finish/modules.md` C11). A document built here carries no example
+ * NOTHING IS INSTALLED AS AN EXAMPLE. A document built here carries no example
  * rows unless it is asked for them (`examples: true`), for a preview to draw or a test to hold a page against.
  * Asked, the rows belong to the use case, not to the module: a first-party module's own are the sample studio's
  * (Kiln, Halden Type Co), so a student's record is never handed a type foundry's projects and clients.
@@ -35,7 +35,7 @@ import { useCaseDocument, type UseCase } from './index.ts';
 type Body = Record<string, unknown>;
 
 /**
- * The example rows each use case gives the first-party modules it names, drawn only by a preview or a test (C11). A use
+ * The example rows each use case gives the first-party modules it names, drawn only by a preview or a test. A use
  * case not listed gives none. PERSONAL IS NOT LISTED SINCE ITS 2.0.0: a person's month in pounds was the wrong picture
  * of anybody's record, and a person's Home is drawn from what they write.
  */
@@ -44,7 +44,7 @@ const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { business: B
 /**
  * The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. IN NO
  * CURRENCY: a bound here is a count or a number of days, because a use case cannot know the currency of the record it
- * lands on (`loop/finish/modules.md` C1), and a sum of money a person means is a setting they type.
+ * lands on, and a sum of money a person means is a setting they type.
  */
 const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = { personal: PERSONAL_TARGETS };
 
@@ -52,7 +52,7 @@ const MODULE_TARGETS: Readonly<Record<string, Readonly<Record<string, unknown>>>
 type ModuleWords = Readonly<Record<string, Readonly<Record<string, string>>>>;
 
 /**
- * THE PLAIN WORDS, which every use case but a business's starts from (`loop/finish/modules.md` MOD-23). Money and a
+ * THE PLAIN WORDS, which every use case but a business's starts from. Money and a
  * project's page speak a business's money as they ship: "Owed to you", "Late to you", "Most owed by you". Nobody but
  * a founder or a small business is owed money by a client on an invoice, so a person, a student, a team or somebody
  * starting a project reads what is due to them and what they have to pay.
@@ -158,7 +158,7 @@ export type ModuleOptions = {
   holds?: Iterable<string>;
   /**
    * `true` for a document that carries example rows: the use case's for the module, or the module's own with no use
-   * case. Left out, the module carries none (`loop/finish/modules.md` C11), and the first run never passes it.
+   * case. Left out, the module carries none, and the first run never passes it.
    */
   examples?: boolean;
 };
@@ -166,7 +166,7 @@ export type ModuleOptions = {
 /**
  * A first-party module as this use case installs it, with no rows in it. `null` for an id that is not one.
  *
- * NOTHING IS WRITTEN AS AN EXAMPLE (`loop/DIRECTION.md` §26, `loop/finish/modules.md` C11). A module used to carry the
+ * NOTHING IS WRITTEN AS AN EXAMPLE. A module used to carry the
  * use case's example rows, and with no use case the sample studio's (Kiln, Halden), so the first run's "Start from a
  * list" planted a type foundry's clients in a student's record. A document asked for with `examples: true` still
  * carries them, for a preview to draw or a test to hold a page against; nothing that writes to a record asks for one.
@@ -243,8 +243,8 @@ const escapeWord = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 
 /**
  * Whether the pack a use case carries owns a list of its own, not only a page. A student or a guide declares its own
- * registers (courses, milestones) and claims its signals; small business's pack is one page and no list since MOD-18
- * (its own Home), so a pack alone no longer says a use case carries something.
+ * registers (courses, milestones) and claims its signals; small business's pack is one page and no list since it took
+ * its own Home, so a pack alone no longer says a use case carries something.
  */
 const ownsList = (pack: Record<string, unknown> | null): boolean => {
   const declarations = pack?.declarations;
@@ -275,8 +275,8 @@ export const forms = (u: UseCase): boolean => Object.hasOwn(FORMS, u.usecase);
  * The pack a use case carries, with its voice as settings, or `null`. Its only rows are the plan formed from what the
  * person said (`formedFor`), each tagged `formed`, with its days counted from today.
  *
- * THE USE CASE'S OWN EXAMPLES ARE NOT CARRIED (`loop/finish/modules.md` C11): a Personal record arrived holding 56 rows,
- * every one in pounds, which its owner then had to find and clear (`loop/finish/modules.md` §2.5, counted from
+ * THE USE CASE'S OWN EXAMPLES ARE NOT CARRIED: a Personal record arrived holding 56 rows,
+ * every one in pounds, which its owner then had to find and clear (counted from
  * `personal.ts`). `examples: true` carries them for a preview or a test,
  * and a formed plan still wins over them, because it is what the person asked for.
  */

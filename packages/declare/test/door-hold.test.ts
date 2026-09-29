@@ -1,6 +1,5 @@
 /**
- * The Shortcut's door stays open while HSBC Egypt's wordings move from money-core to `bank-hsbc-eg`
- * (`loop/research-batch-thirty-two-audit.md` §3).
+ * The Shortcut's door stays open while HSBC Egypt's wordings move from money-core to `bank-hsbc-eg`.
  *
  * THE UPDATE SHUT IT, AND NOTHING IN THE PLAN SAID SO. Measured through `@braindog/record` on a record at money-core
  * 1.7.0 with a path token minted for `bank-from-out-sms`: `ingestVerify` answered the digest, the update to 1.8.0

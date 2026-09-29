@@ -8,8 +8,8 @@
  *
  * WHAT IT DOES NOT YET DO IS KEEP THE SAMPLE'S ROWS OUT OF THE BUNDLE. `packs/first-party.ts` slices every document out
  * of `packDocument()` in `index.ts`, whose example seeds are the first row of each of the sample's lists, so loading
- * this file loads `index.ts`, and ES modules evaluate a dependency before the file that names it. Measured on 25
- * September with `pnpm --filter @braindog/web build`: the chunk holding `METRICS` still carries the sample's learnings
+ * this file loads `index.ts`, and ES modules evaluate a dependency before the file that names it. Measured with
+ * `pnpm --filter @braindog/web build`: the chunk holding `METRICS` still carries the sample's learnings
  * text, and building `METRICS` here from the four modules instead of re-exporting it changed no byte of any chunk. The
  * move from a namespace import of the root to this file took that chunk from 13.5 KB to 10.7 KB brotli, and all shipped
  * JavaScript from 512.3 KB to 499.4 KB. The rest is `first-party.ts` reading `index.ts`, which this file cannot change.

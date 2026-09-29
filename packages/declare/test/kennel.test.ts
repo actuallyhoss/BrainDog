@@ -1,5 +1,5 @@
 /**
- * The Kennel's rules, held with no bucket (`src/kennel.ts`, `loop/finish/platform.md` §4.0 K): a signed file from a new
+ * The Kennel's rules, held with no bucket (`src/kennel.ts`): a signed file from a new
  * key waits for review and is listed with who, what and when; the same version twice, an eleventh in a day and an id
  * BrainDog keeps are each refused by name; a yank by the key that signed it marks the version and keeps its file.
  *

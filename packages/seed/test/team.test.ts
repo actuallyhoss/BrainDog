@@ -83,8 +83,8 @@ const TEAM_1 = {
 test('A NEW TEAM IS NOT GIVEN A TICKETS LIST OF ITS OWN: its tickets are Work tasks, in its words', () => {
   const doc = useCaseDocument('team', TODAY)!;
   const lists = (doc.declarations as { register?: string }[]).flatMap((d) => (d.register ? [d.register] : []));
-  /* Since MOD-19, the cycle also plants `cycle_days`, the burndown's own line of open-task counts per day
-     (`loop/finish/gaps.md` MOD-19: "the cycle's burndown, lines of open tasks over the cycle's days"). */
+  /* The cycle also plants `cycle_days`, the burndown's own line of open-task counts per day: the cycle's
+     burndown, lines of open tasks over the cycle's days. */
   assert.deepEqual(lists.sort(), ['cycle_days', 'cycle_plan', 'cycles']);
   assert.deepEqual(useCase('team')!.modules, ['portfolio', 'people', 'work']);
   assert.equal(useCase('team')!.labels.tasks, 'Tickets');

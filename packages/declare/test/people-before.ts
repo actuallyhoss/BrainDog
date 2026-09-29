@@ -2,7 +2,7 @@
  * People AS IT SHIPPED BEFORE 2.0.0, with `registrar` on `role`, for the tests that start from a record whose rows hold it.
  *
  * THESE TESTS USED `registrar` AS THE VALUE AN UPDATE TAKES AWAY, and built the update by filtering it out of the
- * first-party document. People 2.0.0 took it out of the shipped document itself (M3 B9, `814ca32c`), so the record they
+ * first-party document. People 2.0.0 took it out of the shipped document itself (`814ca32c`), so the record they
  * started from no longer offered it and every create of a registrar row was `ENUM_VALUE_UNKNOWN` (CI 35938679271). The
  * record they measure is one made before that update, so this is the document it was made under: the shipped one with
  * the value put back where 1.0.0 declared it, between `accountant` and `collaborator`.

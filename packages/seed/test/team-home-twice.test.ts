@@ -1,8 +1,7 @@
 /**
  * The team pack's Home drawing one ticket under two headings.
  *
- * `loop/research-usability-2026-09-21.md` finding 15 measured this on `home-team` and item 2 of
- * `loop/BACKLOG.md`'s `Left by batch eleven` carried it forward: `Blocked` is `state is blocked` and
+ * A usability pass measured this on `home-team`: `Blocked` is `state is blocked` and
  * `Due this week` is `state is not done or dropped, by before +8d`, so a blocked ticket with a date
  * inside the week is drawn twice and a team lead counting the board counts it twice. Driven on a
  * record made the way onboarding makes one, Home drew five rows and `Wait on the design for the

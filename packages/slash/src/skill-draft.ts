@@ -1,6 +1,6 @@
 /**
- * A skill's next version, drafted from the learnings that bear on it (`loop/finish/gaps.md` GAP-12, DIRECTION §0 "The
- * brain evolves"): the prompt a host hands its model, and the check of what the model answered.
+ * A skill's next version, drafted from the learnings that bear on it, so the
+ * brain evolves: the prompt a host hands its model, and the check of what the model answered.
  *
  * THE RECORD CHOOSES AND FILES; THIS ONLY WRITES THE TEXT. The daily look in `@braindog/record` finds each skill that
  * active learnings bear on and its `because` does not carry yet, asks the model through `SlashModel.skill`, and files the

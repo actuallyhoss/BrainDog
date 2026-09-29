@@ -55,7 +55,7 @@
       U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
 
-  /* Geist Mono carries key caps, addresses, code and times in a feed (SYSTEM §3). Latin only, and fetched only by
+  /* Geist Mono carries key caps, addresses, code and times in a feed. Latin only, and fetched only by
      a page that draws one of those. */
   @font-face {
     font-family: 'Geist Mono';
@@ -86,7 +86,7 @@
   :root {
     --font-ui: 'Geist', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Poppins', 'Geist', 'Plex', system-ui, sans-serif;
-    /* SYSTEM §3 names Geist Mono for key caps, addresses, code and times: `geist-mono.woff2` in both apps'
+    /* The design system names Geist Mono for key caps, addresses, code and times: `geist-mono.woff2` in both apps'
        `static/fonts`, declared above. */
     --font-id: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 
@@ -104,7 +104,7 @@
 
     --t-xs: 12px;
     --t-sm: 13px;
-    /* 2026-09-16, one notch down (loop/DESIGN-BRIEF.md 4.2). Every reference for a dense record sets
+    /* 2026-09-16, one notch down. Every reference for a dense record sets
        its chrome at 13 to 14 and ranks with weight and ink; 15 made a ledger read like a landing
        page. Long prose still reaches 16 through `--t-md`. */
     --t-base: 14px;
@@ -113,7 +113,7 @@
     --t-xl: 24px;
     --t-2xl: 32px;
     --t-3xl: 40px;
-    /* 2026-09-29, SYSTEM §3's own steps, beside the scale rather than in place of it: a row title (15/20, 500; a tile
+    /* The design system's own steps, beside the scale rather than in place of it: a row title (15/20, 500; a tile
        heading at 600), a group heading on the ground and the panel's title (17/24, 600), the figure in a tile (30/34),
        the page title (28/34) and a lead sentence or figure (34/40). Meta is `--t-sm` and body `--t-base`. */
     --t-row: 15px;
@@ -162,12 +162,12 @@
     /* Softer than they were (4 / 6 / 8), which read as a spreadsheet's cells. A control or a card
        is a thing you can pick up, and a pill is the shape of a choice or a single action.
 
-       WHAT TAKES WHICH, ONCE (design D-2). `--r-pill` is everything you press or choose: a button of
+       WHAT TAKES WHICH, ONCE. `--r-pill` is everything you press or choose: a button of
        any weight, a segmented track and its segments, a chip, an answer option, a toast.
        `--r-md` is a field, a select, a menu and a card; `--r-lg` a sheet, a dialog and the palette;
        `--r-sm` the focus ring and small marks.
 
-       2026-09-29, SYSTEM §4: a tile, the rail card, the docked panel, a sheet and the palette are 22; a row's wash,
+       The design system's radii: a tile, the rail card, the docked panel, a sheet and the palette are 22; a row's wash,
        a field, a menu and a card inside chrome are 12; a key cap is 6; and an icon well is 9, the fifth radius. */
     --r-sm: 6px;
     --r-well: 9px;
@@ -207,16 +207,16 @@
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
-    /* 2026-09-29, SYSTEM §5 and §6: a one-line row 44 and a two-line row 56, a toolbar control 36, a rail place 36. */
+    /* The design system's heights: a one-line row 44 and a two-line row 56, a toolbar control 36, a rail place 36. */
     --row-h: 44px;
     --ctl-h: 36px;
     --tap: 44px;
-    /* Header and row actions, a two-line row, a table row, a rail row (DESIGN-BRIEF 4.3). */
+    /* Header and row actions, a two-line row, a table row, a rail row. */
     --ctl-h-sm: 28px;
     --row-h-2: 56px;
     --table-row-h: 40px;
     --rail-item-h: 36px;
-    /* An icon well on a tile heading (28) and before a row (32), SYSTEM §6. */
+    /* An icon well on a tile heading (28) and before a row (32). */
     --well: 28px;
     --well-l: 32px;
     /* The widest a dashboard page's content runs, left aligned in the panel. */
@@ -236,13 +236,13 @@
     --tab-h: 56px;
     --tabbar: calc(var(--tab-h) + env(safe-area-inset-bottom));
     --measure: 72ch;
-    /* THE PAGE GUTTER, ONE VALUE FOR THE HEAD AND THE CONTENT UNDER IT (DESIGN-SYSTEM 3.1). The head
+    /* THE PAGE GUTTER, ONE VALUE FOR THE HEAD AND THE CONTENT UNDER IT . The head
        padded 24 and every page padded 32, so no title on any screen shared a left edge with the list
        it named. A width query and not a pointer query, because this is layout, not target size. */
     --gutter: var(--sp-6);
     --sticky: 52px;
     /* The rail CARD, 216 wide; the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
-       docked panel, and the gap between tiles; the panel is 440 (SYSTEM §4, §5). */
+       docked panel, and the gap between tiles; the panel is 440. */
     --rail: 216px;
     --inset: 12px;
     --panel-w: 440px;
@@ -345,7 +345,7 @@
      * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
      * element appears it gets a token beside this one, not a tenth percentage.
      */
-    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE GENERATED NOW (2026-09-29). SYSTEM §2 gives the wash as a
+    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE GENERATED. The design system gives the wash as a
        cool near-black at 5% in light and white at 6% in dark, and the arrival as an opaque lavender, which no one
        `color-mix` of an ink writes in both schemes. `packages/theme` emits all three into every scheme block of the
        palette sheet, beside the glass. */
@@ -354,12 +354,12 @@
 
        INK AND NOT THE ACCENT, AND THIS IS WHERE THE PRODUCT STOPPED READING AS A WARNING. The accent
        is the brand's red and sits at danger's own hue, so a focused field wore a red edge and a red
-       glow before anything had been typed, which is exactly what a validation error looks like
-       (design D-1, SYS-1). Focus is a place, not a verdict. */
+       glow before anything had been typed, which is exactly what a validation error looks like.
+       Focus is a place, not a verdict. */
     --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
     --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
 
-    /* SYSTEM §2 AND §4's GLASS AND THE GROUND'S LIGHT. The colours are generated (`--glass`, `--glass-strong`,
+    /* THE DESIGN SYSTEM'S GLASS AND THE GROUND'S LIGHT. The colours are generated (`--glass`, `--glass-strong`,
        `--glass-rim`, `--glass-hair`, `--ground-glow`, `--glass-sat`); the geometry is here. Chrome is
        `background: var(--glass); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`.
        `--ground-light` is the only gradient in the product, painted on the ground by `base.css`. */
@@ -373,12 +373,12 @@
      * Each of these was the accent, and each for a reason that sounded right on its own: a checked
      * switch is "on", the rail's item is "here", a link is "go". Together they put the brand's red
      * on every control that has a state, beside the same red on an overdue dot, so nothing on a
-     * screen could say "wrong" any more (design D-1). The accent now lives on the mark, the record
+     * screen could say "wrong" any more. The accent now lives on the mark, the record
      * tile, /start, /signin and `::selection`, and these roles carry the rest in ink.
      *
      * `--selected` WAS HERE, opaque, ink mixed into `--bg`, because the old light ladder put `s1` to
-     * `s3` above the page and a selected segment vanished (design SYS-5). SYSTEM's light ladder steps
-     * DOWN from a white tile, and SYSTEM's selection is its wash, so it is generated beside
+     * `s3` above the page and a selected segment vanished. The design system's light ladder steps
+     * DOWN from a white tile, and the design system's selection is its wash, so it is generated beside
      * `--hover-wash` now.
      *
      * `--on-ink` IS THE GROUND, BECAUSE THE MARK ON AN INK FILL IS A HOLE IN IT: the thumb of a
@@ -402,7 +402,7 @@
        vanishes on the ground (1.05:1). Rows and group headings draw their rule with this. */
     --rule: color-mix(in srgb, var(--ink) 10%, transparent);
     --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
-    /* Primary actions are drawn in ink, not in the accent (DESIGN-BRIEF 4.1). */
+    /* Primary actions are drawn in ink, not in the accent. */
     --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
     --warn-wash: color-mix(in srgb, var(--warn) 12%, transparent);
 
@@ -452,7 +452,7 @@
     --press-dim: 0.62;
     --ease-push: cubic-bezier(0.4, 0, 1, 1);
 
-    /* 2026-09-29, SYSTEM §8: 90ms for a hover fill and a row's state, 140ms for menus, tooltips and anything leaving,
+    /* The design system's timings: 90ms for a hover fill and a row's state, 140ms for menus, tooltips and anything leaving,
        220ms for the panel sliding in, a sheet and the title collapsing. Motion here answers, it does not perform. */
     --d-press: 120ms;
     --d-release: 160ms;
@@ -469,7 +469,7 @@
       0, 0.0503, 0.1684, 0.3158, 0.4672, 0.6068, 0.7265, 0.8232, 0.8972, 0.9509, 0.9875, 1.0104,
       1.0232, 1.0286, 1.0292, 1.0268, 1.0229, 1.0185, 1.0141, 1.0102, 1.0069, 1.0043, 1.0024, 1
     );
-    /* SYSTEM §8: a swift-out curve for anything arriving, and its own curve for leaving. */
+    /* The design system's easing: a swift-out curve for anything arriving, and its own curve for leaving. */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in: cubic-bezier(0.4, 0, 1, 0.5);
 
@@ -516,7 +516,7 @@
     :root { --gutter: var(--sp-4); }
   }
 
-  /* Comfortable is SYSTEM's 44 (§6), and the other two keep a step of 8 either side of it. */
+  /* Comfortable is the design system's 44, and the other two keep a step of 8 either side of it. */
   html[data-density='compact'] { --row-h: 36px; }
   html[data-density='comfortable'] { --row-h: 44px; }
   html[data-density='roomy'] { --row-h: 52px; }

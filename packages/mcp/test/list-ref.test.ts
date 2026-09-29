@@ -1,19 +1,18 @@
 /**
  * `list` filtered by a ref, asked every way an agent writes "Kiln's tasks".
  *
- * THE QUESTION THE OLD TOOL'S AGENTS ASK MOST AFTER THE LOG. 80 of the 93 `brain_tasks` calls in his
- * transcripts filter by project (`loop/research-mcp-parity.md` §2 row 5), and the natural translation
- * here is `list tasks` with `{field: 'thing', is: 'things#1'}`, the id `context` and every `list`
- * answer hand out. Measured over the seed before this file existed (§3 of the same survey): that tree
+ * THE QUESTION AGENTS ASK MOST AFTER THE LOG. Most task reads an agent makes filter by project, and
+ * the natural translation here is `list tasks` with `{field: 'thing', is: 'things#1'}`, the id
+ * `context` and every `list` answer hand out. Measured over the seed before this file existed: that tree
  * answered ok with 0 rows on a project holding 14, the tree with the name `Kiln` answered 0 as well,
  * the sentence `thing is things#1` was refused `REF_UNKNOWN`, and a name that matches no project at
  * all answered ok with 0 rather than a refusal. An empty board reads as "nothing to do", and an agent
  * cannot see the screen to notice. `create` already stored `thing: 'things#3'` as the row id, so the
  * write path and the read path disagreed about one address.
  *
- * DELETED IN `00f3aa6a` RATHER THAN ADAPTED, AND RESTORED HERE (audit fifty-two, finding 8). It read its
+ * DELETED IN `00f3aa6a` RATHER THAN ADAPTED, AND RESTORED HERE. It read its
  * row id off a task's `thing`, and that commit made the tool answer `things#1` there, so its setup found
- * no id and the file went. Its twelve cases still answered as before, measured by the audit, but nothing
+ * no id and the file went. Its twelve cases still answered as before, measured, but nothing
  * drove a ref predicate through the agent's `list` any more, and `kernel/test/where-ref.test.ts` still
  * sends its reader here. The row id is now read from the record itself, which the tool no longer shows.
  *
@@ -80,7 +79,7 @@ test('a ref in a predicate reads the spoken id, the name and the row id alike, i
   assert.deepEqual(got, forms.map(([label]) => [label, truth]));
 
   /* `not` IS THE ONE WHERE A LITERAL LOOKS RIGHT: every task that is not on the string `things#1`
-     is every task, Kiln's included, and the survey measured exactly that. */
+     is every task, Kiln's included, which is exactly what was measured. */
   const others = rows.filter((r) => r.fields.thing !== id).length;
   assert.equal(await count(mcp, { field: 'thing', not: 'things#1' }), others);
   assert.equal(await count(mcp, { field: 'thing', not_in: ['things#1'] }), others);
@@ -97,7 +96,7 @@ test('a ref that names nothing is refused rather than answered with an empty boa
 });
 
 test('a ref to a prefixed register is found by the id the tool answers, in the tree, in `in` and in the sentence', async () => {
-  /* THE CASE THE AUDIT ADDED (its M2). A learning answers `supersedes: "LN<n>"`, a prefixed id and not
+  /* THE PREFIXED CASE. A learning answers `supersedes: "LN<n>"`, a prefixed id and not
      `register#number`, so the predicate an agent writes from the answer it was handed is that id. */
   const { api, mcp } = await seeded();
   const read = await mcp.call('list', { register: 'learnings', limit: 500 }, agent);

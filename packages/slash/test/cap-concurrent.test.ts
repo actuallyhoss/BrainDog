@@ -3,8 +3,7 @@
  *
  * WHY THIS FILE EXISTS. `read-meter.test.ts` sends its asks one after another, so each one's `call` row is written before
  * the next one checks the meter. A browser with two tabs, a script, or a Durable Object that lets a second request in while
- * the first awaits its `fetch` does not wait like that. The audit of batch twenty-eight (`loop/research-batch-twenty-eight-audit.md`
- * §1) drove this package's own double with a model that answers after 20 ms, as a network model does, and sent ten
+ * the first awaits its `fetch` does not wait like that. A probe drove this package's own double with a model that answers after 20 ms, as a network model does, and sent ten
  * `read`s at `ask_cap: 2` through `Promise.all`: ten were answered, ten model calls were made, and `status()` read 10 of 2.
  * The check counted rows that are written after the model answers, so every ask in flight passed it against the same count.
  *
@@ -36,7 +35,7 @@ const PROPOSAL = JSON.stringify({
 const build = (record = fakeRecord()) => {
   const sql = openSqlite();
   const inference = canned();
-  /* 20 ms, the audit's figure. The canned adapter still records every call, so `seen` is the count of model calls made. */
+  /* 20 ms, the probe's figure. The canned adapter still records every call, so `seen` is the count of model calls made. */
   const slow: Inference = {
     complete: async (call) => {
       await new Promise((resolve) => setTimeout(resolve, 20));

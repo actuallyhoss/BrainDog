@@ -34,8 +34,7 @@ export type CardCell = { column: Column; value: string };
 /**
  * Which columns a phone card may draw, as indexes into `columns`, decided once for the table. `-1` is none.
  *
- * A PHONE CARD IS THE LEAD, THE FIGURE AND AT MOST TWO UNLABELLED VALUES (design-brief §5 and §6,
- * "Tables"; `design.md`'s hand-off to the render package). Every column with its label is a form per
+ * A PHONE CARD IS THE LEAD, THE FIGURE AND AT MOST TWO UNLABELLED VALUES. Every column with its label is a form per
  * row on a phone, and it puts "#", ids and missing marks in front of the one thing a reader scans a
  * list for, so a card draws only what a reader reads down the list by.
  *
@@ -69,7 +68,7 @@ export function cardPlan(columns: readonly Column[]): CardPlan {
   return { title, mark, start, end };
 }
 
-/** How many values the second line of a phone card holds at most (design-brief §5, "A card at 390"). */
+/** How many values the second line of a phone card holds at most, on a card 390px wide. */
 export const CARD_VALUES = 2;
 
 /** One row's phone card: its lead, its figure and the values on its second line, every one of them there to read. */
@@ -89,7 +88,7 @@ const drawable = (value: string | null | undefined): value is string => {
  *
  * AN EMPTY VALUE IS DROPPED, NOT MARKED. On a grid a missing cell keeps its box and draws the mark,
  * because the column is still there above it; a card has no columns to keep, so the missing mark on it
- * would stand in for nothing (design-brief §11, "Never" 7). The second line takes the first
+ * would stand in for nothing. The second line takes the first
  * `CARD_VALUES` values that are there, in the table's column order, so a row with a blank note shows
  * its date and its balance rather than its date and a hole.
  *

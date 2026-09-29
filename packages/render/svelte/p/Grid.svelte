@@ -136,7 +136,7 @@
 
   /**
    * THE MOVE, AND IT IS OPTIMISTIC. The card is in its new column on the next frame; nothing waits
-   * for a host that may take a second to answer or may refuse (REWORK §4). What it does not do is
+   * for a host that may take a second to answer or may refuse. What it does not do is
    * pretend the move is saved: the card carries a mark until whatever `onmove` reached redraws the
    * block with the new state in cell 0, at which point `moved` is answering about a row that already
    * agrees with it and the mark is gone. There is no confirmation dialog, here or anywhere in this

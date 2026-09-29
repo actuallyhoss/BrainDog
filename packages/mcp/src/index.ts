@@ -5,17 +5,16 @@
  * session, so one more tool costs every conversation for ever. So the record's own vocabulary
  * carries the load: `list` takes a predicate rather than there being a filter tool per register.
  *
- * FOURTEEN OF THEM, AND THE THREE NEWEST ARE THINGS AN AGENT DOES EVERY SESSION
- * (`loop/research-agent-path.md` §1.5). `context` is the briefing for where it stands, `handoff`
+ * FOURTEEN OF THEM, AND THE THREE NEWEST ARE THINGS AN AGENT DOES EVERY SESSION.
+ * `context` is the briefing for where it stands, `handoff`
  * keeps its session's next step true, and `meet` records a person it came across. Five went to pay
  * for them: `pages`, `page` and `metric` were already resources, `credentials` could never answer a
  * token because the vault refuses every one, and `dry_run` previews a rule, which only a person
  * installs.
  *
- * AND `activity` IS THE FIFTEENTH, WHICH PAID FOR ITSELF. `loop/research-switch.md` §1 lists the
- * twenty-one tools the old tool gives its agents, and nineteen of them have a path here already;
- * `brain_audit` had none, because `history` takes a row and a session picking up after another one
- * does not yet know which row to ask about. It cost 117 tokens of the 45 the ceiling had left, so
+ * AND `activity` IS THE FIFTEENTH, WHICH PAID FOR ITSELF. An agent used to a record-wide activity
+ * log had no path to one here, because `history` takes a row and a session picking up after another
+ * one does not yet know which row to ask about. It cost 117 tokens of the 45 the ceiling had left, so
  * four descriptions gave back what they were saying twice: `get` said the id grammar in its
  * description and again in its schema, `handoff` and `update` each said in their description what
  * their own schema and the instructions say, and `meet` listed the examples the instructions list.
@@ -25,7 +24,7 @@
  * ledger, to answer "how am I doing this month" by reading seven figures that one pack declares, by
  * id. It cost 91 tokens of the 35 the ceiling had left, and nine descriptions gave them back by
  * stopping saying what the instructions or the schema beside them already say. The instructions are ten rules
- * (`loop/research-agent-path.md` §1.4) and a client shows them in the same payload as this list, so
+ * (`instructions.ts`) and a client shows them in the same payload as this list, so
  * `propose` carried two of them word for word ("an agent never decides" and "to change what you may
  * not"), `context` opened on the first rule's "where you are", and `handoff`'s `tried` repeated the
  * rule about ruling a dead end out. The other five are the schema beside them: `activity` compared
@@ -35,7 +34,7 @@
  * after the word cursor.
  * The list measured 2,565 before, 2,656 with the tool, and 2,565 again after.
  *
- * IT LEFT BECAUSE IT WAS THE ONE USE CASE IN THE CORE (`loop/research-m3-dynamic.md` section 3, B6).
+ * IT LEFT BECAUSE IT WAS THE ONE USE CASE IN THE CORE.
  * A tool that knows one pack's figure ids is a tool that answers a record keeping its money in any
  * other pack with "install ours", and its own refusal said exactly that. Nothing replaced it by name:
  * a page that draws the figures is `braindog:page/<slug>`, each figure it draws is offered at
@@ -45,7 +44,7 @@
  * doing and never the tool's (`test/money-out.test.ts`). The list measured 2,597 tokens with the
  * tool and 2,520 without it, which leaves 80 of the ceiling free and spends none of them here.
  *
- * AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL (audit sixty-two finding 2). Probe M1 called each of the
+ * AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL. A probe called each of the
  * nine reads with its most helpful arguments over a record with a money pack installed and not one answer named a
  * figure, and the resource list named only the figures a page draws, 18 of that pack's 36. So `record_index` names
  * the figures the caller may read and `get` reads one by its id, whatever pack declared it, for 16 tokens of the 72
@@ -53,12 +52,12 @@
  * The record then learnt to list them (`figures`), so `record_index` names all 36 and asks three methods, `boot`,
  * `version` and `figures`, where naming the drawn 18 had run five pages and read eighteen figures.
  *
- * AND AUTOMATIONS COST IT NOTHING (`loop/research-shell-automations.md` §5). `dry_run` went above because only a person
+ * AND AUTOMATIONS COST IT NOTHING. `dry_run` went above because only a person
  * installed a rule; an agent now writes automations, so what one would do came back as `dry_run` on `propose`'s answer
  * for a rule change rather than as a tool, and the definitions, one automation with its runs, and the grammar are
  * resources. The list measured 2,597 tokens before and 2,597 after.
  *
- * AND SO DID `script_try`, BY THE SAME ROUTE (`loop/research-shell-scripts.md` section 7). The design asked for a tool,
+ * AND SO DID `script_try`, BY THE SAME ROUTE. The design asked for a tool,
  * and the smallest one that says what it does, a name, a sentence and one `body` argument, measured 102 tokens by
  * `budget.test.ts`'s estimator against the 3 the ceiling had left. Nothing that size could be taken out of sixteen
  * descriptions that three passes have already cut to what the schema and the instructions do not say. So a trial is
@@ -71,12 +70,12 @@
  * because a trial writes nothing and files nothing. Filing nothing is also what lets an agent iterate: a trial per
  * attempt, and one question in Decide for the draft that works.
  *
- * AND A PAGE IS SEEN DRAWN THE SAME WAY (M4 wave three brief 3). A page change whose body carries `"try": true` is
+ * AND A PAGE IS SEEN DRAWN THE SAME WAY. A page change whose body carries `"try": true` is
  * answered `page_preview`, the record's `previewPage` of it, and filed nowhere, so an agent sees what its blocks hold
  * before the owner is asked. It is a branch of `propose`'s, not a tool, for `script_try`'s reason, so the list costs
  * what it did; `budget.test.ts` holds that.
  *
- * AND `triage` IS THE SIXTEENTH, THE ONE TOOL THE CEILING WAS RAISED FOR (`loop/finish/contracts.md` §6.1, X2). An
+ * AND `triage` IS THE SIXTEENTH, THE ONE TOOL THE CEILING WAS RAISED FOR. An
  * agent could read the inbox and act on none of it, because filing and setting aside were the owner's in a browser; the
  * record now admits a token its owner gave the `inbox` reach, and every other token is refused in the record's own
  * sentence. Nothing it says could ride on another tool's answer, as `dry_run` and `script_try` do, because it is a write
@@ -152,9 +151,9 @@ export type McpSurface<C> = {
   recentHistory?(args: { limit?: number }, ctx: C): Answer;
   /** Every scheduled action, with its key by label only. READ+, and optional for the same reason as the five above. */
   actions?(ctx: C): Answer;
-  /** How the record is arranged, one page's declaration, or a grammar (`loop/research-spark.md` S12). READ+, optional likewise. */
+  /** How the record is arranged, one page's declaration, or a grammar. READ+, optional likewise. */
   arrangement?(args: { page?: string; grammar?: string }, ctx: C): Answer;
-  /** Every automation, or one with its last ten runs (`loop/research-shell-automations.md` §5). READ+, optional likewise. */
+  /** Every automation, or one with its last ten runs. READ+, optional likewise. */
   automations?(args: { rule?: string }, ctx: C): Answer;
   /**
    * What a rule body would do, writing nothing. READ+, and optional for one more reason than the others: it backs no
@@ -177,14 +176,14 @@ export type McpSurface<C> = {
   previewPage?(args: { body: Record<string, unknown> }, ctx: C): Answer;
   /**
    * A whole change drawn as it would stand, every page it makes over sample rows if it brings any, installed in the
-   * record's rehearsal and kept nowhere (the record's `previewChange`, `loop/finish/contracts.md` §2.4). READ+, and
+   * record's rehearsal and kept nowhere (the record's `previewChange`). READ+, and
    * optional for `scriptTry`'s reason: it backs only `propose`'s `try` on a bundle, or on one list or figure, and a surface
    * without it answers that `NOT_IN_THIS_BUILD`.
    */
   previewChange?(args: { to: unknown; rows?: unknown; about?: unknown }, ctx: C): Answer;
   /**
    * An automation body's steps taken by the real runner over a sample, everything they wrote rolled back and nothing
-   * sent (the record's `tryAutomation`, `loop/finish/contracts.md` §2.2). READ+, and optional for `scriptTry`'s reason: it
+   * sent (the record's `tryAutomation`). READ+, and optional for `scriptTry`'s reason: it
    * backs only `propose`'s `try` on a rule change, and a surface without it answers that `NOT_IN_THIS_BUILD`.
    */
   tryAutomation?(args: { body: Record<string, unknown>; sample?: unknown }, ctx: C): Answer;
@@ -195,7 +194,7 @@ export type McpSurface<C> = {
    */
   inbox?(args: { state?: string }, ctx: C): Answer;
   /**
-   * One arrival filed as a row in a list, or set aside (`loop/finish/contracts.md` §2.3, the record's `triage`). DATA,
+   * One arrival filed as a row in a list, or set aside (the record's `triage`). DATA,
    * and it admits a token only when its owner gave it the `inbox` reach. Optional for the command line's reason above:
    * both HTTP hosts hand `serveMcp` the whole record, and `apps/cli/src/surface.ts` routes it once its client knows it.
    */
@@ -203,8 +202,8 @@ export type McpSurface<C> = {
   /**
    * Every figure the record declares that this caller may read, whatever pack declared it, and whether it is read about
    * one thing (`param`, asked as `<id>:<value>`). READ+, the record's `figures`. Without it the record's methods name a
-   * figure only where a page draws it (`pages`, `page`) or by an id already known (`metric`): measured by audit
-   * sixty-two's M1 on the money pack as it ships, 18 of its 36 figures, and what is late coming in among the 18 missing.
+   * figure only where a page draws it (`pages`, `page`) or by an id already known (`metric`): measured on the money
+   * pack as it ships, 18 of its 36 figures, and what is late coming in among the 18 missing.
    *
    * OPTIONAL, for a command line built against a host older than the route, which `apps/cli/src/surface.ts` probes for.
    * Without it `record_index` and `resources/list` name the drawn ones, each read first, and `get` still reads any
@@ -269,7 +268,7 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
 export const TOOLS: readonly Tool[] = [
   {
     name: 'record_index',
-    /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE (audit sixty-two finding 2). With the one tool
+    /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE. With the one tool
        that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
     description: 'What this record holds: its registers, how many rows in each, its figures, and its version. The cheap way to learn register names.',
@@ -383,7 +382,7 @@ export const TOOLS: readonly Tool[] = [
         body_kind: str('options, rowset, pattern, change, pack, settings or arrange.'),
         /* THE change EXAMPLE WAS ONE THE RECORD REFUSES. Sent as written it answered `REQUIRED_MISSING` at
            `body.declaration_id`, and it taught the whole-declaration form for adding a field, which meant copying every
-           field of the list and racing any other agent doing the same (`loop/research-shell-schema.md` blockers 6 and 7).
+           field of the list and racing any other agent doing the same.
            `record/test/schema-add.test.ts` files the addition below against a real record. The rowset example lacked its
            `register`, which `checkBody` also requires. The fix cost 33 tokens of the 35 the ceiling had left (2,565 to
            2,598), which is why the addition names no `register` of its own: the record reads it from `declaration_id`.
@@ -414,9 +413,9 @@ export const TOOLS: readonly Tool[] = [
     name: 'update',
     /* COMPARE-AND-SET IS A RULE ABOUT EVERY WRITE, so it is one line of the instructions and no
        longer a second copy here. What is left is what is true of this tool alone.
-       AND DELETING IS SAID, because nothing told an agent how. the old tool gives its agents a
-       `brain_task_delete` (`loop/research-switch.md` §1); here it is `deleted_at` through the same
-       verb and the same permission, and an agent had no way to find that out. */
+       AND DELETING IS SAID, because nothing told an agent how. Other records hand their agents a
+       delete tool; here it is `deleted_at` through the same verb and the same permission, and an
+       agent had no way to find that out. */
     description: 'Change a row. Send the version you read.',
     input: obj(
       {
@@ -432,9 +431,9 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'log',
     description: 'Append one note to a row, changing nothing about it.',
-    /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL (`loop/finish/gaps.md` 1.6.2). It needed a row, so an agent first
+    /* A NOTE ABOUT NOTHING IN PARTICULAR IS ONE CALL. It needed a row, so an agent first
        asked `context` for its session's id, or wrote something to open one, and then logged on it: two calls for what
-       the old tool's `brain_log` did in one. Left out, the note goes on the caller's own session, and `log` in `tools`
+       a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
        below says how. */
     input: obj(
       { spoken: str('register#number, or a prefixed id such as LN7. Omit for your own session.'), note: str('One sentence, for the next reader.') },
@@ -481,7 +480,7 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'triage',
-    /* THE DESCRIPTION IS THE CONTRACT'S, WORD FOR WORD (`loop/finish/contracts.md` §6.2), and the site's list of tools
+    /* THE DESCRIPTION IS THE CONTRACT'S, WORD FOR WORD, and the site's list of tools
        reads `TOOLS` rather than a copy. Who may call it is not said here: the record refuses every token without the
        `inbox` reach in one sentence that names what it lacks, which teaches better than a clause every turn pays for.
        `ignore` says nothing beside its name, because "or set it aside" in the description already has. */
@@ -684,7 +683,7 @@ const SEARCH_MOST = 100;
 /**
  * What a search that matched more rows than it answered says about the rest.
  *
- * THE CALLER'S OWN LIMIT IS SAID AS THE CALLER'S (defects G3). This said "the record answers at most" whatever number
+ * THE CALLER'S OWN LIMIT IS SAID AS THE CALLER'S. This said "the record answers at most" whatever number
  * came back, so an agent that sent `limit: 5` read that the record stops at five and had no reason to ask for more, and
  * one that sent no limit read twenty, the default, where the record gives up to a hundred. Only a full hundred is the
  * record's own cap, and only then is narrowing the one way on.
@@ -695,13 +694,13 @@ const fewer = (total: number, showing: number, asked: boolean): string =>
     : `${String(total)} rows matched and ${asked ? 'your limit' : 'the default limit'} kept this answer to ${String(showing)}. Send a limit up to ${String(SEARCH_MOST)}, or narrow the question.`;
 
 /**
- * The sentences `context` adds to the record's briefing, for an agent arriving from the old tool.
+ * The sentences `context` adds to the record's briefing, for an agent arriving from another record.
  *
- * TWO HABITS HAD A PATH HERE AND NO SENTENCE ANYWHERE AN AGENT READS (`loop/research-mcp-parity.md`
- * §4). His agents called `brain_log` 49 times with no entity, and the home for that here is `log` on
- * the agent's own session row; 166 of his 167 `brain_task_add` calls set a lane, and the lane here is
- * the `agent` field, empty for his own. The third sentence is the question his agents asked 80 times
- * after the log, one project's tasks, in the form commit 5fde092b made work: the tree with the
+ * TWO HABITS HAD A PATH HERE AND NO SENTENCE ANYWHERE AN AGENT READS. Agents log notes about no row
+ * at all, and the home for that here is `log` on the agent's own session row; nearly every task an
+ * agent adds sets a lane, and the lane here is the `agent` field, empty for the person's own. The
+ * third sentence is the question agents ask most after the log, one project's tasks, in the form
+ * commit 5fde092b made work: the tree with the
  * project's spoken id. The literal `null` is not taught because `{"field":"agent","is":null}` is
  * refused VALUE_MALFORMED, measured on the seed; `agent is empty` answered 19 of 27 tasks.
  *
@@ -726,8 +725,8 @@ const teaching = (briefing: Record<string, unknown>): string[] => {
              seed it is Kiln, so a copied sentence read 14 of Kiln's tasks as the project asked about. */
           `One project's tasks: list tasks where {"field":"thing","is":"${project ?? "<the project's spoken id>"}"}.`,
           /* MEASURED ON THE SEED: `update tasks#3 {note}` left the note as the one line sent, and the import's text
-             only in `history`. 89 of the old tool's `brain_task_update` calls were `{id, note}` alone, which is an
-             append there, so an agent carrying the habit over wiped a note each time and nothing said so. */
+             only in `history`. Agents often send an update as `{id, note}` alone, which elsewhere is an append,
+             so an agent carrying the habit over wiped a note each time and nothing said so. */
           /* NOT "ADDS TO THE NOTE": a `log` leaves `fields.note` as it was and keeps its line in `history`, as
              `teaching.test.ts` asserts, so a sentence saying it appends to the note field sent an agent to look for its
              line where it never lands. */
@@ -889,7 +888,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * project a task was on, paid a `get` per id.
    *
    * ONE READ PER REGISTER THE REFS POINT INTO, NOT ONE PER ID. This asked `get` for each distinct id, one after another,
-   * so an answer cost a request per ref (audit fifty-two, finding 6): measured through `handle` on the seed with 120
+   * so an answer cost a request per ref: measured through `handle` on the seed with 120
    * learnings added, each superseding the one before, `list learnings` of 127 rows asked the surface 126 times, 123 of
    * them `get`. A ref field's declaration names its register in `to`, so every id an answer holds for that register goes
    * to it in `list` reads where `id` is in them, and the same answer asks six times: the `list`, the `schema` of
@@ -899,7 +898,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * IN READS OF AT MOST 64 IDS, BECAUSE THE DURABLE OBJECT BINDS AT MOST 100 PARAMETERS. `where` binds one per id, and
    * `list` three more of its own. Measured in workerd through Miniflare, a statement of 100 parameters ran and one of
    * 101 threw `too many SQL variables`, while `node:sqlite` takes tens of thousands. The first cut read 200 ids at a
-   * time, which passed every test here and in production turned the audit's 127 learnings, 119 ids in one read and
+   * time, which passed every test here and in production turned those 127 learnings, 119 ids in one read and
    * 122 parameters, into an internal error for the whole `list`: the answer was lost, not only its names. 64 is the
    * chunk `where` already slices `in` by (`packages/where/src/index.ts`), and it leaves the ceiling 33 to spare. It
    * also keeps the GET the command line sends (`packages/client/src/index.ts`) well short of the 16 KiB Node lets a
@@ -907,8 +906,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    *
    * NOTHING IS KEPT PAST THE ANSWER. `rpc.ts` builds these tools for each message, and every read is asked with the
    * caller's own context, so a register the caller may not read, by its level on that register or by its ceiling, is
-   * refused by the record and its ids stay ids, and a row deleted since the last message is read as it is now. The
-   * attempt held in wave fifty-two kept names across messages keyed by what `whoami` said, which says nothing of
+   * refused by the record and its ids stay ids, and a row deleted since the last message is read as it is now. An
+   * earlier attempt kept names across messages keyed by what `whoami` said, which says nothing of
    * `ctx.levels`, so a token held to `append` on `things` could be told a project's name. With the reads batched, a
    * cache across messages would save at most the four calls above besides the `list`, which is not worth a key that
    * has to name every grant a token holds.
@@ -916,8 +915,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * A ROW THE CALLER CANNOT READ, OR ONE THAT IS GONE, KEEPS ITS ID: `list` leaves a deleted row out, as `get` answered
    * one `null`, measured on the seed. A ref whose declaration names no register is still asked by `get`, one id each.
    *
-   * EACH READ IS A `register.read` OF THE LIST IT NAMES, AND THAT IS MEANT. Audit fifty-five, finding 2 asked whether
-   * these should count as the host's own. Both readers of the signal ask whether a list was read at all in ninety days,
+   * EACH READ IS A `register.read` OF THE LIST IT NAMES, AND THAT IS MEANT, and not the host's own. Both readers of the
+   * signal ask whether a list was read at all in ninety days,
    * the kernel's `dormant` and Slash's untouched pack, and a list whose rows name the refs on an agent's pages is in use:
    * retiring it would turn every one of those names back into a row id. What these reads must not count as is a scan,
    * and `id` is the primary key, so the kernel's `observe` leaves a scan of any of its own columns out.
@@ -1093,7 +1092,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * A page change drawn now and filed nowhere: `propose` with `"try": true` beside `to` (M4 wave three brief 3).
+   * A page change drawn now and filed nowhere: `propose` with `"try": true` beside `to`.
    *
    * AN AGENT'S DRAFT PAGE WAS SEEN DRAWN ONLY BY THE OWNER, in Decide, which calls `previewPage` on a filed change
    * (`apps/web/src/routes/decide/[id]/proposed.ts`). The agent filed a page it had never seen hold a row, and each wrong
@@ -1114,7 +1113,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
 
   /**
    * A rule change whose steps are taken now over a sample and filed nowhere: `propose` with `"try": {"sample": {...}}`, or
-   * `"try": true` for a clock or a button, which need none (`loop/finish/contracts.md` §6.3, `automation_try`).
+   * `"try": true` for a clock or a button, which need none. The answer is `automation_try`.
    *
    * THE REAL RUNNER, ROLLED BACK. The record lints the body as an install would, then runs it inside its rehearsal, so
    * the agent reads each step as done, would, waiting, failed or skipped in the runner's own words, and a call, a script,
@@ -1132,8 +1131,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
 
   /**
    * A whole change drawn as it would stand and filed nowhere: `propose` with `"try": true`, or `"try": {"rows": ...,
-   * "about": ...}` to draw it over sample rows, on a change whose `to` is a bundle, or one list or figure
-   * (`loop/finish/contracts.md` §6.3, `change_preview`).
+   * "about": ...}` to draw it over sample rows, on a change whose `to` is a bundle, or one list or figure. The answer is
+   * `change_preview`.
    *
    * A BUNDLE COULD NOT BE TRIED AT ALL. `try` read one page or one script, so a launch desk's lists, figures and pages
    * were filed and accepted a piece at a time before any page of it was seen holding a row
@@ -1162,7 +1161,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
 
   /**
    * A script change run now in the host's sandbox and filed nowhere: `propose` with `"try": true`, or `"try": {"input":
-   * ...}` to hand it what a door would have, beside `to` (`loop/research-shell-scripts.md` section 7).
+   * ...}` to hand it what a door would have, beside `to`.
    *
    * NOTHING IS FILED, SO NOBODY IS ASKED. The answer is the trial, `script_try`, and `proposed: false`; the agent sends the
    * change again without `try` to put it in front of the owner. The record checks the draft as it would at install
@@ -1215,8 +1214,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * parameter.
    *
    * THE RECORD'S LIST WHEN THE HOST ANSWERS ONE, AND THE DRAWN ONES WHEN IT DOES NOT. Named only when drawn, a figure no
-   * page shows could be read by nobody who did not already know its id: audit sixty-two's M1 counted 18 of one pack's
-   * 36 so, and nothing a tool answered named any of them.
+   * page shows could be read by nobody who did not already know its id: a probe counted 18 of one pack's 36 so, and
+   * nothing a tool answered named any of them.
    *
    * THE RECORD'S LIST IS TAKEN AS ANSWERED. It is held to `metric`'s own check figure by figure
    * (`packages/record/test/figures-list.test.ts`), so reading each id again here was that check twice, at a query per
@@ -1247,8 +1246,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * A filed question with the address where the person answers it: `<origin>/app/<slug>/decide/<id>`
-   * (`loop/finish/contracts.md` §6.3, agents C3).
+   * A filed question with the address where the person answers it: `<origin>/app/<slug>/decide/<id>`.
    *
    * AN AGENT THAT PROPOSED COULD SAY ONLY "I PUT A QUESTION IN YOUR QUEUE". Deciding is the person's, in the app, and no
    * token reaches it (ADR-060), so the one useful thing to hand them is the link to the question itself, which the agent
@@ -1436,7 +1434,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      * its turns discovering.
      */
     /**
-     * AND A RULE CHANGE COMES BACK WITH ITS DRY RUN (`loop/research-shell-automations.md` §5). `dry_run` was taken off
+     * AND A RULE CHANGE COMES BACK WITH ITS DRY RUN. `dry_run` was taken off
      * the tool list because only a person installed a rule; an agent now writes automations, so what one would do is
      * said here, on the answer to the call that filed it, which costs the list nothing. It is the record's own `dryRun`,
      * the one Decide reads, so the agent and the owner read one account of it. Asked after the filing, so a body the
@@ -1470,7 +1468,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      *
      * THIS PACKAGE QUALIFIED A PREFIX HERE AND IN `update`, and `propose`'s `rowset` was the third writer of a row and
      * went round it: a skill's `because: ["LN6"]`, as `get` answers it, was filed and then refused at the owner's accept
-     * (audit fifty-two section 1). A reader at each tool is a reader some tool lacks, so there is one, in `coerce.ts`,
+     * A reader at each tool is a reader some tool lacks, so there is one, in `coerce.ts`,
      * which every write reaches, the accept of a rowset among them. `refs-round-trip.test.ts` sends every ref any tool
      * answers back through every tool that writes.
      */
@@ -1703,7 +1701,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       /**
        * `log` ANSWERS WHAT IT WROTE: the row's name, the version the note left it at, and when. It answered the whole
        * row, so on the seed a one-line note on Kiln, whose note is its write-up, answered 6,610 bytes for a 5,889-byte
-       * note, and `log` is the most-called tool (211 of the old tool's 837 daily-flow calls). The note changed no field,
+       * note, and `log` is the tool agents call most. The note changed no field,
        * so the fields were the one thing in that answer the agent already had. The version stays because the next
        * `update` needs it, and a refusal passes through whole.
        */
@@ -1712,7 +1710,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         if (!said.ok || !isObject(said.value)) return said;
         /* AND `deleted_at` WHEN THE ROW HAS ONE. The record takes a note on a deleted row, and cutting the answer to three
            fields cut the one that said so: an agent logging on an id carried from another session was told `ok` and
-           nothing else (audit fifty-two section 7), which is the case where it did not already have the row. */
+           nothing else, which is the case where it did not already have the row. */
         const { spoken, version, updated_at, deleted_at } = said.value;
         return {
           ok: true,

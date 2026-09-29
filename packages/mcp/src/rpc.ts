@@ -3,8 +3,8 @@
  *
  * ONE FUNCTION, AND IT IS PURE. `handle` takes one parsed message and returns one reply, or `null`
  * for a notification, which is never answered. The command line's stdio loop and the hosts'
- * `POST /mcp` each do their own reading and writing around it (`loop/research-agent-path.md` §1.1),
- * so the two cannot drift in what they say. No `node:` module and no `process`, which the `stack`
+ * `POST /mcp` each do their own reading and writing around it, so the two cannot drift in what they
+ * say. No `node:` module and no `process`, which the `stack`
  * and `graph` gates require of anything under `packages/`.
  *
  * STATELESS. `initialize` negotiates a version and hands over the instructions, and nothing is
@@ -100,7 +100,7 @@ const CAPABILITIES = { tools: {}, resources: {}, prompts: {} };
 /**
  * Whether `propose` answers in the input-required shape of the 2026-07-28 revision's multi round-trip requests.
  *
- * OFF, BECAUSE NO CLIENT CAPABILITY FOR IT COULD BE CONFIRMED (`loop/finish/contracts.md` §6.3, agents C3). The
+ * OFF, BECAUSE NO CLIENT CAPABILITY FOR IT COULD BE CONFIRMED. The
  * contract turns the input-required answer on only when a request's `_meta` carries the capability the revision names
  * for it, and the name has to be read in the specification's own text, which this repository does not hold. The shape
  * `44-SPEC-MCP` §5.7 drew (one request of kind `decision`) is this project's design, not a kind the revision is known to

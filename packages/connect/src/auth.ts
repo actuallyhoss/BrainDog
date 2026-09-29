@@ -490,8 +490,8 @@ export async function applyAuth(
 
 /**
  * The ways a record's `call` or `poll` sends its one key, as its declaration names them: connect's
- * `bearer`, `header`, `query_param` and `basic`, with `query` for `query_param` (`loop/finish/
- * contracts.md`, "call and poll `auth.kind`"). The kernel keeps the same four (`ACTION_AUTH_KINDS`).
+ * `bearer`, `header`, `query_param` and `basic`, with `query` for `query_param`, as the shared contract for
+ * call and poll `auth.kind` names them. The kernel keeps the same four (`ACTION_AUTH_KINDS`).
  */
 export type CallAuth = { kind: 'bearer' | 'basic' } | { kind: 'header' | 'query'; name: string };
 

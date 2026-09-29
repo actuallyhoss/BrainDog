@@ -2,8 +2,8 @@
  * Each starter use case's version against what its pack declares (`version` in `src/usecases/<id>.ts`).
  *
  * A RECORD IS OFFERED AN UPDATE ONLY WHEN A VERSION GOES UP, and that is as true of a use case as of a first-party
- * pack. Until this file nothing in the tree held a use case to it. `loop/research-batch-three-audit.md` finding 6
- * drove the hole: changing the label on the founder's thirty-day tile with `version` left at 1.3.2 left
+ * pack. Until this file nothing in the tree held a use case to it. A mutation
+ * showed the hole: changing the label on the founder's thirty-day tile with `version` left at 1.3.2 left
  * `node --test --experimental-strip-types "packages/seed/test/*.test.ts"` at 182 tests, 182 pass, 0 fail, the same
  * tallies as the unmutated run. `df458964` had raised that version by hand an hour earlier and spent four lines of
  * comment arguing why the raise mattered; the argument was the only thing enforcing it, and an argument in a comment
@@ -230,7 +230,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'a50db125a0a2beb1',
     history: [
-      'The studio roles Personal relabels, `setting.label_people__role__client` and its siblings, lose their fifth: the `registrar` label went, because People 2.0.0 no longer offers the value (M3 B9) -> a50db125a0a2beb1',
+      'The studio roles Personal relabels, `setting.label_people__role__client` and its siblings, lose their fifth: the `registrar` label went, because People 2.0.0 no longer offers the value -> a50db125a0a2beb1',
     ],
   },
   'personal@1.7.1': {
@@ -461,7 +461,7 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.dashboard` and `page.project` open with one sentence said from their figures first and keep a rail; `Send numbers here` on `page.organisation` and `page.project` says `panel: reporting` -> 3755a69ec8c3ff98",
       "Home, Decide, the Inbox and the add buttons now speak in your use case's own words: `setting.voice_working_now`, `setting.voice_coming_up`, `setting.voice_overdue`, `setting.voice_nothing_now`, `setting.voice_nothing_waiting`, `setting.voice_fills_with`, `setting.voice_no_questions`, `setting.voice_inbox_clear` and `setting.voice_pen_waits` -> b78dfb33a2490526",
-      "CHECK pass repair round 1 renamed `page.home-founder`'s Working now columns from `as` to `label`, the shape every other table on the page already used (`agent`, `doing`, `last_seen`) -> 51db7a7065cc95c7",
+      "A later pass renamed `page.home-founder`'s Working now columns from `as` to `label`, the shape every other table on the page already used (`agent`, `doing`, `last_seen`) -> 51db7a7065cc95c7",
     ],
   },
   /** THE SAME IDS AS 1.8.0, and a version because 1.8.0 is on `origin/master` (`bfe14e39`): what moved is inside `page.project`. */
@@ -809,10 +809,10 @@ test('EACH STARTER USE CASE DECLARES WHAT ITS VERSION SAYS, and one that changed
 /**
  * THE GUARD'S OWN REFUSALS, driven over entries made up for the purpose.
  *
- * WRITTEN BECAUSE THE THING THIS GUARDS WENT UNGUARDED FOR NINE EDITS OF `founder.ts` and nobody noticed until an
- * audit mutated a label and watched 182 tests stay green. Every rule the comments above claim is enforced is
+ * WRITTEN BECAUSE THE THING THIS GUARDS WENT UNGUARDED FOR NINE EDITS OF `founder.ts` and nobody noticed until a
+ * review mutated a label and watched 182 tests stay green. Every rule the comments above claim is enforced is
  * exercised here with the smallest entry that breaks it, so that a rule quietly dropped from `wrong()` takes a test
- * with it rather than going unnoticed until the next audit reads the diff.
+ * with it rather than going unnoticed until the next review reads the diff.
  */
 test('THE GUARD REFUSES AN ENTRY WITH NO REASON BESIDE ITS FINGERPRINT, and names which rule the entry broke', () => {
   const live = { holds: ['register.organisations', 'setting.voice_home'], declares: 'aaaaaaaaaaaaaaaa', current: true };
@@ -863,9 +863,9 @@ test('THE GUARD REFUSES AN ENTRY WITH NO REASON BESIDE ITS FINGERPRINT, and name
 });
 
 /**
- * THE AUDIT'S OWN MUTATION, KEPT, so that what was measured by hand once is measured on every run.
+ * THE MUTATION, KEPT, so that what was measured by hand once is measured on every run.
  *
- * `loop/research-batch-three-audit.md` finding 6 changed the `datapoints-30d` cell label on the founder's dashboard
+ * The mutation changed the `datapoints-30d` cell label on the founder's dashboard
  * from "Reported, 30 days" to "Reported in the last 30 days", left `version` at 1.3.2, and watched `packages/seed`
  * stay at 182 tests, 182 pass, 0 fail. The same rename is made here over a copy of the document rather than over
  * `founder.ts`, which is what makes it a test rather than a thing somebody did once: the words a record prints move,
@@ -879,7 +879,7 @@ test("A RENAMED LABEL WITH THE VERSION LEFT ALONE IS WHAT THIS REFUSES, over the
   assert.deepEqual(wrong(key, entry, { holds: inventory(doc), declares: fingerprint(doc), current: true }), [], 'the entry is right before any word is moved');
 
   const renamed = JSON.parse(JSON.stringify(doc).replace('"Numbers reported, 30 days"', '"Numbers reported in the last 30 days"')) as Doc;
-  assert.notEqual(fingerprint(renamed), fingerprint(doc), 'the label the audit moved is inside the fingerprint');
+  assert.notEqual(fingerprint(renamed), fingerprint(doc), 'the label the mutation moved is inside the fingerprint');
   assert.deepEqual(inventory(renamed), inventory(doc), 'only a word moved: nothing appeared and nothing vanished');
 
   const said = wrong(key, entry, { holds: inventory(renamed), declares: fingerprint(renamed), current: true });

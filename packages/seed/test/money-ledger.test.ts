@@ -85,7 +85,7 @@ test('THE LEDGER HOLDS WHAT MOVED, and each payment names the promise it dischar
 test('A TRANSFER IS NOT SPENDING, AND A PENDING ROW IS NOT A FACT, and the figure leaves both out', async () => {
   const k = await seeded();
   /* SPENT'S OWN WINDOW, `on after -30d`: `after` does not include its own day, so the thirty days are the ones after
-     day -30. This said `day(-31)` and counted a day the figure does not (`loop/finish/defects.md` M16). */
+     day -30. This said `day(-31)` and counted a day the figure does not. */
   const since = day(-30);
   const counted = TRANSACTIONS.filter((t) => t.state === 'cleared' && t.transfer !== true && t.direction === 'out' && String(t.on) > since);
   const expected = counted.reduce((n, t) => n + minor(t.amount), 0);

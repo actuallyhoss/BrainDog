@@ -1,5 +1,5 @@
 /**
- * `{{icon:<name>}}` and the two glyph slots, drawn by both renderers from one answer (pages C6).
+ * `{{icon:<name>}}` and the two glyph slots, drawn by both renderers from one answer.
  *
  * WHAT IS HELD HERE: a name the set holds is a glyph and anything else is the author's text; the
  * host's `icon` is the only art there is, so without it nothing but a named, empty span is drawn;

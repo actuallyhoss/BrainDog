@@ -4,7 +4,7 @@ raises: packages/kernel/src/index.ts
 at:     id
 fix:    Name a view this list has, or save it first.
 
-# NO `found:` AND NO `wanted:`, AND THAT IS THE FINDING. `Refusal` at
+# NO `found:` AND NO `wanted:`, AND THAT IS THE POINT. `Refusal` at
 # `packages/ports/src/index.ts:329-369` is `{ code, fix, at?, allowed?, retry_after? }`, and `no()`
 # takes `Omit<Refusal, 'code' | 'fix'>`, so those two words cannot be attached to a refusal anywhere
 # in the tree. This was the only fixture of the hundred and fifteen that claimed them, and a runner

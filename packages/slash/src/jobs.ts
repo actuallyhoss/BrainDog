@@ -7,7 +7,7 @@
  * the host's model-job pass acks the job with it and the kernel files it in the ack's transaction, through the one gate
  * (`packages/kernel/src/outbox.ts`, the `infer.draft` branch), so a draft is never filed twice. `digestProse` answers an
  * `infer.prose` job. Neither job is one of the owner's asks: each writes a `pattern` or `prose` row to the ledger, which
- * `asksUsed` does not count, and the host meters them on the background allowance (`loop/finish/contracts.md` X8).
+ * `asksUsed` does not count, and the host meters them on the background allowance.
  *
  * WHAT A PATTERN IS FOR. Messages keep arriving that no declared pattern parses, and they are the same
  * message every time: one sender, one subject, one amount in one place. A person can write the
@@ -42,7 +42,7 @@ const FORBIDDEN_REGISTERS = new Set(['grant']);
 /**
  * An ingest as a pattern files it: the declaration `install` takes, and never the bare body.
  *
- * THE BARE BODY WAS FILED AND REFUSED AT EVERY ACCEPT (`loop/finish/defects.md` A7). `govern.ts` holds a pattern's
+ * THE BARE BODY WAS FILED AND REFUSED AT EVERY ACCEPT. `govern.ts` holds a pattern's
  * `ingest` at acceptance to having an id to install under, and answers a bare body with "It installs once it is proposed
  * as {"id":"ingest.<name>","kind":"ingest","body":{...}} naming its channel", so every pattern Slash drafted could be
  * answered no and never yes. The name and the channel are this file's to write and never the model's: the channel is the
@@ -102,7 +102,7 @@ export const patterns = (
     const s = core.settings();
     /* THE ROW AND THE PROPOSAL NAME WHAT THE HOST SENT, read off the reply or the marked throw as `propose` reads it.
        `core.run` holds the template's name, so on a self-host with `SLASH_MODEL=llama3` every pattern row read
-       `glm-5.3-flash` (audit fifty §4, `test/pattern-model.test.ts`). `naming` in `propose.ts` is private to that
+       `glm-5.3-flash` (`test/pattern-model.test.ts`). `naming` in `propose.ts` is private to that
        module, so this is the same wrapper over the same exported `nameIn`, as `answer.ts` has its own. */
     let sent: string | undefined;
     const engine: Inference = {
@@ -334,7 +334,7 @@ const sampleText = (raw: RawPayload): string =>
  * mail as its braces. So these sentences name no figure at all, and the figures they are about are the digest's own,
  * printed straight below them.
  *
- * HERE AND NOT IN `prompts.ts`, whose one writer in this workflow is another unit (`loop/finish/contracts.md` X42).
+ * HERE AND NOT IN `prompts.ts`, beside the one job that sends it.
  */
 const PROSE_SYSTEM = `You are BrainDog Slash, writing at most two sentences that go above a digest about to be sent to the owner of a business record.
 Reply with ONE JSON object that matches the schema you were given. No prose outside the JSON.

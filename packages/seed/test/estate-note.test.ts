@@ -1,11 +1,10 @@
 /**
  * A service's NOTE: the prose about why a name is held, which the Services list had nowhere to put.
  *
- * WHY THIS FILE EXISTS. the old tool's domain register carries a note on most of its rows, and they are the most
+ * WHY THIS FILE EXISTS. An imported domain register carried a note on most of its rows, and they are the most
  * valuable text in it: one is a standing conflict between two registers, one names the open task behind a site that
  * resolves nowhere, one runs to the whole clearance search behind a purchase. `services` declared nine fields and not
- * one of them held prose, so the importer (now `packs/legacy-import/adapter.ts`) left every note in the export and named the domain in a skip
- * line. Measured before this change, against the seeded record: `create('services', {..., note})` answered
+ * one of them held prose, so the importer left every note in the export and named the domain in a skip line. Measured before this change, against the seeded record: `create('services', {..., note})` answered
  * `services has no field called note. (FIELD_UNKNOWN)`, so the row was refused whole rather than carried without it.
  *
  * `installments`, `holdings` and every Money list already declare `{ id: 'note', type: 'text' }`, so this is the same

@@ -1,19 +1,19 @@
 /**
- * A card bill paid from the bank is a move between two of your own accounts, and reconciling it does not make it spend
- * (`loop/research-batch-sixty-three-audit.md` finding 3, probe F4).
+ * A card bill paid from the bank is a move between two of your own accounts, and reconciling it does not make it
+ * spend.
  *
  * WHAT WENT WRONG. money-core 2.2.0 said `settles is empty` in `pairs.where:`, so a row that paid an obligation was
  * nobody's partner. The card bill is both at once: a promise with a date, which a founder keeps in Obligations so the
  * forecast holds it, and a move from CIB to his own card. The import writes both legs bare, the record pairs them, and
  * then Reconcile sets `settles` on the bank leg, which is what Reconcile is. The kernel reads `settles` again on that
- * update, the leg stops matching `where:`, and both marks go false: the audit measured Spent EGP 9,500.00 and Received
+ * update, the leg stops matching `where:`, and both marks go false: measured, Spent read EGP 9,500.00 and Received
  * EGP 9,500.00 on top of the purchases the bill paid, which are already in Spent on the card.
  *
  * WHY THE DECLARATION CANNOT SIMPLY ASK FOR THE CARD. The bank leg of a card bill and a rent payment that settles its
  * obligation are the same row: out of a bank account, no Who, a Settles. Their partners are the same row too: in, bare,
  * another account. What tells them apart is the obligation's payee or the other account's kind, and both are a hop
  * through a ref that `pairs.where` refuses (`packages/kernel/src/pairs.ts`, `pairsFault`: no ref lookup on a write).
- * `packages/kernel` knows no card bill (`loop/DIRECTION.md` sections 22 and 24), so the answer is in money-core.
+ * `packages/kernel` knows no card bill, since the kernel carries no use case, so the answer is in money-core.
  *
  * WHAT money-core 2.3.0 SAYS INSTEAD: a leg that settles something may still be a leg when the record already holds it
  * as one. See the declaration in `modules/money.ts` for the clause and the cost, which the last test below records.
@@ -86,8 +86,8 @@ const figure = (k: Kernel, id: 'spent-30d' | 'received-30d'): number => {
 
 const pairOf = (k: Kernel, e: Entry): unknown => k.get(e.id)!.fields._pair ?? null;
 
-test('F4: THE CARD BILL RECONCILED STAYS A MOVE, so EGP 9,500.00 is neither spent nor received a second time', async () => {
-  /* THE AUDIT'S F4 AS HIS LEDGER HOLDS IT: the card's leg lands a day before the bank's, both written bare by the import,
+test('THE CARD BILL RECONCILED STAYS A MOVE, so EGP 9,500.00 is neither spent nor received a second time', async () => {
+  /* THE CARD BILL AS A REAL LEDGER HOLDS IT: the card's leg lands a day before the bank's, both written bare by the import,
      and the obligation is the one a founder keeps so the forecast holds the bill. */
   const k = await moneyCore();
   const a = hisAccounts(k);
@@ -106,7 +106,7 @@ test('F4: THE CARD BILL RECONCILED STAYS A MOVE, so EGP 9,500.00 is neither spen
 });
 
 test('A RECONCILED CARD BILL STILL COMES APART WHEN A PERSON NAMES WHO IT WAS WITH, and a void leg is still nobody\'s partner', async () => {
-  /* THE CLAUSE LOOSENS `settles` AND NOTHING ELSE. Naming a Who is the repair `money-pairs.test.ts` M5 relies on, and a
+  /* THE CLAUSE LOOSENS `settles` AND NOTHING ELSE. Naming a Who is the repair `money-pairs.test.ts`'s dinner test relies on, and a
      void leg was never counted; both have to part a pair that a Settles now keeps. */
   const k = await moneyCore();
   const a = hisAccounts(k);
@@ -133,11 +133,11 @@ test('A RECONCILED CARD BILL STILL COMES APART WHEN A PERSON NAMES WHO IT WAS WI
 
 test('WHAT THE CLAUSE COSTS, HELD ON PURPOSE: which was written first decides, and reconciling no longer parts a pair', async () => {
   /* ORDER DECIDES, WHICH THE KERNEL'S OWN PAIRING TAKES CARE NOT TO LET IT DO (`pairs.ts`, `partnerOf`). A leg that
-     settles is let in only while it already holds the mark, so it keeps a pair it has and never starts one. Measured on
-     24 September with money-core 2.3.0: */
+     settles is let in only while it already holds the mark, so it keeps a pair it has and never starts one. Measured
+     with money-core 2.3.0: */
 
   /* 1. THE BANK LEG RECONCILED BEFORE THE CARD'S LEG ARRIVES pairs with nothing, and the bill is counted both ways, as
-        every order was at 2.2.0. His import writes the card's leg first and Reconcile is a person's act afterwards, which
+        every order was at 2.2.0. An import writes the card's leg first and Reconcile is a person's act afterwards, which
         is the order the first test holds. */
   const k = await moneyCore();
   const a = hisAccounts(k);
@@ -150,7 +150,7 @@ test('WHAT THE CLAUSE COSTS, HELD ON PURPOSE: which was written first decides, a
   /* 1b. AND WHATEVER THE ORDER OF THE TWO LEGS, A RECONCILED LEG HOLDING NO PAIR GAINS NONE. A bank alert writes the leg
          pending, and reconciling it then, before it clears, leaves it unpaired once it has cleared, although a pending
          leg that was not reconciled pairs when it clears. A pair parted for a moment stays parted too: a mistyped amount
-         on the card's leg, put right, leaves the bill counted. Both measured by the checker on 24 September. */
+         on the card's leg, put right, leaves the bill counted. Both measured. */
   const k3 = await moneyCore();
   const c = hisAccounts(k3);
   const bill3 = owedByMe(k3, 'CIB card bill, September', 950_000, -1);
@@ -171,10 +171,10 @@ test('WHAT THE CLAUSE COSTS, HELD ON PURPOSE: which was written first decides, a
   assert.equal(pairOf(k4, bankOut4), null, 'a reconciled leg parted by a typo now pairs again once it is put right, so the cost written beside `pairs:` is out of date');
   assert.equal(figure(k4, 'spent-30d'), 950_000);
 
-  /* 2. RENT AND A CLIENT'S PAYMENT OF THE SAME SUM, BOTH BARE, pair as `money-pairs.test.ts` M5 says two bare rows do; at
+  /* 2. RENT AND A CLIENT'S PAYMENT OF THE SAME SUM, BOTH BARE, pair as `money-pairs.test.ts`'s dinner test says two bare rows do; at
         2.2.0 reconciling the rent against its obligation parted them, and now it does not. The two rows are the card
         bill's two rows field for field, so no flat clause can keep the one pair and part the other. Naming a Who still
-        parts it, and a rent written already reconciled is never paired (M4). */
+        parts it, and a rent written already reconciled is never paired. */
   const k2 = await moneyCore();
   const b = hisAccounts(k2);
   const rent = owedByMe(k2, 'Rent, October', 1_500_000, -5);

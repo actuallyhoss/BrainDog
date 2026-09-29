@@ -1,7 +1,7 @@
 /**
  * What a script can reach from inside the sandbox, asked from inside the sandbox.
  *
- * `node:vm` was refused in section 4 of the design because `this.constructor.constructor('return
+ * `node:vm` was refused for the sandbox because `this.constructor.constructor('return
  * process')()` walks out of it in one line. These are that line and its siblings, run in QuickJS,
  * with the answer carried out through `ctx.write` so the assertion reads what the script saw.
  */

@@ -288,7 +288,7 @@ test('THE FIRST-PARTY MAP AGREES WITH THE SEED: every list names the pack that d
     /* A RULE NAMES THE LIST IT WATCHES WITH `register:` TOO, and declares none. */
     for (const d of doc.declarations) if (typeof d.register === 'string' && d.rule === undefined) lists.push([d.register, id]);
   }
-  /* AGENTS WAS LEFT OUT OF THE HAND-WRITTEN MAP, and an add-on declaring `skills` read as fine because of it (N4). The
+  /* AGENTS WAS LEFT OUT OF THE HAND-WRITTEN MAP, and an add-on declaring `skills` read as fine because of it. The
      agents pack is not one of `FIRST_PARTY`, so its lists are read off its own document. */
   const agents = agentsPackDocument() as { declarations: Record<string, unknown>[] };
   for (const d of agents.declarations) if (typeof d.register === 'string' && d.rule === undefined) lists.push([d.register, 'agents']);

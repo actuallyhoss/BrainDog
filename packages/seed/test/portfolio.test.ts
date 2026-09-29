@@ -144,11 +144,11 @@ test('A PROJECT EARNING IN ANOTHER CURRENCY IS NEVER ADDED TO THE REST, which is
 /**
  * WHAT AN IMPORTED RECORD ACTUALLY LOOKS LIKE, AND IT IS THE CASE THIS FILE HAD NO ROW FOR.
  *
- * the the old tool adapter (`packs/legacy-import/adapter.ts`) files a project's monthly revenue as a READING and writes no annual
+ * an importer may file a project's monthly revenue as a READING and write no annual
  * field, which is right: a month is not a year and the importer has no year to write. So on an
  * imported record every project in play arrives with `revenue` unset, and the three figures above
  * were declared over `lane is building or earning` with nothing said about whether a row states a
- * figure at all. Measured on a self-host at his size, 27 projects and 14 of them in play with no
+ * figure at all. Measured on a self-host at a real record's size, 27 projects and 14 of them in play with no
  * annual figure on any of them: `projects-earning` answered `value: 0, rows: 14, held: 27, met:
  * true`, so the Overview's Earning tile drew "Earned in a year GBP 0.00" in the good tone with a
  * link into the list, beside a bar that correctly drew "No project in play says what it earns".

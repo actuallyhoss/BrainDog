@@ -290,7 +290,7 @@ test('THE SAMPLE’S QUESTIONS ARE FILED THROUGH propose AND decide, in the orde
  * THE SEED INSTALLS NO PATTERN FOR A BANK MESSAGE, AND NO FIRST-PARTY PACK DECLARES ONE. money-core carried two card
  * wordings and their `-sms` twins until 3.0.0; they are `packs/card-alerts` now, whose own test forwards a charge and a
  * credit into a record (`packs/card-alerts/card-alerts.test.ts`), so a record set up with Money reads no bank's messages
- * unless somebody adds the pack (`loop/DIRECTION.md` section 22).
+ * unless somebody adds the pack.
  */
 test('THE SEED INSTALLS NO PATTERN FOR A BANK MESSAGE, and no first-party pack declares one: card alerts are packs/card-alerts', async () => {
   const { k, sql } = await seeded();

@@ -7,7 +7,7 @@
  * use.
  *
  * The root exports are `parse` · `toHTML` · `KINDS` · `PRIMITIVES` · `PRIMITIVES_VERSION`, and beside
- * them the plan each drawer reads. THE PLANS ARE HERE BECAUSE A HOST WIRES THEM: wave two's forms
+ * them the plan each drawer reads. THE PLANS ARE HERE BECAUSE A HOST WIRES THEM: the forms
  * (a path, a range, tiles, `inputs`) shipped with their names reachable only by module path, which
  * the package does not promise, so a host could not name `OnInput` to hand `inputs` its writer.
  * There is no `expand`: kinds expansion belongs to `declare`, not here (ADR-045). The Svelte
