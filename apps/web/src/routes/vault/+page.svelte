@@ -22,12 +22,18 @@
 
   `/vault` carries NOTHING in its query string, ever. A credential id in the address is an entry in
   browser history and in URL-bar autocomplete (19 §5).
+
+  THE LOOK (`loop/design/SYSTEM.md`, SCREENS "Vault"). The sentence under the title says how many keys and how often they
+  were opened, and a machine asking is its one red phrase. A request waiting for its six digits is a tile at the top.
+  Then two tiles side by side: "Opens by key", the one figure here with its bars and its reading line, and the passphrase,
+  a control with the trade it makes. The keys and the machines are lists on the ground in one row shape: a well, the name,
+  what it opens and where it applies, the count at the end, and the verbs on hover.
 -->
 <script lang="ts">
   import { apiBase, at, signInFirst } from '$lib/at.ts';
   import { onDestroy, onMount } from 'svelte';
   import { createClient } from '@braindog/client';
-  import { since, relative } from 'braindog-render';
+  import { since, relative, TONES } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
@@ -43,9 +49,11 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Chip from '$lib/ui/Chip.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Bars from '$lib/viz/Bars.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
@@ -53,6 +61,7 @@
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
+  import { opensOf, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
@@ -107,6 +116,25 @@
   const machinesTell = $derived(machinesTellOf(devices));
   /** Whether `listGrants` answered, so a row may say how often it was opened rather than guessing never. */
   const counts = $derived(counted.kind === 'held');
+
+  /**
+   * THE LINE UNDER THE TITLE, drawn once the record has answered: how many keys, how often opened, and a machine asking
+   * as its red phrase. The machines clause only for a reader the record let list them.
+   */
+  const sentence = $derived(
+    from === 'live'
+      ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held' })
+      : null,
+  );
+  /** "Opens by key": the one figure on this screen, or nothing where no count came back. */
+  const opens = $derived(opensOf(keys, lastBy, counts, Date.now()));
+  /** Where the record said why no count came back, said once over the list rather than on every row. */
+  const uncounted = $derived(!counts && keys.some((k) => k.sealed) ? countSaid(counted) : '');
+  /** "Opened 12 times", a row's count at its end, with the capital a line of its own starts with. */
+  const openedSaid = (n: number): string => {
+    const line = words.opened(n);
+    return line.charAt(0).toUpperCase() + line.slice(1);
+  };
 
   onMount(() => {
     void read(async () => {
@@ -203,6 +231,26 @@
     const back = await reprove({ support, methods, passkeySignIn }, (href) => location.assign(href));
     reproving = false;
     if (back) await tryCode();
+  }
+
+  /**
+   * A REQUEST TURNED AWAY. The record's revoke takes a grant that is still pending as well as one in use, so "Deny" is
+   * the same one call as Revoke, sent before the six digits rather than after.
+   */
+  async function deny(row: DeviceRow) {
+    if (!acts || !client) {
+      refuse();
+      return;
+    }
+    const at = opened();
+    const out = await revoke(client, machines, row.handle);
+    closed(true, at);
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    machines = out.rows;
+    toasts.push(tileWords.denied(row.label ?? copy.unnamedMachine), { intent: 'good' });
   }
 
   async function revokeRow(row: DeviceRow) {
@@ -497,30 +545,57 @@
   }
 </script>
 
+
 <svelte:head><title>{titleOf(copy.vault)}</title></svelte:head>
 
-<PageHead icon="vault" title={copy.vault} />
+<PageHead icon="vault" title={copy.vault} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text} needs={sentence?.needs}>
+  {#snippet actions()}
+    <!-- ON A PHONE "Add a key" IS THE TOOLBAR'S CIRCLE (SCREENS "Vault"): ink while it is the one thing to press, glass
+         while a request waiting for its digits holds the screen's one primary. At a desk it is the list's own pill. -->
+    {#if acts && index.kind === 'held'}
+      <span class="add-phone">
+        <Button weight={waiting.length ? 'glass' : 'primary'} aria-label={tileWords.addKey} title={tileWords.addKey} onclick={openAdd}>
+          <Icon name="plus" size="l" />
+        </Button>
+      </span>
+    {/if}
+  {/snippet}
+</PageHead>
 
 <div class="page">
   {#if waiting.length}
-    <Section title={words.waiting} count={waiting.length}>
-      <ul class="whos">
+    <!--
+      THE REQUEST LEADS, AND ONLY WHILE THERE IS ONE: it is time-boxed, so it is the one tile that is about now. Amber and
+      not red, because it waits on him rather than being late (SYSTEM §2); the sentence over the page carries the red.
+    -->
+    <Tile icon="lock" title={tileWords.askingTitle} count={waiting.length > 1 ? waiting.length : undefined} data-part="asking">
+      <ul class="ledger ledger-lead whos">
         {#each waiting as d (d.handle)}
-          <li class="who" data-intent="warn">
-            <div class="who-head">
-              <Icon name="key" size="s" />
-              <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
-              <Chip label={scopeName(d.scope, names)} />
-              <span class="who-detail">{words.days(daysFor(d.scope))}</span>
+          <li class="who" data-intent="warn" data-needs>
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name="session" size="l" /></span>
+              <span class="line-main">
+                <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
+                <span class="line-detail who-detail"
+                  ><span class="state"><span class="dot" data-tone="warn" role="img" aria-label={TONES.warn.label}></span>{tileWords.waiting}</span
+                  ><span class="sep" aria-hidden="true">·</span>{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">·</span>{words.days(
+                    daysFor(d.scope),
+                  )}</span
+                >
+              </span>
+              <span class="line-when">{copy.endsWhen(since(d.expires, Date.now()))}</span>
+              {#if acts}
+                <span class="line-verbs"><Button size="sm" onclick={() => void deny(d)}>{tileWords.deny}</Button></span>
+              {/if}
             </div>
           </li>
         {/each}
       </ul>
 
       <form class="code-form" onsubmit={tryCode} novalidate>
-        <label class="code-label" for="vault-code">{copy.codeLabel}</label>
+        <label class="field-label" for="vault-code">{copy.codeLabel}</label>
         <div class="code-row">
-          <div class="field field-lg">
+          <div class="field code-field">
             <input
               class="field-input code-input"
               id="vault-code"
@@ -538,17 +613,43 @@
           </div>
           <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
         </div>
-        <p class="code-said" id="vault-code-said" role="status" data-intent={said?.tone}>{said?.line ?? ''}</p>
+        <p class="code-said" id="vault-code-said" role="status" data-intent={said?.tone}>
+          {#if said}<span class="code-glyph" role="img" aria-label={TONES[said.tone].label}>{TONES[said.tone].glyph}</span>{said.line}{/if}
+        </p>
         {#if answer?.kind === 'signin'}
           <div class="row-actions">
             <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
           </div>
         {/if}
       </form>
-    </Section>
+    </Tile>
+  {/if}
+
+  {#if opens || acts}
+    <div class="tiles">
+      {#if opens}
+        <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink (SYSTEM §7).
+             Counts and names only; a value never reaches a chart. -->
+        <Tile icon="key" title={tileWords.opensTitle} meta={tileWords.opensMeta}>
+          <p class="figure num">{opens.total.toLocaleString('en')}<span class="figure-unit">{tileWords.opensUnit(opens.total)}</span></p>
+          <Bars items={opens.bars} subject={tileWords.opensTitle} />
+          <p class="reading">{opens.reading}</p>
+        </Tile>
+      {/if}
+      <!-- THE PASSPHRASE BESIDE THE KEYS IT GUARDS, and only for a person who may act here: it is an owner's decision. -->
+      {#if acts}
+        <Passphrase {lock} {client} onturn={(next) => (lock = next)} />
+      {/if}
+    </div>
   {/if}
 
   <Section title={words.keys} count={keys.length}>
+    {#snippet aside()}
+      <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
+      {#if acts && index.kind === 'held'}
+        <span class="add-desk"><Button onclick={openAdd}>{words.addKey}</Button></span>
+      {/if}
+    {/snippet}
     {#if indexTell}
       <!--
         WHAT THE RECORD SAID, RATHER THAN "No keys yet." OVER IT. A record with no Keys register and a
@@ -563,39 +664,61 @@
     {:else if from !== 'reading' && keys.length === 0}
       <Empty kind="no-data-yet" title={words.noKeys} body={words.noKeysHow} />
     {/if}
-    <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
-    {#if acts && index.kind === 'held'}
-      <div class="row-actions">
-        <Button weight="primary" onclick={openAdd}>{words.addKey}</Button>
-      </div>
-    {/if}
-    <ul class="whos">
+    <!-- A COUNT THE RECORD WOULD NOT GIVE IS SAID ONCE, in the record's own words, and never drawn as "never opened". -->
+    {#if uncounted}<p class="said">{uncounted}</p>{/if}
+    <ul class="ledger ledger-lead whos keys">
       {#each keys as k (k.id)}
         <!--
-          ONE ROW ANATOMY, THE KEYS LIST'S (design 2.14, SYS-6): the name on line one; where it applies, what it opens and
-          how often it was opened on line two; one visible verb and a "…" menu at the end. The scope chip lived on the
-          name's line and wrapped under it on some rows and not others, so it now always leads line two. A key whose
-          value is kept elsewhere says nothing about it, rather than a phrase on every row: it simply has no Reveal.
+          ONE ROW ANATOMY (SYSTEM §6): the key's well, its name (a link to its row), and under it where it applies, what it
+          opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu on hover.
+          Replace and Revoke stay in the key's own menu (design 2.14): neither is what a person comes to the vault to do most.
         -->
-        <li class="who key">
-          <div class="who-head">
-            <Icon name="key" size="s" />
-            <span class="who-name">{k.label}</span>
+        {@const state = stateOf(k)}
+        {@const href = rowPath(k)}
+        {@const u = lastBy.get(k.id)}
+        <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined}>
+          <div class="line line-tall">
+            <span class="line-mark"><IconWell name="key" size="l" /></span>
+            <span class="line-main">
+              {#if href}<a class="line-title key-name" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
+              <span class="line-detail key-meta">
+                <ScopeChip scope={k.scope} />
+                {#if k.opens}<span class="key-opens">{k.opens}</span>{/if}
+                <span class="state" data-sealed={state.sealed ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>
+              </span>
+            </span>
+            <span class="key-count">
+              {#if k.sealed && counts}
+                <span class="key-opened num">{openedSaid(k.opened)}</span>
+                {#if u}
+                  {@const run = runPath(u.run)}
+                  {@const who = tileWords.lastBy(u.agent ?? u.run, since(u.at, Date.now()))}
+                  <span class="key-last who-used">{#if run}<a href={at(run)}>{who}</a>{:else}{who}{/if}</span>
+                {:else if k.lastOpened}
+                  <span class="key-last">{words.lastOpened(since(k.lastOpened, Date.now()))}</span>
+                {/if}
+              {/if}
+            </span>
+            {#if acts}
+              <span class="line-verbs who-do">
+                {#if k.grant && k.sealed}
+                  <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
+                  <Button size="sm" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
+                    {revealing === k.id ? words.revealing : words.reveal}
+                  </Button>
+                {/if}
+                <Menu label={moreFor(k.label)} align="end">
+                  {#snippet trigger()}
+                    <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
+                  {/snippet}
+                  <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{words.replace}</button>
+                  {#if k.grant && k.sealed}
+                    <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
+                  {/if}
+                </Menu>
+              </span>
+            {/if}
           </div>
-          <p class="key-meta">
-            <ScopeChip scope={k.scope} />
-            {#if k.opens}<span class="key-opens">{k.opens}</span>{/if}
-            {#if k.sealed}<span
-                >{words.sealed}{#if counts}{', '}{words.opened(k.opened)}{#if k.lastOpened}{', '}{words.lastOpened(since(k.lastOpened, Date.now()))}{/if}{:else}{' · '}{countSaid(counted)}{/if}</span
-              >{/if}
-          </p>
-          {#if lastBy.get(k.id)}
-            {@const u = lastBy.get(k.id)!}
-            {@const href = runPath(u.run)}
-            <p class="who-why who-used">
-              {#if href}<a href={at(href)}>{words.openedBy(u.run, u.agent, since(u.at, Date.now()))}</a>{:else}{words.openedBy(u.run, u.agent, since(u.at, Date.now()))}{/if}
-            </p>
-          {/if}
           {#if shown && shown.id === k.id}
             <!--
               THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
@@ -603,43 +726,17 @@
             -->
             <div class="shown">
               <output class="shown-value" for={`key-${k.id}`}>{shown.value}</output>
-              <div class="who-do">
-                <Button weight="quiet" onclick={() => void copyShown()}>{words.copyValue}</Button>
-                <Button weight="bare" onclick={forget}>{words.hide}</Button>
-                <span class="who-detail">{words.hidesIn(shown.left)}</span>
+              <div class="shown-do">
+                <Button size="sm" onclick={() => void copyShown()}>{words.copyValue}</Button>
+                <Button size="sm" weight="bare" onclick={forget}>{words.hide}</Button>
+                <span class="shown-left num">{words.hidesIn(shown.left)}</span>
               </div>
-            </div>
-          {/if}
-          {#if acts}
-            <div class="who-do">
-              {#if k.grant && k.sealed}
-                <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
-                <Button weight="quiet" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
-                  {revealing === k.id ? words.revealing : words.reveal}
-                </Button>
-              {/if}
-              <!-- REPLACE AND REVOKE IN THE KEY'S OWN MENU (design 2.14): six bordered "Replace value" buttons down the
-                   page were the loudest thing on it, and neither is what a person comes to the vault to do most. -->
-              <Menu label={moreFor(k.label)} align="end">
-                {#snippet trigger()}
-                  <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
-                {/snippet}
-                <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{words.replace}</button>
-                {#if k.grant && k.sealed}
-                  <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
-                {/if}
-              </Menu>
             </div>
           {/if}
         </li>
       {/each}
     </ul>
   </Section>
-
-  <!-- THE PASSPHRASE BESIDE THE KEYS IT GUARDS, and only for a person who may act here: it is an owner's decision. -->
-  {#if acts}
-    <Passphrase {lock} {client} onturn={(next) => (lock = next)} />
-  {/if}
 
   <Section title={words.mayOpen} count={holding.length}>
     {#if machinesTell}
@@ -648,19 +745,25 @@
     {:else if from !== 'reading' && holding.length === 0}
       <Empty kind="no-data-yet" title={words.noMachines} />
     {/if}
-    <ul class="whos">
+    <ul class="ledger ledger-lead whos">
       {#each holding as d (d.handle)}
+        <!-- THE KEYS' ROW SHAPE, so a machine and a key read as one kind of list: its well, its name, where it may open
+             keys and when it was last used, when its grant ends, and Revoke on hover. -->
         <li class="who">
-          <div class="who-head">
-            <Icon name="session" size="s" />
-            <span class="who-name">{d.label ?? copy.unnamedMachine}</span>
-            <Chip label={scopeName(d.scope, names)} />
-            <span class="who-detail">
-              {d.last_used ? copy.usedWhen(since(d.last_used, Date.now())) : copy.neverUsed} · {copy.endsWhen(relative(d.expires.slice(0, 10), Date.now()))}
+          <div class="line line-tall">
+            <span class="line-mark"><IconWell name="session" size="l" /></span>
+            <span class="line-main">
+              <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
+              <span class="line-detail who-detail"
+                >{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">·</span>{d.last_used
+                  ? copy.usedWhen(since(d.last_used, Date.now()))
+                  : copy.neverUsed}</span
+              >
             </span>
+            <span class="line-when">{copy.endsWhen(relative(d.expires.slice(0, 10), Date.now()))}</span>
             {#if acts}
-              <span class="who-do">
-                <Button weight="bare" tone="bad" onclick={() => void revokeRow(d)}>{copy.revokeKey}</Button>
+              <span class="line-verbs who-do">
+                <Button size="sm" weight="bare" tone="bad" onclick={() => void revokeRow(d)}>{copy.revokeKey}</Button>
               </span>
             {/if}
           </div>
@@ -720,7 +823,9 @@
         <span>{connectorWords.field}</span>
       </label>
       <p class="field-hint">{connectorWords.hint}</p>
-      {#if sheetSaid}<p class="code-said" data-intent="bad" role="status">{sheetSaid}</p>{/if}
+      {#if sheetSaid}<p class="code-said" data-intent="bad" role="status">
+          <span class="code-glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{sheetSaid}
+        </p>{/if}
     </form>
     {#snippet footer()}
       <Button weight="quiet" onclick={shut}>{words.cancel}</Button>
@@ -731,7 +836,9 @@
   <Sheet open={asking !== null} title={asking ? words.askTitle(asking.label) : words.passField} subtitle={words.askHint} onclose={shutAsk}>
     <form class="key-form" id="ask-form" onsubmit={askGo} novalidate>
       <PassField id="ask-passphrase" label={words.passField} autocomplete="current-password" bind:value={askPass} invalid={askSaid !== ''} />
-      {#if askSaid}<p class="code-said" data-intent="bad" role="status">{askSaid}</p>{/if}
+      {#if askSaid}<p class="code-said" data-intent="bad" role="status">
+          <span class="code-glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{askSaid}
+        </p>{/if}
     </form>
     {#snippet footer()}
       <Button weight="quiet" onclick={shutAsk}>{words.cancel}</Button>
@@ -746,115 +853,190 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--sp-6);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), not a width of its own. */
     max-inline-size: var(--page-max);
   }
 
-  /* The rows are Settings' rows: unboxed, a hairline between them, the controls at the end of the line. */
-  .whos {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A KEY IS ONE ROW WITH ITS ACTIONS AT THE END. It was four stacked lines, the name, what it
-     opens, and a row of buttons under both, so six keys filled two screens. The name line and what
-     it opens stack on the left; the actions sit at the trailing edge, centred on both. */
-  .who {
+  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart (SYSTEM §4), one over the other where two will not fit; a lone tile
+     takes the row. Each is as tall as what it holds. */
+  .tiles {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 2px var(--sp-4);
-    padding-block: var(--sp-3);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    align-items: start;
+    gap: var(--sp-3);
   }
 
-  .who > :not(.who-do) {
-    grid-column: 1;
-  }
-
-  .who > .who-do {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-  }
-
-  .who > .shown {
-    grid-column: 1 / -1;
-    margin-block: var(--sp-2);
-  }
-
-  /* ON A PHONE THE ACTIONS STAY AT THE END and sit level with the name, Reveal and the "…" beside each other, so a key
-     is still one block beside its verb rather than a button on a line of its own. */
-  @media (width < 640px) {
-    .who {
-      align-items: start;
-      column-gap: var(--sp-3);
-    }
-
-    .who > .who-do {
-      grid-row: 1 / span 3;
-    }
-  }
-
-  /* THE SOFT HAIRLINE A LIST'S ROWS ARE PARTED BY everywhere (design 6.5), and not `--line`, which is a field's edge. */
-  .who + .who {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  .who-head {
+  /* THE FIGURE, `t-figure`, with its unit in meta beside it (SYSTEM §3, §6). */
+  .figure {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    align-items: baseline;
     gap: var(--sp-2);
-  }
-
-  /* A NAME ONE LONG WORD WIDE, a host name most of all, breaks rather than pushing the row past the edge at 320. */
-  .who-name {
-    min-inline-size: 0;
-    color: var(--ink);
-    font-weight: 500;
-    overflow-wrap: anywhere;
-  }
-
-  /* A KEY'S LINE TWO, the Keys list's: where it applies first, so the chip starts every row's second line and never
-     wraps under the name on one row and not the next, then what it opens, then how often it was opened. */
-  .key-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-1) var(--sp-2);
     margin: 0;
+    color: var(--ink);
+    font-size: var(--t-figure);
+    font-weight: 600;
+    line-height: 34px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .figure-unit {
     color: var(--dim);
     font-size: var(--t-sm);
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* THE ONE LINE THAT READS THE CHART (SYSTEM §6), in ink, under it. */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* THE RECORD'S OWN SENTENCE FOR A COUNT IT WOULD NOT GIVE, once, above the rows it is about. */
+  .said {
+    margin: 0 0 var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  /* ── the rows ─────────────────────────────────────────────────────────── */
+
+  /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer (SYSTEM §6), and the hairlines either side of it
+     step aside, as `rows.css` does for a link's row, so the fill is one clean shape. */
+  @media (hover: hover) and (pointer: fine) {
+    .whos > li:hover > .line {
+      background: var(--hover-wash);
+    }
+
+    .whos > li:hover > .line::after,
+    .whos > li:hover + li > .line::after {
+      opacity: 0;
+    }
+  }
+
+  /* THE NAME, a link to the key's own row that looks like a title until it is pointed at. */
+  .key-name {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    a.key-name:hover {
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* THE META LINE: where it applies first, so the chip starts every row's second line, then what it opens, then the
+     state. One line at a desk; the parts that do not fit are cut at the end, never wrapped under the name. */
+  .key-meta,
+  .who-detail {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .key-meta > :global(*) {
+    flex: none;
   }
 
   .key-opens {
+    flex: 0 1 auto;
     min-inline-size: 0;
+    overflow: hidden;
     color: var(--ink2);
-    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .key > .who-do {
+  .sep {
+    color: var(--dim);
+  }
+
+  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6, Badges): ink for a value sealed here, an open ring for a key kept
+     elsewhere or out of service, amber for a machine waiting on its six digits. */
+  .state {
+    display: inline-flex;
     align-items: center;
-    flex-wrap: nowrap;
+    gap: 6px;
+    white-space: nowrap;
   }
 
-  /* THE "…" TRIGGER: the size of a control at a desk and of a thumb under one. `Menu` puts it in a `.tap` button. */
+  .dot {
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--dim);
+    border-radius: var(--r-pill);
+  }
+
+  .state[data-sealed] .dot {
+    background: var(--ink2);
+    border-color: var(--ink2);
+  }
+
+  .dot[data-tone='warn'] {
+    background: var(--warn);
+    border-color: var(--warn);
+  }
+
+  /* THE COUNT AT THE ROW'S END: how often, tabular, and under it who opened it last. */
+  .key-count {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    min-inline-size: 0;
+    text-align: end;
+  }
+
+  .key-opened {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .key-last {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .who-used a {
+    color: inherit;
+    text-underline-offset: 3px;
+  }
+
+  /* THE "…" TRIGGER, a round control the height of a row's verb. `Menu` puts it in a `.tap` button. */
   .more-trigger {
     display: grid;
     place-items: center;
-    inline-size: var(--ctl-h);
-    block-size: var(--ctl-h);
-    border-radius: var(--r-sm);
-    color: var(--dim);
+    inline-size: var(--ctl-h-sm);
+    block-size: var(--ctl-h-sm);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .more-trigger:hover {
-      background: var(--hover-wash);
+      background: var(--hold-wash);
       color: var(--ink);
     }
   }
@@ -869,19 +1051,19 @@
     white-space: nowrap;
   }
 
-  /* A MENU'S ROW, as a flow card's menu draws one; `Menu` makes them 48px rows at 16px when it rises as a sheet. */
+  /* A MENU'S ROW, 32 tall with the verb (SYSTEM §6, menus); `Menu` makes them 48px rows at 16px when it rises as a sheet. */
   .mi {
     display: flex;
     align-items: center;
     inline-size: 100%;
-    min-block-size: var(--ctl-h);
+    min-block-size: 32px;
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
     border-radius: var(--r-sm);
-    color: var(--ink2);
+    color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     text-align: start;
     cursor: pointer;
   }
@@ -889,14 +1071,9 @@
   .mi:hover,
   .mi:focus-visible {
     background: var(--hover-wash);
-    color: var(--ink);
   }
 
-  /* RED ONLY UNDER THE POINTER OR THE FOCUS, as a destructive item is drawn in every menu (`FlowCard`). */
-  .mi[data-tone='bad']:hover,
-  .mi[data-tone='bad']:focus-visible {
-    color: var(--danger);
-  }
+  /* A DESTRUCTIVE VERB IS ITS WORDS IN INK (SYSTEM §6): red is for what needs him, and a menu item never does. */
 
   @media (pointer: coarse) {
     .more-trigger {
@@ -909,89 +1086,17 @@
     }
   }
 
-  .who-detail {
-    flex: 1 1 auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .who-do {
-    display: flex;
-    flex: none;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  .who-why {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  /* THE RUN THAT OPENED THE KEY LAST, a link to it: quieter than what the key opens, and wrapping on a phone. */
-  .who-used {
-    color: var(--dim);
-    overflow-wrap: anywhere;
-  }
-
-  .who-used a {
-    color: inherit;
-  }
-
-  .code-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
-  }
-
-  .code-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .code-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  /* THE BUTTON IS THE FIELD'S HEIGHT, so the two read as one control and not a tall box beside a
-     short one. */
-  .code-row :global(.btn) {
-    min-block-size: var(--tap);
-  }
-
-  .code-input {
-    flex: 0 1 12ch;
-    font-size: var(--t-md);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.18em;
-  }
-
-  .code-said {
-    margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
-  }
-
-  .row-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
-  }
-
-  /* The revealed value: its own block, monospaced, wrapping rather than scrolling, and never truncated. */
+  /* THE REVEALED VALUE: under its row, lined up with the name, on the tile's own white with a key cap's font. It wraps
+     rather than scrolling and is never cut short. */
   .shown {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    margin: 0 var(--sp-3) var(--sp-3) calc(var(--well-l) + var(--sp-3) * 2);
     padding: var(--sp-3);
-    border: 1px solid var(--line);
+    background: var(--bg);
     border-radius: var(--r-md);
-    background: var(--s2);
+    box-shadow: var(--e1);
   }
 
   .shown-value {
@@ -1002,21 +1107,98 @@
     user-select: all;
   }
 
+  .shown-do {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .shown-left {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── the request ──────────────────────────────────────────────────────── */
+
+  .code-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .code-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* SIX DIGITS WIDE, in the mono face a code is set in (SYSTEM §3), spaced so each digit reads on its own. */
+  .code-field {
+    flex: 0 1 16ch;
+  }
+
+  .code-input {
+    font-family: var(--font-id);
+    font-size: var(--t-md);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.18em;
+  }
+
+  .code-said {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-block-size: 18px;
+    margin: var(--sp-2) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .code-said:empty {
+    display: none;
+  }
+
+  .code-said[data-intent='good'] .code-glyph {
+    color: var(--earn);
+  }
+
+  .code-said[data-intent='bad'] .code-glyph {
+    color: var(--danger);
+  }
+
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
+  }
+
+  /* ── the toolbar's add, and the list's ─────────────────────────────────── */
+
+  .add-phone {
+    display: none;
+  }
+
+  /* ── the sheets ───────────────────────────────────────────────────────── */
+
   .key-form {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
   }
 
-  .field-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+  .key-form .field-label {
+    margin-block-end: 0;
   }
 
   .field-hint {
     margin: 0 0 var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   /* ONE COLUMN AT ANY WIDTH, the box then its words, which wrap rather than push the sheet sideways. The control is
@@ -1027,7 +1209,7 @@
     gap: var(--sp-2);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     cursor: pointer;
   }
 
@@ -1044,9 +1226,84 @@
     overflow-wrap: anywhere;
   }
 
+  /* ── a phone ──────────────────────────────────────────────────────────── */
+
   @media (width < 900px) {
     .page {
+      gap: var(--sp-5);
       padding: var(--sp-4) var(--gutter) var(--sp-8);
+    }
+
+    /* THE ADD MOVES TO THE TOOLBAR as a circle (SYSTEM §9), and the list's own pill goes. */
+    .add-phone {
+      display: contents;
+    }
+
+    .add-phone :global(.btn) {
+      inline-size: var(--ctl-h);
+      padding: 0;
+    }
+
+    .add-desk {
+      display: none;
+    }
+  }
+
+  /**
+   * UNDER 640PX A ROW IS TWO LINES BESIDE ITS WELL: the name, then what it is and its count, and the verbs at the end
+   * across both. `rows.css` moves a list's main column onto a line of its own at this width, which is a card with an
+   * id over it; these rows lead with a well instead, so every part is placed here.
+   */
+  @media (width < 640px) {
+    .whos .line {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 2px var(--sp-3);
+    }
+
+    .whos .line-mark {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      align-self: start;
+      padding-block-start: 2px;
+    }
+
+    .whos .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .whos :is(.key-count, .line-when) {
+      grid-column: 2;
+      grid-row: 2;
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      gap: 0 var(--sp-2);
+      text-align: start;
+    }
+
+    .whos .line-verbs {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+    }
+
+    .key-meta,
+    .who-detail {
+      flex-wrap: wrap;
+      row-gap: 2px;
+    }
+
+    .shown {
+      margin-inline: var(--sp-3);
+    }
+
+    .code-field {
+      flex: 1 1 100%;
+    }
+
+    .code-row :global(.btn) {
+      flex: 1 1 auto;
     }
   }
 </style>

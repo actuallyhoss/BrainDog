@@ -9,6 +9,12 @@
   BrainDog is used. Each suggestion says whether it is new, waiting on Decide or answered, and links there once asked. The
   press puts the new ones on Decide and changes nothing else: accepting is Decide's, and only the owner's.
 
+  THE LOOK (`loop/design/SYSTEM.md`, SCREENS "Slash"). The sentence under the title says what waits for him on Decide, in
+  red, then who drafts. The Ask tile leads: the field, and under it the answer with its sources, the rows it read drawn as
+  rows, then Slash's sentence beside its face with the model named. Two tiles follow, "Suggestions" (the one figure, where
+  each suggestion stands) and the daily check. Then the lists on the ground: what Slash suggests, with the screen's one
+  primary, what it noticed in the live hue, what you answered, what you asked lately, and the describe field.
+
   THE RECORD IS ASKED WHATEVER THE SHELL SAYS. This screen used to look at `page.data.live` first and, on a shell that was
   not live, say "This is the sample" without asking anything. With no sample (DIRECTION 26) a shell that is not live is a
   record that refused or could not be reached, and `readSlash` hands back that refusal in the record's own words, which
@@ -36,6 +42,12 @@
   import Empty from '$lib/ui/Empty.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
   import SlashMark from './SlashMark.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import Stacked from '$lib/viz/Stacked.svelte';
+  import { listName } from '$lib/record/names.ts';
+  import { sentenceOf, tallyOf, words as lineWords } from './lines.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
   let client: SlashClient | null = null;
@@ -50,11 +62,15 @@
   const stillOpen = $derived(suggestions.filter((s) => s.state !== 'answered'));
   const settled = $derived(suggestions.filter((s) => s.state === 'answered'));
 
-  /* THE WORDS THIS SCREEN ADDS for the answered list; the rest are `slash.ts`'s. */
-  const pageWords = {
-    answeredTitle: 'What you answered',
-    allAnswered: 'You have answered everything Slash suggested. What it notices next is drafted here.',
-  };
+  /* THE WORDS THIS SCREEN ADDS for the answered list and its tile are `lines.ts`'s; the rest are `slash.ts`'s. */
+  const pageWords = lineWords;
+
+  /** How many of Slash's suggestions wait for his answer on Decide: the title row's red phrase. */
+  const waitingOn = $derived(suggestions.filter((s) => s.state === 'waiting').length);
+  /** The line under the title: what waits on him, then who drafts. Nothing until the record has answered. */
+  const sentence = $derived(phase === 'ready' && reading ? sentenceOf(draftedBy(reading, asked), waitingOn) : null);
+  /** "Suggestions": the one figure on this screen, where each suggestion stands, or nothing with none. */
+  const tally = $derived(reading && !nothingYet(reading) ? tallyOf(suggestions, reading.waiting.length, reading.cap) : null);
 
   /**
    * THE DESCRIBE FIELD (`loop/research-dynamic-layouts.md` §6 brief D2, `loop/finish/pages.md` PGS-12) is `AskPage`, the
@@ -142,7 +158,7 @@
     }
   }
 
-  /** Asking a listed question again: the answer is drawn at the top, so the page is taken there first. */
+  /** Asking a listed question again: the answer is drawn in the Ask tile, so the page is taken to its field first. */
   function askAgain(text: string) {
     answerAt?.scrollIntoView({ block: 'start' });
     void askQuestion(text);
@@ -188,69 +204,86 @@
 
 </script>
 
+
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
-<PageHead icon="star" title={words.title} />
+<PageHead icon="star" title={words.title} sentence={sentence?.text} needs={sentence?.needs} />
 <div class="page">
   {#if phase === 'refused'}
     <Empty kind="no-permission" title={fix} />
   {:else if phase === 'ready' && reading}
-    <!-- SLASH FIRST, WITH A FACE (DSN-18). The screen is the product's manager and it opened on a form with no
-         one behind it: the mark, what Slash does and what drafts for it now come before anything to press. -->
-    <div class="slash-intro">
-      <SlashMark />
-      <div class="slash-intro-words">
-        <p class="slash-lede">{words.lede}</p>
-        <p class="slash-by">{draftedBy(reading, asked)}</p>
-      </div>
-    </div>
-
     {#if modelHere}
-      <Section title={askWords.title}>
+      <!--
+        THE ASK TILE LEADS (AGT-24): a question about what the record holds, and its answer in the same tile. The rows it
+        read come first, drawn by code as rows with the list each came from (`23 §7`); Slash's sentence about them follows
+        beside its face, drawn through `Cited` so a figure opens its rows; the model is named under it (`23 §8`); and what
+        Slash read folds away at the foot. No chart here: the tile holds no figure of its own, the answer carries its own.
+      -->
+      <Tile icon="slash" title={askWords.title} lead data-part="ask">
         <form
           class="slash-ask"
+          bind:this={answerAt}
           onsubmit={(e) => {
             e.preventDefault();
             void askQuestion(question);
           }}
         >
-          <label class="slash-said" for="slash-question">{askWords.label}</label>
-          <!-- `field-lg` IS THE 16 PX FIELD, which is also what keeps a phone from zooming into it on focus. -->
-          <div class="field field-lg">
-            <input
-              id="slash-question"
-              class="field-input"
-              type="text"
-              enterkeyhint="send"
-              autocomplete="off"
-              spellcheck="true"
-              placeholder={askWords.placeholder}
-              bind:value={question}
-            />
-          </div>
-          <div class="slash-ask-go">
-            <Button weight="primary" type="submit" disabled={asking || question.trim().length < 2}>{asking ? askWords.asking : askWords.ask}</Button>
+          <label class="field-label slash-ask-label" for="slash-question">{askWords.label}</label>
+          <div class="slash-ask-row">
+            <!-- `field-lg` IS THE 16 PX FIELD, which is also what keeps a phone from zooming into it on focus. -->
+            <div class="field field-lg">
+              <Icon name="search" size="m" />
+              <input
+                id="slash-question"
+                class="field-input"
+                type="text"
+                enterkeyhint="send"
+                autocomplete="off"
+                spellcheck="true"
+                placeholder={askWords.placeholder}
+                bind:value={question}
+              />
+            </div>
+            <div class="slash-ask-go">
+              <Button type="submit" kbd="↵" disabled={asking || question.trim().length < 2}>{asking ? askWords.asking : askWords.ask}</Button>
+            </div>
           </div>
         </form>
 
-        <div class="slash-answer" bind:this={answerAt}>
-          {#if answer}
-            <p class="slash-asked">{answer.question}</p>
+        {#if answer}
+          <div class="slash-answer">
+            <p class="slash-asked"><span class="slash-asked-said">{pageWords.asked}</span> <span class="slash-asked-q">{answer.question}</span></p>
             {#if answer.fix !== null}
               <p class="slash-said" role="status">{answer.fix}</p>
             {:else if answer.drawn === null}
               <p class="slash-said" role="status">{copy.slashAsking}</p>
             {:else}
-              {#if answer.drawn.where !== null}
-                <p class="slash-said">{copy.slashWhere} {answer.drawn.where}</p>
-              {:else if answer.drawn.q !== null}
-                <p class="slash-said">{copy.slashSearched(answer.drawn.q)}</p>
+              <!-- THE SOURCE, BEFORE ANY SENTENCE: where Slash looked, and how many rows came back. -->
+              {#if answer.drawn.where !== null || answer.drawn.q !== null}
+                <p class="slash-source">
+                  <Icon name="rows" size="s" />
+                  <span
+                    >{answer.drawn.where !== null ? `${copy.slashWhere} ${answer.drawn.where}` : copy.slashSearched(answer.drawn.q ?? '')}{#if answer.drawn.rows.length > 0}<span
+                        class="slash-source-n num"
+                        >, {pageWords.rowsRead(answer.drawn.rows.length)}</span
+                      >{/if}</span
+                  >
+                </p>
               {/if}
               <!-- THE ROWS FIRST, DRAWN BY CODE (`23 §7`), and the sentence under them, never instead of them. -->
               {#if answer.drawn.rows.length > 0}
-                <ul class="slash-rows">
+                <ul class="ledger ledger-lead slash-rows">
                   {#each answer.drawn.rows as row (row.id)}
-                    <li><a class="slash-row tap" href={at(row.href)}>{row.title}</a></li>
+                    <li>
+                      <a class="line slash-row" href={at(row.href)}>
+                        <span class="line-mark"><IconWell name="rows" size="l" /></span>
+                        <span class="line-main">
+                          <span class="line-title">{row.title}</span>
+                          <span class="line-detail">{listName(row.register)}</span>
+                        </span>
+                        <span class="slash-row-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
+                      </a>
+                    </li>
                   {/each}
                 </ul>
               {:else if answer.second === null}
@@ -258,22 +291,25 @@
               {/if}
               {#if answer.second}
                 <section class="slash-second" aria-label={slashWords.proposed}>
-                  {#if answer.second.refused}
-                    <p class="slash-said">{answer.second.refused.fix}</p>
-                    {#if answer.second.refused.without}<p class="slash-said">{answer.second.refused.without}</p>{/if}
-                    {#if answer.second.refused.spent}<SlashOut />{/if}
-                  {:else if answer.second.drawn}
-                    {#if answer.second.drawn.text}
-                      <p class="slash-text"><Cited text={answer.second.drawn.text} figures={answer.second.drawn.figures} /></p>
+                  <SlashMark />
+                  <div class="slash-second-words">
+                    {#if answer.second.refused}
+                      <p class="slash-said">{answer.second.refused.fix}</p>
+                      {#if answer.second.refused.without}<p class="slash-said">{answer.second.refused.without}</p>{/if}
+                      {#if answer.second.refused.spent}<SlashOut />{/if}
+                    {:else if answer.second.drawn}
+                      {#if answer.second.drawn.text}
+                        <p class="slash-text"><Cited text={answer.second.drawn.text} figures={answer.second.drawn.figures} /></p>
+                      {/if}
+                      {#if answer.second.drawn.decide}
+                        <div class="slash-second-do"><Button size="sm" href={answer.second.drawn.decide}>{slashWords.decide}</Button></div>
+                      {/if}
+                      <!-- `23 §8`: every answer names its model in the footer. `drawProposal` never leaves it empty. -->
+                      <p class="slash-model">{answer.second.drawn.footer}</p>
+                    {:else}
+                      <p class="slash-said" role="status">{slashWords.proposing}</p>
                     {/if}
-                    {#if answer.second.drawn.decide}
-                      <a class="slash-link tap" href={at(answer.second.drawn.decide)}>{slashWords.decide}</a>
-                    {/if}
-                    <!-- `23 §8`: every answer names its model in the footer. `drawProposal` never leaves it empty. -->
-                    <p class="slash-model">{answer.second.drawn.footer}</p>
-                  {:else}
-                    <p class="slash-said" role="status">{slashWords.proposing}</p>
-                  {/if}
+                  </div>
                 </section>
               {/if}
               <details class="slash-fold">
@@ -283,33 +319,164 @@
                 </ul>
               </details>
             {/if}
+          </div>
+        {/if}
+      </Tile>
+    {/if}
+
+    {#if tally || reading.daily}
+      <div class="tiles">
+        {#if tally}
+          <!-- THE ONE FIGURE: every suggestion by where it stands, one bar, and the line that reads it (SYSTEM §7). -->
+          <Tile icon="decide" title={pageWords.tileTitle} meta={pageWords.tileMeta}>
+            <p class="figure num">{tally.total}<span class="figure-unit">{pageWords.unit(tally.total)}</span></p>
+            <Stacked parts={tally.parts} subject={pageWords.tileTitle} />
+            <p class="reading">{tally.reading}</p>
+          </Tile>
+        {/if}
+        {#if reading.daily}<SlashDaily daily={reading.daily} />{/if}
+      </div>
+    {/if}
+
+    {#if nothingYet(reading)}
+      <!-- A NEW RECORD HAS NOTHING UNDER EITHER HEADING, so it gets one sentence of what Slash will do, and the reason it is
+           quiet when the record is young. -->
+      <Empty kind="no-data-yet" glyph="star" title={words.emptyTitle} body={reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`} />
+    {:else}
+      <!-- WHAT SLASH SUGGESTS, WITH THE SCREEN'S ONE PRIMARY at the end of its heading: the press puts the new ones on
+           Decide and changes nothing else. Accepting is Decide's, and only the owner's. -->
+      <Section title={words.suggests} count={stillOpen.length}>
+        {#snippet aside()}
+          {#if reading && reading.quiet === null && stillOpen.length > 0 && canAsk(reading)}
+            <Button weight="primary" disabled={busy} onclick={() => void press()}>{busy ? words.asking : words.ask}</Button>
           {/if}
-        </div>
+        {/snippet}
+        {#if reading.quiet !== null}
+          <p class="slash-said">{reading.quiet}</p>
+        {:else if stillOpen.length === 0}
+          <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>
+        {:else}
+          <p class="slash-hint">{pageWords.press}</p>
+          <ul class="ledger ledger-lead slash-list">
+            {#each stillOpen as s (s.question)}
+              <!-- A SUGGESTION WAITING ON DECIDE NEEDS HIM, so its verb always shows; a new one is his to put there. -->
+              <li class="slash-suggestion" data-state={s.state} data-needs={s.state === 'waiting' ? '' : undefined}>
+                <div class="line line-tall">
+                  <span class="line-mark"><IconWell name="decide" size="l" /></span>
+                  <span class="line-main">
+                    <span class="line-title slash-question">{s.question}</span>
+                    <span class="line-detail slash-state"><span class="dot" data-state={s.state} aria-hidden="true"></span>{s.said}</span>
+                  </span>
+                  {#if s.href}
+                    <span class="line-verbs"><Button size="sm" href={s.href}>{words.open}</Button></span>
+                  {/if}
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </Section>
+    {/if}
+
+    {#if asked && (asked.skipped.length > 0 || asked.dropped.length > 0)}
+      <!-- WHAT THE LAST PRESS LEFT OFF DECIDE, and why, right under the press that left it. -->
+      <Section title={words.skipped}>
+        <ul class="ledger ledger-lead slash-list">
+          {#each asked.skipped as s (s.question)}
+            <li>
+              <div class="line line-tall">
+                <span class="line-mark"><IconWell name="info" size="l" /></span>
+                <span class="line-main">
+                  <span class="line-title slash-question">{s.question}</span>
+                  <span class="line-detail slash-wrap">{s.why}</span>
+                </span>
+              </div>
+            </li>
+          {/each}
+          {#each asked.dropped as d (d)}
+            <li>
+              <div class="line">
+                <span class="line-mark"><IconWell name="info" size="l" /></span>
+                <span class="line-main"><span class="line-title slash-wrap slash-sentence">{d}</span></span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {/if}
+
+    {#if !nothingYet(reading)}
+      <!-- WHAT SLASH NOTICED, in the one hue that means Slash's own lines (SYSTEM §2 `live`). Each is the record's own
+           reading of how this BrainDog is used, a sentence a person reads whole. -->
+      <Section title={words.noticed} count={reading.noticed.length}>
+        {#if reading.noticed.length === 0}
+          <p class="slash-said">{words.noticedNone}</p>
+        {:else}
+          <ul class="ledger ledger-lead slash-list">
+            {#each reading.noticed as n (`${n.kind}:${n.subject}`)}
+              <li class="slash-noticed">
+                <div class="line line-tall">
+                  <span class="line-mark"><IconWell name="slash" size="l" tone="live" /></span>
+                  <span class="line-main"><span class="line-title slash-wrap slash-sentence">{n.text}</span></span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </Section>
 
-      {#if lately}
-        <Section title={askWords.lately}>
-          {#if lately.length === 0}
-            <p class="slash-said">{askWords.latelyNone}</p>
-          {:else}
-            <ul class="slash-list">
-              {#each lately as line (line.id)}
-                <li class="slash-lately">
-                  <span class="slash-question">{line.question}</span>
-                  <span class="slash-lately-meta">
-                    <span class="slash-state">{line.when}{line.refused ? `, ${askWords.refused}` : ''}</span>
-                    {#if line.href}
-                      <a class="slash-link tap" href={at(line.href)}>{askWords.open}</a>
-                    {:else}
-                      <button type="button" class="slash-again tap" disabled={asking} onclick={() => askAgain(line.question)}>{askWords.again}</button>
-                    {/if}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-          {/if}
+      <!-- AND WHAT YOU ANSWERED, UNDER ITS OWN HEADING (DSN-18): what Slash suggested and what the owner already settled
+           are two lists. Each still opens its question on Decide, where the answer is. -->
+      {#if settled.length > 0}
+        <Section title={pageWords.answeredTitle} count={settled.length}>
+          <ul class="ledger ledger-lead slash-list">
+            {#each settled as s (s.question)}
+              <li class="slash-suggestion" data-state={s.state}>
+                {#if s.href}
+                  <a class="line" href={at(s.href)}>
+                    <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
+                    <span class="line-main"><span class="line-title slash-question">{s.question}</span></span>
+                    <span class="line-when">{words.open}</span>
+                  </a>
+                {:else}
+                  <div class="line">
+                    <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
+                    <span class="line-main"><span class="line-title slash-question">{s.question}</span></span>
+                  </div>
+                {/if}
+              </li>
+            {/each}
+          </ul>
         </Section>
       {/if}
+    {/if}
+
+    {#if modelHere && lately}
+      <!-- WHAT YOU ASKED LATELY, each line reopening its proposal on Decide or asking its question again at the top. -->
+      <Section title={askWords.lately} count={lately.length}>
+        {#if lately.length === 0}
+          <p class="slash-said">{askWords.latelyNone}</p>
+        {:else}
+          <ul class="ledger ledger-lead slash-list">
+            {#each lately as line (line.id)}
+              <li class="slash-lately">
+                <div class="line">
+                  <span class="line-mark"><IconWell name="history" size="l" /></span>
+                  <span class="line-main"><span class="line-title slash-question">{line.question}</span></span>
+                  <span class="line-when">{line.when}{line.refused ? `, ${askWords.refused}` : ''}</span>
+                  <span class="line-verbs">
+                    {#if line.href}
+                      <Button size="sm" href={line.href}>{askWords.open}</Button>
+                    {:else}
+                      <Button size="sm" disabled={asking} onclick={() => askAgain(line.question)}>{askWords.again}</Button>
+                    {/if}
+                  </span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </Section>
     {/if}
 
     {#if reading.model !== null}
@@ -324,229 +491,201 @@
         />
       </Section>
     {/if}
-
-    {#if nothingYet(reading)}
-      <!-- A NEW RECORD HAS NOTHING UNDER EITHER HEADING, so it gets one sentence of what Slash will do, and the reason it is
-           quiet when the record is young. -->
-      <Empty kind="no-data-yet" glyph="star" title={words.emptyTitle} body={reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`} />
-    {:else}
-    <Section title={words.noticed}>
-      {#if reading.noticed.length === 0}
-        <p class="slash-said">{words.noticedNone}</p>
-      {:else}
-        <ul class="slash-list">
-          {#each reading.noticed as n (`${n.kind}:${n.subject}`)}
-            <li class="slash-noticed">{n.text}</li>
-          {/each}
-        </ul>
-      {/if}
-    </Section>
-
-    <Section title={words.suggests}>
-      {#if reading.quiet !== null}
-        <p class="slash-said">{reading.quiet}</p>
-      {:else if stillOpen.length === 0}
-        <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>
-      {:else}
-        <ul class="slash-list">
-          {#each stillOpen as s (s.question)}
-            <li class="slash-suggestion" data-state={s.state}>
-              <span class="slash-question">{s.question}</span>
-              {#if s.href}
-                <a class="slash-link" href={at(s.href)}>{s.said}. {words.open}</a>
-              {:else}
-                <span class="slash-state">{s.said}</span>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-        {#if canAsk(reading)}
-          <div class="slash-actions">
-            <Button weight="primary" disabled={busy} onclick={() => void press()}>{busy ? words.asking : words.ask}</Button>
-          </div>
-        {/if}
-      {/if}
-    </Section>
-
-    <!-- AND WHAT YOU ANSWERED, UNDER ITS OWN HEADING (DSN-18). An answered suggestion was drawn dimmed among the open
-         ones, so what Slash suggested and what the owner already settled read as one list. Each still opens its
-         question on Decide, where the answer is. -->
-    {#if settled.length > 0}
-      <Section title={pageWords.answeredTitle} count={settled.length}>
-        <ul class="slash-list">
-          {#each settled as s (s.question)}
-            <li class="slash-suggestion" data-state={s.state}>
-              <span class="slash-question">{s.question}</span>
-              {#if s.href}<a class="slash-link" href={at(s.href)}>{words.open}</a>{/if}
-            </li>
-          {/each}
-        </ul>
-      </Section>
-    {/if}
-    {/if}
-
-    {#if reading.daily}<SlashDaily daily={reading.daily} />{/if}
-
-    {#if asked && (asked.skipped.length > 0 || asked.dropped.length > 0)}
-      <Section title={words.skipped}>
-        <ul class="slash-list">
-          {#each asked.skipped as s (s.question)}
-            <li class="slash-said"><span class="slash-question">{s.question}</span> {s.why}</li>
-          {/each}
-          {#each asked.dropped as d (d)}
-            <li class="slash-said">{d}</li>
-          {/each}
-        </ul>
-      </Section>
-    {/if}
   {/if}
 </div>
 
 <style>
+  /* ONE COLUMN, NARROWER THAN A LIST SCREEN'S: what is here is sentences and questions, and a line that runs the width of
+     the window is a line nobody reads. */
   .page {
     display: flex;
     flex-direction: column;
     gap: var(--sp-6);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 820px;
+    max-inline-size: 60rem;
   }
 
-  /* THE MARK BESIDE WHAT SLASH DOES, on the lede's first line, and the lede kept to the measure. */
-  .slash-intro {
-    display: flex;
+  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart (SYSTEM §4), one over the other where two will not fit. */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
     align-items: start;
-    gap: var(--sp-4);
-  }
-
-  .slash-intro-words {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    max-inline-size: var(--measure);
-  }
-
-  .slash-lede {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-ui);
-    line-height: 1.5;
-  }
-
-  .slash-by,
-  .slash-said,
-  .slash-state {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .slash-list {
-    display: flex;
-    flex-direction: column;
     gap: var(--sp-3);
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 
-  .slash-noticed {
-    color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.5;
-  }
-
-  /* A SUGGESTION IS ITS QUESTION, and under it where it stands. No boxes: space between them. */
-  .slash-suggestion {
+  .figure {
     display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-  }
-
-  .slash-question {
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
-    font-weight: 500;
-    line-height: 1.45;
+    font-size: var(--t-figure);
+    font-weight: 600;
+    line-height: 34px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
-  .slash-suggestion[data-state='answered'] .slash-question {
+  .figure-unit {
     color: var(--dim);
-  }
-
-  .slash-link {
-    color: var(--ink2);
     font-size: var(--t-sm);
-    text-underline-offset: 3px;
+    font-weight: 500;
+    letter-spacing: 0;
   }
 
-  .slash-actions {
-    margin-block-start: var(--sp-4);
+  /* THE ONE LINE THAT READS THE CHART (SYSTEM §6). */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  /* THE ASK SECTION: a label, the field full width, and the press under it. */
+  .slash-said,
+  .slash-hint {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .slash-hint {
+    margin-block-end: var(--sp-2);
+  }
+
+  /* ── the Ask tile ─────────────────────────────────────────────────────── */
+
   .slash-ask {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
   }
 
-  .slash-ask .field {
-    inline-size: 100%;
+  .slash-ask-label {
+    max-inline-size: var(--measure);
+    font-weight: 400;
   }
 
-  /* ONE COLUMN, TOP TO BOTTOM: what was asked, where Slash looked, the rows, the sentence, the model, the fold. */
+  /* THE FIELD AND ITS PRESS ON ONE LINE: the field takes the room, the pill with its key cap at the end. */
+  .slash-ask-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .slash-ask-row .field {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  .slash-ask-go {
+    flex: none;
+  }
+
+  /* THE ANSWER, UNDER A HAIRLINE ONCE THERE IS ONE: what was asked, where Slash looked, the rows, then Slash's sentence
+     beside its face, the model, and the fold. One column, top to bottom. */
   .slash-answer {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    margin-block-start: var(--sp-4);
     min-inline-size: 0;
   }
 
+  .slash-answer {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
   .slash-asked {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
     margin: 0;
+  }
+
+  .slash-asked-said {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .slash-asked-q {
+    min-inline-size: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
-    font-weight: 500;
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
     overflow-wrap: anywhere;
+  }
+
+  /* THE SOURCE LINE: where the rows came from and how many, in meta with the rows glyph, before any of Slash's words. */
+  .slash-source {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .slash-source :global(.icon) {
+    flex: none;
+    color: var(--dim);
+  }
+
+  .slash-source-n {
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
   }
 
   .slash-rows {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    margin-block: calc(-1 * var(--sp-1));
   }
 
-  .slash-row {
-    color: var(--ink);
-    font-size: var(--t-ui);
-    text-underline-offset: 3px;
-    overflow-wrap: anywhere;
+  .slash-row-go {
+    display: grid;
+    place-items: center;
+    color: var(--dim);
   }
 
+  /* SLASH'S SENTENCE, BESIDE ITS FACE: an answer is somebody's, and the model that drew it is named under it. */
   .slash-second {
+    display: grid;
+    grid-template-columns: var(--well) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
+  .slash-second-words {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    min-inline-size: 0;
+    padding-block-start: 4px;
   }
 
   .slash-text {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.5;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-row);
+    line-height: 22px;
     overflow-wrap: anywhere;
+  }
+
+  .slash-second-do {
+    display: flex;
   }
 
   /* `23 §8`'s footer: receded and small, but always there. */
   .slash-model {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
     overflow-wrap: anywhere;
   }
 
@@ -562,55 +701,120 @@
   }
 
   .slash-summary {
-    cursor: pointer;
-  }
-
-  .slash-lately {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-  }
-
-  .slash-lately .slash-question {
-    overflow-wrap: anywhere;
-  }
-
-  .slash-lately-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-1) var(--sp-3);
-  }
-
-  /* ASKING AGAIN IS A LINK'S EQUAL on the line, so it looks like one, beside "Open the proposal" on the lines that filed. */
-  .slash-again {
-    padding: 0;
-    background: none;
-    border: 0;
+    inline-size: fit-content;
     color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    font-weight: 500;
     cursor: pointer;
   }
 
-  .slash-again:disabled {
-    color: var(--dim);
-    cursor: default;
+  /* ── the lists ────────────────────────────────────────────────────────── */
+
+  /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer (SYSTEM §6), and the hairlines either side step
+     aside so the fill is one shape. */
+  @media (hover: hover) and (pointer: fine) {
+    .slash-list > li:hover > div.line {
+      background: var(--hover-wash);
+    }
+
+    .slash-list > li:hover > .line::after,
+    .slash-list > li:hover + li > .line::after {
+      opacity: 0;
+    }
+  }
+
+  /* A SENTENCE IS READ WHOLE: what Slash noticed and why a suggestion was left off wrap, rather than end in an ellipsis. */
+  .slash-wrap {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .slash-sentence {
+    font-weight: 400;
+    line-height: 22px;
+  }
+
+  .slash-noticed .line,
+  .slash-list .line-tall {
+    padding-block: var(--sp-2);
+  }
+
+  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6): ink for new, which is his to put on Decide, and amber for one
+     waiting there on him. */
+  .slash-state {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dot {
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: var(--r-pill);
+    background: var(--ink);
+  }
+
+  .dot[data-state='waiting'] {
+    background: var(--warn);
+  }
+
+  .slash-suggestion[data-state='answered'] .slash-question {
+    color: var(--ink2);
   }
 
   @media (width < 900px) {
     .page {
+      gap: var(--sp-5);
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 
-  /* AT PHONE WIDTH THE PRESS IS FULL WIDTH UNDER THE FIELD, so a thumb reaches it from either side of the screen. A grid
-     stretches its one child across, which the button's own styles cannot be asked to do from here. */
+  /**
+   * AT PHONE WIDTH THE PRESS IS FULL WIDTH UNDER THE FIELD, so a thumb reaches it from either side of the screen; and a
+   * row keeps its well beside two lines rather than taking `rows.css`'s card, whose main column moves under an id these
+   * rows do not have.
+   */
   @media (width < 640px) {
+    .slash-ask-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
     .slash-ask-go {
       display: grid;
+    }
+
+    .slash-list .line,
+    .slash-rows .line {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      gap: 2px var(--sp-3);
+    }
+
+    .slash-list .line-mark,
+    .slash-rows .line-mark {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      align-self: start;
+    }
+
+    .slash-list .line-main,
+    .slash-rows .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .slash-list .line-when {
+      grid-column: 2;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
+
+    .slash-list .line-verbs,
+    .slash-row-go {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      align-self: center;
     }
   }
 </style>

@@ -15,9 +15,12 @@
   and how long a passphrase must be is the host's rule, said in the host's sentence, not a second copy of it here.
 
   NOTHING IS KEPT. Both fields are emptied when the sheet shuts, whatever the answer was.
+
+  A TILE WITH NO FIGURE (SYSTEM §6): it holds a control and the trade it makes, not a number, so it has no chart. The
+  switch sits in the tile's heading, where a tile's own control goes, and the table is the tile's body.
 -->
 <script lang="ts">
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -96,23 +99,22 @@
   }
 </script>
 
-<Section title={words.passphrase}>
-  <div class="lock-head">
-    <div class="lock-said">
-      <span class="lock-name" id="lock-name">{words.lockSwitch}</span>
-      <p class="lock-line" id="lock-line" role="status">{line}</p>
-    </div>
+<Tile icon="lock" title={words.lockSwitch} data-part="passphrase">
+  {#snippet actions()}
     <button
       type="button"
       class="switch"
       role="switch"
       aria-checked={on}
-      aria-labelledby="lock-name"
+      aria-label={words.lockSwitch}
       aria-describedby="lock-line"
       disabled={!can || busy}
       onclick={press}><span class="switch-track"></span></button
     >
-  </div>
+  {/snippet}
+  <p class="lock-line" id="lock-line" role="status" data-on={on ? '' : undefined}>
+    <span class="lock-dot" aria-hidden="true"></span>{line}
+  </p>
 
   <p class="lock-text">{words.lockProtects}</p>
 
@@ -132,12 +134,12 @@
       </tr>
     </thead>
     <tbody>
-      <tr>
+      <tr data-now={on ? undefined : ''}>
         <th scope="row">{words.rowOff} <span class="lock-note">{words.rowOffNote}</span></th>
         <td><span class="lock-label">{words.tableReads}</span>{words.offReads}</td>
         <td><span class="lock-label">{words.tableForget}</span>{words.offForget}</td>
       </tr>
-      <tr>
+      <tr data-now={on ? '' : undefined}>
         <th scope="row">{words.rowOn}</th>
         <td><span class="lock-label">{words.tableReads}</span>{words.onReads}</td>
         <td><span class="lock-label">{words.tableForget}</span><strong class="lock-strong">{words.onForget}</strong></td>
@@ -145,8 +147,8 @@
     </tbody>
   </table>
 
-  <p class="lock-text">{words.backups}</p>
-</Section>
+  <p class="reading">{words.backups}</p>
+</Tile>
 
 <Sheet
   open={sheet !== null}
@@ -181,35 +183,45 @@
 </Sheet>
 
 <style>
-  .lock-head {
+  /* THE SWITCH'S OWN LINE, what the vault is now: a dot for the state, ink when the passphrase is on, and the words. */
+  .lock-line {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-4);
-  }
-
-  .lock-said {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-  }
-
-  .lock-name {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .lock-line,
-  .lock-text {
+    align-items: baseline;
+    gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+    line-height: 20px;
   }
 
-  .lock-text {
-    margin-block-start: var(--sp-3);
+  .lock-dot {
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border: 1.5px solid var(--dim);
+    border-radius: var(--r-pill);
+    transform: translateY(-1px);
+  }
+
+  .lock-line[data-on] .lock-dot {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+
+  .lock-text,
+  .reading {
+    margin: 0;
     max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .reading {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .lock-strong {
@@ -233,12 +245,14 @@
     white-space: nowrap;
   }
 
-  /* A TABLE WITH NO BOX, as every list here is: hairlines between the rows and nothing around them. */
+  /* A TABLE WITH NO BOX: the tile is the surface, hairlines part the rows, and the row the vault is in now reads in ink
+     while the other steps back to the second ink. */
   .lock-table {
     inline-size: 100%;
-    margin-block-start: var(--sp-3);
     border-collapse: collapse;
     font-size: var(--t-sm);
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
   }
 
   .lock-table th,
@@ -251,17 +265,23 @@
   }
 
   .lock-table thead th {
+    padding-block-start: 0;
     color: var(--dim);
     font-weight: 500;
   }
 
   .lock-table tbody th {
-    color: var(--ink);
+    color: var(--ink2);
     font-weight: 500;
+    white-space: nowrap;
   }
 
   .lock-table tbody tr {
     border-block-start: 1px solid var(--line);
+  }
+
+  .lock-table tbody tr[data-now] :is(th, td) {
+    color: var(--ink);
   }
 
   .lock-note {
@@ -277,6 +297,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+  }
+
+  .lock-form .lock-text {
+    margin-block-start: var(--sp-2);
+    font-size: var(--t-sm);
   }
 
   /* UNDER 640PX, TWO LABELLED ROWS: each row a block, its state as the title, each cell its label above its value. */
@@ -304,17 +329,23 @@
 
     .lock-table tbody th {
       font-size: var(--t-md);
+      white-space: normal;
     }
 
     .lock-table td {
       margin-block-start: var(--sp-2);
-      color: var(--ink);
     }
 
     .lock-label {
       display: block;
       color: var(--dim);
       font-size: var(--t-sm);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .lock-line[data-on] .lock-dot {
+      background: CanvasText;
     }
   }
 </style>

@@ -31,7 +31,7 @@
   let shown = $state(false);
 </script>
 
-<label class="pass-label" for={id}>{label}</label>
+<label class="field-label pass-label" for={id}>{label}</label>
 <div class="field field-lg pass-field">
   <input
     class="field-input pass-input"
@@ -58,9 +58,9 @@
 {#if hint}<p class="pass-hint" id={`${id}-hint`}>{hint}</p>{/if}
 
 <style>
+  /* THE LABEL IS THE HOUSE FIELD LABEL (`controls.css` `.field-label`): meta size, the second ink, above the field. */
   .pass-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    margin-block-start: var(--sp-1);
   }
 
   /* THE FIELD TAKES THE WHOLE WIDTH it is given, and the button sits flush with its trailing edge. */
@@ -75,6 +75,7 @@
     font-size: var(--t-md);
   }
 
+  /* THE EYE SITS IN THE FIELD'S OWN FILL, a round target flush with its trailing edge. */
   .pass-show {
     display: inline-flex;
     flex: none;
@@ -85,10 +86,11 @@
     margin: 0;
     padding: 0;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pill);
     background: transparent;
     color: var(--dim);
     cursor: pointer;
+    transition: color var(--d-state) var(--ease-out);
   }
 
   /* SHOWN IS INK, hidden is dim: the one glyph, and `aria-pressed` says which to a screen reader. */
@@ -111,5 +113,6 @@
     margin: 0 0 var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 </style>

@@ -5,6 +5,9 @@
   the switch is the owner's, in a browser. On a record the caller does not own, or on the sample, nothing is drawn: there is
   no choice to offer.
 
+  A TILE WITH NO FIGURE (SYSTEM §6, SCREENS "Slash"): it holds a control and what it means, not a number, so it has no
+  chart. The switch sits at the end of the tile's heading, where a tile's own control goes, and the sentence is the body.
+
   `daily` is handed in where the page has already read Slash; otherwise it is read here.
 -->
 <script lang="ts">
@@ -14,7 +17,8 @@
   import { createClient } from '@braindog/client';
   import { dailySaid, readSlash, setDaily, words, type Daily, type SlashClient } from '$lib/record/slash.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
 
   let { daily = null, link = false }: { daily?: Daily | null; link?: boolean } = $props();
 
@@ -50,9 +54,8 @@
 </script>
 
 {#if shown}
-  <Section title={words.dailyTitle}>
-    <div class="slash-daily">
-      <p class="slash-daily-said" id="slash-daily-said">{dailySaid(shown)}</p>
+  <Tile icon="clock" title={words.dailyTitle} data-part="slash-daily">
+    {#snippet actions()}
       <button
         type="button"
         class="switch"
@@ -63,37 +66,38 @@
         disabled={busy}
         onclick={flip}><span class="switch-track"></span></button
       >
-    </div>
-    {#if link}<a class="slash-daily-link tap" href={at('/slash')}>{words.dailyMore}</a>{/if}
-  </Section>
+    {/snippet}
+    <p class="slash-daily-said" id="slash-daily-said">{dailySaid(shown)}</p>
+    {#if link}<a class="slash-daily-link tap" href={at('/slash')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
+  </Tile>
 {/if}
 
 <style>
-  /* THE SENTENCE AND ITS SWITCH ON ONE LINE, as every switch in Settings sits. */
-  .slash-daily {
-    display: grid;
-    grid-template-columns: minmax(0, var(--measure)) auto;
-    align-items: start;
-    justify-content: start;
-    gap: var(--sp-6);
-  }
-
+  /* THE SENTENCE IS THE TILE'S BODY, at the body size in the second ink, kept to the measure. */
   .slash-daily-said {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  .slash-daily :global(.switch) {
-    margin-block-start: calc((1em * var(--lh-body) - var(--ctl-h)) / 2);
-  }
-
+  /* THE WAY ON, a link word with its arrow, as a tile's heading draws one (SYSTEM §6). */
   .slash-daily-link {
-    display: inline-block;
-    margin-block-start: var(--sp-3);
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--sp-1);
     color: var(--ink2);
     font-size: var(--t-sm);
-    text-underline-offset: 3px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .slash-daily-link:hover {
+      color: var(--ink);
+    }
   }
 </style>
