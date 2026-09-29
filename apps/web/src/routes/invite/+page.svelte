@@ -10,6 +10,9 @@
   again with the proof beside the invitation (`/invite#<token>&proof=<proof>`), and Accept then makes them, signs them
   in, and asks for a passkey, because that is how they come back. An address that can already sign in is sent to sign
   in first.
+
+  ONE SHEET, AS SIGN IN IS (`signin/Entry.svelte`): the mark at its top, the invitation's own title, what it opens, and
+  one ink button. The states are sign in's calm block: a glyph in a 32px well, the title, the lines under it.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -21,6 +24,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import Entry from '../signin/Entry.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
 
@@ -123,7 +127,7 @@
 
 <svelte:head><title>{titleOf(copy.invitePageTitle)}</title></svelte:head>
 
-<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`): the brand at the top left, then this column. -->
+<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`signin/Entry.svelte`): one sheet on the lit ground, the mark at its top. -->
 <Entry>
   <div class="col">
     <div class="act">
@@ -148,13 +152,13 @@
         <!-- A NEW ADDRESS, ASKED TO PROVE ITSELF. Nothing is made until the mailed link comes back, so this is the
              whole of what the screen can say: where the link went, and what opening it does. -->
         <div class="calm">
-          <span class="door-glyph"><Icon name="link" size="l" /></span>
+          <IconWell name="link" size="l" />
           <h1 class="calm-title">{copy.inviteCheckMail}</h1>
           <p class="calm-body" role="status">{copy.inviteMailSent(proving)}</p>
         </div>
       {:else if seen && seen.ok && !joined}
         <div class="calm">
-          <span class="door-glyph"><Icon name="link" size="l" /></span>
+          <IconWell name="link" size="l" />
           <!-- THE PAGE'S ONE LEVEL-ONE HEADING, in every state it can settle into. While this screen
                drew an error card it settled `refused`, so `a11y` skipped it and nothing ever audited
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
@@ -171,10 +175,12 @@
                goes nowhere, and so would asking again on the page the mail opens, whose name was kept with the
                proof. Without it People drew their address where their name goes. -->
           {#if asksName}
-            <label class="lbl" for="in-name">{copy.inviteNameLabel}</label>
-            <span class="field field-lg">
-              <input id="in-name" class="field-input" type="text" autocomplete="name" bind:value={name} />
-            </span>
+            <div class="row">
+              <label class="field-label" for="in-name">{copy.inviteNameLabel}</label>
+              <span class="field">
+                <input id="in-name" class="field-input" type="text" autocomplete="name" bind:value={name} />
+              </span>
+            </div>
           {/if}
           <Button weight="primary" onclick={accept} aria-busy={busy === 'accept'}>
             {busy === 'accept' ? copy.inviteAccepting : copy.inviteAccept}
@@ -186,7 +192,7 @@
         </div>
       {:else if joined}
         <div class="calm">
-          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
+          <IconWell name="check" size="l" tone="earn" />
           <h1 class="calm-title">{copy.inviteJoined}</h1>
           {#if !keyAdded && here.webauthn && here.secure}<p class="calm-body">{copy.inviteKeepWay}</p>{/if}
         </div>
@@ -211,8 +217,8 @@
 </Entry>
 
 <style>
-  /* THE FRAME AND THE BRAND ARE `signin/Entry.svelte`'s, the same as sign in's, so an invitation that leads to sign in
-     does not move the brand under the person. What is here is the column inside it. */
+  /* THE FRAME, THE SHEET AND THE BRAND ARE `signin/Entry.svelte`'s, the same as sign in's, so an invitation that leads
+     to sign in does not move the brand under the person. What is here is the column inside the sheet. */
   .col,
   .act,
   .doors {
@@ -222,7 +228,7 @@
   }
 
   .col {
-    gap: var(--sp-6);
+    gap: var(--sp-5);
   }
 
   .act {
@@ -233,49 +239,64 @@
     gap: var(--sp-3);
   }
 
+  /* EVERY BUTTON IS THE COLUMN'S WIDTH and as tall as a field: 40 under a mouse, 44 under a thumb. */
+  .col :global(.btn) {
+    inline-size: 100%;
+    min-block-size: max(40px, var(--ctl-h));
+    white-space: normal;
+    text-align: center;
+  }
+
+  /* `Empty` stands in the sheet as sign in's does: its own padding goes, because the column already spaces it. */
+  .act :global(.empty) {
+    padding-block: 0;
+  }
+
+  .act :global(.empty-actions) {
+    align-self: stretch;
+  }
+
   .calm {
     display: flex;
     flex-direction: column;
+    align-items: start;
     gap: var(--sp-2);
   }
 
-  /* NOT `.glyph`, for the reason `/signin` gives: `blocks.css` draws that name as a 6px intent dot, and this set only
-     the colour of it. */
-  .door-glyph {
-    color: var(--ink2);
-  }
-
-  .door-glyph.ok {
-    color: var(--earn);
+  .calm :global(.well) {
+    margin-block-end: var(--sp-1);
   }
 
   .calm-title {
-    /* THE SIZE IS STATED HERE BECAUSE THE TAG CHANGED. This was a `p` and is now the page's `h1`,
-       and a user agent draws an `h1` at `2em` against a paragraph's `1em`, so leaving the size to
-       the default would have doubled this line the moment it became a heading. */
+    /* THE SIZE IS STATED HERE BECAUSE THE TAG IS A HEADING. This is the page's `h1`, and a user agent draws an `h1`
+       at `2em`, so leaving the size to the default would double it. */
     margin: 0;
-    /* AND IT IS THE ENTRY SCREENS' ONE TITLE: `--t-3xl` in the display face, as sign in's slogan is (design §4). */
+    /* AND IT IS THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600, in Geist (SYSTEM §3); 30/36 on a phone. */
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-3xl);
+    font-family: var(--font-ui);
+    font-size: var(--t-title);
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: var(--lh-3xl);
+    letter-spacing: -0.02em;
+    line-height: 34px;
     text-wrap: balance;
     overflow-wrap: anywhere;
   }
 
-  .lbl {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 600;
+  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has (SYSTEM §6). */
+  .row {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
   }
 
   .calm-body,
   .status {
     margin: 0;
     color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
     overflow-wrap: anywhere;
+    text-wrap: pretty;
   }
 
   /* THE NAME FIELD SCROLLS CLEAR OF THE PHONE'S KEYBOARD with Accept under it still in view. */
@@ -287,5 +308,19 @@
   .opens {
     color: var(--ink);
     font-weight: 500;
+  }
+
+  /* UNDER A THUMB THE FIELD READS AT 16, the phone's body size, below which a phone's browser zooms in on focus. */
+  @media (pointer: coarse) {
+    .doors .field-input {
+      font-size: var(--t-md);
+    }
+  }
+
+  @media (width < 900px) {
+    .calm-title {
+      font-size: var(--t-figure);
+      line-height: 36px;
+    }
   }
 </style>

@@ -8,8 +8,13 @@
   `free` IS TRUE ONLY FOR THE NAME ON SCREEN NOW. Every keystroke sets it false before the check goes out, and an
   answer for a name that is no longer typed is dropped, so a press can never pay for a name that was checked a moment
   ago and then changed.
+
+  THE ANSWER IS A STATUS, A 6PX DOT AND ITS WORD (SYSTEM §6 Badges): green for a name that is free, the second ink for
+  one that is taken or could not be checked. Never red: a taken name is a thing to change, not a thing that needs him.
+  Under it, once something is typed, the address the name becomes, in the mono face, so the person reads what they get.
 -->
 <script lang="ts">
+  import { BASE } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { checkName, nameOf } from '$lib/signup.ts';
 
@@ -51,11 +56,15 @@
   });
 
   const help = $derived(checking ? copy.signupNameChecking : why !== null ? why : free ? copy.signupNameFree : copy.signupNameHint);
+  /** Which dot the line carries: a free name, a name that cannot be had, or none while checking or before typing. */
+  const tone = $derived(checking ? undefined : why !== null ? 'no' : free ? 'free' : undefined);
+  /** The record's address this name becomes: the app's own host, then `/app/<name>` (where sign-up lands it). */
+  const address = $derived(value === '' ? null : `${globalThis.location?.host ?? ''}${BASE}/${value}`);
 </script>
 
 <div class="name">
-  <label class="lbl" for={id}>{copy.signupNameLabel}</label>
-  <span class="field field-lg" data-bad={why !== null ? '' : undefined}>
+  <label class="field-label" for={id}>{copy.signupNameLabel}</label>
+  <span class="field" data-bad={why !== null ? '' : undefined}>
     <input
       {id}
       class="field-input"
@@ -77,40 +86,76 @@
       }}
     />
   </span>
-  <p class="help" class:bad={why !== null} class:good={free && !checking} id={`${id}-help`} aria-live="polite">{help}</p>
+  <p class="help" data-tone={tone} id={`${id}-help`} aria-live="polite">
+    {#if tone}<span class="dot" aria-hidden="true"></span>{/if}<span class="said">{help}</span>
+  </p>
+  {#if address}<p class="where">{address}</p>{/if}
 </div>
 
 <style>
   .name {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
-  .lbl {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  /* A label to its field is 8, a field to its help 4 (design-brief §3), so the help pulls back half the gap. */
+  /* 8 under the field, and the address 2 under the line (the board's spacing). */
   .help {
-    margin-block-start: calc(var(--sp-1) - var(--sp-2));
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 0;
     color: var(--dim);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    line-height: 18px;
     overflow-wrap: anywhere;
   }
 
-  .help.bad {
-    color: var(--danger);
+  .help[data-tone] {
+    color: var(--ink2);
+    font-weight: 500;
   }
 
-  .help.good {
-    color: var(--earn);
+  .help[data-tone='free'] {
+    color: var(--ink);
   }
 
-  .field[data-bad] {
-    border-color: var(--danger);
+  /* THE DOT SITS ON THE BASELINE, so it stands level with the first line's lower-case letters however the line wraps. */
+  .dot {
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: var(--ink2);
+  }
+
+  .said {
+    min-inline-size: 0;
+  }
+
+  .help[data-tone='free'] .dot {
+    background: var(--earn);
+  }
+
+  .where {
+    margin: 2px 0 0;
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  /* UNDER A THUMB THE FIELD READS AT 16, the phone's body size, below which a phone's browser zooms in on focus. */
+  @media (pointer: coarse) {
+    .field-input {
+      font-size: var(--t-md);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .dot {
+      background: CanvasText;
+    }
   }
 </style>

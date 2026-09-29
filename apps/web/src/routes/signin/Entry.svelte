@@ -1,47 +1,61 @@
 <!--
-  The one layout every entry screen stands in: sign in, sign up, start and an invitation (DSN-18).
+  The one frame every entry screen stands in: sign in, sign up, an invitation, and /start (DSN-18).
 
-  THERE WERE FOUR, AND THEY DISAGREED. Sign in centred its logo and floated its slogan in the middle of
-  a phone, which left a 170px hole between the slogan and the ways in; /start put its logo at the left;
-  sign up and the invitation centred a column in the middle of the screen. A person moves between these
-  screens in one sitting (an invitation leads to sign in, sign in to /start), so the brand jumped about
-  under them at every step (design §2.13, §4).
+  ONE SHEET ON A CALM, LIT GROUND (SYSTEM §2, §6, `loop/design/bento/boards/Light-Signup.dc.html`). The ground and its
+  one light are the body's (`app.css`); on it stands a single sheet-like tile, the mark and the name at its top, and the
+  screen's own column under them. A person moves between these screens in one sitting (an invitation leads to sign in,
+  sign in to /start), so the brand is in the same place on every one of them.
 
-  ONE ANSWER NOW: the mark and the name at the top left, on the page's gutter, as the rail puts them
-  once the person is in; then the screen's own column under it, starting at the top rather than the
-  middle, so on a 390 by 664 phone the title and the first way in are on screen together and nothing
-  hangs in empty space. From 900px up the column is centred on the page, still starting near the top,
-  so a wide screen does not read as a phone stretched sideways.
+  `aside` IS THE RAIL BESIDE THE SHEET: sign-up's next steps. From 900px it stands to the right of the sheet, both
+  starting at the top; below that it stacks under the sheet at the full width, so the form comes first under a thumb.
 
-  A SCREEN KEEPS ITS OWN COLUMN. What goes inside (the title at `--t-3xl`, the form under it) is each
-  screen's markup and style; this file owns only the frame, and `wide` gives /start the room its
-  previews need.
+  `wide` IS /start's, AND IT DRAWS NO SHEET. /start holds tiles of its own ("Your record, building"), and a tile never
+  holds a tile (SYSTEM §4), so there the brand stands on the ground at the top left and the column under it runs to
+  1040, room for /start's two columns from 900px.
+
+  THE FRAME STARTS AT THE TOP, never the middle: on a 390 by 664 phone the title and the first way in are on screen
+  together and nothing hangs in empty space.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { copy } from '$lib/copy.ts';
   import Mark from '$lib/ui/Mark.svelte';
 
-  let { wide = false, children }: { wide?: boolean; children: Snippet } = $props();
+  let { wide = false, aside, children }: { wide?: boolean; aside?: Snippet | undefined; children: Snippet } = $props();
 </script>
 
-<div class="entry" class:wide>
+{#snippet brand()}
   <header class="entry-brand">
-    <Mark height={32} />
+    <Mark height={24} />
     <span class="entry-word">{copy.product}</span>
   </header>
-  <div class="entry-col">{@render children()}</div>
+{/snippet}
+
+<div class="entry" data-shape={wide ? 'wide' : 'sheet'}>
+  {#if wide}
+    {@render brand()}
+    <div class="entry-col">{@render children()}</div>
+  {:else}
+    <div class="entry-board" data-paired={aside ? '' : undefined}>
+      <!-- `data-surface="tile"`: a quiet button inside takes the tile's `--s1` pill, not the ground's wash (`Button`). -->
+      <div class="entry-sheet" data-surface="tile">
+        {@render brand()}
+        <div class="entry-col">{@render children()}</div>
+      </div>
+      {#if aside}<div class="entry-aside">{@render aside()}</div>{/if}
+    </div>
+  {/if}
 </div>
 
 <style>
-  /* THE FRAME STARTS AT THE TOP. The top inset is paid here once, because the app is `viewport-fit=cover` and an entry
-     screen has no sticky bar to pay it; the bottom one pads the last control clear of a phone's home indicator. */
+  /* THE TOP INSET IS PAID HERE ONCE, because the app is `viewport-fit=cover` and an entry screen has no bar to pay it;
+     the bottom one pads the last control clear of a phone's home indicator. 12 is the window inset (SYSTEM §4). */
   .entry {
     display: grid;
     align-content: start;
     row-gap: var(--sp-7);
     min-block-size: 100dvh;
-    padding-block: calc(var(--sp-5) + env(safe-area-inset-top)) calc(var(--sp-7) + env(safe-area-inset-bottom));
+    padding-block: calc(var(--inset) + env(safe-area-inset-top)) calc(var(--sp-7) + env(safe-area-inset-bottom));
     padding-inline: var(--gutter);
   }
 
@@ -49,33 +63,94 @@
     display: flex;
     align-items: center;
     justify-self: start;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
+    min-block-size: var(--well-l);
   }
 
+  /* GEIST, AS EVERY WORD IS (SYSTEM §3, §11): the wordmark was the display face, and there is one face now. */
   .entry-word {
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-lg);
+    font-family: var(--font-ui);
+    font-size: var(--t-group);
     font-weight: 600;
-    letter-spacing: -0.026em;
+    line-height: 24px;
   }
 
-  /* `min(…, 100%)` so the column never outgrows a phone, and `min-inline-size: 0` so a long word inside it wraps rather
-     than widening the track past the screen. */
-  .entry-col {
+  /* ── The sheet ─────────────────────────────────────────────────────────── */
+
+  /* `min(…, 100%)` so nothing outgrows a phone, and `min-inline-size: 0` so a long word inside wraps rather than
+     widening the track past the screen. */
+  .entry-board {
+    display: grid;
+    align-items: start;
+    gap: var(--inset);
     justify-self: center;
-    inline-size: min(400px, 100%);
+    inline-size: min(440px, 100%);
     min-inline-size: 0;
   }
 
-  .entry.wide .entry-col {
-    inline-size: min(640px, 100%);
+  /* A LEAD TILE: the tile's fill, radius and level-one shadow (none in dark, where the fill tells it from the ground),
+     and the lead tile's 24 of padding (SYSTEM §4, §6). No border: a tile is told by its fill. */
+  .entry-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+    padding: var(--sp-5);
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+    color: var(--ink);
   }
 
-  /* ON A WIDE SCREEN THE COLUMN SITS A LITTLE LOWER than the brand's row, where the eye lands, and never in the middle. */
+  .entry-col {
+    min-inline-size: 0;
+  }
+
+  .entry-aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  /* ON A PHONE THE SHEET IS A TILE AT THE FULL WIDTH between 16 gutters, with a tile's own 20 of padding. */
+  @media (width < 640px) {
+    .entry-sheet {
+      padding: 20px;
+    }
+  }
+
+  /* FROM 900PX THE BOARD STANDS A STEP DOWN FROM THE TOP, where the eye lands, and never in the middle. With a rail,
+     the sheet keeps its 440 and the rail takes the rest of 1040, both from the same top edge. */
   @media (width >= 900px) {
-    .entry-col {
-      margin-block-start: var(--sp-7);
+    .entry[data-shape='sheet'] {
+      padding-block-start: calc(var(--sp-8) + env(safe-area-inset-top));
+    }
+
+    .entry-board[data-paired] {
+      grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+      inline-size: min(1040px, 100%);
+    }
+  }
+
+  /* ── /start, on the ground ─────────────────────────────────────────────── */
+
+  [data-shape='wide'] .entry-col {
+    justify-self: center;
+    inline-size: min(1040px, 100%);
+  }
+
+  @media (width >= 900px) {
+    [data-shape='wide'] .entry-col {
+      margin-block-start: var(--sp-5);
+    }
+  }
+
+  /* Forced colours drop the fill and the shadow, so the sheet keeps an edge to be told from the page by. */
+  @media (forced-colors: active) {
+    .entry-sheet {
+      outline: 1px solid CanvasText;
     }
   }
 </style>

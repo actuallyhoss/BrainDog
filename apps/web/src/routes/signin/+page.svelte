@@ -12,8 +12,8 @@
   NOTHING HAPPENS ON ARRIVAL. A passkey sheet nobody asked for is alarming, and a link in the address
   is spent by a press rather than on load, so a mail scanner that opens it spends nothing.
 
-  ON A PHONE THE WAYS IN SIT AT THE FOOT OF THE SCREEN, where a thumb already is, and the brand and
-  the slogan keep the top.
+  ONE SHEET, THE MARK AT ITS TOP (`Entry.svelte`): the slogan, then every way in straight under it, the lead one the
+  ink pill, and the passkey said in one line under its button. No figure, so no chart and no tile inside the sheet.
 -->
 <script lang="ts">
   import { onMount, tick } from 'svelte';
@@ -42,8 +42,10 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
+  import { words } from './words.ts';
 
   const here = support();
 
@@ -301,7 +303,7 @@
   {/if}
 {/snippet}
 
-<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`Entry.svelte`): the brand at the top left, then this column. -->
+<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`Entry.svelte`): one sheet on the lit ground, the mark at its top, then this column. -->
 <Entry>
   <div class="col">
     <div class="intro">
@@ -321,13 +323,13 @@
         </div>
       {:else if view.name === 'no-host'}
         <div class="calm">
-          <span class="door-glyph"><Icon name="info" size="l" /></span>
+          <IconWell name="info" size="l" />
           <p class="calm-title">{copy.noHostTitle}</p>
           <p class="calm-body">{copy.noHostWhy}</p>
         </div>
       {:else if view.name === 'open'}
         <div class="calm">
-          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
+          <IconWell name="check" size="l" tone="earn" />
           <p class="calm-title">{copy.openTitle}</p>
           <p class="calm-body">{copy.openWhy}</p>
         </div>
@@ -353,14 +355,14 @@
         </div>
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">
-          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
+          <IconWell name="check" size="l" tone="earn" />
           <p class="calm-title">{copy.linkSentTitle}</p>
           <p class="calm-body">{copy.linkSentBody(view.email)}</p>
         </div>
         <div class="doors"><Button onclick={mail}>{copy.useAnotherEmail}</Button></div>
       {:else if view.name === 'link-landing'}
         <div class="calm">
-          <span class="door-glyph"><Icon name="link" size="l" /></span>
+          <IconWell name="link" size="l" />
           <p class="calm-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</p>
         </div>
         <div class="doors">
@@ -370,7 +372,7 @@
         </div>
       {:else if view.name === 'signed-in'}
         <div class="calm">
-          <span class="door-glyph ok"><Icon name="check" size="l" /></span>
+          <IconWell name="check" size="l" tone="earn" />
           <p class="calm-title">{copy.signedInTitle}</p>
           <p class="calm-who">{view.who.email}</p>
           <p class="calm-body">{copy.signedInReads}</p>
@@ -409,16 +411,26 @@
       {#if doors}
         <div class="doors">
           {#if doors.passkey}
-            <Button weight={doors.lead === 'passkey' ? 'primary' : 'quiet'} onclick={withPasskey} aria-busy={asking === 'passkey'}>
-              <Icon name="key" size="m" />{asking === 'passkey' ? copy.waitingForPasskey : copy.withPasskey}
-            </Button>
+            <!-- WHAT A PASSKEY IS, IN ONE LINE UNDER ITS BUTTON, and read as the button's description, so its name stays
+                 exactly `copy.withPasskey` (the `passkey` gate presses it by that name). -->
+            <div class="door">
+              <Button
+                weight={doors.lead === 'passkey' ? 'primary' : 'quiet'}
+                onclick={withPasskey}
+                aria-busy={asking === 'passkey'}
+                aria-describedby="in-passkey-why"
+              >
+                <Icon name="key" size="m" />{asking === 'passkey' ? copy.waitingForPasskey : copy.withPasskey}
+              </Button>
+              <p class="why" id="in-passkey-why">{words.passkeyLine}</p>
+            </div>
           {/if}
 
           {#if doors.magic}
             {#if doors.lead === 'magic' || mailing}
               <form class="form" onsubmit={send}>
-                <label class="lbl" for="in-email">{copy.emailLabel}</label>
-                <span class="field field-lg">
+                <label class="field-label" for="in-email">{copy.emailLabel}</label>
+                <span class="field">
                   <input
                     id="in-email"
                     class="field-input"
@@ -447,8 +459,8 @@
             <details class="own" bind:open={keyOpen}>
               <summary class="own-q"><Icon name="chevronDown" size="s" />{copy.serverKeyWay}</summary>
               <form class="form" onsubmit={withKey}>
-                <label class="lbl" for="in-key">{copy.serverKeyLabel}</label>
-                <span class="field field-lg">
+                <label class="field-label" for="in-key">{copy.serverKeyLabel}</label>
+                <span class="field">
                   <!-- `value` and `oninput` rather than `bind:value`, because the type is what the show
                        control changes, and a two-way binding on a dynamic type is not legal. -->
                   <input
@@ -491,41 +503,45 @@
 </Entry>
 
 <style>
-  /* THE FRAME AND THE BRAND ARE `Entry.svelte`'s; this is the column inside it, the slogan first and every way in
-     straight under it, all on the column's start edge, where the brand above it starts. */
+  /* THE FRAME, THE SHEET AND THE BRAND ARE `Entry.svelte`'s; this is the column inside the sheet, the slogan first and
+     every way in straight under it, all on one start edge. */
   .col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
   .intro {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
   }
 
+  /* THE SLOGAN IS THE SCREEN'S LEAD LINE: `t-lead`, 34/40 at 600 (SYSTEM §3), in Geist like every word. A phone takes
+     the large title's 30/36 (§3, Phone). */
   .slogan {
+    margin: 0;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-3xl);
+    font-family: var(--font-ui);
+    font-size: var(--t-lead);
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: var(--lh-3xl);
+    letter-spacing: -0.025em;
+    line-height: 40px;
     text-wrap: balance;
   }
 
   .lede {
-    color: var(--dim);
+    margin: 0;
+    color: var(--ink2);
     font-size: var(--t-md);
-    line-height: var(--lh-body);
+    line-height: 24px;
   }
 
   .act {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--sp-4);
   }
 
   .doors {
@@ -534,18 +550,37 @@
     gap: var(--sp-3);
   }
 
-  /* EVERY WAY IN IS THE WIDTH OF THE COLUMN, and a label may wrap: at 320 the longest one is wider
-     than a nowrap pill can be. 48 is above the 44 floor on any pointer. */
+  .door {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  /* EVERY WAY IN IS THE WIDTH OF THE COLUMN and as tall as a field beside it: 40 under a mouse, 44 under a thumb
+     (`--ctl-h` is 44 there). A label may wrap: at 320 the longest one is wider than a nowrap pill can be. */
   .col :global(.btn) {
     inline-size: 100%;
-    min-block-size: var(--sp-7);
+    min-block-size: max(40px, var(--ctl-h));
     white-space: normal;
     text-align: center;
   }
 
-  .new-here {
+  /* THE PASSKEY IN ONE LINE, under its button, in the meta size. */
+  .why {
+    margin: 0;
+    color: var(--dim);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    line-height: 18px;
+    text-wrap: pretty;
+  }
+
+  /* THE FOOT OF THE SHEET: a hairline, then the one way to a record of your own (the board's "Already have a record?"). */
+  .new-here {
+    margin: 0;
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--line);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   /* A 44PX TARGET ON A PHONE, as every way on from this screen is, without making a line of text look like a button. */
@@ -554,61 +589,60 @@
     align-items: center;
     min-block-size: var(--tap);
     color: var(--link);
+    font-weight: 500;
+  }
+
+  .status,
+  .small {
+    margin: 0;
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .status {
     color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
   }
 
   .small {
     color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
   }
 
-  /* A state that is not a problem: a glyph, a sentence and what it means, on the slogan's start edge. */
+  /* A STATE THAT IS NOT A PROBLEM: its glyph in a 32px well (green when it went well), the title at the group size, the
+     body under it. On the slogan's start edge, as `Empty` is everywhere else. */
   .calm {
     display: flex;
     flex-direction: column;
     align-items: start;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
   }
 
-  /* NOT `.glyph`, WHICH `blocks.css` DRAWS AS AN INTENT DOT. Under that name this set `display` and `color` and
-     inherited the rest: measured on 23 September, a 6 by 6 grey box around a 20-pixel icon, over "Your record is
-     ready to claim." and "You are signed in" (`loop/research-first-sign-in.md` friction 7). */
-  .door-glyph {
-    display: flex;
-    margin-block-end: var(--sp-1);
-    color: var(--dim);
-  }
-
-  .door-glyph.ok {
-    color: var(--earn);
+  .calm :global(.well) {
+    margin-block-end: var(--sp-2);
   }
 
   .calm-title {
+    margin: 0;
     color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-md);
+    font-size: var(--t-group);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    line-height: 24px;
     text-wrap: balance;
   }
 
   .calm-who {
-    color: var(--ink2);
-    font-weight: 600;
+    margin: 0;
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
 
   .calm-body {
+    margin: 0;
     max-inline-size: 42ch;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 
@@ -629,26 +663,26 @@
     text-wrap: pretty;
   }
 
+  /* A FIELD: its label above (`.field-label`, 6 under it), the field, a hint 8 under that, and its button 12 under. */
   .form {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
-  .lbl {
+  .form .hint {
+    margin: var(--sp-2) 0 0;
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 600;
+    line-height: 18px;
   }
 
-  .hint {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
+  .form :global(.btn) {
+    margin-block-start: var(--sp-3);
   }
 
   /* The key is 43 characters of base64url checked glyph for glyph, which is what `--font-id` is for. */
-  .field-lg .field-input#in-key {
+  .field-input#in-key {
     font-family: var(--font-id);
     font-size: var(--t-sm);
   }
@@ -657,43 +691,45 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    min-block-size: var(--ctl-h);
+    min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
+    border-radius: var(--r-pill);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
-  }
-
-  .peek:hover {
-    color: var(--ink);
+    transition: color var(--d-state) var(--ease-out);
   }
 
   .own-q {
     display: flex;
     align-items: center;
-    gap: var(--sp-1);
+    gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 600;
+    font-size: var(--t-base);
+    font-weight: 500;
     list-style: none;
     cursor: pointer;
+    transition: color var(--d-state) var(--ease-out);
   }
 
   .own-q::-webkit-details-marker {
     display: none;
   }
 
-  .own-q:hover {
-    color: var(--ink);
+  @media (hover: hover) and (pointer: fine) {
+    .peek:hover,
+    .own-q:hover {
+      color: var(--ink);
+    }
   }
 
   .own-q :global(svg) {
-    transition: transform var(--d-state) var(--ease-out);
+    transition: transform var(--d-move) var(--ease-out);
   }
 
   .own[open] .own-q :global(svg) {
@@ -704,11 +740,30 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* A FOCUSED FIELD SCROLLS CLEAR OF THE EDGES WITH THE PHONE'S KEYBOARD UP, with the button under it in view: the
-     column starts at the top now (`Entry.svelte`), so what the keyboard covers is below the field, and the margin
-     keeps the field's own submit button on screen with it. The phone rule that floated the slogan in the middle of
-     the screen, and left the hole under it, is gone with the centred frame. */
+  /* A FOCUSED FIELD SCROLLS CLEAR OF THE EDGES WITH THE PHONE'S KEYBOARD UP, with the button under it in view. */
   .form .field-input {
     scroll-margin-block: var(--sp-6) var(--sp-8);
+  }
+
+  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size (SYSTEM §3), which is also the size below which a
+     phone's browser zooms the page in on focus. The key's mono too. */
+  @media (pointer: coarse) {
+    .form .field-input,
+    .field-input#in-key {
+      font-size: var(--t-md);
+    }
+  }
+
+  @media (width < 640px) {
+    .own-q {
+      min-block-size: var(--tap);
+    }
+  }
+
+  @media (width < 900px) {
+    .slogan {
+      font-size: var(--t-figure);
+      line-height: 36px;
+    }
   }
 </style>

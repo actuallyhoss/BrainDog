@@ -12,6 +12,10 @@
 
   THE ANSWER TO STEP ONE IS THE SAME FOR EVERY ADDRESS: the host sends a sign-in link to an address that already has an
   account and a proof to a new one, and says which to nobody watching this page.
+
+  THE FORM IS ONE SHEET AND THE STEPS ARE A RAIL BESIDE IT (`loop/design/bento/boards/Light-Signup.dc.html`): the sheet
+  holds the mark and the form with its one ink button, and "What happens next" stands to its right from 900px and under
+  it on a phone, with the step this person is on marked. The rail is drawn from `step` and nothing else.
 -->
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
@@ -34,7 +38,11 @@
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import Tile from '$lib/ui/Tile.svelte';
   import Entry from '../signin/Entry.svelte';
+  import { words } from '../signin/words.ts';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import NoRecord from '../start/NoRecord.svelte';
   import NameField from './NameField.svelte';
@@ -230,6 +238,33 @@
     if (!gone) step = 'slow';
   }
 
+  /* ── the rail: where this person is in the six steps ────────────────────── */
+
+  /** Each step's glyph, in `words.steps` order: the mail, the link, the payment, the passkey, the sentence, the Home. */
+  const STEP_ICONS: readonly IconName[] = ['inbox', 'link', 'money', 'key', 'edit', 'home'];
+
+  /**
+   * THE STEP THIS SCREEN IS, counted from 0, or null where the rail is not drawn. Waiting for the host's first answer is
+   * step one still, so the sheet does not jump sideways when the form arrives; a proof being checked is step two. A
+   * host that is out of reach or closed has no steps to offer, and "making your record" is past the payment and not
+   * yet at the passkey, so neither draws the rail.
+   */
+  const stepNow = $derived.by((): number | null => {
+    switch (step) {
+      case 'loading':
+      case 'ask':
+        return 0;
+      case 'verifying':
+      case 'sent':
+      case 'link-failed':
+        return 1;
+      case 'pay':
+        return 2;
+      default:
+        return null;
+    }
+  });
+
   /* THIS SCREEN'S FIRST DRAW IS ITS STEP, whichever it is, once the host has answered or the address has said. */
   $effect(() => {
     if (step !== 'loading' && step !== 'verifying') drew('ready');
@@ -238,8 +273,32 @@
 
 <svelte:head><title>{titleOf(copy.signupTitle)}</title></svelte:head>
 
-<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`): the brand at the top left, then this column. -->
-<Entry>
+{#snippet next()}
+  {#if stepNow !== null}
+    <Tile icon="arrow" title={words.nextTitle} meta={words.stepOf(stepNow + 1, words.steps.length)}>
+      <ol class="steps">
+        {#each words.steps as s, i (i)}
+          <li class="step" aria-current={i === stepNow ? 'step' : undefined}>
+            <IconWell name={i < stepNow ? 'check' : (STEP_ICONS[i] ?? 'task')} size="l" tone={i < stepNow ? 'earn' : i === stepNow ? 'ink' : undefined} />
+            <span class="step-text">
+              <span class="step-title" class:now={i === stepNow}>{s.title}</span>
+              <span class="step-line">{s.line}</span>
+            </span>
+            {#if i === stepNow}
+              <span class="step-state now">{words.now}</span>
+            {:else if i < stepNow}
+              <span class="step-state">{words.done}</span>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+      <p class="reading">{words.payNote}</p>
+    </Tile>
+  {/if}
+{/snippet}
+
+<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`signin/Entry.svelte`): the sheet with the mark at its top, and the rail. -->
+<Entry aside={stepNow !== null ? next : undefined}>
   <div class="col">
     {#if step === 'loading' || step === 'verifying'}
       <h1 class="title">{copy.signupTitle}</h1>
@@ -260,8 +319,8 @@
       <p class="lede">{copy.signupLede}</p>
       <form class="form" onsubmit={send}>
         <div class="row">
-          <label class="lbl" for="up-email">{copy.emailLabel}</label>
-          <span class="field field-lg">
+          <label class="field-label" for="up-email">{copy.emailLabel}</label>
+          <span class="field">
             <input
               id="up-email"
               class="field-input"
@@ -281,8 +340,8 @@
         <NameField bind:value={slug} bind:free id="up-name" />
 
         <div class="row">
-          <label class="lbl" for="up-person">{copy.signupYourName}</label>
-          <span class="field field-lg">
+          <label class="field-label" for="up-person">{copy.signupYourName}</label>
+          <span class="field">
             <input id="up-person" class="field-input" type="text" autocomplete="name" maxlength="200" bind:value={person} />
           </span>
         </div>
@@ -319,24 +378,29 @@
 </Entry>
 
 <style>
-  /* ONE COLUMN AT EVERY WIDTH. The frame, its gutter and the brand are `Entry.svelte`'s; `min-inline-size: 0` so a
-     long address cannot widen the column past the screen and take the page sideways. */
+  /* THE COLUMN INSIDE THE SHEET. The frame, the sheet, the brand and the rail are `signin/Entry.svelte`'s;
+     `min-inline-size: 0` so a long address cannot widen the column past the screen and take the page sideways. A title
+     and its line sit 8 apart, and what follows them a step further down. */
   .col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
-  /* THE ENTRY SCREENS' ONE TITLE: `--t-3xl` in the display face, as sign in's slogan and /start's question are
-     (design §4), so moving from one of these screens to the next does not change the size of what it asks. */
+  .col > :is(.form, .go, .said, .aside) {
+    margin-block-start: var(--sp-4);
+  }
+
+  /* THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600 in Geist (SYSTEM §3), and the phone's large title 30/36. */
   .title {
+    margin: 0;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-3xl);
+    font-family: var(--font-ui);
+    font-size: var(--t-title);
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: var(--lh-3xl);
+    letter-spacing: -0.02em;
+    line-height: 34px;
     text-wrap: balance;
     overflow-wrap: anywhere;
   }
@@ -347,33 +411,32 @@
   }
 
   .lede {
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-md);
-    line-height: var(--lh-body);
+    line-height: 24px;
     overflow-wrap: anywhere;
   }
 
   .quiet {
+    margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .form {
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+    min-inline-size: 0;
   }
 
+  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has (SYSTEM §6). */
   .row {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
-  }
-
-  .lbl {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    min-inline-size: 0;
   }
 
   .human {
@@ -382,18 +445,22 @@
   }
 
   .bad {
+    margin: 0;
     color: var(--danger);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    line-height: 18px;
   }
 
+  /* THE ONE INK BUTTON, the column's width, as tall as the fields above it: 40 under a mouse, 44 under a thumb. */
   .go :global(.btn) {
     inline-size: 100%;
-    min-block-size: var(--tap);
+    min-block-size: max(40px, var(--ctl-h));
+    white-space: normal;
   }
 
   /* THE SEND BUTTON STAYS ABOVE THE PHONE'S KEYBOARD: `--kb` is the keyboard's height, written at run time, and the
-     button rides it rather than sitting under it while the address is typed. */
+     button rides it rather than sitting under it while the address is typed. The sheet's own fill behind it, so the
+     fields it passes over do not show through. */
   .sticky {
     position: sticky;
     inset-block-end: calc(var(--kb, 0px) + var(--sp-4));
@@ -401,8 +468,13 @@
     padding-block: var(--sp-2);
   }
 
+  /* THE FOOT OF THE SHEET: a hairline, then the way back to sign in (the board's "Already have a record?"). */
   .aside {
-    font-size: var(--t-sm);
+    margin: 0;
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--line);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .link {
@@ -410,10 +482,102 @@
     align-items: center;
     min-block-size: var(--tap);
     color: var(--link);
+    font-weight: 500;
   }
 
   /* A FOCUSED FIELD SCROLLS CLEAR OF THE KEYBOARD, with room under it for the Send button riding `--kb` below. */
   .row .field-input {
     scroll-margin-block: var(--sp-6) calc(var(--tap) + var(--sp-7));
+  }
+
+  /* ── The rail: what happens next ───────────────────────────────────────── */
+
+  /* SIX ROWS, NO BOX ROUND ANY OF THEM: each a 32px well, the step's title and its one line, and at the end where
+     this person stands. A hairline between rows, as a list inside a tile has. A pure list, so no chart (SYSTEM §6). */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .step + .step {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .step-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .step-title {
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .step-title.now {
+    font-weight: 600;
+  }
+
+  .step-line {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    text-wrap: pretty;
+  }
+
+  .step-state {
+    flex: none;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .step-state.now {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* THE TILE'S ONE WRITTEN LINE: when money moves, which is what a stranger wants to know before typing anything. */
+  .reading {
+    margin: 0;
+    padding-block-start: var(--sp-3);
+    border-block-start: 1px solid var(--line);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+    text-wrap: pretty;
+  }
+
+  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size (SYSTEM §3), which is also the size below which a
+     phone's browser zooms the page in on focus. */
+  @media (pointer: coarse) {
+    .row .field-input {
+      font-size: var(--t-md);
+    }
+  }
+
+  @media (width < 900px) {
+    .title {
+      font-size: var(--t-figure);
+      line-height: 36px;
+    }
+
+    .step {
+      min-block-size: 60px;
+    }
   }
 </style>
