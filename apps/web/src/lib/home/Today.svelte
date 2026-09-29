@@ -29,6 +29,12 @@
   import Question from './Question.svelte';
   import type { TodayRead } from '$lib/record/today-live.ts';
   import { drew } from '../ui/screen.svelte.ts';
+  import { run } from '$lib/data/optimistic.svelte.ts';
+  import { may } from '$lib/record/may.ts';
+  import type { Entry } from '$lib/record/schema.ts';
+  import Kbd from '$lib/ui/Kbd.svelte';
+  import { dayOf } from '$lib/work/board.ts';
+  import { captureOf, contextOf, freshFields, isQuestion } from '$lib/work/capture.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -56,6 +62,9 @@
     owed: 'in',
     owing: 'out',
     agent: (name: string) => name.charAt(0).toUpperCase() + name.slice(1),
+    addTask: 'Add as a task',
+    askIt: 'Ask',
+    added: (t: string) => `Added “${t}” to your tasks.`,
   } as const;
 
   /* The day as the reader's wall says it, over the title. */
@@ -69,13 +78,60 @@
   const t = $derived(today.value);
 
   /* THE ASK BAR HANDS WHAT WAS TYPED TO THE PALETTE, which searches, adds a row and asks, so there is one place that
-     answers a sentence rather than two that answer it differently. */
+     answers a sentence rather than two that answer it differently.
+
+     AND A LINE THAT IS NOT A QUESTION IS OFFERED AS A TASK, which Enter adds, on a record that holds tasks and for
+     somebody who may add one. It is added the way the Work screen adds one (`lib/work/Work.svelte`): the same light
+     syntax, "tomorrow", "!urgent", "#project", and a six-second Undo. A question still goes to the palette on Enter. */
   let asked = $state('');
+  const typed = $derived(asked.trim());
+  const takesTasks = $derived(data.lists.some((l) => l.id === 'tasks') && may(data, 'append', 'tasks'));
+  const offerTask = $derived(takesTasks && typed !== '');
+  const enterAdds = $derived(offerTask && !isQuestion(typed));
+
   function ask(e: SubmitEvent) {
     e.preventDefault();
+    if (enterAdds) void addTask();
+    else askIt();
+  }
+
+  function askIt() {
     const said = asked.trim();
     asked = '';
     openPaletteWith(said);
+  }
+
+  /* WHAT A TASK IS READ AGAINST, asked for as the bar is first used, so Enter does not wait on it. */
+  function warm() {
+    if (takesTasks) void import('$lib/record/work-live.ts').then((m) => m.captureContext(apiBase())).catch(() => {});
+  }
+
+  async function addTask() {
+    const said = asked.trim();
+    if (said === '') return;
+    asked = '';
+    const base = apiBase();
+    const [live, rows] = await Promise.all([import('$lib/record/work-live.ts'), import('$lib/record/rows-write.ts')]);
+    const held = await live.captureContext(base).catch(() => null);
+    if (held === null) {
+      if (asked.trim() === '') asked = said;
+      return;
+    }
+    const now = Date.now();
+    const c = captureOf(said, contextOf(held.shape, dayOf(today.value?.now ?? now), held.projects));
+    const fields = { ...rows.capturedFields(live.TASKS, c.text, [], now).fields, ...freshFields(c, held.shape, null) };
+    const writer = rows.rowWriter(base);
+    void run<Entry>({
+      apply: () => undefined,
+      /* A REFUSED LINE COMES BACK INTO THE BAR, so it is corrected rather than typed again. */
+      revert: () => {
+        if (asked.trim() === '') asked = said;
+      },
+      send: () => writer.create(live.TASKS, fields).then((out) => (out.ok ? { ok: true as const, value: out.entry } : { ok: false as const, fix: out.fix })),
+      settle: () => void today.reread(),
+      said: words.added(c.text),
+      undo: (row) => () => void writer.archive(live.TASKS, row.seq, row.version).then(() => today.reread()),
+    });
   }
 
   /* An answered question lowers the count at once and the screen reads again, so the next one moves up. */
@@ -125,7 +181,20 @@
       placeholder={words.ask}
       title={words.askHint}
       bind:value={asked}
+      onfocus={warm}
     />
+    {#if offerTask}
+      <!-- THE TWO THINGS A LINE CAN BE, the one Enter does first and marked with the key. -->
+      <div class="offer">
+        {#if enterAdds}
+          <button type="submit" class="offer-btn">{words.addTask}<Kbd keys="↵" /></button>
+          <button type="button" class="offer-btn" onclick={askIt}>{words.askIt}</button>
+        {:else}
+          <button type="submit" class="offer-btn">{words.askIt}<Kbd keys="↵" /></button>
+          <button type="button" class="offer-btn" onclick={() => void addTask()}>{words.addTask}</button>
+        {/if}
+      </div>
+    {/if}
   </form>
 
   {#if data.refused}
@@ -270,6 +339,50 @@
   /* THE ASK BAR: one field the width of the page, a hairline box, no ornament. */
   .ask {
     display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .offer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .offer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+  }
+
+  .offer-btn:first-child {
+    border-color: var(--ink2);
+    color: var(--ink);
+  }
+
+  .offer-btn:hover,
+  .offer-btn:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .offer-btn {
+      min-block-size: var(--tap);
+    }
+
+    .offer-btn :global(kbd) {
+      display: none;
+    }
   }
 
   .ask-input {
