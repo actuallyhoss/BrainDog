@@ -5,8 +5,8 @@
  * document (source, predicate, aggregation, format, target, window, comparison), and the kernel's
  * `metrics.ts` is what reads one: the rows it matched, the parts a sum across currencies is in, the
  * comparison with the window before. This file held a second reader of the same document, run by no
- * screen and kept equal to the record's by a test, so every change to a figure was made twice (DIRECTION
- * §32, `loop/finish/architecture.md` ARC-1). What is left is what a tile, a page and a palette draw a
+ * screen and kept equal to the record's by a test, so every change to a figure was made twice. What is
+ * left is what a tile, a page and a palette draw a
  * reading with: its format, its target as a sentence, its note, its door and the sentence under a
  * figure in several currencies.
  *
@@ -381,7 +381,7 @@ export function hrefFor(decl: MetricDecl): string | null {
  * wrote, and the record still checks it against the register, so `project-owed:Atlantis` is refused
  * by name rather than reported as nothing owed.
  */
-/* A WHERE MAY BE A PREDICATE TREE and not a sentence (MOD-4: one sentence cannot mix a comma with an `or`), and a tree is
+/* A WHERE MAY BE A PREDICATE TREE and not a sentence (one sentence cannot mix a comma with an `or`), and a tree is
    never a template, so only a sentence is searched. */
 export const isTemplate = (decl: MetricDecl): boolean => typeof decl.where === 'string' && decl.where.includes('{{');
 
@@ -531,14 +531,14 @@ const PARAM = '{{it}}';
  * `held` stays the whole register it has always been.
  *
  * AND NOTHING IS CUT FROM A SENTENCE WITH A `, or`, which is the kernel's `scopeOf` again. `compile` reads `a, or b` as an
- * or-group since M4 wave two brief 7, and a parameter under an "or" widens the rows rather than naming which rows the
+ * or-group, and a parameter under an "or" widens the rows rather than naming which rows the
  * figure is about. Split on the comma regardless, `state is paid, or thing is {{it}}` kept ` or thing is Kiln` as its
  * scope, which compiled to no row, and read `held: 0` beside eighteen matched rows on the seed; the other order read
  * `held: 10` under the same eighteen (`where-any.test.ts`).
  *
  * THE NAME IS WRITTEN BY THE GRAMMAR'S OWN `quoteValue` AND THE CLAUSES CUT BY ITS OWN `clausesOf`, which is what the
- * kernel's `fill` does with the same template. This copy substituted the name raw and cut on every comma
- * (`loop/research-audit-2026-09-25-layouts.md` §9): a project called `not Kiln` became `thing is not Kiln`, whose tile
+ * kernel's `fill` does with the same template. This copy substituted the name raw and cut on every comma: a
+ * project called `not Kiln` became `thing is not Kiln`, whose tile
  * linked to `f=thing:not-in:Kiln`, every project but Kiln; `Wax, wick and scent` became `thing is Wax` and a clause
  * about a field called `wick`; and `Kiln, or state is paid` widened the figure's scope with an `or`. Quoted, each is
  * the one name.
@@ -598,7 +598,7 @@ const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}/gu;
  * figure between them stops the words.
  *
  * NOUGHT IS NOUGHT IN ANY CURRENCY. A money figure comes back from `said` as `GBP 0.00`, never `0`, so a clause saying
- * only that nothing was owed was kept while the same clause over a count went (defects M12). `nought` reads the figure
+ * only that nothing was owed was kept while the same clause over a count went. `nought` reads the figure
  * as the resolver writes it, one currency's part at a time.
  *
  * A FIGURE THAT DID NOT READ TAKES ITS CLAUSE WITH IT. `said` answers `null` for a figure the record refused, and the
@@ -685,7 +685,7 @@ export function meetsTarget(decl: MetricDecl, value: number | null): boolean | n
  * line somebody set and ".00" on it is width a phone does not have.
  */
 export const targetLine = (decl: MetricDecl): string => {
-  /* A TARGET THAT NAMES A SETTING AND NO NUMBER YET (MOD-4, a money ceiling with no default) has no line to say. */
+  /* A TARGET THAT NAMES A SETTING AND NO NUMBER YET (a money ceiling with no default) has no line to say. */
   const target = decl.target as { lte?: unknown; gte?: unknown };
   const under = typeof target.lte === 'number';
   const bound = typeof target.lte === 'number' ? target.lte : typeof target.gte === 'number' ? target.gte : null;

@@ -41,7 +41,7 @@
   const bill = read(() => (hosted ? 'account-billing' : null), readBilling, { empty: (v) => v.records.length === 0 });
 
   /**
-   * THIS MONTH AGAINST THE ALLOWANCE, which only `/usage` asked for until the tile (SCREENS, Settings: NEW PLUMBING 3).
+   * THIS MONTH AGAINST THE ALLOWANCE, which only `/usage` asked for until this tile.
    *
    * THE SAME READ AS `/usage`, and asked only on the Cloud for the reason the bill is: a self-host keeps no ledger, and
    * its record's events carry no allowance to draw a meter against. A host without the route answers `none`, which is
@@ -106,7 +106,7 @@
     const out = await paymentPage(kind, r.record);
     if (out.ok) {
       /* LEAVING FOR STRIPE, and `going` stays set, so the button keeps saying so until the page is gone. Stripe's
-         own host, so `at()` hands it back unchanged; the argument still starts with `at(` (rules.md §7). */
+         own host, so `at()` hands it back unchanged; the argument still starts with `at(`. */
       location.assign(at(out.value));
       return;
     }
@@ -116,7 +116,7 @@
 </script>
 
 <!--
-  PLAN AND USAGE, THE AREA'S LEAD TILE (Light-Settings): the plan as the figure, one bar per meter with the nearest in
+  PLAN AND USAGE, THE AREA'S LEAD TILE: the plan as the figure, one bar per meter with the nearest in
   ink, and one line saying which limit the month turns on. Drawn only where the ledger answered with this record's
   allowance: a plan with no limit has no meters, and a number tile without a chart is the one thing a tile may not be.
 -->
@@ -142,7 +142,7 @@
   <Section title={copy.billingYours}>
     {#if bill.state === 'ready' && bill.value}
       {#if !bill.value.open}<p class="hint">{copy.billingNotOpen}</p>{/if}
-      <!-- ROWS ON THE GROUND (SYSTEM §6): a well, the record and its plan, the state under them, and the verbs at the
+      <!-- ROWS ON THE GROUND: a well, the record and its plan, the state under them, and the verbs at the
            end. A bill that needs him wears the red well, and says so in its sentence, so red is never the only sign. -->
       <ul class="bills">
         {#each bill.value.records as r (r.record)}
@@ -186,8 +186,8 @@
   <Section title={copy.billing}>
     <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
          every shipped bundle, so a live Cloud record was told "This record runs on your own
-         machine." (`research-first-sign-in.md` friction 5). `billing.ts` says what is asked instead. -->
-    <!-- AS A ROW, NOT A PARAGRAPH (DSN-18): the state in its title, the host's sentence as its line. -->
+         machine." `billing.ts` says what is asked instead. -->
+    <!-- AS A ROW, NOT A PARAGRAPH: the state in its title, the host's sentence as its line. -->
     <StateRow icon="money" title={copy.billingNotBilled} line={billingLine({ host: shell.host, mintsMail: mintsHere })} />
   </Section>
 {/if}
@@ -209,7 +209,7 @@
 </div>
 
 <style>
-  /* THE FIGURE IN A TILE (SYSTEM §3, `t-figure`): the plan, which is what the meters under it are measured against. */
+  /* THE FIGURE IN A TILE (`t-figure`): the plan, which is what the meters under it are measured against. */
   .figure {
     margin: 0;
     color: var(--ink);
@@ -221,7 +221,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* THE ONE WRITTEN LINE under the chart (SYSTEM §6), in ink, with the phrase that needs him in red. */
+  /* THE ONE WRITTEN LINE under the chart, in ink, with the phrase that needs him in red. */
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
@@ -303,8 +303,8 @@
     line-height: 18px;
   }
 
-  /* PAST DUE AND LAPSED ARE THE TWO STATES THAT NEED THE PERSON, and red is the house's word for what needs him
-     (SYSTEM §2). The sentence says it too, so the colour is never the only sign. */
+  /* PAST DUE AND LAPSED ARE THE TWO STATES THAT NEED THE PERSON, and red is the house's word for what needs him.
+     The sentence says it too, so the colour is never the only sign. */
   .bill-state[data-state='past_due'],
   .bill-state[data-state='lapsed'] {
     color: var(--danger);

@@ -137,7 +137,7 @@
      there is no session to list keys for is that there is no passkey here, and how that
      person gets back in without one, which the host's own `magic` decides. There is no "Add
      a passkey": without a session there is nobody to add one for. -->
-<!-- AND THE WAY TO ONE, WHERE THE HOST OFFERS PASSKEYS AND NOBODY IS SIGNED IN (DSN-18). There is
+<!-- AND THE WAY TO ONE, WHERE THE HOST OFFERS PASSKEYS AND NOBODY IS SIGNED IN. There is
      still nobody to add a passkey for, so the action is signing in, which lands back here with
      "Add a passkey" drawn by the arm above. A host that offers no passkeys is offered nothing. -->
 <Section title={copy.passkeys}>

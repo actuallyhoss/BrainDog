@@ -1,14 +1,14 @@
 <!--
   Notifications on this device: one toggle that subscribes this browser to the record's pushes, with the host's public
-  key, and is drawn only where the host has one (`loop/research-living-in-it.md` W58-4). The rules are `push.ts`, which
+  key, and is drawn only where the host has one. The rules are `push.ts`, which
   the tests hold, and the words are `copy.ts`'s `push*` keys; this file fills in the browser's half and draws the answer.
 
-  NOTHING AT ALL WITHOUT A KEY. The key is asked of `<apiBase>/api/push/key` when the row mounts, and until he has set the
-  keys (his call 6) the Worker delivers no `notify.push`, so a switch here would turn on and never ring. A host that
+  NOTHING AT ALL WITHOUT A KEY. The key is asked of `<apiBase>/api/push/key` when the row mounts, and until the owner has set
+  the keys the Worker delivers no `notify.push`, so a switch here would turn on and never ring. A host that
   answers `null`, a 404, the static shell or nothing at all draws nothing, and `hostKey` holds all four.
 
-  EVERYBODY'S OWN, NOT THE OWNER'S. `subscribePush` is READ and above, and each person's subscription is theirs alone
-  (W58-2), so this row is drawn for anyone signed in, unlike the owner-only rows beside it.
+  EVERYBODY'S OWN, NOT THE OWNER'S. `subscribePush` is READ and above, and each person's subscription is theirs alone,
+  so this row is drawn for anyone signed in, unlike the owner-only rows beside it.
 
   THE PRESS IS THE ONLY THING THAT REGISTERS THE WORKER. `svelte.config.js` sets `serviceWorker.register: false`: at the
   default, `@sveltejs/kit` 2.70.3's `render.js` put a `register` call in the shell's inline boot script for every visitor

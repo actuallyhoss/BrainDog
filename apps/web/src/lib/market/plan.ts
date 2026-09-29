@@ -1,5 +1,5 @@
 /**
- * The one plan sheet's reading of a plan (`loop/finish/platform.md` §4.0 P): the record's `Diff` for an add-on or a
+ * The one plan sheet's reading of a plan: the record's `Diff` for an add-on or a
  * module, a use case's pack-by-pack plan (`routes/packs/sharing.ts` `SharedPlan`), or several of either for "Update
  * all", turned into the rows `PlanSheet.svelte` draws.
  *
@@ -25,7 +25,7 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
-/** The sheet's own words. The buttons' verbs follow `design.md` §6.4: the verb and its object. */
+/** The sheet's own words. The buttons' verbs are the verb and its object. */
 export const words = {
   install: (name: string) => `Install ${name}`,
   /* NO VERSION NUMBERS ON THE BUTTONS OR THE PARTS: a person updates an add-on, and "1.2.0 to 1.3.0" is the add-on's
@@ -166,7 +166,7 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
     else stops.push(words.conflict(what, name(text(c.pack))));
   }
   if (count(d.orphans) > 0) stops.push(words.orphans(count(d.orphans)));
-  /* AN UNRESOLVED PAGE ADD IS THE PAGE THAT IS MISSING (GAP-9): `page_adds` carries `unresolved` only beside a
+  /* AN UNRESOLVED PAGE ADD IS THE PAGE THAT IS MISSING: `page_adds` carries `unresolved` only beside a
      `refusal`, whose sentence already names the page and the pack, so it is shown as a stop rather than dropped
      silently the way the resolved ones below are drawn. */
   for (const p of list(d.page_adds)) if (p.unresolved === true && isMap(p.refusal)) stops.push(text(p.refusal.fix));

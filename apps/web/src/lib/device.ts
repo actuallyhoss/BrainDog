@@ -5,7 +5,7 @@
  * whatever calls this decides what it is looking at, and a test hands in a plain object.
  *
  * TWO ANSWERS, BECAUSE THERE ARE TWO INSTALLERS. `apps/site/static/cli/` publishes `install.ps1` for
- * Windows and `install.sh` for macOS and Linux (`loop/finish/agents.md` C10), and those are the only
+ * Windows and `install.sh` for macOS and Linux, and those are the only
  * lines there are to choose between. A phone is read as the second: nobody runs Claude Code on one, and
  * the person setting a computer up from their phone can switch to the other line with one press.
  */
@@ -20,7 +20,7 @@ export const OSES: readonly Os[] = ['windows', 'unix'];
  * The line that puts `braindog` on this computer, per installer.
  *
  * ALWAYS `brain.dog`, WHICHEVER HOST THE APP IS ON. The command is published by the site's deploy and
- * nowhere else (`loop/finish/agents.md` C10), and it is the same command for the Cloud and for a
+ * nowhere else, and it is the same command for the Cloud and for a
  * self-host: `braindog setup` is handed the record's own address, which is where the host is named.
  */
 export const INSTALL_LINES: Readonly<Record<Os, string>> = {

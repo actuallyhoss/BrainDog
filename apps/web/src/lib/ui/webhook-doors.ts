@@ -4,8 +4,8 @@
  *
  * IT REPLACES A SCREEN THAT NAMED ONE USE CASE. `shortcut-door.ts` held `SHORTCUT_INGEST = 'bank-from-out-sms'` and an
  * iPhone recipe, so the only door this app could mint for was a bank's text, and a record that declared a door for a
- * form, a build server or a price feed had no way to get its token short of a POST typed by hand. `DIRECTION.md` §22 is
- * the rule it broke: the code ships the door, and what arrives through it is the record's business. So nothing here
+ * form, a build server or a price feed had no way to get its token short of a POST typed by hand. That broke
+ * the rule: the code ships the door, and what arrives through it is the record's business. So nothing here
  * names an ingest. The list is the record's answer to `doors`, and the id each press sends is the id that answer gave.
  *
  * THROUGH THE CLIENT, AS THE OLD SCREEN WAS. `doors` and `ingestMint` are record methods in `ROUTES`, so `client.call`
@@ -30,7 +30,7 @@ type Answered = { ok: true; value: unknown } | { ok: false; refusal: Refusal } |
  *
  * A PARAMETER, SO A TEST CAN ANSWER `doors` BEFORE A HOST DOES. The client refuses a name missing from `ROUTES` with
  * `ROUTE_UNKNOWN` before it fetches anything, so a fetch double cannot stand in for a read the host table does not
- * list yet, and this screen was written in the same wave as the read it lists.
+ * list yet, and this screen was written alongside the read it lists.
  */
 export type Call = (name: string, args?: Record<string, unknown>) => Promise<Answered>;
 
@@ -69,7 +69,7 @@ function refusedAs(out: Answered): { kind: 'signin'; fix: string } | { kind: 're
   const refusal: Refusal = !out.ok && 'refusal' in out ? out.refusal : { code: 'VALUE_MALFORMED', fix: copy.doorsNoToken };
   /* THE RECORD'S OWN SENTENCE, VERBATIM (`13 §6`). It says whether the sign-in is stale or the host was started without
      `BRAINDOG_TOKEN`, and a paraphrase here would say that worse. A 401 WITH NO SLUG IN THE ADDRESS was the sample, and
-     the screen drew the demo's sentence about having no account; there is no sample now (`DIRECTION.md` §26), so it is a
+     the screen drew the demo's sentence about having no account; there is no sample now, so it is a
      person not signed in, and the section's sign-in button is the way forward wherever they are. An unreachable host
      falls through to `refused` with the client's sentence, as it already did under a slug. */
   if (refusal.code === 'UNAUTHORIZED' || refusal.code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix: refusal.fix };

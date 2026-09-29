@@ -1,5 +1,5 @@
 <!--
-  The settings index: every area as a row, in its group (DSN-13).
+  The settings index: every area as a row, in its group.
 
   ONE INDEX AT BOTH WIDTHS. Below 900px it is the whole of `/settings`, a list of 60px rows with a
   chevron that each open an area on a page of its own. From 900px up it stands beside the area that
@@ -7,10 +7,10 @@
   same list in both places, the same groups, rows and order, so a person who learns where an area
   sits on one screen finds it there on the other.
 
-  A LIST ON THE GROUND, NOT A CARD (SYSTEM §6, SCREENS "Settings"). Each group is a group on the ground: its title at
+  A LIST ON THE GROUND, NOT A CARD. Each group is a group on the ground: its title at
   `--t-group` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
   at 1440, 36 tall with its glyph in a 28px well and the name at 14/500, and the current row is the rail's "here": the
-  wash, an ink well and the name at 600. Never the mark's red (D-1).
+  wash, an ink well and the name at 600. Never the mark's red.
 
   WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There the index is all a person sees, and the line
   is how they tell the areas apart before opening one. Beside an open area the index is as narrow as
@@ -62,7 +62,7 @@
     gap: var(--sp-5);
   }
 
-  /* A GROUP ON THE GROUND (SYSTEM §6): its title at `--t-group`, 17 on 24 at 600, and one hairline under it. The rows
+  /* A GROUP ON THE GROUND: its title at `--t-group`, 17 on 24 at 600, and one hairline under it. The rows
      start a step under the line, so the wash of the first one never touches it. */
   .group-title {
     margin: 0 0 var(--sp-2);
@@ -89,7 +89,7 @@
     list-style: none;
   }
 
-  /* BESIDE AN AREA, A ROW IS THE RAIL'S (SYSTEM §5): 36 tall, its glyph in a 28px well, the name 14/500 in the second
+  /* BESIDE AN AREA, A ROW IS THE RAIL'S: 36 tall, its glyph in a 28px well, the name 14/500 in the second
      ink. Two columns and not three with the chevron's hidden: a hidden item leaves its track, and the gap before the
      track, taking room from the name. The whole row is the target, and 44 under a thumb. */
   .area-row {
@@ -150,7 +150,7 @@
   }
 
   /* THE CURRENT AREA IS THE ONE "HERE" THE PRODUCT HAS, drawn as the rail draws it: the wash, an ink well and the name
-     at 600 in ink. Never the accent (design D-1). */
+     at 600 in ink. Never the accent. */
   .area-row[aria-current='page'] {
     background: var(--selected);
     color: var(--ink);
@@ -173,7 +173,7 @@
     }
   }
 
-  /* ON A PHONE THE INDEX IS THE PAGE (SYSTEM §9): a 32px well, the name at the phone's body size and its line under it,
+  /* ON A PHONE THE INDEX IS THE PAGE: a 32px well, the name at the phone's body size and its line under it,
      then the chevron, in a row 60 tall, with a hairline between rows under the words and none around them. The line
      keeps to one line with an ellipsis as its guard; the registry keeps each line short enough that the guard is not
      what a reader sees. */

@@ -5,11 +5,11 @@
  * as a value.
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the sample's
- * figures, feed and log; there is no sample now (DIRECTION 26). A live answer is drawn from the answer and nothing else.
+ * figures, feed and log; there is no sample now. A live answer is drawn from the answer and nothing else.
  *
  * EVERY SENTENCE THE RECORD STORED IS HANDED ON THROUGH `moneyInText`. The kernel writes an amount into a sentence the
  * way a program reads it, "GBP 2,400.00", and a screen prints it the way a person does, "£2,400.00" in the home
- * currency and "$4,800.00 USD" in any other (design.md §5, DSN-4). So the log leaves here already spoken.
+ * currency and "$4,800.00 USD" in any other. So the log leaves here already spoken.
  */
 
 import { createClient, type Cursor, type EventLine } from '@braindog/client';
@@ -105,7 +105,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
 
 /*
  * HOME READS WHAT IS NEW AS A `feed` BLOCK NOW (`lib/home/default-home.ts`), which the page reader draws with the
- * reader's mark, so the feed's own read went (MOD-8). What stays is the mark: Home stamps it when the reader leaves.
+ * reader's mark, so the feed's own read went. What stays is the mark: Home stamps it when the reader leaves.
  */
 
 /**

@@ -1,7 +1,7 @@
 /**
  * A `list<ref>` IS A REF, and `targetsOf` did not say so, which is where a list chip died on a live record.
  *
- * `loop/STATUS.md` §5's first item blames `leafOf` in `remote.ts` for turning a `has` chip back into
+ * `leafOf` in `remote.ts` was once blamed for turning a `has` chip back into
  * `is`. That was true and is not any more: `leafOf` keeps both words, `whereOf` reads them back and
  * `registerHref` mints them. The chip still answered nothing on a record, and the cause is one line
  * further back.

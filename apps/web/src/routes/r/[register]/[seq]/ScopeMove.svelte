@@ -1,5 +1,5 @@
 <!--
-  Where this row applies, in its header, and the one press that moves it (agents C8, AGT-11).
+  Where this row applies, in its header, and the one press that moves it.
 
   THE CHIP OPENS A SHORT LIST: "Everywhere", then each project by name, with where the row applies now marked. One press
   on another moves the row as the person, as an ordinary edit whose history line reads "Moved to Kiln"
@@ -56,7 +56,7 @@
   let places = $state<Place[] | null | undefined>(undefined);
   /* THE ONE QUESTION A MOVE ASKS: set when the press would open a key to every project, and answered by the button. */
   let asking = $state(false);
-  /* ONE MOVE AT A TIME, so a second press on the list while the first is out writes nothing (defects U2). */
+  /* ONE MOVE AT A TIME, so a second press on the list while the first is out writes nothing. */
   let moving = $state(false);
 
   function openMove() {
@@ -144,9 +144,9 @@
 {/if}
 
 <style>
-  /* ROWS WITH SPACE AND NO BOX AROUND THEM (design-brief §1), each the whole of its target and 48px tall, which is the
+  /* ROWS WITH SPACE AND NO BOX AROUND THEM, each the whole of its target and 48px tall, which is the
      action sheet's row under a thumb. A hairline between two rows, drawn inset so it runs under the words and never
-     under the wash's curve; the row pointed at, and the place the row applies now, take the rounded wash (SYSTEM §6). */
+     under the wash's curve; the row pointed at, and the place the row applies now, take the rounded wash. */
   .scope-places {
     display: flex;
     flex-direction: column;

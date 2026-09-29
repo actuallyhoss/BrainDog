@@ -1,5 +1,5 @@
 <!--
-  "Hand to": one press gives a row to a teammate or an agent (GAP-11).
+  "Hand to": one press gives a row to a teammate or an agent.
 
   A SHORT SHEET, YOU FIRST: you, then the people on this record by face and name (the People rows that stand for them),
   then the agents that have run here by the name each signs with (`readHolders` in `lib/record/hand.ts`). One press
@@ -112,7 +112,7 @@
     }
     open = false;
     const name = holder.kind === 'person' && holder.you ? copy.handYou : holder.name;
-    /* THE EVENT SAYS WHO HANDED IT TO WHOM: the note is signed by whoever pressed, so the history reads "Sam handed this
+    /* THE EVENT SAYS WHO HANDED IT TO WHOM: the note is signed by whoever pressed, so the history reads "Sami handed this
        to Mona". A note that did not land leaves the hand made, which is the thing that was asked for. */
     void writer.note(register, row.seq, copy.handedNote(name));
     last = { before, patch, after: out.entry };
@@ -228,7 +228,7 @@
     font-size: var(--t-ui);
   }
 
-  /* A META HEADING over each group, as the palette's are (SYSTEM §6). */
+  /* A META HEADING over each group, as the palette's are. */
   .hand-head {
     margin-block: var(--sp-4) var(--sp-1);
     color: var(--dim);
@@ -271,7 +271,7 @@
     background: var(--hover-wash);
   }
 
-  /* SIXTEEN ON A PHONE, its row step (SYSTEM §3). */
+  /* SIXTEEN ON A PHONE, its row step. */
   @media (width < 900px) {
     .hand-one {
       font-size: var(--t-md);

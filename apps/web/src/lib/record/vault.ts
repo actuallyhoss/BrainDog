@@ -5,7 +5,7 @@
  * are handed in, so every branch is testable against an object literal.
  *
  * AND NOTHING HERE DRAWS A VAULT THAT IS NOT THE RECORD. This module turned the sample's grants and keys into
- * the record's rows for a visitor with no record; the sample went on 25 September (DIRECTION 26), and the
+ * the record's rows for a visitor with no record; the sample is gone, and the
  * screen now draws only what `listDevices`, `list` and `listGrants` answer.
  *
  * ONE APPROVAL, TWO SCREENS. A machine asking to open keys prints `/settings/agents`, and the Vault
@@ -235,7 +235,7 @@ export const daysFor = (scope: string | null): number => (scope === null || scop
 export const scopeName = (scope: string | null, names: ReadonlyMap<string, string>): string =>
   scope === null || scope === GLOBAL ? words.global : (names.get(scope) ?? words.someProject);
 
-/** A project's mark and hue by row id, from the same `list` `namesOf` reads (AGT-11): what a key's `scope` chip is drawn from. */
+/** A project's mark and hue by row id, from the same `list` `namesOf` reads: what a key's `scope` chip is drawn from. */
 export type ProjectMark = { seq: number; mark: string | null; hue: number | null };
 
 /**
@@ -274,7 +274,7 @@ export type KeyRow = {
   label: string;
   opens: string;
   project: string | null;
-  /** Where the key applies, as the chip draws it (AGT-11): the project's spoken id, name, mark and hue, or `null` for
+  /** Where the key applies, as the chip draws it: the project's spoken id, name, mark and hue, or `null` for
       a global key. Built from the same project row `project` names, never a second lookup. */
   scope: Scope | null;
   sealed: boolean;
@@ -350,7 +350,7 @@ export type UsedByReader = { usedBy(args: { spoken: string }): Promise<Wire<{ ru
  *
  * WHY A KEY'S ROW SAYS IT: the vault counts every open and signs each with the run that asked, so "opened 12 times"
  * was a count with nobody behind it, and the question a person has about a key is which agent is using it
- * (`loop/finish/agents.md` AGT-10). A key nobody opened is not asked about, and a refusal leaves the row saying what
+ * A key nobody opened is not asked about, and a refusal leaves the row saying what
  * it said before rather than guessing: `usedBy` answers a key the caller cannot read as one that is not there.
  */
 export async function lastUsers(client: UsedByReader, keys: readonly KeyRow[], most = 24): Promise<Map<string, UsedByRun>> {

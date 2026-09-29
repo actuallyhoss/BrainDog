@@ -129,7 +129,7 @@ test('A LINK IN THE ADDRESS WAITS FOR A PRESS, and a spent one is link-expired',
   assert.equal(stateOf(seen({ link, methods: host({ passkey: false, magic: false }) })).name, 'link-landing');
 });
 
-/* MEASURED FIRST, BY THE AUDIT'S PROBE (`loop/research-batch-forty-six-audit.md` §9): with somebody signed in, a kept
+/* MEASURED FIRST, BY THE AUDIT'S PROBE: with somebody signed in, a kept
    link and an idle step answered `{ name: 'signed-in' }` and nothing else, so the link had left the address bar and
    the screen had no way to say it arrived. The state carries it now, and Sign out lands on it. */
 test('A LINK PASTED WHILE SOMEBODY IS IN IS CARRIED BY SIGNED IN, and signing out hands it to the landing', () => {
@@ -203,7 +203,7 @@ const shelf = (): Shelf & { held: Map<string, string> } => {
 
 const ASKED = '?next=%2Fapp%2Facme%2Fr%2Ftasks';
 
-/* MEASURED FIRST (`loop/research-batch-forty-six-audit.md`, "Found on the way"): pasting a link over
+/* MEASURED FIRST: pasting a link over
    `/app/signin?next=...` changes the query, which is a full navigation, so the page mounted again on
    `/app/signin#magic=...` and "Open BrainDog" read an empty search and went to `/app/`. */
 test('A PASTED LINK KEEPS THE PAGE HE WAS SENT FROM, held in the tab across the navigation', () => {
@@ -257,7 +257,7 @@ test('NO STORAGE, OR STORAGE THAT THROWS, IS THE ADDRESS ALONE, and never an exc
   }
 });
 
-/* MEASURED FIRST (`loop/research-batch-forty-nine-audit.md` §8, by a probe that was never kept in the tree): `onward()`
+/* MEASURED FIRST (by a probe that was never kept in the tree): `onward()`
    checked the spelling of the path, so a dot segment, plain or percent-encoded, passed as `/app/...` and the drawn
    href resolved on this origin outside the app, `/auth/signout`, `/api/export`, `/in/x` and `/`. The mail's
    `safeNext` resolved the same values and dropped every one. */

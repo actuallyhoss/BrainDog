@@ -1,10 +1,10 @@
 /**
  * An update that keeps what the owner changed says so on Decide, by the owner's name for it
- * (`loop/research-pack-update-edited.md`, `packages/record/test/pack-update-kept.test.ts`).
+ * (`packages/record/test/pack-update-kept.test.ts`).
  *
  * THE RECORD FILES `keeps` ON THE STEP AND THE OWNER'S NAME IN `names`. Without a line for it, Decide listed what the
  * update adds and changes and said nothing about the one thing it leaves alone, and that thing can carry the older
- * version's window: on the probe, `spent-30d` stayed at `-31d` while `received-30d` moved to `-30d`.
+ * version's window: measured, `spent-30d` stayed at `-31d` while `received-30d` moved to `-30d`.
  */
 
 import { test } from 'node:test';

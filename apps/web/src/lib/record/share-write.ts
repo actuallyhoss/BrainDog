@@ -9,7 +9,7 @@
  * the link and nothing else (`client.sharedPage`), because the link is the credential.
  *
  * THE WORDS ARE HERE, in `words`, and not in `lib/copy/`: every screen that draws them is this unit's, and a key in the
- * aggregate would be one more line in a file other units write (`loop/finish/rules.md` §2).
+ * aggregate would be one more line in a file other units write.
  */
 
 import { createClient } from '@braindog/client';
@@ -207,7 +207,7 @@ export async function readShared(origin: string, token: string, io?: Fetch): Pro
   if (!out.ok) {
     if (!('refusal' in out)) return { from: 'shut' };
     if (out.refusal.code !== 'UNREACHABLE') return { from: 'shut' };
-    /* THE REASON GOES UNDER DETAILS, never as the sentence (`loop/finish/rules.md` §2). */
+    /* THE REASON GOES UNDER DETAILS, never as the sentence. */
     const detail = (out.refusal as { detail?: unknown }).detail;
     return { from: 'unreached', why: typeof detail === 'string' ? detail : out.refusal.fix };
   }

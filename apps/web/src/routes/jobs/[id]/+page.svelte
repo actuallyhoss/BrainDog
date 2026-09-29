@@ -1,5 +1,5 @@
 <!--
-  One run: `/jobs/<id>`, its transcript while a machine works on it and after (`loop/finish/agents.md` AGT-23, C13).
+  One run: `/jobs/<id>`, its transcript while a machine works on it and after.
 
   THE TITLE ROW SAYS WHERE IT STANDS: the outcome as a dot and its word, then where it runs and since when, or how
   long, where and in how many turns it ran. The word is red only for a failure or a machine gone quiet. The status is
@@ -9,7 +9,7 @@
   ONE TILE, "THIS RUN": its facts as a list, and once it has called tools, the tools it called as bars, busiest in ink,
   with the line saying what that means. Nothing here is guessed: a fact the record did not send is not listed.
 
-  THE TRANSCRIPT IS ON THE GROUND, NOT IN A TILE (SYSTEM §6): the runner's distillation, one row per line it sent, each
+  THE TRANSCRIPT IS ON THE GROUND, NOT IN A TILE: the runner's distillation, one row per line it sent, each
   with a well for its kind and the time it came in Geist Mono. A tool call carries its result folded onto the same row,
   what Claude said is prose, its thinking is folded away, and the end says how it ended.
 
@@ -79,7 +79,7 @@
   const live = $derived(status !== null && isLive(status));
   const said = $derived(status === null ? null : statusOf(status, lost, cancel));
 
-  /* THIS BROWSER'S CLOCK, moved on with each poll. Every date here is the record's, read against now (DIRECTION 26). */
+  /* THIS BROWSER'S CLOCK, moved on with each poll. Every date here is the record's, read against now. */
   let now = $state(Date.now());
 
   /* ONE POLL PER RUN ON SCREEN. A new id or a new record starts over from line 0, and leaving stops the timer and drops
@@ -312,7 +312,7 @@
                   {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
                 {/if}
               </div>
-              <!-- THE MINUTE IT CAME IN, in Geist Mono as a feed's times are (SYSTEM §3). -->
+              <!-- THE MINUTE IT CAME IN, in Geist Mono as a feed's times are. -->
               {#if sentAt.get(s.seq)}<time class="step-at" datetime={sentAt.get(s.seq)}>{stampOf(sentAt.get(s.seq))}</time>{/if}
             </li>
           {/each}
@@ -353,7 +353,7 @@
   }
 
   /* THE OUTCOME DOT, as the list draws it: done in ink, running in the live hue, a look in amber, failed in red, and
-     waiting or stopped in the quiet ink. It holds still: nothing pulses (SYSTEM §8). */
+     waiting or stopped in the quiet ink. It holds still: nothing pulses. */
   .dot {
     display: inline-block;
     inline-size: 6px;
@@ -418,7 +418,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6). */
+  /* THE ONE LINE UNDER THE CHART that says what it means. */
   .reading {
     margin: 0;
     color: var(--ink);
@@ -611,7 +611,7 @@
   }
 
   /* ABOVE THE TAB BAR, NOT UNDER IT, AND ON GLASS: below 900 the shell's scroller runs to the bottom of the window and
-     `TabBar` floats over its last `--tabbar`, so the bar sticks just above it as chrome does (SYSTEM §4, level 2). */
+     `TabBar` floats over its last `--tabbar`, so the bar sticks just above it as chrome does. */
   @media (width < 900px) {
     .stop-bar {
       position: sticky;

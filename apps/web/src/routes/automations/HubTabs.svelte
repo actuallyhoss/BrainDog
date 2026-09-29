@@ -1,7 +1,7 @@
 <!--
-  The hub's tabs (`loop/finish/shell.md` EDT-3): Automations, Scheduled, Scripts, Doors and Runs, each a link.
+  The hub's tabs: Automations, Scheduled, Scripts, Doors and Runs, each a link.
 
-  A GLASS SEGMENTED CONTROL IN THE TOOLBAR (SYSTEM §5, SCREENS Automations): the frosted pill with the chosen tab a
+  A GLASS SEGMENTED CONTROL IN THE TOOLBAR: the frosted pill with the chosen tab a
   white pill lifted by a hairline shadow, drawn by `controls.css`'s `.segmented` and `.segment`, so it reads as every
   other choice of view in the product and not as a strip of underlined links under the title.
 

@@ -1,6 +1,5 @@
 <!--
-  Change a page by describing it: one field, Slash's drafts drawn as the page would stand, and one press to keep one
-  (`loop/finish/pages.md` PGS-12).
+  Change a page by describing it: one field, Slash's drafts drawn as the page would stand, and one press to keep one.
 
   NOTHING IS FILED BY ASKING. The press calls the record's `slashDraft`, which drafts, checks and draws each change and
   keeps none of it. What the owner sees is the page as each draft would make it, beside the page as it is, through the

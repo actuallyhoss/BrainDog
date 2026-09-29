@@ -2,7 +2,7 @@
  * `/vault`'s reads, and what the screen is allowed to draw from each answer.
  *
  * DRIVEN BEFORE IT WAS WRITTEN, against two provisioned self-hosts and a colleague invited at `read`.
- * Every body quoted below is one this record actually sent on 21 September 2026:
+ * Every body quoted below is one this record actually sent:
  *
  *   fresh record, owner, 390 and 1440
  *     422 GET /api/list?register=things       {"code":"REGISTER_UNKNOWN","fix":"There is no register called things."}

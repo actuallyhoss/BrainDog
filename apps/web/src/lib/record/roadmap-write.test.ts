@@ -2,7 +2,7 @@
  * A roadmap bar dropped on a page, as the write it becomes and the undo its receipt offers.
  *
  * AT HEAD A ROADMAP DREW EVERY BAR AND NONE OF THEM MOVED. `dragPatch` had its arithmetic and its test, and nothing in
- * `apps` called it (`loop/research-legacy-parity.md` row 30, brief B9). the old tool's roadmap is dragged by its
+ * `apps` called it. The owner's old tool drags a roadmap bar by its
  * window, its first day or its last, and he moves dates that way; so the gesture has to end in a write.
  *
  * WHAT IS HELD HERE: the drop is ONE update carrying every field it changes, named by the fields the block's own

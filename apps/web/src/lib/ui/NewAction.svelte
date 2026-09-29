@@ -1,5 +1,5 @@
 <!--
-  The "New door" and "New scheduled action" sheets (shell DOR-4): what used to be a declaration somebody typed, asked as
+  The "New door" and "New scheduled action" sheets: what used to be a declaration somebody typed, asked as
   a form, filed as one `change` and accepted in the same press.
 
   ONE SHEET FOR BOTH, because a door and a scheduled action are one kind of declaration, an ingest, and the questions
@@ -10,7 +10,7 @@
   the webhook doors screen's own `mintDoor`, so the address is built one way; it lives in `said` and closing the sheet
   drops it, as leaving the Ingest area drops the doors screen's. Nothing here logs or keeps it.
 
-  REACHED FROM OUTSIDE THE HUB by `?new=door` or `?new=action&preset=<id>` (`contracts.md` X57), which the hub reads and
+  REACHED FROM OUTSIDE THE HUB by `?new=door` or `?new=action&preset=<id>`, which the hub reads and
   hands in as `kind` and `preset`, so a declared page can link to a sheet already filled in.
 -->
 <script lang="ts">
@@ -60,7 +60,7 @@
   /* The vault's labels; `null` is a vault this sheet cannot read, and the key is then typed. */
   let keys = $state<string[] | null | undefined>(undefined);
   /* EVERY INGEST ID THE RECORD ALREADY DECLARES, doors and scheduled actions together, so `declarationOf` can refuse a
-     name that would silently replace one; `undefined` while unread never blocks a press (USE-5). */
+     name that would silently replace one; `undefined` while unread never blocks a press. */
   let taken = $state<Set<string> | undefined>(undefined);
 
   async function loadTaken() {
@@ -338,7 +338,7 @@
     border: 0;
   }
 
-  /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink (SYSTEM §6, Fields). */
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink. */
   .label {
     margin: 0 0 var(--sp-1);
     padding: 0;
@@ -371,7 +371,7 @@
   }
 
   /* A SELECT IS A FIELD: 40 tall and 44 under a thumb, the `--s1` fill with no border, radius `--r-md`, as
-     `controls.css` draws `.field` (SYSTEM §6). */
+     `controls.css` draws `.field`. */
   .pick {
     min-inline-size: 0;
     min-block-size: 40px;

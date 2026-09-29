@@ -94,7 +94,7 @@ test('a put back that never reached the record is still owed, and one somebody e
 });
 
 test("the record's raw conflict reaches a put back as a conflict, so the change is spent", async () => {
-  /* THE CHECKER'S THIRD POINT, MEASURED RATHER THAN READ. `rows-write.ts` `failed` has a line mapping a raw `conflict`
+  /* MEASURED RATHER THAN READ. `rows-write.ts` `failed` has a line mapping a raw `conflict`
      answer to `why: 'refused'`, which this file would treat as still owed. That line is reached only when `seq` is
      null, which is a create; an update has a number, so `stale` is already true and the answer is `conflict`. This
      drives the real writer with the record's own 409 body, twice: once carrying the row as it now stands and once

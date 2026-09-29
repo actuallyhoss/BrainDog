@@ -1,5 +1,5 @@
 /**
- * How many records hold each listing, as the Kennel counts them (`GET /api/kennel/v1/counts.json`, platform §4.0 K):
+ * How many records hold each listing, as the Kennel counts them (`GET /api/kennel/v1/counts.json`):
  * `{ at, counts: Record<'<kind>:<id>', number> }`.
  *
  * ROUNDED HERE, ONCE, BEFORE ANY SCREEN SEES A NUMBER. Every reader says a count at 10, 50, 100, 500 or 1000 and says

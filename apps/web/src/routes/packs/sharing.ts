@@ -1,5 +1,5 @@
 /**
- * Sharing a BrainDog's arrangement as a use case, and installing one somebody shared (`loop/research-spark.md` S14).
+ * Sharing a BrainDog's arrangement as a use case, and installing one somebody shared.
  *
  * THREE WAYS IN, ONE PLAN. A file picked from the computer, an https address, and a built-in use case from the browse
  * screen all become the same text, which the record's `planUseCase` reads through `readShared` and plans pack by pack.

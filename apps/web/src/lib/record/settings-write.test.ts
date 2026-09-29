@@ -3,7 +3,7 @@
  *
  * NO RECORD IS A REFUSAL, AND NOT THE SAMPLE. Every expectation here that read `from: 'sample'` for a host with no
  * record behind it (`UNREACHABLE`, `UNAUTHORIZED`) now reads the refusal that sample stood in for, carrying the
- * sentence the client wrote for it (DIRECTION 26, `loop/research-no-sample.md` brief A4).
+ * sentence the client wrote for it.
  */
 
 import { test } from 'node:test';
@@ -294,7 +294,7 @@ test('an invitation is minted for one address, handed back once as a link, liste
 
 test('CONNECT AN AGENT SENDS THE INBOX ONLY WHEN IT WAS CHOSEN, and an ordinary agent is sent what it always was', async () => {
   /* MEASURED BEFORE THIS: the screen minted `{ scope: 'write', label, days }` whatever the owner wanted, so no token made
-     in Settings could carry the reach the record's inbox gate reads (DIRECTION section 30, P2). */
+     in Settings could carry the reach the record's inbox gate reads. */
   const minted = { id: 't_1', bearer: 'rec_1.thesecret', scope: 'write', reach: ['inbox'], expires_at: '2026-12-24T09:00:00.000Z' };
   const { io, sent } = host(() => json(200, { ok: true, value: minted }));
   assert.deepEqual(await mintAgent(BASE, { label: 'triage', inbox: true, days: 90 }, io), { ok: true, value: minted });

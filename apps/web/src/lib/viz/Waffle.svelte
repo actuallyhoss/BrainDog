@@ -1,5 +1,5 @@
 <!--
-  A waffle: part of a whole as one small square a thing (SYSTEM §7), such as open tasks by tier.
+  A waffle: part of a whole as one small square a thing, such as open tasks by tier.
 
   Parts fill in order, reading left to right and down. Parts with no `tone` step down the ramp from
   ink; give the part that needs him `danger` ("1 urgent") and the others greys. Past 200 things each

@@ -1,5 +1,5 @@
 <!--
-  Segments: progress as one cell per step or part (SYSTEM §7). Done cells are ink, the rest a light
+  Segments: progress as one cell per step or part. Done cells are ink, the rest a light
   grey, and with `current` the next cell is an outline in `tone`: `danger` when that step waits on him
   (a review, a part due), `live` when an agent is on it, a grey by default.
 
@@ -25,7 +25,7 @@
     current?: boolean | undefined;
     /** The current step's outline: `danger`, `live`, `warn`, or a grey (`g2`, the default). */
     tone?: Tone | undefined;
-    /** What is being counted, which leads the sentence: "Nile, parts paid". */
+    /** What is being counted, which leads the sentence: "Lina, parts paid". */
     subject?: string | undefined;
     /** The whole sentence, when "10 of 23 done" will not do. */
     summary?: string | undefined;

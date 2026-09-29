@@ -1,6 +1,6 @@
 /**
  * What `/jobs` and `/jobs/<id>` say about their runs: the title row's sentence, the runs grouped by day, the machines'
- * lanes over the last day or week, the outcome split, and the tools one run called (SYSTEM §6, §7).
+ * lanes over the last day or week, the outcome split, and the tools one run called.
  *
  * EVERY FIGURE IS A COUNT OF THE RUNS THE SCREEN READ. `listJobs` answers pages of fifty, so a chart sees the pages
  * loaded and no more, and says so ("Latest 50 runs") when older runs exist that it has not seen. Nothing here guesses a

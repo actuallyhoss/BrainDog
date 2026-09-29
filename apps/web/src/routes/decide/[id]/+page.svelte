@@ -75,8 +75,8 @@
 
   /**
    * WHERE THE QUESTION CAME FROM, as `/decide` decides it: the record through `governance`, or the
-   * host's own sentence when it refuses. The sample that stood in for a host with no record is gone
-   * (DIRECTION 26), and with it every press on this screen that wrote nothing.
+   * host's own sentence when it refuses. The sample that stood in for a host with no record is gone,
+   * and with it every press on this screen that wrote nothing.
    */
   let from = $state<'reading' | 'live' | 'refused'>('reading');
   let live = $state<One | null>(null);
@@ -104,7 +104,7 @@
 
   /**
    * THE OPEN QUESTIONS IN THE QUEUE'S ORDER, so `j` and `k` and the button after a decision go to the next
-   * one rather than back to the list (DESIGN-SYSTEM D2). Read with the question, and not again after a
+   * one rather than back to the list. Read with the question, and not again after a
    * decision, so the one just decided keeps its place and the next is the one after it.
    */
   let queue = $state<string[]>([]);
@@ -585,7 +585,7 @@
 
     <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
          sent, as the record worked them out when the proposal was filed. Accept and Decline below are the one
-         approval (`research-scheduled-actions.md` §5), so the lines go once the question is settled. -->
+         approval, so the lines go once the question is settled. -->
     {#if from === 'live' && live && live.calls.length > 0 && !settled && !live.closed}
       <Tile icon="globe" title={installWords.heading}>
         <dl class="calls-out">
@@ -803,7 +803,7 @@
       {/if}
     {/if}
 
-    <!-- THE QUESTION'S COMMENTS (COL-8), open or settled, since what was said about it is worth as much after the
+    <!-- THE QUESTION'S COMMENTS, open or settled, since what was said about it is worth as much after the
          decision as before. On the question and not on each option: the record keeps a thread on a question or a
          decision, and an option is part of the question. A Reads colleague may comment here too. -->
     {#if from === 'live'}
@@ -1054,7 +1054,7 @@
     gap: var(--sp-2);
   }
 
-  /* THE KEY CAP (SYSTEM §6): Geist Mono 12 on the tile's white inside a tile-2 well, 18 square at its smallest. */
+  /* THE KEY CAP: Geist Mono 12 on the tile's white inside a tile-2 well, 18 square at its smallest. */
   .card-n {
     display: inline-grid;
     flex: none;
@@ -1126,7 +1126,7 @@
     font-weight: 500;
   }
 
-  /* A FIELD IS 40 ON TILE-2, radius 12, no border: the fill is its edge (SYSTEM §6). */
+  /* A FIELD IS 40 ON TILE-2, radius 12, no border: the fill is its edge. */
   .commit-date {
     min-block-size: 40px;
     padding: 0 var(--sp-3);

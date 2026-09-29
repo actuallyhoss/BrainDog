@@ -1,6 +1,6 @@
 /**
  * An `inputs` block's writes: a field typed into on a page goes to the record's row after a pause, and the page is read
- * again (brief D7 of `loop/research-dynamic-layouts.md`, P8).
+ * again.
  *
  * WHY A PAUSE AND NOT EVERY KEYSTROKE. The renderer hands on every keystroke (`braindog-render`'s `OnInput` says the
  * waiting is the host's), and a write per keystroke is one line in the row's history per character: typing `1250` over
@@ -31,7 +31,7 @@ import { currencyOf } from './money.ts';
 import type { Wrote } from './rows-write.ts';
 import type { FieldDecl, Fields } from './schema.ts';
 
-/** How long a field has to go untouched before what it says is written. The brief's 600ms: under a typist's pause. */
+/** How long a field has to go untouched before what it says is written. 600ms: under a typist's pause. */
 export const QUIET = 600;
 
 /** The timers the pause is kept on: the browser's, or a test's. */
@@ -79,7 +79,7 @@ const MONEY = /^(?:([A-Z]{3})\s*)?(-?[\d,.]+)(?:\s*([A-Z]{3}))?$/u;
  *
  * THE RULE THE ADD-ON SETTINGS' MONEY BOX ALREADY KEEPS (`packs.ts` `valueOf`), and the only one that reads the box as
  * it opens, `EGP 1,200.00`. The pattern before it took `[\d,]*` and dropped every comma, so a decimal comma was read as
- * grouping: `1,20` was written as 120.00 where the person meant 1.20, and `,5` as 5.00 (audit of September 25th, §11).
+ * grouping: `1,20` was written as 120.00 where the person meant 1.20, and `,5` as 5.00.
  * A comma anywhere else is a figure that means one thing to a person who writes `1.250,50` and another to one who
  * writes `1,250.50`, and guessing between them is a hundredfold error in somebody's money, so it is refused.
  */
@@ -96,7 +96,7 @@ const FIGURE = /^-?(?:\d{1,3}(?:,\d{3})+|\d*)(?:\.\d+)?$/u;
  *
  * NEVER A CURRENCY NOBODY CHOSE. The chain ended `?? 'GBP'`, and the box of an empty money field opens on nothing, so
  * on an EGP record a cost typed `1200` was stored as GBP 1,200.00 beside a price in EGP, and nothing on screen had
- * named a currency to the person typing it (audit of September 25th, §2). With none known it is refused, and the
+ * named a currency to the person typing it. With none known it is refused, and the
  * sentence says to type the code.
  *
  * AN INSTANT IS THE MINUTE THE BOX HOLDS, read as the UTC minute the page opened it on (`blocks.ts` `inputsRows`), so
@@ -192,7 +192,7 @@ export function inputsWriter(deps: InputsDeps): InputsWriter {
     /*
      * A CONFLICT OVER ANOTHER FIELD IS NOT A CONFLICT OVER THIS ONE. The record refused the stale write, rightly, and
      * nothing sent the typed value again: somebody else changed the row's count, and the price typed at the old version
-     * was dropped while the box went on showing it (audit of September 25th, §17). Where the field typed into still
+     * was dropped while the box went on showing it. Where the field typed into still
      * holds what the page drew, the figure is sent once more at the version the row is at now. Once, so two writers
      * racing each other do not loop.
      */

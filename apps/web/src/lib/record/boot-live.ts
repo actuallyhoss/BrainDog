@@ -5,8 +5,8 @@
  * route table as a value, and the entry chunk has half a kilobyte of room.
  *
  * EVERY REFUSAL IS THE RECORD'S ANSWER, AND THERE IS NO SAMPLE BEHIND ANY OF THEM. `UNREACHABLE` and `UNAUTHORIZED` at
- * an address with no slug used to draw the sample business in the browser; the app only ever shows a real record now
- * (DIRECTION 26). The root layout sends a 401 to sign-in, and for anything else the shell draws itself empty so the
+ * an address with no slug used to draw the sample business in the browser; the app only ever shows a real record now.
+ * The root layout sends a 401 to sign-in, and for anything else the shell draws itself empty so the
  * screen under it can say what the record said, or that no record answered at all.
  *
  * KEPT FOR THE TAB once decided, the way `lib/data/record.ts` always kept its probe: the layout's `load` runs on every
@@ -17,8 +17,8 @@
 import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { isStale, railRoom } from '@braindog/kernel';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
-   carried the same six and the sample's two made-up add-ons, until wave C1, then a hand copy in `modules.ts` until each module's
-   own manifest said it (USE-3). */
+   carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
+   own manifest said it. */
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
@@ -33,7 +33,7 @@ import type { Level } from './schema.ts';
 import { levelsFrom } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
 import { agentKindOf, type AgentKind } from '../ui/face.ts';
-/* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws (PGS-16). */
+/* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws. */
 import { penOf, type PenItem } from '../design/pen.ts';
 import type { Prefs } from '../nav-prefs.svelte.ts';
 
@@ -63,7 +63,7 @@ type ShellBase = {
   };
   /**
    * The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs, and `cut` on a
-   * tabbed section's page the rail's budget left out: the strip of tabs draws it and the rail does not (PGS-18).
+   * tabbed section's page the rail's budget left out: the strip of tabs draws it and the rail does not.
    */
   nav: (NavEntry & { tabs?: true; cut?: true })[];
   /**
@@ -98,7 +98,7 @@ export type Shell = ShellBase & {
      *
      * `level` CANNOT SAY IT. The record answers `level: null` for a person invited to one list, and the
      * shell falls back to `read` so nothing downstream meets a word it does not know. Measured through the
-     * real seed (`loop/research-invite-landing.md`), that fallback is the whole of what a bookkeeper given
+     * real seed, that fallback is the whole of what a bookkeeper given
      * `write` on Expenses was: "Can read, cannot change", "you have read access", and a Home that took
      * them for the owner of an empty record. This is the fact the fallback threw away.
      */
@@ -169,7 +169,7 @@ export type Shell = ShellBase & {
   /* HOW MANY QUESTIONS ARE OPEN, which `questions` cannot say: `boot` caps that list at twenty, and the count is the record's. */
   open: number;
   /**
-   * `boot`'s counts as the record sent them, which `spineOf` reads to say whether Decide and Inbox are drawn yet (PGS-18).
+   * `boot`'s counts as the record sent them, which `spineOf` reads to say whether Decide and Inbox are drawn yet.
    * Absent on a shell no record answered; the root layout then reads `open` and `inbox`.
    */
   counts?: NonNullable<Boot['counts']>;
@@ -209,8 +209,8 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     }
     const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
     /* NOT KEPT, THE 401 LEAST OF ALL. This line used to keep a 401 or an unreached host at the bare `/app` as the
-       sample, for the tab, and so the first load after signing in was handed The Studio with no request made
-       (`loop/research-first-sign-in.md` friction 1). A refusal kept nothing then either; now it is every such answer. */
+       sample, for the tab, and so the first load after signing in was handed The Studio with no request made.
+       A refusal kept nothing then either; now it is every such answer. */
     kept = null;
     refusal = { code: said.code, fix: said.fix };
     return { from: 'refused', code: said.code, fix: said.fix };
@@ -228,7 +228,7 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
 export const signsIn = (b: Boot): boolean => (b as Boot & { signIn?: unknown }).signIn !== false;
 
 /**
- * One agent at work, as the rail's Working now draws it (SYSTEM §5): the run, the kind of agent, the project it was
+ * One agent at work, as the rail's Working now draws it: the run, the kind of agent, the project it was
  * placed in, what it says it is doing, when the run began, and whether it has gone quiet.
  */
 export type Working = { seq: number | null; agent: string; kind: AgentKind; project: string | null; doing: string; since: string | null; quiet: boolean };
@@ -467,8 +467,8 @@ function hrefOf(e: EventLine): string {
  * The `resolve` of the question a decision `settles`, written in the same instant, is folded into that decision's line;
  * any other `resolve` keeps its own.
  *
- * BY `settles`, AND IT WAS `rowid - 1`. A member held to named lists is sent no rowid (`loop/research-history-cursor.md`:
- * the gap between two of hers counted the events she was not shown), so the pairing had nothing to read, and the record
+ * BY `settles`, AND IT WAS `rowid - 1`. A member held to named lists is sent no rowid (the
+ * gap between two of hers counted the events she was not shown), so the pairing had nothing to read, and the record
  * now says on the decision which question it settled, from the join the kernel already makes in SQL. The lines are keyed
  * by themselves, since each is one object in one answer and needs no number to be told apart.
  */
@@ -635,7 +635,7 @@ export function layoutOf(b: Boot): Shell {
      are the five oldest, where before they were the five edited last. So the cap is spent in order of `about.updated_at`,
      newest first, and the pages it keeps are then drawn where the record put them. A host that sends no time spends
      it in the record's order, which is the rail it drew before. */
-  /* A PAGE OVER A LIST WITH NOTHING IN IT STAYS OFF THE RAIL UNTIL THE LIST'S FIRST ROW (PGS-18). A module installs its
+  /* A PAGE OVER A LIST WITH NOTHING IN IT STAYS OFF THE RAIL UNTIL THE LIST'S FIRST ROW. A module installs its
      pages with its lists, so a record that took a few modules had a rail of pages that each said "nothing here yet".
      `list` is the one list a page draws, sent only when the caller reads it, and its count is `registers`' own. A saved
      view is somebody's own page and stays, as its list does above, and so does a colleague's own list, for the same
@@ -643,7 +643,7 @@ export function layoutOf(b: Boot): Shell {
   const rows = new Map(b.registers.map((r) => [r.id, r.count]));
   const waiting = (p: NonNullable<Boot['pages']>[number]) =>
     typeof p.list === 'string' && p.nav?.section !== copy.viewsSection && !theirs.has(p.list) && rows.get(p.list) === 0;
-  /* A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET (PGS-18). A launch desk with more parts than `RAIL_PAGES` lost the
+  /* A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET. A launch desk with more parts than `RAIL_PAGES` lost the
      rest from its strip, because the cap ran before `nav` existed. They are kept apart instead: the rail still spends
      its budget, and a page past it is carried with `cut`, which the strip draws and the rail leaves out. */
   const tabbed = new Set((b.pages ?? []).flatMap((p) => (p.nav && (p.nav as { tabs?: unknown }).tabs === true ? [p.nav.section] : [])));
@@ -734,7 +734,7 @@ export function layoutOf(b: Boot): Shell {
  * read when the caller has none to hand.
  */
 /**
- * Whether a refused `boot` is the one a person signed in and on no record gets (`loop/finish/ops.md` OPS-17).
+ * Whether a refused `boot` is the one a person signed in and on no record gets.
  *
  * THE WORKER'S DOOR ANSWERS IT 403 `FORBIDDEN` IN ONE SENTENCE (`doorOf`, `apps/worker/src/session.ts`), and the same
  * code is every other refusal a record gives a person, so the sentence is what tells them apart. `/start` draws "Make a

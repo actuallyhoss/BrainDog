@@ -1,5 +1,5 @@
 /**
- * The settings index's grouping (DSN-13): every area once, in its group, in the registry's order.
+ * The settings index's grouping: every area once, in its group, in the registry's order.
  */
 
 import assert from 'node:assert/strict';

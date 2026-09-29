@@ -1,5 +1,5 @@
 <!--
-  The query builder: the one editor of a `where` tree in this app (GAP-2, `docs/21 §4.1`).
+  The query builder: the one editor of a `where` tree in this app (`docs/21 §4.1`).
 
   EVERY PLACE A FILTER IS WRITTEN MOUNTS THIS: the list's filter (its menu from 640 and its sheet below), a saved view's
   narrowing, a page block's filter and an automation's condition. Each hands it the tree it stores and takes the tree
@@ -11,7 +11,7 @@
   the sentence the record parses and reads typed text back through the record's own parser. And the foot, pinned: the
   record's count for this filter ("Matches n of N"), debounced, and Done.
 
-  THE PROPS ARE THE CONTRACT (`loop/finish/contracts.md`, GAP-2), and a consumer is built against them:
+  THE PROPS ARE THE CONTRACT, and a consumer is built against them:
     value     the stored tree, or undefined for none
     fields    the fields a condition may name, as a register declares them (`QueryField`)
     register  the list the fields are on, which the text lens parses against
@@ -345,7 +345,7 @@
   }
 
   /* THE COUNT AND DONE STAY AT THE FOOT, pinned to the bottom of whatever scrolls the builder, so the answer to the
-     filter is in view while it is written (design-brief §6: the primary stays visible). */
+     filter is in view while it is written (the primary stays visible). */
   .qb-foot {
     position: sticky;
     inset-block-end: 0;

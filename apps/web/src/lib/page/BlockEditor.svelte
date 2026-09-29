@@ -6,7 +6,7 @@
   row's name would be, and nothing the answer computed is ever written back. What leaves is a patch (`block-edit.ts`),
   laid over the stored block inside the one arrangement write, so Put back undoes an edit and a move together.
 
-  ONE FILTER EDITOR. Which rows a block shows is edited with the query builder (`lib/query/QueryBuilder.svelte`, GAP-2),
+  ONE FILTER EDITOR. Which rows a block shows is edited with the query builder (`lib/query/QueryBuilder.svelte`),
   which draws the filter as rows and as a sentence and asks the record for its count through `previewPage`. There is no
   second editor of a `where` here, because two editors of one tree are two readings of it.
 
@@ -430,7 +430,7 @@
     margin-block-start: var(--sp-5);
   }
 
-  /* A FIELD'S LABEL SITS ABOVE IT in the meta step and the second ink (SYSTEM §6, fields). */
+  /* A FIELD'S LABEL SITS ABOVE IT in the meta step and the second ink. */
   .label {
     margin: 0;
     color: var(--ink2);

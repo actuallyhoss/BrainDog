@@ -71,7 +71,7 @@
 
 <style>
   /**
-   * A FLOATING GLASS BAR, the rail's treatment laid across the top (SYSTEM §5, §10): glass, radius 22, 12 in from the
+   * A FLOATING GLASS BAR, the rail's treatment laid across the top: glass, radius 22, 12 in from the
    * window (the shell's `.bar-slot`), and level 2. The glass is on a pseudo-element for the rail's reason: a
    * `backdrop-filter` here would be the box a fixed descendant is placed against.
    */

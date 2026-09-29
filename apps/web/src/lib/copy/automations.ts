@@ -2,7 +2,7 @@
  * The words of the doors in: the web addresses this record takes things in at (`WebhookDoors.svelte`). The
  * flow editor on `/automations` keeps its own words beside its code in `lib/flow`, and adds them here from now on.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
@@ -14,7 +14,7 @@ export const automations = {
   /* WHAT IT IS, WHAT HE DOES WITH IT, AND WHAT IT COSTS HIM, in the mail section's order, because the two sit one under
      the other on the same screen and are the same act spelled for a different sender.
      NO SENDER IS NAMED. These keys were `shortcut*` and said "your bank", "an iPhone Shortcut" and "withdrawals", so a
-     record whose only door took a build server's results read a section about bank texts (`DIRECTION.md` §22). The
+     record whose only door took a build server's results read a section about bank texts. The
      sender is whatever posts, and `webhook-doors.test.ts` fails if a use case comes back into these words. */
   doorsTitle: 'Web addresses that take things in',
   doorsHow: 'Each door below is a web address a phone, a script or another service posts to, and what arrives is written to the list the door names. The address carries a token, made here.',
@@ -24,7 +24,7 @@ export const automations = {
   doorsReading: 'Reading the web addresses this record takes things in at.',
   /* THE EMPTY STATE SAYS WHAT FILLS IT AND WHO ADDS ONE, because nothing on this screen can: a door arrives as a
      change somebody approves. It said "an ingest with channel webhook and verify kind path", which is the file's
-     spelling and not the person's (MOD-24); those words stay in the prompt, which is handed to an agent. */
+     spelling and not the person's; those words stay in the prompt, which is handed to an agent. */
   doorsNone: 'Nothing is posted in yet',
   doorsNoneWhy: 'Things a phone, a script or another service posts to this record, each written to the list you name. Ask an agent to set one up, and approve the change it proposes on Decide.',
   doorsPrompt: 'read my record, then propose a webhook door with verify kind path for what I want posted in, and name the list it writes to',
@@ -56,10 +56,10 @@ export const automations = {
   doorsNoRead: 'This host does not list its doors yet, so none can be shown here. Updating it brings the list.',
   doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into this record.',
 
-  /* ── the automation editor's footer (`routes/automations/[id]`, EDT-4) ── */
+  /* ── the automation editor's footer (`routes/automations/[id]`) ── */
   /* SAID IN THE LIVE LINE AFTER AN UNDO, by the button or by Mod+Z, since the card that moved back says nothing. */
   flowUndone: 'Undid the last change.',
-  /* THE SAME, AFTER A REDO, by the button or by Mod+Shift+Z / Mod+Y (EDT-4). */
+  /* THE SAME, AFTER A REDO, by the button or by Mod+Shift+Z / Mod+Y. */
   flowRedone: 'Redid the last change.',
   /* A NEW ONE THAT STARTS ON A PRESS: its trigger says "When you press Run now", and the button only exists once there
      is something saved to run, so the footer says where it will be. */

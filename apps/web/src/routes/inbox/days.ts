@@ -1,6 +1,6 @@
 /**
  * What the Inbox says about itself: its arrivals grouped by the day they came, the sentence under its title, and the
- * one tile it draws (SYSTEM §5, §6).
+ * one tile it draws.
  *
  * THE DAY IS THE READER'S, on their own wall clock, as Work's days are (`lib/work/board.ts`): an email that came in at
  * 23:40 is yesterday's to the person reading it this morning, whatever the server's zone.
@@ -49,7 +49,7 @@ export function daysOf<T extends { arrived: string }>(items: readonly T[], now: 
   return out.sort((a, b) => b.day.localeCompare(a.day));
 }
 
-/** How long an arrival may wait before the sentence says so in red: two days (SCREENS, Inbox). */
+/** How long an arrival may wait before the sentence says so in red: two days. */
 export const WAITED_TOO_LONG_MS = 2 * 86_400_000;
 
 /** The sentence under the title, and the phrase inside it that needs him, when one does. */
@@ -58,7 +58,7 @@ export type Sentence = { text: string; needs?: string };
 const things = (n: number): string => (n === 1 ? '1 thing waits on you' : `${n.toLocaleString('en-GB')} things wait on you`);
 
 /**
- * The title row's sentence (SYSTEM §5), from the record's tally.
+ * The title row's sentence, from the record's tally.
  *
  * RED ONLY FOR WHAT HAS WAITED. What waits is news, and it becomes something that needs him once the oldest of it has
  * sat for more than two days. `oldest` is the oldest arrival drawn; when there are older pages still unread, the real

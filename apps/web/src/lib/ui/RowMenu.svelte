@@ -14,12 +14,12 @@
   Placement is `position: fixed` against the row's viewport rect and then clamped, because a menu
   opened on the last visible row must not open below the fold. It flips above the row instead.
 
-  UNDER A THUMB IT IS A BOTTOM ACTION SHEET, as `Menu.svelte` is and for its reasons (design SYS-4,
-  DSN-6): below 640px or with a coarse pointer, the list rises from the bottom of the screen over a
+  UNDER A THUMB IT IS A BOTTOM ACTION SHEET, as `Menu.svelte` is and for its reasons:
+  below 640px or with a coarse pointer, the list rises from the bottom of the screen over a
   scrim, as a popover in the top layer, in 48px rows at 16px with a Cancel row. A panel pinned to a
   row's rect is a panel under the finger that long-pressed the row.
 
-  "HAND TO" IS THIS MENU'S OWN ITEM (GAP-11), last before Cancel, on a row of a list that says who holds its rows and
+  "HAND TO" IS THIS MENU'S OWN ITEM, last before Cancel, on a row of a list that says who holds its rows and
   for somebody who may change it, at every width. The sheet it opens lives outside the menu, since the menu closes on
   the press, and its code is fetched on the first press, so the rail that also uses this menu carries none of it.
 -->
@@ -195,7 +195,7 @@
 {/if}
 
 <style>
-  /* `Menu.svelte`'s surface (SYSTEM §6): the strong glass at level 2, radius `--r-md`, in 140ms on the arriving curve. */
+  /* `Menu.svelte`'s surface: the strong glass at level 2, radius `--r-md`, in 140ms on the arriving curve. */
   .row-menu {
     position: fixed;
     z-index: var(--z-palette);
@@ -320,7 +320,7 @@
     }
   }
 
-  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). */
+  /* A FADE IN PLACE OF EVERY MOVE. */
   @media (prefers-reduced-motion: reduce) {
     .row-menu,
     .row-menu[popover] {

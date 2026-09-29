@@ -28,7 +28,7 @@
   let { shell }: AreaProps = $props();
 
   /**
-   * THE TITLES OF THIS AREA'S ROWS (DSN-18). What a host does not do was three paragraphs, identical on
+   * THE TITLES OF THIS AREA'S ROWS. What a host does not do was three paragraphs, identical on
    * both hosts; each is a row now, titled by the state it is in, and the paragraph's one sentence that
    * matters is the row's line. The sentences stay in `copy`.
    */
@@ -76,7 +76,7 @@
   const KEPT_NIGHTS = 30;
 
   /**
-   * THE LAST THIRTY NIGHTS, ONE SQUARE EACH (Light-Settings), from the copies the record answered with and nothing
+   * THE LAST THIRTY NIGHTS, ONE SQUARE EACH, from the copies the record answered with and nothing
    * else. `null` until it answered with at least one: a strip of thirty quiet squares over a record that has never
    * been copied would be a chart of nothing, and the list below already says there is no backup yet.
    *
@@ -85,7 +85,7 @@
    */
   const nights = $derived(copyLines.length > 0 ? nightsOf(copyLines, Date.now(), KEPT_NIGHTS) : null);
 
-  /** The copies by the month they were taken in, newest first: one group on the ground each (SYSTEM §6). */
+  /** The copies by the month they were taken in, newest first: one group on the ground each. */
   const MONTH_NAME = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const months = $derived.by(() => {
     const out: { key: string; label: string; lines: CopyLine[] }[] = [];
@@ -100,7 +100,7 @@
   });
 
   /* A COPY IS NAMED BY ITS DAY, AND A DAY READS AS THE REST OF THE PRODUCT WRITES ONE: `3 Sep 2026`,
-     not `2026-09-03` (DESIGN-SYSTEM APPENDIX C14). An id that is not a day is shown as it is. */
+     not `2026-09-03`. An id that is not a day is shown as it is. */
   const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const copyDay = (id: string): string => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(id);
@@ -180,10 +180,10 @@
   which was not pressed. The refusal is the record's own sentence, so nothing is said twice.
 
   AND ONLY WHERE THE RECORD ANSWERED WITH ITS COPIES. On the Worker `snapshots` answers `NOT_IN_THIS_BUILD`, and the
-  button sat under that sentence and answered its press with the same refusal as a toast (`research-first-sign-in.md`
-  friction 11). `reading` is not an answer either, or the button flashes before the refusal lands.
+  button sat under that sentence and answered its press with the same refusal as a toast.
+  `reading` is not an answer either, or the button flashes before the refusal lands.
 
-  AT THE RIGHT OF THE FIRST GROUP'S HEADING, where a group's own verb goes (SYSTEM §6), so it stays one press away
+  AT THE RIGHT OF THE FIRST GROUP'S HEADING, where a group's own verb goes, so it stays one press away
   whether the record has kept thirty copies or none.
 -->
 {#snippet backUpButton()}
@@ -198,7 +198,7 @@
   ... disaster recovery, not portability."
 -->
 <!--
-  THE NIGHTLY COPIES AS A STRIP OF THIRTY (Light-Settings): one square a night, oldest at the left, the newest copy in
+  THE NIGHTLY COPIES AS A STRIP OF THIRTY: one square a night, oldest at the left, the newest copy in
   ink and a night with none in red where it fell, then one line saying what the strip means. The policy under it is the
   host's own: `53 §4` has the Cloud keep "the 30 newest dated keys plus `latest`" and run at `17 3 * * *` UTC, and
   `49 §5.13` a self-host keep 30 files and run at 02:00 UTC plus `hash(slug) mod 60` minutes, so no one time is printed.
@@ -207,7 +207,7 @@
   <Tile icon="archive" title={tileWords.copiesTitle} meta={tileWords.copiesMeta(KEPT_NIGHTS)}>
     <div class="strip">
       <Waffle parts={nightParts(nights)} columns={KEPT_NIGHTS} summary={nightsSaid(nights)} />
-      <!-- THE STRIP'S TWO ENDS, so the squares read as dates. Secondary labels, dropped on a phone (SYSTEM §9). -->
+      <!-- THE STRIP'S TWO ENDS, so the squares read as dates. Secondary labels, dropped on a phone. -->
       <div class="strip-ends" aria-hidden="true">
         <span>{nightWords(nights[0]?.day ?? '')}</span>
         <span class="strip-now">{tileWords.stripTo}</span>
@@ -224,7 +224,7 @@
 {#if copiesFrom === 'refused'}
   <Section title={copy.kept}>
     <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
-         out that does exist on every host, the export, as its action (DSN-18). -->
+         out that does exist on every host, the export, as its action. -->
     <div role="status">
       <StateRow icon="archive" title={words.notHereYet} line={copiesSaid} action={anOwner ? exportInstead : undefined} />
     </div>
@@ -335,7 +335,7 @@
     <p class="hint">{copy.restoreLive}</p>
   {/if}
   {#if restoring}
-    <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND (SYSTEM §6): a destructive verb is its words in ink asking to
+    <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND: a destructive verb is its words in ink asking to
          be pressed again, never a red box. What it replaces is said in the sentence, which is the part to read. -->
     <div class="confirm" role="group" aria-label={copy.restoreThis}>
       <p class="confirm-said">{copy.restoreConfirm(restoring)}</p>
@@ -431,7 +431,7 @@
     font-weight: 500;
   }
 
-  /* THE ONE WRITTEN LINE under the chart (SYSTEM §6), and the host's policy under it in the quiet ink. */
+  /* THE ONE WRITTEN LINE under the chart, and the host's policy under it in the quiet ink. */
   .reading {
     margin: 0;
     max-inline-size: var(--measure);

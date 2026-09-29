@@ -1,6 +1,5 @@
 <!--
-  The one form both script screens draw: `/scripts/new` with an empty draft, `/scripts/<id>` with the installed one
-  (`loop/finish/shell.md` SCR-3).
+  The one form both script screens draw: `/scripts/new` with an empty draft, `/scripts/<id>` with the installed one.
 
   THE HEADER FIRST, THEN THE SOURCE, THEN WHAT A RUN WOULD DO. The header is what the owner approves (what starts it,
   where it fetches from, which keys it sends, which lists it reads and writes), so it is a group of pickers on the
@@ -337,7 +336,7 @@
     border: 0;
   }
 
-  /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink (SYSTEM §6, fields). */
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink. */
   .label {
     padding: 0;
     color: var(--ink2);
@@ -370,7 +369,7 @@
     color: var(--danger);
   }
 
-  /* A FIELD WITH A FAULT IN IT: a red edge drawn inside it, since a field has no border to colour (SYSTEM §6). */
+  /* A FIELD WITH A FAULT IN IT: a red edge drawn inside it, since a field has no border to colour. */
   .field[data-wrong],
   .lines[data-wrong],
   .code[data-wrong] {
@@ -388,7 +387,7 @@
     font-size: var(--t-base);
   }
 
-  /* A FIELD IS THE INNER FILL WITH NO BORDER, rounded 12, on the ground and inside a tile alike (SYSTEM §6). */
+  /* A FIELD IS THE INNER FILL WITH NO BORDER, rounded 12, on the ground and inside a tile alike. */
   .lines,
   .code {
     box-sizing: border-box;
@@ -422,7 +421,7 @@
     min-block-size: var(--sp-9);
   }
 
-  /* FOCUS IS THE 2PX INK RING OFFSET 2, as on every other field (SYSTEM §6). */
+  /* FOCUS IS THE 2PX INK RING OFFSET 2, as on every other field. */
   .lines:focus-visible,
   .code:focus-visible {
     outline: 2px solid var(--focus-in);

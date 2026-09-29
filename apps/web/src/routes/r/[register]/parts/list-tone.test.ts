@@ -1,5 +1,5 @@
 /**
- * What a dot means on a list (design DSN-7): the deadline's column carries a row's tone, and a finished row carries none.
+ * What a dot means on a list: the deadline's column carries a row's tone, and a finished row carries none.
  *
  * THE TWO ANSWERS THE GRID AND THE SAVED VIEW BOTH READ, from `list.ts`, so the list and the view it narrows cannot draw
  * a dot in two places. The register below is written here rather than read from a module, because what is under test is

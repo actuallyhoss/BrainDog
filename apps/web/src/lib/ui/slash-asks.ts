@@ -1,17 +1,17 @@
 /**
  * Slash's row in Settings: this month's asks against the cap, the model, when the count resets, and the owner's limit
- * (`docs/23-ASSISTANT-UI.md` §8, `loop/research-spark-routes.md` §4 and Brief W1).
+ * (`docs/23-ASSISTANT-UI.md` §8).
  *
  * PURE, SO `node --test` CAN IMPORT IT. The rules and the words live here, beside the components that draw them
  * (`SlashAsks.svelte` in Settings, `SlashUsage.svelte` and `SlashOut.svelte` on `/usage`), and the components only
  * draw what these answer.
  *
- * THE CHOICE OF MODEL IS `SlashModel`'s, beside this row: "Included" or "Your own key" (`loop/finish/agents.md` AGT-21).
+ * THE CHOICE OF MODEL IS `SlashModel`'s, beside this row: "Included" or "Your own key".
  * This row shows what the host says of the choice made. On the included model the month's asks against the cap, and the
  * limit the owner sets. On his own key the same count with no cap beside it, because his asks there are listed and not
- * capped (`agents.md` §5 item 7): the host says so with `asks.capped: false`.
+ * capped: the host says so with `asks.capped: false`.
  *
- * WHAT SLASH SPENT IS HERE TOO, for the Slash section of `/usage` (`loop/finish/agents.md` AGT-29): the month's asks and the
+ * WHAT SLASH SPENT IS HERE TOO, for the Slash section of `/usage`: the month's asks and the
  * background work's own allowance, apart, then the asks by day with what each cost and what it filed, and when the month
  * is spent, the two ways on. `SlashUsage.svelte` draws it and `SlashOut.svelte` draws the two buttons.
  */
@@ -204,7 +204,7 @@ export const backgroundLine = (m: SpentMonth): string =>
   `${m.whole ? '' : 'At least '}${m.background} of ${BACKGROUND_ASKS_MONTH} background asks this month`;
 
 /**
- * Where the two buttons go when the month's asks are spent (`loop/finish/agents.md` AGT-29). Both are the Agents area of
+ * Where the two buttons go when the month's asks are spent. Both are the Agents area of
  * Settings, where `SlashModel` is: "Use your own key" lands on its own-key choice, whose hint carries that id.
  */
 export const outOfAsks = { key: '/settings/agents#slash-kind-key', settings: '/settings/agents' } as const;

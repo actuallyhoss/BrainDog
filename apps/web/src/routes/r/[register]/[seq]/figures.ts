@@ -1,8 +1,8 @@
 /**
- * The figures a row's page draws as tiles, and the one line under each chart that says what it means (SYSTEM §6, §7).
+ * The figures a row's page draws as tiles, and the one line under each chart that says what it means.
  *
  * A ROW'S PAGE IS MOSTLY WORDS: its properties, its prose, its history. A tile is drawn only where there is a figure the
- * record holds and a chart that answers a question about it, and never where there is not (SYSTEM §11: no number tile
+ * record holds and a chart that answers a question about it, and never where there is not (no number tile
  * without a chart, no chart without its reading line). Three, each from the record and nothing else:
  *
  *   - the row's own money compared with itself: a project's year against the year before, from its two money fields;

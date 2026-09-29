@@ -1,6 +1,5 @@
 /**
- * A page shared as a template: a pack of that page alone, for somebody else to install (`loop/finish/platform.md`
- * PLT-14, P14).
+ * A page shared as a template: a pack of that page alone, for somebody else to install.
  *
  * WHAT GOES OUT IS THE PAGE AS THE RECORD STORES IT, read as the source view reads it (`sourceOf` in `lib/dog/read.ts`),
  * never the live answer with its rows spread over it. So no row of this record goes in: a page holds filters and

@@ -103,7 +103,7 @@
     flex: 1 1 12rem;
   }
 
-  /* A FIELD'S LABEL SITS ABOVE IT in the meta size and the second ink (SYSTEM §6, Fields). */
+  /* A FIELD'S LABEL SITS ABOVE IT in the meta size and the second ink. */
   .add-label {
     color: var(--ink2);
     font-size: var(--t-sm);
@@ -117,7 +117,7 @@
     gap: 6px;
   }
 
-  /* WHETHER IT LANDS AT ONCE OR WAITS ON DECIDE, in the meta size: 12 is for a chart's axis and nothing else (SYSTEM §3). */
+  /* WHETHER IT LANDS AT ONCE OR WAITS ON DECIDE, in the meta size: 12 is for a chart's axis and nothing else. */
   .add-note {
     margin: var(--sp-2) 0 0;
     color: var(--dim);

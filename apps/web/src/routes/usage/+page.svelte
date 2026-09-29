@@ -1,22 +1,22 @@
 <!--
-  The account's usage: `/usage` (`loop/research-scheduled-actions.md` §6.3).
+  The account's usage: `/usage`.
 
   A MONTH AT A TIME, this one first, with a switcher for the year before it in the toolbar. `?project=` is one
   project's slice, which is where its "Runs on" links.
 
-  THE FIGURES ARE TILES, EACH WITH ITS CHART AND THE LINE THAT READS IT (SYSTEM §6, §7). The month's allowance leads:
+  THE FIGURES ARE TILES, EACH WITH ITS CHART AND THE LINE THAT READS IT. The month's allowance leads:
   its four meters as rings, amber once one is near its limit and red once actions wait on it, with the binding meter's
   own sentence under them. Then the runs by week as bars, the projects as one stacked bar, the days as a heat grid, and
   Slash's credits as a ring where the host counts them. A chart with nothing behind it is no tile at all.
 
-  THE LISTS SIT ON THE GROUND UNDER THEM (SYSTEM §6, "Lists are neither"): the projects, each with its actions under
+  THE LISTS SIT ON THE GROUND UNDER THEM: the projects, each with its actions under
   it and the global ones under Everywhere, then the deliveries and arrivals, then Slash's own section, `SlashUsage`.
 
   THE LEDGER FIRST. `GET /account/usage` is the Directory's count, and there is ONE allowance, the Directory's, read
   from its answer. A host without the route (404), or no host, falls back to the record's own run events, which say
   nothing about limits because the record cannot see them. No record at all is the record's refusal.
 
-  ONE READ, THROUGH `read()` (ARC-5). The page draws the month and hands waiting, refused and offline to `ReadState`,
+  ONE READ, THROUGH `read()`. The page draws the month and hands waiting, refused and offline to `ReadState`,
   so this screen fails the way every screen that reads fails, with Retry. Its two empty answers keep their own
   sentences: a host with nothing to count, and a month with no runs, which says so once rather than over zeroes.
 
@@ -84,7 +84,7 @@
   const parts = $derived(view ? projectParts(view.groups) : null);
 
   /**
-   * THIS PAGE'S OWN WORDS (`loop/finish/contracts.md` X44 gives the page's words to EDT-4). The rest are `actions.ts`'s
+   * THIS PAGE'S OWN WORDS. The rest are `actions.ts`'s
    * and `reading.ts`'s.
    */
   const said = {
@@ -353,7 +353,7 @@
     text-decoration: none;
   }
 
-  /* THE TILES: one column on a phone, two from a tablet's width, three from a desk's, 12 apart (SYSTEM §4). The
+  /* THE TILES: one column on a phone, two from a tablet's width, three from a desk's, 12 apart. The
      allowance takes two columns wherever there are two. */
   .tiles {
     display: grid;
@@ -378,7 +378,7 @@
     }
   }
 
-  /* THE FIGURE (SYSTEM §3, `t-figure`): 30 on 34 at 600, and the unit beside it in the meta step. */
+  /* THE FIGURE (`t-figure`): 30 on 34 at 600, and the unit beside it in the meta step. */
   .figure {
     display: flex;
     align-items: baseline;
@@ -399,7 +399,7 @@
     letter-spacing: 0;
   }
 
-  /* THE ONE LINE THAT READS THE CHART, at the foot of its tile (SYSTEM §6). Waiting actions are said here in ink: the
+  /* THE ONE LINE THAT READS THE CHART, at the foot of its tile. Waiting actions are said here in ink: the
      ring that ran out is red, and so is the phrase in the sentence, which is enough red for one fact. */
   .reading {
     margin: auto 0 0;

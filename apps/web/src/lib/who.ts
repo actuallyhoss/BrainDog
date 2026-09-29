@@ -1,6 +1,5 @@
 /**
- * The name in the first run's one sentence, "Who are you?", read without a model (`loop/research-modular.md`
- * §2.2); the rest of the sentence is read by `start/propose.ts`.
+ * The name in the first run's one sentence, "Who are you?", read without a model; the rest of the sentence is read by `start/propose.ts`.
  *
  * DETERMINISTIC ON PURPOSE: the answer becomes the first People row, and a wrong guess about a name is
  * worse than no guess. So a name is only taken
@@ -15,12 +14,12 @@ export type Heard = { name: string | null; bio: string };
 /** What `meet` is sent from onboarding. */
 export type Introduction = { name: string; email?: string; where: 'onboarding' };
 
-/* A capitalised word, any script: `Sam`, `Élodie`, `O'Neill`, `Jean-Luc`. */
+/* A capitalised word, any script: `Sami`, `Élodie`, `O'Neill`, `Jean-Luc`. */
 const CAP = "\\p{Lu}[\\p{L}\\p{M}'’.-]*";
 /* Any word, for the one place a lowercase name is taken: before a comma at the very start. */
 const WORD = "\\p{L}[\\p{L}\\p{M}'’.-]*";
 
-/* Up to three words, and never the pronoun `I` as the second or third: "I'm Sam I freelance". */
+/* Up to three words, and never the pronoun `I` as the second or third: "I'm Sami I freelance". */
 const NAME = `${CAP}(?:\\s+(?!I\\b)${CAP}){0,2}`;
 
 const GREETING = /^(?:hi|hello|hey)\b[\s,.!]*/iu;
@@ -62,7 +61,7 @@ export function withChip(text: string, chip: string): string {
  *
  * NONE WITHOUT A NAME, because a People row needs one. NONE WHEN PEOPLE IS OFF OR ABSENT: the turn
  * still ran and the name was still shown back, and the identity the person signed in with is
- * kernel's, not the pack's (`research-modular.md` §2.3), so there is nothing to report as missing.
+ * kernel's, not the pack's, so there is nothing to report as missing.
  */
 export function introduce(heard: Heard, email: string | null, packs: readonly { id: string; disabled_at: string | null }[] | null): Introduction | null {
   if (!heard.name) return null;

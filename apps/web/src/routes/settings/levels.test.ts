@@ -43,7 +43,7 @@ const source = (area: string): string =>
     .replaceAll(/<!--[\s\S]*?-->/gu, '')
     .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
-/** Every area's file, for the checks about a handler rather than one area's markup (ARC-7b split them). */
+/** Every area's file, for the checks about a handler rather than one area's markup, now split one file per area. */
 const PAGE = AREAS.map(source).join('\n');
 
 /** One area's markup: its own file from `</script>` on, so a name in the script cannot stand in for a control. */
@@ -81,7 +81,7 @@ test('an owner is an owner by either half of what the record said', () => {
  *
  * THE FIRST WRITING OF THIS GUARD ASKED WHETHER THE CONTROL CAME AFTER THE WORD `anOwner`, and that
  * is vacuous wherever an area opens with the NEGATIVE arm: `delete`, `export` and `ingest` all start
- * `{#if !anOwner}`, which sets the word before every control in the slice. Measured by its checker:
+ * `{#if !anOwner}`, which sets the word before every control in the slice. Measured:
  * deleting the `{:else}` from the delete arm, so the red `Delete studio` button draws to a colleague
  * at `read`, left all six tests green. A gate test that passes against exactly the code it exists to
  * catch is worse than no gate test, on the screen that can destroy the record.
@@ -94,7 +94,7 @@ test('an owner is an owner by either half of what the record said', () => {
  * A `{#snippet}`'S OWN BODY SITS IN NO ARM, because a snippet is a template, not a render: nothing inside
  * it draws until something `{@render}`s it, or hands it to a component as a prop, and `/settings/export`
  * and `/settings/backups` do the gating right there: `action={anOwner ? exportPack : undefined}` hands a
- * colleague `undefined` and `StateRow` draws no control at all (DSN-18). So a snippet whose only mention
+ * colleague `undefined` and `StateRow` draws no control at all. So a snippet whose only mention
  * anywhere else in the file is on the `anOwner` arm of exactly that shape is gated by proxy: read as though
  * its body sat inside `{#if anOwner}`. One that is ever rendered some other way is left as the walk found it,
  * which is `other`, same as before this existed, so nothing here can turn an ungated control gated by accident.
@@ -203,15 +203,15 @@ test('the sentence names the ceiling and the remedy, and claims nothing about th
 });
 
 test('the invitation form no longer tells a refused colleague that nothing was saved YET', () => {
-  /* FINDING 4. `makeInvite` and five presses beside it branched on `peopleFrom !== 'live'`, so a
-     colleague the record had refused was handed `copy.notWritten` — the sample's "nothing was saved
-     yet" — which says the press did nothing because the product is a mock-up, and never says the one
+  /* `makeInvite` and five presses beside it branched on `peopleFrom !== 'live'`, so a
+     colleague the record had refused was handed `copy.notWritten`, the sample's "nothing was saved
+     yet", which says the press did nothing because the product is a mock-up, and never says the one
      fact that matters. Measured: a `read` colleague pressing Invite a person read *"A single-use
      link would be made, bound to that one address and good for 24 hours, but nothing was saved
      yet."* The two cases are told apart by name now. */
   for (const m of PAGE.matchAll(/peopleFrom !== 'live'/gu))
     assert.doesNotMatch(PAGE.slice(m.index, m.index + 160), /notWritten/u, 'a refusal is answered with the sample\'s "nothing was saved yet"');
-  /* AND NOW THERE IS ONE CASE, NOT TWO. The sample was the only arm allowed to say "yet", and DIRECTION 26 took it
+  /* AND NOW THERE IS ONE CASE, NOT TWO. The sample was the only arm allowed to say "yet", and it has been taken
      away: a press the People area cannot send is always a record, or a host, that answered no, so what is said is
      the record's own sentence, which `readPeople` has already put in hand, or that the record was not reached. */
   assert.match(PAGE, /function cannotWrite\(\): void \{\s*toasts\.push\(peopleRefusal \|\| copy\.recordNotReached/u, 'a press that cannot be sent says something other than the refusal');

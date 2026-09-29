@@ -1,10 +1,9 @@
 /**
- * Scheduled actions on screen: a project's "Runs on" list and the account's usage page (`loop/DIRECTION.md`
- * §0b, `loop/research-scheduled-actions.md` §6).
+ * Scheduled actions on screen: a project's "Runs on" list and the account's usage page.
  *
  * THE RECORD OR ITS REFUSAL, as `packs.ts` does it. A screen reads a `Source`, which is the record over HTTP.
  * With no record it drew the sample's five actions, one of them paused with a Resume that changed only the tab;
- * that went with DIRECTION 26, and no record is now the sentence for it.
+ * that went with the sample, and no record is now the sentence for it.
  *
  * TWO READS, AND WHAT EACH FALLS BACK TO.
  *
@@ -46,7 +45,7 @@ export type MeterKey = 'runs' | 'requests' | 'bytes' | 'ms';
 /**
  * One scheduled action, as the record's `actions` read answers it.
  *
- * THE CONTRACT THIS SCREEN ASKS FOR, from `research-scheduled-actions.md` §4.6 ("each action's state,
+ * THE CONTRACT THIS SCREEN ASKS FOR ("each action's state,
  * last run, next run and counts from its own events"). The key is its vault label, never the key.
  */
 export type ActionRow = {
@@ -88,8 +87,8 @@ export type AccountUsage = {
     actions: ({ scope: string; action: string } & LedgerTotals)[];
     days: ({ day: string } & LedgerTotals)[];
     /**
-     * Slash's credits this month: how many the plan includes, how many are used, and how many packs hold on top
-     * (`loop/DIRECTION.md` §33). Absent from a host that does not count them yet, and then nothing is said.
+     * Slash's credits this month: how many the plan includes, how many are used, and how many packs hold on top.
+     * Absent from a host that does not count them yet, and then nothing is said.
      */
     slash?: { included: number; used: number; packs: number };
     /** Extra usage past the allowance, when the owner turned it on: units this month, and the cost and cap in minor units. */
@@ -181,7 +180,7 @@ export const words = {
   runs: (n: number) => (n === 1 ? '1 run this month' : `${n.toLocaleString('en-GB')} runs this month`),
   verb: { pull: 'Fetches from', call: 'Calls', poll: 'Watches' } as Record<Channel, string>,
   key: (label: string) => `with the key "${label}"`,
-  /* The four states of `research-scheduled-actions.md` §6.2, one calm sentence each. No red: paused is `warn`. */
+  /* The four states of a scheduled action, one calm sentence each. No red: paused is `warn`. */
   live: (last: string, next: string | null) => (next ? `Last ran ${last}. Next run ${next}.` : `Last ran ${last}.`),
   never: (next: string | null) => (next ? `Not run yet. First run ${next}.` : 'Not run yet.'),
   retrying: (host: string, next: string | null) =>
@@ -309,7 +308,7 @@ export type ForProject = { spoken: string; title: string };
  *
  * MATCHED BY THE ROW, as the record resolves the project an action's declaration names (`listActions`,
  * `project_row`): a declaration holds a row id, which is no name, so matching it against the project's title found
- * nothing and an action declared for a project showed on no page (DOR-6). An action the record could not resolve,
+ * nothing and an action declared for a project showed on no page. An action the record could not resolve,
  * or one from a host that does not resolve, is matched by what it holds: the spoken id, or the name case-blind,
  * because a declaration typed `kiln` and a project called Kiln are the same project to a person.
  *
@@ -704,7 +703,7 @@ export type UsageRead = { ok: true; view: UsageView } | { ok: false; refusal: Re
  * A 404 FROM THE LEDGER IS A HOST WITHOUT ONE, and so is no host at all; a 401 is a person not signed in
  * to one, and the record read after it decides whether there is a record here at all. Any other refusal
  * from either is the record's own sentence, and so is the record's 401 or dead network: those drew the
- * sample's month of 3 September, counted against projects nobody has, until DIRECTION 26.
+ * sample's month of 3 September, counted against projects nobody has, until the sample went.
  *
  * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
  * person's; `api` is where the record answers, `/app/<slug>` under a slug, so the events counted are the record on screen.
@@ -868,11 +867,11 @@ export const installWords = {
   noLimit: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, with no monthly limit on this record.`,
   counted: (runs: number) => `About ${runs.toLocaleString('en-GB')} ${runs === 1 ? 'run' : 'runs'} a month, counted against this record's monthly allowance.`,
   byRule: (perDay: number) => `when a rule runs it, at most ${perDay.toLocaleString('en-GB')} a day`,
-  /* THE ONE APPROVAL (`research-scheduled-actions.md` §5): said under the lines, before the press. */
+  /* THE ONE APPROVAL: said under the lines, before the press. */
   asksOnce: 'Installing asks you to approve these once, and none of them runs until you do.',
   acceptApproves: 'Accepting approves these, and they start running. Declining runs none of them.',
   /* `wouldAsk` SAID WHAT AN INSTALL ON THE SAMPLE "would" ask, under a toast that nothing was saved; `/packs` plans on the
-     record now and draws the record's own lines (DIRECTION 26). */
+     record now and draws the record's own lines. */
 } as const;
 
 /** How often one runs: its interval, when a rule runs it, or both. */

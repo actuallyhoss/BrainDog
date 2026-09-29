@@ -1,5 +1,5 @@
 /**
- * The words browse and an add-on's detail page draw that no other screen does (`loop/finish/rules.md` §2: a unit's own
+ * The words browse and an add-on's detail page draw that no other screen does (a module's own
  * `words` object). The sentences these screens share with /packs, the catalogue's trust lines among them, stay in
  * `lib/copy/packs.ts`, so both screens say a key and a signature the same way.
  */
@@ -56,7 +56,7 @@ export const words = {
   examples: (n: number): string => (n === 0 ? 'No example rows' : n === 1 ? '1 example row' : `${n} example rows`),
   bump: { major: 'Takes something away', minor: 'Adds something', patch: 'Changes details' },
   first: 'First version',
-  /* A DAY, NEVER ISO: "2 Sep" this year, "2 Sep 2025" before it (design.md §6.5). A version is dated to the day, so a
+  /* A DAY, NEVER ISO: "2 Sep" this year, "2 Sep 2025" before it. A version is dated to the day, so a
      time inside the week is not worth the relative form. */
   published: (at: string): string => {
     const d = new Date(at);
@@ -89,15 +89,15 @@ export const words = {
   details: 'Details',
   version: 'Version',
   signature: 'Signature',
-  /* AN INSTALLED ADD-ON ON /packs AND ITS OWN PAGE (design.md §4, the add-ons row): one row, its switch, one "…". */
+  /* AN INSTALLED ADD-ON ON /packs AND ITS OWN PAGE: one row, its switch, one "…". */
   more: (name: string): string => `More for ${name}`,
   versionOf: (version: string): string => `Version ${version}`,
-  /* A CARD'S COUNTS, the board's "1 list · 1 page · 1 rule", each beside its glyph. */
+  /* A CARD'S COUNTS, "1 list · 1 page · 1 rule", each beside its glyph. */
   countLists: (n: number): string => (n === 1 ? '1 list' : `${n} lists`),
   countPages: (n: number): string => (n === 1 ? '1 page' : `${n} pages`),
   countRules: (n: number): string => (n === 1 ? '1 rule' : `${n} rules`),
   countHosts: (n: number): string => (n === 1 ? 'Calls 1 host' : `Calls ${n} hosts`),
-  /* THE BROWSE TITLE ROW'S SENTENCE (SYSTEM §5): how many there are, and how many this record holds already. */
+  /* THE BROWSE TITLE ROW'S SENTENCE: how many there are, and how many this record holds already. */
   sentence: (n: number, held: number | null): string =>
     held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from; ${held} ${held === 1 ? 'is' : 'are'} already in your record.`,
   /* THE DETAIL PAGE'S PLAN: the row that names every host it calls, and the tail of a row that names more than fit. */

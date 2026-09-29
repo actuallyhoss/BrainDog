@@ -1,6 +1,6 @@
 /**
  * What `/scripts` says about its scripts: the title row's sentence, each script's recent runs as a chart and the line
- * under it, and the outcome dot each run wears (SYSTEM §6, §7).
+ * under it, and the outcome dot each run wears.
  *
  * EVERY FIGURE IS ONE THE RECORD SENT. The month's runs are each row's own `month` count, summed and never recounted
  * from history; a script's recent runs are the ones `readScripts` found in the history it walked, and the line under

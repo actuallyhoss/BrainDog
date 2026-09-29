@@ -1,5 +1,5 @@
 /**
- * The hub's sentence and the inputs of its tiles (SCREENS, Automations): each is worked out from the reads the tabs
+ * The hub's sentence and the inputs of its tiles: each is worked out from the reads the tabs
  * already make, and the tests hold them to the rules that matter to a reader. A failure is the red part and nothing
  * else is; a share with a failure in it never reads as the whole; a chart is not drawn from nothing.
  *

@@ -1,5 +1,5 @@
 <!--
-  Edit the look (GAP-3, `21 §6`): every colour the record is drawn in, changed in words, checked as it is changed.
+  Edit the look (`21 §6`): every colour the record is drawn in, changed in words, checked as it is changed.
 
   THE ROLE LIST FIRST. Each colour is one row with its light and its dark swatch; pressing a swatch opens that colour's
   controls under its own row, so on a phone the thing being changed and the way to change it are one thumb apart.

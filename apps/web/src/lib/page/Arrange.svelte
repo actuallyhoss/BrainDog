@@ -116,7 +116,7 @@
    * THE LIST A NEW BLOCK SHOWS: the page's own first list, or, on a page that shows none, the one the reader chooses.
    *
    * IT WAS `obligations` WHEREVER THE PAGE SHOWED NO LIST, which is a list only a record with Money has: every other
-   * record was offered blocks over rows it does not hold (`loop/finish/shell.md` USE-2). A page's blocks say what the
+   * record was offered blocks over rows it does not hold. A page's blocks say what the
    * page is about, and where they say nothing the reader is asked rather than handed a guess.
    */
   const primary = $derived(declared.find((b) => b.register)?.register ?? null);

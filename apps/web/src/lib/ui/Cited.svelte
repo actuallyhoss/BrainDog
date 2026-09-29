@@ -2,8 +2,7 @@
   A sentence Slash wrote, with every brace drawn as what it stands for (`lib/cite.ts`).
 
   ONE RENDERER FOR EVERY SCREEN THAT PRINTS SLASH'S WORDS: the palette's answer and Decide's options card draw through
-  this, so a row, a figure and a total read the same in both, and no brace reaches either (`loop/finish/agents.md` §2.7,
-  rewrite 6).
+  this, so a row, a figure and a total read the same in both, and no brace reaches either.
 
   A ROW IS A LINK TO THE ROW, NAMED BY ITS TITLE. An amount is `Money`, so it reads in the record's own currency. A total
   is a button: the figure, and one press away the rows it adds up, because a total nobody can open is a total nobody can

@@ -1,6 +1,5 @@
 /**
- * The read copy a phone keeps, for 7 days, so a record opened on a train still draws what it drew at the last stop
- * (`loop/research-legacy-keeps.md` K8, his pick P5, owner item O11 in `loop/finish/modules.md`).
+ * The read copy a phone keeps, for 7 days, so a record opened on a train still draws what it drew at the last stop.
  *
  * TWO HALVES SHARE THIS FILE. `service-worker.ts` imports the pure half (which request is which, how old is too old,
  * the words a write is answered with offline), and the page imports the half that touches the browser (registering the
@@ -12,7 +11,7 @@
  * land changes nobody could see being made, which is the one thing this record must never do.
  *
  * NOTHING READABLE OUTLIVES THE SESSION. The copy is deleted on a 401, on sign-out and when the phone moves to another
- * record (`loop/finish/gaps.md` §1.1), so a signed-out or shared phone keeps nothing of the record it was on.
+ * record, so a signed-out or shared phone keeps nothing of the record it was on.
  *
  * PLAIN NODE LOADS THIS FILE, because the worker imports it and `push.test.ts` runs the worker under `node --test`. So
  * it imports only a relative `.ts` file, and every browser global is read inside a function, never at the top.
@@ -101,7 +100,7 @@ export const fresh = (at: number, now: number): boolean => Number.isFinite(at) &
 export const markOf = (scope: string): string => new URL('~record', scope).href;
 
 /**
- * The words the copy says, the unit's own (`loop/finish/rules.md` §2), because the worker says one of them and cannot
+ * The words the copy says, this module's own, because the worker says one of them and cannot
  * import the copy aggregate: the whole of every screen's words would ship inside a file whose job is two listeners.
  */
 export const words = {

@@ -1,5 +1,5 @@
 /**
- * The phone half of Web Push (`loop/research-living-in-it.md` W58-4): the key the host hands the browser, whether a toggle
+ * The phone half of Web Push: the key the host hands the browser, whether a toggle
  * is drawn at all, what a press sends and what it says, and the service worker that shows the one line.
  *
  * WHAT A BROWSER TEST WOULD MISS IS THE REFUSAL. `pushManager.subscribe` throws a `NotAllowedError` when notifications are
@@ -14,8 +14,8 @@
  * line. The read copy's listeners are registered too and never fired here.
  *
  * THE SUBSCRIPTION'S SHAPE IS `37 §2.3`'s `PushSubscription`, `{ endpoint, keys: { p256dh, auth } }`, and the two method
- * names are the ones W58-2 adds to the record. Neither was in the host table when this was written, so both are held by
- * doubles, as `webhook-doors.test.ts` holds a read written in the same wave as its screen.
+ * names are the ones the record's push methods add. Neither was in the host table when this was written, so both are held by
+ * doubles, as `webhook-doors.test.ts` holds a read written alongside its screen.
  */
 
 import { test } from 'node:test';
@@ -135,7 +135,7 @@ test('A KEY THAT IS NOT A P-256 POINT IS NO KEY, so the browser is never handed 
 const EVERY = { worker: true, push: true, notify: true };
 
 test('A HOST WITH NO KEY DRAWS NO TOGGLE AT ALL, not a switch that could only fail', async () => {
-  /* UNTIL HE HAS PUT THE KEYS IN (his call 6), `DELIVERS` has no `notify.push` and nothing would ever arrive, so the row
+  /* UNTIL THE OWNER HAS PUT THE KEYS IN, `DELIVERS` has no `notify.push` and nothing would ever arrive, so the row
      is absent rather than disabled: a control that turns on and is never used to deliver anything is a lie told once. */
   for (const none of [null, undefined, '', 'short'] as const) assert.equal(offerOf(none, EVERY), null, String(none));
 });
@@ -337,7 +337,7 @@ test('A STALE SIGN-IN IS THE RECORD\'S OWN SENTENCE, and so is no sign-in at all
   const stale = await turnOn(ports('granted', manager(null), caller({ subscribePush: { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix } } }).call), keyBytes(key)!);
   assert.deepEqual(stale, { kind: 'signin', fix });
   /* A 401 WITH NO SLUG IN THE ADDRESS WAS THE SAMPLE, and the row answered it with the demo's sentence about having no
-     account. There is no sample now (`DIRECTION.md` §26): a 401 is a person who is not signed in, wherever they are. */
+     account. There is no sample now: a 401 is a person who is not signed in, wherever they are. */
   const m = manager(null);
   const none = await turnOn(ports('granted', m, caller({ subscribePush: { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in to this record first.' } } }).call), keyBytes(key)!);
   assert.deepEqual(none, { kind: 'signin', fix: 'Sign in to this record first.' });
@@ -440,7 +440,7 @@ test('A PUSH SHOWS ONE FIXED LINE AND READS NOTHING THAT CAME WITH IT', async ()
 });
 
 test('THE WORKER LISTENS FOR PUSH, A CLICK, AND THE READ COPY\'S THREE EVENTS, each once', async () => {
-  /* THE READ COPY (MOD-27) ADDED `install`, `activate` and `fetch`; `lib/data/offline.ts` holds which request is which. */
+  /* THE READ COPY ADDED `install`, `activate` and `fetch`; `lib/data/offline.ts` holds which request is which. */
   const w = await worker();
   assert.deepEqual([...w.on.keys()].sort(), ['activate', 'fetch', 'install', 'notificationclick', 'push']);
 });

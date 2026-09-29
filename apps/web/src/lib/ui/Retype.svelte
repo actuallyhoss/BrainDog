@@ -1,6 +1,6 @@
 <!--
   Changing one field of a live list over the rows it holds: its type, whether every row must have one, and a choice
-  list's values, words, order and which choice may follow which (`21 §5`, GAP-8).
+  list's values, words, order and which choice may follow which (`21 §5`).
 
   A BUTTON ON THE FIELD'S ROW AND A SHEET OF ITS OWN, opened over the Fields sheet (`ListEditor.svelte`), because the
   preview is a list of rows that needs the height. Nothing is written until the conversion has been shown: how many rows

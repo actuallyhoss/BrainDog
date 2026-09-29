@@ -13,7 +13,7 @@
  * requires more than a title, which is most of them.
  *
  * LESS EVERY AMOUNT. The sentence has nowhere to type one, and the line's emptiest amount reads its currency off the rows
- * it is handed, which here were none, so it fell back to the SAMPLE's: audit sixty-six (probe c3) pressed "Add to Money
+ * it is handed, which here were none, so it fell back to the SAMPLE's: pressing "Add to Money
  * owed: rent" on a record imported in USD and wrote GBP 0.00, and "Owed by you, 30 days" went from USD 45.00 to no value,
  * two parts in two currencies. A list that requires an amount is refused by the record, which names the field.
  *
@@ -31,7 +31,7 @@ import type { Captured, Wrote } from '../record/rows-write.ts';
 import type { Entry, Fields, Level } from '../record/schema.ts';
 import type { Creation } from './admit.ts';
 
-/** Kept here rather than in `copy.ts`, which no builder in this wave owns. */
+/** Kept here rather than in `copy.ts`, so the palette's add owns its own words. */
 export const words = {
   /** The declaration's title, which `admits()` checks. The row draws `row` in its place. */
   declared: 'Add to a list',
@@ -89,10 +89,10 @@ export type Offer<T> = {
  * The lists the add row may name for this caller.
  *
  * EVERY LIST, THE EMPTY ONES TOO. The palette read the rail's lists, and the rail drops a list with no rows, so "Add to
- * Tasks: buy milk" on an empty Tasks drew nothing (audit sixty-six, probe c1), which is the one moment the row helps
+ * Tasks: buy milk" on an empty Tasks drew nothing, which is the one moment the row helps
  * most. `shell.lists` is the one the shell keeps for putting something into a list.
  *
- * AND ONLY WHERE THE CALLER MAY ADD, LIST BY LIST, which is `may(shell, 'append', list)` (COL-13). The same probe drew
+ * AND ONLY WHERE THE CALLER MAY ADD, LIST BY LIST, which is `may(shell, 'append', list)`. The palette once drew
  * the row for a `read` member, and `create` then refused the press: a row that cannot run is absent (`admit.ts`), not
  * drawn to fail. `boot` now says the level held on each list (`me.levels`), so a colleague with Edits on Expenses and
  * Reads on the rest is offered Expenses alone, and a record-wide appender is not offered the owner's lists `create`

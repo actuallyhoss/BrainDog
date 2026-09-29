@@ -1,5 +1,5 @@
 <!--
-  Everything a record can add, in one grid: `/packs/browse` (`loop/finish/platform.md` PLT-3, §4.0 L).
+  Everything a record can add, in one grid: `/packs/browse`.
 
   ONE LISTING MODEL. The modules this build ships, its built-in use cases and every entry the Kennel answers are read into
   `Listing`s by `listingsOf` (`$lib/market/listing.ts`), so they are searched, counted, filtered and sorted the same
@@ -13,7 +13,7 @@
   A HOST WITH NO KENNEL, OR A RECORD THAT DOES NOT ANSWER, still draws every built-in listing: neither is what browse is
   about, and a signed-out visitor from the site's Install link is shown what there is before being asked to sign in.
 
-  THE LOOK (SYSTEM §5, §6, and the site's catalogue board): the search field and the order are glass in the title row's
+  THE LOOK (and the site's catalogue board): the search field and the order are glass in the title row's
   toolbar, and the sentence under the title says how many there are and how many this record holds already. The
   categories are a glass segmented control on the ground under it: a row of up to nine chips does not fit a toolbar
   beside a title, and a toolbar that wraps under itself reads as two toolbars. Then the grid of tiles, 12 apart.
@@ -145,8 +145,8 @@
 
   /**
    * THE SEARCH FIELD IN THE TOOLBAR: a field (the `--r-md` corner, the search glyph, 36 tall and 44 under a thumb) in
-   * the toolbar's glass rather than the field's `--s1`, because it sits on the ground with the other toolbar controls
-   * (SYSTEM §5). Its focus is the field's ring, on the wrapper.
+   * the toolbar's glass rather than the field's `--s1`, because it sits on the ground with the other toolbar controls.
+   * Its focus is the field's ring, on the wrapper.
    */
   .find {
     display: flex;
@@ -232,7 +232,7 @@
     font-size: var(--t-sm);
   }
 
-  /* ONE COLUMN OF TILES ON A PHONE, TWO FROM 640PX AND THREE FROM 900PX, 12 apart (SYSTEM §4), set by the breakpoints
+  /* ONE COLUMN OF TILES ON A PHONE, TWO FROM 640PX AND THREE FROM 900PX, 12 apart, set by the breakpoints
      rather than by a tile's least width, so the count is the same at 390 and at 1440 whatever the rail takes. */
   .catalogue {
     display: grid;

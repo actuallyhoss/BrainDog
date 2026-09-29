@@ -1,15 +1,14 @@
 /**
- * The new answers a built page gets, from the record through this app to the fence the renderer draws (brief D7 of
- * `loop/research-dynamic-layouts.md`, P3 to P10, the app half).
+ * The new answers a built page gets, from the record through this app to the fence the renderer draws (the app half).
  *
- * WHAT THIS FILE MEASURED AGAINST THE TREE WAVE TWO LEFT, over the record below. The kernel already answered every one
+ * WHAT THIS FILE MEASURED AGAINST THE TREE BEFORE IT, over the record below. The kernel already answered every one
  * of these (`nexts`, `done_now` and `next`, `shows`, `range`, `types`), and the renderer already drew every form
  * (`cards lead`, `steps path`, `queue tiles`, `progress range`, `note lead`, `inputs`), and nothing between them wrote
  * a single one. Run against that `blocks.ts`, every fence came back with no form at all; the lead note read
  * "1 essential step(s) done"; the `inputs` block, which has no `source:`, drew "Nothing matched." over the row the
  * kernel had handed it; and once the forms were written, the card's `as: next` column still reached the fence as
  * `fact: Next` over the card's own `what`, "The first piece" where the record answered "Sample the fit", because
- * `page-live.ts` dropped the two roles wave one added.
+ * `page-live.ts` dropped the two roles added before it.
  *
  * EVERY BLOCK GOES THROUGH THE RECORD'S OWN PAGE READ, `blockOf` AND `draw`, because a hand-made answer would pass
  * while the page read, the app's narrowing or the fence writer threw a key away. The lists are invented and name
@@ -183,7 +182,7 @@ function fence(block: LiveBlock): Block {
 
 const cells = (b: Block): string[][] => b.rows.map((r) => r.cells.map((c) => c.trim()));
 
-/* ── P10: the lead sentence ─────────────────────────────────────────────── */
+/* ── the lead sentence ──────────────────────────────────────────────────── */
 
 test('A LEAD NOTE SAYS ITS FIGURES AS A SENTENCE: one step, not one step(s), and a clause of noughts goes', async () => {
   /* THE SENTENCE AS A READER HEARS IT: the renderer wraps each figure in its own span, which is drawing, not words. */
@@ -203,7 +202,7 @@ test('A LEAD NOTE SAYS ITS FIGURES AS A SENTENCE: one step, not one step(s), and
   assert.match(said(named(none, 'Two figures')), /<p>0 of the 3 essential steps are done<\/p>/u, 'only the clause whose every figure is nought goes');
 });
 
-/* ── P3 and P4: the next step on a card, and the lead card ──────────────── */
+/* ── the next step on a card, and the lead card ─────────────────────────── */
 
 test('A CARD SAYS ITS NEXT STEP, from the record\'s nexts, and the first card is the lead', async () => {
   const b = fence(named(await desk(true), 'Parts'));
@@ -215,7 +214,7 @@ test('A CARD SAYS ITS NEXT STEP, from the record\'s nexts, and the first card is
   ]);
 });
 
-/* ── P5: the path ───────────────────────────────────────────────────────── */
+/* ── the path ───────────────────────────────────────────────────────────── */
 
 test('A PATH MARKS ITS STEPS DONE AND NEXT from the record, and its short view counts the rest', async () => {
   const blocks = await desk(true);
@@ -273,7 +272,7 @@ test('THE SHORT VIEW\'S "more" COUNTS THE OPEN STEPS IT LEFT OUT, and a done ste
   assert.doesNotMatch(JSON.stringify(all.segments), /more/u);
 });
 
-/* ── P6: an option shown as what it is ──────────────────────────────────── */
+/* ── an option shown as what it is ──────────────────────────────────────── */
 
 test('AN OPTION CARRIES WHAT IT IS in its seventh cell, and tiles are the queue\'s form', async () => {
   const b = fence(named(await desk(true), 'Calls'));
@@ -282,7 +281,7 @@ test('AN OPTION CARRIES WHAT IT IS in its seventh cell, and tiles are the queue\
   assert.deepEqual(opts.map((c) => [c[2], c[6]]), [['sand', 'swatch:#d8c3a5'], ['ink', 'figure:2 weeks longer']]);
 });
 
-/* ── P9: ranges against spend ───────────────────────────────────────────── */
+/* ── ranges against spend ───────────────────────────────────────────────── */
 
 test('A RANGE IS WRITTEN label, spent, low and high, each figure the record\'s own', async () => {
   const b = fence(named(await desk(true), 'Budget'));
@@ -354,7 +353,7 @@ test('A RANGE OF MONEY BESIDE PLAIN NUMBERS IS SAID TO BE ONE, not drawn as if n
   assert.match(words, /not all in one unit, money beside plain numbers or two currencies, so they are not drawn on one scale or added up\.$/u);
 });
 
-/* ── P8: inputs ─────────────────────────────────────────────────────────── */
+/* ── inputs ─────────────────────────────────────────────────────────────── */
 
 test('INPUTS ARE ONE ROW\'S FIELDS, field, label, type and value, and each row names the record row it edits', async () => {
   const block = named(await desk(true), 'Check');

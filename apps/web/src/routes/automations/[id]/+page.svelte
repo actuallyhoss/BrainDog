@@ -1,5 +1,5 @@
 <!--
-  One automation on the canvas: `/automations/<id>`, and `/automations/new` for a new one (§6, Brief E).
+  One automation on the canvas: `/automations/<id>`, and `/automations/new` for a new one.
 
   THE TRIGGER CARD ON TOP, THEN THE STEPS IN A COLUMN, and a branch's two arms as two columns under it. That is the
   whole geometry: nothing has an x or a y, so every drag, key and menu entry is a move between lists (`lib/flow`).
@@ -27,7 +27,7 @@
   before in the steps' own words, and puts an older one back on the canvas to be saved. As written is the declaration
   itself, one click away and never the only way to see it (21 §3.1's text lens).
 
-  THE LOOK (SYSTEM §6, SCREENS Automations). The trigger and every step are tiles on the ground, joined by `--rule`
+  THE LOOK. The trigger and every step are tiles on the ground, joined by `--rule`
   lines, each with its icon in a well; the card being edited has an ink well and the docked panel beside it
   (`Inspector.svelte`), so the flow stays in view while it is filled in. Try it is a tile under the flow, and Try and
   Save ride in a glass bar at the foot. Runs opens on a tile of how the last runs went, a bar of their endings and a
@@ -228,9 +228,9 @@
   /**
    * A NEW DRAFT NOBODY HAS TOUCHED SAYS NOTHING IS WRONG WITH IT. It has no steps, so the lint says "An automation does at
    * least one step." before anything has been drawn, and the page drew that twice, under the trigger and in the footer,
-   * as the first thing a stranger read at `/automations/new` (`loop/research-canvas-ux.md` 1.2).
+   * as the first thing a stranger read at `/automations/new`.
    *
-   * NOT `flow.dirty`, WHICH THE BRIEF NAMED AND WHICH IS NEVER FALSE HERE. `FlowDraft.open` sets what `dirty` compares
+   * NOT `flow.dirty`, THE OBVIOUS FLAG, WHICH IS NEVER FALSE HERE. `FlowDraft.open` sets what `dirty` compares
    * against to '' for a new draft ("A new one is always dirty", `flow.svelte.ts`), so `!flow.dirty` would have hidden
    * nothing. The page keeps the blank body it opened and compares against that instead. The button still reads
    * `faults`, so nothing that could not be sent becomes sendable.
@@ -246,7 +246,7 @@
   const blocked = $derived(faults.length > 0 || served !== null);
   const triedNow = $derived(tried !== null && tried.body === drawn ? tried.answer : null);
   const ranNow = $derived(ran !== null && ran.body === drawn ? ran.answer : null);
-  /* THE DECLARED TITLE, NEVER THE ID (`loop/finish/design-brief.md` §9): the name typed, else the one the record's row
+  /* THE DECLARED TITLE, NEVER THE ID: the name typed, else the one the record's row
      carries, which `rowOf` has already worked out from the product's names when the body declares none. */
   const title = $derived(flow.draft.name.trim() || (row ? row.name : fresh ? words.newOne : words.untitled));
   const manual = $derived('manual' in flow.draft.trigger);
@@ -531,7 +531,7 @@
     flow.said = copy.flowUndone;
   }
 
-  /** Put the last undo back, from the button or the key (EDT-4). Same reason as `undo`: the card says nothing itself. */
+  /** Put the last undo back, from the button or the key. Same reason as `undo`: the card says nothing itself. */
   function redo() {
     flow.redo();
     flow.said = copy.flowRedone;
@@ -546,7 +546,7 @@
    * NEVER WHILE TYPING, because a field's own undo is the browser's and takes back letters, not steps. Only on the Steps
    * tab, since Runs and Versions draw no canvas to change.
    *
-   * MOD+SHIFT+Z AND MOD+Y BOTH REDO (EDT-4), the two spellings a keyboard offers for the move, taken the same way as
+   * MOD+SHIFT+Z AND MOD+Y BOTH REDO, the two spellings a keyboard offers for the move, taken the same way as
    * Mod+Z: first, in the capture phase, and only when the canvas has something to give back.
    */
   $effect(() => {
@@ -685,7 +685,7 @@
           </div>
 
           <!-- TRY AND SAVE, AND NOTHING ELSE, IN THE STICKY GLASS BAR, so on a phone it is one row of two 44px buttons, no
-               taller than `--sticky`, floating above the tab bar (`loop/finish/design-brief.md` §6 and §11.12). -->
+               taller than `--sticky`, floating above the tab bar. -->
           <div class="bar">
             <Button disabled={trying || flow.draft.steps.length === 0} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
             <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
@@ -773,7 +773,7 @@
                       <Tile icon="history" title={canvasWords.changed} count={changes.length}>
                         <ul class="diff">
                           {#each changes as d, j (j)}
-                            <!-- A WORD AND A MARK, NOT A COLOUR ALONE (`loop/finish/design-brief.md` §10): the mark is read out
+                            <!-- A WORD AND A MARK, NOT A COLOUR ALONE: the mark is read out
                                  as added or removed, and the line keeps its indent under a branch. -->
                             <li class="diff-line" data-op={d.op}>
                               <span class="diff-mark" role="img" aria-label={d.op === 'added' ? 'Added' : 'Removed'}>{d.op === 'added' ? '+' : '−'}</span>
@@ -849,8 +849,7 @@
   }
 
   /* ONE COLUMN OF 720 for the flow and everything that goes with it: the try tile, the calls, the footer and the bar
-     are the cards' width, so at 1440 Save never sits out on its own to the right of what it saves
-     (`loop/finish/design.md` 2.7). */
+     are the cards' width, so at 1440 Save never sits out on its own to the right of what it saves. */
   .column {
     display: flex;
     flex-direction: column;
@@ -914,7 +913,7 @@
     line-height: 18px;
   }
 
-  /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph (SCREENS, Automations), on the
+  /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph, on the
      ground, lined up with the trigger's words. */
   .fault {
     display: flex;
@@ -979,7 +978,7 @@
     text-underline-offset: 3px;
   }
 
-  /* THE RECORD'S NO, IN INK AFTER A RED GLYPH; WHAT HOLDS THE SAVE BACK, IN RED WORDS (SCREENS, Automations). */
+  /* THE RECORD'S NO, IN INK AFTER A RED GLYPH; WHAT HOLDS THE SAVE BACK, IN RED WORDS. */
   .said[data-tone='warn'] {
     display: flex;
     align-items: flex-start;
@@ -1000,13 +999,13 @@
   }
 
   /**
-   * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a glass bar at the foot of the column (SYSTEM §5: chrome is glass). A
+   * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a glass bar at the foot of the column (chrome is glass). A
    * flow of twenty cards puts them two screens down, and they are the two things the page is for.
    *
    * ON A PHONE IT FLOATS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
    * scrollport runs to the bottom of the window, and `TabBar` floats `--inset` over its last `--tabbar`, so this sticks
    * a step above that. It is the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most anything sticky
-   * may be on a phone (`loop/finish/design-brief.md` §6). The sentence, Undo and Run now sit in the flow above it. At
+   * may be on a phone. The sentence, Undo and Run now sit in the flow above it. At
    * 900 and up there is no tab bar and it floats `--inset` over the bottom edge, at the column's end.
    */
   .bar {
@@ -1059,7 +1058,7 @@
     }
   }
 
-  /* THE HEAD'S "…": a 36px circle, as every icon control in a toolbar is (SYSTEM §5). */
+  /* THE HEAD'S "…": a 36px circle, as every icon control in a toolbar is. */
   .more-trigger {
     display: flex;
     align-items: center;
@@ -1101,7 +1100,7 @@
   }
 
   /* THE MENU'S ROWS: `Menu.svelte` gives them their height and rhythm; the colours are the caller's. A destructive verb
-     is its words in ink (SYSTEM §6), last in the menu and never red. */
+     is its words in ink, last in the menu and never red. */
   .mi {
     background: none;
     border: 0;
@@ -1119,13 +1118,13 @@
 
   /* ── the Runs tab ─────────────────────────────────────────────────────── */
 
-  /* THE SPARKLINE IN THE TILE'S TOP RIGHT, 120 by 32 with no axes (SYSTEM §7). */
+  /* THE SPARKLINE IN THE TILE'S TOP RIGHT, 120 by 32 with no axes. */
   .trend {
     display: block;
     inline-size: 120px;
   }
 
-  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6), at body size in ink. */
+  /* THE ONE LINE UNDER THE CHART that says what it means, at body size in ink. */
   .reading {
     margin: 0;
     color: var(--ink);

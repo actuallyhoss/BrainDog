@@ -1,5 +1,5 @@
 /**
- * The `reroute` hook: `/app/<slug>/…` is drawn by the same route as `/app/…` (`loop/research-one-domain.md` §2.4).
+ * The `reroute` hook: `/app/<slug>/…` is drawn by the same route as `/app/…`.
  *
  * THE ROUTE TREE DOES NOT MOVE. The slug cannot be `paths.base`, which is static, so SvelteKit is handed the address
  * with the slug taken out, and `routes/r/[register]` answers `/app/acme/r/tasks` as it answers `/app/r/tasks`.

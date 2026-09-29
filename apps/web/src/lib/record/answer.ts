@@ -6,8 +6,7 @@
  * `<span class="q-options">` printing three titles joined with a middle dot, INSIDE the card's own
  * link. Three things that read as three choices and behaved as one, because clicking any of them
  * landed on `/decide/<id>` with nothing selected. Answering meant a second screen and a paragraph of
- * prose before the button would turn on. `loop/research-friction.md` §6 ranks that ninth of the ten
- * things that cost a person the most.
+ * prose before the button would turn on, one of the ten things that cost a person the most.
  *
  * The card now presses. Which means three facts stopped being decoration and started being logic:
  * WHICH options a question offers, WHAT one press records, and WHAT the inverse restores. All three
@@ -18,7 +17,7 @@
  *
  * NOTHING HERE WRITES. An `Answer` is the shape a press takes before `decide-write.ts` sends it to the
  * record. It was also the sample's receipt: `wouldRecord` said what the record "would" have gained,
- * toasted on a Decide drawn from the sample, and went when the sample did (DIRECTION 26).
+ * toasted on a Decide drawn from the sample, and went when the sample did.
  */
 
 import type { Question } from './schema.ts';
@@ -129,8 +128,8 @@ export function record(answers: ReadonlyMap<string, Answer>, a: Answer): Map<str
 /**
  * Take one answer back.
  *
- * THIS IS THE UNDO, AND IT IS THE WHOLE ARGUMENT FOR THE PRESS BEING ONE PRESS. `loop/REWORK.md` §4:
- * there are no confirmation dialogs in this product, because a dialog asks its question before
+ * THIS IS THE UNDO, AND IT IS THE WHOLE ARGUMENT FOR THE PRESS BEING ONE PRESS.
+ * There are no confirmation dialogs in this product, because a dialog asks its question before
  * anything has happened, when the reader knows the least they ever will, and the answer is always
  * yes. Of eighty-five human writes over thirteen days in the record this product is modelled on,
  * thirteen reversed the write immediately before them and twelve of those landed inside five

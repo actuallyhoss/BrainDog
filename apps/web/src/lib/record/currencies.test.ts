@@ -54,8 +54,8 @@ test('THE COMMON CURRENCIES COME FIRST, then every other offered code once, in c
 
 test('EGP IS NOT ONE OF THE COMMON ONES, and a record whose home currency it is still leads with it', () => {
   /* THE ELEVEN ARE THE CURRENCIES MOST PEOPLE HOLD, AND EGP WAS IN THEM BECAUSE ONE PERSON HOLDS IT. It was the
-     twelfth, the last trace of the list that led with it, and `shell-words` exempted this file by name for it until
-     25 September. Taken out, a person at EGP loses nothing: `currencyChoices` puts a held code the picker offers at the
+     twelfth, the last trace of the list that led with it, and `shell-words` exempted this file by name for it.
+     Taken out, a person at EGP loses nothing: `currencyChoices` puts a held code the picker offers at the
      head of the common group whatever group it came from, so their own money is still the first option, once. */
   assert.equal(COMMON_CURRENCIES.includes('EGP'), false, 'EGP is offered among the common currencies');
   assert.equal(OTHER_CURRENCIES.includes('EGP'), true, 'EGP is not offered at all');

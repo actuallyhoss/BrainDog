@@ -1,5 +1,5 @@
 /**
- * Slash's citations, drawn: the one reader of the brace grammar in the app (`loop/finish/contracts.md` §4.3, C15).
+ * Slash's citations, drawn: the one reader of the brace grammar in the app.
  *
  * WHAT A BRACE IS. Slash may not type a figure (`packages/slash/src/prompts.ts`, rule 1), so every figure and every row
  * it names reaches the screen as a brace: `{{ref:obligations#7}}` is a row, `{{obligations#7.amount}}` a row's value,
@@ -11,7 +11,7 @@
  * NO BRACE IS EVER DRAWN. A brace this file cannot resolve, because the answer is older than `figures` or names
  * something it did not keep, is drawn in words of its own: a row by its list, a figure by its name. It was the defect
  * this file exists to end: the palette printed `p.text` as it came and Decide printed `because` as it came, and both
- * showed the owner raw braces (`loop/finish/agents.md` §2.7, S2 and S3).
+ * showed the owner raw braces.
  *
  * PURE AND NODE-LOADABLE, so `node --test` can hold it: `Cited.svelte` draws what `cited` answers and decides nothing.
  */

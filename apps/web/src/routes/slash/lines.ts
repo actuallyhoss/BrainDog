@@ -1,9 +1,9 @@
 /**
- * What `/slash` says in figures and sentences (SYSTEM §5, §6): the line under the title, whose red phrase is the
+ * What `/slash` says in figures and sentences: the line under the title, whose red phrase is the
  * suggestions waiting for him on Decide, and the "Suggestions" tile's figure, bar and reading line.
  *
  * EVERY NUMBER IS ONE `readSlash` ANSWERED. The tile counts `suggestionsOf(reading)` by where each stands and nothing
- * else, and the cap is the record's own `cap`, so no figure here is a guess (SCREENS rule 4).
+ * else, and the cap is the record's own `cap`, so no figure here is a guess.
  *
  * PURE, SO `node --test` CAN IMPORT IT.
  */
@@ -34,8 +34,8 @@ export const words = {
 export type Sentence = { text: string; needs: string | undefined };
 
 /**
- * THE LINE UNDER "Slash": what waits for him first, in red, then who drafts (`draftedBy`, the screen's line since
- * DSN-18). With nothing waiting it is who drafts alone, with no red, because nothing on this screen is late.
+ * THE LINE UNDER "Slash": what waits for him first, in red, then who drafts (`draftedBy`, the screen's line).
+ * With nothing waiting it is who drafts alone, with no red, because nothing on this screen is late.
  */
 export function sentenceOf(by: string, waiting: number): Sentence {
   if (waiting <= 0) return { text: by, needs: undefined };
@@ -55,7 +55,7 @@ const listed = (parts: readonly string[]): string =>
 
 /**
  * "Suggestions": new, waiting on Decide and answered, as one stacked bar. Waiting is amber, since it waits on him; new is
- * ink, since it is his to put there; answered is green, since it is done (SYSTEM §2). `null` with nothing suggested.
+ * ink, since it is his to put there; answered is green, since it is done. `null` with nothing suggested.
  *
  * `onDecide` IS THE RECORD'S COUNT of Slash's open questions, the one `canAsk` holds under `cap`, so the line can say why
  * the new ones are not put there yet when Decide is full.

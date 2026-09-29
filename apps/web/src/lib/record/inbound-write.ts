@@ -2,9 +2,9 @@
  * The forwarding address: `POST /api/inbound/mint` and `POST /api/inbound/revoke`, the half a person presses.
  *
  * IT EXISTED WITH NO CALLER, WHICH IS WHY THIS FILE EXISTS. `apps/worker/src/inbound.ts` mints an address, writes
- * only its SHA-256 to the Directory's `dir_inbound` and answers the token once. Measured on 2026-09-21 by grepping
- * `apps/web` for `api/inbound`: nothing in the app called either door, so the Cloud could take a bank's forwarded
- * mail at an address no owner had any way to obtain. `loop/research-batch-three-audit.md` finding 1.
+ * only its SHA-256 to the Directory's `dir_inbound` and answers the token once. Measured by grepping `apps/web` for
+ * `api/inbound`: nothing in the app called either door, so the Cloud could take a bank's forwarded mail at an address
+ * no owner had any way to obtain.
  *
  * NOT THROUGH THE CLIENT, FOR `downloadSnapshot`'s REASON AND ONE MORE. `/api/inbound/*` is not a record method:
  * it writes the DIRECTORY's tenant map, not the record, so it is not in the client's route table and a name in
@@ -49,7 +49,7 @@ export const mailUrl = (origin: string, token: string): string => `${origin.repl
  * route mints one. Reported as a refusal it would read as forwarding being broken rather than spelled differently.
  *
  * THERE WAS A `sample` KIND, for a screen with no record behind it, and the caller answered it with the demo's sentence
- * about having no account. There is no sample now (`DIRECTION.md` §26): a 401 is `signin`, and a host that answered
+ * about having no account. There is no sample now: a 401 is `signin`, and a host that answered
  * nothing a record says is `refused` with `recordNotReached`, the sentence every other Settings write says for it.
  */
 export type Said =

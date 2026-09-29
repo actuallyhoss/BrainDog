@@ -1,7 +1,7 @@
 /**
  * A heat grid's geometry: rows by columns of rounded squares, each shaded by how much, with the row
- * names at the left and every few column names on top (SYSTEM §7, "intensity over time";
- * Light-Activity's changes by hour).
+ * names at the left and every few column names on top ("intensity over time",
+ * such as changes by hour).
  *
  * FIVE STEPS, NOT A GRADIENT: nothing, then four quarters of the busiest cell, drawn as the track and
  * then the ramp from light grey to ink. Four greys are what an eye can tell apart; a continuous

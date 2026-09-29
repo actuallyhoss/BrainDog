@@ -11,7 +11,7 @@
  * NO FACTOR TABLES. The browser's own figure engine was the one reader of `held.ts`'s `LOOKUPS`, and it is gone: a
  * figure is read by the record, which reads its factors off the figure's declaration.
  *
- * IT WAS THE FIXTURE'S OWN SIDE EFFECT UNTIL WAVE C1, and not only a test's. `data.ts` wrote the declarations and pages
+ * IT WAS THE FIXTURE'S OWN SIDE EFFECT UNTIL THE SAMPLE LEFT THE APP, and not only a test's. `data.ts` wrote the declarations and pages
  * into `held.ts` when it loaded, and eleven shipped files imported it for a table or two, so every tab carried the
  * seed's declarations from its first line.
  */

@@ -1,11 +1,11 @@
 <!--
   The hub's Scripts tab: each script, what starts it, and where it stands, one row each opening that script.
 
-  NO TILES HERE (SCREENS, Automations): the scripts screen holds the charts of its runs, and a second copy one tab
+  NO TILES HERE: the scripts screen holds the charts of its runs, and a second copy one tab
   away would drift from the first. The list sits on the ground under its heading, each row with the code glyph.
 
   THE SCRIPTS SCREEN KEEPS THE DETAIL. What a script may read, write and fetch, its versions, its owner-only log and
-  Resume are on `/scripts` (SCR-2), so this tab says where each one stands and points there, rather than drawing a
+  Resume are on `/scripts`, so this tab says where each one stands and points there, rather than drawing a
   second copy of cards that would drift from the first.
 -->
 <script lang="ts">

@@ -11,7 +11,7 @@
   each would name a part of the record the link does not open. What it carries is the owner's words, the columns' labels,
   the plain values of the fields those columns draw, and the figures, and that is what is drawn here.
 
-  IT IS THE ONE SCREEN A STRANGER SEES, SO IT IS THE LOOK AT ITS CALMEST (SYSTEM §2, §5, §10). The ground and its one
+  IT IS THE ONE SCREEN A STRANGER SEES, SO IT IS THE LOOK AT ITS CALMEST. The ground and its one
   light, a glass bar floating 12 from the top with the mark, the name and what the link is, the page's title and the
   day the link stops working, and then the owner's blocks on twelve columns: a block that holds figures or rows is a
   white tile with an icon on its heading, and a block of the owner's words sits on the ground with no box. Geist for
@@ -41,7 +41,7 @@
 
   const token = $derived(route.params.token ?? '');
 
-  /* THE ONE WORD THIS SCREEN ADDS (DSN-18): the action under a dead link. The rest are `share-write.ts`'s. */
+  /* THE ONE WORD THIS SCREEN ADDS: the action under a dead link. The rest are `share-write.ts`'s. */
   const shareWords = { whatItIs: 'See what BrainDog is' };
 
   let got = $state<SharedRead | null>(null);
@@ -114,7 +114,7 @@
 
   /**
    * WHETHER A BLOCK IS A TILE. A block that holds figures, a table the owner wrote or rows is content with a shape of
-   * its own, so it stands on a white tile with its heading's icon (SYSTEM §6). One that holds the owner's words and
+   * its own, so it stands on a white tile with its heading's icon. One that holds the owner's words and
    * nothing else is read as a page is read, on the ground with no box, and so is a heading the link keeps alone.
    */
   const tiled = (b: SharedBlock): boolean => b.readings.length > 0 || b.authored.length > 0 || b.rows.length > 0 || b.columns.length > 0;
@@ -150,7 +150,7 @@
 
     {#if b.readings.length > 0}
       <!-- EACH FIGURE IS ITS LABEL AND ITS NUMBER, and where the record sent how it moved, the line of it at the top right
-           and one sentence under it saying which way and by how much (SYSTEM §6, §7). -->
+           and one sentence under it saying which way and by how much. -->
       <dl class="figures">
         {#each b.readings as r, n (n)}
           {@const trend = trendOf(r)}
@@ -214,7 +214,7 @@
     <Waiting head />
   {:else if got.from === 'shut'}
     <!-- NO REASON. Every way a link fails is one answer at the record, so the page says it is not shared and who can fix
-         that, and nothing about which way it failed. AND ONE ACTION (DSN-18): the person holding a dead link cannot mend
+         that, and nothing about which way it failed. AND ONE ACTION: the person holding a dead link cannot mend
          it from here, so the one thing offered is where it came from, the product, rather than an empty end. -->
     <div class="gone">
       <Empty kind="no-permission" heading glyph="link" title={words.sharedDead} body={words.sharedDeadBody}>
@@ -288,7 +288,7 @@
 
   /* ── The bar ───────────────────────────────────────────────────────────── */
 
-  /* LEVEL TWO GLASS (SYSTEM §4, §10): the frosted fill, its blur, the hairline pair and the chrome's shadow. It stays
+  /* LEVEL TWO GLASS: the frosted fill, its blur, the hairline pair and the chrome's shadow. It stays
      12 from the top while the page passes under it, which is the only thing on this screen that moves. */
   .bar {
     position: sticky;
@@ -313,7 +313,7 @@
     min-inline-size: 0;
   }
 
-  /* GEIST, AS EVERY WORD IS (SYSTEM §3, §11): the wordmark was the display face, and there is one face now. */
+  /* GEIST, AS EVERY WORD IS: the wordmark was the display face, and there is one face now. */
   .wordmark {
     color: var(--ink);
     font-family: var(--font-ui);
@@ -362,7 +362,7 @@
     gap: var(--sp-1);
   }
 
-  /* `t-title`, 28/34 at 600 (SYSTEM §3), and the phone's large title below 900. */
+  /* `t-title`, 28/34 at 600, and the phone's large title below 900. */
   .title {
     margin: 0;
     color: var(--ink);
@@ -375,7 +375,7 @@
     text-wrap: balance;
   }
 
-  /* THE SENTENCE: 16/24 in the second ink (SYSTEM §5). */
+  /* THE SENTENCE: 16/24 in the second ink. */
   .until {
     margin: 0;
     max-inline-size: var(--measure);
@@ -386,7 +386,7 @@
 
   /* ── The blocks ────────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN, and twelve from 900px up, where each block takes the span its owner gave it, 12 apart (SYSTEM §4). */
+  /* ONE COLUMN, and twelve from 900px up, where each block takes the span its owner gave it, 12 apart. */
   .blocks {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -401,7 +401,7 @@
     min-inline-size: 0;
   }
 
-  /* A TILE: the white surface, radius 22, padding 20, level one, and no border (SYSTEM §6). Its own markup rather than
+  /* A TILE: the white surface, radius 22, padding 20, level one, and no border. Its own markup rather than
      `Tile`, because a stranger's screen reader reaches each block by its heading's id (`#shared-b{i}`). */
   .tile {
     gap: var(--sp-4);
@@ -475,7 +475,7 @@
   }
 
   /* THE LABEL OVER THE FIGURE, and where there is a trend, its line at the top right across both and the one sentence
-     under them (SYSTEM §7: "a sparkline sits in the stat tile's top right, 120×32"). */
+     under them (the design system: "a sparkline sits in the stat tile's top right, 120×32"). */
   .figure {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -632,7 +632,7 @@
     }
   }
 
-  /* THE PHONE (SYSTEM §3, §9): the large title at 30/36, and the owner's words at 16 where a thumb holds the page. */
+  /* THE PHONE: the large title at 30/36, and the owner's words at 16 where a thumb holds the page. */
   @media (width < 900px) {
     .title {
       font-size: var(--t-figure);

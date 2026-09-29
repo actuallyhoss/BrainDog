@@ -321,7 +321,7 @@ test('A PLAN OF ROWS reads list by list, each row with the row it belongs with, 
 /*
  * A DECLARATION AN UPDATE HANDS TO ANOTHER PACK IS NOT TAKEN AWAY. The record files it with `to` (`arrange.ts`), and this
  * read every retire alike, so the HSBC door money-core hands to `bank-hsbc-eg`, still live and answering the owner's
- * Shortcut, was listed under "Takes away" (`loop/research-batch-thirty-four-audit.md` §8, the presenter's last half).
+ * Shortcut, was listed under "Takes away" by the presenter's last half.
  */
 test('A DECLARATION HANDED TO ANOTHER PACK GETS ITS OWN LINE, naming the pack, and is not said as taken away', () => {
   const body = {

@@ -6,11 +6,11 @@
  * and the next reader who has both files at once should move `mintsMail` beside `mintInbound` and
  * delete this header. Nothing else imports it.
  *
- * THE SCREEN OFFERED TWO CONTROLS THAT NO SELF-HOST CAN HONOUR. `loop/research-usability-2026-09-21.md`
- * finding 16: `/settings/ingest` drew `Make an address` and `Stop taking forwarded mail` on every
+ * THE SCREEN OFFERED TWO CONTROLS THAT NO SELF-HOST CAN HONOUR. `/settings/ingest` drew `Make an address` and
+ * `Stop taking forwarded mail` on every
  * host, both presses answered 404 `ROUTE_UNKNOWN`, and the sentence explaining that a self-host
  * keeps its address in the file `inbound.token` arrived only after the press. A reload put both
- * buttons back. Two of the eight controls that survey counted as unable to act on a fresh record
+ * buttons back. Two of the eight controls counted as unable to act on a fresh record
  * were these two.
  *
  * WHY THIS IS A REQUEST AND NOT `DEPLOYMENT.kind`. The sample's `DEPLOYMENT` followed a build flag that every shipped

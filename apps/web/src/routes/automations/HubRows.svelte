@@ -1,7 +1,7 @@
 <!--
-  The hub's rows (`loop/finish/shell.md` EDT-3): one list shape for automations, scheduled actions, scripts and runs.
+  The hub's rows: one list shape for automations, scheduled actions, scripts and runs.
 
-  ROWS ON THE GROUND (SYSTEM §6, "Lists are neither"): `rows.css`'s ledger, a 56px row with a 32px icon well for what
+  ROWS ON THE GROUND: `rows.css`'s ledger, a 56px row with a 32px icon well for what
   the thing is, its name, and under it what it is and where it stands; the right-hand column is its next turn or the
   time a run started. Nothing round the list, a hairline between its rows, and the rounded wash under the one pointed
   at. The caller puts it under a `Section` heading, grouped by kind or by day.
@@ -12,8 +12,8 @@
   THE SECOND LINE IS NEVER CUT. It is the verdict ("Paused. The key is not in the vault.") and an ellipsis took exactly
   the part that said what to do, so it wraps; the name gives way instead.
 
-  A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone (SYSTEM
-  §6, "a status is a 6px dot and its word"). Red for a failure, amber for a pause, and a hollow ring for off.
+  A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone (a
+  status is a 6px dot and its word). Red for a failure, amber for a pause, and a hollow ring for off.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
@@ -110,7 +110,7 @@
     border: 1.5px solid var(--dim);
   }
 
-  /* A TIME IN A FEED IS SET IN GEIST MONO (SYSTEM §3); a next turn is words and keeps the UI face. */
+  /* A TIME IN A FEED IS SET IN GEIST MONO; a next turn is words and keeps the UI face. */
   .aside[data-clock] {
     font-family: var(--font-id);
   }

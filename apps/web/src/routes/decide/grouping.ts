@@ -1,7 +1,7 @@
 /**
  * How the Decide queue is grouped, read from the address and written back into it.
  *
- * IT WAS A LOCAL `$state` AND THAT WAS THE WHOLE DEFECT. REWORK §5 asks that everything a screen is arranged by be a
+ * IT WAS A LOCAL `$state` AND THAT WAS THE WHOLE DEFECT. Everything a screen is arranged by is a
  * query parameter, on the test *would you want to send this to somebody*, and the register list has passed it for a
  * while. `/decide` grouped by list in memory only, so the one arrangement of the queue worth sending was the one the
  * link did not carry, and a reload put it back to ranked.

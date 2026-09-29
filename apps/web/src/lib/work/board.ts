@@ -6,7 +6,7 @@
  * Project, Due, Owner and Agent; a student's homework list may say only a title and a state. Each part of the screen
  * asks `shapeOf` whether its field is there and is absent when it is not, so the same screen draws both.
  *
- * THE BANDS ARE THE OWNER'S OLD TOOL'S (the old tool's `Work.svelte`): what is late or due today first, then the work by
+ * THE BANDS ARE THE OWNER'S OLD TOOL'S: what is late or due today first, then the work by
  * how much it matters, then what waits on somebody or sits with an agent, then what was kept for later and what was
  * finished. A task is in exactly one band, and the first rule that takes it wins, so no task is drawn twice.
  */

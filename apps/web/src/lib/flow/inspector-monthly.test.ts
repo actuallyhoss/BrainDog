@@ -2,7 +2,7 @@
  * The inspector's clock offers the record's monthly and yearly clocks, and every clock it builds is one the record
  * installs (`packages/kernel/src/clock.ts`, `flow-lint.ts` `calendarFault`).
  *
- * MEASURED RED ON 25 SEPTEMBER AT `896dd8b`. The kernel had taken `every: 1mo, day: 31, at: 09:00` since `clock.ts`
+ * MEASURED RED AT `896dd8b`. The kernel had taken `every: 1mo, day: 31, at: 09:00` since `clock.ts`
  * landed, and the inspector still offered 15m to 1w only. A monthly rule opened with its clock as an unlisted option and
  * no field for its day, time or month, and picking any clock went through `flow.ts`'s `clockOf`, which keeps `at` and
  * `day` for a day or a week alone: from `1mo, day: 31, at: 07:30` a pick of `3mo` wrote `{ every: 3mo }`, which the
@@ -75,7 +75,7 @@ test('A CLOCK OF MONTHS IS SAID IN WORDS, and which months it falls in is said f
 });
 
 test('A MONTHLY CLOCK PICKED ON THE CANVAS LEAVES SEND ON, and the trigger says its months in words', () => {
-  /* MEASURED RED ON 25 SEPTEMBER. `faultsOf` read every clock through `everyMs`, which knows m, h, d and w, so a pick of
+  /* MEASURED RED. `faultsOf` read every clock through `everyMs`, which knows m, h, d and w, so a pick of
      every 3 months said "3mo is not a clock" and turned Send off, and the card said "3mo on 1 at 09:00". */
   const draft = (on: unknown) => draftOf('rule.m', { rule: 'm', on, steps: [{ notify: { say: 'x' } }] });
   const quarterly = draft(clockTo('3mo', { every: '1h' }));

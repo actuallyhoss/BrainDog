@@ -1,5 +1,5 @@
 <!--
-  The inspector: a form for the card the canvas has open, in the docked `Panel` (SYSTEM §5): beside the canvas from
+  The inspector: a form for the card the canvas has open, in the docked `Panel`: beside the canvas from
   900px up, so the card being edited stays in view and its sentence changes as the fields do, and a bottom sheet on a
   phone. The canvas narrows beside it and never goes under it (`--dock-w`), the way Work's list does.
 
@@ -22,7 +22,7 @@
   `where.ts` compiles against the sample record's own lists; on a real record it would refuse a field the sample does
   not have, which is a wrong sentence rather than no sentence. The record checks the condition again when it is filed.
 
-  PICKED, NEVER TYPED, WHERE THE RECORD ALREADY HOLDS THE ANSWER (`loop/research-canvas-ux.md` 1.4 and 1.5). "In the
+  PICKED, NEVER TYPED, WHERE THE RECORD ALREADY HOLDS THE ANSWER. "In the
   list" was a box with `obligations` as its placeholder, "The declared call" a box hinting `gold_rate`, and a channel or
   a day was printed as its stored value; a stranger does not know any of those names, and a guess faulted on Send.
   Each is now a choice read from the record, and this sheet does the reading itself so the page's file stays the
@@ -36,7 +36,7 @@
   record, so on anybody's own record the chips offered nothing from the row and "the invoice's amount" could only be
   typed as braces. The record's own declaration is asked first now, and `fieldsOf` is the sample's path.
 
-  EVERY TRIGGER AND STEP THE RECORD RUNS HAS ITS FIELDS HERE (EDT-2). A figure crossing a line and a decision taken on
+  EVERY TRIGGER AND STEP THE RECORD RUNS HAS ITS FIELDS HERE. A figure crossing a line and a decision taken on
   Decide are offered beside the four that were (`flow.ts` `TRIGGER_KINDS`, read from the kernel's capability table); a
   clock says how late a turn may still be taken; a script is picked from the installed ones, a person asked from the
   record's members, and a call from the declared ones with the way to declare another. A template's references are
@@ -343,7 +343,7 @@
     flow.setStep(found.node.key, setAt(found.node.step, a.path, out));
   }
 
-  /* ── what Slash answers, and what goes with the question (AGT-25) ─────── */
+  /* ── what Slash answers, and what goes with the question ──────────────── */
 
   /* THE ARGUMENTS THAT MEAN SOMETHING NOW. `choices` is drawn only while the answer is a choice (`Arg.when`), so a
      person switching to "A number" is not left holding a list the lint would refuse. */
@@ -375,7 +375,7 @@
   }
 
   /*
-   * THE TRIGGER'S CONDITION, EITHER FORM (EDT-2): `flow.setCondition` marks the undo and files whichever one the
+   * THE TRIGGER'S CONDITION, EITHER FORM: `flow.setCondition` marks the undo and files whichever one the
    * editor is holding, sentence, tree or nothing, through `withCondition`, which keeps one form at a time.
    */
   function setWhenOf(next: string | Predicate | null) {
@@ -407,7 +407,7 @@
   function setCrossing(way: 'target' | 'gte' | 'lte', line: number) {
     setMetric({ crosses: way === 'target' ? 'target' : way === 'gte' ? { gte: line } : { lte: line } });
   }
-  /** A typed line, read as decimal digits only (`rules.md` §4): "0x10" is not 16, and a half-typed "-" keeps the old line. */
+  /** A typed line, read as decimal digits only: "0x10" is not 16, and a half-typed "-" keeps the old line. */
   function lineFrom(text: string): number | null {
     return /^-?\d+(?:\.\d+)?$/u.test(text.trim()) ? Number(text.trim()) : null;
   }
@@ -465,7 +465,7 @@
 <Panel {open} {title} onclose={shut}>
   {#snippet verbs()}
     {#if found}
-      <!-- WORDS IN INK, NOT RED (SYSTEM §6): a destructive verb is its words, and Undo in the footer takes it back. -->
+      <!-- WORDS IN INK, NOT RED: a destructive verb is its words, and Undo in the footer takes it back. -->
       <Button weight="bare" size="sm" tone="bad" onclick={() => found && flow.remove(found.node.key)}>{words.remove}</Button>
     {/if}
   {/snippet}
@@ -772,7 +772,7 @@
               </div>
             {/if}
             {#if picks === 'call' && live}
-              <!-- A CALL NOT DECLARED YET IS DECLARED IN DOR-4's SHEET, which the automations hub opens from its address
+              <!-- A CALL NOT DECLARED YET IS DECLARED IN THE NEW-ACTION SHEET, which the automations hub opens from its address
                    (`?new=action`), so a person who needs one is sent to where it is made rather than told it is missing. -->
               <p class="help">{words.inspect.newCallHelp} <a class="link" href={at('/automations?new=action')}>{words.inspect.newCall}</a></p>
             {/if}
@@ -807,7 +807,7 @@
     gap: var(--sp-2);
   }
 
-  /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink (SYSTEM §6, Fields), a step clear of the field
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink, a step clear of the field
      before it. */
   .label {
     margin: var(--sp-2) 0 0;
@@ -831,7 +831,7 @@
     border-block-start: 1px solid var(--line);
   }
 
-  /* AN ERROR IS RED WORDS AFTER THE GLYPH, NEVER A WASH (DESIGN-SYSTEM 1.2 and 4.8; SCREENS, Automations). */
+  /* AN ERROR IS RED WORDS AFTER THE GLYPH, NEVER A WASH. */
   .fault {
     display: flex;
     align-items: flex-start;
@@ -848,7 +848,7 @@
     color: var(--danger);
   }
 
-  /* A SELECT AND A BOX OF LINES ARE FIELDS (SYSTEM §6): 40 tall and 44 under a thumb, the `--s1` fill with no border,
+  /* A SELECT AND A BOX OF LINES ARE FIELDS: 40 tall and 44 under a thumb, the `--s1` fill with no border,
      radius `--r-md`. `controls.css` draws the select's chevron. */
   .select,
   .area {
@@ -917,7 +917,7 @@
   }
 
   @media (width < 640px) {
-    /* EACH CONTROL THE SHEET'S WIDTH ON A PHONE (AGT-25): the answer's shapes share the row equally, so a thumb has an
+    /* EACH CONTROL THE SHEET'S WIDTH ON A PHONE: the answer's shapes share the row equally, so a thumb has an
        even part of it each rather than pills huddled at the start. */
     .fill .segment {
       flex: 1 1 0;

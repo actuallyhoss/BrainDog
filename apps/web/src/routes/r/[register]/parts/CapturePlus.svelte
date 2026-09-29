@@ -1,5 +1,5 @@
 <!--
-  THE PHONE'S WAY IN TO ADDING A ROW: a "+" in the head's action slot (design SYS-6, DSN-7).
+  THE PHONE'S WAY IN TO ADDING A ROW: a "+" in the head's action slot.
 
   Below 640px the capture line is not drawn over the list, because it stood above the search box and
   the filters and put three rows of controls before the first card. This opens `CaptureLine`'s sheet,
@@ -9,7 +9,7 @@
   A BUTTON NAMED BY WHAT IT DOES, "Add an item", since a bare "+" says nothing to a screen reader.
   The page owns whether the sheet is open, so this only asks for it.
 
-  IT IS THE PHONE'S ONE PRIMARY (SYSTEM §5): an ink circle with the plus in the tile's colour, where the laptop's
+  IT IS THE PHONE'S ONE PRIMARY: an ink circle with the plus in the tile's colour, where the laptop's
   "New" pill stands, which a phone does without.
 -->
 <script lang="ts">
@@ -28,7 +28,7 @@
     display: none;
   }
 
-  /* 44 ON BOTH AXES UNDER A THUMB, AND INK: the toolbar's one primary as a circle (SYSTEM §5). */
+  /* 44 ON BOTH AXES UNDER A THUMB, AND INK: the toolbar's one primary as a circle. */
   @media (width < 640px) {
     .capture-open {
       display: inline-grid;

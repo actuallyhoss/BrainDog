@@ -14,12 +14,12 @@
   `/SG5` answered "Nothing answers to SG5" for a question that exists. A question is read through
   `governance` as `/decide` reads it and a row through `get` with the spoken id. `UNREACHABLE` and
   `UNAUTHORIZED` then sent it to the sample's question or row of the same id, a fictional studio's,
-  until DIRECTION 26 removed the sample.
+  until the sample was removed.
 
   AND ONLY WHAT IS SHAPED LIKE A SPOKEN ID IS ASKED ABOUT. Every one-segment address inside a record
   lands here, so `/moneyy` was answered "Nothing answers to “moneyy”" and told how ids are spelt, as
   if the person had been reading one out. A string that is not an id's shape was never an id: it is
-  an address that leads nowhere, and it gets the same not-found screen as any other (design SYS-8).
+  an address that leads nowhere, and it gets the same not-found screen as any other.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -61,8 +61,7 @@
 
   const raw = $derived(spoken());
 
-  /* This page's own words (contracts §11 X18). None of the titles ends in a full stop: a title is not a sentence
-     (design §6.8.5). */
+  /* This page's own words. None of the titles ends in a full stop: a title is not a sentence. */
   const words = {
     bareTitle: (said: string): string => `“${said}” could be in any of your lists`,
     bareBody: 'A number on its own does not say which list it is in. Search for the thing by what it says instead.',
@@ -82,7 +81,7 @@
 
   /**
    * A refusal as this page reads it. `detail` is the transport's own words when the client keeps them apart from its
-   * sentence (AGT-4's `unreachable()`); until then they are inside `fix`, and the fold below shows whichever it has.
+   * sentence (`unreachable()`); until then they are inside `fix`, and the fold below shows whichever it has.
    */
   type Refusal = { code: string; fix: string; detail?: string | undefined };
   type Wire = { ok: true; value: unknown } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
@@ -92,7 +91,7 @@
    *
    * A ROW'S OTHER REFUSALS ARE "NOTHING ANSWERS", which is what `get` refusing a spoken id nobody can name means. But
    * `UNAUTHORIZED` and `UNREACHABLE` are not an answer about the id: nothing was looked up, so "Nothing answers to
-   * tasks#3" would be a claim about a row nobody asked about. They drew the sample's row until DIRECTION 26; now they
+   * tasks#3" would be a claim about a row nobody asked about. They drew the sample's row until the sample left; now they
    * are said, like any refusal of a question.
    */
   const unasked = (code: string): boolean => code === 'UNAUTHORIZED' || code === 'UNREACHABLE';
@@ -200,7 +199,7 @@
 {/if}
 
 <style>
-  /* ON THE GROUND AND NOTHING ELSE (SYSTEM §5): no tile and no chart, only the state, its glyph level with where a
+  /* ON THE GROUND AND NOTHING ELSE: no tile and no chart, only the state, its glyph level with where a
      title row's title would stand (12 from the top of the work, as the head's) and at the page's gutter, so an address
      that led nowhere reads as a quiet screen of the app rather than a page of its own. `Empty` keeps its words at the
      measure; the column is not capped here. */

@@ -14,7 +14,7 @@
   against that object alone: no `createClient`, no `*-live` import, so `/v/services.lapsing` on a
   real record drew a filter somebody else wrote over rows from a register this record may not even
   declare. `views-live.ts` is built on the record's own `view` table. The sample then stayed on as
-  the answer when no record answered, and DIRECTION 26 removed that too: a record that does not
+  the answer when no record answered, and that was removed too: a record that does not
   answer is a refusal, drawn in its own words, and nothing on this screen comes from a fixture.
 
   AND THERE IS NO `+page.ts` IN FRONT OF IT ANY MORE, which is why any of the above runs in a
@@ -158,7 +158,7 @@
   /* WHETHER THE TITLE ROW HAS A LINE TO SAY: the snippet's own test, so the head draws no empty sentence. */
   const saying = $derived(Boolean(filters?.length || narrowed || live?.search));
   /* THE COLUMNS THE VIEW KEPT, and the register's own where it kept none. The spoken id ends the
-     row either way, as it does on the list this view narrows (DESIGN-SYSTEM rule 7). */
+     row either way, as it does on the list this view narrows. */
   const columns = $derived(register ? keptColumns(columnsFor(register, undefined, (live?.columns ?? []).includes('seq')), live?.columns ?? []) : []);
 
   const entries = $derived(got?.from === 'live' ? got.entries : []);
@@ -175,7 +175,7 @@
    * column is called and an enum value is written the way its cell writes it. A date clause keeps
    * its value as typed, because `today` is already a word and `display` would read it as a day.
    *
-   * AND THE LIST'S STATE SAYS ITSELF (design SYS-6, DSN-7): "Open or part paid", and not "Filter
+   * AND THE LIST'S STATE SAYS ITSELF: "Open or part paid", and not "Filter
    * Status is open or part". A state's values are the words a person uses for where a row is, so
    * they need no field name in front of them; any other field keeps its name, because "Money in"
    * alone does not say it is about which way the money went.
@@ -211,7 +211,7 @@
   let focus = $state({ row: 0, col: 1 });
   let binding = $state(false);
 
-  /* ── narrowing the view with the query builder (GAP-2) ─────────────────── */
+  /* ── narrowing the view with the query builder ─────────────────────────── */
 
   /**
    * THE BUILDER EDITS THE NARROWING, NEVER THE VIEW'S OWN PREDICATE. `19 §1` makes the saved view the predicate and the
@@ -351,7 +351,7 @@
     </Empty>
   </div>
 {:else}
-  <!-- THE TITLE ROW'S LINE IS WHAT THE VIEW SHOWS, IN WORDS (SYSTEM §5): the predicate as the list says it, and what was
+  <!-- THE TITLE ROW'S LINE IS WHAT THE VIEW SHOWS, IN WORDS: the predicate as the list says it, and what was
        typed into the box, quoted as typed. Never red: a view the record does not flag as late needs nobody.
 
        NO LINE AT ALL WHERE THE PREDICATE CANNOT BE WRITTEN AS CHIPS, which is the header's own rule applied to a shape
@@ -384,8 +384,8 @@
     sentence={saying ? predicateLine : undefined}
   >
     {#snippet actions()}
-      <!-- THE TOOLBAR IS GLASS (SYSTEM §5). The list this view narrows is the kicker's link, one step up, so it is not a
-           pill here as well; `o` still opens it. "Narrow this view" (GAP-2) wherever the list has fields to narrow by,
+      <!-- THE TOOLBAR IS GLASS. The list this view narrows is the kicker's link, one step up, so it is not a
+           pill here as well; `o` still opens it. "Narrow this view" wherever the list has fields to narrow by,
            and the way back to the view's own address once the address has narrowed it. -->
       {#if fields.length}
         <Button weight="glass" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.queryNarrowView}</Button>
@@ -516,7 +516,7 @@
     border-block-end-color: transparent;
   }
 
-  /* THE BIND CONTROL IS AN ICON CIRCLE (SYSTEM §5): 36 across, its name its label and its tooltip. */
+  /* THE BIND CONTROL IS AN ICON CIRCLE: 36 across, its name its label and its tooltip. */
   .bind-slot {
     display: inline-flex;
   }

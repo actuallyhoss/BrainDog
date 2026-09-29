@@ -185,14 +185,14 @@
 
   /**
    * A LINK PASTED INTO A TAB ALREADY HERE IS TAKEN TOO. A change to the fragment alone is a same-document navigation,
-   * so nothing mounts again: walked on 23 September, a claim link pasted over `/app/signin` changed the address, left
+   * so nothing mounts again: a claim link pasted over `/app/signin` changed the address, left
    * "Sign in to open your record." on screen, made no request, and stayed so until a reload. The owner will very likely
    * have this page open when he pastes it, from the site's own "Sign in". A press that is out keeps its moment; anything
    * else on screen gives way to the landing, which needs the step idle to be drawn.
    *
    * WHERE SOMEBODY IS ALREADY IN, THE LINK IS KEPT AND SAID, NOT LANDED. `stateOf` answers `signed-in` before it looks
-   * at a link, and measured by the audit's probe that drew "You are signed in" with the address emptied and nothing to
-   * say a link had come (`loop/research-batch-forty-six-audit.md` §9). The signed-in state carries the link now, the
+   * at a link, and was measured drawing "You are signed in" with the address emptied and nothing to
+   * say a link had come. The signed-in state carries the link now, the
    * screen says so in one line, and Sign out lands on it.
    */
   function arrived() {
@@ -216,10 +216,10 @@
 
   /**
    * SIGNING IN DROPS THE BOOT THIS TAB KEPT. The screen's own load asked `boot` at the bare `/app` with no session, was
-   * refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie and nothing more. Walked on
-   * 23 September (`loop/research-first-sign-in.md` friction 1), "Open BrainDog" then drew The Studio with no request,
+   * refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie and nothing more. Walked through,
+   * "Open BrainDog" then drew The Studio with no request,
    * after the claim link and again after the passkey. The onward buttons are full page loads, which is the repair.
-   * That refusal is not kept any more, since the sample went (DIRECTION 26); this stays for a tab that came here from
+   * That refusal is not kept any more, since the sample went; this stays for a tab that came here from
    * a record it had read, so a move out that is not a full load asks the record again rather than drawing the old one.
    */
   const enter = (via: 'passkey' | 'key' | 'link') => (who: Who) => {
@@ -490,14 +490,14 @@
         </div>
       {/if}
 
-      <!-- A STRANGER'S WAY TO A RECORD OF THEIR OWN (OPS-17). Not where the server key is offered: that is a self-host,
+      <!-- A STRANGER'S WAY TO A RECORD OF THEIR OWN. Not where the server key is offered: that is a self-host,
            made by its operator, and it has no sign-up to send anybody to. -->
       {#if doors && !doors.key}
         <p class="new-here"><a class="new-link" href={at('/signup')} data-sveltekit-reload>{copy.signupNewHere}</a></p>
       {/if}
 
       <!-- NO DEMO PILL. It opened the sample business at `/app/` for anybody not signed in, and there is no
-           sample now (DIRECTION 26): `/app/` with no session is this screen, so the pill led back here. -->
+           sample now: `/app/` with no session is this screen, so the pill led back here. -->
     </div>
   </div>
 </Entry>
@@ -518,8 +518,8 @@
     gap: var(--sp-2);
   }
 
-  /* THE SLOGAN IS THE SCREEN'S LEAD LINE: `t-lead`, 34/40 at 600 (SYSTEM §3), in Geist like every word. A phone takes
-     the large title's 30/36 (§3, Phone). */
+  /* THE SLOGAN IS THE SCREEN'S LEAD LINE: `t-lead`, 34/40 at 600, in Geist like every word. A phone takes
+     the large title's 30/36. */
   .slogan {
     margin: 0;
     color: var(--ink);
@@ -745,7 +745,7 @@
     scroll-margin-block: var(--sp-6) var(--sp-8);
   }
 
-  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size (SYSTEM §3), which is also the size below which a
+  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size, which is also the size below which a
      phone's browser zooms the page in on focus. The key's mono too. */
   @media (pointer: coarse) {
     .form .field-input,

@@ -1,6 +1,6 @@
 /**
  * The pattern builder's draft: the rule a person is making, held as the few things the screens let her change, and
- * turned into the ingest declaration the record installs (`loop/finish/platform.md` PLT-10).
+ * turned into the ingest declaration the record installs.
  *
  * THE BUILDER CHANGES FOUR THINGS AND KEEPS EVERYTHING ELSE. The list the rows go to, what each field is read by, the
  * match, and how sure the rule is. A proposal Slash or an agent drafted may carry a skip list, a dedupe key or a door,

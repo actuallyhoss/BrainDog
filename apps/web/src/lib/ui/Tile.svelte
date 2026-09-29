@@ -1,6 +1,5 @@
 <!--
-  A content tile: the white surface that holds a figure, its chart and the one line saying what the chart means
-  (SYSTEM §6, §12.2).
+  A content tile: the white surface that holds a figure, its chart and the one line saying what the chart means.
 
   THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px icon well, the title at
   the row size and 600, an optional count in the quiet ink, and at the far end either a link word with its arrow or a

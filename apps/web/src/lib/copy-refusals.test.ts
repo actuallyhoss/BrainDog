@@ -5,8 +5,7 @@
  * the one that builds a refusal's second half out of a list, because a list is the argument nothing
  * upstream promises anything about: `/v/<key>` hands it whatever `client.views()` answered, which on
  * a record with no saved views is nothing at all, and `/p/<slug>` hands it every pack's page titles,
- * which are not unique. Both were measured from a browser in the usability pass of 2026-09-21,
- * findings 12 and 4, within five minutes of a fresh record.
+ * which are not unique. Both were measured from a browser within five minutes of a fresh record.
  *
  * A separate file rather than a case in `copy.test.ts` because the subject is different: not whether
  * a generated sentence is English, but whether a refusal still has a usable second half when the
@@ -18,7 +17,7 @@ import assert from 'node:assert/strict';
 import { copy } from './copy.ts';
 
 test('A REFUSAL WHOSE HELPFUL HALF IS A FULL STOP. `/v/nothing` on a live record with no saved views', () => {
-  /* Finding 12. `addressOf` answers null for a keyless address, `client.views()` answers `[]`, and
+  /* `addressOf` answers null for a keyless address, `client.views()` answers `[]`, and
      `v/[view]/+page.svelte:264` handed those zero addresses straight to this sentence. What the
      screen printed under "There is no saved view called nothing." was "Saved views on this record:
      ." and nothing else: a refusal that trails off reads as a broken product rather than an answer,
@@ -28,13 +27,13 @@ test('A REFUSAL WHOSE HELPFUL HALF IS A FULL STOP. `/v/nothing` on a live record
 
   /* THE SAME BRANCH IS REACHED BY THREE OTHER SCREENS, and each names its own noun, so the sentence
      is built from `kind` rather than written out four times. `/r/<unknown>` on a record whose lists
-     are all at zero rows is the one finding 4 reaches. */
+     are all at zero rows is the one a mistyped list address reaches. */
   assert.equal(copy.theseExist('Lists', []), 'This record has no lists yet.');
   assert.equal(copy.theseExist('Pages', []), 'This record has no pages yet.');
 });
 
 test('and it does not repeat a name, because five entries called Overview are not a list anybody reads', () => {
-  /* Finding 4, the second half. After `Clear the examples` the rail keeps entries for pages that no
+  /* The second half. After `Clear the examples` the rail keeps entries for pages that no
      longer exist, and following one gave "Pages on this record: Overview · People · Home · Overview
      · Ledger · Overview · Board · Overview · Dashboard." Nine names of which five are one word
      repeated, because a page title is per-pack and this list is every pack's. The duplicate carries
@@ -67,7 +66,7 @@ test('A DEAD NETWORK IS ONE SENTENCE, whichever control was pressed', () => {
 
 test('and neither half of it sells, apologises or uses a word out of the schema', () => {
   /**
-   * The brief's third question: nothing that requires knowing what a "register", a "declaration" or
+   * The third question: nothing that requires knowing what a "register", a "declaration" or
    * a "projection" is in order to use it. `access.test.ts` walks every value in this file against a
    * banned-word list with several argument shapes; this pins the two shapes that matter for THIS
    * sentence, because the empty branch is a string `access.test.ts` reaches only by luck of which

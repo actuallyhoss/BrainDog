@@ -4,7 +4,7 @@
  * ONE POLL PER TAB, STARTED BY THE SHELL. The layout calls `follow` with the record it is showing, so every screen reads
  * the same two runes and none of them starts a timer of its own. `Reporting.svelte`'s 30 s re-list was the only poll in
  * the app before this, and a second per-screen poll would have been a second clock asking the same record the same
- * question (`loop/research-living-in-it.md` §1.1).
+ * question.
  *
  * NEVER FOR THE SAMPLE. The sample is in the browser and nothing else writes to it, so there is nothing to ask and no
  * host to ask it of: a static host answers `/api/version` with its SPA fallback, and the hairline would go to offline

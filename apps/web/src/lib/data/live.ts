@@ -1,10 +1,10 @@
 /**
  * Whether the record has changed since this tab last looked, asked of `/api/version` on a clock.
  *
- * SCREENS DID NOT MOVE WHILE AN AGENT WROTE. `loop/research-living-in-it.md` §1.1 found one poll in the whole app, and
+ * SCREENS DID NOT MOVE WHILE AN AGENT WROTE. There was one poll in the whole app, and
  * a register list that asked again only when its own question changed, so a row an agent wrote into the list he had
  * open appeared on his next navigation and not before. The record already answered the question: a second client's
- * write took a self-host's `version` from 0 to 1, and fifty calls averaged 0.87 ms each (§1.2, measured). This asks it.
+ * write took a self-host's `version` from 0 to 1, and fifty calls averaged 0.87 ms each (measured). This asks it.
  *
  * EVERY 1.5 s WHILE HE IS LOOKING, EVERY 15 s WHILE HE IS NOT. The owner's old tool asked per screen every 0.25 to 4 s
  * and felt alive; fifteen seconds for everything felt like a page that had to be reloaded. A tab that is visible and

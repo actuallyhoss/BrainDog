@@ -1,12 +1,12 @@
 <!--
   How a page is built: the text the record holds for it, in the `.dog` dialect, as a file somebody can keep, and as a
-  text somebody can change and apply (`loop/finish/pages.md` PGS-11).
+  text somebody can change and apply.
 
   THE STORED DECLARATION, NOT THE ANSWER DRAWN FROM IT. This printed the page as the record answered it, so a page drawn
   for each row of a list printed that row's page with every `{{field}}` filled in, and a key the dialect did not carry
   was lost on the way to the screen. It prints `dogText` of the body the record stores, read through `sourceOf`
   (`lib/dog/read.ts`), which is the same text `braindog page pull` writes: what is on the screen, in the file and in the
-  record are one text (`loop/finish/pages.md` R2).
+  record are one text.
 
   THE TEXT IS A TEXTAREA, AND ONLY THAT. 22 §8: "Ship the textarea. Load CodeMirror on demand. Never in the main
   bundle." An editor is a later, separate load; the box that ships reads and writes the same bytes.
@@ -359,7 +359,7 @@
     align-items: start;
   }
 
-  /* THE TEXT IS A TILE ON THE GROUND, as the page's blocks are (SYSTEM §6), and its box the tile's second surface. */
+  /* THE TEXT IS A TILE ON THE GROUND, as the page's blocks are, and its box the tile's second surface. */
   .source-edit {
     display: grid;
     gap: var(--sp-3);

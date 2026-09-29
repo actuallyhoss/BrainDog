@@ -1,7 +1,7 @@
 <!--
-  The one frame every entry screen stands in: sign in, sign up, an invitation, and /start (DSN-18).
+  The one frame every entry screen stands in: sign in, sign up, an invitation, and /start.
 
-  ONE SHEET ON A CALM, LIT GROUND (SYSTEM §2, §6, `loop/design/bento/boards/Light-Signup.dc.html`). The ground and its
+  ONE SHEET ON A CALM, LIT GROUND, as the design system draws sign-up. The ground and its
   one light are the body's (`app.css`); on it stands a single sheet-like tile, the mark and the name at its top, and the
   screen's own column under them. A person moves between these screens in one sitting (an invitation leads to sign in,
   sign in to /start), so the brand is in the same place on every one of them.
@@ -10,7 +10,7 @@
   starting at the top; below that it stacks under the sheet at the full width, so the form comes first under a thumb.
 
   `wide` IS /start's, AND IT DRAWS NO SHEET. /start holds tiles of its own ("Your record, building"), and a tile never
-  holds a tile (SYSTEM §4), so there the brand stands on the ground at the top left and the column under it runs to
+  holds a tile, so there the brand stands on the ground at the top left and the column under it runs to
   1040, room for /start's two columns from 900px.
 
   THE FRAME STARTS AT THE TOP, never the middle: on a 390 by 664 phone the title and the first way in are on screen
@@ -49,7 +49,7 @@
 
 <style>
   /* THE TOP INSET IS PAID HERE ONCE, because the app is `viewport-fit=cover` and an entry screen has no bar to pay it;
-     the bottom one pads the last control clear of a phone's home indicator. 12 is the window inset (SYSTEM §4). */
+     the bottom one pads the last control clear of a phone's home indicator. 12 is the window inset. */
   .entry {
     display: grid;
     align-content: start;
@@ -67,7 +67,7 @@
     min-block-size: var(--well-l);
   }
 
-  /* GEIST, AS EVERY WORD IS (SYSTEM §3, §11): the wordmark was the display face, and there is one face now. */
+  /* GEIST, AS EVERY WORD IS: the wordmark was the display face, and there is one face now. */
   .entry-word {
     color: var(--ink);
     font-family: var(--font-ui);
@@ -90,7 +90,7 @@
   }
 
   /* A LEAD TILE: the tile's fill, radius and level-one shadow (none in dark, where the fill tells it from the ground),
-     and the lead tile's 24 of padding (SYSTEM §4, §6). No border: a tile is told by its fill. */
+     and the lead tile's 24 of padding. No border: a tile is told by its fill. */
   .entry-sheet {
     display: flex;
     flex-direction: column;

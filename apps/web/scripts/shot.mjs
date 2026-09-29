@@ -10,8 +10,8 @@
  *   node scripts/shot.mjs /decide/SG5 390       one route at one width
  *
  * IT PHOTOGRAPHS THE GATES' RECORD, SO RUN THAT FIRST: `node tools/gates/record.mjs` from the root
- * serves the seed on the port `vite dev` proxies `/api` to. The app has drawn no sample of its own
- * since `loop/DIRECTION.md` section 26, so with nothing behind the proxy every screen here is the
+ * serves the seed on the port `vite dev` proxies `/api` to. The app draws no sample of its own, so
+ * with nothing behind the proxy every screen here is the
  * card that says the record was not reached, and it photographs as a tidy page.
  *
  * On Git Bash, prefix a route argument with `MSYS_NO_PATHCONV=1` or the shell rewrites `/p/kiln`
@@ -34,7 +34,7 @@ const OUT = process.env.BD_SHOTS ?? 'shots';
 
 /**
  * THE ADDRESSES ARE THE ONES `tools/gates/routes.mjs` SAMPLES, because that is what the record above
- * holds. Until 25 September this list opened the sample's `SG31`, `/v/obligations.overdue`,
+ * holds. This list once opened the sample's `SG31`, `/v/obligations.overdue`,
  * `/jobs/j_7Q2F` and `/s/9f2a7c41d8b3`, four addresses that only the sample ever held and that went
  * with it. `SG5` is where `installSeed` files the Kiln licensing question, `obligations.open` is the
  * view `record.mjs` saves, and the job and the shared link are the ids `routes.mjs` gives them: both

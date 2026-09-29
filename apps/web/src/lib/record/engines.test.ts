@@ -6,8 +6,8 @@
  * of the same answer (`fixtures/readers.ts`, which draws the record's block through `page-live.ts`'s `blockOf`) to
  * the same rows in the same places.
  *
- * THIS WAS TWO ENGINES HELD EQUAL, the kernel's and a second one in this app, and the second is gone (DIRECTION §32,
- * `loop/finish/architecture.md` ARC-1). What is kept is the cases about where a row applies, which test the record;
+ * THIS WAS TWO ENGINES HELD EQUAL, the kernel's and a second one in this app, and the second is gone.
+ * What is kept is the cases about where a row applies, which test the record;
  * the cases that held the browser's figures, walks and pages to the kernel's went with the browser's copy.
  */
 

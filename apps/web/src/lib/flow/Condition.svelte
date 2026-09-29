@@ -1,5 +1,5 @@
 <!--
-  An automation's condition: the trigger's "Only when" and a branch's "If". It is GAP-2's query builder
+  An automation's condition: the trigger's "Only when" and a branch's "If". It is the query builder
   (`lib/query/QueryBuilder.svelte`) over the `where` tree the record stores (`packages/where`), with AND, OR and NONE
   groups nested as the record nests them, and a sentence kept as a sentence.
 

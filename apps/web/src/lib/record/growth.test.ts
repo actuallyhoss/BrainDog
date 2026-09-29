@@ -1,7 +1,7 @@
 /**
  * WHAT A RECORD LOOKS LIKE AS IT GROWS, which nothing had ever asserted.
  *
- * `loop/USABILITY.md` asks for this test by name: *"seed a record with 1 row, then 10, then 400, and
+ * The ask, word for word: *"seed a record with 1 row, then 10, then 400, and
  * diff the rendered controls. What appears should appear because there is now something for it to
  * do."* A browser gate can count the controls; this covers the half where the bugs actually are —
  * the arithmetic underneath them, at sizes nothing has ever run at.
@@ -74,7 +74,7 @@ const at = (register: string, n: number, run: () => void) => {
 
 /**
  * A RECORD THAT GROWS, AND THE SAMPLE CANNOT. The list tests below swapped the fixture's `ROWS` for rows at each size and
- * asked the fixture's `list`, which answered out of those rows. Since ARC-1 the fixture's `list` asks a kernel seeded
+ * asked the fixture's `list`, which answered out of those rows. Since the app has had one engine the fixture's `list` asks a kernel seeded
  * once and never written to (`fixtures/readers.ts`), so a swapped `ROWS` reaches nothing and every size answered the
  * seed's own. What a grid pages through on a live tab is the record's `list` (`data/record.ts` `ask`, a page of `PAGE`
  * at a time on the record's cursor), so that is what is grown and asked here.

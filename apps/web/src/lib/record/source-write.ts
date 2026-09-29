@@ -1,5 +1,5 @@
 /**
- * A PAGE'S SOURCE, CHANGED AND WRITTEN BACK (`loop/finish/pages.md` PGS-11).
+ * A PAGE'S SOURCE, CHANGED AND WRITTEN BACK.
  *
  * The source view printed the stored declaration as `.dog` text and stopped there: somebody who could read how a page
  * was built still had to describe the change to an agent, or pull the file, edit it and push it from a terminal. This is

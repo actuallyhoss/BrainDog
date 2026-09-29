@@ -1,5 +1,5 @@
 <!--
-  The week strip (SYSTEM §6): a column a day, the weekday at 13 in `dim`, the date at 17/600, and one
+  The week strip: a column a day, the weekday at 13 in `dim`, the date at 17/600, and one
   dot a thing that day in its project's colour. Today is an ink disc with its date in `--on-ink`; a
   thing still open past the day it was due is a red dot on that day. A hairline separates the weeks.
 

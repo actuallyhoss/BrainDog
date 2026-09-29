@@ -96,7 +96,7 @@ test('A LIST THIS BUILD HAS NO DECLARATION FOR CANNOT BE WRITTEN FROM A PAGE, so
 });
 
 test('THE PAGE HANDS THE CAPTURE A WRITE ONLY WHERE ONE CAN BE MADE', () => {
-  /* ONE BLOCK'S SLOT HANDS THE CALLBACK AND THE PAGE'S WRITES MAKE IT, since PGS-1 split the page. */
+  /* ONE BLOCK'S SLOT HANDS THE CALLBACK AND THE PAGE'S WRITES MAKE IT, since the page was split. */
   const slot = readFileSync(new URL('../page/BlockSlot.svelte', import.meta.url), 'utf8');
   const writes = readFileSync(new URL('../page/page-writes.ts', import.meta.url), 'utf8');
   assert.match(slot, /oncapture=\{/, 'the block never hands a capture its write, so every capture draws the read-only line');

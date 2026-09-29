@@ -1,8 +1,8 @@
 /**
  * The entry screens' own words: the one line that says what a passkey is, and the six steps sign-up draws beside its
- * form (`loop/design/SCREENS.md`, Sign in / Sign up / Invite).
+ * form.
  *
- * A `words` OBJECT IN A MODULE THESE SCREENS OWN, and not keys in `copy.ts` (`lib/copy.ts` header: after ARC-8 no unit
+ * A `words` OBJECT IN A MODULE THESE SCREENS OWN, and not keys in `copy.ts` (`lib/copy.ts` header: no unit
  * edits the aggregate). The steps restate what the flow already does, in the order it does it: the mail
  * (`copy.signupMailSent`), Stripe's page (`copy.signupPayWhy`), the passkey `/start` asks for first
  * (`copy.passkeyFirstWhy`), then the one question and "Make it mine" (`firstRun`). Nothing here promises a step the

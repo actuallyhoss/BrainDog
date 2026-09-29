@@ -1,6 +1,6 @@
 /**
  * The scripts screen, `/scripts`: every installed script, where it stands, what it may touch, its versions and, for its
- * owner, what its runs logged (`loop/finish/shell.md` SCR-2, `loop/DIRECTION.md` §22).
+ * owner, what its runs logged.
  *
  * TWO EXISTING READS AND ONE WRITE, and nothing new on the record. `scripts` answers each script's state, last run,
  * refused-in-a-row count and reach; `recentHistory` carries each run's `pull` event, whose `to.log` is the script's own
@@ -179,7 +179,7 @@ export function afterResume(rows: readonly Script[], script: string, nowIso: str
 
 export const words = {
   heading: 'Scripts',
-  /* THE ONE WAY IN, since nothing on this list otherwise starts a script (SCR-3). */
+  /* THE ONE WAY IN, since nothing on this list otherwise starts a script. */
   newScript: 'New script',
   none: 'No scripts yet',
   noneWhy: 'A script is a short program an agent writes and you accept. It runs on a clock, when something arrives, or when an automation starts it, and it may only read, write and fetch what it declares.',

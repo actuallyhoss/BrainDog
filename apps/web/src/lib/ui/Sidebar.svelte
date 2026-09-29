@@ -1,5 +1,5 @@
 <!--
-  The rail: a floating glass card (SYSTEM §5). From the top, the record switcher, the ask field, the places, the agents
+  The rail: a floating glass card. From the top, the record switcher, the ask field, the places, the agents
   working now, and at the foot More and the person.
 
   ONE FLAT LIST, AND IT WAS THREE. The rail had a spine (Home, Decide, Inbox, Slash, Automations, Jobs), then every
@@ -75,7 +75,7 @@
     pages?: readonly NavEntry[] | undefined;
     /** How many pages the reader hid from the nav, so the way back is on the rail. */
     hidden?: number | undefined;
-    /** The holding pen's offers (`boot`'s `pen`); the rail says only how many (PGS-18). */
+    /** The holding pen's offers (`boot`'s `pen`); the rail says only how many. */
     pen: readonly unknown[];
     record: string;
     records?: SwitcherRow[];
@@ -92,15 +92,15 @@
     ontoggle?: (() => void) | undefined;
   } = $props();
 
-  /** The words the rail says itself, kept beside the one component that says them (design DSN-11). */
+  /** The words the rail says itself, kept beside the one component that says them. */
   const words = {
     unnamed: 'My BrainDog',
     ask: 'Ask, add or find',
     moreLists: (n: number) => `Show ${n} more`,
     fewerLists: 'Show fewer',
-    /* FLD-1's row under the lists, said only here. */
+    /* The new-list row under the lists, said only here. */
     newList: 'New list',
-    /* THE HOLDING PEN'S ROW (PGS-18): how many offers wait, and Settings, Navigation says what they are. */
+    /* THE HOLDING PEN'S ROW: how many offers wait, and Settings, Navigation says what they are. */
     suggested: (n: number) => `${n} suggested`,
     working: 'Working now',
     quiet: 'gone quiet',
@@ -380,7 +380,7 @@
         </ul>
 
         <!-- THE LISTS, UNDER THEIR OWN WORD. Native, never pack-positioned: a page can go with the add-on that declared
-             it, and the rows underneath still have to be reachable. "New list" is the last row (FLD-1). -->
+             it, and the rows underneath still have to be reachable. "New list" is the last row. -->
         {#if !icons}<h3 class="sub">{said('lists')}</h3>{:else}<hr class="sep" />{/if}
         <ul class="group">
           {#each listsShown as r}
@@ -791,7 +791,7 @@
       color var(--d-state) var(--ease-out);
   }
 
-  /* THE RAIL'S WELL IS 26, TWO UNDER A TILE'S (SYSTEM §5), and on glass its rest fill is the wash rather than
+  /* THE RAIL'S WELL IS 26, TWO UNDER A TILE'S, and on glass its rest fill is the wash rather than
      `tile-2`, which would read as a white chip on the card. The chosen well is `IconWell`'s own ink. */
   .item :global(.well) {
     inline-size: 26px;
@@ -825,7 +825,7 @@
     color: var(--ink);
   }
 
-  /* "HERE" IS AN INK WELL, THE NAME AT 600 AND A WHITE ROW, never the mark's red (design SYS-1, D-1). */
+  /* "HERE" IS AN INK WELL, THE NAME AT 600 AND A WHITE ROW, never the mark's red. */
   .item[aria-current='page'] {
     background: color-mix(in srgb, var(--bg) 70%, transparent);
     color: var(--ink);

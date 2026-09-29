@@ -1,6 +1,6 @@
 /**
- * The marks of the agents a record works with, drawn as their makers draw them (the owner, 30 September 2026: "for stuff
- * like claude codex logos etc please use real ones").
+ * The marks of the agents a record works with, drawn as their makers draw them, because the owner
+ * asked for the real logos.
  *
  * EACH IS ONE PATH ON A 24 GRID, from LobeHub's icon set (MIT), which traces each maker's published mark. They are the
  * makers' trademarks, drawn only to say which agent did a thing, beside its name. Claude wears its clay and Gemini its

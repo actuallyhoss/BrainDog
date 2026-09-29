@@ -7,7 +7,7 @@
  *
  * LIVE OR REFUSED, AND NOTHING IN BETWEEN. A refusal is drawn in the host's own sentence, whatever its code. This
  * used to read `UNREACHABLE` and `UNAUTHORIZED` at an address with no slug as "no record here" and answer
- * `sample`, so both screens drew fixture questions nobody had asked; the sample is gone (DIRECTION 26), and a 401
+ * `sample`, so both screens drew fixture questions nobody had asked; the sample is gone, and a 401
  * is sent to sign-in by the layout before this is ever asked.
  */
 
@@ -126,7 +126,7 @@ const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !
  * no screen that prints an option prints `{{ref:…}}`: what a brace stands for where the body keeps `figures`, and words
  * of its own where it does not, which is every question Slash files, because a filed question is shown to readers who
  * may not read the rows it cites (`packages/slash/src/propose.ts`). Money written into a sentence as "GBP 2400.00" is
- * drawn in the record's currency (`moneyInText`, design §5). The options card on `/decide/<id>` draws the reasons again
+ * drawn in the record's currency (`moneyInText`). The options card on `/decide/<id>` draws the reasons again
  * with their links (`Cited`), from the body; everything else reads these words.
  */
 export function questionOf(row: Row, asked: string | undefined, rank: number): Question {

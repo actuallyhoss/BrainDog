@@ -1,7 +1,7 @@
 /**
  * WHERE A COLLEAGUE WHO HOLDS LISTS, AND NOT THE RECORD, LANDS: their list, or their lists.
  *
- * MEASURED BEFORE IT WAS WRITTEN (`loop/research-invite-landing.md` finding 1), through the real seed
+ * MEASURED BEFORE IT WAS WRITTEN, through the real seed
  * and the record's own `boot`: a bookkeeper given `write` on an Expenses list made for them, empty on
  * the day they were sent the link, accepted, pressed `Open BrainDog`, and Home said "Nothing in the
  * record yet." over a record of 230 rows, with `Start here`. `Start here` led to the tiles that set up

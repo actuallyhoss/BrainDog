@@ -100,7 +100,7 @@ test('a row nothing points at draws no sections', async () => {
   assert.deepEqual(await linkReader(BASE, io).read('things', 4), { from: 'live', groups: [], cursor: null });
 });
 
-/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): the page drew the sample's backlinks under these three,
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE: the page drew the sample's backlinks under these three,
    which were another business's rows pointing at whatever row the address named. */
 test("a 401 at no slug is the record's sentence, not the sample's backlinks", async () => {
   const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
@@ -182,7 +182,7 @@ test("a pack's own list that points here is drawn under its declared name and la
   assert.ok(sent.some((u) => u.pathname === '/api/list' && u.searchParams.get('register') === 'study_courses'), 'its refs are walked');
 });
 
-/* A LIST THE BUILD SHIPS IS ASKED ABOUT TOO (DIRECTION §22): a field added to Projects at run time is on the record and
+/* A LIST THE BUILD SHIPS IS ASKED ABOUT TOO: a field added to Projects at run time is on the record and
    in no file here, so the reader asks the record for every list it draws, once each for the tab. */
 test('a sample list that points here is asked about once for the tab, and one the record will not declare keeps its words', async () => {
   const { io, sent } = host(record);

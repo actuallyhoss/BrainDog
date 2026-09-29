@@ -1,6 +1,6 @@
 /**
  * The one primary button on a listing's page, as steps: read the record's plan for the document, then install what the
- * plan said (`loop/finish/platform.md` PLT-3, §4.0 P).
+ * plan said.
  *
  * THE PLAN IS THE RECORD'S, AND WHAT INSTALLS IS WHAT WAS SHOWN. An add-on or a module is planned by `planPack`, and
  * `installPack` is sent the plan's `planHash` and the calls-out lines the sheet printed, so a record that moved in

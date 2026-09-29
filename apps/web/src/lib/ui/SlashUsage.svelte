@@ -1,9 +1,9 @@
 <!--
-  What Slash spent, on `/usage` (`loop/finish/agents.md` AGT-29; the page's Slash section, `contracts.md` X44).
+  What Slash spent, on `/usage`: the page's Slash section.
 
   TWO ALLOWANCES, APART. His asks against his cap, then the background work's own month (the daily look, an
-  automation's question, a digest's prose, a pattern drafted for the inbox), because one never spends the other
-  (`contracts.md` §7.5 and X41). Each is a tile with its ring and the line that reads it (SYSTEM §6, §7), and the asks by
+  automation's question, a digest's prose, a pattern drafted for the inbox), because one never spends the other.
+  Each is a tile with its ring and the line that reads it, and the asks by
   day are a third, as bars. Under the tiles, on the ground, each day's lines: what was asked, when, what it cost and a
   link to what it filed. The rules are `slash-asks.ts`, which the tests hold; this draws what they answer.
 
@@ -72,7 +72,7 @@
   const spent = $derived(rows ? spentIn(rows, month) : null);
   const mine = $derived(status ? asksLine(status) : null);
 
-  /** A ring's tone: ink with room, amber from 80%, red once it is spent (SYSTEM §2). */
+  /** A ring's tone: ink with room, amber from 80%, red once it is spent. */
   const toneOf = (used: number, cap: number): 'ink' | 'warn' | 'danger' => (cap <= 0 || used >= cap ? 'danger' : used >= cap * 0.8 ? 'warn' : 'ink');
 
   /* THE BACKGROUND ALLOWANCE, EXACT WHERE THE HOST SAYS IT (`status.background`), and counted from the ledger's list
@@ -173,7 +173,7 @@
     justify-content: center;
   }
 
-  /* THE FIGURE (SYSTEM §3), for his asks on his own key, where there is no cap for a ring to measure against. */
+  /* THE FIGURE, for his asks on his own key, where there is no cap for a ring to measure against. */
   .spent-figure {
     margin: 0;
     color: var(--ink);
@@ -212,7 +212,7 @@
     margin-block-end: var(--sp-4);
   }
 
-  /* OUT OF ASKS NEEDS HIM: the words carry it, in red at 500 so the colour is never a hairline (SYSTEM §2). */
+  /* OUT OF ASKS NEEDS HIM: the words carry it, in red at 500 so the colour is never a hairline. */
   .spent-said[data-needs] {
     color: var(--danger);
     font-weight: 500;

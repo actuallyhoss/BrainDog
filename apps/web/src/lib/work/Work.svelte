@@ -1,9 +1,9 @@
 <!--
   Work: one screen for the tasks, where most writing happens.
 
-  THE OWNER'S OLD TOOL HAD ONE, AND 85% OF HIS WRITES LANDED ON IT (`C:\Tools\legacy\app\src\routes\Work.svelte`). Here
+  THE OWNER'S OLD TOOL HAD ONE, AND 85% OF HIS WRITES LANDED ON IT. Here
   the same work was split over a Work page and a Board page, drawn by page blocks, and every gesture waited for the
-  record. This screen is the old one's shape over the record's tasks list, drawn to `loop/design/SYSTEM.md`:
+  record. This screen is the old one's shape over the record's tasks list, drawn to the design system:
 
     1. THE TITLE ROW SAYS WHAT NEEDS HIM in one sentence ("3 of your 50 are late"), and its toolbar picks whose work is
        shown: yours, the agents', or all of it.
@@ -2153,7 +2153,7 @@
     margin-inline-start: auto;
   }
 
-  /* A SUGGESTION IS SAID IN `--live`, the hue Slash's suggestion lines wear (SYSTEM §2). */
+  /* A SUGGESTION IS SAID IN `--live`, the hue Slash's suggestion lines wear. */
   .stale-said {
     color: var(--live);
     font-size: var(--t-sm);
@@ -2647,7 +2647,7 @@
     flex: 1;
   }
 
-  /* A DESTRUCTIVE VERB IS WORDS IN INK asking for a confirm (SYSTEM §6), never a red fill. */
+  /* A DESTRUCTIVE VERB IS WORDS IN INK asking for a confirm, never a red fill. */
   .p-delete {
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-2);

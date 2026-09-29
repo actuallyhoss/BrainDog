@@ -62,7 +62,7 @@ test("a live inbox is the record's page and nothing of the sample", async () => 
   assert.equal(sent[1]!.searchParams.get('cursor'), '3', 'the page below is asked for by the cursor the page above gave');
 });
 
-/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26). These three drew the studio's nine arrivals, with a rule
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE. These three drew the studio's nine arrivals, with a rule
    offer under each and two buttons that could only say nothing was saved. */
 test('no record here is a refusal: nothing answering, a sign-in wall, and a 404 that is not JSON', async () => {
   assert.deepEqual(await readInbox(BASE, host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } })).io), { from: 'refused', fix: 'Sign in.' });

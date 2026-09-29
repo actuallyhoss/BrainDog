@@ -1,5 +1,5 @@
 <!--
-  A group on the ground (SYSTEM §6): the heading at `--t-group`, its count in the quiet ink, the actions at the right,
+  A group on the ground: the heading at `--t-group`, its count in the quiet ink, the actions at the right,
   and one hairline under the heading. The rows follow with no box round them.
 
   THE HAIRLINE IS THE GROUP'S EDGE NOW, because there is no container any more to draw one. Lists sit straight on the

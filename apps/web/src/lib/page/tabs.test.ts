@@ -1,6 +1,5 @@
 /**
- * A nav section that says `tabs: true` is drawn as a strip of tabs across the top of each of its pages (brief D3 of
- * `loop/research-dynamic-layouts.md`, primitive P2).
+ * A nav section that says `tabs: true` is drawn as a strip of tabs across the top of each of its pages.
  *
  * THE STRIP IS READ FROM THE SHELL'S OWN `nav`, which is what the rail is drawn from, so the tabs and the rail cannot
  * disagree about which pages a section holds or the order they sit in. Every case here goes through `layoutOf`, the
@@ -104,7 +103,7 @@ test(`PAST ${TABS_SHOWN} THE REST ARE BEHIND MORE, and the page you are on is sa
 });
 
 /*
- * A TABBED SECTION'S PAGES ARE NEVER CUT BY THE RAIL'S BUDGET (PGS-18). `layoutOf` spends the rail's five on a template's
+ * A TABBED SECTION'S PAGES ARE NEVER CUT BY THE RAIL'S BUDGET. `layoutOf` spends the rail's five on a template's
  * pages under one heading, and the rest arrive with `cut`: the strip draws every one of them, and the rail leaves them
  * out, so a desk with seven parts and a page of figures has nine tabs.
  */

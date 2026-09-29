@@ -1,6 +1,6 @@
 /**
  * Decide says what a pack lays on another pack's list, and which choices an update takes off stay on it, from the step
- * the record files (`packages/record/src/arrange.ts` `planAll`, brief E of `loop/research-held-landing.md`).
+ * the record files (`packages/record/src/arrange.ts` `planAll`).
  *
  * THE STEPS BELOW ARE AS THE RECORD FILED THEM on the seed catalogue: Personal set up on a fresh record, and a People
  * update that sheds `registrar` from a Personal record holding one registrar row. Before the record carried `extends`
@@ -78,7 +78,7 @@ test('THE OWNER’S WORDS FOR A CHOICE ARE USED, and several choices and rows ar
 });
 
 /* THE ROWS THAT HOLD IT, NOT THE LIST'S. "Because it holds 3 rows that may use it" was said of a Personal record whose
-   three People rows were all Family (`loop/research-batch-forty-eight-audit.md` §4). Where the record counts holders the
+   three People rows were all Family. Where the record counts holders the
    step carries `holding`, keyed as `values` is, and the sentence gives both numbers. */
 test('A CHOICE KEPT FOR THE ROWS THAT HOLD IT SAYS HOW MANY OF THE LIST’S ROWS DO', () => {
   const stays = (s: Record<string, unknown>, labels?: Record<string, string>) =>

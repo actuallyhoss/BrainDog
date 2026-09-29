@@ -1,5 +1,5 @@
 /**
- * What the first run proposes from one sentence (`loop/finish/modules.md` C10, MOD-6), held against the use cases and
+ * What the first run proposes from one sentence, held against the use cases and
  * the reader the app ships.
  *
  * AGAINST THE SEED, NOT A FIXTURE: the proposal is the arranger's, the modules are the seed's and the name is `who.ts`'s,
@@ -18,14 +18,14 @@ const CTX = { zone: 'Europe/London', locale: 'en-GB' };
 const said = (sentence: string): Proposal => propose(sentence, CTX);
 
 test('ONE SENTENCE GIVES THE WHOLE PROPOSAL: the name, the use case, the modules, and what each phrase became', () => {
-  const p = said('Sam, I run a few companies and I send invoices');
-  assert.equal(p.name, 'Sam');
+  const p = said('Sami, I run a few companies and I send invoices');
+  assert.equal(p.name, 'Sami');
   assert.equal(p.usecase, 'founder');
   const founder = USE_CASES.find((u) => u.usecase === 'founder')!;
   for (const m of founder.modules) assert.ok(p.modules.includes(m), `the founder stands on ${m}, and it is not proposed`);
   assert.ok(p.heard.length > 0, 'nothing was said back');
   for (const h of p.heard) {
-    assert.ok('Sam, I run a few companies and I send invoices'.includes(h.phrase), `${h.phrase} is not a phrase of the sentence`);
+    assert.ok('Sami, I run a few companies and I send invoices'.includes(h.phrase), `${h.phrase} is not a phrase of the sentence`);
     assert.notEqual(h.became, '', `${h.phrase} became nothing`);
   }
 });
@@ -77,7 +77,7 @@ test('A MODULE NOTHING POINTED AT DOES NOT ARRIVE, and what one leans on still d
 });
 
 test('THE SAME WORDS ALWAYS GIVE THE SAME PROPOSAL', () => {
-  for (const sentence of ['Sam, I run a few companies', "I'm part of a team", 'I want to start a podcast'])
+  for (const sentence of ['Sami, I run a few companies', "I'm part of a team", 'I want to start a podcast'])
     assert.deepEqual(said(sentence), said(sentence), sentence);
 });
 
@@ -91,7 +91,7 @@ test('THE WORDS SAY NONE OF THE DEVELOPER WORDS THE OLD CARD SAID', () => {
  *
  * `/start` drew the sample whenever `boot` answered 401 or nobody, kept the typed row in the tab, and
  * said why it was not saved in one of four causes read off `/auth/methods`, measured on the live hosts
- * when nobody could sign in to them. There is no sample now (DIRECTION 26): a signed-out `/start` is
+ * when nobody could sign in to them. There is no sample now: a signed-out `/start` is
  * sent to sign in, so there is no row kept in a tab to explain, and these sentences are rendered by
  * nothing, so they are gone too.
  */

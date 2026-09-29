@@ -1,6 +1,6 @@
 <!--
   A `<dialog>`: from 900px up a drawer that floats `--inset` in from the window's end edge, a tile's surface at radius
-  `--r-lg` and the third level of depth, over a scrim with no blur (SYSTEM §4, §6). Below 900px, the phone (SYSTEM §9),
+  `--r-lg` and the third level of depth, over a scrim with no blur. Below 900px, the phone,
   it is a bottom sheet that is as tall as what it holds, up to 88dvh, with a grab handle and a head on one line.
 
   THE PHONE SHEET FITS ITS CONTENT. It was always 88% of the screen, so a Display sheet of six
@@ -12,10 +12,10 @@
 
   NO ID AFTER THE TITLE. The sheet took an `id` and printed it in the identifier face beside the
   title, which is where a peeked row showed "#12". A person reads a name there; the id lives in the
-  row's Details and in "Copy link" (design SYS-3).
+  row's Details and in "Copy link".
 
   It slides in over 220ms on the arriving curve and closes at once. Opening is something you watch;
-  closing is something you have already decided about (SYSTEM §8).
+  closing is something you have already decided about.
 -->
 <script lang="ts">
   import { copy } from '../copy.ts';
@@ -217,8 +217,8 @@
 
 <style>
   /* THE DRAWER, from 900px up. It floats `--inset` in from the window's end edge on three sides, as the docked panel
-     does (SYSTEM §5), rather than hanging off the edge with a rule down its side: a sheet is a tile's surface at radius
-     `--r-lg` and the third level of depth, and a tile has no border (SYSTEM §6). */
+     does, rather than hanging off the edge with a rule down its side: a sheet is a tile's surface at radius
+     `--r-lg` and the third level of depth, and a tile has no border. */
   .sheet {
     position: fixed;
     inset-block: var(--inset);
@@ -257,12 +257,12 @@
   }
 
   /* THE SAME `--scrim` THE PALETTE AND THE MENUS USE, with no blur: a blur behind a sheet is glass, and a sheet is not
-     chrome (SYSTEM §6). */
+     chrome. */
   .sheet::backdrop {
     background: var(--scrim);
   }
 
-  /* THE ARRIVING CURVE, OVER 220MS (SYSTEM §8), with no overshoot: a spring squeezed into a fifth of a second is a
+  /* THE ARRIVING CURVE, OVER 220MS, with no overshoot: a spring squeezed into a fifth of a second is a
      flick at the end of every open, which is motion performing rather than answering. */
   .sheet[open] {
     animation: slide-in var(--d-enter) var(--ease-out);
@@ -308,7 +308,7 @@
   }
 
   /* The element holding the words carries the ellipsis, and it is a block, not the flex row. A sheet's title is at a
-     group heading's step, as the docked panel's is (SYSTEM §3). */
+     group heading's step, as the docked panel's is. */
   .sheet-title {
     flex: 1;
     min-inline-size: 0;
@@ -328,7 +328,7 @@
     font-size: var(--t-sm);
   }
 
-  /* A 36px CIRCLE, the toolbar's icon circle (SYSTEM §5), with a quiet fill at rest so it reads as a thing to press.
+  /* A 36px CIRCLE, the toolbar's icon circle, with a quiet fill at rest so it reads as a thing to press.
      `.tap` grows its hit box to 44 where the pointer is a thumb. */
   .sheet-close {
     flex: none;
@@ -474,7 +474,7 @@
     }
   }
 
-  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). The a11y layer shortens the duration; this takes the move away. */
+  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .sheet[open] {
       animation-name: sheet-fade;

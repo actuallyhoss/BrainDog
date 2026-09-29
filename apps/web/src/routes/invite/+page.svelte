@@ -79,7 +79,7 @@
   /**
    * ACCEPTING SIGNS SOMEBODY IN, SO IT DROPS THE BOOT THIS TAB KEPT. The layout's load asked `boot` for `/app/invite`,
    * which names no record, was refused, and kept the sample for the tab; Accept is a `fetch` that sets a cookie and
-   * nothing more. Measured through the real `readBoot` (`loop/research-batch-forty-six-audit.md` section 5), the next
+   * nothing more. Measured through the real `readBoot`, the next
    * move was handed The Studio, "Nothing you do here is saved.", with no request made, which is what `/signin` drew
    * for the owner before 6959cf06. "Open BrainDog" below is a full page load, which is the repair; this is for any
    * move out of here that is not one, so it at least asks the record rather than drawing the sample. Only on success:
@@ -139,7 +139,7 @@
              state. Drawn as `error` it set `data-screen="refused"`, and `layout` and `a11y` sweep this route bare,
              so both measured an error card at fifteen widths and reported the screen as never auditable. A token
              the host rejects below is still `error`, because that one is a refusal. -->
-        <!-- ONE ACTION UNDER EITHER (DSN-18): the invitation is out of this person's hands until somebody sends a
+        <!-- ONE ACTION UNDER EITHER: the invitation is out of this person's hands until somebody sends a
              new one, so the one thing left to press is the way into whatever they already hold. -->
         <Empty heading kind="no-results" glyph="link" title={copy.inviteNoLink} body={copy.inviteAskNew}>
           {#snippet actions()}<Button href="/signin">{copy.signIn}</Button>{/snippet}
@@ -271,7 +271,7 @@
     /* THE SIZE IS STATED HERE BECAUSE THE TAG IS A HEADING. This is the page's `h1`, and a user agent draws an `h1`
        at `2em`, so leaving the size to the default would double it. */
     margin: 0;
-    /* AND IT IS THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600, in Geist (SYSTEM §3); 30/36 on a phone. */
+    /* AND IT IS THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600, in Geist; 30/36 on a phone. */
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--t-title);
@@ -282,7 +282,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has (SYSTEM §6). */
+  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has. */
   .row {
     display: flex;
     flex-direction: column;

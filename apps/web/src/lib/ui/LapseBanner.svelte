@@ -58,7 +58,7 @@
     going = true;
     const out = await paymentPage('checkout', here.record);
     if (out.ok) {
-      /* Stripe's own host, so `at()` hands it back unchanged; the argument still starts with `at(` (rules.md §7). */
+      /* Stripe's own host, so `at()` hands it back unchanged; the argument still starts with `at(`. */
       location.assign(at(out.value));
       return;
     }
@@ -83,7 +83,7 @@
 {/if}
 
 <style>
-  /* A TILE ON THE GROUND, over whatever screen is open (SYSTEM §6): opaque, radius 22, level 1, inside the work's own
+  /* A TILE ON THE GROUND, over whatever screen is open: opaque, radius 22, level 1, inside the work's own
      gutter. Red is the glyph and nothing else, because this is the one line on the screen that needs him. */
   .lapse {
     display: flex;

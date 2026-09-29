@@ -3,7 +3,7 @@
  *
  * FOUR OF THE FIVE WRITES A LIVE LIST MAKES CAME BACK WITH NO WAY BACK. Archive was the one that carried `Put back`;
  * adding a row, moving one row's state, editing a cell and moving a selection's state each landed a green chip and
- * nothing else, measured with `grep -n "intent: 'good'"` over the screen on 24 September. REWORK §4 asks for the
+ * nothing else, measured with `grep -n "intent: 'good'"` over the screen. The rule is the
  * inverse of every write, pushed only once the write has landed, because an undo offered for a write that never
  * happened is a second write nobody asked for.
  *
@@ -90,7 +90,7 @@ test('the inverse is in the screen spelling, so it goes out through the same pat
 
 test('every live write that lands on the list carries its way back', () => {
   const landed = callsOf(SCREEN, 'receipt').filter((c) => /intent:\s*'good'/u.test(c.args));
-  /* NOT VACUOUS: the add, the state, the cell, the bulk state and the restore were five on 24 September. */
+  /* NOT VACUOUS: the add, the state, the cell, the bulk state and the restore were five when this was written. */
   assert.ok(landed.length >= 5, `found ${landed.length} landed receipts, so the sweep is no longer reading the screen`);
   /* A RESTORED ROW IS ITSELF THE WAY BACK, and offering to undo the undo is a loop with no floor. */
   const bare = landed.filter((c) => !/\bundo:/u.test(c.args) && !/mark:\s*copy\.writeMarkRestored\b/u.test(c.args));

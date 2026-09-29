@@ -2,7 +2,7 @@
  * Home's own words: the headings of the house Home (`default-home.ts`), its lead line, and the calm sentence a record
  * with lists and nothing in them reads.
  *
- * A `words` OBJECT IN THE MODULE THAT DRAWS THEM, and not keys in `copy.ts` (contracts §11: after ARC-8 no unit edits the
+ * A `words` OBJECT IN THE MODULE THAT DRAWS THEM, and not keys in `copy.ts` (no unit edits the
  * aggregate). A heading a use case's voice may say its own way is still read through `said()` first; these are the
  * house lines it falls back to.
  */

@@ -1,5 +1,5 @@
 <!--
-  The specimen (GAP-3, `21 §6`): a small page drawn in the look being edited, beside the editor.
+  The specimen (`21 §6`): a small page drawn in the look being edited, beside the editor.
 
   DRAWN BY THE REAL CONTROLS, NOT BY PICTURES OF THEM. The buttons, the chip, the field and the switch are the app's own,
   and every one reads its colours through `var(--x)`. The wrapper sets each role as a custom property on itself, so
@@ -21,7 +21,7 @@
 
   const vars = $derived(varsOf(palette, draft));
   /* THE ACCENT IS SHOWN AS A SWATCH OF ITS OWN VALUE and not through the accent token, which only the mark, the tile,
-     /start, /signin and the selection may read (design brief 10). */
+     /start, /signin and the selection may read. */
   const accentVars = $derived(`--swatch: ${palette.accent ?? ''}; --swatch-ink: ${palette['accent-ink'] ?? ''}`);
   const intents = [
     ['earn', copy.lookSampleEarn, 'money'],

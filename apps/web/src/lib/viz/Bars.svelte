@@ -2,10 +2,10 @@
   Horizontal bars, one row an item: the label, the bar, a note at its end, and the value at the right.
 
   Bars are greys (`g2`) unless an item has a `tone`; give the one that matters `ink` and its label
-  turns ink with it (SYSTEM §2, "one series highlighted in ink and the rest are greys"). `danger`,
+  turns ink with it (the design system: "one series highlighted in ink and the rest are greys"). `danger`,
   `earn`, `warn` and `live` keep their meanings, and a project's colour works too.
 
-  PAIRED is two periods (SYSTEM §7): pass `paired`, one earlier value per item, and each row draws
+  PAIRED is two periods: pass `paired`, one earlier value per item, and each row draws
   this period's bar over the earlier one's in a light grey. Alone, each bar sits on a track.
 
   THE SCALE IS SHARED WHEN YOU SAY SO: pass `max` to put several charts on one scale.

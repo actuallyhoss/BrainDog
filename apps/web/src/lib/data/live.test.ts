@@ -1,15 +1,15 @@
 /**
  * The poll that tells an open screen the record changed, with its clock and its visibility handed in.
  *
- * WHY IT EXISTS. `loop/research-living-in-it.md` §1.1 found one poll in the whole app, `Reporting.svelte`'s report
+ * WHY IT EXISTS. There was one poll in the whole app, `Reporting.svelte`'s report
  * keys, and a register list that asked again only when its own question changed: an agent writing into the list he
  * had open changed none of the four parts of that question, so the row appeared on his next navigation and not before.
- * `/api/version` already answered the change, 0.87 ms a call on a self-host (§1.2), and nothing asked it.
+ * `/api/version` already answered the change, 0.87 ms a call on a self-host, and nothing asked it.
  *
  * NO REAL TIMER AND NO DOCUMENT. `every` is a fake clock that fires on `advance`, and visibility is a flag with a
  * listener, so a fifteen-second interval is tested in no time at all and a hidden tab is a boolean rather than a
  * browser. What this file cannot prove is that the layout starts the poll or that a list redraws when it answers:
- * those are the in-browser proof `W56-1` hands to the layout gate.
+ * those are the in-browser proof the layout gate carries.
  */
 
 import { test } from 'node:test';

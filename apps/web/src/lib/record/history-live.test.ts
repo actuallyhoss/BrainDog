@@ -56,7 +56,7 @@ test("the record's events are drawn newest first, each with who and what", async
   assert.equal(url.searchParams.get('seq'), '2');
 });
 
-/* THERE IS NO SAMPLE BEHIND A REFUSAL ANY MORE (DIRECTION 26). These three answers, at an address with no slug, drew
+/* THERE IS NO SAMPLE BEHIND A REFUSAL ANY MORE. These three answers, at an address with no slug, drew
    the sample's ledger for services #2, which is another business's history under whatever row the address named. Each
    is now the refusal it is: the record's sentence for a 401, and the client's own for a host that did not answer. */
 test("a 401 at no slug is the record's sentence, not the sample's lines", async () => {

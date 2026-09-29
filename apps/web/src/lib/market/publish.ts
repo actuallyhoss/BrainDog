@@ -1,6 +1,6 @@
 /**
  * Publishing from the app: a use case from `/packs/share` and a page shared as a template from its menu, each sent to
- * the Kennel as the signed-in person (`POST /api/kennel/v1/submit`, contracts §3 platform K), and what a share changes
+ * the Kennel as the signed-in person (`POST /api/kennel/v1/submit`), and what a share changes
  * since the version it counts on from.
  *
  * THE SESSION IS WHO PUBLISHES. The body is `{ text }` and nothing else: no signature, because the app holds no author

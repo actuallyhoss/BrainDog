@@ -2,8 +2,8 @@
   Draws one glyph, inline, `currentColor` only: the app's own from `icons.ts`, or any of the 251 in
   `braindog-render/glyphs`, resolved in that order by `shapesOf`.
 
-  Stroke 1.75 with round caps and joins, for every glyph alike: the app's own (ICONS.md's shapes) and
-  a Lucide glyph a record names through `icon:` (SYSTEM §12.2 "Glyphs"). A glyph is paths, circles,
+  Stroke 1.75 with round caps and joins, for every glyph alike: the app's own (the design system's icon shapes)
+  and a Lucide glyph a record names through `icon:`. A glyph is paths, circles,
   ellipses and rounded rects, drawn as the elements they are; a dot is a zero-length path with a round
   cap, and `more` and `drag` carry their own heavier stroke for it.
 

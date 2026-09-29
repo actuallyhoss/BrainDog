@@ -1,5 +1,5 @@
 <!--
-  Runs: `/automations/runs`, every run of every kind that runs by itself, newest first (`loop/finish/shell.md` EDT-3).
+  Runs: `/automations/runs`, every run of every kind that runs by itself, newest first.
 
   THREE READS, ONE LIST. Automations, scheduled actions and scripts each keep their runs their own way: an automation's
   own read carries its newest ten, a scheduled action's ledger only its last, and a script's from recent history. They
@@ -10,7 +10,7 @@
   worth listing, so only when all three refuse is the screen a refusal; otherwise one line above the list says it may
   be short, rather than a quiet list reading as a quiet record.
 
-  A TILE, THEN THE RUNS ON THE GROUND BY DAY (SCREENS, Automations). "Recent runs" is a heat grid of runs a day over the
+  A TILE, THEN THE RUNS ON THE GROUND BY DAY. "Recent runs" is a heat grid of runs a day over the
   last fourteen, one row for each of the six things that ran most, with the line under it saying what ran most and
   what failed; its meta says "Latest runs", because each thing's newest runs are what is read, not every run there was.
 
@@ -147,7 +147,7 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6), at body size in ink. */
+  /* THE ONE LINE UNDER THE CHART that says what it means, at body size in ink. */
   .reading {
     margin: 0;
     color: var(--ink);

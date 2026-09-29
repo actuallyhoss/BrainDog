@@ -1,13 +1,13 @@
 <!--
   A declared page, drawn: the one reader every declared page goes through, wherever it is drawn.
 
-  ONE READER, THREE MODES (contracts §8.2, `loop/finish/pages.md` C8). `page` is `/p/<slug>`: the head, the source,
+  ONE READER, THREE MODES. `page` is `/p/<slug>`: the head, the source,
   Edit layout, the writes and the keys. `home` is Home's body: no head, no source and no Edit layout, and the writes stay
   on. `preview` is a page not yet installed, drawn as it would be: inert, with no writes, no arranging and no source,
   and with `was` it is drawn beside the page as it is now, one at a time on a phone. Home and Decide each drew a
   declared page a second and a third way, as a flat stack of blocks with no layout; they draw it through this now.
 
-  THIS FILE IS THE FRAME. It was 1,752 lines holding six jobs, and every page unit after it needed the one file, so it
+  THIS FILE IS THE FRAME. It was 1,752 lines holding six jobs, and every change to a page needed the one file, so it
   is split one job to a file: `PageBody.svelte` lays the blocks out, `BlockSlot.svelte` draws one, `Arrange.svelte` is
   Edit layout, `page-writes.ts` is every write a page makes, `SourceView.svelte` is how the page is built, and the host's
   panels are `panels/`. What stays here is what a page is before any of those: waiting, refused, missing, its head, and
@@ -185,7 +185,7 @@
           </Button>
         </span>
         <ShareMenu {slug} />
-        <!-- "Change this page", and below 900px the page menu that holds it and the link above (PGS-12). -->
+        <!-- "Change this page", and below 900px the page menu that holds it and the link above. -->
         <ChangePage {slug} title={live.page.page.title} {showSource} {reread} />
       {/if}
       <Arrange {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />

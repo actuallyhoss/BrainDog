@@ -4,7 +4,7 @@
  *
  * THE SCREENS WAITED FOR THE ROUND TRIP. A tick, a moved card, a typed row and an archive each drew nothing until the
  * record had answered, so every everyday gesture paid a network's latency before the reader saw it land, and the
- * owner's old tool, which drew first and asked after, felt faster on the same host (`ux-gap-map.md` §5). The record is
+ * owner's old tool, which drew first and asked after, felt faster on the same host. The record is
  * right almost every time, so the screen draws the change at once and says so only on the rare refusal.
  *
  * TWO PIECES, BOTH PURE, so plain Node tests them the way `live.test.ts` tests the poll:

@@ -2,12 +2,12 @@
  * The account's words: settings and every area in it, the vault, signing in, an invitation, usage, backups and
  * History.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
- * ONE BLOCK PER UNIT. A unit adding account words adds them in a block of its own under a comment naming it, so
- * two units writing here in one workflow never share a line (`loop/finish/contracts.md` §8.1).
+ * ONE BLOCK PER AREA. A change adding account words adds them in a block of its own under a comment naming it, so
+ * two changes writing here at once never share a line.
  *
  * Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports only relative `.ts` files.
  */
@@ -119,7 +119,7 @@ export const account = {
      between. What it does for them is the same fact from their side, including the refusal, which
      is the one thing a swatch press can do that they would not expect. AND THEN IT WAS STILL A PARAGRAPH ABOUT THE
      SCREEN: how the other colours follow, and what a press may refuse, which the refusal says in place when it happens
-     (`accentRefused`). What is left is the choice itself (MOD-24). */
+     (`accentRefused`). What is left is the choice itself. */
   accentHint: 'The colour this record wears.',
   accentHouse: 'House',
   accentSet: (name: string) => `${name} is this record's colour.`,
@@ -259,7 +259,7 @@ export const account = {
   yourRecords: 'Records you can open',
   thisOne: 'you are here',
 
-  /* identity, GAP-7: a person changes their own name and sign-in email. The name is the record's `renamePerson`; the
+  /* identity: a person changes their own name and sign-in email. The name is the record's `renamePerson`; the
      address is a link mailed to the new one (`/account/email`), and nothing moves until it is opened. */
   identityNoName: 'No name yet',
   identityChangeName: 'Change name',
@@ -308,7 +308,7 @@ export const account = {
     denied: 'turned away',
     revoked: 'revoked',
   } as Record<string, string>,
-  /* A KEY OR A MACHINE THE OPERATOR'S CUT-OFF ENDED (`ended_by: 'operator'`, OPS-10), said in place of its state, so the
+  /* A KEY OR A MACHINE THE OPERATOR'S CUT-OFF ENDED (`ended_by: 'operator'`), said in place of its state, so the
      owner reads why it stopped rather than a key that still looks connected. */
   endedByOperator: 'ended by the operator',
 
@@ -355,7 +355,7 @@ export const account = {
 
   /* Connect an agent: a write token for ninety days, its bearer shown once. */
   connectTitle: 'Connect an agent',
-  /* THE INBOX, OFF UNTIL THE OWNER TURNS IT ON (DIRECTION section 30, P2). What it opens, and what it still cannot do. */
+  /* THE INBOX, OFF UNTIL THE OWNER TURNS IT ON. What it opens, and what it still cannot do. */
   connectInbox: 'May read the inbox',
   connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
 
@@ -368,7 +368,7 @@ export const account = {
   /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
   whenWeInterrupt: 'When this record interrupts you',
   batchByDefault: 'Most things wait for your summary. Only urgent ones interrupt.',
-  /* QUIET HOURS ARE THE RECORD'S AND AN OWNER SETS THEM (`09 §5` rule 3, GAP-10). One sentence with the two times in it
+  /* QUIET HOURS ARE THE RECORD'S AND AN OWNER SETS THEM (`09 §5` rule 3). One sentence with the two times in it
      and a switch beside it; a member reads the same sentence with no control. A summary due inside them waits for
      their end, and an urgent notice never does. */
   quietHours: 'Quiet hours',
@@ -385,7 +385,7 @@ export const account = {
      a rule declares `urgent: true`, and what it raises by itself is two things: a vault credential two days from
      expiry (`vault.ts`), and a scheduled action held back, paused because its key is missing or refused or stopped at
      its daily limit of calls from rules (`actions.ts`, whose `notify` the kernel routes with `urgent: true`). The first
-     rewrite named only the credential, and the checker found the action's three call sites. A payment and a domain
+     rewrite named only the credential, and missed the action's three call sites. A payment and a domain
      are what one use case's rules might say, not what BrainDog does. */
   urgentKindsAre: 'A credential in the vault expiring inside 48 hours, a scheduled action held back because its key is missing or it reached its daily limit, and anything a rule marks urgent. Each rule says so itself, and adding an add-on shows which of its rules would interrupt you.',
   interruptCap: 'At most',
@@ -400,7 +400,7 @@ export const account = {
      switch is muting one kind of interruption, which is what this sentence was always about. */
   muteAtSource: 'There is no switch that mutes one of these. Each is raised by a rule, and the rule is named on the row.',
 
-  /* notifications on this device: Web Push, `loop/research-living-in-it.md` W58-4, drawn only where the host has a key.
+  /* notifications on this device: Web Push, drawn only where the host has a key.
      THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */
   pushTitle: 'Notifications on this device',
   pushHow: 'When something in this record interrupts you, this device shows one line, and pressing it opens BrainDog. The line never says what happened: the record tells you once it is open.',
@@ -498,7 +498,7 @@ export const account = {
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
   keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
   snapshotFailed: 'Nothing kept',
-  /* A COPY OF NOTHING SAYS SO, rather than "0 B" (design SYS-14): render's `bytes(0)` is pinned, so the line is chosen here. */
+  /* A COPY OF NOTHING SAYS SO, rather than "0 B": render's `bytes(0)` is pinned, so the line is chosen here. */
   snapshotEmpty: 'Empty',
   download: 'Download',
   rowsAndSize: (rows: number, size: string) => `${rows === 1 ? '1 row' : `${rows.toLocaleString('en')} rows`} · ${size}`,
@@ -623,7 +623,7 @@ export const account = {
   linkWaitsSignedIn: 'A link arrived, and you are already signed in. To use it, sign out first.',
   addPasskeyHere: 'Add a passkey on this device',
   /* SAID BY THE WAY HE CAME IN. "Without the key" is the self-host's server key, and it was said after a claim link
-     too, to an owner on the Cloud who had never seen a key (`loop/research-first-sign-in.md` friction 9). `null` is a
+     too, to an owner on the Cloud who had never seen a key. `null` is a
      session that was already there when the screen opened, so it cannot say how, and names neither. */
   addPasskeyWhy: (via: 'passkey' | 'key' | 'link' | null) =>
     via === 'key'
@@ -691,7 +691,7 @@ export const account = {
   inviteFailed: 'That did not work. Open the link again, or ask for a new one.',
   inviteAskNew: 'Ask the person who sent it for a new link.',
   inviteSignInFirst: 'Sign in',
-  /* OPS-7: a new address proves it is somebody's own mailbox before an invitation makes them anybody */
+  /* A new address proves it is somebody's own mailbox before an invitation makes them anybody */
   inviteNameLabel: 'Your name (optional)',
   inviteCheckMail: 'Check your mail',
   inviteMailSent: (email: string) => `A link to finish accepting is on its way to ${email}. Open it to prove the address is yours. It works once, within a day.`,
@@ -699,7 +699,7 @@ export const account = {
   /* A key taken out of service from the vault screen: the bytes go, the row stays. */
   keyRevoked: (label: string) => label + ' is out of service. Its row stays, because what it opened is a fact.',
 
-  /* ── OPS-18: Billing, Sessions, Recovery and the lapse banner ─────────────────────────────────────────────────────
+  /* ── Billing, Sessions, Recovery and the lapse banner ─────────────────────────────────────────────────────────────
      BILLING SAYS ONE SENTENCE A RECORD, and the sentence says what happens next: nothing for a paid one, Stripe's retry
      and a new card for a failed payment, and for a lapsed one the date it went read-only, the date it is deleted and
      that export never stops. The plan's price is the Worker's own string (`GET /account/billing`), never written here. */
@@ -747,7 +747,7 @@ export const account = {
       ? 'Sign in with a link from your mail, then remove the lost passkey here. With no passkey and no mail, the person who runs this host can let you back in.'
       : 'Sign in with another passkey, then remove the lost one here. With none left, the person who runs this host can let you back in.',
 
-  /* OPS-17: sign-up for a stranger, a record of your own for somebody signed in with none, and a passkey first */
+  /* Sign-up for a stranger, a record of your own for somebody signed in with none, and a passkey first */
   signupTitle: 'Make a record',
   signupLede: 'Your email, and a name for your record.',
   signupClosedTitle: 'Sign-up is not open yet',
@@ -788,7 +788,7 @@ export const account = {
   passkeyFirstLater: 'Not now',
   passkeyFirstFailed: 'That did not add a passkey. You can add one later in Settings, under Recovery.',
 
-  /* COL-6: People and invitations. Stop and let back in, an invitation to chosen lists, a new link for one that ran
+  /* People and invitations. Stop and let back in, an invitation to chosen lists, a new link for one that ran
      out, and what a link opens, said on `/invite` before Accept. */
   stopAccess: 'Stop',
   letBackIn: 'Let back in',
@@ -808,7 +808,7 @@ export const account = {
   inviteEverything: (does: string) => `everything (${does})`,
   inviteListGives: (list: string, does: string) => `${list} (${does})`,
   inviteDoes: { owner: 'owns it', decide: 'decides', write: 'edits rows', append: 'adds rows', read: 'reads' },
-  /* COL-12: one list's grant narrowed to the rows where one field holds one value, picked in the exception picker and
+  /* One list's grant narrowed to the rows where one field holds one value, picked in the exception picker and
      said back under the exception on the person's card. */
   exceptionOnly: 'Only rows where',
   exceptionEveryRow: 'Every row',
@@ -821,7 +821,7 @@ export const account = {
   exceptionOnlyUnread: 'A rule BrainDog cannot read, so no rows of this list.',
   exceptionAddedOnly: (name: string, list: string, level: string, field: string, value: string) =>
     `${name} is set to ${level} on ${list}, only where ${field} is ${value}.`,
-  /* OPS-21: closing your account, from Settings > Identity. The records keep their own history, and the Directory's
+  /* Closing your account, from Settings > Identity. The records keep their own history, and the Directory's
      nightly copies still hold the account until they age out, so both are said before anybody presses. */
   closeTitle: 'Close your account',
   closeSays:

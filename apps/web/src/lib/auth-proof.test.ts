@@ -1,6 +1,6 @@
 /**
- * The browser's half of OPS-7's doors: reading an invitation link that carries a proof, accepting for a new address,
- * the stale answer, and the sessions a person can see and end. `loop/finish/ops.md` OPS-7.
+ * The browser's half of the invitation-proof doors: reading an invitation link that carries a proof, accepting for a new address,
+ * the stale answer, and the sessions a person can see and end.
  *
  * THE HOST IS A FUNCTION HERE, answering exactly what `packages/host/src/auth.ts` and `invite.ts` answer, so what is
  * pinned is how this file reads those answers and what it sends back.

@@ -1,5 +1,5 @@
 /**
- * The Slash page's Ask section: its words, and the list of what was asked (`loop/finish/agents.md` AGT-24).
+ * The Slash page's Ask section: its words, and the list of what was asked.
  *
  * PURE, SO `node --test` CAN IMPORT IT, beside `slash.ts`, whose drawing of an answer the page reuses whole. The page asks
  * the same two passes the palette asks, so a question typed on `/slash` and the same question typed after `/` read the

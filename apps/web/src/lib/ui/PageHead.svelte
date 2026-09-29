@@ -1,29 +1,29 @@
 <!--
-  The title row of every body surface (SYSTEM §5): the title and its count, the toolbar at the right, and under them the
+  The title row of every body surface: the title and its count, the toolbar at the right, and under them the
   one sentence that says what the screen means.
 
   The title is `page.title` else `register.name`, NEVER an id. `register`, `predicate` and
   `projection` are internal vocabulary and where a draft leaked them into UI copy, that is a defect
   (19 §9). NOR DOES AN ID FOLLOW IT: the head took an `id` and printed it after every title, which
   is how "SG5" came to sit after a question on Decide. A person reads a name here, and an id lives
-  in a row's Details and in "Copy link" (design SYS-3).
+  in a row's Details and in "Copy link".
 
   The count says `n of N`, and when examples are in the figure it says so: a metric counts example
   rows and admits it, because the alternative is a money page reading "Due in 30 days · EGP 0"
   directly above a table containing one obligation due in 30 days (19 §6).
 
-  THE SENTENCE is Bento's intelligence kept in one line: 16/24 in `--ink2`, and the phrase that needs him in `--danger`.
+  THE SENTENCE is the page's intelligence kept in one line: 16/24 in `--ink2`, and the phrase that needs him in `--danger`.
   Handed as words (`sentence`, with `needs` naming the phrase inside it) or as a snippet, where the phrase is marked
   `data-needs`. It scrolls away with the page; the title row does not.
 
-  TWO SHAPES, ONE ON EACH SIDE OF 900px (design SYS-4, DSN-6).
+  TWO SHAPES, ONE ON EACH SIDE OF 900px.
 
   From 900px up the title row sits on the ground, 44 tall, 12 from the top of the work. Once the page scrolls it stays
   where it is and becomes a compact glass bar over what passes under it: the title steps down to 17, and the bar's glass
   arrives in 220ms. The row keeps its height, so the page under it never jumps and a page an inch taller than the window
   cannot flicker between the two states.
 
-  Toolbar controls are glass pills and circles, 36 high and 6 apart, and the one primary is ink (SYSTEM §5): a quiet
+  Toolbar controls are glass pills and circles, 36 high and 6 apart, and the one primary is ink: a quiet
   `Button` in the toolbar is drawn as glass here, and inside the compact bar it drops its own glass, because glass never
   holds glass.
 
@@ -89,7 +89,7 @@
      */
     back?: string | undefined;
     /**
-     * The screen's one sentence under the title (SYSTEM §5): words, or a snippet whose urgent phrase is marked
+     * The screen's one sentence under the title: words, or a snippet whose urgent phrase is marked
      * `data-needs`. "Four things need you, and the backup vendor is 2 days late."
      */
     sentence?: string | Snippet | undefined;
@@ -336,7 +336,7 @@
     min-inline-size: 0;
   }
 
-  /* `t-title`, 28/34 at 600 and −0.02em, and 17 in the compact bar (SYSTEM §3). A BLOCK AND NOT A FLEX ROW, so a title
+  /* `t-title`, 28/34 at 600 and −0.02em, and 17 in the compact bar. A BLOCK AND NOT A FLEX ROW, so a title
      that wraps is text that wraps, with its glyph inline before the first word. */
   .title {
     display: block;
@@ -402,7 +402,7 @@
     min-inline-size: 0;
   }
 
-  /* A QUIET CONTROL IN THE TOOLBAR IS GLASS (SYSTEM §5): the glass fill, its hairline pair and its blur, on the ground. */
+  /* A QUIET CONTROL IN THE TOOLBAR IS GLASS: the glass fill, its hairline pair and its blur, on the ground. */
   .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])) {
     background: var(--glass);
     border-color: transparent;
@@ -536,7 +536,7 @@
       opacity: 1;
     }
 
-    /* THE ASK FIELD, AS A PHONE HOLDS IT: a 44px glass circle at the top right (SYSTEM §9), and plain once the bar
+    /* THE ASK FIELD, AS A PHONE HOLDS IT: a 44px glass circle at the top right, and plain once the bar
        itself is glass. */
     .find {
       display: grid;
@@ -578,7 +578,7 @@
       padding-block-start: 0;
     }
 
-    /* The phone's large title, 30/36 (SYSTEM §3). It is never the compact one: that is the bar's. */
+    /* The phone's large title, 30/36. It is never the compact one: that is the bar's. */
     .title,
     .head[data-under] .title {
       overflow: visible;

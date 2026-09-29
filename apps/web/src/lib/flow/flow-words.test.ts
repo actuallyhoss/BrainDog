@@ -4,8 +4,8 @@
  * THE CANVAS SAID THE SENTENCE HAD NO WORD FOR "MORE THAN", AND IT HAS FIVE. `flow.ts` over `COMPARE` and the
  * inspector's header both said `packages/where/src/sentence.ts` read is, before, after, empty, set, has and lacks and
  * nothing that orders, so a condition over a number had to be the tree the "A number" builder writes. That was true
- * until `3187be5a` taught the sentence more than, at least, less than, at most and between, and false from then on
- * (audit sixty-five, finding 6). Measured over the record's own `parseWhere` with an answer typed as the runner types
+ * until `3187be5a` taught the sentence more than, at least, less than, at most and between, and false from then on.
+ * Measured over the record's own `parseWhere` with an answer typed as the runner types
  * it: `rate is more than 70` over a decimal is `{ field: rate, gt: 70 }`, the very tree the builder files, and
  * `rate between 50 and 90` is `between`. Over an answer held as text the words fall back to an `is` of the whole
  * phrase, which answers false where the tree answers false too, so the two forms never disagree about a row.

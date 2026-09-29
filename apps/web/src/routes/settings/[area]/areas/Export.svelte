@@ -73,7 +73,7 @@
   }
 
   /**
-   * THE WORDS THIS AREA'S ROWS ADD (DSN-18). Each way out of the record is a row now, titled by what
+   * THE WORDS THIS AREA'S ROWS ADD. Each way out of the record is a row now, titled by what
    * leaves, with the one sentence that tells it apart and the button that takes it; the sentences the
    * area already had stay in `copy` and are read where they were.
    */
@@ -175,7 +175,7 @@
        because it is a link to a screen that explains itself. -->
   <StateRow icon="skill" title={words.wayTitle} line={words.wayLine} action={anOwner ? exportPack : undefined} />
   <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine} action={anOwner ? exportRows : undefined} />
-  <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install (`loop/research-spark.md` S14). -->
+  <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install. -->
   <StateRow icon="packs" title={words.setupTitle} line={words.setupLine} action={shareOne} />
 </Section>
 <!--
@@ -193,7 +193,7 @@
   AND THE ONLY KEY THIS BLOCK EVER DREW WAS THE SAMPLE'S. `SIGNING_KEY` sat in `data.ts` with the
   rest of the synthetic record: no keypair ever produced it, and its two halves were made to
   agree, so `key_id` really was `sha256(raw)[0:16]` of the value beside it. It was drawn where
-  `shell.live` was false, the public demo, and there is no demo now (DIRECTION 26), so the arm
+  `shell.live` was false, the public demo, and there is no demo now, so the arm
   went with it: a shell with no record is not handed an invented key either.
 
   SO EVERY SHELL IS TOLD THE SAME TRUE THING. Its exports and its backups are signed, and this

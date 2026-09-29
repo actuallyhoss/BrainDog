@@ -19,7 +19,7 @@ import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } f
  * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
  *
  * IT WAS A SET OF ARCHIVED SEQUENCES AND THE ROW LEFT THE SCREEN. That is the single change with
- * the most evidence behind it in `loop/REWORK.md`: of eighty-five human writes over thirteen days
+ * the most evidence behind it: of eighty-five human writes over thirteen days
  * in the record this product is modelled on, **thirteen reversed the write immediately before
  * them, and twelve of those landed inside five seconds**, across four different verbs. They had
  * one cause. The row vanished, so the only way to check you had hit the right one was to do the
@@ -118,7 +118,7 @@ export const wayOf = (field: string, decl: RegisterDecl | undefined): readonly [
 /**
  * THE FIELD A ROW'S TONE IS ABOUT: the register's `day` field declared `deadline:`, the one `toneOf`
  * (`lib/record/api.ts`) dates a row by. A table marks this column as the one that carries the tone,
- * so the dot sits beside the date that made the row late or close (design DSN-7). It was the state
+ * so the dot sits beside the date that made the row late or close. It was the state
  * column, and a red dot beside "Open" said overdue while the word beside it said something else.
  */
 export const deadlineOf = (decl: RegisterDecl | undefined): string | undefined =>
@@ -127,7 +127,7 @@ export const deadlineOf = (decl: RegisterDecl | undefined): string | undefined =
 /**
  * A FINISHED ROW CARRIES NO COLOUR. `toneOf` calls a row in a `done` state `good`, which drew a green
  * dot beside every "Paid" and "Cleared" on a list and beside "Cancelled" too. A normal state is the
- * calm one (design-brief §10): a list draws a row late or close, and a finished row says it is
+ * calm one: a list draws a row late or close, and a finished row says it is
  * finished in its own word. The rows keep every other field as they came.
  */
 export function withoutGood<R extends { tone?: Tone | undefined }>(rows: readonly R[]): R[] {
@@ -241,7 +241,7 @@ const DAY_MS = 86_400_000;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/u;
 
 /**
- * THE THREE WAYS A LIST IS DRAWN FROM 640PX UP (SYSTEM §5, the toolbar's segmented control): the table, the board
+ * THE THREE WAYS A LIST IS DRAWN FROM 640PX UP: the table, the board
  * and the cards. Below 640 a list is always the phone's cards, whatever the address asks for.
  *
  * IN THE ADDRESS, as `?view=board`, beside the filters and the sort: a link to a board opens on the board. The table
@@ -315,7 +315,7 @@ export function dayWord(iso: string, now: number): string {
 
 /**
  * WHEN A ROW IS DUE, AS A BOARD CARD SAYS IT: "2 days late" when it is past its deadline, which is the one phrase on
- * the card drawn in red (SYSTEM §6), and "Due tomorrow" when it is not. A finished row, and a row with no deadline,
+ * the card drawn in red, and "Due tomorrow" when it is not. A finished row, and a row with no deadline,
  * says nothing about one.
  */
 export function dueOf(decl: RegisterDecl | undefined, e: Entry, now: number): { text: string; late: boolean } | null {
@@ -367,7 +367,7 @@ export type Reading = { before: string; needs: string; after: string };
 const plain = (text: string): Reading => ({ before: text, needs: '', after: '' });
 
 /**
- * THE ONE LINE UNDER THE LIST'S TITLE (SYSTEM §5): what is open, what is late, and when the next thing falls due.
+ * THE ONE LINE UNDER THE LIST'S TITLE: what is open, what is late, and when the next thing falls due.
  *
  * "12 open, 3 late, the next due tomorrow." with "3 late" red and nothing else, and "none late" when nothing is. A list
  * that declares no deadline stops after what is open; one with neither a state nor a deadline says how many it holds

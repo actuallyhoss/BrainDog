@@ -169,8 +169,8 @@ function quietly<T>(work: () => T): T | null {
  * Where "Open BrainDog" goes: the `next` in the address, or the one this tab was handed before a link replaced it.
  *
  * A PASTE LOST IT. Pasting a sign-in link over `/app/signin?next=...` changes the query, which is a full navigation
- * and not a `hashchange`, so the page mounted again on `/app/signin#magic=...` and `onward()` read an empty search
- * (`loop/research-batch-forty-six-audit.md`, "Found on the way"). So a `next` in the address is kept for the tab, and
+ * and not a `hashchange`, so the page mounted again on `/app/signin#magic=...` and `onward()` read an empty search.
+ * So a `next` in the address is kept for the tab, and
  * an arrival carrying a link and no `next` takes the kept one. A mailed link now carries its own, which wins.
  *
  * A PLAIN VISIT FORGETS IT. Sign-in with neither a `next` nor a link was not sent from anywhere, so an older page is

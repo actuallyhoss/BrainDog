@@ -156,7 +156,7 @@ test("marking all read sends the newest line's number, and the shell asks boot a
 });
 
 test('A MEMBER HELD TO ONE LIST MARKS WITH THE CURSOR SHE WAS HANDED, and it goes back exactly as it came', async () => {
-  /* `loop/research-history-cursor.md`: she is sent `upTo: 'e.<id>'` and no rowid, and the record refuses her a number.
+  /* She is sent `upTo: 'e.<id>'` and no rowid, and the record refuses her a number.
      `markAll` typed `upTo` as a number, so the one thing it could send her back was a number, which is now a refusal. */
   forget();
   const upTo = 'e.01M1RQ3130J6MBME97EKYKKWZ2';
@@ -236,7 +236,7 @@ test('the page below is asked for with the cursor the page above answered, and t
 
 /* HOME DREW THE SAMPLE WHEREVER THE SHELL WAS NOT LIVE: the studio's figures through `metric`, its obligations due this
    week and its lapsing services out of `ROWS` against the frozen `NOW`, and its feed filtered by a mark kept on this
-   device. With no sample (DIRECTION 26) a shell is a record or a refusal, and Home draws the record's answers or the
+   device. With no sample a shell is a record or a refusal, and Home draws the record's answers or the
    refusal's sentence. */
 test("Home reads the record's answers and nothing of the sample", () => {
   /* TODAY IS THE LANDING NOW AND THE OLD HOME IS `/?overview`, one component each, and neither reads the sample. */
@@ -323,7 +323,7 @@ test('TODAY READS THE RECORD`S OWN ANSWERS, leaves out what it does not hold, an
         },
       });
     if (method === 'list') return json(200, { ok: true, value: { rows: [{ id: 't1', seq: 1, fields: { what: 'Pay the VAT', by: '2026-09-28' } }], cursor: null, matched: 1 } });
-    return json(404, { ok: false, refusal: { code: 'NOT_FOUND', fix: 'No such thing.' } });
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such thing.' } });
   });
   const out = await readToday(BASE, io, Date.parse('2026-09-29T12:00:00'));
   assert.ok(out.ok);

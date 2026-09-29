@@ -4,7 +4,7 @@
  * THE FORM READ NO LABEL. `RowForm.svelte` drew every enum option as `copy.valueWord(value)`, so a household's People
  * picker offered Client, Contractor, Accountant and Registrar where Personal's labels say Work contact, Hired help, Tax
  * and accounts and Agency, and a new bill was offered Client work and Premises where its saved row reads Pay and Home
- * (`api.ts` `display`, which does read `f.labels`). Measured on the held wave forty-six tree by `personal-picker.mts`.
+ * (`api.ts` `display`, which does read `f.labels`). Measured on the held tree by `personal-picker.mts`.
  *
  * HELD BY READING THE FORM'S SOURCE, because a Svelte component does not mount under `node --test` and the browser gates
  * share ports with a full run. The source check names the two option sites and nothing else.

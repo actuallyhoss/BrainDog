@@ -1,5 +1,5 @@
 /**
- * The look editor's arithmetic (GAP-3, `21 §6`): a draft, the palettes it draws, the three ways a colour is changed,
+ * The look editor's arithmetic (`21 §6`): a draft, the palettes it draws, the three ways a colour is changed,
  * and the contrast gate that says in words whether everybody can still read it.
  *
  * ONE SOLVER, THE RECORD'S. Every palette here is `@braindog/theme`'s `build`, under the house profile and the

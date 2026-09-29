@@ -2,7 +2,7 @@
  * One read, decided the same way on every screen: waiting, ready, empty, refused or offline.
  *
  * WHY THERE IS ONE. Each screen asked the record for itself and then drew its own loading, refusal, retry and empty
- * states, so the same failure looked and behaved differently from one screen to the next (architecture §3.1). The
+ * states, so the same failure looked and behaved differently from one screen to the next. The
  * difference was never a design choice; it was one small state machine written again inside every screen. This is
  * that machine once, and `read.svelte.ts` is the thin half that holds it in a rune.
  *
@@ -26,7 +26,7 @@ export type Phase = 'waiting' | 'ready' | 'empty' | 'refused' | 'offline';
  * least a `code` and a `fix`), so every client method's answer is a valid `fn` without a cast.
  *
  * `detail` IS THE TRANSPORT'S OWN WORDS, when a refusal carries them apart from its sentence. The client's
- * `unreachable()` keeps the reason there and says DSN-12's sentence in `fix` (contracts §11.2, AGT-4), so an offline
+ * `unreachable()` keeps the reason there and says the offline sentence in `fix`, so an offline
  * read folds `detail` under Details; folding `fix` would print that sentence twice and lose the reason.
  */
 export type Result<T> =
@@ -38,7 +38,7 @@ export type Result<T> =
 export type Snapshot<T> = { state: Phase; value: T | null; refusal: string | null };
 
 /**
- * One read, as a screen holds it (contracts §8.1).
+ * One read, as a screen holds it.
  *
  * `refusal` IS A SENTENCE, NEVER A CODE: the record's `fix` for a refusal, and the technical reason for an offline
  * read, which `ReadState` folds under Details rather than printing as the content.
@@ -151,7 +151,7 @@ export function reader<T>(empty?: (value: T) => boolean, version: number | null 
       if (kept(ticket)) return true;
       /* A THROW IS DRAWN AS OFFLINE, AND THE REASON IS KEPT. The client never throws (a dead socket is its
          `UNREACHABLE`), so a throw here is a screen's own `fetch` failing, which is the network. The sentence the
-         person reads is DSN-12's; what actually threw sits under Details, so nobody is misled about which it was. */
+         person reads is the offline one; what actually threw sits under Details, so nobody is misled about which it was. */
       snap = { state: 'offline', value: null, refusal: why };
       return true;
     },

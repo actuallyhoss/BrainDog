@@ -1,11 +1,11 @@
 /**
  * Whether this host mints forwarding addresses, asked before the two buttons are drawn.
  *
- * FINDING 16 OF `loop/research-usability-2026-09-21.md`, AS AN ASSERTION. `/settings/ingest` offered
+ * A USABILITY FINDING, AS AN ASSERTION. `/settings/ingest` offered
  * `Make an address` and `Stop taking forwarded mail` on every host, and on a self-host both presses
  * answered 404 `ROUTE_UNKNOWN`. The screen then printed a good sentence about `inbound.token` AFTER
  * the press, and a reload put both buttons back, so the lesson did not stick. Two of the eight
- * controls that survey counted as unable to do anything on a one-minute-old record were these.
+ * controls counted as unable to do anything on a one-minute-old record were these.
  *
  * THE ANSWERS BELOW ARE THE TWO HOSTS' OWN, COPIED OUT OF THEM, so a probe that drifts from either
  * door fails here rather than on somebody's screen:
@@ -45,7 +45,7 @@ function host(answer: (() => Response) | null): { io: Fetch; sent: Sent[] } {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SETTINGS = join(HERE, '..', '..', 'routes', 'settings', '[area]');
-/* THE INGEST AREA AND THE STATE IT SHARES WITH BILLING, where the host's answer is asked and kept (ARC-7b). */
+/* THE INGEST AREA AND THE STATE IT SHARES WITH BILLING, where the host's answer is asked and kept. */
 const AREA = [join(SETTINGS, 'areas', 'Ingest.svelte'), join(SETTINGS, 'settings-state.svelte.ts')].map((f) => readFileSync(f, 'utf8')).join('\n');
 const INGEST = ((): string => {
   const markup = readFileSync(join(SETTINGS, 'areas', 'Ingest.svelte'), 'utf8');
@@ -91,7 +91,7 @@ test('a host that answered nothing this screen can read is not a host that said 
 });
 
 test('THE SCREEN SAYS WHAT THE HOST CAN DO BEFORE IT OFFERS TO DO IT', () => {
-  /* Finding 16, as the markup: neither button exists until the host has answered, and the sentence
+  /* The same finding, as the markup: neither button exists until the host has answered, and the sentence
      about `inbound.token` is drawn as a fact about the host rather than as a refusal of a press. */
   assert.match(INGEST, /mintsHere === true/u, 'the ingest area does not branch on what the host serves');
   assert.match(

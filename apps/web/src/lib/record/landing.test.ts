@@ -1,7 +1,7 @@
 /**
  * WHERE A COLLEAGUE INVITED TO SOME LISTS, AND NOT TO THE RECORD, LANDS.
  *
- * `loop/research-invite-landing.md` finding 1, measured through the real seed: a bookkeeper given
+ * MEASURED THROUGH THE REAL SEED: a bookkeeper given
  * `write` on one empty list opened the product to "Nothing in the record yet." and `Start here`, and
  * `Start here` led to tiles that set up a brand new record and that the record then refused. Their
  * list answered `list` and `create` the whole time; nothing on any screen pointed at it. This is the

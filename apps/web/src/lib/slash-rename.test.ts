@@ -1,13 +1,13 @@
 /**
- * Spark is called Slash now (`loop/DIRECTION.md` section 31), and this is the web app's half of the rename, measured.
+ * Spark is called Slash now, and this is the web app's half of the rename, measured.
  *
- * WHY A SCAN AND NOT A LIST OF FILES. The survey (`loop/research-slash-rename.md` section 1) counted 673 occurrences in 50
+ * WHY A SCAN AND NOT A LIST OF FILES. A count before the rename found 673 occurrences in 50
  * files of this app alone, in route folders, copy keys, palette ids, CSS classes, a localStorage key and the canvas's verb
  * list. A test that names the files it knows about passes the day somebody adds a fifty-first, so the last test here reads
  * every file under `src` and allows exactly the words that are not the product: `sparkline`, the chart, and `sparkle`, the
  * English word.
  *
- * AND THE `/` KEY IS NOT THE PRODUCT. Section 3 of the survey found the keymap already had a binding called
+ * AND THE `/` KEY IS NOT THE PRODUCT. The keymap already had a binding called
  * `palette-slash`, the key that opens the palette, which after the rename reads as "Slash's palette". It is
  * `palette-slash-key` now, so no identifier `slash` means anything but Slash.
  */
@@ -50,12 +50,10 @@ test('the key that opens the palette is named for the key, not for the product',
   assert.ok(!ids.includes('palette-slash'), 'palette-slash still names the key');
 });
 
-/* THE WORDS THAT STAY: the chart, the English word, and the history files in `loop/` that keep their names, which 36
-   comments here cite as evidence (the survey's section 1). Renaming a citation would point it at a file that does not
-   exist. */
-const KEPT = /sparkline|sparkle|research-(?:worker-)?spark[a-z-]*\.md/giu;
+/* THE WORDS THAT STAY: the chart and the English word. */
+const KEPT = /sparkline|sparkle/giu;
 
-test('nothing under src says spark, except the chart, the English word and the history it cites', () => {
+test('nothing under src says spark, except the chart and the English word', () => {
   const found: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

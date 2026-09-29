@@ -1,5 +1,5 @@
 /**
- * Accepting an invitation, and the name that travels with it. `loop/research-batch-fourteen-audit.md` finding 1.
+ * Accepting an invitation, and the name that travels with it.
  *
  * THE PAGE WAS THE FIRST HOP THAT DROPPED IT. `acceptInvite` posted `{ inviteToken, accept: true }` and nothing else,
  * so the host's name handling, the Directory's column and the record's mirror were all waiting on a field no page

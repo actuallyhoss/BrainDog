@@ -1,6 +1,6 @@
 <!--
   A file field where it is drawn: a button that opens the phone's picker or its camera, and once a file is chosen its
-  name, its size, a preview when it is a picture, and a way to take it off (OPS-20).
+  name, its size, a preview when it is a picture, and a way to take it off.
 
   ONE STRING IN AND OUT, the file as the row holds it written out (`field-draft.ts` `fileDraft`), because both screens
   keep what is being edited as one string and save it through `patchOf`, which reads the file back with `fileOf`. The

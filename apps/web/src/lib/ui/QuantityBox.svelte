@@ -1,5 +1,5 @@
 <!--
-  A quantity typed where it is drawn: the number in one box and the unit it counts beside it (MOD-22).
+  A quantity typed where it is drawn: the number in one box and the unit it counts beside it.
 
   ONE STRING IN AND OUT, the number, a space and the unit (`field-draft.ts` `quantityLine`), because both screens keep
   whatever is being typed as one string and save it through `patchOf`, which puts `{ value, unit }` back together.

@@ -1,8 +1,8 @@
 /**
- * The four screens of brief A8 (`loop/research-no-sample.md`) that drew the seeded studio when no record answered, read
+ * The four screens that drew the seeded studio when no record answered, read
  * from their source, because this app has no DOM to open them in.
  *
- * WHAT EACH ONE DID (DIRECTION 26). The bind sheet offered the studio's pages under a `sampleSide` and toasted "nothing
+ * WHAT EACH ONE DID. The bind sheet offered the studio's pages under a `sampleSide` and toasted "nothing
  * was saved" for a block on one of them. Slash answered a shell that was not live with "This is the sample". The
  * spoken-id resolver sent `/SG5` and `/tasks#3` to the studio's question and row when the record said 401. The saved
  * view drew the studio's `VIEWS` over rows from `list`. None of them asked whether anybody was looking at a real record.

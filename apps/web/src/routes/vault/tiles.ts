@@ -1,5 +1,5 @@
 /**
- * What `/vault` says in figures and sentences (SYSTEM §5, §6): the one line under the title, the "Opens by key" tile's
+ * What `/vault` says in figures and sentences: the one line under the title, the "Opens by key" tile's
  * bars, figure and reading line, and each key's state as a word.
  *
  * COUNTS AND NAMES, NEVER A VALUE. Everything here is built from what `keysOf` already holds about a key: its name, what
@@ -8,7 +8,7 @@
  *
  * NO NUMBER THIS SCREEN WAS NOT GIVEN. `opened` is a lifetime count, so no line says "this month"; and where the record
  * refused `listGrants` there is no count at all, so the tile is not drawn and the sentence says how many keys there are
- * and nothing about how often they were opened (SCREENS "Vault", rule 4).
+ * and nothing about how often they were opened.
  *
  * PURE, SO `node --test` CAN IMPORT IT, as `said.ts` is.
  */
@@ -104,7 +104,7 @@ export function opensOf(keys: readonly KeyRow[], lastBy: ReadonlyMap<string, Use
 }
 
 /**
- * THE ONE LINE UNDER THE BARS (SYSTEM §6): the most opened key, who opened it last, and how many were never opened.
+ * THE ONE LINE UNDER THE BARS: the most opened key, who opened it last, and how many were never opened.
  * "Payments service was opened 12 times, last by claude 2d ago, and 2 keys have never been opened."
  */
 export function readingOf(ranked: readonly KeyRow[], lastBy: ReadonlyMap<string, UsedByRun>, now: number = Date.now()): string {

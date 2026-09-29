@@ -271,8 +271,8 @@ const ROW = (seq: number, title: string, extra: Partial<Row> = {}): Row => ({ ce
 /**
  * THE ROW THE READER JUST TICKED WAS GONE BEFORE THEY COULD SEE THE TICK. `writeRow` read the page again after the
  * write, and a `todo` whose `where:` leaves out done rows answers without the row it just ticked: no mark, no receipt,
- * and nothing on screen to press. REWORK §1 counted 13 of 85 human writes reversed within five seconds for exactly this
- * shape. Before the repair this file failed to import, because nothing exported `keepInPlace`.
+ * and nothing on screen to press. A count of the history found 13 of 85 human writes reversed within five seconds for
+ * exactly this shape. Before the repair this file failed to import, because nothing exported `keepInPlace`.
  */
 test('A TICKED TASK THE RE-READ LEAVES OUT IS DRAWN WHERE IT WAS, done', () => {
   const [a, b, c] = [ROW(1, 'a'), ROW(2, 'b'), ROW(3, 'c')];
@@ -359,7 +359,7 @@ test('A WRITE THAT LANDS SAYS THE VERSION IT MADE, which is the version Put back
 /**
  * THE SCREEN HALF, swept from the source because it is a component. A live tick or move that lands is held in place and
  * answered by a receipt carrying its way back; before the repair `writeRow` pushed a toast only on a refusal and nothing
- * in the page's writes (`PageView.svelte` then, `page-writes.ts` since PGS-1's split) named `keepInPlace`.
+ * in the page's writes (`PageView.svelte` then, `page-writes.ts` since the reader was split) named `keepInPlace`.
  */
 test('ON A LIVE PAGE THE ROWS GO THROUGH keepInPlace AND A LANDED WRITE PUSHES A RECEIPT WITH AN UNDO', () => {
   const view = readFileSync(fileURLToPath(new URL('../page/page-writes.ts', import.meta.url)), 'utf8');

@@ -4,7 +4,7 @@
  * THE BOARD PUT THE COLUMN BACK AND NOT THE DAY. Its undo was `movePatch(ref, field, from)`, which is right about the
  * state and wrong about the finished day: the record fills or empties that day in the same write as a move into or out
  * of `done` (the kernel's `finished.ts`), and a move back into `done` that names no day is dated today. Measured against
- * a kernel on 24 September (audit sixty-five, section 2, probe B1): a task done on 1 September, moved to `doing` and put
+ * a kernel: a task done on 1 September, moved to `doing` and put
  * back, was sent `{"state":"done"}` and read `done on 2026-09-24`. `tick-undo.ts` said the board "never had this fault";
  * that was true of the state only.
  *

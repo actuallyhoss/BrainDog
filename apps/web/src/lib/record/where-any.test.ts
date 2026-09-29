@@ -3,7 +3,7 @@
  *
  * THE RECORD LEARNED IT IN `packages/where/src/sentence.ts` AND THIS FILE IS THE OTHER HALF. Before
  * either did, `state is open, or due before today` was refused on both sides for naming a field called
- * `or` (`loop/research-m4-wave-two.md`, brief 7), so "open or overdue" over the obligations could not be
+ * `or`, so "open or overdue" over the obligations could not be
  * put to a page, a tile or a view in the words they are all written in.
  *
  * THE OR-GROUP IS NOT A FLAG OVER `clauses`, AND THIS FILE HOLDS THE READERS THAT SAY WHY. `clauses`
@@ -12,7 +12,7 @@
  * project, a new row filled from both sides. So the group is `any`, beside `clauses`, which those lines
  * do not read. The record is driven, not described, as `where-compare.test.ts` drives it.
  *
- * WHICH ROWS A GROUP ADMITS IS THE RECORD'S ANSWER ALONE since ARC-2: the browser's matcher and its
+ * WHICH ROWS A GROUP ADMITS IS THE RECORD'S ANSWER ALONE: the browser's matcher and its
  * figure engine are gone, and `compile` is the record's own parser. So the browser's half of each case
  * below is the shape `compile` hands its readers, and its refusals, which are the record's word for word.
  */

@@ -7,8 +7,7 @@
  * nothing there. A `?env=` parameter would be a product surface nobody asked for, and one that lies.
  *
  * IT IS NOT A RECORD VARIANT. There was a second build flag, `BRAINDOG_VARIANT`, for which record a build showed, so a
- * gate could reach the half of a screen the sample could not draw; it went with the sample (wave C2 of
- * `loop/research-no-sample.md`), and the gates reach those halves with a record instead (`tools/gates/record.mjs`).
+ * gate could reach the half of a screen the sample could not draw; it went with the sample, and the gates reach those halves with a record instead (`tools/gates/record.mjs`).
  * An environment answers *which deployment this build is for*, and nothing else.
  *
  * WHAT IT IS FOR. Two windows, one on the alpha record and one on the real one, look identical,

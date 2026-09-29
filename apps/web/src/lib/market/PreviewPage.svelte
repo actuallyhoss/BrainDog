@@ -3,7 +3,7 @@
 
   IT DRAWS NO BLOCK ITSELF. Each `PageAnswer` becomes an `Opened` through the page's own `blockOf` and is mounted in
   `PageView` with `mode: 'preview'`, which hands no block a write, arranges nothing and has no source view. So what a
-  person sees here is what the installed page draws, from the same renderer (contracts §11 X50).
+  person sees here is what the installed page draws, from the same renderer.
 
   THE PAGE'S TABS ARE THE `--s1` SEGMENTED PILL, because the preview sits inside a tile and glass never sits on content
   (`controls.css`).
@@ -76,7 +76,7 @@
 
   /* THE PAGE DRAWN ON ITS OWN GROUND: a well in `--sunk`, radius `--r-md`, with no edge, so the installed page's blocks
      sit on it as they would on the app's ground. It is a picture of the product inside the tile that holds it, not a
-     second box (SYSTEM §4, §10). */
+     second box. */
   .frame {
     box-sizing: border-box;
     inline-size: 100%;
@@ -87,7 +87,7 @@
   }
 
   /* NO EDGE AND NO FILL OF ITS OWN: a card's drawing well is the one surface (`ListingCard.svelte`), and a second box
-     inside it is the nesting design.md §2.8 found on this screen. */
+     inside it is the nesting this screen once had. */
   .small {
     block-size: 180px;
     overflow: hidden;

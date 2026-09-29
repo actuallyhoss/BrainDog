@@ -1,5 +1,5 @@
 <!--
-  The Try panel: what to try the drawn automation on, and what it would do, before it is saved (EDT-1).
+  The Try panel: what to try the drawn automation on, and what it would do, before it is saved.
 
   SEE IT WORK BEFORE YOU TRUST IT. Zapier's Test and n8n's Execute step both put this at the centre of their editors,
   and before this the only way to learn whether "only when due before today" caught anything was to save it and wait.
@@ -11,11 +11,11 @@
 
   AN INLINE RULE HAS NO RUN TO TRY, and the record refuses one (`flow-try.ts` `trialTrigger`), so it keeps the dry run:
   walked over its list by the kernel, it says how many rows match now and what the first few would get. A refusal is
-  the record's sentence, in ink with a glyph and never a wash (DESIGN-SYSTEM 4.8).
+  the record's sentence, in ink with a glyph and never a wash.
 
   THE PICK IS THE PAGE'S, bound here, because the sticky bar's Try reads it as well as this panel.
 
-  A TILE UNDER THE CANVAS (SYSTEM §6): the play glyph in its well and "If it ran now" as its heading, the pick as the
+  A TILE UNDER THE CANVAS: the play glyph in its well and "If it ran now" as its heading, the pick as the
   tile's own segmented control, and once it has been tried, the answer drawn before it is said. A run's steps are one
   stacked bar by how each went, in the colours the cards are painted in; a dry run's rows are the share of the list it
   would act on now. The sentence under either is the chart's one written line.
@@ -118,8 +118,7 @@
         {#if rows.length === 0}
           <p class="tried-note">{editWords.noRows}</p>
         {:else}
-          <!-- A LIST OF PRESSABLE ROWS AND NOT A <select>, which would draw the phone's own picker over the page
-               (`loop/finish/design-brief.md` §11.10). -->
+          <!-- A LIST OF PRESSABLE ROWS AND NOT A <select>, which would draw the phone's own picker over the page. -->
           <ul class="tried-choices" aria-label={editWords.pickRow}>
             {#each rows as r (r.id)}
               <li>
@@ -217,7 +216,7 @@
   }
 
   /* A ROW TO TRY IT ON: one line in the second ink, the tile's inner fill under the chosen one and the one pointed at,
-     rounded as a row's wash is (SYSTEM §6, Rows). */
+     rounded as a row's wash is. */
   .tried-choice {
     display: flex;
     align-items: center;
@@ -261,7 +260,7 @@
   }
 
   /* A FIELD FOR WHAT IS PASTED: the `--s1` well, no border, the field's corner, in Geist Mono because it is JSON, and
-     16px in every input (`loop/finish/design-brief.md` §6), so a phone does not zoom the page on focus. */
+     16px in every input, so a phone does not zoom the page on focus. */
   .tried-json {
     box-sizing: border-box;
     inline-size: 100%;
@@ -281,7 +280,7 @@
     outline-offset: 2px;
   }
 
-  /* THE CHART'S ONE WRITTEN LINE (SYSTEM §6): body size in ink. */
+  /* THE CHART'S ONE WRITTEN LINE: body size in ink. */
   .tried-count,
   .tried-trigger {
     margin: 0;
@@ -303,7 +302,7 @@
     font-size: var(--t-base);
   }
 
-  /* THE GLYPH CARRIES THE INTENT AND THE SENTENCE STAYS INK (DESIGN-SYSTEM 1.2 and 4.8): red, since what it says is
+  /* THE GLYPH CARRIES THE INTENT AND THE SENTENCE STAYS INK: red, since what it says is
      what stopped the run. */
   .tried-glyph {
     display: inline-flex;

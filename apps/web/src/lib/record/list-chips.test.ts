@@ -31,7 +31,7 @@ import { compile, registerHref } from './where.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
 import './fixtures/fill.ts';
 
-/* THE LIST SCREEN IS ITS PAGE AND ITS PARTS (ARC-7a): the chips are parsed in the page and drawn by `ChipsBar`, read as one text. */
+/* THE LIST SCREEN IS ITS PAGE AND ITS PARTS: the chips are parsed in the page and drawn by `ChipsBar`, read as one text. */
 const route = ['+page.svelte', 'parts/ChipsBar.svelte']
   .map((at) => readFileSync(new URL(`../../routes/r/[register]/${at}`, import.meta.url), 'utf8'))
   .join('\n');
@@ -152,7 +152,7 @@ test('an element carrying a comma is refused by name, in both languages, rather 
   const chips = chipsOf(new URL(`/r/skills?f=because:has:${encodeURIComponent(title)}`, 'http://x').searchParams);
   const said = compile('skills', whereOf(chips));
   assert.equal(said.bad.length, 1);
-  /* THE RECORD'S OWN SENTENCE, full stop and all, since `compile` is the record's parser (ARC-2). */
+  /* THE RECORD'S OWN SENTENCE, full stop and all, since `compile` is the record's parser. */
   assert.match(said.bad[0] ?? '', /there is no learnings called Attach the rows a proposal read\.$/);
   assert.deepEqual(list('skills', { filters: chips }).entries, []);
 });

@@ -6,7 +6,7 @@
  * filter bar, the search page and the onboarding step each grew their own, and by the time anyone
  * looked they disagreed about the surface, the radius and what focus does.
  *
- * A FIELD IS A SOFT WELL (SYSTEM §6, Fields): 40 tall, 44 under a thumb, the `--s1` fill with no border, radius
+ * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--s1` fill with no border, radius
  * `--r-md`, and its label above it in `--t-sm` `--ink2`. Focus is the 2px ink ring offset 2, the same ring every other
  * control takes from the a11y layer. A segmented control is a glass pill on the ground (and an `--s1` one inside a
  * tile), with the chosen segment a `--bg` pill lifted by a tiny shadow. Switches, checkboxes and radios are ink when
@@ -72,13 +72,13 @@
   }
 
   /* AND NOT THE BROWSER'S FLASH AS WELL. A phone browser paints its own translucent blue over
-     whatever a finger touches, on top of the press above, in a colour this palette does not have
-     (design §6.8 rule 10). The press is the product's answer to a tap, so it is the only one. */
+     whatever a finger touches, on top of the press above, in a colour this palette does not have.
+     The press is the product's answer to a tap, so it is the only one. */
   html {
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* The scale is for buttons only; rows and tabs never scale (DESIGN-BRIEF 4.10). */
+  /* The scale is for buttons only; rows and tabs never scale. */
   .btn:active:not(:disabled) {
     transform: scale(var(--press-scale));
   }
@@ -95,7 +95,7 @@
   }
 
   /* 40 TALL AND 44 UNDER A THUMB, on the `--s1` fill with no border. A FIELD IS NOT A PILL: the pill is for what you
-     press or choose, and a field is somewhere you put something, so it keeps the `--r-md` corner (design D-2). */
+     press or choose, and a field is somewhere you put something, so it keeps the `--r-md` corner. */
   .field {
     display: flex;
     align-items: center;
@@ -110,9 +110,9 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* ONE FOCUS, ON THE WRAPPER: the 2px ink ring offset 2 (SYSTEM §6), which is the a11y layer's ring for every other
+  /* ONE FOCUS, ON THE WRAPPER: the 2px ink ring offset 2, which is the a11y layer's ring for every other
      control. The input inside draws nothing, or a focused field is two boxes. It was the accent once, and a red edge
-     round a field nobody had typed in yet read as a validation error (design SYS-1). */
+     round a field nobody had typed in yet read as a validation error. */
   .field:focus-within,
   .capture-field:focus-within {
     outline: 2px solid var(--focus-in);
@@ -206,7 +206,7 @@
   }
 
   /**
-   * A SEGMENTED CONTROL IS A GLASS PILL WITH PILLS IN IT (SYSTEM §5, toolbar controls): the frosted fill and its
+   * A SEGMENTED CONTROL IS A GLASS PILL WITH PILLS IN IT: the frosted fill and its
    * hairline pair on the ground, and the chosen segment a `--bg` pill lifted by a tiny shadow. The selected state has to
    * be a SHAPE and not a shade: a slightly lighter grey behind one word out of four is the single most-missed control
    * in dense software.
@@ -247,7 +247,7 @@
    * THE WHOLE CONTROL IS `--ctl-h` UNDER A MOUSE (36) and each segment 44 under a thumb: density follows the POINTER,
    * never the width (`05 §6`, `13 §7`). `min-block-size`, not `block-size`: a segment whose label wraps grows.
    *
-   * THE LABEL IS THE CONTROL SIZE, 14 UNDER A MOUSE AND 16 UNDER A THUMB (design DSN-2).
+   * THE LABEL IS THE CONTROL SIZE, 14 UNDER A MOUSE AND 16 UNDER A THUMB.
    */
   .segment {
     min-block-size: var(--ctl-h);
@@ -313,7 +313,7 @@
    * a thumb; the track is drawn inside it.
    *
    * ON IS AN INK TRACK WITH A GROUND THUMB, AND IT WAS THE ACCENT. Six red switches down a list of
-   * add-ons read as six alarms (design SYS-1). The thumb's position says the state without the
+   * add-ons read as six alarms. The thumb's position says the state without the
    * colour; the fill says it again for a reader who cannot see the position change.
    */
   .switch {
@@ -390,7 +390,7 @@
    *
    * Each was left to the browser, which draws them in its own blue, or in the brand's red where a
    * screen set `accent-color`, with the operating system's chevron on every select and a native
-   * thumb on every slider, so one form spoke three design languages (design §6.8 rule 10).
+   * thumb on every slider, so one form spoke three design languages.
    * `appearance: none` takes the browser's drawing away and the rules below put the product's back:
    * ink for what is on, `--edge` for a box's boundary, the `--s1` fill and `--r-md` for a field, a pill for a thumb.
    *

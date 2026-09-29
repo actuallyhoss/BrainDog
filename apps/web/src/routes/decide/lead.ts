@@ -1,6 +1,6 @@
 /**
  * WHAT DECIDE SAYS FIRST: the sentence under its title, the open question's evidence, and how long each question has
- * waited (SYSTEM §5, §7; `loop/design/SCREENS.md` "Decide").
+ * waited, as the design system draws Decide.
  *
  * EVERY FIGURE HERE IS READ, NEVER MADE. The count is the questions still waiting; an age is the time since a question
  * was opened; the evidence is a pair of numbers the proposer wrote in its own reason ("41 of 58 lines"), and when the

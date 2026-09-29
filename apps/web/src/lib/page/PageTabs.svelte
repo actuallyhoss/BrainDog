@@ -1,5 +1,5 @@
 <!--
-  The tabs of a nav section, drawn above each of its pages when the section asks for them (`nav.tabs`, brief D3).
+  The tabs of a nav section, drawn above each of its pages when the section asks for them (`nav.tabs`).
 
   WHAT IS A TAB HERE IS DECIDED IN `tabs.ts` AND ONLY DRAWN HERE. This component is handed a strip or nothing, and it
   never looks at the nav itself, so the strip a test reads is the strip a person sees.
@@ -9,8 +9,8 @@
   That is also why this is a `nav` of links with `aria-current` and not an ARIA `tablist`: a tablist promises arrow keys
   that move between panels on one page, and these go to another page.
 
-  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: the toolbar's glass segmented control (SYSTEM §5), "here" the
-  white pill in it, and nothing in it takes a colour from the record (DIRECTION 28: what a person builds is structure,
+  IT IS THE APP'S OWN CONTROL, NOT THE DECLARING PACK'S: the toolbar's glass segmented control in the design system, "here" the
+  white pill in it, and nothing in it takes a colour from the record (what a person builds is structure,
   and BrainDog's look stays its own).
 -->
 <script lang="ts">
@@ -75,7 +75,7 @@
 </nav>
 
 <style>
-  /* THE STRIP IS A GLASS SEGMENTED CONTROL ON THE GROUND (SYSTEM §5, `controls.css`'s `.segmented`): a glass track with
+  /* THE STRIP IS A GLASS SEGMENTED CONTROL ON THE GROUND (`controls.css`'s `.segmented`): a glass track with
      its hairline pair, each tab a pill in it, and the page you are on the tile's own white pill lifted by a tiny
      shadow, a shape and not a shade. It sits in the page's gutter, on the title's left edge, and `--page-max` is the
      page grid's own width. */
@@ -108,7 +108,7 @@
   }
 
   /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the track's edge said
-     nothing about the tabs past it (pages §2.5, PageTabs). The wide table's fade (`blocks.css`, `.table-region`): the
+     nothing about the tabs past it. The wide table's fade (`blocks.css`, `.table-region`): the
      row's own inline scroll timeline moves the two fade widths, `--edge-start` and `--edge-end`, which that sheet
      registers as lengths so they animate. A row that fits has no timeline and no fade. The mask reads only alpha, so
      `--ink` is the kept part. */

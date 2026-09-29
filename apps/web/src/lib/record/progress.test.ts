@@ -165,8 +165,8 @@ function openSqlite(): Parameters<typeof openRecord>[0] {
   } as unknown as Parameters<typeof openRecord>[0];
 }
 
-/* ON A RECORD OF ITS OWN, AND IT WAS "in the sample". The sample is a kernel seeded once and never written to since
-   ARC-1 (`fixtures/readers.ts`), so a list pushed into `held.ts` for it reaches nothing and the record refused the
+/* ON A RECORD OF ITS OWN, AND IT WAS "in the sample". The sample is now a kernel seeded once and never written to
+   (`fixtures/readers.ts`), so a list pushed into `held.ts` for it reaches nothing and the record refused the
    source it had never been given. The lists, the figure and the rows are declared and written here instead; the page's
    `REGISTERS` still learns the list, which is what a live tab does before it draws one. */
 test('A BUDGET IN ONE CURRENCY AND A FIGURE IN ANOTHER ARE NEVER SET AGAINST EACH OTHER on a record', async () => {

@@ -71,7 +71,7 @@ const WHERES: (string | undefined)[] = [
   'thing is Kiln',
   /* ONE WRITTEN-OUT DAY AND ONE RELATIVE WORD, which `compile` puts in order at a clock. The sample's engine matches at
      the seed's 3 September and the kernel here is opened there too; `captureBlock` compiled at the wall clock once
-     `compile` stopped reading `NOW`, and on 25 September refused this as "today is past 2026-09-20" while the kernel
+     `compile` stopped reading `NOW`, and later in the month refused this as "today is past 2026-09-20" while the kernel
      filled the task. */
   'by between today and 2026-09-20',
 ];

@@ -1,5 +1,5 @@
 <!--
-  `/settings`: the index of every settings area (DSN-13).
+  `/settings`: the index of every settings area.
 
   It used to redirect to the first area, because the areas had a strip of their own and a second
   list of them would have been a second nav. On a phone that strip was the problem: it showed the

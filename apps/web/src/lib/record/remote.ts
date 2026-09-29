@@ -464,7 +464,7 @@ export type SchemaCall = (register: string) => Promise<{ ok: boolean; value?: un
  *
  * AND A LIST THE BUILD SHIPS IS ASKED ABOUT AS WELL, AND REPLACED BY THE ANSWER. This returned early for any list in the
  * bundle, on the reading that the seed's copy and the record's were pinned equal. They are equal only until somebody
- * adds a field, which DIRECTION §22 makes the ordinary case: an owner added `launched` to Projects on a real kernel, and
+ * adds a field, which is the ordinary case: an owner added `launched` to Projects on a real kernel, and
  * the row page, `RowForm` (both draw `readableFields`) and a page block over Projects went on drawing the bundle's
  * fifteen fields, the new one on no screen and `display` formatting its day as raw text (`field-write.test.ts`, three
  * red before this). The bundle is now what a tab draws before the record has answered, and what it keeps when there is

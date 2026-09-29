@@ -1,7 +1,7 @@
 /**
- * The holding pen's own words (the M4 rule: a unit's new words live in a module it owns, never in `copy.ts`).
+ * The holding pen's own words (a unit's new words live in a module it owns, never in `copy.ts`).
  *
- * THE THREE VERBS ARE `pages.md` PGS-16's, the same three every offer in the product carries: "Show it" draws what keeping
+ * THE THREE VERBS ARE THE HOLDING PEN'S, the same three every offer in the product carries: "Show it" draws what keeping
  * would draw, "Keep it" writes it, "Not this one" puts it away for good. Nothing here says a thing happened until it did.
  */
 export const penWords = {

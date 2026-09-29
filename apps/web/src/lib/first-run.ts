@@ -5,14 +5,14 @@
  * in the chunk every screen waits for, and these sentences are read by one screen a person sees once. The `dead-copy`
  * gate reads this object as it reads `copy`: every key here is read, as `firstRun.<key>`, by a file the app ships.
  *
- * ONE PROMPT AND ONE ACCEPT (`loop/finish/modules.md` MOD-6). The two turns, the use-case card worded as a manifest
+ * ONE PROMPT AND ONE ACCEPT. The two turns, the use-case card worded as a manifest
  * ("Builds on", "Lists:", "Pages:", "In a voice that is"), the five one-row tiles and screen two's panel went with the
  * screen they belonged to. What is left says what was heard and what the BrainDog will be, in words a person says.
  */
 
 export const firstRun = {
-  /* THE PROMPT. A question, one field and four chips, one for each of the four people the product is for
-     (`loop/DIRECTION.md` §11): an individual, a solo founder, a team and somebody starting something. Each chip is a
+  /* THE PROMPT. A question, one field and four chips, one for each of the four people the product is for:
+     an individual, a solo founder, a team and somebody starting something. Each chip is a
      clause a person could have typed, appended to what is there, never a choice made for them. */
   whoQuestion: 'Who are you?',
   whoPlaceholder: 'Your name, and what you want to keep here',
@@ -46,7 +46,7 @@ export const firstRun = {
   mineFor: 'Make it for',
   minePages: 'Its pages',
   mineHome: 'Its Home',
-  /* THE HOME IS DRAWN WITH EXAMPLES AND SAYS SO, because none of them is written (`loop/DIRECTION.md` §26). */
+  /* THE HOME IS DRAWN WITH EXAMPLES AND SAYS SO, because none of them is written. */
   mineExamples: 'Drawn with examples to show its shape. None of them is saved.',
   mineEntries: 'From what you said',
   mineIn: (title: string, list: string) => `${title}, in ${list}`,
@@ -55,7 +55,7 @@ export const firstRun = {
   /* A MODULE THE USE CASE STANDS ON stays on while that use case is chosen, and says why. */
   keepNeeded: (title: string) => `${title} needs it.`,
 
-  /* THE CURRENCY, asked only when Money is kept and the sentence typed none (`loop/finish/modules.md` C10). */
+  /* THE CURRENCY, asked only when Money is kept and the sentence typed none. */
   currencyQuestion: 'Which currency do you use?',
   currencyFind: 'Find a currency',
   currencyNone: 'No currency matches that.',

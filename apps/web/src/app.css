@@ -13,7 +13,7 @@
  */
 
 @layer components {
-  /* The window is THE GROUND (SYSTEM §2, §5): `--sunk`, with one soft light from the top of the
+  /* The window is THE GROUND: `--sunk`, with one soft light from the top of the
      window painted on it, `--ground-light`, the only gradient in the product. The rail floats on it
      as glass and the work sits straight on it; nothing is lifted into a panel any more.
 
@@ -36,7 +36,7 @@
     background-repeat: no-repeat;
   }
 
-  /* EVERY HEADING IN THE RECORD IS GEIST (DESIGN-SYSTEM 2.1). The shared base sets headings in the
+  /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the
      display face because the marketing site is a document with a brand voice; in the app that put
      Poppins on every page title and every section, next to Geist rows, so each screen carried two
      type systems. Poppins stays where a component names it on purpose: the wordmark and the one hero

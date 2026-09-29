@@ -50,9 +50,9 @@
     toggleSelect: (seq: number, extend: boolean) => void;
     copyId: (seq: number) => void;
     copyLink: (seq: number) => void;
-    /** Absent for a caller whose level cannot change the list, and Archive is then not in the menu (COL-13). */
+    /** Absent for a caller whose level cannot change the list, and Archive is then not in the menu. */
     archive?: ((seq: number) => void) | undefined;
-    /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only (GAP-11). */
+    /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only. */
     onhanded?: ((entry: Entry) => void) | undefined;
   } = $props();
 </script>
@@ -121,7 +121,7 @@
 </RowMenu>
 
 <style>
-  /* The menu rows (SYSTEM §6): 32 tall with an icon, a word and a key cap, the wash on hover, and each printing the key
+  /* The menu rows: 32 tall with an icon, a word and a key cap, the wash on hover, and each printing the key
      it stands in for, so using the menu teaches the key that replaces it. */
   .mi {
     display: flex;

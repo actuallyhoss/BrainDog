@@ -1,6 +1,6 @@
 /**
  * `Put this on a page` on a live record: the block the sheet describes, written onto a page the record holds, and taken
- * off again by the toast's Put back (loop/research-m4-wave-two.md brief 1).
+ * off again by the toast's Put back.
  *
  * WHAT WAS THERE BEFORE. `BindBlock.svelte` offered the fixture's pages (`pages()` over the built-in sample) and called
  * `onbind`, and both callers answered with a warning toast saying nothing was written. On a live record that sheet named
@@ -154,7 +154,7 @@ const blocksOf = (k: Kernel, slug: string) => {
   return out.value.blocks;
 };
 
-/* ── the brief's red ── */
+/* ── a bound block, landed and put back ── */
 
 test('A BOUND BLOCK LANDS ON A PAGE THAT REQUIRES ITS LIST, the page draws its rows, and Put back takes it off', async () => {
   const k = await record();

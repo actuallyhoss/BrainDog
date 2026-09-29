@@ -2,7 +2,7 @@
  * The words of Decide and the inbox: a question and its options, deferring, the reason a decision keeps, a
  * proposal and everything accepting it would change, and filing what came in.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen outside Decide
  * and the inbox also draws is in `shell.ts`.
  *
@@ -61,7 +61,7 @@ export const decide = {
   noQuestions: 'Nothing waits on you',
   lastDecided: 'The last one was decided',
   /* THE QUESTION IS NOT SAID. Its callers used to pass the question's id, `SG2`, and an id is never a word a person
-     reads (MOD-24); the toast stands over the question it answers, so the option alone is the whole sentence. */
+     reads; the toast stands over the question it answers, so the option alone is the whole sentence. */
   decisionRecorded: (option: string) => `${option} is recorded as the decision.`,
   parkedUntil: (on: string) => `Parked until ${on}.`,
   changedSince: 'A row this would change has changed since it was proposed. Nothing was written.',
@@ -85,7 +85,7 @@ export const decide = {
   inboxNoLists: 'This record has no lists to file it in yet.',
   /* Decide and page writes (lane B) */
   decideConflict: 'A row this would change has changed since it was proposed. Nothing was written, and the question has been read again.',
-  /* DECIDE AND THE INBOX AS QUEUES (DESIGN-SYSTEM appendix D): the cursor, a selection, and what a
+  /* DECIDE AND THE INBOX AS QUEUES: the cursor, a selection, and what a
      proposal would put on the screen. No sentence here assumes what kind of record it is. */
   proposalWillAppear: 'What will appear',
   fromSlash: 'From Slash',
@@ -140,7 +140,7 @@ export const decide = {
   inboxArchiveSelected: (n: number) => `Archive ${n}`,
   inboxBatchFiled: (n: number) => `${n} filed. They have left the inbox.`,
   inboxBatchArchived: (n: number) => `${n} archived. They are kept, and they have left the inbox.`,
-  /* A PROPOSAL THAT ARRANGES THIS BRAINDOG (DESIGN-SYSTEM D11): a pack, its settings, or several at once. Why, what it
+  /* A PROPOSAL THAT ARRANGES THIS BRAINDOG: a pack, its settings, or several at once. Why, what it
      calls out, the packs, what appears, the words that change, the rest; then what was applied, or how far it got. */
   arrangeLeadUseCase: (name: string) => `Sets this BrainDog up for ${name}`,
   arrangeLeadArrange: 'Rearranges this BrainDog',
@@ -182,7 +182,7 @@ export const decide = {
   arrangeRetires: 'Takes away',
   arrangeRetiredRows: (name: string, rows: number) => `${name}, whose ${rows} ${rows === 1 ? 'row stays' : 'rows stay'}`,
   /* WHAT AN UPDATE LEAVES AS THE OWNER CHANGED IT, said because the update does not rewrite it: an edit that carried the
-     older version's window keeps that window (`loop/research-pack-update-edited.md`). */
+     older version's window keeps that window. */
   arrangeKept: 'Kept',
   arrangeKeeps: (name: string) => `Keeps ${name} as you changed it. This update's version of it is not taken.`,
   arrangeKeepsPage: (name: string) => `Keeps your ${name} page as you arranged it. This update's version of it is not taken.`,

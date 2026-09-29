@@ -2,7 +2,7 @@
  * What a shared figure's trend says, out of the component so `node --test` can hold it (a Svelte page does not mount
  * there).
  *
- * A NUMBER TILE CARRIES A CHART AND A LINE SAYING WHAT IT MEANS (SYSTEM §6, §11), and the only series a shared page can
+ * A NUMBER TILE CARRIES A CHART AND A LINE SAYING WHAT IT MEANS, and the only series a shared page can
  * be handed is the one the record computed for a figure declared with `trend:` (`packages/kernel/src/pages.ts`
  * `trendOf`), one value a day, `null` on a day with no reading. The share keeps it (`shownBlock` copies `trend`), and
  * until the page's reader keeps it too (`share-write.ts` `readingOf`), no reading carries one and every figure is drawn

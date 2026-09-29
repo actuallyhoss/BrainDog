@@ -1,7 +1,7 @@
 <!--
-  Structured data typed where it is drawn (MOD-22).
+  Structured data typed where it is drawn.
 
-  WRITTEN OUT, IN THE FACE THIS PRODUCT KEEPS FOR WHAT A PERSON WRITES AS CODE (`--font-id`, design-brief §3). The
+  WRITTEN OUT, IN THE FACE THIS PRODUCT KEEPS FOR WHAT A PERSON WRITES AS CODE (`--font-id`). The
   box opens on the value two spaces to a level (`field-draft.ts` `draftOf`), so its shape is on screen, and it keeps
   every line break it is given. Nothing is checked while it is typed, because every value is invalid halfway through
   being written: the save asks `wrongValue`, which refuses what does not read before anything is sent, and the

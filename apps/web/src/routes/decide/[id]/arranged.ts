@@ -6,7 +6,7 @@
  * its reasons; then what it calls out, because that is the one part that reaches outside the record and costs egress;
  * then the packs it installs or turns off; then what will appear, page by page and list by list; then the words that
  * change ("Home will be called “Today”"); then any other setting. `arrange` is all of these as one question, so it is
- * drawn as one story and not as several proposals stacked (DIRECTION §11, DESIGN-SYSTEM D11).
+ * drawn as one story and not as several proposals stacked.
  *
  * THE RECORD'S READING, NEVER THE PROPOSER'S. Everything drawn here is a key `prepare` worked out: the plan, the
  * calls out, the settings as they stood. Nothing a proposer typed about consequences reaches the screen but `why`.
@@ -98,7 +98,7 @@ export function callOf(line: string): Call {
     const grant = /^grant "(.*)"$/u.exec(part);
     if (grant) return grant[1] === 'none' ? copy.arrangeCallNoKey : copy.arrangeCallKey(grant[1]!);
     if (part.startsWith('sends ')) return copy.arrangeCallSends(part.slice('sends '.length));
-    /* A CADENCE IS SAID IN WORDS, "every hour" and never the record's `every 1h` (design SYS-14). */
+    /* A CADENCE IS SAID IN WORDS, "every hour" and never the record's `every 1h`. */
     const every = /^every (\d+)([mhdw])$/u.exec(part);
     if (every) return copy.arrangeCallEvery(Number.parseInt(every[1]!, 10), every[2] as 'm' | 'h' | 'd' | 'w');
     return part;

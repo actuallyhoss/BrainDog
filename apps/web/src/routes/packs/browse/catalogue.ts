@@ -1,6 +1,6 @@
 /**
- * The Kennel on browse: the use cases and add-ons every host answers under `/api/kennel/v1/` (`@braindog/declare/kennel`,
- * `loop/finish/platform.md` §4.0 K), the bundled catalogue from `packs/` first and the Kennel's entries after it.
+ * The Kennel on browse: the use cases and add-ons every host answers under `/api/kennel/v1/` (`@braindog/declare/kennel`),
+ * the bundled catalogue from `packs/` first and the Kennel's entries after it.
  *
  * NOTHING HERE INSTALLS. It reads the index, fetches a version's file and holds it to the checksum and signature the index
  * gives, says whether this record holds that entry at that version, and what changed from the version installed. The

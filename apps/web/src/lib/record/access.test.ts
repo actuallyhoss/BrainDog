@@ -498,7 +498,7 @@ test('and the delete control is the confirmation rather than a sentence about on
      carries what the other does not: what is given up, and the one copy that outlives it. */
   assert.doesNotMatch(copy.deleteCosts, /cannot be undone|no undo/iu, 'it repeats the line above it again');
   assert.match(copy.deleteWhat('The Studio'), /cannot be undone/iu);
-  /* AND IT NAMES THE ONE WINDOW THAT IS REAL (OPS-28). `destroy.ts`'s `FINAL_KEPT_DAYS` is 30, and its own
+  /* AND IT NAMES THE ONE WINDOW THAT IS REAL. `destroy.ts`'s `FINAL_KEPT_DAYS` is 30, and its own
      comment asks this sentence to say the same number; `settings/delete-costs.test.ts` holds the fuller
      case for why. There is still no restore, so the sentence says the copy cannot be opened from here. */
   assert.match(copy.deleteCosts, /30 days/iu, 'the retention window must match `FINAL_KEPT_DAYS`');

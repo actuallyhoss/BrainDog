@@ -1,5 +1,5 @@
 /**
- * Writing a script in the app: `/scripts/new` and `/scripts/<id>` (`loop/finish/shell.md` SCR-3, `loop/DIRECTION.md` §22).
+ * Writing a script in the app: `/scripts/new` and `/scripts/<id>`.
  *
  * THE SAME ROAD AN AGENT TAKES, AND NO NEW METHOD. A draft is tried with `scriptTry`, which runs it once in the host's
  * sandbox and writes nothing, and it is filed with `propose` as a `change` to `script.<id>`, exactly the body an agent's

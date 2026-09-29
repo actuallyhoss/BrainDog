@@ -1,19 +1,19 @@
 <!--
-  Jobs: `/jobs`, every run of a job on this record, and "Run a job" (`loop/finish/agents.md` AGT-23, C13).
+  Jobs: `/jobs`, every run of a job on this record, and "Run a job".
 
-  THE RUNS ARE A LIST ON THE GROUND, GROUPED BY DAY (SYSTEM §6). The live ones lead under their own heading, then each
+  THE RUNS ARE A LIST ON THE GROUND, GROUPED BY DAY. The live ones lead under their own heading, then each
   day newest first. A run is one 56px row that is wholly its own link: a well whose glyph says what it is doing or how it
   ended, the kind's name, then its outcome as a dot and a word with the machine, the start and the turns, and at the
   right how long it took, or how long it has been going. One row list at every width; a phone reads the same rows at 60.
 
-  TWO TILES SAY WHAT THE ROWS MEAN (SYSTEM §7). "Who ran what" draws each machine's runs as lanes over the last day, or
+  TWO TILES SAY WHAT THE ROWS MEAN. "Who ran what" draws each machine's runs as lanes over the last day, or
   the last week when the day was quiet, with the now line through them; "How they went" splits the runs read by outcome.
   Both count only the runs this screen has read, and say "Latest 50 runs" when older ones exist that they have not seen.
   A tile with nothing to draw is not drawn.
 
   LIVE RUNS ARE ASKED ABOUT AGAIN. The list asks again every `LIST_POLL_MS` while one is shown, so a run that ends is
   seen to end without a reload, and it stops asking once none is live. The live dot is the one hue that means alive, and
-  it holds still: nothing on the product pulses (SYSTEM §8).
+  it holds still: nothing on the product pulses.
 
   `?repo=<name>` IS A PROJECT'S "RUNS ON" LINK: the runs of kinds that work in that repository, with a way back to all.
 
@@ -96,7 +96,7 @@
   const rows = $derived(ordered(loaded, repo));
   const anyLive = $derived(rows.some((r) => isLive(r.status)));
 
-  /* THIS BROWSER'S CLOCK. Every date in the list is the record's, read against now (DIRECTION 26). */
+  /* THIS BROWSER'S CLOCK. Every date in the list is the record's, read against now. */
   let now = $state(Date.now());
 
   /* WHAT THE ROWS MEAN, each from the runs read and nothing else. */
@@ -243,7 +243,7 @@
                     <span class="line-main">
                       <span class="line-title" dir="auto">{runName(r)}</span>
                       <span class="line-detail">
-                        <!-- THE OUTCOME IS A DOT AND ITS WORD (SYSTEM §6, badges). A toned dot is the intent's own mark,
+                        <!-- THE OUTCOME IS A DOT AND ITS WORD. A toned dot is the intent's own mark,
                              named for a screen reader as `TONES` names it, so colour never says it alone. -->
                         <span class="status" data-intent={state.tone ?? undefined} data-outcome={outcome}
                           >{#if state.tone}<span class="dot glyph" role="img" aria-label={TONES[state.tone].label}>{TONES[state.tone].glyph}</span>{:else}<span
@@ -381,7 +381,7 @@
     }
   }
 
-  /* THE ONE LINE UNDER EACH CHART that says what it means (SYSTEM §6), at body size in ink, at the tile's foot. */
+  /* THE ONE LINE UNDER EACH CHART that says what it means, at body size in ink, at the tile's foot. */
   .reading {
     margin: 0;
     margin-block-start: auto;

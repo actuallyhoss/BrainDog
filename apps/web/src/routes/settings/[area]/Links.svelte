@@ -124,7 +124,7 @@
     max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
-  /* ONE LINK TO A ROW ON THE GROUND (SYSTEM §6): its well, the page it opens and when it stops, and its Close at the
+  /* ONE LINK TO A ROW ON THE GROUND: its well, the page it opens and when it stops, and its Close at the
      end, with a hairline between rows from the words' edge. Below 640px the button drops under the words. */
   .link {
     position: relative;

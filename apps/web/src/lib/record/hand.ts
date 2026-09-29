@@ -1,5 +1,5 @@
 /**
- * Handing a row to a teammate or an agent in one press (GAP-11).
+ * Handing a row to a teammate or an agent in one press.
  *
  * A LIST SAYS WHO HOLDS ITS ROWS WITH `hand:` (`42 §4.4`): the link field a person is handed a row by, the text field
  * holding the name an agent signs with, and the state a row an agent takes moves to. Work declares it on `tasks`, and
@@ -167,7 +167,7 @@ export async function readHolders(
 
 /* ── the agent's run ─────────────────────────────────────────────────── */
 
-/** The argument an approved job kind takes a row by (AGT-7): `job.<id>` with `args: [{ id: 'row' }]`. */
+/** The argument an approved job kind takes a row by: `job.<id>` with `args: [{ id: 'row' }]`. */
 export const ROW_ARG = 'row';
 
 /** The row as a job's `row` argument and a briefing say it: `tasks#12`. */

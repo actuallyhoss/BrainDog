@@ -11,7 +11,7 @@
  *     record had (`apps/worker/src/destroy.ts`). So changing your mind and making the record again
  *     at the same name, which is the one reversal the sentence invited, is the one the host has
  *     already decided it will refuse for ever.
- *   - A FINAL COPY IS TAKEN, KEPT `FINAL_KEPT_DAYS` (30) AND THEN GONE (OPS-28). `destroyRecord`
+ *   - A FINAL COPY IS TAKEN, KEPT `FINAL_KEPT_DAYS` (30) AND THEN GONE. `destroyRecord`
  *     (`apps/worker/src/destroy.ts`) writes it before the sweep, and `apps/worker/src/index.ts`'s
  *     `destroy` hands it a swept copies port wherever `BLOBS` and the snapshots port are bound,
  *     which production is: the sentence Settings shows before a delete has to say the same number
@@ -49,10 +49,10 @@ test('and it does not invite a change of mind the host refuses for ever', () => 
   assert.doesNotMatch(copy.deleteCosts, /within the hour|rest of today|same day/iu, 'no window exists: `destroy()` is the whole of deletion');
 });
 
-test('and it names the one copy this deployment does keep, and the day it goes (OPS-28)', () => {
+test('and it names the one copy this deployment does keep, and the day it goes', () => {
   /* `apps/worker/src/index.ts`'s `destroy` HANDS `destroyRecord` A SWEPT COPIES PORT wherever `BLOBS` and the
      snapshots port are bound, which production is, so the final copy `destroy.ts` describes is written on every
-     delete this deployment does today, not only once W55-7 lands. `FINAL_KEPT_DAYS` (`destroy.ts:38`) is the day it
+     delete this deployment does today, not only later. `FINAL_KEPT_DAYS` (`destroy.ts:38`) is the day it
      expires, and the sentence here must say the same number, as that constant's own comment requires. */
   assert.match(copy.deleteCosts, /final copy|copy is kept|last copy/iu, 'a final copy really is kept, and Settings said otherwise');
   assert.match(copy.deleteCosts, /30 days/iu, 'the retention window must match `FINAL_KEPT_DAYS`');

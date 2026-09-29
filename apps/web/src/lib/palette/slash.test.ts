@@ -3,7 +3,7 @@
  *
  * THE RULE IS `50 §5.5` STEP 5 AND `23 §8`, and both are sentences a markup test would only prove the shape of. The row
  * reads *Ask Slash: {text}* when a model is behind Slash and the query matches no place, and without a model it does not
- * exist: absent, not disabled. `loop/research-spark.md` §0 decision 6 is the same rule said about words, and it is the
+ * exist: absent, not disabled. The same rule holds for words, and it is the
  * one most easily broken by accident, because every other palette row is built without asking whether a model is there.
  *
  * AND THE ANSWER IS DRAWN BY CODE, NOT BY A MODEL. A `Reading` is a predicate, the rows it matched and what was read; what
@@ -40,7 +40,7 @@ test('THE ROW EXISTS ONLY WITH A MODEL BEHIND IT, and then only for plain text t
 
 test("THE ROW'S WORDS SAY SLASH AND THE QUESTION, and no row this palette draws without a model says Slash", () => {
   assert.equal(copy.askSlash('late invoices'), 'Ask Slash: late invoices');
-  /* THE ROWS THAT EXIST WITHOUT A MODEL are built from these keys, and none of them may name Slash (`research-spark.md` §0.6). */
+  /* THE ROWS THAT EXIST WITHOUT A MODEL are built from these keys, and none of them may name Slash. */
   for (const key of ['paletteLabel', 'palettePlaceholder', 'noMatches', 'commands', 'destinations', 'records', 'pages', 'openById'] as const)
     assert.doesNotMatch(String(copy[key]), /Slash/u, key);
 });
@@ -122,7 +122,7 @@ test('A DRAFT THAT DID NOT FIT IS A KEYWORD SEARCH, and the drawing says which o
 });
 
 /*
- * PASS 2, W2 of `loop/research-spark-routes.md`: what the palette asks after the rows, and what it draws from the answer.
+ * PASS 2: what the palette asks after the rows, and what it draws from the answer.
  * The markup cannot be held here; these are the four decisions it makes, each of which `23 §6` or `23 §8` states as a rule.
  */
 
@@ -197,7 +197,7 @@ test('THE 80 % LINE IS SHOWN ONCE A MONTH, ON TIER A, BELOW THE CAP, UNTIL DISMI
 
 test('A SPENT BUDGET ON PASS 2 IS ITS OWN FIX, VERBATIM, THEN THE SENTENCE THAT THE ROWS WERE DRAWN WITHOUT IT', () => {
   const fix = 'Slash is out of asks until 2026-10-01. Add your own key, or wait.';
-  /* `spent` IS WHAT DRAWS THE TWO BUTTONS, "Use your own key" and "Settings" (AGT-29). */
+  /* `spent` IS WHAT DRAWS THE TWO BUTTONS, "Use your own key" and "Settings". */
   assert.deepEqual(pass2Refused({ code: 'SLASH_BUDGET_SPENT', fix }), { fix, without: 'Everything above this line was drawn without it.', spent: true });
   /* ANY OTHER REFUSAL IS ITS FIX ALONE: the sentence is only true of a budget stop with rows above it. */
   assert.deepEqual(pass2Refused({ code: 'PROPOSAL_NO_ROWS', fix: 'A proposal names the rows behind it, or it is not filed.' }), {

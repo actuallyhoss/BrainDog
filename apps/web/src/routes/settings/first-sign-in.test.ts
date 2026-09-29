@@ -1,18 +1,18 @@
 /**
  * Three sentences and one button that were wrong for the first person to sign in on the Cloud.
  *
- * WHAT WAS MEASURED, AND IT IS WHY THIS FILE EXISTS. `loop/research-first-sign-in.md` drove the
+ * WHAT WAS MEASURED, AND IT IS WHY THIS FILE EXISTS. A walk drove the
  * Worker locally the way production runs it, provisioned a record, claimed it through the link and
- * a passkey Chrome's own WebAuthn stack made, and read every settings area as it came. Section 3
- * frictions 6, 10 and 11 are held here:
+ * a passkey Chrome's own WebAuthn stack made, and read every settings area as it came. Three of
+ * the things it found are held here:
  *
- *   6. Settings > Agents, with no machine yet, told him to run `braindog login`. The CLI refuses
+ *   - Settings > Agents, with no machine yet, told him to run `braindog login`. The CLI refuses
  *      that without a host, and the "Connect an agent" block further down the same area already
  *      printed the line that works, because `connectLines` builds it.
- *  10. After Sign out on Settings > Identity, "Signed in as owner@example.test" stayed in the table
+ *   - After Sign out on Settings > Identity, "Signed in as owner@example.test" stayed in the table
  *      beside "You are signed out.", and the Sign in button was `href="/app/signin"` with no
- *      `next`, so the sign-in that followed landed on the kept sample (friction 1).
- *  11. Backups drew "Back up now" under the record's own sentence saying this host keeps no copies
+ *      `next`, so the sign-in that followed landed on the kept sample.
+ *   - Backups drew "Back up now" under the record's own sentence saying this host keeps no copies
  *      the app can take, and the press answered with that same refusal as a toast.
  *
  * A TEXT TEST OVER MARKUP, for the reason `levels.test.ts` gives: these are `{#if}` arms in a
@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs';
 
 import { connectLines } from '../../lib/record/device.ts';
 
-/** One area's file without its comments: each area is its own component since the settings split (ARC-7b). */
+/** One area's file without its comments: each area is its own component since the settings split. */
 function area(name: string): string {
   return readFileSync(new URL(`./[area]/areas/${name.charAt(0).toUpperCase()}${name.slice(1)}.svelte`, import.meta.url), 'utf8')
     .replaceAll(/<!--[\s\S]*?-->/gu, '')
@@ -45,14 +45,14 @@ function enclosing(markup: string, at: number): string {
   return stack.join(' && ');
 }
 
-/* THE AREA NO LONGER HAS A MACHINES LIST WITH ITS OWN EMPTY STATE (AGT-8): the setup card hands over the line, and the
-   check on the markup went with the markup it read. What stays is the fact the friction was about: the line names the
+/* THE AREA NO LONGER HAS A MACHINES LIST WITH ITS OWN EMPTY STATE: the setup card hands over the line, and the
+   check on the markup went with the markup it read. What stays is the fact the check was about: the line names the
    record, because the Cloud's device flow refuses one that does not. */
-test('friction 6: the line that signs a machine in names this record', () => {
-  assert.equal(connectLines('https://app.brain.dog', 'sam').setup, 'braindog setup https://app.brain.dog/app/sam');
+test('the line that signs a machine in names this record', () => {
+  assert.equal(connectLines('https://app.brain.dog', 'studio').setup, 'braindog setup https://app.brain.dog/app/studio');
 });
 
-test('friction 10: once signed out, nobody is named as signed in, and Sign in comes back here', () => {
+test('once signed out, nobody is named as signed in, and Sign in comes back here', () => {
   const identity = area('identity');
   const row = identity.indexOf('copy.signedInAs');
   assert.ok(row >= 0, 'the Signed in as row is gone entirely, so this is about nothing');
@@ -64,7 +64,7 @@ test('friction 10: once signed out, nobody is named as signed in, and Sign in co
   assert.equal(signIn[1], 'signinFor(page.url)', 'Sign in is handed no `next`, so it lands on the front door');
 });
 
-test('friction 11: Back up now is drawn only where the record answered with its copies', () => {
+test('Back up now is drawn only where the record answered with its copies', () => {
   const backups = area('backups');
   const button = backups.indexOf('copy.snapshotNow');
   assert.ok(button >= 0, 'Back up now is gone, so this is about nothing');

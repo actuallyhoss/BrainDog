@@ -5,7 +5,7 @@
   `mobile:` declaration rather than from a media query: the register knows what matters about its own
   rows better than a breakpoint does (13 §10, 50 §5.2 step 10).
 
-  TWO LINES, AND WHAT A DOT MEANS IS SAID BESIDE IT (design SYS-6, DSN-7). Line one is the project's
+  TWO LINES, AND WHAT A DOT MEANS IS SAID BESIDE IT. Line one is the project's
   mark, the title and the figure. Line two is the dot and its word, the date that word is about, and
   one detail, with nothing after it: "Overdue · 3 Sep · Kiln", "Paid · 2 Sep". The dot sat beside
   "Money out" once, so what it meant was never said, and the row's number ended the line in the id
@@ -29,7 +29,7 @@
   a verb means there. A component that assumes its second caller wants everything the first one did
   is how the table ended up on a phone in the first place.
 
-  WHAT W2 ADDED IS DRAWN IN THE SAME TWO LINES (design DSN-16). Where the row applies, its scope chip, takes the
+  WHAT CAME LATER IS DRAWN IN THE SAME TWO LINES. Where the row applies, its scope chip, takes the
   detail slot at the end of line two; the holder's face after a hand ends line two where a selected row's tick does;
   a list of people leads each card with the person's face. None of them is a third line.
 -->
@@ -37,7 +37,7 @@
   import type { RegisterDecl } from '$lib/record/schema.ts';
 
   /**
-   * Whether a list's rows are people, so each is led by a face rather than a project's mark (design SYS-7).
+   * Whether a list's rows are people, so each is led by a face rather than a project's mark.
    *
    * BY THE GLYPH THE LIST DECLARES, which is the declaration's own word for what it holds, and not by its id: a list is
    * never known here by the name a pack gave it. The list's grid and a row's page ask the same question of this.
@@ -113,7 +113,7 @@
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
 
   /**
-   * THE ROW'S HOLDER, AFTER A HAND (GAP-11): a person by their People row's own name, read as any other ref field is
+   * THE ROW'S HOLDER, AFTER A HAND: a person by their People row's own name, read as any other ref field is
    * (`display`, so the record's `names` resolve it exactly as `card-figure` above does), or an agent by the name it
    * signs with. `null` on a list with no `hand:` and on a row nobody has been handed.
    */
@@ -135,7 +135,7 @@
    *
    * A register declares a `deadline:` field and `toneOf` turns "past it" into `bad`, "within two
    * weeks" into `warn` and "done" into `good`. The card draws the first two. A finished row is the
-   * calm state (design-brief §10): "Paid" and "Cleared" carry no colour, and a green dot on every one
+   * calm state: "Paid" and "Cleared" carry no colour, and a green dot on every one
    * of them said nothing the word did not.
    *
    * A DOT WITH ITS WORD, AND NO COLOURED EDGE. `13 §5.1`: "Colour never carries meaning alone." The
@@ -214,7 +214,7 @@
   const figure = $derived(decl?.mobile.slice(1).find((f) => FIGURES.has(decl.fields.find((d) => d.id === f)?.type ?? '')));
   /* THE DATE THE TONE IS ABOUT, which is the field `toneOf` reads: the one `day` declared `deadline:`. */
   const dated = $derived(decl?.fields.find((f) => f.type === 'day' && f.deadline)?.id);
-  /* THE FIELD THAT SAYS WHERE A ROW APPLIES (agents C8), whose chip is drawn in the detail slot rather than its name
+  /* THE FIELD THAT SAYS WHERE A ROW APPLIES, whose chip is drawn in the detail slot rather than its name
      as text. Read through `decl` so a list the record taught this file after mount is asked again. */
   const scoped = $derived(decl ? scopeFieldOf(register)?.id : undefined);
   /* ONE DETAIL, the first declared card field that is none of the others and has something to say. */
@@ -244,7 +244,7 @@
   const saidOf = (e: Entry, f: string): string => worded(f, e.fields[f], display(register, f, e.fields[f], now, names) ?? '');
 
   /**
-   * THE SECOND LINE: `● word · date · detail` (design SYS-6).
+   * THE SECOND LINE: `● word · date · detail`.
    *
    * THE WORD IS THE TONE'S WHEN THE ROW IS LATE OR CLOSE ("Overdue", "Due in 3 days"), and otherwise the
    * row's own state ("Open", "Paid"), so the dot is never beside a word that says something else. The
@@ -252,7 +252,7 @@
    * list's `finished` field ("Paid · 2 Sep"): a due date beside "Paid" would read as the day it was
    * paid. A finished row on a list that declares no such field says its word alone.
    *
-   * THE SCOPE CHIP TAKES THE DETAIL SLOT (design DSN-16). It was a line of its own under the card, a third line with a
+   * THE SCOPE CHIP TAKES THE DETAIL SLOT. It was a line of its own under the card, a third line with a
    * hairline over it, and on Tasks the project was said twice, as the detail's text and again as the chip. Where the
    * list puts its scope field on the card, the chip is that detail; where it does not, the chip fills the slot only
    * when no declared detail has anything to say, so a person's role is not traded for where they were met.
@@ -335,7 +335,7 @@
             {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
             {#if line.date}{#if line.word}<span aria-hidden="true">{' · '}</span>{/if}<span class="card-date">{line.date}</span>{/if}
             {#if line.chip}
-              <!-- WHERE THE ROW APPLIES, AS THE DETAIL (agents C8): a pill needs no separator before it, so it takes
+              <!-- WHERE THE ROW APPLIES, AS THE DETAIL: a pill needs no separator before it, so it takes
                    the gap the line's words keep instead. A card is a link, so the chip is words and never a control. -->
               <ScopeChip scope={line.place ?? null} />
             {:else if line.detail}
@@ -343,8 +343,8 @@
               {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir={dirOf(register, f)} data-enum={isEnum(f) ? '' : undefined}>{@render amount(saidOf(e, f))}</span>
             {/if}
           </span>
-          <!-- THE END OF LINE TWO: the holder's face after a hand (GAP-11), then a selected row's tick. The face had
-               a third grid row of its own, which made a handed row a card of three lines (design DSN-16). -->
+          <!-- THE END OF LINE TWO: the holder's face after a hand, then a selected row's tick. The face had
+               a third grid row of its own, which made a handed row a card of three lines. -->
           {#if holder || picked?.has(e.seq)}
             <span class="card-end">
               {#if holder}<span class="card-holder" role="img" aria-label={holder.name}><Face name={holder.name} kind={holder.kind} size="s" /></span>{/if}
@@ -393,7 +393,7 @@
       list-style: none;
     }
 
-    /* ONE HAIRLINE BETWEEN ROWS, in the soft line a row takes at every width (design-brief §5). */
+    /* ONE HAIRLINE BETWEEN ROWS, in the soft line a row takes at every width. */
     .cards li + li {
       border-block-start: 1px solid var(--line-soft);
     }
@@ -449,7 +449,7 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       align-content: center;
-      /* The card's two lines are 4px apart (design-brief §3, Space). */
+      /* The card's two lines are 4px apart. */
       gap: var(--sp-1) var(--sp-3);
       /* A two-line row: 44px on both axes and then some, so the whole card is the target. */
       min-block-size: var(--row-h-2);
@@ -460,7 +460,7 @@
       text-decoration: none;
     }
 
-    /* THE TITLE IS ONE LINE (design-brief §5, a card at 390), and what does not fit ends in an
+    /* THE TITLE IS ONE LINE, and what does not fit ends in an
        ellipsis. The line under it says what state the row is in and when, so the end of a long title
        is the part a person can most afford to lose, and a card that grows to three lines pushes the
        next row's word and date off the screen. */
@@ -498,7 +498,7 @@
       translate: 0 -50%;
     }
 
-    /* A CALM WORD'S DOT IS QUIET, in the ink open, paid and cleared are drawn in (design-brief §10).
+    /* A CALM WORD'S DOT IS QUIET, in the ink open, paid and cleared are drawn in.
        Only an intent on the line gives the dot a colour, through `blocks.css`'s intent map. */
     .card-b:not([data-intent]) .glyph {
       background: var(--dim);
@@ -555,8 +555,8 @@
     }
 
     /* NOTHING ENDS THE SECOND LINE BUT WHO HOLDS THE ROW AND THE TICK of a selected row. The row's number
-       stood here, in the id face, on every card (design SYS-6: no "#" on a phone), and the holder's face had
-       a third row of its own (design DSN-16: no third line). */
+       stood here, in the id face, on every card (no "#" on a phone), and the holder's face had
+       a third row of its own (no third line). */
     .card-end {
       grid-column: 2;
       grid-row: 2;

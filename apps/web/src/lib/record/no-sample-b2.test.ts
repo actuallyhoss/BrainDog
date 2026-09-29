@@ -1,8 +1,8 @@
 /**
- * Brief B2 of `loop/research-no-sample.md` section 5: `api.ts` is the render helpers live screens draw with, and the
+ * `api.ts` is the render helpers live screens draw with, and the
  * sample's readers are a test fixture no shipped file can reach.
  *
- * WHAT WAS WRONG, MEASURED ON THE CODE BEFORE THIS BRIEF. `api.ts` was two modules in one file: the helpers every live
+ * WHAT WAS WRONG, MEASURED ON THE CODE BEFORE THIS CHANGE. `api.ts` was two modules in one file: the helpers every live
  * screen draws a cell, a column or a name with, and the eight readers that answered the app's calls out of the sample
  * (`boot`, `list`, `entry`, `search`, `page`, `values`, `job`, `metric`), plus a line re-exporting twenty-five of the
  * sample's tables. Six shipped files still called a reader or read a table through it. The Add a block sheet previewed
@@ -22,12 +22,12 @@ import { fileURLToPath } from 'node:url';
 import * as api from './api.ts';
 import * as held from './held.ts';
 
-/* THE EIGHT THE BRIEF NAMES, and two readers under other names: `pages` resolved the sample's declarations against the
+/* THE EIGHT READERS ABOVE, and two under other names: `pages` resolved the sample's declarations against the
    sample's rows, and `heldBy` counted the sample's rows. Settings read the first as a record's pen. */
 const READERS = ['boot', 'list', 'entry', 'search', 'page', 'values', 'job', 'metric', 'pages', 'heldBy'] as const;
 
-/* THE TABLES THE OLD LAST LINES RE-EXPORTED, every one of them the sample's. `REGISTERS` is left out on purpose: since
-   wave B3 it is `held.ts`'s table of what the record declared, and the first test holds it to that. */
+/* THE TABLES THE OLD LAST LINES RE-EXPORTED, every one of them the sample's. `REGISTERS` is left out on purpose: it is
+   now `held.ts`'s table of what the record declared, and the first test holds it to that. */
 const TABLES = [
   'AUDIT', 'AUTH_METHODS', 'DEPLOYMENT', 'DEVICES', 'INBOX', 'JOB', 'JOBS', 'NOW', 'PACKS', 'PAGES', 'PASSKEYS', 'QUESTIONS',
   'DECIDED', 'ROWS', 'NEWS', 'SNAPSHOTS', 'SNAPSHOTS_KEPT', 'SIGNING_KEY', 'SOURCES', 'TODAY', 'TOKENS', 'VAULT', 'VIEWS',

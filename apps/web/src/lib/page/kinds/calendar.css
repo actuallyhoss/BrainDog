@@ -2,13 +2,13 @@
  * A `calendar` block (`kinds/calendar.ts`, drawn by `braindog-render`'s `Calendar.svelte` and its `toHTML` twin).
  *
  * THE RENDERER DRAWS EVERY MONTH AND THE AGENDA, ALWAYS, and this sheet decides which the reader sees, by the width the
- * block has (C4 in `loop/finish/pages.md`). Wide, each month is a grid of weeks whose days name their first rows and
+ * block has. Wide, each month is a grid of weeks whose days name their first rows and
  * count the rest, and the agenda is not shown, because it says again what the grid already holds. Narrow, a grid of
  * seven columns cannot hold a title, so each month is a strip of its days with a dot on a busy one, and the agenda
  * under it carries the words.
  *
  * THE BLOCK IS ITS OWN CONTAINER, so a calendar in a narrow column at 1440 turns into the strip exactly as it does on a
- * phone. 40rem is C4's 640px at the default root; it is a container query and not a new `@media` width, so no route
+ * phone. 40rem is the phone breakpoint's 640px at the default root; it is a container query and not a new `@media` width, so no route
  * gains a width to fit (05 §6).
  *
  * No colour is written: every value is a role a theme maps, and a row's tone draws the glyph the renderer wrote.
@@ -81,7 +81,7 @@
     font-size: var(--t-xs);
   }
 
-  /* TODAY IS AN INK DISC WITH THE DATE IN THE GROUND'S COLOUR (SYSTEM §6, the week strip), told by weight as well as
+  /* TODAY IS AN INK DISC WITH THE DATE IN THE GROUND'S COLOUR, told by weight as well as
      ground so it holds in every theme. */
   .calendar-cell[data-today] .calendar-num,
   .calendar-day[data-today] .calendar-date {

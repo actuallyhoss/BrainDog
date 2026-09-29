@@ -1,13 +1,13 @@
 /**
  * An add-on's pages as a record holding it would draw them: the `.preview.json` the Kennel keeps beside a version's file
- * (`Preview`, platform §4.0 C), read and turned into what `PageView` draws.
+ * (`Preview`), read and turned into what `PageView` draws.
  *
  * ONLY A TRUSTED PARTY MAKES ONE (the integrator's `from-packs` run, the operator's review), and the Kennel answers it
  * only for a version whose index entry says `preview: true`, so nothing here asks for a picture nobody vouched for.
  *
  * CONVERTED WITH THE PAGE'S OWN `blockOf` (`lib/record/page-live.ts`), the function every live page goes through, and
  * drawn by `PageView` with `mode: 'preview'`, which hands no block a write. One renderer draws a page and its preview, so
- * a preview cannot draw a block the installed page would draw differently (contracts §11 X50).
+ * a preview cannot draw a block the installed page would draw differently.
  */
 
 import type { EntryKind, PageAnswer, Preview } from '@braindog/declare/catalogue';

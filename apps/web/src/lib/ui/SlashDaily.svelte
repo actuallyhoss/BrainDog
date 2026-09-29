@@ -1,11 +1,11 @@
 <!--
-  Whether Slash looks once a day on its own (`slashDaily`, `loop/research-spark.md` S15).
+  Whether Slash looks once a day on its own (`slashDaily`).
 
   ONE SENTENCE AND ONE SWITCH, on /slash and in Settings. The sentence says what on and off mean and when Slash last looked;
   the switch is the owner's, in a browser. On a record the caller does not own, or on the sample, nothing is drawn: there is
   no choice to offer.
 
-  A TILE WITH NO FIGURE (SYSTEM §6, SCREENS "Slash"): it holds a control and what it means, not a number, so it has no
+  A TILE WITH NO FIGURE: it holds a control and what it means, not a number, so it has no
   chart. The switch sits at the end of the tile's heading, where a tile's own control goes, and the sentence is the body.
 
   `daily` is handed in where the page has already read Slash; otherwise it is read here.
@@ -82,7 +82,7 @@
     line-height: 20px;
   }
 
-  /* THE WAY ON, a link word with its arrow, as a tile's heading draws one (SYSTEM §6). */
+  /* THE WAY ON, a link word with its arrow, as a tile's heading draws one. */
   .slash-daily-link {
     display: inline-flex;
     align-items: center;

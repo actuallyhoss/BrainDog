@@ -4,7 +4,7 @@
  *
  * TWO SHAPES. Alone, each bar is 8px on a full-width track (the "since you were here" rows). Paired,
  * each row holds two 7px bars, this period over the last, and no track, because the second bar is
- * the comparison a track would only blur (Light-Money's "September against August").
+ * the comparison a track would only blur ("September against August").
  *
  * THE SCALE STARTS AT ZERO, always: a bar's length is its value. `max` fixes the scale when several
  * charts must share one; otherwise the largest value, paired ones included, fills the row.

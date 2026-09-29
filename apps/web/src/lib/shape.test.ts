@@ -18,7 +18,7 @@ const read = (s: string): Shape => shape(s, TODAY);
 const ids = (s: Shape): string[] => s.packs.map((p) => p.id);
 const said = (s: Shape): string[] => s.heard.map((h) => h.text);
 
-test('THE SENTENCE IN THE BRIEF: a studio, two people, monthly billing, side projects', () => {
+test('THE REFERENCE SENTENCE: a studio, two people, monthly billing, side projects', () => {
   const s = read('I run a design studio with two people, we bill clients monthly and I track a few side projects');
   assert.deepEqual(ids(s), ['portfolio', 'people', 'money-core']);
   assert.deepEqual(said(s), ['studio', 'two people', 'bill', 'clients', 'monthly', 'side projects']);
@@ -149,8 +149,8 @@ test('EVERY CHIP, on its own, turns something on or suggests a use case', () => 
   for (const chip of firstRun.whoChips) assert.ok(read(chip).packs.length > 0 || arrange(chip).pick !== null, chip);
 });
 
-test('THE FIRST RUN ASKS WHAT THIS BRAINDOG IS FOR, not what the business is (`loop/research-spark.md` §1)', () => {
-  /* ONE QUESTION SINCE MOD-6, and its four chips are the four people of DIRECTION §11. */
+test('THE FIRST RUN ASKS WHAT THIS BRAINDOG IS FOR, not what the business is', () => {
+  /* ONE QUESTION, and its four chips are the four people the product is for. */
   const first = [firstRun.whoQuestion, firstRun.whoPlaceholder, ...firstRun.whoChips];
   for (const line of first) assert.doesNotMatch(line, /business/iu, line);
   const kinds = new Set(firstRun.whoChips.map((c) => arrange(c).pick?.usecase).filter(Boolean));
@@ -200,7 +200,7 @@ test('WHAT TURNS ON: dependencies first, and People whenever turn 1 heard a name
   /* A name alone is a person, not a project: People goes in without Projects. */
   assert.deepEqual(toTurnOn(read(''), true), ['people']);
   assert.deepEqual(toTurnOn(read('I use Claude'), true), ['portfolio', 'people', 'agents']);
-  /* AN INVOICE'S PARTY IS A LINK MONEY GOES IN WITHOUT (MOD-4, `first-party.ts` `LINKS`), so Money alone does not bring
+  /* AN INVOICE'S PARTY IS A LINK MONEY GOES IN WITHOUT (`first-party.ts` `LINKS`), so Money alone does not bring
      People: a name heard in the sentence does, as the cases above say. */
   assert.deepEqual(toTurnOn(read('I send invoices'), false), ['portfolio', 'money-core']);
   assert.deepEqual(toTurnOn(read('Domains and hosting'), false), ['portfolio', 'estate']);

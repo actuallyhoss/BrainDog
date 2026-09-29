@@ -1,7 +1,7 @@
 <!--
   Keys: who is asking to open them, what they are, and which machines may.
 
-  FOUR SECTIONS, IN THE ORDER OF URGENCY, as the old tool's Access screen asks it. A request waiting for
+  FOUR SECTIONS, IN THE ORDER OF URGENCY. A request waiting for
   its six digits is time-boxed, so it leads, and it is drawn only while there is one. Then the Keys
   index, then the vault passphrase that guards them (`Passphrase.svelte`, an owner's only), then the
   machines holding a vault grant, each with Revoke. While the passphrase is on, opening or putting a
@@ -23,7 +23,7 @@
   `/vault` carries NOTHING in its query string, ever. A credential id in the address is an entry in
   browser history and in URL-bar autocomplete (19 §5).
 
-  THE LOOK (`loop/design/SYSTEM.md`, SCREENS "Vault"). The sentence under the title says how many keys and how often they
+  THE LOOK, as the design system draws Vault. The sentence under the title says how many keys and how often they
   were opened, and a machine asking is its one red phrase. A request waiting for its six digits is a tile at the top.
   Then two tiles side by side: "Opens by key", the one figure here with its bars and its reading line, and the passphrase,
   a control with the trade it makes. The keys and the machines are lists on the ground in one row shape: a well, the name,
@@ -65,8 +65,8 @@
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
-   * dated by the sample's clock, wherever a 401 or an unreachable host came back with no slug, and the sample went
-   * on 25 September (DIRECTION 26). Those two refusals are now said like any other.
+   * dated by the sample's clock, wherever a 401 or an unreachable host came back with no slug, and the sample has
+   * gone. Those two refusals are now said like any other.
    */
   let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
@@ -550,7 +550,7 @@
 
 <PageHead icon="vault" title={copy.vault} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text} needs={sentence?.needs}>
   {#snippet actions()}
-    <!-- ON A PHONE "Add a key" IS THE TOOLBAR'S CIRCLE (SCREENS "Vault"): ink while it is the one thing to press, glass
+    <!-- ON A PHONE "Add a key" IS THE TOOLBAR'S CIRCLE: ink while it is the one thing to press, glass
          while a request waiting for its digits holds the screen's one primary. At a desk it is the list's own pill. -->
     {#if acts && index.kind === 'held'}
       <span class="add-phone">
@@ -566,7 +566,7 @@
   {#if waiting.length}
     <!--
       THE REQUEST LEADS, AND ONLY WHILE THERE IS ONE: it is time-boxed, so it is the one tile that is about now. Amber and
-      not red, because it waits on him rather than being late (SYSTEM §2); the sentence over the page carries the red.
+      not red, because it waits on him rather than being late; the sentence over the page carries the red.
     -->
     <Tile icon="lock" title={tileWords.askingTitle} count={waiting.length > 1 ? waiting.length : undefined} data-part="asking">
       <ul class="ledger ledger-lead whos">
@@ -628,7 +628,7 @@
   {#if opens || acts}
     <div class="tiles">
       {#if opens}
-        <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink (SYSTEM §7).
+        <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink.
              Counts and names only; a value never reaches a chart. -->
         <Tile icon="key" title={tileWords.opensTitle} meta={tileWords.opensMeta}>
           <p class="figure num">{opens.total.toLocaleString('en')}<span class="figure-unit">{tileWords.opensUnit(opens.total)}</span></p>
@@ -669,7 +669,7 @@
     <ul class="ledger ledger-lead whos keys">
       {#each keys as k (k.id)}
         <!--
-          ONE ROW ANATOMY (SYSTEM §6): the key's well, its name (a link to its row), and under it where it applies, what it
+          ONE ROW ANATOMY: the key's well, its name (a link to its row), and under it where it applies, what it
           opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu on hover.
           Replace and Revoke stay in the key's own menu (design 2.14): neither is what a person comes to the vault to do most.
         -->
@@ -859,7 +859,7 @@
     max-inline-size: var(--page-max);
   }
 
-  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart (SYSTEM §4), one over the other where two will not fit; a lone tile
+  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart, one over the other where two will not fit; a lone tile
      takes the row. Each is as tall as what it holds. */
   .tiles {
     display: grid;
@@ -868,7 +868,7 @@
     gap: var(--sp-3);
   }
 
-  /* THE FIGURE, `t-figure`, with its unit in meta beside it (SYSTEM §3, §6). */
+  /* THE FIGURE, `t-figure`, with its unit in meta beside it. */
   .figure {
     display: flex;
     align-items: baseline;
@@ -889,7 +889,7 @@
     letter-spacing: 0;
   }
 
-  /* THE ONE LINE THAT READS THE CHART (SYSTEM §6), in ink, under it. */
+  /* THE ONE LINE THAT READS THE CHART, in ink, under it. */
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
@@ -908,7 +908,7 @@
 
   /* ── the rows ─────────────────────────────────────────────────────────── */
 
-  /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer (SYSTEM §6), and the hairlines either side of it
+  /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer, and the hairlines either side of it
      step aside, as `rows.css` does for a link's row, so the fill is one clean shape. */
   @media (hover: hover) and (pointer: fine) {
     .whos > li:hover > .line {
@@ -962,7 +962,7 @@
     color: var(--dim);
   }
 
-  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6, Badges): ink for a value sealed here, an open ring for a key kept
+  /* A STATE IS A 6PX DOT AND ITS WORD: ink for a value sealed here, an open ring for a key kept
      elsewhere or out of service, amber for a machine waiting on its six digits. */
   .state {
     display: inline-flex;
@@ -1051,7 +1051,7 @@
     white-space: nowrap;
   }
 
-  /* A MENU'S ROW, 32 tall with the verb (SYSTEM §6, menus); `Menu` makes them 48px rows at 16px when it rises as a sheet. */
+  /* A MENU'S ROW, 32 tall with the verb; `Menu` makes them 48px rows at 16px when it rises as a sheet. */
   .mi {
     display: flex;
     align-items: center;
@@ -1073,7 +1073,7 @@
     background: var(--hover-wash);
   }
 
-  /* A DESTRUCTIVE VERB IS ITS WORDS IN INK (SYSTEM §6): red is for what needs him, and a menu item never does. */
+  /* A DESTRUCTIVE VERB IS ITS WORDS IN INK: red is for what needs him, and a menu item never does. */
 
   @media (pointer: coarse) {
     .more-trigger {
@@ -1134,7 +1134,7 @@
     gap: var(--sp-2);
   }
 
-  /* SIX DIGITS WIDE, in the mono face a code is set in (SYSTEM §3), spaced so each digit reads on its own. */
+  /* SIX DIGITS WIDE, in the mono face a code is set in, spaced so each digit reads on its own. */
   .code-field {
     flex: 0 1 16ch;
   }
@@ -1202,7 +1202,7 @@
   }
 
   /* ONE COLUMN AT ANY WIDTH, the box then its words, which wrap rather than push the sheet sideways. The control is
-     ink and not the accent (D-1). */
+     ink and not the accent. */
   .field-toggle {
     display: flex;
     align-items: center;
@@ -1234,7 +1234,7 @@
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    /* THE ADD MOVES TO THE TOOLBAR as a circle (SYSTEM §9), and the list's own pill goes. */
+    /* THE ADD MOVES TO THE TOOLBAR as a circle, and the list's own pill goes. */
     .add-phone {
       display: contents;
     }

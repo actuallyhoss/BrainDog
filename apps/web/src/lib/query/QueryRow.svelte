@@ -168,7 +168,7 @@
     min-inline-size: 0;
   }
 
-  /* EVERY BOX IS 16px AT EVERY WIDTH (design-brief §3), so a phone never zooms into it. */
+  /* EVERY BOX IS 16px AT EVERY WIDTH, so a phone never zooms into it. */
   .q-box {
     inline-size: 100%;
     min-inline-size: 0;
@@ -204,7 +204,7 @@
     gap: var(--sp-1);
   }
 
-  /* THE PILLS ARE THE LIST BAR'S (design D-2): a pill on a raised track, the chosen one on the selected ground. */
+  /* THE PILLS ARE THE LIST BAR'S: a pill on a raised track, the chosen one on the selected ground. */
   .q-pick {
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);

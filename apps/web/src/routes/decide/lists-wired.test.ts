@@ -1,7 +1,7 @@
 /**
  * BOTH DECIDE SCREENS HAND THE HINT THE LISTS, not only the level.
  *
- * `whyNotAnswering` learned the colleague sentence in batch eighteen, and `page.test.ts` holds its
+ * `whyNotAnswering` learned the colleague sentence earlier, and `page.test.ts` holds its
  * words. Neither screen passed it `me.lists`, so the function's second argument defaulted to `null`
  * on every call in the product and a bookkeeper given `write` on Expenses still read "This needs
  * decide, and you have read access." on `/decide` and on `/decide/<id>`. A sentence nobody is handed

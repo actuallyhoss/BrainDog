@@ -4,10 +4,10 @@
   AN AUTOMATION IS A RULE THAT GREW A TRIGGER AND STEPS rather than a kind of its own, so a rule installed before this
   screen existed is an automation whose trigger is a change, and it opens on the same canvas.
 
-  TWO TILES, THEN THE LIST ON THE GROUND (SCREENS, Automations). "Runs this month" is a bar per automation and "How
+  TWO TILES, THEN THE LIST ON THE GROUND. "Runs this month" is a bar per automation and "How
   runs ended" a ring of the month's runs that finished, each with the one line that says what it means. Both are drawn
   from the month the list read already carries (`AutomationRow.month`), and neither is drawn when there is no month to
-  draw from: a tile without a chart is a number nobody can check (SYSTEM §11).
+  draw from: a tile without a chart is a number nobody can check.
 
   THE LIST IS GROUPED ON AND OFF, the turned-off ones quieter and never red. Each row leads with its trigger's icon,
   says how its last run went, and puts its next turn in the right-hand column.
@@ -72,7 +72,7 @@
   /* THIS BROWSER'S CLOCK, read once when the tab is drawn. */
   const now = Date.now();
 
-  /* AN AGENT SETS THESE UP AS READILY AS A PERSON (DIRECTION §22), so the empty list says what to ask one. An example a
+  /* AN AGENT SETS THESE UP AS READILY AS A PERSON, so the empty list says what to ask one. An example a
      person reads and replaces, not a feature the code ships. */
   const agentPrompt = 'read my record, then propose an automation that fetches the US dollar in euros from api.example.com every hour and tells me when it is over 0.95';
 
@@ -101,7 +101,7 @@
   <Empty kind="no-data-yet" title={words.absent} body={words.absentHow} />
 {:else if from === 'ready' && rows.length === 0}
   <!-- NO BUTTON OF ITS OWN. The heading's "New automation" is above it on every width, and a second one under it read as
-       two different things to press (`loop/finish/design.md` 2.7). -->
+       two different things to press. -->
   <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt} />
 {:else if from === 'ready'}
   {#if split && bars.length > 0}
@@ -132,7 +132,7 @@
 {/if}
 
 <style>
-  /* TWO TILES SIDE BY SIDE WHERE THEY FIT, 12 apart (SYSTEM §4), and one over the other on a phone. The bars take the
+  /* TWO TILES SIDE BY SIDE WHERE THEY FIT, 12 apart, and one over the other on a phone. The bars take the
      wider share, since their labels are names. */
   .tiles {
     display: grid;
@@ -151,7 +151,7 @@
     justify-content: center;
   }
 
-  /* THE ONE LINE UNDER EACH CHART that says what it means (SYSTEM §6), at body size in ink, at the tile's foot. */
+  /* THE ONE LINE UNDER EACH CHART that says what it means, at body size in ink, at the tile's foot. */
   .reading {
     margin: 0;
     margin-block-start: auto;

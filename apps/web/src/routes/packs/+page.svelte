@@ -1,5 +1,5 @@
 <!--
-  Add-ons (`loop/finish/platform.md` PLT-4): three tabs, Installed, Updates and "Install from…".
+  Add-ons: three tabs, Installed, Updates and "Install from…".
 
   A pack declares CONTENT AND IDENTITY, never position or visibility. That is Chrome's line, stated most plainly of
   anyone: extension actions are unpinned by default, and `isOnToolbar` is exposed to the extension READ-ONLY. There is
@@ -13,7 +13,7 @@
   BROWSING IS `/packs/browse`. This screen used to list what could still be installed under what was, with a guess at
   what each would add; the plan now comes from the record, so it is read where the listing is.
 
-  THE LOOK (SYSTEM §5, §6): the three tabs are a glass segmented control in the title row's toolbar, beside Browse, and
+  THE LOOK: the three tabs are a glass segmented control in the title row's toolbar, beside Browse, and
   the sentence under the title says how many are installed and how many have an update, in ink (an update is never
   urgent). Installed leads with one tile, what the add-ons hold between them as a stacked bar of lists, pages and rules
   with its reading line; then the add-ons themselves as 56px rows on the ground, each with its icon well, its switch,
@@ -30,8 +30,8 @@
   import { builtInFile } from '@braindog/seed/usecases/share';
   import { moduleName, ruleName } from '@braindog/seed/usecases/names';
   /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists, read off each one's own manifest and document. It
-     was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote (wave C1), then a hand copy with
-     stale versions (USE-3). */
+     was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote, then a hand copy with
+     stale versions. */
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -518,7 +518,7 @@
 
 <PageHead icon="packs" title={copy.packs} count={live ? installed.length : undefined} sentence={live ? words.sentence(installed.length, updates ? updates.length : null) : undefined}>
   {#snippet actions()}
-    <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, glass on the ground (SYSTEM §5), and a tab list still: the arrows
+    <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, glass on the ground, and a tab list still: the arrows
          move between them and the panel they control is the content under the title. -->
     <div class="tabs segmented" role="tablist" aria-label={words.tabsLabel} tabindex="-1" onkeydown={tabKey}>
       {#each TABS as t (t)}
@@ -576,7 +576,7 @@
   {/if}
 
   {#if installed.length > 0}
-    <!-- ONE ROW PER ADD-ON (SYSTEM §6, Rows): its well, its name and one line, its switch, and one "…" holding Settings,
+    <!-- ONE ROW PER ADD-ON: its well, its name and one line, its switch, and one "…" holding Settings,
          What this adds and Uninstall, destructive last. On the ground, no box, a hairline between rows. -->
     <Section title={words.installedTitle} count={installed.length}>
       {#snippet aside()}<Button weight="bare" size="sm" href="/packs/share">{copy.shareSetup}</Button>{/snippet}
@@ -716,7 +716,7 @@
     min-inline-size: 0;
   }
 
-  /* THE TABS IN THE TOOLBAR. The count on Updates is a plain number in the quiet ink (SYSTEM §6, Badges): an update
+  /* THE TABS IN THE TOOLBAR. The count on Updates is a plain number in the quiet ink: an update
      does not need him, so it is never the red square. */
   .tab {
     white-space: nowrap;
@@ -749,7 +749,7 @@
 
   /**
    * AN ADD-ON'S ROW: the 32px well, the name over its line, the switch, and the "…" at the trailing edge, 56 tall on the
-   * ground (SYSTEM §6, Rows). Its own grid rather than the list's id column, because a row here is a thing with a switch
+   * ground. Its own grid rather than the list's id column, because a row here is a thing with a switch
    * and not a line of a register; the wash, the hairline and the verbs' show-on-hover are the shared `rows.css` ones.
    */
   .addon {
@@ -818,7 +818,7 @@
     color: var(--ink);
   }
 
-  /* A DESTRUCTIVE VERB IS ITS WORDS IN INK (SYSTEM §6): Uninstall is one more item, last in the menu, and never red. */
+  /* A DESTRUCTIVE VERB IS ITS WORDS IN INK: Uninstall is one more item, last in the menu, and never red. */
 
   /* WHAT STOPPED THE SWITCH sits under the name, across the rest of the row. */
   .addon-said {
@@ -870,7 +870,7 @@
   }
 
   /* ON A PHONE the tabs take the toolbar's whole line, each a third of it, and a row's name is read at the phone's body
-     size, as every row's first line is (SYSTEM §9). */
+     size, as every row's first line is. */
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);

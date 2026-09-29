@@ -70,8 +70,8 @@
 >
   {#snippet actions()}
     <!-- NO "Add the first row" AND NO EXAMPLE ROW. The capture line sits directly above and the New button beside the
-         title, so an empty list drew three ways to add a row; and no row nobody typed is written by any path
-         (DIRECTION §26, MOD-6), so the example offer went too. -->
+         title, so an empty list drew three ways to add a row; and no row nobody typed is written by any path,
+         so the example offer went too. -->
     {#if kind === 'no-results'}
       <Button href="/r/{register}">{copy.clearFilters}</Button>
     {/if}

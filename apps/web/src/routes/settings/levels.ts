@@ -2,7 +2,7 @@
  * Which settings areas hold the OWNER'S controls, and what a colleague reads in their place.
  *
  * EVERY AREA WAS DRAWN TO EVERY LEVEL, WITH THE OWNER'S CONTROLS IN IT.
- * `loop/research-second-person.md` finding 7 drove seven colleagues through these screens and each
+ * A walk drove seven colleagues through these screens and each
  * of them was shown the owner's settings: `/settings/delete` offered the confirm field and the red
  * button to somebody who cannot change one row, `/settings/export` offered four buttons that all
  * refuse at the press, `/settings/agents` offered a six-digit field and an Approve, and

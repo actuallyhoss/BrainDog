@@ -3,7 +3,7 @@
  *
  * THE UNDO WROTE A STATE THE ROW NEVER HAD. It was `tickPatch(ref, !done)`, and "not done" is the list's default state,
  * so a task in `doing`, `blocked` or `review`, ticked and then undone, came back `open` while the receipt said it had only
- * been marked not done (audit sixty-four, section 3, measured against a kernel in `tick-undo.test.ts`). The board never
+ * been marked not done (measured against a kernel in `tick-undo.test.ts`). The board never
  * had this fault, because its undo writes the column the card came from. This is the same idea for a tick: the values
  * the row held, which is the row page's `putBackOf` rule.
  *

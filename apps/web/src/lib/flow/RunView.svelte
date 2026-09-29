@@ -1,6 +1,6 @@
 <!--
   One run, drawn on the automation's own canvas: every step of the version it ran under, each painted with how it went
-  and what it handed back, and Run it again for a run that has finished (EDT-1).
+  and what it handed back, and Run it again for a run that has finished.
 
   THE VERSION IT RAN UNDER, NOT THE ONE ON THE PAGE. A run is pinned to its version for its life, and the runner numbers
   its steps by their place in that version's plan (`packages/kernel/src/flow.ts` `plan`), so step 3 of an older run is
@@ -144,7 +144,7 @@
     min-inline-size: 0;
   }
 
-  /* A FULL-SCREEN SHEET ON A PHONE (`loop/finish/shell.md` EDT-1): the sheet is content-sized, so the run's detail asks
+  /* A FULL-SCREEN SHEET ON A PHONE: the sheet is content-sized, so the run's detail asks
      for the height itself, and a short run still reads as a page of its own rather than a strip over the list. */
   @media (width < 640px) {
     .rv {
@@ -195,7 +195,7 @@
   }
 
   /* A STEP OF THE RUN, INSIDE THE SHEET: the sheet is a tile's surface and a tile never holds a tile, so a step is the
-     surface's inner fill at the field's corner (SYSTEM §4), with no border. */
+     surface's inner fill at the field's corner, with no border. */
   .rv-card {
     display: flex;
     flex-direction: column;
@@ -260,7 +260,7 @@
     font-weight: 500;
   }
 
-  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6), each in its meaning: going now `--live`, done green, parked on a
+  /* A STATE IS A 6PX DOT AND ITS WORD, each in its meaning: going now `--live`, done green, parked on a
      person amber, failed red, stopped the quiet ink, and a step never reached a hollow ring. */
   .rv-dot {
     display: inline-block;

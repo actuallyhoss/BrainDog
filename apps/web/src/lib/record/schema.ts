@@ -747,7 +747,7 @@ export type Person = {
    * as one.
    */
   seen: string | null;
-  /** The lists whose grant is narrowed to some rows, keyed by list id, as the record answered them (COL-9). */
+  /** The lists whose grant is narrowed to some rows, keyed by list id, as the record answered them. */
   wheres?: Record<string, unknown>;
 };
 

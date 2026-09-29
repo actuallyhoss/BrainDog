@@ -1,5 +1,5 @@
 /**
- * The spine: the places every bar carries before any page a record declares (pages PGS-18).
+ * The spine: the places every bar carries before any page a record declares.
  *
  * DECIDE AND INBOX APPEAR WHEN THEY HAVE BEEN USED. On a young record both were rows over nothing, places the shell
  * called essential with nothing in them, so the first thing a new person learned from the
@@ -9,9 +9,9 @@
  * ONE PURE FUNCTION, WHICH THE RAIL, THE TAB BAR AND THE TOP BAR ALL READ, so the three never disagree about what the
  * spine holds. Before this each bar wrote its own spine rows, and a rule written once per bar is one rule per bar.
  *
- * SLASH AND AUTOMATIONS STAY IN IT (DSN-11). They went up from the rail's foot in W1, and a spine rebuilt from the counts
+ * SLASH AND AUTOMATIONS STAY IN IT. They went up from the rail's foot, and a spine rebuilt from the counts
  * alone would put them back down. The phone's tab bar and the top bar still carry only Home, Decide and Inbox (`BAR_SPINE`),
- * as they did: a new place there is a row in More, never a fifth tab (design 6.6).
+ * as they did: a new place there is a row in More, never a fifth tab.
  *
  * ITS OWN MODULE AND PURE, so the shell's entry chunk takes nothing with it and `node --test` reads it with no SvelteKit.
  */
@@ -34,7 +34,7 @@ export const BAR_SPINE: ReadonlySet<SpineKey> = new Set<SpineKey>(['home', 'deci
  *
  * A HOST OLDER THAN `decided` AND `arrived` IS READ FROM WHAT IT DID SEND: the open questions and the arrivals waiting.
  * That under-counts use, never over-counts it, so a row appears late on an old host rather than over nothing.
- * NO COUNTS AT ALL is a shell nobody answered, and it draws Home and the DSN-11 rows only.
+ * NO COUNTS AT ALL is a shell nobody answered, and it draws Home, Slash and Automations only.
  */
 export function spineOf(counts: SpineCounts | null | undefined): SpineKey[] {
   if (!counts) return ['home', 'slash', 'automations'];

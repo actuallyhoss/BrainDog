@@ -187,7 +187,7 @@ for (const [what, answer] of [
   ['the record says UNAUTHORIZED', () => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } })],
   ['a static host answers a 404 page', () => new Response('<!doctype html><title>Not found</title>', { status: 404 })],
 ] as const)
-  /* NO RECORD IS A REFUSAL NOW, carrying the sentence the record or the client gave (DIRECTION 26). It answered
+  /* NO RECORD IS A REFUSAL NOW, carrying the sentence the record or the client gave. It answered
      `{ from: 'sample' }` and the route drew the seeded studio's `services.lapsing` over whatever address was open. */
   test(`a view is refused when ${what}, never read from the sample`, async () => {
     const { io } = host(answer);
@@ -305,8 +305,8 @@ test('nothing stands in front of the route: /v/<key> is drawn on a record, never
    * page called services.lapsing" with a list of pages: the wrong question answered confidently.
    *
    * The redirect was added to stop `/v/<key>` drawing the sample's fictional views on a real
-   * record. That is what `viewReader` does now, and it does it by asking the record; and since
-   * DIRECTION 26 there is no sample left to draw even when nothing answers, which the three tests above pin.
+   * record. That is what `viewReader` does now, and it does it by asking the record; and there is
+   * no sample left to draw even when nothing answers, which the three tests above pin.
    */
   const dir = new URL('../../routes/v/[view]/', import.meta.url);
   const files = readdirSync(dir);

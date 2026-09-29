@@ -83,7 +83,7 @@
   {#snippet note(e)}
     {@const said = receiptFor(e.seq)}
     <!-- WHERE THE ROW APPLIES IS NOT HERE: `RowCards` draws the scope chip in the card's detail slot, so a scoped row
-         is two lines like any other and a saved view's cards wear it too (design DSN-16). -->
+         is two lines like any other and a saved view's cards wear it too. -->
     {#if said}
       {@const name = display(register, decl.title, e.fields[decl.title]) ?? copy.thisRow}
       <Chip label={said.mark} tone={said.intent} />
@@ -121,7 +121,7 @@
    * the row on this device, and half a row that does nothing when tapped is worse than no control.
    */
   @media (width < 640px) {
-    /* A PHONE'S ROW IS 60 (SYSTEM §9), the size a thumb reads a list at. */
+    /* A PHONE'S ROW IS 60, the size a thumb reads a list at. */
     .list-cards :global(.card) {
       min-block-size: 60px;
     }
@@ -159,8 +159,8 @@
       cursor: pointer;
     }
 
-    /* A WASH ONLY UNDER A MOUSE: a tapped button on a phone kept it after the finger lifted (design brief 6.6,
-       nothing hover-only and nothing stuck on hover). */
+    /* A WASH ONLY UNDER A MOUSE: a tapped button on a phone kept it after the finger lifted (nothing
+       hover-only and nothing stuck on hover). */
     @media (hover: hover) and (pointer: fine) {
       .card-more:hover {
         background: var(--hover-wash);

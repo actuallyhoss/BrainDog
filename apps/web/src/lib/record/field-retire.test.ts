@@ -1,6 +1,5 @@
 /**
- * Retiring a field from the row page files a question on Decide and never answers it (DIRECTION §22, brief 5 of
- * `loop/research-m4-wave-three.md`).
+ * Retiring a field from the row page files a question on Decide and never answers it.
  *
  * THE LINE THAT MATTERS IS `asked`. `field-write.ts` files an addition and then accepts it in the next call when the
  * person owns the record, and a retire written by copying it would do the same: the owner's press on a row's label

@@ -1,6 +1,6 @@
 <!--
-  Where a row applies, as one chip: the project's mark in its hue and its name, or the globe and "Everywhere"
-  (agents C8). Every row of a list with a `scope` field wears it, on its list, on its page and in Decide, so the
+  Where a row applies, as one chip: the project's mark in its hue and its name, or the globe and "Everywhere".
+  Every row of a list with a `scope` field wears it, on its list, on its page and in Decide, so the
   answer to "which project is this for" reads the same wherever the row is.
 
   "EVERYWHERE" IS A PLACE AND NOT A GAP. An empty scope field was drawn as an unset chip, "+ Where it applies", which
@@ -10,7 +10,7 @@
   so to a screen reader; without it, the chip is words and draws no control, because a control that cannot act is
   absent and never greyed.
 
-  THE NAME KEEPS TWELVE CHARACTERS before it gives way (agents AGT-11): a chip that cut "Marlow & Co Studio" to
+  THE NAME KEEPS TWELVE CHARACTERS before it gives way: a chip that cut "Marlow & Co Studio" to
   "Marl…" in a narrow cell would name a different project to anybody who has two starting the same way.
 -->
 <script lang="ts">
@@ -55,7 +55,7 @@
 {/if}
 
 <style>
-  /* A PILL ON THE WASH, the shape every choice in the product has (design D-2), and 28px tall at every width, inside
+  /* A PILL ON THE WASH, the shape every choice in the product has, and 28px tall at every width, inside
      the 44px target `.tap` grows under a thumb. */
   .scope-chip {
     display: inline-flex;
@@ -85,7 +85,7 @@
     cursor: pointer;
   }
 
-  /* A WASH ONLY UNDER A MOUSE: a tapped chip on a phone would keep it after the finger lifted (design-brief §6). */
+  /* A WASH ONLY UNDER A MOUSE: a tapped chip on a phone would keep it after the finger lifted. */
   @media (hover: hover) and (pointer: fine) {
     .scope-move:hover {
       background: var(--hold-wash);
@@ -93,7 +93,7 @@
     }
   }
 
-  /* The project's own hue, the one identity accent (design-brief §3), and the name's colour where it declares none. */
+  /* The project's own hue, the one identity accent, and the name's colour where it declares none. */
   .scope-mark {
     margin-inline-end: 0;
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));

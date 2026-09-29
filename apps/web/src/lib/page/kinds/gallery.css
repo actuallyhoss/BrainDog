@@ -4,7 +4,7 @@
  * either.
  *
  * THE HOST LAYS THE TILES OUT, and the renderer counts no columns: as many 10rem tracks as the block holds, and two
- * below C4's 640px, so a phone shows pictures big enough to tell apart rather than a column of one. The block is its
+ * below the phone breakpoint's 640px, so a phone shows pictures big enough to tell apart rather than a column of one. The block is its
  * own container, so a gallery in a narrow column at 1440 is laid out as it is on a phone, and no `@media` width is added.
  *
  * EVERY TILE KEEPS ONE SHAPE, 4:3, whatever it holds: a picture is cut to it, a file that is no picture is its name on

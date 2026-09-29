@@ -157,7 +157,7 @@ function leadOf<T extends { title: string; row?: boolean | undefined }>(entries:
   return entries.find((e) => plainOf(e.title) === 'overview') ?? entries.find((e) => !e.row) ?? entries[0];
 }
 
-/* THE PLACES THE SHELL DRAWS WITH ITS OWN GLYPH (`loop/design/bento/ICONS.md`), whatever the lead page declares, so the
+/* THE PLACES THE SHELL DRAWS WITH ITS OWN GLYPH, whatever the lead page declares, so the
    rail's Projects is the same picture on every record. Any other section wears its lead page's glyph. */
 const SECTION_ICONS: Readonly<Record<string, string>> = { projects: 'projects', work: 'work' };
 

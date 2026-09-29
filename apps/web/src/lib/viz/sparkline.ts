@@ -3,7 +3,7 @@
  * it reads as.
  *
  * THE SCALE IS THE DATA'S OWN RANGE, not zero-based: a sparkline shows a shape, and the stat it
- * sits beside carries the figure (SYSTEM §7). A threshold widens the range so its rule is always on
+ * sits beside carries the figure. A threshold widens the range so its rule is always on
  * the chart.
  *
  * PADDING IS THE DOT'S. The last point wears a 3px dot with a 1.5px ring, so 4px on every side keeps
@@ -139,7 +139,7 @@ export function sparkline(values: readonly number[], o: TrendOptions): TrendGeom
 }
 
 /**
- * The sentence a sparkline reads as: "acme.example takings a day, 9 weeks, from 138 to 96, low 95".
+ * The sentence a sparkline reads as: "Kiln takings a day, 9 weeks, from 138 to 96, low 95".
  * `last` names both ends of the range, `low` and `high` the one they mark.
  */
 export function describeSparkline(

@@ -1,7 +1,7 @@
 /**
  * Slash's braces, drawn: what `Cited.svelte` is handed for each piece of a sentence, without a browser.
  *
- * THE RULE IS ONE SENTENCE: no brace reaches a screen (`loop/finish/agents.md` §2.7, AGT-22). A row is a link named by
+ * THE RULE IS ONE SENTENCE: no brace reaches a screen. A row is a link named by
  * its title, a value is drawn in its field's format, a figure is its reading, a total carries the rows it adds up, and a
  * brace the answer kept nothing for is drawn in words of its own. Each case below is one of those.
  */

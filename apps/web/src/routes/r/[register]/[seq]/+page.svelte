@@ -1,5 +1,5 @@
 <!--
-  One row: a task, a project, a person, a money line (SYSTEM §5, §6).
+  One row: a task, a project, a person, a money line.
 
   THE PAGE IS THE DOCKED PANEL'S BODY WITH ROOM, and it reads in the product's grammar, top to bottom:
     - the title row: the list's name as the way back, the row's title, the verbs in the toolbar, and under them one
@@ -15,11 +15,11 @@
   it, and it fails contrast in most themes (06 §8). A set field is a fact with its label; an unset
   one is a chip that says its label and opens its field.
 
-  THE ROW'S NUMBER LIVES IN DETAILS AND NOWHERE ELSE (design SYS-3). It is per-list, which is why
+  THE ROW'S NUMBER LIVES IN DETAILS AND NOWHERE ELSE. It is per-list, which is why
   renaming a list's id is refused and its display name is free, and it is what `y` copies; a person
   reading the page reads the title, the figure and where the row stands, never an id after them.
 
-  TWO SHAPES (design DSN-14). Below 640px a fact is its label above its value; from 640px the label
+  TWO SHAPES. Below 640px a fact is its label above its value; from 640px the label
   sits in a column capped at 16ch. At every width the pencil that opens a field sits in one trailing
   44px column, so every pencil on the page shares an edge. The hero figure is `--t-figure`, and never wraps.
 -->
@@ -111,8 +111,8 @@
    *
    * It had two other sources. The sample's row of the same number was drawn here when there was no
    * record, and a row somebody typed into the capture line against the sample waited in `pending`
-   * under a NEGATIVE sequence, drawn here with `Not saved` on it. The sample went in DIRECTION 26 and
-   * `pending` with it (`loop/research-no-sample.md` B1): the capture line writes to the record, so the
+   * under a NEGATIVE sequence, drawn here with `Not saved` on it. The sample went, and
+   * `pending` with it: the capture line writes to the record, so the
    * row it makes has a number the record gave it and opens here like any other.
    */
   let got = $state<Got | null>(null);
@@ -125,7 +125,7 @@
   const readable = $derived.by(() => (void got, readableFields(id)));
   const live = $derived(got?.from === 'live');
   /**
-   * WHAT THE CALLER'S LEVEL ON THIS ROW'S LIST REACHES (COL-13), asked of `may()` and never worked out here.
+   * WHAT THE CALLER'S LEVEL ON THIS ROW'S LIST REACHES, asked of `may()` and never worked out here.
    *
    * A CONTROL THE RECORD WOULD REFUSE IS NOT DRAWN: Edit, Archive, a field's pencil and the scope move are an `update`,
    * which asks `write` of the list, and a note is a `log`, which asks `append`. A comment asks only that the row can be
@@ -149,11 +149,11 @@
      once, on the field that declares it. */
   /* AND IT IS THE RECORD'S OWN READ, which it was not: the section was left out on a live record,
      because the sample's backlinks would be another record's rows pointing at this one, and drawn
-     from the sample's walk everywhere else. That walk is gone with the sample (DIRECTION 26). */
+     from the sample's walk everywhere else. That walk is gone with the sample. */
   let linked = $state<Linked | null>(null);
   let links: LinkReader | null = null;
   /* A ROW THAT POINTS HERE LEADS WITH WHAT IT IS AND CARRIES NO NUMBER: its columns are `columnsFor`'s, which draws
-     none by default (design SYS-3), and each row still opens by its own link. */
+     none by default, and each row still opens by its own link. */
   const incoming = $derived(linked?.from === 'live' ? linked.groups : []);
 
   /**
@@ -328,7 +328,7 @@
 
   function startEdit(f: FieldDecl) {
     /* ONLY A ROW THE RECORD HOLDS OPENS A BOX. The sample's toast, "the row would open for editing", went with the
-       sample (DIRECTION 26), and a row the record refused to show draws no edit control to press. */
+       sample, and a row the record refused to show draws no edit control to press. */
     if (!row || !changes) return;
     problem = null;
     editing = f.id;
@@ -574,14 +574,14 @@
   const titled = $derived(Boolean(decl && row && !unsetValue(row.fields[decl.title])));
   const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id) && (f.id !== decl?.title || !titled || editing === f.id)));
 
-  /* EVERY EMPTY FIELD IS A CHIP (design SYS-10). A person with four unset fields was a column of four "Not set" rows,
+  /* EVERY EMPTY FIELD IS A CHIP. A person with four unset fields was a column of four "Not set" rows,
      then one line of names with a separator trailing the last; a chip names its field, wraps whole, and on a row you can
      write to it opens that field. */
   const unsetFields = $derived(row ? listed.filter((f) => unsetValue(row.fields[f.id]) && editing !== f.id) : []);
   const shownFields = $derived(listed.filter((f) => !unsetFields.includes(f)));
 
   /**
-   * THE ROW'S PROPERTIES ARE PILLS IN ONE STRIP UNDER THE TITLE (SYSTEM §6): a word or a day that says what kind of row
+   * THE ROW'S PROPERTIES ARE PILLS IN ONE STRIP UNDER THE TITLE: a word or a day that says what kind of row
    * this is and where it points, which a person scans across rather than down. Its status, its dates, who holds it and
    * which project, each with its label, each a press away from its box; the rest (sums, counts, lists, sentences) are
    * facts in Details, where a value has the room to be long.
@@ -597,7 +597,7 @@
   const opensRow = (f: FieldDecl, value: unknown): boolean => id === 'session' && f.id === 'project' && spokenRow(value, names) !== null;
 
   /**
-   * A RUN'S PAGE LEADS WITH ITS HANDOFF (AGT-13): what it is doing, where, the next step, what it already tried and its
+   * A RUN'S PAGE LEADS WITH ITS HANDOFF: what it is doing, where, the next step, what it already tried and its
    * notes, said as the next session would want them, above the same fields listed as facts.
    *
    * THE PROJECT BY ITS NAME OR NOT AT ALL. A run holds it as a spoken id, which is not for a person to read, so it is
@@ -628,7 +628,7 @@
   const unset = $derived([...unsetFields.filter((f) => !isProp(f)), ...documents.filter((f) => !writtenDocuments.includes(f))]);
 
   /**
-   * THE SENTENCE UNDER THE TITLE (SYSTEM §5), in place of the lead line of dots and words it replaced: where the row
+   * THE SENTENCE UNDER THE TITLE, in place of the lead line of dots and words it replaced: where the row
    * stands, how late or when it is due, and how old it is. `said.ts` builds it; the state's word is drawn here, through
    * `stateSaid`, in the `lead-word` span the label tests read.
    */
@@ -649,10 +649,10 @@
   );
 
   /**
-   * THE LEAD TILE (SYSTEM §6), AND ONLY WHEN IT HAS A CHART: the row's amount, where the row stands on its list's way
+   * THE LEAD TILE, AND ONLY WHEN IT HAS A CHART: the row's amount, where the row stands on its list's way
    * through its states (`Segments`), and its amounts against each other where it holds two in one currency (`Bars`). An
    * amount with nothing to chart is a figure on the ground and not a tile, since a number tile without a chart is the
-   * one thing SYSTEM §11 forbids a tile to be.
+   * one thing the design system forbids a tile to be.
    */
   const steps = $derived(stepsOf(decl, stateValue));
   const compared = $derived(row && figureField && figure !== null ? comparedOf(shortFields, row.fields, figureField.id, labelOf) : null);
@@ -663,7 +663,7 @@
   const moneySaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
 
   /* EVERY VALUE IN A ROW'S PROSE IS A HOLE UNTIL PAGES READ THEM. The sample's own values answered them off the
-     row, and pressing one said what would have happened; neither has a record behind it (DIRECTION 26). */
+     row, and pressing one said what would have happened; neither has a record behind it. */
   const resolve = (): null => null;
   /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
 
@@ -797,16 +797,16 @@
           <span class="edit-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
         </div>
       {:else if f.type === 'day'}
-        <!-- A DAY IN THE RECORD'S WORDS, `3 Sep 2026`, and not the browser's `mm/dd/yyyy` (MOD-22). -->
+        <!-- A DAY IN THE RECORD'S WORDS, `3 Sep 2026`, and not the browser's `mm/dd/yyyy`. -->
         <DayBox bind:value={draft} label={labelOf(f)} />
       {:else if isQuantity(f)}
-        <!-- A NUMBER AND THE UNIT IT COUNTS, the unit chosen from the ones the field knows (MOD-22). -->
+        <!-- A NUMBER AND THE UNIT IT COUNTS, the unit chosen from the ones the field knows. -->
         <QuantityBox bind:value={draft} units={unitsOf(f, value)} label={labelOf(f)} />
       {:else if isJson(f)}
-        <!-- STRUCTURED DATA WRITTEN OUT, refused on the save when it does not read (MOD-22). -->
+        <!-- STRUCTURED DATA WRITTEN OUT, refused on the save when it does not read. -->
         <JsonBox bind:value={draft} label={labelOf(f)} />
       {:else if isFile(f)}
-        <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back (OPS-20). -->
+        <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back. -->
         <FileField bind:value={draft} label={labelOf(f)} />
       {:else if f.type === 'money'}
         <!-- THE CURRENCY THE BOX WRITES IN, by the chain `field-draft.ts` types in: the row's, the field
@@ -882,7 +882,7 @@
   {/snippet}
 
   <!-- THE LIST'S NAME IS THE WAY BACK: a link above the title from 900px, and the chevron in the
-       phone's bar below it. No number follows the title (design SYS-3); it is in Details. -->
+       phone's bar below it. No number follows the title; it is in Details. -->
   <PageHead icon={iconFor(decl?.icon, 'rows')} kicker={listName(id)} back={`/r/${id}`} title={String(row.fields[decl.title] ?? '')} sentence={sentenceLine}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER, AND IT LIVES BESIDE THE NUMBER NOW. A row's
@@ -898,18 +898,18 @@
            place and not the other is two products. `Put back` stands where `Archive` was for as
            long as this tab holds the row it just archived: see `archived` for why that moment is
            the only one it can be offered in. -->
-      <!-- AND NEITHER FOR SOMEBODY WHO CANNOT CHANGE THE LIST (COL-13), where the note's place says why. -->
+      <!-- AND NEITHER FOR SOMEBODY WHO CANNOT CHANGE THE LIST, where the note's place says why. -->
       {#if changes && archived}
         <Button weight="quiet" disabled={saving} onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {:else if changes}
         <Button weight="quiet" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</Button>
       {/if}
-      <!-- "HAND TO" (GAP-11): a teammate or an agent in one press, on a list that says who holds its rows, and while an
+      <!-- "HAND TO": a teammate or an agent in one press, on a list that says who holds its rows, and while an
            agent holds this one, the run working on it or whose next session it waits for. -->
       {#if live && !archived}
         <HandSheet register={id} {row} {decl} trigger onhanded={() => void rowMoved(id, seq)} />
       {/if}
-      <!-- THE HEAD'S "…", LAST (design DSN-16): what is done to the list this row is in, and the row's link. A 36px
+      <!-- THE HEAD'S "…", LAST: what is done to the list this row is in, and the row's link. A 36px
            glass circle, named for a screen reader by the hidden words and for a pointer by its tooltip. -->
       {#if live}
         <Menu label={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)} align="end">
@@ -933,7 +933,7 @@
       <p class="archived-note"><Icon name="archive" size="s" /><span>{copy.rowArchivedNote}</span></p>
     {/if}
 
-    <!-- THE STRIP OF PROPERTIES. A PERSON'S PAGE LEADS IT WITH THEIR FACE (design SYS-7), the one their row wears in the
+    <!-- THE STRIP OF PROPERTIES. A PERSON'S PAGE LEADS IT WITH THEIR FACE, the one their row wears in the
          list, drawn from the name in the title above; `Face` is `aria-hidden` because that name is already said. Each
          pill is its label and its value, and on a row you can write to it opens its box under the strip; each dashed
          pill is a property the row has not answered. -->
@@ -995,7 +995,7 @@
       </div>
     {/if}
 
-    <!-- THE TILES, ONLY WHERE THERE IS A FIGURE (SYSTEM §6): each a figure, its chart, and one line saying what it means. -->
+    <!-- THE TILES, ONLY WHERE THERE IS A FIGURE: each a figure, its chart, and one line saying what it means. -->
     {#if charted || moneyIn || openWork}
       <div class="tiles">
         {#if charted}
@@ -1042,7 +1042,7 @@
 
     <div class="split">
       <div class="main">
-        <!-- A RUN READS AS ITS HANDOFF (AGT-13), led by its face, what it is doing and where it is, then what the next
+        <!-- A RUN READS AS ITS HANDOFF, led by its face, what it is doing and where it is, then what the next
              session needs: the next step, what was already tried, newest first, and the notes it left. The one place
              `live` is used on this page, in the face's ring. -->
         {#if handoff}
@@ -1137,7 +1137,7 @@
             <div class="fact">
               <dt class="field-label">{nameWords.number}</dt>
               <!-- THE ROW'S NUMBER, AND THE BUTTON THAT COPIES ITS LINK. This is the one place the number is
-                   printed (design SYS-3), bare and without the `#` that made it read as an id. The link is
+                   printed, bare and without the `#` that made it read as an id. The link is
                    what a person pastes into a message and what opens the row for whoever follows it; `y`
                    still copies the id and `⇧Y` the link, and the `?` sheet lists both keys. -->
               <dd class="field-value id-line">
@@ -1172,11 +1172,11 @@
               {/each}
             </ul>
           {/if}
-          <!-- A FIELD THIS LIST DOES NOT HAVE YET is added from the head's "…" menu (design DSN-16), in the list's own Fields
+          <!-- A FIELD THIS LIST DOES NOT HAVE YET is added from the head's "…" menu, in the list's own Fields
                sheet, so the row page and the list offer one way to add a field and not two. -->
         </Section>
 
-        <!-- WHO USED IT (AGT-10): a key's or a tool's row lists the last ten runs that opened or reached it. -->
+        <!-- WHO USED IT: a key's or a tool's row lists the last ten runs that opened or reached it. -->
         {#if live && (id === 'credentials' || id === 'tools')}
           <UsedBy spoken="{id}#{row.seq}" />
         {/if}
@@ -1223,13 +1223,13 @@
       </div>
 
       <div class="side">
-        <!-- THE ROW'S COMMENTS (COL-8). A note is the row's own log line and asks to change the row; a comment is somebody
+        <!-- THE ROW'S COMMENTS. A note is the row's own log line and asks to change the row; a comment is somebody
              saying something about it, which a Reads colleague may too, with replies one level deep and a resolved comment
              folded. Named as the row is spoken. -->
         {#if live}<Thread on="{id}#{row.seq}" me={me || null} {people} />{/if}
 
         <Section title={rowWords.history}>
-          <!-- THE NOTE BOX, at the head of the history it lands in, for somebody whose level adds to the list (COL-13).
+          <!-- THE NOTE BOX, at the head of the history it lands in, for somebody whose level adds to the list.
                For a Reads colleague the place says in one sentence why this row has no Edit, Archive or note. -->
           {#if notes}
             <form class="note-form" onsubmit={addNote}>
@@ -1254,7 +1254,7 @@
                        mark, never a monogram. The name is printed as `actor` says it, since "de Vries" is not a typo. -->
                   {@const who = actor(e.by, me || null, people)}
                   <li>
-                    <!-- AN AGENT'S LINE WEARS ITS RUN (AGT-13), in the run's hue and linking to its handoff. -->
+                    <!-- AN AGENT'S LINE WEARS ITS RUN, in the run's hue and linking to its handoff. -->
                     <Face name={who.name} kind={who.kind} run={runOf(e.by)} size="s" />
                     <p class="history-line"><span class="history-by">{who.name}</span> <span class="history-note">{e.note}</span></p>
                     <time class="history-when" datetime={e.at}>{since(e.at, clock)}</time>
@@ -1328,7 +1328,7 @@
     margin-inline-end: var(--sp-1);
   }
 
-  /* A PROPERTY IS A PILL (SYSTEM §6): the wash on the ground, its label in the meta ink and its value in ink, at the
+  /* A PROPERTY IS A PILL: the wash on the ground, its label in the meta ink and its value in ink, at the
      meta size. It never grows past the strip: a long value wraps inside it rather than pushing the page sideways. */
   .prop {
     display: inline-flex;
@@ -1422,7 +1422,7 @@
     container-type: inline-size;
   }
 
-  /* THE HERO IS `--t-figure` (SYSTEM §3), and it never wraps: a figure broken between its symbol and its digits is two
+  /* THE HERO IS `--t-figure`, and it never wraps: a figure broken between its symbol and its digits is two
      figures. */
   .lead-figure {
     margin: 0;
@@ -1434,7 +1434,7 @@
     white-space: nowrap;
   }
 
-  /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE (design-brief §6), which on the
+  /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE, which on the
      narrowest phone is what keeps a long foreign amount from pushing the page sideways. */
   @container (inline-size < 20rem) {
     .lead-figure.num {
@@ -1456,7 +1456,7 @@
     gap: var(--sp-2);
   }
 
-  /* A tile's figure and the chart at its top right (SYSTEM §7: a sparkline sits there, 120 × 32). */
+  /* A tile's figure and the chart at its top right (a sparkline sits there, 120 × 32). */
   .stat {
     display: flex;
     flex-wrap: wrap;
@@ -1494,7 +1494,7 @@
     color: var(--dim);
   }
 
-  /* THE ONE WRITTEN LINE UNDER A CHART, saying what it means (SYSTEM §6). */
+  /* THE ONE WRITTEN LINE UNDER A CHART, saying what it means. */
   .reading {
     margin: 0;
     color: var(--ink2);
@@ -1539,9 +1539,9 @@
      every row of this list wore an input box: a surface, a border and a radius, eight boxes that read
      as a form to fill in. The name is the fix; nothing here fights the input style.
 
-     TWO SHAPES, AND THE PHONE'S IS WRITTEN FIRST (design DSN-14). Below 640px the label sits above its
+     TWO SHAPES, AND THE PHONE'S IS WRITTEN FIRST. Below 640px the label sits above its
      value, because a 16ch label column left a value 170px to wrap in at 390 and broke paths and
-     dates mid-word (design SYS-10). The pencil's 44px column trails at every width, so no pencil moves with its value. */
+     dates mid-word. The pencil's 44px column trails at every width, so no pencil moves with its value. */
   .fact {
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--tap);
@@ -1637,7 +1637,7 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A WASH ONLY UNDER A MOUSE: on a phone a tapped control would keep it after the finger lifted (design-brief §6). */
+  /* A WASH ONLY UNDER A MOUSE: on a phone a tapped control would keep it after the finger lifted. */
   @media (hover: hover) and (pointer: fine) {
     .copy-id:hover {
       background: var(--hold-wash);
@@ -1708,7 +1708,7 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A FINGER NEEDS ROOM BETWEEN TWO PILLS as well as the 44px `.tap` gives each (design-brief §3). */
+  /* A FINGER NEEDS ROOM BETWEEN TWO PILLS as well as the 44px `.tap` gives each. */
   @media (pointer: coarse) {
     .unset,
     .props {
@@ -1750,7 +1750,7 @@
 
   .edit-input {
     font: inherit;
-    /* 16px IN EVERY BOX AT EVERY WIDTH (design-brief §5), because a phone zooms the page when a smaller one takes focus. */
+    /* 16px IN EVERY BOX AT EVERY WIDTH, because a phone zooms the page when a smaller one takes focus. */
     font-size: var(--t-md);
     cursor: pointer;
   }
@@ -1819,7 +1819,7 @@
      the block KIND, not of the page: the third time that family of bug was paid for (13 §4.1).
 
      AND A NOTE'S OWN HEADINGS SIT UNDER THE PAGE'S, never over them: a note's first heading was set above
-     the group's own, so the row's prose outranked the row (design-brief §5). */
+     the group's own, so the row's prose outranked the row. */
   .document-slot :global(.document > h1) {
     margin-block: var(--sp-5) var(--sp-2);
     font-size: var(--t-md);
@@ -1942,7 +1942,7 @@
 
   /* ── the side: comments, the note and the history ─────────────────── */
 
-  /* COMMENTS ARE A GROUP OF THIS COLUMN, LIKE THE HISTORY (design DSN-16). `Thread` titles itself as a caption, small
+  /* COMMENTS ARE A GROUP OF THIS COLUMN, LIKE THE HISTORY. `Thread` titles itself as a caption, small
      and in the second ink, which is right under a Decide card and read here as a fourth weight of heading; beside the
      history it takes a group's heading, over the group's hairline. */
   .side :global(.thread-title) {
@@ -1979,7 +1979,7 @@
     font-size: var(--t-md);
   }
 
-  /* WHY THERE IS NO NOTE BOX (COL-13): one sentence in the box's place, so nothing below it moves further than the box's
+  /* WHY THERE IS NO NOTE BOX: one sentence in the box's place, so nothing below it moves further than the box's
      own height. */
   .reach {
     margin: 0 0 var(--sp-3);
@@ -2031,7 +2031,7 @@
     font-weight: 500;
   }
 
-  /* THE TIME IN THE FEED'S MONO (SYSTEM §3), in the quiet ink, at the row's trailing edge. */
+  /* THE TIME IN THE FEED'S MONO, in the quiet ink, at the row's trailing edge. */
   .history-when {
     align-self: start;
     padding-block-start: 2px;
@@ -2044,7 +2044,7 @@
 
   /* ── the toolbar's "…" ─────────────────────────────────────────────── */
 
-  /* A 36px GLASS CIRCLE (SYSTEM §5), and plain inside the compact bar, which is glass already: glass never holds glass.
+  /* A 36px GLASS CIRCLE, and plain inside the compact bar, which is glass already: glass never holds glass.
      The glass is on this span and not on the menu's button, so the menu's panel is never placed against a filter. */
   .head-more {
     display: flex;
@@ -2103,7 +2103,7 @@
       padding: var(--sp-3) var(--gutter) var(--sp-8);
     }
 
-    /* Tiles go full width (SYSTEM §9). */
+    /* Tiles go full width. */
     .tiles {
       grid-template-columns: minmax(0, 1fr);
     }

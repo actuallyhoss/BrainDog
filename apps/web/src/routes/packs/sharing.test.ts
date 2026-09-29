@@ -198,7 +198,7 @@ test('A FILE WITH A BLOCK THIS BUILD DOES NOT DRAW IS SAID PLAINLY, WITH ITS COD
 });
 
 test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READER ARRANGEMENT', async () => {
-  /* THE GUIDE'S, since Student 1.3.0 carries no example to link (`loop/finish/modules.md` C11). */
+  /* THE GUIDE'S, since Student 1.3.0 carries no example to link. */
   const rows: Record<string, { seq: number; fields: Record<string, unknown> }[]> = {
     steps: [{ seq: 1, fields: { what: 'Write one sentence about what this is and who it is for', tags: ['example'] } }],
     milestones: [{ seq: 4, fields: { what: 'Say what it is and who it is for', tags: ['example'] } }],

@@ -2,12 +2,12 @@
  * Two defaults the shell carried for one owner: a figure with no list linked to Money, and every currency picker led
  * with the Egyptian pound.
  *
- * BOTH WERE DRIVEN BEFORE THIS FILE EXISTED (`loop/research-shell-leftovers.md` L7): `hrefFor` over a figure whose
+ * BOTH WERE DRIVEN BEFORE THIS FILE EXISTED: `hrefFor` over a figure whose
  * source names no list answered `/p/money`, and `currencyChoices` answered `["EGP","USD","GBP","EUR", ...]` for a
  * record at `GBP`, at `JPY` and with no home currency at all. `/p/money` is a page only money-core declares, so on a
  * record without Money that door opens nothing, and the picker's order was the order of the person who wrote it.
  *
- * WHAT A PERSON COULD SEE OF THE FIRST ONE, MEASURED ON 23 SEPTEMBER: nothing yet. Every figure the seed declares names
+ * WHAT A PERSON COULD SEE OF THE FIRST ONE, MEASURED: nothing yet. Every figure the seed declares names
  * a list (seven sources, all `register.`). So the `/p/money` fallback was a default waiting for the first figure that
  * reads something other than a list, and the cases below hand the live tiles such a figure to hold them to the answer
  * before one ships.

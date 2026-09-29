@@ -1,7 +1,7 @@
 /**
  * Every `<CallsOut>` asks the host whether this record's calls are counted, and none of them asks the build.
  *
- * THE HOST WAS READ ON ONE SITE OF SEVEN (`loop/research-batch-forty-eight-audit.md` section 2). `boot` gave the shell a
+ * THE HOST WAS READ ON ONE SITE OF SEVEN. `boot` gave the shell a
  * `host` and Billing read it, while five `<CallsOut>` props passed `hosted={DEPLOYMENT.kind !== 'self-host'}` and the
  * automation builder passed `hosted={false}`. `DEPLOYMENT.kind` is the sample's variant and reads `self-host` in the
  * bundle production serves, so on the Cloud `estimateOf` answered `installWords.noLimit`, "with no monthly limit on this

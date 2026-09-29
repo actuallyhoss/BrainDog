@@ -1,6 +1,6 @@
 /**
  * The pattern builder's calls to the record: the samples out of the inbox, the dry run, the ways to find a selection
- * again, and the save (`loop/finish/platform.md` §4.0 T).
+ * again, and the save.
  *
  * EVERY ANSWER IS A VALUE, NEVER A THROW. A call that could not reach the record answers `{ ok: false }` with the
  * sentence the screen says, so the builder draws a refusal where it would have drawn the answer.

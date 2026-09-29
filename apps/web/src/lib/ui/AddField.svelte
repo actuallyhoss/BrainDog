@@ -1,5 +1,5 @@
 <!--
-  Add a field to a list, from one of its rows (DIRECTION §22): a name, a kind, and one press.
+  Add a field to a list, from one of its rows: a name, a kind, and one press.
 
   UNDER THE DECLARED FIELDS, because that is where a person notices a field is missing: reading a project and finding
   nowhere to put its domain. The field goes on every row of the list, and every screen that draws the list draws it
@@ -11,7 +11,7 @@
 
   NOT DRAWN UNTIL THE ROW IS THE RECORD'S. `live` is the row page's own answer, and until the record has answered, or
   after it refused, there is no list to add a field to. It drew a button whose only answer was "A field would be added to
-  every row, but nothing was saved yet." on the sample, which is gone (DIRECTION 26).
+  every row, but nothing was saved yet." on the sample, which is gone.
 -->
 <script lang="ts">
   import { apiBase } from '../at.ts';

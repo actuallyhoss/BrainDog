@@ -24,7 +24,7 @@ export const initialOf = (name: string): string => {
 };
 
 /**
- * A project's or a record's initials, for its rounded square (SYSTEM §2: "Faces are a rounded square with the project's
+ * A project's or a record's initials, for its rounded square ("Faces are a rounded square with the project's
  * initials").
  *
  * TWO LETTERS AT MOST, the first of the first two words, so "Marlow & Co" is "MC" and "Portage" is "P". A word that is
@@ -100,8 +100,8 @@ export type RunLive = 'working' | 'quiet' | 'stopped';
 /**
  * The glyph each kind of agent falls back to, from the app's own set, where there is no mark to draw.
  *
- * A NAMED AGENT WEARS ITS MAKER'S MARK NOW, not this. Agents C11 once ruled "a glyph and never a vendor logo"; the owner
- * overruled it on 30 September 2026 ("for stuff like claude codex logos etc please use real ones"), so `AgentMark`
+ * A NAMED AGENT WEARS ITS MAKER'S MARK NOW, not this. An earlier rule said "a glyph and never a vendor logo"; the
+ * owner overruled it and asked for the real logos, so `AgentMark`
  * draws Claude, Codex, Cursor, Gemini, Copilot and Windsurf as their makers do, and these glyphs are what a runner and
  * an agent nobody names wear, and what a surface too small for a mark falls back to. Slash is not here, because it
  * wears its own mark, the slash `Face` draws.

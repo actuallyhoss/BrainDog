@@ -1,12 +1,12 @@
 /**
  * The Inbox's three writes against the record: file an arrival as a row in a list, archive it, and put either back.
  *
- * PUT BACK GOES THROUGH `triage`, THE ONE DOOR AN AGENT FILES BY TOO, with `back: true` over the kernel's `returnArrival`
- * (`loop/finish/contracts.md` §2.3, X34): there is no second verb for it, so what a person takes back here and what an
+ * PUT BACK GOES THROUGH `triage`, THE ONE DOOR AN AGENT FILES BY TOO, with `back: true` over the kernel's
+ * `returnArrival`: there is no second verb for it, so what a person takes back here and what an
  * agent takes back are the same write.
  *
  * A ROUTE-ONLY MODULE, loaded by the one screen that writes it, like `inbox-live.ts`. ONLY A LIVE SCREEN CALLS THIS, and
- * since the sample left the app (`loop/DIRECTION.md` §26) every Inbox is a live one: there is no drawn Inbox left to
+ * since the sample left the app every Inbox is a live one: there is no drawn Inbox left to
  * answer a press with a sentence instead of a write.
  *
  * A POST TO `/api/<method>` WITH THE SESSION'S COOKIE, as `actions.ts` sends one, rather than through the client, whose

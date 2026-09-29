@@ -1,6 +1,6 @@
 /**
  * What `/usage` says about its figures: the title row's sentence, the four meters as rings, and the line under each
- * chart, worked out from `UsageView` and nothing else (SYSTEM §6, §7).
+ * chart, worked out from `UsageView` and nothing else.
  *
  * EVERY NUMBER HERE IS ONE THE LEDGER OR THE RECORD SENT. A chart with no data behind it is `null`, and the page draws
  * no tile for it; a sentence with nothing true to say is `null`, and the page says nothing.
@@ -35,7 +35,7 @@ const AND = new Intl.ListFormat('en-GB', { style: 'long', type: 'conjunction' })
 const lower = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
 
 /**
- * The sentence under the title (SYSTEM §5), from the first record the person owns.
+ * The sentence under the title, from the first record the person owns.
  *
  * RED ONLY WHEN ACTIONS ARE WAITING. A meter near its limit is said plainly, since nothing has stopped yet; once the
  * plan holds a run, the phrase saying until when is the one thing on the screen that needs him. A member is told why
@@ -69,7 +69,7 @@ export type Ringed = { key: MeterKey; name: string; share: number; tone: 'ink' |
 
 /**
  * The four meters as rings. Ink while there is room, amber from 80%, which is a soft warning, and red only once a meter
- * is used up and actions wait (SYSTEM §2: red is "needs you", amber is waiting and soft warnings).
+ * is used up and actions wait (red is "needs you", amber is waiting and soft warnings).
  */
 export function ringsOf(r: Allowed): Ringed[] {
   return r.meters.map((m) => ({

@@ -10,7 +10,7 @@
   spans the record; this keeps each list whole with its own count, because a person who has come here
   has already decided the ranked answer was not the one they wanted.
 
-  GROUPED UNDER META HEADINGS, AS THE PALETTE GROUPS THEM (SYSTEM §6). Each list that matched is a
+  GROUPED UNDER META HEADINGS, AS THE PALETTE GROUPS THEM. Each list that matched is a
   quiet heading in the meta step with its count, and its rows sit on the ground under it: a 32px well
   with the glyph of what it is, the title, and one line saying where it sits or why it matched. The
   row is drawn here and not through the palette's `Result`, which is an option inside glass; here it
@@ -220,7 +220,7 @@
                 {group.kind}<span class="group-count num">{group.total.toLocaleString('en')}</span>
               </h2>
               <!--
-                EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own (design DSN-10).
+                EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own.
 
                 This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null`
                 by construction, because `/decide` is not a filtered list. So with fourteen matching
@@ -243,7 +243,7 @@
                   <!-- THE ROW SAYS WHY IT IS HERE. `nordhaven` draws four services named after none of it, because
                        `services.provider` is declared searchable, and the reason is what makes that readable. A row
                        the record sends with nothing beside its title says the list it is in, which is what a person
-                       calls it (design SYS-3). -->
+                       calls it. -->
                   <a class="line line-tall hit" href={at(hit.href)}>
                     <IconWell name={hit.icon} size="l" />
                     <span class="line-main">
@@ -278,7 +278,7 @@
     max-inline-size: 640px;
   }
 
-  /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is (design brief §5), so a phone does not zoom the page
+  /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is, so a phone does not zoom the page
      when the field is pressed. */
   .search-field .field-input {
     font-size: var(--t-md);
@@ -320,7 +320,7 @@
     }
   }
 
-  /* THE ONE LINE THAT READS THE CHART, under it (SYSTEM §6). */
+  /* THE ONE LINE THAT READS THE CHART, under it. */
   .reading {
     margin: 0;
     color: var(--ink2);
@@ -335,7 +335,7 @@
     min-inline-size: 0;
   }
 
-  /* A META HEADING OVER EACH LIST, AS THE PALETTE HEADS ITS GROUPS (SYSTEM §6): the meta step at 500 in the lowest text
+  /* A META HEADING OVER EACH LIST, AS THE PALETTE HEADS ITS GROUPS: the meta step at 500 in the lowest text
      ink, its count beside it, and the way to the rest at the far end. */
   .group-head {
     display: flex;

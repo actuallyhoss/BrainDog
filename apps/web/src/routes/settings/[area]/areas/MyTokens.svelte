@@ -1,6 +1,6 @@
 <!--
-  Settings > Agents, for a member who is not an owner: keys for their own agent (COL-10, `docs/20-COLLABORATION.md` §2,
-  tier 0, and `loop/finish/contracts.md` X54).
+  Settings > Agents, for a member who is not an owner: keys for their own agent (`docs/20-COLLABORATION.md` §2,
+  tier 0).
 
   WHY THIS IS HERE. An "Adds only" colleague cannot open the rest of the app, since every screen reads first, and an
   agent adding rows through MCP is the one way in their level was made for. So their sign-in lands here, and this is
@@ -202,7 +202,7 @@
     color: var(--danger);
   }
 
-  /* ROWS ON THE GROUND WITH A HAIRLINE BETWEEN THEM (SYSTEM §6), each led by its key's well, as the owner's Connected
+  /* ROWS ON THE GROUND WITH A HAIRLINE BETWEEN THEM, each led by its key's well, as the owner's Connected
      list draws its keys. The hairline runs from the words' edge. */
   .mine-list {
     display: flex;

@@ -1,11 +1,11 @@
 <!--
   The list as white cards on the ground, from 640px up: in lanes by state (the board), or in one wrapping grid (the
-  cards). SYSTEM §6 draws content on white and lists on the ground, and a board is both: each lane is a column of the
+  cards). The design system draws content on white and lists on the ground, and a board is both: each lane is a column of the
   ground with its heading and a hairline under it, as a group on the ground is, and each row is a white card at level 1.
 
   A CARD SAYS WHAT A ROW IS AND WHEN IT IS DUE. The project's mark or the person's face, the title, the figure at the
-  end of the first line, then one quiet line: "2 days late" in red when it is past its deadline (the one red on a card,
-  SYSTEM §6), else when it falls due, and one declared detail. A card is a link to the row, as a table row is; its
+  end of the first line, then one quiet line: "2 days late" in red when it is past its deadline (the one red on a card),
+  else when it falls due, and one declared detail. A card is a link to the row, as a table row is; its
   verbs are the same row menu the table's ⋯ opens, and what just happened to it is the same receipt, under it.
 
   A CARD MOVES LANES BY BEING DRAGGED, and by "Set to …" in its menu, which is the way that needs no pointer. Both are
@@ -64,7 +64,7 @@
     more: boolean;
     receiptFor: (seq: number) => Receipt | undefined;
     openCardMenu: (seq: number, el: HTMLElement) => void;
-    /** Absent for a caller whose level cannot change the list, and no card is draggable then (COL-13). */
+    /** Absent for a caller whose level cannot change the list, and no card is draggable then. */
     setRowState?: ((seq: number, state: string) => void) | undefined;
   } = $props();
 
@@ -250,7 +250,7 @@
   /* ── the board: lanes of the ground, side by side ───────────────────────── */
 
   /* THE LANES SHARE THE WIDTH WHILE THEY FIT AND SCROLL SIDEWAYS ONCE THEY DO NOT: never narrower than a card that can
-     hold a title, 12 apart (SYSTEM §4, the gap between tiles). The region hangs a step into the gutter on each side so
+     hold a title, 12 apart. The region hangs a step into the gutter on each side so
      the first lane's words line up with the title above it. */
   .board {
     display: grid;
@@ -278,7 +278,7 @@
     background: var(--hover-wash);
   }
 
-  /* A GROUP'S HEADING ON THE GROUND (SYSTEM §6): the name at `--t-group`, its count quiet, and a hairline under it. */
+  /* A GROUP'S HEADING ON THE GROUND: the name at `--t-group`, its count quiet, and a hairline under it. */
   .lane-head {
     display: flex;
     align-items: center;
@@ -504,7 +504,7 @@
       0 0 0 2px var(--ink);
   }
 
-  /* A CARD THAT ARRIVED WHILE THE READER LOOKED: the arrival's tint, fading over a second and a half (SYSTEM §8). */
+  /* A CARD THAT ARRIVED WHILE THE READER LOOKED: the arrival's tint, fading over a second and a half. */
   .bcard[data-arrived] {
     animation: bcard-arrived 1.5s var(--ease-out);
   }

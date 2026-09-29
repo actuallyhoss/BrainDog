@@ -1,5 +1,5 @@
 <!--
-  The toast stack, bottom-left of the work (SYSTEM §6): one glass-strong pill, the verb, the thing, and Undo with its key.
+  The toast stack, bottom-left of the work: one glass-strong pill, the verb, the thing, and Undo with its key.
 
   Not bottom-right, and not centred. The launcher owns the bottom-right corner on the shapes that have one, and a toast
   that lands on top of it covers the one control that is on every surface; a centred toast covers the work.
@@ -10,7 +10,7 @@
   as one.
 
   THE KEY ON UNDO IS THE ONE THAT WORKS: `⌘Z` (Ctrl+Z off a Mac, which `Kbd` says), the stack's own chord in the
-  layout. SYSTEM draws a bare `z`, and no such binding exists.
+  layout. The design system draws a bare `z`, and no such binding exists.
 
   ONE live region for the whole stack, and it is `polite`. `role="alert"` for "archived
   obligations#4" interrupts whatever a screen-reader user was reading in order to tell them about
@@ -85,7 +85,7 @@
   }
 
   /**
-   * ONE GLASS-STRONG PILL, AT LEVEL 2 (SYSTEM §6): the stack floats over whatever the work is showing, and
+   * ONE GLASS-STRONG PILL, AT LEVEL 2: the stack floats over whatever the work is showing, and
    * `glass-strong` is the fill legible over busy content. The filter is on the pill itself, which holds no fixed
    * descendant. The start pads a full step and the end half of one, so the text clears the curve and the close glyph
    * sits inside it.
@@ -103,7 +103,7 @@
     backdrop-filter: var(--glass-blur);
     color: var(--ink);
     font-size: var(--t-base);
-    /* Swift out, as everything arriving (SYSTEM §8): no overshoot on a report. */
+    /* Swift out, as everything arriving: no overshoot on a report. */
     animation: toast-in var(--d-enter) var(--ease-out);
   }
 
@@ -187,7 +187,7 @@
     }
   }
 
-  /* A THUMB READS THE TOAST AND ITS UNDO AT THE CONTROL SIZE, 16 (design DSN-2), and has no key to press. */
+  /* A THUMB READS THE TOAST AND ITS UNDO AT THE CONTROL SIZE, 16, and has no key to press. */
   @media (pointer: coarse) {
     .toast {
       font-size: var(--t-md);

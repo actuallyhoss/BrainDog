@@ -1,5 +1,5 @@
 /**
- * The canvas's draft of one automation: a trigger, and a tree of step lists (`loop/research-shell-automations.md` §3, §6).
+ * The canvas's draft of one automation: a trigger, and a tree of step lists.
  *
  * AN AUTOMATION IS A `rule` THAT GREW A TRIGGER AND STEPS, NOT A KIND OF ITS OWN, so what this file reads and writes is a
  * `rule` declaration body, the same one an agent files through `propose` and the same one `flow-lint.ts` checks. There
@@ -37,7 +37,7 @@ export type Trigger =
   | { every: string; at?: string; day?: string | number; month?: string; late?: string }
   | { metric: { id: string; crosses: 'target' | { lte: number } | { gte: number } } }
   /* `about` IS THE DECLARATION THAT PUT THE QUESTION (`rule.chase`), and `option` one answer's words exactly as the
-     question offers it, since a rule's `suggest` options are words whose ids are only their places (contracts X36). */
+     question offers it, since a rule's `suggest` options are words whose ids are only their places. */
   | { decided: { about?: string; option?: string } }
   | { manual: true };
 
@@ -59,7 +59,7 @@ export type Verb = (typeof VERBS)[number];
 
 /**
  * The kernel's depth ceiling (`flow-lint.ts`): three levels of branch. A move that would pass it is refused here, as the
- * record would refuse the body; every other limit the record holds is said by `checkAutomation` (R2).
+ * record would refuse the body; every other limit the record holds is said by `checkAutomation`.
  */
 export const DEPTH_CEILING = 3;
 
@@ -302,7 +302,7 @@ export function nudge(nodes: readonly Node[], key: string, dir: Nudge): Moved {
  * every save by a person a quiet edit of what an agent wrote.
  *
  * A `when` WRITTEN AS A TREE IS NOT IN `rest`, though the canvas cannot edit one. It was, and three things followed
- * from nothing drawing it (`loop/research-batch-thirty-six-audit.md` finding 3, measured on an installed rule tagging
+ * from nothing drawing it (measured on an installed rule tagging
  * bills above 500): the trigger card said the rule started on every write; a sentence typed into "Only when" was
  * shown on the card and then lost to the tree, because `rest` is spread after it; and a switch to a clock left the tree
  * in the body with `faultsOf` silent and the record refusing on Send. Held here beside the sentence, it is drawn, it
@@ -405,8 +405,8 @@ export function conditionOf(d: Draft): unknown {
  * The draft with another trigger. THE CONDITION GOES WITH A CHANGE OF KIND, BOTH FORMS OF IT: a condition is about the
  * row a change brings or the row (or body) an arrival wrote, and a clock, a button, a figure or a decision has none, so
  * a condition carried across is one the record refuses or one that names fields the new trigger does not have.
- * `Inspector.svelte`'s `pick` once cleared the sentence and left the tree, which is how C3 in the thirty-sixth audit
- * filed a `when:` on a clock. An edit within one kind (another list, added or changed) keeps it.
+ * `Inspector.svelte`'s `pick` once cleared the sentence and left the tree, which is how a `when:` was once
+ * filed on a clock. An edit within one kind (another list, added or changed) keeps it.
  */
 export function withTrigger(d: Draft, trigger: Trigger): Draft {
   const leaves = triggerKind(d.trigger) !== triggerKind(trigger);
@@ -464,14 +464,14 @@ export function bodyOf(d: Draft): Body {
  * THE SAME PROPOSAL AN AGENT FILES, so the two editors are one. `packages/mcp/src/index.ts` documents this body for
  * `propose`, and Decide reads it the same way whichever of them drew it. What Decide draws of it today is thin: a rule
  * change is the word "Rule" and the id (`routes/decide/[id]/proposed.ts` `appearsOf`), with no trigger, no steps and
- * no dry run, although an earlier line here said it showed the dry run (`loop/research-canvas-ux.md` 1.1). The owner's
+ * no dry run, although an earlier line here said it showed the dry run. The owner's
  * press is what installs it: the canvas never writes a declaration of its own.
  *
  * `from_version` IS 0 FOR A NEW ONE, AND NEVER LEFT OUT. This comment used to say an absent version was read as drawn
  * from nothing, and the record reads it the other way: an absent version is stamped with the one live at filing
  * (`packages/kernel/src/govern.ts` `stamp`). A member who cannot read Money sees no clocks in the list, so `freshId`
  * gave her "Gold rate" the id of the owner's hourly clock, and the owner's accept of "Add the automation Gold rate?"
- * replaced its steps with hers (`loop/research-batch-thirty-six-audit.md` finding 4). A 0 is kept as written
+ * replaced its steps with hers. A 0 is kept as written
  * (`isDrawn`), and an accept over a live version is a conflict that reopens the question instead. For an edit it is
  * the version the canvas opened, so a second change that landed in between is a conflict on Decide as well.
  */
@@ -585,7 +585,7 @@ export type TriggerKind = (typeof ALL_TRIGGERS)[number];
  * The triggers a person can pick: every one the record installs and runs, read from the kernel's one table
  * (`capabilities.ts`, through `notInThisBuild`) rather than listed here. `metric` and `decided` were held back while the
  * lint refused them, since a choice that installs and is then refused on Decide teaches somebody the canvas cannot be
- * trusted; AUT-1 made both run, the table's rows say so, and this list follows the table without an edit.
+ * trusted; both run now, the table's rows say so, and this list follows the table without an edit.
  */
 export const TRIGGER_KINDS: readonly TriggerKind[] = ALL_TRIGGERS.filter((k) => !notInThisBuild(false).triggers.includes(k));
 
@@ -631,7 +631,7 @@ export function clockOf(every: string, at?: string, day?: string): Clock {
  * `if` IS "IF" AND NOT "ONLY IF". "Only if" is Zapier's word for a Filter, which stops the Zap, and the runner does not
  * stop: `plan` in `packages/kernel/src/flow.ts` walks the arm it took and then carries on down the parent list either
  * way. A person who picked "Only if" and added the next step under it in the main column believed that step was
- * guarded, and it ran every time (`loop/research-canvas-ux.md` 1.3).
+ * guarded, and it ran every time.
  */
 export const VERB_LABELS: Record<Verb, string> = {
   if: 'If',
@@ -775,7 +775,7 @@ type ArgBase = { path: readonly string[]; label: string; kind: ArgKind; template
 /**
  * A REQUIRED ARGUMENT CARRIES THE SENTENCE ITS ABSENCE SAYS, and the type will not take one without it. The fault was
  * assembled, `${verb} needs ${label}.`, and worked through `ARGS` it said "Tell you needs say.", "Add a note needs
- * note." and "Ask Slash needs keep the answer as." (`loop/research-canvas-ux.md` 1.7). A label names a field; it does
+ * note." and "Ask Slash needs keep the answer as.". A label names a field; it does
  * not also make a sentence with a verb's name in front of it.
  */
 export type Arg = (ArgBase & { required?: false }) | (ArgBase & { required: true; missing: string });
@@ -834,7 +834,7 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
     { path: ['ask_person', 'wait'], label: 'Wait at most', kind: 'span', hint: '7d' },
   ],
-  /* THE SHAPE, THE CHOICES AND `about` WERE WRITTEN ONLY THROUGH MCP OR A `.dog` FILE (AGT-25): the runner held an
+  /* THE SHAPE, THE CHOICES AND `about` WERE WRITTEN ONLY THROUGH MCP OR A `.dog` FILE: the runner held an
      answer to its shape and sent the named fields with the question, and the canvas drew the question and the name and
      nothing else, so a choice could not be asked from here at all. The two optional ones are left out when unset, as
      the runner reads no `shape` as text and no `about` as no fields. What a choice with nothing to choose from lacks is
@@ -855,7 +855,7 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
      and `as:` holds that job's id; what the script returns never comes back into the run. The field said "Keep the
      answer as" and its absence said `NAME_IT`, so a person named a value no step would ever see.
      OPTIONAL, AS `call.as` IS. It was required here only because the lint (`flow-lint.ts`, the `script` case) refused a
-     step with none until 24 September, though the runner never needed it; the lint and this dropped it together, and
+     step with none, though the runner never needed it; the lint and this dropped it together, and
      `flow-script-as.test.ts` holds the two in step. */
   script: [
     { path: ['script', 'id'], label: 'The script', kind: 'text', required: true, missing: 'Say which script to run.' },
@@ -933,7 +933,7 @@ export const words = {
   heading: 'Automations',
   newOne: 'New automation',
   untitled: 'Untitled automation',
-  /* A TITLE, SO NO FULL STOP, as Appendix C15 and D10 of `loop/DESIGN-SYSTEM.md` already made Search and Decide. */
+  /* A TITLE, SO NO FULL STOP, as the design system already made Search and Decide. */
   none: 'Nothing runs on its own yet',
   noneWhy: 'An automation starts on a change, an arrival, a clock or a button, and then does its steps in order.',
   absent: 'This record does not list its automations yet',
@@ -972,7 +972,7 @@ export const words = {
   asRun: 'Runs after what starts it, one step at a time.',
   /* SAID ONLY WHEN AN EDIT IS ABOUT TO MOVE IT, by the new path. Which path a rule runs on matters to its timing and its
      history and to nobody choosing what to automate, and the two lines above were printed on the trigger card, in the
-     trigger's sheet and on every row of the list (`loop/research-canvas-ux.md` 1.11). */
+     trigger's sheet and on every row of the list. */
   pathChange: {
     inline: 'Once sent, it runs inside the change that starts it, rather than one step at a time after it.',
     run: 'Once sent, it runs after what starts it, one step at a time, rather than inside the change.',
@@ -1020,7 +1020,7 @@ export const words = {
     decided: 'A question on Decide is answered.',
     manual: 'Only when somebody presses Run now.',
   } as Record<string, string>,
-  /* THE INSPECTOR'S OWN WORDS for the triggers and pickers EDT-2 added, beside the ones above so the sheet reads one
+  /* THE INSPECTOR'S OWN WORDS for the triggers and pickers the inspector adds, beside the ones above so the sheet reads one
      object. Sentence case, no full stop on a label or a button. */
   inspect: {
     figure: 'The figure',
@@ -1085,7 +1085,7 @@ const str = (v: unknown): string => (typeof v === 'string' ? unbrace(v.trim()) :
 /*
  * A REFERENCE IS MARKED WHILE A SENTENCE IS BUILT, AND CUT OUT AFTER. `unbrace` read `{{vars.rate}}` as `rate` and the
  * card printed it in the running text, so the sample said "Tell you: Gold is rate a gram" and "Ask you: File body as
- * spending?" (`loop/research-canvas-ux.md` 1.6). Every case in `saying` keeps its words; only the value it reads is
+ * spending?". Every case in `saying` keeps its words; only the value it reads is
  * marked, with two control characters no template holds, and `sayParts` splits on them.
  */
 const OPEN = '\u0002';
@@ -1112,7 +1112,7 @@ const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice
  * SO THE "A NUMBER" BUILDER IS A PICKER NOW, NOT THE ONLY WAY TO ASK. It still writes the leaf,
  * `{ field: rate, gt: 70 }`, because it chooses the field from the answers and fields a step can read and a tree needs
  * no name typed right, and the runner's `test` (`packages/kernel/src/flow.ts`) reads the leaf and the sentence through
- * one schema, where an answer holding a number is a decimal. Measured over `parseWhere` on 24 September: over an answer
+ * one schema, where an answer holding a number is a decimal. Measured over `parseWhere`: over an answer
  * held as text, "rate is more than 70" is an `is` of the whole phrase and the leaf is a `gt` on a text, and both answer
  * false, so the two forms do not disagree about a run. `between` is in the sentence and not here, since the builder has
  * one value box and a range needs two.
@@ -1403,7 +1403,7 @@ const blank = (v: unknown): boolean =>
  * What is plainly missing from this draft, one sentence each, with the card each is about: a list not picked, a figure
  * not picked, no step at all, a required field left empty, a branch with nothing under If so.
  *
- * ONLY WHAT NEEDS NO SECOND READING (R2, `loop/finish/shell.md` §3). This was a second copy of the record's lint, a
+ * ONLY WHAT NEEDS NO SECOND READING. This was a second copy of the record's lint, a
  * hundred and forty lines of it, and it drifted: it refused a condition on an arrival after the runner learned to read
  * one, and said a figure trigger would never start after the sweep started it. Every other fault now comes from the
  * record's own lint through `checkAutomation`, placed on the card its `at` names (`FlowDraft.served`), so there is one

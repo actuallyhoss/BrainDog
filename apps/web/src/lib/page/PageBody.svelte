@@ -5,7 +5,7 @@
 
   ONE LAYOUT WHEREVER A DECLARED PAGE IS DRAWN. `/p/<slug>`, Home's body and a preview all lay their blocks out here, so
   a page Slash proposes with a rail is judged on Decide with its rail, and a use case's Home keeps its columns. It was
-  `/p/` alone, and the other two drew a flat stack of blocks (`loop/finish/pages.md` R1).
+  `/p/` alone, and the other two drew a flat stack of blocks.
 
   A PAGE IS A ROW, NOT A FILE, which is what makes "the Money page" something a freelancer never sees and a studio does
   (06). One request per page load, never one per block: the record answers every block in one read, and this only lays
@@ -59,7 +59,7 @@
 
   const arranging = $derived(arrangement?.editing ?? false);
 
-  /* ── the main column and the rail (brief D4) ──────────────────────────────
+  /* ── the main column and the rail ─────────────────────────────────────────
      A PAGE THAT DECLARES `layout` DRAWS TWO COLUMNS; every other page draws the one flow it always has, through the same
      markup, so nothing below changes for it. `layout.ts` says why the rail is a split of the one list and never a
      second list. */
@@ -424,7 +424,7 @@
      column to the rightmost, and people lost their spatial memory of where a control lived. A flow cannot do that: the
      order you declared is the order you get, at every width.
 
-     THE PAGE SITS ON THE GROUND AND EVERY BLOCK IS A TILE ON IT (SYSTEM §4, §6): 12 between tiles on both axes, and the
+     THE PAGE SITS ON THE GROUND AND EVERY BLOCK IS A TILE ON IT: 12 between tiles on both axes, and the
      tiles of one row stretch to one height, so a row reads as a row of tiles rather than a skyline. The page has no
      surface of its own; the ground and its light are the shell's.
 
@@ -447,7 +447,7 @@
     max-inline-size: none;
   }
 
-  /* ── the main column and the rail (brief D4) ──────────────────────────────
+  /* ── the main column and the rail ─────────────────────────────────────────
      THE TWO COLUMNS ARE SPANS OF THE PAGE'S OWN TWELVE, so the rail's `4` is four of the same twelfths a block's span is
      counted in. THE MAIN COLUMN IS A TWELVE-COLUMN FLOW OF ITS OWN, so `span: 6` there is half the main column, not half
      the page. THE RAIL IS ONE STACK, and a block's span means nothing in it. Each area is its own height, which a sticky
@@ -491,7 +491,7 @@
   }
 
   /* ── the tile ─────────────────────────────────────────────────────────────
-     A BLOCK IS A TILE (SYSTEM §6): the tile surface at the large radius, 20 in, at the first level of depth, and no
+     A BLOCK IS A TILE: the tile surface at the large radius, 20 in, at the first level of depth, and no
      border. Its heading row is `BlockSlot`'s. */
   .block-slot {
     grid-column: span var(--span, 12);
@@ -508,8 +508,8 @@
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
 
-  /* A BOXED SECTION IS ONE TILE: the section and the blocks after it, up to the next section, and no tile inside it
-     (SYSTEM §4). Its blocks are sections of the one surface, still laid out by their spans as twelfths of it. */
+  /* A BOXED SECTION IS ONE TILE: the section and the blocks after it, up to the next section, and no tile inside it.
+     Its blocks are sections of the one surface, still laid out by their spans as twelfths of it. */
   .box {
     grid-column: 1 / -1;
     display: grid;
@@ -534,8 +534,8 @@
     }
   }
 
-  /* NOT A TILE: a block inside a boxed tile, a section, which is a group heading on the ground (SYSTEM §6), and the
-     page's sentence (`note lead`), which is the title row's line under the title (SYSTEM §5). */
+  /* NOT A TILE: a block inside a boxed tile, a section, which is a group heading on the ground, and the
+     page's sentence (`note lead`), which is the title row's line under the title. */
   .box > .block-slot,
   .block-slot:has(> :global(.block[data-kind='section'])),
   .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
@@ -568,7 +568,7 @@
     margin-block-end: var(--sp-2);
   }
 
-  /* THE CURSOR IS THE FOCUS RING, round the tile it is on, in the focus ink and never the brand's red (design D-1). */
+  /* THE CURSOR IS THE FOCUS RING, round the tile it is on, in the focus ink and never the brand's red. */
   .block-slot[data-cursor] {
     outline: 2px solid var(--focus-in);
     outline-offset: 2px;
@@ -640,7 +640,7 @@
     inset-block-end: var(--mid);
   }
 
-  /* ONE COLUMN below 900px, in declaration order, the tiles full width in the 16 gutters (SYSTEM §9). 13 §10 has two
+  /* ONE COLUMN below 900px, in declaration order, the tiles full width in the 16 gutters. 13 §10 has two
      breakpoints and 05 §6 allows width to change LAYOUT but never size. There is no second stored layout for narrow,
      because a second layout is a second thing to keep in sync and nobody ever does. */
   @media (width < 900px) {
@@ -677,7 +677,7 @@
   }
 
   /* A BOARD ON A PHONE STACKS ITS LANES. A stat is not restacked here: under 480px of block it is rows, label on the
-     left and figure on the right, drawn by blocks.css (DSN-8), and above that its own container steps decide. */
+     left and figure on the right, drawn by blocks.css, and above that its own container steps decide. */
   @media (width < 640px) {
     .block-slot :global(.grid:not(:has(> .cell))) {
       grid-template-columns: minmax(0, 1fr);

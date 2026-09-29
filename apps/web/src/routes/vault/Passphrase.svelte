@@ -1,6 +1,6 @@
 <!--
   The vault passphrase: its switch, the honest trade it makes, and the two sheets that turn it on and off
-  (`12 §6`, "The optional second factor"; `loop/finish/platform.md` COL-11).
+  (`12 §6`, "The optional second factor").
 
   THE CONSEQUENCE SITS WITH THE SWITCH, NOT BEHIND IT. `12 §6` asks for the trade "stated in the UI rather than in a
   whitepaper" and offered "with the consequence in the same sentence as the switch", so the table is always drawn, the
@@ -16,7 +16,7 @@
 
   NOTHING IS KEPT. Both fields are emptied when the sheet shuts, whatever the answer was.
 
-  A TILE WITH NO FIGURE (SYSTEM §6): it holds a control and the trade it makes, not a number, so it has no chart. The
+  A TILE WITH NO FIGURE: it holds a control and the trade it makes, not a number, so it has no chart. The
   switch sits in the tile's heading, where a tile's own control goes, and the table is the tile's body.
 -->
 <script lang="ts">

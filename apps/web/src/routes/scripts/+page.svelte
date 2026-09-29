@@ -1,10 +1,10 @@
 <!--
-  Scripts: `/scripts`, every installed script and where it stands (`loop/finish/shell.md` SCR-2).
+  Scripts: `/scripts`, every installed script and where it stands.
 
   THE TITLE ROW SAYS HOW MANY, HOW MUCH THEY RAN THIS MONTH, AND WHAT HAS STOPPED. The month is the sum of each row's
   own count, never recounted from history, and the red phrases are a paused script and a refused last run.
 
-  ONE TILE A SCRIPT (SYSTEM §6). A script is read, not scanned, and each one holds a figure: its name in the tile's
+  ONE TILE A SCRIPT. A script is read, not scanned, and each one holds a figure: its name in the tile's
   heading, one sentence of where it stands, its recent runs as one cell each with the ones that went through filled,
   the line saying what starts it and how those runs went, and the facts a person checks before trusting it (how close
   it is to pausing, this month's runs, and what it may read, write, fetch and open) as a pure list. One column up to
@@ -59,10 +59,10 @@
   let failed = $state<{ script: string; fix: string; signin: boolean } | null>(null);
   let reproving = $state(false);
 
-  /* THIS BROWSER'S CLOCK. Every date on a card is the record's, read against now (DIRECTION 26). */
+  /* THIS BROWSER'S CLOCK. Every date on a card is the record's, read against now. */
   const now = (): number => Date.now();
 
-  /* AN AGENT WRITES THESE AS READILY AS A PERSON ACCEPTS THEM (DIRECTION §22), so the empty list says what to ask one,
+  /* AN AGENT WRITES THESE AS READILY AS A PERSON ACCEPTS THEM, so the empty list says what to ask one,
      in the form every other empty state's prompt takes. An example a person reads and replaces. */
   const agentPrompt = 'read my record, then propose a script that fetches the US dollar in euros from api.example.com every hour and writes it to a list';
 
@@ -105,7 +105,7 @@
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
 <PageHead icon="code" title={words.heading} count={scripts.state === 'ready' ? rows.length : undefined} sentence={told ? sentence : undefined}>
   {#snippet actions()}
-    <!-- THE ONE PRIMARY: an ink pill with its word, and on a phone the ink circle with the plus (SYSTEM §5). -->
+    <!-- THE ONE PRIMARY: an ink pill with its word, and on a phone the ink circle with the plus. -->
     <Button weight="primary" href="/scripts/new" aria-label={words.newScript} data-circle><Icon name="plus" size="s" /><span class="new-word">{words.newScript}</span></Button>
   {/snippet}
 </PageHead>
@@ -233,8 +233,8 @@
     }
   }
 
-  /* ONE TILE A SCRIPT, one column up to 640 wide, and two side by side once the page has room for two (SCREENS,
-     Scripts). A script is read, not scanned, and each tile holds its own chart. */
+  /* ONE TILE A SCRIPT, one column up to 640 wide, and two side by side once the page has room for two.
+     A script is read, not scanned, and each tile holds its own chart. */
   .cards {
     display: grid;
     grid-template-columns: minmax(0, 640px);
@@ -277,7 +277,7 @@
     font-size: var(--t-sm);
   }
 
-  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6). */
+  /* THE ONE LINE UNDER THE CHART that says what it means. */
   .reading {
     margin: 0;
     color: var(--ink2);

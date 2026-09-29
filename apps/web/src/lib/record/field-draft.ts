@@ -32,7 +32,7 @@ import { listFromDraft, listLine } from './tags.ts';
  * never drawn and never edited: a credential does not go in a row, the vault is a different surface with different
  * rules, and `readableFields` has already left it out.
  *
- * A `file` WAS UNBOXED BESIDE IT until the file store existed (OPS-20): its bytes live outside the row, at
+ * A `file` WAS UNBOXED BESIDE IT until the file store existed: its bytes live outside the row, at
  * `/api/files/<sha256>`, and the row holds `{ sha256, mime, bytes, name }`. Its draft is that value written out
  * (`draftOf`), which `FileField.svelte` reads and writes, so the file goes through the same `patchOf` and `unchanged` as
  * every other field.
@@ -141,7 +141,7 @@ const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 
  * A day as the record writes it on every screen, `3 Sep 2026`, which is what a day box opens on (`DayBox.svelte`).
  *
  * THE BROWSER'S DATE CONTROL SPOKE ITS OWN FORMAT, `mm/dd/yyyy` on a machine set to American English, in a record that
- * writes the same day as `3 Sep 2026` in the cell beside it (design SYS-15). So the box is text, and it opens on the
+ * writes the same day as `3 Sep 2026` in the cell beside it. So the box is text, and it opens on the
  * record's own words for the day, from the formatter that draws the cell (`braindog-render` `day`).
  */
 export const dayLine = (value: string): string => (value.trim() === '' ? '' : day(value.trim()));
@@ -181,25 +181,25 @@ export function dayFrom(typed: string): string | null {
 
 /**
  * The currency a money box is typed in: the row's own, else the field's default's, else the list's, else the record's,
- * or `null` when nobody has chosen one. Never a literal (`loop/finish/rules.md` §13).
+ * or `null` when nobody has chosen one. Never a literal.
  */
 const currencyIn = (f: FieldDecl, held: unknown, currency: string | null | undefined): string | null =>
   currencyOf(held) ?? currencyOf(f.default) ?? currency ?? homeCurrency();
 
 /**
- * WHAT A MONEY BOX SAYS WHEN NO CURRENCY IS KNOWN, this unit's own words: the record would refuse an amount without a
+ * WHAT A MONEY BOX SAYS WHEN NO CURRENCY IS KNOWN, this module's own words: the record would refuse an amount without a
  * currency, and the box takes digits alone, so the sentence says why nothing was written rather than guessing one.
  */
 const words = {
   noCurrency: 'Nothing says which currency this amount is in yet, so it was not written: this row has none, and neither does the record.',
-  /* AND THE SAME FOR THE BOXES THAT TAKE A VALUE APART (MOD-22): each says what it would have written, so the
+  /* AND THE SAME FOR THE BOXES THAT TAKE A VALUE APART: each says what it would have written, so the
      sentence under the box is a way to fix it rather than a refusal the record would give a second later. */
   quantityShape: 'Write the amount as a number, like 2.5, with its unit beside it.',
   noUnit: 'Nothing says what this number counts yet, so it was not written: choose its unit beside it.',
   unitUnknown: (units: string) => `This field counts in ${units}: write the number alone and choose its unit beside it.`,
   jsonShape: 'This does not read as structured data yet: check its brackets, quotes and commas.',
   dayShape: 'Write the day as the record does, like 3 Sep 2026.',
-  /* A FILE IS CHOSEN AND NEVER TYPED (OPS-20), so a draft that names none came from somewhere other than the picker. */
+  /* A FILE IS CHOSEN AND NEVER TYPED, so a draft that names none came from somewhere other than the picker. */
   fileShape: 'This is not a file yet: choose one with Add a file.',
 } as const;
 
@@ -207,9 +207,8 @@ const words = {
  * What a `duration`'s declared unit is worth in the seconds the record stores.
  *
  * THE SAME TABLE `api.ts` `display` DRAWS A DURATION WITH, and it has to be: the box opens on what the cell says, and
- * a cell that reads `2 h` and a box that opens on `7200` are two answers to one question. That was the checker's
- * first refusal of this module (`field-draft.test.ts`). `display`'s copy is private to `api.ts`, which is another
- * brief's file, so this one is a second copy of five numbers rather than an edit to it; an unknown unit is worth one
+ * a cell that reads `2 h` and a box that opens on `7200` are two answers to one question. That was the first
+ * refusal of this module (`field-draft.test.ts`). `display`'s copy is private to `api.ts`, so this one is a second copy of five numbers rather than an edit to it; an unknown unit is worth one
  * second in both, which is what `display` prints beside it.
  */
 const SECONDS: Readonly<Record<string, number>> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };

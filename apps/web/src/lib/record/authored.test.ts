@@ -92,8 +92,8 @@ test('a cell containing a pipe survives, and does not become two cells', () => {
 test('a cell containing a backslash survives, including next to a pipe', () => {
   // Escaping the pipe first would double the backslash it just introduced, turning one literal pipe
   // into a backslash and a column break. Backslash first is the only order that round-trips.
-  const out = cellsOf(authored('comparison', [{ cells: ['C:\\Repos', 'a \\| b', 'end'] }]))[0];
-  assert.deepEqual(out, ['C:\\Repos', 'a \\| b', 'end']);
+  const out = cellsOf(authored('comparison', [{ cells: ['C:\\Work', 'a \\| b', 'end'] }]))[0];
+  assert.deepEqual(out, ['C:\\Work', 'a \\| b', 'end']);
 });
 
 test('an empty cell is a cell, not a missing one', () => {
@@ -143,7 +143,7 @@ test('a block that declares BOTH a source and authored rows renders neither', ()
  *
  * A RECORD OF ITS OWN, BECAUSE THE SAMPLE CANNOT BE WRITTEN TO. These two changed a row in the fixture's `ROWS` and
  * read the page back, which reached the page while the sample drew it with a browser engine over those rows. Since
- * ARC-1 the fixture's `page` asks a kernel seeded once and never written to (`fixtures/readers.ts`), so the value is
+ * the app has had one engine the fixture's `page` asks a kernel seeded once and never written to (`fixtures/readers.ts`), so the value is
  * written to a record here and the page drawn from it the way a live page is (`page-live.ts`).
  */
 async function pointsAtWith(value: string): Promise<BlockResult> {
@@ -177,9 +177,9 @@ test('a pipe in a register value does not delete the block', async () => {
 });
 
 test('a backslash in a register value survives too', async () => {
-  // `String.raw` because a plain literal drops an unknown escape: 'C:\Repos' IS 'C:Repos' in
+  // `String.raw` because a plain literal drops an unknown escape: 'C:\Work' IS 'C:Work' in
   // JavaScript, so the obvious version of this test compares a string to itself and proves nothing.
-  const value = String.raw`C:\\Repos\\kiln`;
+  const value = String.raw`C:\\Work\\kiln`;
   assert.ok(value.includes('\\'), 'the fixture has to actually contain a backslash');
   const segs = toSegments(await pointsAtWith(value));
   const cells = segs.flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : [])).map((r) => r.cells);

@@ -2,7 +2,7 @@
  * WHO A ROW ON `/settings/people` IS, said the way the rest of the product says a person.
  *
  * WHAT WAS MEASURED. `personOf` in `lib/record/settings-write.ts` falls back to the email for the
- * name when the record holds none, and `research-second-person.md` measured that it holds none for
+ * name when the record holds none, and it was measured that it holds none for
  * anybody: `boot.names` came back `{}` for all seven people on a driven record, owners included,
  * because nothing in the product writes `member.name`. The row then drew that fallback in the two
  * places a name goes, the initial on the face (`B` for `ben@ashgrove.co.uk`) and the name slot

@@ -177,7 +177,7 @@ function fill(decl: RegisterDecl, slots: Slot[]): { field: string }[] | null {
 }
 
 /**
- * A block of a kind one of the record's packs declares (`block.<id>`, PLT-8), bound to the list and drawing.
+ * A block of a kind one of the record's packs declares (`block.<id>`), bound to the list and drawing.
  *
  * THE SPEC SAYS HOW MANY CELLS A ROW HAS AND NOTHING ABOUT WHAT EACH ONE WANTS, so the first is the list's title and the
  * rest are the next fields in the order the list declares them: a seed to narrow, as every other is. A list this build

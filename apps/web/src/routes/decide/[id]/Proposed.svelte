@@ -186,7 +186,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* A KIND THAT WRITES, IN RED: agents AGT-23's job line reads as a warning rather than an ordinary fact. */
+  /* A KIND THAT WRITES, IN RED: an agent job's line reads as a warning rather than an ordinary fact. */
   .appear-lines dd[data-intent='bad'] {
     color: var(--danger);
   }

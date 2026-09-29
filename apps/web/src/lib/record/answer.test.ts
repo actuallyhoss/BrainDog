@@ -140,7 +140,7 @@ test('UNDO RESTORES EXACTLY WHAT WAS THERE BEFORE THE PRESS', () => {
 });
 
 test('undo takes back one answer and leaves every other one alone', () => {
-  // The failure this catches is the one the research measured: thirteen of eighty-five human writes
+  // The failure this catches is the one measured: thirteen of eighty-five human writes
   // reversed the write before them, and a reversal that took a neighbour with it would be found by
   // nobody, because the neighbour's card would simply be back to how it looks when untouched.
   const two = record(record(new Map(), answered('SG29')), answered('SG31'));

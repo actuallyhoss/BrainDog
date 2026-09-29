@@ -1,5 +1,5 @@
 <!--
-  A passkey, asked for before anything else on a new record's `/start` (`loop/finish/ops.md` OPS-17).
+  A passkey, asked for before anything else on a new record's `/start`.
 
   A PERSON WHO SIGNED UP HAS ONLY THEIR MAILBOX. They proved it with a link, paid, and landed here; without a passkey
   every later sign-in is another email to wait for. So the first thing the new record asks is for a way back in on
@@ -54,7 +54,7 @@
       <p class="first-why">{copy.passkeyFirstWhy}</p>
       {#if said}<p class="first-said" role="status">{said}</p>{/if}
       <div class="first-go">
-        <!-- QUIET, NOT INK: the screen's one primary is the answer below it (SYSTEM §6), and this is asked beside it. -->
+        <!-- QUIET, NOT INK: the screen's one primary is the answer below it, and this is asked beside it. -->
         <Button weight="quiet" onclick={() => void add()} aria-busy={busy}>
           <Icon name="key" size="m" />{busy ? copy.addingPasskey : copy.addPasskeyHere}
         </Button>

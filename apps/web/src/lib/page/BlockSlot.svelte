@@ -101,14 +101,14 @@
     /* A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it from the same predicate the figure
        is computed over, so a tile and the list it opens cannot disagree. */
     cellHref: (n: number) => block.metrics?.[n]?.href ?? null,
-    /* WHERE A ROW APPLIES, AS A CHIP, in a card grid's scope facts (agents C8, `page-live.ts` `scopeCells`). */
+    /* WHERE A ROW APPLIES, AS A CHIP, in a card grid's scope facts (`page-live.ts` `scopeCells`). */
     ...(block.scopeCells ? { scope: block.scopeCells } : {}),
-    /* A RUN'S FACE, ON A CARD OF RUNS (AGT-13): the run and whether it is working, gone quiet or stopped, so
+    /* A RUN'S FACE, ON A CARD OF RUNS: the run and whether it is working, gone quiet or stopped, so
        `Cards.svelte` draws the run's glyph in the `who` cell instead of a plain initial. */
     ...(block.source === 'sessions.live' && block.entries
       ? { runs: block.entries.map((e, n) => ({ run: `S${e.seq}`, agent: typeof e.fields.agent === 'string' ? e.fields.agent : null, live: liveOf(e.fields.state, block.quiet?.[n] === true) })) }
       : {}),
-    /* A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON (pages C10): a gallery tile's or a card's file, found in what the
+    /* A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON: a gallery tile's or a card's file, found in what the
        block already holds (`fileAt`) and placed under this record's address. A file the block does not hold answers
        nothing, and the tile draws its caption. */
     file: (row: string, field: string) => {
@@ -157,7 +157,7 @@
   /**
    * WHETHER A FIELD OF AN `inputs` BLOCK MAY BE TYPED INTO, which is whether the reader may write its list.
    *
-   * A READER WHO MAY ONLY READ WAS DRAWN INPUT BOXES (audit finding 19): the boxes took every keystroke and each write
+   * A READER WHO MAY ONLY READ WAS DRAWN INPUT BOXES: the boxes took every keystroke and each write
    * came back refused. The level is the record's, answered in `boot` and read through `may`, so a box is drawn only
    * where a write can land, and a reader who may not write sees the values as text.
    */
@@ -192,10 +192,10 @@
 </script>
 
 <header class="block-bar">
-  <!-- THE TILE'S HEADING ROW (SYSTEM §6): the block's own glyph in its well when it declares one, the name, and where
+  <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and where
        its rows live at the right. A BLOCK WITH NO AUTHORED `heading:` PRINTS ITS KIND'S NAME, never its dialect id: an
        id is what an agent writes into a declaration, a name is what a person reads. AN AUTHORED ONE IS READ AS TEXT, so
-       `{{icon:rocket}} shipped` draws the rocket (PGS-4) rather than its braces. -->
+       `{{icon:rocket}} shipped` draws the rocket rather than its braces. -->
   {#if block.icon && isGlyph(block.icon)}<IconWell name={block.icon} />{/if}
   <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
     >{#if block.heading}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{:else}{copy.kindNames[block.kind] ?? block.kind}{/if}</svelte:element
@@ -240,7 +240,7 @@
   <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
   <Table columns={block.columns} rows={writes ? writes.arrivedTable(i, block.rows, block) : block.rows} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
-  <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (MOD-9, `QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
+  <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <div class="queue">
     {#each block.queue as question (question.id)}<QueueAnswer {question} onanswered={() => {}} />{/each}
     {#if block.total > block.queue.length}<a class="queue-more" href={inApp('/decide')}>{queueMore(block.total - block.queue.length)}</a>{/if}
@@ -282,7 +282,7 @@
      the key twice. Not while arranging, since a list that fetches is not a block to move, and not on an inert page,
      since the key's panel makes one. -->
 {#if panel && param && writes && !arranging}
-  <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row (DOR-6). -->
+  <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
   {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
   {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
 {/if}
@@ -311,7 +311,7 @@
 {/if}
 
 <style>
-  /* THE TILE'S HEADING ROW (SYSTEM §6, `ui/Tile.svelte`'s): the well, the name at `--t-row` 600, and the source as the
+  /* THE TILE'S HEADING ROW (`ui/Tile.svelte`'s): the well, the name at `--t-row` 600, and the source as the
      meta at the right, one well high, with the tile's 16 under it. No rule under it: the name is what says a block
      starts here. */
   .block-bar {
@@ -384,7 +384,7 @@
   }
 
   /* THE DOOR TO THE REST IS A QUIET LINK, not the red underline the browser's link colour gave it: "Open Money for the
-     rest" under the forecast read as a warning on a healthy page (design §2.11, Money). The second ink with a hairline
+     rest" under the forecast read as a warning on a healthy page. The second ink with a hairline
      under it says it can be pressed, and red stays for what is wrong. */
   .block-slice > a {
     color: var(--ink2);

@@ -14,7 +14,7 @@
   it running. It is `aria-hidden` for the layout's hairline's reason: the screen's own states say what it read.
 
   THE OFFLINE LINE is drawn while the poll says offline and something on screen came from the copy: "Offline · from
-  14:02", and that nothing changed here is sent until he is back online (MOD-27, his pick P5).
+  14:02", and that nothing changed here is sent until he is back online.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';

@@ -3,10 +3,10 @@
  *
  * THE SAVE IS THE ONE AN AGENT MAKES. The test that matters most here reads the request the canvas sends and holds it
  * to `proposalOf`: a POST to `/api/propose` whose body is a `change` to `rule.<id>`. A canvas that wrote through
- * `setDeclaration` instead would be a second editor with a second set of checks, which is what §5 of the research
- * says the two editors must not be.
+ * `setDeclaration` instead would be a second editor with a second set of checks, which is what the two editors
+ * must not be.
  *
- * AND THE READ WAS WRITTEN IN THE SAME WAVE, BY ANOTHER BRIEF. The first reader here guessed a body on every listed
+ * AND THE READ WAS WRITTEN ALONGSIDE THE RECORD'S LIST, NOT AFTER IT. The first reader here guessed a body on every listed
  * row, and the record's list (`packages/record/src/automations.ts`) carries none: every row of a real record would have
  * been dropped and the list would have said nothing was automated. The rows below are that file's shape, key for key.
  */
@@ -24,7 +24,7 @@ import { copy } from '../copy.ts';
  * arrival that asks a person, and a button.
  *
  * TEST DATA, AND ONLY HERE. They were the sample's four automations, drawn on the list when no record answered; the
- * sample is gone (DIRECTION 26) and they stay as the bodies the round trip and the wire are tested on.
+ * sample is gone and they stay as the bodies the round trip and the wire are tested on.
  *
  * `friday-review` ASKS A PERSON AND NOT SLASH, because `ask_slash` is a fault on a host with no model (`flow-lint.ts`
  * `slashAskAt`), and a starter body that opened with a fault on its first card failed the round trip below until it
@@ -150,13 +150,13 @@ test('Run now and Stop name the rule and the run the way the record methods take
 });
 
 /* NO RECORD DREW THE SAMPLE'S FOUR AUTOMATIONS, and a flow drawn and "sent" on it was kept for the tab and filed nowhere.
-   Each way of there being no record is now its sentence (DIRECTION 26); the one for a dead network said "The demo has no
+   Each way of there being no record is now its sentence; the one for a dead network said "The demo has no
    account", which was about a door that is gone. */
 test('A RECORD WITHOUT THE READ DRAWS NO LIST, and no record at all draws why', async () => {
   const unknown: Fetch = async () => answer(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'no such method' } });
   const absent = await openAutomations(unknown);
   assert.equal(absent.absent, true);
-  /* NO `sample` FLAG ON A SOURCE AT ALL, since wave C3: it was `false` on every one, and two screens still branched on it. */
+  /* NO `sample` FLAG ON A SOURCE AT ALL, since the sample left: it was `false` on every one, and two screens still branched on it. */
   assert.equal('sample' in absent.source, false, 'a source still says whether it is the sample');
 
   const nobody: Fetch = async () => {

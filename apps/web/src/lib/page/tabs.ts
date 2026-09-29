@@ -1,5 +1,5 @@
 /**
- * The tab strip a declared page draws above itself, read from the shell's `nav` (brief D3, primitive P2).
+ * The tab strip a declared page draws above itself, read from the shell's `nav`.
  *
  * A SECTION IS TABBED WHEN ANY PAGE IN IT SAYS `nav.tabs: true`, not only the page you are on. A launch desk is a page
  * somebody wrote beside a template that makes one page per area, and the two are declared apart: requiring every one of
@@ -25,7 +25,7 @@ export type Strip = { section: string; shown: Tab[]; more: Tab[] };
 /**
  * HOW MANY TABS SIT IN THE STRIP BEFORE THE REST GO BEHIND MORE, and it is a constant rather than a measurement for the
  * reason `TopBar.svelte` gives for its own four: a strip that measured itself would put a different page behind More at
- * every window width. Twelve is the brief's number. On a phone the strip scrolls sideways well before twelve, so the
+ * every window width. Twelve is the chosen number. On a phone the strip scrolls sideways well before twelve, so the
  * number only decides when a section has become too long to be a row of tabs at all.
  */
 export const TABS_SHOWN = 12;

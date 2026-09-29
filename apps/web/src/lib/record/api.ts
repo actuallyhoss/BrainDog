@@ -7,10 +7,10 @@
  * re-exported twenty-five of the sample's tables beside them. The client arrived and every live screen reads the record
  * through it, but the helpers those screens draw with lived in the same module as the mock, so the mock shipped with
  * them and six screens still called it: the Add a block previews, `/s/<token>`, `/jobs/<id>`, the aim on `/decide`, the
- * pen in Settings and the shell's own type (DIRECTION 26, `loop/research-no-sample.md` wave B2). The readers are in
+ * pen in Settings and the shell's own type. The readers are in
  * `fixtures/readers.ts` now, which only a test may import, and `no-sample-b2.test.ts` holds both halves of that.
  *
- * AND NOTHING HERE READS THE SAMPLE NOW. Until wave C1 `ROWS` was the fallback of `display`, `identityOf` and
+ * AND NOTHING HERE READS THE SAMPLE NOW. Until the sample left the app `ROWS` was the fallback of `display`, `identityOf` and
  * `spokenRow` when a caller handed no `names`, and all of `currencyFor`, `homeCurrency` and `hueOf`, and the
  * sample's `PACKS` named an add-on in `setupSaid` and `packDiff`. The rows, the row names and the declarations are
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
@@ -436,7 +436,7 @@ export function seqWidth(entries: readonly { seq: number }[]): string {
 }
 
 /**
- * THE ROW'S NUMBER, AS A COLUMN SOMEBODY ASKS FOR AND NO LIST DRAWS BY DEFAULT (design.md SYS-3). Every list opened on a
+ * THE ROW'S NUMBER, AS A COLUMN SOMEBODY ASKS FOR AND NO LIST DRAWS BY DEFAULT. Every list opened on a
  * "#" column, so every line began with an identifier a person had not asked about and the title they came for sat
  * second. The number still belongs to the row, and Display offers it under the name a person uses for it.
  */
@@ -669,7 +669,7 @@ export const joinOf = (params: URLSearchParams): 'any' | undefined => (params.ge
  * evaluator underneath, and it is the one with the tests.
  *
  * `join` IS THE ADDRESS WORD `join=any`, AND UNDER IT THE CHIPS ARE JOINED WITH `, or`. One word is
- * the whole of it because both engines refuse a sentence mixing `,` and `, or` (wave two's brief 7),
+ * the whole of it because both engines refuse a sentence mixing `,` and `, or`,
  * so a set of chips is all "and" or all "or". `applyFilters` and `list` below pass it on the
  * sample, and on a record the register list sends this very sentence (`whereFor` in `remote.ts`),
  * which the record parses; `treeOf` reads the same word into an `any` group only when the search box
@@ -803,9 +803,8 @@ function compareRows(register: string, a: Entry, b: Entry, field: string, sign: 
   /**
    * AN ENUM SORTS BY ITS POSITION IN `values`, as the record's `list` does, and it sorted by the label where it had one
    * and the stored word where it did not. `tasks.priority` read High, Low, Normal, Urgent ascending, and the sample's
-   * tasks by state put Later (`backlog`) after Dropped. Declared order is his call 1 in
-   * `loop/research-living-in-it.md` section 8, taken for him as the survey's default and reversible here and in the
-   * kernel's `list`. A word outside `values` goes after every declared one, and an empty value has gone last above.
+   * tasks by state put Later (`backlog`) after Dropped. Declared order is the owner's call, taken as the default and
+   * reversible here and in the kernel's `list`. A word outside `values` goes after every declared one, and an empty value has gone last above.
    */
   const declared = decl?.type === 'enum' ? decl.values : undefined;
   if (declared?.length) {
@@ -1065,7 +1064,7 @@ export const NO_ROW_SAID = copy.nothingMatched;
  * on a money sum is met by every value such a sum can take, which is the decoration a target is
  * refused at install for being. So `met: true` carried no measurement and the tile drew a tick anyway.
  *
- * MEASURED AT HIS SIZE, on the record `loop/research-at-scale.md` §1 built: 27 projects, 14 in play, a
+ * MEASURED AT HIS SIZE, on a record built to it: 27 projects, 14 in play, a
  * monthly figure held for three of them and `revenue` unset on every row, because the importer files a
  * monthly figure as a reading and has no year to write. After `a89bc072` put `revenue is set` on the
  * Earning figures the reading is `rows: 0, held: 27`. Driven through the three engines before this
@@ -1107,8 +1106,8 @@ export type NavEntry = {
  * glyph for the kind of row, never an empty box and never a thrown error: a rail is not allowed to
  * fail to render because someone spelled `obligations` where the set says `obligation`.
  *
- * "THE SET" IS ALL 251, not the 63 the app drew for itself. This checked `PATHS` alone until
- * 24 September, so `icon: rocket`, a name `braindog-render/glyphs` ships, drew a document. The answer is
+ * "THE SET" IS ALL 251, not the 63 the app drew for itself. This once checked `PATHS` alone,
+ * so `icon: rocket`, a name `braindog-render/glyphs` ships, drew a document. The answer is
  * still synchronous: `isGlyph` knows every name up front and only the paths arrive late.
  */
 export const iconFor = (declared: string | undefined, fallback: IconName): IconName =>
@@ -1544,7 +1543,7 @@ export const changedText = (by: string, at: string): string => {
  * A column's `sign:` and a `changed` column, filled in over the cells `toRows` drew.
  *
  * THE SIGN IS A WORD ON THE FIGURE, never a colour: money going out reads `−GBP 1,350.00` and money coming in
- * `+GBP 4,800.00`, in the same neutral ink (DESIGN-SYSTEM §0 rule 3).
+ * `+GBP 4,800.00`, in the same neutral ink.
  */
 export function markColumns(
   register: string,

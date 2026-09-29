@@ -2,7 +2,7 @@
  * A page's words: editing its layout, the block picker and the kinds' names, the cash walk and the series, the
  * report keys and the poll form on `/p`, a thread on `/t`, and what a block says about the slice it shows.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
@@ -178,7 +178,6 @@ export const pages = {
   /* POSTING ONE. The button's own word was typed into the route, so
      the one control in the product that writes an update kept its words where no review of the
      copy could see them, which is the whole reason the copy is kept in one place. */
-  postUpdate: 'Post an update',
   post: 'Post',
   /* `blockNeedsOneCurrency` WAS HERE AND IS DELETED RATHER THAN EXCUSED. It was one of two headings the
      browser chose between by running `/currenc/` over the record's refusal text, which is the habit that put

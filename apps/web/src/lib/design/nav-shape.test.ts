@@ -1,7 +1,7 @@
 /**
  * The design agent's navigation recommendation, read against fixed record shapes.
  *
- * Every case is a record `19 §3` and `loop/research-navigation.md §6` already describe: the
+ * Every case is a record `19 §3` already describes: the
  * freelancer with four entries, the studio with eighteen across six sections, and the record with
  * nothing placed yet. Each assertion checks the shape AND that a reason was actually stated, because
  * `29 §4`'s rule this recommendation is held to is that a recommendation with no reason is an

@@ -1,8 +1,8 @@
 /**
- * Nothing the first run writes is an example (`loop/finish/modules.md` C11, `loop/DIRECTION.md` §26), held against the
+ * Nothing the first run writes is an example, held against the
  * documents the seed builds and the file "Make it mine" hands the record.
  *
- * WHAT IT WAS (`loop/finish/modules.md` §2.5): a Personal record arrived holding 56 example rows, every one in pounds,
+ * WHAT IT WAS: a Personal record arrived holding 56 example rows, every one in pounds,
  * and "Start from a list" planted the sample studio's clients (Kiln, Halden) in anybody's record, because
  * `moduleDocument` with no use case left the module's own rows in. A preview may draw examples; nothing that writes asks
  * for them.
@@ -33,7 +33,7 @@ test('A MODULE CARRIES NO ROWS UNLESS IT IS ASKED FOR EXAMPLES, with a use case 
     for (const u of USE_CASES) assert.deepEqual(seedsOf(moduleDocument(u, id, { today: TODAY })), [], `${id} carries ${u.usecase}'s examples`);
   }
   /* AND ASKED, THEY ARE STILL THERE, for a preview or a test to draw. The founder's, since Personal 2.0.0 gives its
-     modules none (`loop/finish/modules.md` MOD-17). */
+     modules none. */
   const founder = useCase('founder');
   assert.ok(moduleExamples(founder).length > 0, 'the founder gives its modules no examples to draw');
   assert.ok(seedsOf(moduleDocument(founder, 'money-core', { today: TODAY, examples: true })).length > 0, 'examples: true carries nothing');

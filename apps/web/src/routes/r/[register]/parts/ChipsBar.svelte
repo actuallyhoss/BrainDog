@@ -1,9 +1,9 @@
 <!--
   The bar over the list: the search box, the filters as pills, menus or one phone button, the list
   clauses a pill cannot draw, Clear and Save as a view. And the phone's filter sheet, which is the
-  same filters behind the one button. Display is the toolbar's now (SYSTEM §5), beside the view switch.
+  same filters behind the one button. Display is the toolbar's now, beside the view switch.
 
-  IT IS A CONTROL ON THE GROUND, NOT CHROME (SYSTEM §6): the search box is a field, the `--s1` well, and the pills are
+  IT IS A CONTROL ON THE GROUND, NOT CHROME: the search box is a field, the `--s1` well, and the pills are
   wash pills with the chosen value a white pill in them. No glass: glass is for what floats.
 
   THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT, which is `shown`, the page's answer. Below eight
@@ -21,7 +21,7 @@
   are the page's `facets`; `saveView` is the page's write. The sheet's open state is kept here
   because nothing but this bar opens it or reads it.
 
-  THE SHEET HOLDS THE QUERY BUILDER (GAP-2), the one editor of a filter in this app, at every width:
+  THE SHEET HOLDS THE QUERY BUILDER, the one editor of a filter in this app, at every width:
   from 640 it opens from the bar's Filter control beside the pills, and below it from the one Filter
   button, under the pills' own values. The builder edits the address's chips as rows and writes them
   back when the sheet closes, so typing a value is not a navigation per key. The address is a flat
@@ -92,7 +92,7 @@
   /* This part's own words: the phone's Filter button, named with what is chosen in it. */
   const words = { filterOn: (chosen: string): string => `${copy.filter}: ${chosen}` } as const;
 
-  /* ── the query builder in the sheet (GAP-2) ─────────────────────────────── */
+  /* ── the query builder in the sheet ─────────────────────────────────────── */
 
   /**
    * THE FIELDS A CONDITION MAY NAME, as the record last declared this list. `REGISTERS` is filled by the page's own
@@ -188,8 +188,8 @@
     scrolling the bar sideways, and a control nobody knows is there is a control that is not
     there. The sheet holds every field and Clear, and Display is in the toolbar above.
 
-    AND THE BUTTON IS 44px SQUARE, so the phone's bar is one row: search and Filter (design
-    SYS-6, DSN-7). It said "Filter" and every chosen value in words, which took a second line under
+    AND THE BUTTON IS 44px SQUARE, so the phone's bar is one row: search and Filter.
+    It said "Filter" and every chosen value in words, which took a second line under
     the search box. How many values are on is the figure beside the glyph, and what they are is in
     its name for a screen reader and in the sheet it opens.
   -->
@@ -370,7 +370,7 @@
   /**
    * THE FILTERS ARE WASH PILLS ON THE GROUND: one rounded track in the ground's wash, and the chosen value a white pill
    * in it lifted by a tiny shadow (`controls.css`), with its word in ink. The bar is a control on the ground and not
-   * chrome, so the track sheds the toolbar's glass (SYSTEM §5, §6). The state is a SHAPE and not a shade. Scoped to this
+   * chrome, so the track sheds the toolbar's glass. The state is a SHAPE and not a shade. Scoped to this
    * screen, so every other segmented control keeps the shared rule.
    *
    * THE COUNT SITS BESIDE THE WORD AND QUIETER THAN IT, so a pill says what it holds before it is
@@ -532,7 +532,7 @@
     color: var(--ink);
   }
 
-  /* THE SEARCH BOX IS A FIELD (SYSTEM §6): `controls.css`'s `--s1` well, 40 tall, radius `--r-md`, as wide as a
+  /* THE SEARCH BOX IS A FIELD: `controls.css`'s `--s1` well, 40 tall, radius `--r-md`, as wide as a
      phrase and no wider, so the pills beside it keep their room. */
   .bar > .field {
     flex: 0 1 280px;
@@ -544,7 +544,7 @@
     margin-inline-start: auto;
   }
 
-  /* The menu rows: 32 tall and the same wash on hover as every menu row (SYSTEM §6). */
+  /* The menu rows: 32 tall and the same wash on hover as every menu row. */
   .mi {
     display: flex;
     align-items: center;
@@ -658,7 +658,7 @@
 
   @media (width < 640px) {
     /**
-     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX AND FILTER (design SYS-6, DSN-7).
+     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX AND FILTER.
      *
      * The bar was two lines on a phone, the search box across the first and a sideways scroller of
      * Filter, its chosen values and Display across the second, under a capture line of its own, so

@@ -1,7 +1,7 @@
 /**
- * The look's words (GAP-3): the editor in Settings > Appearance, its contrast gate and its specimen.
+ * The look's words: the editor in Settings > Appearance, its contrast gate and its specimen.
  *
- * A NEW AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads it into `copy`, and every key here is read as a
+ * A NEW AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads it into `copy`, and every key here is read as a
  * literal `copy.<key>` by `lib/theme/LookEditor.svelte`, `lib/theme/Specimen.svelte` or the Appearance area, so
  * `dead-copy` sees each one drawn. Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports
  * nothing.
@@ -14,7 +14,7 @@
 /** How far a fix moves a colour: the one axis a person can see without knowing what a lightness is. */
 export type LookWay = 'darken' | 'lighten';
 
-/* ── GAP-3: the look and its editor ─────────────────────────────────────── */
+/* ── the look and its editor ────────────────────────────────────────────── */
 
 export const theme = {
   lookTitle: "The record's look",
@@ -144,6 +144,6 @@ export const theme = {
   lookSampleNote: 'A note on the page reads like this, in second text on the panel.',
   lookSampleQuiet: 'Added 3d ago by you',
   lookSampleFaint: 'Faint text is kept for large type',
-  /* THE WORDS MONEY GIVES A DIRECTION, `owed_to_me` said as "Money in", and not the "Owed to you" MOD-24 retires. */
+  /* THE WORDS MONEY GIVES A DIRECTION, `owed_to_me` said as "Money in", and not the retired "Owed to you". */
   lookSampleFigure: 'Money in',
 };

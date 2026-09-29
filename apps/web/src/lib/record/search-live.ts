@@ -6,7 +6,7 @@
  *
  * A REFUSAL IS THE RECORD'S SENTENCE, WHATEVER ITS CODE. `UNREACHABLE` and `UNAUTHORIZED` drew the
  * in-browser sample's search and kept it for the tab, so a lapsed session searched a fictional studio's
- * rows under a real record's address and never asked again (DIRECTION 26 removed the sample). Now
+ * rows under a real record's address and never asked again. The sample is gone, and now
  * they are said like any other refusal, and the next query asks again, because a record that turned
  * one away may answer the next once somebody has signed in.
  *
@@ -38,9 +38,9 @@ type Hit = { register: string; seq: number; title: string };
  * What the record answered, in either of the two shapes it can answer in.
  *
  * THE SCREEN PRINTED THE CEILING AS THE TOTAL, and this is the number that fixes it. Driven at the
- * owner's size (`loop/research-at-scale.md`, *Wrong, not slow* 3): `/search?q=revenue` drew **100**
+ * owner's size: `/search?q=revenue` drew **100**
  * beside the heading and **"All 100 in Datapoints"** beside the group while **140** rows matched,
- * counted against the record file. `the` matched 304 and said 100; `bake` matched 577 and said 100.
+ * counted against the record file, and `the` matched 304 and said 100.
  * The cause is not the clamp, it is that the record answered a bare array: a hundred hits is
  * character-for-character the answer to a query with exactly a hundred matches, so this module had
  * nothing to count but what it was handed, and `groupsOf` handed that on as a total.

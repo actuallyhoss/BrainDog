@@ -1,8 +1,7 @@
 /**
- * A page declared with `layout: { rail: 4 }` draws a main column and a side rail (brief D4 of
- * `loop/research-dynamic-layouts.md`, primitive P1).
+ * A page declared with `layout: { rail: 4 }` draws a main column and a side rail.
  *
- * WHAT WAS WRONG BEFORE THIS FILE. The kernel admits `layout` and a block's `area` since wave one, and the page read hands
+ * WHAT WAS WRONG BEFORE THIS FILE. The kernel admits `layout` and a block's `area`, and the page read hands
  * both to the app, but nothing in the app read either: every block went into the one twelve-column flow in declared
  * order. So three `area: rail` blocks declared after one tall main block were drawn UNDER it, a screen's height below
  * where their author put them. The browser half of that (the rail blocks' `offsetTop` against the main block's) is the
@@ -24,7 +23,7 @@ import { boxesOf, layoutOf, mainSpan, splitAreas, sticks, type Layout } from './
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
-/* ONE TALL MAIN BLOCK AND THREE FOR THE RAIL, declared after it: the brief's page. */
+/* ONE TALL MAIN BLOCK AND THREE FOR THE RAIL, declared after it: a launch desk's page. */
 const DESK = [
   { kind: 'table', heading: 'Every step' },
   { kind: 'note', heading: 'Pinned', area: 'rail' },
@@ -142,7 +141,7 @@ function desk(): { io: (input: RequestInfo | URL, init?: RequestInit) => Promise
 }
 
 test('DONE WRITES A BLOCK MOVED TO THE RAIL IN THE RAIL, through the one arrangement write every page uses', async () => {
-  // THE RED WAVE TWO LEFT: `saveArrangement` laid the body out by order and span, so the area a block was moved to never
+  // THE FAULT THIS HOLDS: `saveArrangement` laid the body out by order and span, so the area a block was moved to never
   // reached the record, and pages with a rail went through a second write, `layout-write.ts`, to carry it. `Placed`
   // carries `area` now and `arrangedBody` writes it (`page-write.test.ts` holds the rules), so that file is gone and
   // this is the plain path, which failed here with the areas as the record held them: Pinned still rail, Every step main.

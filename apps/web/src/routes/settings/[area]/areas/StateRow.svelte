@@ -1,14 +1,14 @@
 <!--
   One thing an area states about this record, drawn as a row: its glyph in a well, a short title, one line of what is
-  true, and the one action that exists for it (DSN-18, SYSTEM §6 Rows).
+  true, and the one action that exists for it (the design system's row).
 
   WHY A ROW AND NOT A PARAGRAPH. Backups, Export and Billing said what a host does not do yet in
   paragraphs, three to a section and identical on both hosts, so a person had to read every sentence to
-  learn there was nothing to press (design §2.12). A row says the same thing at the size of a setting:
+  learn there was nothing to press. A row says the same thing at the size of a setting:
   the title is what somebody scans for, the line is the one sentence that matters, and the action, when
   one exists, sits at the end of the row where a thumb or a pointer expects it.
 
-  A ROW ON THE GROUND (SYSTEM §6): a 28px icon well, the title at `--t-row` 500, the line in the meta size and the
+  A ROW ON THE GROUND: a 28px icon well, the title at `--t-row` 500, the line in the meta size and the
   quiet ink, 56 tall with both. Rows stack with a hairline between them and nothing around them, so two rows written
   one after the other draw as one list; the separator is this file's own `.state-row + .state-row`, and the area
   around them writes no list of its own.
@@ -120,7 +120,7 @@
     margin-block: calc((20px - var(--ctl-h)) / 2);
   }
 
-  /* ON A PHONE (SYSTEM §9): rows 60 tall, 16px words, and a button on a line of its own under them. */
+  /* ON A PHONE: rows 60 tall, 16px words, and a button on a line of its own under them. */
   @media (width < 900px) {
     .state-row {
       min-block-size: 60px;

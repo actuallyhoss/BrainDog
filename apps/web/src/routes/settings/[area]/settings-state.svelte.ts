@@ -2,7 +2,7 @@
  * What more than one settings area reads, held once for as long as Settings is open.
  *
  * ONE COMPONENT PER AREA, AND THIS IS WHAT THEY STILL HAVE IN COMMON. Settings was one file that drew
- * every area, so any `$state` two areas read was simply in scope for both. Split (ARC-7b), each area
+ * every area, so any `$state` two areas read was simply in scope for both. Split, each area
  * in `areas/` keeps its own state and loses it when the person moves to the next area, which is what
  * the old `{#if area !== ...}` resets were doing by hand. What more than one area reads or writes
  * lives here instead: whether the reader owns the record, who the record's members are (People and
@@ -66,8 +66,8 @@ export class SettingsState {
    * the sixteen said it was off. `write` and `decide` were offered the same sixteen, because every
    * settings write in this product is an ADMIN method and none of them is reachable below `owner`.
    *
-   * ONE DERIVED AND NOT A CHECK PER CONTROL. `loop/research-second-person.md` finding 7: "It is one
-   * predicate on `AREAS` and one per section ... rather than eleven times." The predicate itself is in
+   * ONE DERIVED AND NOT A CHECK PER CONTROL: one
+   * predicate on `AREAS` and one per section, rather than eleven times. The predicate itself is in
    * `../levels.ts` with what it costs, and `levels.test.ts` holds each area to it.
    */
   anOwner = $derived.by(() => ownsRecord(this.#shell().me));
@@ -127,8 +127,8 @@ export class SettingsState {
   /**
    * WHETHER THIS HOST MAKES FORWARDING ADDRESSES, asked once on arriving at the first area that needs it.
    *
-   * `null` UNTIL IT ANSWERS, AND NEITHER MAIL BUTTON IS DRAWN MEANWHILE. `research-usability-2026-09-21.md`
-   * finding 16 counted `Make an address` and `Stop taking forwarded mail` among the eight controls a
+   * `null` UNTIL IT ANSWERS, AND NEITHER MAIL BUTTON IS DRAWN MEANWHILE. A usability
+   * pass counted `Make an address` and `Stop taking forwarded mail` among the eight controls a
    * fresh record cannot honour: on a self-host both presses answered 404 `ROUTE_UNKNOWN`, the good
    * sentence about `inbound.token` arrived only after the press, and a reload put both buttons back.
    *
@@ -162,7 +162,7 @@ export class SettingsState {
 
   /* ── the lists a colleague can hold, which People offers and Identity names ── */
 
-  /* THE LISTS AN EXCEPTION CAN BE ON: the shell's, which are the record's. `REGISTERS` is the declaration cache, until wave B. */
+  /* THE LISTS AN EXCEPTION CAN BE ON: the shell's, which are the record's. `REGISTERS` is the declaration cache, for now. */
   lists = $derived(
     ((page.data as { lists?: readonly { id: string; name: string }[] }).lists ??
       Object.entries(REGISTERS).map(([id, r]) => ({ id, name: r.name }))),

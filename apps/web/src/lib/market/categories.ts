@@ -1,5 +1,5 @@
 /**
- * Browse's category chips (`loop/finish/platform.md` §4.0 C): each category any listing is in, with how many are in it.
+ * Browse's category chips: each category any listing is in, with how many are in it.
  *
  * A CATEGORY IS NEVER CHOSEN BY AN AUTHOR. The Kennel's are worked out from the file by `categoriesOf`, and a bundled
  * listing's are said in `listing.ts`, so a chip counts what a thing does and not what its author hoped it would be found as.

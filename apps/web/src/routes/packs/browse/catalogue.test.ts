@@ -354,7 +354,7 @@ test('a file whose own id is not the entry it is listed under is not asked for',
 /* ── the packs in packs/, in the catalogue this app ships ───────────────── */
 
 /*
- * BRIEF B3 OF `loop/research-legacy-parity.md`. Before it, `static/catalogue/index.json` listed one add-on,
+ * THE PACKS IN `packs/` ARE PUBLISHED. Before this, `static/catalogue/index.json` listed one add-on,
  * `reading-list`, and none of the four packs in `packs/`, so Browse had nothing of theirs to draw and a host could
  * resolve none of their ids. `tools/catalogue/from-packs.mjs` publishes each one into this folder through `publishTo`,
  * the door `braindog pack publish` uses, so a version is never rewritten under readers who hold it to its checksum.
@@ -443,7 +443,7 @@ test('from-packs publishes a pack once, leaves it alone after, and refuses one w
 /*
  * NOTHING IS WRITTEN UNLESS EVERY PACK PASSES. The test above has one pack, so a refusal there is always the first pack
  * and a tool that wrote each pack as it passed would leave the same folder behind. Checked by writing each file and the
- * index inside the loop: every assertion above still held. Here a good pack sorts before a refused one.
+ * index inside the per-pack loop: every assertion above still held. Here a good pack sorts before a refused one.
  */
 test('from-packs writes nothing when a later pack is refused, not even the good pack before it', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-from-packs-'));

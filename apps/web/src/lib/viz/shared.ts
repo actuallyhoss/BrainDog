@@ -5,7 +5,7 @@
  * PURE, AND NO SVELTE, so the geometry modules beside it (and their tests under `node --test`) can
  * use it without a component in sight.
  *
- * A TONE IS A NAME OR A PROJECT'S OWN COLOUR (SYSTEM §2, §7). The names are the chart ramp (`ink`,
+ * A TONE IS A NAME OR A PROJECT'S OWN COLOUR. The names are the chart ramp (`ink`,
  * then the greys `g1` to `g4`, darkest first) and the four meanings (`danger` for late or needs him,
  * `earn` for money in, `warn` for waiting, `live` for running). Anything else is taken as a colour
  * the record holds (a project's `colour`) and is set inline as `--c`, which is the one way a colour
@@ -20,7 +20,7 @@ export type NamedTone = (typeof NAMED_TONES)[number];
 /** A named tone, or any other string, which is a project's own colour. */
 export type Tone = NamedTone | (string & {});
 
-/** The chart ramp, darkest first: one series in ink, the rest in greys (SYSTEM §2). */
+/** The chart ramp, darkest first: one series in ink, the rest in greys. */
 export const RAMP = ['ink', 'g1', 'g2', 'g3', 'g4'] as const satisfies readonly NamedTone[];
 
 /**
@@ -71,7 +71,7 @@ const LIST = new Intl.ListFormat('en-GB', { style: 'long', type: 'conjunction' }
 /** "a, b and c", the way a sentence joins things. */
 export const listed = (parts: readonly string[]): string => LIST.format(parts);
 
-/** The subject and the reading, as one sentence: "acme.example takings a day, from 138 to 96". */
+/** The subject and the reading, as one sentence: "Kiln takings a day, from 138 to 96". */
 export function sentence(subject: string | undefined, reading: string): string {
   const s = subject?.trim();
   if (s) return reading ? `${s}, ${reading}` : s;

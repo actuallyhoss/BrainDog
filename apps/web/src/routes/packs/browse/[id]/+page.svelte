@@ -1,6 +1,6 @@
 <!--
   One listing on its own page, for every kind: `/packs/browse/<id>?kind=module|usecase|pack`, `usecase` when no kind is
-  said so the links written before add-ons had pages still open (`loop/finish/platform.md` PLT-3, §4.0 L).
+  said so the links written before add-ons had pages still open.
 
   EVERYTHING HERE IS READ FROM THE THING ITSELF, never written for the page: the summary and who published it, a large
   drawing of each page it adds, what it adds (`$lib/market/adds.ts`, from the document the plan is read from), every line
@@ -14,11 +14,11 @@
   through (`catalogue.ts` `keepFirstKey`), and never written over.
 
   ONE PRIMARY BUTTON: Install, Update, Turn on, or Installed. Install and Update read the record's plan and open the plan
-  sheet (`$lib/market/PlanSheet.svelte`, PLT-4's); what installs is what the sheet showed (`./offer.ts`). Somebody the
+  sheet (`$lib/market/PlanSheet.svelte`); what installs is what the sheet showed (`./offer.ts`). Somebody the
   record will not let install is refused there, and a Kennel entry is then asked for on Decide instead.
 
-  THE LOOK (SYSTEM §6, and the site's catalogue board): tiles, 12 apart. The lead tile holds what it does, who made it,
-  the trust line and the one button; beside it, what it adds as the board draws a plan (a glyph, the kind, its count and
+  THE LOOK (the design system, and the site's catalogue board): tiles, 12 apart. The lead tile holds what it does, who made it,
+  the trust line and the one button; beside it, what it adds as a plan is drawn (a glyph, the kind, its count and
   what each is called, then the hosts it calls); under them its pages drawn large; then its hosts, its versions and its
   details. A trust state is its intent and its glyph, and a key revoked or a signature lost is the danger line.
 -->
@@ -75,7 +75,7 @@
 
   /* AN ADDRESS WITH NO `?kind=` IS READ AS A USE CASE FIRST, for the links written before add-ons had pages, and then as
      whatever else goes by that id: `/packs/browse/reading-list` said "nothing here by that name" for an add-on the
-     catalogue lists (design.md §2.8). A kind that is said is kept to. */
+     catalogue lists. A kind that is said is kept to. */
   const listing = $derived.by(() => {
     const all = listingsOf({ kennel, counts });
     const exact = all.find((l) => l.key === listingKey(kind, id));
@@ -348,7 +348,7 @@
 <svelte:head><title>{titleOf(listing?.title ?? copy.browseTitle)}</title></svelte:head>
 
 <!-- THE WAY BACK IS THE HEAD'S: a kicker at 1440 and the back link in the phone's bar, on the gutter like every detail
-     page's, where a bare button above the lead sat off it (design.md §2.8). -->
+     page's, where a bare button above the lead sat off it. -->
 <PageHead icon="packs" kicker={copy.browseTitle} back="/packs/browse" title={listing?.title ?? copy.browseTitle} />
 
 {#snippet act()}
@@ -372,7 +372,7 @@
     {#if recordRefused}<Empty kind="error" title={recordRefused} />{/if}
 
     <div class="tiles">
-      <!-- THE LEAD TILE: what it does, whether it is vouched for, and its one button (design.md DSN-17). Who made it heads
+      <!-- THE LEAD TILE: what it does, whether it is vouched for, and its one button. Who made it heads
            the tile; its version, licence and signature are the Details tile's. -->
       <div class="lead-cell">
         <Tile lead icon={glyphOf(listing)} title={copy.useCaseFor} meta={words.kinds[listing.kind]} aria-label={copy.useCaseFor}>
@@ -393,7 +393,7 @@
             <p class="said refused" data-intent="bad" role="status" title={refused.code ? copy.refusalCode(refused.code) : undefined}>
               <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span><span>{refused.fix}</span>
             </p>
-            <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install" (GAP-3): the editor side, staging and the failing
+            <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install": the editor side, staging and the failing
                  roles selected, is built; this is the one press that reaches it from here. -->
             {#if refused.code && FIXABLE.has(refused.code) && hasTheme(file?.doc)}
               <div>
@@ -524,7 +524,7 @@
   }
 
   /**
-   * THE TILES, 12 APART (SYSTEM §4): the lead beside what it adds, its pages across the width under them, then its hosts,
+   * THE TILES, 12 APART: the lead beside what it adds, its pages across the width under them, then its hosts,
    * versions and details in thirds. One column on a phone, in the order they are read.
    */
   .tiles {
@@ -716,7 +716,7 @@
     text-decoration: line-through;
   }
 
-  /* A VERSION IS A FIGURE, in tabular figures of the body face and never the identifier face (design-brief §11.4). */
+  /* A VERSION IS A FIGURE, in tabular figures of the body face and never the identifier face. */
   .v {
     color: var(--ink);
     font-size: var(--t-base);

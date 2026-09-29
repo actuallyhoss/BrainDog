@@ -18,7 +18,7 @@
   exists, in its cells and its receipt; said in advance, over the list, it was the screen
   explaining itself.
 
-  ON A PHONE IT IS A SHEET BEHIND THE HEAD'S "+" (design SYS-6, DSN-7). The line stood over the
+  ON A PHONE IT IS A SHEET BEHIND THE HEAD'S "+". The line stood over the
   search box and the filters, so three rows of controls came before the first card, and a phone's
   list starts within 150px of its head. Below 640px the line is not drawn; `CapturePlus` in the
   head's action slot opens this sheet with the field focused, "Add" as its primary, and "All fields"
@@ -130,7 +130,7 @@
     white-space: nowrap;
   }
 
-  /* ONE FRIENDLY FIELD, AS EVERY FIELD IS (SYSTEM §6): 40 tall and 44 under a thumb, the `--s1` well with no border,
+  /* ONE FRIENDLY FIELD, AS EVERY FIELD IS: 40 tall and 44 under a thumb, the `--s1` well with no border,
      radius `--r-md`, and a plus at its head in the second ink, which is the shape "add" has in every list a person has
      used. It sits on the ground at the top of the list, where the blend draws it under the sentence. */
   .capture-field {
@@ -172,7 +172,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    /* The body size under a mouse, and 16px under a thumb (design-brief §3), so a phone never zooms into the field. */
+    /* The body size under a mouse, and 16px under a thumb, so a phone never zooms into the field. */
     font-size: var(--t-base);
   }
 

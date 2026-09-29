@@ -1,5 +1,5 @@
 /**
- * Every starter use case's voice, held to the phone it is read on (PGS-24): a line that names a tab fits the tab bar's
+ * Every starter use case's voice, held to the phone it is read on: a line that names a tab fits the tab bar's
  * label, and every line wraps inside the 358px column at 390.
  *
  * THE TAB BAR DRAWS HOME, DECIDE AND THE INBOX SIDE BY SIDE, and a label longer than its tab is cut off mid-word, so a

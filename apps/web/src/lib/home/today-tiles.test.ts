@@ -133,6 +133,6 @@ test('CASH: the low point in words, going under said as the one red phrase, and 
   assert.equal(under.needs, 'goes under on 2 Nov');
   const flat = cashReading({ currency: 'EGP', values: [100, 200], weeks: 13, low: { value: 100, day: null }, crossed: null });
   assert.equal(flat.text, "Nothing dated takes it below today's figure in the next 13 weeks.");
-  assert.equal(shareReading([{ label: 'Personal', value: 71 }, { label: 'Quartz', value: 29 }]), 'Personal holds 71% of it.');
+  assert.equal(shareReading([{ label: 'Personal', value: 71 }, { label: 'Studio', value: 29 }]), 'Personal holds 71% of it.');
   assert.equal(shareReading([]), null);
 });

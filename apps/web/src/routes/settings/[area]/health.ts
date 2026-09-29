@@ -1,5 +1,5 @@
 /**
- * The one sentence under Settings' title (SYSTEM §5, SCREENS "Settings"): whether last night's copy is in, and whether
+ * The one sentence under Settings' title: whether last night's copy is in, and whether
  * anything runs out before the month resets. "All healthy: last night's copy is in, and nothing runs out before
  * 1 October." The phrase that needs him is marked, and only when something does: "No copy last night", or "Runs are
  * at 91%, 2 days to go".

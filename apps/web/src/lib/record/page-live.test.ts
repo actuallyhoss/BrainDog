@@ -81,9 +81,9 @@ const ANSWER = {
       source: 'actions',
       rows: [
         {
-          id: 'crumb-stats',
+          id: 'site-stats',
           fields: {
-            ingest: 'crumb-stats', channel: 'poll', project: null, host: 'api', every: '1h', key: null, state: 'paused', next: null,
+            ingest: 'site-stats', channel: 'poll', project: null, host: 'api', every: '1h', key: null, state: 'paused', next: null,
             last_at: '2026-09-15T10:00:00.000Z', last_outcome: 'paused', last_status: 401, last_note: 'The key was refused.', runs: 3, failures: 1,
           },
         },
@@ -142,7 +142,7 @@ test("the record's page is drawn from its answer, and only its answer", async ()
   assert.equal(refused!.rows.length, 0);
 });
 
-/* NO RECORD HERE IS THE RECORD'S REFUSAL, AND IT IS ASKED AGAIN (DIRECTION 26). It answered `{ from: 'sample' }` and
+/* NO RECORD HERE IS THE RECORD'S REFUSAL, AND IT IS ASKED AGAIN. It answered `{ from: 'sample' }` and
    remembered that for the tab, so `PageView` drew the seeded studio's Desk under a real record's address, and a person
    who then signed in in another tab kept reading the studio until they reloaded. */
 test('no record here is refused in its own words, and the next page asks again', async () => {
@@ -160,7 +160,7 @@ test('no record here is refused in its own words, and the next page asks again',
 
 test('the page draws only a live answer, and reads nothing of the sample', () => {
   /* COMMENTS LEFT OUT, so the paragraph saying where the source view once fell back to `PAGES` is not a read of it. */
-  /* THE READER IS SEVERAL FILES SINCE PGS-1 SPLIT IT, read as one text. */
+  /* THE READER IS SEVERAL FILES SINCE IT WAS SPLIT, read as one text. */
   const view = ['PageView.svelte', 'PageBody.svelte', 'BlockSlot.svelte', 'Arrange.svelte', 'SourceView.svelte', 'PageTabs.svelte', 'page-writes.ts']
     .map((f) => readFileSync(new URL(`../page/${f}`, import.meta.url), 'utf8'))
     .join('\n')
@@ -285,7 +285,7 @@ test('a value is read from what the record sent, and nothing it did not', () => 
 test('the page route reads the record, waits for it, and draws what it cannot say plainly', () => {
   const route = readFileSync(new URL('../../routes/p/[slug]/+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /pageReader\(apiBase\(\)\)/);
-  /* THE ROUTE KEEPS THE READ; WHAT IT DRAWS IS `PageView`, moved out whole (`loop/research-modules-next.md`, Brief 5). */
+  /* THE ROUTE KEEPS THE READ; WHAT IT DRAWS IS `PageView`, moved out whole. */
   const view = ['PageView.svelte', 'BlockSlot.svelte'].map((f) => readFileSync(new URL(`../page/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.match(route, /<PageView /);
   assert.match(view, /\{#if got === null\}/);
@@ -818,7 +818,7 @@ test('A SUM OVER A FIELD NOBODY HAS FILLED IN DRAWS NO VERDICT AND NO DOOR, and 
   assert.ok((said as { href?: string } | undefined)?.href, 'and keep their door');
 
   /* AND A FIGURE MADE OF TWO HALVES IS ONE TOO, which the first writing of this test did not hold:
-     the audit of batch ten measured that `reducedFields`' pair branch could be deleted whole and
+     an audit measured that `reducedFields`' pair branch could be deleted whole and
      this file stayed 26 of 26, while `projects-earning-change` (`diff` of two sums, both over
      `revenue is set`) is a tile the Overview draws. */
   const change = blockOf(

@@ -1,5 +1,5 @@
 /**
- * The spine appears as it is used, and the three bars read it from one function (pages PGS-18).
+ * The spine appears as it is used, and the three bars read it from one function.
  */
 
 import { test } from 'node:test';
@@ -24,7 +24,7 @@ test('A CALLER TOLD `null` ABOUT THE INBOX IS NOT SHOWN ONE', () => {
   assert.deepEqual(spineOf({ decide: 0, inbox: null, decided: 0, arrived: null }), ['home', 'slash', 'automations']);
 });
 
-test('A HOST OLDER THAN THE FIELDS IS READ FROM WHAT IT SENT, and no counts draw Home and the two DSN-11 rows', () => {
+test('A HOST OLDER THAN THE FIELDS IS READ FROM WHAT IT SENT, and no counts draw Home, Slash and Automations', () => {
   assert.deepEqual(spineOf({ decide: 0, inbox: 4 }), ['home', 'inbox', 'slash', 'automations']);
   assert.deepEqual(spineOf(undefined), ['home', 'slash', 'automations']);
 });

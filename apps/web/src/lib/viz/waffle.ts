@@ -1,6 +1,6 @@
 /**
- * A waffle's geometry: one small rounded square a unit, filled part by part in reading order (SYSTEM
- * §7, "part of a whole"; Light-Project's open tasks by tier).
+ * A waffle's geometry: one small rounded square a unit, filled part by part in reading order ("part
+ * of a whole", such as open tasks by tier).
  *
  * ONE SQUARE A THING while there are at most 200 of them. Past that each square stands for an equal
  * share and the counts are rounded by largest remainder, so the squares still add up to the whole and

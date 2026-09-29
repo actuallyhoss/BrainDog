@@ -1,9 +1,9 @@
 /**
- * The chart primitives (SYSTEM §7, §12.2): SVG drawn from the record's data, coloured only through
+ * The chart primitives: SVG drawn from the record's data, coloured only through
  * tokens, each sized to its box and each read aloud as a sentence built from its data.
  *
  * They draw the mark and its direct labels; the tile around a chart, its figure and its one written
- * reading line are the caller's (`Tile`, SYSTEM §6). Which chart answers which question:
+ * reading line are the caller's (`Tile`). Which chart answers which question:
  *
  *   a trend                 `Sparkline` (or `Bars`)
  *   part of a whole         `Stacked`, `Ring`, `Waffle`
@@ -14,7 +14,7 @@
  *   dates                   `WeekStrip`
  *
  * EVERY CHART TAKES `subject` AND `summary`. `subject` names what is measured and leads the sentence
- * built from the data ("acme.example takings a day, 9 weeks, from 138 to 96, low 95"); `summary` replaces
+ * built from the data ("Kiln takings a day, 9 weeks, from 138 to 96, low 95"); `summary` replaces
  * that sentence outright when a screen can say it better.
  *
  * A `tone` is a name (`ink`, the greys `g1` to `g4`, `danger`, `earn`, `warn`, `live`) or a project's

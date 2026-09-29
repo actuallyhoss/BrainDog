@@ -3,7 +3,7 @@
   and the lists it adds.
 
   ON A CARD IT IS A THUMBNAIL OF THE HOME IT INSTALLS, and nothing else: a rail beside it left the Home a column too
-  narrow for its own headings at every card width (design.md §2.8). The large drawing, on the use case's own page and
+  narrow for its own headings at every card width. The large drawing, on the use case's own page and
   on share, keeps the rail beside the Home. Either way it is one surface: the card's well, or this drawing's own when
   large, with the Home's blocks as lines under hairlines and never a box inside it.
 -->

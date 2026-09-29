@@ -1,11 +1,11 @@
 /**
- * The chart primitives' one stylesheet: the grey ramp, the tones, and the marks (SYSTEM §7).
+ * The chart primitives' one stylesheet: the grey ramp, the tones, and the marks.
  *
  * EVERY CHART IMPORTS IT, so a screen that draws one chart gets the lot and a screen that draws none
  * gets nothing. It is global rather than scoped because the tones are shared by nine components, and
  * nine copies of one ramp is how a ramp drifts. Every class here starts with `viz`.
  *
- * THE RAMP IS INK MIXED INTO THE TILE, never a literal. SYSTEM §2's light steps (`#4A505B`,
+ * THE RAMP IS INK MIXED INTO THE TILE, never a literal. The design system's light steps (`#4A505B`,
  * `#8C939E`, `#C5CAD2`, `#DEE2E8` on white) are ink at about 76%, 48%, 24% and 13%, and the same
  * mixes give the dark steps, so one rule serves both schemes and the high-contrast theme.
  *
@@ -20,7 +20,7 @@
     --viz-g2: color-mix(in srgb, var(--ink) 48%, var(--bg));
     --viz-g3: color-mix(in srgb, var(--ink) 24%, var(--bg));
     --viz-g4: color-mix(in srgb, var(--ink) 13%, var(--bg));
-    /* A chart's track: SYSTEM's tile-2, mixed rather than `--s1` so it still shows in the
+    /* A chart's track: the design system's tile-2, mixed rather than `--s1` so it still shows in the
        high-contrast theme, where `--s1` sits a hair off the tile. */
     --viz-track: color-mix(in srgb, var(--ink) 6%, var(--bg));
     --c: var(--ink);
@@ -69,7 +69,7 @@
     fill: var(--viz-track);
   }
 
-  /* A line is 2px with round joins (SYSTEM §7). */
+  /* A line is 2px with round joins. */
   .viz-line {
     fill: none;
     stroke: var(--c);
@@ -126,7 +126,7 @@
 
   /* ── words ─────────────────────────────────────────────────────────────── */
 
-  /* A direct label: 12 in `dim` (SYSTEM §3 keeps 12 for chart labels). */
+  /* A direct label: 12 in `dim` (the design system keeps 12 for chart labels). */
   .viz-label {
     fill: var(--dim);
     font-size: var(--t-xs);

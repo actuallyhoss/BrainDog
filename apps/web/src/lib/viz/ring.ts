@@ -1,7 +1,7 @@
 /**
  * A ring's geometry: a track circle and an arc from twelve o'clock, clockwise, as long as the share.
  *
- * THE STROKE FOLLOWS THE SIZE: 8px from 96px up (Light-Decide's 140px ring), thinner below, never
+ * THE STROKE FOLLOWS THE SIZE: 8px from 96px up (Decide's 140px ring), thinner below, never
  * under 3px. The arc is a dash on a full circle rotated to the top, so a share of 1 is a closed
  * circle and a share of 0 draws nothing at all (a round cap on a zero-length dash would draw a dot
  * that says "a little").

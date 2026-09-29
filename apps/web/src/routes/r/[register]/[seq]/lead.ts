@@ -3,12 +3,12 @@
  * choices in the inline editor, by the labels that field carries.
  *
  * THE LEAD SAID THE STORED VALUE. A Personal project's page led with Earning over a Status field reading Ongoing, the
- * one place on the page that drew the state without its label (`loop/research-batch-forty-seven-audit.md` §3). Out of
+ * one place on the page that drew the state without its label. Out of
  * the component so `node --test` can run it, since a Svelte page does not mount there (`ui/enum-label-sites.test.ts`).
  *
  * AND IT WAS NOT THE ONLY ONE. Beside the fixed lead, the state field's chip still read "earning" and the inline
- * editor still offered a person's Role as `registrar` where the People list reads Agency
- * (`loop/research-batch-forty-eight-audit.md` §6). The chip draws through `stateSaid` with the lead, and the editor's
+ * editor still offered a person's Role as `registrar` where the People list reads Agency.
+ * The chip draws through `stateSaid` with the lead, and the editor's
  * options through `choicesOf`, so the three say a value by the function the tests run.
  */
 
@@ -24,7 +24,7 @@ export const stateSaid = (decl: Declared | undefined, value: string): string =>
 export const choicesOf = (f: { values?: readonly string[] } & Labelled): (readonly [value: string, said: string])[] =>
   (f.values ?? []).map((v) => [v, valueSaid(f, v)] as const);
 
-/** Where a row stands on its list's way through its states, as `Segments` draws it (SYSTEM §7, "progress"). */
+/** Where a row stands on its list's way through its states, as `Segments` draws it. */
 export type Steps = {
   /** One cell per step. */
   total: number;

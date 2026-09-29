@@ -68,7 +68,7 @@
       Two rows or fewer and there is nothing to order, which is the same test the table applies
       before it wires `onsort` at all.
 
-      ONE CHOICE IS A RADIO GROUP, WITH THE CURRENT ORDER CHECKED (design SYS-6, DSN-7). It was a column
+      ONE CHOICE IS A RADIO GROUP, WITH THE CURRENT ORDER CHECKED. It was a column
       of toggle chips, drawn as checkboxes, for a choice that has one answer, and nothing was checked
       while the list was in its own order. The list's own order is the first radio; choosing a field
       orders by it from the start, and the direction is a pair of segments under the group, each named
@@ -124,7 +124,7 @@
     <fieldset class="filter-group columns-group">
       <legend class="filter-legend">{copy.columns}</legend>
       <div class="filter-values">
-        <!-- THE NUMBER IS OFFERED AND OFF (DSN-5): it is the one column the page draws only once it is in `hidden`, so
+        <!-- THE NUMBER IS OFFERED AND OFF: it is the one column the page draws only once it is in `hidden`, so
              its box reads the set the other way round, and the same press toggles it. -->
         {#each columnsFor(register, decl, true) as c}
           {@const locked = c.field === decl.title}

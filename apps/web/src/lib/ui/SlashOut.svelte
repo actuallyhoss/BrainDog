@@ -1,5 +1,5 @@
 <!--
-  What running out of Slash's asks offers: "Use your own key" and "Settings" (`loop/finish/agents.md` AGT-29).
+  What running out of Slash's asks offers: "Use your own key" and "Settings".
 
   ONE PAIR, DRAWN WHEREVER THE MONTH IS SPENT: under the Slash section of `/usage`, and under a pass-2 refusal whose
   `pass2Refused(...).spent` is true, in the palette and on `/slash`. Both go to the Agents area of Settings (`outOfAsks`

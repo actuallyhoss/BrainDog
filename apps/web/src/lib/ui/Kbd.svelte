@@ -62,7 +62,7 @@
     white-space: nowrap;
   }
 
-  /* THE CAP (SYSTEM §6): Geist Mono 12 on the `--s1` fill, an 18px square at its smallest, radius `--r-sm`, and no
+  /* THE CAP: Geist Mono 12 on the `--s1` fill, an 18px square at its smallest, radius `--r-sm`, and no
      border. The old raised cap with a thicker bottom edge was a picture of a keyboard; this is a label. */
   .kbd {
     display: inline-grid;

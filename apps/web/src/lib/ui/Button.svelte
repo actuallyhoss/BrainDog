@@ -1,5 +1,5 @@
 <!--
-  One control, four weights, and every one of them a pill (SYSTEM §6 Buttons, §12.2).
+  One control, four weights, and every one of them a pill.
 
   PRIMARY is an ink pill with the tile's colour for its label, one per screen. QUIET, the default, is the secondary: a
   `--s1` pill inside a tile, sheet or panel body, and the `--hover-wash` pill on the ground. BARE is words in `--ink2`
@@ -7,7 +7,7 @@
 
   THERE IS NO BLUE AND NO RED FILL. `tone` still reaches the element as `data-intent`, so a gate or a test can read what
   the verb is, but it colours nothing: a destructive verb is its words in ink, asking for a confirm, and red means
-  "needs you" and nothing else (D-1).
+  "needs you" and nothing else.
 
   `kbd` draws the key cap inside the pill at its trailing edge (Geist Mono 12, an 18px cap), so the fast path is printed
   on the slow one. It is hidden from a screen reader, which already has the verb.
@@ -68,7 +68,7 @@
 </svelte:element>
 
 <style>
-  /* THE LABEL IS THE CONTROL SIZE: 14 under a mouse, 16 under a thumb (design DSN-2). No border on any weight: a pill is
+  /* THE LABEL IS THE CONTROL SIZE: 14 under a mouse, 16 under a thumb. No border on any weight: a pill is
      told by its fill, and the old `--edge` ring round every quiet button is the admin-console look this replaces. */
   .btn {
     display: inline-flex;

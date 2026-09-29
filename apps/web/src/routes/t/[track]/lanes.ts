@@ -1,6 +1,6 @@
 /**
- * Who has worked on a thread's project over the last day, as swimlanes and one line saying what they mean (SYSTEM §7,
- * "time and overlap"). Out of the component so `node --test` can hold it; a Svelte page does not mount there.
+ * Who has worked on a thread's project over the last day, as swimlanes and one line saying what they mean (time
+ * and overlap). Out of the component so `node --test` can hold it; a Svelte page does not mount there.
  *
  * A RUN'S SPAN IS WHEN ITS ROW WAS WRITTEN TO WHEN IT WAS LAST HEARD FROM. The kernel writes a `session` row when a run
  * starts and stamps `last_seen` on every write it makes (`packages/kernel/src/session.ts`), so `created` and
@@ -95,7 +95,7 @@ const COUNT = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eig
 const counted = (n: number): string => COUNT[n] ?? String(n);
 
 /**
- * The one line under the lanes (SYSTEM §6: specific and sourced). "claude has worked on it for 42 minutes in the last
+ * The one line under the lanes (specific and sourced). "claude has worked on it for 42 minutes in the last
  * day, and is working now." With several agents it names the one who put in the most and says how many are at it now.
  */
 export function lanesSaid(l: Lanes, project: string): string {

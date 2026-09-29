@@ -1,10 +1,9 @@
 /**
- * The service worker: it rings (`loop/research-living-in-it.md` W58-4), and it keeps the phone's read copy
- * (`loop/research-legacy-keeps.md` K8, MOD-27). Which request is which, and the copy's rules, are in
+ * The service worker: it rings, and it keeps the phone's read copy. Which request is which, and the copy's rules, are in
  * `lib/data/offline.ts`, which the page shares.
  *
  * ONE FIXED LINE, WHATEVER CAME WITH THE PUSH. `09 §3` is that a push carries no content, because it passes through a
- * push service nobody here runs and this record holds money and credentials. The Worker sends no body at all (W58-3),
+ * push service nobody here runs and this record holds money and credentials. The Worker sends no body at all,
  * and the kernel's `notify.push` job still writes `{ title, url }`, so this file is the place that guarantees it: the
  * payload is never read, and `push.test.ts` fires a push whose payload throws when touched.
  *

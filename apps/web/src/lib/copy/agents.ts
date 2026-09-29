@@ -1,13 +1,13 @@
 /**
  * The agents area's words and the consent screen's: the three ways to connect an agent, what is connected, and the page
- * an app's sign-in lands on (`loop/finish/agents.md` AGT-8, C5).
+ * an app's sign-in lands on.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The words the Agents area drew before the rebuild (the six-digit field, a grant's reach, a
  * key's scope) stay in `account.ts`, where they were typed; what the rebuild added is here, so the two can be told
  * apart by file.
  *
- * NO "TOKEN" ON SCREEN. It is a developer's word (design-brief §9), so what a script is handed is a key, as it is on
+ * NO "TOKEN" ON SCREEN. It is a developer's word, so what a script is handed is a key, as it is on
  * every other screen that hands one over.
  *
  * Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports only relative `.ts` files.
@@ -39,14 +39,14 @@ export const agents = {
   /* WHAT IS CONNECTED: every machine, key and app on one list (`record/device.ts` `connected`). */
   connectedTitle: 'Connected',
   connectedNone: 'Nothing is connected yet',
-  /* IT NAMES WHAT FILLS THE LIST, not where on the screen the ways to fill it are (MOD-24). */
+  /* IT NAMES WHAT FILLS THE LIST, not where on the screen the ways to fill it are. */
   connectedNoneWhy: 'The machines, keys and apps you let into this record, each with what it can do and when it last worked.',
   agentOn: (agent: string, machine: string) => `${agent} on ${machine}`,
   canAndInbox: (can: string) => `${can}, and may read the inbox`,
   unnamedKey: 'A key with no name',
   lastRun: 'last run',
 
-  /* THE CONSENT SCREEN (`routes/connect`). What it may do is always a sentence and never the bare word (C5). */
+  /* THE CONSENT SCREEN (`routes/connect`). What it may do is always a sentence and never the bare word. */
   consentTitle: 'Connect an app',
   consentNamed: (app: string) => `Connect ${app}`,
   consentNone: 'No app is asking to connect',

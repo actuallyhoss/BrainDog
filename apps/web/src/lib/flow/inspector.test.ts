@@ -2,7 +2,7 @@
  * The inspector's clock fields, read as text, because the sheet is a `.svelte` file and this runner is `node --test`
  * (the move `canvas-page.test.ts` makes on the page, for the same reason).
  *
- * MEASURED RED ON 25 SEPTEMBER AT `896dd8b`. The "How often" list was `flow.ts`'s `EVERY`, 15m to 1w, and every pick went
+ * MEASURED RED AT `896dd8b`. The "How often" list was `flow.ts`'s `EVERY`, 15m to 1w, and every pick went
  * through `clockOf`, so a monthly rule opened with no field for its day, its time or its month, and a pick of another
  * clock dropped all three. `calendar.ts` holds what is offered and how a pick is written, and
  * `inspector-monthly.test.ts` holds that to the record; this holds the sheet to `calendar.ts`, so the list the record is
@@ -28,7 +28,7 @@ test('A CLOCK OF MONTHS DRAWS ITS TIME, ITS DAY OF THE MONTH AND, ABOVE ONE MONT
   assert.match(markup, /\{#each MONTH_DAYS as /u, 'the day of the month is not picked from MONTH_DAYS');
 });
 
-/* THE WIRING BETWEEN THE FIELDS AND `clockTo` WAS HELD BY NOTHING. Measured by the checker on 25 September: with
+/* THE WIRING BETWEEN THE FIELDS AND `clockTo` WAS HELD BY NOTHING. Measured: with
    `setClock` passing the patch alone to `clockTo`, which is the day-and-time-dropping pick this change exists to end,
    with it keeping the old `every` on a pick, and with the month field drawn for a year alone, all six tests above and
    in `inspector-monthly.test.ts` stayed green, because `clockTo` was tested and the sheet's call to it was not. */

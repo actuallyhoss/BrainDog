@@ -9,7 +9,7 @@
   Which is why there is no delete control on this screen and no filter that can hide a row. A
   history you can edit is a history, and a history you cannot is a record.
 
-  THE SHAPE (SYSTEM §5 to §7, `loop/design/SCREENS.md` Activity): the title and its sentence, the three filters in
+  THE SHAPE, as the design system draws Activity: the title and its sentence, the three filters in
   the toolbar, the stream on the ground grouped by hour, and beside it three tiles, each with its chart and the one
   line that says what the chart means: who worked in the last day, what changed, and the busy hours of the week.
 -->
@@ -174,7 +174,7 @@
   let live = $state<{ events: AuditEvent[]; names: Map<string, string>; cursor: Cursor | null } | null>(null);
   let refused = $state<string | null>(null);
   /* THE SAMPLE'S LOG AND ITS 3 SEPTEMBER CLOCK WERE THE OTHER HALF OF THESE TWO LINES, behind `route.data.live`, which
-     every shell sets `true` since wave A (`no-sample-b4.test.ts` says why it is no witness). */
+     every shell now sets `true` (`no-sample-b4.test.ts` says why it is no witness). */
   const LOG = $derived(live?.events ?? []);
 
   /**
@@ -266,7 +266,7 @@
 
   /**
    * THE LOG LISTENS. When the record moves (the shell's version poll, `lib/data/live.svelte.ts`), the newest page is read
-   * again and what arrived goes on top, tinted for a second and a half (SYSTEM §8): an agent's line appears under the
+   * again and what arrived goes on top, tinted for a second and a half: an agent's line appears under the
    * reader's eye rather than on the next visit. Never while an older page is on its way, which it would land under.
    */
   let fresh = $state<ReadonlySet<string>>(new Set());
@@ -305,7 +305,7 @@
    *
    * Every line read "Created services#6": a column of lists and numbers a stranger had to open one by one. A row is its
    * title now, with its list said at the line's trailing edge; the number stays in the address the line links to and in
-   * the row's own Details, which is where somebody who wants to say it goes (design.md SYS-3).
+   * the row's own Details, which is where somebody who wants to say it goes.
    *
    * A PERSON FIRST, because an `access.grant` line's target IS somebody and `targetSaid` says them
    * by name with no link: there is no person route in this build. Everything else is `thingOf`'s,
@@ -336,7 +336,7 @@
   const kinds = $derived([...new Set(LOG.map((e) => e.kind))]);
   const perKind = $derived(LOG.reduce((m, e) => m.set(e.kind, (m.get(e.kind) ?? 0) + 1), new Map<EventKind, number>()));
 
-  /* A SEGMENTED CONTROL WHERE THE NAMES ARE FEW AND SHORT, as the board draws "Everyone | claude | codex", and a menu
+  /* A SEGMENTED CONTROL WHERE THE NAMES ARE FEW AND SHORT, as in "Everyone | claude | codex", and a menu
      where they are not: seven names in a strip is a toolbar wider than the title. */
   const segmented = $derived(actors.length <= 4 && actors.every((a) => actorSaid(a, me, names).name.length <= 14));
 
@@ -624,7 +624,7 @@
                             >{:else}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span
                       >{/if}
                     <span class="line-detail">
-                      <!-- AN AGENT'S LINE WEARS ITS RUN (AGT-13): the run's hue, and a door to the run's handoff. -->
+                      <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
                       <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
                       <span class="detail-text"
                         >{by.name}{#if note}<span class="note" title={note}> · {note}</span>{/if}{#if thing?.list}<span class="where-inline">
@@ -661,7 +661,7 @@
       {/if}
       {#if olderFix}<p class="foot">{olderFix}</p>{/if}
       <!-- WHAT THE VERSION IS FOR: it is how you name a moment when you talk to somebody about it. Not for a reader who
-           was sent no version, whose lines carry `version: 0` (`loop/research-history-cursor.md`). -->
+           was sent no version, whose lines carry `version: 0`. -->
       {#if LOG[0] && LOG[0].version > 0}
         <p class="foot">{copy.auditVersion(LOG[0].version.toLocaleString('en'))}</p>
       {/if}
@@ -708,7 +708,7 @@
     min-inline-size: 0;
   }
 
-  /* AT 1440 THE TILES ARE A 320 COLUMN AT THE STREAM'S RIGHT (SCREENS, Activity), 12 apart like any two tiles. */
+  /* AT 1440 THE TILES ARE A 320 COLUMN AT THE STREAM'S RIGHT, 12 apart like any two tiles. */
   @container (width >= 860px) {
     .board {
       grid-template-areas: 'feed side';
@@ -728,7 +728,7 @@
     }
   }
 
-  /* THE ONE LINE UNDER EACH CHART that says what it means (SYSTEM §6), at body size in ink, at the tile's foot. */
+  /* THE ONE LINE UNDER EACH CHART that says what it means, at body size in ink, at the tile's foot. */
   .reading {
     margin: 0;
     margin-block-start: auto;
@@ -763,7 +763,7 @@
     min-inline-size: 0;
   }
 
-  /* A MENU'S TRIGGER IS A GLASS PILL (SYSTEM §5): an icon, the word, and the chevron, 36 high. The focus ring follows
+  /* A MENU'S TRIGGER IS A GLASS PILL: an icon, the word, and the chevron, 36 high. The focus ring follows
      the pill, since the button round it is the thing focused. */
   .tools :global(.menu-trigger) {
     border-radius: var(--r-pill);
@@ -970,7 +970,7 @@
     display: none;
   }
 
-  /* A TIME IN A FEED IS GEIST MONO (SYSTEM §3), tabular, in the quiet ink. */
+  /* A TIME IN A FEED IS GEIST MONO, tabular, in the quiet ink. */
   .line-when time {
     font-family: var(--font-id);
     font-size: var(--t-sm);

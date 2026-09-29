@@ -1,5 +1,5 @@
 /**
- * The words `/packs` draws that no other screen does (`loop/finish/rules.md` §2: a unit's own `words` object): its three
+ * The words `/packs` draws that no other screen does (a unit's own `words` object): its three
  * tabs, the Updates list and "Install from…". What it shares with browse and share, a refusal's code line and the
  * catalogue's trust sentences, stays in `lib/copy/packs.ts`.
  *
@@ -16,7 +16,7 @@ export const words = {
   tabsLabel: 'Add-ons',
   tabs: { installed: 'Installed', updates: 'Updates', from: 'Install from…' },
   browse: 'Browse add-ons',
-  /* THE TITLE ROW'S SENTENCE (SYSTEM §5). An update is never urgent, so no phrase in it is red. `updates` is `null`
+  /* THE TITLE ROW'S SENTENCE. An update is never urgent, so no phrase in it is red. `updates` is `null`
      while the newer versions are still being looked for, and the sentence then says only what is installed. */
   sentence: (installed: number, updates: number | null): string => {
     const head = counted(installed, 'add-on installed', 'add-ons installed');

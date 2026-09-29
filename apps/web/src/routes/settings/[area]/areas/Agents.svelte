@@ -1,6 +1,6 @@
 <!--
   Settings > Agents: connecting an agent three ways, approving a machine, everything that is connected, and what Slash
-  may do on its own (`loop/finish/agents.md` AGT-8).
+  may do on its own.
 
   THREE WAYS IN, ONE UNDER ANOTHER. Any MCP client takes the record's address and signs in through OAuth, which the owner
   allows on `/connect`; Claude Code with its hooks and skills is one install line and one `braindog setup`, which
@@ -16,7 +16,7 @@
 
   ALL OF IT IS THE OWNER'S. Approving, minting, revoking and listing what can act on the record are ADMIN methods, so a
   colleague is not shown controls the record refuses them. A colleague sees `MyTokens.svelte` instead: keys for their
-  own agent, which the record caps by their own levels (COL-10), and each of which the owner's list names by whose it is.
+  own agent, which the record caps by their own levels, and each of which the owner's list names by whose it is.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -98,7 +98,7 @@
   /**
    * THE MACHINES DECIDE WHETHER THE LIST WAS READ; the keys and the runs only add to it. A record that answers the
    * machines and not the keys still has a list worth drawing, and a run that cannot be read only leaves "last run"
-   * off a row. There was a `sample` state here, which drew machines nobody connected; with no sample (DIRECTION 26) a
+   * off a row. There was a `sample` state here, which drew machines nobody connected; with no sample a
    * refusal is the record's sentence like any other.
    */
   async function listed(): Promise<Result<Held>> {
@@ -146,7 +146,7 @@
   let os = $state<Os>(osOf(globalThis.navigator));
 
   /**
-   * THE WORDS THE CONNECTED TILE ADDS (Light-Settings): what each key can do in two words, at the end of its row, and
+   * THE WORDS THE CONNECTED TILE ADDS: what each key can do in two words, at the end of its row, and
    * the line under the list that says what a propose-only key means for the person reading it.
    */
   const words = {
@@ -164,8 +164,8 @@
   };
 
   /**
-   * A MACHINE WAITING FOR SIX DIGITS IS THE ONE ROW THAT WAITS ON THE READER, so its well is amber (SYSTEM §2, "waiting
-   * on someone"); every other state is said in words on the row, and a colour would only repeat them.
+   * A MACHINE WAITING FOR SIX DIGITS IS THE ONE ROW THAT WAITS ON THE READER, so its well is amber (waiting
+   * on someone); every other state is said in words on the row, and a colour would only repeat them.
    */
   const waitsOnYou = (c: Connection): boolean => c.machine?.status === 'pending';
 
@@ -215,7 +215,7 @@
 
   /**
    * The facts under a row's name, each its own item, so a line that wraps breaks between facts and never leaves a
-   * separator leading the next line (design-brief §5). A grant that is waiting or finished says only that: "never used"
+   * separator leading the next line. A grant that is waiting or finished says only that: "never used"
    * beside "turned away" says nothing more.
    */
   function factsOf(c: Connection, nowMs: number): string[] {
@@ -223,7 +223,7 @@
     const status = c.machine?.status;
     if (status === 'pending' || status === 'expired' || status === 'denied' || status === 'revoked') return [copy.deviceState[status] ?? status];
     const facts: string[] = status === 'approved' ? [copy.deviceState.approved ?? status] : [];
-    /* WHOSE KEY IT IS, since a colleague may mint their own (COL-10): Revoke means something different on a key the
+    /* WHOSE KEY IT IS, since a colleague may mint their own: Revoke means something different on a key the
        owner made and on one a colleague's agent runs on. `person_name` is on `listTokens`'s rows and not on the type
        `device.ts` declares, so it is read here as the optional it is. */
     const whose = (c.token as { person_name?: string | null } | null | undefined)?.person_name;
@@ -439,11 +439,11 @@
   {/if}
 
   <!--
-    EVERYTHING THAT CAN ACT ON THE RECORD, AS ONE LIST TILE (Light-Settings): each machine or key with its face, what it
+    EVERYTHING THAT CAN ACT ON THE RECORD, AS ONE LIST TILE: each machine or key with its face, what it
     can do in two words at the end of its row, and the line under the list that says what the narrowest of them means.
     Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). Never a
     secret, a handle or an id: a row is named by what runs on it or the name it was given (`12 §3`). A pure list, so the
-    one tile that holds no chart (SYSTEM §6).
+    one tile that holds no chart.
   -->
   <Tile icon="session" title={copy.connectedTitle} count={held.state === 'ready' ? rows.length : undefined} meta={atWork}>
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
@@ -598,16 +598,16 @@
 
 {:else}
   <!-- A COLLEAGUE CONNECTS THEIR OWN AGENT, with a key of their own capped by their own levels, rather than being shown
-       three ways in that the record would refuse them at the end (COL-10, `loop/finish/contracts.md` X54). -->
+       three ways in that the record would refuse them at the end. -->
   <MyTokens />
 {/if}
 <SlashAsks owner={anOwner} />
 <SlashModel owner={anOwner} />
-<!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in (`loop/research-spark.md` S15). -->
+<!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in. -->
 <SlashDaily link />
 
 <style>
-  /* THE CONNECTED TILE'S ROWS (SYSTEM §6): the face or the 32px well, the name over what is known about it, what it can
+  /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can
      do in two words, and Revoke at the end, at a two-line row's height with a hairline between each. */
   .whos {
     display: flex;
@@ -668,7 +668,7 @@
     color: var(--ink2);
   }
 
-  /* WHAT IT CAN DO, IN TWO WORDS, at the end of the row where the eye runs down the list (Light-Settings). */
+  /* WHAT IT CAN DO, IN TWO WORDS, at the end of the row where the eye runs down the list. */
   .who-scope {
     color: var(--ink2);
     font-size: var(--t-sm);
@@ -815,7 +815,7 @@
   /* THE ONE PLACE A MONOSPACE FACE IS RIGHT. `Money.svelte` argues against it for figures (a mono
      face gives the thousands separator a full character width), and a key or a command is not a
      figure: it is a string somebody compares character by character against another screen, or
-     pastes into a terminal. `--font-id` is the theme's face for exactly that (design-brief §3).
+     pastes into a terminal. `--font-id` is the theme's face for exactly that.
 
      A BASE64 KEY HAS NO SPACES IN IT, so it is one 43-character word, and it reached 432px inside a
      400px screen: every line here breaks anywhere and keeps its own spaces, so the page body never
@@ -904,7 +904,7 @@
     column-gap: var(--sp-3);
   }
 
-  /* A LINK AS EVERY LINK IS DRAWN (design-brief §3): ink, with a 1px underline at 40% ink, 3px below. */
+  /* A LINK AS EVERY LINK IS DRAWN: ink, with a 1px underline at 40% ink, 3px below. */
   .run {
     color: var(--link);
     text-decoration: underline;

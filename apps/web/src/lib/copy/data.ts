@@ -2,7 +2,7 @@
  * The words the shared read helpers put together: the feed's lines on a live record (`record/api.ts` and
  * `record/boot-live.ts`), and money in more than one currency under a figure (`record/metrics.ts`).
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *

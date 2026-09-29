@@ -1,10 +1,10 @@
 /**
- * Jobs in the app (`loop/finish/agents.md` AGT-23, C13): the list at `/jobs`, starting a run of an approved kind, one
+ * Jobs in the app: the list at `/jobs`, starting a run of an approved kind, one
  * run's transcript at `/jobs/<id>` while it runs and after, and a `job.<id>` change as Decide draws it.
  *
  * FOUR METHODS AND NOTHING NEW ON THE RECORD. `listJobs` answers the runs newest first, `createJob` starts one,
  * `cancelJob` stops one and `jobEvents` answers a run's lines after the last one a screen holds, which the run's screen
- * asks every `POLL_MS` while the run is live and never once it has ended (contracts §2.3, C13).
+ * asks every `POLL_MS` while the run is live and never once it has ended.
  *
  * THE KINDS ARE THE APPROVED CHANGES THAT INSTALLED THEM. No method answers the installed `job` declarations, so "Run a
  * job" reads the `change` proposals the owner accepted, newest first, and keeps the newest body of each `job.<id>`
@@ -30,7 +30,7 @@ export type Answer<T> = { ok: true; value: T } | { ok: false; refusal: { code: s
 export type JobStatus = JobRow['status'];
 export type { JobEvent, JobRow };
 
-/** How often a live run's screen asks for its next lines (contracts §2.3). */
+/** How often a live run's screen asks for its next lines. */
 export const POLL_MS = 700;
 /** How often the list asks again while a run on it is live, so a run that ends is seen to end without a reload. */
 export const LIST_POLL_MS = 5_000;
@@ -62,7 +62,7 @@ export type Tone = 'good' | 'warn' | 'bad' | 'info' | null;
 /**
  * A status as a person reads it, and its intent.
  *
- * RUNNING IS `info` AND DONE CARRIES NO COLOUR (design-brief §10): a run that finished is the normal outcome, and the
+ * RUNNING IS `info` AND DONE CARRIES NO COLOUR: a run that finished is the normal outcome, and the
  * colours are kept for what needs a look (ran out of turns, interrupted, waiting on a decision) and what failed.
  */
 export function statusOf(status: string, lost = false, cancel = false): { word: string; tone: Tone } {
@@ -327,7 +327,7 @@ export function transcriptOf(events: readonly JobEvent[]): Step[] {
 /**
  * The status the header draws: the last line's, when the last line says how the run ended, else the record's.
  *
- * THE LAST LINE FIRST, because the header reads what the transcript under it says (agents AGT-23), and an `end` row
+ * THE LAST LINE FIRST, because the header reads what the transcript under it says, and an `end` row
  * saying "Done" under a header still saying "Running" for one poll is a screen contradicting itself.
  */
 export function headerStatus(steps: readonly Step[], answered: JobStatus): JobStatus {

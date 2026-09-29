@@ -1,5 +1,5 @@
 /**
- * The query builder's model: one `where` tree as rows a person edits, and the three ways back out of it (GAP-2).
+ * The query builder's model: one `where` tree as rows a person edits, and the three ways back out of it.
  *
  * ONE TREE, FOUR SURFACES (`docs/21 §4.1`). A filter is written in four places in this app: a list's filter, a saved
  * view's narrowing, a page block's filter and an automation's condition. Each had, or was about to have, its own editor,

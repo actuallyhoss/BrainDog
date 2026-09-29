@@ -1,12 +1,12 @@
 /**
  * The frame's words, and every word more than one area draws.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`, exactly as it did while the whole of `copy` was one object in one file. The house voice
  * is written once, at the top of `copy.ts`, and holds here as it does in every area file.
  *
- * THE FRAME IS THE RAIL, THE TOP BAR, THE TAB BAR, THE KEY SHEET AND THE ERROR PAGE (the web-shell domain of
- * `loop/finish/architecture.md` §8.1), and their words are here.
+ * THE FRAME IS THE RAIL, THE TOP BAR, THE TAB BAR, THE KEY SHEET AND THE ERROR PAGE (the web shell), and their words
+ * are here.
  *
  * AND A SENTENCE TWO AREAS DRAW IS HERE, IN NO AREA'S OWN FILE. `tryAgain`, `noSuch`, `recordNotReached`, the
  * poll form's labels that the exchange rates form reuses, and the rest: rewording one of them changes a screen in
@@ -71,7 +71,7 @@ export const shell = {
   /* ACTIVITY, AND IT WAS HISTORY: the owner's old tool called the same screen Activity, and it is a row of the flat nav now. */
   audit: 'Activity',
   automations: 'Automations',
-  /* AGT-23's screen, named in the rail and in the phone's More sheet. */
+  /* The Jobs screen, named in the rail and in the phone's More sheet. */
   jobs: 'Jobs',
   more: 'More',
   close: 'Close',
@@ -427,7 +427,7 @@ export const shell = {
     kind.charAt(0).toUpperCase() + kind.slice(1),
   arrangeAdds: 'Adds',
   /* WHAT AN UPDATE HANDS TO ANOTHER PACK, which stays live: said apart from what it takes away, because a door the owner's
-     Shortcut posts to goes on answering (`loop/research-batch-thirty-four-audit.md` §8). */
+     Shortcut posts to goes on answering. */
   arrangeMoving: 'Moves',
   arrangeMovesTo: (name: string, pack: string) => `${name} moves to ${pack}, which is not installed; it keeps working until you remove it.`,
 } as const;

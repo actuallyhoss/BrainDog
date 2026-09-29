@@ -4,7 +4,7 @@
  *
  * IT IS A LIST AND KEEPS THE LIST'S RULES (`.list > .item` in `blocks.css`): the title on the first line, the host in
  * the detail line and the note under it. What this sheet adds is what a list of doors needs: the title looks like the
- * link it is, and the whole row is the target, 44px tall under a coarse pointer (C4), since a thumb aims at a row and
+ * link it is, and the whole row is the target, 44px tall under a coarse pointer, since a thumb aims at a row and
  * not at the words in it.
  */
 

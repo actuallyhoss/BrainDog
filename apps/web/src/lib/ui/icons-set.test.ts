@@ -1,6 +1,6 @@
 /**
  * A declared icon draws from all 251 glyphs, not only the 68 the app draws for itself, and the app's
- * own are ICONS.md's shapes, drawn as the elements they are.
+ * own are the design system's icon shapes, drawn as the elements they are.
  *
  * BEFORE THIS FILE, `icon: rocket` ON A PAGE DREW A DOCUMENT. `iconFor` checked the name against
  * `icons.ts` alone, so every name in `braindog-render/glyphs` that the app had not also drawn by hand
@@ -84,7 +84,7 @@ test('a glyph of several shapes is drawn as those shapes, with no name special-c
     drawnShapes('projects').map((s) => s.tag),
     ['rect', 'rect', 'rect', 'rect'],
   );
-  /* The dots carry ICONS.md's heavier stroke, on the element, over the glyph's 1.75. */
+  /* The dots carry the icon set's heavier stroke, on the element, over the glyph's 1.75. */
   assert.equal((drawnShapes('more')[0] as Extract<Shape, { tag: 'path' }>).attrs['stroke-width'], '2.75');
 });
 

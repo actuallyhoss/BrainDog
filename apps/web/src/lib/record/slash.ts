@@ -1,5 +1,5 @@
 /**
- * The Slash screen's reads and its one press (`/slash`, `loop/research-spark.md` S15).
+ * The Slash screen's reads and its one press (`/slash`).
  *
  * PURE, SO `node --test` CAN IMPORT IT: the client is handed in, as `governance.ts` takes it.
  *
@@ -87,7 +87,7 @@ export const canAsk = (reading: Reading): boolean =>
  * The line under the title: who drafts.
  *
  * THE LAST PRESS OUTRANKS THE READING, because the reading names the model the host has and not whether it will be asked.
- * `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the included model turns every press away unsent, and
+ * At 300 lists the included model turns every press away unsent, and
  * this line went on saying it drafts. A fresh reading still says the model's name until a press says `large`: the record
  * learns it only by asking, and keeps no note of it between loads.
  */
@@ -116,7 +116,7 @@ export async function askSlash(client: SlashClient, asked?: string): Promise<{ o
 }
 
 /* ── a change described, drawn, then kept ─────────────────────────────────────
-   `loop/finish/pages.md` PGS-12: the owner says what a page should do differently, Slash drafts the change, the page
+   The owner says what a page should do differently, Slash drafts the change, the page
    draws it as it would stand, and one press keeps it. The Slash screen's own description goes the same way, with no
    page named. */
 
@@ -156,8 +156,8 @@ export const changeWords = {
 export type ChangeDecl = { id: string; kind: string; body: Record<string, unknown> };
 
 /**
- * One draft from a description, as `slashDraft` answers it (`SlashDrafted` in the record, `loop/finish/contracts.md`
- * `slashDraft`). `rows` are sample rows the preview is drawn over and nothing files; `preview` is what the record drew
+ * One draft from a description, as `slashDraft` answers it (`SlashDrafted` in the record). `rows` are sample rows the
+ * preview is drawn over and nothing files; `preview` is what the record drew
  * when it checked the draft, carried here as it came.
  */
 export type Drafted = {

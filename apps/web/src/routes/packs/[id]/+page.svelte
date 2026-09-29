@@ -2,7 +2,7 @@
   One add-on's settings: `/packs/<id>`.
 
   A FORM GENERATED FROM WHAT THE ADD-ON DECLARES, by the rule `06 §8` gives a register's create form,
-  over the six types of `loop/research-modular.md` §1.3. A label is always visible, an error sits
+  over the six types a setting can declare. A label is always visible, an error sits
   beside its field, and Ctrl or Cmd with Enter saves from anywhere in the form.
 
   SAVE SENDS ONLY WHAT MOVED, and Reset sends `null` for one setting, which the record reads as its
@@ -10,7 +10,7 @@
   or updated, and that is the one sentence this screen says. An add-on that declares no settings
   draws no settings section.
 
-  THE LOOK (SYSTEM §5, §6): what the add-on does is the title row's sentence and its switch is in the toolbar. The form
+  THE LOOK: what the add-on does is the title row's sentence and its switch is in the toolbar. The form
   is a group on the ground, each setting's label above its 40px field (a switch sits beside its label, as a switch
   does). Exchange rates are a tile of their own, and what the add-on added is a list of rows with their icon wells.
 -->
@@ -24,8 +24,8 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists, read off each one's own manifest and document. It
-     was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote (wave C1), then a hand copy with
-     stale versions (USE-3). */
+     was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote, then a hand copy with
+     stale versions. */
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -179,7 +179,7 @@
 
   /**
    * WHETHER THIS ADD-ON IS ON (`installed`), read beside its settings, so its own page carries the same switch its row on /packs does
-   * (design.md §2.8: the page had "no version, switch or uninstall"). `null` until the record answers, and the switch is
+   * (the page once had no version, switch or uninstall). `null` until the record answers, and the switch is
    * not drawn until then, because a switch that guesses is a switch that lies.
    */
   let installed = $state<PackState | null>(null);
@@ -524,12 +524,12 @@
         </form>
       </Section>
       {#if HOME_CURRENCY_SETTING in settings.config}
-        <!-- EXCHANGE RATES ARE A PRESET OF THE NEW-ACTION SHEET (USE-5), reached by its address (`contracts.md` X57).
+        <!-- EXCHANGE RATES ARE A PRESET OF THE NEW-ACTION SHEET, reached by its address.
              This page drew a form written for one pack, which it imported by name; now it links to the same sheet
              every scheduled action is made on, filled in for a rate. It stays offered once one is set up, because each
              currency is an action of its own and a second currency is the same press again. -->
         <!-- A TILE, AND NO CHART IN IT: the rates are fetched by an action, and until one runs there is no rate here to
-             draw. It is a control tile, which SYSTEM §6 allows to hold no figure. -->
+             draw. It is a control tile, which the design system allows to hold no figure. -->
         <Tile icon="money" title={copy.ratesHeading}>
           <p class="rates-why">{copy.ratesWhy}</p>
           <div class="settings-actions">
@@ -552,7 +552,7 @@
     {/if}
     {#if pack && (pack.registers.length || pack.pages.length)}
       <Section title={copy.installDiff} count={pack.registers.length + pack.pages.length}>
-        <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it (SYSTEM §6, Rows). -->
+        <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
         <ul class="ledger">
           {#each pack.registers as r (r)}
             <li>
@@ -641,7 +641,7 @@
     text-wrap: pretty;
   }
 
-  /* ONE SETTING: its label above its control (SYSTEM §6, Fields), its note and any refusal under it. */
+  /* ONE SETTING: its label above its control, its note and any refusal under it. */
   .setting {
     display: flex;
     flex-direction: column;
@@ -760,7 +760,7 @@
     gap: var(--sp-3);
   }
 
-  /* A ROW OF WHAT IT ADDED: its well, its name, and the chevron that says it opens (SYSTEM §6, Rows). */
+  /* A ROW OF WHAT IT ADDED: its well, its name, and the chevron that says it opens. */
   .added {
     grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
     column-gap: var(--sp-3);

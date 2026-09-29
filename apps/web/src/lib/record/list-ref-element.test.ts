@@ -16,7 +16,7 @@
  * it left one shipped `list<ref>` field partly unfilterable on the sample alone.
  *
  * THE ROWS A CLAUSE ADMITS ARE THE RECORD'S TO COUNT (`remote.test.ts` asks it), and the browser's
- * matcher that counted them here went with the browser's engine (ARC-2). What `compile` answers now is
+ * matcher that counted them here went with the browser's engine. What `compile` answers now is
  * the record's own parse, so these cases ask which element a sentence names.
  */
 

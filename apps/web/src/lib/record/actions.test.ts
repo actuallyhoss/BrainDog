@@ -135,7 +135,7 @@ test('a project gets its own actions, matched by name without case, and the glob
   assert.deepEqual(split.everywhere.map((r) => r.ingest), ['g']);
 });
 
-/* DOR-6: A DECLARATION HOLDS THE PROJECT AS A ROW ID, which is no name, and the record resolves it to the row. */
+/* A DECLARATION HOLDS THE PROJECT AS A ROW ID, which is no name, and the record resolves it to the row. */
 test('an action the record resolved to the project row shows on that project, whatever its declaration held', () => {
   const kiln = { id: '01KILN', spoken: 'things#1', title: 'Kiln' };
   const rows = [
@@ -164,7 +164,7 @@ test('no sentence this screen says carries an em dash', () => {
 
 /* NO RECORD DREW THE SAMPLE'S FIVE ACTIONS UNDER "Runs on", one of them paused with a Resume that changed the tab and
    said nothing was saved, on a project page nobody could read. Each of the three ways of there being no record is now
-   the sentence for it (DIRECTION 26), and the one that said "the demo has no account" says the record was not reached. */
+   the sentence for it, and the one that said "the demo has no account" says the record was not reached. */
 test('NO RECORD DRAWS WHY: nothing listening, a static 404 page, or a 401', async () => {
   const cases: [Record<string, () => Response>, { code: string; fix: string }][] = [
     [{}, { code: 'UNREACHABLE', fix: copy.recordNotReached }],

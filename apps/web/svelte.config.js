@@ -25,7 +25,7 @@ const inlineHashes = (tag) =>
 const TURNSTILE = 'https://challenges.cloudflare.com';
 const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];
 
-/* THE APP LIVES AT `brain.dog/app`, AND ITS FILES LIVE AT `build/app` (`loop/research-one-domain.md` §2.2). The Worker's
+/* THE APP LIVES AT `brain.dog/app`, AND ITS FILES LIVE AT `build/app`. The Worker's
    asset directory stays `build/`, so `/app/_app/x.js` is `build/app/_app/x.js` and the marketing site's own `/_app/*`
    never reaches the product. `lib/at.ts` holds the same word as `BASE`, and a test holds the two equal. */
 const BASE = '/app';
@@ -72,7 +72,7 @@ export default {
     /* AN ALPHA BUILD GOES SOMEWHERE ELSE. `adapter-static` writes the pages, not Vite's `outDir`, so
        `BRAINDOG_ENV=alpha` goes to `build-alpha`: `env.alpha` in the Worker's wrangler file serves that
        directory, so an alpha build can never replace production's. The record variants the browser gates
-       measure were builds here too until wave C2 of `loop/research-no-sample.md`; they are records now
+       measure were builds here too until the sample went; they are records now
        (`tools/gates/record.mjs`), served beside the one build. */
     adapter: atBase,
     paths: { base: BASE },
@@ -82,8 +82,8 @@ export default {
        of `src/service-worker.ts` puts a `register` call in the shell's inline boot script, and the generated
        `internal.js` read `service_worker: true`: every visitor to every page installed a worker, whether or not they
        ever turned notifications on. `PushToggle.svelte` registers it when he turns notifications on, and `keep` in
-       `lib/data/offline.ts` registers it for a record being followed, outside development, for the read copy
-       (MOD-27). The file is still built to `service-worker.js` either way, because building it follows the file and
+       `lib/data/offline.ts` registers it for a record being followed, outside development, for the read copy.
+       The file is still built to `service-worker.js` either way, because building it follows the file and
        not this flag. */
     serviceWorker: { register: false },
     version: { pollInterval: 0 },

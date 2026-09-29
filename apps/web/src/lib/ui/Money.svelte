@@ -10,8 +10,8 @@
   ONE PIECE, NEVER BROKEN. Sign, symbol, figure and code sit on one line, so a narrow column never
   leaves a minus or a `£` at the end of one line and the digits on the next.
 
-  A FIGURE THAT DOES NOT FIT SHRINKS ONE TYPE STEP BEFORE IT IS CUT, AND IS NEVER CUT INSIDE ITSELF
-  (design DSN-4). When the block it sits in is narrower than the figure, it is drawn a step smaller; if
+  A FIGURE THAT DOES NOT FIT SHRINKS ONE TYPE STEP BEFORE IT IS CUT, AND IS NEVER CUT INSIDE ITSELF.
+  When the block it sits in is narrower than the figure, it is drawn a step smaller; if
   that still does not fit, the code goes first and then the whole amount, behind an ellipsis, because
   `£4,8…` is a different number and a cut figure is worse than a missing one. The full figure stays in
   the text a screen reader reads, and in the title on a pointer.
@@ -153,7 +153,7 @@
     color: inherit;
   }
 
-  /* A STRONG FIGURE IS SET AT THE FIGURE'S WEIGHT, 600 (design-brief, Type: "600 (titles, figures)"). It was 500, and
+  /* A STRONG FIGURE IS SET AT THE FIGURE'S WEIGHT, 600, the weight of titles and figures. It was 500, and
      because this rule sits on `.amount` it won over the caller: a row page's hero figure asks for 600 on `.lead-figure`
      and was drawn at 500 inside it. */
   .money[data-weight='strong'] .amount {

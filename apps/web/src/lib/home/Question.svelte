@@ -1,5 +1,5 @@
 <!--
-  One open question on Today, answered where it is shown, as a row on the ground (SYSTEM §6): a 32px well with the
+  One open question on Today, answered where it is shown, as a row on the ground: a 32px well with the
   Decide glyph, the question, who asked and how long it has waited, the recommendation in one line, and its options as
   pills with their number keys. A press sends the option alone and the record says whether it wants a reason
   (`answerQuestion`); when it does, one line opens under the options, focused, and Enter sends it with the option already
@@ -254,7 +254,7 @@
     white-space: nowrap;
   }
 
-  /* THE RECOMMENDATION, ONE LINE IN THE SECOND INK, its lead in `--live`: the one hue for a suggestion (SYSTEM §2). */
+  /* THE RECOMMENDATION, ONE LINE IN THE SECOND INK, its lead in `--live`: the one hue for a suggestion. */
   .q-rec {
     margin: 6px 0 0;
     overflow: hidden;
@@ -279,7 +279,7 @@
     margin-block-start: 10px;
   }
 
-  /* A QUIET PILL ON THE GROUND (SYSTEM §6): the wash, ink words, and the option's number key at its end. The one the
+  /* A QUIET PILL ON THE GROUND: the wash, ink words, and the option's number key at its end. The one the
      record suggests says so in its weight, not in a colour. */
   .opt {
     display: inline-flex;

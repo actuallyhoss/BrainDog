@@ -1,9 +1,8 @@
 /**
- * Turn 2 of the first run, "What's your business?", read without a model (`loop/research-modules.md`
- * §5, option (a)). A sentence becomes a `Shape`: which packs to turn on, and the first rows the
+ * Turn 2 of the first run, "What's your business?", read without a model. A sentence becomes a `Shape`: which packs to turn on, and the first rows the
  * sentence itself can fill.
  *
- * THE WORDS ARE THE CATALOGUE'S, NOT THIS FILE'S (shell.md USE-3, R4). Each pack says what a person
+ * THE WORDS ARE THE CATALOGUE'S, NOT THIS FILE'S. Each pack says what a person
  * calls what it keeps in its manifest's `signals`, as a use case does, and this reads them: the six
  * modules from their own manifests (`@braindog/seed/packs/modules`), and any other pack the caller
  * hands in from the catalogue. A pack from the Kennel that says it is for "choir" is offered to a
@@ -317,7 +316,7 @@ export function shape(sentence: string, today: string = new Date().toISOString()
 /**
  * Which packs each module points at, so turning one on turns those on too, read off each manifest's `requires`
  * (`@braindog/seed/packs/modules` `leans`). People and Work only link to Projects and People, and Money links to People
- * for a payment's party, so each goes in without them (`first-party.ts` `LINKS`, MOD-4). `shape.test.ts` holds this to
+ * for a payment's party, so each goes in without them (`first-party.ts` `LINKS`). `shape.test.ts` holds this to
  * the seed's pack manifests.
  */
 export const LEANS_ON: Readonly<Record<PackId, readonly PackId[]>> = Object.fromEntries(BUNDLED.map((o) => [o.id, o.modules]));

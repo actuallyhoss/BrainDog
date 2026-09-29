@@ -8,7 +8,7 @@
   Three rules the copy obeys: be specific about what WILL be here; a CTA is Verb + Noun, never
   "Get Started"; and the CTA is a real button or link, so it joins the tab order.
 
-  DRAWN IN THE NEW LANGUAGE (SYSTEM §6): the kind's glyph in a 32px icon well, the title, the one line,
+  DRAWN IN THE NEW LANGUAGE: the kind's glyph in a 32px icon well, the title, the one line,
   and the action as the primary ink pill, which the caller passes as `Button weight="primary"`.
 
   `cleared` has no action, because nobody manufactures work.
@@ -81,13 +81,13 @@
      * The technical reason, folded under "Details" and never the content.
      *
      * A PERSON TOLD "200 WITH A BODY THAT IS NOT JSON" HAS BEEN TOLD NOTHING THEY CAN ACT ON, and that string was the
-     * title of the not-found screen (design SYS-8). The sentence says what happened in their words; this keeps the
+     * title of the not-found screen. The sentence says what happened in their words; this keeps the
      * transport's words one press away for whoever reports the fault.
      */
     detail?: string | undefined;
     /**
      * The host's glyph drawings, for a title an AUTHOR wrote (a block's `empty:`), so `{{icon:rocket}} shipped` draws
-     * the rocket rather than its braces (PGS-4). Absent, the title is drawn as the plain text it always was, which is
+     * the rocket rather than its braces. Absent, the title is drawn as the plain text it always was, which is
      * every title typed in `copy`.
      */
     icon?: ((name: string) => string | null) | undefined;
@@ -100,7 +100,7 @@
    * difference between "nothing here yet" and "you cannot see this" was carried by the sentence alone.
    *
    * NOTHING-YET HAS NO GLYPH OF ITS OWN BECAUSE IT HAS NO SUBJECT OF ITS OWN. It was the three-line menu glyph, so
-   * Automations, Machines, Usage, Slash and Home all drew a hamburger beside their first-use sentence (design SYS-8);
+   * Automations, Machines, Usage, Slash and Home all drew a hamburger beside their first-use sentence;
    * a whole screen passes the glyph of what will be there, and one that passes none draws the sentence alone.
    */
   const GLYPH: Record<EmptyKind, IconName | null> = {
@@ -278,7 +278,7 @@
    * INSIDE A `Section` THIS IS THE FORM WHETHER OR NOT THE CALLER SAID `compact`. The whole-screen
    * form belongs to a state that IS the screen, and a section is never that. The settings areas
    * never passed the flag, so "No passkey yet." drew at 16px 600 with the menu glyph under a 14px
-   * section title and read as the heading, with the heading as its caption (design SYS-8).
+   * section title and read as the heading, with the heading as its caption.
    * `Section` emits `section.section` and nothing else does, so the ancestor selector names exactly
    * the case and no caller has to be edited to be right.
    */

@@ -17,7 +17,7 @@
  * inbox when something waits there. This screen now says where the question went, how many still wait,
  * and offers the next one, the queue, or the inbox, from one snippet drawn in every one of those states.
  *
- * THE MODULE HALF IS THE EASY HALF, and the queue's own checker proved it (`page.test.ts` here): a test
+ * THE MODULE HALF IS THE EASY HALF, and the queue's own test proved it (`page.test.ts` here): a test
  * that only asks the module stays green with the wiring torn out. So the second half reads the screen.
  */
 
@@ -81,7 +81,7 @@ test('the way on always offers somewhere, and the next question only when one wa
 
 test('a defer leaves for the next question or the queue instead of redrawing what it parked', () => {
   /* ONE PLACE NOW, WHERE THERE WERE TWO. The sample's defer, which sent nothing, kept its own copy of this
-     line, and it went with the sample (DIRECTION 26); the defer that sends `decide` is what is left, and it
+     line, and it went with the sample; the defer that sends `decide` is what is left, and it
      must still leave. */
   const guard = /void goto\(at\(onwardTo \? `\/decide\/\$\{onwardTo\}` : '\/decide'\)\);/gu;
   assert.equal([...page.matchAll(guard)].length, 1, 'a defer still stays on a page that draws the parked question open');
@@ -91,10 +91,10 @@ test('a defer leaves for the next question or the queue instead of redrawing wha
 });
 
 test('a record that refuses this question offers only its own queue as the way on', () => {
-  /* FOUND BY THE CHECKER ON 22 SEPTEMBER. The refused state used to draw only `Back to Decide`; it now
+  /* FOUND IN REVIEW. The refused state used to draw only `Back to Decide`; it now
      draws the shared way on, and `openIds` fell back to the SAMPLE queue for every state but `live`,
      so a live record that refused one question offered `Next question` to a sample id it never held.
-     The sample is gone (DIRECTION 26): every way on reads the record's own queue, which is empty when
+     The sample is gone: every way on reads the record's own queue, which is empty when
      that read was refused too, and nothing here reads the fixture module. */
   assert.doesNotMatch(page, /from '\$lib\/record\/data\.ts'/u, 'the screen reads the fixture module again');
   for (const read of ['const here = $derived(queue.indexOf(', 'nextOpen(queue, ', 'stillWaiting(queue, '])

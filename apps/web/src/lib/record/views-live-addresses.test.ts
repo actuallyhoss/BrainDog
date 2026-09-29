@@ -9,7 +9,7 @@
  * addresses are that ONE register's, and a key naming a register with no views — a list that has
  * been retired, a rail entry that outlived what it pointed at, a typed address — came back with an
  * empty set, which `/v/[view]` prints as "This record has no saved views yet." over a record holding
- * several. That is the shape of finding 4 in `loop/research-usability-2026-09-21.md`: a stale entry
+ * several. That is the shape of a usability finding: a stale entry
  * leading to a refusal whose helpful half is not only unusable but untrue.
  *
  * AND THE SECOND READ IS PAID FOR ONLY WHERE IT BUYS SOMETHING. A register that does hold views has

@@ -9,7 +9,7 @@
   A card cannot hold a button inside its link, so the anchor and the verbs are SIBLINGS under one
   item, as `RowCards.svelte` does for the register.
 
-  AND IT IS A QUEUE, CLEARED FROM THE KEYBOARD (DESIGN-SYSTEM appendix D). A cursor moves with `j`
+  AND IT IS A QUEUE, CLEARED FROM THE KEYBOARD. A cursor moves with `j`
   and `k`; a number answers with that option, `a` with the suggested one, `d` defers on the gate, `x`
   selects for one answer to several, and Enter opens the question. Inside a reason, `⌘↵` sends it and
   Esc goes back to the list. A question decided here stays in its place as one line.
@@ -18,7 +18,7 @@
   bodies, the recommendation, the defer with its wake date, and a commit that takes a named decider
   and a written reason and cannot be edited afterwards.
 
-  THE LOOK (SYSTEM §5 to §7, `loop/design/SCREENS.md` "Decide"). The title row says how many wait and what the first
+  THE LOOK, as the design system draws Decide. The title row says how many wait and what the first
   one suggests. The first question in the ranking is OPEN in a lead tile: what accepting does, the suggestion and why,
   the share its reason claims drawn as squares, and its options with their keys. Beside it a tile draws how long each
   question has waited, and under that the rest of the queue sits on the ground as rows. What accepting would change is
@@ -81,7 +81,7 @@
    * WHERE THE QUEUE CAME FROM. `live` is the record's open suggestions, through `governance`; `refused`
    * is a host that answered no, and its own sentence is what is drawn. Nothing is drawn while the first
    * read is out. There was a third, `sample`, for a host with no record behind it, which drew fixture
-   * questions and let them be answered with nothing sent; it went with the sample record (DIRECTION 26).
+   * questions and let them be answered with nothing sent; it went with the sample record.
    */
   let from = $state<'reading' | 'live' | 'refused'>('reading');
   let live = $state<Queue | null>(null);
@@ -105,7 +105,7 @@
   /* WHAT WAS PUT OFF AND WHEN IT COMES BACK, and the calls a prediction was made about (`views.ts`). */
   let views = $state<Views>({ later: [], calls: [] });
 
-  /* ASKING YOURSELF A QUESTION, filed through PGS-19's sheet; the new question is read back into the queue it joins. */
+  /* ASKING YOURSELF A QUESTION, filed through `AskSheet`; the new question is read back into the queue it joins. */
   let asking = $state(false);
   function filed() {
     asking = false;
@@ -140,9 +140,9 @@
   /**
    * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED.
    *
-   * Measured on 21 September, driving a real self-host as a colleague invited to READ: this screen
+   * Measured driving a real self-host as a colleague invited to READ: this screen
    * came back at 279 words and 168 controls, 17 of them buttons that answer a question, and NOT ONE
-   * of them disabled — control for control the screen the colleague at `decide` got. The refusal
+   * of them disabled, control for control the screen the colleague at `decide` got. The refusal
    * arrived from the record after a press, a typed reason and a second press. `shell.me` has carried
    * the answer since `boot`, and one grep across the app found exactly one line of markup reading
    * `me.level` anywhere, on `/settings/identity`. This is the second.
@@ -166,7 +166,7 @@
    * DECIDED HERE, ON A LIVE RECORD, AND DRAWN WHERE IT WAS.
    *
    * A written answer used to read the whole queue again, so every card under it moved at once and
-   * focus fell to the document (DESIGN-SYSTEM D3). The record has the decision; the queue keeps the
+   * focus fell to the document. The record has the decision; the queue keeps the
    * question in its place as one line saying what was decided, and the cursor moves to the next one.
    * Coming back to the screen reads the queue without it.
    */
@@ -182,7 +182,7 @@
   );
 
   /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the
-     record rather than a row in it (DIRECTION §11: this is where Slash's proposals land). */
+     record rather than a row in it: this is where Slash's proposals land. */
   const previews = $derived(
     new Map(
       open.map((q) => {
@@ -231,7 +231,7 @@
      and the questions about nothing in particular come last.
 
      THE ADDRESS HOLDS IT, NOT THIS FILE. It was a local `$state`, so a grouped queue could not be sent to anybody
-     and a reload undid it (REWORK §5). `grouping.ts` reads and writes the parameter; a press replaces the address
+     and a reload undid it. `grouping.ts` reads and writes the parameter; a press replaces the address
      rather than pushing one, because a grouping arranges this queue and is not somewhere Back should return to. */
   const grouping = $derived(groupingOf(route.url));
   const groupBy = (next: Grouping) => void goto(at(groupedAddress(route.url, next)), { replaceState: true, noScroll: true, keepFocus: true });
@@ -698,7 +698,7 @@
                    word is `braindog-render`'s, the same one the `queue` block draws. -->
               {#if queueCost(q.band ?? '')}<span class="q-band" data-cost={q.band}>{queueCost(q.band ?? '')}</span>{/if}
               <!-- NO ID ENDS THE LINE, NOT EVEN ONE A READER COULD SAY: the question is named by its words, and a number
-                   here counted the questions a one-list member was not shown (rules §2, SYS-3). -->
+                   here counted the questions a one-list member was not shown. -->
             </span>
           </span>
         </a>
@@ -761,7 +761,7 @@
           {@const state = reasonState(said.reason)}
           <div class="said">
             <span class="said-what">{SAY.answered(said.title)}</span>
-            <!-- THE ROW STAYS AND OFFERS THE WAY BACK (REWORK §1, §4). -->
+            <!-- THE ROW STAYS AND OFFERS THE WAY BACK. -->
             <Button
               weight="bare"
               id="undo-{q.id}"
@@ -1121,7 +1121,7 @@
     margin-block-start: var(--sp-4);
   }
 
-  /* THE ONE WRITTEN LINE UNDER A CHART OR A TABLE, saying what it means (SYSTEM §6). */
+  /* THE ONE WRITTEN LINE UNDER A CHART OR A TABLE, saying what it means. */
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
@@ -1615,7 +1615,7 @@
   }
 
   /* A FIELD IS 40 ON `--s1` IN A TILE AND ON THE TILE'S OWN WHITE ON THE GROUND, radius 12, and no border: the fill is
-     its edge (SYSTEM §6). */
+     its edge. */
   .why-field {
     inline-size: 100%;
     min-block-size: 40px;
@@ -1811,7 +1811,7 @@
       display: none;
     }
 
-    /* A PHONE'S ROW IS 60 (SYSTEM §9), and the bar sits above the tab bar. */
+    /* A PHONE'S ROW IS 60, and the bar sits above the tab bar. */
     .q:not([data-lead]) {
       min-block-size: 60px;
     }

@@ -1,13 +1,13 @@
 <!--
-  Slash's face on its own screen: the stroke its face carries everywhere else, in a circle (DSN-18, SYSTEM §2).
+  Slash's face on its own screen: the stroke its face carries everywhere else, in a circle.
 
   THE SAME STROKE AS `AgentFace`'s SLASH, so the face a person meets in History and on a run is the one that answers here.
   It is drawn here rather than through `AgentFace`, because that component is a run's face (a hue from the run, a door to
   it) and an answer on this screen names no run.
 
   WHERE IT IS: beside Slash's own sentence in the Ask tile, so an answer reads as somebody's, with its sources above it.
-  A CIRCLE, because faces for agents are circles and Slash is one; in the tile's inner fill and ink, never the brand's red
-  (D-1), since Slash is a part of the product and not the product.
+  A CIRCLE, because faces for agents are circles and Slash is one; in the tile's inner fill and ink, never the brand's red,
+  since Slash is a part of the product and not the product.
 
   DECORATION, AND HIDDEN FROM A SCREEN READER: the answer's footer names what drew it.
 -->

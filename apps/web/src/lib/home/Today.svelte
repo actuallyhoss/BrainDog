@@ -1,5 +1,5 @@
 <!--
-  Today: the screen every record opens on, and the one the owner reads first each morning (SYSTEM §5, board `Main`).
+  Today: the screen every record opens on, and the one the owner reads first each morning.
 
   Under the title, one sentence says what the morning holds, with the one phrase that needs him in red. Then the next
   two weeks as a strip of days. On the left, on the ground: what needs you, with its verbs and their keys, and the days
@@ -739,7 +739,7 @@
             {/if}
           </Tile>
         {:else if money}
-          <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile (SYSTEM §11). -->
+          <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile. -->
           <div class="ground">
             <Section title={words.cash}>
               {#snippet aside()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
@@ -834,7 +834,7 @@
     min-inline-size: 0;
   }
 
-  /* ── the grid (SYSTEM §5, board `Main`) ──────────────────────────────────────
+  /* ── the grid ────────────────────────────────────────────────────────────────
      The strip across the top; the list on the ground at the left and three tiles at the right, 12 apart. Every track
      may shrink to nothing, so no tile or row can push the page wider than the window. */
   .today {
@@ -895,7 +895,7 @@
     }
   }
 
-  /* ON A PHONE (SYSTEM §9) the order is what needs you, the agents, what changed and cash, and then the days. */
+  /* ON A PHONE the order is what needs you, the agents, what changed and cash, and then the days. */
   @media (width < 900px) {
     .page {
       padding: var(--sp-2) var(--gutter) var(--sp-8);
@@ -1154,7 +1154,7 @@
 
   /* ── inside the tiles ──────────────────────────────────────────────────────── */
 
-  /* THE ONE WRITTEN LINE under every chart, saying what it means (SYSTEM §6). */
+  /* THE ONE WRITTEN LINE under every chart, saying what it means. */
   .reading {
     margin: 0;
     color: var(--ink);
@@ -1374,7 +1374,7 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
-    /* A PHONE'S ROW (SYSTEM §9): the mark, the words across, and the time and the verbs on a line under them. */
+    /* A PHONE'S ROW: the mark, the words across, and the time and the verbs on a line under them. */
     .rows :global(.line.line-tall) {
       grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
       grid-template-rows: auto auto;

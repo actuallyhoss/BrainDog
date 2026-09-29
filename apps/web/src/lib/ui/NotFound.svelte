@@ -1,5 +1,5 @@
 <!--
-  An address that leads to nothing on this record, drawn inside the shell with Search and Home (design SYS-8, DSN-12).
+  An address that leads to nothing on this record, drawn inside the shell with Search and Home.
 
   ONE SCREEN FOR BOTH DOORS A MISTYPED ADDRESS COMES THROUGH. A path that is one segment long reaches `routes/[id]`, the
   spoken-id resolver, before anything else can answer it, and every other unmatched path reaches `+error.svelte` at 404.
@@ -24,7 +24,7 @@
   import Empty from './Empty.svelte';
   import Icon from './Icon.svelte';
 
-  /* This screen's own words, in a `words` object in the module that draws them (contracts §11 X18). */
+  /* This screen's own words, in a `words` object in the module that draws them. */
   const words = {
     title: 'Nothing is at this address',
     body: 'It may have moved, or a letter may be out of place. Search for what you were after, or start again from Home.',

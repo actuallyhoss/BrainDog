@@ -173,7 +173,7 @@ test('UNDER join=any THE CHIPS ARE ONE OR-GROUP ON A RECORD, as they are on the 
   assert.deepEqual(allOf.record, allOf.sample);
   assert.notDeepEqual(allOf.record, anyOf.record, 'the seed answers the same rows either way, so this test cannot tell "and" from "or"');
 
-  /* A COMPARE CHIP INSIDE THE GROUP, which is the case both halves of this brief meet in. */
+  /* A COMPARE CHIP INSIDE THE GROUP, which is the case both halves of this file meet in. */
   const mixed = await address('obligations', 'f=amount:gte:GBP%202400&f=state:in:paid&join=any');
   assert.deepEqual(mixed.record, mixed.sample);
   assert.deepEqual(mixed.record, recordRows(k, refs, 'obligations', 'amount at least GBP 2400, or state is paid'));
@@ -187,7 +187,7 @@ test('UNDER join=any THE CHIPS ARE ONE OR-GROUP ON A RECORD, as they are on the 
 
 test('`not-on`, THE CHIP registerHref MINTS FOR `due is not today`, IS THE NEGATION ON A RECORD TOO', async () => {
   /* IT FELL TO THE LAST LINE OF `leafOf` AND WENT OVER AS `is`, which is the inversion `whereOf`
-     already had and lost on the sample. Measured by the checker on this seed: the sentence and the
+     already had and lost on the sample. Measured on this seed: the sentence and the
      sample drew all 40 obligations, and the chip on a record drew none, because nothing is due today.
      Nothing in this file's sweep mints the chip, so the sweep could not see it. */
   const { k, refs } = await seeded;

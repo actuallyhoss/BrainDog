@@ -10,7 +10,7 @@
   AGENTS ARE THE RUNS ON THE THREAD'S PROJECT. A run in the kernel's `session` register carries a
   project and no thread, so the tile names the project rather than claiming the thread.
 
-  THE LOOK (SYSTEM §5, §6, §7). The title row says where the thread stands in one line: the newest update's health as a
+  THE LOOK. The title row says where the thread stands in one line: the newest update's health as a
   dot and its word, then who said it and when. The main lane is a list-and-lane screen: the composer is a tile at its
   head, where the update it writes will appear, and the thread follows on the ground with no box. The side lane holds
   the one figure this screen has, the agents' time over the last day as swimlanes with the one line saying what they
@@ -72,7 +72,7 @@
    * already: `tracks`, `updates`, `tasks` and `things` are declared, and `session` is the kernel's.
    *
    * A REFUSAL IS THE RECORD'S OWN SENTENCE, whichever it is. A read that found no record drew the
-   * sample's thread here until DIRECTION 26 took the sample away; it is a refusal like any other now.
+   * sample's thread here until the sample was taken away; it is a refusal like any other now.
    *
    * THE READ IS FOR THE WHOLE RECORD RATHER THAN FOR ONE THREAD, so moving between threads on one
    * record costs nothing and the component is not re-read when the address changes.
@@ -171,7 +171,7 @@
   let draftHealth = $state(String(healthField?.values?.[0] ?? ''));
   let form = $state<HTMLFormElement>();
 
-  /* THIS SCREEN'S OWN WORDS (DSN-18). `working` is the word beside a working run's face, so its ring is never the only
+  /* THIS SCREEN'S OWN WORDS. `working` is the word beside a working run's face, so its ring is never the only
      sign; `said` is the title row's line after the health. */
   const trackWords = {
     working: 'Working now',
@@ -240,8 +240,8 @@
 <svelte:head><title>{titleOf(track && String(track.fields.name), REGISTERS.tracks?.name ?? '')}</title></svelte:head>
 
 <!-- THE TITLE ROW'S LINE: the health as its dot and word, and who said it and when. The health is a CLAIM SOMEBODY MADE
-     rather than a computed status, and the thread below says in full who said so. AND ONLY ONCE SOMEBODY HAS SAID ONE
-     (DSN-18): with no update the chip read "Update missing", a capsule standing for a value nobody gave. Off track is
+     rather than a computed status, and the thread below says in full who said so. AND ONLY ONCE SOMEBODY HAS SAID ONE:
+     with no update the chip read "Update missing", a capsule standing for a value nobody gave. Off track is
      the one that needs him, so it alone takes the red. -->
 {#snippet standing()}
   {#if health.health}<span class="standing" data-needs={health.health === 'off_track' ? '' : undefined}><Chip label={healthLabel(health, REGISTERS.updates)} tone={healthTone(health.health)} /></span><span class="standing-by">{trackWords.said(since(String(health.asOf), clock), actorOf(String(health.by)))}</span>{:else}{trackWords.unsaid}{/if}
@@ -293,7 +293,7 @@
         <form class="composer" bind:this={form} onsubmit={post}>
           <label class="field-label" for="update-body">{bodyField ? labelOf(bodyField) : ''}</label>
           <textarea id="update-body" class="c-area" rows="3" dir="auto" bind:value={draft} {onkeydown}></textarea>
-          <!-- THE HEALTH AS PILLS, NOT THE BROWSER'S MENU (DSN-18, design brief §11.10): the choices are few and
+          <!-- THE HEALTH AS PILLS, NOT THE BROWSER'S MENU: the choices are few and
                declared, so every one is on screen and the chosen one is `[data-on]`, as every segmented control is. -->
           <div class="c-line">
             <div class="c-health">
@@ -352,7 +352,7 @@
       {#if runs.length === 0}
         <p class="reading">No agent has worked on {project.fields.name}.</p>
       {:else}
-        <!-- THE ONE FIGURE ON THIS SCREEN, AND ITS LINE (SYSTEM §6, §7): who was busy when over the last day, the now
+        <!-- THE ONE FIGURE ON THIS SCREEN, AND ITS LINE: who was busy when over the last day, the now
              line in `live`, and what that adds up to in words. Runs older than the day are still listed under it. -->
         {#if lanes.lanes.length > 0}
           <Swimlanes lanes={lanes.lanes} start={lanes.start} end={lanes.end} now={clock} subject="Agents on {project.fields.name}" />
@@ -369,7 +369,7 @@
                 <span class="line-mark"><AgentFace agent={String(s.fields.agent ?? '')} run="" live={liveOf(s.fields.state, !working)} /></span>
                 <span class="line-main">
                   <span class="line-title" dir="auto">{s.fields.doing}</span>
-                  <!-- THE RING'S WORD BESIDE IT: a mark never stands alone (design brief §5, Status). -->
+                  <!-- THE RING'S WORD BESIDE IT: a mark never stands alone. -->
                   <span class="line-detail">{working ? `${trackWords.working} · ` : ''}{s.fields.agent} · {since(String(s.fields.last_seen), clock)}</span>
                 </span>
               </a>
@@ -447,7 +447,7 @@
     vertical-align: -1px;
   }
 
-  /* THE HEALTH READS AT THE SENTENCE'S SIZE, and off track, the one that needs him, reads in red (SYSTEM §5). */
+  /* THE HEALTH READS AT THE SENTENCE'S SIZE, and off track, the one that needs him, reads in red. */
   .standing :global(.chip) {
     color: var(--ink);
     font-size: var(--t-md);
@@ -470,7 +470,7 @@
     min-inline-size: 0;
   }
 
-  /* A FIELD: the `--s1` fill, radius 12 and no border, the ink ring when focused (SYSTEM §6, `controls.css`). 16PX AT
+  /* A FIELD: the `--s1` fill, radius 12 and no border, the ink ring when focused (`controls.css`). 16PX AT
      EVERY WIDTH, so a phone does not zoom into it, and it scrolls clear of the keyboard with the health and Post under
      it still in view. */
   .c-area {
@@ -595,7 +595,7 @@
 
   /* ── The side lane ─────────────────────────────────────────────────────── */
 
-  /* THE LINE UNDER THE LANES: what the chart means, in the second ink (SYSTEM §6). */
+  /* THE LINE UNDER THE LANES: what the chart means, in the second ink. */
   .reading {
     margin: 0;
     color: var(--ink2);
@@ -619,14 +619,14 @@
     padding-inline: var(--sp-2);
   }
 
-  /* THE `live` RING ON A RUN'S FACE (SYSTEM §2): solid while it works, dashed once it has gone quiet. `AgentFace` draws
+  /* THE `live` RING ON A RUN'S FACE: solid while it works, dashed once it has gone quiet. `AgentFace` draws
      the ring only on a face that is a door to its run, and this one is not, because the whole row is that door. */
   .line-mark :global(.agent-face:is([data-live='working'], [data-live='quiet'])) {
     border-color: var(--live);
     box-shadow: inset 0 0 0 1px var(--bg);
   }
 
-  /* On a phone the lanes are rows of 60 (SYSTEM §9) through `rows.css`, and the update's text reads at 16. */
+  /* On a phone the lanes are rows of 60 through `rows.css`, and the update's text reads at 16. */
   @media (width < 900px) {
     .u-body {
       font-size: var(--t-md);

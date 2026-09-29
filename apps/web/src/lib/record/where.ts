@@ -2,10 +2,9 @@
  * `where:` in the browser: the record's sentence, read by the record's own parser, and printed back as an address.
  *
  * THERE IS ONE GRAMMAR AND IT IS `@braindog/where`'s. This file used to be a second compiler of it, which parsed the
- * sentence again, and a matcher that walked rows with it, so every grammar change had to land twice
- * (`loop/finish/architecture.md` §2.1 counts the commits), and the bugs the two engines caused between them are the
- * whole of `loop/research-two-engines.md`. The matcher ran only over the sample, which no screen draws any more, so it
- * went with the browser's engine (ARC-1 and ARC-2 there), and `compile` is now `parseWhere` with this tab's
+ * sentence again, and a matcher that walked rows with it, so every grammar change had to land twice, and the two
+ * engines caused bugs between them. The matcher ran only over the sample, which no screen draws any more, so it
+ * went with the browser's engine, and `compile` is now `parseWhere` with this tab's
  * declarations and row names handed to it.
  *
  * WHAT IS LEFT IS WHAT THE BROWSER PRINTS. A block, a tile and a page link to the rows they drew (`registerHref`), a
@@ -31,8 +30,8 @@ import { exponentOf } from 'braindog-render';
 import { REGISTERS, seqTitled, TITLES } from './held.ts';
 import type { FieldDecl } from './schema.ts';
 
-/* THE RECORD'S OWN READING OF A DAY, re-exported under the name this file always gave it (`loop/finish/contracts.md`
-   §8.1 keeps it), so a reader that resolves a clause's day against a clock reads the one function and not a copy of
+/* THE RECORD'S OWN READING OF A DAY, re-exported under the name this file always gave it, so a reader that resolves
+   a clause's day against a clock reads the one function and not a copy of
    it. A re-export binds no local name, which is why `wordFor` below reads it through the import above as
    `resolveDayOf`. */
 export { resolveDay } from '@braindog/where';

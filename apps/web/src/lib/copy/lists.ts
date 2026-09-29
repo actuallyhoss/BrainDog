@@ -2,7 +2,7 @@
  * A list's words: the grid on `/r`, its search, filters, sort and selection, the capture line, a row's own page,
  * the row form, and a saved view on `/v`.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
@@ -13,7 +13,7 @@ import { article, list } from './english.ts';
 
 export const lists = {
   rowActions: 'What you can do here',
-  /* A LIST THAT SAYS WHO HOLDS ITS ROWS (`hand:`) offers this view over its own, filtered to what is handed to you (GAP-11). */
+  /* A LIST THAT SAYS WHO HOLDS ITS ROWS (`hand:`) offers this view over its own, filtered to what is handed to you. */
   handedToMe: 'Handed to me',
   editValue: (field: string) => `Change ${field.toLowerCase()}`,
   /* WHY THIS CELL IS NOT THE EDITOR, said when somebody asks for it rather than only drawn.
@@ -28,7 +28,7 @@ export const lists = {
   /* ONE REASON PER TYPE THE GRID REFUSES, AND ONLY THOSE. The first version gave two reasons for six types, so `e`
      on an update's `When` answered *When is a row in another list*, which was not true of an instant: a wrong sentence
      is worse than the silence it replaced, because silence is not a claim. The grid then learnt to edit money, ref,
-     document, instant, duration, yes or no and, once the file store existed (OPS-20), a file too, and their reasons
+     document, instant, duration, yes or no and, once the file store existed, a file too, and their reasons
      stayed behind as sentences explaining a refusal that no longer happens. What is left is what `editable` answers
      no to, a secret alone, which `field-draft.test.ts` holds equal. */
   cellWhy: {

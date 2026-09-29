@@ -1,8 +1,8 @@
 /**
  * Decide's grouping lives in the address, so the one arrangement of the queue worth sending somebody is one a link carries.
  *
- * REWORK §5 LEFT IT AS THE MISSING HALF. The register list keeps its filters, its search and its sort in the query
- * string; `/decide` kept its group-by in a local `$state` (`+page.svelte:211` on 24 September), so pressing *By list*,
+ * THE GROUPING WAS THE MISSING HALF. The register list keeps its filters, its search and its sort in the query
+ * string; `/decide` kept its group-by in a local `$state` in `+page.svelte`, so pressing *By list*,
  * copying the address and sending it opened the recipient's queue ranked and ungrouped, and a reload did the same to
  * the person who pressed it. The two halves here are the reading (`groupingOf`) and the writing (`groupedAddress`), and
  * the sweep at the bottom holds the page to them, because a pure module the screen does not call is a module that fixes
@@ -53,7 +53,7 @@ test('what is written is what is read back', () => {
 
 test('the screen reads its grouping from the address and writes it there, and holds no copy of its own', () => {
   /* THE DEFECT WAS A LOCAL `$state`, so that is the thing looked for. With one in the file, a press could change what
-     is drawn and leave the address saying something else, which is the whole of what REWORK §5 is about. */
+     is drawn and leave the address saying something else, which is the whole of what an address-held arrangement is about. */
   assert.doesNotMatch(SCREEN, /let\s+grouping\s*=\s*\$state/u, 'the grouping is still a local $state, so the address does not carry it');
   assert.match(SCREEN, /groupingOf\(route\.url\)/u, 'the screen does not read its grouping from the address');
   /* REPLACE, NOT PUSH. A grouping is an arrangement of the same queue rather than a place, so Back from a grouped queue

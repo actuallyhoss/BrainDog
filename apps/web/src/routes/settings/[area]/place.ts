@@ -1,13 +1,13 @@
 /**
- * Settings as a place: the groups its index draws, and the areas a phone is not offered (DSN-13).
+ * Settings as a place: the groups its index draws, and the areas a phone is not offered.
  *
  * BELOW 900PX `/settings` IS AN INDEX AND EACH AREA A PAGE OF ITS OWN. The areas sat in one sideways
- * strip that a phone cut at its edge, with nothing there to say more followed (design SYS-11). An
+ * strip that a phone cut at its edge, with nothing there to say more followed. An
  * index of grouped rows shows every area at once, and an area opened from it has a back link to it.
  * From 900px up the same index stands beside the area, as the rail stands beside a page.
  *
  * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE. The rows themselves stay in `+page.svelte`'s
- * `AREAS`, which is the registry a unit adding an area writes its row into (contracts §0 point 5);
+ * `AREAS`, which is the registry a unit adding an area writes its row into;
  * this file only says how the index groups what that list holds.
  */
 
@@ -45,7 +45,7 @@ export const GROUPS: readonly { readonly id: AreaGroup; readonly title: string }
 ];
 
 /**
- * THE AREAS A PHONE'S INDEX LEAVES OUT (design-brief §6, Settings).
+ * THE AREAS A PHONE'S INDEX LEAVES OUT.
  *
  * Keyboard is a table of keys, and a phone has none to press: offering it there is a visible key
  * hint on a screen with no keyboard. Its address still opens, so a link somebody shares still lands.

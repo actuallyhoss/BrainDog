@@ -23,13 +23,13 @@
   keyboard user at the top of the document, which is the single most common way a custom menu is
   worse than the native one it replaced.
 
-  UNDER A THUMB IT IS A BOTTOM ACTION SHEET, NOT A POPOVER (design SYS-4, DSN-6). Below 640px, or
+  UNDER A THUMB IT IS A BOTTOM ACTION SHEET, NOT A POPOVER. Below 640px, or
   with a coarse pointer at any width, a list the size of a trigger opened under the finger that
   pressed it, and its rows were menu rows sized for a mouse. There the same list rises from the
   bottom of the screen over a scrim, in 48px rows at 16px, with a Cancel row at its foot. The items,
   the keys and the roles are the same in both forms; only the placing differs.
 
-  WITH A MOUSE IT IS GLASS (SYSTEM §6): the strong glass at level 2, radius `--r-md`, arriving in 140ms, and every row
+  WITH A MOUSE IT IS GLASS: the strong glass at level 2, radius `--r-md`, arriving in 140ms, and every row
   in it 32 tall with an icon, the word and a key cap, whatever class the caller drew its items with. Under a thumb it is
   a sheet and not glass: a tile's surface over the scrim.
 
@@ -292,9 +292,9 @@
     cursor: pointer;
   }
 
-  /* GLASS, AND THE STRONG ONE (SYSTEM §6): a menu opens over busy content, and legibility is the whole of its job. Level
+  /* GLASS, AND THE STRONG ONE: a menu opens over busy content, and legibility is the whole of its job. Level
      2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it arrives in 140ms on the
-     arriving curve (SYSTEM §8). */
+     arriving curve. */
   .menu {
     /* The three the clamp writes, declared here so the panel is correct before `place()` has run
        and so the names exist in a stylesheet rather than only in TypeScript. */
@@ -340,7 +340,7 @@
   }
 
   /**
-   * THE ROW, WHATEVER CLASS THE CALLER GAVE IT (SYSTEM §6): 32 tall, an icon, the word, and a key cap at the trailing
+   * THE ROW, WHATEVER CLASS THE CALLER GAVE IT: 32 tall, an icon, the word, and a key cap at the trailing
    * edge. Callers draw their own items and style them, and this is the one place the menu's rhythm is said, so every
    * menu in the product reads as one menu. The colours stay the caller's: a destructive verb is its own business.
    */
@@ -383,7 +383,7 @@
    * taken back here. From 640px up, which only a coarse pointer reaches, it is a 560px sheet in the
    * middle of the bottom edge rather than one as wide as a tablet.
    *
-   * A SHEET, NOT GLASS (SYSTEM §6): a tile's surface at radius `--r-lg`, the third level, over the scrim.
+   * A SHEET, NOT GLASS: a tile's surface at radius `--r-lg`, the third level, over the scrim.
    */
   .menu[popover] {
     position: fixed;
@@ -449,7 +449,7 @@
     }
   }
 
-  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). The a11y layer shortens the duration; this takes the move away. */
+  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .menu,
     .menu[popover] {

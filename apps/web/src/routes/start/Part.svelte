@@ -1,13 +1,13 @@
 <!--
   One part of the BrainDog being built, as its tile: what it is, why it is on, what the person's own words put in it, and
-  the switch that keeps it (`loop/design/SCREENS.md`, Start; the board `Light-Start.dc.html`).
+  the switch that keeps it.
 
   EVERY LINE IS THE PROPOSAL'S. The meta says why the part is on: a phrase asked for it, a use case stands on it, the
   person turned it on, or it waits on the question beside it (the one red here, because it needs him). "You said" quotes
   the phrases. The rows are the entries the sentence filled, which are what "Make it mine" writes; the line under them is
   what the part's lists are called, read off the part itself.
 
-  A PURE LIST TILE, NO FIGURE (SYSTEM §6): nothing here is a number the record holds yet, so there is no chart to draw.
+  A PURE LIST TILE, NO FIGURE: nothing here is a number the record holds yet, so there is no chart to draw.
 
   THE SWITCH STAYS IN ONE PLACE. The screen draws a tile while a part is on and a ground row while it is off, and puts
   focus back on the switch after a press (`data-keep`), so a keyboard is never dropped at the top of the page.
@@ -141,7 +141,7 @@
   }
 
   /* A ROW INSIDE THE TILE: 44 tall, a face or a well, the name and one detail, and the amount at the right. A row that
-     the last thing said added takes the arrival tint, which fades over a second and a half (SYSTEM §2, §8). */
+     the last thing said added takes the arrival tint, which fades over a second and a half. */
   .entry {
     display: flex;
     align-items: center;
@@ -198,8 +198,8 @@
     line-height: 18px;
   }
 
-  /* A PART THAT IS OFF IS A ROW ON THE GROUND, not a tile: it holds nothing yet. Its switch sits beside its words
-     (DESIGN-SYSTEM 12.7), never across the screen from them. */
+  /* A PART THAT IS OFF IS A ROW ON THE GROUND, not a tile: it holds nothing yet. Its switch sits beside its words,
+     never across the screen from them. */
   .keep {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;

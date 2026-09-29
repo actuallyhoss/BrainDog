@@ -14,7 +14,7 @@
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to mean "draw
  * the sample's backlinks", which were another business's rows pointing at the row in the address; there is no sample
- * now (DIRECTION 26).
+ * now.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';

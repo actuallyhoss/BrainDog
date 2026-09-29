@@ -1,5 +1,5 @@
 /**
- * The one read's state machine, with no browser, no rune and no record (ARC-5).
+ * The one read's state machine, with no browser, no rune and no record.
  *
  * WHAT THIS PROVES is the part every screen now shares: which of the five states an answer becomes, that an answer for
  * a key the screen has left is dropped, that asking again keeps a good answer on screen while a failure goes back to

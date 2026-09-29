@@ -1,8 +1,8 @@
 /**
  * The rule that decides what is in the command surface, and what the command surface can reach.
  *
- * `search.test.ts` covers the counts the palette says. This covers the two things `loop/REWORK.md`
- * §6 is actually about: an admission rule with three tests that is enforced rather than described,
+ * `search.test.ts` covers the counts the palette says. This covers the two things the palette is
+ * actually about: an admission rule with three tests that is enforced rather than described,
  * and a surface that reaches the OBJECTS the record holds rather than the screens they live on.
  *
  * NOT THE MARKUP. A `.svelte` file cannot be imported by `node --test`, and a regex over source

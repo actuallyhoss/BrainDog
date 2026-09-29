@@ -1,5 +1,5 @@
 <!--
-  A heat grid: how busy, by row and column (SYSTEM §7, "intensity over time"), such as days by hour.
+  A heat grid: how busy, by row and column (the design system: "intensity over time"), such as days by hour.
 
   Each cell is a rounded square in one of five steps, from the track for nothing to ink for the
   busiest quarter. Row names sit at the left and every few column names on top, at 12 in `dim`.

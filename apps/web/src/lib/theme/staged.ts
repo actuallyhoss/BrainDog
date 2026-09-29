@@ -1,5 +1,5 @@
 /**
- * Fix and install (GAP-3): a theme refused at install, handed to the look editor.
+ * Fix and install: a theme refused at install, handed to the look editor.
  *
  * THE ADD-ON SCREEN HAS THE DOCUMENT AND THE EDITOR HAS THE TOOLS. A pack whose theme the install refused
  * (`CONTRAST_FLOOR`, `INTENT_INSEPARABLE`, `THEME_LADDER_ORDER`) offers "Fix and install": it calls `stageFix` with the

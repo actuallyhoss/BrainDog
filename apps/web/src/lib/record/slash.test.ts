@@ -59,7 +59,7 @@ test('reading and asking go to the two record methods, and a refusal is said in 
   assert.equal(((await askSlash(none)) as { said: string }).said, words.filedNone);
 });
 
-/* A PRESS THE INCLUDED MODEL TURNED AWAY UNSENT (`loop/research-batch-sixty-four-audit.md` finding 5). The record says
+/* A PRESS THE INCLUDED MODEL TURNED AWAY UNSENT. The record says
    `large` (`packages/record/test/slash-declined.test.ts`), and before this the screen kept "Slash drafts with a model
    (included)" under the title, on a record where every press will be the rules'. */
 test('a record too large for the included model is said plainly, under the title and once in the press, with no fix he cannot apply', async () => {

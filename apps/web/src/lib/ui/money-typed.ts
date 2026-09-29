@@ -5,7 +5,7 @@
  * THE FORM WROTE STERLING ON EVERY RECORD. Its chain was `currencyFor(register, f.id) ?? 'GBP'`, and `currencyFor`
  * reads `ROWS`, which nothing fills in a shipped tab, so every amount typed into a new row went in as GBP, on a record
  * kept in any other currency as much as on one kept in sterling; and the grid labelled the editor of an empty money
- * cell GBP the same way (`loop/finish/defects.md` M1). The currency is now one somebody chose, and with none of them known
+ * cell GBP the same way. The currency is now one somebody chose, and with none of them known
  * nothing is written and the box says why.
  *
  * THE AMOUNT ITSELF IS `field-draft.ts`'s. `wrongMoney` and `patchOf` are where the row page and the grid take a money
@@ -30,7 +30,7 @@ export const NO_CURRENCY = "Say which currency, or set this record's currency in
 /**
  * The currency an amount typed into this field goes in: the value's own when the box opened on one, else the field's
  * declared currency (the one its default is in), else the one `currencyFor` finds on the list's rows, else the
- * record's own (`homeCurrency()`); `null` when nobody has chosen one. Never a literal (`loop/finish/rules.md` §13).
+ * record's own (`homeCurrency()`); `null` when nobody has chosen one. Never a literal.
  *
  * THE SAME ORDER `field-draft.ts` WRITES A CELL IN, so the unit drawn beside a box is the currency its save carries.
  */

@@ -1,7 +1,7 @@
 /**
  * The sentence a dead button says about itself.
  *
- * `/start?add=…` AND ITS TILES WENT WITH THE ONE-ROW FIRST RUN (`loop/finish/modules.md` MOD-6), and the
+ * `/start?add=…` AND ITS TILES WENT WITH THE ONE-ROW FIRST RUN, and the
  * tests of their mapping went with them. What the first run proposes is held by `first-run.test.ts`.
  */
 

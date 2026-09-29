@@ -6,7 +6,7 @@
   between the two is a place learnt twice. Decide moves up beside Today while something waits on it, with its count.
   Search is the 44px button in each screen's head bar (`PageHead.svelte`) and the first row of More, never a tab.
 
-  A GLASS BAR FLOATING OVER THE WORK (SYSTEM §9), 22px glyphs over their words, every target 44 or more.
+  A GLASS BAR FLOATING OVER THE WORK, 22px glyphs over their words, every target 44 or more.
 
   Safe-area insets are paid exactly once, on the fixed elements only. Paying twice is a real, easy bug.
 -->
@@ -50,7 +50,7 @@
 
 <style>
   /**
-   * A GLASS BAR FLOATING 12 FROM THE BOTTOM AND 12 IN FROM EACH SIDE (SYSTEM §9): radius 22, level 2, the glass on a
+   * A GLASS BAR FLOATING 12 FROM THE BOTTOM AND 12 IN FROM EACH SIDE: radius 22, level 2, the glass on a
    * pseudo-element for the rail's reason. The home indicator is paid once, in the offset, and `--tabbar` (the bar and
    * the indicator) is what the shell and the toasts clear, with the `--inset` above it added where they do.
    */
@@ -140,7 +140,7 @@
     white-space: nowrap;
   }
 
-  /* DECIDE'S COUNT IS THE RED SQUARE, the one filled badge (SYSTEM §6), on the corner of its glyph. */
+  /* DECIDE'S COUNT IS THE RED SQUARE, the one filled badge, on the corner of its glyph. */
   .badge {
     position: absolute;
     inset-block-start: -5px;

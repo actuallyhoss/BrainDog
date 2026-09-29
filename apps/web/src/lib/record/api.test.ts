@@ -367,7 +367,7 @@ async function seededRecord(): Promise<Kernel> {
  * The seed has fewer rows than the cut, which is why this defect was invisible: it only appears on a
  * register that has outgrown one page, and every register does.
  *
- * A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS. Since ARC-1 the fixture reads a record seeded
+ * A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS. Since the app has one engine the fixture reads a record seeded
  * once and never written to (`fixtures/readers.ts`), so a row pushed into `ROWS` reaches no block.
  */
 async function withExtra(n: number, amount: number): Promise<Kernel> {
@@ -441,7 +441,7 @@ test('the rows it DRAWS are still cut, because that half was never the bug', asy
 });
 
 /**
- * NO SHIPPED PAGE DRAWS A GAUGE ANY MORE (estate's moved to `queue` and `split` on the way to W2), but the kind is
+ * NO SHIPPED PAGE DRAWS A GAUGE ANY MORE (estate's moved to `queue` and `split`), but the kind is
  * still one `declare.ts` accepts and `blockOf` still draws, so the two tests below build the block by hand, over the
  * same `services` register estate's gauge once read, rather than assert on a page nobody declares.
  */
@@ -484,7 +484,7 @@ test('a gauge keeps its currency when nothing matches', async () => {
      currency anywhere to find (a money field declares none, only its values carry one), so that
      case is a gap in the declaration rather than in this code, and it is filed as one.
 
-     ON A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS, which since ARC-1 reached nothing: the
+     ON A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS, which since the app has had one engine reached nothing: the
      gauge read the seed's monthly services and this asked the case where something matches. */
   const k = await seededRecord();
   const services = k.list({ register: 'services', limit: 500 });
@@ -1231,7 +1231,7 @@ test("Student's Assignments list shows the course of each by default", async () 
  * them under Projects. Open tracks in the same function are capped at five under a comment saying
  * why, and the same argument was never applied to the pages a template produces.
  *
- * AT HIS SCALE ON A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS. Since ARC-1 the fixture's
+ * AT HIS SCALE ON A RECORD OF ITS OWN, AND IT WAS THE SAMPLE'S `ROWS` PUT BACK AFTERWARDS. Since the app has had one engine the fixture's
  * `pages` and `boot` ask a record seeded once and never written to (`fixtures/readers.ts`), so the rows swapped in
  * reached nothing and the sample kept its three projects. The projects are written to a seeded record here, and the rail
  * is the one a live tab draws of it: the record's own list of pages, each saying which row it is about, through the

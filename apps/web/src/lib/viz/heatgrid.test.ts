@@ -19,7 +19,7 @@ test('nothing is level 0, then a level a quarter of the busiest cell', () => {
   assert.equal(heatLevel(3, 0), 0);
 });
 
-test('Light-Activity\'s grid: 12px squares 3 apart after a gutter for the day names', () => {
+test('the activity grid: 12px squares 3 apart after a gutter for the day names', () => {
   const g = heatgrid(DAYS, HOURS, grid(() => 1), 393);
   assert.equal(g.cells.length, 7 * 24);
   assert.equal(g.size, 12);

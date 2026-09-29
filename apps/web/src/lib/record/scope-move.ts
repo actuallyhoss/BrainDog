@@ -1,5 +1,5 @@
 /**
- * WHERE A ROW APPLIES, AND ONE PRESS TO MOVE IT (agents C8).
+ * WHERE A ROW APPLIES, AND ONE PRESS TO MOVE IT.
  *
  * A list with a `scope` field holds rows that belong to one project or to every project: a learning, a skill, a tool,
  * a key. That field was drawn as one more ref among the facts, so "applies everywhere" was an empty value, a chip
@@ -41,12 +41,12 @@ export const words = {
   /** The chip as a button, for a screen reader: where the row applies now, and what pressing it does. */
   moveLabel: (name: string) => `Where it applies: ${name}. Move it`,
   movedTo: (name: string) => `Moved to ${name}`,
-  /** The one sentence asked before a key is opened to every project (agents C8). */
+  /** The one sentence asked before a key is opened to every project. */
   widenKey: 'Any machine with a vault grant for every project can open it.',
   widenGo: 'Move to Everywhere',
   current: 'Where it applies now',
   noPlaces: 'BrainDog could not reach this record.',
-  /** The press under `noPlaces`, which reads the projects again (design SYS-8). */
+  /** The press under `noPlaces`, which reads the projects again. */
   retry: 'Retry',
   /** A project this tab could not name is still a project, and never its id. */
   someProject: 'A project',
@@ -116,7 +116,7 @@ export function scopeOf(register: string, fields: Readonly<Record<string, unknow
 
 /**
  * Whether a move opens a KEY to every project: the list holds a sealed value (`secret`), and the row goes from one
- * project to everywhere. That one move is asked about first (agents C8), because it hands the key to every machine
+ * project to everywhere. That one move is asked about first, because it hands the key to every machine
  * that holds a grant for all projects, which is more than the person who pressed it may have in mind.
  */
 export function widens(register: string, from: Scope | null, to: Place | null): boolean {

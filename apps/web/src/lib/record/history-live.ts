@@ -6,11 +6,11 @@
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` at an address with no slug used to
  * read the sample's ledger instead, which put another business's history beside whatever row the address named; there
- * is no sample now (DIRECTION 26), so a host that did not answer says so and a 401 says to sign in.
+ * is no sample now, so a host that did not answer says so and a 401 says to sign in.
  *
  * EVERY SENTENCE THE RECORD STORED LEAVES HERE THROUGH `moneyInText`, as the feed and the log leave `news-live.ts`. A
  * rule's note holds an amount the way a program reads it, "GBP 2,400.00", and a row's history printed it so; the screen
- * says it the way a person does, "£2,400.00" in the home currency and "$4,800.00 USD" in any other (design.md §5, DSN-4).
+ * says it the way a person does, "£2,400.00" in the home currency and "$4,800.00 USD" in any other.
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
@@ -88,7 +88,7 @@ const listed = (words: readonly string[]): string =>
  * HISTORY AND HOME BOTH SAID "Changed the page" OR THE BARE NOTE, "Added domain.", for a field put on a list: the verb
  * named the wrong thing and the note did not say which list. The target names the list (`declaration:register.<id>`) and
  * the note names the fields, so the line is made of the two. What else the note says ("Proposed by p_… in SG5.") is ids,
- * which nobody reads (design.md §6.8.3), so it is left out rather than printed beside the sentence.
+ * which nobody reads, so it is left out rather than printed beside the sentence.
  */
 export function declaredOf(target: string | null | undefined, note: string | null | undefined): string | null {
   const register = /^declaration:register\.([a-z][a-z0-9_-]*)$/u.exec(target ?? '')?.[1];

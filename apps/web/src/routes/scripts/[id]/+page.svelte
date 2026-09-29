@@ -1,5 +1,5 @@
 <!--
-  One script, to change: `/scripts/<id>` (`loop/finish/shell.md` SCR-3).
+  One script, to change: `/scripts/<id>`.
 
   THE INSTALLED VERSION IS WHAT THE FORM STARTS FROM, AND IT IS HELD. The read asks again whenever the record moves, and
   a form rebuilt from each answer would throw away what somebody was typing. So the first answer is held, the form

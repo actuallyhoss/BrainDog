@@ -1,6 +1,5 @@
 /**
- * What `arrangeTurns` proposes, read from two sentences, held against the words a founder typed on 22 September
- * (`loop/research-first-sign-in.md` §3, friction 3).
+ * What `arrangeTurns` proposes, read from two sentences, held against the words a founder typed in a real first run.
  *
  * RED FIRST, AND BOTH HALVES WERE. Against the screen's old reading (turn two alone, turn one only when
  * turn two picked nothing) and catalogue order for every tie, the two tests below answered `personal`
@@ -21,8 +20,8 @@ import { arrangeTurns } from './arrange.ts';
 
 const founder = USE_CASES.find((u) => u.usecase === 'founder')!;
 
-/* Walk two's own words, as typed (`loop/research-first-sign-in.md` steps 7 and 8). */
-const WHO = 'Sam. I run a few companies and use Claude and Codex on all of them.';
+/* Walk two's own words, as typed. */
+const WHO = 'Sami. I run a few companies and use Claude and Codex on all of them.';
 const ABOUT = 'My companies, the money across them, and the Claude and Codex agents I run on them';
 
 test('THE SOLO FOUNDER CARD, TYPED BACK, IS SOLO FOUNDER, and not Personal on a one-to-one tie', () => {
@@ -64,7 +63,7 @@ test('THE PROPOSAL FORMS AROUND THE TURN THAT NAMED IT, when turn two only heard
 });
 
 /* EACH CHIP ON ITS OWN PROPOSES ITS OWN PERSON. The first run asks one question now, so the chips are the four people
-   of `loop/DIRECTION.md` §11 and there is no second turn to hold them against. */
+   the product is for and there is no second turn to hold them against. */
 const CHIPS: Record<string, string> = {
   "I'm a student": 'student',
   'I run a few companies': 'founder',

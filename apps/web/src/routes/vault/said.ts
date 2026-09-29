@@ -1,7 +1,7 @@
 /**
  * WHAT THE RECORD SAID TO EACH OF `/vault`'S READS, and what the screen is allowed to draw from it.
  *
- * THIS EXISTS BECAUSE THE SCREEN THREW THREE REFUSALS AWAY. Driven on 21 September 2026 against a
+ * THIS EXISTS BECAUSE THE SCREEN THREW THREE REFUSALS AWAY. Driven against a
  * freshly provisioned self-host, `/vault` fired `list?register=things` and `list?register=credentials`,
  * took `422 REGISTER_UNKNOWN` for both, and drew "No keys yet." with a working `Add a key` button over
  * a register the record does not hold: 44 words, one control, and neither sentence on the screen. A

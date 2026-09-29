@@ -81,7 +81,7 @@ test('methods reads the host and keeps only the fields the screen uses', async (
   assert.ok(odd.ok && !('why' in odd.value));
 });
 
-/* THERE IS NO DEMO TO OPEN (DIRECTION 26), so a host older than the change that still says `demo` is read past rather
+/* THERE IS NO DEMO TO OPEN, so a host older than the change that still says `demo` is read past rather
    than carried into a screen that has nothing left to draw with it. */
 test('methods drops `demo`, even from a host that still sends it as true', async () => {
   const out = await methods(host({ '/auth/methods': () => ok({ ...METHODS, demo: true }) }).io);

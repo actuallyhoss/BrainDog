@@ -1,27 +1,25 @@
 /**
- * Automations on the wire: the record's `automations` read, `automationRun`, `cancelRun`, and `propose` for a save
- * (`loop/research-shell-automations.md` §5 and §6, Brief E against Brief D's methods), and since EDT-1 the editor's
- * methods from `loop/finish/contracts.md` §2.2: `checkAutomation`, `tryAutomation`, `setAutomation`, `retryRun` and
+ * Automations on the wire: the record's `automations` read, `automationRun`, `cancelRun`, and `propose` for a save,
+ * and the editor's methods: `checkAutomation`, `tryAutomation`, `setAutomation`, `retryRun` and
  * `automationVersions`, with `decide` for the owner's one-press save and `retireDeclaration` for Delete.
  *
  * THE RECORD OR ITS REFUSAL, as `record/actions.ts` does it for scheduled actions. A screen reads a `Source`, which is
  * the record over HTTP. With no record it drew the sample's four automations, and a flow drawn and "sent" there was
- * kept for the tab and filed nowhere; that went with DIRECTION 26, and no record is now the sentence for it.
+ * kept for the tab and filed nowhere; that went with the sample, and no record is now the sentence for it.
  *
  * THE THREE READS AND WHAT EACH FALLS BACK TO.
  *
  *   · `automations` answers the list. A record with no such method yet (`ROUTE_UNKNOWN`, which is every record built
- *     before Brief D) draws no list; the canvas still opens, because saving goes through `propose`, which every record
+ *     before the method existed) draws no list; the canvas still opens, because saving goes through `propose`, which every record
  *     has. Any other refusal, `UNREACHABLE` and `UNAUTHORIZED` among them, is said.
  *   · `automationRun` and `cancelRun` are ADMIN and a browser session's. A refusal is the record's own sentence.
  *   · `propose` files the `change`.
  *
  * NOT THROUGH `@braindog/client`, FOR `actions.ts`'s REASON: the client refuses a method missing from its own route
  * table before sending anything, and "this build has no such read" and "there is no record here" are two answers this
- * screen draws differently. `send` is a copy of the one in `actions.ts`, which does not export it and is not this
- * brief's to change; the two are the same eighteen lines and say so here so that a fix to one is looked for in both.
+ * screen draws differently. `send` is a copy of the one in `actions.ts`, which does not export it; the two are the same eighteen lines and say so here so that a fix to one is looked for in both.
  *
- * READ DEFENSIVELY. The `automations` answer was written in the same wave as this file (`packages/record/src/
+ * READ DEFENSIVELY. The `automations` answer was written alongside this file (`packages/record/src/
  * automations.ts`), and this screen was first written against a guess at it that had a body on every listed row. The
  * record's list has none, and every row would have been dropped. So `rowOf` reads the record's keys by name, works out
  * from a body what the record left out, and leaves out only a row with no id.
@@ -127,7 +125,7 @@ export type Version = { version: number; at: string; live: boolean; enabled: boo
 /** What `setAutomation` answers: the version now live and whether it runs. */
 export type Switched = { version: number; enabled: boolean };
 
-/* ── reading an answer that is being written in the same wave ────────────── */
+/* ── reading an answer written alongside this file ───────────────────────── */
 
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 const text = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
@@ -254,11 +252,11 @@ export function answerWords(answer: string): string {
   return one(v);
 }
 
-/* ── the editor's words and the pure half of its reads (EDT-1) ──────────────── */
+/* ── the editor's words and the pure half of its reads ──────────────────────── */
 
 /**
- * THE WORDS EDT-1 ADDS, kept beside the reads they describe as `fieldWords` is in `record/field-write.ts`, because
- * `flow.ts` and its `words` are EDT-2's file in this wave. The page, `Tried.svelte` and `RunView.svelte` read them here.
+ * THE EDITOR'S OWN WORDS, kept beside the reads they describe as `fieldWords` is in `record/field-write.ts`, so
+ * `flow.ts` and its `words` stay the canvas's own. The page, `Tried.svelte` and `RunView.svelte` read them here.
  */
 export const editWords = {
   rename: 'Rename',
@@ -397,7 +395,7 @@ export function versionsOf(raw: unknown): Version[] {
 
 /**
  * A row as a try's picker names it: the first text field it has, cut to a line, else when it was added. Never its id
- * or its number, which a person does not say (`loop/finish/design-brief.md` §9).
+ * or its number, which a person does not say.
  */
 export function pickableRow(raw: unknown, now: number): Pickable | null {
   if (!isObject(raw)) return null;

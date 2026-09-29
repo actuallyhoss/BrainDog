@@ -6,7 +6,7 @@
  *
  * `ROUTE_UNKNOWN` is a record whose host is older than this read: there is a record, and no list of its own to draw.
  * Any other refusal is the record's own sentence, `UNREACHABLE` and `UNAUTHORIZED` included: with no slug those two
- * drew the sample's arrivals, and there is no sample now (DIRECTION 26). A live answer is drawn from the answer and
+ * drew the sample's arrivals, and there is no sample now. A live answer is drawn from the answer and
  * nothing else.
  */
 

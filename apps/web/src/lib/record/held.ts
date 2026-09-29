@@ -5,15 +5,15 @@
  * is the sample, so a live record read the sample wherever it had not been asked yet: a list not learnt kept the seed's
  * declaration, a ref typed as `thing is Kiln` was looked up among the sample's projects and sent the record the ULID of
  * whichever of its own rows had the same number, and the new-row form offered the sample's four projects as the rows a
- * ref could point at, on a record that holds none of them (`loop/research-no-sample.md` 1d, wave B3).
+ * ref could point at, on a record that holds none of them.
  *
  * WHO FILLS WHAT. `learn` in `remote.ts` puts each list's declaration in `REGISTERS` as the record answers `schema`;
  * `refMapOf` there puts a list's row names in `TITLES` each time a reader walks that list to resolve its refs; and
  * `readBoot` puts each page `boot` lists in `PAGES`, by `learnPages` below. Nothing else writes here in a shipped build.
  *
- * A TEST FILLS IT WITH THE SAMPLE BY IMPORTING `fixtures/fill.ts`, and only a test may. Until wave C1 the fixture
+ * A TEST FILLS IT WITH THE SAMPLE BY IMPORTING `fixtures/fill.ts`, and only a test may. Until the sample left the app the fixture
  * itself copied the seed's declarations here the moment anything imported it, and eleven shipped files did, so a list
- * a live tab had not learnt yet drew the seed's fields. Measured on 25 September with that copy gone and no test
+ * a live tab had not learnt yet drew the seed's fields. Measured with that copy gone and no test
  * changed: 277 of 1,984 tests failed across 66 files. 61 of them import `fill.ts` now; four already did and had grown a
  * list through the fixture's own tables, which they grow through these now; the last held the build variants to the
  * fixture (`deployment.test.ts`).

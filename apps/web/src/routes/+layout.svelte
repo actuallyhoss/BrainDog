@@ -2,7 +2,7 @@
   The shell: a skip link, the rail or the tab bar, the phone's More sheet, the palette, the toast
   stack, and one polite live region.
 
-  THE LIVE HAIRLINE ACROSS THE TOP IS DRAWN ONLY WHILE SOMETHING IS WRONG (design SYS-5, DSN-6). It
+  THE LIVE HAIRLINE ACROSS THE TOP IS DRAWN ONLY WHILE SOMETHING IS WRONG. It
   was two pixels in the boundary colour on every screen at all times, on the argument that a
   healthy state should still be visible; what it drew was a line across the top of every window
   that said nothing. A healthy connection is the ordinary state and carries no mark. The line
@@ -91,7 +91,7 @@
      with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6),
      and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
      screen claiming you are already in. `/connect`, an app's consent screen, comes before any work
-     in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach (AGT-8). */
+     in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach. */
   const bare = $derived.by(() => {
     /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
@@ -104,7 +104,7 @@
   let moreOpen = $state(false);
 
   /**
-   * THE MORE SHEET IS THE PHONE'S RAIL (design SYS-4, DSN-6): search at its head, the record and
+   * THE MORE SHEET IS THE PHONE'S RAIL: search at its head, the record and
    * its switcher, the rail's groups with the rail's glyphs and counts, the current page marked, then
    * the places the rail keeps at its foot (`PLACES`). It was a bare list of words with no glyphs, no
    * current place, no switcher and no search.
@@ -145,7 +145,7 @@
 
   /** The same order the rail draws, one nav and not two shapes. */
   /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
-  /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`, PGS-18). */
+  /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`). */
   const railNav = $derived.by(() => {
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
     return data.nav.filter((n) => !n.cut && !placed.has(n.href));
@@ -154,9 +154,9 @@
      has no `counts`, and is read from the two numbers it does carry. */
   const spine = $derived(spineOf(data.counts ?? { decide: data.open, inbox: data.inbox }));
   /* THE TOOLS UNDER MORE, IN THE ORDER A PHONE READS THEM, with the rail's glyphs and the rail's words (`Sidebar.svelte`).
-     Slash's page is Suggestions there, and Inbox joins once anything has arrived (`spineOf`). USAGE IS HERE (MOD-25): its
+     Slash's page is Suggestions there, and Inbox joins once anything has arrived (`spineOf`). USAGE IS HERE: its
      word is written out rather than read from `record/actions.ts`, which would carry the usage reader into the entry
-     chunk for one word. Settings goes to `/settings`, the index of areas below 900px (DSN-13). */
+     chunk for one word. Settings goes to `/settings`, the index of areas below 900px. */
   const USAGE = 'Usage';
   const places = $derived([
     ...(spine.includes('inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
@@ -205,9 +205,9 @@
    * `restoreAccent` is what puts the custom properties behind that attribute.
    *
    * IT ALSO DROPS A STORED COLOUR THE CONTRAST FLOOR NOW REFUSES, and this shell used to throw that
-   * refusal away. The four colours the swatch row suggested until 21 September are all refused by
-   * check R — Moss is 2.92:1 as a fill against `s1` in dark against a 3:1 floor, and the other three
-   * are 2.55, 2.84 and 2.94 — so every browser that pressed one of them loses its colour on the next
+   * refusal away. The four colours the swatch row once suggested are all refused by
+   * check R: Moss is 2.92:1 as a fill against `s1` in dark against a 3:1 floor, and the other three
+   * are 2.55, 2.84 and 2.94, so every browser that pressed one of them loses its colour on the next
    * load. `accent.ts` writes a `console.warn` naming the ratio, which is the right account for
    * whoever can move a lightness axis and no account at all for the person who chose the green.
    *
@@ -296,7 +296,7 @@
    */
   /*
    * THE RECORD'S WORD, `nav.shape`, held for the tab by `navPrefs` and adopted from `boot` above. Before `boot` answers
-   * it is the cookie's first-paint copy, and after it the cookie is only ever written from the record (contracts §7.3).
+   * it is the cookie's first-paint copy, and after it the cookie is only ever written from the record.
    *
    * AND IT REDRAWS WHEN IT IS SET, because the control that sets it is INSIDE the thing it changes: `/settings/navigation`
    * is a screen in this shell, and this shell mounts once for the life of the tab. Reading the field rather than the
@@ -328,17 +328,17 @@
   }
   const go = new GoPrefix();
 
-  /* THE HAIRLINE READS THE POLL NOW, AND IT WAS A CONSTANT UNTIL W56. `const live = 'open'` stood here with a comment
-     saying there was no write and no poll yet, so the `polling` and `offline` rules below could never match
-     (`loop/research-living-in-it.md` §1.1). `follow` starts one poll of `/api/version` per tab (`lib/data/live.ts`),
+  /* THE HAIRLINE READS THE POLL NOW, AND IT WAS ONCE A CONSTANT. `const live = 'open'` stood here with a comment
+     saying there was no write and no poll yet, so the `polling` and `offline` rules below could never match.
+     `follow` starts one poll of `/api/version` per tab (`lib/data/live.ts`),
      on a record that answered only. NOT OVER A REFUSAL, though its shell says `live`: `version` is `READ+`, so on the
      signed-out sign-in screen every tick was a 401 and the hairline went to `offline`, which the sample's shell had
-     hidden by saying `live: false` until DIRECTION 26 took it away. `page.url` and not `location`, so a move from one
+     hidden by saying `live: false` until the sample left the app. `page.url` and not `location`, so a move from one
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
   /**
-   * WHO IS WORKING NOW, FOR THE RAIL (SYSTEM §5), asked as Today asks it (`readWorking` in `record/boot-live.ts`) and
+   * WHO IS WORKING NOW, FOR THE RAIL, asked as Today asks it (`readWorking` in `record/boot-live.ts`) and
    * again whenever the poll hears the record move, so a run that starts or stops shows up without a reload.
    *
    * NOT THROUGH `read()`, WHICH IS A SCREEN'S. `read` brackets every call in the screen's readiness count, and a rail
@@ -472,7 +472,7 @@
      and `polling` is drawn dashed in `--warn`. With the poll as the only transport that would put a warning on every
      screen at all times, which is an alarm for the state in which nothing is wrong. So a poll that answers is `open`,
      a poll that fails is `offline`, and `polling` is never set: it is kept for a socket's fallback once there is a
-     socket to fall back from (`loop/research-living-in-it.md` §1.4). -->
+     socket to fall back from. -->
 <div class="live" data-state={live.state} aria-hidden="true"></div>
 
 {#if bare}
@@ -642,7 +642,7 @@
           <li>
             <a class="more-row" href={at('/settings/identity')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
           </li>
-          <!-- NO "NEW RECORD" HERE (MOD-6): it opened this record's own `/start`, and it is drawn only once the host says
+          <!-- NO "NEW RECORD" HERE: it opened this record's own `/start`, and it is drawn only once the host says
                the person may make a record, which `boot` does not carry yet. The rail's copy of it went the same way. -->
         </ul>
       {/if}
@@ -797,7 +797,7 @@
   }
 
   /**
-   * THE GROUND, AND ON IT A FLOATING RAIL AND THE WORK (SYSTEM §5).
+   * THE GROUND, AND ON IT A FLOATING RAIL AND THE WORK.
    *
    * The work no longer sits in a lifted panel: the page IS the ground (`--sunk` with `--ground-light`, painted on
    * `body` in `app.css`), the rail is a glass card floating 12 in from the window, and the content sits straight on the
@@ -853,7 +853,7 @@
     padding-inline: var(--sp-3) var(--sp-4);
     background: none;
     border: 0;
-    /* A pill, because it is pressed (design D-2). */
+    /* A pill, because it is pressed. */
     border-radius: var(--r-pill);
     color: var(--ink);
     font: inherit;
@@ -977,7 +977,7 @@
       grid-template-rows: minmax(0, 1fr);
     }
 
-    /* THE PHONE'S OWN GUTTER, 16, whatever the shape (SYSTEM §9). */
+    /* THE PHONE'S OWN GUTTER, 16, whatever the shape. */
     .body,
     .shell[data-shape='bar'] .body,
     .shell[data-shape='menu'] .body {
@@ -1008,7 +1008,7 @@
     gap: var(--sp-1);
   }
 
-  /* SEARCH, DRAWN AS THE FIELD IT OPENS: a field's fill and radius, 44px, the words in `--dim` (SYSTEM §6). */
+  /* SEARCH, DRAWN AS THE FIELD IT OPENS: a field's fill and radius, 44px, the words in `--dim`. */
   .more-find {
     display: flex;
     align-items: center;
@@ -1061,7 +1061,7 @@
     cursor: pointer;
   }
 
-  /* The glyph is quiet, and ink on the row you are on, as the rail draws it (design SYS-12). */
+  /* The glyph is quiet, and ink on the row you are on, as the rail draws it. */
   .more-row > :global(.icon) {
     flex: none;
     color: var(--dim);

@@ -25,7 +25,7 @@ function client(over: Partial<Governor> = {}, calls: Calls = []): Governor {
     governance: async (args) => {
       calls.push({ name: 'governance', args });
       if (args.register === 'decision') {
-        const decisions = [{ id: 'D1', question: 'Which registrar?', answer: 'nordhaven', reason: 'Registry lock.', decided_by: 'sam', ts: '2026-09-01T10:00:00Z', suggestion: 'SG1' }];
+        const decisions = [{ id: 'D1', question: 'Which registrar?', answer: 'nordhaven', reason: 'Registry lock.', decided_by: 'sami', ts: '2026-09-01T10:00:00Z', suggestion: 'SG1' }];
         return { ok: true, value: args.id ? decisions.find((d) => d.id === args.id) ?? null : decisions };
       }
       if (args.id === 'SG3') return { ok: true, value: null };
@@ -46,8 +46,8 @@ function client(over: Partial<Governor> = {}, calls: Calls = []): Governor {
             ],
           },
         },
-        { id: 'SG2', body_kind: 'options', status: 'open', opened_by: 'sam', opened_at: '2026-09-10T09:00:00Z', body: { options: [{ id: 'seat', label: 'Per seat', because: 'Predictable.' }, { id: 'product', label: 'Per product', because: 'Matches use.', recommended: true }] } },
-        { id: 'SG1', body_kind: 'options', status: 'resolved', opened_by: 'sam', opened_at: '2026-08-30T09:00:00Z', body: { options: [{ id: 'nordhaven', label: 'Nordhaven Registry', because: 'Lock.' }, { id: 'cove', label: 'Cove Domains', because: 'Cheaper.' }] }, decision: 'D1' },
+        { id: 'SG2', body_kind: 'options', status: 'open', opened_by: 'sami', opened_at: '2026-09-10T09:00:00Z', body: { options: [{ id: 'seat', label: 'Per seat', because: 'Predictable.' }, { id: 'product', label: 'Per product', because: 'Matches use.', recommended: true }] } },
+        { id: 'SG1', body_kind: 'options', status: 'resolved', opened_by: 'sami', opened_at: '2026-08-30T09:00:00Z', body: { options: [{ id: 'nordhaven', label: 'Nordhaven Registry', because: 'Lock.' }, { id: 'cove', label: 'Cove Domains', because: 'Cheaper.' }] }, decision: 'D1' },
       ];
       if (args.id) return { ok: true, value: rows.find((r) => r.id === args.id) ?? null };
       return { ok: true, value: args.status === 'all' ? rows : rows.filter((r) => r.status === (args.status ?? 'open')) };
@@ -87,7 +87,7 @@ test('the queue is the record’s open suggestions, in its order, each with the 
   assert.equal(rowset?.title, 'SG4');
   assert.deepEqual(rowset?.options.map((o) => o.key), ['accept', 'reject']);
 
-  assert.deepEqual(out.value.decided.map((q) => [q.id, q.title, q.decided?.option, q.decided?.by]), [['D1', 'Which registrar?', 'nordhaven', 'sam']]);
+  assert.deepEqual(out.value.decided.map((q) => [q.id, q.title, q.decided?.option, q.decided?.by]), [['D1', 'Which registrar?', 'nordhaven', 'sami']]);
   /* THE OPTION IS NAMED BY ITS LABEL, from the suggestion the decision settled. */
   const d1 = out.value.decided[0];
   assert.equal(d1?.options.find((o) => o.key === d1.decided?.option)?.title, 'Nordhaven Registry');
@@ -121,7 +121,7 @@ test('a suggestion no longer open is drawn settled: what was decided, by whom, w
   const { question, closed } = out.value;
   assert.equal(closed, true);
   assert.equal(question?.title, 'Which registrar?');
-  assert.deepEqual(question?.decided, { option: 'nordhaven', reason: 'Registry lock.', by: 'sam', at: '2026-09-01T10:00:00Z' });
+  assert.deepEqual(question?.decided, { option: 'nordhaven', reason: 'Registry lock.', by: 'sami', at: '2026-09-01T10:00:00Z' });
   assert.equal(question?.options.find((o) => o.key === question.decided?.option)?.title, 'Nordhaven Registry');
 
   const open = await readOne(client(), 'SG2');
@@ -136,7 +136,7 @@ test('what an accepted arrangement did is read back from its decision, for a rel
   const body = { install: 'usecase-personal', title: 'Personal' };
   const governance: Governor['governance'] = async (args) => {
     if (args.register === 'decision')
-      return { ok: true, value: { id: 'D7', question: 'Add Personal?', answer: 'accept', reason: 'Yes.', decided_by: 'sam', ts: '2026-09-17T10:00:00Z', suggestion: 'SG7', applied: { installed: ['usecase-personal'] } } };
+      return { ok: true, value: { id: 'D7', question: 'Add Personal?', answer: 'accept', reason: 'Yes.', decided_by: 'sami', ts: '2026-09-17T10:00:00Z', suggestion: 'SG7', applied: { installed: ['usecase-personal'] } } };
     return { ok: true, value: { id: 'SG7', body_kind: 'pack', status: 'resolved', opened_by: 'slash', opened_at: '2026-09-17T09:00:00Z', body, decision: 'D7' } };
   };
   for (const id of ['SG7', 'D7']) {
@@ -162,7 +162,7 @@ test('decisions pair with the suggestions they name, and one that names none or 
 });
 
 /**
- * NO RECORD HERE IS A REFUSAL LIKE ANY OTHER, AND NEVER THE SAMPLE (DIRECTION 26).
+ * NO RECORD HERE IS A REFUSAL LIKE ANY OTHER, AND NEVER THE SAMPLE.
  *
  * `node --test` has no `location`, which `noRecord` read as an empty pathname and so as "no slug", so
  * this is the no-slug case exactly. `noRecord` is gone (`device.test.ts` holds that), and before it
@@ -260,8 +260,8 @@ test('A DECISION IS PAIRED BY THE SUGGESTION IT NAMES, not guessed from its opti
     { id: 'SG1', body_kind: 'options', status: 'resolved', opened_at: '2026-09-01T09:00:00Z', body: opts('Yes, the first'), decision: 'D2' },
   ];
   const decisions = [
-    { id: 'D2', question: 'Same words?', answer: 'yes', reason: 'this one', decided_by: 'sam', ts: at, suggestion: 'SG1' },
-    { id: 'D1', question: 'Same words?', answer: 'yes', reason: 'not this one', decided_by: 'sam', ts: at, suggestion: 'SG2' },
+    { id: 'D2', question: 'Same words?', answer: 'yes', reason: 'this one', decided_by: 'sami', ts: at, suggestion: 'SG1' },
+    { id: 'D1', question: 'Same words?', answer: 'yes', reason: 'not this one', decided_by: 'sami', ts: at, suggestion: 'SG2' },
   ];
   const linked = client({
     governance: async (args) => {
@@ -385,7 +385,7 @@ test('DECISIONS PAST THE NEWEST TWO HUNDRED: Decide reads a page, says how many 
 });
 
 test('DECISIONS ALREADY PAGED IN STAY DOWN THE SCREEN when the queue is read again, and paging carries on from there', () => {
-  const decision = (n: number): Question => ({ id: `D${n}`, title: `About SG${n}?`, cost: '', rank: 0, opened: '2026-09-01T00:00:00Z', options: [], decided: { option: 'yes', reason: 'r', by: 'sam', at: '2026-09-01T00:00:00Z' } });
+  const decision = (n: number): Question => ({ id: `D${n}`, title: `About SG${n}?`, cost: '', rank: 0, opened: '2026-09-01T00:00:00Z', options: [], decided: { option: 'yes', reason: 'r', by: 'sami', at: '2026-09-01T00:00:00Z' } });
   const queue = (decided: Question[], cursor: string | null, total: number, suggestions: [string, Record<string, unknown>][]): Queue => ({
     open: [],
     decided,

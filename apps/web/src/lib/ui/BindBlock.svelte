@@ -3,7 +3,7 @@
 
   THIS IS THE WHOLE WIZARD, and it is deliberately small.
 
-  The research said the smallest genuinely useful generator is not a page generator at all: it is a
+  The smallest genuinely useful generator is not a page generator at all: it is a
   ONE-BLOCK generator with a page-shaped destination. Three reasons, and they are not preferences:
 
     1. A whole-page proposal cannot be FILED. 24 §4.4 enumerates the twelve things an assistant may
@@ -27,7 +27,7 @@
   through `bind-write.ts`, and the toast's Put back sets the page body the write read. A record that refused is its
   sentence in the sheet. It used to offer the sample's pages whatever record was behind it, so a real list was offered
   the fictional studio's pages and the press put the block on none of them; after that it kept a sample side, which
-  offered them only when no record answered and toasted "nothing was saved". DIRECTION 26 removed that side.
+  offered them only when no record answered and toasted "nothing was saved". That side went with the sample.
 -->
 <script lang="ts">
   import { KINDS, isKind } from 'braindog-render';

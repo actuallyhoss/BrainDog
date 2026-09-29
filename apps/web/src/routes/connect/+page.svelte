@@ -1,5 +1,5 @@
 <!--
-  Connect an app: the page an MCP client's sign-in lands on (`loop/finish/agents.md` C5).
+  Connect an app: the page an MCP client's sign-in lands on.
 
   WHO IS ASKING, WHERE THE ANSWER GOES, WHAT IT MAY DO, ON WHICH RECORD, AND ONE ALLOW. The app's name and the host its
   code is sent back to come from the held request (`GET /oauth/request`); what it may do is a sentence, never the bare
@@ -11,7 +11,7 @@
   here with nothing else open. It fits an iPhone's screen without scrolling, and on a phone Allow is the last button,
   full width, where a thumb already is.
 
-  THE LOOK IS THE ENTRY SCREENS' (SYSTEM §2, §6, `signin/Entry.svelte`): the lit ground, and on it one lead tile with
+  THE LOOK IS THE ENTRY SCREENS' (`signin/Entry.svelte`): the lit ground, and on it one lead tile with
   the mark and the name at its top, because a person arrives here from sign-in, often straight from it, and the brand
   stays where it was. In the tile, the app's own face and the one heading, the sentence of what it asks, the two facts
   as a label over its value (or the choice, where there is one), how long it lasts in the quiet ink, and the two
@@ -219,7 +219,7 @@
     min-inline-size: 0;
   }
 
-  /* `t-title`, 28/34 at 600 (SYSTEM §3); the phone's large title below 900. */
+  /* `t-title`, 28/34 at 600; the phone's large title below 900. */
   .title {
     min-inline-size: 0;
     margin: 0;
@@ -238,7 +238,7 @@
     padding-block: 0;
   }
 
-  /* WHAT THE APP WROTE AND WHERE IT GOES, THE SCREEN'S ONE SENTENCE: 16/24 in the second ink (SYSTEM §5), breaking
+  /* WHAT THE APP WROTE AND WHERE IT GOES, THE SCREEN'S ONE SENTENCE: 16/24 in the second ink, breaking
      anywhere, so a long name or host never pushes the page sideways at 320. */
   .asks {
     margin: 0;

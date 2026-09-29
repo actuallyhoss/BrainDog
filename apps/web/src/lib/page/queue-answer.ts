@@ -17,8 +17,8 @@ import { moneyInText } from '../record/money.ts';
 import { actor, type Actor } from '../record/names.ts';
 
 /**
- * THE CARD'S OWN WORDS, in a `words` object in a module this unit owns rather than the copy aggregate, by the rule every
- * unit keeps (`loop/finish/contracts.md` §8.1). "Suggested" is the one word for a recommended option (design brief §9).
+ * THE CARD'S OWN WORDS, in a `words` object in a module this card owns rather than the copy aggregate, by the rule every
+ * area keeps. "Suggested" is the one word for a recommended option.
  */
 export const queueWords = {
   /** The label over the one line a question opens when the record wants a reason. */

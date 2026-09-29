@@ -1,12 +1,12 @@
 /**
- * How Slash is run, chosen by the owner in Settings: "Included" or "Your own key" (`loop/finish/agents.md` AGT-21), and on a
+ * How Slash is run, chosen by the owner in Settings: "Included" or "Your own key", and on a
  * self-host also `byo`, the host's own endpoint with a model the owner names and no limit.
  *
  * PURE, SO `node --test` CAN IMPORT IT, and the words live here because `copy.ts` belongs to other work this run.
  *
  * HIS OWN KEY IS FOUR THINGS AND THE KEY IS NEVER TYPED HERE. A provider (Anthropic Messages, or any endpoint that speaks
  * OpenAI's chat completions), an address (empty for the provider's own), a model name, and a key PICKED from the API
- * tokens in his vault, by its id (`loop/finish/defects.md` S1). The key's value never reaches this page: the vault holds
+ * tokens in his vault, by its id. The key's value never reaches this page: the vault holds
  * it, and the host opens it on each ask. The address is checked by the host, which is the only place that can say what a
  * public address is (`slashBaseUrlOf` in `packages/host/src/slash.ts`), and its refusal is drawn as it came.
  *
@@ -62,7 +62,7 @@ export const startOf = (s: SlashSettings): Start => ({
 export type Draft = Start;
 
 /* THE NAME AND THE ADDRESS ARE SENT TRIMMED. `configure` refuses a name that trims to nothing, and a pasted trailing space
-   in a model name once saved ok and failed every ask (measured on 22 September against the real package). A blank name or
+   in a model name once saved ok and failed every ask (measured against the real package). A blank name or
    no key picked sends nothing rather than drawing the engine's refusal, the line `capOf` in `slash-asks.ts` draws for a
    blank limit. An empty address is sent as `null`: the provider's own, and never the address saved before it. */
 /** The patch to send for what the owner has chosen, or `null` when there is nothing to send. */

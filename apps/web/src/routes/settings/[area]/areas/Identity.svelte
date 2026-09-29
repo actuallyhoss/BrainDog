@@ -1,7 +1,6 @@
 <!--
   Settings > Identity: who you are (your face, your name and how you sign in), what you hold on
-  this record, and the other records you can open. Your name and your sign-in email change here
-  (GAP-7).
+  this record, and the other records you can open. Your name and your sign-in email change here.
 -->
 <script lang="ts">
   import { BASE, apiBase, at, signinFor } from '$lib/at.ts';
@@ -32,7 +31,7 @@
   const SLUG = $derived(shell.index.slug);
   const me = $derived(shell.me);
   const signedOut = $derived(s.signedOut);
-  /* THE TWO SIGN-IN STATES THAT ARE NOT A SESSION, said in the row where "Signed in as" stands when there is one (DSN-18). */
+  /* THE TWO SIGN-IN STATES THAT ARE NOT A SESSION, said in the row where "Signed in as" stands when there is one. */
   const identityWords = {
     here: 'This browser',
     openHost: 'Let in without signing in, as this host’s one person',
@@ -94,7 +93,7 @@
     outSaid = out.ok ? copy.signedOut : copy.signOutFailed;
   }
 
-  /* ── your name and sign-in email (GAP-7) ── */
+  /* ── your name and sign-in email ────────── */
 
   let client: ReturnType<typeof createClient> | null = null;
   const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
@@ -146,7 +145,7 @@
 
   /**
    * THE PERSON'S OWN PEOPLE ROW, found by the address they sign in with, when People is on and exactly one row holds it
-   * under another name: the one press the brief offers. Two rows with one address are not guessed between, and a list
+   * under another name: the one press offered. Two rows with one address are not guessed between, and a list
    * that could not be read offers nothing rather than a button that fails.
    */
   let peopleRow = $state<{ seq: number } | null>(null);
@@ -241,7 +240,7 @@
   });
 
   /**
-   * CLOSING THE ACCOUNT (OPS-21) IS THE CLOUD'S ALONE: a self-host belongs to its operator, and its `/account/close` is a
+   * CLOSING THE ACCOUNT IS THE CLOUD'S ALONE: a self-host belongs to its operator, and its `/account/close` is a
    * 404. The address is typed to confirm, in a sheet, and the host checks it, the fifteen minutes and every record's
    * owners; this prints what the host answered and decides none of it.
    */
@@ -293,7 +292,7 @@
 </script>
 
 <!--
-  THE AREA OPENS WITH THE PERSON (GAP-7): their face, their name and how they sign in, never an id.
+  THE AREA OPENS WITH THE PERSON: their face, their name and how they sign in, never an id.
   The name is the record's `renamePerson`, which the host carries into every other record they
   belong to; the address is the account's, a link mailed to the new one that moves nothing until
   it is opened (`POST /account/email`), and this area is where that link lands.
@@ -361,10 +360,10 @@
          listed below. -->
     <!-- AND NOBODY ONCE THE SESSION IS OVER. The fallbacks below are the record's idea of who
          you are, so after Sign out this still read "Signed in as owner@example.test" beside
-         "You are signed out." (`research-first-sign-in.md` friction 10). -->
-    <!-- AND NEVER AN ID (design.md:270, SYS-3): with no address and no name the row says
+         "You are signed out." -->
+    <!-- AND NEVER AN ID: with no address and no name the row says
          nothing rather than the person's id. -->
-    <!-- AND A REAL SIGN-IN STATE (DSN-18). "Signed in as" stood beside a "Sign in" button whenever the
+    <!-- AND A REAL SIGN-IN STATE. "Signed in as" stood beside a "Sign in" button whenever the
          host answered no session, because the row's only condition was that nobody had pressed Sign
          out here. It is drawn only while a session names somebody, and otherwise the row says which
          of the two other states this is: a host that lets its one person in without signing in, or
@@ -380,8 +379,8 @@
       {/if}
     {/if}
     <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
-         `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows
-         (`research-invite-landing.md` finding 3). What they hold is the lists, so the lists are named. -->
+         `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows.
+         What they hold is the lists, so the lists are named. -->
     <li><IconWell name="rows" /><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
   </ul>
   <p class="hint">{copy.identityOutside}</p>
@@ -404,7 +403,7 @@
       <Button onclick={signOutHere} aria-busy={signingOutNow}>{signingOutNow ? copy.signingOut : copy.signOut}</Button>
     {:else}
       <!-- WITH A WAY BACK HERE. A bare `/signin` sent the person to the app's front door after
-           signing in, which is the tab's kept sample (friction 1). -->
+           signing in, which is the tab's kept sample. -->
       <Button href={signinFor(page.url)}>{copy.signIn}</Button>
     {/if}
   </div>
@@ -491,7 +490,7 @@
   {#if shell.recordsRefused}<p class="hint">{shell.recordsRefused}</p>{/if}
 </Section>
 
-<!-- CLOSE YOUR ACCOUNT, LAST (OPS-21): what goes and what stays said before anybody presses, the
+<!-- CLOSE YOUR ACCOUNT, LAST: what goes and what stays said before anybody presses, the
      red text button here and the one filled red button inside the sheet that does it. At 390px
      `row-actions` stacks, so the button is full width. -->
 {#if closable || closedNow}
@@ -539,7 +538,7 @@
 {/if}
 
 <style>
-  /* HOW YOU SIGN IN, AS ROWS ON THE GROUND (SYSTEM §6): a 28px well, what the fact is in the meta size, and what is true
+  /* HOW YOU SIGN IN, AS ROWS ON THE GROUND: a 28px well, what the fact is in the meta size, and what is true
      at the row's size under it, with a hairline between rows from the words' edge. */
   .facts {
     display: grid;
@@ -621,7 +620,7 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* THE PERSON FIRST (GAP-7): their face, the name at the group size as the line a reader looks for, and the address
+  /* THE PERSON FIRST: their face, the name at the group size as the line a reader looks for, and the address
      under it in the meta ink. Long addresses wrap rather than push the page sideways at 320. */
   .person {
     display: flex;
@@ -658,7 +657,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* A FORM, AS THE BRIEF DRAWS ONE: the label above the field, the help under it, and a refusal in
+  /* A FORM, AS THE DESIGN SYSTEM DRAWS ONE: the label above the field, the help under it, and a refusal in
      the help's place in `--danger` with the field's edge in `--danger` too. */
   .rename {
     display: flex;
@@ -678,7 +677,7 @@
     font-size: var(--t-md);
   }
 
-  /* THE FIELD'S EDGE IN `--danger` (design §4.6): a field has no border, so the edge is drawn inside it. */
+  /* THE FIELD'S EDGE IN `--danger`: a field has no border, so the edge is drawn inside it. */
   .rename-bad {
     box-shadow: inset 0 0 0 1.5px var(--danger);
   }

@@ -141,7 +141,7 @@
   let makeOpen = $state(false);
 
   /**
-   * "HANDED TO ME" (GAP-11): a list that says who holds its rows (`hand:`) offers a view onto the ones handed to you,
+   * "HANDED TO ME": a list that says who holds its rows (`hand:`) offers a view onto the ones handed to you,
    * found the same way `HandSheet.svelte` finds every holder, `readHolders`, filtered to the one with `you: true`. The
    * seq is asked again each time the list itself does, since who you are handed does not change inside one visit and a
    * second read would only cost the record another round trip for nothing that could have changed.
@@ -150,7 +150,7 @@
   const shell = $derived(page.data as unknown as Shell);
 
   /**
-   * WHAT THE CALLER'S LEVEL ON THIS LIST REACHES (COL-13), asked of `may()` and never worked out here.
+   * WHAT THE CALLER'S LEVEL ON THIS LIST REACHES, asked of `may()` and never worked out here.
    *
    * A CONTROL THE RECORD WOULD REFUSE IS NOT DRAWN. A colleague given Reads on Tasks met the capture line, the New
    * button, a pencil in every cell and Archive on every row, and each press came back refused: `create` asks `append`
@@ -303,7 +303,7 @@
    *
    * IT ALSO ANSWERED FOR A ROW NOBODY HAD PRESSED HERE: a row typed against the sample waited in
    * `pending` under a negative number and wore `Not saved` on every screen for the life of the tab.
-   * The sample went in DIRECTION 26 and `pending` with it (`loop/research-no-sample.md` B1), so every
+   * The sample went, and `pending` with it, so every
    * row on this list is one the record holds and the receipts are the only marks there are.
    */
   const receiptFor = (seq: number): Receipt | undefined => receipts.get(seq);
@@ -494,9 +494,9 @@
   };
 
   /**
-   * THE RECORD CHANGED UNDER THIS LIST, AND UNTIL W56 THE LIST NEVER HEARD. It asked again only when its own question
+   * THE RECORD CHANGED UNDER THIS LIST, AND THE LIST ONCE NEVER HEARD. It asked again only when its own question
    * changed, and an agent writing into the list he has open changes none of the four parts of it, so the row appeared
-   * on his next navigation and not before (`loop/research-living-in-it.md` §1.1). The shell's poll publishes the
+   * on his next navigation and not before. The shell's poll publishes the
    * record's version (`lib/data/live.svelte.ts`), and a change is this screen's cue to ask its current question again.
    *
    * ONE PAGE IS REPLACED WHERE IT STANDS. MORE THAN ONE IS MARKED STALE, and that is `50 §5.4` step 2. Page 1 asked again
@@ -751,9 +751,9 @@
   /**
    * AND THE PICKER IS NOT ON THE SCREEN UNTIL THERE IS A SET TO BUILD.
    *
-   * `USABILITY.md`'s second question is whether the product grows as the record grows, and its
+   * The product should grow as the record grows, and the
    * example is exactly this: *"a control that is meaningless at n=1 should not be on the screen at
-   * n=1"*. Everything the bulk bar offers over one row — copy the id, set the state, archive it —
+   * n=1"*. Everything the bulk bar offers over one row (copy the id, set the state, archive it)
    * is already on that row's own menu, so at one row the picker is a column of chrome whose only
    * outcome is a toolbar that says `1 selected` above a list of one.
    *
@@ -762,9 +762,9 @@
    * and the select-all were left unconditional, so half of the answer to "is this list big enough
    * to act on in bulk" was drawn and half was not.
    */
-  /* The register's own projection. Which column carries the row's tone is `ListTable`'s (`deadlineOf` in `parts/list.ts`): the deadline, beside the date it is about (design DSN-7). */
+  /* The register's own projection. Which column carries the row's tone is `ListTable`'s (`deadlineOf` in `parts/list.ts`): the deadline, beside the date it is about. */
   const projected = $derived(
-    /* THE NUMBER IS THE ONE COLUMN OFF BY DEFAULT (DSN-5: no list has an id column until Display adds "Number"), so for
+    /* THE NUMBER IS THE ONE COLUMN OFF BY DEFAULT (no list has an id column until Display adds "Number"), so for
        it the stored set means the reverse: in the set, drawn. */
     columnsFor(id, decl, hidden.has('seq'))
       .filter((c) => c.field === 'seq' || !hidden.has(c.field))
@@ -852,7 +852,7 @@
   const standing = $derived(result.entries.filter((e) => e.seq > 0 && receipts.get(e.seq)?.mark !== copy.markArchived));
 
   /**
-   * THE SENTENCE UNDER THE TITLE (SYSTEM §5): what is open, what is late in red, and when the next thing falls due
+   * THE SENTENCE UNDER THE TITLE: what is open, what is late in red, and when the next thing falls due
    * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
    */
   const reading = $derived(
@@ -1001,8 +1001,8 @@
   /* ── writes ───────────────────────────────────────────────────────────────── */
 
   /**
-   * EVERY GESTURE BELOW WRITES. On the sample each said `notWritten` instead, and the sample is gone
-   * (`loop/DIRECTION.md` 26), so there is one path and it is the record's.
+   * EVERY GESTURE BELOW WRITES. On the sample each said `notWritten` instead, and the sample is gone,
+   * so there is one path and it is the record's.
    *
    * THE ROW THE RECORD HANDS BACK IS DRAWN WHERE THE OLD ONE WAS. A changed row that jumped to where
    * its new state sorts is the row the reader has to go and find again; a new row goes at the top.
@@ -1229,7 +1229,7 @@
   /**
    * CHANGING A VALUE YOU ARE LOOKING AT COST A FULL ROUTE CHANGE.
    *
-   * A friction pass measured the path: click a cell, land on a read-only detail page, press *Edit
+   * The path was measured: click a cell, land on a read-only detail page, press *Edit
    * the row*, get a toast. In-place editing was advertised on the `?` sheet as `e`, was reachable
    * only from the keyboard, was announced nowhere on screen, and answered the press with a sentence
    * saying what it would have done. It is eighth of the ten things that cost a person the most,
@@ -1283,7 +1283,7 @@
    * back: `where.ts` `declaredValue` takes a value by its label.
    */
   const saidInLine = (field: string, value: string): string => fieldOf(field)?.labels?.[value] ?? value.replace(/_/g, ' ');
-  /* AND ONLY FOR SOMEBODY WHO MAY CHANGE THE LIST, so a Reads colleague is drawn no pencil (COL-13). */
+  /* AND ONLY FOR SOMEBODY WHO MAY CHANGE THE LIST, so a Reads colleague is drawn no pencil. */
   const editableHere = (field: string) => {
     const f = fieldOf(field);
     return changes && f !== undefined && editable(f);
@@ -1311,7 +1311,7 @@
 
   function openEditor(seq: number, field: string) {
     /* `e` STILL ANSWERS A READS COLLEAGUE, with why the list will not change for them rather than a reason about the
-       field's type, which would be true of the field and not the reason (COL-13). */
+       field's type, which would be true of the field and not the reason. */
     if (!changes) {
       readOnlySaid();
       return;
@@ -1501,7 +1501,7 @@
    */
   /* A ROW'S NUMBER IS ONE OR MORE, which is what the record hands out. This read `said !== 0` for as
      long as `pending` minted NEGATIVE numbers for rows typed against the sample, so `?row=-1` could
-     open the drawer on one; `pending` went with the sample (`loop/research-no-sample.md` B1), and a
+     open the drawer on one; `pending` went with the sample, and a
      negative number in an address now names no row anywhere. */
   const peeked = $derived.by(() => {
     const said = Number(page.url.searchParams.get('row'));
@@ -2007,7 +2007,7 @@
    * list's own words, and the toast's undo retires the page and comes back here. See `viewPage` for why it is a page.
    */
   /* ONE SAVE AT A TIME. A second press of Save as view, or a second Alt+V, while the first write was still out made a
-     second page over the same filter (defects U2). Not `$state`, because nothing draws it. */
+     second page over the same filter. Not `$state`, because nothing draws it. */
   let saving = false;
 
   async function saveView() {
@@ -2058,7 +2058,7 @@
    * screen's change by writing over theirs, which is an undo that loses somebody else's edit to recover one's own.
    *
    * PUSHED ONLY ONCE THE WRITE HAS LANDED, because the inverse of a write that never happened is a second write
-   * nobody asked for (REWORK §4). A row the screen was not holding has no values to go back to, so it gets none.
+   * nobody asked for. A row the screen was not holding has no values to go back to, so it gets none.
    */
   const putBackOf = (before: Entry | undefined, patch: Fields, answered: Entry): (() => void) | undefined =>
     before ? () => void putBack([{ before, patch, answered }]) : undefined;
@@ -2171,7 +2171,7 @@
   $effect(() => drew('ready'));
 
   /* WHETHER ANY ROW IN HAND HAS A PROJECT'S MARK. When one does, every title keeps the mark's slot,
-     so a row with no project starts where its marked neighbours do (DESIGN-SYSTEM appendix C3). */
+     so a row with no project starts where its marked neighbours do. */
   const anyMark = $derived(
     bySeq.size > 0 && [...bySeq.values()].some((e) => identityFor(id, e.fields, result.names ?? undefined) !== null),
   );
@@ -2224,7 +2224,7 @@
   <!-- THE SENTENCE, cut round the phrase that needs him, which `PageHead` draws in red (`data-needs`). -->
   {#snippet readingSaid()}{reading?.before}{#if reading?.needs}<span data-needs>{reading.needs}</span>{/if}{reading?.after}{/snippet}
 
-  <!-- THE SCREEN NARROWS BESIDE THE DOCKED PEEK, AND NEVER GOES UNDER IT (SYSTEM §5). `--dock-w` is what an open docked
+  <!-- THE SCREEN NARROWS BESIDE THE DOCKED PEEK, AND NEVER GOES UNDER IT. `--dock-w` is what an open docked
        panel takes from the window's end edge, and nothing otherwise; the head's and the list's own gutter already
        stand inside it, so what is added is the rest. -->
   <div class="list-screen">
@@ -2236,9 +2236,9 @@
     sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}
-      <!-- THE TOOLBAR (SYSTEM §5): glass, 36 high and 6 apart, the view switch first and the one ink primary last. -->
+      <!-- THE TOOLBAR: glass, 36 high and 6 apart, the view switch first and the one ink primary last. -->
       {#if result.total > 0}<ViewSwitch {view} board={boardable} onview={setView} />{/if}
-      <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows (GAP-11). -->
+      <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows. -->
       {#if handedToMeHref}<Button weight="glass" href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
       <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
       {#if proposes}<Button weight="glass" onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>{/if}
@@ -2281,7 +2281,7 @@
          that does not act on the rows below it. Not on the arrival itself, where the New button in
          the head is the way in. -->
     {#if !adds}
-      <!-- AND WHERE IT WOULD HAVE BEEN, WHY IT IS NOT (COL-13): a list with no way in reads as one nobody can add to. -->
+      <!-- AND WHERE IT WOULD HAVE BEEN, WHY IT IS NOT: a list with no way in reads as one nobody can add to. -->
       <p class="reach">{reachWords.readOnly(decl.name)}</p>
     {:else if !arriving}
       <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
@@ -2425,7 +2425,7 @@
       {/if}
       </div>
     {/if}
-    <!-- NO SECOND SCREEN UNDER THE LIST (`loop/finish/modules.md` MOD-6). The first run's "One kind of thing is a
+    <!-- NO SECOND SCREEN UNDER THE LIST. The first run's "One kind of thing is a
          list" panel and its Money, Services and Projects tiles went with the one-row path that led here; a list with
          nothing in it draws its own empty state. -->
   </div>
@@ -2504,7 +2504,7 @@
      `<style>` block styles only what its own file writes. What is left here is the page's frame. */
 
   /* THE ROOM THE DOCKED PEEK TAKES, less the gutter the head and the list already keep at their end, so the list's
-     edge stands 12 from the panel (SYSTEM §4, "12 to a docked panel"). It moves with the panel's own 220ms. */
+     edge stands 12 from the panel. It moves with the panel's own 220ms. */
   .list-screen {
     padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));
     transition: padding-inline-end var(--d-move) var(--ease-out);
@@ -2551,7 +2551,7 @@
     font-size: var(--t-xs);
   }
 
-  /* WHY THERE IS NO CAPTURE LINE (COL-13), one dim sentence where the line would stand. It wraps like any sentence, so
+  /* WHY THERE IS NO CAPTURE LINE, one dim sentence where the line would stand. It wraps like any sentence, so
      at 390px it is the line's height or two and nothing else moves. */
   .reach {
     margin: 0;

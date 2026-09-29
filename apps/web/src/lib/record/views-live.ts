@@ -13,7 +13,7 @@
  * screens disagreeing about which one holds a view is the thing to fix next.
  *
  * `UNREACHABLE` and `UNAUTHORIZED` are refusals like any other, said in their own words. They
- * answered with the sample until DIRECTION 26, and the route drew the seeded studio's view of
+ * answered with the sample until it was removed, and the route drew the seeded studio's view of
  * the same key over rows from the in-browser fixture. `VIEW_UNKNOWN` is a view this record does not hold, carrying the addresses it does
  * hold, so the answer ends the search instead of starting one. THAT SENTENCE WAS HALF TRUE UNTIL
  * `everyAddress` BELOW: the record builds `allowed` from `kernel.views(register)`, which is

@@ -1,6 +1,6 @@
 <!--
   "Which currency do you use?": the one question the first run asks, and only when Money is kept and the sentence typed
-  no currency (`loop/finish/modules.md` C10).
+  no currency.
 
   NUMBERED CHOICES, EACH WITH THE FACT IT STANDS ON. At most three currencies come first (`building.ts`
   `currencyChoices`): the ones the person named ("pounds and dollars"), the one of the region whose time this device
@@ -11,7 +11,7 @@
   AND EVERY CURRENCY THE BROWSER KNOWS, ONE SEARCH AWAY. Typing narrows by name or by code, so a word of the currency's
   name finds it as surely as its three letters do. A word the person typed that names several currencies ("dollars",
   with no fact to pick between them) starts the search, so they are one press away rather than guessed at.
-  Each is said by its name alone: a code is for typing, never for reading (`loop/finish/design-brief.md`).
+  Each is said by its name alone: a code is for typing, never for reading.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';

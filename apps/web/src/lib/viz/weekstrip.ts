@@ -1,10 +1,10 @@
 /**
  * The week strip's geometry: a column a day with its weekday, its date, and a dot for each thing that
- * day, today as an ink disc, and a hairline where one week meets the next (SYSTEM §6).
+ * day, today as an ink disc, and a hairline where one week meets the next.
  *
  * ONE ROW WHERE IT FITS, A WEEK A ROW WHERE IT DOES NOT. Thirteen or fourteen days need about 28px a
- * column (Main draws 14 in 416); below that (a phone) the strip folds into a calendar, Monday to Sunday across, each week on
- * its own row with a hairline between, the way Light-Money draws five weeks. Days are placed by their
+ * column (14 fit in 416); below that (a phone) the strip folds into a calendar, Monday to Sunday across, each week on
+ * its own row with a hairline between, as a month's five weeks are drawn. Days are placed by their
  * own date, so a gap in the list is a gap on the strip, never a shifted week.
  *
  * DATES ARE CALENDAR DATES, `YYYY-MM-DD`, read in UTC so a timezone never moves a day.
@@ -205,7 +205,7 @@ export function weekstrip(days: readonly WeekDay[], today: string, width: number
 
 /**
  * "14 days from Tue 29 Sep; today is Tue 29 Sep. Tue 29 Sep: the Cat Yard commission. Wed 30 Sep:
- * the skin bundle import and Acme's salary, late."
+ * the skin bundle import and a client's salary, late."
  */
 export function describeWeek(days: readonly WeekDay[], today: string, subject?: string): string {
   const first = days[0];

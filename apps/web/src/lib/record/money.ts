@@ -257,7 +257,7 @@ const written = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): 
  *
  * A CURRENCY ENGLISH WRITES BY ITS CODE HAS NO SYMBOL HERE, even where the runtime knows a narrow one. The narrow
  * display alone gave `E£` for EGP, where English writes `EGP`, as it writes `CHF` and `KWD`, and the contract for
- * money on a screen says a currency with no symbol keeps its code first (contracts §8.3, "how money is written"). A
+ * money on a screen says a currency with no symbol keeps its code first. A
  * currency that does have one is drawn with its narrow form, `$` rather than `CA$`, because the code after every
  * figure that is not in the home currency already says which dollar it is.
  */
@@ -302,7 +302,7 @@ export function drawn(text: string, home: string | null): Drawn | null {
  *
  * `headline` IS A FIGURE STANDING ON ITS OWN, a tile's, where a fraction of all zeros is dropped: "£33,850" and
  * "EGP 58,185", because ".00" under a headline is width a phone does not have and says nothing a round figure does not
- * (contracts §8.3). A fraction that is not all zeros is part of the figure and stays.
+ * A fraction that is not all zeros is part of the figure and stays.
  */
 export function symbolText(text: string, home: string | null, headline = false): string {
   return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
@@ -330,8 +330,8 @@ const grouped = (whole: string): string => whole.replace(/,/gu, '').replace(/\B(
 
 /**
  * A sentence the record stored, with every amount in it drawn as a screen draws one: `£2,400.00` in the record's own
- * currency, `$4,800.00 USD` in any other, `−£39.00` for money out, and `EGP 58,185.54` for a currency written by its code
- * (contracts §8.3, "how money is written").
+ * currency, `$4,800.00 USD` in any other, `−£39.00` for money out, and `EGP 58,185.54` for a currency written by its
+ * code.
  *
  * AT THE READER, NOT IN THE ROUTE. Home's feed, History, Decide's titles and options and a notification all print words
  * somebody else wrote, so the module that reads them (`news-live.ts`, `governance.ts`, the audit reader) hands them on

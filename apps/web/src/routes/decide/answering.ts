@@ -49,12 +49,12 @@ export const mayAnswer = (level: string, owner: boolean): boolean => owner || le
  *
  * A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD (`lists`, from the shell's `me.lists`) HAS NO LEVEL
  * TO BE TOLD. The shell's `read` is a fallback for them, and measured through the real seed
- * (`loop/research-invite-landing.md` finding 3) this hint told a bookkeeper given `write` on one list
+ * this hint told a bookkeeper given `write` on one list
  * "you have read access", which is neither their level nor their situation. The record's own refusal
  * for them asks for "a record-wide token", which they were never offered and cannot ask for by that
  * name. So they are told who answers here, and that the questions they see are the ones about what
  * they hold. The lists are counted and not named: the ids are all this function is handed, and an id
- * is the word finding 6 measured a colleague being told instead of a name.
+ * is the word a colleague was measured being told instead of a name.
  */
 export const whyNotAnswering = (level: string, lists: readonly string[] | null = null): string =>
   lists && lists.length > 0

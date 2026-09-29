@@ -1,7 +1,6 @@
 /**
  * What the first run proposes from one sentence: who the person is, what their BrainDog is for, the modules it keeps,
- * the currency typed, the first entries the sentence itself fills, and what each phrase became
- * (`loop/finish/modules.md` C10, MOD-6).
+ * the currency typed, the first entries the sentence itself fills, and what each phrase became.
  *
  * ONE SENTENCE, READ WITHOUT A MODEL, because the first run works on a fresh self-host with nothing configured (19 §6).
  * The name is read by `who.ts`, the rest of the sentence by `shape.ts` (the modules and the entries) and by the use-case
@@ -9,7 +8,7 @@
  *
  * IT NEVER REFUSES. A sentence in a language these rules do not read, or one that names nothing they know, is a proposal
  * with nothing heard: the screen offers every module to turn on by hand and keeps the words as the person's note. The
- * signature is fixed, and the inside reads the catalogue's signals (shell.md USE-3).
+ * signature is fixed, and the inside reads the catalogue's signals.
  *
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
  */
@@ -74,7 +73,7 @@ const overlaps = (a: { at: number; text: string }, b: { at: number; text: string
  * The modules a sentence asks for, closed over what each leans on.
  *
  * A MODULE NOTHING POINTED AT DOES NOT ARRIVE. The reader answers Projects for any sentence at all, so a maths student's
- * record arrived with an empty Projects page on the rail (`loop/research-usability-2026-09-21.md` finding 2). Only a
+ * record arrived with an empty Projects page on the rail. Only a
  * module with a phrase behind it is kept, People for a heard name, and then whatever those lean on (`LEANS_ON`), so
  * nothing loses a module it cannot install without. A phrase the use case claims ("an Etsy shop" said to the guide is
  * its project) asks for no module of its own (`claimedBy`).
@@ -91,7 +90,7 @@ function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean,
 /**
  * WHETHER THE SENTENCE DESCRIBES A BUSINESS NO USE CASE FITS: the lexicon heard no use case's words in it
  * (`arrangeTurns` picks none with no score), so whatever it heard can only turn on a module or two. That is when a host with a model is asked
- * to draft lists and pages made for it (`loop/finish/pages.md` PGS-20); a sentence these rules could not read at all is
+ * to draft lists and pages made for it; a sentence these rules could not read at all is
  * one of those too, since a model reads it in any language.
  */
 export const outsideCatalogue = (p: Proposal): boolean => p.usecase === null && p.also.length === 0;
@@ -133,7 +132,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   });
   /* PAY DAY IS A RECURRING ROW FORMED ONLY WHEN THE SENTENCE NAMES PAY, and only once Money is one of the modules the
      sentence turns on: Personal's own pack seeds no rows of its own kind, so this is written alongside the others
-     rather than in `personal.ts` (MOD-17). A sentence that names pay but leaves out an amount or a day is not
+     rather than in `personal.ts`. A sentence that names pay but leaves out an amount or a day is not
      written half-formed: `missing` says which field payDayRow could not read, and only a row with neither missing
      is proposed. THE MODULE IS THE ONE THAT DECLARES THE ROW'S LIST (`moduleOfList`), not a pack named here. */
   if (u?.usecase === 'personal') {

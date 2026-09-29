@@ -1,8 +1,8 @@
 /**
- * The words of handing a row to somebody (GAP-11): the "Hand to" control in the row menu and the row page's head, the
+ * The words of handing a row to somebody: the "Hand to" control in the row menu and the row page's head, the
  * short sheet it opens, the line the row keeps while an agent holds it, and the event a hand leaves in the history.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. Plain Node loads this file through the aggregate (`passkey.mjs`), so it imports nothing.
  */
 
@@ -16,7 +16,7 @@ export const hand = {
   /* SAID WHEN THE SHEET HAS NOBODY BUT YOU TO OFFER, so an empty list is not read as a list that failed. */
   handNobody: 'Nobody else is on this record yet, and no agent has run here.',
   handHolding: 'Holds it now',
-  /* THE EVENT A HAND LEAVES ON THE ROW, signed by whoever pressed, so the history reads "Sam handed this to Mona". */
+  /* THE EVENT A HAND LEAVES ON THE ROW, signed by whoever pressed, so the history reads "Sami handed this to Mona". */
   handedNote: (name: string): string => `Handed this to ${name}`,
   handedToast: (name: string): string => `Handed to ${name}`,
   handPutBack: 'Put back',

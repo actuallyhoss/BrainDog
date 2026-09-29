@@ -1,6 +1,5 @@
 <!--
-  "Change this page" in a declared page's head, and the page menu that holds it on a phone (`loop/finish/pages.md`
-  PGS-12).
+  "Change this page" in a declared page's head, and the page menu that holds it on a phone.
 
   FROM 900px IT IS A BUTTON beside "How this is built" and Edit layout. Below 900px those two are not drawn, since
   authoring is a desktop surface (13 §10), so the head gains one 44px "More" button whose menu holds "Change this page"

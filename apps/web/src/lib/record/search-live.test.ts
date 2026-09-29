@@ -61,7 +61,7 @@ test('the record answers, and its hits are drawn grouped by register, best first
 });
 
 /**
- * NO RECORD IS A REFUSAL, AND THE SEEDED STUDIO'S HITS ARE NOT AN ANSWER (DIRECTION 26). This drew the in-browser
+ * NO RECORD IS A REFUSAL, AND THE SEEDED STUDIO'S HITS ARE NOT AN ANSWER. This drew the in-browser
  * sample's search for a 401, an unreachable host and a static host's 404 page, and remembered that for the tab, so a
  * person whose session had lapsed searched a fictional studio's rows under their own record's address and was never
  * asked again. Each case is now the refusal the record or the client gave, with its sentence, and the next query asks
@@ -201,7 +201,7 @@ test("a pack's own list is grouped under the name and icon the record declares, 
       [REGISTERS.obligations!.name, iconFor(REGISTERS.obligations!.icon, 'rows')],
     ],
   );
-  /* A LIST THE BUILD SHIPS IS ASKED ABOUT TOO (DIRECTION §22), since a field added at run time is on the record alone. */
+  /* A LIST THE BUILD SHIPS IS ASKED ABOUT TOO, since a field added at run time is on the record alone. */
   const schemas = () => sent.filter((u) => u.pathname === '/api/schema').map((u) => u.searchParams.get('register')).sort();
   assert.deepEqual(schemas(), ['obligations', 'study_courses']);
   await find.find('linear');

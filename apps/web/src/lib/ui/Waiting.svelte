@@ -1,6 +1,6 @@
 <!--
-  WHILE THE RECORD IS ANSWERING. DESIGN-SYSTEM 4.8: hold the final geometry, no shimmer, and only
-  after 300ms. The geometry is a list's (SYSTEM §6): rows the height of a row, each with the 32px
+  WHILE THE RECORD IS ANSWERING. Hold the final geometry, no shimmer, and only
+  after 300ms. The geometry is a list's: rows the height of a row, each with the 32px
   well a row leads with and one bar where its title goes.
 
   Eight screens drew nothing at all here, on the argument that a placeholder list is rows that are

@@ -1,9 +1,9 @@
 /**
  * What Settings > Billing says, held to the host that answered rather than to the build.
  *
- * `loop/research-first-sign-in.md` friction 5: on a live Cloud record Billing said "This record
+ * On a live Cloud record Billing said "This record
  * runs on your own machine." `DEPLOYMENT.kind`, the sample's, followed a build flag that was empty in every shipped
- * bundle, so it read `self-host` on the Cloud build and on every production screen. It was a fact about the sample, and since DIRECTION 26 there is no sample for it to speak for.
+ * bundle, so it read `self-host` on the Cloud build and on every production screen. It was a fact about the sample, and there is no sample now for it to speak for.
  */
 
 import { test } from 'node:test';
@@ -54,7 +54,7 @@ test('and the screen asks the host that answered, and never the build', () => {
 });
 
 test('and Billing asks the mail door itself, or a self-host reached straight at Billing never says what it is', () => {
-  /* THE CHECKER DELETED THE BILLING EFFECT AND EVERY TEST ABOVE STAYED GREEN. `mintsHere` is otherwise
+  /* WITH THE BILLING EFFECT DELETED, EVERY TEST ABOVE STAYED GREEN. `mintsHere` is otherwise
      asked only by the ingest area, so a self-host whose owner opened `/settings/billing` first kept
      `null`, and `billingLine` gave it the Cloud's default for as long as the screen was open. */
   const page = readFileSync(new URL('./[area]/areas/Billing.svelte', import.meta.url), 'utf8');
@@ -66,8 +66,8 @@ test('and Billing asks the mail door itself, or a self-host reached straight at 
 });
 
 test('billing.ts reads nothing from the fixture module, which is the sample and nothing else', () => {
-  /* `DEPLOYMENT` WAS THE LAST THING IT READ THERE, and it is the sample's variant. `research-no-sample.md` 1d lists this
-     file among the thirty shipped importers of `data.ts`; wave C1 moved that module to `fixtures/sample.ts`, which the
+  /* `DEPLOYMENT` WAS THE LAST THING IT READ THERE, and it is the sample's variant. This file was one of
+     the thirty shipped importers of `data.ts`; that module has since moved to `fixtures/sample.ts`, which the
      `no-fixtures` gate keeps out of every route. */
   const source = readFileSync(new URL('./billing.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /from '[^']*record\/data\.ts'/u, 'billing.ts still imports the sample');
@@ -76,7 +76,7 @@ test('billing.ts reads nothing from the fixture module, which is the sample and 
 
 /*
  * WHETHER THIS RECORD'S CALLS ARE COUNTED AGAINST AN ALLOWANCE, which six `<CallsOut hosted=...>` props decided from the
- * build (`loop/research-batch-forty-eight-audit.md` section 2). On the Cloud bundle `DEPLOYMENT.kind` reads `self-host`,
+ * build. On the Cloud bundle `DEPLOYMENT.kind` reads `self-host`,
  * so every estimate said "with no monthly limit on this record" while the Worker holds a hosted record's runs at 15,000.
  */
 
@@ -91,7 +91,7 @@ test('a live record whose host said nothing is not hosted, because only a self-h
 });
 
 test('a shell with no record is not hosted, and the build it was made as has no say in it', () => {
-  /* THE BRIEF'S OWN CHECK, and it passed before the change as well: under `node --test` there is no
+  /* THE PLAIN CHECK, and it passed before the change as well: under `node --test` there is no
      `__BRAINDOG_VARIANT__`, so the default argument read `self-host` and answered false by accident. */
   assert.equal(hostedHere({ live: false, host: undefined }), false);
   /* SO THE BUILD IS HANDED `cloud` OUTRIGHT, which is what the Cloud variant's gate build did: before this change a shell

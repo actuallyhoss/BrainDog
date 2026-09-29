@@ -4,7 +4,7 @@
  * A ROUTE-ONLY MODULE, like `history-live.ts`: the client carries the route table as a value.
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the
- * sample's row of the address's number, another business's row; there is no sample now (DIRECTION 26). A row the
+ * sample's row of the address's number, another business's row; there is no sample now. A row the
  * record does not hold is `entry: null`, and the LIST's declaration is learned
  * even then, because the screen that says the row is not there has to name the list it is not in.
  *
@@ -84,7 +84,7 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       /* NO REF WALK FOR A ROW THAT IS NOT THERE: there are no fields to draw, so paging a 400-row target register would
          name refs nobody is going to read.
 
-         COUNTED AGAINST A REAL KERNEL over `node:sqlite`, on the survey's shape (a `Courses` list with one `ref` field,
+         COUNTED AGAINST A REAL KERNEL over `node:sqlite`, on the shape it was found on (a `Courses` list with one `ref` field,
          a `Teachers` list holding 400 rows), at the foot of `row-live.test.ts`:
 
              a row that is there     get, schema courses, schema teachers, list teachers    400 rows back

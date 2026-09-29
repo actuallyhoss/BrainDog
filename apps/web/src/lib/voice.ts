@@ -1,5 +1,5 @@
 /**
- * The voice a record speaks in: which lines of the house voice a use case replaces (`loop/research-spark.md` §2.2).
+ * The voice a record speaks in: which lines of the house voice a use case replaces.
  *
  * THE HOUSE VOICE IS `copy.ts` AND THE `words` OBJECTS BESIDE THE SCREENS, AND THEY STAY THE ONLY PLACES A SENTENCE
  * IS TYPED. A voice is data a record holds, as the settings of its use-case pack (`voice_home`, `voice_needs_you`,
@@ -84,7 +84,7 @@ export const homePageOf = (pack: string): string => `home-${pack.replace(/^useca
  * The page Home draws on a live record: the use case's own Home page when the record holds it, else the house one, `home`,
  * when that is held, else `null`. Only a page the record names is ever asked for, so a use case with no Home page is not
  * refused on every load. `null` is not an empty Home: Home then draws the house page, `DEFAULT_HOME`
- * (`lib/home/default-home.ts`), through the same reader (modules C8).
+ * (`lib/home/default-home.ts`), through the same reader.
  */
 export const homeSlugOf = (useCasePage: string | null, pages: readonly string[]): string | null =>
   [useCasePage, 'home'].find((slug): slug is string => slug !== null && pages.includes(slug)) ?? null;
@@ -154,7 +154,7 @@ export function voiceBatch(now: number = Date.now()): string {
 }
 
 /**
- * THE WORDS A RECORD GIVES ITS LISTS, FIELDS AND STATES (`loop/research-spark.md` S8), by label key: `tickets`,
+ * THE WORDS A RECORD GIVES ITS LISTS, FIELDS AND STATES, by label key: `tickets`,
  * `people.role`, `people.role.collaborator`. Held as the use-case pack's `label_*` settings, where a person can
  * change them, and read in place of the declaration's own word. A key left out reads the declaration's word.
  */

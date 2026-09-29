@@ -1,5 +1,5 @@
 /**
- * Who the palette's add row is offered to once `boot` says the level held on each list (COL-13).
+ * Who the palette's add row is offered to once `boot` says the level held on each list.
  *
  * `create.test.ts` holds the row to a caller who may add, on a host that sends no `me.levels`. This holds it to the
  * list-by-list answer: a list the caller reads and cannot add to is not named by the row, whatever they hold elsewhere.

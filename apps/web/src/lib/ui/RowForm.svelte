@@ -59,7 +59,7 @@
      *
      * IT WENT NOWHERE. This form held every value and handed out only `problems`, so the two
      * screens that submit it could say whether the row was valid and not what the row was. On the
-     * first run that is the whole defect a friction pass ranked first of ten: four clicks,
+     * first run that is the worst friction of all: four clicks,
      * twenty-five keystrokes and zero rows, because the one control that matters had nothing to
      * pass on.
      */
@@ -114,7 +114,7 @@
    * first screen of a product about money; and a person, asked when they are due.
    *
    * AND NOT A REQUIRED FIELD THE CHOICE HAS ALREADY ANSWERED. Every required field made Money five
-   * fields for one row, measured on the build of September 10th: `Which way` opened on `owed by me`
+   * fields for one row, as measured: `Which way` opened on `owed by me`
    * under "Your first invoice", so the default most people accept recorded the invoice backwards,
    * and `Status` offered `part` and `written off` to somebody who had not made a row yet. Both are
    * still required. `given` carries the answers the choice implies, `seed` below puts them where a
@@ -190,7 +190,7 @@
     const out: Record<string, string> = {};
     /* ONLY WHAT THE FORM DRAWS, AND IT WALKED EVERY READABLE FIELD. On the first run that filled
        fields the form did not show: a task added from the Work tile arrived with "Due 1 Oct 2026, in
-       4w" on its own page, measured on the build of September 10th, a date nobody was shown, on a
+       4w" on its own page, as measured, a date nobody was shown, on a
        field Tasks does not require. The row now carries what is on the screen and what the choice
        answered, and nothing else. */
     for (const f of fields) {
@@ -236,7 +236,7 @@
       const raw = (typed[f.id] ?? '').trim();
       if (raw === '') continue;
       /* A FILE IS HELD AS ITS VALUE WRITTEN OUT (`FileField`), and goes as the object the record stores; a draft that
-         names no file writes nothing (OPS-20). `Fields` does not list the file's shape, so it is cast as `patchOf`'s is. */
+         names no file writes nothing. `Fields` does not list the file's shape, so it is cast as `patchOf`'s is. */
       if (isFile(f)) {
         const file = fileOf(raw);
         if (file !== null) out[f.id] = file as unknown as Fields[string];
@@ -323,8 +323,8 @@
         {label && f.id === decl?.title ? label : labelOf(f)}
         <!-- Required is marked on the LABEL and spelled out, never as a bare asterisk: an asterisk
              is a convention you have to already know, and it is announced as "star". -->
-        <!-- AND THE ATTRIBUTE, NOT ONLY THE WORD. A friction pass counted the word `required` five
-             times on the first-run form over zero fields carrying it: the form said the rule and
+        <!-- AND THE ATTRIBUTE, NOT ONLY THE WORD. The first-run form said the word `required` five
+             times over zero fields carrying it: the form said the rule and
              the browser did not know it, so a screen reader announced nothing, autofill treated
              every field alike, and the only thing enforcing it was this component's own count. The
              submit is still what refuses, with a sentence naming the fields; this is the browser
@@ -343,7 +343,7 @@
 
           It was `role="group"` over buttons carrying `aria-pressed`, which is a legitimate pattern
           for four independent toggles and is the wrong one for four values of one field: every
-          segment took its own tab stop, so a friction pass counted twelve tab stops serving five
+          segment took its own tab stop, so there were twelve tab stops serving five
           fields on the first-run form, and a screen reader announced four separate pressed states
           rather than one choice with four options.
 
@@ -433,7 +433,7 @@
       {:else if f.type === 'document'}
         <textarea class="row-input row-area" id={id(f)} rows="4" required={f.required} bind:value={typed[f.id]}></textarea>
       {:else if isFile(f)}
-        <!-- A FILE IS CHOSEN, NEVER TYPED (OPS-20): the picker sends the bytes and the draft holds what came back. -->
+        <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back. -->
         <FileField id={id(f)} label={labelOf(f)} bind:value={typed[f.id]} />
       {:else}
         <div class="field"><input class="field-input" id={id(f)} type="text" required={f.required} bind:value={typed[f.id]} /></div>

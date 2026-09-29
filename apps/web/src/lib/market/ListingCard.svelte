@@ -4,7 +4,7 @@
   its foot the one cue that says what its page will offer beside who made it. Who made it is not on the heading, where
   the heading's one line would cut the title short to make room for it.
 
-  A TILE, AS EVERYTHING THAT HOLDS A FIGURE IS (SYSTEM §6), and the catalogue the site's board draws: a white tile with
+  A TILE, AS EVERYTHING THAT HOLDS A FIGURE IS, and the catalogue the site's board draws: a white tile with
   its icon on the heading, and "1 list, 1 page, 1 rule" under what it is for. The drawing sits in a well of the ground's
   colour inside it, so a Home in miniature or a page at half size is a picture of the product and never a tile in a
   tile.
@@ -226,7 +226,7 @@
     margin-block-start: auto;
   }
 
-  /* A QUIET PILL (SYSTEM §6): the `--s1` pill inside a tile, ink words. Its hit box is the whole card. */
+  /* A QUIET PILL: the `--s1` pill inside a tile, ink words. Its hit box is the whole card. */
   .cue {
     display: inline-flex;
     flex: none;

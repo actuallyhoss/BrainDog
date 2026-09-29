@@ -36,7 +36,7 @@ test('a longer label is wider, and a wider size wider still', () => {
 
 test('lists, sentences and ordinals read as English', () => {
   assert.equal(listed(['a', 'b', 'c']), 'a, b and c');
-  assert.equal(sentence('acme.example takings', 'from 1 to 2'), 'acme.example takings, from 1 to 2');
+  assert.equal(sentence('Kiln takings', 'from 1 to 2'), 'Kiln takings, from 1 to 2');
   assert.equal(sentence(undefined, 'from 1 to 2'), 'From 1 to 2');
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal), [
     '1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st',

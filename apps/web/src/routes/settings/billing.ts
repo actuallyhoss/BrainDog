@@ -1,8 +1,8 @@
 /**
  * The one sentence Settings > Billing says, chosen by the host that answered and not by the build.
  *
- * ON THE CLOUD IT SAID "This record runs on your own machine." `loop/research-first-sign-in.md`
- * friction 5, read off a record provisioned and claimed on the Worker run the way production runs
+ * ON THE CLOUD IT SAID "This record runs on your own machine.", read
+ * off a record provisioned and claimed on the Worker run the way production runs
  * it. The branch was `DEPLOYMENT.kind`, the sample's host (now `lib/record/fixtures/sample.ts`), which followed a
  * build flag that every shipped bundle set to nothing: it read `self-host` on the Cloud build, so every production
  * record was told it was on his laptop.
@@ -24,7 +24,7 @@
  * and a Cloud host is not taken for one because a read of that door failed. A host older than the
  * field sends none, and is judged by the door as before.
  *
- * AND THERE IS NO THIRD CASE FOR THE SAMPLE ANY MORE (DIRECTION 26). A shell with no record behind it
+ * AND THERE IS NO THIRD CASE FOR THE SAMPLE ANY MORE. A shell with no record behind it
  * was answered from `DEPLOYMENT.kind`, the variant the sample was built as: "This record runs on your
  * own machine" in every shipped bundle, and on the gates' Cloud build `copy.billingCloud`, "Payment is
  * up to date", over no record and no payment. A refused shell names no host and Billing never asks its
@@ -59,8 +59,7 @@ export function billingLine(b: Pick<Billed, 'host' | 'mintsMail'>): string {
  * FIVE PROPS ANSWERED IT FROM THE BUILD, AND A SIXTH FROM NOTHING AT ALL. The Packs screen's diff and offer, a shared
  * plan, the Settings plan and the Decide gate passed `DEPLOYMENT.kind !== 'self-host'`, which is `false` in the bundle
  * production serves, and the automation builder passed `false`. So on the Cloud `estimateOf` said "with no monthly limit
- * on this record" while the Worker holds a hosted record's runs at `ALLOWANCE.hosted`, 15,000 a month, and sends nothing past it
- * (`loop/research-batch-forty-eight-audit.md` section 2).
+ * on this record" while the Worker holds a hosted record's runs at `ALLOWANCE.hosted`, 15,000 a month, and sends nothing past it.
  *
  * A LIVE RECORD WITH NO `host` IS NOT HOSTED. Every Worker at HEAD sends one, so a host that sends none is a self-host
  * older than the field, and telling it about an allowance it does not have would be the same mistake the other way.
@@ -75,7 +74,7 @@ export function hostedHere(shell: Pick<Billed, 'live' | 'host'>): boolean {
   return shell.live && shell.host === 'cloud';
 }
 
-/* ── what the Cloud says each record costs (OPS-18) ─────────────────────────────────────────────────────────────── */
+/* ── what the Cloud says each record costs ──────────────────────────────────────────────────────────────────────── */
 
 /** One record the person owns, as `GET /account/billing` answers it (`apps/worker/src/billing.ts`). Times are epoch ms. */
 export type BilledRecord = {
@@ -236,11 +235,11 @@ export function thisRecord(answer: BillingAnswer | null, slug: string | null | u
   return answer.records.find((r) => r.slug === slug) ?? null;
 }
 
-/* ── what the Settings tiles draw (SYSTEM §6, §7): the meters, the nightly strip and the title's sentence ─────────── */
+/* ── what the Settings tiles draw: the meters, the nightly strip and the title's sentence ─────────── */
 
 /*
  * PURE, AND HERE, so `node --test` holds every sentence a tile says. The areas draw the tiles; what each tile means is
- * worked out below from the record's own answers, and a tile with nothing true to say is not drawn (SCREENS rule 4).
+ * worked out below from the record's own answers, and a tile with nothing true to say is not drawn.
  */
 
 /** The words the Settings tiles add. A sentence another screen already says is read from there, never typed twice. */
@@ -286,7 +285,7 @@ export const shareOf = (share: number): string =>
 /**
  * One bar per meter: the meter's short name, what it has used as a note ("18,400 of 75,000"), and its share.
  *
- * THE NEAREST ONE IS INK AND THE REST ARE GREY (SYSTEM §2): the binding meter is the one the month turns on. The note
+ * THE NEAREST ONE IS INK AND THE REST ARE GREY: the binding meter is the one the month turns on. The note
  * is `Meter.line` without the name it starts with, so the figures are the ledger's own and never counted twice.
  */
 export function meterBars(meters: readonly Meter[]): { label: string; value: number; note?: string; tone?: 'ink' }[] {
@@ -361,7 +360,7 @@ export type NightTone = 'ink' | 'g2' | 'g4' | 'danger';
 
 /**
  * The strip as the waffle takes it: one part per run of nights in one state, in order, so thirty squares in one row
- * read left to right as the thirty nights. A copied night is grey and the newest copy ink (one highlight, SYSTEM §2); a
+ * read left to right as the thirty nights. A copied night is grey and the newest copy ink; a
  * miss is the red of what needs him; a night before the first copy, or not due yet, is the quietest grey.
  */
 export function nightParts(nights: readonly Night[]): { label: string; value: number; tone: NightTone }[] {
@@ -452,7 +451,7 @@ function usageSaid(meters: readonly Meter[], resets: string, now: number): { nee
 }
 
 /**
- * The sentence under "Settings" (SYSTEM §5), from the nightly copies and this month's meters, and the phrase inside it
+ * The sentence under "Settings", from the nightly copies and this month's meters, and the phrase inside it
  * that needs him. `null` when neither was read: a self-host with no ledger and no copies says nothing rather than
  * "all healthy" about what nobody looked at.
  */

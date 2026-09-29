@@ -20,7 +20,7 @@ export const said = (key: VoiceKey): string => lineOf(state.voice, key);
 
 /**
  * The page this record's use case declares as its Home, `home-<use case>`, or `null` when no use case speaks here
- * and Home is the house one (`loop/research-spark.md` S13).
+ * and Home is the house one.
  */
 export const homePage = (): string | null => (state.pack === null ? null : homePageOf(state.pack));
 
@@ -74,6 +74,6 @@ export async function listen(boot: object | null, base: string): Promise<void> {
   if (heardFor !== boot) return;
   state.voice = voiceOf(values);
   state.pack = id;
-  /* AND THE WORDS IT GIVES ITS LISTS, FIELDS AND STATES (S8), read by the list reader and the rail. */
+  /* AND THE WORDS IT GIVES ITS LISTS, FIELDS AND STATES, read by the list reader and the rail. */
   await hear(labelsOf(values, read.config ?? {}));
 }

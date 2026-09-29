@@ -1,6 +1,6 @@
 <!--
   The list's figures, above its rows: at most two tiles side by side, each with its chart and the one line saying what
-  the chart means (SYSTEM §6, §7). No tile holds a number without a chart, and no chart goes without its reading.
+  the chart means. No tile holds a number without a chart, and no chart goes without its reading.
 
   "BY STATE" is how the list divides, one stacked bar of its rows counted by state: the open states in the greys with
   the first in ink, the finished one in `--earn`, and none in red. THE NUMBER is the list's number column added up,
@@ -93,7 +93,7 @@
 {/if}
 
 <style>
-  /* SIDE BY SIDE WHILE BOTH FIT, 12 apart (SYSTEM §4), and one tile takes the whole width. */
+  /* SIDE BY SIDE WHILE BOTH FIT, 12 apart, and one tile takes the whole width. */
   .summary {
     display: grid;
     gap: var(--sp-3);
@@ -103,7 +103,7 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   }
 
-  /* `t-figure`: 30/34 at 600 and −0.02em (SYSTEM §3). */
+  /* `t-figure`: 30/34 at 600 and −0.02em. */
   .figure {
     margin: 0;
     color: var(--ink);
@@ -122,7 +122,7 @@
     line-height: 20px;
   }
 
-  /* THE ROWS COME FIRST ON A PHONE (SYSTEM §9): the list is what the screen is for. */
+  /* THE ROWS COME FIRST ON A PHONE: the list is what the screen is for. */
   @media (width < 900px) {
     .summary {
       display: none;

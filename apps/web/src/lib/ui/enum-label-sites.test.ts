@@ -5,9 +5,9 @@
  * on drawing each filter pill, menu, segment and sheet row as `copy.valueWord(value)`, the inline cell editor's options
  * and the state menus as `v.replace(/_/g, ' ')`, and a saved view's title the same way. So a household's People list,
  * whose rows read Work contact, was filtered by a pill that said Client, and a Things row was moved by a menu that offered
- * `building` where the list's rows read Active (`loop/research-held-landing.md`, section 3, "Not covered, same defect").
+ * `building` where the list's rows read Active.
  *
- * THE CARDS WORDED WHAT `display` HAD ALREADY SAID, which the research called harmless, and on screen it is: every
+ * THE CARDS WORDED WHAT `display` HAD ALREADY SAID, which looked harmless, and on screen it is: every
  * value label the seed ships starts with a capital, so `copy.valueWord` gave each back unchanged, and the card's
  * `::first-letter` rule raises the one letter it would have changed in `iPhone repairs`. A card now draws the stored
  * value through `valueSaid` all the same, so the card and the form say a value by one function and cannot drift.
@@ -21,24 +21,24 @@
  * THREE SITES FURTHER OUT, AND THESE ARE HELD BY WHAT THEY SAY. With Personal's labels laid on the sample, a block's
  * filter line read "status is building or earning" over rows reading Active and Ongoing, Decide's diff of a rowset said
  * a person's role was changing to "registrar" where the row reads Agency, and a project's own page led with Earning
- * over a Status field reading Ongoing (`loop/research-batch-forty-seven-audit.md` §3, all three measured failing). The
+ * over a Status field reading Ongoing (all three measured failing). The
  * last tests below run the three with Personal's own labels and read what they say. The row page's lead keeps one
  * source check, that it draws through the function the tests run; a rename there turns it red, never green.
  *
  * AND THE LEAD HAD TWO NEIGHBOURS. The same page chipped that project's state "Earning" under a lead reading Ongoing,
  * and its inline editor offered a person's Role as `registrar` where the People list reads Agency
- * (`loop/research-batch-forty-eight-audit.md` §6; both tests failed against the page before it changed). The chip
+ * (both tests failed against the page before it changed). The chip
  * now draws through `stateSaid` and the options through `choicesOf`, the tests run both with Personal's labels, and
  * each keeps the same single source check that the page calls them.
  *
  * AND A THREAD'S PAGE DID THE SAME WITH HEALTH. Each update's chip and the composer's menu spelt the stored value with
- * its underscores out, so the menu offered "on track" under a header reading "On track" (`loop/research-batch-forty-nine-audit.md`
- * §6; both tests failed against the page before it changed). They draw through `t/[track]/health.ts` now.
+ * its underscores out, so the menu offered "on track" under a header reading "On track"
+ * (both tests failed against the page before it changed). They draw through `t/[track]/health.ts` now.
  *
  * THEN THE HEADER ABOVE THEM, AND AN ADD-ON'S SETTINGS. With those chips fixed, a record labelling on_track Fine read
  * Fine on every update and On track in the header, whose `healthLabel` read a table and no labels; it takes the
  * declaration now. The settings page spelt an enum setting's values with the underscores out, and there the honest fix
- * is smaller than the brief: a pack's setting cannot declare a value's words, so the page says each the way an
+ * is smaller than asked: a pack's setting cannot declare a value's words, so the page says each the way an
  * unlabelled field value reads everywhere else. Both tests below failed before the code under them changed.
  */
 
@@ -62,7 +62,7 @@ import { healthLabel } from '../record/api.ts';
 import { settingChoices } from '../../routes/packs/[id]/said.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-/* THE LIST SCREEN IS ITS PAGE AND EVERY PART IT DRAWS THROUGH (ARC-7a), read as one text so each count below is the screen's. */
+/* THE LIST SCREEN IS ITS PAGE AND EVERY PART IT DRAWS THROUGH, read as one text so each count below is the screen's. */
 const LIST = join(here, '../../routes/r/[register]');
 const PAGE = ['+page.svelte', ...readdirSync(join(LIST, 'parts')).filter((f) => f.endsWith('.svelte')).sort().map((f) => join('parts', f))]
   .map((f) => readFileSync(join(LIST, f), 'utf8'))
@@ -174,7 +174,7 @@ test("A ROW'S LEAD SAYS ITS STATE BY ITS LABEL, as its saved field does", () => 
 
 test("A ROW'S STATE CHIP SAYS ITS STATE BY THE SAME FUNCTION AS ITS LEAD", () => {
   /* THE CHIP BESIDE THE FIXED LEAD STILL SPELT THE STORED VALUE: a Personal project led with Ongoing over a chip that
-     read Earning, since `Chip` raises the first letter of whatever it is handed (audit forty-eight §6). */
+     read Earning, since `Chip` raises the first letter of whatever it is handed. */
   relabelAll(REGISTERS, PERSONAL);
   assert.equal(stateSaid(REGISTERS.things, 'earning'), 'Ongoing');
   relabelAll(REGISTERS, {});
@@ -183,8 +183,8 @@ test("A ROW'S STATE CHIP SAYS ITS STATE BY THE SAME FUNCTION AS ITS LEAD", () =>
 });
 
 test("A ROW'S INLINE EDITOR OFFERS EACH VALUE BY ITS LABEL, in the order the field declares", () => {
-  /* Editing a person's Role offered `registrar` where the People list read Agency (audit forty-eight §6). Asked of
-     `accountant` since People 2.0.0 took `registrar` away (M3 B9): the same relabel, Tax and accounts. */
+  /* Editing a person's Role offered `registrar` where the People list read Agency. Asked of
+     `accountant` since People 2.0.0 took `registrar` away: the same relabel, Tax and accounts. */
   relabelAll(REGISTERS, PERSONAL);
   const role = REGISTERS.people!.fields.find((f) => f.id === 'role')!;
   const offered = choicesOf(role);
@@ -202,7 +202,7 @@ test("A ROW'S INLINE EDITOR OFFERS EACH VALUE BY ITS LABEL, in the order the fie
 
 test("NEITHER A ROW'S PAGE NOR A THREAD'S SPELLS A VALUE WITH ITS UNDERSCORES TAKEN OUT", () => {
   /* The register page's own check, laid on the two pages that draw one row or one thread, WITHOUT ITS LEADING `\w`.
-     Audit forty-nine §6 asked for that pattern and said it found two lines on each page; measured, it found one, since
+     That pattern was expected to find two lines on each page; measured, it found one, since
      `String(u.fields.health).replace(...)` puts a bracket before the dot, and so did the row page's chip before
      `fbf9e708`. Neither page has a helper that reads labels to exempt. Before this held, it found the thread's update
      chip and its composer's menu; the row page was already clean. */
@@ -233,8 +233,8 @@ test("A THREAD SAYS EACH UPDATE'S HEALTH, AND OFFERS EACH, BY THE RECORD'S LABEL
 test("A THREAD'S HEADER SAYS ITS HEALTH BY THE SAME LABELS AS THE CHIPS UNDER IT", () => {
   /* THE HEADER WAS THE ONE SITE LEFT ON THE THREAD. With the record's own `updates.health.on_track` reading Fine, every
      update's chip said Fine and the header chip above them said On track, from a table in `healthLabel` that read no
-     labels (audit fifty's checkers; failed against `api.ts` before it changed). */
-  const current = { health: 'on_track', asOf: '2026-09-20', by: 'Sam', state: 'current' } as const;
+     labels (failed against `api.ts` before it changed). */
+  const current = { health: 'on_track', asOf: '2026-09-20', by: 'Sami', state: 'current' } as const;
   relabelAll(REGISTERS, { 'updates.health.on_track': 'Fine' });
   assert.equal(healthLabel(current, REGISTERS.updates), healthSaid(REGISTERS.updates, 'on_track'));
   assert.equal(healthLabel(current, REGISTERS.updates), 'Fine');
@@ -253,7 +253,7 @@ test("AN ADD-ON'S SETTINGS PAGE SAYS AN ENUM SETTING'S VALUES AS THE REST OF THE
   /* THERE IS NO LABEL TO DRAW. A pack's setting takes `type`, `values`, `default`, `label` and `note`, and the kernel's
      `readConfig` refuses any other key, so a value's words cannot be declared. What the page can do is say a value the
      way `valueSaid` says one a field does not label: the segments and the menu read `two yearly` where a register's
-     pills for the same stored value read Two yearly (audit forty-nine §6 named both lines; failed before they moved). */
+     pills for the same stored value read Two yearly (both lines failed before they moved). */
   const decl = { type: 'enum', values: ['weekly', 'two_yearly', 'api'] } as const;
   assert.deepEqual(settingChoices(decl), [['weekly', 'Weekly'], ['two_yearly', 'Two yearly'], ['api', 'API']]);
   assert.deepEqual(settingChoices({ type: 'enum' }), []);

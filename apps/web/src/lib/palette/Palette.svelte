@@ -1,7 +1,7 @@
 <!--
   The palette: a centred dialog that reaches OBJECTS, not only the screens they live on.
 
-  A 640px DIALOG 12vh FROM THE TOP, AND THE WHOLE SCREEN BELOW 640PX (design SYS-13). It was a panel
+  A 640px DIALOG 12vh FROM THE TOP, AND THE WHOLE SCREEN BELOW 640PX. It was a panel
   two thirds of the width, pinned to the inline end, and at 1440 it cut the page title in half and
   read as a second app beside the first. Centred and narrow, it sits over the page as one question
   being asked of it; on a phone the field is in the top bar and the results fill what is left. Each
@@ -12,7 +12,7 @@
   figures, decisions, with everything the record answered with underneath all of them, so typing
   four letters of the row on the screen behind the panel drew every command, page and figure that
   matched before it drew the row.
-  `loop/REWORK.md` phase 3 item 5 asks for the other order and `rankOf` below is where it is
+  The other order is the one wanted, and `rankOf` below is where it is
   written down.
 
   STILL A `<dialog>`. The element is not the shape: it is the focus trap, the inert background and
@@ -24,12 +24,12 @@
   out. The rule is enforced there, in `commands()`, so nothing in this file can add a row that
   fails it. This file applies the same standing rule to the objects it draws.
 
-  NO LEGEND OF KEYS, AND A KEY ONLY ON THE CURSOR ROW (SYSTEM §6). A key on every row and a grammar
+  NO LEGEND OF KEYS, AND A KEY ONLY ON THE CURSOR ROW. A key on every row and a grammar
   in a mono footer read as a tool for the people who wrote it. The cursor row carries a key cap hint
   at desktop width: its binding, read from the keymap registry so it cannot drift from what is bound,
   and `↵`. The `?` sheet is where the whole map lives.
 
-  GLASS, THE STRONG ONE (SYSTEM §6): 640 wide, level 2, radius `--r-lg`, a 52px field, and the
+  GLASS, THE STRONG ONE: 640 wide, level 2, radius `--r-lg`, a 52px field, and the
   results grouped under meta headings. Slash's answers are drawn in the same surface, under the same
   headings, rather than in a second panel.
 
@@ -54,7 +54,7 @@
   import { terms, tokensOf } from '../record/find.ts';
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
   /* `REGISTERS` IS THE DECLARATION CACHE, not the sample: it names a list the rail has not, and `learn` fills it from the
-     record (it still starts with the seed's declarations, which wave B's `held.ts` brief takes away). */
+     record (it still starts with the seed's declarations, which `held.ts` takes away). */
   import { type NavEntry } from '../record/api.ts';
   import { REGISTERS } from '../record/held.ts';
   import { toasts } from '../ui/toast.svelte.ts';
@@ -125,9 +125,9 @@
    * `record/palette-live.ts`, loaded the first time a live palette needs it.
    *
    * WITH NO RECORD THE PALETTE IS ITS COMMANDS AND PAGES. It searched the studio's rows, listed its figures, its last
-   * changes and its questions, and offered to add a row it then said was not saved; that went with the sample
-   * (DIRECTION 26). A refused shell has `live: true` (`layoutOf` sets it), so every branch below that was the sample's
-   * had been unreachable since wave A: a search there is the record's refusal, said under the box.
+   * changes and its questions, and offered to add a row it then said was not saved; that went with the sample.
+   * A refused shell has `live: true` (`layoutOf` sets it), so every branch below that was the sample's
+   * had long been unreachable: a search there is the record's refusal, said under the box.
    */
   const shell = $derived(
     page.data as {
@@ -287,7 +287,7 @@
    * behind the panel drew every command, page and figure that matched first, and the row itself
    * under all of them. That is a menu of screens with the answer at the bottom of it.
    *
-   * `loop/REWORK.md` phase 3 item 5 asks for the other shape: a panel that reaches the OBJECTS the
+   * The palette wants the other shape: a panel that reaches the OBJECTS the
    * record holds, with the commands as the section underneath. So an exact spoken id comes first,
    * because it is the one thing somebody heard said out loud; then the record's own lists; then
    * what is waiting on you; then the figures; then the screens; and the commands last. The
@@ -542,7 +542,7 @@
           out.push({ id: `p-${entry.id}`, title: entry.title, detail: `${entry.section} page`, href: entry.href, group: copy.pages, icon: entry.icon, complete: entry.title });
       /* THE SAVED VIEWS ARE PAGES ON A RECORD, and the loop over `nav` above has already listed them. A loop here built
          rows from `savedViews`, whose record half names no list, so every one was skipped: only the sample's views were
-         ever drawn by it, and it went with the sample (DIRECTION 26). */
+         ever drawn by it, and it went with the sample. */
       for (const r of lists)
         if (starts(r.name))
           /* The count, not a definition of the word "register". A row that explains the app's own
@@ -576,7 +576,7 @@
      * An open palette listed the commands, the pages, the saved views, the registers, the figures
      * and the questions, and not one row of the record. To get back to the obligation you edited ten
      * minutes ago you had to remember what it was called and type it, which is the whole failure
-     * `loop/REWORK.md` phase 3 item 5 describes: a surface that reaches the screens objects live on
+     * of a surface that reaches the screens objects live on
      * rather than the objects.
      *
      * NOTHING NEW IS STORED TO DO IT. The record's log already knows (`recentHistory`, read through
@@ -655,7 +655,7 @@
              declares its provider searchable, so `nordhaven` now reaches three domains named after
              none of it: useful, and unreadable without the reason. A row the record sends with
              nothing beside its title says the list it is in, where its number used to stand, because
-             a list's name is something a person reads and a number is not (design SYS-13). */
+             a list's name is something a person reads and a number is not. */
           detail: hit.why ?? (hit.detail || hit.kind),
           href: hit.href,
           group: hit.kind,
@@ -1099,8 +1099,8 @@
   </div>
 
   <!-- A FOOTER ONLY WHEN THERE IS SOMETHING TO SAY IN IT. It held the query grammar in the identifier face,
-       `> commands · # rows · @ people · / pages`, on every open, which read as a tool for the people who built it
-       (design SYS-13). The prefixes still work for whoever knows them; nothing on this surface teaches them now. -->
+       `> commands · # rows · @ people · / pages`, on every open, which read as a tool for the people who built it.
+       The prefixes still work for whoever knows them; nothing on this surface teaches them now. -->
   <!-- `23 §8` AT 80 %: ONE LINE, HERE, ONCE A MONTH. Not a chip, not a modal, and gone for the month once hidden. -->
   {#if capShown && slashStatus}
     <footer class="p-foot">
@@ -1125,7 +1125,7 @@
     onclick={() => run(row)}
   >
     <Result icon={row.icon} title={row.title} line={row.detail} value={row.value} tone={row.tone} />
-    <!-- THE KEY CAP HINT, ON THE CURSOR ROW ONLY (SYSTEM §6: "the cursor row is wash plus a key cap hint"): the row's own
+    <!-- THE KEY CAP HINT, ON THE CURSOR ROW ONLY (the design system: "the cursor row is wash plus a key cap hint"): the row's own
          binding when it has one, so the slow path teaches the fast one, and `↵`, which is what runs it now. Drawn only at
          desktop width with a fine pointer (the style block says when), and `aria-hidden` so no key is read out as part of
          the option's name: the `?` sheet is where a screen reader hears the keymap. -->
@@ -1171,7 +1171,7 @@
   /**
    * A 640px DIALOG, CENTRED, 12vh FROM THE TOP, and the whole screen below 640px.
    *
-   * GLASS, THE STRONG ONE, AT LEVEL 2 (SYSTEM §6): the palette opens over whatever the page holds, and legibility over
+   * GLASS, THE STRONG ONE, AT LEVEL 2: the palette opens over whatever the page holds, and legibility over
    * busy content is what the strong glass is for. Radius `--r-lg`, the hairline pair and the floating shadow; no border.
    * Its height is its content's, up to what leaves the same 12vh free below it, and past that the list scrolls inside.
    *
@@ -1204,7 +1204,7 @@
   }
 
   /* NO ENTRANCE. It is opened from the keyboard far more often than from anything else, and nothing
-     moves on a keyboard action (SYSTEM §8). It is there on the frame the key is pressed. */
+     moves on a keyboard action. It is there on the frame the key is pressed. */
   .palette:not([open]) {
     display: none;
   }
@@ -1218,7 +1218,7 @@
     background: var(--scrim);
   }
 
-  /* THE 52PX FIELD (SYSTEM §6): the glyph, the query, the count. The hairline under it is the one rule in the panel. */
+  /* THE 52PX FIELD: the glyph, the query, the count. The hairline under it is the one rule in the panel. */
   .p-head {
     display: flex;
     align-items: center;
@@ -1234,7 +1234,7 @@
   /* The state change the input gave up. It is the row that looks like a field, so it is the row
      that says it is live, and it says it the way every focused field in the product does: its edge
      darkens toward the ink. Never the accent, which under the query read as a validation error
-     before anything had been typed (design SYS-1). */
+     before anything had been typed. */
   .p-head:focus-within {
     border-block-end-color: var(--ink2);
     color: var(--ink2);
@@ -1300,7 +1300,7 @@
     overscroll-behavior: contain;
   }
 
-  /* A META HEADING OVER EACH GROUP (SYSTEM §6): the meta step, at 500, in the lowest text ink. */
+  /* A META HEADING OVER EACH GROUP: the meta step, at 500, in the lowest text ink. */
   .p-group {
     margin: 0;
     padding: var(--sp-3) var(--sp-2) var(--sp-1);
@@ -1311,7 +1311,7 @@
 
   /* A ROW'S HEIGHT, 44, WITH A FINE POINTER OR A COARSE ONE, AND 56px ON A PHONE, where a result is two lines
      (`Result.svelte`) and is the phone's route to several places. What the row draws is `Result`'s; this is the box the
-     arrow keys and the pointer walk. The wash is rounded `--r-md`, a row's wash (SYSTEM §4). */
+     arrow keys and the pointer walk. The wash is rounded `--r-md`, a row's wash. */
   .p-row {
     position: relative;
     display: flex;
@@ -1336,7 +1336,7 @@
     }
   }
 
-  /* THE CURSOR ROW IS THE WASH (SYSTEM §6), and the pointer moves the cursor, so hover and the cursor are one state. */
+  /* THE CURSOR ROW IS THE WASH, and the pointer moves the cursor, so hover and the cursor are one state. */
   .p-row[data-cursor] {
     background: var(--hover-wash);
   }
@@ -1362,7 +1362,7 @@
     color: var(--dim);
   }
 
-  /* SLASH ANSWERS IN THE SAME SURFACE (SYSTEM §6). What it looked for sits where a group heading sits, in the meta step,
+  /* SLASH ANSWERS IN THE SAME SURFACE. What it looked for sits where a group heading sits, in the meta step,
      and the rows it found are grouped under their own heading like any others. EVERY LINE SLASH'S ANSWER DRAWS BREAKS
      WHERE IT MUST (`overflow-wrap: anywhere`): a predicate over a long value, a row's title or a model's name can be one
      unbroken word, and at 390px one of those would push the panel sideways. */
@@ -1452,7 +1452,7 @@
     cursor: pointer;
   }
 
-  /* THE FOOTER WRAPS (defects U4): the button drops under the sentence when the two do not fit side by side. */
+  /* THE FOOTER WRAPS: the button drops under the sentence when the two do not fit side by side. */
   .p-foot {
     display: flex;
     flex-wrap: wrap;
@@ -1493,7 +1493,7 @@
       padding-inline: var(--sp-4) var(--sp-3);
     }
 
-    /* ONE EDGE DOWN THE SCREEN (design DSN-16): the list's inset plus a row's own puts every glyph on the 16px gutter
+    /* ONE EDGE DOWN THE SCREEN: the list's inset plus a row's own puts every glyph on the 16px gutter
        the field's glyph sits on in the bar above. */
     #palette-list {
       padding-inline: var(--sp-2);

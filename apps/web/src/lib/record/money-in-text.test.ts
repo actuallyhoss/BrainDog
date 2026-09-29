@@ -1,6 +1,6 @@
 /**
- * `moneyInText`: a sentence the record stored, drawn with its amounts as a screen draws money (design DSN-4; contracts
- * §8.3, "how money is written").
+ * `moneyInText`: a sentence the record stored, drawn with its amounts as a screen draws money (the design system's
+ * rule for how money is written).
  *
  * THE RECORD WRITES MONEY CODE FIRST, "GBP 2,400.00", and a screen draws "£2,400.00" in the record's currency and
  * "$4,800.00 USD" in another. A sentence a rule filled before the kernel grouped its figures holds "GBP 2400.00" and

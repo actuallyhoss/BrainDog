@@ -1,15 +1,15 @@
 <!--
-  The four ways a read is not a screen yet, drawn the same way on every screen that reads (ARC-5).
+  The four ways a read is not a screen yet, drawn the same way on every screen that reads.
 
   A SCREEN DRAWS `ready` AND HANDS THIS THE REST. `read()` in `lib/data/read.svelte.ts` says which state a read is in;
   this draws the other four through `Empty`'s compact form, so waiting, empty, refused and offline look and behave alike
-  from one screen to the next, which is the whole reason there is one read (architecture §3.1).
+  from one screen to the next, which is the whole reason there is one read.
 
-  WAITING IS `Waiting`, NOT AN `Empty`. Loading holds the final geometry in bars after 300ms and says no visible word
-  (design-brief §8), and an `Empty` mounted while a read is out would claim `empty` for a screen that has not answered
+  WAITING IS `Waiting`, NOT AN `Empty`. Loading holds the final geometry in bars after 300ms and says no visible word,
+  and an `Empty` mounted while a read is out would claim `empty` for a screen that has not answered
   yet: the readiness count would then settle a screen whose question has no key as blank.
 
-  OFFLINE SAYS DSN-12's SENTENCE WITH RETRY, and the technical reason goes under Details, never in the sentence: a person
+  OFFLINE SAYS THE UNREACHABLE SENTENCE WITH RETRY, and the technical reason goes under Details, never in the sentence: a person
   told a socket error has been told nothing they can act on, and the one thing they can do is try again.
 -->
 <script lang="ts">

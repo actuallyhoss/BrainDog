@@ -71,7 +71,7 @@
   `09` SPECIFIES A COMPLETE MECHANISM WITH ONE SETTING, the record's quiet hours (`09 §5` rule 3). Everything else is
   still a constant, digests are pack declarations, and muting is turned off at the source: edit or retire the rule that
   raises it. So the facts below still REPORT, and the quiet hours are the one thing on this screen that is the record's
-  and can be changed, by an owner. The last switch is Web Push for this device (W58-4), which is kept by the browser and
+  and can be changed, by an owner. The last switch is Web Push for this device, which is kept by the browser and
   the record, not a preference over what interrupts.
 -->
 <Section title={copy.whenWeInterrupt}>
@@ -138,7 +138,7 @@
 
 <style>
   /* THE QUIET HOURS, AS ONE ROW: the well, the sentence with its two pickers inside it, and the switch at the row's end
-     (design brief: "a switch sits beside its sentence", never 700px from it). The pickers sit inside the sentence, so it
+     (a switch sits beside its sentence, never 700px from it). The pickers sit inside the sentence, so it
      reads "Hold notices from 22:00 to 08:00". The row's measure is the one every settings row keeps, so the switch
      lands where the switches of the other areas land. */
   .quiet {

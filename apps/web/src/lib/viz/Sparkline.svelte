@@ -1,5 +1,5 @@
 <!--
-  A sparkline: a trend's shape with no axes, for a stat tile's top right (SYSTEM §7, 120×32).
+  A sparkline: a trend's shape with no axes, for a stat tile's top right (120×32).
 
   A 2px line with round joins, its area at 8%, and a 3px dot on the last point. `mark` names the
   point that matters: the last one (the default), or the low or the high, which then wears a dot of
@@ -11,7 +11,7 @@
   viewBox is the width it measured, so the dot stays round and a label keeps its size. Give it more
   `height` (48 or so) when it carries a label.
 
-  The reading line under it is the caller's (SYSTEM §11: no chart without one).
+  The reading line under it is the caller's (no chart without one).
 -->
 <script lang="ts">
   import './viz.css';
@@ -39,7 +39,7 @@
     /** `ink` by default; `earn` for money in, `danger` for a fall that needs him, `live` for a run. A project's colour works too. */
     tone?: 'ink' | 'earn' | 'danger' | 'live' | Tone | undefined;
     mark?: TrendMark | undefined;
-    /** What the line measures, which leads the sentence it reads as: "acme.example takings a day, 9 weeks". */
+    /** What the line measures, which leads the sentence it reads as: "Kiln takings a day, 9 weeks". */
     subject?: string | undefined;
     /** The whole sentence, when the one built from the values will not do. */
     summary?: string | undefined;

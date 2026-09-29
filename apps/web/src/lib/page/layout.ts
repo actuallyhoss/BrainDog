@@ -1,6 +1,5 @@
 /**
- * A declared page's two regions, a main column and a side rail, and the boxed runs inside each (brief D4 of
- * `loop/research-dynamic-layouts.md`, primitive P1).
+ * A declared page's two regions, a main column and a side rail, and the boxed runs inside each.
  *
  * THE DECLARATION IS STILL ONE LIST IN ONE ORDER. `layout: { rail: 4 }` on the page says the rail is four twelfths wide,
  * and a block that says `area: rail` sits in it; everything else is main. A layout is not a page in a page (`06 §7`):
@@ -9,7 +8,7 @@
  *
  * WHY A SPLIT AND NOT SPANS. Before this the only way to put blocks side by side was `span`, and a flow aligns rows: a
  * span-4 block beside a tall span-8 block leaves a hole under the short one, so three short blocks declared "beside"
- * one tall block were drawn under it (the survey's S1, measured). A rail is its own stack, so its height is its own.
+ * one tall block were drawn under it (measured). A rail is its own stack, so its height is its own.
  *
  * PURE, SO `node --test` READS IT WITH NO SVELTEKIT. `PageBody.svelte` draws what this answers and decides nothing.
  */

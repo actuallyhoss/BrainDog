@@ -1,8 +1,8 @@
 /**
  * What `/signin` hands on once somebody is in, and four things it got wrong on the owner's first minutes.
  *
- * WALKED, NOT READ. `loop/research-first-sign-in.md` drove the Worker as production runs it, with a passkey made by
- * Chrome's own WebAuthn stack, on 23 September 2026. Section 3 ranks what it met, and this file holds four of them:
+ * WALKED, NOT READ. A walk of the first sign-in drove the Worker as production runs it, with a passkey made by
+ * Chrome's own WebAuthn stack, and ranked what it met. This file holds four of those, by their rank:
  *
  *   1. After a sign-in that starts at the bare `/app/signin`, "Open BrainDog" drew The Studio, the sample business,
  *      and said "Nothing you do here is saved." Measured twice on the laptop (after the claim link and after the
@@ -18,8 +18,8 @@
  * `readBoot` keeps across a sign-in, driven for real) and the page's own wiring, read as text.
  * The source checks are narrow on purpose: they name the four buttons, the two functions and the one class.
  *
- * THE INVITATION HOLDS FRICTION 1 AS WELL. `/invite` is the first screen a colleague meets, it signs them in on
- * Accept exactly as `/signin` does, and `loop/research-batch-forty-six-audit.md` section 5 found it drawing the sample
+ * THE INVITATION HOLDS ITEM 1 AS WELL. `/invite` is the first screen a colleague meets, it signs them in on
+ * Accept exactly as `/signin` does, and an audit found it drawing the sample
  * after the repair had been made here, so its "Open BrainDog" and its `accept` are held by the same two checks.
  */
 
@@ -40,7 +40,7 @@ const LAYOUT = readFileSync(join(ROUTES, '+layout.svelte'), 'utf8');
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-const BOOT = { record: { slug: 'walk', name: 'Sam', locale: 'en' }, registers: [], now: '2026-09-23T06:30:00.000Z' };
+const BOOT = { record: { slug: 'walk', name: 'Sami', locale: 'en' }, registers: [], now: '2026-09-23T06:30:00.000Z' };
 
 /** A host that refuses `boot` until somebody signs in, and then answers the record, which is the walk exactly. */
 function host(): { io: Fetch; signIn: () => void; asked: () => number } {
@@ -60,9 +60,9 @@ function host(): { io: Fetch; signIn: () => void; asked: () => number } {
 /**
  * THE 401 ON THE SIGN-IN SCREEN IS NOT KEPT, SO THE FIRST LOAD AFTER SIGNING IN ASKS THE RECORD.
  *
- * THIS TEST HELD FRICTION 1 AS IT WAS. The sign-in screen's own load asked `boot` at the bare `/app` with no session,
+ * THIS TEST HELD ITEM 1 AS IT WAS. The sign-in screen's own load asked `boot` at the bare `/app` with no session,
  * was refused, and kept the sample for the tab; signing in is a `fetch` that sets a cookie, so the next load was
- * handed The Studio with no request made, and only `forget` put it right. With the sample gone (DIRECTION 26) that
+ * handed The Studio with no request made, and only `forget` put it right. With the sample gone that
  * 401 is a refusal like any other, and a refusal is never kept, so the read after the cookie asks and answers his
  * record without anybody dropping anything. `forget` in `enter` and the full page loads below stay: the switcher's
  * list and the voice are still kept for the tab.
@@ -101,7 +101,7 @@ function buttonFor(src: string, key: string): string | null {
   return m ? m[0] : null;
 }
 
-/* THE INVITATION IS THE SAME DOOR FOR THE FIRST COLLEAGUE. `loop/research-batch-forty-six-audit.md` section 5 drove
+/* THE INVITATION IS THE SAME DOOR FOR THE FIRST COLLEAGUE. An audit drove
    the mechanism through the real `readBoot` for `/app/invite`: the layout kept the sample with nobody signed in,
    Accept set a cookie and nothing more, and "Open BrainDog" was `href="/"` with no reload, so the next move was handed
    `{"from":"sample"}` with one request made in all. The repair of 6959cf06 had been made on `/signin` alone. */
@@ -132,7 +132,7 @@ test('ACCEPTING AN INVITATION FORGETS THE KEPT BOOT, and only once the host has 
   assert.ok(accept, 'no `accept` on the invite screen');
   /* ON SUCCESS, NOT BEFORE THE ANSWER. A refused Accept leaves the stranger exactly as signed out as before, and the
      tab's kept answers are still right for a tab with no session, so dropping them there only asks for them again. */
-  /* SUCCESS IS NOW TWO ANSWERS (OPS-7): joined, or a mail sent to prove the address. Proving leaves the stranger as
+  /* SUCCESS IS NOW TWO ANSWERS: joined, or a mail sent to prove the address. Proving leaves the stranger as
      signed out as a refusal does, so the kept boot is dropped only in the branch after both, where they joined. */
   assert.match(
     accept,
@@ -163,7 +163,7 @@ test('A LINK PASTED INTO A TAB ALREADY ON /signin IS TAKEN, on hashchange as wel
   const body = new RegExp(`(?:function ${on[1]}\\b|const ${on[1]} =)[\\s\\S]*?\\n {2}\\}`, 'u').exec(SIGNIN)?.[0] ?? '';
   assert.match(body, /\btakeLink\(/u, `${on[1]} does not read the link:\n${body}`);
   /* AND KEEPS WHAT IT READ. With `takeLink` called and its answer dropped, the fragment was cleared and the screen
-     still said "Sign in to open your record.", which is friction 8 with the link now gone from the address as well. */
+     still said "Sign in to open your record.", which is item 8 above with the link now gone from the address as well. */
   assert.match(body, /^\s*link = \w+;/mu, `${on[1]} reads the link and does not keep it:\n${body}`);
 });
 

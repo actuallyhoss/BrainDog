@@ -2,7 +2,7 @@
  * The clocks the inspector offers, and how a pick or an edit is written, now that the record keeps the calendar
  * (`packages/kernel/src/clock.ts`: every month, or every few, on a day of the month, at a time).
  *
- * A PICK WENT THROUGH `flow.ts`'s `clockOf`, WHICH KEEPS A DAY FOR A WEEK ALONE. Measured on 25 September: from
+ * A PICK WENT THROUGH `flow.ts`'s `clockOf`, WHICH KEEPS A DAY FOR A WEEK ALONE. Measured: from
  * `every: 1mo, day: 31, at: 07:30`, a pick of 3mo wrote `{ every: 3mo }`, and the record refused it as naming no day
  * of the month. So every pick and every edit of a clock is written here, from the clock it was, keeping what the new
  * clock reads and dropping what the lint refuses on it (`flow-lint.ts` `calendarFault`), and a day, a week or anything

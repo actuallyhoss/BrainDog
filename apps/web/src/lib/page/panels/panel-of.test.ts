@@ -1,10 +1,10 @@
 /**
- * A host panel is chosen by the name a section gives it, and by nothing else (`panel-of.ts`, contracts §4.3).
+ * A host panel is chosen by the name a section gives it, and by nothing else (`panel-of.ts`).
  *
  * WHAT WAS WRONG BEFORE THIS FILE. The page reader drew Resume and the report key under a section whose heading was the
  * exact English "Runs on", so renaming the section took both away with no word said. These cases hold the rule: the
  * key wins, a key naming no panel draws none, and a heading is never read, since every first-party section names its
- * panel (PGS-22).
+ * panel.
  */
 
 import { test } from 'node:test';

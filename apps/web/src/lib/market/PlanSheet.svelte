@@ -1,5 +1,5 @@
 <!--
-  The one plan sheet (`loop/finish/platform.md` §4.0 P). Every install and every update draws this: an add-on or a
+  The one plan sheet. Every install and every update draws this: an add-on or a
   module from its record's `Diff`, a use case pack by pack, and "Update all" as every plan at once before the one press.
 
   THE WHOLE PLAN, READ BY `plan.ts`: what stops it first, in the danger colour and with its glyph, then each pack's part
@@ -10,7 +10,7 @@
   A `Sheet`: a drawer from 640px up, and below it a bottom sheet with its sections as rows and the buttons pinned in its
   footer. `extra` is a question the install asks beside the plan, a use case's voice, drawn above the buttons.
 
-  THE LOOK (SYSTEM §6): the sheet is a tile's surface, so nothing in it is a box. Each thing the plan does is a group
+  THE LOOK: the sheet is a tile's surface, so nothing in it is a box. Each thing the plan does is a group
   with an icon well, its title and its count, and its rows under it with hairlines between them, the way a list sits on
   the ground. What stops it leads, with the danger well and its title in the danger ink: it is the one thing on the
   sheet that needs him before anything else can happen.

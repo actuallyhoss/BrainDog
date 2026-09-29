@@ -37,10 +37,10 @@
    * THE MINT WAS BUILT AND NO OWNER COULD REACH IT.
    *
    * `apps/worker/src/inbound.ts` mints a forwarding address, writes only its SHA-256 into the
-   * Directory's `dir_inbound` and answers the token once. Measured on 2026-09-21 by grepping
+   * Directory's `dir_inbound` and answers the token once. Measured by grepping
    * `apps/web` for `api/inbound`: nothing in this app called either door. So the Cloud would take a
    * bank's forwarded statement at an address no person had any way to obtain, with both halves of the
-   * surface finished and green. `loop/research-batch-three-audit.md` finding 1.
+   * surface finished and green.
    *
    * THE TOKEN LIVES IN `mailSaid` AND NOWHERE ELSE, the way the agents area holds a bearer: leaving
    * the area unmounts this component and empties it, and nothing writes it to a store, a query string
@@ -92,7 +92,7 @@
    * `sample` arm said the demo had no account to mint on; a host with no record behind it is
    * `refused` now, with `recordNotReached`, and draws that like any other refusal.
    *
-   * `unrouted` IS NOT AN ARM HERE ANY MORE, AND THAT IS THE POINT OF FINDING 16. A host whose
+   * `unrouted` IS NOT AN ARM HERE ANY MORE, AND THAT IS THE POINT. A host whose
    * forwarding address is a file rather than a door has not refused a press; it has answered the
    * question this screen now asks on arrival. So `askMail` turns that answer into `mintsHere` and
    * the section states it above, where a person reads it instead of earning it, and `mailSaid` is
@@ -128,7 +128,7 @@
     if (said.kind === 'unrouted') {
       /* THE HOST HAS ANSWERED THE QUESTION THE SCREEN ASKS ON ARRIVAL, so it is kept as what the
          host is and not as what this press did. Before this the sentence was shown once and a
-         reload put both buttons back, which is the half of finding 16 that let somebody press the
+         reload put both buttons back, which is what let somebody press the
          same unservable button all afternoon. */
       s.mintsHere = false;
       mailSaid = null;
@@ -152,7 +152,7 @@
   }
 
   /**
-   * THE DOORS TILE (Light-Settings): each web address the record takes things in at, on while an address is in use and
+   * THE DOORS TILE: each web address the record takes things in at, on while an address is in use and
    * off with none, and one line saying what an unused door means.
    *
    * THE SAME READ AS THE SECTION BELOW, asked once more, and only of an owner: `doors` is ADMIN, and a colleague asking
@@ -162,13 +162,13 @@
    */
   async function doorsNow(): Promise<Result<Door[]>> {
     const out = await listDoors(callerAt(apiBase()));
-    return out.kind === 'doors' ? { ok: true, value: out.doors } : { ok: false, refusal: { code: 'REFUSED', fix: out.fix } };
+    return out.kind === 'doors' ? { ok: true, value: out.doors } : { ok: false, refusal: { code: out.kind === 'signin' ? 'NEEDS_BROWSER_SESSION' : 'FORBIDDEN', fix: out.fix } };
   }
   const doors = read(() => (anOwner ? `doors ${apiBase()}` : null), doorsNow);
   const doorList = $derived(doors.value ?? []);
 
   /**
-   * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds (DSN-18). The
+   * THE TITLES OF THE MAIL SECTION'S THREE STEPS, and the one sentence the third adds. The
    * sentences the first two carry are `inbound-write.ts`'s and are read from there.
    */
   const words = {
@@ -187,7 +187,7 @@
   only. `47 §12` gives the composition: one row per connector, from `PullResult` via the
   receipts and the schedule row.
 -->
-<!-- A LIST TILE, WITH NO CHART (SYSTEM §6: a pure list is the one tile that holds no figure). Drawn only where the record
+<!-- A LIST TILE, WITH NO CHART (a pure list is the one tile that holds no figure). Drawn only where the record
      declares a door and an owner is reading; the section below says the rest. -->
 {#if anOwner && doorList.length > 0}
   <Tile icon="plug" title={doorWords.title} count={doorList.length}>
@@ -244,7 +244,7 @@
   redirect its statements, so the door wants an owner and a sign-in from the last fifteen minutes; the
   screen states that before either button rather than after a refusal.
 
-  AND SO IS WHETHER THIS HOST HAS THE DOOR, WHICH IS FINDING 16 OF `research-usability-2026-09-21.md`.
+  AND SO IS WHETHER THIS HOST HAS THE DOOR.
   Both buttons were drawn on every host, both presses answered 404 `ROUTE_UNKNOWN` on a self-host, and
   the sentence about `inbound.token`, a good sentence, was earned by pressing rather than read. A
   reload put the pair back. `mintsHere` is the host's own answer to one GET, and neither control exists
@@ -277,7 +277,7 @@
     <p class="hint">{levelWords.ownersOnly}</p>
   {:else if mintsHere === true}
     <!--
-      THREE STEPS, IN THE ORDER A PERSON TAKES THEM (DSN-18): make the address, point the mail at it,
+      THREE STEPS, IN THE ORDER A PERSON TAKES THEM: make the address, point the mail at it,
       and send one to see it land. It was a wall of five paragraphs around two buttons, and the step
       that tells somebody it worked was not on the screen at all. Each step is its number, its title,
       its one sentence and its control, and nothing is boxed.
@@ -375,7 +375,7 @@
   }
 
   /* THE IDENTIFIER FACE, because an address is a string somebody compares character by character, and
-     the house's token for it rather than a font stack written here (design brief §3, Type). It sits on
+     the house's token for it rather than a font stack written here. It sits on
      the sunk ground as code does, so the one credential on the screen reads as a thing to copy. */
   .address {
     margin: 0;
@@ -386,8 +386,8 @@
     font-size: var(--t-sm);
   }
 
-  /* THE STEPS: a number in a fixed track, then the step. No box around a step or the list (design brief
-     §11.6); a hairline between steps, as between rows. */
+  /* THE STEPS: a number in a fixed track, then the step. No box around a step or the list;
+     a hairline between steps, as between rows. */
   .steps {
     display: grid;
     margin: var(--sp-4) 0 0;
@@ -443,8 +443,8 @@
     line-height: var(--lh-body);
   }
 
-  /* THE DOORS TILE'S ROWS: a 32px well, the door and the list it writes to, and its state as a 6px dot and a word
-     (SYSTEM §6, Badges), with a hairline between each. */
+  /* THE DOORS TILE'S ROWS: a 32px well, the door and the list it writes to, and its state as a 6px dot and a word,
+     with a hairline between each. */
   .doors {
     display: flex;
     flex-direction: column;

@@ -4,8 +4,8 @@
  * **To check**, and a sentence may say either label in any case, with an underscore for the space or two spaces for one.
  *
  * THREE READINGS OF ONE WORD, and each had its own matcher. `compile` reads the filter (through the record's own
- * parser since ARC-2), `declaredValue` turns the word into what a URL and the live reader carry, and `inheritedFrom`
- * decides what a capture line under the filter writes. Batch twenty-six's checkers found the last two disagreeing with
+ * parser now), `declaredValue` turns the word into what a URL and the live reader carry, and `inheritedFrom`
+ * decides what a capture line under the filter writes. An audit found the last two disagreeing with
  * the kernel: `declaredValue` never read a label at all, and `inheritedFrom` folded case but not the kernel's runs of
  * spaces and underscores, so `state is to_check` filled `review` on a record and nothing on the demo.
  */
@@ -79,7 +79,7 @@ const titles = (rows: readonly { fields: Record<string, unknown> }[]): string[] 
 for (const [said, stored] of SPELLINGS) {
   const where = `state is ${said}`;
 
-  /* THE BROWSER'S MATCHER IS GONE (ARC-2), so the browser's half of this pair is what `compile` hands its readers: the
+  /* THE BROWSER'S MATCHER IS GONE, so the browser's half of this pair is what `compile` hands its readers: the
      record's own parse, which names the stored value. */
   test(`${JSON.stringify(where)} IS ${stored} TO THE RECORD, AND TO compile`, async () => {
     const k = await kernel;

@@ -20,7 +20,7 @@ import type { NavShape, NavShapeRecommendation } from './nav-shape.ts';
 export type Decl = { id: string; kind: string; body: Record<string, unknown> };
 
 /**
- * One offer in the pen, in the record's own shape (`PenItem`, contracts §7.4). `kind` is left open, because the record
+ * One offer in the pen, in the record's own shape (`PenItem`). `kind` is left open, because the record
  * adds kinds and this side draws every one the same way. `id` is the dismissal signature.
  */
 export type PenItem = { id: string; kind: string; register: string; title: string; why: string; change: { to: Decl } };

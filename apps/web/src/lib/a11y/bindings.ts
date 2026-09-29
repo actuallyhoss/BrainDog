@@ -168,7 +168,7 @@ export const BINDINGS: Binding[] = [
   { id: 'gate-leave', scope: 'gate', key: 'Esc', label: 'Leave. The question stays open', bare: false },
   { id: 'gate-next', scope: 'gate', key: 'j  k', label: 'The next or the previous open question', bare: true },
 
-  /* THE TWO QUEUES, which bound nothing (DESIGN-SYSTEM D1). A number answers the question under the cursor, as a press on
+  /* THE TWO QUEUES, which bound nothing. A number answers the question under the cursor, as a press on
      its button does; the gate above is where one is examined, and the queue is where one already thought about is cleared. */
   { id: 'decide-move', scope: 'decide', key: 'j  k', label: 'The next or the previous question', bare: true },
   { id: 'decide-open', scope: 'decide', key: '↵', label: 'Open it, with every option and its reasoning', bare: false },

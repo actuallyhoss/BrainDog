@@ -3,16 +3,16 @@
   and one press per row that mints the token the address carries.
 
   IT WAS ONE DOOR, AND A BANK'S. `ShortcutDoor.svelte` minted for `bank-from-out-sms` and printed an iPhone recipe, so a
-  record whose door took anything else had no screen for it (`DIRECTION.md` §22). The rows are now the record's answer
+  record whose door took anything else had no screen for it. The rows are now the record's answer
   to `doors`, and each press sends back the id that answer gave: nothing here knows what any door is for.
 
   AN OWNER'S SCREEN, SAID BEFORE THE LIST. Both `doors` and `ingestMint` are ADMIN, and the mint wants a sign-in from the
   last fifteen minutes, because whoever holds a token can write into the record. The page's own `anOwner` is handed in,
   so there is one predicate for who owns the record; the record decides again on each call.
 
-  A LIST ON THE GROUND (SYSTEM §6): each door a row with the plug in its 32px well, its name, the list it writes to and
+  A LIST ON THE GROUND: each door a row with the plug in its 32px well, its name, the list it writes to and
   whether an address is in use, then its one press. No tile over it, because the doors read carries no count to draw:
-  a number with no chart under it is the one thing a tile may not hold (SCREENS, Automations).
+  a number with no chart under it is the one thing a tile may not hold.
 
   A TOKEN LIVES IN `said` AND NOWHERE ELSE. The section is drawn only inside the `ingest` arm, so leaving the area takes
   the component and every token with it, and nothing writes one to a store, a query string or a toast. The rules are
@@ -78,7 +78,7 @@
      an ADMIN refusal drawn under the sentence that already says so. */
   /* THE READ IS UNTRACKED, and without that this effect asked for ever. `read` calls `opened()` on its first line, which
      increments the screen's `$state` counter, so the effect depended on what it wrote and ran again before `listed` was
-     set: measured on `/settings/ingest` over the gates' record on 23 September, `/api/doors` was requested more than
+     set: measured on `/settings/ingest` over the gates' record, `/api/doors` was requested more than
      thirty times in three seconds and the screen never settled, which `a11y` reported on all four of its passes. The
      mail door above this section is called the same way for the same reason. */
   $effect(() => {
@@ -159,7 +159,7 @@
               {#if mine?.kind === 'minted'}
                 {@const minted = mine}
                 <!-- SHOWN ONCE, from `said` alone. THE SENTENCE IS PASSED to `clipboard.put` as `said`, so the toast is
-                     that one line: passed only as the label it read "Copied Address copied." (defects A12), and with
+                     that one line: passed only as the label it read "Copied Address copied.", and with
                      neither it would quote the text, which is a live credential. -->
                 <div class="code-form">
                   <p class="code-label">{copy.doorsOnce}</p>
@@ -235,7 +235,7 @@
   }
 
   /* A DOOR IS A ROW ON THE GROUND: the plug in its well beside everything the door says and offers, and a hairline
-     between two doors, as between any two rows (SYSTEM §6). */
+     between two doors, as between any two rows. */
   .door {
     display: grid;
     grid-template-columns: var(--well-l) minmax(0, 1fr);
@@ -295,7 +295,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* AN ADDRESS IS SET IN GEIST MONO (SYSTEM §3). */
+  /* AN ADDRESS IS SET IN GEIST MONO. */
   .mono {
     font-family: var(--font-id);
     font-size: var(--t-sm);

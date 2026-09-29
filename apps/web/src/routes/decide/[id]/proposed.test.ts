@@ -87,7 +87,7 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
     { label: 'Step 2', value: sayStep(steps[1]!) },
     { label: `Step 2, ${words.then.toLowerCase()} 1`, value: 'Tell you: A big one is late' },
     { label: `Step 2, ${words.otherwise.toLowerCase()} 1`, value: 'Add a note: Small, left alone' },
-    /* A CALL RUNS SINCE AUT-2: the run waits for its answer and goes on, so the step says what it calls and nothing more. */
+    /* A CALL RUNS: the run waits for its answer and goes on, so the step says what it calls and nothing more. */
     { label: 'Step 3', value: sayStep(steps[2]!) },
     /* A SCRIPT STEP RUNS SINCE `e6010208`, and this screen still ended it "Not in this build: a run stops here", as it
        once ended a call, where the record's dry run says the run goes on. Measured red first on that sentence. What the owner
@@ -164,7 +164,7 @@ test('a choice and a rowset have drawings of their own, and a change with nothin
   assert.equal(proposedOf('change', { declaration_id: 'x', to: {} }), null);
 });
 
-/* ── what a digest and a pattern send out (audit fifty-one, section 2) ── */
+/* ── what a digest and a pattern send out ───────────────────────────── */
 
 const POLL_BODY = { ingest: 'gold', channel: 'poll', url: 'https://api.goldapi.io/v1/xau', every: '1h', grant: 'goldapi', extract: { what: { after: 'rate ' } }, writes: { register: 'notes' } };
 const HOOK_BODY = {
@@ -192,7 +192,7 @@ test('a digest that posts out says where, when and what, in the line the record 
 
 /* A PATTERN'S INGEST COMES IN TWO SHAPES, and Decide drew one. `slash/src/jobs.ts` files the bare body; an agent files the
    declaration, and drawn as a body the declaration read its `ingest`, `channel` and `writes` off the wrapper, where there
-   are none, so the probe's poll was a title-less "Rule for what comes in" with no host and no key. */
+   are none, so a pattern's poll was a title-less "Rule for what comes in" with no host and no key. */
 test('a pattern draws its ingest as a bare body or as a declaration, with the line the record filed and its key', () => {
   /* FOR A PROJECT'S POLL, so the line the record filed and this screen's own reading differ: the record names the project
      and the screen can only say its row id. Filed with no project, the two were the same string, and drawing the body's
@@ -221,7 +221,7 @@ test('a pattern that holds another kind is drawn as that kind', () => {
   assert.equal(out?.appears[0]?.kind, 'Rule');
 });
 
-/* ── the page itself, drawn by the record before anybody accepts it (M4 wave two brief 5) ── */
+/* ── the page itself, drawn by the record before anybody accepts it ──────────────────────── */
 
 const CLOCK = Date.UTC(2026, 8, 24, 9);
 const BASE = 'http://record.test';

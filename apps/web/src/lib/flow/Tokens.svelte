@@ -1,6 +1,6 @@
 <!--
   One template field, with its data tokens drawn as pills: `{{vars.rate}}` is a pill that says `rate`, and nobody at
-  the canvas meets a brace (EDT-2, "data tokens as pills, never raw braces").
+  the canvas meets a brace ("data tokens as pills, never raw braces").
 
   AN EDITABLE BOX, NOT AN INPUT, because an `<input>` holds only characters and a pill is not one. The box is
   `contenteditable="plaintext-only"`, so a paste lands as words and never as somebody's markup; each pill is a
@@ -231,7 +231,7 @@
     gap: 6px;
   }
 
-  /* A CHIP TO PUT IN IS A QUIET PILL (SYSTEM §6, Buttons): the tile's inner fill, no border, the second ink, and a step
+  /* A CHIP TO PUT IN IS A QUIET PILL: the tile's inner fill, no border, the second ink, and a step
      darker under the pointer. */
   .tok-chip {
     display: inline-flex;

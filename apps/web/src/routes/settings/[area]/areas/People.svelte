@@ -13,7 +13,7 @@
   import { LIST_LEVELS } from '$lib/record/may.ts';
   /* THE WRITES THIS AREA MAKES, and the one reading of what the record answered to each. */
   import { addException, dropException, moveLevel, removeAccess, suspendPerson, type Wrote } from '$lib/record/settings-write.ts';
-  /* COL-12: the rows of one list a grant reaches, picked with the exception and said back under it. */
+  /* The rows of one list a grant reaches, picked with the exception and said back under it. */
   import { ruleRead, rulesHeld, ruleValue } from '$lib/record/settings-write.ts';
   import { labelOf } from '$lib/record/api.ts';
   import type { FieldDecl } from '$lib/record/schema.ts';
@@ -104,7 +104,7 @@
   /**
    * A PRESS THAT CANNOT BE SENT, AND THE TWO CASES THIS SCREEN USED TO CONFLATE.
    *
-   * `loop/research-second-person.md` finding 4. Six presses here branched on `peopleFrom !== 'live'`
+   * Six presses here branched on `peopleFrom !== 'live'`
    * and pushed `copy.notWritten` (the SAMPLE's sentence), so a colleague the record had refused
    * read, on a real record, in a real session: *"A single-use link would be made, bound to that one
    * address and good for 24 hours, but nothing was saved yet."* That says the press did nothing
@@ -113,7 +113,7 @@
    * already drawing the record's refusal four inches above.
    *
    * AND NOW THERE IS ONE CASE. The sample was the only arm allowed to say "yet", and it took a
-   * sentence saying what each press would have done; there is no sample now (DIRECTION 26), so every
+   * sentence saying what each press would have done; there is no sample now, so every
    * press that cannot be sent is a host that answered no. What is said is its own sentence (`13 §6`),
    * which `readPeople` has already put in `peopleRefusal`, or that the record was not reached.
    */
@@ -140,9 +140,9 @@
   /**
    * WHAT A WAITING INVITATION GIVES, AND A ONE-LIST INVITATION GIVES NO RECORD LEVEL.
    *
-   * The row read a missing level as `read`, and drew the invitation `probe2` minted, `level: null, registers:
-   * { expenses: 'write' }`, as "Reads", which told the owner the bookkeeper would read the whole business
-   * (`research-invite-landing.md` finding 5). The lists it carries are the whole of what it gives, so they are what
+   * The row read a missing level as `read`, and drew an invitation minted with `level: null, registers:
+   * { expenses: 'write' }`, as "Reads", which told the owner the bookkeeper would read the whole business.
+   * The lists it carries are the whole of what it gives, so they are what
    * the row names, each at its own level.
    */
   const inviteGives = (inv: Invitation): string =>
@@ -167,7 +167,7 @@
     pickValue = '';
   }
 
-  /* ── one grant narrowed to some rows: "only rows where <field> is <value>" (COL-12) ── */
+  /* ── one grant narrowed to some rows: "only rows where <field> is <value>" ─────────── */
 
   /**
    * THE FIELDS A RULE CAN NAME, which are the ones a person can say one value of: words, a choice, a link to a row, a
@@ -392,8 +392,8 @@
    * WHETHER THERE IS ANYBODY TO COMPARE YOURSELF WITH, which is what most of this area is about.
    *
    * A level, an exception, a removal and an erasure are all facts about one person MEASURED
-   * AGAINST another, and on a record whose only person is you there is no other. `USABILITY.md`'s
-   * second question asks that the product be smaller at one row than at four hundred and grow by
+   * AGAINST another, and on a record whose only person is you there is no other. The product
+   * should be smaller at one row than at four hundred and grow by
    * itself; this is the line that lets the People area do it.
    */
   const alone = $derived(people.length < 2);
@@ -422,7 +422,7 @@
   const said = (who: Person) => personSaid(who, me.person, peopleNames);
 
   /**
-   * THE COLLEAGUES TILE (Light-Settings): everybody on the record but the reader, each with their face, what they may
+   * THE COLLEAGUES TILE: everybody on the record but the reader, each with their face, what they may
    * do and when they last looked. The tile is who is here at a glance; what each may do is changed on the ground under
    * it, where the controls are.
    */
@@ -456,7 +456,7 @@
   reader. Every one of those is a fact about a comparison with nothing to compare, and the
   heading counted the reader as a person on their own record.
 
-  `USABILITY.md`'s second question is that the product should be SMALLER at one row than at
+  The product should be SMALLER at one row than at
   four hundred and get bigger by itself. So at one person this area is one sentence and one
   control, and the segments, the exceptions, the two hints and the erasure appear on the day
   a second person exists, which is the day each of them means something.
@@ -636,7 +636,7 @@
                       onclick={() => backToLevel(p, ex.register)}
                     >{copy.removeException}</Button>
                     <!-- WHICH ROWS OF THE LIST, when the grant is narrowed, said as a sentence on its own line under
-                         the exception it narrows, since it is part of what they hold there (COL-12). -->
+                         the exception it narrows, since it is part of what they hold there. -->
                     {#if onlySaid(p, ex.register) !== null}<span class="ex-only">{onlySaid(p, ex.register)}</span>{/if}
                   </li>
                 {/each}
@@ -670,7 +670,7 @@
                     {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
                   </select>
                 </label>
-                <!-- AND WHICH ROWS OF IT (COL-12): every row, or only those where one of the list's own fields holds
+                <!-- AND WHICH ROWS OF IT: every row, or only those where one of the list's own fields holds
                      one value, the value picked from a choice or typed. Offered only when the list's fields are known
                      here, because a field this screen cannot name is not one it can offer. -->
                 {#if ruleFields.length > 0}
@@ -736,7 +736,7 @@
 <!--
   AND THE FORM IS THE OWNER'S, DRAWN TO THE OWNER.
 
-  `loop/research-second-person.md` findings 7 and 4: this form was drawn in full, four inches
+  This form was drawn in full, four inches
   under a section already saying *"This needs owner, and you have read access"*, to every
   colleague at every level. Driven again here as a `read` colleague: the address field, the
   five-option level select and `Invite a person`, none of them disabled, and the press answered
@@ -854,7 +854,7 @@
 </Section>
 {/if}
 
-<!-- The read-only links to single pages, beside who can see the record (COL-7). -->
+<!-- The read-only links to single pages, beside who can see the record. -->
 {#if anOwner}<Links />{/if}
 
 <!-- AND ERASE ARRIVES WITH THE SECOND PERSON. On a record whose only person is you, the one
@@ -1311,7 +1311,7 @@
   }
 
   /* ERASING IS WORDS AND FIELDS ON THE GROUND, unboxed: the red-edged panel it sat in drew red for a danger, and red
-     is what needs him and nothing else (SYSTEM §2). */
+     is what needs him and nothing else. */
   .danger {
     display: grid;
     gap: var(--sp-2);

@@ -422,11 +422,11 @@ test("a list this build does not ship draws a link by the linked row's name, and
  * NO SCREEN HOLDS A ROW THE RECORD WAS NOT GIVEN, BECAUSE THERE IS NO SAMPLE TO HOLD ONE AGAINST.
  *
  * `pending` kept the rows a person typed while the tab was drawing the in-browser sample, marked them
- * `Not saved`, and gave them negative numbers so they could not collide with the record's. Wave A of
- * `loop/research-no-sample.md` took the sample away, so every caller passed `false` for "was this typed
+ * `Not saved`, and gave them negative numbers so they could not collide with the record's. Once the sample
+ * was taken away, every caller passed `false` for "was this typed
  * against the sample" and the module held nothing reachable: the list, the row page, the shell's
  * banner and `/start` were each still drawing, counting and branching on rows that could no longer
- * exist. Brief B1 deletes the module, and this is what keeps it deleted.
+ * exist. The module is deleted, and this is what keeps it deleted.
  *
  * A SOURCE READ, AS `list-chips.test.ts` AND `undo-live.test.ts` READ THIS SAME ROUTE. The claim is
  * about what the four screens import and draw, and no browser is needed to see an import.

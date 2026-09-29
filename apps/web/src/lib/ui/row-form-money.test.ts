@@ -2,8 +2,8 @@
  * The new-row form writes a typed amount in a currency somebody chose, and in none when nobody has.
  *
  * IT WROTE STERLING ON EVERY RECORD. `RowForm.svelte` ended its chain in `'GBP'` after `currencyFor`, which reads rows no
- * shipped tab holds, so "120" typed into a new row on a record kept in EGP went in as GBP 120.00 (`loop/finish/defects.md`
- * M1, DEF-2). The component does not mount under `node --test`, so these cases hold `money-typed.ts`, the module it
+ * shipped tab holds, so "120" typed into a new row on a record kept in EGP went in as GBP 120.00.
+ * The component does not mount under `node --test`, so these cases hold `money-typed.ts`, the module it
  * reads the currency and the amount from.
  */
 

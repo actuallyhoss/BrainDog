@@ -10,7 +10,7 @@
  * THE ANSWERS ARE THE RECORD'S OWN, or the shapes agreed with it. Every refusal is one `ingestMint` in
  * `packages/record/src/index.ts` writes, with its code and its sentence; `doors` answers
  * `[{ id, description, verify, held, register }]` and the mint `{ ingest, token, rec, path }`, which a record-side
- * change lands in the same wave, so both are held here by doubles.
+ * change lands alongside, so both are held here by doubles.
  */
 
 import { test } from 'node:test';
@@ -98,7 +98,7 @@ test('A HOST TYPED WITH A TRAILING SLASH STILL BUILDS ONE ADDRESS, because `//in
 });
 
 test('A MINT ANSWERED WITHOUT A USABLE PATH SHOWS THE TOKEN AND NO ADDRESS, because it is still the only copy', () => {
-  /* WHAT `ingestMint` ANSWERED BEFORE THIS WAVE: `{ ingest, token }`, no path. And a path starting `//` is read as a
+  /* WHAT `ingestMint` ANSWERED BEFORE THE PATH: `{ ingest, token }`, no path. And a path starting `//` is read as a
      different host by anything that follows it, so it is not offered as this record's address. */
   for (const value of [
     { ingest: 'x', token: TOKEN },
@@ -112,7 +112,7 @@ test('A MINT ANSWERED WITHOUT A USABLE PATH SHOWS THE TOKEN AND NO ADDRESS, beca
 test('A SUCCESS WITH NO TOKEN IN IT IS A REFUSAL WITH A SENTENCE, not an address ending in undefined', () => {
   const said = saidOf({ ok: true, value: { ingest: 'x', rec: REC, path: '/in/webhook/x/' } }, BASE);
   assert.deepEqual(said, { kind: 'refused', fix: copy.doorsNoToken });
-  /* AN EMPTY TOKEN IS THE SAME ANSWER. The checker took the `=== ''` guard out of the old `saidOf` and every test still
+  /* AN EMPTY TOKEN IS THE SAME ANSWER. With the `=== ''` guard taken out of the old `saidOf` every test still
      passed, so the screen could have offered an address ending in a bare slash and nothing would have said so. */
   assert.equal(saidOf({ ok: true, value: { ingest: 'x', token: '', rec: REC, path: pathOf('x') } }, BASE).kind, 'refused');
 });
@@ -162,7 +162,7 @@ test('A DOOR THE RECORD NO LONGER DECLARES IS THE RECORD\'S OWN SENTENCE, which 
 
 test('NO SIGN-IN IS signin AND NO HOST IS A REFUSAL, with no slug in the address as with one', async () => {
   /* BOTH WERE THE SAMPLE when the address named no record, and the screen drew the demo's sentence about having no
-     account. There is no sample now (`DIRECTION.md` §26), so the answer no longer depends on the address. */
+     account. There is no sample now, so the answer no longer depends on the address. */
   const fix = 'Sign in to this record first.';
   assert.deepEqual(saidOf({ ok: false, refusal: { code: 'UNAUTHORIZED', fix } }, BASE), { kind: 'signin', fix });
   assert.deepEqual(doorsOf({ ok: false, refusal: { code: 'UNAUTHORIZED', fix } }), { kind: 'signin', fix });
@@ -187,7 +187,7 @@ test('THE MODULE HOLDING THE ONLY COPY OF THE TOKEN NEITHER LOGS NOR KEEPS IT', 
   }
 });
 
-test('NO USE CASE IS SPELLED IN THE SCREEN OR ITS WORDS (`DIRECTION.md` §22)', () => {
+test('NO USE CASE IS SPELLED IN THE SCREEN OR ITS WORDS', () => {
   /* THE OLD SCREEN WAS A BANK'S. Its id, its recipe and its title named one sender on one phone, so a record with any
      other door read a section about texts from a bank. The words for this section are every `doors*` key. */
   const here = dirname(fileURLToPath(import.meta.url));

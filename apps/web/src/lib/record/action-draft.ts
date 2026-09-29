@@ -1,5 +1,5 @@
 /**
- * A door or a scheduled action, drafted on a sheet and filed as one `change` (shell DOR-4).
+ * A door or a scheduled action, drafted on a sheet and filed as one `change`.
  *
  * A PERSON MADE ONE BY WRITING A FILE. A door was an ingest declaration somebody typed, and a scheduled action was the
  * same declaration with a url, a key's label and an interval; the only way in was an agent or a pack. This holds what
@@ -10,7 +10,7 @@
  * THE RECORD STILL DECIDES. Nothing here is a second lint: what this refuses is only what could never be sent (no name,
  * no address), and every other sentence the person reads about a declaration is the record's own `fix`.
  *
- * THE PRESETS ARE HOW A DECLARED PAGE REACHES THE SHEET (`contracts.md` X57). A page links to
+ * THE PRESETS ARE HOW A DECLARED PAGE REACHES THE SHEET. A page links to
  * `/app/<slug>/automations?new=action&preset=<id>`, the hub opens `NewAction.svelte` with that id, and the id is looked
  * up here. A preset is a draft with some boxes filled; it installs nothing on its own.
  */
@@ -30,7 +30,7 @@ export const CHANNELS = ['poll', 'call', 'pull'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 /**
- * How the key is sent (`contracts.md`, "call and poll `auth.kind`"). `bearer` is what a bare `grant:` has always meant,
+ * How the key is sent ("call and poll `auth.kind`"). `bearer` is what a bare `grant:` has always meant,
  * so it writes no `auth:` on a call or a poll and the declaration reads as it did before the other three existed.
  */
 export const AUTH_KINDS = ['bearer', 'header', 'query', 'basic'] as const;
@@ -145,10 +145,10 @@ export const blankDraft = (kind: ActionKind): ActionDraft => ({
 /**
  * The presets a page may open the sheet with, by id.
  *
- * `numbers` AND `watch` ARE THE FOUNDER HOME'S TWO BUTTONS (MOD-18), both writing to `datapoints`, which is the list its
+ * `numbers` AND `watch` ARE THE FOUNDER HOME'S TWO BUTTONS, both writing to `datapoints`, which is the list its
  * numbers blocks read; `name` and `value` are that list's fields.
  *
- * `rates` IS "SET UP EXCHANGE RATES" ON MONEY'S PAGE (USE-5), which was a form written for one pack. It reads one
+ * `rates` IS "SET UP EXCHANGE RATES" ON MONEY'S PAGE, which was a form written for one pack. It reads one
  * currency a day into `fx`, whose fields say that one `currency` is worth `rate` of `base`: here one US dollar in the
  * currency the person names twice, once as the base and once at the end of `rates.`. ONE CURRENCY AN ACTION, so a
  * record gains a currency by opening the preset again, which the old form could not do once its pack was installed.
@@ -271,7 +271,7 @@ function mapOf(draft: ActionDraft): Record<string, unknown> | null {
  * carry their url whole; A PULL splits it into the host and the path, because a connector's `base` is a host alone.
  *
  * `taken` IS EVERY INGEST ID THE RECORD ALREADY DECLARES, bare (as `doors()` and `actions()` answer it, never
- * prefixed `ingest.`), so a name that collides is refused here instead of silently replacing what it names (USE-5).
+ * prefixed `ingest.`), so a name that collides is refused here instead of silently replacing what it names.
  */
 export function declarationOf(draft: ActionDraft, taken?: ReadonlySet<string>): Built {
   const said = draft.name.trim();

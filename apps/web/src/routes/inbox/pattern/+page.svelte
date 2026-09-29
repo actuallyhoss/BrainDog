@@ -1,10 +1,10 @@
 <!--
-  The ingest pattern builder (`loop/finish/platform.md` PLT-10): a rule made from a few messages that arrived alike, by
+  The ingest pattern builder: a rule made from a few messages that arrived alike, by
   pointing at the words in them, never by writing a pattern.
 
   THE FLOW BY WHICH THE INBOX LEARNS A SENDER ONCE: what arrived, what the rule reads from it, and what it would take.
   The sample is shown in a tile, and the try is a tile too, with the samples it takes as cells and each field's reads
-  as bars, so the answer is seen before it is saved (SYSTEM §6, §7). Fields are the soft wells, and one ink primary.
+  as bars, so the answer is seen before it is saved. Fields are the soft wells, and one ink primary.
 
   FOUR SCREENS IN ONE PLACE. Samples (a counter, a paste box, the list the rows go to); what it reads (a column per
   sample, a row per field, the typed value in each cell and a `3/3` chip per field, and the match as a sentence of
@@ -639,7 +639,7 @@
     overflow-wrap: anywhere;
   }
 
-  /* THE FIGURE AND THE LINE THAT READS THE CHART (SYSTEM §3, §6). */
+  /* THE FIGURE AND THE LINE THAT READS THE CHART. */
   .figure {
     display: flex;
     flex-wrap: wrap;
@@ -669,7 +669,7 @@
     line-height: 20px;
   }
 
-  /* A FIELD IS A SOFT WELL (SYSTEM §6, Fields): 40 tall, `--s1`, no border, radius 12, its label above it. */
+  /* A FIELD IS A SOFT WELL: 40 tall, `--s1`, no border, radius 12, its label above it. */
   .form-row {
     display: flex;
     flex-direction: column;
@@ -797,7 +797,7 @@
     }
   }
 
-  /* ON A PHONE THE BAR FLOATS AS GLASS UNDER THE THUMB, above the tab bar (SYSTEM §9), and every action in it is 44px
+  /* ON A PHONE THE BAR FLOATS AS GLASS UNDER THE THUMB, above the tab bar, and every action in it is 44px
      and shares the width. */
   @media (width < 640px) {
     .bar {

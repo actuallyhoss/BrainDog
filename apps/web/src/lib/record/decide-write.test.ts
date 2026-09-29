@@ -65,12 +65,12 @@ test('a refusal is the record sentence', async () => {
 });
 
 test('a conflict says a row changed since it was proposed', async () => {
-  const { io } = host(() => json(409, { ok: false, conflict: { version: 4, current: {}, actor: 'sam' } }));
+  const { io } = host(() => json(409, { ok: false, conflict: { version: 4, current: {}, actor: 'sami' } }));
   assert.deepEqual(await answerQuestion(BASE, 'SG4', 'accept', 'Both are right.', io), { from: 'conflict', fix: copy.decideConflict });
 });
 
 /* NO SAMPLE, SO NO `gone`. A host that does not answer, a sign-in wall and a 404 that is not JSON were `gone` at an
-   address with no slug, the one place the sample used to be drawn instead of the record (wave C3). They are the refusal
+   address with no slug, the one place the sample used to be drawn instead of the record. They are the refusal
    they are, with its sentence, wherever the screen is. */
 test('no record behind the screen is refused, with a sentence: nothing answering, a sign-in wall, a 404 that is not JSON', async () => {
   const down = await answerQuestion(BASE, 'SG2', 'seat', 'Because.', host(null).io);

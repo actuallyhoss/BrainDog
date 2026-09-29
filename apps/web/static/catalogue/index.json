@@ -192,7 +192,7 @@
         },
         {
           "version": "1.1.0",
-          "checksum": "027554c11c0da97a0b18dc4068d5c64dea7b6675a9d32c3067e31a21d8749576",
+          "checksum": "c1f424e4577166738ab25b8853befabc0dbc9a49426c0c3ef5813cc65207f1ed",
           "bytes": 12296,
           "published_at": "2026-09-28T00:35:03.785Z",
           "bump": "patch",
@@ -618,11 +618,41 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
         {
+          "version": "1.0.1",
+          "checksum": "039ca547e63a02ea23d79c903f3f36f354e67994aaa6aaef3057c19fd1ae339f",
+          "bytes": 19659,
+          "published_at": "2026-09-29T22:15:58.971Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · grant \"Mercury (read only)\"",
+                "key": "Mercury (read only)"
+              },
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its vault entry opens",
+                "key": "Mercury (read only)"
+              }
+            ]
+          },
+          "notes": "Nothing a person sees changed: two comments in the ledger script are reworded."
+        },
+        {
           "version": "1.0.0",
-          "checksum": "427afc04ebd60a5da9475d5fcdebd6baaf8cda67657de51aa33f59d07ed0480d",
+          "checksum": "2adad7c137114c8f94b749d918918713c8205f5b9fa5b9c80e02ffc3b8b6bd80",
           "bytes": 19779,
           "published_at": "2026-09-28T15:05:40.127Z",
           "bump": null,
@@ -673,7 +703,7 @@
       "versions": [
         {
           "version": "1.3.0",
-          "checksum": "7f49073d8fe319bfa29d8a2b72f0540ad189ffca023f2c2338444f6af7d765c3",
+          "checksum": "e9f6f47c72c5799045161043ee8c9c1bfac06384a3cfa6624325efdc8f9847f2",
           "bytes": 19384,
           "published_at": "2026-09-28T00:35:03.785Z",
           "bump": "patch",
@@ -706,7 +736,7 @@
         },
         {
           "version": "1.2.0",
-          "checksum": "e1279d5004954603b672fa3d9f3db8dbc810c852cf3940567670620571987afd",
+          "checksum": "b4768b53f76b2d615b4346da69923dbc341de2e01213adb5876803d035250058",
           "bytes": 17264,
           "published_at": "2026-09-27T22:16:05.238Z",
           "bump": "patch",
@@ -944,7 +974,7 @@
         },
         {
           "version": "1.0.0",
-          "checksum": "34d12a976b6f3f96a2f9c842c2e902e2d5d60eb7f0eb30d940af40212d956040",
+          "checksum": "8f51f64774092aee11d989b42db136d80212937dcda33deebdf9b89d76d18531",
           "bytes": 10865,
           "published_at": "2026-09-24T23:19:27.433Z",
           "bump": null,
@@ -983,11 +1013,32 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
         {
+          "version": "1.2.1",
+          "checksum": "903d1ef936f4b8084ee4e0f46305a78b5272b31c263f1213a0799b763e03cb7e",
+          "bytes": 4330,
+          "published_at": "2026-09-29T22:15:58.971Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [],
+            "pages": [
+              "Briefs"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing a person sees changed: the note on the block it adds to a project's page is reworded."
+        },
+        {
           "version": "1.2.0",
-          "checksum": "8edd88552c834a9639d27fea9c003b9c380e114bd66f7a6a3118a97198c057f0",
+          "checksum": "24d2f7c8fd9feee95da3c08a86bc67d4f6e585e1f12caf1564f43857eed11903",
           "bytes": 4315,
           "published_at": "2026-09-28T15:05:40.127Z",
           "bump": "patch",
@@ -1008,7 +1059,7 @@
         },
         {
           "version": "1.1.0",
-          "checksum": "2ee5290fdf121f0e094609d883cc2aa886003bf20d1528eab178b1d2b83ca671",
+          "checksum": "80519aa2e65b556f3fddc69ed546f9f4238f7cdafe222fccbc66b2d6d82b11ac",
           "bytes": 4209,
           "published_at": "2026-09-28T00:35:03.785Z",
           "bump": "patch",
@@ -1334,7 +1385,7 @@
         },
         {
           "version": "1.2.0",
-          "checksum": "00c02cb1ff0f550a575a6e8730955eabe06b3b1f1cd99c72ca9fecfd7ba5c51d",
+          "checksum": "dcfee8e9979f9eb2d8212ba41ecedb84cd27833d7f6ed8dc0ef1e82fa564d9ce",
           "bytes": 12331,
           "published_at": "2026-09-28T00:35:03.785Z",
           "bump": "patch",
@@ -1358,7 +1409,7 @@
         },
         {
           "version": "1.1.0",
-          "checksum": "9594d6abf7422bca1ec7d592482dcb1937e367ffbde476bf40e82e05d5ae14f5",
+          "checksum": "156d2a430880936d731f2acad5364d8e50981bc5cac98358a66e322218689c5c",
           "bytes": 10677,
           "published_at": "2026-09-27T22:16:05.238Z",
           "bump": "patch",

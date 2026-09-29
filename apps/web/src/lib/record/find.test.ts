@@ -8,8 +8,7 @@
  * `packages/kernel/src/fts.ts` is the implementation.
  *
  * SO THE ASSERTIONS RUN AGAINST THE KERNEL'S FUNCTIONS, not against a description of them. That is
- * the only shape that catches the NEXT drift: `REPORT.md` lists closing the kernel/screen split as
- * the second thing left to do, and both halves of this one were written from the same documents and
+ * the only shape that catches the NEXT drift: the kernel/screen split is still open, and both halves of this one were written from the same documents and
  * disagreed anyway.
  */
 

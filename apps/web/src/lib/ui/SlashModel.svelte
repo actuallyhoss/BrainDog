@@ -1,5 +1,5 @@
 <!--
-  How Slash is run, the owner's choice in Settings: "Included" or "Your own key" (`loop/finish/agents.md` AGT-21), and on a
+  How Slash is run, the owner's choice in Settings: "Included" or "Your own key", and on a
   self-host also `byo`, the host's own endpoint with a model the owner names. The rules and the words are `slash-model.ts`,
   which the tests hold; this file only draws what they answer and sends what `patchOf` says to send.
 

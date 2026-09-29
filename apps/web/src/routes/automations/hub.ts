@@ -1,5 +1,5 @@
 /**
- * The automations hub (`loop/finish/shell.md` EDT-3): one place for everything that runs by itself, as five tabs.
+ * The automations hub: one place for everything that runs by itself, as five tabs.
  *
  * FIVE KINDS OF THING RAN ON THEIR OWN AND EACH HAD ITS OWN CORNER. Automations were on `/automations`, scheduled
  * actions only under a project's "Runs on", scripts on `/scripts`, and doors inside Settings, Ingest, so "what does this
@@ -7,11 +7,11 @@
  * draws its kind in the words that kind's own screen uses, and Runs lists every run newest first.
  *
  * THE TAB IS IN THE ADDRESS, as `?tab=`, and Runs has its own path because it is the one tab worth linking to by itself.
- * The new-action sheet opens from the address too (`contracts.md` X57), so a declared page links to a sheet already
+ * The new-action sheet opens from the address too, so a declared page links to a sheet already
  * filled in and the hub is the only reader of `?new=`.
  *
  * PURE, so it loads in plain Node: the clock is an argument and every import is a type but `since`, `humanize`,
- * `lasted` and the flow's own words. The chart inputs are here too (SCREENS, Automations): what the tiles above each
+ * `lasted` and the flow's own words. The chart inputs are here too: what the tiles above each
  * list draw, worked out from the reads the tabs already make, and never a number the record did not send.
  */
 
@@ -43,7 +43,7 @@ export type NewAsk = { kind: 'door' | 'action'; preset: string | null } | null;
 
 export function newOf(params: URLSearchParams): NewAsk {
   const kind = params.get('new');
-  /* A DOOR TAKES A PRESET TOO (MOD-18): the founder Home's "Send numbers from a project" links to `?new=door&preset=numbers`
+  /* A DOOR TAKES A PRESET TOO: the founder Home's "Send numbers from a project" links to `?new=door&preset=numbers`
      so the sheet opens already writing to `datapoints`, as a scheduled action's preset already does. */
   if (kind === 'door' || kind === 'action') return { kind, preset: params.get('preset') || null };
   return null;
@@ -78,7 +78,7 @@ export const hubWords = {
   kind: { automation: 'Automation', scheduled: 'Scheduled action', script: 'Script' } as Record<RunKind, string>,
   newAction: 'New scheduled action',
   newScript: 'New script',
-  /* AN EMPTY TAB SAYS WHAT THE THING IS AND WHAT TO ASK AN AGENT, as the automations list always has (DIRECTION §22).
+  /* AN EMPTY TAB SAYS WHAT THE THING IS AND WHAT TO ASK AN AGENT, as the automations list always has.
      The prompts are examples a person reads and replaces, not features the code ships. */
   scheduledNone: 'No scheduled actions yet',
   scheduledWhy: 'A scheduled action fetches from, calls or watches a web address on a clock, and writes what it gets to a list.',
@@ -122,7 +122,7 @@ export const hubWords = {
   /* THE RIGHT-HAND COLUMN OF AN AUTOMATION'S ROW, when it has a next turn. */
   nextAt: (when: string) => `Next ${when}`,
 
-  /* ── the tiles above the lists, each a chart and the one line saying what it means (SYSTEM §6) ── */
+  /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
   runsMonthSubject: 'Runs this month, by automation',
   runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
@@ -142,7 +142,7 @@ export const hubWords = {
 /* ── the leading mark of a row ──────────────────────────────────────────── */
 
 /**
- * The icon in an automation's well, by what starts it (SCREENS, Automations): a clock, a bell for an arrival, a press,
+ * The icon in an automation's well, by what starts it: a clock, a bell for an arrival, a press,
  * a tick for a decision, a document for a change to a list, and an eye for a figure that is watched.
  */
 const TRIGGER_ICONS: Record<string, IconName> = {
@@ -185,7 +185,7 @@ function andList(names: readonly string[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 }
 
-/* ── the hub's sentence (SYSTEM §5) ─────────────────────────────────────── */
+/* ── the hub's sentence ─────────────────────────────────────────────────── */
 
 /** The sentence under the title, and the phrase inside it that needs him (drawn red), or `''` when nothing does. */
 export type Sentence = { text: string; needs: string };
@@ -250,7 +250,7 @@ function ranThisMonth(rows: readonly AutomationRow[]): (AutomationRow & { month:
 }
 
 /**
- * "Runs this month" (SCREENS, Automations): a bar per automation, the busiest six. One is highlighted in ink, the
+ * "Runs this month": a bar per automation, the busiest six. One is highlighted in ink, the
  * busiest, and any with a failure is red with the count at its end, because a failure is the part that needs him.
  */
 export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
@@ -361,7 +361,7 @@ export function runDays(lines: readonly RunLine[], now: number): { key: string; 
 export type Heat = { rows: string[]; cols: string[]; values: number[][]; days: string[] };
 
 /**
- * "Recent runs" (SCREENS, Automations): runs a day over the last `days`, for the six things that ran most in them.
+ * "Recent runs": runs a day over the last `days`, for the six things that ran most in them.
  * Columns are the days, oldest first, labelled by their date. `null` when nothing ran in the window.
  */
 export function runHeat(lines: readonly RunLine[], now: number, days = 14): Heat | null {
@@ -409,7 +409,7 @@ export function intervalOf(every: string): number | null {
 }
 
 /**
- * "Next up" (SCREENS, Automations): the next `days` days, a dot on each day a scheduled action is due.
+ * "Next up": the next `days` days, a dot on each day a scheduled action is due.
  *
  * FROM ITS NEXT TURN, ON ITS OWN CLOCK. The read carries each action's next run and how often it runs, so its turns
  * after that are that clock's, one dot a day however many times it runs in it. A paused action has no turns, and one
@@ -467,11 +467,11 @@ export type HubRow = {
   path: string | null;
   /** A link under the row that does what its sentence asks, like adding a missing key. */
   fix?: { path: string; label: string } | undefined;
-  /** The glyph in the row's 32px well (SYSTEM §6): what starts it, how it reaches out, or what kind of thing ran. */
+  /** The glyph in the row's 32px well: what starts it, how it reaches out, or what kind of thing ran. */
   icon?: IconName | undefined;
   /** The right-hand column: an automation's next turn, or the time a run started. */
   aside?: string | undefined;
-  /** Whether the aside is a time in a feed, which is set in Geist Mono (SYSTEM §3). */
+  /** Whether the aside is a time in a feed, which is set in Geist Mono. */
   clock?: boolean | undefined;
 };
 
@@ -626,7 +626,7 @@ export function failedAt(run: RunRow, places: readonly string[] | null): { n: nu
 }
 
 /**
- * The line under "How the last runs went" (SCREENS, Automations), built from the newest run: "The last run failed 2h
+ * The line under "How the last runs went", built from the newest run: "The last run failed 2h
  * ago, at step 3: Call a service." Then, when the newest did not fail and an older one did, how many of these failed.
  */
 export function lastRunReading(runs: readonly RunRow[], places: readonly string[] | null, now: number): string {

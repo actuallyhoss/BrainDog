@@ -1,7 +1,7 @@
 /**
  * WHO MAY ANSWER A QUESTION ON `/decide`, AND WHAT THE SCREEN SAYS TO SOMEBODY WHO MAY NOT.
  *
- * DRIVEN BEFORE IT WAS WRITTEN, on 21 September, against a real self-host: `braindog init studio`
+ * DRIVEN BEFORE IT WAS WRITTEN, against a real self-host: `braindog init studio`
  * with the seed in it, the owner in through the server key and a passkey, then two colleagues
  * invited by email and accepted in their own browser contexts. `/decide` came back at 279 words and
  * 168 controls with NONE disabled for the colleague at `read`, control for control the same screen
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 import { mayAnswer, whyNotAnswering } from './answering.ts';
 
-/** Word for word what the record answered the `read` colleague on 21 September, off the wire. */
+/** Word for word what the record answered the `read` colleague, off the wire. */
 const RECORD_SAID = 'This needs decide, and you have read access. Ask an owner to raise your access.';
 
 test('only decide and an owner may answer a question here', () => {
@@ -128,7 +128,7 @@ test('both handlers refuse before they act, not only the controls that call them
 /**
  * A COLLEAGUE ON ONE LIST IS NOT A READER OF THE RECORD, AND THE HINT MUST NOT SAY THEY ARE.
  *
- * `loop/research-invite-landing.md` finding 3: the shell has no level for a member who holds lists
+ * The shell has no level for a member who holds lists
  * and not the record, so `layoutOf` falls back to `read`, and this hint told a bookkeeper given
  * `write` on Expenses "This needs decide, and you have read access." Neither half is theirs. The
  * record's own refusal for them talks about a "record-wide token", which they were never offered and

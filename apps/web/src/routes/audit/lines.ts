@@ -18,7 +18,7 @@
  * NO ID REACHES A PERSON FROM HERE. The log names a row `transactions#36`, a question `suggestion:SG31` and a pack
  * `pack:money-core`, and each of those used to be printed as it was stored. A row is its title and its list, a
  * question is what it asks, a pack is its name, and a target this file cannot word is left unsaid rather than
- * printed as a key (design.md SYS-3).
+ * printed as a key.
  */
 
 import { useCaseName } from '@braindog/seed/usecases/names';
@@ -95,7 +95,7 @@ export const groupWords: Record<Group, string> = {
   record: 'BrainDog',
 };
 
-/** One series in ink and the rest in greys (SYSTEM §2): the agents are the highlight, you a quiet grey. */
+/** One series in ink and the rest in greys: the agents are the highlight, you a quiet grey. */
 export const GROUP_TONES: Record<Group, 'ink' | 'g1' | 'g2' | 'g3' | 'g4'> = {
   agent: 'ink',
   rule: 'g1',
@@ -208,8 +208,8 @@ export const listOf = (target: string | undefined): string | null => (target ===
  * question a governance line is about. It is a sentence the record stored, so it goes through `moneyInText` like the
  * note beside it.
  *
- * A ROW'S LIST IS SAID APART FROM ITS TITLE, at the row's trailing edge where the board draws the project: the log
- * carries the list a row is in and not the project, so the list is the honest answer to "where" (SCREENS, Activity).
+ * A ROW'S LIST IS SAID APART FROM ITS TITLE, at the row's trailing edge where a list row draws the project: the log
+ * carries the list a row is in and not the project, so the list is the honest answer to "where".
  *
  * A PERSON NEVER GETS HERE: `targetSaid` in `who.ts` answers for one first, and says them by name.
  */
@@ -334,7 +334,7 @@ export const keyOf = (e: AuditEvent): string =>
 /**
  * The newest page, read again because the record moved, laid over the lines already held.
  *
- * `added` ARE THE LINES THAT ARRIVED, which the page tints for a second and a half (SYSTEM §8). A page that shares no
+ * `added` ARE THE LINES THAT ARRIVED, which the page tints for a second and a half. A page that shares no
  * line with what is held means more arrived than one page holds, and the lines held are no longer the ones next to it:
  * then the page stands alone (`joined: false`), the caller takes its cursor, and nothing is tinted, because a screen
  * redrawn from scratch is not a row arriving.

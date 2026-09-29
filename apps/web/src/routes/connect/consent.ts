@@ -1,5 +1,5 @@
 /**
- * The consent screen an app's sign-in lands on (`loop/finish/agents.md` C5): what it reads, which records it offers,
+ * The consent screen an app's sign-in lands on: what it reads, which records it offers,
  * and what its two presses send, with no runes.
  *
  * PURE, SO `node --test` CAN IMPORT IT, for the reason `lib/record/device.ts` gives. The fetch is handed in.
@@ -93,7 +93,7 @@ export type ShellSeen = {
  * ONLY AN OWNER'S, because only an owner may mint a key (`createToken` is ADMIN), and the host's approve door asks the
  * record itself, which refuses anybody else. Offering a record that will refuse wastes the one press that matters.
  *
- * UNDER A SLUG, THAT RECORD AND NO OTHER (C5: "for the record the session names"). The address was chosen, so the
+ * UNDER A SLUG, THAT RECORD AND NO OTHER, the record the session names. The address was chosen, so the
  * screen does not offer to connect the app somewhere else instead.
  */
 export function choicesOf(shell: ShellSeen, here: string | null): Choice[] {

@@ -1,13 +1,13 @@
 /**
- * "Make it mine": the one press that writes a first run's proposal into the record (`loop/finish/modules.md` MOD-6).
+ * "Make it mine": the one press that writes a first run's proposal into the record.
  *
  * THE INSTALL PATH BROWSE ALREADY USES, NEVER A SECOND ONE. The use case goes in as the file it would be if somebody
  * shared it (`builtInFile`), planned by the record's `planUseCase` and installed pack by pack through `installPack`
  * (`planShared`, `installShared`), then its formed plan is linked and its rail order kept (`afterInstall`). What the
  * screen used to do instead was about ten record calls of its own, with a branch for each way one could fail.
  *
- * NOTHING IS WRITTEN AS AN EXAMPLE (`loop/DIRECTION.md` §26). The use case's own example rows are taken out of the file
- * before it is read, the modules go in with none (`moduleDocument`, C11), and the only rows written are the ones formed
+ * NOTHING IS WRITTEN AS AN EXAMPLE. The use case's own example rows are taken out of the file
+ * before it is read, the modules go in with none (`moduleDocument`), and the only rows written are the ones formed
  * from the person's own sentence: a guide's plan, the person, and the entries the sentence filled completely.
  *
  * IN THIS ORDER, because each step reads what the one before it made: the lists; the person's own People row, before
@@ -53,7 +53,7 @@ export type Accepting = {
   /** The reader's own rail order, which a use case's order is laid over. */
   nav: readonly string[];
   /**
-   * What Slash drafted for a business no use case fits, when the person kept it (`loop/finish/pages.md` PGS-20): its
+   * What Slash drafted for a business no use case fits, when the person kept it: its
    * lists, figures and pages, filed and accepted in this same press. Its sample rows are never written.
    */
   drafted?: Drafted | null;
@@ -167,7 +167,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   let states = held.value;
   const who = hear(asked.sentence);
   const u = asked.usecase === null ? null : (useCase(asked.usecase) ?? null);
-  /* PEOPLE IS NEVER TURNED BACK ON BEHIND SOMEBODY WHO TURNED IT OFF (`loop/DIRECTION.md` §9). A name heard in the
+  /* PEOPLE IS NEVER TURNED BACK ON BEHIND SOMEBODY WHO TURNED IT OFF. A name heard in the
      sentence keeps People in the proposal, and on a record where it is off that name is said back and stored nowhere;
      only a use case that cannot stand without People turns it on, as installing it from Browse would. */
   const off = states.some((p) => p.id === PEOPLE && p.disabled_at !== null) && !(u?.modules.includes(PEOPLE) ?? false);

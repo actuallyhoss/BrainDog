@@ -1,7 +1,7 @@
 /**
- * A field added to a list at run time, from the row page, and whether the screens then draw it (DIRECTION §22).
+ * A field added to a list at run time, from the row page, and whether the screens then draw it.
  *
- * THE HALF THAT MATTERS IS AT THE BOTTOM. `loop/research-shell-audit.md` finding 3: `learn` in `remote.ts` returned
+ * THE HALF THAT MATTERS IS AT THE BOTTOM. `learn` in `remote.ts` returned
  * early for any list this build ships, and `page-live.ts` skipped its `schema` call on the same test, so a field added
  * to Projects on the record reached no row, no form and no page block. The owner's own example is a `domain` on a
  * project, and `things` is the list the build ships as Projects, so that is the case driven here.
@@ -234,10 +234,10 @@ test('A RECORD THAT WILL NOT SAY LEAVES THE BUILD’S OWN LIST WHERE IT WAS', as
   assert.equal(REGISTERS.things, BUNDLED);
 });
 
-/* ── a new value for a closed list (loop/research-m4-app.md brief 4) ── */
+/* ── a new value for a closed list ──────────────────────────────────── */
 
 test('A NEW VALUE IS FILED AS AN ADDITION TO ONE CLOSED LIST, naming that value and nothing else', () => {
-  /* THE BRIEF'S SHAPE, PLUS `declaration_id`. The brief wrote the body as `{ to: ... }` alone; `propose` refuses a
+  /* THE PLANNED SHAPE, PLUS `declaration_id`. The plan wrote the body as `{ to: ... }` alone; `propose` refuses a
      change with no `declaration_id` (`kernel/src/govern.ts`, `missing('declaration_id')`), so the field's own body
      carries it and this one does too. */
   assert.deepEqual(valueAdditionOf('things', 'lane', 'paused'), {

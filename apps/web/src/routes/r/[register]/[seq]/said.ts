@@ -2,7 +2,7 @@
  * The words a row's page leads with: how far off its deadline is, the day a finished row finished, and how old the row
  * is, and the one word its unset fields are offered with.
  *
- * THE LEAD SAID "Open" BESIDE A RED DOT, AND "8w ago" BESIDE A DUE DATE (design.md SYS-10). The dot meant overdue while
+ * THE LEAD SAID "Open" BESIDE A RED DOT, AND "8w ago" BESIDE A DUE DATE. The dot meant overdue while
  * the word beside it said something else, and nobody could tell whether "8w ago" was the date or the row. So the tone is
  * said in words beside its dot ("Overdue by 38 days", "Paid 2 Sep"), and the age carries its own label ("added 8w ago").
  *
@@ -38,7 +38,7 @@ export const rowWords = {
 } as const;
 
 /**
- * ONE PIECE OF THE TITLE ROW'S SENTENCE (SYSTEM §5). The state is a piece of its own because the page draws it, through
+ * ONE PIECE OF THE TITLE ROW'S SENTENCE. The state is a piece of its own because the page draws it, through
  * `stateSaid` and the `lead-word` span the label tests read, and every other piece is words. A late or near deadline is
  * a piece of its own too, because it is the phrase that is coloured: red when it has passed, amber when it is close.
  */
@@ -102,7 +102,7 @@ export const localDay = (at: number): string => {
 };
 
 /**
- * THE HISTORY GROUPED BY DAY (SYSTEM §6, "a group on the ground"), in the order it came, which is newest first.
+ * THE HISTORY GROUPED BY DAY, in the order it came, which is newest first.
  *
  * A line whose time does not read goes with the line before it rather than into a day of its own, since a group headed
  * by nothing would say less than no heading at all.

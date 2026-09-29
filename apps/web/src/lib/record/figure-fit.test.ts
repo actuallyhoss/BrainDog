@@ -5,16 +5,15 @@
  * thirty-seven line comment at `routes/p/[slug]/+page.svelte:1172`: three slot widths, three cell
  * widths, a figure width, three cut amounts, two widths either side of the threshold, two phone slot
  * widths and a rem threshold rejected after being measured. Fifteen figures, every one of them
- * reproducible, and not one of them asserted anywhere. `loop/research-batch-five-audit.md` finding 7
- * is that nothing will ever re-take those measurements, and that the headroom at the width the
+ * reproducible, and not one of them asserted anywhere. The risk is
+ * that nothing will ever re-take those measurements, and that the headroom at the width the
  * threshold was solved for is 0.8px: a 280px slot gives each of two cells 124px, and the widest
  * ten-character money figure in the record draws 123.2px of ink. A font whose digits are one percent
  * wider closes that, and `13 §4.2` says what happens then — a truncated figure is not shortened, it
  * is wrong.
  *
- * THIS FILE IS THE MEASUREMENT RATHER THAN THE PROSE, and it is the first of the two repairs that
- * audit offers and not the second: the threshold is still a hand-solved number, in a file this run
- * did not own. What is new is that the 0.8px is read off a drawn page on every run and printed, so
+ * THIS FILE IS THE MEASUREMENT RATHER THAN THE PROSE, and it is the first of the two possible repairs and not the second: the threshold is still a hand-solved
+ * number, in another file. What is new is that the 0.8px is read off a drawn page on every run and printed, so
  * the font swap that closes it is a failing test rather than a screenshot somebody notices later.
  *
  * AND THAT IS WHAT HAPPENED, ON THE FIRST LINUX RUN. The same woff2 drew 1.6 per cent wider there,
@@ -23,10 +22,10 @@
  * solved against Windows alone. `MARGIN` below makes every figure fit with two per cent of its own
  * width to spare in whichever face the run draws, so the Linux runner holds the wider face to it too.
  *
- * FINDING 6 WAS ANSWERED HERE TOO, BY A TEST THAT IS GONE. That finding is that the commit's message
+ * A SECOND DEFECT WAS ANSWERED HERE TOO, BY A TEST THAT IS GONE. The commit's message
  * put the defect on a phone at 390px where the diff changed nothing, and that what it really repaired
  * was a narrow slot between 900 and 1180. A test lifted the rule back out and measured the figures
- * cut again in that slot. Since DSN-8 a stat under 480px of block draws as rows, label on the left and
+ * cut again in that slot. Now a stat under 480px of block draws as rows, label on the left and
  * figure on the right, so nothing in that slot is cut with or without the rule, and that test was
  * retired: the first test below still holds that no figure is cut at any width.
  *
@@ -50,7 +49,7 @@
  * at a laptop window. Every one of those was a lie about the app: nine of the ten stat blocks on the
  * declared pages are `span: 12` and a full-width slot at a laptop window is 586px at 900 and 1216px
  * at the page's own maximum, never 280. Only `/p/portfolio`'s `Earning` is `span: 4`, which is the
- * block the audit is about. So the shell, the rail, the body and the twelve-column page are built
+ * block this test is about. So the shell, the rail, the body and the twelve-column page are built
  * here as the app builds them, and the slot width per span is READ OFF that page at each viewport
  * rather than asserted from the comment. `--rail`, `--gutter`, `--sp-6` and `--page-max` do the
  * arithmetic, so a token moving moves this test with it.
@@ -152,7 +151,7 @@ function componentCss(path: string): string {
   return unglobal(src.slice(open + '<style>'.length, close));
 }
 
-/* THE PAGE IS THREE COMPONENTS SINCE PGS-1 SPLIT IT: the frame, the grid of slots (where `.page`, `.block-slot` and the
+/* THE PAGE IS THREE COMPONENTS SINCE IT WAS SPLIT: the frame, the grid of slots (where `.page`, `.block-slot` and the
    money step live) and one block's slot, in the order the frame mounts them. */
 const routeCss = ['apps/web/src/lib/page/PageView.svelte', 'apps/web/src/lib/page/PageBody.svelte', 'apps/web/src/lib/page/BlockSlot.svelte']
   .map(componentCss)
@@ -306,7 +305,7 @@ function reading(): Seen[] {
  * than a whole number.
  *
  * WHAT THAT PIXEL COVERS ON THE SHIPPED RECORD, MEASURED, because slack nobody has measured is slack
- * that hides the next defect: the tightest figure on the whole record is NOT the threshold the audit
+ * that hides the next defect: the tightest figure on the whole record is NOT the threshold that was
  * flagged. `/p/money`'s fourth tile, `£10,416.16`, draws 123.203px of ink in a 122.5px cell — 0.703px
  * over, of which 0.48px is that trailing letter-spacing, leaving about a fifth of a pixel of the last
  * digit inside the antialiasing at the block's edge. It happens in a 586px full-width slot, which is
@@ -461,7 +460,7 @@ test('NO MONEY FIGURE A DECLARED PAGE DRAWS IS CUT, AT ANY WIDTH THE APP CAN PUT
   t.diagnostic(`${figures - following} of ${figures} figures held to the ${MARGIN * 100}% margin; ${following} sit in a box that grows with its text (${bandsFollowing.join(", ")})`);
 
   /* AND A PIXEL AT A TIME ACROSS THE WHOLE RANGE OF THE ONE BLOCK THAT LIVES IN A NARROW SLOT, at
-     the narrowest window that draws it at full size, which is where the audit found the defect and
+     the narrowest window that draws it at full size, which is where the defect was found and
      where the 0.8px is. `/p/portfolio`'s `Earning` is the only `span: 4` stat on the declared pages;
      every other one is `span: 12` and never sees a slot under 288px. */
   const narrow = Math.min(...SPANS);

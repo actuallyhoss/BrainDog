@@ -2,7 +2,7 @@
  * The words of add-ons and use cases: the catalogue, a pack's own page, sharing and installing a shared plan,
  * turning one off, and the way into exchange rates on Money's settings.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
@@ -13,7 +13,7 @@ import { list } from './english.ts';
 
 export const packs = {
   /* THE HOME CURRENCY PICKER AND THE WAY INTO EXCHANGE RATES, on Money's settings (`routes/packs/[id]`). Rates are a
-     preset of the new-action sheet (USE-5), so the words of the sheet itself are `actionWords` in `action-draft.ts`. */
+     preset of the new-action sheet, so the words of the sheet itself are `actionWords` in `action-draft.ts`. */
   currencyNone: 'None chosen',
   currencyCommon: 'Common',
   currencyAll: 'All currencies',
@@ -51,10 +51,10 @@ export const packs = {
      `Add-ons` now, the reader's word for an installable thing with an author. The API, the docs and
      the `mcp` surface keep `pack`. It says what an add-on brings, which is also what fills the screen while none is
      installed. "It is readable text, and nothing in it runs" was a sentence about how an add-on is built, and a person
-     choosing one is asking what they get (MOD-24). */
+     choosing one is asking what they get. */
   packBlurb: 'An add-on brings ready-made lists and pages.',
 
-  /* USE CASES, SHARED AND INSTALLED (`loop/research-spark.md` S14). A use case is a file like an add-on, planned and
+  /* USE CASES, SHARED AND INSTALLED. A use case is a file like an add-on, planned and
      approved the same way, so these sentences say what it arranges and never how the screen works. */
   /* BROWSE LISTS BOTH: the built-in use cases, and the use cases and add-ons this BrainDog's catalogue serves. */
   browseTitle: 'Use cases and add-ons',

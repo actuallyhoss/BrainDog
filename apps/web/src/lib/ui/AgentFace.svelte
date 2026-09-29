@@ -1,7 +1,7 @@
 <!--
   An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a ring while the run is open.
 
-  A NAMED AGENT WEARS ITS MAKER'S MARK on a plain disc (the owner, 30 September 2026: "use real ones"): Claude's clay
+  A NAMED AGENT WEARS ITS MAKER'S MARK on a plain disc, because the owner asked for the real ones: Claude's clay
   starburst, Codex's knot, Cursor's cube. A maker's logo on a washed disc is two colours arguing, so the run's hue is kept for
   the faces that wear the app's own glyph (a runner, an agent nobody names), where it is still what tells two apart.
 
@@ -17,7 +17,7 @@
   [seq]`, the session header). Its name is what it does and where the run is, since the ring is not read out; a face
   that names no run is decoration, and hidden, because the agent's name sits beside it.
 
-  TWO SIZES (AGT-13): `m` is 32px, a list's or a card's, and `s` is 24px, a line of text's. The ring is two pixels at
+  TWO SIZES: `m` is 32px, a list's or a card's, and `s` is 24px, a line of text's. The ring is two pixels at
   both, with a hair of the ground inside it, so at 390px it is still a ring and not a heavier disc.
 -->
 <script lang="ts">
@@ -106,7 +106,7 @@
     background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg));
   }
 
-  /* THE RING IS `--live`, the one hue that means "alive" (SYSTEM §2): an agent working right now wears it, solid, and
+  /* THE RING IS `--live`, the one hue that means "alive": an agent working right now wears it, solid, and
      one gone quiet wears it dashed. A hair of the tile inside it, so it reads as a ring round the disc and not as a
      darker disc. A glyph's disc keeps the run's own hue, which is what tells two runs apart. */
   .agent-face[data-live='working'],

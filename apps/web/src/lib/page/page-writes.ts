@@ -1,7 +1,7 @@
 /**
  * Every write a declared page makes: a task ticked, a card moved, a bar dropped on a new day, a line captured, a field
  * typed into, and an option pressed on a queue. The one job `PageView.svelte` held beside five others until it was
- * split (`loop/finish/pages.md` R1), and the `Writes` object the page hands each block.
+ * split, and the `Writes` object the page hands each block.
  *
  * ONE OBJECT, HANDED DOWN WHOLE, OR NOTHING AT ALL. A page that can be written hands every block the same `Writes`; a
  * preview hands none, and a block with no writes draws no control, because the renderer draws a control only for a
@@ -215,7 +215,7 @@ export function pageWrites(deps: WritesDeps) {
    * reads the page again without blanking it, so the card's mark goes once the row agrees with it.
    *
    * A WRITE THAT LANDS HOLDS ITS ROW AND SAYS SO WITH A WAY BACK. The re-read can leave the row out: a `todo` whose
-   * `where:` leaves out done rows answers without the row it just ticked (`loop/research-m4-app.md`, brief 3), and a
+   * `where:` leaves out done rows answers without the row it just ticked, and a
    * tick with no row and no receipt is a tick somebody reverses to check. The row stays where it was, wearing `what`;
    * the receipt's undo sends `back` at the version the write made, and the row stays put through that too, wearing
    * `undone`.
@@ -291,8 +291,8 @@ export function pageWrites(deps: WritesDeps) {
     /* WHERE IT CAME FROM, in the screen's spelling, which is what `movePatch` takes and what the held card wears. */
     const from = row.cells[0] ?? '';
     /* AND THE ROW IT WAS, because the column alone put a done card back dated today: the record re-dates a move into
-       `done` that names no day, so a task finished on 1 September came back finished on the day of the undo (audit
-       sixty-five, section 2). `moveBackOf` names the day the row held, as a tick's undo does. */
+       `done` that names no day, so a task finished on 1 September came back finished on the day of the undo.
+       `moveBackOf` names the day the row held, as a tick's undo does. */
     const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
     void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title, {
       at,
@@ -406,7 +406,7 @@ export function pageWrites(deps: WritesDeps) {
    * A task ticked done or not done, with a receipt whose undo puts the row back as it was.
    *
    * THE UNDO SENDS WHAT THE ROW HELD, read off the block's `entries` at the version the tick is sent at, and not the
-   * list's default not-done state: a task in `doing` ticked and undone came back `open` (audit sixty-four, section 3).
+   * list's default not-done state: a task in `doing` ticked and undone came back `open`.
    * `tickBackOf` says why, and why a held row the re-read left out still falls back to the default.
    */
   function tickTask(block: LiveBlock, row: Row, done: boolean, at: number, before: readonly Row[]) {

@@ -1,15 +1,15 @@
 /**
- * The screens of brief B4 (`loop/research-no-sample.md` section 5) that drew the seeded studio, or said "nothing was
+ * The screens that drew the seeded studio, or said "nothing was
  * saved", when no record answered, read from their source because this app has no DOM to open them in.
  *
- * WHAT EACH ONE DID (DIRECTION 26). The palette searched the studio's rows, listed its figures, its last changes and its
+ * WHAT EACH ONE DID. The palette searched the studio's rows, listed its figures, its last changes and its
  * questions, and toasted "would be added" for a row it never sent. The record switcher toasted that another record
  * "would open". Add a field toasted that one "would be added to every row". A project's Runs on drew the studio's
  * actions at the studio's clock and resumed one in the tab. A run's page offered Stop, which stops nothing, and drew a
  * transcript under a refused shell. Usage counted the studio's month. The add-ons screens listed six packs nobody
  * installed, with a sentence saying so, a settings form in sterling and a Share note about "the sample".
  *
- * `Shell.live` IS NO WITNESS. The refused shell is built from `layoutOf`, which sets `live: true`, so since wave A every
+ * `Shell.live` IS NO WITNESS. The refused shell is built from `layoutOf`, which sets `live: true`, so already every
  * `!page.data.live` branch below was already unreachable; the refusal a screen draws is `data.refused`.
  */
 

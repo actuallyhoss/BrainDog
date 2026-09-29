@@ -1,5 +1,5 @@
 <!--
-  How the list is drawn, from 640px up: the table, the board or the cards (SYSTEM §5, a segmented control in the
+  How the list is drawn, from 640px up: the table, the board or the cards (a segmented control in the
   toolbar). Glass on the ground, and the chosen view a white pill lifted by a tiny shadow (`controls.css`).
 
   THE CHOICE IS THE ADDRESS'S (`?view=`), written by the page's `setView`, so a link to a board opens on the board and
@@ -48,7 +48,7 @@
 </div>
 
 <style>
-  /* 36 HIGH ON THE TOOLBAR'S LINE: the track is `--ctl-h` and each segment sits 3px inside it (SYSTEM §5). The word is
+  /* 36 HIGH ON THE TOOLBAR'S LINE: the track is `--ctl-h` and each segment sits 3px inside it. The word is
      the meta size the blend draws its segments at. */
   .view-switch {
     flex-wrap: nowrap;

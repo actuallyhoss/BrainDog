@@ -1,5 +1,5 @@
 <!--
-  One question from a `queue` block, answered where it is shown (`loop/finish/contracts.md` §8.3, modules C9): on Home,
+  One question from a `queue` block, answered where it is shown: on Home,
   Money, Work, a project's page and the Agents page, a press on an option is the answer, and nobody is sent to Decide.
 
   THE OPTION GOES ALONE AND THE KERNEL DECIDES WHETHER IT OWES A REASON (`answerQuestion` with no `reason`). A light
@@ -68,7 +68,7 @@
   let reason = $state('');
   let fix = $state('');
   let answeredAt = $state('');
-  /* ONE WRITE IN FLIGHT, so a double press answers once (defects U2). The options are not disabled for it: a pressed
+  /* ONE WRITE IN FLIGHT, so a double press answers once. The options are not disabled for it: a pressed
      button that turns disabled drops the focus it holds to the page. */
   let busy = $state(false);
 
@@ -244,7 +244,7 @@
     column-gap: var(--sp-2);
   }
 
-  /* AN ANSWER IS A PILL (design D-2), and a long one wraps inside it rather than pushing the card sideways. */
+  /* AN ANSWER IS A PILL, and a long one wraps inside it rather than pushing the card sideways. */
   .queue-act {
     border-radius: var(--r-pill);
     padding-inline: var(--sp-4);

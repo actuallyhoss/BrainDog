@@ -1,6 +1,6 @@
 /**
- * What a BrainDog is for, read from what a person said about themselves and what they said it is for
- * (`loop/research-first-sign-in.md` §3, friction 3). The first run asks one question now and hands
+ * What a BrainDog is for, read from what a person said about themselves and what they said it is for.
+ * The first run asks one question now and hands
  * its sentence over as the second, with no first (`start/propose.ts`), which is `arrange` alone;
  * two sentences are still read together as below.
  *
@@ -29,7 +29,7 @@ export function arrangeTurns(bio: string | null | undefined, about: string): Arr
   if (!first) return { ...arrange(about), from: about };
   const lead = `${first}. `;
   const whole = arrange(`${lead}${about}`);
-  /* TURN ONE ADDS WEIGHT, AND A TIE GOES TO TURN TWO (`loop/research-batch-forty-six-audit.md` §3).
+  /* TURN ONE ADDS WEIGHT, AND A TIE GOES TO TURN TWO.
      Every chip is one signal of one use case, so a turn-one chip beside a turn-two chip that names another
      is a one-to-one tie, and read as one sentence it went to the longer phrase and then to catalogue
      order: "I run a few companies" then "I send invoices" proposed Solo founder, and 6 of the 24 chip

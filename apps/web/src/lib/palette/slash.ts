@@ -7,7 +7,7 @@
  * WHEN THE ROW EXISTS is `50 §5.5` step 5: a model behind Slash on this host, and a query that matched no place or that ends
  * in a question mark. Without a
  * model the row is ABSENT, NOT DISABLED (`23 §8`), and because the row is the only way into the mode, nothing that says
- * "Slash" can reach the screen on a host without one (`loop/research-spark.md` §0 decision 6).
+ * "Slash" can reach the screen on a host without one.
  *
  * WHAT THE ANSWER DRAWS is pass 1 of `46 §5.4`: the predicate Slash drafted, in words and BEFORE the rows, so a person reads
  * what was asked of the record before reading what it answered; the rows, drawn by code as addresses; and the fold, whose
@@ -43,7 +43,7 @@ export function offersSlash(a: { slash: boolean; prefix: string | null; text: st
      `places` would be zero for every single letter and each one would be offered to Slash as a question. */
   const question = a.text.trim();
   if (question.length < 2) return null;
-  /* A QUESTION MARK IS THE PERSON SAYING IT IS A QUESTION (`loop/finish/agents.md` AGT-24), so the row is offered beside the
+  /* A QUESTION MARK IS THE PERSON SAYING IT IS A QUESTION, so the row is offered beside the
      places that matched and not only when none did. It does not wait on the search either: it depends on nothing the
      search answers, so it cannot vanish under the pointer when the hits arrive. */
   if (question.endsWith('?')) return question;
@@ -56,8 +56,7 @@ export function offersSlash(a: { slash: boolean; prefix: string | null; text: st
  * NO THOUSANDS COMMA, BECAUSE BOTH ENGINES READ A COMMA AS THE END OF A CONDITION. This printed a number through
  * `toLocaleString('en')` and a money through `money()`, the record's screens' spellings, and every clause over a value past
  * a thousand stopped typing back: `amount is at least GBP 1,500.00` was `FIELD_UNKNOWN` for a field called `500.00` in the
- * record and a refusal in the browser, and `money()`'s minus is U+2212, which neither reads as a sign (audit sixty-five,
- * finding 4, and `slash-print.test.ts`). So a number is its digits, and a money is its code and its amount in the
+ * record and a refusal in the browser, and `money()`'s minus is U+2212, which neither reads as a sign (`slash-print.test.ts`). So a number is its digits, and a money is its code and its amount in the
  * currency's own places, which is the literal the grammar was written to read.
  */
 const valueWords = (v: unknown): string => {
@@ -160,7 +159,7 @@ export function drawReading(r: Reading): Drawn {
 }
 
 /*
- * PASS 2 (`46 §5.5`, Brief W2 of `loop/research-spark-routes.md`): after the rows, what Slash proposes about them.
+ * PASS 2 (`46 §5.5`): after the rows, what Slash proposes about them.
  *
  * THE WORDS ARE HERE AND NOT IN `copy.ts`, because `copy.ts` was another agent's file for the run that built this. They
  * are the palette's and nobody else's, so moving them into its Slash block later changes an import and nothing else.
@@ -171,7 +170,7 @@ export const slashWords = {
   /* `23 §8`'s footer: receded, small, and naming the model on every output. */
   drawnBy: (model: string) => `Drawn by ${model}`,
   noModel: 'Drawn by a model this host did not name',
-  /* THE VERB AND WHAT IT OPENS, AND NO ID: `Decide SG14` read an address aloud (design brief §9). */
+  /* THE VERB AND WHAT IT OPENS, AND NO ID: `Decide SG14` read an address aloud. */
   decide: 'Open the proposal in Decide',
   without: 'Everything above this line was drawn without it.',
   figuresLine: (n: number) => (n === 1 ? 'figures: 1 read' : `figures: ${n.toLocaleString('en')} read`),
@@ -237,7 +236,7 @@ export const capLine = (s: SlashStatus, dismissed: string | null): boolean =>
  * sentence, because only there is it true in the sense `23 §8` means: the rows above were found by code and the proposal
  * is what the missing ask would have bought.
  *
- * `spent` IS RUNNING OUT, SAID WITH ITS TWO WAYS ON (`loop/finish/agents.md` AGT-29): where it is true the caller draws
+ * `spent` IS RUNNING OUT, SAID WITH ITS TWO WAYS ON: where it is true the caller draws
  * `SlashOut` under the sentences, "Use your own key" and "Settings", so a person at the cap is shown what to press and
  * not only told to wait.
  */

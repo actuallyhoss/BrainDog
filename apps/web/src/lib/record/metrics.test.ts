@@ -7,7 +7,7 @@
  * reading of each figure the seed declares.
  *
  * THE ARITHMETIC IS NOT TESTED HERE. The browser kept its own copy of the evaluator and this file held that copy to
- * the record's answers; the copy is gone (DIRECTION §32, `loop/finish/architecture.md` ARC-1), and the kernel's own
+ * the record's answers; the copy is gone, and the kernel's own
  * tests hold the figures.
  */
 
@@ -35,7 +35,7 @@ test('every declared metric is drawn from what the record read, and none of them
 
 test('THE FIGURES ARE THE ONES THE SWITCH PRODUCED', () => {
   // Ported, not rewritten: if a number here changes, a page changed and somebody has to say why.
-  /* MOVED BY money-core 3.0.0 (MOD-4): repeating money lives in `recurring` alone, so the Kiln storefront payout
+  /* MOVED BY money-core 3.0.0: repeating money lives in `recurring` alone, so the Kiln storefront payout
      (GBP 930.00 owed to you, on Kiln) and the studio rent (GBP 1,650.00 due inside thirty days) are no longer bills. */
   for (const [id, want] of [
     ['owed-to-you', 'GBP 28,320.00'],

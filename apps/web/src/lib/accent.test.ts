@@ -30,7 +30,7 @@ import * as accent from './accent.ts';
 import * as pref from './pref.ts';
 
 /**
- * Moss as it shipped until 21 September, which the floor added that day refuses at 2.92:1.
+ * Moss as it once shipped, which the contrast floor added later refuses at 2.92:1.
  *
  * ONE OF THE FOUR AND NOT A COLOUR INVENTED FOR A TEST. A value nobody's browser holds would prove
  * the branch and not the bug: these four are what the swatch row wrote into real cookies.

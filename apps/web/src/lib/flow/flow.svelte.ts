@@ -100,7 +100,7 @@ export class FlowDraft {
   /**
    * CARDS ADDED HERE WHOSE FAULTS ARE NOT SAID YET, until the inspector has closed on them once. `blankStep` leaves every
    * required argument empty, so a card turned into a fault the moment it was added, while the sheet was still opening
-   * on it to be filled (`loop/research-canvas-ux.md` 1.7). A card read from the body is never held: what an agent wrote
+   * on it to be filled. A card read from the body is never held: what an agent wrote
    * wrong is said at once.
    */
   #held = $state.raw<ReadonlySet<string>>(new Set());
@@ -355,7 +355,7 @@ export class FlowDraft {
     this.draft = { ...this.draft, when: when === '' ? null : when };
   }
 
-  /** A query-builder tree has no setter of its own (EDT-2): `Inspector.svelte` marks the undo through this, then
+  /** A query-builder tree has no setter of its own: `Inspector.svelte` marks the undo through this, then
       assigns `flow.draft = withCondition(...)` directly. */
   setCondition(cond: unknown) {
     this.#keepOnce();

@@ -1,5 +1,5 @@
 <!--
-  The docked detail panel (SYSTEM §5): opening a task or a question keeps the list in view, and nothing needs a page
+  The docked detail panel: opening a task or a question keeps the list in view, and nothing needs a page
   change. Work and Decide draw it.
 
   FROM 900PX UP IT IS DOCKED at the window's end edge: 440 wide (380 on a narrower desktop), inset `--inset` from the
@@ -14,7 +14,7 @@
 
   THE CONTENT NARROWS BESIDE IT, NEVER UNDER IT. While a docked panel is open the root carries `--dock-w`, the inline
   space the panel takes from the window's end edge: its width, its inset from the window, and the 12 between it and the
-  content (SYSTEM §4, "12 to a docked panel"). It is `0px` otherwise, and `0px` below 900px, where the panel is a sheet.
+  content. It is `0px` otherwise, and `0px` below 900px, where the panel is a sheet.
   A page that draws a Panel pads its content's inline end with it:
 
       padding-inline-end: max(var(--gutter), var(--dock-w));
@@ -159,8 +159,8 @@
 </dialog>
 
 <style>
-  /* THE WIDTH THE PAGE GIVES UP. `--dock-panel` is the panel's own width, 440 and 380 on a desktop narrower than 1360
-     (SYSTEM §5, "380 at 1280"); `--dock-w` is what the page pads by, and it is nothing until a docked panel is open. */
+  /* THE WIDTH THE PAGE GIVES UP. `--dock-panel` is the panel's own width, 440 and 380 on a desktop narrower than 1360;
+     `--dock-w` is what the page pads by, and it is nothing until a docked panel is open. */
   :global(:root) {
     --dock-panel: var(--panel-w);
     --dock-w: 0px;
@@ -198,7 +198,7 @@
     border: 0;
     border-radius: var(--r-lg);
     color: var(--ink);
-    /* LEVEL 2, the chrome's: the glass hairline pair and the floating shadow (SYSTEM §4). */
+    /* LEVEL 2, the chrome's: the glass hairline pair and the floating shadow. */
     box-shadow: var(--glass-edge), var(--e2);
   }
 
@@ -206,7 +206,7 @@
     display: none;
   }
 
-  /* IT SLIDES IN OVER 220MS on the arriving curve (SYSTEM §8), from a start somebody could still read if the first frame
+  /* IT SLIDES IN OVER 220MS on the arriving curve, from a start somebody could still read if the first frame
      stalls, which is `Sheet.svelte`'s reason for never starting at `opacity: 0`. */
   .dock[open] {
     animation: dock-in var(--d-enter) var(--ease-out);
@@ -317,7 +317,7 @@
     }
   }
 
-  /* A FADE IN PLACE OF EVERY MOVE (SYSTEM §8). The a11y layer shortens the duration; this takes the move away. */
+  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .dock[open],
     .dock:modal {

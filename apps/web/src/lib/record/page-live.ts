@@ -5,7 +5,7 @@
  *
  * A REFUSAL IS THE RECORD'S SENTENCE, `UNREACHABLE` AND `UNAUTHORIZED` INCLUDED. Those two drew the
  * in-browser sample's page and kept that for the tab, so a person whose session lapsed read the seeded
- * studio's Desk under their own record's address until they reloaded (DIRECTION 26 removed the sample).
+ * studio's Desk under their own record's address until they reloaded. The sample is gone now.
  * Every page now asks, and the next one asks again. A page the record does not have is `missing`, with
  * the addresses of the pages it does have.
  *
@@ -197,7 +197,7 @@ export type LiveBlock = BlockResult & {
 export type ScopeMark = { mark: string | null; hue: number | null };
 
 /**
- * WHAT A SCOPE CELL DRAWS ITS CHIP FROM, handed to the renderer beside the block (agents C8).
+ * WHAT A SCOPE CELL DRAWS ITS CHIP FROM, handed to the renderer beside the block.
  *
  * `columns` are the indexes of the columns declared `as: scope`; a cell there holds the project's name, or
  * `everywhere`. `marks` is each name's mark and hue, and `glyph` the globe's path, which the renderer draws for
@@ -277,7 +277,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
  * `braindog-render`'s own `CARD_ROLES` has one more, `quiet`, and its comment says why it is not one of
  * these: the evaluator writes `quiet` from the record's clock, and a declaration does not name it.
  *
- * `next` AND `reply` CAME WITH WAVE ONE, AND THIS LIST DROPPED BOTH. The kernel admitted them and answered `nexts`, the
+ * `next` AND `reply` CAME WITH THE CARD ROLES, AND THIS LIST DROPPED BOTH. The kernel admitted them and answered `nexts`, the
  * renderer drew "Next: ...", and a card declared `{ field: 'what', as: 'next' }` reached the fence as `fact: Next` over
  * the card's own `what`: "The first piece" where the record had answered "Sample the fit" (`dynamic-app.test.ts`).
  * `scope` is not a role either. It says what the cell HOLDS, which this file settles from `scopes`
@@ -419,7 +419,7 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
    * decoration a target is refused at install for being. So `met: true` carried no measurement and
    * the tile drew a tick anyway.
    *
-   * MEASURED AT HIS SIZE, on the record `loop/research-at-scale.md` §1 built: 27 projects, 14 in
+   * MEASURED AT HIS SIZE, on a record built to it: 27 projects, 14 in
    * play, a monthly figure held for three of them and `revenue` unset on every row, because the
    * importer files a monthly figure as a reading and has no year to write. After `a89bc072` put
    * `revenue is set` on the Earning figures the reading is `rows: 0, held: 27`, and this renderer
@@ -689,7 +689,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
        unchecked: `fills` is what a press writes, so a value in it the app did not look at is a value it would store. */
     register: into,
     fills: filled,
-    /* WHAT A BUILT PAGE'S FORMS ARE DRAWN FROM (brief D7), taken by name and narrowed below, so a record on another
+    /* WHAT A BUILT PAGE'S FORMS ARE DRAWN FROM, taken by name and narrowed below, so a record on another
        build that sent one in a shape this cannot read draws the plain form rather than a wrong one. */
     nexts: nexted,
     types: typed,
@@ -741,7 +741,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...(cells === undefined ? {} : { cells }),
     register: undefined,
     /* THE CAST IS `schema.ts`'S ROLE LIST BEING TWO SHORT: it still names the eight roles and `scope`, and the renderer's
-       `Column` and the kernel both take `next` and `reply`. That file is not this brief's; the two words belong there. */
+       `Column` and the kernel both take `next` and `reply`. The two words belong in that file. */
     columns: columnsOf(b) as LiveBlock['columns'],
     entries: [],
     matched: [],
@@ -827,13 +827,13 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (!b.source) return shell;
   /* WHAT A PROJECT RUNS ON NAMES NO REGISTER (`packages/kernel/src/pages.ts` `runsOnBlock`), so `registerOf` cannot
      resolve it and the common path below, which checks `REGISTERS[register]`, drew every such block as one this
-     build cannot draw. Its rows are the kernel's own fields (agents C6), scoped and ordered already: the project's
+     build cannot draw. Its rows are the kernel's own fields, scoped and ordered already: the project's
      own first, then the ones that apply everywhere. */
   if (b.source === 'runs_on') {
     const register = 'runs_on';
     const entries = got.map((r) => entryOf(register, r, refs));
     const rows = toRows(register, entries, shell.columns, now, namesOf(refs));
-    /* EACH ROW'S PROJECT IS A CHIP (agents C8), as any block with a `scope` column draws one: the kernel's own
+    /* EACH ROW'S PROJECT IS A CHIP, as any block with a `scope` column draws one: the kernel's own
        `scopes`, the project's name for its own rows and none, drawn as Everywhere, for the ones beside it. */
     (b.columns ?? []).forEach((c, i) => {
       if (c.as !== 'scope') return;
@@ -852,8 +852,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       total: matched,
       names: namesOf(refs),
       /* A ROW THAT APPLIES EVERYWHERE DRAWS FAINT, exactly as a run gone quiet does (`lib/record/blocks.ts`
-         `cardsRows` already reads this array for any cards block): the kernel's own `quiet` cell on each row
-         (agents C6), which a declaration cannot name (`braindog-render`'s `CARD_ROLES` admits it, `declare.ts`
+         `cardsRows` already reads this array for any cards block): the kernel's own `quiet` cell on each row,
+         which a declaration cannot name (`braindog-render`'s `CARD_ROLES` admits it, `declare.ts`
          does not), so it is filled here rather than through a column an author wrote. */
       quiet: entries.map((e) => Boolean(e.fields.quiet)),
       ...(scopeCells ? { scopeCells } : {}),
@@ -1000,7 +1000,7 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       row.cells[i] = scopes?.[n] ?? (live ? (row.cells[i] ?? null) : EVERYWHERE);
     });
   });
-  /* AND THE CHIP EACH OF THOSE CELLS WEARS: the project's mark in its hue, or the globe for everywhere (agents C8). A
+  /* AND THE CHIP EACH OF THOSE CELLS WEARS: the project's mark in its hue, or the globe for everywhere. A
      run's project is where it was placed, and a run placed nowhere is not "everywhere", so an agent's runs draw words. */
   const scopeCells = live ? undefined : scopeCellsOf(b.columns ?? [], rows, scopeMarked);
   /* EACH CARD'S NEXT STEP IS THE RECORD'S ANSWER, `nexts`, written into the cell and never into the row, unlike a ring.
@@ -1085,7 +1085,7 @@ function sha256Of(v: unknown): string | null {
  * THE RENDERER NAMES A FILE BY WHERE THE RECORD KEEPS IT, `file:<list>#<seq>/<field>`, and never by its address, because
  * only the host knows the address (`packages/render/src/gallery.ts`). The record's page answer already carries each
  * file's stored value, `{ sha256, mime, bytes, name }`, so the address is made from what the block holds and nothing is
- * fetched to find it (pages C10). Three places hold one:
+ * fetched to find it. Three places hold one:
  * - the rows a block drew over a list, a card's `picture` among them (`entries`, beside `register`);
  * - the rows the record answered a registered kind with (`answer.rows`, over `answer.source`), a `gallery` over a list;
  * - a `gallery`'s written-out rows, whose files the record answers in `answer.files`, one a row in the rows' order, so
@@ -1195,7 +1195,7 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       const said = typeof read_at === 'string' ? Date.parse(read_at) : Number.NaN;
       const now = Number.isFinite(said) ? said : clock();
       /* EVERY LIST A BLOCK DRAWS IS ASKED FOR, through `learn`, whether or not this build ships it. A use case's own
-         lists (`loop/research-spark.md` §2.1) are declared by the record and by no file here, and a page over them drew
+         lists are declared by the record and by no file here, and a page over them drew
          "cannot be drawn" on every block. This then skipped any list the bundle holds, so a field added to Projects at
          run time was on the record and in no block over Projects: measured in `field-write.test.ts`, where the page
          asked for `page` and nothing else. `learn` keeps what it asked per reader, so a list two blocks draw is asked once. */

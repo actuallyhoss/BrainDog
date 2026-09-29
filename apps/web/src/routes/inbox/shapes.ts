@@ -3,7 +3,7 @@
  *
  * ONE GROUPING, THE KERNEL'S. An arrival's shape is `shapeOf` from `packages/kernel/src/ingest.ts`, the same key the
  * record counts when it drafts a pattern at the third alike, so the screen and the record cannot disagree about which
- * arrivals are "the same sender". The rule offer PLT-10 adds sits on these groups too (contracts X43).
+ * arrivals are "the same sender". The pattern builder's rule offer sits on these groups too.
  *
  * THE READ IS ITS OWN AND NOT `readInbox`'s, because the screen's `InboxItem` drops the channel and the to address the
  * shape is made from. The item each line becomes is still `itemOf`'s, so a row here reads exactly as it did.

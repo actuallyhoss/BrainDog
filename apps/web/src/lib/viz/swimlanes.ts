@@ -1,7 +1,7 @@
 /**
  * Swimlanes' geometry: a lane a row (an agent, a person, a machine), each with the spans it was busy,
- * on one time axis with hour ticks under it and the now line through it (SYSTEM §7, "time and
- * overlap"; Main's "At work", Light-Activity's sessions).
+ * on one time axis with hour ticks under it and the now line through it ("time and
+ * overlap", such as who is at work, or sessions).
  *
  * TIME IS EPOCH MILLISECONDS, and ticks fall on the viewer's own local hours: the axis says "09:00"
  * where their clock does. The tick step is the smallest of 1, 2, 3, 4, 6, 12 or 24 hours that keeps

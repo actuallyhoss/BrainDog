@@ -1,8 +1,8 @@
 /**
- * `read(key, fn)`: the one way a screen asks the record for something (contracts §8.1, ARC-5).
+ * `read(key, fn)`: the one way a screen asks the record for something.
  *
  * THE THIN HALF. `read.ts` decides every state; this file only holds the answer in a rune, brackets each call with
- * `opened()`/`closed()` so the readiness contract (architecture §7.4) never measures a half-drawn screen, and asks again
+ * `opened()`/`closed()` so the readiness contract never measures a half-drawn screen, and asks again
  * when the shell's version poll (`live.svelte.ts`) hears the record move. A screen draws `ready` itself and hands the
  * other four states to `ReadState.svelte`.
  *

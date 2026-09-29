@@ -40,7 +40,7 @@
     {
       "page": "page.project",
       "after": "Where it stands",
-      "note": "The one line, the plan and what is in the way, on the project page itself, where the old tool shows them.",
+      "note": "The one line, the plan and what is in the way, on the project page itself, where a brief is read.",
       "block": {
         "kind": "cards",
         "heading": "The brief",

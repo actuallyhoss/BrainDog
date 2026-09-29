@@ -1,5 +1,5 @@
 <!--
-  A ring: a share of a whole, or progress, as an arc from twelve o'clock on a quiet track (SYSTEM §7).
+  A ring: a share of a whole, or progress, as an arc from twelve o'clock on a quiet track.
 
   The arc is ink by default; `earn`, `danger`, `live`, `warn` or a project's colour when the share
   means one of those. From 72px the figure sits inside it, and from 112px its `label` under that

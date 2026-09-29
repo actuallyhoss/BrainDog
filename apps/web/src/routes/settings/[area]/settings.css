@@ -1,7 +1,7 @@
 /*
- * THE ROWS EVERY SETTINGS AREA SHARES (DSN-13).
+ * THE ROWS EVERY SETTINGS AREA SHARES.
  *
- * Each area is its own component with its own styles (ARC-7b), so every area that draws a sentence
+ * Each area is its own component with its own styles, so every area that draws a sentence
  * with its switch, or a label with its field and button, carried its own copy of that rule, and the
  * copies had drifted apart. One shape each lives here, and an area uses it by writing the class; it
  * keeps no copy of the rule.
@@ -23,15 +23,15 @@
  *                          `StateRow` it belongs to and starting where that row's title starts.
  *   `.wide-only`           not drawn below 900px (the index's Keyboard row; a desktop-only control).
  *
- * AND WHAT SETTINGS DRAWS ON THE GROUND, WHICH IS EVERY AREA'S BODY (SCREENS "Settings"): a segmented control there is
+ * AND WHAT SETTINGS DRAWS ON THE GROUND, WHICH IS EVERY AREA'S BODY: a segmented control there is
  * glass-free, a `--hover-wash` track with the chosen segment a `--bg` pill, because glass is for chrome and never
  * holds content; and a `.ledger-lead` list keeps its 32px well beside the title at a phone's width, where `rows.css`
  * would move the well above the title.
  */
 
 /* THE SWITCH SITS BESIDE ITS SENTENCE. The sentence's track was `minmax(0, var(--measure))`, which is
-   always the whole measure, so a short sentence left its switch 72ch away across empty page (design
-   SYS-11). `fit-content` makes the track as wide as the sentence and no wider than the measure. */
+   always the whole measure, so a short sentence left its switch 72ch away across empty page.
+   `fit-content` makes the track as wide as the sentence and no wider than the measure. */
 .settings-place .setting-row {
   display: grid;
   grid-template-columns: fit-content(var(--measure)) auto;
@@ -51,7 +51,7 @@
   padding-block-start: max(0px, (var(--ctl-h) - 1lh) / 2);
 }
 
-/* A SENTENCE LED BY ITS WELL (SCREENS "Settings": a 28px well per row), the well on the sentence's first line. */
+/* A SENTENCE LED BY ITS WELL (a 28px well per row), the well on the sentence's first line. */
 .settings-place .setting-row:has(> .well) {
   grid-template-columns: var(--well) fit-content(var(--measure)) auto;
   column-gap: var(--sp-3);
@@ -243,7 +243,7 @@
   }
 }
 
-/* LABEL ABOVE, 8PX TO THE FIELD (design-brief §5, A form). */
+/* LABEL ABOVE, 8PX TO THE FIELD. */
 .settings-place .field-row {
   display: grid;
   gap: var(--sp-2);
@@ -257,7 +257,7 @@
 }
 
 /* ONE HEIGHT FOR THE FIELD AND ITS BUTTON. A `.field-lg` is 44px at every width while a button is
-   `--ctl-h`, so under a mouse the field stood taller than the button beside it (design §2.12). Here
+   `--ctl-h`, so under a mouse the field stood taller than the button beside it. Here
    both start at `--ctl-h`, which is itself 44 under a coarse pointer, and the button sits on the
    field's baseline. The field takes the room; the button keeps its label's width. */
 .settings-place .field-row-controls {

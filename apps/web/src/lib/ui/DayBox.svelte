@@ -1,8 +1,8 @@
 <!--
-  A day typed where it is drawn, in the record's words for a day (MOD-22).
+  A day typed where it is drawn, in the record's words for a day.
 
   THE BROWSER'S DATE CONTROL SPOKE ITS OWN FORMAT: `mm/dd/yyyy` on a machine set to American English, beside a cell
-  that says the same day as `3 Sep 2026` (design SYS-15). So this is a text box that opens on the record's words
+  that says the same day as `3 Sep 2026`. So this is a text box that opens on the record's words
   (`field-draft.ts` `dayLine`) and reads back what is typed (`dayFrom`): a day, a month by name and a year, or the
   stored form pasted from elsewhere.
 

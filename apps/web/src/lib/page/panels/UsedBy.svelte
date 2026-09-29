@@ -1,10 +1,10 @@
 <!--
   Who used one key or one tool: the ten runs that used it last, the newest first, each with its agent, its machine,
-  how many times and when (`usedBy`, agents C7).
+  how many times and when (`usedBy`).
 
   WHY A ROW PAGE SAYS IT: the record signs every open of a key and every use of a tool with the run that asked, and a
   key's row said what it opens and nothing about who opened it. The question a person has about a key or a tool is
-  which agent is using it, so the answer is drawn where the row is (`loop/finish/agents.md` AGT-10).
+  which agent is using it, so the answer is drawn where the row is.
 
   A LIST WITHOUT BOXES, as "Runs on" is: the run's name links to its page, and the rest is one quiet line under it.
   A refusal draws nothing, since `usedBy` answers a row the reader cannot read as one that is not there, and a row

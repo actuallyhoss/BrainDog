@@ -1,5 +1,5 @@
 <!--
-  The name for a new record, checked as it is typed (`loop/finish/ops.md` OPS-17).
+  The name for a new record, checked as it is typed.
 
   ONE FIELD FOR BOTH PLACES A NAME IS ASKED: the first step of sign-up and the no-record state on `/start`, so the two
   cannot come to disagree about what a name may be. The text is turned into an address as it is typed (`nameOf`), and
@@ -9,7 +9,7 @@
   answer for a name that is no longer typed is dropped, so a press can never pay for a name that was checked a moment
   ago and then changed.
 
-  THE ANSWER IS A STATUS, A 6PX DOT AND ITS WORD (SYSTEM §6 Badges): green for a name that is free, the second ink for
+  THE ANSWER IS A STATUS, A 6PX DOT AND ITS WORD: green for a name that is free, the second ink for
   one that is taken or could not be checked. Never red: a taken name is a thing to change, not a thing that needs him.
   Under it, once something is typed, the address the name becomes, in the mono face, so the person reads what they get.
 -->

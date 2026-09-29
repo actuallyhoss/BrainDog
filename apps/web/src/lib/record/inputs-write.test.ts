@@ -1,6 +1,6 @@
 /**
  * An `inputs` block's writes: after a pause, once, at the row's version, a refusal said beside its field, and the page
- * read again so the figures over the row answer what was typed (brief D7 of `loop/research-dynamic-layouts.md`, P8).
+ * read again so the figures over the row answer what was typed.
  *
  * THE RED WAS THAT NONE OF IT EXISTED. The kernel answered an `inputs` block's row and types and the renderer drew the
  * boxes and handed every keystroke to `oninput`, and no host passed one: the page drew a spec of values nobody could
@@ -247,7 +247,7 @@ test('THROUGH THE RECORD: the typed price is the row\'s, and the sentence over i
   assert.equal(resolverOf(blocks[1]!.values)('price-now'), 'GBP 1,250.00');
 });
 
-/* ── the audit of September 25th (`loop/research-audit-2026-09-25-layouts.md` §2, §11, §17) ───────────────── */
+/* ── money boxes: decimal commas, currencies and conflicts ─────────────────────────────────────────────────── */
 
 const DINARS = {
   id: 'checks',
@@ -304,7 +304,7 @@ async function egyptian(home: string | null) {
 }
 
 test('AN EMPTY MONEY BOX TAKES THE RECORD\'S HOME CURRENCY, and with none known it refuses rather than writing pounds', async () => {
-  /* THE RED (audit §2): on an EGP record a cost typed `1200` into its empty box was stored as GBP 1,200.00 beside a
+  /* THE RED: on an EGP record a cost typed `1200` into its empty box was stored as GBP 1,200.00 beside a
      price in EGP. The chain ended `homeCurrency() ?? 'GBP'`, and the web's `homeCurrency()` reads `ROWS`, which nothing
      fills in a shipped build, so every empty money box on every record wrote pounds. */
   const egp = await egyptian('EGP');
@@ -331,7 +331,7 @@ test('AN EMPTY MONEY BOX TAKES THE RECORD\'S HOME CURRENCY, and with none known 
 });
 
 test('A COMMA ONLY GROUPS THOUSANDS, and any other comma is refused beside the box rather than read as a hundredfold figure', () => {
-  /* THE RED (audit §11): the money pattern took `[\d,]*` and then dropped every comma, so a decimal comma was read as a
+  /* THE RED: the money pattern took `[\d,]*` and then dropped every comma, so a decimal comma was read as a
      thousands separator: `1,20` was 120.00 where the person meant 1.20, and `,5` was 5.00. The rule now is the one the
      add-on settings' money box already keeps (`packs.ts` `valueOf`): commas in groups of three are the grouping the box
      opens on, `EGP 1,200.00`, and every other comma is a figure this cannot read without guessing. */
@@ -347,7 +347,7 @@ test('A COMMA ONLY GROUPS THOUSANDS, and any other comma is refused beside the b
 });
 
 test('A CONFLICT KEEPS WHAT WAS TYPED: written at the new version when the field did not move, said beside it when it did', async () => {
-  /* THE RED (audit §17): the record refused the stale write correctly, and nothing sent the typed price again. Somebody
+  /* THE RED: the record refused the stale write correctly, and nothing sent the typed price again. Somebody
      else changed the row's count; the price typed at the old version was dropped, the box went on showing 1,250 and the
      record went on holding 1,200. */
   const moved = await egyptian('EGP');
@@ -372,6 +372,6 @@ test('A CONFLICT KEEPS WHAT WAS TYPED: written at the new version when the field
   /* AND IT DOES NOT SAY WHERE THE TYPED FIGURE IS NOW, because that depends on when the box was left, which this writer
      cannot see. Typed and left with Tab inside the pause, the box is pinned to the value it held when left, the conflict
      read back is a different value, and `shownIn` then shows the record's figure: the sentence said the typed one was
-     "still in the box" while the box held the other person's (checked on 25 September against `input-hold.ts`). */
+     "still in the box" while the box held the other person's (checked against `input-hold.ts`). */
   assert.doesNotMatch(sentence, /in the box/u, 'the sentence names the typed figure rather than claiming the box holds it');
 });

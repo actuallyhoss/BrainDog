@@ -1,8 +1,8 @@
 /**
- * The look's writes (GAP-3): an owner's save installs it, a member's save proposes it, and the house look is one press.
+ * The look's writes: an owner's save installs it, a member's save proposes it, and the house look is one press.
  *
  * THROUGH THE DOOR A PACK'S THEME TAKES. `setDeclaration` wraps the one declaration as a pack and reads it through
- * `normaliseChecked` (`packages/record/src/theme-check.ts`, OPS-11), so a look saved here is solved and checked exactly
+ * `normaliseChecked` (`packages/record/src/theme-check.ts`), so a look saved here is solved and checked exactly
  * as a theme installed from a file is, and refused in the same words. The editor's gate ran the same checks first, so a
  * refusal here is a record that moved on under the editor, not a gate that let something through.
  *

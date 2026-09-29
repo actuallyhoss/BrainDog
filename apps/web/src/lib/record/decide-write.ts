@@ -18,12 +18,12 @@
  * A REFUSAL THAT ASKS FOR A REASON SAYS SO, as `wants: 'reason'`. A question answered where it is shown
  * (`lib/page/QueueAnswer.svelte`) sends the option alone and lets the kernel decide whether a reason is owed
  * (`govern.ts` `decide`, which refuses `REQUIRED_MISSING` at `reason` for every question except a light one a rule or
- * Slash opened, MOD-29). The card opens its one reason line on that answer and on no other, so it never asks for a
+ * Slash opened). The card opens its one reason line on that answer and on no other, so it never asks for a
  * sentence the record would not have wanted.
  *
  * THERE WAS A FOURTH, `gone`, for a 401 or an unreachable host at an address with no slug, which is where the sample
  * was drawn. Neither Decide screen told it from `refused`, both print the `fix`, and with no sample an address with
- * no slug is a record like any other (wave C3 of `loop/research-no-sample.md`).
+ * no slug is a record like any other.
  */
 
 import { createClient } from '@braindog/client';
@@ -85,7 +85,7 @@ export async function writeDecision(base: string, id: string, verdict: Verdict, 
 /**
  * Answer one with an option, the reason where there is one, and on accepting some rows of several, which.
  *
- * WITHOUT A REASON THE KERNEL DECIDES (`loop/finish/contracts.md` §8.3, modules C9): the option goes alone, and a record
+ * WITHOUT A REASON THE KERNEL DECIDES: the option goes alone, and a record
  * that wants a sentence answers `wants: 'reason'`, so the caller asks for one and sends again.
  */
 export const answerQuestion = (base: string, id: string, option: string, reason?: string, io?: Fetch, rows?: number[]): Promise<Written> =>

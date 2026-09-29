@@ -11,7 +11,7 @@
   drawn in (`govern.ts` `showsOf`). A colour is picked with the platform's own picker, one 44px input a swatch, because
   a colour is judged by eye and a typed code would be a developer's word on a person's screen.
 
-  MOUNTED BY DECIDE'S HEAD (`routes/decide/+page.svelte`, MOD-15's line), with `about` set when a page opens it.
+  MOUNTED BY DECIDE'S HEAD (`routes/decide/+page.svelte`), with `about` set when a page opens it.
 -->
 <script lang="ts">
   import Sheet from './Sheet.svelte';
@@ -299,7 +299,7 @@
     gap: var(--sp-2);
   }
 
-  /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink (SYSTEM §6, Fields). */
+  /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink. */
   .ask-label {
     padding: 0;
     color: var(--ink2);
@@ -313,7 +313,7 @@
     font-size: var(--t-sm);
   }
 
-  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field` (SYSTEM §6). */
+  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field`. */
   .ask-text {
     inline-size: 100%;
     min-block-size: 40px;
@@ -338,7 +338,7 @@
     min-inline-size: 0;
   }
 
-  /* AN OPTION IS A GROUP ON THE SHEET, NOT A CARD IN IT (SYSTEM §4: a tile never holds a tile), and its fields take the
+  /* AN OPTION IS A GROUP ON THE SHEET, NOT A CARD IN IT (a tile never holds a tile), and its fields take the
      `--s1` fill a card would have hidden them in. A hairline over each, one below the next. The one that is wrong says so
      in its rule, its fields' `aria-invalid` and the alert under the form. */
   .ask-option {

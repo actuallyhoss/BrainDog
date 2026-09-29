@@ -6,18 +6,18 @@
   passing through rather than as a log file. One component, so a writer is drawn one way wherever
   they turn up.
 
-  BY KIND, NOT BY NAME (design.md SYS-7). `kind` is `actor(by).kind` from `lib/record/names.ts`,
+  BY KIND, NOT BY NAME. `kind` is `actor(by).kind` from `lib/record/names.ts`,
   which knows what signed the write. A caller that hands a name alone still gets the right face for
   the words `names.ts` itself says (`faceKindOf`), and a monogram for any other name.
 
   AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record, and a letter in a
   disc is a face without inventing one. It is `aria-hidden` because the name always sits beside it.
 
-  THREE SIZES, THE DESIGN BRIEF'S THREE (design-brief.md, `Face`): `s` is 20px, for an entry that
+  THREE SIZES: `s` is 20px, for an entry that
   is one line and not two (a row, a row's history), where a larger disc would set the line's
   height; `m` is 24px, a feed's; `l` is 32px, a row's leading mark and a person's own page.
 
-  TWO SHAPES (SYSTEM §2, §6). People and agents are circles; projects and records are rounded squares
+  TWO SHAPES. People and agents are circles; projects and records are rounded squares
   with their initials. `of="project"` or `of="record"` draws the square for a thing that is not an
   actor at all, and BrainDog, the record itself, wears the square too.
 -->
@@ -63,7 +63,7 @@
 <!-- AN AUTOMATION AND A RULE ARE NOT PEOPLE, SO THEY DO NOT WEAR AN INITIAL: they take the glyph the
      rail gives Automations, which is where a person goes to find them. Slash wears its own mark, a
      slash, and BrainDog the product's mark in ink, never in the brand's red, which a face repeated
-     down a log would spend. AN AGENT IS `AgentFace` (AGT-13): its maker's mark, or its kind's glyph in its run's hue, where the caller
+     down a log would spend. AN AGENT IS `AgentFace`: its maker's mark, or its kind's glyph in its run's hue, where the caller
      names the run, at the size a line of text takes and the list size for a page's own. -->
 {#if drawn === 'agent'}
   <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 's'} />

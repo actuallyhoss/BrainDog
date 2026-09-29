@@ -1,9 +1,9 @@
 /**
- * Every address the app renders goes through `at()`, and every record call through `apiBase()` (`research-one-domain.md` §3.2).
+ * Every address the app renders goes through `at()`, and every record call through `apiBase()`.
  *
  * WHY A SOURCE SCAN AND NOT A TEST PER SCREEN. Under `paths.base = '/app'` an `<a href="/decide">` is outside the app,
  * so SvelteKit treats it as another site: a full load of `brain.dog/decide`, which is the marketing site's 404. A `goto`
- * to it does the same. On 23 September the tree held 90 such `href`s and 30 `goto`s, spread over 113 files, and no
+ * to it does the same. Measured once, the tree held 90 such `href`s and 30 `goto`s, spread over 113 files, and no
  * screen test draws more than one of them. So this reads the source the way a reviewer would, and names each one.
  *
  * `inApp` IS `at` WHERE A FILE ALREADY HAS AN `at` OF ITS OWN (an each-block index in `PageView.svelte`).

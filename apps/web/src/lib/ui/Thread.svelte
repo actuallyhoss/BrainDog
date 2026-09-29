@@ -1,5 +1,5 @@
 <!--
-  THE COMMENT THREAD ON ONE THING: a row, a question or a decision (`docs/20-COLLABORATION.md` §5, COL-8). The row
+  THE COMMENT THREAD ON ONE THING: a row, a question or a decision (`docs/20-COLLABORATION.md` §5). The row
   page mounts it in its side panel and Decide under the question, each naming the thing as the record takes it.
 
   ONE LEVEL OF REPLIES. Reply is offered on a comment and never on a reply, and a reply always names the comment that

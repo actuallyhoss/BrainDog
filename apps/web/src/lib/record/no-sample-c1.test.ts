@@ -1,8 +1,8 @@
 /**
- * Brief C1 of `loop/research-no-sample.md` section 5: the sample is a test fixture, and nothing a live screen draws
+ * The sample is a test fixture, and nothing a live screen draws
  * with reads it.
  *
- * WHAT WAS WRONG, MEASURED ON THE CODE BEFORE THIS BRIEF. The fixture was `lib/record/data.ts`, and eleven shipped files
+ * WHAT WAS WRONG, MEASURED ON THE CODE BEFORE THIS CHANGE. The fixture was `lib/record/data.ts`, and eleven shipped files
  * imported it. Loading it wrote the seed's declarations into `held.ts`, the table a live tab keeps the record's in, so
  * a list the record had not been asked about drew the seed's fields. `currencyFor` and `homeCurrency` answered from the
  * sample's rows, so a money field on a new row was offered the sample's currency on any record. A ref drawn without the

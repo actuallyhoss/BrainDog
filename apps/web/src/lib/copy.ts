@@ -12,7 +12,7 @@
  *   - A CTA is Verb + Noun. Never "Get Started".
  *   - Say what a thing does, plainly. Never sell it, and never explain the interface.
  *
- * THIS FILE TYPES NO SENTENCE: IT IS THE AGGREGATE (ARC-8). `copy` was one object in one file, the
+ * THIS FILE TYPES NO SENTENCE: IT IS THE AGGREGATE. `copy` was one object in one file, the
  * most edited file in the web, so every unit that drew a screen wrote into the same lines. Each web
  * domain now types its words in its own file under `lib/copy/`, and this file spreads them into
  * `copy`, so every `copy.<key>` reads as it did and no key changed its spelling or its text. A key

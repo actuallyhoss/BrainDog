@@ -2,7 +2,7 @@
  * The words of the palette, search and Slash: finding anything, a run on `/jobs`, what a load-bearing noun means
  * (`Define.svelte`), and what Slash read and found.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
@@ -21,7 +21,7 @@ export const palette = {
   /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
      a search is over every list at once, so there is no single total to count against. */
   searchNone: (q: string) => `Nothing matches “${q}”`,
-  /* THE NEXT STEP, NOT A WAY OUT (DESIGN-SYSTEM APPENDIX C15): what to change about the words, and the one
+  /* THE NEXT STEP, NOT A WAY OUT: what to change about the words, and the one
      other place a thing that is not in a list may have been. */
   searchNoneNext: 'Check the spelling or try fewer words. A row that was archived or changed still shows in History.',
   searchClear: 'Clear the search',
@@ -47,8 +47,8 @@ export const palette = {
   openById: 'Open by number',
   askBrainDog: 'Ask BrainDog',
   /* SLASH'S ROW AND WHAT IT DRAWS (`50 §5.5` step 5). Every one of these is on screen only when `/api/version` says a model
-     is behind Slash on this host, because the row is the only way into the mode and without a model the row does not exist
-     (`loop/research-spark.md` §0 decision 6). The fold's last line is `23 §6`'s, with a colon for the dash. */
+     is behind Slash on this host, because the row is the only way into the mode and without a model the row does not exist.
+     The fold's last line is `23 §6`'s, with a colon for the dash. */
   askSlash: (text: string) => `Ask Slash: ${text}`,
   slashAsking: 'Slash is reading the record.',
   slashWhere: 'Slash looked for',
@@ -127,7 +127,7 @@ export const palette = {
        title and the figures; what a reader meeting a page needs is that it is theirs to change. Where
        its figures come from is how the software works, and it was cut for that. It names no control,
        because Edit layout is absent on a phone. AND "YOURS TO CHANGE" WAS STILL A SENTENCE ABOUT THE SCREEN, not
-       about the page: what a page is to its reader is what it gathers (MOD-24). */
+       about the page: what a page is to its reader is what it gathers. */
     page: 'one screen that gathers what you keep an eye on: figures, tables and notes',
     block: 'one piece of a page: a table, a figure, a note',
   } as const,

@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { copy } from '../copy.ts';
 import { DEPLOYMENT, SNAPSHOTS, SNAPSHOTS_KEPT } from './fixtures/sample.ts';
 
-/** The three areas this file reads, each its own component since the settings split (ARC-7b). */
+/** The three areas this file reads, each its own component since the settings split. */
 const AREA = ['Backups', 'Billing', 'Delete']
   .map((name) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', 'areas', `${name}.svelte`), 'utf8'))
   .join('\n');
@@ -84,7 +84,7 @@ test('every branch on the host has two sides, and they say different things', ()
 });
 
 test('AND THE CLOUD HALF SAYS WHAT THE CLOUD DOES', () => {
-  /* The "restore to a time" sentences were drawn only over the sample and went with it (DIRECTION 26). What is left
+  /* The "restore to a time" sentences were drawn only over the sample and went with it. What is left
      for the Cloud is retention: thirty PLUS `latest`, `53 §4`, which the shared sentence used to hide. */
   assert.match(copy.keptCloud(SNAPSHOTS_KEPT), /latest/iu);
 });
@@ -111,7 +111,7 @@ test('and the Cloud half promises nothing the Worker cannot do', () => {
   assert.ok(opened > 0, 'the Worker no longer builds its record here, so this premise needs measuring again');
   const built = WORKER.slice(opened, WORKER.indexOf('\n      });', opened));
   assert.ok(built.length > 200, 'the call to createRecordApi was not found whole');
-  /* THE WORKER HANDS THE RECORD A SNAPSHOTS PORT SINCE W55-7 (`99f8f18a`), and this line used to insist it did not.
+  /* THE WORKER HANDS THE RECORD A SNAPSHOTS PORT SINCE `99f8f18a`, and this line used to insist it did not.
      Re-read as it asked: `apps/worker/src/copies.ts` goes back to a copy by the bookmark that copy recorded, and leaves
      `getBookmarkForTime` out on purpose, so going back is still "one of those nights and not a moment between two of
      them". The premise that keeps these sentences true is that no instant between nights is served, and that is what
@@ -137,7 +137,7 @@ test('and the Cloud half promises nothing the Worker cannot do', () => {
 
   /**
    * AND THERE IS NO "RESTORE TO A TIME" CONTROL AT ALL. `restoreToTime` called `restore` with an empty bookmark, and it
-   * was drawn only over the sample on the Cloud build, which is gone (DIRECTION 26). Going back is `Restore this` on a
+   * was drawn only over the sample on the Cloud build, which is gone. Going back is `Restore this` on a
    * copy the record listed.
    */
   const at = AREA.indexOf('<Section title={copy.restore}>');
@@ -207,7 +207,7 @@ test('EVERY VARIANT IS A RECORD BOTH BROWSER GATES MEASURE, AND NONE OF THEM IS 
    * THEY WERE THREE BUILDS, AND THE BUILDS HAD STOPPED DIFFERING. `BRAINDOG_VARIANT` swapped the sample's
    * constants and `build:variants` wrote `build-cloud`, `build-quiet` and `build-busy`; once the screens
    * read the record, no screen read those constants, and each variant build drew the main build's
-   * screens. They are records now (wave C2 of `loop/research-no-sample.md`), so what is held together
+   * screens. They are records now, so what is held together
    * is what `tools/gates/record.mjs` starts and what the two browser gates measure, and that nothing
    * builds the app twice.
    */

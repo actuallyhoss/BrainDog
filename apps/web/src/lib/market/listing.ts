@@ -1,5 +1,5 @@
 /**
- * One listing model for everything a record can add (`loop/finish/platform.md` §4.0 L): the modules this build ships,
+ * One listing model for everything a record can add: the modules this build ships,
  * its built-in use cases, and every entry the Kennel answers. Browse, an add-on's detail page, /packs' updates and the
  * first run's offer all read `listingsOf`, so a thing is called, counted and sorted the same way wherever it is drawn.
  *
@@ -154,7 +154,7 @@ export function listingsOf(input: { kennel: CatalogueIndex | null; counts: Recor
   });
 
   const taken = new Set<string>([...modules, ...usecases].map((l) => l.key));
-  /* AN UNLISTED ENTRY INSTALLS BY ID AND IS LEFT OUT OF EVERY LISTING (decisions C41). */
+  /* AN UNLISTED ENTRY INSTALLS BY ID AND IS LEFT OUT OF EVERY LISTING. */
   const kennel = (input.kennel?.entries ?? [])
     .filter((e) => e.unlisted !== true && !taken.has(listingKey(e.kind, e.id)))
     .map((e): Listing => ({

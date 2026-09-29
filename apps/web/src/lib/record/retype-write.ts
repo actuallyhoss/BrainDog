@@ -1,6 +1,6 @@
 /**
  * Changing one field of a live list over the rows it holds: what the Fields sheet asks, the preview it shows, and the one
- * call that files it (`21 §5`, GAP-8).
+ * call that files it (`21 §5`).
  *
  * THE OTHER HALF OF THE REGISTER EDITOR. `field-write.ts` adds and renames and `field-retire.ts` retires; neither can
  * change what a field holds, because the record refuses a type change over held values (`FIELD_TYPE_CHANGED`) and a new
@@ -12,7 +12,7 @@
  * READ FROM THE RECORD, NEVER FROM THIS TAB'S COPY. `REGISTERS` is the relabelled copy the screens draw from and carries
  * no transitions, so the field is read fresh through `schema`, as `renameField` reads a list.
  *
- * AN OWNER'S LANDS AT ONCE AND ANYBODY ELSE'S WAITS ON DECIDE, the record decides which (DIRECTION §22). The words say
+ * AN OWNER'S LANDS AT ONCE AND ANYBODY ELSE'S WAITS ON DECIDE, the record decides which. The words say
  * which before the press, so nobody is surprised afterwards.
  */
 
@@ -23,8 +23,7 @@ import { choicesOf, DURATION_UNITS, SHEET_KINDS, type SheetKind } from './field-
 import { learn } from './remote.ts';
 
 /**
- * The words for changing a field, kept beside the calls they describe, as `retireWords` is, because nobody owns
- * `copy.ts` in this wave.
+ * The words for changing a field, kept beside the calls they describe, as `retireWords` is.
  */
 export const retypeWords = {
   open: 'Change type',

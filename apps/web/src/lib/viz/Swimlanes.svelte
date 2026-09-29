@@ -1,5 +1,5 @@
 <!--
-  Swimlanes: who was busy when, and what is running now (SYSTEM §7, "time and overlap").
+  Swimlanes: who was busy when, and what is running now (the design system: "time and overlap").
 
   A lane a row, each on a quiet track, its finished spans in a grey and its live ones in `live`. The
   now line runs through every lane in `live`, with a small pill at its top ("now 09:40"), and hour

@@ -109,13 +109,13 @@
     cancelEdit: () => void;
     leftTheRow: (e: FocusEvent) => void;
     cellKeys: (e: KeyboardEvent, enterCommits: boolean) => void;
-    /** Absent for a caller whose level cannot change the list, and the row's Archive is then not drawn (COL-13). */
+    /** Absent for a caller whose level cannot change the list, and the row's Archive is then not drawn. */
     archive?: ((seq: number) => void) | undefined;
     openCardMenu: (seq: number, el: HTMLElement) => void;
   } = $props();
 
   /**
-   * WHAT A DOT MEANS, AT 1440 (design DSN-7).
+   * WHAT A DOT MEANS, AT 1440.
    *
    * THE DOT SITS BESIDE THE DATE IT IS ABOUT. The row's tone is its deadline's, and it was drawn in the
    * status column, so "Open" wore a red dot that meant overdue and "Live" an amber one that meant due
@@ -158,7 +158,7 @@
          `showRow` finds the row by this attribute, so what is scrolled to and what is marked cannot
          disagree. -->
     {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
-    <!-- A PERSON IS LED BY THEIR FACE (design SYS-7), in the place a project's mark takes on any other list, drawn from
+    <!-- A PERSON IS LED BY THEIR FACE, in the place a project's mark takes on any other list, drawn from
          the name the title cell prints beside it; `Face` is `aria-hidden` for that reason. -->
     {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" /></span
       >{:else if own}<span
@@ -278,7 +278,7 @@
             onkeydown={(e) => cellKeys(e, false)}
           ></textarea>
         {:else if f?.type === 'day'}
-          <!-- A DAY IN THE RECORD'S WORDS, `3 Sep 2026`, and not the browser's `mm/dd/yyyy` (MOD-22). -->
+          <!-- A DAY IN THE RECORD'S WORDS, `3 Sep 2026`, and not the browser's `mm/dd/yyyy`. -->
           <DayBox
             fit="cell"
             autofocus
@@ -289,7 +289,7 @@
             onkeydown={(e) => cellKeys(e, true)}
           />
         {:else if f && isQuantity(f)}
-          <!-- A NUMBER AND THE UNIT IT COUNTS, the unit chosen from the ones the field knows (MOD-22). Moving between
+          <!-- A NUMBER AND THE UNIT IT COUNTS, the unit chosen from the ones the field knows. Moving between
                the two stays inside the row, so `leftTheRow` keeps the editor open. -->
           <QuantityBox
             fit="cell"
@@ -302,7 +302,7 @@
             onkeydown={(e) => cellKeys(e, true)}
           />
         {:else if f && isFile(f)}
-          <!-- A FILE IS CHOSEN, NEVER TYPED (OPS-20): the picker sends the bytes and the draft holds what came back,
+          <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back,
                saved through the same commit as any other cell once the row is left. -->
           <!-- The box only keeps a click inside the cell from opening the row; the picker in it is the control. -->
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -311,7 +311,7 @@
           </span>
         {:else if f && isJson(f)}
           <!-- STRUCTURED DATA KEEPS ITS LINE BREAKS, so Enter is a new line and the grid's Cmd+Enter commits, as a
-               document's cell does (MOD-22). -->
+               document's cell does. -->
           <JsonBox
             fit="cell"
             autofocus
@@ -408,13 +408,13 @@
           </span>
         {/if}
       {:else if column.field === scopeFieldOf(register)?.id && scopeOf(register, rowAt(seq)?.fields ?? {}, names) !== undefined}
-        <!-- WHERE THE ROW APPLIES, AS A CHIP (agents C8): the project's mark and name, or the globe and "Everywhere", where an empty cell drew nothing. -->
+        <!-- WHERE THE ROW APPLIES, AS A CHIP: the project's mark and name, or the globe and "Everywhere", where an empty cell drew nothing. -->
         <ScopeChip scope={scopeOf(register, rowAt(seq)?.fields ?? {}, names) ?? null} />
       {:else if ident}
         <IdentityMark identity={ident} />
       {:else if column.field === 'seq'}
         <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT, and it is drawn as the number under the
-             column's name, with no "#" in front (design DSN-7): the cell's text is `toRows`' spoken
+             column's name, with no "#" in front: the cell's text is `toRows`' spoken
              form, which is for a sentence and not for a column headed Number.
         --><span class="row-seq">{seq}</span>
       {:else if value === null}
@@ -525,8 +525,7 @@
   }
 
   /* THE ROW'S NUMBER, QUIET, IN THE BODY FACE with tabular figures, so a column of them lines up. It was
-     the identifier face, and mono is for what a person wrote as code, never for a number (design-brief
-     §11). */
+     the identifier face, and mono is for what a person wrote as code, never for a number. */
   .row-seq {
     color: var(--dim);
     font-family: var(--font-ui);
@@ -534,7 +533,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ONE HAIRLINE BETWEEN ROWS AND NONE AROUND THE TABLE (design DSN-7). Every row draws the line under
+  /* ONE HAIRLINE BETWEEN ROWS AND NONE AROUND THE TABLE. Every row draws the line under
      itself, so the last one drew a rule under the list that closed it like a box. The last group is the
      one with no group after it, since the paging sentinel can follow it. */
   .table-slot :global(.rowgroup:not(:has(~ .rowgroup)) > .tr:last-child) {
@@ -542,7 +541,7 @@
   }
 
   /**
-   * A CLEAN TABLE ON THE GROUND (SYSTEM §6): the heads at the meta size in the quiet ink, a hairline between rows,
+   * A CLEAN TABLE ON THE GROUND: the heads at the meta size in the quiet ink, a hairline between rows,
    * and a rounded wash under the row a pointer is on. Only the hooks `Table` already draws are reached for here.
    *
    * THE ROW IS THE READER'S ROW HEIGHT, `--row-h`: 44 at Comfortable, and Compact and Roomy move it, which the
@@ -571,7 +570,7 @@
     min-block-size: var(--ctl-h);
   }
 
-  /* THE KEYBOARD'S ROW IS THE WASH, as the cursor row is on every list (SYSTEM §6), and not a raised band; the focus
+  /* THE KEYBOARD'S ROW IS THE WASH, as the cursor row is on every list, and not a raised band; the focus
      ring still marks it while the grid has focus. A selected row keeps `--selected`. */
   .table-slot :global(.rowgroup .tr[data-focused]:not([aria-selected='true'])) {
     background: var(--hover-wash);
@@ -657,8 +656,8 @@
    * THE ROW THAT JUST ARRIVED, MARKED FOR A MOMENT.
    *
    * A DOT AT THE HEAD OF THE TITLE AND NOT A WASH OVER THE ROW. A tinted row competes with the row's own tone, which
-   * is the declared deadline state and means something; this is a dot in the info ink, never the brand's red (design
-   * SYS-1), before the title where no tone is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
+   * is the declared deadline state and means something; this is a dot in the info ink, never the brand's red,
+   * before the title where no tone is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
    * the second somebody's eye takes to arrive, not to demand attention it has already got.
    *
    * IT ANIMATES ONCE BECAUSE IT IS MOUNTED ONCE. The page clears `fresh` in `$effect.pre`, before the list
@@ -703,7 +702,7 @@
     justify-content: flex-end;
   }
 
-  /* A ROW'S VERBS ARE PILLS (SYSTEM §6): 28 tall, the meta size at 500, and a round 28 for a verb that is its glyph.
+  /* A ROW'S VERBS ARE PILLS: 28 tall, the meta size at 500, and a round 28 for a verb that is its glyph.
      On a row that is already washed, the pill under the pointer takes the held wash, one step deeper. */
   .verb {
     display: inline-flex;

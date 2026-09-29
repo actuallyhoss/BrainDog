@@ -133,7 +133,7 @@ test('AND NEITHER IS ONE THAT PARSES AND HOLDS THE WRONG TYPE, which used to be 
 
 test('THE SAMPLE BAR’S DISMISSAL IS NOT A PREFERENCE ANY MORE, and a cookie still carrying one is left alone', () => {
   /**
-   * `sampleSaid` put away the bar that said "this is a sample record". The sample went in DIRECTION 26 and
+   * `sampleSaid` put away the bar that said "this is a sample record". The sample went and
    * the bar with it, so the key is read by nothing and checked by nothing: a value this build does not
    * know, exactly like a key from a newer build, and kept for the reason the test above gives.
    *

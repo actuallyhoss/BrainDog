@@ -46,9 +46,8 @@ export type NavShapeRecommendation = {
 /**
  * The top bar's own fixed number of visible slots before it overflows into More.
  *
- * `loop/research-navigation.md` section 7, item 4: "Four is §3's own freelancer number and a
- * constant rather than a measurement, so the figure a reader is told does not change as they drag
- * the window." `TopBar.svelte` draws the same four, so this is that constant read once rather than
+ * Four is `19 §3`'s own freelancer number and a constant rather than a measurement, so the figure a
+ * reader is told does not change as they drag the window. `TopBar.svelte` draws the same four, so this is that constant read once rather than
  * a second copy of it.
  */
 const TOP_BAR_SLOTS = 4;

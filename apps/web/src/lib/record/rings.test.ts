@@ -3,7 +3,7 @@
  *
  * A list may say its rows are steps of a project (`steps: { of, done }`), and a card whose ring reads a field nobody filled
  * draws the share of those steps done. The record works it out and this app draws what it answered, and a number somebody
- * typed wins. The sample was a second engine that worked it out again until ARC-1; it is the record now.
+ * typed wins. The sample was once a second engine that worked it out again; it is the record now.
  */
 
 import { test } from 'node:test';
@@ -73,7 +73,7 @@ test('A PROJECT WITH NO NUMBER TYPED IS AS FAR ALONG AS ITS STEPS, AND A NUMBER 
   assert.deepEqual(answered.rings, [null, null, 25]);
   const live = rings(blockOf(answered as never, new Map(), NOW));
 
-  /* THE SAMPLE IS THE RECORD NOW (ARC-1): `fixtures/readers.ts` asks a kernel seeded once and never written to, so the
+  /* THE SAMPLE IS THE RECORD NOW: `fixtures/readers.ts` asks a kernel seeded once and never written to, so the
      sample's half of this, which grew a list in `held.ts` for a browser engine to count, reaches nothing. What stays is
      the record's answer drawn the way a live page draws it, and the unmodified seed drawn by the fixture the same way,
      each number typed on a project kept. */

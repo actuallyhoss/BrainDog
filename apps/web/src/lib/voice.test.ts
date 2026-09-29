@@ -1,5 +1,5 @@
 /**
- * The voice a record speaks in (`loop/research-spark.md` §2.2): its keys are the format's, each replaces a
+ * The voice a record speaks in: its keys are the format's, each replaces a
  * line the house voice already has, and a key left out reads the house line.
  */
 
@@ -48,7 +48,7 @@ test('THE VOICE COMES FROM THE FIRST USE-CASE PACK SWITCHED ON', () => {
   assert.equal(speaking([{ id: 'usecase-student', disabled_at: '2026-09-17' }, { id: 'usecase-founder', disabled_at: null }]), 'usecase-founder');
 });
 
-test('LABELS ARE READ FROM SETTINGS THE SAME WAY THE FORMAT WRITES THEM (S8)', () => {
+test('LABELS ARE READ FROM SETTINGS THE SAME WAY THE FORMAT WRITES THEM', () => {
   const values = {
     label_tickets: 'Issues',
     label_people__role__collaborator: 'Teammate',
@@ -72,7 +72,7 @@ test('LABELS ARE READ FROM SETTINGS THE SAME WAY THE FORMAT WRITES THEM (S8)', (
   }
 });
 
-test('A LABEL IS DRAWN OVER THE DECLARATION, AND A KEY LEFT OUT READS THE DECLARATION (S8)', () => {
+test('A LABEL IS DRAWN OVER THE DECLARATION, AND A KEY LEFT OUT READS THE DECLARATION', () => {
   const people = {
     id: 'people',
     name: 'People',

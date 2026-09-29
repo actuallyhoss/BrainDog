@@ -1,6 +1,6 @@
 /**
  * Signing up, from the browser's side: the three `/auth/signup/*` calls, the billing calls a new record is paid through,
- * and what the address says when somebody arrives from their mail or from Stripe (`loop/finish/ops.md` OPS-17).
+ * and what the address says when somebody arrives from their mail or from Stripe.
  *
  * PLAIN TYPESCRIPT, like `auth.ts` beside it, so a test can load it in Node with a fake `fetch` and no browser. The page
  * (`routes/signup/+page.svelte`) and the no-record state on `/start` (`routes/start/NoRecord.svelte`) hold the runes.

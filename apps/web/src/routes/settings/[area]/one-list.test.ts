@@ -1,10 +1,10 @@
 /**
  * A COLLEAGUE ON ONE LIST IS NOT A READER OF THE RECORD, on the two settings screens that said so.
  *
- * `loop/research-invite-landing.md`, measured through the real seed with a bookkeeper given `write` on
- * Expenses and no record level. Finding 3: `/settings/identity` drew `copy.levelMeans[me.level]` from the
+ * Measured through the real seed with a bookkeeper given `write` on
+ * Expenses and no record level. `/settings/identity` drew `copy.levelMeans[me.level]` from the
  * shell's `read` fallback, "Can read, cannot change", to somebody whose whole job is changing rows.
- * Finding 5: People drew the waiting invitation `probe2` minted (`level: null, registers: { expenses:
+ * And People drew a waiting invitation (`level: null, registers: { expenses:
  * 'write' }`) through `inv.level ?? 'read'`, "Reads", which told the owner a bookkeeper would read the
  * whole business. Both type-checked, because `read` is a word the ladder knows, so this reads the
  * screen's own text, the way `decide/page.test.ts` reads the queue's.
@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-/* EACH AREA IS ITS OWN COMPONENT since the settings split (ARC-7b), so each check reads the area it is about. */
+/* EACH AREA IS ITS OWN COMPONENT since the settings split, so each check reads the area it is about. */
 const people = readFileSync(fileURLToPath(new URL('./areas/People.svelte', import.meta.url)), 'utf8');
 const identityArea = readFileSync(fileURLToPath(new URL('./areas/Identity.svelte', import.meta.url)), 'utf8');
 

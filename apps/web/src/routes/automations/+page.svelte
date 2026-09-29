@@ -1,5 +1,5 @@
 <!--
-  Automations: `/automations`, one place for everything that runs by itself (`loop/finish/shell.md` EDT-3).
+  Automations: `/automations`, one place for everything that runs by itself.
 
   FIVE TABS IN ONE CONTROL: Automations, Scheduled (calls, polls and pulls), Scripts, Doors, and Runs. They were four
   corners of the product (this list, a project's "Runs on", `/scripts`, and Settings, Ingest) and nowhere listed a run
@@ -10,7 +10,7 @@
   ONE ROW EACH, TWO LINES: its name and what it is, then where it stands. The second line is the verdict and wraps
   rather than losing its end to an ellipsis, which on a phone was exactly the part that said what to do.
 
-  THE NEW-ACTION SHEET OPENS FROM THE ADDRESS, `?new=door` or `?new=action&preset=<id>` (`contracts.md` X57), so a
+  THE NEW-ACTION SHEET OPENS FROM THE ADDRESS, `?new=door` or `?new=action&preset=<id>`, so a
   declared page links to a sheet already filled in and this hub is the one reader. Closing it takes the two keys off
   the address and redraws the tab under it, so what was just made shows without a reload.
 -->
@@ -63,8 +63,7 @@
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
 <!-- THE TABS ARE THE TOOLBAR'S GLASS SEGMENTED CONTROL, beside the one primary action, which is the tab's own: "New
-     automation", "New scheduled action", "New script", and none on Doors, whose section carries "New door" for an owner
-     (SCREENS, Automations). -->
+     automation", "New scheduled action", "New script", and none on Doors, whose section carries "New door" for an owner. -->
 <PageHead
   icon="refresh"
   title={words.heading}
@@ -100,7 +99,7 @@
 <NewAction open={ask !== null} kind={ask?.kind ?? 'action'} preset={ask?.preset ?? null} onclose={shut} />
 
 <style>
-  /* THE LISTS SIT ON THE GROUND UNDER THEIR TILES, 20 apart, as wide as the page allows (SYSTEM §4, §5). */
+  /* THE LISTS SIT ON THE GROUND UNDER THEIR TILES, 20 apart, as wide as the page allows. */
   .page {
     display: flex;
     flex-direction: column;

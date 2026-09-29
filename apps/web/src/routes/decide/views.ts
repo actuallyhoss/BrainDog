@@ -1,7 +1,7 @@
 /**
  * THE TWO LISTS UNDER THE QUEUE: what was put off and when it comes back, and how the calls with a prediction went.
  *
- * NO NEW METHOD, BECAUSE THE RECORD ALREADY SAYS BOTH (contracts X33). `governance` hands every suggestion with its
+ * NO NEW METHOD, BECAUSE THE RECORD ALREADY SAYS BOTH. `governance` hands every suggestion with its
  * `defer_until` and `defer_why` once it is asked for `status: 'all'`, and a deferred question is one still open whose
  * day has not come, which is exactly the one the default `open` read leaves out (`kernel/src/govern.ts`,
  * `listGovernance`). A prediction row carries `met`, `scored_at` and `score_at` as the scorer left them.
@@ -52,7 +52,7 @@ const QUESTION = /^(SG\d+|q\.[0-9A-Z]+)$/u;
 
 /**
  * A DAY SAID THE WAY THE REST OF THE PRODUCT SAYS ONE: relative inside a week ("in 3 days", "today"), then the day and
- * month, then the year as well once it is another year (design §6.5). "on" leads a date so a sentence reads whole.
+ * month, then the year as well once it is another year. "on" leads a date so a sentence reads whole.
  */
 export function dayWord(iso: string, now: number): string {
   const d = iso.slice(0, 10);

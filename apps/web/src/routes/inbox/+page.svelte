@@ -6,12 +6,12 @@
   outside the record, and the quarantine is structural rather than a sanitiser: it is drawn as plain
   text nodes, never parsed (50 §8).
 
-  AND IT IS A QUEUE, CLEARED FROM THE KEYBOARD (DESIGN-SYSTEM appendix D). `j` and `k` move a cursor,
+  AND IT IS A QUEUE, CLEARED FROM THE KEYBOARD. `j` and `k` move a cursor,
   Enter opens the one under it, `e` files it in the chosen list, Delete archives it, `x` selects it so
   several are filed or archived at once, and Esc clears the selection. A row leads with its subject,
   then who sent it and the first words of what they said, then when (rule 7).
 
-  ARRIVALS SIT ON THE GROUND, GROUPED BY THE DAY THEY CAME (SYSTEM §6, "Lists are neither"): Today, Yesterday, then
+  ARRIVALS SIT ON THE GROUND, GROUPED BY THE DAY THEY CAME: Today, Yesterday, then
   each day by name, newest first, with no box round them. The cursor walks the rows in the order they are drawn, so
   `j` never jumps between days. A row leads with a round check that selects it, and its verbs show on the cursor row
   with the keys that do the same.
@@ -23,7 +23,7 @@
 
   AND WHAT LEFT IT IS STILL HERE. Waiting, Filed and Archived are one series of the same arrivals, chosen in the
   toolbar. The record's tally is the title row's sentence and the one tile, "Who filed it". Every filing and
-  archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back` (MOD-26).
+  archiving, a person's or an agent's, names who did it and can be put back, through `triage`'s `back`.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -100,7 +100,7 @@
   /**
    * THE INBOX IS THE RECORD'S, its newest page, and nothing of the sample is mixed into it. Until the
    * page arrives the screen draws no rows and no empty state, and a refusal is the record's own
-   * sentence: a read that found no record drew the sample's arrivals here until DIRECTION 26, and
+   * sentence: a read that found no record drew the sample's arrivals here until the sample left, and
    * says so in the record's words now.
    *
    * `unrouted` IS A HOST OLDER THAN THIS READ: there is a record, and no list to draw from it.
@@ -279,8 +279,8 @@
   /**
    * THE LIST A FILED EMAIL GOES INTO, and the one chosen last time.
    *
-   * It opened on the first list in the record, which on a live record is Agent runs (DESIGN-SYSTEM
-   * D6), so the likeliest press filed an invoice as an agent's run. The choice is remembered on this
+   * It opened on the first list in the record, which on a live record is Agent runs,
+   * so the likeliest press filed an invoice as an agent's run. The choice is remembered on this
    * device, as a convenience and nothing more: a browser that forgets it opens on the first list again.
    */
   const INTO = 'braindog.inbox.into';
@@ -664,7 +664,7 @@
       so it says what is true in both, with the door to a connector; and where something waits on
       Decide, the door there too. Only the sample knew its own sources and drew the two apart.
 
-      NEITHER DOOR IS INK. An empty inbox is good news, and the filled pill was the loudest shape on it (design.md 2.4),
+      NEITHER DOOR IS INK. An empty inbox is good news, and the filled pill was the loudest shape on it,
       so both are the quiet secondary.
     -->
     <Empty kind="no-data-yet" glyph="inbox" title={said('inbox_clear')} body={copy.inboxClearWhy}>
@@ -677,7 +677,7 @@
     {#if alike.length > 0}
       <!-- LEARNED ONCE. Each sender with two or more alike is one row: how many, from whom, and the newest of them.
            Asking Slash waits for the record's threshold for a pattern, since it spends a model call; making the rule by
-           hand (PLT-10, contracts X43) is offered for any group, because pointing at two alike messages costs nothing
+           hand is offered for any group, because pointing at two alike messages costs nothing
            and already shows what the rule would read. Both are quiet: filing is the screen's one primary. -->
       <Section title={words.learn} count={alike.length}>
         <p class="why">{words.learnWhy}</p>
@@ -725,7 +725,7 @@
                 ><Icon name="check" size="s" /></button>
                 <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
                      sender's domain led the row in a column of its own and was said again under the
-                     subject (DESIGN-SYSTEM D5). -->
+                     subject. -->
                 <button
                   type="button"
                   id="arrival-{item.id}"
@@ -797,7 +797,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
+    max-inline-size: var(--page-max); /* One cap for every list page. */
   }
 
   /* ── the toolbar ──────────────────────────────────────────────────────── */
@@ -913,7 +913,7 @@
     min-inline-size: 0;
   }
 
-  /* THE FIGURE (SYSTEM §3, `t-figure`), with what it counts beside it in the meta step. */
+  /* THE FIGURE (`t-figure`), with what it counts beside it in the meta step. */
   .figure {
     display: flex;
     flex-wrap: wrap;
@@ -936,7 +936,7 @@
     letter-spacing: 0;
   }
 
-  /* THE ONE LINE THAT READS THE CHART (SYSTEM §6). */
+  /* THE ONE LINE THAT READS THE CHART. */
   .reading {
     margin: 0;
     color: var(--ink2);
@@ -980,7 +980,7 @@
   /**
    * AN ARRIVAL IS ITS CHECK, ITS ROW, ITS VERBS, AND ITS BODY WHEN OPEN. The check and the row are two buttons side by
    * side, so the wash is the list item's, round the lot: the cursor row and a hovered one take `--hover-wash`, and a
-   * picked one `--selected` (SYSTEM §6). The row button draws no fill of its own, or the two would stack.
+   * picked one `--selected`. The row button draws no fill of its own, or the two would stack.
    */
   .arrival {
     position: relative;
@@ -1118,7 +1118,7 @@
 
   /* ── the selection's bar ─────────────────────────────────────────────── */
 
-  /* GLASS CHROME, FLOATING (SYSTEM §4, level 2): the strong glass for legibility over the rows passing under it, its
+  /* GLASS CHROME, FLOATING: the strong glass for legibility over the rows passing under it, its
      hairline pair and the floating shadow, and a pill's ends. */
   .batch {
     position: sticky;

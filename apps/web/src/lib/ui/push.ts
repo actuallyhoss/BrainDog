@@ -1,9 +1,9 @@
 /**
  * The phone half of Web Push, without a browser: the host's public key as the bytes `pushManager.subscribe` takes,
- * whether a toggle is drawn at all, and what turning it on or off sends and says (`loop/research-living-in-it.md` W58-4).
+ * whether a toggle is drawn at all, and what turning it on or off sends and says.
  *
  * A HOST WITH NO KEY DRAWS NOTHING, NOT A DISABLED SWITCH. The Worker adds `notify.push` to `DELIVERS` only when both VAPID
- * keys are set (W58-3), and until he sets them (his call 6) nothing would ever be delivered. A toggle that turns on and
+ * keys are set, and until the owner sets them nothing would ever be delivered. A toggle that turns on and
  * then never rings is a control that writes nothing, which is what `09`'s notifications screen was rewritten to stop.
  *
  * NOTHING HERE THROWS AT THE SCREEN. Blocked notifications are the most common thing a person meets on this row, and the
@@ -26,7 +26,7 @@ import type { Call } from './webhook-doors.ts';
  * Worker's `servesPushKey` matches `/api/push/key` only. This asked `<apiBase>/push/key` at first, which on brain.dog is
  * not the Worker's route, and since every miss below is `null`, the row was drawn for nobody and nothing said so.
  *
- * `{ key: string | null }` IS THE WHOLE ANSWER, and `null` is a host whose keys are not set (his call 6). A 404 is a host
+ * `{ key: string | null }` IS THE WHOLE ANSWER, and `null` is a host whose keys are not set. A 404 is a host
  * that predates the route, a thrown fetch is no host reached, and a 200 that is not JSON is a static host, where
  * `adapter-static`'s fallback answers every address with the shell. All of them draw no row, so none is told apart.
  *
@@ -219,7 +219,7 @@ type Refused = Exclude<Awaited<ReturnType<Call>>, { ok: true }>;
  * A refusal as this row says it, in `webhook-doors.ts`'s two arms, and `ROUTE_UNKNOWN` as a host that predates it.
  *
  * A 401 IS A PERSON NOT SIGNED IN, WHATEVER THE ADDRESS. With no slug it used to be the sample, and the row answered it
- * with the demo's sentence about having no account; there is no sample now (`DIRECTION.md` §26), so it is `signin` with
+ * with the demo's sentence about having no account; there is no sample now, so it is `signin` with
  * the record's own sentence, as a stale sign-in already was.
  *
  * `UNREACHABLE` IS `pushNotSent`, THE SENTENCE A THROWN CALL ALREADY SAID. The client's own is a status and a parse

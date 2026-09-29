@@ -1,5 +1,5 @@
 <!--
-  A new script: `/scripts/new` (`loop/finish/shell.md` SCR-3).
+  A new script: `/scripts/new`.
 
   THE FORM IS `ScriptForm`, SHARED WITH `/scripts/<id>`. This screen reads only what the form may offer (the vault's key
   labels, the doors and the ids already taken) and starts it empty. Once the owner's press installs it, the screen

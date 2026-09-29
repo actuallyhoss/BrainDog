@@ -1,7 +1,7 @@
 <!--
   Peek: the row beside the list, for triage. `p`, and Peek on the row's menu.
 
-  THE DOCKED PANEL (SYSTEM §5): from 900px up it stands at the window's end edge, 440 wide, and the list narrows
+  THE DOCKED PANEL: from 900px up it stands at the window's end edge, 440 wide, and the list narrows
   beside it and stays in view, so `j` and `k` go on walking the list and `p` peeks the next row. Its head is glass (the
   close circle, the row's title, and "Open the row" with its key); its body is white. Below 900px it is a bottom sheet.
   It is a `<dialog>` either way, so what reads an open peek as `dialog[open]` still finds one.

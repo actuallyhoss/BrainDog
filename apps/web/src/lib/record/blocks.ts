@@ -242,7 +242,7 @@ function progressRows(block: BlockResult): string[] {
 /**
  * Two clauses of a sentence predicate as one.
  *
- * A FIGURE'S WHERE MAY BE A PREDICATE TREE (MOD-4: one sentence cannot mix a comma with an `or`), which has no sentence
+ * A FIGURE'S WHERE MAY BE A PREDICATE TREE (one sentence cannot mix a comma with an `or`), which has no sentence
  * to join a clause to, so the clause goes alone rather than a string operation throwing on an object.
  */
 const joined = (where: unknown, clause: string): string => (typeof where === 'string' && where.trim() ? `${where}, ${clause}` : clause);
@@ -371,7 +371,7 @@ function forecastRows(block: BlockResult): string[] {
     ...(block.horizons?.length ? [`horizons | ${block.horizons.join(' ')} |  | `] : []),
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),
     /* CONVERTED "SHOW IN" FIGURES ARE WRITTEN BY SYMBOL ALONE IN THE RECORD'S OWN CURRENCY, and with the code after in
-       any other (design §8.3); the render package cannot know which is home, so this row says it. */
+       any other; the render package cannot know which is home, so this row says it. */
     ...(homeCurrency() ? [`home | ${homeCurrency()} |  | `] : []),
     /* EVERY OTHER CURRENCY THE RECORD'S RATES REACH FROM THE WALK'S, at the newest rate on or before the day the block was
        read, which the "Show in" control converts the walk with (`show` rows, `packages/render/src/forecast.ts` `showsOf`). */
@@ -1131,7 +1131,7 @@ function withRefs(segments: ReturnType<typeof parse>, register: string, entries:
   return segments;
 }
 
-/* ── the forms a built page draws (brief D7) ─────────────────────────────── */
+/* ── the forms a built page draws ────────────────────────────────────────── */
 
 /** A key the record answers or a declaration carries that the app's block type does not name, read as it came. */
 const keyOf = (block: BlockResult, key: string): unknown => (block as unknown as Record<string, unknown>)[key];
@@ -1350,7 +1350,7 @@ export function draw(
    * declared `holds:` sentence come from the record and this file draws blocks.
    */
   held?: { rows: number; name: string; holds?: string; add?: { href: string; label: string } } | undefined,
-  /** The record's installed pack kinds (PLT-8, `kinds.ts` `installedKinds`), threaded to `toSegments` below. */
+  /** The record's installed pack kinds (`kinds.ts` `installedKinds`), threaded to `toSegments` below. */
   kinds?: Readonly<Record<string, KindSpec>>,
 ): { segments: ReturnType<typeof parse>; refusal: Refusal | null } {
   /**
@@ -1563,7 +1563,7 @@ export function saidPlainly(register: string, where: string | undefined): string
   return where
     .split(',')
     .map((clause, i) => {
-      /* `, or` JOINS TWO CONDITIONS SINCE M4 WAVE TWO BRIEF 7, and the word is the separator's, not the field's. Handed
+      /* `, or` JOINS TWO CONDITIONS, and the word is the separator's, not the field's. Handed
          whole to the regex below, `or due before +30d` looked for a field called `or due`, found none and was printed as
          written, so a block read `which way is Money in, or due before +30d`: half in the rows' words and half in the
          declaration's (`where-any.test.ts`). The `or` is said as the folded word, as the verb is. */

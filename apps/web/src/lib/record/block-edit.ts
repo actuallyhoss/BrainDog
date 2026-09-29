@@ -25,8 +25,8 @@ import type { BlockBody } from './pages-live.ts';
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
 /**
- * The editor's words. Kept here rather than in `copy/pages.ts`, which another unit owns, as `page-write.ts` keeps its
- * receipts (`architecture.md` §8.2: a unit's own `words` object).
+ * The editor's words. Kept here rather than in `copy/pages.ts`, as `page-write.ts` keeps its
+ * receipts (a module's own `words` object).
  */
 export const blockWords = {
   edit: 'Edit',
@@ -197,7 +197,7 @@ export function draftOf(block: BlockBody): Draft {
   };
 }
 
-/** A typed count, read as decimal digits only (`defects.md` M11: `Number('0x10')` is 16). `null` for anything else. */
+/** A typed count, read as decimal digits only (`Number('0x10')` is 16). `null` for anything else. */
 export function countOf(said: string): number | null {
   const t = said.trim();
   if (!/^\d{1,3}$/u.test(t)) return null;
@@ -300,8 +300,8 @@ export type ListRead = { fields: QueryField[]; kinds: Record<string, InstalledKi
 /**
  * A list's `schema`, read once per tab and list, or `null` when the record will not say.
  *
- * THE KINDS COME WITH IT because the record answers its installed block kinds on the same call (`contracts.md`
- * `schema`, PLT-8), and the add-block picker, which already names the list it binds to, lists them beside its own.
+ * THE KINDS COME WITH IT because the record answers its installed block kinds on the same call
+ * (`schema`), and the add-block picker, which already names the list it binds to, lists them beside its own.
  */
 const read = new Map<string, Promise<ListRead | null>>();
 export function readList(base: string, register: string, io?: Fetch): Promise<ListRead | null> {

@@ -1,11 +1,11 @@
 <!--
   An icon in its well: the rounded square that leads a tile's heading, a rail place and a row that is
-  not a task or a person (SYSTEM §6, §12.2). `m` is 28 (a tile heading), `l` is 32 (a row). The icon is
+  not a task or a person. `m` is 28 (a tile heading), `l` is 32 (a row). The icon is
   18 in `--ink2` on `--s1`.
 
   A TONE IS A MEANING, never decoration. `ink` is the chosen form, the rail's current place: an ink
   fill with the icon in `--on-ink`. `danger`, `earn`, `warn` and `live` tint the icon in that intent and
-  fill the well with a 12% tint of it (the `-fill` roles are saturated, so they would draw red on red). Red is for what needs him and nothing else (SYSTEM §2).
+  fill the well with a 12% tint of it (the `-fill` roles are saturated, so they would draw red on red). Red is for what needs him and nothing else.
 
   Decorative: the words beside a well say what it means, so the icon is hidden from assistive tech.
 -->
@@ -38,7 +38,7 @@
     block-size: var(--well-l);
   }
 
-  /* 18, between the named `--icon-m` (16) and `--icon-l` (20): SYSTEM §6 draws a well's icon at 18. The
+  /* 18, between the named `--icon-m` (16) and `--icon-l` (20): the design system draws a well's icon at 18. The
      attribute is in the selector so this outranks `Icon`'s own size rule without leaning on source order. */
   .well :global(.icon[data-size]) {
     inline-size: 18px;

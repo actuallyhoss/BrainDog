@@ -1,5 +1,5 @@
 /**
- * The app's Content Security Policy, read from the built shell (OPS-22, 12 §8).
+ * The app's Content Security Policy, read from the built shell (12 §8).
  *
  * WHY THE BUILT SHELL AND NOT THE CONFIG. The browser runs the page, not `svelte.config.js`. SvelteKit writes the policy
  * into the shell's `<meta>` and both hosts copy that meta into the header (`pagePolicy` in `apps/worker/src/route.ts`

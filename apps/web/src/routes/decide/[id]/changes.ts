@@ -29,7 +29,7 @@ export const words = {
 } as const;
 
 /**
- * A MOVE OF WHERE A ROW APPLIES, which is drawn as two chips and not as two row ids (agents C8): the list its
+ * A MOVE OF WHERE A ROW APPLIES, which is drawn as two chips and not as two row ids: the list its
  * projects are in, and the project each side names, as the proposal and the record hold it, `null` for everywhere.
  * `Changes.svelte` names each one from that list; the ids themselves are never drawn.
  */

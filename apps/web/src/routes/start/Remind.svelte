@@ -71,7 +71,7 @@
 {/if}
 
 <style>
-  /* A ROW IN THE CONVERSATION: the bell in its well, the sentence, and the press at its end (SYSTEM §6, rows). */
+  /* A ROW IN THE CONVERSATION: the bell in its well, the sentence, and the press at its end. */
   .remind {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;

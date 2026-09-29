@@ -106,7 +106,7 @@ const titleOf = (fields: Record<string, unknown>) => String(fields.what ?? field
 type Answered = Parameters<typeof blockOf>[0] & { heading?: string; kind: string; drawn?: boolean; matched?: number; refusals?: unknown[]; rows?: Row[]; readings?: { reading?: { value?: unknown } }[] };
 
 /**
- * ONE ENGINE SINCE ARC-1, AND THIS WAS TWO. The sample was a second engine in this app that these tests filled with the
+ * ONE ENGINE NOW, AND THIS WAS TWO. The sample was a second engine in this app that these tests filled with the
  * record's declarations and rows and held to the record's answer. `fixtures/readers.ts` now asks a kernel seeded once
  * with the sample and never written to, so a guide record's pages cannot reach it and there is nothing second to hold
  * equal. What stays is the half a person sees: the record's answer for each page, drawn the way a live page draws it

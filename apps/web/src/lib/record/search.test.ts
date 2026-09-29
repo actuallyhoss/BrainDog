@@ -266,7 +266,7 @@ test('THE HEAD AND THE CAP LINE COUNT AGAINST THE SAME NUMBER', () => {
      answers to one question, three inches apart, and the desktop had drawn no cap line in that state
      before, so the contradiction was new.
      `50 §5.2` step 6 settles it: while filtering, the denominator is the answer. Unfiltered it is the record's own count: every add is a write the list reads again after, so no
-     row this tab typed is held apart from `result.total` (research-no-sample B1). */
+     row this tab typed is held apart from `result.total`. */
   assert.match(
     REGISTER,
     /const denominator = \$derived\(filters\.length \|\| q \? result\.matched : result\.total\)/u,

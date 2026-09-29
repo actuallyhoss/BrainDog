@@ -187,7 +187,7 @@ test('THE REASON A QUESTION WAS ACCEPTED FOR IS PART OF ITS DECISION LINE, never
 });
 
 test('A MEMBER HELD TO ONE LIST IS SENT NO ROWID, and the reason still folds into its decision by the question it settled', () => {
-  /* THE PAIR WAS `rowid - 1`. `loop/research-history-cursor.md`: the record no longer sends a rowid to somebody invited to
+  /* THE PAIR WAS `rowid - 1`. The record no longer sends a rowid to somebody invited to
      named lists, because the gap between two of hers counted the events she was not shown, so the decision's line says
      which question it settled and the `resolve` is found by that. Here the two sit apart in the answer, with a line of
      somebody else's between them, which `rowid - 1` could never have paired even when the numbers were there. */
@@ -231,7 +231,7 @@ test('a pack install names the list it brought, not the bare verb', () => {
 });
 
 /**
- * NO RECORD HERE IS A REFUSAL LIKE ANY OTHER, and the sample it used to answer is gone (DIRECTION 26).
+ * NO RECORD HERE IS A REFUSAL LIKE ANY OTHER, and the sample it used to answer is gone.
  *
  * THESE THREE WERE THE SAMPLE'S DOOR. A 401, a socket that failed and a static host's 404 page at an address with no
  * slug all answered `{ from: 'sample' }`, kept for the tab, and the shell drew The Studio over them. Now each is the
@@ -467,7 +467,7 @@ test('THE FIVE A TEMPLATE DRAWS ARE THE ROWS TOUCHED LAST, drawn and tabbed in t
      row is edited, and the first five of that are the five oldest. Where the list came newest first they were the five
      edited last, and that is what the rail keeps drawing: chosen by `about.updated_at`, placed where the record put them.
 
-     A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET (PGS-18, `boot-live.ts`): the strip of tabs draws every one of
+     A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET (`boot-live.ts`): the strip of tabs draws every one of
      them, in the record's own order, and only the rail narrows to the five kept, each entry past that carrying `cut`.
      So `rail` below reads `nav` less anything `cut`, and `tabs`, which `tabsOf` draws from the same `nav` without ever
      reading `cut`, is the same seven pages whichever five the budget kept. */
@@ -556,7 +556,7 @@ test('and a shell over a record that answered, or over no record at all, carries
 
   /* AND OVER A HOST WHERE NOBODY IS SIGNED IN. A tab can go from a record that refused to a host that
      answers 401; that host's own sentence is the one carried, never the first host's. It was the
-     sample's shell here, with no sentence at all, until the sample went (DIRECTION 26). */
+     sample's shell here, with no sentence at all, until the sample went. */
   forget();
   const again = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Ask the owner.' } }));
   assert.equal((await readBoot(BASE, again.io)).from, 'refused');
@@ -569,7 +569,7 @@ test('and a shell over a record that answered, or over no record at all, carries
 /**
  * A COLLEAGUE INVITED TO ONE LIST KEEPS THAT LIST, AND THE SHELL KEEPS THE FACT THAT IT IS ONE.
  *
- * MEASURED BY `loop/research-invite-landing.md`, through the real seed and the record's own `boot`:
+ * MEASURED through the real seed and the record's own `boot`:
  * a bookkeeper given `write` on an Expenses list made for them, and empty on the day they arrive,
  * gets `boot.registers` of exactly `[Expenses 0]` and `boot.me.level` of `null`. The shell turned the
  * `null` into `read` and dropped the list for having no rows, so the rail was empty and Home said

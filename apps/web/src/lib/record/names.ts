@@ -4,7 +4,7 @@
  * A SCREEN NEVER PRINTS AN ID, A SLUG OR A LIST ID. The record signs a write `p_01M2PAZ…`, `rule:cash-stale`,
  * `agent:claude`, `S42` or `system` (`30 §3`), keeps a list as `obligations` and a rule as `invoice-late`, and every one of
  * those reached a screen at some point: `P_seed` under Added, "rule:cash-stale" down History, "When a row in things" on an
- * automation, a "#" column opening every list (design.md SYS-3). Each surface had grown its own small rule for turning
+ * automation, a "#" column opening every list. Each surface had grown its own small rule for turning
  * one into words, and each rule covered the shapes its own screen had seen. This file is the one rule, so a new screen
  * asks here instead of writing another.
  *

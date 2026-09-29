@@ -2,12 +2,12 @@
   One result, as the palette and `/search` both draw it: the glyph of what it is, its title, and one line saying which
   one it is (the list it is in, why it matched, where a page sits), with a figure's reading at the trailing edge.
 
-  ONE ROW IN TWO PLACES (design SYS-13). `/search` is where somebody goes when the palette's ranked list was not
+  ONE ROW IN TWO PLACES. `/search` is where somebody goes when the palette's ranked list was not
   enough, and a result drawn differently there would be a second thing to learn about the same object. The box around
   it stays each caller's own, because in the palette it is an option the arrow keys walk and on `/search` it is a link:
   this file draws what sits inside that box, and nothing about how it is pressed.
 
-  NO NUMBER AND NO KEY. A row's number or a question's id is not what a person calls it (design SYS-3), and a key
+  NO NUMBER AND NO KEY. A row's number or a question's id is not what a person calls it, and a key
   printed on a result is advice nobody is looking at; the keymap is where keys are taught.
 
   ON A PHONE IT IS TWO LINES, the title over its line, because at 390 a title and its line side by side cut both at an
@@ -61,7 +61,7 @@
     min-inline-size: 0;
   }
 
-  /* THE GLYPH IN ITS WELL (SYSTEM §6: "a 32px icon well for anything else"), at the 28 a result's row has room for. */
+  /* THE GLYPH IN ITS WELL (the design system: "a 32px icon well for anything else"), at the 28 a result's row has room for. */
   .result-glyph {
     display: flex;
     flex: none;

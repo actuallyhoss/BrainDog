@@ -1,6 +1,6 @@
 /**
  * Whether the person this shell was drawn for may do a thing, on the whole record or on one list: the one question
- * every screen that draws a control asks before it draws it (`loop/finish/contracts.md` §8, platform A).
+ * every screen that draws a control asks before it draws it.
  *
  * THE RECORD DECIDES AND THIS READS WHAT IT DECIDED. `boot` answers `me.levels`, the level the caller holds on each list,
  * with a record-wide appender's owner-only lists (Keys, People, and any list declaring `owner_only: true`) already left

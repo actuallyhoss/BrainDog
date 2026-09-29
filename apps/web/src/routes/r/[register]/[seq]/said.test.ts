@@ -1,5 +1,5 @@
 /**
- * A row's lead says its tone in words and labels its age (design.md DSN-14, SYS-10).
+ * A row's lead says its tone in words and labels its age.
  *
  * The page draws these beside the tone's dot, so what is held here is the wording and the day count, never the tone:
  * the colour stays `toneOf`'s. Every clock below is 25 September 2026, at the hour the case needs.

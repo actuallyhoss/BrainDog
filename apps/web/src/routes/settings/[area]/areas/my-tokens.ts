@@ -1,5 +1,5 @@
 /**
- * The words and the one pure rule of `MyTokens.svelte`, a member's own agent keys (COL-10, `docs/20-COLLABORATION.md`
+ * The words and the one pure rule of `MyTokens.svelte`, a member's own agent keys (`docs/20-COLLABORATION.md`
  * §2, tier 0).
  *
  * THE WORDS LIVE WITH THE ONE SCREEN THAT DRAWS THEM, as `levels.ts` keeps its own (`lib/copy.ts`, "a `words` object in

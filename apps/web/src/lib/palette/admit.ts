@@ -6,8 +6,7 @@
  * launcher rots: nothing in it is wrong on its own, and after a year it is a menu of the screens
  * whoever added them happened to be working on.
  *
- * the old tool's command palette (`C:\Tools\legacy`, `loop/research-brain-study.md`) writes its rule
- * at the top of the file and this is the same rule, stated the same way. A command belongs here when it can be STARTED WITHOUT FIRST CHOOSING WHERE, and
+ * So the rule is written at the top of this file. A command belongs here when it can be STARTED WITHOUT FIRST CHOOSING WHERE, and
  * three tests decide it. All three have to pass:
  *
  *   1. NO OBJECT IS REQUIRED BEFORE IT. "Open the vault" always makes sense. "File this row under
@@ -178,7 +177,7 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
   /* SLASH'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
   { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'slash' },
-  /* AUTOMATIONS, the canvas an owner and an agent both edit (`loop/DIRECTION.md` section 22). Reachable only by its address
+  /* AUTOMATIONS, the canvas an owner and an agent both edit. Reachable only by its address
      until it was here and in the rail. */
   { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh' },
   { id: 'c-settings', title: copy.settings, href: '/settings', group: copy.destinations, icon: 'settings' },

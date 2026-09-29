@@ -1,5 +1,5 @@
 <!--
-  What an install, an update or a proposal would call, inside a definition list (`research-scheduled-actions.md` §5).
+  What an install, an update or a proposal would call, inside a definition list.
 
   A `dt` AND A `dd`, NOT A WRAPPER, so it drops into the Packs screen's diff, Settings' plan and the gate alike. One
   line per action, then the runs a month they add against the hosted allowance, or with no limit on a
@@ -34,7 +34,7 @@
 
 <style>
   /* THE HEADING AT THE META STEP IN THE SECOND INK, each call a line with its service in ink, and the estimate and the
-     note under them in the quiet ink (SYSTEM §3, §6). A caller that heads its tile with the same words hides this one
+     note under them in the quiet ink. A caller that heads its tile with the same words hides this one
      from sight and keeps it for a screen reader, so the list is never nameless. */
   .calls-h {
     color: var(--ink2);

@@ -1,7 +1,7 @@
 /**
  * The shell carries which host answered `boot`, when the host said, so a screen reads it rather than inferring it.
  *
- * `loop/research-held-landing.md` friction 5: Billing told a self-host from the Cloud by whether `/api/inbound/mint`
+ * WHY: Billing told a self-host from the Cloud by whether `/api/inbound/mint`
  * answered 404, because `boot` said nothing about the host. The record now copies `Build.host` into `boot`; this is
  * the half that carries it past `layoutOf`, which builds the shell key by key and drops anything it does not name.
  */

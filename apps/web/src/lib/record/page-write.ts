@@ -136,7 +136,7 @@ export async function updateRow(base: string, ref: RowRef, patch: Record<string,
 
 /**
  * The receipt's words. Past tense with the row named, as `toast.svelte.ts` asks, and never a claim beyond the write that
- * landed. Kept here rather than in `copy.ts`, which no builder in this wave owns.
+ * landed. Kept here beside the write rather than in `copy.ts`.
  */
 export const words = {
   ticked: (title: string, done: boolean) => `Marked ${title} ${done ? 'done' : 'not done'}.`,
@@ -176,8 +176,8 @@ function wear(row: Row, kept: Kept): Row {
  *
  * A TICK WAS FOLLOWED BY THE ROW LEAVING. `writeRow` reads the page again once a write lands, and a `todo` whose
  * `where:` leaves out done rows answers without the row it just ticked, so the mark the reader was checking went with
- * it and the only way to see whether they had hit the right one was to tick it back and look. REWORK §1 counted 13 of
- * 85 writes reversed within five seconds on the register list for the same reason. A board moved a card to the head of
+ * it and the only way to see whether they had hit the right one was to tick it back and look. A count of the history
+ * found 13 of 85 writes reversed within five seconds on the register list for the same reason. A board moved a card to the head of
  * its new column for the same cause one step removed: the record answers newest write first.
  *
  * A MOVED CARD IS HELD AT THE FOOT OF ITS NEW COLUMN, NOT AT ITS OLD INDEX. A board's columns are the order its rows
@@ -288,7 +288,7 @@ export function declaredBlock(block: Added): BlockBody {
  * where they were put.
  *
  * THE AREA WENT NOWHERE UNTIL THIS WROTE IT. This wrote order and span only, so a block moved to the rail went back to
- * the record in the main column and the page read after Done drew it where it had been; wave two answered that with a
+ * the record in the main column and the page read after Done drew it where it had been; a later change answered that with a
  * second write path for pages with a rail (`layout-write.ts`), which this replaces. A block moved to the rail gains
  * `area: rail`; one moved to main loses the key, since main is what a block with none already means, rather than
  * gaining a second spelling of the default. A block whose column did not change is written as the record holds it,

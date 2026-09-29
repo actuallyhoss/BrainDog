@@ -1,7 +1,7 @@
 /**
  * The pattern builder's words, and how a reading and a match are said to a person.
  *
- * THIS UNIT'S OWN WORDS, beside the screens that say them, as the Inbox keeps its own. Nothing here names a form, an
+ * THE PATTERN BUILDER'S OWN WORDS, beside the screens that say them, as the Inbox keeps its own. Nothing here names a form, an
  * anchor or a predicate: a reading is "the amount after “Amount:”", a match is "the sender is ...", and a date's
  * format is shown as a date written that way.
  *

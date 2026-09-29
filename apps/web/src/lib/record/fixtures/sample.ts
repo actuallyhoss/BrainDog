@@ -3,8 +3,8 @@
  * inbox, vault, add-ons, news, audit trail and runs the sample's readers answer with.
  *
  * A TEST IMPORTS THIS AND NOTHING SHIPPED MAY. It was `lib/record/data.ts`, the mock the app was drawn against before a
- * record could answer, and it shipped for as long as a live screen read one of its tables (DIRECTION 26, wave C1 of
- * `loop/research-no-sample.md`). `tools/gates/no-fixtures.mjs` refuses any file under `apps/web/src` outside a test that
+ * record could answer, and it shipped for as long as a live screen read one of its tables.
+ * `tools/gates/no-fixtures.mjs` refuses any file under `apps/web/src` outside a test that
  * imports this directory.
  *
  * IMPORTING IT FILLS NOTHING. Its `REGISTERS` and `PAGES` are its own tables; the helpers read `held.ts`'s, which only a
@@ -70,7 +70,7 @@ import { cashSeries, openTasksSeries } from '@braindog/seed';
  * The pages the record ships with. They live in the seed, because a page is a document it holds.
  *
  * THE AGENTS PACK'S PAGES ARE HERE BECAUSE ITS REGISTERS ARE: `/p/agents`, a page per skill, and the
- * project template already ends with "Runs on" (the seed's own `PAGES.project`, agents.md AGT-10), taken from the
+ * project template already ends with "Runs on" (the seed's own `PAGES.project`), taken from the
  * seed as a record holding the pack installs them.
  */
 export const PAGES: Record<string, PageDecl> = { ...SEED_PAGES, ...AGENTS_PAGES } as unknown as Record<string, PageDecl>;
@@ -87,7 +87,7 @@ import { answers } from '../find.ts';
  * AGENT RUNS COME FROM THE KERNEL'S OWN DECLARATION, the body migration 0002 seats, because that is
  * what a real record's `boot` lists. A copy written here would be the second "Agent runs" again.
  *
- * THE SAMPLE'S OWN TABLE, NOT `held.ts`'S. Until wave C1 this was `Object.assign` into the table every shipped reader
+ * THE SAMPLE'S OWN TABLE, NOT `held.ts`'S. Until the sample left the app this was `Object.assign` into the table every shipped reader
  * reads, so importing the fixture for any reason put the seed's declarations where a live tab keeps the record's, and a
  * list the record had not been asked about yet drew the seed's fields. `fill.ts` makes that copy now, and only a test
  * asks it to.
@@ -250,7 +250,7 @@ export const ROWS: Record<string, Entry[]> = {
  *
  * IT IS THE SAMPLE'S HOST AND NO OTHER RECORD'S. It read `self-host` on the Cloud build too, so a screen that
  * branched on it over a live record was branching on the build. Billing did, and told a record provisioned on the Worker "This record runs
- * on your own machine." (`loop/research-first-sign-in.md` friction 5). A live record's host is asked:
+ * on your own machine.". A live record's host is asked:
  * `routes/settings/billing.ts` and `inbound-door.ts` say how, and what `boot` does not yet carry.
  */
 export const DEPLOYMENT: { kind: 'self-host' | 'cloud'; since: string } = {
@@ -750,7 +750,7 @@ import type { ActionRow } from '../actions.ts';
 /**
  * The sample's scheduled actions: three for Kiln, one for Portage, one for every project.
  *
- * ONE OF EACH STATE a person reads on "Runs on" (`loop/research-scheduled-actions.md` §6.2): live, paused
+ * ONE OF EACH STATE a person reads on "Runs on": live, paused
  * because the provider refused the key, and retrying after a 503. Each day of the month so far carries its
  * runs, so `/usage` draws the same numbers the rows say, and the month is the sum of its days.
  *

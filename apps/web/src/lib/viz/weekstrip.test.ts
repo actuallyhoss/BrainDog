@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 
 import { dayName, dayNumber, describeWeek, dotsFor, MIN_COLUMN, weekdayOf, weekstrip, type WeekDay } from './weekstrip.ts';
 
-const BAKE = '#B35F1F';
-const ACME = '#3F5FD4';
+const KILN = '#B35F1F';
+const STUDIO = '#3F5FD4';
 
-/** 14 days from Tue 29 Sep 2026, Main.dc.html's "Coming up". */
+/** 14 days from Tue 29 Sep 2026, as Today's "Coming up" draws them. */
 function fortnight(): WeekDay[] {
   const base = dayNumber('2026-09-29');
   return Array.from({ length: 14 }, (_, i) => {
     const date = new Date((base + i) * 86_400_000).toISOString().slice(0, 10);
     const items =
       i === 0
-        ? [{ colour: BAKE, label: 'the Cat Yard commission' }]
+        ? [{ colour: KILN, label: 'the Cat Yard commission' }]
         : i === 1
-          ? [{ colour: BAKE, late: true }, { colour: ACME }]
+          ? [{ colour: KILN, late: true }, { colour: STUDIO }]
           : [];
     return { date, items };
   });
@@ -89,7 +89,7 @@ test('a week or less never folds', () => {
 });
 
 test('a column draws what fits and says the rest as "+n"', () => {
-  const items = Array.from({ length: 9 }, () => ({ colour: BAKE }));
+  const items = Array.from({ length: 9 }, () => ({ colour: KILN }));
   const { dots, more } = dotsFor(items, 20, 50, 30);
   /* 3 a row, 2 rows: 5 dots and "+4". */
   assert.equal(dots.length, 5);

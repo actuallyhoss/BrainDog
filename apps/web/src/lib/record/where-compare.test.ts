@@ -1,8 +1,8 @@
 /**
  * `more than`, `at least`, `less than`, `at most`, `between` and `contains`, held against the record.
  *
- * BOTH ENGINES REFUSED THE FIRST FIVE AND ONE OF THEM REFUSED THE SIXTH. Measured on 24 September at
- * `facafeed` (`loop/research-m4-app.md`, brief 6): the record's sentence answered `n is at least 100`
+ * BOTH ENGINES REFUSED THE FIRST FIVE AND ONE OF THEM REFUSED THE SIXTH. Measured at
+ * `facafeed`: the record's sentence answered `n is at least 100`
  * with `VALUE_MALFORMED` and `n more than 100` and `n between 1 and 5` with `MATCH_OP_UNSUPPORTED`,
  * while this compiler named all three as operators "this build" does not read; and `what contains
  * rent`, which the record has answered since `2023a1c0`, came back from here as *"that is not
@@ -10,7 +10,7 @@
  *
  * SO THE RECORD IS DRIVEN, NOT DESCRIBED: a real SQLite record with the seed installed, every sentence
  * asked of `k.list` and of `compile`, and the two held to the same verdict, or to the same refusal in
- * the same words. The rows are the record's alone since ARC-2, which deleted the browser's matcher and
+ * the same words. The rows are the record's alone now: the browser's matcher was deleted and
  * made `compile` the record's own parser; what the browser still owns is reading the sentence the same
  * way, and refusing it in the same words.
  */
@@ -99,7 +99,7 @@ async function agree(register: string, sentence: string): Promise<Answer> {
 
 /* ── the probe ───────────────────────────────────────────────────────────── */
 
-test('THE PROBE: every sentence the brief measured refused now answers, in both engines, as the same rows', async () => {
+test('THE PROBE: every sentence measured as refused now answers, in both engines, as the same rows', async () => {
   for (const [register, sentence] of [
     ['installments', 'number is at least 3'],
     ['installments', 'number more than 3'],
@@ -158,7 +158,7 @@ test('A RANGE OF INSTANTS KEEPS ITS LAST DAY, where the tree\'s own `between` dr
 });
 
 test('A RANGE WITH ONE DAY WRITTEN OUT AND ONE RELATIVE IS ORDERED ON THE RECORD\'S CLOCK', async () => {
-  /* THE CHECKER FOUND IT, AND IT IS A CLOCK AND NOT A WORD. `compile` put the two ends of a range of
+  /* IT IS A CLOCK AND NOT A WORD. `compile` put the two ends of a range of
      days in order at the wall clock, on the reasoning that two relative words move together; one
      written-out day and one relative word do not. With the mirror's `NOW` on 3 September and the wall
      clock on the 24th, `due between today and 2026-09-20` was four rows in the record and "today is
@@ -206,7 +206,7 @@ test('A VALUE AN ENUM DECLARES IS STILL A VALUE, whatever words it starts with',
 
      NO SEED ENUM DECLARES SUCH A VALUE, so the register is lent for the length of the test. The
      first version of this test asked `state is open`, which never reaches the ordered branch, and
-     it stayed green with the guard deleted (`isValue` forced to `false`, checked on 24 September).
+     it stayed green with the guard deleted (`isValue` forced to `false`, checked by hand).
      This one goes red under that same mutation, on the first `bad` it reads. */
   REGISTERS.counts = { id: 'counts', name: 'Counts', title: 'size', fields: [{ id: 'size', type: 'enum', values: ['one', 'more_than_one'] }] } as never;
   try {
@@ -224,7 +224,7 @@ test('A VALUE AN ENUM DECLARES IS STILL A VALUE, whatever words it starts with',
 });
 
 test('A TEXT THAT STARTS WITH AN ORDERED WORD IS STILL A TEXT after `is`, in both engines', async () => {
-  /* THE FIRST ATTEMPT'S CHECKER FOUND IT: both engines refused `what is more than coffee` as an order a
+  /* A REVIEW OF THE FIRST ATTEMPT FOUND IT: both engines refused `what is more than coffee` as an order a
      text cannot be asked, where before the words were taught it was a value, and a merchant may be
      called anything. The negation is the row that proves it is read as a value on both sides: it
      admits every row whose `what` is not those words, and the same rows in each engine. */
@@ -238,7 +238,7 @@ test('A TEXT THAT STARTS WITH AN ORDERED WORD IS STILL A TEXT after `is`, in bot
 /* ── quantity ────────────────────────────────────────────────────────────── */
 
 test('A QUANTITY IS ORDERED WITH ITS UNIT, in both engines, though no seed register declares one', async () => {
-  /* THE FIRST ATTEMPT'S CHECKER FOUND IT: `ORDERED` here named `quantity` and `boundOf` had no case
+  /* A REVIEW OF THE FIRST ATTEMPT FOUND IT: `ORDERED` here named `quantity` and `boundOf` had no case
      for it, so `weight at least 5 kg` was a value this field "cannot hold" while the record answered
      it. `schema.ts` leaves `quantity` out of the mirror's types because no seed register declares one,
      so the register is lent to both engines for the length of the test: installed into a record of its
@@ -261,7 +261,7 @@ test('A QUANTITY IS ORDERED WITH ITS UNIT, in both engines, though no seed regis
   };
   REGISTERS.weights = WEIGHTS as never;
   try {
-    /* THE BROWSER READS THE BOUNDS, AND THE RECORD COUNTS THE ROWS (ARC-2). */
+    /* THE BROWSER READS THE BOUNDS, AND THE RECORD COUNTS THE ROWS. */
     const ours = (sentence: string): string => {
       const w = compile('weights', sentence);
       return w.bad.length ? `refused ${w.bad[0]}` : JSON.stringify(w.clauses.map((c) => ('bounds' in c ? c.bounds : null)));
@@ -450,7 +450,7 @@ function hostile(n: number, seed: number): string[] {
 const PAYLOAD = `' ” ’ ", or state is open, or what is x`;
 
 test('A NAME NO PAIR OF MARKS HOLDS FILTERS ITS OWN PAGE IN BOTH ENGINES, and not every open obligation', async () => {
-  /* `loop/research-audit-2026-09-25-layouts.md` §3, P1: this row's `what`, filled into `what is {{what}}`, read as three
+  /* THIS ROW'S `what`, filled into `what is {{what}}`, read as three
      conditions joined by `or` and drew all 24 open obligations in the record and in this engine alike. No seed row
      holds the name, so the one right answer is no rows. */
   const k = await record;
@@ -494,7 +494,7 @@ test('EVERY VALUE `quoteValue` WRITES THIS ENGINE READS BACK BYTE FOR BYTE, and 
 });
 
 test('A NAME STARTING WITH in, starts OR ends, OR HOLDING A LINE BREAK, IS READ HERE AS THE RECORD READS IT', async () => {
-  /* §16 of the same audit: bare, this engine read the first word as an operator it does not read, and a quoted value
+  /* Bare, this engine read the first word as an operator it does not read, and a quoted value
      with a line break failed `CLAUSE` itself, which had no `s` flag, while the record matched the text both times. */
   for (const v of ['in stock', 'starts now', 'ends here', 'a\nb', 'Studio rent,\nJune']) {
     const said = await agree('obligations', `what is ${quoteValue(v)}`);

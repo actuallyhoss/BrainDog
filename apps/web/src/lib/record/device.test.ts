@@ -86,9 +86,9 @@ test('the sentences for the refusals say what to do, and none prints a count of 
   assert.match(copy.codeLong(7), /7 digits/);
 });
 
-/* `noRecord` WENT WITH ITS LAST CALLER (wave C3 of `loop/research-no-sample.md`). It told a 401 or an unreachable host at
+/* `noRecord` WENT WITH ITS LAST CALLER. It told a 401 or an unreachable host at
    an address with no slug from any other refusal, which was the one place the sample was drawn; three writers still
-   asked it on 25 September and answered `gone`, which no screen drew differently from `refused`. */
+   asked it at the end and answered `gone`, which no screen drew differently from `refused`. */
 test('there is no longer a refusal that means no record is here', async () => {
   assert.equal('noRecord' in (await import('./device.ts')), false);
 });
@@ -151,7 +151,7 @@ test('a revoked token is not listed as standing', () => {
 });
 
 /*
- * THE SAMPLE IS GONE FROM THIS MODULE (DIRECTION 26). `sampleMachines` and `sampleTokens` turned the fixture's
+ * THE SAMPLE IS GONE FROM THIS MODULE. `sampleMachines` and `sampleTokens` turned the fixture's
  * machines and keys into the record's rows so `/settings/agents` could draw them to a visitor with no record;
  * with no sample, nothing on that screen is drawn from anything but `listDevices` and `listTokens`.
  */

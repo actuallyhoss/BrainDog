@@ -1,7 +1,7 @@
 /**
  * One value in a box, and the same value back out, whichever screen the box is on.
  *
- * THE GRID EDITED FIVE TYPES AND THE ROW PAGE EDITED ALL BUT ONE. Measured on 24 September at HEAD `653ae663`: the
+ * THE GRID EDITED FIVE TYPES AND THE ROW PAGE EDITED ALL BUT ONE. Measured at `653ae663`: the
  * register screen's `EDITABLE` held `text enum day int decimal`, and every other type answered the pencil's key with
  * "open the row". The row page could do the rest because it had three closures over its own state, `draftOf`,
  * `wrongMoney` and `patchOf`, and nothing else could call them. So a money cell was refused in the grid for being "an
@@ -24,7 +24,7 @@ import { copy } from '../copy.ts';
 import * as draft from './field-draft.ts';
 import type { FieldDecl } from './schema.ts';
 
-/* THE LIST SCREEN IS ITS PAGE AND ITS PARTS (ARC-7a): the editor's functions are the page's and the cell it becomes is `ListTable`'s, read as one text, page first. */
+/* THE LIST SCREEN IS ITS PAGE AND ITS PARTS: the editor's functions are the page's and the cell it becomes is `ListTable`'s, read as one text, page first. */
 const GRID = ['+page.svelte', 'parts/ListTable.svelte']
   .map((at) => readFileSync(new URL(`../../routes/r/[register]/${at}`, import.meta.url), 'utf8'))
   .join('\n');
@@ -82,7 +82,7 @@ test('a money value opens in major units at its own exponent, and comes back out
 const EFFORT: FieldDecl = { id: 'effort', type: 'duration', unit: 'h' };
 
 test('a duration opens in the unit it is said in, and a number typed there is read in that unit', () => {
-  /* MEASURED BY THE CHECKER ON 24 SEPTEMBER: a cell drawn as `2 h` opened its box on `7200`, the seconds the record
+  /* MEASURED: a cell drawn as `2 h` opened its box on `7200`, the seconds the record
      stores, and on the row page that box sat beside the letter `h`. Typing `3` there meaning three hours wrote three
      seconds, and the cell then read `0.001 h`. `work.ts` declares `effort` in days, so every effort edited on either
      screen was off by a factor of 86,400. */
@@ -131,8 +131,7 @@ test('a yes or no is ticked, not typed', () => {
 test('every type the record has is editable but a secret', () => {
   assert.equal(typeof draft.editable, 'function', 'field-draft.ts exports no editable');
   /* THE RECORD'S TYPES, NOT THE APP'S, because a declaration the record serves can carry any of them. A quantity and
-     structured data came back when a box could take each apart (MOD-22); a file when the file store could hold it
-     (OPS-20). */
+     structured data came back when a box could take each apart; a file when the file store could hold it. */
   const not = RECORD_TYPES.filter((type) => !draft.editable({ type: type as FieldDecl['type'] }));
   assert.deepEqual(not, ['secret']);
 });
@@ -151,7 +150,7 @@ test('a file opens as its value written out, and goes back as the object the rec
 });
 
 test('no editable type opens on the words [object Object]', () => {
-  /* MEASURED BY THE CHECKER ON 24 SEPTEMBER: with `editable` answering yes to all but `secret`, a `json` cell holding
+  /* MEASURED: with `editable` answering yes to all but `secret`, a `json` cell holding
      `{ a: 1 }` opened in the grid as `[object Object]`, and one character typed after it went back as the string
      `[object Object]x`, which the record's `json` coercion takes as it comes. A `quantity` opened the same way and
      went back as a bare `"3"` the record refuses. Each value below is the shape the kernel's `coerce.ts` stores. */
@@ -171,7 +170,7 @@ test('no editable type opens on the words [object Object]', () => {
 });
 
 test('the grid says why a cell is not the editor only for the types it cannot edit, and says it truly', () => {
-  /* THE CHECKER'S SECOND REFUSAL. `copy.cellWhy` kept a reason for money, ref, document, instant, duration and bool
+  /* THE SECOND REFUSAL. `copy.cellWhy` kept a reason for money, ref, document, instant, duration and bool
      after the grid learnt to edit all six, and the four it still refuses were told "Open the row to change it", when
      the row page asks the same `editable` and does not edit them either. */
   const reasons = Object.keys(copy.cellWhy);

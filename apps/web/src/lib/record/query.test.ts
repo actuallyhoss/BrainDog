@@ -82,7 +82,7 @@ test('text sorts without regard to case, not the way a byte compares, and in the
 
 /**
  * THE RECORD MATCHES, SO THE ROWS A FILTER IS ASKED ABOUT ARE WRITTEN TO A RECORD. These asked the fixture's
- * `applyFilters` about rows made up here, which it matched in the browser; since ARC-1 it asks the seeded record which of
+ * `applyFilters` about rows made up here, which it matched in the browser; now it asks the seeded record which of
  * ITS rows a filter admits and keeps a made-up row whose number the record happened to name (`fixtures/readers.ts`), so
  * the rows below were being matched against obligations they never were. They are written to a record of their own now,
  * under the seed's declaration of obligations with every field optional (so a row may leave a day empty) and the links
@@ -294,7 +294,7 @@ function readerKey(register: string, field: string, e: Entry): number | string |
   if (raw === null || raw === undefined) return null;
   const decl = REGISTERS[register]?.fields.find((f) => f.id === field);
   const type = decl?.type;
-  /* AN ENUM IS ITS POSITION IN `values`, the order its author declared (W56-3). This helper returned the drawn word, so
+  /* AN ENUM IS ITS POSITION IN `values`, the order its author declared. This helper returned the drawn word, so
      the sweep pinned A to Z and went red in twelve registers, each on an enum column, the moment both engines moved to declared order:
      `tasks.state` ascending "puts doing after open", which is exactly the order declared. The position is still a
      function of what is on the screen, since each word stands for one value; a word outside `values` goes after every
@@ -397,7 +397,7 @@ test('`is <a date>` ON A DATE FIELD MATCHED NOTHING, ON EVERY REGISTER, ALWAYS',
   assert.deepEqual(await admitted(rows2, [{ field: 'due', op: 'is', values: ['2026-09-03'] }]), [1]);
 
   /* A relative literal, which is the thing somebody actually types, read as the day itself and kept in its word. The
-     rows each of the three operators admits are the record's to count (ARC-2). */
+     rows each of the three operators admits are the record's to count. */
   const said = compile('obligations', 'due is today');
   assert.deepEqual(explain(said), [], 'the clause was not understood');
   assert.deepEqual(said.clauses, [{ field: 'due', op: 'on', day: 'today' }]);

@@ -1,5 +1,5 @@
 <!--
-  Sign-up, for a stranger (`loop/finish/ops.md` OPS-17): a record of their own, paid for, in four steps.
+  Sign-up, for a stranger: a record of their own, paid for, in four steps.
 
   ONE: an email and a name for the record, the name checked as it is typed, and Cloudflare Turnstile when the host asks
   for it. TWO: "Check your mail". THREE: the link from the mail proves the address, signs the person in, and asks them
@@ -13,7 +13,7 @@
   THE ANSWER TO STEP ONE IS THE SAME FOR EVERY ADDRESS: the host sends a sign-in link to an address that already has an
   account and a proof to a new one, and says which to nobody watching this page.
 
-  THE FORM IS ONE SHEET AND THE STEPS ARE A RAIL BESIDE IT (`loop/design/bento/boards/Light-Signup.dc.html`): the sheet
+  THE FORM IS ONE SHEET AND THE STEPS ARE A RAIL BESIDE IT: the sheet
   holds the mark and the form with its one ink button, and "What happens next" stands to its right from 900px and under
   it on a phone, with the step this person is on marked. The rail is drawn from `step` and nothing else.
 -->
@@ -392,7 +392,7 @@
     margin-block-start: var(--sp-4);
   }
 
-  /* THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600 in Geist (SYSTEM §3), and the phone's large title 30/36. */
+  /* THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600 in Geist, and the phone's large title 30/36. */
   .title {
     margin: 0;
     color: var(--ink);
@@ -432,7 +432,7 @@
     min-inline-size: 0;
   }
 
-  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has (SYSTEM §6). */
+  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has. */
   .row {
     display: flex;
     flex-direction: column;
@@ -493,7 +493,7 @@
   /* ── The rail: what happens next ───────────────────────────────────────── */
 
   /* SIX ROWS, NO BOX ROUND ANY OF THEM: each a 32px well, the step's title and its one line, and at the end where
-     this person stands. A hairline between rows, as a list inside a tile has. A pure list, so no chart (SYSTEM §6). */
+     this person stands. A hairline between rows, as a list inside a tile has. A pure list, so no chart. */
   .steps {
     display: flex;
     flex-direction: column;
@@ -562,7 +562,7 @@
     text-wrap: pretty;
   }
 
-  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size (SYSTEM §3), which is also the size below which a
+  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size, which is also the size below which a
      phone's browser zooms the page in on focus. */
   @media (pointer: coarse) {
     .row .field-input {

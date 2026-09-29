@@ -1,5 +1,5 @@
 <!--
-  Share this setup: `/packs/share` (`loop/research-spark.md` S14).
+  Share this setup: `/packs/share`.
 
   WHAT GOES IN THE FILE IS SAID BEFORE THE BUTTON, and none of the record's rows go in unless one is ticked here. The
   record writes the file (`exportUseCase`), reading it back through the door a stranger's file comes in by, so a row
@@ -10,17 +10,17 @@
   installed. The rail goes out in the order this person sees it (`drawnOrder`), and the words that suggest the use case
   and its skills go in only when ticked.
 
-  WHAT GOES OUT IS SHOWN AS A DIFF, AND AS AN INSTALLER SEES IT (PLT-14, P29). While the form is filled the record
+  WHAT GOES OUT IS SHOWN AS A DIFF, AND AS AN INSTALLER SEES IT. While the form is filled the record
   writes the file again after each pause (`exportUseCase` writes nothing), and the screen says what it changes against
   the version it counts on from: the one last published, else the use case as BrainDog ships it, else the one installed.
   Under that, the file is drawn as browse draws a use case (`previewOf`), so the author sees the rail and Home a
   stranger will be offered. "Publish to the Kennel" sits beside Download and sends the same file as the signed-in
   person (`lib/market/publish.ts`); its answer is one sentence with a link.
 
-  ONE COLUMN AT `--measure`, at every width (design.md §4, the share row): a form read top to bottom, never two ragged
+  ONE COLUMN AT `--measure`, at every width: a form read top to bottom, never two ragged
   columns.
 
-  THE LOOK (SYSTEM §5, §6): what goes in the file is the title row's sentence, and the way back to the add-ons is the
+  THE LOOK: what goes in the file is the title row's sentence, and the way back to the add-ons is the
   head's. The form is groups on the ground, each field's label above it; what changes and what an installer sees are two
   tiles, the second drawing the use case on a well of the ground's colour. Download is the one primary.
 -->
@@ -104,7 +104,7 @@
     void read(async () => {
       client = createClient({ base: apiBase() });
       /* WITH NO RECORD THIS SAID "This is the sample, so the file is made from a record of your own" over a form whose
-         Download could not be pressed. The record's refusal is the page now (DIRECTION 26). */
+         Download could not be pressed. The record's refusal is the page now. */
       const chosen = await choose(client);
       if (!chosen.first.ok) {
         refused = chosen.first.refusal.fix;
@@ -443,7 +443,7 @@
     padding-block-start: var(--sp-2);
   }
 
-  /* A FIELD'S LABEL ABOVE IT (SYSTEM §6, Fields), 6 apart. */
+  /* A FIELD'S LABEL ABOVE IT, 6 apart. */
   .pair {
     display: flex;
     flex-direction: column;

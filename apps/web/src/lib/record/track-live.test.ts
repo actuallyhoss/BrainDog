@@ -114,7 +114,7 @@ test('a register two refs point at is walked once', async () => {
   assert.equal(things.length, 1, 'both `tracks` and `tasks` point at things, and it is read once');
 });
 
-/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26): under these three the screen drew the studio's own
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE: under these three the screen drew the studio's own
    thread, updates and runs under the thread number in the address. */
 test("a 401 at no slug is the record's sentence, not the sample's thread", async () => {
   const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));

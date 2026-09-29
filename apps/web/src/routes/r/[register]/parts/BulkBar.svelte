@@ -10,7 +10,7 @@
   rather than in the stylesheet once swallowed this into the card arm, so a desktop selection raised
   no bulk bar at all. The page draws it whichever body is on the screen.
 
-  IT IS CHROME THAT FLOATS (SYSTEM §5): a glass pill at the bottom centre of the window, over the list, with the count,
+  IT IS CHROME THAT FLOATS: a glass pill at the bottom centre of the window, over the list, with the count,
   the verbs and Esc to let go. Its glass is on a pseudo-element, because a `backdrop-filter` makes its element the box
   every fixed descendant is placed against, and the state menu is one. Glass never holds glass, so the verbs in it are
   the quiet wash pills.
@@ -46,7 +46,7 @@
     saidInLine: (field: string, value: string) => string;
     copyIds: () => void;
     setPickedState: (state: string) => void;
-    /** Absent for a caller whose level cannot change the list, and Archive is then not on the bar (COL-13). */
+    /** Absent for a caller whose level cannot change the list, and Archive is then not on the bar. */
     archiveSelected?: (() => void) | undefined;
     onclear: () => void;
   } = $props();
@@ -169,7 +169,7 @@
     display: inline-flex;
   }
 
-  /* The menu rows: 32 tall with the same wash on hover as every menu row (SYSTEM §6). */
+  /* The menu rows: 32 tall with the same wash on hover as every menu row. */
   .mi {
     display: flex;
     align-items: center;

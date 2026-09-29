@@ -30,8 +30,8 @@ test('the inspector names the field as the id of the queued run, with no answer 
   assert.doesNotMatch(as.label, /answer/u);
 });
 
-/* THE CANVAS AND THE LINT BOTH TAKE A SCRIPT STEP WITH NO NAME, and a new step starts without one. Until 24 September
-   the lint refused `{ script: { id: 'tidy' } }` ("steps[0].script.as is undefined, and an answer's name is ...") though
+/* THE CANVAS AND THE LINT BOTH TAKE A SCRIPT STEP WITH NO NAME, and a new step starts without one. The lint once
+   refused `{ script: { id: 'tidy' } }` ("steps[0].script.as is undefined, and an answer's name is ...") though
    the runner writes `vars[as]` only when `as` is a string, so this test used to pin the canvas to that refusal. The lint
    now escapes `undefined` as `call` does (`packages/kernel/test/flow-lint-script-as.test.ts` runs such a step), and
    this held red on the canvas's own `required` and on `blankStep` seeding `as: ''` until both were dropped. A seeded ''

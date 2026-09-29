@@ -1,6 +1,6 @@
 /**
  * Which host panel a block carries under it: the project's scheduled actions, the key its numbers are sent with, or
- * none (`loop/finish/pages.md` R3, contracts §4.3).
+ * none.
  *
  * A PANEL IS NAMED, NOT FOUND BY ITS HEADING. The reader drew Resume and the report key under any section whose heading
  * was the exact English "Runs on", and the report key and the poll form under "Send numbers here". Renaming a section,
@@ -9,7 +9,7 @@
  * row (`for:`), which is the row the panel is about.
  *
  * NO HEADING IS READ ANY MORE. The two old headings were read where no `panel` was said, until every first-party
- * declaration named its panel; since portfolio's project template and founder 1.8.0 do (PGS-22), a section that names
+ * declaration named its panel; since portfolio's project template and founder 1.8.0 do, a section that names
  * none draws none. A record still on an older version draws its sections without the panel until it takes the update,
  * which is offered and never forced.
  *

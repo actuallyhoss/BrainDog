@@ -2,13 +2,13 @@
   One list of steps: the column under the trigger, or one arm of a branch. A branch draws its two arms as two columns
   under its card, each of them this component again, so the whole canvas is this file and `FlowCard` and nothing else.
 
-  THE JOINS ARE A BORDER, NOT A DRAWING. §1.8 of the research found nothing in the app that draws connectors between
+  THE JOINS ARE A BORDER, NOT A DRAWING. There is nothing in the app that draws connectors between
   nodes, and nothing needs to: a vertical flow's hairline is each gap's own border, and an "Add a step" circle sits on
   it between every two cards, which is where Zapier puts its plus and where a thumb looks for one.
 
   A BRANCH FORKS AND JOINS, AND BOTH ARE BORDERS TOO. Before this, the arms hung from a second hairline 16px in from the
   left and each arm drew its own spine at its own centre: three vertical lines at three x positions, nothing leaving
-  the branch card and nothing coming back to the column (`loop/research-canvas-ux.md` 1.9). Now a stem leaves the
+  the branch card and nothing coming back to the column. Now a stem leaves the
   card's centre, one box drawn with a top and a bottom border spans the two arms' centres (the fork above them, the
   join under them), and "Then, either way" hangs from the join's centre where the column carries on. The runner does
   carry on there whichever arm it took (`packages/kernel/src/flow.ts` `plan`), and a stranger who cannot see that
@@ -23,7 +23,7 @@
   could otherwise never be filled by one. It used to be a 28px circle over a dashed "Nothing yet" box, two things to
   read where one pill says both what is missing and what to press (1.10).
 
-  THE CONNECTORS ARE `--rule` LINES (SYSTEM §2, the line that reads on the ground): the cards are tiles on the ground,
+  THE CONNECTORS ARE `--rule` LINES (the line that reads on the ground): the cards are tiles on the ground,
   and the wires between them are drawn in the ground's own hairline, never a box or a colour.
 
   SIDE BY SIDE WHERE THERE IS ROOM, STACKED WHERE THERE IS NOT, and the room is the column's, not the window's. The

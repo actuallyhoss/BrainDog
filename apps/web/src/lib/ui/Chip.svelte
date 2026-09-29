@@ -27,7 +27,7 @@
 </span>
 
 <style>
-  /* A STATUS IS A 6px DOT AND ITS WORD (SYSTEM §6, Badges), and nothing round them. The pill on the hold wash is gone:
+  /* A STATUS IS A 6px DOT AND ITS WORD, and nothing round them. The pill on the hold wash is gone:
      the only filled badge in the product is the red square count (`Count.svelte`), and a row of washed capsules beside
      a page's one primary was the loudest thing on Decide, a thread and a run.
 

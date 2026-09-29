@@ -1,7 +1,7 @@
 /**
  * Keeping an offer from the holding pen, and putting it back.
  *
- * `pages.md` PGS-16: "Keep it" is the owner's `setDeclaration` of the offer's whole declaration, with Put back. So this
+ * "Keep it" is the owner's `setDeclaration` of the offer's whole declaration, with Put back. So this
  * reads what stands at that id first, writes the offer against the version it read (a page somebody changed in between
  * is a conflict, said as the page having moved, rather than an overwrite), and hands back the one call that restores
  * what it read: the old body at the version the keep made, or, for a page that was not there, the page retired.

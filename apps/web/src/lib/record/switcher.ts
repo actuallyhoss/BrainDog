@@ -47,7 +47,7 @@ export const levelWord = (row: SwitcherRow): string | null => (row.level === nul
 const isAnswer = (v: unknown): v is Answer<unknown> =>
   typeof v === 'object' && v !== null && 'ok' in v && ((v as { ok: unknown }).ok === true ? 'value' in v : 'refusal' in v);
 
-/* ONE SENTENCE FOR EVERY TRANSPORT FAILURE, THE SAME ONE A SCREEN SAYS (design SYS-8). This said "This host answered
+/* ONE SENTENCE FOR EVERY TRANSPORT FAILURE, THE SAME ONE A SCREEN SAYS. This said "This host answered
    nothing recognisable.", which is the transport's view of the fault and nothing a person can act on; it was drawn as
    content wherever the list of records is shown. */
 const unreachable = (): Answer<never> => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: copy.readOffline } });
@@ -78,7 +78,7 @@ export type Opened = { from: 'opened'; to: string } | { from: 'absent' } | { fro
  *
  * THE SESSION ROW MOVES AND THE COOKIE DOES NOT, and the answer says where to go: `/app/<slug>/`, which names the record
  * opened in the address. The caller used to reload the page it was on, whose address named no record, so a second tab
- * on the first record silently began reading and writing the second one (`research-one-domain.md` §2.4). The switch
+ * on the first record silently began reading and writing the second one. The switch
  * still happens, because it is what `/app` with no slug opens next time.
  *
  * `/auth/switch` AND `/account/records` ARE AT THE ROOT, under no slug: they are the person's, not a record's.

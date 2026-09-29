@@ -8,7 +8,7 @@
  * the record moved underneath, so the screen reads it again before anybody presses twice.
  *
  * THERE WAS A THIRD, `sample`, for a host with no record behind it (`UNREACHABLE`, `UNAUTHORIZED`), and the screen
- * answered it with the demo's "nothing was saved yet". There is no sample now (DIRECTION 26), so those are refusals like
+ * answered it with the demo's "nothing was saved yet". There is no sample now, so those are refusals like
  * any other, carrying the sentence the client wrote for them: "The record could not be reached: ..." or the host's own.
  *
  * These are ADMIN methods, so a browser session. A token, or somebody who is not an owner, is refused
@@ -224,7 +224,7 @@ export const inviteLink = (origin: string, token: string): string => `${origin.r
  *
  * ONE OR THE OTHER, NEVER AN EMPTY MAP. The record refuses an invitation that gives nothing, and a screen that could
  * send `{ registers: {} }` would only be asking for that refusal. Lists are sent as the map the record keeps
- * (`registers`, contracts X12), never as an array.
+ * (`registers`), never as an array.
  */
 export type InviteReach = { level: Level } | { registers: Record<string, Level> };
 
@@ -284,7 +284,7 @@ export async function withdrawInvite(base: string, id: string, io?: Fetch): Prom
  * Connect an agent: a write token for `days`, named by its label, that reads the money inbox only when the owner said so.
  *
  * THE INBOX IS OFF UNLESS IT WAS CHOSEN, AND THEN IT IS NAMED. The record lets an owner's whole-record token read
- * `inbox` when its row carries that reach (DIRECTION section 30, P2), and this screen always minted `{ scope, label,
+ * `inbox` when its row carries that reach, and this screen always minted `{ scope, label,
  * days }`, so no token made here could ever read it. `reach` is left out rather than sent empty when the switch is off,
  * so what is sent for an ordinary agent is byte for byte what it was.
  */

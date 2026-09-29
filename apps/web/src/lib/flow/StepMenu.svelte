@@ -15,12 +15,12 @@
   "Nothing yet" box gone the pill is the only thing there to light up, so it takes the ink ring the landing line between
   two cards is drawn in.
 
-  BOTH ARE SMALL NODES ON THE WIRE: the tile's white at its first depth, on the `--rule` connector (SYSTEM §4, §6).
+  BOTH ARE SMALL NODES ON THE WIRE: the tile's white at its first depth, on the `--rule` connector.
 
   ASK SLASH IS OFFERED WHERE A MODEL IS, read from the layout's `slash` here rather than passed down through `FlowList`,
   because every menu on the canvas asks the same question of the same tab and none of the lists between has a use for it.
 
-  ON A PHONE IT IS A SEARCHABLE SHEET, WITH A LINE SAYING WHAT EACH STEP DOES (EDT-2). Nineteen verbs in an action sheet
+  ON A PHONE IT IS A SEARCHABLE SHEET, WITH A LINE SAYING WHAT EACH STEP DOES. Nineteen verbs in an action sheet
   are a long scroll of labels ("Come back later", "Run a call on this row") that a stranger has to guess at; the sheet
   puts a search box at the top, which reads the label and the line (`flow.ts` `STEP_HELP`), and a line under each. The
   width is the app's one answer to "cards or a table" (`body.svelte.ts` `rowsAsCards`), so a menu never asks
@@ -196,7 +196,7 @@
     white-space: nowrap;
   }
 
-  /* A GROUP'S HEADING IN THE MENU: sentence case at 500 in the meta size, never a letterspaced eyebrow (SYSTEM §3). */
+  /* A GROUP'S HEADING IN THE MENU: sentence case at 500 in the meta size, never a letterspaced eyebrow. */
   .group {
     margin: var(--sp-2) var(--sp-2) var(--sp-1);
     color: var(--dim);

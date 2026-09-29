@@ -1,5 +1,5 @@
 /**
- * Where the app lives, and which record an address names (`loop/research-one-domain.md` §2.4).
+ * Where the app lives, and which record an address names.
  *
  * THE APP IS `brain.dog/app` AND THE RECORD IS THE NEXT SEGMENT. `/app/acme/r/tasks` is acme's tasks, checked by the
  * Directory before any id is used; `/app/r/tasks` is the record the session is on, which is what the app meant by every
@@ -91,7 +91,7 @@ export const signinFor = (url: { pathname: string; search: string }): string =>
  * Where a refused `boot` sends the page instead of drawing it, or `null` to draw it.
  *
  * EVERY 401, UNDER A SLUG OR NOT. It was a 401 under a slug only, because `/app` with nobody signed in drew the sample
- * record the marketing site linked to. The sample is gone (DIRECTION 26), so the bare address asks for sign-in as
+ * record the marketing site linked to. The sample is gone, so the bare address asks for sign-in as
  * `/app/acme/…` always did, and `/start` with it: making a record needs somebody to own it. The answer is the same 401
  * whether acme exists or not, so the redirect says nothing about which names are taken. Sign-in and the other addresses
  * with no record are never sent, or sign-in would be sent to itself.
@@ -115,7 +115,7 @@ const HERE = 'https://here.invalid';
  *
  * THE SPELLING PASSED AND THE ADDRESS DID NOT. This checked the string as typed, so `/app/../auth/session`,
  * `/app/%2e%2e/api/export`, `/app/.%2e/in/x` and `/app/..` each started with `/app/` and each opened on this origin
- * outside the app (`loop/research-batch-forty-nine-audit.md` §8). Wave 50 resolved them in `signin.ts` alone, which
+ * outside the app. A first fix resolved them in `signin.ts` alone, which
  * left this function's own promise false for any other caller; so the rule is here, once, and sign-in calls it.
  *
  * A TAB, A NEWLINE OR A RETURN IS REFUSED BEFORE IT IS PARSED. The URL parser deletes them first, so `/\t/[` reads as

@@ -1,8 +1,8 @@
 /**
  * WHO A LOG LINE IS BY, AND WHO IT IS ABOUT, on a record with more than one person on it.
  *
- * `/audit` printed raw person ids in three places, and nobody caught it because every pass before
- * `loop/research-second-person.md` drove a record with one person on it, whose lines are all signed
+ * `/audit` printed raw person ids in three places, and nobody caught it because every earlier pass
+ * drove a record with one person on it, whose lines are all signed
  * `you`. Driven in process against a real record with eight people put on it by the record's own
  * `invite` (a scratch script, not a fixture: `createRecord` then seven `invite` calls then one
  * `acceptInvite`), `recentHistory` came back with 8 lines, and every one of the 8 `access.grant`

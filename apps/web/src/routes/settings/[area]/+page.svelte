@@ -1,7 +1,7 @@
 <!--
-  Settings as a place: the index of areas, and the one area the address names (DSN-13).
+  Settings as a place: the index of areas, and the one area the address names.
 
-  ONE COMPONENT PER AREA, in `areas/` (ARC-7b). This file used to draw every area itself, so any
+  ONE COMPONENT PER AREA, in `areas/`. This file used to draw every area itself, so any
   two of them could not be changed by two people at once and every style rule sat in one block
   with every other area's. It chooses an area and draws it now; each area keeps its own markup,
   state, handlers and styles, and what more than one area reads is in `settings-state.svelte.ts`.
@@ -162,7 +162,7 @@
   $effect(() => drew('ready'));
 
   /**
-   * THE SENTENCE UNDER THE TITLE (SYSTEM §5, SCREENS "Settings"): last night's copy and the month's allowance, said on
+   * THE SENTENCE UNDER THE TITLE: last night's copy and the month's allowance, said on
    * the index and on the two areas whose data it is, Billing and Backups. The phrase that needs him is red, and only
    * when something does. `health.ts` says what the answers mean.
    *
@@ -285,7 +285,7 @@
   }
 
   /* ONE COLUMN ON A PHONE, where the index and an area are each a page; the head to the first
-     content is 24px (design-brief §3, Space). */
+     content is 24px. */
   .settings-place {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

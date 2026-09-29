@@ -1,7 +1,7 @@
 <!--
   The hub's Scheduled tab: every call, poll and pull the record makes on a clock, in the words "Runs on" uses.
 
-  A TILE, THEN THE LIST ON THE GROUND (SCREENS, Automations). "Next up" is the next fourteen days with a dot on each day
+  A TILE, THEN THE LIST ON THE GROUND. "Next up" is the next fourteen days with a dot on each day
   an action is due, from each one's next turn on its own clock (`hub.ts` `nextWeek`), and the line under it says which
   is next and when. A paused action has no turns to draw; it leads the list, in its own group, because it is the one
   that needs a look.
@@ -55,7 +55,7 @@
     return {
       key: r.ingest,
       /* ITS ID IN WORDS, NEVER THE ID. An action declares no title, and a slug in a list of named automations one
-         tab over read as a different product (`loop/finish/design.md` 2.7 and SYS-3). */
+         tab over read as a different product. */
       name: humanize(r.ingest),
       what: whatOf(r),
       said: said.line,
@@ -100,7 +100,7 @@
 {/if}
 
 <style>
-  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6), at body size in ink. */
+  /* THE ONE LINE UNDER THE CHART that says what it means, at body size in ink. */
   .reading {
     margin: 0;
     color: var(--ink);

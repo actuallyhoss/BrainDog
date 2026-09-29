@@ -1,10 +1,10 @@
 /**
  * The count beside the hits, which is what stops `/search` printing the record's ceiling as a total.
  *
- * `loop/research-at-scale.md`, *Wrong, not slow* 3, driven at the owner's size: searching `revenue`
+ * DRIVEN AT THE OWNER'S SIZE: searching `revenue`
  * drew **100** beside the heading and **"All 100 in Datapoints"** beside the group while **140** rows
- * matched, counted against the record file itself. `the` matched 304 and said 100; `bake` matched 577
- * and said 100. The clamp in `fts.ts` is not the fault. The fault is that the record answered a bare
+ * matched, counted against the record file itself, and `the` matched 304 and said 100. The clamp in
+ * `fts.ts` is not the fault. The fault is that the record answered a bare
  * array, and a full page of a hundred is character-for-character the answer to a query with exactly a
  * hundred matches, so `groupsOf` had nothing to count but what it had been handed.
  *

@@ -1,9 +1,9 @@
 /**
- * Turning an add-on off and on, for `/packs` (`loop/research-modular.md` §4 step 6).
+ * Turning an add-on off and on, for `/packs`.
  *
  * THE RECORD OR ITS REFUSAL. The screen reads a `Source`, which is the record over HTTP. There was a
  * second one, a sample of six installed add-ons held in the tab with its own copy of which leans on
- * which, drawn when no record answered; it went with DIRECTION 26, and with no record the screen
+ * which, drawn when no record answered; it went with the sample, and with no record the screen
  * draws the record's own sentence for why.
  *
  * PURE, AND THEREFORE TESTABLE, for the reason `device.ts` gives: `node --test` cannot import a
@@ -27,10 +27,10 @@ export type PackState = { id: string; version: string | null; disabled_at: strin
 /** What `disablePack` and `enablePack` answer. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
 
-/** The seven types a setting may take (`loop/research-modular.md` §1.3). */
+/** The seven types a setting may take. */
 export type ConfigType = 'text' | 'enum' | 'bool' | 'money' | 'day' | 'duration' | 'number' | 'list';
 
-/** One setting as `packConfig` answers it. `max` bounds a `list`'s item count (contracts.md platform S, PLT-7). */
+/** One setting as `packConfig` answers it. `max` bounds a `list`'s item count. */
 export type ConfigDecl = { type: ConfigType; values?: readonly string[]; default?: unknown; label?: string; note?: string; max?: number };
 
 /** What `packConfig` answers: what the manifest declares, and the value each setting holds now. */
@@ -135,7 +135,7 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  * FOR THE RECORD IT GOES INTO, WHEN THE SCREEN KNOWS WHICH PACKS THAT RECORD HOLDS. People sent whole pointed at
  * Projects, so installing People alone was refused on a record without them; a link to a list the record will not
  * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And it carries no example rows
- * (`moduleDocument`, `loop/finish/modules.md` C11): a module added here never writes rows nobody typed.
+ * (`moduleDocument`): a module added here never writes rows nobody typed.
  */
 export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed/packs');
@@ -227,9 +227,9 @@ export async function installPlanned(
  * there was no record, so a signed-out `/packs` listed six add-ons nobody installed with switches that moved in the tab.
  * With no sample, the record's own refusal is the answer: a 401 says to sign in, a dead network says it was not reached.
  *
- * `_shell` IS HEARD AND NOT OBEYED. `/start` and `/packs/browse` still pass `!page.data.live`, and they are other briefs'
- * files; it can go once neither does. It was never a witness anyway: the refused shell is built by `layoutOf`, which sets
- * `live: true`, so since wave A every caller passed `false`.
+ * `_shell` IS HEARD AND NOT OBEYED. `/start` and `/packs/browse` still pass `!page.data.live`; it can go once neither
+ * does. It was never a witness anyway: the refused shell is built by `layoutOf`, which sets `live: true`, so every
+ * caller passed `false`.
  *
  * A REFUSAL IS THE RECORD'S OWN, ALL OF THEM. Falling back on `UNREACHABLE` is what once let `/start` believe it was on
  * the demo while the list that draws its rows was live, and a row typed against one is not a row the other will show.

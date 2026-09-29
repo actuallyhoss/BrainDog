@@ -1,6 +1,6 @@
 /**
  * The list shape every screen uses: rows sitting straight on the ground, grouped under a `Section` heading, with no
- * box round them (SYSTEM §6, "Lists are neither").
+ * box round them.
  *
  * It lives in one file rather than in each screen's `<style>` because it is one contract, not eight, and a rule
  * declared in a stylesheet that nothing emits reads as live and is what somebody edits by mistake (22 §7).
@@ -100,8 +100,8 @@
     }
   }
 
-  /* A ROW THAT ARRIVED WHILE THE READER LOOKED: the tint under it fades over a second and a half, and nothing moves
-     (SYSTEM §8). Under reduced motion it holds and then goes in one step. */
+  /* A ROW THAT ARRIVED WHILE THE READER LOOKED: the tint under it fades over a second and a half, and nothing moves.
+     Under reduced motion it holds and then goes in one step. */
   .line:is(.arrived, [data-arrived]),
   .ledger > li:is(.arrived, [data-arrived]) > .line {
     animation: line-arrived 1.5s var(--ease-out);
@@ -243,7 +243,7 @@
   }
 
   /**
-   * THE LEADING MARK (SYSTEM §6): a 20px round check for a task, a 32px icon well (`IconWell size="l"`) for anything
+   * THE LEADING MARK: a 20px round check for a task, a 32px icon well (`IconWell size="l"`) for anything
    * else, or a face. `.ledger-lead` gives the list a 32px lead column, so a check, a well and a face all start their
    * titles on one edge.
    */
@@ -354,7 +354,7 @@
     text-align: end;
   }
 
-  /* ON A PHONE A TWO-LINE ROW IS 60 (SYSTEM §9), the size a thumb reads a list at. */
+  /* ON A PHONE A TWO-LINE ROW IS 60, the size a thumb reads a list at. */
   @media (width < 900px) {
     .line-tall {
       min-block-size: 60px;
@@ -465,7 +465,7 @@
   }
 
   /**
-   * A THING'S MARK, DRAWN AND NOT TYPESET (DESIGN-SYSTEM APPENDIX C3).
+   * A THING'S MARK, DRAWN AND NOT TYPESET.
    *
    * The marks are the characters a project was given (a circle, a triangle, a diamond, a square), and
    * set as text each one came out of a different font at a different optical size: the circle as a

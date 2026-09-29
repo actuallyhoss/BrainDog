@@ -1,7 +1,7 @@
 # @braindog/web
 
 The browser client of the record. Every screen reads a real record through `/api`, and draws no
-sample of its own since `loop/DIRECTION.md` section 26.
+sample of its own.
 
 ```
 pnpm install

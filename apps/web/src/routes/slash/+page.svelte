@@ -1,7 +1,7 @@
 <!--
-  Slash: `/slash` (`loop/research-spark.md` S15, `loop/DIRECTION.md` §11).
+  Slash: `/slash`.
 
-  A HOME FOR ASKING FIRST (`loop/finish/agents.md` AGT-24). Where the host has a model the page opens with an Ask field, which
+  A HOME FOR ASKING FIRST. Where the host has a model the page opens with an Ask field, which
   runs the palette's two passes and draws the answer with `Cited`, and under it what was asked lately, each line reopening
   its proposal on Decide or asking its question again. What Slash noticed and suggests follows, as it was.
 
@@ -9,14 +9,14 @@
   BrainDog is used. Each suggestion says whether it is new, waiting on Decide or answered, and links there once asked. The
   press puts the new ones on Decide and changes nothing else: accepting is Decide's, and only the owner's.
 
-  THE LOOK (`loop/design/SYSTEM.md`, SCREENS "Slash"). The sentence under the title says what waits for him on Decide, in
+  THE LOOK, as the design system draws Slash. The sentence under the title says what waits for him on Decide, in
   red, then who drafts. The Ask tile leads: the field, and under it the answer with its sources, the rows it read drawn as
   rows, then Slash's sentence beside its face with the model named. Two tiles follow, "Suggestions" (the one figure, where
   each suggestion stands) and the daily check. Then the lists on the ground: what Slash suggests, with the screen's one
   primary, what it noticed in the live hue, what you answered, what you asked lately, and the describe field.
 
   THE RECORD IS ASKED WHATEVER THE SHELL SAYS. This screen used to look at `page.data.live` first and, on a shell that was
-  not live, say "This is the sample" without asking anything. With no sample (DIRECTION 26) a shell that is not live is a
+  not live, say "This is the sample" without asking anything. With no sample a shell that is not live is a
   record that refused or could not be reached, and `readSlash` hands back that refusal in the record's own words, which
   is the sentence this screen already draws for any other refusal.
 -->
@@ -58,7 +58,7 @@
   let asked = $state<Asked | null>(null);
 
   const suggestions = $derived(reading ? suggestionsOf(reading) : []);
-  /* WHAT SLASH SUGGESTED AND WHAT YOU ANSWERED, drawn apart (DSN-18): the first is still to act on, the second is done. */
+  /* WHAT SLASH SUGGESTED AND WHAT YOU ANSWERED, drawn apart: the first is still to act on, the second is done. */
   const stillOpen = $derived(suggestions.filter((s) => s.state !== 'answered'));
   const settled = $derived(suggestions.filter((s) => s.state === 'answered'));
 
@@ -73,7 +73,7 @@
   const tally = $derived(reading && !nothingYet(reading) ? tallyOf(suggestions, reading.waiting.length, reading.cap) : null);
 
   /**
-   * THE DESCRIBE FIELD (`loop/research-dynamic-layouts.md` §6 brief D2, `loop/finish/pages.md` PGS-12) is `AskPage`, the
+   * THE DESCRIBE FIELD is `AskPage`, the
    * same sheet a page's "Change this page" opens. It drafts with the record's `slashDraft`, which files nothing, and
    * draws each draft as the pages it would make before a press keeps it or puts it on Decide.
    *
@@ -82,7 +82,7 @@
    * NOT HELD BACK ON A YOUNG RECORD, as the plain press is: a description is the owner asking, and the record reaches the
    * model for it on any day, held to the month's asks like every other press.
    *
-   * THE FIELD HAS NO LENGTH OF ITS OWN (defects G2). The record is the one that counts: past its bound it refuses `asked`
+   * THE FIELD HAS NO LENGTH OF ITS OWN. The record is the one that counts: past its bound it refuses `asked`
    * at `VALUE_MALFORMED` with a sentence naming the bound, and that sentence is what the owner reads, with the
    * description still in the field to shorten.
    */
@@ -106,7 +106,7 @@
   }
 
   /**
-   * THE ASK FIELD AT THE TOP (`loop/finish/agents.md` AGT-24): a question about what the record holds, asked the way the
+   * THE ASK FIELD AT THE TOP: a question about what the record holds, asked the way the
    * palette asks it. Pass 1 reads the rows, drawn by code as links before any sentence; pass 2, only when a row or a
    * figure was read (`secondPass`), is Slash's sentence about them, drawn through `Cited` so no brace reaches the page.
    * The ask id goes back with pass 2 so the engine re-runs the predicate it drafted rather than drafting a second.
@@ -165,7 +165,7 @@
   }
 
   /**
-   * "Asked lately", C15's `asks` door (owner only, as this whole screen is). A refused or unreached list is left out
+   * "Asked lately", the record's `asks` door (owner only, as this whole screen is). A refused or unreached list is left out
    * rather than drawn as a sentence: the ask field above it still works, and the answer it draws says any refusal itself.
    */
   async function loadAsks() {
@@ -214,7 +214,7 @@
   {:else if phase === 'ready' && reading}
     {#if modelHere}
       <!--
-        THE ASK TILE LEADS (AGT-24): a question about what the record holds, and its answer in the same tile. The rows it
+        THE ASK TILE LEADS: a question about what the record holds, and its answer in the same tile. The rows it
         read come first, drawn by code as rows with the list each came from (`23 §7`); Slash's sentence about them follows
         beside its face, drawn through `Cited` so a figure opens its rows; the model is named under it (`23 §8`); and what
         Slash read folds away at the foot. No chart here: the tile holds no figure of its own, the answer carries its own.
@@ -327,7 +327,7 @@
     {#if tally || reading.daily}
       <div class="tiles">
         {#if tally}
-          <!-- THE ONE FIGURE: every suggestion by where it stands, one bar, and the line that reads it (SYSTEM §7). -->
+          <!-- THE ONE FIGURE: every suggestion by where it stands, one bar, and the line that reads it. -->
           <Tile icon="decide" title={pageWords.tileTitle} meta={pageWords.tileMeta}>
             <p class="figure num">{tally.total}<span class="figure-unit">{pageWords.unit(tally.total)}</span></p>
             <Stacked parts={tally.parts} subject={pageWords.tileTitle} />
@@ -406,7 +406,7 @@
     {/if}
 
     {#if !nothingYet(reading)}
-      <!-- WHAT SLASH NOTICED, in the one hue that means Slash's own lines (SYSTEM §2 `live`). Each is the record's own
+      <!-- WHAT SLASH NOTICED, in the one hue that means Slash's own lines (`live`). Each is the record's own
            reading of how this BrainDog is used, a sentence a person reads whole. -->
       <Section title={words.noticed} count={reading.noticed.length}>
         {#if reading.noticed.length === 0}
@@ -425,7 +425,7 @@
         {/if}
       </Section>
 
-      <!-- AND WHAT YOU ANSWERED, UNDER ITS OWN HEADING (DSN-18): what Slash suggested and what the owner already settled
+      <!-- AND WHAT YOU ANSWERED, UNDER ITS OWN HEADING: what Slash suggested and what the owner already settled
            are two lists. Each still opens its question on Decide, where the answer is. -->
       {#if settled.length > 0}
         <Section title={pageWords.answeredTitle} count={settled.length}>
@@ -480,7 +480,7 @@
     {/if}
 
     {#if reading.model !== null}
-      <!-- THE DESCRIPTION'S DRAFTS ARE DRAWN HERE, as a page's own "Change this page" draws them (PGS-12): each as the
+      <!-- THE DESCRIPTION'S DRAFTS ARE DRAWN HERE, as a page's own "Change this page" draws them: each as the
            pages it would make, beside the pages as they are, kept, asked on Decide or dropped from here. -->
       <Section title={changeWords.describeTitle}>
         <AskPage
@@ -505,7 +505,7 @@
     max-inline-size: 60rem;
   }
 
-  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart (SYSTEM §4), one over the other where two will not fit. */
+  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart, one over the other where two will not fit. */
   .tiles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
@@ -533,7 +533,7 @@
     letter-spacing: 0;
   }
 
-  /* THE ONE LINE THAT READS THE CHART (SYSTEM §6). */
+  /* THE ONE LINE THAT READS THE CHART. */
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
@@ -709,7 +709,7 @@
 
   /* ── the lists ────────────────────────────────────────────────────────── */
 
-  /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer (SYSTEM §6), and the hairlines either side step
+  /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer, and the hairlines either side step
      aside so the fill is one shape. */
   @media (hover: hover) and (pointer: fine) {
     .slash-list > li:hover > div.line {
@@ -739,7 +739,7 @@
     padding-block: var(--sp-2);
   }
 
-  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6): ink for new, which is his to put on Decide, and amber for one
+  /* A STATE IS A 6PX DOT AND ITS WORD: ink for new, which is his to put on Decide, and amber for one
      waiting there on him. */
   .slash-state {
     display: flex;

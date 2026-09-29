@@ -1,7 +1,7 @@
 <!--
   One step's card: a handle, what the step does in one line, and a menu of the moves.
 
-  A NODE IS A TILE (SYSTEM §6): the white surface at radius `--r-lg` and the first level of depth, sitting straight on
+  A NODE IS A TILE: the white surface at radius `--r-lg` and the first level of depth, sitting straight on
   the ground with the `--rule` connectors between it and the next. Its verb is the icon in a 28px well, the sentence is
   a row title, and the card's state is said by the well, which is the system's own language for it: the chosen card's
   well is ink (the rail's chosen place is drawn the same way), and a card with something wrong has a red well over the
@@ -49,7 +49,7 @@
 
   const said = $derived(sayStep(node.step));
   /* THE SENTENCE AS PARTS, so a value a step reads is a chip and not a word run into the words round it: the sample
-     said "Tell you: Gold is rate a gram" (`loop/research-canvas-ux.md` 1.6). `said` stays the plain join for every
+     said "Tell you: Gold is rate a gram". `said` stays the plain join for every
      label and the live region, where a chip has nothing to draw. */
   const parts = $derived(sayParts(node.step));
   const verb = $derived(verbOf(node.step));
@@ -226,7 +226,7 @@
   {/if}
 
   {#if paint}
-    <!-- THE WORD CARRIES THE OUTCOME AND THE DOT ONLY REPEATS IT (`loop/finish/design-brief.md` §5, a dot never stands
+    <!-- THE WORD CARRIES THE OUTCOME AND THE DOT ONLY REPEATS IT (a dot never stands
          alone). A step that did something says its answer; one that did not says the runner's sentence for why. -->
     <p class="paint">
       <span class="paint-dot" data-state={paint.state} aria-hidden="true"></span>
@@ -264,7 +264,7 @@
   }
 
   /* A FAULT IS A WORD UNDER THE CARD AND A RED WELL, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and
-     `loop/DESIGN-SYSTEM.md` 1.2 and 4.8 draw an intent as a word, a dot or a 16px glyph and an error as ink with a
+     the design system draws an intent as a word, a dot or a 16px glyph and an error as ink with a
      glyph, never as a wash; so the card stays white and each sentence under it leads with the glyph. */
 
   /* The one held: half there, so the column does not close up and move every other card under the pointer. */
@@ -328,7 +328,7 @@
     cursor: grabbing;
   }
 
-  /* THE SENTENCE, AS A ROW TITLE (SYSTEM §3): 15 at 500, after its verb's well. It wraps; a step is read whole. */
+  /* THE SENTENCE, AS A ROW TITLE: 15 at 500, after its verb's well. It wraps; a step is read whole. */
   .say {
     gap: var(--sp-2);
     min-inline-size: 0;
@@ -347,7 +347,7 @@
   }
 
   /* A VALUE THE STEP READS IS A CHIP IN THE SENTENCE, in the UI face and the meta size: `rate` and `what` are names a
-     person picked, not identifiers to copy, so not `--font-id` (`loop/DESIGN-SYSTEM.md` 2.1). The tile's inner fill,
+     person picked, not identifiers to copy, so not `--font-id`. The tile's inner fill,
      a pill, and no border. */
   .ref {
     display: inline-block;
@@ -374,7 +374,7 @@
   }
 
   /* WHAT IS WRONG, UNDER THE SENTENCE AND LINED UP WITH IT: red words at 500 after the glyph, because a fault is what
-     stands between him and the save (SCREENS, Automations: "faults say danger text with the glyph"). */
+     stands between him and the save ("faults say danger text with the glyph"). */
   .faults {
     grid-column: 1 / -1;
     margin: 0;
@@ -410,7 +410,7 @@
     font-size: var(--t-sm);
   }
 
-  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6), each in its meaning: done is green, what it would do out in the world
+  /* A STATE IS A 6PX DOT AND ITS WORD, each in its meaning: done is green, what it would do out in the world
      the second ink, parked on something amber, a failure red, and a step never reached a hollow ring. */
   .paint-dot {
     display: inline-block;

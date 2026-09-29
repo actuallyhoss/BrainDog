@@ -4,7 +4,7 @@
  * A ROUTE-ONLY MODULE, like `row-live.ts`: the client carries the route table as a value, so only the two register
  * screens that write import it.
  *
- * ONLY A LIVE SCREEN CALLS THIS, and since the sample record went (DIRECTION 26) every screen is live.
+ * ONLY A LIVE SCREEN CALLS THIS, and since the sample record went every screen is live.
  *
  * THE VALUES GO OUT IN THE RECORD'S SPELLING AND COME BACK IN THE SCREEN'S. The screen holds a ref as the number a
  * person says and an enum as whichever spelling the address carried; the record stores the target row's ULID and the
@@ -81,7 +81,7 @@ export function outbound(register: string, fields: Fields, refs: ReadonlyMap<str
  * A number as a person types it: an optional leading minus, digits with grouping commas in threes, and one point.
  *
  * `Number()` READ MORE THAN A PERSON WRITES. It takes "0x10" as sixteen and "1e3" as a thousand, so a box holding either
- * wrote a figure nobody typed, and the record cannot tell, because it reads a decimal the same way (defects M11). A
+ * wrote a figure nobody typed, and the record cannot tell, because it reads a decimal the same way. A
  * comma anywhere but between groups of three is refused rather than dropped: "1,5" is one and a half where the comma is
  * the decimal mark and fifteen where it is not, and a guess either way writes a figure somebody did not mean.
  */
@@ -195,7 +195,7 @@ export function holdInPlace(entries: readonly Entry[], held: ReadonlyMap<number,
  * undoes did: a ref as the number a person says, an enum as the address spelled it.
  *
  * AND THE FINISHED DAY, WHEN THE CHANGE MOVED THE STATE, because the record wrote it in the same write (the kernel's
- * `finished.ts`). Measured against a real kernel on 24 September: a task done on 1 September, reopened and put back
+ * `finished.ts`). Measured against a real kernel: a task done on 1 September, reopened and put back
  * with the state alone, came back done on the day of the put back, since a move into done that names no day is dated
  * today. Naming the day it held, or `null` when it held none, is a day the write says itself, which the record keeps.
  * A change that left the state alone left the day alone too, so its inverse does not name it.

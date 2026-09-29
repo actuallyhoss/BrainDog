@@ -4,13 +4,13 @@
   the value it would have. The words `Before` and `After` are still read to a screen reader.
 
   A SHORT CHANGE WAS A TWO-ROW TABLE, "Before building / After earning", which is a form to read and
-  not a change to see (DESIGN-SYSTEM D4). One line with the old value struck is how Linear and GitHub
+  not a change to see. One line with the old value struck is how Linear and GitHub
   say it, and the eye takes it in one fixation.
 
   `compact` IS THE QUEUE'S. There a long diff folds to its name and its count of lines, so the answer
   buttons for a proposal sit under its title and not a screen below it; the gate draws it whole.
 
-  A MOVE OF WHERE A ROW APPLIES IS TWO CHIPS (agents C8): "Where it applies: Kiln → Everywhere", each the project's
+  A MOVE OF WHERE A ROW APPLIES IS TWO CHIPS: "Where it applies: Kiln → Everywhere", each the project's
   mark and name or the globe, and never the two row ids the proposal carries. The projects are read once a list for
   the tab (`scope-move.ts` `placesIn`); until they arrive, and for a project this reader cannot see, a side reads
   "A project".

@@ -1,9 +1,9 @@
 /**
- * `where.ts` after ARC-2: the record's sentence, read by the record's own parser, and printed back as an address.
+ * `where.ts`: the record's sentence, read by the record's own parser, and printed back as an address.
  *
  * WHAT THIS FILE USED TO HOLD AND WHY MOST OF IT WENT. It held the browser's second compiler and its matcher to the
  * record, sentence by sentence and row by row, because two engines read one grammar. `compile` is `parseWhere` now and
- * the matcher is deleted with the browser's engine (`loop/finish/architecture.md` ARC-1, ARC-2), so the cases that
+ * the matcher is deleted with the browser's engine, so the cases that
  * counted rows through `matches` went with it, and so did the differential against a real kernel, which would have
  * compared the record's parser with itself. What a sentence means is `packages/where`'s to test, and is tested there.
  *

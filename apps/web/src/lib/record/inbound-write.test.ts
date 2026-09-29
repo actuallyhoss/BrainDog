@@ -119,7 +119,7 @@ test('A HOST WITH NO MINT DOOR SAYS SO, and does not read as a record that said 
 
 test('NO SIGN-IN IS signin, and a host that answered nothing a record says is a record not reached', async () => {
   /* ALL THREE WERE THE SAMPLE when the address named no record, and the screen answered them with the demo's sentence
-     about having no account. There is no sample now (`DIRECTION.md` §26). A 401 is a person who is not signed in, and
+     about having no account. There is no sample now. A 401 is a person who is not signed in, and
      the screen already has the state for that: the sign-in button, then the same press again. */
   const bare = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in.' } }));
   assert.deepEqual(await mintInbound(BASE, bare.io), { kind: 'signin', fix: 'Sign in.' });
@@ -157,7 +157,7 @@ test('THE ONLY COPY OF THE TOKEN IS THE ONE ON SCREEN', () => {
 
 test('THE MINT IS BUILT AND AN OWNER CAN NOW REACH IT', () => {
   /**
-   * Finding 1 of `loop/research-batch-three-audit.md`, as an assertion. Before this change the two greps below
+   * An audit finding, as an assertion. Before this change the two greps below
    * found nothing in `apps/web`: `/api/inbound/mint` and `/api/inbound/revoke` existed, were tested in
    * `apps/worker/test/route.test.ts`, and had no caller a person could reach.
    */

@@ -1,5 +1,5 @@
 /**
- * What the list says about itself (SYSTEM §5, §6): the sentence under its title, the lanes of its board, and the
+ * What the list says about itself: the sentence under its title, the lanes of its board, and the
  * figures its summary tile draws. Every one turns on its arguments alone, so the register below is written here rather
  * than read from a module, and the record's instant is fixed: 29 September 2026 at 09:00 UTC.
  */

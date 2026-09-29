@@ -16,7 +16,7 @@ test('WHAT WAS HANDED BACK TO BE CHECKED COMES AFTER THE LATE WORK, and each tas
     [row(1, { what: 'Late', by: '2026-09-27', thing: 'p1', priority: 'high' }, { version: 4 })],
     [row(3, { what: 'Urgent' })],
     TODAY,
-    new Map([['p1', 'acme.example']]),
+    new Map([['p1', 'Portage']]),
     [row(2, { what: 'Check it', state: 'review', agent: 'claude' })],
     new Map([['p1', 30]]),
   );
@@ -29,11 +29,11 @@ test('THE NEXT TWO WEEKS: after today, inside the window, soonest first, and nev
     [row(1, { what: 'Today', by: TODAY }), row(2, { what: 'Friday', by: '2026-10-02', thing: 'p1' }), row(3, { what: 'Tomorrow', by: '2026-09-30' }), row(4, { what: 'Too far', by: '2026-10-20' }), row(5, { what: 'Shown', by: '2026-10-01' })],
     TODAY,
     '2026-10-13',
-    new Map([['p1', 'acme.example']]),
+    new Map([['p1', 'Portage']]),
     new Map([['p1', 30]]),
     new Set([5]),
   );
-  assert.deepEqual(out.map((d) => [d.seq, d.day, d.project, d.hue]), [[3, '2026-09-30', null, null], [2, '2026-10-02', 'acme.example', 30]]);
+  assert.deepEqual(out.map((d) => [d.seq, d.day, d.project, d.hue]), [[3, '2026-09-30', null, null], [2, '2026-10-02', 'Portage', 30]]);
 });
 
 test('THE RUNS OF THE DAY: a span from when each opened, from midnight at the earliest, to its last word or to now while it works', () => {

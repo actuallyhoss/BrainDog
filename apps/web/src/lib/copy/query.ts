@@ -1,7 +1,7 @@
 /**
- * The query builder's words (GAP-2): `lib/query/QueryBuilder.svelte` and the surfaces that mount it.
+ * The query builder's words: `lib/query/QueryBuilder.svelte` and the surfaces that mount it.
  *
- * A NEW AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads it into `copy`, and every key here is read as a
+ * A NEW AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads it into `copy`, and every key here is read as a
  * literal `copy.<key>` by the builder or a surface that mounts it, so `dead-copy` sees each one drawn. Plain Node loads
  * this file through the aggregate (`passkey.mjs`), so it imports nothing.
  *
@@ -9,7 +9,7 @@
  * copy, and `lib/query/tree.ts` keeps each one beside the `where` operator it says, so the two cannot drift apart.
  */
 
-/* ── GAP-2: the query builder ───────────────────────────────────────────── */
+/* ── the query builder ──────────────────────────────────────────────────── */
 
 export const query = {
   /** The group's own control: how its conditions join. A condition row says the rest of the sentence. */

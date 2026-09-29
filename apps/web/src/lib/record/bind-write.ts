@@ -21,7 +21,7 @@ import { copy } from '../copy.ts';
 import { saveArrangement, schemaOf, type Added, type Arranged, type Placed } from './page-write.ts';
 import { pagesReader, type Fetch } from './pages-live.ts';
 
-/** Kept here rather than in `copy.ts`, which no builder in this wave owns. */
+/** Kept here rather than in `copy.ts`, so this module owns its words. */
 export const words = {
   bound: (kind: string, page: string) => `Added a ${kind.toLowerCase()} to ${page}.`,
   moved: 'This page changed while the sheet was open. Open the sheet again to see it as it is now.',
@@ -64,7 +64,7 @@ export function unkept(predicate: string, says: string, list: string): string | 
  * THE PAGE'S OWN ADDRESS AS THE SUBJECT IS NOT AN ID TO TRANSLATE AWAY, it is the page's name spelled for an agent. The
  * block ceiling reads `page.work declares 25 blocks. The ceiling is 24: a page longer than that is a report.`, and every
  * sentence naming `page.<slug>` used to become "Work did not take the block", which threw away the reason and the number
- * she needed to take a block off first (audit sixty-six, 10). So the leading address becomes the title, and the sentence
+ * she needed to take a block off first. So the leading address becomes the title, and the sentence
  * is kept when nothing else in it is an id; one that still names another address or an index is translated as before.
  */
 function owned(fix: string, to: Destination): string {

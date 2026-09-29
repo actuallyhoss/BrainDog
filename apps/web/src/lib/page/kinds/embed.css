@@ -3,7 +3,7 @@
  * design or a map, first as a facade (its title, whose it is, a Load button) and, once pressed, as the provider's frame.
  *
  * THE FACADE AND THE FRAME ARE ONE SIZE, the aspect the author named (`data-aspect`), so pressing Load swaps what is in
- * the box and moves nothing under it. The box is the block's full width at every width, as C4 says; a tall `9:16`
+ * the box and moves nothing under it. The box is the block's full width at every width; a tall `9:16`
  * alone is held to a phone's width, since at 1440 a full-width portrait frame would be taller than the screen.
  *
  * Nothing here loads anything: the renderer puts the frame on the page only on the press.

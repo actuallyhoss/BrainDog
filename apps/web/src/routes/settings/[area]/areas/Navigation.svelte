@@ -258,7 +258,7 @@
 {/snippet}
 
 <Section title={copy.navShape}>
-  <!-- ON A PHONE THE SHAPE IS ONE SENTENCE (DSN-13). A phone always draws the tab bar, so a picker there offers a choice
+  <!-- ON A PHONE THE SHAPE IS ONE SENTENCE. A phone always draws the tab bar, so a picker there offers a choice
        the phone would not draw; `wide-only` (`settings.css`) leaves the picker to the screens that use it. -->
   <div class="wide-only">
     <p class="hint">{copy.navShapeHint}</p>

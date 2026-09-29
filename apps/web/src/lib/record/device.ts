@@ -8,11 +8,11 @@
  * THE RECORD'S SHAPE AND NOTHING ELSE. The kernel names a grant by a handle and never by its poll id,
  * and five wrong codes leave rows `denied`. The screen draws `listDevices` and `listTokens` as they
  * come back. It also drew the sample's machines and keys, converted into those rows, until the sample
- * went on 25 September (DIRECTION 26).
+ * went.
  *
  * NO APPROVAL IS SIMULATED. The kernel owns the arithmetic of a wrong guess and tests it.
  *
- * AND WHAT IS CONNECTED IS ONE LIST (`loop/finish/agents.md` AGT-8). A machine signed in by six digits, a key minted
+ * AND WHAT IS CONNECTED IS ONE LIST. A machine signed in by six digits, a key minted
  * for a script and an app let in through OAuth are three ways of letting something act on the record, and the owner's
  * question is the same about each: what is it, what can it do, when did it last work, and how do I stop it. So
  * `connected` folds the record's two lists, and the runs they opened, into rows that answer those four.
@@ -44,9 +44,9 @@ export type TokenRow = {
   last_surface: string | null;
   expires_at: string | null;
   revoked_at: string | null;
-  /** Present when the operator's cut-off ended it (OPS-10): it can do nothing, and the list says why. */
+  /** Present when the operator's cut-off ended it: it can do nothing, and the list says why. */
   ended_by?: 'operator';
-  /** Whose token this is, for the owner's `listTokens` (COL-10). Absent on a host older than the field. */
+  /** Whose token this is, for the owner's `listTokens`. Absent on a host older than the field. */
   person_name?: string | null;
 };
 
@@ -158,11 +158,11 @@ export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((
  *
  * `mcp` IS THE ADDRESS ANY MCP CLIENT TAKES, and `claude` is the same address as Claude Code's own command for it: an
  * HTTP server, which the stdio line this printed before could not be, because it named a `braindog` that only a
- * checkout of the repository had (`loop/finish/agents.md` §3 item 2).
+ * checkout of the repository had.
  *
  * THE SETUP LINE NAMES THE RECORD when the screen knows it. The Cloud device flow is refused without a slug, and a line
  * with the bare origin did not work where most people would paste it. `setup` logs in, installs the hooks, registers
- * the MCP server and syncs the skills in one command (contracts §8.4, X55).
+ * the MCP server and syncs the skills in one command.
  */
 export function connectLines(origin: string, slug?: string | null): { mcp: string; claude: string; setup: string } {
   const mcp = `${origin}/mcp`;
@@ -284,8 +284,8 @@ const own = (map: Readonly<Record<string, string>>, key: string | null): string 
 /**
  * What a connection is called.
  *
- * A MACHINE IS WHAT RUNS ON IT, "Claude on studio-pc", from the newest run its key opened, because the label a machine
- * signs in with is the command's own (`studio-pc · braindog-cli`) and says nothing about the agent. A key and an app keep
+ * A MACHINE IS WHAT RUNS ON IT, "Claude on STUDIO-PC", from the newest run its key opened, because the label a machine
+ * signs in with is the command's own (`STUDIO-PC · braindog-cli`) and says nothing about the agent. A key and an app keep
  * the name they were given, which the owner typed or the app registered ("claude.ai"): that name was chosen.
  */
 export function nameOf(c: Connection): string {

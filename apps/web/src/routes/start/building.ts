@@ -1,6 +1,6 @@
 /**
  * What the first run says while the BrainDog builds: which parts are on and why, the one question left, the words the
- * person typed with what each became, and the currencies worth offering first (`loop/design/SCREENS.md`, Start).
+ * person typed with what each became, and the currencies worth offering first.
  *
  * EVERY LINE IS READ OFF THE PROPOSAL, NEVER WRITTEN FOR IT. A part is on because a phrase asked for it, a use case
  * stands on it or the person turned it on; an entry is in a part because the sentence filled it; a currency is offered

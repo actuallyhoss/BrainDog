@@ -1,5 +1,5 @@
 /**
- * Where the app lives on `brain.dog`, and which record an address names (`loop/research-one-domain.md` §2.4, §3.2).
+ * Where the app lives on `brain.dog`, and which record an address names.
  *
  * THE RECORD IS IN THE PATH NOW, AND THE DATA DOES NOT KNOW IT. A rail address, a nav-prefs key and a `{{ref:…}}` are
  * stored as `/r/<list>` and `/p/<page>` inside the record, so every one of them is still record-relative, and the prefix
@@ -100,7 +100,7 @@ test('sign-in comes back to the address it was sent from, and never to one somew
 });
 
 /* THE SPELLING IS NOT THE ADDRESS. Each of these starts with `/app/` as typed, and each resolves on this origin outside
-   the app (`loop/research-batch-forty-nine-audit.md` §8). Wave 50 caught them in `signin.ts` only, so `onward()` called
+   the app. A first fix caught them in `signin.ts` only, so `onward()` called
    on its own still handed back every one while its comment said a next that leaves the app is dropped. */
 test('A NEXT IS JUDGED WHERE IT RESOLVES, so a dot segment however spelled cannot carry it out of the app', () => {
   for (const bad of ['/app/../auth/session', '/app/%2e%2e/api/export', '/app/%2E%2E/api/export', '/app/.%2e/in/x', '/app/..'])
@@ -123,7 +123,7 @@ test('THE BASE HERE IS THE BASE THE BUILD WAS GIVEN, and the build lands where t
 });
 
 /**
- * A 401 IS SENT TO SIGN-IN WHEREVER IT LANDS, slug or not (DIRECTION 26, `loop/research-no-sample.md` brief A2).
+ * A 401 IS SENT TO SIGN-IN WHEREVER IT LANDS, slug or not.
  *
  * `/app/` WITH NOBODY SIGNED IN WAS THE SAMPLE, and this test used to hold that it was left alone to draw it. The app
  * only ever shows a real record now, so the bare address asks for sign-in exactly as `/app/acme/` does, and `/start`

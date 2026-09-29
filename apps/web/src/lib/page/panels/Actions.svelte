@@ -1,7 +1,7 @@
 <!--
-  A project's scheduled actions, under "Runs on" (`loop/research-scheduled-actions.md` §6.1 and §6.2).
+  A project's scheduled actions, under "Runs on".
 
-  A LIST WITHOUT BOXES, in the the old tool feel: each action's name and this month's runs, what it does
+  A LIST WITHOUT BOXES: each action's name and this month's runs, what it does
   and how often with which key, and one calm sentence about where it stands. The project's own first;
   the ones for every project after, faintly, as the Keys, Tools and Skills beside them do.
 
@@ -44,7 +44,7 @@
   let reproving = $state(false);
 
   /* THE WALL CLOCK, AND ONLY IT. The sample's five actions were drawn at its own clock, 3 September, and said "Last ran"
-     against that; with no sample every row is the record's, dated by the record, and read against now (DIRECTION 26). */
+     against that; with no sample every row is the record's, dated by the record, and read against now. */
   const now = (): number => Date.now();
 
   async function load() {
@@ -143,7 +143,7 @@
       {#each split.own as row (row.ingest)}{@render item(row, false)}{/each}
       {#each split.everywhere as row (row.ingest)}{@render item(row, true)}{/each}
     </ul>
-    <!-- "RUNS ON" LINKS TO THE PROJECT'S OWN SLICE OF /JOBS (AGT-23): /jobs already filters on `?repo=`. -->
+    <!-- "RUNS ON" LINKS TO THE PROJECT'S OWN SLICE OF /JOBS: /jobs already filters on `?repo=`. -->
     {#if project}
       <Button weight="quiet" href={`/jobs?repo=${encodeURIComponent(project.title)}`}>{jobWords.headingFor(project.title)}</Button>
     {/if}

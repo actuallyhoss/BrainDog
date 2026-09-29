@@ -59,18 +59,18 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
   const api = apiBase(url);
   /* Read inside the record: the address is `/app/acme/start` and every rule below is written about `/start`. */
   const inner = here(url.pathname);
-  /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway (AGT-8). */
+  /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. */
   const spared =
     inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner.startsWith('/s/');
   const booted = await live.readBoot(api);
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
      `/app/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
-     sample business until DIRECTION 26 took it away. */
+     sample business until the sample left the app. */
   const signIn = booted.from === 'refused' ? signInFirst(booted.code, url) : null;
   if (signIn) redirect(307, signIn);
 
-  /* THE VOICE THE RECORD SPEAKS IN, from its use-case pack's settings (`loop/research-spark.md` §2.2). Asked once per
+  /* THE VOICE THE RECORD SPEAKS IN, from its use-case pack's settings. Asked once per
      `boot` answer and never awaited past a refusal: a record that cannot say speaks in the house voice. */
   await voice.listen(booted.from === 'live' ? booted.boot : null, api).catch(() => undefined);
   if (typeof document !== 'undefined') void import('$lib/theme/draw.ts').then((look) => look.draw(booted.from === 'live' ? booted.boot : null));
@@ -86,7 +86,7 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
            mark reaches) nulls it, and a colleague who may not read the record would be told the
            record is empty instead. The answer is right here, so it is passed. */
         live.refusedShell({ code: booted.code, fix: booted.fix });
-  /* THE RAIL SAYS THE RECORD'S NAME FOR EACH LIST, where its use case gives one (`loop/research-spark.md` S8). */
+  /* THE RAIL SAYS THE RECORD'S NAME FOR EACH LIST, where its use case gives one. */
   if (booted.from === 'live') {
     const words = voice.labels();
     shell.index.registers = shell.index.registers.map((r) => ({ ...r, name: voice.listNamed(words, r.id, r.name) }));
@@ -112,7 +112,7 @@ export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> 
 
      THE KERNEL'S OWN `session` LIST IS NOT ONE OF THEM. Every record declares it at open (migration 0002), so a count
      that included it was never zero and this redirect never fired: a fresh record opened on an empty Home instead of
-     the prompt (`loop/finish/modules.md` MOD-6). What is counted is the lists a person or a pack declared. */
+     the prompt. What is counted is the lists a person or a pack declared. */
   const declared = booted.from === 'live' ? booted.boot.registers.filter((r) => r.id !== 'session').length : null;
   if (declared === 0 && !spared) redirect(307, at('/start', url.pathname));
 

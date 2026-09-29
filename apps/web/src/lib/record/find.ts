@@ -127,7 +127,7 @@ export function terms(q: string): string[] | null {
  * A `function` AND NOT A `const`, and `tokensOf` too. The fixture (then `data.ts`) called `answers()`
  * while its own module body was still evaluating, so its run-log receipts counted the way the record
  * counts, and the two files imported each other, so a `const` arrow here was in its temporal dead zone
- * when that call landed. The cycle is gone since wave C1 (this file reads `held.ts`, and the fixture's
+ * when that call landed. The cycle is gone now (this file reads `held.ts`, and the fixture's
  * receipts count when they are read), and a hoisted declaration costs nothing, so it stays one.
  */
 function fold(text: string): string {

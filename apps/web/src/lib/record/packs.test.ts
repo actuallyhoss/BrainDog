@@ -152,7 +152,7 @@ test('EVERY OTHER REFUSAL IS READ AS WHAT THE SCREEN CAN SAY', () => {
 test('WITH NO RECORD THE SCREEN DRAWS THE RECORD’S OWN REFUSAL, and there is no sample left to draw instead', async () => {
   /* THE SHELL SAYING THERE IS NO RECORD USED TO MEAN NOTHING WAS ASKED, and six add-ons nobody installed were listed as
      this record's, switchable, with settings in sterling. Now the record is asked whatever the shell said, and a 401 or
-     a dead network is its sentence on the screen (DIRECTION 26). Start and browse still pass the shell's answer; it is
+     a dead network is its sentence on the screen. Start and browse still pass the shell's answer; it is
      heard and not obeyed. */
   const signIn = { ok: false as const, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } };
   const nobody = await choose(recordOf({ packs: signIn }), true);
@@ -368,7 +368,7 @@ test('A MODULE A USE CASE BRINGS IS ITS, even on a record where none speaks yet:
 test("A MODULE ALREADY HERE IS OFFERED IN A USE CASE'S WORDS ONLY WHEN THE USE CASE GIVES IT SOME, and with no example rows", async () => {
   const { relabelDocument } = await import('./packs.ts');
   const held = [{ id: 'money-core', version: '1.0.0', disabled_at: null, registers: ['accounts', 'obligations'] }];
-  /* A STUDENT GIVES MONEY THE PLAIN WORDS SINCE MOD-23, so Money is offered again in them; Services it leaves alone. */
+  /* A STUDENT GIVES MONEY THE PLAIN WORDS, so Money is offered again in them; Services it leaves alone. */
   assert.equal(await relabelDocument('estate', held, 'student'), null);
   assert.ok(JSON.stringify((await relabelDocument('money-core', held, 'student'))!.declarations).includes('Due to you'));
   assert.equal(await relabelDocument('people', held, 'personal'), null);

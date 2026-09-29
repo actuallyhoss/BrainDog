@@ -1,7 +1,7 @@
 /**
  * What `Panel.svelte` decides, in plain `.ts` so `node --test` can read it without mounting anything.
  *
- * THE PANEL HAS TWO FORMS (SYSTEM §5, §9). From 900px up it is docked at the window's end edge, beside the content,
+ * THE PANEL HAS TWO FORMS. From 900px up it is docked at the window's end edge, beside the content,
  * which narrows for it: a non-modal `<dialog>` opened with `show()`, so the list behind it keeps its keyboard and its
  * pointer. Below 900px it is a bottom sheet: the same `<dialog>`, opened with `showModal()`, over the scrim.
  *
@@ -9,7 +9,7 @@
  * do to match what was asked, and one of its answers is to reopen in the other form.
  */
 
-/** Below this the panel is a bottom sheet (SYSTEM §9, "Phone (below 900px)"). */
+/** Below this the panel is a bottom sheet. */
 export const NARROW = '(width < 900px)';
 
 export type Form = 'docked' | 'sheet';

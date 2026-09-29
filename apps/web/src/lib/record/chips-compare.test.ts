@@ -22,7 +22,7 @@
  * other test files pin the wide address.
  *
  * WHICH ROWS A SENTENCE ADMITS IS THE RECORD'S TO SAY, and the browser's matcher that used to answer it
- * here is gone with the browser's engine (ARC-2). What is left is what the browser prints: a chip
+ * here is gone with the browser's engine. What is left is what the browser prints: a chip
  * reads back as the clause it was spelled from, in the record's own parse.
  */
 

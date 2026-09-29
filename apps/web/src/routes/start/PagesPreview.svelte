@@ -1,14 +1,13 @@
 <!--
   Every page the first run would make, drawn before it is made: one row a page in a tile, each opening the page as the
-  record would draw it, with its layout, its rail and its tabs, over examples that are marked and never saved
-  (`loop/finish/pages.md` PGS-20).
+  record would draw it, with its layout, its rail and its tabs, over examples that are marked and never saved.
 
   THE RECORD DRAWS THEM, IN A REHEARSAL. Each call in `asked` is `previewChange`, which installs its lists and pages with
-  the examples inside a transaction it throws away (`loop/finish/contracts.md` `previewChange`), and each page it answers
+  the examples inside a transaction it throws away, and each page it answers
   goes through Decide's own conversion (`previewOf`) into the one page reader, in its inert `preview` mode. Nothing is
   kept, and nothing is written before the press beside the preview.
 
-  A TILE WITH A FIGURE HOLDS A CHART (SYSTEM §6): the count of pages, a stacked bar of where they sit on the side of the
+  A TILE WITH A FIGURE HOLDS A CHART: the count of pages, a stacked bar of where they sit on the side of the
   screen, and one line saying so. The pages are rows inside it, never cards in a tile. The page the record opens on is
   named first, as the one it opens on.
 
@@ -183,7 +182,7 @@
   }
 
   /* A ROW, NOT A CARD (a tile never holds tiles): a 32px well, the page and where it sits, and the whole row the
-     target, with the rounded wash under a pointer (SYSTEM §6). */
+     target, with the rounded wash under a pointer. */
   .card,
   .rail-row {
     display: flex;
@@ -241,7 +240,7 @@
     white-space: nowrap;
   }
 
-  /* THE ONE WRITTEN LINE under the chart and its rows (SYSTEM §6). */
+  /* THE ONE WRITTEN LINE under the chart and its rows. */
   .reading {
     margin: 0;
     color: var(--ink2);
@@ -250,7 +249,7 @@
   }
 
   /* A PAGE OPENED FROM ITS ROW FILLS A PHONE'S SCREEN, clear of the top and bottom insets, and is a wide sheet from
-     640px up: the tile's fill at radius 22, level two, over the plain scrim (SYSTEM §6, sheets and dialogs). */
+     640px up: the tile's fill at radius 22, level two, over the plain scrim. */
   .opened {
     box-sizing: border-box;
     inline-size: 100%;

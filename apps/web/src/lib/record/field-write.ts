@@ -1,7 +1,7 @@
 /**
  * Adding one field to a live list from the app: the body the record is sent, and the one or two calls that send it.
  *
- * DIRECTION §22, THE METADATA HALF: a field on a thing is not a column the core declares for everyone. A person adds a
+ * THE METADATA HALF: a field on a thing is not a column the core declares for everyone. A person adds a
  * project's domain at run time, and every row of the list has it from then on. Nothing in this build names the field.
  *
  * AN ADDITION AND NEVER A WHOLE LIST. The record takes a field-level change, `to: { add: { register, fields } }`, which
@@ -297,7 +297,7 @@ export async function renameField(base: string, register: string, field: string,
 
 /**
  * The words for adding a value to a closed list and for putting an edit back, kept here beside the calls they describe,
- * as `fieldWords` is, because nobody owns `copy.ts` in this wave (`loop/research-m4-app.md`, rules for the wave).
+ * as `fieldWords` is, so this module owns them rather than `copy.ts`.
  */
 export const valueWords = {
   add: 'Another value',
@@ -369,8 +369,8 @@ export async function addValue(base: string, register: string, field: string, va
  *
  * IT IS THE LIST'S `inverseOf` NOW, and not a copy of it, because the copy missed the finished day. A state edit moves
  * that day in the same write (the kernel's `finished.ts`), and a put back that named the state alone was a move into
- * `done` with no day, which the record dates today. Measured against a kernel on 24 September (audit sixty-five,
- * section 2, probe B1): a task done on 1 September, edited to `open` and put back, read `done on 2026-09-24`.
+ * `done` with no day, which the record dates today. Measured against a kernel whose clock read 24 September: a
+ * task done on 1 September, edited to `open` and put back, read `done on 2026-09-24`.
  * `finished-day-rest.test.ts` holds it. `decl` is the list's declaration, which names the state and the day; without
  * it nothing here knows which key is the state, and the put back is the fields the edit touched and nothing else.
  */

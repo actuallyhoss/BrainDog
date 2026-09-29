@@ -11,7 +11,7 @@
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE: a record without the work pack has no `tracks` at all, and being told
  * so is the honest answer to an address that names one. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw
- * the sample's thread instead; there is no sample now (DIRECTION 26).
+ * the sample's thread instead; there is no sample now.
  *
  * THE ROWS ARE HANDED BACK WHOLE AND FILTERED ON THE SCREEN, through the helpers `tracks.test.ts` pins
  * (`healthOf`, `updatesIn`, `runsIn`). Filtering here instead would be a second implementation of the

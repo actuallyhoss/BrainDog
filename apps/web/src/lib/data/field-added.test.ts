@@ -1,5 +1,5 @@
 /**
- * A field added to a list at run time, and whether it is still there after the tab moves on (DIRECTION §22).
+ * A field added to a list at run time, and whether it is still there after the tab moves on.
  *
  * TWO WAYS IT WAS LOST, both after `field-write.test.ts` had gone green. `voice.ts` `relabelAll` kept each list's
  * first declaration, which for a list the build ships is the bundle's, and drew it back over `REGISTERS` on every boot:
@@ -110,7 +110,7 @@ test('A LIST SCREEN OPENED FIRST IN A TAB HAS THE FIELD, and asks the record abo
 });
 
 /*
- * THE LIST SCREEN'S QUESTION SENT BEFORE THE ADD AND ANSWERED AFTER IT (`loop/research-batch-thirty-three-audit.md` §7).
+ * THE LIST SCREEN'S QUESTION SENT BEFORE THE ADD AND ANSWERED AFTER IT.
  * `learn` keeps the newest ticket per list, but the Source sent its `schema` first and took the ticket only once the
  * answer was back, so the slow, older answer carried a newer ticket than the add's and put Projects back without
  * `launched`: measured true after the add, false once the slow answer landed, false after the next boot.

@@ -1,12 +1,12 @@
 /**
- * THE HOUSE HOME: the page Home draws on a record that declares neither its use case's `home-<id>` nor a `home` page
- * (modules C8), and what Home does to whichever of the three it draws.
+ * THE HOUSE HOME: the page Home draws on a record that declares neither its use case's `home-<id>` nor a `home` page,
+ * and what Home does to whichever of the three it draws.
  *
  * A PAGE BODY OVER COMPUTED SOURCES ONLY, NAMING NO LIST. Every figure, question, run and deadline it shows is one the
  * record already answers across its lists (`figures.home`, `governance.open`, `sessions.live`, `deadlines`,
- * `activity`), so the web never knows a pack by the name of its list (shell.md USE-2). The record draws it with
+ * `activity`), so the web never knows a pack by the name of its list. The record draws it with
  * `previewPage`, which writes nothing, and Home hands the answer to `PageView` with `mode: 'home'`, so its questions are
- * answered in place and its writes stay on (contracts §11 X19).
+ * answered in place and its writes stay on.
  *
  * A PLAIN MODULE, so the body and the reshaping below are read by a test without a component.
  */
@@ -38,7 +38,7 @@ const HOUSE: HomeVoice = {
   nothingDue: words.nothingDue,
 };
 
-/** How far ahead "Coming up" looks, in days (modules MOD-8). */
+/** How far ahead "Coming up" looks, in days. */
 export const COMING_UP_DAYS = 14;
 
 /** How many questions "What needs you" draws before its count becomes the door to Decide. */
@@ -55,7 +55,7 @@ export function defaultHome(voice: HomeVoice = HOUSE): { page: string; title: st
     blocks: [
       /* THE FIGURES A PACK ASKED A PLACE ON HOME FOR (`home: 1..9`), at most four; hidden below when none did. */
       { kind: 'stat', heading: voice.rightNow, source: 'figures.home' },
-      /* ANSWERED WHERE THEY ARE SHOWN (MOD-9): the page's writes are on, so a queue draws `QueueAnswer`. */
+      /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
       { kind: 'queue', heading: voice.needsYou, source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting },
       /* THE RUNS STILL WORKING, one line each with the agent's face; hidden below when none is. */
       {
@@ -86,7 +86,7 @@ export function defaultHome(voice: HomeVoice = HOUSE): { page: string; title: st
   };
 }
 
-/** The house Home in the house voice (contracts §8.3). */
+/** The house Home in the house voice. */
 export const DEFAULT_HOME = defaultHome();
 
 const isFigures = (b: LiveBlock): boolean => b.source === 'figures.home';
@@ -187,7 +187,7 @@ export function leadOf(c: HomeCounts): string | null {
 }
 
 /**
- * THE LEAD LINE AS THE TITLE ROW'S SENTENCE (SYSTEM §5): the same words as `leadOf`, and the half that needs the
+ * THE LEAD LINE AS THE TITLE ROW'S SENTENCE: the same words as `leadOf`, and the half that needs the
  * reader named, so the head draws it red. Nothing needs him when only agents are counted, so that line has no red.
  */
 export function leadSaid(c: HomeCounts): { text: string; needs: string } | null {

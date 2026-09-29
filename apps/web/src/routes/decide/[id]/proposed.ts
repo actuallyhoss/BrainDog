@@ -6,7 +6,7 @@
  * trigger and steps, a script with where it calls out and its source, a summary with where it posts. A `pattern`
  * carries the rule an arrival suggested. Both were drawn as Accept and Reject under a title and nothing else,
  * so the one question Slash asks most, "shall I arrange this for you", was the one a person could not
- * see the answer to before saying yes (DIRECTION §11, DESIGN-SYSTEM D4).
+ * see the answer to before saying yes.
  *
  * THE WORDS ARE THE PERSON'S, NOT THE SCHEMA'S. `page`, `register`, `ingest` and `theme` are what the
  * declaration calls itself; a person sees a page, a list, a rule and a look, and nothing here assumes
@@ -29,7 +29,7 @@ type Row = Record<string, unknown>;
 export type Appears = {
   kind: string;
   title: string;
-  /** `tone: 'bad'` on a line that must be read in red, as a job kind that changes files is (agents AGT-23). */
+  /** `tone: 'bad'` on a line that must be read in red, as a job kind that changes files is. */
   lines: { label: string; value: string; tone?: 'bad' }[];
   /** A look's accent, so the preview can show the colour and not only its code. */
   accent?: string;
@@ -49,7 +49,7 @@ export type Proposed = {
   appears: Appears[];
   samples: number | null;
   change?: Row;
-  /** A `pattern`'s address in the builder, with its samples and its rule, for "Open in the builder" (PLT-10). */
+  /** A `pattern`'s address in the builder, with its samples and its rule, for "Open in the builder". */
   builder?: string;
 };
 
@@ -100,8 +100,8 @@ const callsOut = (line: string): string => line.replace(/^CALLS OUT /u, '');
 /**
  * A rule for what comes in: where from, how often, what it calls out with, and the list it files into.
  *
- * WHAT IT CALLS OUT WITH IS ITS FILED LINE, which names the key. Audit fifty-one found a pattern polling `api.goldapi.io`
- * every hour on the owner's `goldapi` drawn as a host and an interval, with no key anywhere on the screen.
+ * WHAT IT CALLS OUT WITH IS ITS FILED LINE, which names the key. A pattern polling `api.goldapi.io`
+ * every hour on the owner's `goldapi` was drawn as a host and an interval, with no key anywhere on the screen.
  */
 function ingest(id: string, body: Row, filed: readonly unknown[] = []): Appears {
   const lines: Appears['lines'] = [];
@@ -139,7 +139,7 @@ function stepLines(list: unknown, at: readonly string[], arm: string, out: Appea
     const here = [...at, arm === '' ? String(i + 1) : copy.proposalArmStep(arm, i + 1)];
     const said = isRow(step) ? sayStep(step) : sayStep({});
     const verb = isRow(step) ? verbOf(step) : null;
-    /* A `script` GOES ON WITHOUT WAITING, SO IT CARRIES THE DRY RUN'S SENTENCE; A `call` CARRIES NONE. Since AUT-2 a call
+    /* A `script` GOES ON WITHOUT WAITING, SO IT CARRIES THE DRY RUN'S SENTENCE; A `call` CARRIES NONE. A call
        parks the run until its answer comes back, and the run goes on (`flow.ts`), so the "not in this build: a run stops
        here" line it ended with was false; the step's own sentence says what it calls.
        NO `as:` IS HANDED ON. The sentence said what `as:` keeps when a step named one, because `sayStep` before it said
@@ -195,8 +195,8 @@ function script(id: string, body: Row, filed: readonly unknown[]): Appears {
  * A summary, as the owner approves it: where it posts, when, and what it carries, or that it stays with him.
  *
  * IT WAS A TITLE. Every kind this file did not know was drawn as `{ kind, title, lines: [] }`, so accepting a weekly
- * digest that posts a table of Notes to `https://collector.example.com/in` read "Summary" and a name (audit fifty-one,
- * section 2). A digest has one channel that leaves the record, its webhook, and the line says it as `script` says its
+ * digest that posts a table of Notes to `https://collector.example.com/in` read "Summary" and a name.
+ * A digest has one channel that leaves the record, its webhook, and the line says it as `script` says its
  * fetches; one that sends only in-app or by email says it calls nothing out.
  */
 function digest(id: string, body: Row, filed: readonly unknown[]): Appears {
@@ -210,7 +210,7 @@ function digest(id: string, body: Row, filed: readonly unknown[]): Appears {
 
 /**
  * A job kind, as the owner approves it: what it asks Claude, the tools it may use in plain words, the repository it
- * works in, its permission mode and, in red, that it changes files (agents AGT-23, C13).
+ * works in, its permission mode and, in red, that it changes files.
  *
  * THE PROMPT IS DRAWN WHOLE, because it is what runs on his machine each time the kind is started; its `%arg%` slots
  * stay as written, since they are filled once per run and never here.
@@ -258,7 +258,7 @@ export function proposedOf(kind: string, body: Row): Proposed | null {
     const filed = Array.isArray(body.egress) ? body.egress : [];
     const held = body.ingest;
     const rule = !isRow(held) ? null : 'id' in held || 'kind' in held ? appearsOf(held, filed) : ingest('', held, filed);
-    /* AND THE BUILDER, OPENED ON THE SAME SAMPLES WITH THE SAME RULE (PLT-10), so a pattern that reads nearly right is
+    /* AND THE BUILDER, OPENED ON THE SAME SAMPLES WITH THE SAME RULE, so a pattern that reads nearly right is
        fixed by pointing at what it missed rather than answered no. Only an ingest opens there. */
     const samples = Array.isArray(body.samples) ? body.samples.filter((s): s is string => typeof s === 'string') : [];
     const opens = isRow(held) && (held.kind === undefined || held.kind === 'ingest');
@@ -287,8 +287,8 @@ export function proposedOf(kind: string, body: Row): Proposed | null {
 }
 
 /**
- * WHAT THE DRAWING OF A PROPOSED PAGE IS CALLED ON THE SCREEN. Here and not in `copy.ts`, which nobody owns this wave
- * (`loop/research-m4-wave-two.md`, the wave's rules): new words go in a `words` object in the module that says them.
+ * WHAT THE DRAWING OF A PROPOSED PAGE IS CALLED ON THE SCREEN. Here and not in `copy.ts`:
+ * new words go in a `words` object in the module that says them.
  */
 export const words = {
   /** Over the drawing, so it is not read as a page that is already there. */
@@ -385,7 +385,7 @@ async function liveOf(client: Client, runs: readonly Answered[][], now: number, 
 }
 
 /**
- * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it (M4 wave two brief 5).
+ * WHAT ACCEPTING THE PAGE WOULD DRAW, drawn by the record before anybody accepts it.
  *
  * THE LINES NAMED THE BLOCKS AND NOTHING FILLED THEM. "Shows: Open, Notes" was the whole preview of a page, so what an
  * agent's page would hold was found out by accepting it. `previewPage` draws the body as `page` draws an installed one,
@@ -409,7 +409,7 @@ export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Draw
 }
 
 /**
- * THE WHOLE CHANGE, DRAWN AS IT WOULD STAND, beside each page as it stands now (pages R4, contracts `previewChange`).
+ * THE WHOLE CHANGE, DRAWN AS IT WOULD STAND, beside each page as it stands now (the record's `previewChange`).
  *
  * `drawnOf` TRIED ONE PAGE AGAINST THE RECORD AS IT IS, so a bundle whose page reads a list the same bundle brings drew
  * that page as blocks that could not be drawn, and a change to an installed page showed only the page after, with

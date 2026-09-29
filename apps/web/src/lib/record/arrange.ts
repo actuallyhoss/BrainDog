@@ -12,7 +12,7 @@
 
 import { KINDS, isKind } from 'braindog-render';
 
-/** Which of a page's two columns a block sits in, on a page that declares `layout` (brief D4). */
+/** Which of a page's two columns a block sits in, on a page that declares `layout`. */
 export type Area = 'main' | 'rail';
 
 /**

@@ -200,7 +200,7 @@ for (const [what, answer] of [
   test(`the refusal is said in its own words when ${what}, and no sample under it`, async () => {
     const { io } = host(answer);
     /* NOT `from: 'absent'` ANY MORE, WHICH EVERY CALLER TURNED INTO "the record could not be reached". That was
-       wrong for a 401: the record was reached and said to sign in. With no sample anywhere (DIRECTION 26) there is no
+       wrong for a 401: the record was reached and said to sign in. With no sample anywhere there is no
        second meaning for these codes to carry, so they are the record's or the client's sentence like any other. */
     for (const out of [await pagesReader(BASE, io).read(), await pagesReader(BASE, io).readOne('money')]) {
       assert.equal(out.from, 'refused', `answered ${JSON.stringify(out)}`);

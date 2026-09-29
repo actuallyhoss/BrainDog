@@ -10,7 +10,7 @@
  * THE DEVICE KEEPS A COPY EITHER WAY, AND THE COPY IS NEVER THE TRUTH. The order, the shape and the switch ride in the
  * `bd_pref` cookie the shell already reads before first paint, and the hidden list and the dismissals in `localStorage`,
  * so a reload draws the rail as it was left before `boot` answers. Once `boot` answers, the record's word stands over the
- * copy and the copy is rewritten from it (contracts §7.3).
+ * copy and the copy is rewritten from it.
  *
  * ADOPTED ONCE PER TAB. `boot` is read once and kept for the tab, so adopting it on every navigation would put back the
  * rail as it stood when the tab opened, over whatever was hidden or moved since.

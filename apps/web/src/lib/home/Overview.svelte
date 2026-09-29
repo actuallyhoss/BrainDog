@@ -5,7 +5,7 @@
   NOT THE LANDING ANY MORE. Every record opens on Today (`routes/+page.svelte`), and this page, the use case's own Home
   with its figures and tables, is kept at `/?overview` and reached from More.
 
-  ONE PAGE, THROUGH THE ONE READER (modules C8, contracts §11 X19). Home draws the speaking use case's `home-<id>` page,
+  ONE PAGE, THROUGH THE ONE READER. Home draws the speaking use case's `home-<id>` page,
   else the record's `home` page, else the house page `DEFAULT_HOME` (`lib/home/default-home.ts`), which the record draws
   with `previewPage`. All three go through `PageView` with `mode: 'home'`, so a question is answered where it is shown,
   a row is ticked where it is drawn, and a line is captured without leaving. Home drew the house page a second way, as
@@ -16,7 +16,7 @@
   drawn its second half, because the screen advanced the mark on open and then asked for everything since it (19 §6).
 
   IT LISTENS. A write from an agent, a rule or another tab moves the record's version, and Home reads its page again
-  without a reload and without blanking it (`listen`, PGS-10).
+  without a reload and without blanking it (`listen`).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -44,7 +44,7 @@
   let { data }: { data: Shell } = $props();
 
   /**
-   * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday 16 September at two in the morning of the 17th,
+   * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday at two in the morning of Thursday,
    * because it named the day in UTC. The record's own `tz` is not read, because every host provisions `UTC` and nobody
    * sets it, so it cannot be told from a zone somebody chose. A quiet line over the title now, not the title itself.
    */
@@ -140,14 +140,14 @@
     }
   }
 
-  /* THE SAME BUSY RULE AS `/p/[slug]` (PGS-10): a re-read waits for a field being typed into and for a card's write
+  /* THE SAME BUSY RULE AS `/p/[slug]`: a re-read waits for a field being typed into and for a card's write
      still out (`aria-busy`), on top of Home's own read already being out. */
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   const live = $derived(got?.from === 'live' ? got : null);
   const blocks = $derived(live ? homeBlocks(live.page.blocks, live.now, voice) : []);
   /* THE LEAD LINE IS BUILT FROM THE PAGE'S OWN COUNTS, so it can never disagree with the blocks under it. It is the
-     title row's sentence (SYSTEM §5), with what needs the reader in red. */
+     title row's sentence, with what needs the reader in red. */
   const lead = $derived(live ? leadSaid(countsOf(live.page.blocks)) : null);
   /* NOTHING PINNED, WAITING, DUE OR WORKING: one calm sentence, and only what changed under it. A host that cannot draw
      the house page at all is calm too, rather than blank. */
@@ -160,7 +160,7 @@
   });
   const slug = $derived(live?.page.page.page ?? declares ?? 'home');
 
-  /* A RECORD WITH NO LISTS AT ALL goes to the prompt (MOD-6, `+layout.ts`); this is what is left if it is reached anyway. */
+  /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.open === 0);
 
   /* WHERE A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD LANDS (`landing.ts`), and `null` for everybody else. */
@@ -218,7 +218,7 @@
     <!--
       THE RECORD WOULD NOT ANSWER THIS READER, WHICH IS NOT THE SAME THING AS AN EMPTY RECORD. A colleague invited with
       `Adds only` is refused `boot` with the record's own sentence, which names the person who can help, so it stands
-      here alone with no action. And a record that could not be reached is not a refusal (design SYS-8, DSN-12): the one
+      here alone with no action. And a record that could not be reached is not a refusal: the one
       offline sentence with Retry, and the client's own reason under Details.
     -->
     {#if data.refused.code === 'UNREACHABLE'}
@@ -239,7 +239,7 @@
     {#if calm && lands}
       <!--
         A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the record is
-        empty (`loop/research-invite-landing.md` finding 1).
+        empty.
       -->
       <Empty
         kind="cleared"

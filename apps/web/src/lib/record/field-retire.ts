@@ -2,8 +2,8 @@
  * Retiring one field of a live list from the app: the body the record is sent, and the one call that sends it.
  *
  * THE OTHER HALF OF `field-write.ts`, AND IT DOES NOT MIRROR IT. An addition is filed and, when the person owns the
- * record, accepted in the next call, because DIRECTION §22 lets an optional field land at once. Removing waits for his
- * press (§22 again), so a retire is filed and nothing more, whoever files it, the owner included: it reaches Decide as a
+ * record, accepted in the next call, because an optional field may land at once. Removing waits for his
+ * press, so a retire is filed and nothing more, whoever files it, the owner included: it reaches Decide as a
  * question and lands only when somebody answers it there. The record holds the same line on its own side (the kernel's
  * `additiveFault` refuses a retire by rule, and the record's `byRule` never sends one), so a second `decide` here would
  * be the app answering on the owner's behalf a question the record exists to put to him.
@@ -24,8 +24,8 @@ import { forget, type Fetch } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
 
 /**
- * The words for retiring a field, kept beside the call they describe, as `fieldWords` is, because nobody owns `copy.ts`
- * in this wave (`loop/research-m4-wave-three.md`, rules for the wave).
+ * The words for retiring a field, kept beside the call they describe, as `fieldWords` is, so this module owns them
+ * rather than `copy.ts`.
  */
 export const retireWords = {
   retire: 'Retire',

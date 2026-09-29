@@ -1,5 +1,5 @@
 /**
- * "Describe it": Slash's first draft of a filter, through the record's existing query door (GAP-2).
+ * "Describe it": Slash's first draft of a filter, through the record's existing query door.
  *
  * THE DOOR IS `POST /api/slash/read`, pass 1 of `46 §5.4`, which the palette already asks (`Palette.svelte`): it answers
  * the predicate Slash drafted for a question, beside the rows that answered it. The builder wants the predicate and

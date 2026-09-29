@@ -1,9 +1,8 @@
 <!--
-  The first run: a conversation on the left, and the BrainDog building beside it (`loop/finish/modules.md` MOD-6,
-  `loop/DIRECTION.md` §6 and §9, the board `loop/design/bento/boards/Light-Start.dc.html`).
+  The first run: a conversation on the left, and the BrainDog building beside it.
 
   ONE QUESTION, ONE FIELD, FOUR CHIPS, AND IT LISTENS WHILE YOU TYPE. "Who are you?", answered in a sentence, with a chip
-  for each of the four people the product is for (§11). The sentence is read without a model (`lib/start/propose.ts`),
+  for each of the four people the product is for. The sentence is read without a model (`lib/start/propose.ts`),
   in any language, as it is typed: the parts it would make light up beside the field, and each phrase it heard is said
   under it. One these rules cannot read is kept as the person's note, never refused.
 
@@ -14,7 +13,7 @@
   part with why it is on and the entries the words filled, and every page it makes, drawn by the record with examples
   that are marked and never saved (`PagesPreview.svelte`).
 
-  A BUSINESS NO USE CASE FITS IS DRAFTED FOR, where a model answers (`loop/finish/pages.md` PGS-20). Slash drafts lists,
+  A BUSINESS NO USE CASE FITS IS DRAFTED FOR, where a model answers. Slash drafts lists,
   figures and pages made for what was said (`slashDraft`), which files nothing; they are drawn over its sample rows, and
   the same one press files and accepts them. The sample rows are never written.
 
@@ -92,7 +91,7 @@
   const colleague = $derived(Boolean(page.data.live) && (page.data as unknown as Shell).me.lists != null);
 
   /**
-   * SIGNED IN AND ON NO RECORD (OPS-17): a proved mailbox that has not paid yet, or a person whose only record closed.
+   * SIGNED IN AND ON NO RECORD: a proved mailbox that has not paid yet, or a person whose only record closed.
    * `/app` sends that session here, and the `boot` under it answered 403, so the screen asks for a name and a payment
    * instead of drawing an empty record that says nothing is here.
    */
@@ -306,7 +305,7 @@
 
   /**
    * EVERY PACK THE PERSON CAN TURN ON HERE: the modules this build ships, in install order, then any other catalogue pack
-   * the sentence was heard asking for or a use case chosen stands on (shell.md USE-3), in the order they came.
+   * the sentence was heard asking for or a use case chosen stands on, in the order they came.
    */
   const offered = $derived<string[]>([
     ...new Set([...INSTALL_ORDER, ...(proposal?.modules ?? []), ...kept, ...cases.flatMap((c) => c.modules)]),
@@ -394,7 +393,7 @@
   const status = $derived(proposal ? statusOf(onCount, allParts.length, waitingOn) : null);
 
   /**
-   * WHAT THE LAST THING SAID ADDED TAKES THE ARRIVAL TINT for a second and a half (SYSTEM §2, §8): a part that came on
+   * WHAT THE LAST THING SAID ADDED TAKES THE ARRIVAL TINT for a second and a half: a part that came on
    * and an entry that came in, while typing and after each turn alike. The first drawing is not an arrival.
    */
   let fresh = $state.raw<Set<string>>(new Set());
@@ -553,7 +552,7 @@
         </section>
       {/if}
 
-      <!-- A NEW PERSON'S FIRST ASK IS A PASSKEY (OPS-17), and it draws nothing for anybody who has one. -->
+      <!-- A NEW PERSON'S FIRST ASK IS A PASSKEY, and it draws nothing for anybody who has one. -->
       <PasskeyFirst />
 
       <!-- THE TITLE ROW: the question, and once it is read, the sentence that says where the build stands. -->
@@ -841,7 +840,7 @@
     min-inline-size: 0;
   }
 
-  /* `t-title` IN GEIST (SYSTEM §3, §11), and the phone's large 30/36 below 900px. */
+  /* `t-title` IN GEIST, and the phone's large 30/36 below 900px. */
   .question {
     margin: 0;
     color: var(--ink);
@@ -853,7 +852,7 @@
     text-wrap: balance;
   }
 
-  /* THE SENTENCE: 16/24 in the second ink, and the phrase that needs him in red (SYSTEM §5). */
+  /* THE SENTENCE: 16/24 in the second ink, and the phrase that needs him in red. */
   .sentence {
     margin: 0;
     max-inline-size: var(--measure);
@@ -869,7 +868,7 @@
 
   /* ── the board ─────────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN ON A PHONE; FROM 900PX THE CONVERSATION AND THE BUILD SIDE BY SIDE, 12 apart (SYSTEM §4). */
+  /* ONE COLUMN ON A PHONE; FROM 900PX THE CONVERSATION AND THE BUILD SIDE BY SIDE, 12 apart. */
   .board {
     display: grid;
     align-items: start;
@@ -914,7 +913,7 @@
     gap: var(--sp-3);
   }
 
-  /* THE ONE FIELD, drawn at the size of a sentence rather than a form row, in the tile's well (SYSTEM §6 fields), and
+  /* THE ONE FIELD, drawn at the size of a sentence rather than a form row, in the tile's well, and
      16px so a phone does not zoom it. Its focus is the a11y layer's 2px ink ring. */
   .prompt-field {
     inline-size: 100%;
@@ -942,7 +941,7 @@
     gap: var(--sp-2);
   }
 
-  /* QUIET PILLS IN THE TILE: the `--s1` fill, no border, the chosen one on the selected fill (SYSTEM §6 buttons). */
+  /* QUIET PILLS IN THE TILE: the `--s1` fill, no border, the chosen one on the selected fill. */
   .chip {
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-4);
@@ -1048,7 +1047,7 @@
     font-weight: 600;
   }
 
-  /* TIMES IN A FEED ARE GEIST MONO (SYSTEM §3). */
+  /* TIMES IN A FEED ARE GEIST MONO. */
   .who-time {
     color: var(--dim);
     font-family: var(--font-id);
@@ -1211,7 +1210,7 @@
     gap: var(--sp-2);
   }
 
-  /* SLASH AT WORK WEARS THE ONE HUE THAT MEANS ALIVE (SYSTEM §2 `live`). Still, never pulsing (SYSTEM §8). */
+  /* SLASH AT WORK WEARS THE ONE HUE THAT MEANS ALIVE (`live`). Still, never pulsing. */
   .live-dot {
     inline-size: var(--dot);
     block-size: var(--dot);
@@ -1318,7 +1317,7 @@
   }
 
   /* EACH PART'S NAME UNDER ITS CELL, in the order the cells are drawn, 3 apart as the cells are. 12 is a chart's own
-     label size (SYSTEM §3). */
+     label size. */
   .step-names {
     display: grid;
     grid-template-columns: repeat(var(--n), minmax(0, 1fr));
@@ -1346,7 +1345,7 @@
     color: var(--dim);
   }
 
-  /* A NARROW PHONE DROPS THE CHART'S SECONDARY LABELS and keeps its reading line (SYSTEM §9). */
+  /* A NARROW PHONE DROPS THE CHART'S SECONDARY LABELS and keeps its reading line. */
   @media (width < 640px) {
     .step-names {
       display: none;
@@ -1416,7 +1415,7 @@
     }
 
     /* MAKE IT MINE RIDES THE BOTTOM EDGE as glass chrome: the button's own 44 and 4 either side, which is the
-       `--sticky` height, with the home indicator's inset paid once under it (SYSTEM §9). */
+       `--sticky` height, with the home indicator's inset paid once under it. */
     .make-bar {
       position: fixed;
       inset-inline: 0;
@@ -1446,7 +1445,7 @@
     }
   }
 
-  /* NO KEY CAPS UNDER A THUMB OR ON A PHONE: there is no keyboard to press them with (DESIGN-SYSTEM §6). */
+  /* NO KEY CAPS UNDER A THUMB OR ON A PHONE: there is no keyboard to press them with. */
   @media (width < 900px), (pointer: coarse) {
     .keys,
     .frame :global(.btn-kbd) {

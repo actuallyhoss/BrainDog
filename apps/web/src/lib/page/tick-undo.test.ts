@@ -2,7 +2,7 @@
  * A task ticked on a page, and then put back from the receipt, is where it was before the tick.
  *
  * THE UNDO WROTE A STATE THE ROW NEVER HAD. The receipt a tick raises offered `tickPatch(ref, !done)`, and "not done" is
- * the list's default state, never the one the row held (audit sixty-four, section 3). Over Work's states a task in
+ * the list's default state, never the one the row held. Over Work's states a task in
  * `doing`, ticked and undone, was written `{"state":"open"}`, and so were `blocked` and `review`, while the receipt had
  * said the task was merely marked not done. The board already did this right: its undo writes the column the card came
  * from. The tick now follows the row page's `putBackOf` rule through `inverseOf`, which is the same rule with the

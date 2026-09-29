@@ -31,7 +31,7 @@
  * under a real record's slug is the precise write this read exists to make unnecessary. It answered
  * `absent` for `UNREACHABLE` and `UNAUTHORIZED` instead, and every caller turned that into "the
  * record could not be reached", which was untrue of a 401: the record was reached and said to sign
- * in. With the sample gone (DIRECTION 26) those two codes carry no second meaning, so they are the
+ * in. With the sample gone those two codes carry no second meaning, so they are the
  * record's or the client's sentence like any other refusal.
  */
 

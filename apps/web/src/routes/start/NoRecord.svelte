@@ -1,5 +1,5 @@
 <!--
-  A record of your own, for somebody signed in and on none (`loop/finish/ops.md` OPS-17).
+  A record of your own, for somebody signed in and on none.
 
   THE LAST STEP OF SIGN-UP, AND THE WAY OUT OF AN EMPTY SHELL. A person whose mailbox is proved but who has not paid,
   and a person whose only record was closed, both used to land on `/start` over a `boot` that answered 403 and draw a
@@ -96,8 +96,8 @@
     min-inline-size: 0;
   }
 
-  /* THE ENTRY SCREENS' ONE TITLE (DSN-18): this stands where /start's question and sign up's title stand, in the same
-     `signin/Entry.svelte` frame, so it takes their size and face: `t-title` in Geist (SYSTEM §3, §11), and the phone's
+  /* THE ENTRY SCREENS' ONE TITLE: this stands where /start's question and sign up's title stand, in the same
+     `signin/Entry.svelte` frame, so it takes their size and face: `t-title` in Geist, and the phone's
      large title, 30/36, below 900px. */
   .own-h {
     margin: 0;
@@ -118,7 +118,7 @@
     }
   }
 
-  /* THE BODY IS `t-body` AT THE SENTENCE'S 16/24 in the second ink, as the title row's sentence is (SYSTEM §5). */
+  /* THE BODY IS `t-body` AT THE SENTENCE'S 16/24 in the second ink, as the title row's sentence is. */
   .own-why,
   .own-price {
     margin: 0;
@@ -135,7 +135,7 @@
   }
 
   /* A REFUSED PAYMENT IS WORDS IN INK, not a red line: nothing here is late or urgent, it is a thing to try again
-     (SYSTEM §2, red only for "needs you"). The `role="alert"` says it. */
+     (red is only for "needs you"). The `role="alert"` says it. */
   .own-said {
     margin: 0;
     color: var(--ink);

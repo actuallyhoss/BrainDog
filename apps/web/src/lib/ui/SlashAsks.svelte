@@ -1,5 +1,5 @@
 <!--
-  Slash's row in Settings (`docs/23-ASSISTANT-UI.md` §8, `loop/research-spark-routes.md` Brief W1).
+  Slash's row in Settings (`docs/23-ASSISTANT-UI.md` §8).
 
   "ONE ROW IN SETTINGS. NOTHING ANYWHERE ELSE." Every signed-in person sees this month's asks against the cap, the model the
   host names, and the day the count resets; the owner also sets the monthly limit. No gauge, no bar, no percentage: a

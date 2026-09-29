@@ -1,11 +1,11 @@
 /**
  * What the first run's preview says the BrainDog will be, read from the declarations it would install and never drawn by
  * hand: its pages, its Home, what each module keeps, whether it has due dates to remind about, and where Money keeps its
- * currency (`loop/finish/modules.md` MOD-6).
+ * currency.
  *
- * NOTHING HERE WRITES. A preview may draw examples; nothing writes them (C11). What is asked of the record from here is
- * its `previewChange`, which runs inside a rehearsal and keeps nothing (`loop/finish/contracts.md` §2.4), and every page
- * the proposal makes is drawn by it, not Home alone (`loop/finish/pages.md` PGS-20).
+ * NOTHING HERE WRITES. A preview may draw examples; nothing writes them. What is asked of the record from here is
+ * its `previewChange`, which runs inside a rehearsal and keeps nothing, and every page
+ * the proposal makes is drawn by it, not Home alone.
  */
 
 import { useCase, type UseCase } from '@braindog/seed/usecases';
@@ -94,7 +94,7 @@ export function currencies(locale: string): { code: string; name: string }[] {
   return Intl.supportedValuesOf('currency').map((code) => ({ code, name: names?.of(code) ?? code }));
 }
 
-/** The ceilings `previewChange` holds a call to (`loop/finish/contracts.md` §2.4): declarations, rows a list, rows in all. */
+/** The ceilings `previewChange` holds a call to: declarations, rows a list, rows in all. */
 const DECLARATIONS_MOST = 12;
 const ROWS_A_LIST = 20;
 const ROWS_MOST = 100;
@@ -130,7 +130,7 @@ type Made = { decl: Decl; needs: string[] };
 
 /**
  * WHAT TO ASK THE RECORD TO DRAW EVERY PAGE THE PROPOSAL MAKES, with the use cases' and the modules' examples, in as
- * few calls as the method's ceilings allow (`loop/finish/pages.md` PGS-20).
+ * few calls as the method's ceilings allow.
  *
  * ONLY LISTS AND PAGES ARE ASKED FOR. A rule or an automation draws nothing, and every declaration it would take is one
  * a page cannot. A page goes into a call with the lists it reads, and a new call is opened when the next page and its

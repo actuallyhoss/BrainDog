@@ -1,8 +1,8 @@
 /**
  * What `/packs/share` draws that no other screen does: the words of its publish, its diff and its installer's view
- * (`loop/finish/rules.md` §2: a unit's own `words` object), and the skills it offers, each once, by title.
+ * (a unit's own `words` object), and the skills it offers, each once, by title.
  *
- * SKILLS BY TITLE, NEVER BY FOLDER NAME, AND EACH ONCE (design.md §2.8 and §4, the share row). A skill's `name` is the
+ * SKILLS BY TITLE, NEVER BY FOLDER NAME, AND EACH ONCE. A skill's `name` is the
  * folder it is written to, so "review-pr" is how the record keys it and not how a person reads it; and a project's skill
  * of the same name replaces the global one where it applies, so the list held "review-pr" twice. The file carries a
  * skill by its name, so one of each name is offered: the one that applies everywhere when there is one.

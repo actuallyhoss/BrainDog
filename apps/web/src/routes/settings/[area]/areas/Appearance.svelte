@@ -4,7 +4,7 @@
   THE SCHEME IS THREE PICTURES OF THE PRODUCT, not three words. Each is the app in miniature, drawn from the tokens it
   would wear: the ground and its light, the glass rail with the mark and an ink "here", a title with its sentence, two
   tiles with a chart and the rows under them. System is both, split on the diagonal. A person choosing how the product
-  looks is shown how it looks (SYSTEM §2, "light is the main scheme; dark is equal and complete").
+  looks is shown how it looks.
 
   AND IT IS STILL A THREE-WAY CHOICE, not a toggle offering the opposite. The predecessor's had three states and a
   one-way UI: once a person chose light or dark, only clearing local storage restored "match the system". "Match the
@@ -321,7 +321,7 @@
 </Section>
 
 <!--
-  THE RECORD'S LOOK, which is everybody's, under the device's colour, which is this screen's alone (GAP-3, `21 §6`).
+  THE RECORD'S LOOK, which is everybody's, under the device's colour, which is this screen's alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
 <Section title={copy.lookTitle}>
@@ -382,7 +382,7 @@
     --l-ink: var(--bg);
   }
 
-  /* IN DARK A TILE IS TOLD FROM THE GROUND BY ITS FILL ALONE (SYSTEM §4), so the dark picture's tiles carry no lift. */
+  /* IN DARK A TILE IS TOLD FROM THE GROUND BY ITS FILL ALONE, so the dark picture's tiles carry no lift. */
   .look[data-look='dark'] {
     --l-lift: 0 0 0 0 transparent;
   }
@@ -526,7 +526,7 @@
     background: color-mix(in srgb, var(--l-ink) 8%, transparent);
   }
 
-  /* A trend in greys with one ink highlight (SYSTEM §7). */
+  /* A trend in greys with one ink highlight. */
   .look-bars {
     display: flex;
     align-items: end;

@@ -2,7 +2,7 @@
  * What `/signin` can actually offer, on the one run nobody has ever walked: a record with no passkey
  * in it yet.
  *
- * MEASURED, AND IT IS THE REASON THIS FILE EXISTS. On 20 September 2026,
+ * MEASURED, AND IT IS THE REASON THIS FILE EXISTS. On a brand new record,
  * `GET https://app.brain.dog/auth/methods` answered `{ passkey: true, magic: false, key: false,
  * open: false, demo: false, me: null, firstRun: true }`. `firstRun` is zero rows in `dir_passkey`
  * (`packages/record/src/identity.ts:356`); `magic` is off because `AUTH_MAIL_FROM` is empty; `key` is
@@ -56,8 +56,8 @@ export const noDoorYet = (it: Methods, ways: Ways | null, note: Note): boolean =
 
 /* THE DEMO PILL IS GONE, AND SO IS THE REASON IT WAS KEPT. The second finding on this screen was that
  * the pill never read `methods.demo`, and measuring showed it did not need to: a 401 at the bare `/app`
- * drew the shipped sample business, which is what the pill promised. There is no sample now
- * (DIRECTION 26). `/app/` with nobody signed in is sent here like every other address that answers
+ * drew the shipped sample business, which is what the pill promised. There is no sample now.
+ * `/app/` with nobody signed in is sent here like every other address that answers
  * 401 (`signInFirst` in `lib/at.ts`), so the pill would have been a button back to this screen, and
  * on the first run the claim link sentence is the one way in there is. `methods.demo` went with it.
  */

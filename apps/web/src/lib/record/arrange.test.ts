@@ -85,7 +85,7 @@ test('`differs` sees a reorder, a resize and a removal', () => {
   assert.equal(differs(base, removeAt(base, 0)), true);
 });
 
-/* ── the main column and the rail (brief D4) ──────────────────────────────── */
+/* ── the main column and the rail ─────────────────────────────────────────── */
 
 /* A page with a rail, as the arrangement holds it: declared order, and each block's area. */
 const areas = (...placed: ('main' | 'rail')[]): Slot[] => placed.map((area, i) => ({ i, span: 12, area }));

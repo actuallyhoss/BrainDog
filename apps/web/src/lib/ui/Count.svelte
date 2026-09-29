@@ -1,9 +1,9 @@
 <!--
-  The one filled badge in the product: a red square with a count in it, for what needs the reader (SYSTEM §6, Badges).
+  The one filled badge in the product: a red square with a count in it, for what needs the reader.
 
   EVERY OTHER COUNT IS A PLAIN NUMBER in the quiet ink, beside the word it counts. This one is filled because it is the
   one thing on a screen allowed to shout: Decide's open questions in the rail, a tab that holds something waiting on
-  him. Red here is "needs you" and nothing else (D-1), so a count that does not need him is never drawn with this.
+  him. Red here is "needs you" and nothing else, so a count that does not need him is never drawn with this.
 
   THE NUMBER IS THE MEANING, so the name says what it counts for a screen reader where the caller knows (`label`); the
   shape and the hue only agree with it.

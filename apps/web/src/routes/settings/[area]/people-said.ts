@@ -3,7 +3,7 @@
  *
  * THE NAME SLOT PRINTED AN EMAIL. `personOf` (`lib/record/settings-write.ts`) falls back to the
  * address when the record holds no name, because a row has to be called something, and
- * `research-second-person.md` measured that the record holds none for anybody: `boot.names` came
+ * it was measured that the record holds none for anybody: `boot.names` came
  * back `{}` for seven people, both owners included, since nothing in the product writes
  * `member.name`. So every colleague on a real record was drawn as `ben@ashgrove.co.uk`, initial `B`,
  * with a level control named "What ben@ashgrove.co.uk can do".

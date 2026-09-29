@@ -64,7 +64,7 @@
 {/if}
 
 <!--
-  ONE TABLE, SO ONE EDGE (design.md §2, the keymap at 1440, MOD-25). Each scope was its own grid whose key column was
+  ONE TABLE, SO ONE EDGE. Each scope was its own grid whose key column was
   as wide as that scope's longest chord, so the words started at a different x in every group and the sheet read as
   several tables set one under another. One table shares one key column across every scope, and the words start at
   one x from the first row to the last. A scope's name is a header row over its rows (`scope="rowgroup"`), so a screen
@@ -95,7 +95,7 @@
   }
 
   /* The space between scopes is the header row's own, above its name, so the first scope starts at the table's top. */
-  /* A META HEADING over each scope, as the palette's are (SYSTEM §6). */
+  /* A META HEADING over each scope, as the palette's are. */
   .scope-title {
     padding-block: var(--sp-5) var(--sp-2);
     color: var(--dim);

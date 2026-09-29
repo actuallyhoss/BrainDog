@@ -260,7 +260,7 @@ test('a loud step about a row gets once for each row, which the record would oth
 /*
  * THE PATH MIRRORS THE KERNEL, AND THE ANSWERS BELOW ARE THE KERNEL'S, MEASURED. `@braindog/kernel` does not export
  * `pathOf`, and importing `packages/kernel/src/flow-lint.ts` by a relative path is a cross-package import the graph
- * gate refuses (31 §3 layer 3). So on 22 September both functions were run over these eight bodies from a scratch
+ * gate refuses (31 §3 layer 3). So both functions were run over these eight bodies from a scratch
  * script outside the tree, all eight answered alike, and the kernel's answers are written here. The day the kernel
  * exports `pathOf`, this becomes an import and a loop.
  */
@@ -339,7 +339,7 @@ test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word f
 /*
  * ON BOTH KINDS OF HOST, because what the menu leaves out is now a fact about the host. With the flag fixed at false
  * this was the whole test, and it could not see a host with a model, where the record installs `ask_slash` and the
- * menu still did not offer it (`research-worker-spark.md` Brief F).
+ * menu still did not offer it.
  */
 test('THE MENU OFFERS EVERY VERB THE RECORD READS AND INSTALLS, ONCE, in the five groups', () => {
   for (const slash of [false, true]) {
@@ -453,10 +453,10 @@ test('the calls a flow makes are found in both arms, once each, by call step or 
   assert.deepEqual(callsIn(draftOf('y', { rule: 'y', register: 'tasks', then: [{ run: 'hook' }] }).steps), ['hook']);
 });
 
-/* ── the words a stranger meets (loop/research-canvas-ux.md, brief 2) ─────── */
+/* ── the words a stranger meets ───────────────────────────────────────────── */
 
 /*
- * THE FAULT WAS A TEMPLATE, AND HALF OF WHAT IT MADE WAS NOT ENGLISH. Worked from `ARGS` on 22 September, a freshly
+ * THE FAULT WAS A TEMPLATE, AND HALF OF WHAT IT MADE WAS NOT ENGLISH. Worked from `ARGS`, a freshly
  * added card said "Tell you needs say.", "Add a note needs note." and "Ask Slash needs keep the answer as.": a verb's
  * label, the word "needs", and a field label lower-cased. Each required argument now carries its own sentence.
  */
@@ -489,7 +489,7 @@ test('"IF" IS A BRANCH AND SAYS SO: its arms are "If so" and "If not", and the c
 });
 
 /*
- * `loop/research-batch-thirty-six-audit.md` FINDING 3, C2 AND C3. An installed rule that tags only bills above 500 drew
+ * A TREE CONDITION WAS LOST BETWEEN THE CARD AND THE FILE. An installed rule that tags only bills above 500 drew
  * its trigger card as "When a row in bills is added or changed", because `draftOf` put a tree `when` in `rest` where
  * nothing drew it; typing a sentence then filed the tree anyway, because `...others` came after `...when`; and switched
  * to a clock, `faultsOf` said nothing while the record refused the body on Send.
@@ -566,7 +566,7 @@ function openSqlite(): Parameters<typeof openRecord>[0] {
 }
 
 /*
- * `loop/research-batch-thirty-six-audit.md` FINDING 4, F. A member who cannot see the owner's clocks reads an empty
+ * A NEW ID MUST NOT TAKE ONE THE MEMBER CANNOT SEE. A member who cannot see the owner's clocks reads an empty
  * automations list, so `freshId` hands her "Gold rate" the id `gold-rate`, which the owner's hourly clock already
  * holds. Measured at `8cab17d7`: filed with no `from_version`, the record stamped it at the live 1, and the owner's
  * accept of "Add the automation Gold rate?" replaced the clock's steps with the member's.
@@ -593,7 +593,7 @@ test('F: "ADD THE AUTOMATION" ON A TAKEN ID IS A CONFLICT ON ACCEPT, and the aut
   assert.equal(landed.ok, false);
 });
 
-/* EDT-2: A DECISION TRIGGER AND AN EMPTY `else` ARE READ AND WRITTEN BACK AS THEY WERE FILED. */
+/* A DECISION TRIGGER AND AN EMPTY `else` ARE READ AND WRITTEN BACK AS THEY WERE FILED. */
 test('A RULE STARTED BY A DECISION ROUND-TRIPS, `about` and `option` and all, and is said in words', () => {
   const chased = { rule: 'chased', on: { decided: { about: 'rule.chase', option: 'Chase it' } }, steps: [{ notify: { say: 'Chasing' } }] };
   const d = draftOf('chased', chased);

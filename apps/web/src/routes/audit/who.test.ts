@@ -16,7 +16,7 @@ import { copy } from '../../lib/copy.ts';
 import { actorOf } from '../../lib/record/api.ts';
 import { actorSaid, offeredActors, personIn, targetSaid } from './who.ts';
 
-/** The decider on the driven record. The survey quotes this id in `loop/research-second-person.md` finding 2. */
+/** The decider on the driven record, the id the screen printed raw. */
 const DECIDER = 'p_01M1KJ7RG0TYYA0AX15QPGJJ4';
 /** The founding owner, whose own grant `createRecord` writes with the other spelling. */
 const OWNER = 'p_01M1KJ7RG0OWNER0000000000';
@@ -60,7 +60,7 @@ test('THE READER IS YOU, whichever spelling the ledger wrote them in', () => {
 test('AN ACTOR THAT IS NOT A PERSON IS SAID BY ITS NAME, and still leads with a capital', () => {
   assert.equal(actorSaid('system', null, NO_NAMES).name, 'BrainDog');
   assert.equal(actorSaid('slash', null, NO_NAMES).name, 'Slash');
-  /* A RULE SAYS IT IS ONE (MOD-16), so its name is never read as a person's. */
+  /* A RULE SAYS IT IS ONE, so its name is never read as a person's. */
   assert.equal(actorSaid('rule.renewal', null, NO_NAMES).name, 'A rule: Renewal');
   assert.equal(actorSaid('rule.renewal', null, NO_NAMES).kind, 'rule');
   assert.equal(actorSaid('agent:claude', null, NO_NAMES).name, 'Claude');
@@ -96,7 +96,7 @@ test('AND IT COMES BACK THE DAY SOMEBODY SETS A NAME, with nothing else changing
   assert.deepEqual(offeredActors([DECIDER, OWNER, 'p_01M1KJ7RG0WRITE000000000W', 'system'], null, some), [DECIDER, 'system']);
   const all = new Map([
     [DECIDER, 'Dara Quint'],
-    [OWNER, 'Hal Quartz'],
+    [OWNER, 'Hal Porter'],
   ]);
   assert.deepEqual(offeredActors([DECIDER, OWNER, 'system'], null, all), [DECIDER, OWNER, 'system']);
 });

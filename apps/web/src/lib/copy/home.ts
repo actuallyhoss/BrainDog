@@ -2,7 +2,7 @@
  * Home's words and the first run's: what needs you, the figures right now, since you were away, an empty record,
  * a colleague's Home, a measure a project reports, and `/start`.
  *
- * AN AREA FILE OF THE COPY AGGREGATE (ARC-8). `lib/copy.ts` spreads this object into `copy`, and every screen reads a
+ * AN AREA FILE OF THE COPY AGGREGATE. `lib/copy.ts` spreads this object into `copy`, and every screen reads a
  * key here as `copy.<key>`. The house voice is written once, at the top of `copy.ts`. A word a screen in another
  * area also draws is in `shell.ts`, so that rewording it is nobody's edit to another area's screen.
  *
@@ -40,7 +40,7 @@ export const home = {
   /**
    * HOME FOR A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD, in place of the two nothings above.
    *
-   * Measured through the real seed (`loop/research-invite-landing.md` finding 1): a bookkeeper invited
+   * Measured through the real seed: a bookkeeper invited
    * to one empty list was told "Nothing in the record yet." and offered `Start here` over 230 rows, and
    * no screen named the list they had been invited to. The first thing they are told is which list is
    * theirs, and the one control goes there.

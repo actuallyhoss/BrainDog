@@ -106,7 +106,7 @@ function resolveDependencies(file: string, deps: string[], { hostId, hostType }:
  * AND `/app/<slug>/api/*`, AS WRITTEN, TO THE SAME PLACE. Under a slug `apiBase()` (`lib/at.ts`) sends every record
  * call to `/app/<slug>/api/<method>`, and with only `/api` here nothing forwarded it, so a dev tab on
  * `/app/acme/r/tasks` asked Vite for the record and Vite has none. The path is NOT rewritten to `/api`: the record
- * answers it for its own slug and refuses any other (`research-one-domain.md` §3.2), and a proxy that cut the slug off
+ * answers it for its own slug and refuses any other, and a proxy that cut the slug off
  * would answer every slug with whichever record is listening, which is the check the path exists to make. A key that
  * opens with `^` is a pattern to Vite (`doesProxyContextMatchUrl`), and every other key is a prefix.
  *

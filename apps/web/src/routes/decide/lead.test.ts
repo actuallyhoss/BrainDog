@@ -64,7 +64,7 @@ test('how long each has waited: the open one in ink, anything past two weeks red
   const qs = [
     { id: 'a', title: 'Read HSBC texts', opened: daysAgo(2) },
     { id: 'b', title: 'GA4 consent gate', opened: daysAgo(36) },
-    { id: 'c', title: 'Tamsin price', opened: daysAgo(5) },
+    { id: 'c', title: 'Supplier price', opened: daysAgo(5) },
   ];
   const w = waitedOf(qs, 'a', NOW);
   assert.deepEqual(

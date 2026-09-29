@@ -1,7 +1,7 @@
 <!--
   A declared page, read. What it draws is `$lib/page/PageView.svelte`, moved out of this file whole so
   the pages that are declarations under a different reader draw through the same component rather
-  than through a copy of this one (`loop/research-modules-next.md`, Brief 5).
+  than through a copy of this one.
 
   THIS FILE KEEPS THE ADDRESS AND THE READ. The slug, `?src=`, the record read and its `opened()`
   and `closed()` bracket, and the rule that an answer for a page somebody has already left draws

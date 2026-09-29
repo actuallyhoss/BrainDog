@@ -5,7 +5,7 @@
  * `finished.ts`), so an undo that sends the state alone dates a done row with the day of the undo. `inverseOf` in
  * `rows-write.ts` carried the day for the list (b935a4df) and `tickBackOf` took it for a tick (6fa38569), but the board's
  * moved card was put back with `movePatch(ref, field, from)` and the row page's edit with `putBackOf(before, patch)`, both
- * the state alone (audit sixty-five, section 2, probe B1). Measured before this change against a kernel whose clock read
+ * the state alone. Measured before this change against a kernel whose clock read
  * 24 September: a task done on 1 September, moved to `doing` on a board and put back, was sent `{"state":"done"}` and read
  * `done on 2026-09-24`; the same task edited to `open` on its row page and put back read the same.
  *

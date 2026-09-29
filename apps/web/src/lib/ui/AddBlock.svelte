@@ -54,7 +54,7 @@
   }: {
     open?: boolean;
     /**
-     * THE KINDS THE RECORD'S PACKS DECLARE (`installedKinds`, PLT-8), listed under their own group beside this build's.
+     * THE KINDS THE RECORD'S PACKS DECLARE (`installedKinds`), listed under their own group beside this build's.
      * Each is seeded over the list like any other; its tile draws its title, because this build has no drawing of a kind
      * it did not ship and a tile never draws a wireframe.
      */
@@ -176,7 +176,7 @@
     });
   });
 
-  /** A kind's name and its one line, from the shared table first, then this unit's words for the kinds it adds. */
+  /** A kind's name and its one line, from the shared table first, then this component's words for the kinds it adds. */
   const nameOf = (kind: string): string => copy.kindNames[kind] ?? blockWords.kindNames[kind] ?? installed[kind]?.title ?? kind;
   const whatOf = (kind: string): string => copy.kinds[kind] ?? blockWords.kinds[kind] ?? '';
 
@@ -266,7 +266,7 @@
     margin-block-start: var(--sp-5);
   }
 
-  /* A META HEADING over each group, as the palette's are (SYSTEM §6), and at 500: the weights are 400 to 600. */
+  /* A META HEADING over each group, as the palette's are, and at 500: the weights are 400 to 600. */
   .group-name {
     margin-block: 0 var(--sp-2);
     color: var(--dim);
@@ -300,7 +300,7 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A CHOICE ON THE SHEET, NOT A TILE IN IT (SYSTEM §4: a tile never holds a tile, and a tile has no border): the `--s1`
+  /* A CHOICE ON THE SHEET, NOT A TILE IN IT (a tile never holds a tile, and a tile has no border): the `--s1`
      fill, and one step deeper under the pointer. */
   @media (hover: hover) and (pointer: fine) {
     .tile:hover {

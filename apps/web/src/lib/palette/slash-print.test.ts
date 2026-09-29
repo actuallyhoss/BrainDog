@@ -1,9 +1,9 @@
 /**
  * A clause Slash prints can be typed back, into either engine, and finds the rows the predicate it was printed from finds.
  *
- * BRIEF 6'S PROMISE WAS "A PRINTED CLAUSE CAN BE TYPED BACK", AND IT HELD ONLY UNDER 1,000. `whereWords` printed a number
+ * THE PROMISE WAS "A PRINTED CLAUSE CAN BE TYPED BACK", AND IT HELD ONLY UNDER 1,000. `whereWords` printed a number
  * with `toLocaleString('en')` and a money through `money()`, both with a thousands comma, and both engines read a comma as
- * the end of a condition. Audit sixty-five (finding 4) measured it, and this file measured it again over the seed before the
+ * the end of a condition. This file measured it over the seed before the
  * repair, each line the words printed and then the record's answer and the browser's:
  *
  *   amount is at least GBP 1,500.00                  FIELD_UNKNOWN (a field called 500.00)   500.00: that is not something a filter can say
@@ -79,7 +79,7 @@ const recordSeqs = (k: Kernel, register: string, where: unknown): string => {
 /**
  * The bounds the browser reads out of a sentence, or its refusal.
  *
- * THE BROWSER NO LONGER COUNTS ROWS (ARC-2): `compile` is the record's parser, and what it hands its readers is the
+ * THE BROWSER NO LONGER COUNTS ROWS: `compile` is the record's parser, and what it hands its readers is the
  * clause. So the browser's half of this pair is that the printed words come back as the bounds the predicate holds.
  */
 const browserBounds = (register: string, sentence: string): string => {

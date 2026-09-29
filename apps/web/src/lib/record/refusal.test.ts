@@ -164,7 +164,7 @@ test('the seeded pages refuse nothing at all, so no page ships a broken declarat
  * The money page's first list-bound table as the record reads it, declared with `over` on top.
  *
  * THE RECORD READS THE DECLARATION, AND IT CANNOT BE WRITTEN TO HERE. This changed the sample's `PAGES` and read the
- * page back, which reached the browser's page expander; since ARC-1 the fixture's `page` asks a kernel seeded once and
+ * page back, which reached the browser's page expander; now the fixture's `page` asks a kernel seeded once and
  * never written to, so the change reached nothing. The record's `block`, which reads one declaration without a page
  * around it (`readBlock` in `fixtures/readers.ts`), is handed the changed declaration instead.
  */
@@ -193,7 +193,7 @@ test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE 
   // one is following the documentation. The tree arrived as an object, `.split` threw, and the
   // throw took every other block on the page with it — against the page route's own stated
   // invariant that six queries are six independent failures.
-  /* THE RECORD READS THE TREE, since ARC-2 (`where: Predicate | string`), where the browser refused it for not being a
+  /* THE RECORD READS THE TREE (`where: Predicate | string`), where the browser refused it for not being a
      sentence. So a tree over values the list holds draws its rows, and one naming a value it does not hold is refused
      on its own block in the record's words, the page around it drawn. */
   const base = page('money')?.blocks.find(registerTable);
@@ -225,7 +225,7 @@ test('a block that throws becomes a block that refuses, whatever threw', () => {
 test('a `source:` that resolves to nothing says it is not one the record reads', () => {
   // `06-PAGES` §1.1 documents `metric.<id>` and `block.<n>`. `block.<n>` is not implemented, and used to draw the
   // author's own "nothing matched" sentence; `metric.<id>` is read by a bar or a split only, and says so on a table.
-  /* IN THE RECORD'S WORDS SINCE ARC-1, which name the source and do not list the prefixes the browser's sentence did. */
+  /* IN THE RECORD'S WORDS, which name the source and do not list the prefixes the browser's sentence did. */
   assert.match(declared({ source: 'metric.overdue' }).refusals.join(' '), /a bar or a split does/u);
   for (const source of ['block.0', 'nonsense']) {
     const block = declared({ source });
@@ -272,7 +272,7 @@ test('A REGISTER-BOUND `todo` CAN SHOW A TICK, and it comes from the register', 
   // which of its states are terminal, in `done:`.
   const rows = (where: string) => {
     const decl = { kind: 'todo', heading: 'T', span: 3, source: 'register.tasks', columns: [{ field: 'what' }, { field: 'by' }], where, limit: 4, empty: 'x' };
-    /* READ BY THE RECORD AS ONE BLOCK, since the sample's `PAGES` no longer reach the page it draws (ARC-1). */
+    /* READ BY THE RECORD AS ONE BLOCK, since the sample's `PAGES` no longer reach the page it draws. */
     const block = readBlock(decl as unknown as PageBlock);
     return toSegments(block).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[]; done?: boolean }[]) : []));
   };

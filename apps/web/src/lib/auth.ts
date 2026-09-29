@@ -24,7 +24,7 @@ export type Methods = {
   /** The host lets anyone in without a session: a self-host started without a key. */
   open: boolean;
   /* NO `demo`. The host said whether it pinned a public record for anonymous reads, and there is no such record to open
-     any more (DIRECTION 26), so the field is read past like any other this screen has no use for. */
+     any more, so the field is read past like any other this screen has no use for. */
   /** Why nothing is offered: no key to check sessions with, or an origin no cookie can be set on. */
   why?: 'not-configured' | 'insecure' | undefined;
   me: Who | null;
@@ -396,7 +396,7 @@ const levelOf = (said: unknown): InviteLevel | null => (typeof said === 'string'
  * What an invitation says before anybody accepts it: the address it is for, when it runs out, who is signed in, and
  * what it opens.
  *
- * WHAT IT OPENS IS SAID BEFORE ACCEPT (`loop/finish/platform.md` §4.0 M): the record's name, the level it gives on the
+ * WHAT IT OPENS IS SAID BEFORE ACCEPT: the record's name, the level it gives on the
  * whole record, and each list by name at its own level. `lists` is empty and the other two `null` when a host older
  * than those fields sent none, and the page then says only the address, as it did.
  */

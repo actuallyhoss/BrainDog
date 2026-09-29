@@ -180,7 +180,7 @@ test('a refusal comes back in the record\'s own words and writes nothing', async
   assert.ok(!out.ok && out.fix.trim().length > 0, 'the refusal says nothing');
 });
 
-/* ── audit sixty-six, finding 4: the sample's currency ────────────────────── */
+/* ── the sample's currency ────────────────────────────────────────────────── */
 
 /** A record holding the build's own Money owed, less its links, with one row the owner wrote in dollars. */
 async function owedInDollars(): Promise<Kernel> {
@@ -201,7 +201,7 @@ const currencies = (k: Kernel): string[] => {
 };
 
 test('ON A RECORD HELD IN DOLLARS THE ADD WRITES NO AMOUNT, and never the sample\'s pounds', async () => {
-  /* MEASURED BY AUDIT SIXTY-SIX (probe c3): one press of "Add to Money owed: rent" on a record imported in USD wrote
+  /* MEASURED: one press of "Add to Money owed: rent" on a record imported in USD wrote
      `owed_by_me`, GBP 0.00, due today, and "Owed by you, 30 days" went from USD 45.00 to no value at all, two parts in
      two currencies, until somebody found the row. The palette handed `capturedFields` no rows, so the money field took
      `currencyFor` over the FIXTURE, whose rows are sterling. Nobody on this record typed a currency or an amount. */
@@ -217,8 +217,8 @@ test('ON A RECORD HELD IN DOLLARS THE ADD WRITES NO AMOUNT, and never the sample
 });
 
 test('no list\'s add writes a money field, since the sentence has nowhere to type one', async () => {
-  /* EVERY REQUIRED MONEY FIELD IN THE BUILD, not only `obligations`: audit sixty-six (probe c2) found `transactions` and
-     `recurring` writing the same GBP 0.00. Read off the fields the press sends, through a writer that keeps them. */
+  /* EVERY REQUIRED MONEY FIELD IN THE BUILD, not only `obligations`: `transactions` and
+     `recurring` were found writing the same GBP 0.00. Read off the fields the press sends, through a writer that keeps them. */
   const sent: Record<string, unknown>[] = [];
   const spy = (async (url: string | URL | Request, init?: RequestInit) => {
     const args = JSON.parse(String(init?.body ?? '{}')) as { fields?: Record<string, unknown> };
@@ -226,7 +226,7 @@ test('no list\'s add writes a money field, since the sentence has nowhere to typ
     return json(400, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Say an amount.' } });
   }) as Fetch;
   const withMoney = Object.values(REGISTERS).filter((r) => r.title && r.fields.some((f) => f.type === 'money' && f.required));
-  assert.ok(withMoney.length >= 3, 'the build requires money on fewer lists than audit sixty-six measured');
+  assert.ok(withMoney.length >= 3, 'the build requires money on fewer lists than were measured');
   for (const r of withMoney) {
     sent.length = 0;
     await create.addRow({ register: r.id, title: 'a line' }, NOW, BASE, spy);
@@ -247,7 +247,7 @@ test('what the receipt says was filled in is what was written, and no amount', a
   for (const said of filled) assert.ok(line.filled.includes(said), `${said} is not what the list's line says`);
 });
 
-/* ── audit sixty-six, finding 8: who the row is offered to ────────────────── */
+/* ── who the row is offered to ────────────────────────────────────────────── */
 
 const BOOTED = {
   registers: [
@@ -261,7 +261,7 @@ const shellAt = (me: Record<string, unknown>) => layoutOf({ ...BOOTED, me: { kin
 
 test('THE ADD ROW IS OFFERED TO A CALLER WHO MAY ADD, and to nobody else', () => {
   assert.equal(typeof create.offered, 'function', 'create.ts exports no offered, so the palette cannot ask who may add');
-  /* MEASURED BY AUDIT SIXTY-SIX (probe c1): a `read` member typed "Add to Money owed: rent", the row was drawn, and the
+  /* MEASURED: a `read` member typed "Add to Money owed: rent", the row was drawn, and the
      press was refused by `create`'s own `guard(ctx, 'append', ...)`. A row that cannot run is absent, not drawn to fail. */
   const reader = shellAt({ level: 'read' });
   assert.deepEqual(create.offered(reader), [], 'a read-level caller was offered the add row');

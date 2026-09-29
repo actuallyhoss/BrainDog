@@ -48,7 +48,7 @@ export type Ask = {
  *
  * `names` IS WHAT THIS RECORD CALLS THE ROWS THESE ONES POINT AT, read in the same walk that turns a
  * stored id into a number. It was `null` where the in-browser sample drew the list out of its own rows;
- * the sample is gone (`loop/DIRECTION.md` 26), so every answer carries the record's names.
+ * the sample is gone, so every answer carries the record's names.
  */
 export type Answer = { entries: Entry[]; matched: number; cursor: string | null; names: Names };
 
@@ -186,7 +186,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
 
   return {
     boot: async () => ({ ok: true, value: booted }),
-    /* THE RECORD'S OWN WORDS OVER THE DECLARATION'S (`loop/research-spark.md` S8): a use case's labels for this list,
+    /* THE RECORD'S OWN WORDS OVER THE DECLARATION'S: a use case's labels for this list,
        its fields and its states, drawn at every read so a label changed at `/packs` shows on the next boot. */
     async schema(register) {
       const kept = declared.get(register);
@@ -199,7 +199,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
          `learn` IS WHAT SENDS THE QUESTION, BEFORE ANYTHING IS AWAITED, so its ticket is taken when the question goes out.
          This awaited the answer first and called `learn` after, which handed it the cached, older promise under a newer
          ticket: a question sent before an add and answered after it outranked the add's own and put Projects back without
-         the added field, and the next boot kept that (`loop/research-batch-thirty-three-audit.md` §7). `schemaOf` then
+         the added field, and the next boot kept that. `schemaOf` then
          hands back the promise `learn` just sent, so the list is still asked once. */
       const learnt = learn(schemaOf, register, asked);
       const out = said(await schemaOf(register));

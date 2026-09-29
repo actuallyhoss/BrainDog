@@ -1,8 +1,8 @@
 /**
  * The page reader's own words: the ones it gained when it was split and made the one drawer of a declared page.
  *
- * HERE AND NOT IN `copy.ts`, by the rule every unit keeps: a unit's new words sit in its area's copy file or in a
- * `words` object in a module it owns, so nothing edits the copy aggregate (`loop/finish/contracts.md` §11 X18). The
+ * HERE AND NOT IN `copy.ts`, by the rule every area keeps: an area's new words sit in its copy file or in a
+ * `words` object in a module it owns, so nothing edits the copy aggregate. The
  * page's older words stay where they were, in `lib/copy/pages.ts`, and are read from there.
  *
  * PURE, AND NODE LOADS IT.

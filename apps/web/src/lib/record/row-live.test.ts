@@ -118,7 +118,7 @@ test('a row the record does not hold is no row, not the sample row of that numbe
  * A HOST FOR ONE RECORD-DECLARED LIST THAT HOLDS ROWS AND DOES NOT HOLD THE ROW ASKED FOR.
  *
  * `matched: 400` and a row in the answer because the asymmetry only shows on a list that is plainly
- * there: on the record the usability survey drove, `Assignments` held 400 rows in the rail while
+ * there: on the record a usability walk drove, `Assignments` held 400 rows in the rail while
  * `/r/assignments/9999` denied the list itself.
  */
 function stocked(declared: Record<string, unknown>) {
@@ -147,13 +147,13 @@ const sentence = (register: string, seq: number): string => {
  * on the one screen that had just proved the list answers: the schema call succeeds, the list call
  * succeeds, only the row is missing. `/r/session/9999` never had the fault because `session` ships in
  * the bundle, which is why one register said *There is no run #9999.* and every record-declared one
- * denied the list. 390 and 1440 are the two numbers the survey typed.
+ * denied the list. 390 and 1440 are the two numbers typed when this was found.
  */
 for (const seq of [390, 1440])
   test(`a missing row on a record-declared list names the number, not the list, at ${seq}`, async () => {
     const register = `rl_courses_${seq}`;
     const teachers = `${register}_teachers`;
-    /* NO `one` IN THE DECLARATION, because a record does not have to send one and the survey's did not:
+    /* NO `one` IN THE DECLARATION, because a record does not have to send one and the one this was found on did not:
        `declOf` folds `Courses` down to `course` itself, and the sentence has to come out right from
        the name alone or it comes out right on nothing real.
 
@@ -194,7 +194,7 @@ test('a list the record will not declare still says the list is not there, becau
   assert.equal(sentence(register, 390), 'There is no list called rl_nope');
 });
 
-/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE (DIRECTION 26). Under these three the page drew `entry('services', 2)`,
+/* NO RECORD IS A REFUSAL NOW, NOT THE SAMPLE. Under these three the page drew `entry('services', 2)`,
    the sample business's row, under the address of a row in no record at all. */
 test("a 401 at no slug is the record's sentence, not the sample's row", async () => {
   const { io } = host(() => json(401, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in again.' } }));
@@ -227,7 +227,7 @@ test('the row page draws the live row and its refusal, and nothing of the sample
   const page = readFileSync(new URL('../../routes/r/[register]/[seq]/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\$lib\/record\/row-live\.ts'/u);
   /* WHAT POINTS HERE IS THE RECORD'S OR NOTHING. The sample's walk filled this for any row that was not live, which
-     after DIRECTION 26 is only ever a row the record does not hold. */
+     with the sample gone is only ever a row the record does not hold. */
   assert.match(page, /const incoming = \$derived\(linked\?\.from === 'live' \? linked\.groups : \[\]\)/u);
   /* THE READ THAT MAKES THE LEARNED DECLARATION VISIBLE, and it is one `void` away from silence. The
      register table is a plain object, so `$derived(REGISTERS[id])` would depend on `id` alone and
@@ -240,7 +240,7 @@ test('the row page draws the live row and its refusal, and nothing of the sample
   assert.match(page, /\{:else if got\?\.from === 'refused'\}/u);
   assert.match(page, /title=\{got\.fix\}/u);
   assert.match(page, /const written = \$derived\(got\?\.from === 'live' \? \(got\.entry \?\? undefined\) : undefined\)/u, 'a row that is not there falls back to the sample again');
-  /* NO ROW THIS TAB TYPED IS HELD APART FROM THE RECORD: `pending` went with the sample (research-no-sample B1), and
+  /* NO ROW THIS TAB TYPED IS HELD APART FROM THE RECORD: `pending` went with the sample, and
      `entry(` was the sample's reader and `values()` the sample's hole answers. */
   assert.doesNotMatch(page, /record\/pending|pending\.of\(/u, 'the row page draws a row the record was not given again');
   assert.doesNotMatch(page, /\bentry\(id, seq\)|\bvalues\(\)|from === 'sample'/u, 'the row page reads the sample again');
@@ -276,8 +276,8 @@ test("a row on a list this build does not ship draws its link by the linked row'
  * Everything above answers out of `host`, which is thirty lines of this file returning what this
  * file expects, so a count taken there proves the reader agrees with the fixture. The record below
  * is the real one: `openRecord` over `node:sqlite`, the two declarations put in through `install`,
- * and 400 teacher rows written one at a time through `create`, which is the shape the usability
- * survey ran on.
+ * and 400 teacher rows written one at a time through `create`, which is the shape the fault was
+ * found on.
  *
  * ONLY THE HTTP ENVELOPE IS LOCAL, and it is not a mock of an answer: `@braindog/host` is not a
  * dependency of this app and making it one is not this change's to make, so `served` below calls the

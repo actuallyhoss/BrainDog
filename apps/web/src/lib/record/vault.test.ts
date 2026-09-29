@@ -46,7 +46,7 @@ test('a malformed code is refused before anything is sent', async () => {
 /*
  * WITH NO CLIENT THERE IS NOBODY SIGNED IN TO APPROVE AS, and signing in is the way forward. This answered
  * `{ kind: 'demo' }` and drew "The demo has no account", which was true only while `/app` with no session was
- * the sample record; with the sample gone (DIRECTION 26) the same state is a person who has to sign in.
+ * the sample record; with the sample gone the same state is a person who has to sign in.
  */
 test('with no client the answer is to sign in, and nothing is sent', async () => {
   const answer = await approve('123456', null);
@@ -156,7 +156,7 @@ test('a key row joins its grant for the counts, and a row with no grant is an in
   ];
   const keys = keysOf(rows, grants, names);
   assert.deepEqual(keys.map((k) => k.label), ['Admin panel', 'Briefed', 'Stripe'], 'retired rows are gone and the order is the label');
-  /* `scope` IS THE CHIP'S OWN SHAPE (AGT-11): the project's spoken id, name, mark and hue, built from the same
+  /* `scope` IS THE CHIP'S OWN SHAPE: the project's spoken id, name, mark and hue, built from the same
      `project` row `names` already looked up, or `null` for a global key. `names` here carries no `.marks`, so a
      scoped row's mark and hue read `null` and its spoken id falls back to the project's bare id. */
   assert.deepEqual(keys.find((k) => k.id === 'c1'), {

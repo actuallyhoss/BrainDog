@@ -1,5 +1,5 @@
 /**
- * What the Settings tiles say (SYSTEM §6, §7): the meters as bars, the last thirty nights as a strip, and the sentence
+ * What the Settings tiles say: the meters as bars, the last thirty nights as a strip, and the sentence
  * under the title. Every number is the record's own answer, and a night is only called missed when it really had none.
  */
 

@@ -1,9 +1,9 @@
 <!--
-  A stacked bar: part of a whole as one pill-ended bar, its parts 2px apart (SYSTEM §7).
+  A stacked bar: part of a whole as one pill-ended bar, its parts 2px apart.
 
   Parts with no `tone` step down the ramp in order, ink first, so put the part that matters first or
   give it `ink` and the rest greys. A part's label sits under it, at its start, when it fits inside
-  the part's width; at phone width the labels that no longer fit drop (SYSTEM §9), and the sentence
+  the part's width; at phone width the labels that no longer fit drop, and the sentence
   a screen reader hears always has every part.
 -->
 <script lang="ts">

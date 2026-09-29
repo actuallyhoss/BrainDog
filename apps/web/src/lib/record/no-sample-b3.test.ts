@@ -1,8 +1,8 @@
 /**
- * Brief B3 of `loop/research-no-sample.md` section 5: the declarations, the pages and the row names a live tab reads are
+ * The declarations, the pages and the row names a live tab reads are
  * the record's, kept in `held.ts`, and no screen reads the sample's clock.
  *
- * WHAT WAS WRONG, MEASURED ON THE CODE BEFORE THIS BRIEF. A record whose projects are Harbour Lane and Tidewater was
+ * WHAT WAS WRONG, MEASURED ON THE CODE BEFORE THIS CHANGE. A record whose projects are Harbour Lane and Tidewater was
  * asked `thing is Harbour Lane` and the sentence was refused, "thing is Harbour Lane: thing has no value Harbour Lane",
  * because `where.ts` looked the title up among the sample's four projects. The same chip went to the record as the
  * characters `Harbour Lane`, and `thing is Kiln` went as `01JLIVEHARBOURLANE0000000A`, the ULID of the record's row #1,
@@ -19,7 +19,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/* THE SAMPLE'S DECLARATIONS PUT WHERE A LIVE TAB KEEPS THE RECORD'S, which the fixture did by itself until wave C1. */
+/* THE SAMPLE'S DECLARATIONS PUT WHERE A LIVE TAB KEEPS THE RECORD'S, which the fixture once did by itself. */
 import './fixtures/fill.ts';
 import * as api from './api.ts';
 import { forget, readBoot, type Fetch } from './boot-live.ts';
@@ -77,8 +77,8 @@ function shipped(dir: string): string[] {
     return /\.(ts|svelte)$/u.test(name) && !/\.test\.ts$/u.test(name) ? [path] : [];
   });
 }
-/* EVERYTHING `shipped` WALKS SHIPS AND READS THE RECORD. The fixture module was the one exemption until wave C1 moved
-   it under `fixtures/`, which `shipped` does not walk; `api.ts` was the second until wave B2. */
+/* EVERYTHING `shipped` WALKS SHIPS AND READS THE RECORD. The fixture module was the one exemption until it moved
+   under `fixtures/`, which `shipped` does not walk; `api.ts` was the second until its readers left it. */
 const imported = (source: string, name: string): boolean =>
   new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*'[^']*/(api|data)\\.ts'`, 'u').test(source);
 

@@ -1,6 +1,6 @@
 /**
  * Segments' geometry: one cell per step or part, done ones filled, the current one outlined, the rest
- * quiet (SYSTEM §7, "progress").
+ * quiet (the design system: "progress").
  *
  * THE CELLS SHARE THE WIDTH, 3px apart, 8px tall with a radius of 3. Many steps in a narrow box close
  * the gap to 1px and then to none rather than drawing cells thinner than their gaps; past about a
@@ -35,7 +35,7 @@ export function segments(total: number, done: number, width: number, current = f
   }));
 }
 
-/** "Nile, parts paid: 10 of 23, the 11th current". */
+/** "Lina, parts paid: 10 of 23, the 11th current". */
 export function describeSegments(total: number, done: number, subject: string | undefined, current = false): string {
   const n = Math.max(0, Math.floor(total));
   const d = Math.min(Math.max(0, Math.floor(done)), n);

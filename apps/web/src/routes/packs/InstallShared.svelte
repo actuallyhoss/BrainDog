@@ -1,5 +1,5 @@
 <!--
-  Install from anywhere (`loop/finish/platform.md` PLT-4): a use case or an add-on somebody shared, from a file on this
+  Install from anywhere: a use case or an add-on somebody shared, from a file on this
   computer, an https address, `git:owner/repo@ref:path`, or its text pasted in.
 
   THE FILE SAYS WHICH IT IS. `readCatalogueFile` reads it in this tab first, as a use case when it names one and as an
@@ -186,7 +186,7 @@
   }
 </script>
 
-<!-- ONE COLUMN, THREE WAYS IN, each a label above its field and a quiet pill to read it (SYSTEM §6, Fields). The one
+<!-- ONE COLUMN, THREE WAYS IN, each a label above its field and a quiet pill to read it. The one
      primary is the plan sheet's Approve, so nothing here is ink. -->
 <div class="from">
   <p class="from-blurb">{words.fromBlurb}</p>

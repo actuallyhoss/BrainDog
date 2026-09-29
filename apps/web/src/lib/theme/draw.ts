@@ -1,5 +1,5 @@
 /**
- * The record's installed look, drawn on the page (GAP-3, `28 §5`).
+ * The record's installed look, drawn on the page (`28 §5`).
  *
  * `boot` ANSWERS `theme`: each scheme's custom properties, solved by `@braindog/theme` from the record's installed
  * `theme` declaration, the same build the install checked (`packages/record/src/theme-check.ts`). This module turns that

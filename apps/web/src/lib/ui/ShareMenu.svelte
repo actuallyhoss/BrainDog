@@ -1,7 +1,7 @@
 <!--
   "Share a read-only link" for one page: the button, and the sheet that makes the link and shows it once.
 
-  SELF-CONTAINED, so the page head places it with one line, `<ShareMenu slug={...} />` (contracts §8, COL-7), and owns
+  SELF-CONTAINED, so the page head places it with one line, `<ShareMenu slug={...} />`, and owns
   nothing of it. What it writes is `share-write.ts`'s.
 
   THE LINK IS SHOWN ONCE AND KEPT NOWHERE. The record never holds it (the host signs it after the record answers), so it
@@ -11,7 +11,7 @@
   ONLY AN OWNER CAN MAKE ONE (`openShare` is ADMIN). The button is drawn for everybody the head is drawn for, and anybody
   else is told the record's own sentence when they press it, rather than this guessing at a level it does not read.
 
-  "SHARE AS A TEMPLATE" LIVES IN THE SAME SHEET (PLT-14), so the page head keeps its one line. It reads the page as the
+  "SHARE AS A TEMPLATE" LIVES IN THE SAME SHEET, so the page head keeps its one line. It reads the page as the
   record stores it, makes a pack of that page alone (`lib/market/template.ts`), and says what the pack adds, what it
   reads, what it calls out to and the page as drawn now, before Download or Publish. Publishing sends the file to the
   Kennel as the signed-in person (`lib/market/publish.ts`), and the answer is one sentence with a link.
@@ -247,7 +247,7 @@
 
   /* The link wraps anywhere: a token has no spaces to break at, and a sideways scroll inside a sheet on a phone hides
      the half that matters. */
-  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field` (SYSTEM §6). */
+  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field`. */
   .share-link {
     inline-size: 100%;
     min-block-size: 40px;

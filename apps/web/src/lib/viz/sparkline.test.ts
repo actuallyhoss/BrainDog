@@ -79,8 +79,8 @@ test('a mark label takes a line of room on its side and stays inside the box', (
 
 test('it reads as a sentence from its data', () => {
   assert.equal(
-    describeSparkline(TAKINGS, 'acme.example takings a day, 9 weeks', 'low'),
-    'acme.example takings a day, 9 weeks, from 138 to 96, low 95',
+    describeSparkline(TAKINGS, 'Kiln takings a day, 9 weeks', 'low'),
+    'Kiln takings a day, 9 weeks, from 138 to 96, low 95',
   );
   assert.equal(describeSparkline([1, 3, 2], undefined), 'From 1 to 2, low 1, high 3');
   assert.equal(describeSparkline([], 'Takings'), 'Takings, no figures yet');

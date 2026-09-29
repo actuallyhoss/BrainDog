@@ -69,7 +69,7 @@ test('THE CAPTURE FIELD SPELLS ITS OWN ARTICLE, and it said "Add a item" on the 
  * other clothes, because on the seven registers and the five Home pages where they differ the title
  * is the only part a reader recognises.
  *
- * AND DE-DUPLICATION MOVES TO THE ADDRESS, which is the half of finding 4 that fixing the titles
+ * AND DE-DUPLICATION MOVES TO THE ADDRESS, which is the half of the problem that fixing the titles
  * quietly made wrong. Five pages titled Overview are five pages at five addresses, so the nine names
  * that pass reduced to six were four real pages the record holds and the refusal no longer mentions.
  * Two entries are the same entry when they answer at the same address and never because two authors
@@ -134,8 +134,8 @@ test('A REFUSAL NAMES ADDRESSES, because the person reading it just typed one th
 
 test('A LIST OF NAMES IS BUILT BY `list()`, and one sentence was joining them by hand', () => {
   /* The refusal that found it, `diffRefused`, used `names.join(' and ')`, so three colliding pack
-     names read "Money and Services and People". It is gone, rendered nowhere once the sample went
-     (DIRECTION 26); the sentences that still name several add-ons are held to the same rule. Two
+     names read "Money and Services and People". It is gone, rendered nowhere once the sample
+     went; the sentences that still name several add-ons are held to the same rule. Two
      names is the common case, which is why a sentence that reads wrong at three went unnoticed. */
   assert.equal(copy.packNeededBy(['Money']), 'Needed by Money');
   assert.equal(copy.packNeededBy(['Money', 'Services']), 'Needed by Money and Services');

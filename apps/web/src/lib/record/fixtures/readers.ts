@@ -3,16 +3,16 @@
  *
  * A TEST IMPORTS THIS AND NOTHING SHIPPED MAY. These are `boot`, `list`, `entry`, `search`, `page`, `values`, `job` and
  * `metric` as `api.ts` answered them out of `data.ts`. They were the mock the app was drawn against before a record could
- * answer, and they shipped for as long as they sat beside the helpers the live screens draw with (wave B2 of
- * `loop/research-no-sample.md`). Also here are the sample-bound helpers no screen called (`applyFilters`, `backlinks`,
+ * answer, and they shipped for as long as they sat beside the helpers the live screens draw with.
+ * Also here are the sample-bound helpers no screen called (`applyFilters`, `backlinks`,
  * `noticed`, `trackHealth`, `workingNow`, `trendOf`, `figureTile` and the like), because each reads the sample's rows or
  * its clock. `no-sample-b2.test.ts` refuses any file outside a test that imports this directory.
  *
  * THE RECORD ANSWERS AND THIS FILE ONLY ASKS. `page`, `pages`, `readBlock`, `metric`, `values`, `list` and `applyFilters`
  * ask a real kernel over `node:sqlite`, seeded once by `installSeed` when this module loads, and a page or a figure comes
  * back drawn by the same `blockOf` and `tileOf` a live page draws with (`page-live.ts`). They answered out of a second
- * engine in this app until DIRECTION §32: a cash walk, a page expander, a figure reader and a row matcher that no screen
- * ran, and that every change to a figure or a sentence had to be made in twice (`loop/finish/architecture.md` ARC-1).
+ * engine in this app once: a cash walk, a page expander, a figure reader and a row matcher that no screen
+ * ran, and that every change to a figure or a sentence had to be made in twice.
  * Where a test was written against that engine and the kernel answers otherwise, the kernel is right.
  *
  * THE CLOCK IS THE SAMPLE'S `NOW` THROUGHOUT, and the kernel is opened at it, because the rows are the sample's: a due
@@ -51,7 +51,7 @@ import {
   type TrackHealth,
 } from '../api.ts';
 /* THE SAMPLE'S READERS READ THE TABLES THE HELPERS READ, which `fill.ts` fills with the sample. They read the fixture's
-   own until wave C1, when the fixture's tables and `held.ts`'s were one object for the declarations and two for the
+   own until the sample left the app, when the fixture's tables and `held.ts`'s were one object for the declarations and two for the
    rows, so a test that grew a list for a reader and a helper had to know which of the two each one looked in. */
 import './fill.ts';
 import { REGISTERS, ROWS } from '../held.ts';
@@ -507,7 +507,7 @@ export function figureTile(id: string, decl: MetricDecl, reading: Reading): Metr
    * install the product, telling them their finances are healthy on the strength of no data at all.
    *
    * `19 §6` names five empty states and says collapsing them is the failure; this is the collapse
-   * nothing had audited, because both usability passes before this one could not reach an empty
+   * nothing had caught, because earlier usability checks could not reach an empty
    * record in a browser. `no-data-yet` was reading as `cleared`.
    *
    * THE TONE GOES AND THE SENTENCE ARRIVES. A tile with no tone is a fact without a verdict, which
@@ -754,8 +754,8 @@ export function boot() {
       /**
        * THE LISTS THAT HOLD SOMETHING, AND IT USED TO BE EVERY LIST DECLARED.
        *
-       * `USABILITY.md`'s second question is whether the product grows as the record grows, and the
-       * rail was the clearest no in it: eight list links, each with its own tally, drawn identically
+       * One question to ask of the product is whether it grows as the record grows, and the
+       * rail was the clearest no: eight list links, each with its own tally, drawn identically
        * over a record of eight rows and a record of four hundred. Seven of the eight read `0`, and a
        * link to a list with nothing in it is a thing a person has to read, decide is irrelevant, and
        * put down, every time they look at the rail. Counting every declared register is the count that
@@ -795,7 +795,7 @@ export function boot() {
     },
     nav,
     /** Pages that emerged and were never placed. A holding pen, not a decision (19 §3).
-        PGS-16: `Shell.pen` is now `PenItem[]` (`lib/design/pen.ts`), and this sample fixture never emits a change
+        `Shell.pen` is now `PenItem[]` (`lib/design/pen.ts`), and this sample fixture never emits a change
         offer, so it holds none rather than the old `PageDecl[]` shape. */
     pen: [],
     me: {
