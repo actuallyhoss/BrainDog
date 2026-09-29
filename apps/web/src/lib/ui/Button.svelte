@@ -197,6 +197,12 @@
     color: var(--dim);
   }
 
+  /* AND ITS KEY CAP GOES QUIET WITH IT: the on-ink cap on the grey fill was a cap nobody could see. */
+  .btn[data-weight='primary']:disabled :global(.kbd) {
+    background: var(--hover-wash);
+    color: var(--dim);
+  }
+
   .btn[data-weight='bare']:disabled {
     background: none;
   }
