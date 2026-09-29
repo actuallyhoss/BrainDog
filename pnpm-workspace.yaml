@@ -51,6 +51,10 @@ allowBuilds:
 #            stranger sent (one reads a mark in this repository and the other is a dev server), but
 #            a bundled native decoder is precisely the dependency whose blast radius is not obvious
 #            from the call site, and 0.35.4 is a patch release of the version already installed.
+#   undici   A medium advisory on 7.28.0 up to 7.29.1. It arrives through `wrangler` and `miniflare` for
+#            the dev server and deploys, never in what a browser or a record runs; the patched 7.x is the
+#            same API, so the range holds until those packages ask for it themselves.
 overrides:
   cookie: ^0.7.2
   sharp: ^0.35.4
+  undici: ^7.29.1
