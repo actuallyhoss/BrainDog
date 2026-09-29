@@ -13,10 +13,15 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
+
+  /* THIS AREA'S OWN WORDS: the group the ways back in sit under. */
+  const words = { wayBack: 'Getting back in' };
 
   /* THE HOST'S ANSWER ABOUT SIGNING IN IS SHARED with Identity, where signing out changes it
      (`settings-state.svelte.ts`). The names below are the ones this markup reads. */
@@ -87,18 +92,21 @@
     {:else if liveKeys.length === 0}
       <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(livePasskeys.magic)} />
     {:else}
-      <ul class="ledger ledger-glyph">
+      <ul class="ledger ledger-lead">
         {#each liveKeys as k (k.id)}
           <li>
-            <div class="line">
-              <span class="seq"><Icon name="key" size="s" /></span>
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
                 <span class="line-title">{k.label ?? copy.passkeyUnnamed}</span>
-                <span class="line-detail">{copy.addedWhen(since(new Date(k.createdAt).toISOString()))}</span>
+                <span class="line-detail"
+                  >{copy.addedWhen(since(new Date(k.createdAt).toISOString()))} · {k.lastUsed
+                    ? copy.usedWhen(since(new Date(k.lastUsed).toISOString()))
+                    : copy.neverUsed}</span
+                >
               </span>
               <span class="line-amount"></span>
               <span class="line-when">
-                {k.lastUsed ? copy.usedWhen(since(new Date(k.lastUsed).toISOString())) : copy.neverUsed}
                 <Button
                   weight="bare"
                   tone="bad"
@@ -147,28 +155,23 @@
   <Button href={signinFor(page.url)}>{copy.signIn}</Button>
 {/snippet}
 
-<!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
-     `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
-     screen offering a link that cannot be sent is worse than one offering nothing. Until the
-     host answers, it is not offered: the fallback was the sample's `AUTH_METHODS`. -->
-{#if hostAuth?.magic}
-  <Section title={copy.magicLink}>
-    <p class="hint">{copy.magicHow}</p>
-  </Section>
-{/if}
-
-<!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
-     and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the
-     mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
-     person who runs the host as the last resort either way, because there is no recovery code to offer. -->
-{#if livePasskeys}
-  <Section title={copy.passkeyLost}>
-    <p class="hint">{copy.passkeyLostHow(livePasskeys.magic)}</p>
-  </Section>
-{/if}
-
-<Section title={copy.lockout}>
-  <p class="hint">{copy.lockoutHow}</p>
+<!-- THE WAYS BACK IN, IN THE ORDER THEY ARE NEEDED: one passkey lost, all of them lost, and too many tries. -->
+<Section title={words.wayBack}>
+  <!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
+       and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the
+       mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
+       person who runs the host as the last resort either way, because there is no recovery code to offer. -->
+  {#if livePasskeys}
+    <StateRow icon="key" title={copy.passkeyLost} line={copy.passkeyLostHow(livePasskeys.magic)} />
+  {/if}
+  <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
+       `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
+       screen offering a link that cannot be sent is worse than one offering nothing. Until the
+       host answers, it is not offered: the fallback was the sample's `AUTH_METHODS`. -->
+  {#if hostAuth?.magic}
+    <StateRow icon="link" title={copy.magicLink} line={copy.magicHow} />
+  {/if}
+  <StateRow icon="clock" title={copy.lockout} line={copy.lockoutHow} />
 </Section>
 
 <style>

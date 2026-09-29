@@ -13,8 +13,10 @@
   import Button from '$lib/ui/Button.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import PushToggle from '$lib/ui/PushToggle.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import { ownsRecord } from '../../levels.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. This one reads who is asking, since only an owner moves the quiet hours. */
   let props: AreaProps = $props();
@@ -74,13 +76,21 @@
 -->
 <Section title={copy.whenWeInterrupt}>
   <p class="hint">{copy.batchByDefault}</p>
+  <!-- WHAT INTERRUPTS, AS ROWS OF FACT: each rule this record holds about interrupting, with its glyph, its name and
+       the one sentence that says it. Nothing here is a control, so no row carries one. -->
+  <StateRow icon="alert" title={copy.urgentKinds} line={copy.urgentKindsAre} />
+  <StateRow icon="clock" title={copy.interruptCap} line={copy.interruptCapIs} />
+  <StateRow icon="bell" title={copy.unreadCount} line={copy.unreadCountIs} />
+  <p class="hint after">{copy.muteAtSource}</p>
+</Section>
 
-  <h3 class="quiet-title">{copy.quietHours}</h3>
+<Section title={copy.quietHours}>
   {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
     <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
   {:else if quiet !== null}
     {#if owner}
       <div class="quiet">
+        <IconWell name="moon" />
         <p class="quiet-said" id="quiet-said">
           {#if on}
             <label class="quiet-word" for="quiet-from">{copy.quietHold}</label>
@@ -108,45 +118,37 @@
           onclick={flip}><span class="switch-track"></span></button
         >
       </div>
-      {#if refusal}
-        <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>
-      {/if}
-      <p class="hint">{copy.quietWhy}</p>
-      {#if quiet.quiet !== null && on && (from !== '22:00' || to !== '08:00')}
-        <Button weight="bare" disabled={busy} onclick={() => void put(null)}>{copy.quietDefault}</Button>
-      {/if}
+      <div class="quiet-after">
+        {#if refusal}
+          <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>
+        {/if}
+        <p class="hint">{copy.quietWhy}</p>
+        {#if quiet.quiet !== null && on && (from !== '22:00' || to !== '08:00')}
+          <Button weight="bare" disabled={busy} onclick={() => void put(null)}>{copy.quietDefault}</Button>
+        {/if}
+      </div>
     {:else}
-      <p class="quiet-said">{on ? copy.quietHeld(from, to) : copy.quietOff}</p>
-      <p class="hint">{copy.quietWhy} {copy.quietOwner}</p>
+      <StateRow icon="moon" title={on ? copy.quietHeld(from, to) : copy.quietOff} line={`${copy.quietWhy} ${copy.quietOwner}`} />
     {/if}
   {/if}
-
-  <ul class="facts">
-    <li><span class="fact-key">{copy.urgentKinds}</span><span class="fact-value">{copy.urgentKindsAre}</span></li>
-    <li><span class="fact-key">{copy.interruptCap}</span><span class="fact-value">{copy.interruptCapIs}</span></li>
-    <li><span class="fact-key">{copy.unreadCount}</span><span class="fact-value">{copy.unreadCountIs}</span></li>
-  </ul>
-  <p class="hint">{copy.muteAtSource}</p>
 </Section>
 <!-- THE ONE CONTROL ON THIS SCREEN THAT IS ABOUT THE DEVICE, NOT THE RECORD. It says whether this browser is rung when
      something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here. -->
 <PushToggle />
 
 <style>
-  /* THE QUIET HOURS, AS ONE SENTENCE WITH ITS SWITCH BESIDE IT (design brief: "a switch sits beside its sentence", never
-     700px from it). The two pickers sit inside the sentence, so it reads "Hold notices from 22:00 to 08:00". */
-  .quiet-title {
-    margin: 0 0 var(--sp-2);
-    font-size: var(--t-base);
-    font-weight: 600;
-  }
-
+  /* THE QUIET HOURS, AS ONE ROW: the well, the sentence with its two pickers inside it, and the switch at the row's end
+     (design brief: "a switch sits beside its sentence", never 700px from it). The pickers sit inside the sentence, so it
+     reads "Hold notices from 22:00 to 08:00". The row's measure is the one every settings row keeps, so the switch
+     lands where the switches of the other areas land. */
   .quiet {
     display: grid;
-    grid-template-columns: fit-content(var(--measure)) auto;
+    grid-template-columns: var(--well) minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-3);
-    margin: 0 0 var(--sp-2);
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
   .quiet-said {
@@ -156,6 +158,8 @@
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
     line-height: var(--lh-body);
   }
 
@@ -174,61 +178,15 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* WHAT FOLLOWS THE ROW STARTS WHERE ITS SENTENCE STARTS. */
+  .quiet-after {
+    padding-inline-start: calc(var(--well) + var(--sp-3));
+  }
+
   .quiet-refused {
     margin: 0 0 var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-sm);
-  }
-
-  /* AT A PHONE'S WIDTH THE SENTENCE TAKES ITS OWN LINE AND THE TWO PICKERS SIT SIDE BY SIDE UNDER IT, each a full
-     touch target, with the switch still beside the sentence rather than under the pickers. */
-  @media (width < 520px) {
-    .quiet-pickers {
-      flex-basis: 100%;
-    }
-
-    .quiet-time {
-      min-block-size: var(--tap);
-    }
-  }
-
-  /* A short list of stated facts, for the areas that REPORT rather than offer. Two columns so
-     the label and the value line up down the page; it wraps to one below 520px. */
-  .facts {
-    display: grid;
-    grid-template-columns: minmax(12ch, max-content) minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-4);
-    margin: var(--sp-3) 0 var(--sp-3);
-    padding: 0;
-    list-style: none;
-  }
-
-  .facts li {
-    display: contents;
-  }
-
-  .fact-key {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .fact-value {
-    color: var(--ink2);
-  }
-
-  @media (width < 520px) {
-    .facts {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0 0;
-    }
-
-    /* The label over its value. As a block the two spans ran together into one line. */
-    .facts li {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-1);
-      margin-block-end: var(--sp-2);
-    }
   }
 
   .hint {
@@ -237,5 +195,29 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
+  }
+
+  .after {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* AT A PHONE'S WIDTH THE SENTENCE TAKES ITS OWN LINE AND THE TWO PICKERS SIT SIDE BY SIDE UNDER IT, each a full
+     touch target, with the switch still at the end of the row rather than under the pickers. */
+  @media (width < 520px) {
+    .quiet {
+      align-items: start;
+    }
+
+    .quiet-said {
+      font-size: var(--t-md);
+    }
+
+    .quiet-pickers {
+      flex-basis: 100%;
+    }
+
+    .quiet-time {
+      min-block-size: var(--tap);
+    }
   }
 </style>

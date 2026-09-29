@@ -1,11 +1,16 @@
 <!--
   The settings index: every area as a row, in its group (DSN-13).
 
-  ONE INDEX AT BOTH WIDTHS. Below 900px it is the whole of `/settings`, a list of 56px rows with a
+  ONE INDEX AT BOTH WIDTHS. Below 900px it is the whole of `/settings`, a list of 60px rows with a
   chevron that each open an area on a page of its own. From 900px up it stands beside the area that
   is open, as the rail stands beside a page, and the open area's row is the current one. It is the
   same list in both places, the same groups, rows and order, so a person who learns where an area
   sits on one screen finds it there on the other.
+
+  A LIST ON THE GROUND, NOT A CARD (SYSTEM §6, SCREENS "Settings"). Each group is a group on the ground: its title at
+  `--t-group` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
+  at 1440, 36 tall with its glyph in a 28px well and the name at 14/500, and the current row is the rail's "here": the
+  wash, an ink well and the name at 600. Never the mark's red (D-1).
 
   WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There the index is all a person sees, and the line
   is how they tell the areas apart before opening one. Beside an open area the index is as narrow as
@@ -19,6 +24,7 @@
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import { ONLY_WIDE, grouped, type AreaRow } from './place.ts';
 
   let { areas, current }: { areas: readonly AreaRow[]; current?: string | undefined } = $props();
@@ -35,7 +41,7 @@
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->
           <li class={ONLY_WIDE.has(a.id) ? 'wide-only' : undefined}>
             <a class="area-row" href={at(`/settings/${a.id}`)} aria-current={a.id === current ? 'page' : undefined}>
-              <span class="area-icon"><Icon name={a.icon} size="m" /></span>
+              <span class="area-icon"><IconWell name={a.icon} tone={a.id === current ? 'ink' : undefined} /></span>
               <span class="words">
                 <span class="name">{a.label}</span>
                 {#if a.line}<span class="area-line">{a.line}</span>{/if}
@@ -56,50 +62,66 @@
     gap: var(--sp-5);
   }
 
-  /* A LABEL OVER ITS ROWS, NOT A SECTION TITLE. The group names the rows under it; the page's own
-     sections are the area's, and a heading as loud as theirs would compete with them at 1440. */
+  /* A GROUP ON THE GROUND (SYSTEM §6): its title at `--t-group`, 17 on 24 at 600, and one hairline under it. The rows
+     start a step under the line, so the wash of the first one never touches it. */
   .group-title {
     margin: 0 0 var(--sp-2);
-    padding-inline: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    padding-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--line);
+    color: var(--ink);
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
   }
 
   /* CLASS NAMES OF ITS OWN, because `.rows`, `.row` and `.glyph` are `blocks.css`'s and `.line` is
      `rows.css`'s, all global. A scoped rule only overrides the properties it names, so every other
      property of theirs reached these elements: the glyph took the size of a block's intent dot
-     (`--dot`), and the line under a name took a ledger row's height and padding. */
+     (`--dot`), and the line under a name took a ledger row's height and padding.
+
+     THE ROWS REACH A STEP PAST THE TITLE'S EDGE, as a list on the ground does (`rows.css` `.ledger`), so the wells
+     line up under the group's title and the rounded wash still has somewhere to be. */
   .area-rows {
-    margin: 0;
+    display: grid;
+    gap: 2px;
+    margin: 0 calc(-1 * var(--sp-1));
     padding: 0;
     list-style: none;
   }
 
-  /* BESIDE AN AREA, A ROW IS ITS GLYPH AND ITS NAME, as a rail row is, at a control's height, which is
-     44 under a thumb. Two columns and not three with the chevron's hidden: a hidden item leaves its
-     track, and the gap before the track, taking room from the name. The whole row is the target. */
+  /* BESIDE AN AREA, A ROW IS THE RAIL'S (SYSTEM §5): 36 tall, its glyph in a 28px well, the name 14/500 in the second
+     ink. Two columns and not three with the chevron's hidden: a hidden item leaves its track, and the gap before the
+     track, taking room from the name. The whole row is the target, and 44 under a thumb. */
   .area-row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: var(--well) minmax(0, 1fr);
     align-items: center;
-    column-gap: var(--sp-3);
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3);
+    column-gap: 10px;
+    min-block-size: var(--rail-item-h);
+    padding-inline: var(--sp-1) var(--sp-2);
     border-radius: var(--r-md);
-    color: var(--ink);
+    color: var(--ink2);
     text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
+  /* THE WELL AT REST IS THE GROUND'S WHITE (`settings.css`), and the current row's is `IconWell`'s own ink; the change
+     between them is the row's own 90ms. */
   .area-icon {
     display: inline-flex;
-    color: var(--dim);
+  }
+
+  .area-icon :global(.well) {
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   .words {
     display: grid;
-    gap: var(--sp-1);
+    gap: 2px;
     min-inline-size: 0;
   }
 
@@ -108,9 +130,9 @@
   .name {
     display: block;
     overflow: hidden;
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     font-weight: 500;
-    line-height: var(--lh-tight);
+    line-height: 20px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -127,45 +149,75 @@
     scale: -1 1;
   }
 
-  /* THE CURRENT AREA IS THE ONE "HERE" THE PRODUCT HAS: the `--selected` ground and an ink glyph, as the
-     rail's current row, and never the accent (design D-1). */
+  /* THE CURRENT AREA IS THE ONE "HERE" THE PRODUCT HAS, drawn as the rail draws it: the wash, an ink well and the name
+     at 600 in ink. Never the accent (design D-1). */
   .area-row[aria-current='page'] {
     background: var(--selected);
+    color: var(--ink);
   }
 
-  .area-row[aria-current='page'] .area-icon {
-    color: var(--ink);
+  .area-row[aria-current='page'] .name {
+    font-weight: 600;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .area-row:not([aria-current]):hover {
       background: var(--hover-wash);
+      color: var(--ink);
     }
   }
 
-  /* ON A PHONE THE INDEX IS THE PAGE: icon, name and its line, then the chevron, in a row never shorter
-     than a two-line row (`--row-h-2`), with a hairline between rows and none around them. The line
-     keeps to one line with an ellipsis as its guard; the registry keeps each line short enough that
-     the guard is not what a reader sees. */
-  @media (width < 900px) {
+  @media (pointer: coarse) {
     .area-row {
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      min-block-size: var(--row-h-2);
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* ON A PHONE THE INDEX IS THE PAGE (SYSTEM §9): a 32px well, the name at the phone's body size and its line under it,
+     then the chevron, in a row 60 tall, with a hairline between rows under the words and none around them. The line
+     keeps to one line with an ellipsis as its guard; the registry keeps each line short enough that the guard is not
+     what a reader sees. */
+  @media (width < 900px) {
+    .area-rows {
+      gap: 0;
     }
 
-    .area-rows > li + li {
-      border-block-start: 1px solid var(--line-soft);
+    .area-rows > li {
+      position: relative;
+    }
+
+    .area-rows > li + li::after {
+      content: '';
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline: calc(var(--sp-1) + var(--well-l) + var(--sp-3)) var(--sp-2);
+      block-size: 1px;
+      background: var(--line);
+      pointer-events: none;
+    }
+
+    .area-row {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      column-gap: var(--sp-3);
+      min-block-size: 60px;
+      color: var(--ink);
+    }
+
+    .area-icon :global(.well) {
+      inline-size: var(--well-l);
+      block-size: var(--well-l);
     }
 
     .name {
       font-size: var(--t-md);
+      line-height: 22px;
     }
 
     .area-line {
       display: block;
       overflow: hidden;
       font-size: var(--t-sm);
-      line-height: var(--lh-tight);
+      line-height: 18px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }

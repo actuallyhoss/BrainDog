@@ -9,7 +9,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
@@ -79,14 +79,20 @@
   {:else if unread}
     <p class="hint">{copy.sessionsUnread}</p>
   {:else if ordered}
-    <ul class="sessions">
+    <!-- EACH BROWSER AS A ROW ON THE GROUND: this one's well is ink, the product's "here", as the rail's current place
+         is; the others are the plain well. -->
+    <ul class="ledger ledger-lead sessions">
       {#each ordered as r (r.ref)}
         <li class="session" data-current={r.current ? '' : undefined}>
-          <span class="session-glyph"><Icon name={r.current ? 'check' : 'lock'} size="s" /></span>
-          <span class="session-main">
-            <span class="session-title">{r.current ? copy.sessionThis : copy.sessionOther}</span>
-            <span class="session-detail">{copy.sessionWhen(when(r.authedAt), when(r.activeAt))}</span>
-          </span>
+          <div class="line line-tall">
+            <span class="line-mark"><IconWell name="monitor" size="l" tone={r.current ? 'ink' : undefined} /></span>
+            <span class="line-main">
+              <span class="line-title session-title">{r.current ? copy.sessionThis : copy.sessionOther}</span>
+              <span class="line-detail session-detail">{copy.sessionWhen(when(r.authedAt), when(r.activeAt))}</span>
+            </span>
+            <span class="line-amount"></span>
+            <span class="line-when"></span>
+          </div>
         </li>
       {/each}
     </ul>
@@ -113,47 +119,17 @@
   }
 
   .sessions {
-    display: grid;
-    margin: 0 0 var(--sp-3);
-    padding: 0;
-    list-style: none;
-  }
-
-  .session {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-3);
-    padding-block: var(--sp-3);
-    border-block-end: 1px solid var(--line-soft);
-  }
-
-  .session-glyph {
-    flex: none;
-    color: var(--dim);
-  }
-
-  /* THE DETAIL WRAPS UNDER THE TITLE, never beside it, so at 390 the two dates read as one line under "Another
-     browser" rather than a column squeezed to the right. */
-  .session-main {
-    display: grid;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-  }
-
-  .session-title {
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
+    margin-block-end: var(--sp-3);
   }
 
   .session[data-current] .session-title {
     font-weight: 600;
   }
 
+  /* THE TWO DATES WRAP UNDER THE TITLE rather than cut, so at 390 both are read whole under "Another browser". */
   .session-detail {
     overflow-wrap: anywhere;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    white-space: normal;
   }
 
   .row-actions {

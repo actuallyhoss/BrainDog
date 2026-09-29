@@ -20,6 +20,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
 
   let links = $state<ShareRow[] | null>(null);
   let refused = $state<string | null>(null);
@@ -82,6 +83,7 @@
       {#each sorted as l (l.id)}
         {@const open = linkState(l, now) === 'open'}
         <li class="link" data-open={open ? '' : undefined}>
+          <IconWell name="link" size="l" />
           <div class="link-text">
             <span class="link-title">{l.title}</span>
             <span class="link-when">{stateSaid(l)} · {words.linksOpened(since(l.opened_at, now))}</span>
@@ -119,51 +121,70 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
-  /* One link to a line, its Close at the end; below 640px the button drops under the words, full width. */
+  /* ONE LINK TO A ROW ON THE GROUND (SYSTEM §6): its well, the page it opens and when it stops, and its Close at the
+     end, with a hairline between rows from the words' edge. Below 640px the button drops under the words. */
   .link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding-block: var(--sp-3);
-    border-block-end: 1px solid var(--line);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .link + .link::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: calc(var(--well-l) + var(--sp-3)) 0;
+    block-size: 1px;
+    background: var(--line);
   }
 
   .link-text {
     display: grid;
     flex: 1 1 auto;
-    gap: var(--sp-1);
+    gap: 2px;
     min-inline-size: 0;
   }
 
   .link-title {
     color: var(--ink);
-    font-weight: 600;
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 
+  /* A CLOSED LINK IS HISTORY: its title steps back to the second ink. */
   .link:not([data-open]) .link-title {
     color: var(--ink2);
-    font-weight: 400;
   }
 
   .link-when {
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .link :global(.btn) {
     min-block-size: var(--tap);
   }
 
-  @media (max-width: 640px) {
+  @media (width < 640px) {
     .link {
       flex-wrap: wrap;
     }
 
+    .link-text {
+      flex-basis: calc(100% - var(--well-l) - var(--sp-3));
+    }
+
     .link :global(.btn) {
-      flex: 1 1 100%;
+      margin-inline-start: calc(var(--well-l) + var(--sp-3));
     }
   }
 </style>

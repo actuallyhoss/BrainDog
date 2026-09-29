@@ -12,17 +12,22 @@
   beside the open area, and `/settings` opens the first one (`SettingsIndex.svelte`, `place.ts`).
 -->
 <script lang="ts">
-  import { at } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import { untrack } from 'svelte';
   import { copy } from '$lib/copy.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
+  import { readUsage } from '$lib/record/actions.ts';
+  import { readSnapshots } from '$lib/record/settings-write.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { hostedHere } from '../billing.ts';
+  import { daysLeft, healthSaid, lastCopy, nearest, type CopyState, type UsageState } from './health.ts';
   import { openSettings } from './settings-state.svelte.ts';
   import SettingsIndex from './SettingsIndex.svelte';
   /* THE ROWS EVERY AREA SHARES, scoped under `.settings-place` below; the file says why it is global. */
@@ -155,7 +160,50 @@
    * this line says.
    */
   $effect(() => drew('ready'));
+
+  /**
+   * THE SENTENCE UNDER THE TITLE (SYSTEM §5, SCREENS "Settings"): last night's copy and the month's allowance, said on
+   * the index and on the two areas whose data it is, Billing and Backups. The phrase that needs him is red, and only
+   * when something does. `health.ts` says what the answers mean.
+   *
+   * ONLY WHERE THE CLOUD HOLDS THIS RECORD, which is where both answers exist: a self-host has no ledger, and says
+   * nothing here rather than half a sentence. Asked once for this visit to Settings, when the first of the three is
+   * opened, and never waited on: the screen is drawn without it and the sentence arrives when the record answers.
+   *
+   * A READ THAT FAILS SAYS NOTHING AND REFUSES NOTHING. The sentence is a summary of two areas that each say their own
+   * refusal in full, so its reads close as fine and never mark the screen refused.
+   */
+  const SAID_ON = new Set([undefined, 'billing', 'backups']);
+  let copyLast = $state<CopyState>(null);
+  let month = $state<UsageState>(null);
+  let asked = false;
+
+  async function readHealth(): Promise<void> {
+    asked = true;
+    const at = opened();
+    const now = Date.now();
+    const [copies, usage] = await Promise.all([
+      readSnapshots(apiBase()).catch(() => null),
+      readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url)).catch(() => null),
+    ]);
+    closed(true, at);
+    if (copies?.from === 'live') copyLast = lastCopy(copies.snapshots.map((c) => c.at), now);
+    if (usage?.ok === true && usage.view.from === 'ledger' && usage.view.current) {
+      const records = usage.view.records;
+      const mine = records.find((r) => r.name === shell.index.slug) ?? (records.length === 1 ? records[0] : undefined);
+      if (mine && mine.meters.length > 0) month = { resets: mine.resets, near: nearest(mine.meters), daysLeft: daysLeft(now) };
+    }
+  }
+
+  $effect(() => {
+    if (!SAID_ON.has(area) || !hostedHere(shell) || asked) return;
+    untrack(() => void readHealth());
+  });
+
+  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month) : null);
 </script>
+
+{#snippet healthLine()}{#each health ?? [] as part}{#if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <svelte:head><title>{titleOf(known?.label, copy.settings)}</title></svelte:head>
 
@@ -174,9 +222,9 @@
 <!-- AN AREA'S HEAD LINKS BACK TO THE INDEX: the kicker at 1440, the back link in the phone's bar. The
      index's own head is the one word, with nowhere above it to go back to. -->
 {#if known}
-  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={known.label} />
+  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={known.label} sentence={health ? healthLine : undefined} />
 {:else}
-  <PageHead icon="settings" title={copy.settings} />
+  <PageHead icon="settings" title={copy.settings} sentence={health ? healthLine : undefined} />
 {/if}
 
 <!-- `data-area` IS WHAT HIDES THE INDEX ON A PHONE while an area is open: there the area is the page,

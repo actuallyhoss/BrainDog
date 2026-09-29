@@ -25,10 +25,15 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import PageView from '$lib/page/PageView.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
+
+  /* THIS AREA'S OWN WORDS: the group the switch sits in, so the row inside can carry the switch's own name. */
+  const words = { offers: 'Suggestions' };
 
   /* THE MOST LISTS WHOSE ICON IS READ FOR AN OFFER, one `schema` read each, the record's own cap on the pen. */
   const ICON_LISTS_MOST = 24;
@@ -232,16 +237,36 @@
   gets whatever is picked here, and the collapsed rail is a width rather than a shape. The three that are choices are
   here, and the phone sentence says what a phone draws rather than letting the choice look ignored there.
 -->
+<!-- ONE SHAPE, DRAWN: the ground, the navigation where that shape puts it, and a page beside or under it. Shapes, never
+     words, so it is hidden from a screen reader; the button it sits in names the shape. -->
+{#snippet shapeOf(v: NavShape)}
+  <span class="nav-look" data-shape={v}>
+    {#if v === 'rail'}
+      <span class="nav-chrome nav-rail"><span class="nav-mark"></span><span class="nav-place" data-on></span><span class="nav-place"></span><span class="nav-place"></span><span class="nav-place"></span></span>
+    {:else if v === 'bar'}
+      <span class="nav-chrome nav-bar"><span class="nav-mark"></span><span class="nav-place" data-on></span><span class="nav-place"></span><span class="nav-place"></span></span>
+    {:else}
+      <span class="nav-chrome nav-menu"><span class="nav-lines"></span></span>
+    {/if}
+    <span class="nav-page">
+      <span class="nav-title"></span>
+      <span class="nav-tiles"><span class="nav-tile"></span><span class="nav-tile"></span></span>
+      <span class="nav-row"></span>
+      <span class="nav-row"></span>
+    </span>
+  </span>
+{/snippet}
+
 <Section title={copy.navShape}>
   <!-- ON A PHONE THE SHAPE IS ONE SENTENCE (DSN-13). A phone always draws the tab bar, so a picker there offers a choice
        the phone would not draw; `wide-only` (`settings.css`) leaves the picker to the screens that use it. -->
   <div class="wide-only">
     <p class="hint">{copy.navShapeHint}</p>
-    <div class="segmented" role="group" aria-label={copy.navShape}>
-      {#each [['rail', copy.navShapeRail, 'rows'], ['bar', copy.navShapeBar, 'grid'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon]}
-        <button type="button" class="segment" aria-pressed={navPrefs.shape === v} data-on={navPrefs.shape === v ? '' : undefined} onclick={() => pickShape(v)}>
-          <Icon name={icon} size="s" />
-          {label}
+    <div class="pictures" role="group" aria-label={copy.navShape}>
+      {#each [['rail', copy.navShapeRail, 'rows'], ['bar', copy.navShapeBar, 'grid'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon] (v)}
+        <button type="button" class="picture" aria-pressed={navPrefs.shape === v} data-on={navPrefs.shape === v ? '' : undefined} onclick={() => pickShape(v)}>
+          <span class="picture-shot" aria-hidden="true">{@render shapeOf(v)}</span>
+          <span class="picture-name"><Icon name={icon} size="m" /><span>{label}</span></span>
         </button>
       {/each}
     </div>
@@ -257,11 +282,11 @@
     {#if hiddenPages.length === 0}
       <Empty kind="cleared" title={copy.hiddenNone} body={copy.hiddenNoneWhy} />
     {:else}
-      <ul class="ledger ledger-glyph">
+      <ul class="ledger ledger-lead">
         {#each hiddenPages as p (p.href)}
           <li>
             <div class="line">
-              <span class="seq"><Icon name="doc" size="s" /></span>
+              <span class="line-mark"><IconWell name="doc" size="l" /></span>
               <span class="line-main"><span class="line-title">{p.title}</span></span>
               <span class="line-amount"></span>
               <span class="line-when"><Button weight="quiet" onclick={() => showAgain(p)}>{copy.showAgain}</Button></span>
@@ -280,19 +305,20 @@
   WHAT IT TURNS OFF IS THE PROPOSING, NOT THE PAGES. Movement is forward-only and needs a user action, so off empties the
   holding pen and stops it refilling; nothing already placed moves, and nothing is lost.
 -->
-<Section title={copy.suggestPages}>
-  <div class="setting-row">
-    <p class="hint">{copy.suggestPagesHint}</p>
-    <button
-      type="button"
-      class="switch"
-      role="switch"
-      aria-checked={navPrefs.suggest}
-      aria-label={copy.suggestPages}
-      onclick={() => void flipSuggest()}><span class="switch-track"></span></button
-    >
-  </div>
-  <p class="hint">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
+{#snippet suggestSwitch()}
+  <button
+    type="button"
+    class="switch"
+    role="switch"
+    aria-checked={navPrefs.suggest}
+    aria-label={copy.suggestPages}
+    onclick={() => void flipSuggest()}><span class="switch-track"></span></button
+  >
+{/snippet}
+
+<Section title={words.offers}>
+  <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
+  <p class="hint kept">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
 </Section>
 
 <!--
@@ -307,11 +333,11 @@
   {:else}
     <p class="hint">{penWords.hint} {copy.holdingPen}</p>
     {#if kept.length > 0}
-      <ul class="ledger ledger-glyph pen">
+      <ul class="ledger ledger-lead pen">
         {#each kept as row (row.item.id)}
           <li class="pen-row">
-            <div class="line">
-              <span class="seq"><Icon name="check" size="s" /></span>
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
               <span class="line-main">
                 <span class="line-title">{row.item.title}</span>
                 <span class="line-detail">{penWords.kept(row.item.title)}</span>
@@ -328,11 +354,11 @@
     {#if offers.length === 0}
       <Empty kind="cleared" title={voiceSaid('pen_nothing')} body={voiceSaid('pen_waits')} />
     {:else}
-      <ul class="ledger ledger-glyph pen">
+      <ul class="ledger ledger-lead pen">
         {#each offers as o (idOf(o))}
           <li class="pen-row" data-pen={idOf(o)}>
-            <div class="line">
-              <span class="seq"><Icon name={glyphOf(o)} size="s" /></span>
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name={glyphOf(o)} size="l" /></span>
               <span class="line-main">
                 <span class="line-title">{titleOf(o)}</span>
                 <span class="line-detail">{whyOf(o)}</span>
@@ -393,7 +419,8 @@
 {/if}
 
 <style>
-  /* THE SENTENCE AND ITS SWITCH (`.setting-row`) ARE LAID OUT BY `settings.css`, which every area shares. */
+  /* THE FRAME OF A CHOICE SHOWN AS PICTURES (`.pictures`) IS `settings.css`'s, which every area shares; the drawing
+     inside it is this file's. */
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
@@ -402,20 +429,145 @@
     line-height: var(--lh-body);
   }
 
-  /* THE SHARED PILLS FROM `controls.css`, with two things this screen needs on top: the track hugs its options, and a
-     segment is 44 on BOTH axes under a thumb (the reason is written beside the same rule in `Appearance.svelte`). */
-  .segmented {
-    margin-block-end: var(--sp-3);
-    inline-size: fit-content;
-    max-inline-size: 100%;
+  /* WHERE THE SWITCH IS KEPT, under its row and starting where the row's title starts. */
+  .kept {
+    padding-inline-start: calc(var(--well) + var(--sp-3));
   }
 
-  .segment {
-    display: inline-flex;
+  /* ── one shape of the navigation, drawn in proportions of the picture's own width (`cqi`) ── */
+
+  .nav-look {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    gap: 4cqi;
+    padding: 4cqi;
+    background: radial-gradient(90cqi 40cqi at 50% -12cqi, var(--ground-glow), transparent), var(--sunk);
+  }
+
+  .nav-look[data-shape='rail'] {
+    grid-template-columns: 23cqi minmax(0, 1fr);
+  }
+
+  .nav-look[data-shape='bar'] {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .nav-look[data-shape='menu'] {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  /* THE CHROME IS GLASS, as the shell's is: the frosted fill and its hairline pair. */
+  .nav-chrome {
+    display: flex;
+    gap: 2.2cqi;
+    background: var(--glass);
+    box-shadow:
+      0 0 0 0.4cqi color-mix(in srgb, var(--ink) 7%, transparent),
+      0 0.4cqi 1.6cqi color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+
+  .nav-rail {
+    flex-direction: column;
+    padding: 3cqi 2.2cqi;
+    border-radius: 3.4cqi;
+  }
+
+  .nav-bar {
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-inline-size: var(--ctl-h);
+    padding: 1.8cqi 2.4cqi;
+    border-radius: 3.4cqi;
+  }
+
+  .nav-menu {
+    display: grid;
+    place-items: center;
+    inline-size: 7cqi;
+    block-size: 7cqi;
+    border-radius: 50%;
+  }
+
+  .nav-lines {
+    inline-size: 3cqi;
+    block-size: 2.4cqi;
+    border-block: 0.5cqi solid var(--ink);
+  }
+
+  .nav-mark {
+    flex: none;
+    inline-size: 5.4cqi;
+    block-size: 3.8cqi;
+    border-radius: 1cqi;
+    background: var(--accent);
+  }
+
+  .nav-rail .nav-mark {
+    margin-block-end: 1.4cqi;
+  }
+
+  .nav-place {
+    display: flex;
+    align-items: center;
+    gap: 1.6cqi;
+  }
+
+  .nav-place::before {
+    content: '';
+    flex: none;
+    inline-size: 3.6cqi;
+    block-size: 3.6cqi;
+    border-radius: 1.1cqi;
+    background: color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+
+  .nav-place::after {
+    content: '';
+    flex: 1;
+    max-inline-size: 9cqi;
+    min-inline-size: 5cqi;
+    block-size: 1.3cqi;
+    border-radius: 1cqi;
+    background: color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  .nav-place[data-on]::before,
+  .nav-place[data-on]::after {
+    background: var(--ink);
+  }
+
+  .nav-page {
+    display: flex;
+    flex-direction: column;
+    gap: 2.4cqi;
+    min-inline-size: 0;
+  }
+
+  .nav-title {
+    inline-size: 26cqi;
+    block-size: 3.4cqi;
+    border-radius: 1cqi;
+    background: var(--ink);
+  }
+
+  .nav-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2.4cqi;
+  }
+
+  .nav-tile {
+    block-size: 14cqi;
+    border-radius: 3cqi;
+    background: var(--bg);
+    box-shadow: var(--e1);
+  }
+
+  .nav-row {
+    block-size: 1.4cqi;
+    inline-size: 60%;
+    border-radius: 1cqi;
+    background: color-mix(in srgb, var(--ink) 20%, transparent);
   }
 
   .pen-acts {
@@ -430,7 +582,7 @@
     align-items: center;
     gap: var(--sp-3);
     margin: 0 0 var(--sp-4);
-    color: var(--text);
+    color: var(--ink2);
     font-size: var(--t-sm);
   }
 
@@ -439,8 +591,11 @@
      is a page nobody can judge. */
   @media (width < 640px) {
     .pen-row .pen-acts {
-      grid-column: 1 / -1;
+      grid-column: 2 / -1;
+      grid-row: 3;
+      justify-content: flex-start;
       inline-size: 100%;
+      padding-block-start: var(--sp-2);
     }
 
     .pen-acts :global(button) {

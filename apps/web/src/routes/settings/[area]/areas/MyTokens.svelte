@@ -26,6 +26,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import { OWN_SCOPES, SCOPE_WORDS, standingOnly, words, type OwnScope } from './my-tokens.ts';
 
   let client: ReturnType<typeof createClient> | null = null;
@@ -143,6 +144,7 @@
     <ul class="mine-list">
       {#each rows as t (t.id)}
         <li class="mine-card">
+          <IconWell name="key" size="l" />
           <div class="mine-main">
             <span class="mine-name" dir="auto">{t.label ?? words.unnamed}</span>
             <span class="mine-facts">
@@ -200,22 +202,33 @@
     color: var(--danger);
   }
 
-  /* ROWS ON THE PAGE WITH A HAIRLINE BETWEEN THEM, as the owner's Connected list draws its keys. */
+  /* ROWS ON THE GROUND WITH A HAIRLINE BETWEEN THEM (SYSTEM §6), each led by its key's well, as the owner's Connected
+     list draws its keys. The hairline runs from the words' edge. */
   .mine-list {
     display: flex;
     flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
+    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
   .mine-card {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     min-block-size: var(--row-h-2);
     padding-block: var(--sp-2);
-    border-block-end: 1px solid var(--line-soft);
+  }
+
+  .mine-card + .mine-card::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: calc(var(--well-l) + var(--sp-3)) 0;
+    block-size: 1px;
+    background: var(--line);
   }
 
   .mine-main {
@@ -227,7 +240,7 @@
 
   .mine-name {
     overflow: hidden;
-    font-size: var(--t-base);
+    font-size: var(--t-row);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -250,15 +263,19 @@
     min-block-size: var(--ctl-h);
   }
 
-  /* ONE CARD PER KEY ON A PHONE: the name and its facts on top, Revoke under them across the card. */
+  /* ON A PHONE THE ROW WRAPS: the well, the name and its facts on the first line, Revoke under them from the name's
+     edge. */
   @media (width < 640px) {
     .mine-card {
-      flex-direction: column;
-      align-items: stretch;
+      flex-wrap: wrap;
+    }
+
+    .mine-main {
+      flex-basis: calc(100% - var(--well-l) - var(--sp-3));
     }
 
     .mine-do {
-      justify-content: flex-end;
+      margin-inline-start: calc(var(--well-l) + var(--sp-3));
     }
   }
 </style>

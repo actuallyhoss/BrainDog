@@ -19,7 +19,14 @@
  *   `.field-row`           a labelled field: `.field-row-label` above, then `.field-row-controls` holding
  *                          the `.field` and its button at one height, the button on the field's baseline.
  *   `.setting-help`        the one line of help under a sentence or a field.
+ *   `.setting-under`       a control too wide for a row's end (a segmented choice, a row of swatches), drawn under the
+ *                          `StateRow` it belongs to and starting where that row's title starts.
  *   `.wide-only`           not drawn below 900px (the index's Keyboard row; a desktop-only control).
+ *
+ * AND WHAT SETTINGS DRAWS ON THE GROUND, WHICH IS EVERY AREA'S BODY (SCREENS "Settings"): a segmented control there is
+ * glass-free, a `--hover-wash` track with the chosen segment a `--bg` pill, because glass is for chrome and never
+ * holds content; and a `.ledger-lead` list keeps its 32px well beside the title at a phone's width, where `rows.css`
+ * would move the well above the title.
  */
 
 /* THE SWITCH SITS BESIDE ITS SENTENCE. The sentence's track was `minmax(0, var(--measure))`, which is
@@ -42,6 +49,198 @@
 .settings-place .setting-row > p {
   margin: 0;
   padding-block-start: max(0px, (var(--ctl-h) - 1lh) / 2);
+}
+
+/* A SENTENCE LED BY ITS WELL (SCREENS "Settings": a 28px well per row), the well on the sentence's first line. */
+.settings-place .setting-row:has(> .well) {
+  grid-template-columns: var(--well) fit-content(var(--measure)) auto;
+  column-gap: var(--sp-3);
+}
+
+.settings-place .setting-row > .well {
+  margin-block-start: max(0px, (var(--ctl-h) - var(--well)) / 2);
+}
+
+/* UNDER A ROW, FROM THE TITLE'S EDGE: the well's width and the row's gap in, and a step under the row's words. */
+.settings-place .setting-under {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-block: calc(-1 * var(--sp-1)) var(--sp-3);
+  padding-inline-start: calc(var(--well) + var(--sp-3));
+  max-inline-size: calc(var(--measure) + var(--sp-9));
+}
+
+/**
+ * A CHOICE SHOWN AS PICTURES (the colour scheme, the navigation's shape): three buttons in a row, each a small drawing
+ * of the product as that choice would draw it, with its name under it. The drawing is the area's own; this is the
+ * frame. At rest the picture has a hairline; chosen, an ink ring a gap away, which is a shape and not a shade, for the
+ * reason `controls.css` gives its chosen segment. The frame is a shadow, so the picture never moves by a pixel.
+ *
+ *   `.pictures`        the row, `role="group"` with its label
+ *   `.picture`         one choice, a button with `aria-pressed` and `data-on`
+ *   `.picture-shot`    the drawing's frame, `aria-hidden`: a size container, so a drawing measures itself in `cqi`
+ *   `.picture-name`    its glyph and its name, and `.picture-meta` for a word after the name
+ */
+.settings-place .pictures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 13.5rem));
+  gap: var(--sp-3);
+  margin-block: var(--sp-3) var(--sp-4);
+}
+
+.settings-place .picture {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-2);
+  min-inline-size: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  color: var(--ink2);
+  text-align: start;
+  cursor: pointer;
+}
+
+.settings-place .picture-shot {
+  position: relative;
+  display: block;
+  container-type: inline-size;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  box-shadow: 0 0 0 1px var(--line);
+  transition: box-shadow var(--d-state) var(--ease-out);
+  /* A DRAWING, AND IT KEEPS ITS COLOURS where the system forces its own, as a picture would. */
+  forced-color-adjust: none;
+}
+
+.settings-place .picture[data-on] .picture-shot {
+  box-shadow:
+    0 0 0 2px var(--sunk),
+    0 0 0 4px var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-place .picture:not([data-on]):hover {
+    color: var(--ink);
+  }
+
+  .settings-place .picture:not([data-on]):hover .picture-shot {
+    box-shadow: 0 0 0 1px var(--edge);
+  }
+}
+
+.settings-place .picture-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+  min-block-size: 20px;
+  padding-inline: 2px;
+  font-size: var(--t-base);
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.settings-place .picture[data-on] .picture-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.settings-place .picture-meta {
+  color: var(--dim);
+  font-size: var(--t-sm);
+  font-weight: 400;
+}
+
+@media (width < 640px) {
+  .settings-place .pictures {
+    gap: var(--sp-2);
+  }
+}
+
+@media (forced-colors: active) {
+  .settings-place .picture[data-on] .picture-shot {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
+/* A WELL ON THE GROUND IS THE TILE'S WHITE, as the rows of every list on the ground draw it: `--s1` is the fill of a
+   well inside a tile, and on the grey ground it reads as a smudge rather than a shape. A toned well keeps its tone,
+   and a well inside a tile, a sheet or the panel's body keeps `IconWell`'s own fill. */
+.settings-place .well:not([data-tone]):not(:is(.tile, .sheet, dialog, [data-surface='tile']) .well) {
+  background: var(--bg);
+}
+
+/* GLASS-FREE ON THE GROUND. `controls.css` draws a segmented track as glass, which is the toolbar's; an area's body is
+   content on the ground, so the track is the ground's own wash and the chosen segment is the white pill on it. Inside a
+   tile, a sheet or the panel's body `controls.css` already draws the `--s1` track, and this leaves those alone. */
+/* A ROW AFTER A CONTROL DRAWN UNDER THE ROW BEFORE IT keeps the list's hairline, so the rows read as one group with
+   their controls between them. `StateRow` draws the same line between two rows that follow each other. */
+.settings-place .setting-under + .state-row::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: calc(var(--well) + var(--sp-3)) 0;
+  block-size: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+
+/* AND THE TRACK HUGS ITS OPTIONS: a settings choice is two to six short words, and a track run to the far edge of the
+   area reads as a field with the words bunched at one end. It still wraps inside the column on a phone. */
+.settings-place .segmented {
+  inline-size: fit-content;
+  max-inline-size: 100%;
+}
+
+.settings-place .segmented:not(:is(.tile, .sheet, dialog, [data-surface='tile']) .segmented) {
+  background: var(--hover-wash);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* A LIST LED BY A 32px WELL KEEPS IT BESIDE THE TITLE ON A PHONE. `rows.css` turns a row into a two-line card below
+   640px and gives the glyph list (`.ledger-glyph`) its own arrangement; the well list has none, so the well would land
+   on a line of its own above its title. This is the glyph list's arrangement at a well's width: the well beside the
+   title, the facts under it, and the row's action across both lines at its end. */
+@media (width < 640px) {
+  .settings-place .ledger-lead .line {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: start;
+    align-content: center;
+    gap: 2px var(--sp-3);
+  }
+
+  .settings-place .ledger-lead .line-mark {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .settings-place .ledger-lead .line-main {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .settings-place .ledger-lead .line-amount {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: start;
+  }
+
+  .settings-place .ledger-lead .line-when {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
 }
 
 /* LABEL ABOVE, 8PX TO THE FIELD (design-brief §5, A form). */

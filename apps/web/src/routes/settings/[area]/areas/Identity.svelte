@@ -20,6 +20,7 @@
   import Face from '$lib/ui/Face.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import { hostedHere } from '../../billing.ts';
 
@@ -302,7 +303,7 @@
 -->
 <Section title={copy.you}>
   <div class="person">
-    <Face name={faceName} you size="l" />
+    <span class="person-face"><Face name={faceName} you size="l" /></span>
     <div class="person-words">
       <p class="person-name">{myName ?? copy.identityNoName}</p>
       {#if myEmail && !signedOut}<p class="person-email">{myEmail}</p>{/if}
@@ -348,8 +349,10 @@
     {/if}
     {#if rowSaid}<p class="hint" role="status">{rowSaid}</p>{/if}
   {/if}
+</Section>
 
-  <h3 class="ways-title">{copy.identitySignInWays}</h3>
+<!-- HOW YOU SIGN IN, AS ROWS: each fact with its glyph, what it is in the meta line and what is true in the title's. -->
+<Section title={copy.identitySignInWays}>
   <ul class="facts">
     <!-- THE EMAIL, NOT THE PERSON ID. It printed `you` (the schema's own id for the signed-in
          human) while `/settings/people` one click away renders the same person as "You" with
@@ -367,19 +370,19 @@
          of the two other states this is: a host that lets its one person in without signing in, or
          nobody signed in at all. -->
     {#if !signedOut && s.hostAuth?.me}
-      <li><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{myEmail ?? myName ?? copy.you}</span></li>
+      <li><IconWell name="lock" /><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{myEmail ?? myName ?? copy.you}</span></li>
     {:else}
-      <li><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
+      <li><IconWell name="monitor" /><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
     {/if}
     {#if !signedOut}
       {#if passkeysHere}
-        <li><span class="fact-key">{copy.identityPasskeysWay}</span><span class="fact-value">{copy.identityPasskeys(s.liveKeys?.length ?? 0)}</span></li>
+        <li><IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span><span class="fact-value">{copy.identityPasskeys(s.liveKeys?.length ?? 0)}</span></li>
       {/if}
     {/if}
     <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
          `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows
          (`research-invite-landing.md` finding 3). What they hold is the lists, so the lists are named. -->
-    <li><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
+    <li><IconWell name="rows" /><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
   </ul>
   <p class="hint">{copy.identityOutside}</p>
   {#if moving}<p class="hint" role="status">{copy.identityEmailMoving}</p>{/if}
@@ -452,13 +455,13 @@
      offering one act must not answer it two ways. The record you are already in is not a link
      at all: you are in it. -->
 <Section title={copy.yourRecords} count={me.records.length}>
-  <ul class="ledger ledger-glyph">
+  <ul class="ledger ledger-lead">
     {#each me.records as r}
       {@const here = r.slug === SLUG}
       <li>
         <svelte:element
           this={here ? 'div' : 'a'}
-          class="line"
+          class="line line-tall"
           href={here ? undefined : at('/', `${BASE}/${r.slug}/`)}
           role={here ? undefined : 'link'}
           onclick={here
@@ -468,10 +471,13 @@
                 void openOther(r);
               }}
         >
-          <span class="seq"><Icon name="rows" size="s" /></span>
-          <span class="line-main"><span class="line-title">{r.name}</span></span>
-          <span class="line-amount"><span class="means">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span></span>
-          <span class="line-when">{#if here}{copy.thisOne}{/if}</span>
+          <span class="line-mark"><Face name={r.name} of="record" size="l" /></span>
+          <span class="line-main">
+            <span class="line-title">{r.name}</span>
+            <span class="line-detail">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span>
+          </span>
+          <span class="line-amount"></span>
+          <span class="line-when">{#if here}<span class="here">{copy.thisOne}</span>{:else}<span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}</span>
         </svelte:element>
       </li>
     {/each}
@@ -533,50 +539,69 @@
 {/if}
 
 <style>
-  /* A short list of stated facts, for the areas that REPORT rather than offer. Two columns so
-     the label and the value line up down the page; it wraps to one below 520px. */
+  /* HOW YOU SIGN IN, AS ROWS ON THE GROUND (SYSTEM §6): a 28px well, what the fact is in the meta size, and what is true
+     at the row's size under it, with a hairline between rows from the words' edge. */
   .facts {
     display: grid;
-    grid-template-columns: minmax(12ch, max-content) minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-4);
     margin: 0 0 var(--sp-3);
     padding: 0;
     list-style: none;
+    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
   .facts li {
-    display: contents;
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--well) minmax(0, 1fr);
+    align-content: center;
+    column-gap: var(--sp-3);
+    row-gap: 2px;
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .facts li :global(.well) {
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .facts li + li::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: calc(var(--well) + var(--sp-3)) 0;
+    block-size: 1px;
+    background: var(--line);
   }
 
   .fact-key {
+    grid-column: 2;
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .fact-value {
-    color: var(--ink2);
+    grid-column: 2;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
+    overflow-wrap: anywhere;
   }
 
-  @media (width < 520px) {
-    .facts {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0 0;
-    }
-
-    /* The label over its value. As a block the two spans ran together into one line, "Signed in
-       asada@studio.example". */
-    .facts li {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-1);
-      margin-block-end: var(--sp-2);
-    }
+  /* "THIS ONE" IS WHERE YOU ARE, said in the meta ink; every other record's row goes somewhere, and says so. */
+  .here {
+    color: var(--dim);
   }
 
-  .means {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+  .go {
+    display: inline-flex;
+    color: var(--dim);
+  }
+
+  .go:dir(rtl) {
+    scale: -1 1;
   }
 
   .hint {
@@ -596,25 +621,33 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* THE PERSON FIRST (GAP-7): a face at the person's-page size, the name as the line a reader
-     looks for, and the address under it in the secondary tone. Long addresses wrap rather than
-     push the page sideways at 320. */
+  /* THE PERSON FIRST (GAP-7): their face, the name at the group size as the line a reader looks for, and the address
+     under it in the meta ink. Long addresses wrap rather than push the page sideways at 320. */
   .person {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    margin-block-end: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    margin-block-end: var(--sp-2);
+  }
+
+  .person-face {
+    display: inline-flex;
+    flex: none;
   }
 
   .person-words {
+    display: grid;
+    gap: 2px;
     min-inline-size: 0;
   }
 
   .person-name {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--t-group);
     font-weight: 600;
+    line-height: 24px;
     overflow-wrap: anywhere;
   }
 
@@ -623,13 +656,6 @@
     color: var(--dim);
     font-size: var(--t-sm);
     overflow-wrap: anywhere;
-  }
-
-  .ways-title {
-    margin: var(--sp-4) 0 var(--sp-2);
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 600;
   }
 
   /* A FORM, AS THE BRIEF DRAWS ONE: the label above the field, the help under it, and a refusal in
@@ -652,8 +678,9 @@
     font-size: var(--t-md);
   }
 
+  /* THE FIELD'S EDGE IN `--danger` (design §4.6): a field has no border, so the edge is drawn inside it. */
   .rename-bad {
-    border-color: var(--danger);
+    box-shadow: inset 0 0 0 1.5px var(--danger);
   }
 
   .identity-help {

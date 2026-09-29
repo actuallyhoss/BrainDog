@@ -11,9 +11,13 @@
   import Section from '$lib/ui/Section.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
+  import StateRow from './StateRow.svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. This one draws a preference of the device and reads none of them. */
   let props: AreaProps = $props();
+
+  /* THE GROUP'S NAME, so the row inside it can be called what the switch is called without the heading saying it too. */
+  const words = { shortcuts: 'Shortcuts' };
 
   /* SEEDED FROM WHAT IS REMEMBERED, so the switch shows the state the keyboard is already in. */
   const held = pref.read();
@@ -26,23 +30,23 @@
   });
 </script>
 
-<Section title={copy.characterKeys}>
-  <!-- THE SENTENCE THAT SAYS WHAT THE SWITCH DOES. It was written, and allow-listed in
-       `dead-copy` as *"UNBUILT: `/settings/keyboard` is a heading and two unexplained
-       buttons"*, the gate knowing, in those words, that a compound noun and two buttons were
-       all a reader got. `19 §4` calls this the app's WCAG 2.1.4 conformance; a switch whose
-       effect nobody states is a switch nobody turns on deliberately. -->
-  <div class="setting-row">
-    <p class="hint">{copy.characterKeysHint}</p>
-    <button
-      type="button"
-      class="switch"
-      role="switch"
-      aria-checked={chars}
-      aria-label={copy.characterKeys}
-      onclick={() => (chars = !chars)}><span class="switch-track"></span></button
-    >
-  </div>
+{#snippet charsSwitch()}
+  <button
+    type="button"
+    class="switch"
+    role="switch"
+    aria-checked={chars}
+    aria-label={copy.characterKeys}
+    onclick={() => (chars = !chars)}><span class="switch-track"></span></button
+  >
+{/snippet}
+
+<Section title={words.shortcuts}>
+  <!-- THE SENTENCE THAT SAYS WHAT THE SWITCH DOES, in the row that holds the switch. It was written, and allow-listed
+       in `dead-copy` as *"UNBUILT: `/settings/keyboard` is a heading and two unexplained buttons"*, the gate knowing,
+       in those words, that a compound noun and two buttons were all a reader got. `19 §4` calls this the app's WCAG
+       2.1.4 conformance; a switch whose effect nobody states is a switch nobody turns on deliberately. -->
+  <StateRow icon="keyboard" title={copy.characterKeys} line={copy.characterKeysHint} action={charsSwitch} />
 </Section>
 <!--
   THE SHEET, ON THE ONE SCREEN THAT CAN STILL REACH IT.
@@ -64,14 +68,3 @@
 <Section title={copy.keymap}>
   <Keymap silenced={!chars} />
 </Section>
-
-<style>
-  /* THE SENTENCE AND ITS SWITCH (`.setting-row`) ARE LAID OUT BY `settings.css`, which every area shares. */
-  .hint {
-    margin: 0 0 var(--sp-3);
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
-  }
-</style>
