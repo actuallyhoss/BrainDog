@@ -14,6 +14,7 @@
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
 
   let shown = $state(false);
   let busy = $state(false);
@@ -46,15 +47,19 @@
 
 {#if shown}
   <section class="first" aria-labelledby="first-h">
-    <!-- A PARAGRAPH AND NOT A HEADING, as `/start`'s own "again" note is: it sits above the page's one `h1`. -->
-    <p class="first-h" id="first-h">{copy.passkeyFirstTitle}</p>
-    <p class="first-why">{copy.passkeyFirstWhy}</p>
-    {#if said}<p class="first-said" role="status">{said}</p>{/if}
-    <div class="first-go">
-      <Button weight="primary" onclick={() => void add()} aria-busy={busy}>
-        <Icon name="key" size="m" />{busy ? copy.addingPasskey : copy.addPasskeyHere}
-      </Button>
-      <Button weight="quiet" onclick={() => (shown = false)}>{copy.passkeyFirstLater}</Button>
+    <IconWell name="key" size="l" />
+    <div class="first-main">
+      <!-- A PARAGRAPH AND NOT A HEADING, as `/start`'s own "again" note is: it sits above the page's one `h1`. -->
+      <p class="first-h" id="first-h">{copy.passkeyFirstTitle}</p>
+      <p class="first-why">{copy.passkeyFirstWhy}</p>
+      {#if said}<p class="first-said" role="status">{said}</p>{/if}
+      <div class="first-go">
+        <!-- QUIET, NOT INK: the screen's one primary is the answer below it (SYSTEM §6), and this is asked beside it. -->
+        <Button weight="quiet" onclick={() => void add()} aria-busy={busy}>
+          <Icon name="key" size="m" />{busy ? copy.addingPasskey : copy.addPasskeyHere}
+        </Button>
+        <Button weight="bare" onclick={() => (shown = false)}>{copy.passkeyFirstLater}</Button>
+      </div>
     </div>
   </section>
 {:else if said}
@@ -62,39 +67,43 @@
 {/if}
 
 <style>
+  /* A ROW ON THE GROUND, not a boxed panel: the key in its well, the ask and why, and the two answers under them. */
   .first {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
     gap: var(--sp-3);
-    padding: var(--sp-4);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: var(--s1);
+    max-inline-size: var(--measure);
+  }
+
+  .first-main {
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 0;
   }
 
   .first-h {
+    margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--t-row);
     font-weight: 600;
-    line-height: var(--lh-tight);
+    line-height: 20px;
   }
 
   .first-why,
   .first-said {
+    margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   /* SIDE BY SIDE WHERE THEY FIT, and each the full width of the column on a phone, at the 44px floor. */
   .first-go {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-3);
-  }
-
-  .first-go :global(.btn) {
-    min-block-size: var(--tap);
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
   }
 
   @media (width < 640px) {

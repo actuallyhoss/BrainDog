@@ -97,35 +97,51 @@
   }
 
   /* THE ENTRY SCREENS' ONE TITLE (DSN-18): this stands where /start's question and sign up's title stand, in the same
-     `signin/Entry.svelte` frame, so it takes their size and face rather than a smaller one of its own. */
+     `signin/Entry.svelte` frame, so it takes their size and face: `t-title` in Geist (SYSTEM §3, §11), and the phone's
+     large title, 30/36, below 900px. */
   .own-h {
+    margin: 0;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-3xl);
+    font-family: var(--font-ui);
+    font-size: var(--t-title);
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: var(--lh-3xl);
+    letter-spacing: -0.02em;
+    line-height: 34px;
     text-wrap: balance;
     overflow-wrap: anywhere;
   }
 
+  @media (width < 900px) {
+    .own-h {
+      font-size: var(--t-figure);
+      line-height: 36px;
+    }
+  }
+
+  /* THE BODY IS `t-body` AT THE SENTENCE'S 16/24 in the second ink, as the title row's sentence is (SYSTEM §5). */
   .own-why,
   .own-price {
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-md);
-    line-height: var(--lh-body);
+    line-height: 24px;
   }
 
   .own-note {
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    line-height: 18px;
   }
 
+  /* A REFUSED PAYMENT IS WORDS IN INK, not a red line: nothing here is late or urgent, it is a thing to try again
+     (SYSTEM §2, red only for "needs you"). The `role="alert"` says it. */
   .own-said {
-    color: var(--danger);
+    margin: 0;
+    color: var(--ink);
     font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    font-weight: 500;
+    line-height: 18px;
   }
 
   .own-form {

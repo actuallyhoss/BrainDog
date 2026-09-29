@@ -1,22 +1,26 @@
 <!--
-  The first run: one prompt and one accept (`loop/finish/modules.md` MOD-6, `loop/DIRECTION.md` §6 and §9).
+  The first run: a conversation on the left, and the BrainDog building beside it (`loop/finish/modules.md` MOD-6,
+  `loop/DIRECTION.md` §6 and §9, the board `loop/design/bento/boards/Light-Start.dc.html`).
 
-  ONE QUESTION, ONE FIELD, FOUR CHIPS. "Who are you?", answered in a sentence, with a chip for each of the four people
-  the product is for (§11). The sentence is read without a model (`lib/start/propose.ts`), in any language: one these
-  rules cannot read is kept as the person's note, never refused.
+  ONE QUESTION, ONE FIELD, FOUR CHIPS, AND IT LISTENS WHILE YOU TYPE. "Who are you?", answered in a sentence, with a chip
+  for each of the four people the product is for (§11). The sentence is read without a model (`lib/start/propose.ts`),
+  in any language, as it is typed: the parts it would make light up beside the field, and each phrase it heard is said
+  under it. One these rules cannot read is kept as the person's note, never refused.
 
-  THEN A PREVIEW, AND NOTHING WRITTEN. What was heard and what each phrase became; the BrainDog it makes, every page of it
-  drawn by the record with examples that are marked and never saved (`PagesPreview.svelte`); a switch for each thing it
-  keeps; the currency, asked only when Money is kept and none was typed; and "Remind me on this phone" where there are
-  due dates to ring about.
+  THEN A CONVERSATION, AND NOTHING WRITTEN. The words come back marked with what each phrase became, then BrainDog's
+  reply: what it heard, what it is for, the one question the words cannot answer (the currency, with the ones worth
+  offering numbered and one suggested with its reason), and a field to tell it more. Each later turn is read with the
+  first, and BrainDog says what it added. Beside it, the BrainDog builds: a progress bar of its parts, a tile for each
+  part with why it is on and the entries the words filled, and every page it makes, drawn by the record with examples
+  that are marked and never saved (`PagesPreview.svelte`).
 
   A BUSINESS NO USE CASE FITS IS DRAFTED FOR, where a model answers (`loop/finish/pages.md` PGS-20). Slash drafts lists,
   figures and pages made for what was said (`slashDraft`), which files nothing; they are drawn over its sample rows, and
   the same one press files and accepts them. The sample rows are never written.
 
-  THEN ONE PRESS. "Make it mine" writes it all through the install path Browse uses (`accept.ts`) and lands on Home.
-  There is no second screen and no one-row form: a list with nothing in it draws its own empty state, and a record with
-  no lists is sent here by the root layout.
+  THEN ONE PRESS. "Make it mine" (or Ctrl Enter from anywhere) writes it all through the install path Browse uses
+  (`accept.ts`) and lands on Home. There is no second screen and no one-row form: a list with nothing in it draws its own
+  empty state, and a record with no lists is sent here by the root layout.
 
   NO SKIP, because a record with no lists has no other screen to show (19 §6). A colleague who holds lists and not the
   record, and an owner whose record is already made, are told so before the question, with the way back.
@@ -26,11 +30,12 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import { firstPartyModule, moduleOfList } from '@braindog/seed/packs/modules';
   import { USE_CASES } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { apiBase, at } from '$lib/at.ts';
+  import { covered, typing } from '$lib/a11y/keys.svelte.ts';
+  import { silenced } from '$lib/a11y/chars.ts';
   import { methods } from '$lib/auth.ts';
   import { copy } from '$lib/copy.ts';
   import { firstRun } from '$lib/first-run.ts';
@@ -45,12 +50,36 @@
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Face from '$lib/ui/Face.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Kbd from '$lib/ui/Kbd.svelte';
+  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import { Segments } from '$lib/viz';
   import Entry from '../signin/Entry.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
   import { accept, type NotMade } from './accept.ts';
+  import {
+    added,
+    browserCurrencyEnv,
+    casePart,
+    currencyChoices,
+    iconOfBecame,
+    joinTurns,
+    marksIn,
+    missingIn,
+    partsOf,
+    statusOf,
+    stepsOf,
+    words,
+    type CurrencyEnv,
+    type Part as PartOf,
+    type Said,
+  } from './building.ts';
   import { caseOf, changesAsked, draftAsked, keepsCurrency, pagesOf, reminds, words as drawing } from './preview.ts';
   import Currency from './Currency.svelte';
   import PagesPreview from './PagesPreview.svelte';
+  import Part from './Part.svelte';
   import Remind from './Remind.svelte';
   import NoRecord from './NoRecord.svelte';
   import PasskeyFirst from './PasskeyFirst.svelte';
@@ -77,7 +106,8 @@
    */
   const alreadyMade = $derived(Boolean(page.data.live) && (page.data.pages.length > 0 || page.data.index.registers.length > 0));
 
-  /* WHERE AND HOW THE SENTENCE WAS TYPED, for a date such as "on the 1st" and for the currency names. */
+  /* WHERE AND HOW THE SENTENCE WAS TYPED, for a date such as "on the 1st", for the currency names and for the currency
+     worth suggesting. */
   const locale = typeof navigator === 'undefined' ? 'en' : navigator.language;
   const zone = (() => {
     try {
@@ -87,6 +117,16 @@
     }
   })();
 
+  /* "09:38", in the person's own clock, beside each turn of the conversation. */
+  const clock = (() => {
+    try {
+      return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return null;
+    }
+  })();
+  const timeOf = (ms: number): string => clock?.format(ms) ?? '';
+
   /* ── the prompt ─────────────────────────────────────────────────────────── */
 
   /* The sentence stays in memory and never in the address, so it is nowhere a link or a history entry can carry it. */
@@ -95,8 +135,8 @@
   let heardHeading = $state<HTMLHeadingElement | undefined>(undefined);
 
   /** A chip appends its words as a clause of what is there, and the caret goes back to the end of it. */
-  function chip(words: string) {
-    sentence = withChip(sentence, words);
+  function chip(said: string) {
+    sentence = withChip(sentence, said);
     void tick().then(() => {
       field?.focus();
       field?.setSelectionRange(sentence.length, sentence.length);
@@ -110,6 +150,24 @@
     read();
   }
 
+  /**
+   * WHAT IT HEARS WHILE THE SENTENCE IS TYPED, read a beat after the last key so a fast typist is not slowed. It draws
+   * the parts lighting up beside the field and the phrases under it, and decides nothing: the press reads it for real.
+   */
+  let live = $state.raw<Proposal | null>(null);
+  $effect(() => {
+    const said = sentence;
+    if (proposal !== null) return;
+    if (said.trim() === '') {
+      live = null;
+      return;
+    }
+    const wait = setTimeout(() => {
+      live = propose(said, { zone, locale });
+    }, 140);
+    return () => clearTimeout(wait);
+  });
+
   /* ── the proposal ───────────────────────────────────────────────────────── */
 
   let proposal = $state<Proposal | null>(null);
@@ -119,19 +177,66 @@
   let kept = $state<string[]>([]);
   let currency = $state<string | null>(null);
 
-  function read() {
-    if (sentence.trim() === '') return;
-    const p = propose(sentence, { zone, locale });
+  /**
+   * WHAT THE PERSON DECIDED BY HAND OUTLIVES A NEW READING. Telling it more reads the whole of what was said again, and
+   * a part they turned on or off, or a use case they picked, stays as they left it rather than snapping back.
+   */
+  let onByHand = $state.raw<Set<string>>(new Set());
+  let offByHand = $state.raw<Set<string>>(new Set());
+  let caseByHand = $state(false);
+
+  /** One turn of the conversation: what was said, when, and what it added to what was heard before (none for the first). */
+  type Turn = { said: string; at: number; adds: Said[] | null };
+  let turns = $state.raw<Turn[]>([]);
+
+  /** Take a reading, keeping what the person decided by hand. */
+  function take(p: Proposal) {
+    const handCurrency = currency !== null && currency !== (proposal?.currency ?? null);
     proposal = p;
-    chosen = p.usecase;
-    kept = [...p.modules];
-    currency = p.currency;
+    if (!caseByHand) chosen = p.usecase;
+    kept = [...new Set([...p.modules.filter((id) => !offByHand.has(id)), ...onByHand])];
+    /* A CURRENCY TYPED IS THE ANSWER; one chosen by hand stands until a later turn types one. */
+    currency = p.currency ?? (handCurrency ? currency : null);
     failed = null;
     draft = null;
     drafting = false;
     drafts += 1;
     if (model && outsideCatalogue(p)) void draftFor(sentence);
+  }
+
+  function read() {
+    if (sentence.trim() === '') return;
+    const p = propose(sentence, { zone, locale });
+    turns = [{ said: sentence.trim(), at: Date.now(), adds: null }];
+    take(p);
     void tick().then(() => heardHeading?.focus());
+  }
+
+  /* ── telling it more ────────────────────────────────────────────────────── */
+
+  let extra = $state('');
+
+  /**
+   * A LATER TURN IS READ WITH EVERYTHING BEFORE IT, as one sentence, and BrainDog's answer to it is what it added. Focus
+   * stays in the field, so a person can keep talking.
+   */
+  function more() {
+    const t = extra.trim();
+    if (t === '' || proposal === null || busy) return;
+    const was = proposal.heard;
+    sentence = joinTurns(sentence, t);
+    const p = propose(sentence, { zone, locale });
+    turns = [...turns, { said: t, at: Date.now(), adds: added(was, p.heard) }];
+    extra = '';
+    take(p);
+  }
+
+  function moreKey(e: KeyboardEvent) {
+    /* CTRL ENTER FINISHES FROM HERE TOO, and is not also a turn. */
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void make();
+    }
   }
 
   /* ── what Slash drafts for a business outside the catalogue ─────────────── */
@@ -165,6 +270,8 @@
 
   /* THE SENTENCE AGAIN, AS A FIELD. The preview goes with it, so nothing on screen describes words that changed. */
   function edit() {
+    /* WHAT WAS READ STANDS BESIDE THE FIELD until the words are read again as they are typed. */
+    live = proposal;
     proposal = null;
     failed = null;
     draft = null;
@@ -180,6 +287,12 @@
   /* THE USE CASES BESIDE IT belong to the proposal they were heard with, so choosing another use case leaves them out. */
   const also = $derived(proposal && chosen === proposal.usecase ? proposal.also.flatMap((id) => caseOf(id) ?? []) : []);
   const cases = $derived(u ? [u, ...also] : []);
+
+  /** Choose a use case from the conversation, or put the one chosen down. */
+  function pickCase(id: string) {
+    caseByHand = true;
+    chosen = chosen === id ? null : id;
+  }
 
   /**
    * WHY A MODULE CANNOT BE TURNED OFF, or `null` when it can: a use case chosen stands on it, or a module kept leans on
@@ -204,7 +317,13 @@
 
   function flip(id: string) {
     if (heldBy(id) !== null) return;
-    kept = kept.includes(id) ? kept.filter((m) => m !== id) : [...kept, id];
+    const on = !kept.includes(id);
+    kept = on ? [...kept, id] : kept.filter((m) => m !== id);
+    const drop = (s: Set<string>) => new Set([...s].filter((x) => x !== id));
+    onByHand = on ? new Set([...drop(onByHand), id]) : drop(onByHand);
+    offByHand = on ? drop(offByHand) : new Set([...drop(offByHand), id]);
+    /* THE SWITCH MOVES BETWEEN A TILE AND A ROW, so focus goes with it rather than to the top of the page. */
+    void tick().then(() => document.querySelector<HTMLElement>(`[data-keep="${id}"]`)?.focus());
   }
 
   /* THE CURRENCY IS ASKED ONLY WHEN MONEY IS KEPT AND THE SENTENCE TYPED NONE; the module that keeps it says so. */
@@ -219,14 +338,80 @@
   /**
    * WHAT THE RECORD IS ASKED TO DRAW: the draft as Slash drew it, over its sample rows, beside the modules kept; or every
    * page of the use cases and modules, over their examples. Every one is a rehearsal that keeps nothing.
+   *
+   * ASKED AGAIN ONLY WHEN IT CHANGES: a turn that adds a client to People asks for the same pages, and the record is not
+   * asked to draw them twice.
    */
   const asks = $derived(using ? [draftAsked(using), ...changesAsked([], modules, today)] : changesAsked(cases, modules, today));
-  const entries = $derived(
-    (proposal?.rows ?? []).flatMap((r) => {
-      const m = moduleOfList(r.register);
-      return m && modules.includes(m.id) ? [firstRun.mineIn(String(r.fields.what ?? r.fields.name ?? ''), m.name)] : [];
-    }),
+  let drawAsked = $state.raw<Record<string, unknown>[]>([]);
+  let drawKey = '';
+  $effect(() => {
+    const key = JSON.stringify(asks);
+    if (key === drawKey) return;
+    drawKey = key;
+    drawAsked = asks as Record<string, unknown>[];
+  });
+
+  /* ── the one question ──────────────────────────────────────────────────── */
+
+  /* THE DEVICE'S FACTS ARE READ ONCE: every currency and the zones of each region, which is a few dozen milliseconds. */
+  let device: CurrencyEnv | null = null;
+  const deviceOf = (): CurrencyEnv =>
+    (device ??= browserCurrencyEnv(locale, typeof navigator === 'undefined' ? [] : [...(navigator.languages ?? [])], zone));
+  const ask = $derived(asksCurrency ? currencyChoices(sentence, deviceOf()) : null);
+
+  /**
+   * NOTHING PLACED: no use case, nothing Slash drafted or is drafting, and no part on. The question then is which use
+   * case is closest, numbered, and turning parts on by hand is the other way on.
+   */
+  const closest = $derived(proposal !== null && u === null && using === null && !drafting && modules.length === 0);
+  /** The open question's short form, for the sentence under the title, or `null` when nothing waits. */
+  const waitingOn = $derived(
+    asksCurrency && currency === null ? (ask && ask.said.length > 0 ? words.whichOf(ask.said) : words.whichCurrency) : closest ? words.whatClosest : null,
   );
+
+  /* ── the parts ─────────────────────────────────────────────────────────── */
+
+  /**
+   * WHAT THE RIGHT-HAND SIDE DRAWS: while typing, the live reading, with no switches; once read, the proposal as the
+   * person has left it. A use case is a part too, since it carries lists and pages of its own.
+   */
+  const reading = $derived(proposal ?? live);
+  const caseParts = $derived.by<PartOf[]>(() => {
+    if (proposal !== null) return cases.map((c) => casePart(c, proposal?.heard ?? [], caseByHand));
+    if (live === null) return [];
+    return [live.usecase, ...live.also].flatMap((id) => caseOf(id) ?? []).map((c) => casePart(c, live?.heard ?? [], false));
+  });
+  const moduleParts = $derived.by<PartOf[]>(() => {
+    if (proposal !== null)
+      return partsOf({ offered, modules, heard: proposal.heard, rows: proposal.rows, heldBy, byHand: onByHand, waiting: asksCurrency && currency === null ? money : null });
+    const liveOffered = [...new Set([...INSTALL_ORDER, ...(live?.modules ?? [])])];
+    return partsOf({ offered: liveOffered, modules: live?.modules ?? [], heard: live?.heard ?? [], rows: live?.rows ?? [], heldBy: () => null, byHand: new Set(), waiting: null });
+  });
+  const allParts = $derived([...caseParts, ...moduleParts]);
+  const steps = $derived(stepsOf(allParts));
+  const onCount = $derived(allParts.filter((p) => p.on).length);
+  const status = $derived(proposal ? statusOf(onCount, allParts.length, waitingOn) : null);
+
+  /**
+   * WHAT THE LAST THING SAID ADDED TAKES THE ARRIVAL TINT for a second and a half (SYSTEM §2, §8): a part that came on
+   * and an entry that came in, while typing and after each turn alike. The first drawing is not an arrival.
+   */
+  let fresh = $state.raw<Set<string>>(new Set());
+  let seen: Set<string> | null = null;
+  let fading: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const now = new Set([...allParts.filter((p) => p.on).map((p) => `part:${p.id}`), ...allParts.flatMap((p) => p.entries.map((e) => e.key))]);
+    const was = seen;
+    seen = now;
+    if (was === null || reading === null) return;
+    const came = [...now].filter((k) => !was.has(k));
+    if (came.length === 0) return;
+    fresh = new Set([...fresh, ...came]);
+    clearTimeout(fading);
+    fading = setTimeout(() => (fresh = new Set()), 1500);
+  });
+  $effect(() => () => clearTimeout(fading));
 
   /* ── the accept ─────────────────────────────────────────────────────────── */
 
@@ -275,19 +460,77 @@
     }
   }
 
+  /* ── the keys ───────────────────────────────────────────────────────────── */
+
+  /**
+   * CTRL ENTER FINISHES, AND 1 TO 9 ANSWER THE QUESTION, from anywhere on the page once there is something to finish. A
+   * digit is a character a person may be typing, so it answers only when no field has focus and character keys are on;
+   * nothing answers through a page opened over this one.
+   */
+  function onkeydown(e: KeyboardEvent) {
+    if (e.defaultPrevented || covered() || proposal === null) return;
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key === 'Enter' && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      void make();
+      return;
+    }
+    if (typing() || mod || e.altKey || silenced(e) || busy) return;
+    if (!/^[1-9]$/u.test(e.key)) return;
+    const n = Number(e.key) - 1;
+    if (ask) {
+      const c = ask.choices[n];
+      if (!c) return;
+      e.preventDefault();
+      currency = c.code;
+    } else if (closest) {
+      const one = USE_CASES[n];
+      if (!one) return;
+      e.preventDefault();
+      pickCase(one.usecase);
+    }
+  }
+
   /* THIS SCREEN DRAWS FROM WHAT IS TYPED, with no read to wait on, so it is ready as soon as it is drawn. */
   $effect(() => drew('ready'));
+
+  /* THE PHRASES MISSING A FACT, said by BrainDog only where Money is kept to hold the entry they began. */
+  const missing = $derived(proposal !== null && money !== null ? missingIn(sentence, today) : []);
+  /** How many answers the number keys reach, printed beside the conversation's heading: at most three caps. */
+  const answers = $derived(Math.min(3, ask ? ask.choices.length : closest ? USE_CASES.length : 0));
+  const onParts = $derived(allParts.filter((p) => p.on));
+  const offParts = $derived(moduleParts.filter((p) => !p.on));
 </script>
 
 <svelte:head><title>{titleOf('Start')}</title></svelte:head>
+<svelte:window {onkeydown} />
 
-<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`), in its wide form for the previews below. -->
+{#snippet you(at: number)}
+  <div class="who"><span class="who-name">{proposal?.name ?? words.you}</span><time class="who-time num" datetime={new Date(at).toISOString()}>{timeOf(at)}</time></div>
+{/snippet}
+
+{#snippet dog(at: number)}
+  <div class="who"><span class="who-name">{words.dog}</span><time class="who-time num" datetime={new Date(at).toISOString()}>{timeOf(at)}</time></div>
+{/snippet}
+
+{#snippet keys()}
+  {#if proposal}
+    <span class="keys" aria-hidden="true">
+      {#if answers > 0}{#each { length: answers } as _, n (n)}<Kbd keys={String(n + 1)} />{/each}<span class="keys-word">{words.answerKeys}</span>{/if}
+      <Kbd keys="⌘↵" /><span class="keys-word">{words.finishKeys}</span>
+    </span>
+  {/if}
+{/snippet}
+
+<!-- THE ENTRY LAYOUT EVERY WAY IN SHARES (`signin/Entry.svelte`), in its wide form: a column up to 1040 on the ground. -->
 <Entry wide>
-  <div class="frame">
+  <div class="frame" data-making={proposal !== null ? '' : undefined}>
     {#if noRecord}
-      <NoRecord title={copy.noRecordTitle} why={copy.noRecordWhy} />
+      <div class="alone">
+        <NoRecord title={copy.noRecordTitle} why={copy.noRecordWhy} />
+      </div>
     {:else if colleague}
-      <section class="again" aria-labelledby="again-h">
+      <section class="again alone" aria-labelledby="again-h">
         <p class="again-h" id="again-h">{copy.startNotYours}</p>
         <p class="again-why">{copy.startNotYoursWhy}</p>
         <div class="actions">
@@ -301,165 +544,282 @@
     {:else}
       {#if alreadyMade}
         <section class="again" aria-labelledby="again-h">
-          <p class="again-h" id="again-h">{firstRun.againMade}</p>
-          <p class="again-why">{firstRun.againMore}</p>
-          <div class="actions">
-            <Button weight="bare" href="/">{firstRun.againBack}</Button>
+          <IconWell name="home" size="l" />
+          <div class="again-main">
+            <p class="again-h" id="again-h">{firstRun.againMade}</p>
+            <p class="again-why">{firstRun.againMore}</p>
           </div>
+          <Button weight="quiet" href="/">{firstRun.againBack}</Button>
         </section>
       {/if}
 
       <!-- A NEW PERSON'S FIRST ASK IS A PASSKEY (OPS-17), and it draws nothing for anybody who has one. -->
       <PasskeyFirst />
 
-      <h1 class="question" id="who-h">{firstRun.whoQuestion}</h1>
-
-      {#if proposal === null}
-        <form
-          class="prompt"
-          onsubmit={(e) => {
-            e.preventDefault();
-            read();
-          }}
-        >
-          <textarea
-            class="prompt-field"
-            rows="2"
-            autocomplete="off"
-            aria-labelledby="who-h"
-            placeholder={firstRun.whoPlaceholder}
-            bind:this={field}
-            bind:value={sentence}
-            onkeydown={enter}
-          ></textarea>
-          <div class="chips" role="group" aria-label={firstRun.whoChipsLabel}>
-            {#each firstRun.whoChips as c (c)}
-              <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
-              <button type="button" class="chip" onmousedown={(e) => e.preventDefault()} onclick={() => chip(c)}>{c}</button>
-            {/each}
-          </div>
-          <div class="actions">
-            <Button weight="primary" type="submit" disabled={sentence.trim() === ''}>{firstRun.whoGo}</Button>
-          </div>
-        </form>
-      {:else}
-        <!-- AFTER THE PRESS THE SENTENCE IS ONE LINE, and pressing it opens it for editing. -->
-        <button type="button" class="said-line" disabled={busy} onclick={edit}><span class="said-text">{sentence}</span><span class="said-edit">{firstRun.whoEdit}</span></button>
-
-        <section class="part" aria-labelledby="heard-h">
-          <h2 class="part-h" id="heard-h" tabindex="-1" bind:this={heardHeading}>{firstRun.heardTitle}</h2>
-          {#if proposal.name}<p class="heard-name">{firstRun.heardName(proposal.name)}</p>{/if}
-          {#if proposal.heard.length > 0}
-            <ul class="heard">
-              {#each proposal.heard as h, i (i)}
-                <li><q class="phrase">{h.phrase}</q> <span class="became"><span aria-hidden="true">→</span> {h.became}</span></li>
-              {/each}
-            </ul>
-          {:else}
-            <p class="quiet">{firstRun.heardNone}</p>
-            {#if proposal.name && modules.includes(PEOPLE)}<p class="quiet">{firstRun.heardNote}</p>{/if}
-          {/if}
-          {#if proposal.name && !modules.includes(PEOPLE)}<p class="quiet">{firstRun.nameNotKept}</p>{/if}
-        </section>
-
-        <section class="part" aria-labelledby="mine-h">
-          <h2 class="part-h" id="mine-h">{firstRun.mineTitle}</h2>
-          {#if u}
-            <p class="mine-title">{u.title}</p>
-            <p class="quiet">{u.summary}</p>
-          {:else if using}
-            <p class="mine-title">{drawing.drafted}</p>
-            <p class="quiet">{using.question}</p>
-          {:else if drafting}
-            <p class="quiet" role="status">{drawing.drafting}</p>
-          {/if}
-          <div class="chips" role="group" aria-label={firstRun.mineFor}>
-            {#each USE_CASES as one (one.usecase)}
-              <button type="button" class="chip" aria-pressed={chosen === one.usecase} onclick={() => (chosen = chosen === one.usecase ? null : one.usecase)}>{one.title}</button>
-            {/each}
-          </div>
-
-          {#if pages.length > 0}
-            <h3 class="sub-h">{firstRun.minePages}</h3>
-            <ul class="pages">
-              {#each pages as s (s.section)}
-                <li><span class="pages-section">{s.section}</span> <span class="quiet">{firstRun.and(s.pages)}</span></li>
-              {/each}
-            </ul>
-          {/if}
-
-          <!-- EVERY PAGE IT MAKES, one card a page under the sentence, each opening as the record would draw it. -->
-          <PagesPreview asked={asks} />
-
-          {#if entries.length > 0}
-            <h3 class="sub-h">{firstRun.mineEntries}</h3>
-            <ul class="entries">
-              {#each entries as e, i (i)}<li>{e}</li>{/each}
-            </ul>
-          {/if}
-
-          <h3 class="sub-h">{firstRun.mineKeeps}</h3>
-          <ul class="keeps">
-            {#each offered as id (id)}
-              {@const by = heldBy(id)}
-              {@const blurb = firstPartyModule(id)?.blurb ?? ''}
-              <li class="keep">
-                <span class="keep-main">
-                  <span class="keep-name" id="keep-{id}">{moduleName(id)}</span>
-                  <span class="quiet">{by === null ? blurb : firstRun.keepNeeded(by)}</span>
-                </span>
-                <button
-                  type="button"
-                  class="switch"
-                  role="switch"
-                  aria-checked={modules.includes(id)}
-                  aria-label={firstRun.keepSwitch(moduleName(id))}
-                  disabled={by !== null || busy}
-                  onclick={() => flip(id)}><span class="switch-track"></span></button
-                >
-              </li>
-            {/each}
-          </ul>
-
-          {#if asksCurrency}<Currency bind:value={currency} {locale} />{/if}
-          {#if ring}<Remind />{/if}
-        </section>
-
-        {#if failed}
-          <section class="part" aria-labelledby="failed-h" role="status">
-            <h2 class="part-h" id="failed-h">{firstRun.notAllMade}</h2>
-            <ul class="failed">
-              {#each failed as f, i (i)}
-                <li>
-                  {f.said}
-                  {#if f.why !== ''}
-                    <details class="why"><summary>{firstRun.whyDetails}</summary><p class="quiet">{f.why}</p></details>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-            <div class="actions">
-              <Button href="/">{firstRun.openHome}</Button>
-            </div>
-          </section>
+      <!-- THE TITLE ROW: the question, and once it is read, the sentence that says where the build stands. -->
+      <header class="title">
+        <h1 class="question" id="who-h">{firstRun.whoQuestion}</h1>
+        {#if status}
+          <p class="sentence">{status.before}{#if status.needs}<span class="needs" data-needs>{status.needs}</span>{/if}{status.after}</p>
         {/if}
+      </header>
 
-        <!-- WHY THE PRIMARY IS OFF sits above the bar, not in it, so the bar a phone keeps on screen stays one button tall. -->
-        {#if nothing}<p class="quiet" id="make-why">{firstRun.makeSomething}</p>{/if}
-        <!-- ONE PRIMARY, AND ON A PHONE IT RIDES THE BOTTOM EDGE, clear of the home indicator. -->
-        <div class="make-bar">
-          <Button weight="primary" disabled={!ready} onclick={() => void make()} aria-describedby={nothing ? 'make-why' : undefined}>
-            {busy ? firstRun.makingIt : firstRun.makeIt}
-          </Button>
+      <div class="board">
+        <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
+        <Tile lead icon="edit" title={words.talk} actions={keys}>
+          {#if proposal === null}
+            <form
+              class="prompt"
+              onsubmit={(e) => {
+                e.preventDefault();
+                read();
+              }}
+            >
+              <textarea
+                class="prompt-field"
+                rows="3"
+                autocomplete="off"
+                aria-labelledby="who-h"
+                placeholder={firstRun.whoPlaceholder}
+                bind:this={field}
+                bind:value={sentence}
+                onkeydown={enter}
+              ></textarea>
+              <div class="chips" role="group" aria-label={firstRun.whoChipsLabel}>
+                {#each firstRun.whoChips as c (c)}
+                  <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
+                  <button type="button" class="chip" onmousedown={(e) => e.preventDefault()} onclick={() => chip(c)}>{c}</button>
+                {/each}
+              </div>
+              <!-- WHAT IT HEARS AS IT IS TYPED, one phrase at a time. Not a live region: a screen reader would be told on
+                   every key. The press says it all in one place. -->
+              {#if live && live.heard.length > 0}
+                <div class="hearing">
+                  <span class="hearing-label">{words.hearing}</span>
+                  <ul class="hearing-list">
+                    {#each live.heard as h, i (i)}
+                      <li class="hearing-item"><q class="phrase">{h.phrase}</q> <span class="became">{h.became}</span></li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+              <div class="actions">
+                <!-- THE CAP ONLY WHILE THE KEY WORKS: a disabled pill's cap would promise a key that does nothing. -->
+                <Button weight="primary" type="submit" kbd={sentence.trim() === '' ? undefined : '↵'} disabled={sentence.trim() === ''}>{firstRun.whoGo}</Button>
+              </div>
+            </form>
+          {:else}
+            <ol class="log">
+              {#each turns as t, i (i)}
+                <li class="turn">
+                  <Face name={proposal.name ?? words.you} you size="l" />
+                  <div class="turn-main">
+                    {@render you(t.at)}
+                    <!-- THE WORDS, MARKED WITH WHAT EACH PHRASE BECAME, and pressing them opens the whole of what was
+                         said for editing. -->
+                    <button type="button" class="said-line" disabled={busy} onclick={edit}>
+                      <span class="said-text">
+                        {#each marksIn(t.said, proposal.heard, i === 0 ? proposal.name : null) as r, j (j)}
+                          {#if r.became}<mark class="said-mark" title={r.became}>{r.text}</mark>{:else}{r.text}{/if}
+                        {/each}
+                      </span>
+                      <span class="said-edit">{firstRun.whoEdit}</span>
+                    </button>
+                  </div>
+                </li>
+
+                {#if i === 0}
+                  <li class="turn">
+                    <Face name={words.dog} kind="system" size="l" />
+                    <div class="turn-main">
+                      {@render dog(t.at)}
+                      <section class="reply" aria-labelledby="heard-h">
+                        <h3 class="reply-h" id="heard-h" tabindex="-1" bind:this={heardHeading}>{firstRun.heardTitle}</h3>
+                        {#if proposal.name}<p class="heard-name">{firstRun.heardName(proposal.name)}</p>{/if}
+                        {#if proposal.heard.length > 0}
+                          <ul class="heard">
+                            {#each proposal.heard as h, k (k)}
+                              <li class="heard-one">
+                                <IconWell name={iconOfBecame(h.became)} size="l" />
+                                <span class="heard-main">
+                                  <q class="phrase">{h.phrase}</q>
+                                  <span class="became"><span class="sr">: </span>{h.became}</span>
+                                </span>
+                              </li>
+                            {/each}
+                          </ul>
+                        {:else}
+                          <p class="quiet">{firstRun.heardNone}</p>
+                          {#if proposal.name && modules.includes(PEOPLE)}<p class="quiet">{firstRun.heardNote}</p>{/if}
+                        {/if}
+                        {#if proposal.name && !modules.includes(PEOPLE)}<p class="quiet">{firstRun.nameNotKept}</p>{/if}
+                        {#each missing as m (m.title)}
+                          <p class="nudge">{words.missing(m.title, m.missing)}</p>
+                        {/each}
+                      </section>
+
+                      <section class="reply" aria-labelledby="mine-h">
+                        <h3 class="reply-h" id="mine-h">{firstRun.mineTitle}</h3>
+                        {#if u}
+                          <p class="mine-title">{u.title}{#if also.length > 0}<span class="quiet">, {firstRun.and(also.map((a) => a.title))}</span>{/if}</p>
+                          <p class="quiet">{u.summary}</p>
+                        {:else if using}
+                          <p class="mine-title">{drawing.drafted}</p>
+                          <p class="quiet">{using.question}</p>
+                        {:else if drafting}
+                          <p class="quiet drafting" role="status"><span class="live-dot" aria-hidden="true"></span>{drawing.drafting}</p>
+                        {/if}
+                        {#if !closest}
+                          <div class="chips" role="group" aria-label={firstRun.mineFor}>
+                            {#each USE_CASES as one (one.usecase)}
+                              <button type="button" class="chip" aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</button>
+                            {/each}
+                          </div>
+                        {/if}
+                      </section>
+                    </div>
+                  </li>
+                {:else}
+                  <li class="turn">
+                    <Face name={words.dog} kind="system" size="l" />
+                    <div class="turn-main">
+                      {@render dog(t.at)}
+                      <!-- THE NEWEST ANSWER IS SAID ALOUD; the older ones stay quiet. -->
+                      <p class="reply-line" role={i === turns.length - 1 ? 'status' : undefined}>
+                        {#if t.adds && t.adds.length > 0}{words.adds(t.adds.map((h) => firstRun.mineIn(`“${h.phrase}”`, h.became)))}{:else}{words.addsNothing}{/if}
+                      </p>
+                    </div>
+                  </li>
+                {/if}
+              {/each}
+            </ol>
+
+            <!-- ── THE ONE QUESTION ─────────────────────────────────────── -->
+            {#if asksCurrency || closest}
+              <section class="ask" aria-labelledby={asksCurrency ? 'currency-q' : 'closest-q'} data-open={waitingOn ? '' : undefined}>
+                <p class="ask-label"><IconWell name="ask" size="m" tone={waitingOn ? 'danger' : undefined} /><span class="ask-word">{words.oneQuestion}</span><span class="ask-meta">{words.cannotTell}</span></p>
+                {#if asksCurrency}
+                  <Currency bind:value={currency} {locale} choices={ask?.choices ?? []} suggested={ask?.suggested ?? null} find={ask?.find ?? null} />
+                {:else}
+                  <h3 class="ask-q" id="closest-q">{words.closest}</h3>
+                  <p class="quiet">{words.closestWhy}</p>
+                  <div class="chips" role="group" aria-label={firstRun.mineFor}>
+                    {#each USE_CASES as one, n (one.usecase)}
+                      <Button weight="quiet" kbd={n < 9 ? String(n + 1) : undefined} aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
+                    {/each}
+                  </div>
+                {/if}
+              </section>
+            {/if}
+
+            {#if ring}<Remind />{/if}
+
+            <!-- ── TELL IT MORE ────────────────────────────────────────── -->
+            <form
+              class="more"
+              onsubmit={(e) => {
+                e.preventDefault();
+                more();
+              }}
+            >
+              <div class="field more-field">
+                <input class="field-input" id="start-more" type="text" autocomplete="off" aria-label={words.more} placeholder={words.more} disabled={busy} bind:value={extra} onkeydown={moreKey} />
+                <Button weight="quiet" size="sm" type="submit" kbd="↵" disabled={busy || extra.trim() === ''}>{words.moreGo}</Button>
+              </div>
+            </form>
+
+            {#if failed}
+              <section class="failed-part" aria-labelledby="failed-h" role="status">
+                <h3 class="reply-h" id="failed-h">{firstRun.notAllMade}</h3>
+                <ul class="failed">
+                  {#each failed as f, i (i)}
+                    <li>
+                      {f.said}
+                      {#if f.why !== ''}
+                        <details class="why"><summary>{firstRun.whyDetails}</summary><p class="quiet">{f.why}</p></details>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+                <div class="actions">
+                  <Button href="/">{firstRun.openHome}</Button>
+                </div>
+              </section>
+            {/if}
+          {/if}
+        </Tile>
+
+        <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
+        <div class="build">
+          <Tile icon="home" title={waitingOn || onCount === 0 || proposal === null ? words.building : words.ready} count={words.parts(onCount, allParts.length)}>
+            <div class="steps">
+              <Segments
+                total={steps.order.length}
+                done={steps.done}
+                current={steps.current}
+                tone="danger"
+                summary={words.progress(
+                  steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
+                  steps.order.find((p) => p.state === 'waiting')?.name ?? null,
+                  steps.order.filter((p) => !p.on).map((p) => p.name),
+                )}
+              />
+              <ol class="step-names" aria-hidden="true" style:--n={steps.order.length}>
+                {#each steps.order as p (p.id)}
+                  <li data-state={p.state}>{p.name}</li>
+                {/each}
+              </ol>
+            </div>
+            <p class="reading">
+              {#if onCount === 0 && !steps.current}{words.lightsUp}{:else}{words.onReading(
+                  steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
+                  steps.order.find((p) => p.state === 'waiting')?.name ?? null,
+                )}{/if}
+              {words.nothingSaved}
+            </p>
+            {#if proposal}
+              <!-- WHY THE PRIMARY IS OFF sits above the bar, not in it, so the bar a phone keeps on screen stays one button tall. -->
+              {#if nothing}<p class="quiet" id="make-why">{firstRun.makeSomething}</p>{/if}
+              <!-- ONE PRIMARY, AND ON A PHONE IT RIDES THE BOTTOM EDGE, clear of the home indicator. -->
+              <div class="make-bar">
+                <Button weight="primary" kbd={ready ? '⌘↵' : undefined} disabled={!ready} aria-busy={busy} onclick={() => void make()} aria-describedby={nothing ? 'make-why' : undefined}>
+                  {busy ? firstRun.makingIt : firstRun.makeIt}
+                </Button>
+              </div>
+            {/if}
+          </Tile>
+
+          {#if onParts.length > 0}
+            <div class="parts" role="group" aria-label={firstRun.mineKeeps} data-live={proposal === null ? '' : undefined}>
+              {#each onParts as p (p.id)}
+                <Part part={p} live={proposal === null || p.id.startsWith('usecase-')} {busy} {locale} arrived={fresh.has(`part:${p.id}`)} {fresh} onflip={flip} />
+              {/each}
+            </div>
+          {/if}
+
+          {#if proposal && offParts.length > 0}
+            <Section title={words.alsoHere} count={offParts.length}>
+              <div class="keeps">
+                {#each offParts as p (p.id)}
+                  <Part part={p} {busy} {locale} onflip={flip} />
+                {/each}
+              </div>
+            </Section>
+          {/if}
+
+          {#if proposal}
+            <!-- EVERY PAGE IT MAKES, one row a page, each opening as the record would draw it. -->
+            <PagesPreview asked={drawAsked} rail={pages} />
+          {/if}
         </div>
-      {/if}
+      </div>
     {/if}
   </div>
 </Entry>
 
 <style>
-  /* ONE COLUMN AT EVERY WIDTH. The frame, its gutter and the brand are `signin/Entry.svelte`'s, the same as sign in's;
-     `min-inline-size: 0` so a long word cannot widen the column past the screen and take the page sideways. */
+  /* THE FRAME: the title row, then the board, 20 apart. `min-inline-size: 0` everywhere a long word could otherwise
+     widen a track past the screen and take the page sideways. */
   .frame {
     display: grid;
     align-content: start;
@@ -467,35 +827,113 @@
     min-inline-size: 0;
   }
 
+  /* A STATE THAT IS NOT THE BUILD (no record yet, a colleague's) is a centred column on the ground, no tile. */
+  .alone {
+    justify-self: center;
+    inline-size: min(440px, 100%);
+  }
+
+  /* ── the title row ─────────────────────────────────────────────────────── */
+
+  .title {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  /* `t-title` IN GEIST (SYSTEM §3, §11), and the phone's large 30/36 below 900px. */
   .question {
+    margin: 0;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-3xl);
+    font-family: var(--font-ui);
+    font-size: var(--t-title);
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: var(--lh-3xl);
+    letter-spacing: -0.02em;
+    line-height: 34px;
     text-wrap: balance;
   }
+
+  /* THE SENTENCE: 16/24 in the second ink, and the phrase that needs him in red (SYSTEM §5). */
+  .sentence {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-md);
+    line-height: 24px;
+  }
+
+  .needs {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  /* ── the board ─────────────────────────────────────────────────────────── */
+
+  /* ONE COLUMN ON A PHONE; FROM 900PX THE CONVERSATION AND THE BUILD SIDE BY SIDE, 12 apart (SYSTEM §4). */
+  .board {
+    display: grid;
+    align-items: start;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  @media (width >= 900px) {
+    .board {
+      grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    }
+  }
+
+  .build,
+  .parts {
+    display: grid;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  /* WHILE TYPING ON A PHONE the build tile alone says what lit up; the part tiles arrive once the sentence is read. */
+  @media (width < 900px) {
+    .parts[data-live] {
+      display: none;
+    }
+  }
+
+  /* A TILE THAT JUST CAME ON takes the arrival tint and fades back to the tile over a second and a half. */
+  .build :global(.tile) {
+    transition: background-color 1500ms var(--ease-out);
+  }
+
+  .build :global(.tile[data-arrived]) {
+    background: var(--arrived-wash);
+    transition: none;
+  }
+
+  /* ── the prompt ────────────────────────────────────────────────────────── */
 
   .prompt {
     display: grid;
     gap: var(--sp-3);
   }
 
-  /* THE ONE FIELD, drawn at the size of a sentence rather than a form row, and 16px so a phone does not zoom it. */
+  /* THE ONE FIELD, drawn at the size of a sentence rather than a form row, in the tile's well (SYSTEM §6 fields), and
+     16px so a phone does not zoom it. Its focus is the a11y layer's 2px ink ring. */
   .prompt-field {
     inline-size: 100%;
+    box-sizing: border-box;
     padding: var(--sp-3) var(--sp-4);
     background: var(--s1);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-md);
-    line-height: var(--lh-body);
+    line-height: 24px;
     resize: vertical;
-    /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and Continue under it still in view. */
+    /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and the press under it still in view. */
     scroll-margin-block: var(--sp-6) var(--sp-9);
+  }
+
+  .prompt-field::placeholder {
+    color: var(--dim);
   }
 
   .chips {
@@ -504,15 +942,17 @@
     gap: var(--sp-2);
   }
 
+  /* QUIET PILLS IN THE TILE: the `--s1` fill, no border, the chosen one on the selected fill (SYSTEM §6 buttons). */
   .chip {
-    min-block-size: var(--tap);
+    min-block-size: var(--ctl-h);
     padding-inline: var(--sp-4);
     background: var(--s1);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-pill);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
+    font-weight: 500;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
@@ -520,101 +960,220 @@
   .chip[aria-pressed='true'] {
     background: var(--selected);
     color: var(--ink);
+    font-weight: 600;
+  }
+
+  .chip:disabled {
+    cursor: not-allowed;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .chip:hover {
-      background: var(--hover-wash);
+    .chip:hover:not(:disabled) {
+      background: var(--s2);
     }
+  }
+
+  .ask .chips :global(.btn[aria-pressed='true']) {
+    background: var(--selected);
+    font-weight: 600;
+  }
+
+  /* WHAT IT HEARS AS IT IS TYPED: a label and the phrases, each quoted with what it became. */
+  .hearing {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .hearing-label {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  .hearing-list {
+    display: contents;
+    list-style: none;
+  }
+
+  .hearing-item {
+    display: inline-flex;
+    gap: var(--sp-1);
+    white-space: nowrap;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  /* THE SENTENCE, ONE LINE, ELLIPSED WHERE IT RUNS OVER: the whole of it is one press away. */
-  .said-line {
-    display: flex;
-    min-block-size: var(--tap);
-    min-inline-size: 0;
     align-items: center;
-    gap: var(--sp-3);
-    padding-inline: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-md);
-    text-align: start;
-    cursor: text;
-  }
-
-  .said-text {
-    flex: 1;
-    overflow: hidden;
-    min-inline-size: 0;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .said-edit {
-    flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .part {
-    display: grid;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  .part-h {
-    color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 600;
-  }
-
-  .sub-h {
-    margin-block-start: var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 600;
-  }
-
-  .heard-name,
-  .mine-title {
-    color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 600;
-  }
-
-  .quiet {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
-  }
-
-  .heard,
-  .pages,
-  .entries,
-  .keeps,
-  .failed {
-    display: grid;
     gap: var(--sp-2);
+  }
+
+  /* ── the conversation ──────────────────────────────────────────────────── */
+
+  .log {
+    display: grid;
+    gap: var(--sp-5);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .phrase,
-  .pages-section {
+  .turn {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
+  .turn-main {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .who {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    min-block-size: 20px;
+  }
+
+  .who-name {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  /* TIMES IN A FEED ARE GEIST MONO (SYSTEM §3). */
+  .who-time {
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+  }
+
+  /* HIS WORDS IN THE TILE'S WELL, whole, with each phrase heard lifted onto the tile's own fill. The whole of it is one
+     press away from editing. */
+  .said-line {
+    display: grid;
+    gap: var(--sp-2);
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    line-height: 22px;
+    text-align: start;
+    cursor: text;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .said-line:hover:not(:disabled) {
+      background: var(--s2);
+    }
+  }
+
+  .said-text {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* THE LIFT REACHES PAST THE WORD AND THE WORD DOES NOT MOVE: a padding and the same margin back, so a phrase before
+     a comma keeps its comma against it. */
+  .said-mark {
+    margin-inline: -3px;
+    padding: 1px 3px;
+    background: var(--bg);
+    border-radius: var(--r-sm);
     color: var(--ink);
     font-weight: 500;
-    overflow-wrap: anywhere;
+    box-decoration-break: clone;
+  }
+
+  .said-edit {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .reply {
+    display: grid;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .reply + .reply {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* THE HEADING FOCUS LANDS ON AFTER A READ is a place, not a control: focus-ok: it is `tabindex="-1"`, reached only
+     by the script that moves the reader to the answer, and it takes no press, so no ring is drawn round it. */
+  .reply-h:focus {
+    outline: none;
+  }
+
+  .reply-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .reply-line {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .heard-name,
+  .mine-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+  }
+
+  /* WHAT IT FOUND, one phrase to a cell, two a row where there is room (the board's grid of found things). */
+  .heard {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+    gap: var(--sp-2) var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .heard-one {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .heard-main {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .phrase {
+    overflow: hidden;
+    color: var(--ink);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hearing .phrase {
+    font-weight: 500;
   }
 
   .became {
@@ -622,27 +1181,108 @@
     font-size: var(--t-sm);
   }
 
-  /* A SWITCH BESIDE ITS SENTENCE, never across the screen from it: the words take what they need up to a line's
-     measure and the switch sits after them, as Settings lays its switches out. */
-  .keep {
-    display: grid;
-    grid-template-columns: fit-content(var(--measure)) auto;
-    align-items: center;
-    gap: var(--sp-4);
-    min-block-size: var(--row-h-2);
-    border-block-end: 1px solid var(--line-soft);
+  /* A SCREEN READER HEARS "BECAME" AS AN ARROW between the phrase and what it became; the eye reads the two lines. */
+  .sr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
-  .keep-main {
-    display: grid;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-  }
-
-  .keep-name {
+  .nudge {
+    margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
-    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .quiet {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .drafting {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* SLASH AT WORK WEARS THE ONE HUE THAT MEANS ALIVE (SYSTEM §2 `live`). Still, never pulsing (SYSTEM §8). */
+  .live-dot {
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    flex: none;
+    border-radius: var(--r-pill);
+    background: var(--live);
+  }
+
+  /* ── the question ──────────────────────────────────────────────────────── */
+
+  /* THE ONE QUESTION, set off from the conversation by a hairline above it, not a box. */
+  .ask {
+    display: grid;
+    gap: var(--sp-3);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .ask-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+  }
+
+  .ask-word {
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+  }
+
+  .ask[data-open] .ask-word {
+    color: var(--danger);
+  }
+
+  .ask-meta {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .ask-q {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+  }
+
+  /* ── telling it more ───────────────────────────────────────────────────── */
+
+  .more-field {
+    padding-inline-end: var(--sp-1);
+  }
+
+  .more-field .field-input {
+    font-size: var(--t-md);
+  }
+
+  .failed-part {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .failed {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
   }
 
   .why summary {
@@ -652,44 +1292,175 @@
     cursor: pointer;
   }
 
-  .again {
-    display: grid;
+  /* ── the keys, at the conversation's heading ───────────────────────────── */
+
+  .keys {
+    display: inline-flex;
+    align-items: center;
     gap: var(--sp-1);
   }
 
-  .again-h {
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 600;
-  }
-
-  .again-why {
+  .keys-word {
+    margin-inline: 2px var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
-  /* THE ONE PRIMARY, AT THE END OF THE PREVIEW at 1440, at the end of the line as a form's primary sits. */
-  .make-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: end;
-    gap: var(--sp-3);
-    padding-block: var(--sp-4) var(--sp-7);
+  .keys-word:last-child {
+    margin-inline-end: 0;
   }
 
-  /* AND ON A PHONE IT RIDES THE BOTTOM EDGE: the button's own 44px and 4px either side, which is the `--sticky` height,
-     with the home indicator's inset paid once under it, and the button full width for a thumb. */
+  /* ── the build ─────────────────────────────────────────────────────────── */
+
+  .steps {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  /* EACH PART'S NAME UNDER ITS CELL, in the order the cells are drawn, 3 apart as the cells are. 12 is a chart's own
+     label size (SYSTEM §3). */
+  .step-names {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step-names li {
+    overflow: hidden;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .step-names li[data-state='waiting'] {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  .step-names li[data-state='off'] {
+    color: var(--dim);
+  }
+
+  /* A NARROW PHONE DROPS THE CHART'S SECONDARY LABELS and keeps its reading line (SYSTEM §9). */
+  @media (width < 640px) {
+    .step-names {
+      display: none;
+    }
+  }
+
+  .reading {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  /* THE ONE PRIMARY, AT THE END OF THE BUILD at 1440. */
+  .make-bar {
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .keeps {
+    display: grid;
+  }
+
+  /* ── the again note ────────────────────────────────────────────────────── */
+
+  .again {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-3);
+    max-inline-size: var(--measure);
+  }
+
+  .again.alone {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .again-main {
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .again-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  .again-why {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-md);
+    line-height: 24px;
+  }
+
+  /* ── a phone ───────────────────────────────────────────────────────────── */
+
   @media (width < 900px) {
+    .question {
+      font-size: var(--t-figure);
+      line-height: 36px;
+    }
+
+    /* MAKE IT MINE RIDES THE BOTTOM EDGE as glass chrome: the button's own 44 and 4 either side, which is the
+       `--sticky` height, with the home indicator's inset paid once under it (SYSTEM §9). */
     .make-bar {
-      position: sticky;
+      position: fixed;
+      inset-inline: 0;
       inset-block-end: 0;
-      padding-block: var(--sp-1) calc(var(--sp-1) + env(safe-area-inset-bottom));
-      background: var(--bg);
+      z-index: var(--z-sheet);
+      padding: var(--sp-1) var(--gutter) calc(var(--sp-1) + env(safe-area-inset-bottom));
+      background: var(--glass);
+      box-shadow: var(--glass-edge);
+      backdrop-filter: var(--glass-blur);
     }
 
     .make-bar :global(.btn) {
       inline-size: 100%;
+      min-block-size: var(--tap);
+    }
+
+    .frame[data-making] {
+      padding-block-end: calc(var(--tap) + var(--sp-2) + env(safe-area-inset-bottom));
+    }
+
+    .again {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .again > :global(.btn) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* NO KEY CAPS UNDER A THUMB OR ON A PHONE: there is no keyboard to press them with (DESIGN-SYSTEM §6). */
+  @media (width < 900px), (pointer: coarse) {
+    .keys,
+    .frame :global(.btn-kbd) {
+      display: none;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .said-mark {
+      border: 1px solid CanvasText;
+    }
+
+    .make-bar {
+      border-block-start: 1px solid CanvasText;
     }
   }
 </style>

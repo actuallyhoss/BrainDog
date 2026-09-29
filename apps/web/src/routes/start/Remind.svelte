@@ -18,6 +18,7 @@
   import { hostKey, offerOf, turnOn, type Manager, type Offer, type Ports } from '$lib/ui/push.ts';
   import type { Call } from '$lib/ui/webhook-doors.ts';
   import Button from '$lib/ui/Button.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
 
   let offer = $state<Offer>(null);
   let on = $state(false);
@@ -56,28 +57,52 @@
 
 {#if offer?.can === true}
   <div class="remind">
+    <IconWell name="bell" size="l" tone={on ? 'earn' : undefined} />
     <p class="remind-why">{on ? firstRun.remindIsOn : firstRun.remindWhy}</p>
     {#if !on}
-      <Button disabled={busy} onclick={() => void press()}>{firstRun.remindOn}</Button>
+      <Button size="sm" disabled={busy} onclick={() => void press()}>{firstRun.remindOn}</Button>
     {/if}
     <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
     <p class="remind-said" role="status">{line}</p>
   </div>
 {:else if offer}
   <!-- A PHONE THAT COULD BE TOLD ONCE THE SITE IS ON ITS HOME SCREEN IS TOLD THAT STEP, in `push.ts`'s words. -->
-  <p class="remind-why">{offer.line}</p>
+  <p class="remind-said">{offer.line}</p>
 {/if}
 
 <style>
+  /* A ROW IN THE CONVERSATION: the bell in its well, the sentence, and the press at its end (SYSTEM §6, rows). */
   .remind {
     display: grid;
-    justify-items: start;
-    gap: var(--sp-2);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
   }
 
-  .remind-why,
+  .remind-why {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
   .remind-said {
+    grid-column: 2 / -1;
+    margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .remind-said:empty {
+    display: none;
+  }
+
+  /* UNDER 640 THE PRESS DROPS UNDER ITS SENTENCE, full width for a thumb. */
+  @media (width < 640px) {
+    .remind :global(.btn) {
+      grid-column: 1 / -1;
+    }
   }
 </style>
