@@ -116,10 +116,9 @@ Two dated pricing notes that will need re-checking:
 ## 2 · Tier C, architected
 
 > **Where the built runner differs from this section and §4 and §5** *(added September 28th 2026;
-> [48-SPEC-CLI](48-SPEC-CLI.md) §5.13 is the runner as built, and `loop/finish/agents.md` §5 items 11 to 13 are the
-> owner's defaults it follows).*
+> [48-SPEC-CLI](48-SPEC-CLI.md) §5.13 is the runner as built, following the owner's defaults).*
 >
-> - **A kind is a declaration, not one of four templates.** A job kind is a `job.<id>` declaration: its title,
+> - **A kind is a declaration, not one of the templates §4 names.** A job kind is a `job.<id>` declaration: its title,
 >   prompt, arguments, repository name, tools, turns and permission mode, linted by the kernel's `jobBody`, approved
 >   once by the owner in Decide and installed by an ordinary `change`. The runner holds no templates and takes
 >   nothing from `@braindog/slash`; it runs the same lint again on what each claim carries.

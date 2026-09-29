@@ -20,14 +20,13 @@ One label per surface, with the environment in front of it.
 | **`app.alpha.brain.dog`** | alpha's app Worker, built as **BrainDog Alpha**, as the legacy host, the same way | the same | live, legacy |
 | **`mcp.alpha.brain.dog`** | reserved | nothing | not claimed |
 
-**The app lives on `brain.dog` since push 4 of the one-domain move** (`loop/research-one-domain-binding.md`
-section 4, `loop/research-push-4.md`). The site keeps `brain.dog` as its Custom Domain and runs its
+**The app lives on `brain.dog` since the one-domain move.** The site keeps `brain.dog` as its Custom Domain and runs its
 script first on the app's doors, which it hands to `braindog-production` through a service binding,
 so no zone route is written. `PUBLIC_HOST` is `brain.dog`, so sign-in, the CSRF origin and the device
 flow are all there; `app.brain.dog` stays the app Worker's Custom Domain for the tokens and `/in/`
 addresses handed out on it, for at least the 90 days a token lives (to about 23 December 2026) and
 until every `/in/` address handed out there is re-minted. A device start there is refused. Alpha is
-the same on its own names since push 2.
+the same on its own names.
 
 `mcp.*` is deliberately unclaimed, and both names resolve to nothing. The MCP door is
 `https://brain.dog/mcp`, a path on the app's own host like every other door, so there is no service
@@ -320,8 +319,8 @@ goes like this.
 
 **Every push:**
 
-1. The workflow lands on a branch `finish/wN` as a pull request labelled `full-gates`. `ci.yml` and
-   `gates.yml` run there, and the repair goes on until both are green. Nothing deploys from a branch.
+1. The change lands on a branch of its own as a pull request labelled `full-gates`. `ci.yml` and
+   `gates.yml` run there, and it is fixed there until both are green. Nothing deploys from a branch.
 2. If anything under `packages/kernel/src/migrations/` changed, rehearse it on last night's copy of
    the live record against the deployed sha, which is the tail of
    `curl -s https://brain.dog/.well-known/braindog-build`:

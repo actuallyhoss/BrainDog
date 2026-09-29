@@ -5,7 +5,7 @@
   prerendered page shows the first mode whole; with scripting the tabs switch it, and the palette moves to the next
   mode on its own every few seconds until somebody presses a tab, unless the reader has asked for reduced motion.
 
-  THE NEW APP'S PALETTE ON A TILE (SYSTEM §6, 29 September): the ask field with its search glyph and its return key
+  THE NEW APP'S PALETTE ON A TILE (the design system): the ask field with its search glyph and its return key
   cap, the three modes as a segmented control with the chosen one in ink, then the answer: an icon well and the
   answer's sentence, the rows it read with a bar each where they are sums of money (the largest in ink and the rest
   grey, as every chart here), and where it came from. It draws its own surface, a tile at level two, because a palette
@@ -118,7 +118,7 @@
 </div>
 
 <style>
-  /* A PALETTE FLOATS, so its tile sits at level two, on the tile fill, radius 22 (SYSTEM §4, §6). */
+  /* A PALETTE FLOATS, so its tile sits at level two, on the tile fill, radius 22 (the design system). */
   .palette {
     display: grid;
     align-content: start;

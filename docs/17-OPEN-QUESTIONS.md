@@ -35,7 +35,7 @@ rather than a measurement.
 *(An earlier draft priced the first two rows at 115d and 60d and gated the second on gate 1; both
 numbers were withdrawn in 15 §1, and gate 2 is the spending gate — [ADR-031](16-DECISIONS.md).)*
 
-**What would settle it:** it is Sam's call, and the stage-0-first shape means it does not have to
+**What would settle it:** it is the owner's call, and the stage-0-first shape means it does not have to
 be made yet. Stage 0 is 10 days, is useful alone, and starts the clock on gates 1a–1d — which can
 veto Phase B but never authorise it.
 
@@ -139,10 +139,10 @@ weakest evidence.
 ## Q3 · Does the pack format survive a second author?
 
 **The question.** The eight pack kinds and sixteen value types are one person's model of a business.
-Gate 5 measures it — 5 packs by somebody who is not Sam, at 6 months — but that is *after* 62–63
+Gate 5 measures it — 5 packs by somebody who is not the owner, at 6 months — but that is *after* 62–63
 days of platform work as first estimated (≈126–195 re-costed — [15-ROADMAP](15-ROADMAP.md) §4).
 
-**What would settle it earlier, and cheaply:** write three packs for businesses Sam does **not**
+**What would settle it earlier, and cheaply:** write three packs for businesses the owner does **not**
 run, before building the page engine. A landlord pack, a photographer pack, an agency pack — as
 YAML only, against the spec, with no code. If any of the three needs a ninth kind or a seventeenth
 value type, the closed list is wrong and it is better to know at day 8 than at day 63.
@@ -228,7 +228,7 @@ date — the exception [10-MCP](10-MCP.md) §1 points at, recorded in [ADR-054](
 
 ## Q8 · Is "Slash" clear of a register, and how much does the collision cost?
 
-**The question changed twice.** An earlier draft asked whether *Pointer* was clear. Sam then
+**The question changed twice.** An earlier draft asked whether *Pointer* was clear. The owner then
 reaffirmed the assistant's earlier name, twice, and the question became what that name cost. On
 September 25th 2026 he renamed it Slash ([ADR-070](16-DECISIONS.md)), so the question is the same
 one asked of a new word: what does this one cost, and is anything about it actually blocking? It is
@@ -440,7 +440,7 @@ settled elsewhere is not re-asked here.
 | [23-ASSISTANT-UI](23-ASSISTANT-UI.md) §14 | 7 | none. Row 1 (*does the assistant ship in v1?*) is Q2, answered by [ADR-030](16-DECISIONS.md), and should be deleted there in favour of it |
 | [30-BLUEPRINT](30-BLUEPRINT.md) §12 | 4 | all four closed: the dialect grammar → [34-GRAMMARS](34-GRAMMARS.md) §2; billing lapse and the export guarantee → [ADR-059](16-DECISIONS.md); the six first-party packs' seeds → the first task of B2; an `admin` token for the install path → never a scope — the install path is a single-use operation grant, [ADR-060](16-DECISIONS.md) as amended in iteration 2 |
 | [31-STACK](31-STACK.md) §6 | 1 | first publish under trusted publishing (stage 0) — publish `0.0.1` by hand and wire it up afterwards |
-| [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §5 — the revision loop, after iteration 2 | — | the rulings settled the audit's thirty-two conflicts and are folded into 16 as [ADR-063](16-DECISIONS.md)–[ADR-068](16-DECISIONS.md). What the loop leaves open, by design rather than by omission: the Durable Object's three conformance cases (Q12, week one); passkeys and the theme editor in later phases; `pack install --force` and `export --with-grants`, marked *CLI: later*; the OAuth authorization server ([ADR-054](16-DECISIONS.md)). The loop runs until two audits find nothing |
+| [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §5 — the revision, after iteration 2 | — | the rulings settled the audit's thirty-two conflicts and are folded into 16 as [ADR-063](16-DECISIONS.md)–[ADR-068](16-DECISIONS.md). What the revision leaves open, by design rather than by omission: the Durable Object's three conformance cases (Q12, week one); passkeys and the theme editor in later phases; `pack install --force` and `export --with-grants`, marked *CLI: later*; the OAuth authorization server ([ADR-054](16-DECISIONS.md)) |
 
 **What stays genuinely open across the corpus:** the Durable Object planner measurement (Q12, week
 one, as three conformance cases); the OAuth authorization server — Phase A ships agent tokens only

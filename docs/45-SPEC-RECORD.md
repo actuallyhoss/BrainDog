@@ -57,10 +57,10 @@ export type RecordApi = {
   propose(args: ProposeArgs, ctx: CallContext): Promise<Result<{ id: string }>>;
   log(args: LogArgs, ctx: CallContext): Promise<Result<EventRow>>;
   markRead(args: { upTo: number }, ctx: CallContext): Promise<Result<null>>;
-  // RUNS: 2, added with the session register (loop/research-agent-path.md §6)
+  // RUNS: 2, added with the session register
   attach(args: AttachArgs, ctx: CallContext): Promise<Result<Attached>>;                               // which run this agent is, and its briefing
   handoff(args: HandoffArgs, ctx: CallContext): Promise<Result<Entry>>;                                // the next step, what was tried, the state
-  // PEOPLE: 1, added with the agents pack (loop/research-agent-path.md §5.6)
+  // PEOPLE: 1, added with the agents pack
   meet(args: MeetArgs, ctx: CallContext): Promise<Result<Met>>;                                         // someone met in the work, matched or added, as the run
   // READ+ — 16
   page(args: { slug: string }, ctx: CallContext): Promise<Result<PageData>>;
@@ -448,7 +448,7 @@ Effective level for a token = `min(scopeLevel(scope), memberLevel)` with `read �
 
 1. `registers` = every declared register the caller may read (`readable`); none → `ok { hits: [], matched: {}, comments }`. A caller who may read them all is not scoped. *(September 28th 2026, as built: the caller names no `registers` and passes no `vec`.)*
 2. `found = kernel.searchMatched(q, { registers?, limit? })`: the kernel quotes the phrase, ranks by `bm25` (41 §5.9) and answers the hits with how many matched per register; `limit` is `min(max(1, limit ?? 20), 100)` (`kernel/src/fts.ts`).
-3. The hits are put in order again by meaning where the rows have vectors (`record/src/rerank.ts`, PLT-11): `SELECT id, model, dims, vec FROM entry_vec WHERE id IN (…)` in chunks of 64; the query's vector is the mean of the vectors of the three best-ranked hits that have one, from the model the best-ranked of them was embedded by, because the record never embeds a query (§13 #9); each such hit's int8 cosine to it; reciprocal-rank fusion (k = 60) of the word order and the cosine order. A hit with no vector, or one built by another model, keeps its place exactly, so a record with no vectors answers as the words alone ranked it. Then each hit the caller's row scope does not admit is dropped.
+3. The hits are put in order again by meaning where the rows have vectors (`record/src/rerank.ts`): `SELECT id, model, dims, vec FROM entry_vec WHERE id IN (…)` in chunks of 64; the query's vector is the mean of the vectors of the three best-ranked hits that have one, from the model the best-ranked of them was embedded by, because the record never embeds a query (§13 #9); each such hit's int8 cosine to it; reciprocal-rank fusion (k = 60) of the word order and the cosine order. A hit with no vector, or one built by another model, keeps its place exactly, so a record with no vectors answers as the words alone ranked it. Then each hit the caller's row scope does not admit is dropped.
 4. `mapRow` each (§4.4). Zero rows → `kernel.observe([{ kind: 'search.empty', subject: q.slice(0, 80) }])`.
 
 **`get`**
@@ -552,7 +552,7 @@ may not import `render`; the `closed-lists` gate diffs it against `packages/rend
 2. `stale = last_seen < now − 45 min` (32 §2.1); never stored.
 3. `same_repo` = non-stale sessions whose `repo = ctx.session?.repo`, minus `ctx.session?.spoken`.
 
-**`context()`**: where the caller stands, in one call (`loop/research-agent-path.md` §6.3). A read, scoped as `boot`
+**`context()`**: where the caller stands, in one call. A read, scoped as `boot`
 is: it needs `read`, never writes, and opens no run. Every part is held to what the caller may read.
 
 1. **The run.** For a token, the run the ladder finds from its hints (30 §3), without opening one: `session` is its
@@ -588,7 +588,7 @@ grant's id never appears (§4.4 rule 3). The learnings `learningsFor` returned i
 3. Keep a line when the caller may see it: an `entry` line when `readable` passes on its row's register (and it carries `register`, `seq` and the row's title); a `suggestion` or `decision` line when `holds` does not (with the question as its title); a line about access or keys (`grant.*`, `access.*`, `share.*`, a `token`, `member`, `device_grant` or `vault_key` target) for an owner only; a `register.<id>` declaration when that register is readable; any other line only for a caller who reads the whole record.
 4. 61 kept → answer the newest 60, `sinceCapped: true`; the walk stopping early is `sinceCapped: true` too. `upTo` = the newest kept rowid for a caller who reads the whole record, and `e.<its id>` for anybody else, whose lines also leave without `rowid`. A cursor from such a caller is resolved by `SELECT rowid FROM event WHERE id = ?` and taken only when step 3 keeps that line for them. Values were redacted at write (20 §8).
 
-*Amended September 22nd 2026: a caller held to named lists is sent no rowid and none is taken from them. Between two of her lines the rowid counted the events she was not shown, a whole-number cursor she chose was a probe that said which rowids were hers, and `markRead` answered the rowid it walked to (`loop/research-history-cursor.md`).*
+*Amended September 22nd 2026: a caller held to named lists is sent no rowid and none is taken from them. Between two of her lines the rowid counted the events she was not shown, a whole-number cursor she chose was a probe that said which rowids were hers, and `markRead` answered the rowid it walked to.*
 
 *Amended September 15th 2026: newest first, where it was oldest first with `cursor` = last + 1. A first screen draws the latest lines, and oldest first showed somebody away a month the first sixty things that happened after they left. The whole log in order is `recentHistory`, which walks the same way below its `cursor` and keeps the same lines.*
 
@@ -613,7 +613,7 @@ the same answer an ended session gets, so the app reads `signIn` instead and ski
 (50 §5.13). *(`signIn` added September 16th 2026.)* It is
 not yet one transaction. A session's briefing comes from `context`, not `boot`.
 
-*As built, September 2026 (`loop/finish/contracts.md` §7.4):* `me.prefs` is every key the person set with
+*As built, September 2026:* `me.prefs` is every key the person set with
 `setPref` (§5.2), key by key, to a person only. `counts.arrived` is every arrival the record ever received,
 whatever became of it, to the owner, and `null` to anybody else. `pen` is the holding pen (`29 §5`, "As
 built"): at most `PEN_MOST` items, strongest first, each `{ id, kind, register, title, why, change: { to } }`
@@ -758,7 +758,7 @@ person. No `tail()`: a view arms nothing.
 retired: true }`. No row → `VIEW_UNKNOWN` at `id` with the names the register does have. The rows themselves are
 untouched, because a view is a question and not a row.
 
-**`slashDraft({ asked, page? })`** *(as built, September 2026, `loop/finish/contracts.md` §2.4)*: `admin(ctx)`, in
+**`slashDraft({ asked, page? })`** *(as built, September 2026)*: `admin(ctx)`, in
 `packages/record/src/methods/slash-draft.ts`; any other key is `FIELD_UNKNOWN`, no `asked` is `REQUIRED_MISSING`, and
 `asked` must be text of 1 to `SLASH_ASKED_MOST` characters once trimmed, counted in code points (`VALUE_MALFORMED`).
 `page` is the slug the description is about; its declaration goes to the model, a page drawn per row being its
@@ -914,7 +914,7 @@ body, never a credential (12 §6 rule 5).
 
 **`applyPull(args: PullPage)`** — `{ outbox, n, raw, rows?, ingest }` (47 §4.x): `SELECT state, leased_until FROM outbox WHERE id = ?` must be `leased` and unexpired, else `OUT_OF_BOUNDS` at `outbox` (47's `PULL_LEASE_EDGE` is its own); then steps 1, 5–6 of `arrive` with `channel 'pull'`, `verified: true`, the given declaration; `raw.body === null` stores headers and `sha256` only (25 §8); return `{ wrote, kept }`. `tail()` is the ack's.
 
-**`runActions(execute, { limit })`** (`actions.ts`, `loop/DIRECTION.md` §0b): claim the due `pull`, `call` and `poll` rows, lease their `pull.fetch` jobs, and hand each request to the host's executor outside every transaction. Every job ends in one `pull` event whose `to_v` is `{ channel, host, status, outcome, scope, usage: { runs, requests, bytes, ms, failures, held } }`, where `scope` is the action's project or `global`. A job that sent nothing (its declaration gone, its pack off, or held) counts `runs: 0`. The pass returns those rows as `usage` (`event`, `at`, `ingest`, `channel`, `scope`, `outcome`, `usage`), and the host adds each to the Directory's ledger with `directory.meter(record, row)`, which counts an event id once. **Limits are the host's to ask, because the record cannot see the Directory:** before sending, the executor calls `directory.mayRun(record, request.ingest)`, and when the record's plan is at its monthly allowance it sends nothing and answers `{ status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: { until, say } }` instead. The job is `done`, the action's schedule row moves to `until` (the first of the next month, UTC) and stays `pending`, and the event's note is `say`, for example "npm downloads is waiting until 1 October. This record has used its 15,000 runs for September." No refusal code is raised (research-scheduled-actions §4.5). The allowance, the ledger and `usage(person, { from, to })` are `@braindog/record/directory`'s, at Directory version 4.
+**`runActions(execute, { limit })`** (`actions.ts`): claim the due `pull`, `call` and `poll` rows, lease their `pull.fetch` jobs, and hand each request to the host's executor outside every transaction. Every job ends in one `pull` event whose `to_v` is `{ channel, host, status, outcome, scope, usage: { runs, requests, bytes, ms, failures, held } }`, where `scope` is the action's project or `global`. A job that sent nothing (its declaration gone, its pack off, or held) counts `runs: 0`. The pass returns those rows as `usage` (`event`, `at`, `ingest`, `channel`, `scope`, `outcome`, `usage`), and the host adds each to the Directory's ledger with `directory.meter(record, row)`, which counts an event id once. **Limits are the host's to ask, because the record cannot see the Directory:** before sending, the executor calls `directory.mayRun(record, request.ingest)`, and when the record's plan is at its monthly allowance it sends nothing and answers `{ status: 0, body: '', bytes: 0, ms: 0, requests: 0, held: { until, say } }` instead. The job is `done`, the action's schedule row moves to `until` (the first of the next month, UTC) and stays `pending`, and the event's note is `say`, for example "npm downloads is waiting until 1 October. This record has used its 15,000 runs for September." No refusal code is raised. The allowance, the ledger and `usage(person, { from, to })` are `@braindog/record/directory`'s, at Directory version 4.
 
 **`ingestVerify({ ingest_id })`** — the active `ingest` declaration, else `REGISTER_UNKNOWN` at `ingest_id`; `verify.kind = 'path'` → `{ kind: 'path', token: verify.token }`; `hmac_sha256` → the grant named by `verify.grant` → `openGrant` steps 1–3 as `system` (the `grant.read` event is the audit trail — 12 §6 rule 1) → `{ kind: 'hmac_sha256', header, sealed }`.
 
@@ -1175,7 +1175,7 @@ Twenty-one, each a `ponytail:` line in the file named.
 20. `metrics.ts` — `ponytail: trend is one log-linear fit; no seasonality, no changepoints. Six points cannot carry more.`
 21. `index.ts` — `ponytail: a saved view is a local table and does not travel in a .brain export; a travelling table is FORMAT_VERSION 2 and every reader of the format. Make it travel when somebody moves a record and asks where their views went.`
 
-*(Item 7, read September 22nd 2026 against DIRECTION §22.)* The fix item 7 names is the right
+*(Item 7, read September 22nd 2026.)* The fix item 7 names is the right
 shape and the wrong default. The core should know only "a row a rule marks urgent": a declared
 marker on `remind:` that whoever built the list sets. Which rows are urgent (a payment failing, a
 domain expiring) is that person's or that pack's to declare, because payments and domains are use

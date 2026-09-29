@@ -16,7 +16,7 @@ __*
 !apps/*/static/_headers
 .DS_Store
 
-# Screenshots a person looks at, regenerated on demand and never asserted on — see the two
+# Screenshots a person looks at, regenerated on demand and never asserted on: see the two
 # `scripts/shot.mjs`. Anchored per app rather than a bare `shots/`, because the marketing site
 # SERVES product shots from `apps/site/static/shots/` and a bare pattern silently excluded them.
 apps/*/shots/
@@ -47,13 +47,13 @@ build-*/
 # The CLI the deploy copies into the site before building it (deploy.yml, "Build the CLI for the site"); built, never committed.
 apps/site/static/cli/braindog.mjs*
 
-# The handoff wrapper writes here and neither belongs in the history.
-loop/handoff.log
-loop/STOP
-
 # Working notes, briefs and reports kept on the machine that builds BrainDog, never in the repository.
 /loop/
 /REPORT.md
 /BUILD.md
 /CLAUDE.md
 /.claude/
+
+# A gate's private word lists: words a machine guards and the repository does not publish
+# (tools/gates/shell-words.mjs and clean-room.mjs read them when they are there).
+tools/gates/*.local.json

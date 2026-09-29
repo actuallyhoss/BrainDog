@@ -6,7 +6,7 @@ implementation of the nine ports, and the `wrangler.jsonc` that binds them. Deri
 [30-BLUEPRINT](30-BLUEPRINT.md) §8, §13 · [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2 ·
 [22-FRONTEND](22-FRONTEND.md) §5 · [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1 · [12-SECURITY](12-SECURITY.md) §6, §8 ·
 [02-DATA-MODEL](02-DATA-MODEL.md) §9–§10 · [16-DECISIONS](16-DECISIONS.md) ADR-021, ADR-044, ADR-061 ·
-[31-STACK](31-STACK.md) §3, §8. Phase 5 of [BUILD.md](../BUILD.md). Licence `Apache-2.0`.
+[31-STACK](31-STACK.md) §3, §8. Build phase 5. Licence `Apache-2.0`.
 
 > **Platform facts.** Everything the design documents verified is cited. Every platform fact this spec needs and
 > the documents do not state is written as an assumption in §13 and marked *verify*; nothing below asserts one.
@@ -239,7 +239,7 @@ The skeleton in 33 §7 lacked `send_email`, `analytics_engine_datasets`, `rateli
 
 *(Amended September 23rd 2026 for push A of the one-domain move, read from `apps/worker/wrangler.jsonc` at
 `bb13a0b8`.)* **The block above is the design, and the file does not put the Worker on `brain.dog` yet.** The owner
-asked on 22 September for the app to leave its own subdomain, and `loop/research-one-domain.md` §2.2 splits
+asked on 22 September for the app to leave its own subdomain, and the move splits
 `brain.dog` between two Workers: the marketing site keeps it as its Custom Domain, and this Worker takes only the paths
 it answers, as zone routes. That goes out in three pushes, and the file carries the two still to come as `STAGE A2` and
 `STAGE B` fragments in its opening comment, which `pushes()` in `scripts/provision-check.mjs` reads and
@@ -340,7 +340,7 @@ Email:
 
 ### 5.5 · `PUT /api/files` and `GET /api/files/<sha256>`
 
-*Amended by OPS-20. This section named `/a/<sha256>` and `PUT /a`; the site does not forward `/a/*` to the Worker
+*Amended. This section named `/a/<sha256>` and `PUT /a`; the site does not forward `/a/*` to the Worker
 (`apps/site/wrangler.jsonc`) and does forward `/api/*`, so the store is reached under `/api/files`, at the root and
 under `/app/<slug>/api/files` alike. `src/files.ts` holds the door and `route()` hands it every such path.*
 
@@ -377,7 +377,7 @@ expires a closed record's final copy sweeps it again. The self-host keeps the sa
 
 ### 5.6 · A shared link: `/app/s/<token>` and `Authorization: Share <token>`
 
-COL-3, `loop/finish/platform.md` §4.0 H. The page a person opens is `/app/s/<token>`, which is the app's shell like any
+The page a person opens is `/app/s/<token>`, which is the app's shell like any
 page under `/app`; the shell reads the page with `GET /api/sharedPage` and `Authorization: Share <token>`. Nothing is
 served at a bare `/s/*`, which the site does not forward.
 
@@ -563,7 +563,7 @@ point — the DO loses precision silently (30 §13).
    action that names a key sends nothing, and its run event carries *"This host holds no key store yet, so the key
    "<label>" was not opened and nothing was sent."* The kernel records that as a failure it does not retry and does
    not pause, so the row runs again at its next interval and sends nothing again until `KEK` is bound. `ALARM_RUNS` is
-   5: at most 20 subrequests and 50 seconds an alarm, inside `loop/research-scheduled-actions.md` §2.3's 800
+   5: at most 20 subrequests and 50 seconds an alarm, inside the platform's 800
    subrequests and ten minutes. A pass that throws is logged by its message and not rethrown, because the drain has
    already re-armed. Before each run the executor asks the Directory's `mayRun(record, action)` over RPC. A record on
    the hosted plan at its monthly allowance answers `held`: nothing is sent, and the action waits for the first of
@@ -590,7 +590,7 @@ queue(batch):
 | Kind | Does | Lease |
 |---|---|---|
 | `notify.email` | `cfDispatch.email(payload)` → `EMAIL.send(...)` | 60 s |
-| `notify.push` | `payload.sub` is `{ id }` and nothing else: one job per subscription, and the endpoint is asked of the record under the job's lease (`pushTarget`, checked as `sealedGrant` is), because the outbox travels in every `.brain` file and `push_sub` is `local`. A POST with no body, signed with VAPID over WebCrypto (`src/vapid.ts`); a 404/410 acks `done` with `{ gone: true }` so the record drops the subscription in the ack's transaction. Leased only where `VAPID_PUBLIC` and `VAPID_PRIVATE` are both set. *(Amended September 24th 2026, W58: this row read `cfDispatch.push(payload.sub, { title, url })` with `@pushforge/builder` signing, a payload that would have carried the phone's address and the notice's words into every export, and a package that is not in the lockfile.)* | 60 s |
+| `notify.push` | `payload.sub` is `{ id }` and nothing else: one job per subscription, and the endpoint is asked of the record under the job's lease (`pushTarget`, checked as `sealedGrant` is), because the outbox travels in every `.brain` file and `push_sub` is `local`. A POST with no body, signed with VAPID over WebCrypto (`src/vapid.ts`); a 404/410 acks `done` with `{ gone: true }` so the record drops the subscription in the ack's transaction. Leased only where `VAPID_PUBLIC` and `VAPID_PRIVATE` are both set. *(Amended September 24th 2026: this row read `cfDispatch.push(payload.sub, { title, url })` with `@pushforge/builder` signing, a payload that would have carried the phone's address and the notice's words into every export, and a package that is not in the lockfile.)* | 60 s |
 | `notify.webhook` | `cfDispatch.webhook(url, body, sig)` — `sig` sits under the header `x-braindog-signature` (`SIGNATURE_HEADER`, `apps/worker/src/deliver.ts:96`), HMAC-SHA-256 under the grant the payload names, unsealed as §5.4 step 3; `redirect: 'manual'`; a 3xx or ≥ 400 is a failure | 60 s |
 | `pull.fetch` | `ingest(decl, { http: cfHttp(), secret })` from `@braindog/connect` — placeholders, `expect:`, cursors, ≤ 2 MB per body, ≤ 50 pages; every page → `arrive({ channel: 'pull', … })`; an `expect:` failure throws without advancing the cursor (25 §9) | 300 s |
 | `export.r2` | §5.12 | 300 s |
@@ -708,7 +708,7 @@ name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can b
 
 ### 5.18 · Telemetry and logging
 
-*Amended September 28th 2026 against the tree (OPS-4, OPS-23; OPS-28 records it).*
+*Amended September 28th 2026 against the tree.*
 
 1. One Analytics Engine point per request in `ctx.waitUntil` (`src/telemetry.ts`), to the dataset
    `braindog_telemetry`, and only when the `TELEMETRY` binding is uncommented in `wrangler.jsonc` and `SESSION_SECRET`
@@ -727,8 +727,8 @@ name ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5.9). With no `KEK` bound no key can b
 
 ### 5.19 · A person's script, in a Dynamic Worker
 
-*Added September 22nd 2026 for DIRECTION 22, from `apps/worker/src/script.ts` and `apps/worker/src/index.ts`, and
-revised the same day for wave thirty-seven at `d23ac77d`. The self-host's half is [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23, and what the record does before
+*Added September 22nd 2026, from `apps/worker/src/script.ts` and `apps/worker/src/index.ts`, and
+revised the same day at `d23ac77d`. The self-host's half is [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23, and what the record does before
 and after a run (the version pinned at fire time, the writes applied in one transaction, the log, the pause after
 three refusals) is the same code on both hosts and is written there once.*
 
@@ -743,9 +743,9 @@ three refusals) is the same code on both hosts and is written there once.*
    `mayRun` over RPC, so a record on the hosted plan at its allowance holds a script as it holds a `call`, and each
    run's usage goes to `Directory.meter`. Only a clock starts one, as on the self-host.
 3. **A fresh loaded Worker for every run.** `env.LOADER.load({ … })`, with no id and no cache, so no run is handed
-   another's module or `globalThis`, as on the self-host, where each run is a new QuickJS instance. Until wave
-   thirty-seven this was `env.LOADER.get('<record>:<script>:v<version>', …)`, cached by the platform under that id,
-   and the audit of wave thirty-five measured a second run of one version reading what the first had left on
+   another's module or `globalThis`, as on the self-host, where each run is a new QuickJS instance. Until `d23ac77d`
+   this was `env.LOADER.get('<record>:<script>:v<version>', …)`, cached by the platform under that id,
+   and an audit measured a second run of one version reading what the first had left on
    `globalThis` (`test/script-isolation.test.ts`). The price is a unique Dynamic Worker per run rather than per
    version per day, which is what billing counts. Its code is two modules:
    `script.js`, the source, and `main.js`, the prelude `@braindog/script` exports (the same text QuickJS evaluates)
@@ -806,11 +806,11 @@ three refusals) is the same code on both hosts and is written there once.*
 Measured locally, workerd 1.20260903.1 through wrangler 4.129.0's miniflare (`apps/worker/test/script.test.ts`, run
 under `node --test` and not Vitest): the loader works, `this.ctx.exports` works from `alarm()`, a bare `fetch` is
 refused at the gateway, and a script that swaps `globalThis.fetch` cannot pass another origin off as the one it
-stamped. The audit of wave thirty-five (`loop/research-batch-thirty-five-audit.md`, *What held*) also found that
+stamped. The same audit also found that
 `connect()` from `cloudflare:sockets` and `new WebSocket(…)` reach nothing, that a script reads only its own record
 and only its `reads:`, and that nothing a run left behind reaches the gateway after it closed.
 
-**What the audit found here, and where it stands.** From the same audit, §6: the loaded Worker kept module state
+**What the audit found here, and where it stands.** From the same audit: the loaded Worker kept module state
 between runs of one version, and locally the `wall_ms` race could not end a loop that never awaits (a 4-second loop
 under `wall_ms: 500` answered clean). Both are closed, by step 3 and by step 8's check on a late answer. A busy loop
 still runs until it lets go or the platform's `cpuMs` ends it, which local workerd does not enforce and no deploy
@@ -874,7 +874,7 @@ Only codes from 30 §6 appear in a body; the Worker mints none. The adapter's th
 | CPU per `/api/*` request | ≤ 20 ms; a whole page renders in 2.12 ms | 22 §5 · `ms` in the log line, p95 per method |
 | CPU per invocation ceiling | 30 s default, 300 s max — a long import is not a request | 01 §2 · never approached; the alarm batch is 100 rows |
 | Queue consumer per message | ≤ 5 s wall for `notify.*`; `pull.fetch` bounded by ≤ 5 runs × ≤ 50 pages ≤ 200 subrequests | 25 §9, 30 §8 · `ms` per kind |
-| Scheduled actions per alarm | ≤ 5 runs (`ALARM_RUNS`) × ≤ 4 requests (one and three redirects) = 20 subrequests; ≤ 5 × 10 s = 50 s wall | `loop/research-scheduled-actions.md` §2.3 · asserted in `test/actions.test.ts` |
+| Scheduled actions per alarm | ≤ 5 runs (`ALARM_RUNS`) × ≤ 4 requests (one and three redirects) = 20 subrequests; ≤ 5 × 10 s = 50 s wall | the platform's per-invocation limits · asserted in `test/actions.test.ts` |
 | Subrequests per invocation | 1,000 (paid) — the cron fan-out stops at 900 records | 25 §9 · counted in `scheduled()` |
 | Memory per isolate | 128 MB — **which is why `export` streams pages of ≤ 1,000 rows** through a `TransformStream` and never buffers a record | 01 §2, 33 §9 · a 10 GB record exports without an OOM in staging |
 | Snapshot buffer | ≤ 40 MiB plaintext (§10) — age has no streaming mode this spec relies on | §13 A12 · the refusal sentence appears above the cap |
@@ -1044,7 +1044,7 @@ A third runtime package is a new ADR.
 **Before this:** `packages/ports` with `preflight`, the case array and the Node reference run (37); `packages/record`
 with `createRecord`, `Method`/`GROUPS` and the methods of §13 D11 (45); `packages/mcp`'s `serveMcp` (44);
 `packages/connect`'s `ingest` (47); `packages/slash`'s `createSlash` (46 — a stub that refuses is enough for phase 5);
-`apps/web/build` (50) for `ASSETS`; the Directory flows (§13 D10). Phases 0–4 of BUILD.md.
+`apps/web/build` (50) for `ASSETS`; the Directory flows (§13 D10). Build phases 0–4.
 
 **This unblocks:** the DO half of Q12 and the committed `reference.json` (30 §14 #1); every Cloud-only feature — PITR,
 inbound email, the hibernatable socket, the nightly `.brainl.age`; phase 6's MCP over the live host; 52's `deploy.yml`

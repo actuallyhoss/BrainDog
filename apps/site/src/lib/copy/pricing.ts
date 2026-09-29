@@ -13,7 +13,7 @@ export const pricing = {
    * THE SLASH PAGE. Everything it says Slash does is in
    * `packages/record/src/slash.ts` and `packages/slash`, and the limits are the product's: drafts are
    * questions in Decide (`arrange.ts`), the vault is closed to it, it is quiet on a record younger than
-   * two weeks (`YOUNG_DAYS`, decisions C71), and background work has its own allowance (contracts X41).
+   * two weeks (`YOUNG_DAYS`), and background work has its own allowance.
    */
   slash: {
     title: 'Slash',
@@ -145,8 +145,8 @@ export const pricing = {
   /**
    * THE PRICING PAGE. The plans it sells are `HOSTED_PLANS` in `apps/worker/src/billing.ts`, and the
    * allowance a record is held to is `ALLOWANCE` in `packages/record/src/directory.ts`; `plans.test.ts`
-   * holds `plans.ts` to both. Credit packs and extra usage are the owner's call of 26 September
-   * (`loop/DIRECTION.md` §33), written for launch day.
+   * holds `plans.ts` to both. Credit packs and extra usage are the owner's call of 26 September,
+   * written for launch day.
    */
   pricing: {
     title: 'Pricing',
@@ -193,7 +193,7 @@ export const pricing = {
     usage: [
       // One ask is one credit however many passes it takes, and background work has `BACKGROUND_ASKS_MONTH` of its own (`packages/slash/src/types.ts`).
       { key: 'credits', name: 'Slash credits', said: 'One for each question or draft. Background work never spends them.', amount: aMonth },
-      // A scheduled action's run and an automation's `rule:` run count (`COUNTED_ONLY` in `directory.ts`, decisions C34).
+      // A scheduled action's run and an automation's `rule:` run count (`COUNTED_ONLY` in `directory.ts`).
       { key: 'runs', name: 'Automation and script runs', said: 'Each time a pull, an automation or a script runs.', amount: aMonth },
       // What a run fetches is metered as requests; a delivery the outbox sends is `COUNTED_ONLY` and never limited.
       { key: 'requests', name: 'Requests to other services', said: 'Pulls and calls your automations and scripts make.', amount: aMonth },
@@ -211,7 +211,7 @@ export const pricing = {
     ] as [string, string, string][],
     extraTitle: 'Need more?',
     packsTitle: 'Slash credit packs',
-    // `PACKS` in `plans.ts`, the owner's call of 26 September (`loop/DIRECTION.md` §33), written for launch day.
+    // `PACKS` in `plans.ts`, the owner's call of 26 September, written for launch day.
     packsLead: 'Used after your monthly credits run out. They never expire.',
     packsPer: (credits: number) => `${credits.toLocaleString('en-US')} credits`,
     perCredit: (price: string) => `${price} a credit`,
@@ -225,7 +225,7 @@ export const pricing = {
       label: 'A month of usage: your plan, then extra usage up to the cap you set, and nothing past the cap',
       reading: 'Off, the month stops at your plan. On, it stops at your cap and never past it.',
     },
-    // With it off, `mayRun` in `directory.ts` holds the action until the first of next month; the prices are `EXTRA` in `plans.ts` (§33).
+    // With it off, `mayRun` in `directory.ts` holds the action until the first of next month; the prices are `EXTRA` in `plans.ts`.
     extraLead:
       'Off by default. Turn it on and set a monthly cap, and you are never charged past it. With it off, ' +
       'anything over your plan waits until next month.',
@@ -242,7 +242,7 @@ export const pricing = {
         a: 'Yes. Invite as many people as you need, with any level of access. The price is per record, not per person.',
       },
       {
-        // A scheduled pull and an automation count (decisions C34); an arrival or a delivery is `COUNTED_ONLY` in `directory.ts`.
+        // A scheduled pull and an automation count; an arrival or a delivery is `COUNTED_ONLY` in `directory.ts`.
         q: 'What counts as a run?',
         a: 'Each time a scheduled pull, an automation or a script runs. Mail and webhooks arriving at your record, and the notices it sends you, are never counted.',
       },

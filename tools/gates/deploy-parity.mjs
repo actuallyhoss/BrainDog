@@ -11,7 +11,7 @@
  * served", and it is asked of two files and one route:
  *
  *   1. `/app/`: the app's shell. A request with no session is answered with the shell as `ASSETS`
- *      holds it (`research-one-domain.md` §3.1), and this comparison is what holds the Worker to that.
+ *      holds it, and this comparison is what holds the Worker to that.
  *   2. `/app/_app/version.json`: SvelteKit's build id, which changes on every build (50 §53).
  *   3. `/.well-known/braindog-build`, whose `app` field is the `BRAINDOG_BUILD` tuple this run
  *      passed to the deploy (33 §4). The two hashes prove the ASSETS are current; this proves the
@@ -69,7 +69,7 @@ export const needs = ['web-build', 'host'];
 /**
  * 52 §181: the live shell and the build id, compared as bytes rather than as text.
  *
- * UNDER `/app` SINCE THE APP MOVED THERE (`loop/research-one-domain.md` §3.2). On `brain.dog` the root is the marketing
+ * UNDER `/app` SINCE THE APP MOVED THERE. On `brain.dog` the root is the marketing
  * site and `/_app/version.json` is the site's build id, so comparing those would measure the other Worker and pass or
  * fail for a reason that is not this deploy; on `app.brain.dog` the root becomes a 308, which `redirect: 'manual'`
  * reports as a finding. The app's own shell is `/app/` and its build id is under the same base.

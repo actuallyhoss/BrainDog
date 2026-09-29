@@ -4,7 +4,7 @@
  * THE SCRIPT HANDS THE REQUEST OVER WHOLE AND GIVES BACK THE APP'S ANSWER WHOLE. The app reads its host from the URL
  * (`legacyRedirect`, the device flow's `reached`), its CSRF check from `Origin`, its session from `Cookie`, and a
  * webhook's body is the thing being delivered, so a copy that dropped any of them would be a quiet fault in a door.
- * Measured on 23 September through `wrangler dev -c site -c app` (`loop/research-one-domain-binding.md` section 2.2):
+ * Measured on 23 September through `wrangler dev -c site -c app`:
  * the app saw the URL, method, body, `Cookie`, `Origin`, `Host` and `cf-connecting-ip` the site script saw, and two
  * `Set-Cookie` headers and a 308 came back untouched.
  *

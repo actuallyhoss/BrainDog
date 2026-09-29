@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * /slash: the assistant inside every record, on a page of its own (the owner's ask of 26 September,
-   * `loop/DIRECTION.md` §33), drawn as Bento tiles on the ground (`loop/design/SYSTEM.md` §10, the Light-Slash board).
+   * /slash: the assistant inside every record, on a page of its own (the owner's ask of 26 September),
+   * drawn as Bento tiles on the ground (the design system).
    *
    *   hero        the name, what it is, the action, and the palette drawn beside them.
    *   abilities   ask, draft, notice and learn, a tile each: what it does, things a person would type, and a

@@ -3,8 +3,8 @@
  *
  *   node tools/gates/no-fixtures.mjs [root]
  *
- * DIRECTION 26: "get rid of that whole sample record stuff". The app shows a real record or says why it cannot, and the
- * sample's rows, questions, add-ons and readers stay only as test data (`loop/research-no-sample.md`, wave C1). They
+ * The sample record is gone from the product. The app shows a real record or says why it cannot, and the
+ * sample's rows, questions, add-ons and readers stay only as test data. They
  * live in `apps/web/src/lib/record/fixtures/`, and this is what keeps them there: any file under `apps/web/src` that is
  * not a test and not in a `fixtures/` directory, and imports a module through a `fixtures/` path, is a finding.
  *
@@ -25,7 +25,7 @@
  * list here. `@braindog/seed/packs` is their door now, so the list is gone rather than empty: an empty list is a place
  * the next exemption goes without anybody deciding it.
  *
- * NOT A WORD THAT ENDS IN `import`. `\bimport` matched inside `legacy-import`, where `\b` sits after the hyphen, so
+ * NOT A WORD THAT ENDS IN `import`. `\bimport` matched inside `csv-import`, where `\b` sits after the hyphen, so
  * prose in a component's markup read as a bare import of the next string; `loader.import(...)` read as a dynamic one.
  * Each keyword is held to the start of a token, not after a word character, `$`, `.` or `-`.
  *
@@ -171,7 +171,7 @@ export default function noFixtures(
   for (const f of findings) console.error(f);
   console.error(
     `\n  no-fixtures: ${files.length} shipped file(s), ${findings.length} finding(s), each a shipped file reading the sample.\n` +
-      '  The app draws the record it is given or says why it cannot (DIRECTION 26). Read the record, or move the file\n' +
+      '  The app draws the record it is given or says why it cannot. Read the record, or move the file\n' +
       '  beside the tests that need it.',
   );
   return 1;

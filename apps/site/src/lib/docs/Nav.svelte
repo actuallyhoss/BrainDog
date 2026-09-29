@@ -1,7 +1,7 @@
 <!--
   The docs' section nav: the search, then every section with its pages, the open page marked.
 
-  A TILE BESIDE THE PAGE (the Bento board `Light-Docs`): the search field, "All sections", then each section under its
+  A TILE BESIDE THE PAGE: the search field, "All sections", then each section under its
   glyph and name with its pages as rows, and the page you are on filled in ink.
 
   TWO DRAWINGS OF ONE LIST, and only one is ever shown. At 900px and wider it is a tile beside the page that stays in

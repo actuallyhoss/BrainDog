@@ -23,12 +23,12 @@ A self-hoster on a laptop cannot provide an always-up endpoint. That asymmetry i
 crippled free tier — it is a genuine infrastructure difference, and it is the honest reason the
 hosted tier has value even though the code is free.
 
-*(Amended September 15th 2026 for `DIRECTION.md` §0b: `channel:` gains two more values beside
+*(Amended September 15th 2026: `channel:` gains two more values beside
 `pull`, `call` (an outbound POST fired by a schedule or a rule) and `poll` (watch an endpoint, act
 through a rule on a change), declared inside this same `ingest` kind rather than a new one, so the
 closed list of kinds in [04-PACKS](04-PACKS.md) §1 did not grow for them. Both are safe by the same rules as `pull`
 in [25-CONNECTORS](25-CONNECTORS.md) §4 and §7: a literal origin, one preflight, the install diff
-naming every host. `loop/research-modular.md` §3.2 has the detail and the runner it still needs.)*
+naming every host.)*
 
 *(Built September 15th 2026: both channels install, arm and run. A `call` is fired by its schedule; a rule
 that fires a `call` is not built. The runner is [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1's and the
@@ -578,8 +578,7 @@ predicate against the real rows and writes nothing.
 
 ## 6.2 · A rule with a trigger and steps is an automation
 
-*(Added September 22nd 2026 for [DIRECTION §22](../loop/DIRECTION.md)'s automations layer. The design is
-`loop/research-shell-automations.md` §2 to §4; this section is what the lint holds and what the runner does. Of the
+*(Added September 22nd 2026 for the automations layer. This section is what the lint holds and what the runner does. Of the
 steps that wait on somebody else, asking a person runs, and can put the question to one member; asking Slash runs on
 a host with a model and is refused at install on one without; a script step starts the script and does not wait for
 it, since September 24th; a call step sends its declared call and waits for the answer. Checked against the code
@@ -689,8 +688,8 @@ rule in the seed, the packs, the docs or the fixtures carried, so any other word
 `on: { every: 1h }`.
 
 An arrival trigger's `when:` is read over the first row the arrival wrote, and with no row over the top-level keys of
-its JSON body, text, numbers, true and false. A `script` step is checked for shape only, because `script.<id>` is the scripts
-brief's declaration: whether the script is installed, says `runs: { rule: true }` and is not paused is asked when a
+its JSON body, text, numbers, true and false. A `script` step is checked for shape only, because `script.<id>` is a declaration
+of its own: whether the script is installed, says `runs: { rule: true }` and is not paused is asked when a
 run reaches the step, as the table below says.
 
 ### What the runner does
@@ -722,7 +721,7 @@ so no CHECK changes.
 
 **An arrival nothing verified starts nothing, unless the rule asks for it.** A webhook with a wrong token is stored
 `untriaged` and offered no pattern, and until September 22nd it still started every arrival automation on its
-channel. The audit of that week sent five such posts at a rule with `runs_per_day: 5`: each started a run that wrote
+channel. A test that week sent five such posts at a rule with `runs_per_day: 5`: each started a run that wrote
 the sender's own text into a note, and the owner's real message after them started nothing, because the day was
 spent. A rule that wants to hear about bad tokens says `on: { arrival: { unverified: true } }`, and its run reads
 `{{trigger.verified}}` as `false`. `unverified:` is true or false; anything else is refused at install. An arrival
@@ -765,7 +764,7 @@ calls it from the place it already works its queue:
 
 **On the Worker a record with no key labelled `slash` fails the run and posts nothing.** The endpoint there is a
 hosted provider on the owner's own bill, and a call with no `authorization` is an anonymous one: the survey that set
-this rule measured one keyless POST, answered 401 (`loop/research-worker-spark.md` §3, W2). So the pass refuses the job `FORBIDDEN` before anything is held or sent, writes no ledger row,
+this rule measured one keyless POST, answered 401. So the pass refuses the job `FORBIDDEN` before anything is held or sent, writes no ledger row,
 and the run stops on *"rule.<id> asked Slash at step N, and this record's vault holds no key labelled slash, so the
 run stopped there. Put your model key in the vault under slash."* A self-host does not make this check, for the
 reason in the table.
@@ -797,8 +796,7 @@ body, parsed when it is JSON.
 everybody who reads the run's row may read it.** When somebody on the record reads the run's row's list, or a list
 one of its `create` steps writes into, and does not read the list the figure adds up, every `{{metric.<id>}}` in
 that run is the dash, in a variable too, since a variable is written into the row later. This is asked at the run
-and not at install, because an invitation after the rule is in changes who reads the list. Measured before it on
-24 September (audit sixty-two, finding 4): a member invited to Inbox alone was refused the figure Payroll, and an
+and not at install, because an invitation after the rule is in changes who reads the list. Measured before it: a member invited to Inbox alone was refused the figure Payroll, and an
 owner's rule writing `filed; payroll {{metric.payroll}}` into each new Inbox row put `GBP 5200.00` in her list. A
 run with no row and nothing to create writes where only the owner reads, and reads every figure.
 

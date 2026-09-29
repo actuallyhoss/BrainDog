@@ -2,7 +2,7 @@
  * `/llms.txt`: the docs as a list an agent reads first, in the shape llmstxt.org proposes.
  *
  * A TITLE, A ONE-LINE SUMMARY AS A QUOTE, A PARAGRAPH, THEN ONE `##` LIST PER SECTION, each line a
- * link to a page's raw text and its summary. The links are to the `.md` addresses (site.md C7), so an
+ * link to a page's raw text and its summary. The links are to the `.md` addresses, so an
  * agent that follows one reads the page as written rather than the HTML drawn from it. A section with
  * no page yet is left out, so every link here answers.
  *

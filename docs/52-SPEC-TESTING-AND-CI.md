@@ -3,13 +3,13 @@
 Cross-cutting: the test pyramid, the fixtures' use, every gate as a script or a spec, the five workflows, and
 publishing. Derives from [18-BUILD-TOOLKIT](18-BUILD-TOOLKIT.md) §6, [33-CONTRACTS](33-CONTRACTS.md) §3 and §8,
 [31-STACK](31-STACK.md) §3–§4 and §6–§7, [30-BLUEPRINT](30-BLUEPRINT.md) §6, §7, §13–§14, [22-FRONTEND](22-FRONTEND.md)
-§9–§10, [34-GRAMMARS](34-GRAMMARS.md) §6, and the recorded deviations in [BUILD.md](../BUILD.md). The template is
+§9–§10, [34-GRAMMARS](34-GRAMMARS.md) §6, and the recorded deviations below. The template is
 [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §3; the sections keep its headings and read them for a cross-cutting spec:
 *Public API* is the commands a developer runs, *Files* is the tools and workflow files, *Data structures* is the
 fixture and trace formats.
 
 > **Clean room.** No gate, fixture or harness here is ported. `tools/gates/clean-room.mjs` is a tripwire for the
-> predecessor's identifiers — a tripwire, not a proof; the proof is the rule ([BUILD.md](../BUILD.md)).
+> predecessor's identifiers — a tripwire, not a proof; the proof is the rule.
 
 ---
 
@@ -23,7 +23,7 @@ opinion of it* — so `deploy-parity` fetches the live host, `bundle` compresses
 the rendered box.
 
 **Refuses.** A framework where `node --test` and `node:assert/strict` hold (Vitest runs the Durable Object host
-alone — [BUILD.md](../BUILD.md)). A gate whose number lives in its own file: every asserted number is in
+alone). A gate whose number lives in its own file: every asserted number is in
 `tools/gates/budgets.json` (§4). A gate that warns: a gate is red or green, and a red gate is fixed or the design
 document is changed first (§6). An HTML snapshot or a full-page pixel diff as an assertion ([22-FRONTEND](22-FRONTEND.md)
 §10). A test that can pass on the degraded branch (§9). A skip that is silent ([33-CONTRACTS](33-CONTRACTS.md) §3).
@@ -125,7 +125,7 @@ The fewest that hold. One gate per file; a shared `lib.mjs`; one budgets file; o
 ```
 tools/
 ├── gates/
-│   ├── run.mjs                 the runner: an ordered array; 22 gates called, 8 spawned, the answer read (§5.1)
+│   ├── run.mjs                 the runner: an ordered array; 22 gates called, 7 spawned, the answer read (§5.1)
 │   ├── self-test.mjs           runs each grep gate against tools/gates/negative/<gate> (§9)
 │   ├── lib.mjs                 budgets() · budget() · keyPaths() · skipDir · MAY_REFUSE · readiness()
 │   ├── record.mjs              NOT a gate: the self-host in memory with the seed installed, served on
@@ -136,7 +136,7 @@ tools/
 │   ├── test/needs.test.mjs     the runner's prerequisite check, driven against a tree with no build
 │   ├── clean-room.mjs   stack.mjs       nul-bytes.mjs         graph.mjs        secret-grep.mjs
 │   ├── event-kinds.mjs  router-groups.mjs  guards.mjs         closed-lists.mjs slash-actor.mjs
-│   ├── import.mjs       refusals.mjs    refusal-fixtures.mjs  flags.mjs        em-dash.mjs
+│   ├── refusals.mjs     refusal-fixtures.mjs  flags.mjs        em-dash.mjs
 │   ├── no-declarations-in-kernel.mjs    css-rules.mjs         colour-grep.mjs  dead-copy.mjs
 │   └── bundle.mjs       prefs.mjs       keys.mjs              layout.mjs       a11y.mjs
 │                        passkey.mjs     queue.mjs             deploy-parity.mjs
@@ -213,7 +213,6 @@ rather than this table's.
 | `guards` | `ROUTES` in `packages/host`; the guard each handler in `packages/record` actually calls | the group the table publishes and the check the record applies agree. It found `members` routed ADMIN and guarded `read`, on an answer carrying every colleague's email | — |
 | `closed-lists` | 34 §6's table; 30 §1's SQL block; `migrations/0001_kernel.ts`; each owner's `as const` array | counts and member sets agree across every source, for the twenty-three lists the DDL refuses in a `CHECK` | — |
 | `slash-actor` | the seed, materialised through the real write path, then offered the four writes a model may not make | 30 §3's query returns zero rows. It makes the writes before it queries, because the seed writes no `slash` event and the filter would otherwise filter nothing | — |
-| `import` | a self-host, onboarded, with the founder, agents and estate packs installed | `braindog import packs/legacy-import/adapter.ts` over HTTP lands every planned row in the record. The adapter's own tests drive an in-memory fake door and a stub server answering ok to everything | — |
 | `refusals` | the refusal registry, the `RefusalCode` union, and every `raises:` in the tree | the registry, the type and the code say the same list, and a registered code no code path emits is named | — |
 | `refusal-fixtures` | 30 §6's code tables; `fixtures/refusals/*.yaml`; the code list `declare` exports (42 §2) | one fixture per code, one code per fixture, kebab name equals code, and every `via` is one of 40 §6's nine. It owns the enumeration; the runners of §5.3 own the behaviour | — |
 | `flags` | the flag list and every read of it | six questions, of which the load-bearing one is whether the flag is read at all; `budgets.flags` caps a flag at ninety days and two call sites | — |
@@ -221,7 +220,7 @@ rather than this table's.
 | `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2, one `what` per rule, plus the dead-class report that never goes red | — |
 | `colour-grep` | the same trees, outside the token file | the colour a class computed in TypeScript, an inline SVG `fill` or a data file smuggles past `css-rules`. 22 §7 gate 2, and the one that actually fires | — |
 | `dead-copy` | `copy.ts` and every file that reads it | no key defined and referenced nowhere. Measured on the day it was written: 212 keys, 26 of them rendered by nothing | — |
-| `em-dash` | `packages/*/src/**` and `apps/*/src/**`, `.ts` and `.svelte`, plus the published README; comments blanked in all three dialects | `LOOP.md`'s no em dashes in anything a stranger reads: no U+2014 with a space on each side. One that stands alone, opens a line or closes one is a glyph and is not punctuation | — |
+| `em-dash` | `packages/*/src/**` and `apps/*/src/**`, `.ts` and `.svelte`, plus the published README; comments blanked in all three dialects | no em dashes in anything a stranger reads: no U+2014 with a space on each side. One that stands alone, opens a line or closes one is a glyph and is not punctuation | — |
 | `theme` | the shipped themes and the emitted stylesheet (`packages/skin/scripts/theme.mjs --check`) | the committed stylesheet is byte-equal to the one the tokens generate | — |
 | `bundle` | the entry chunk and everything statically reachable from it, compressed at `brotliQuality` | `budgets.bundle`: measured from the entry graph and not from the total of `build/`, so adding a screen cannot move it | `web-build` |
 | `prefs` | every preference control, driven in a real browser against a real record | each preference changes what it says it changes. The Text setting shipped inert for the life of the build, because the old browser matrix was widths, schemes and directions and no other preference was an axis of it | — |
@@ -390,7 +389,7 @@ about an app that no longer existed. `pack-build` is declared by nothing, becaus
 `licence-closure`, has never been written. This closed a defect that shipped twice: `passkey` and `queue` each
 found no build and exited `0`, which is a pass.
 
-**Step 3, as built: twenty-two gates are called and eight are spawned.** The dialect is declared per entry,
+**Step 3, as built: twenty-two gates are called and seven are spawned.** The dialect is declared per entry,
 with `call(file)`, and never guessed from the file's text; the text is read only to REFUSE a disagreement
 (a call with no `export default` or no `if (import.meta.main)` guard, or a spawned script that names
 `export default`). A called gate is `export default async (root) => 1 | 3 | undefined`, handed the root and
@@ -401,7 +400,7 @@ with `if (import.meta.main)`, which is also how `self-test` spawns it against a 
 
 The twenty-two called: `nul-bytes` `graph` `secret-grep` `event-kinds` `router-groups` `guards` `closed-lists`
 `refusals` `refusal-fixtures` `flags` `css-rules` `colour-grep` `dead-copy` `em-dash` `bundle` `prefs` `keys`
-`layout` `a11y` `passkey` `queue` `deploy-parity`. The eight spawned, and why:
+`layout` `a11y` `passkey` `queue` `deploy-parity`. The seven spawned, and why:
 
 | Gate | Why it is spawned |
 |---|---|
@@ -412,19 +411,19 @@ The twenty-two called: `nul-bytes` `graph` `secret-grep` `event-kinds` `router-g
 | `clean-room` | a script: its whole body runs at module top level and it exports nothing. |
 | `no-declarations-in-kernel` | the same. |
 | `slash-actor` | the same, and it calls `process.exit(3)` and `process.exit(process.exitCode ?? 0)` at top level. |
-| `import` | the same, and it calls `process.exit(3)` at top level. |
 
-**The last four cannot be called without editing the gate file, and a wrapper is not a way round that.**
+
+**The last three cannot be called without editing the gate file, and a wrapper is not a way round that.**
 Measured on 22 September by importing each from a stand-in for `run.mjs`, which is what an adapter in
 `tools/gates/lib/` would have to do: `clean-room` reads its root from `process.argv[2]`, and in the runner's
 process that is the runner's own first flag, so `run.mjs --only clean-room` made it `scandir
-'C:\Repos\braindog\--only'` and throw `ENOENT`. `no-declarations-in-kernel` ran and printed its line, and a
+'C:\src\braindog\--only'` and throw `ENOENT`. `no-declarations-in-kernel` ran and printed its line, and a
 second import in the same process printed nothing, because the module is cached: an adapter only works once
 per process, and only by treating the importing as the call, which is the exact trap `run.mjs`'s `IMPORTED OR
-SPAWNED` paragraph refuses. `slash-actor` and `import` would end the runner at their `process.exit`. Each of
-the four moves to `call(...)` the way `em-dash` did: the body inside `export default async function
+SPAWNED` paragraph refuses. `slash-actor` would end the runner at its `process.exit`. Each of
+the three moves to `call(...)` the way `em-dash` did: the body inside `export default async function
 gate(root = process.env.BRAINDOG_GATE_ROOT ?? <its current default>)`, where the default is kept as it
-is (`process.cwd()` for `clean-room`, the repository root two directories up for the other three, so that
+is (`process.cwd()` for `clean-room`, the repository root two directories up for the other two, so that
 running one by hand from another directory still scans this tree), `return 3` and `return 1` for the exits, and
 `if (import.meta.main) process.exitCode = (await gate(process.argv[2])) ?? 0;` at the foot. That is an edit to
 the gate, which is the gate owner's to make.
@@ -464,11 +463,11 @@ registration that disagrees with its file.
    `Apache License` and are byte-equal.
 6. Every `packages/render/src/**/*.ts` first line is `// SPDX-License-Identifier: MIT`.
 
-**`clean-room`** ([BUILD.md](../BUILD.md))
+**`clean-room`**
 
 1. Read `tools/gates/clean-room.txt`: non-empty lines, lower-cased, each ≥ 6 characters; an empty list is red
    (`what: 'clean-room list is empty'`) — a tripwire with no wire is decoration.
-2. `git ls-files` minus `docs/**`, `BUILD.md`, `tools/gates/clean-room.txt`, binaries by `.gitattributes`.
+2. `git ls-files` minus `docs/**`, `tools/gates/clean-room.txt`, binaries by `.gitattributes`.
 3. For each file, for each identifier: whole-word, case-insensitive match → red, `where` = the first hit.
 
 **`no-declarations-in-kernel`** ([02-DATA-MODEL](02-DATA-MODEL.md) §1)
@@ -617,7 +616,7 @@ class emissions. Twelve rules and a report; each rule is its own `what`:
 
 ### 5.3 · Gates that are tests — `node --test`, under `pnpm test`
 
-[33-CONTRACTS](33-CONTRACTS.md) §8 wrote `vitest` on three of these; [BUILD.md](../BUILD.md) records the deviation:
+[33-CONTRACTS](33-CONTRACTS.md) §8 wrote `vitest` on three of these; the recorded deviation is
 `node --test` on `.ts` source, Vitest for the Durable Object host only.
 
 **`where-property`** — `packages/where/test/property.test.ts` (30 §7, §14; [38-SPEC-WHERE](38-SPEC-WHERE.md))
@@ -920,7 +919,7 @@ Runtime: **none.** Nothing in this spec ships.
 
 ## 12 · Build order
 
-| Phase ([BUILD.md](../BUILD.md)) | This spec delivers | Unblocks |
+| Build phase | This spec delivers | Unblocks |
 |---|---|---|
 | 0 · Foundations | `run.mjs`, `lib.mjs`, `budgets.json`, `self-test.mjs`; `graph`, `licence-closure`, `clean-room`, `conformance-count`, `compat-date`; `gates.yml`; the Node conformance host and the first `reference.json`; `where-property` with `test/seeds/`; `dialect-fuzz` | every later package has a green `pnpm test` and `pnpm gates` to land into |
 | 1 · Kernel | `closed-lists`, `event-kinds`, `refusal-fixtures`, `no-declarations-in-kernel`, `slash-actor`, `grant-note`; the `lint`, `where`, `write` and `import` refusal runners, `roundtrip.test.ts`, `determinism`, `money-sum`, `boot-probe`, `theme-sixteen` | a record that refuses every code with a fixture |
@@ -942,9 +941,9 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 |---|---|---|
 | 1 | **The budgets file.** Every number a gate asserts lives in `tools/gates/budgets.json`; a gate holds no numeric literal but `0`, `1` and indices; a count is never a budget — it is read from the owning enumeration | 33 §8 (cite the file); 18 §6 (the numbers in its rows point here) |
 | 2 | **The gate output format.** One JSON line per gate — `gate ok ms` or `gate skip`, and on red `what expected found where`; a summary line last; exit codes `0 1 2 3` | 33 §8 |
-| 3 | **`pnpm` scripts.** Six root scripts: `test typecheck gates test:browser test:do release`; per-package `test` is `node --test "test/**/*.test.ts"`; `gates` takes `--only`, `--allow-skip`, `--negative` | 31 §8 (the tree's root); BUILD.md |
+| 3 | **`pnpm` scripts.** Six root scripts: `test typecheck gates test:browser test:do release`; per-package `test` is `node --test "test/**/*.test.ts"`; `gates` takes `--only`, `--allow-skip`, `--negative` | 31 §8 (the tree's root) |
 | 4 | **The negative-fixture rule.** Every script gate has one seeded violation under `tools/gates/negative/<gate>/`, run by `self-test.mjs` in `gates.yml`; every Playwright spec runs once against `negative/web/` | 33 §8; 18 §6 |
-| 5 | **`node --test` for `where-property`, `boot-probe`, `brain-roundtrip`.** 33 §8's `vitest` column becomes *test*; Vitest is `apps/worker/test` alone | 33 §8 (BUILD.md already records the deviation) |
+| 5 | **`node --test` for `where-property`, `boot-probe`, `brain-roundtrip`.** 33 §8's `vitest` column becomes *test*; Vitest is `apps/worker/test` alone | 33 §8 (the deviation is recorded) |
 | 6 | **1,000 property runs, not 10,000.** `budgets.property.runs = 1000`, every committed seed replayed first | 33 §8; 30 §7 (add the number) |
 | 7 | **The four widths are 390 / 768 / 1024 / 1440.** 22 §10 said *four widths* and named none; 390 is 22 §4's phone, 1440 is 13 §4.2's column ceiling | 22 §10 |
 | 8 | **Seventeen Playwright specs, not ten.** [50-SPEC-WEB](50-SPEC-WEB.md) §9's sixteen names are adopted as written (they fold 22 §10's layout assertions into `grid-contract` and 18 §6's `page-render`, `shell`, `no-model`, `keys-sheet` rows in); `vault-screen` is added because 50 covers only one of 12 §8's three vault invariants; `bundle` stays a spec — it reads the build, needs no browser, and runs in `ci.yml` step 8 | 33 §8; 50 §9 (add `vault-screen`) |
@@ -959,7 +958,7 @@ Each decision names the design document to amend in the same revision ([35-SPEC-
 | 17 | **`deploy-parity` also checks the deployed build id**, at the public `/.well-known/braindog-build` rather than at `READ+` `/api/version`, which takes a bearer this job has never held: the `app` tuple must equal the deploying run's `BRAINDOG_BUILD` | 33 §8; 22 §9 |
 | 18 | **`refusal-fixtures` is a script and the runners of 40 §6.** The script owns the enumeration (a code per fixture, a fixture per code); the `via` runners of 40 §6, in the packages 40's table names, own *produces exactly it* | 33 §8; 30 §6 |
 | 19 | **Interface with [40-SPEC-FIXTURES](40-SPEC-FIXTURES.md), confirmed.** This spec reads `PAGES`, `SEED`, `REFUSALS`, `PACKS` as 40 §2 exports them, the `Page.expect` shape, the `corpus` record, and the materialiser at `packages/kernel/test/materialise.ts` (40 §5.3). Two asks of 40: `materialise` takes `{ locale }` so a record can be built `ar` for the RTL half (decision 13), and a fixture job stream for `job-view` | 40 §5.3 (the `locale` option); 40 §3 (a `jobs/` stream) |
-| 20 | **`clean-room.txt` is the owner's file.** Its content is never derived, generated or reviewed by a builder; the gate asserts only that it is non-empty and that nothing matches | BUILD.md |
+| 20 | **`clean-room.txt` is the owner's file.** Its content is never derived, generated or reviewed by a builder; the gate asserts only that it is non-empty and that nothing matches | — |
 | 21 | **`budgets.mcp` and 44's `BUDGETS` are one number twice, asserted equal.** `mcp-budget` deep-equals them on the five shared keys before counting; a change to either without the other is red | 44 §2 (cite `budgets.json`); 33 §8 |
 | 22 | **The four `test/env.ts`, `test/e2e/`, `braindog dev` and `PAGES` names are 50's and 48's**, adopted over this spec's first-draft `harness.ts`, `server.ts`, `FIXTURES` — one name per thing across the two specs | 50 §3, §9 (no change; recorded so the audit sees the agreement) |
 

@@ -462,15 +462,14 @@ flippant language, especially in an error.
 
 ### The canonical first run: one question, one accept, and no model needed
 
-*(Rewritten September 28th 2026 to say what `/start` does, from `loop/finish/modules.md` MOD-6 and
-[DIRECTION](../loop/DIRECTION.md) §6, §9 and §26. The earlier design, three screens with a row typed
+*(Rewritten September 28th 2026 to say what `/start` does. The earlier design, three screens with a row typed
 by hand on the first, pack selection on the second and one worked example row in every list, and the
 dated notes that amended it, are replaced by what follows. What survives of it is named at the end.
 This section is still the only specification of the first run; [13-UI](13-UI.md) §5.1 points here.)*
 
 **The question.** One screen: the mark, "Who are you?", one field with the caret in it ("Your name,
 and what you want to keep here") and four chips that add words to it, one for each of the four people
-the product is for ([DIRECTION](../loop/DIRECTION.md) §11): "I'm a student", "I run a few companies",
+the product is for: "I'm a student", "I run a few companies",
 "I'm part of a team" and "I'm starting something new". **Show my BrainDog** reads the sentence, with
 no model (`apps/web/src/lib/start/propose.ts`): the name by `lib/who.ts`, and what the BrainDog is
 for, the modules it keeps and its first entries by `lib/shape.ts` and the use-case arranger. The same
@@ -531,7 +530,7 @@ question, with the way back.
 
 5. **Home shows what it becomes before it is made, and marks its examples as examples.** The earlier
    design wrote one worked example row into every list and drew an empty Home dimmed with sample
-   data. Now no path writes a sample row ([DIRECTION](../loop/DIRECTION.md) §26): the preview draws
+   data. Now no path writes a sample row: the preview draws
    the Home and pages the BrainDog will have, with examples that say none of them is saved, and the
    use case's own example rows are taken out of its file before it is installed. Marked in words,
    never with a sparkle badge: across a set of experiments *"participants trusted people and

@@ -96,12 +96,12 @@ const GATES = [
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
      code path forgets, which holds only while the CHECK and the document agree about what it is. */
   ['closed-lists', call(join(here, 'closed-lists.mjs'))],
-  /* AND THE COUNTS THE DOCUMENTS STATE, READ AGAINST THE CODE (`loop/finish/ops.md` OPS-25, defects DOC). A number in
+  /* AND THE COUNTS THE DOCUMENTS STATE, READ AGAINST THE CODE. A number in
      prose about the gates, the block kinds, the MCP tools and templates, the refusal codes or the declaration kinds is
      a claim, and those claims went stale unnoticed until this read them. Beside `closed-lists` because that gate
      already holds the spelled-out block-kind counts, and this one reads the digits beside it. */
   ['docs-counts', call(join(here, 'docs-counts.mjs'))],
-  /* AND WHAT A TELEMETRY POINT MAY CARRY (`08 §5`, `51 §5.18`, `loop/finish/ops.md` OPS-23): one writeDataPoint( under apps/, its Blobs and Doubles labelled by 08 §5's columns, and none of the never-written words. */
+  /* AND WHAT A TELEMETRY POINT MAY CARRY (`08 §5`, `51 §5.18`): one writeDataPoint( under apps/, its Blobs and Doubles labelled by 08 §5's columns, and none of the never-written words. */
   ['telemetry-allowlist', call(join(here, 'telemetry-allowlist.mjs'))],
   /* THE NINETY-NINE REFUSAL CODES, which had no `RefusalCode` type and so no list at all. A code is
      the one part of a refusal a caller can branch on, and `10 §7` builds the agent contract on it:
@@ -119,15 +119,6 @@ const GATES = [
      was specified that way. The only gate here that builds a record, and at about 150ms it is still
      a grep's price. */
   ['slash-actor', call(join(here, 'slash-actor.mjs'))],
-  /* BESIDE `slash-actor` BECAUSE IT IS THE OTHER GATE THAT BUILDS A RECORD RATHER THAN READING
-     SOURCE, and it is the only one that stands a whole host up. The the old tool import is the switch
-     out of the tool the owner runs his work from today, and its own tests drive an
-     in-memory fake door and a stub server answering ok to every method, so nothing in them asserts
-     that the founder, agents and estate declarations accept the fields the planner emits. This
-     onboards a self-host, installs those three packs on Decide, runs `braindog import` with the
-     `packs/legacy-import` adapter over HTTP and looks for every planned row in the record. About a second, which is a grep's
-     price, and it needs no build and no browser. */
-  ['import', call(join(here, 'import.mjs'))],
   ['refusals', call(join(here, 'refusals.mjs'))],
 
   /* AND THE OTHER HALF OF `30 §6`'s LAST PARAGRAPH: *"every `code` has a fixture that produces
@@ -145,15 +136,15 @@ const GATES = [
      pack can own, and breaking it is always the shortest path. */
   ['no-declarations-in-kernel', call(join(here, 'no-declarations-in-kernel.mjs'))],
   /* AND THE SAME RULE ONE LEVEL UP: the core ships no declaration, and its code names no use case.
-     Measured on 23 September, no core package says `gold`, `hsbc` or `legacy` outside a comment,
+     Measured on 23 September, no core package says `gold` or `hsbc` outside a comment,
      and nothing held it there. Beside the kernel rule because a `'bank-hsbc-eg'` in the record is
      that rule broken without a single declaration written. */
   ['shell-words', call(join(here, 'shell-words.mjs'))],
-  /* AND THE SAME KIND OF RULE ABOUT THE SAMPLE (DIRECTION 26). The app's test data lives in `fixtures/` and in the seed's
+  /* AND THE SAME KIND OF RULE ABOUT THE SAMPLE. The app's test data lives in `fixtures/` and in the seed's
      root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
      are a grep over what the core ships for something it must not name. */
   ['no-fixtures', call(join(here, 'no-fixtures.mjs'))],
-  /* AND THE WEB NAMES NO FIRST-PARTY LIST OR PACK, AND GUESSES NO CURRENCY (`loop/finish/shell.md` USE-2, defects §4.2).
+  /* AND THE WEB NAMES NO FIRST-PARTY LIST OR PACK, AND GUESSES NO CURRENCY.
      Beside `shell-words` and `no-fixtures` because it is the same kind of rule: a grep over what the app ships for
      something it must not name. */
   ['web-lists', call(join(here, 'web-lists.mjs'))],
@@ -163,8 +154,8 @@ const GATES = [
      only while the file and the product hold the same sentences, and 26 of 212 were reviewable and
      unrendered, including the five that define the words the product is built out of. */
   ['dead-copy', call(join(here, 'dead-copy.mjs'))],
-  /* AND THE ONE HOUSE RULE ABOUT THOSE SENTENCES THAT NOTHING ENFORCED. `LOOP.md`: "no em dashes
-     and no flippant register in anything a stranger reads", against 91 string literals carrying
+  /* AND THE ONE HOUSE RULE ABOUT THOSE SENTENCES THAT NOTHING ENFORCED: "no em dashes and no
+     flippant register in anything a stranger reads", against 91 string literals carrying
      one, most of them in refusals, which is the prose somebody meets at the moment they are stuck. */
   ['em-dash', call(join(here, 'em-dash.mjs'))],
   ['theme', ['node', [join(root, 'packages/skin/scripts/theme.mjs'), '--check']]],
@@ -495,13 +486,13 @@ function declaredNeeds(name, file) {
  * stand-in, and not before.
  * Nothing goes red for any of them: a script gate is a supported dialect, not a gate waiting to be fixed.
  *
- * `clean-room`, `slash-actor`, `import` AND `no-declarations-in-kernel` MOVED BY EDITING THE GATE, NEVER BY A
+ * `clean-room`, `slash-actor` AND `no-declarations-in-kernel` MOVED BY EDITING THE GATE, NEVER BY A
  * WRAPPER HERE OR IN A LIBRARY. Measured on 22
  * September by importing each one from a stand-in for this file: `clean-room` reads its root from
  * `process.argv[2]`, which in this process is this runner's first flag, so `--only clean-room` made it
- * scan `C:\Repos\braindog\--only` and throw `ENOENT`; `no-declarations-in-kernel` ran on the first
- * import and printed nothing on the second, because the module is cached; and `slash-actor` and
- * `import` each call `process.exit` at top level, which would end this run. A wrapper that imports a
+ * scan a directory called `--only` under the repository and throw `ENOENT`; `no-declarations-in-kernel` ran on the first
+ * import and printed nothing on the second, because the module is cached; and `slash-actor`
+ * called `process.exit` at top level, which would end this run. A wrapper that imports a
  * script is the trap described above with an extra file around it. So each now takes the root as its argument,
  * returns its finding rather than calling `process.exit`, closes what it opened on every path out, and ends with
  * the entry guard, which is the shape `52 §5.1` gives and `em-dash` took first.
@@ -699,8 +690,8 @@ process.on('exit', () => {
 /**
  * HOW LONG EACH GATE TOOK, ON A LINE OF ITS OWN AFTER IT, whatever it answered.
  *
- * `loop/research-ci-gates.md` had to price eight gates for `ci.yml` from a runner that printed no
- * duration, so every figure in its table is the gap between two `▸` headers in a step log, and the
+ * Eight gates were once priced for `ci.yml` from a runner that printed no duration, so every
+ * figure in that table was the gap between two `▸` headers in a step log, and the
  * last gate of a run has no next header to subtract from. The closing glyph is `◂` and not `▸`
  * because the tests beside this file prove a gate was asked by matching `▸ <name>`, and a log read
  * that way would otherwise count every gate twice. `test/durations.test.mjs` holds the shape:

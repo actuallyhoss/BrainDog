@@ -5,7 +5,7 @@
  * and it lands the moment the reader presses Accept. The copy said `3h ago` there, which is the
  * sample's `stamp(-3)` for `seq 4191` and `4192`, so the scene showed a row written a second ago
  * under a time three hours old. The app, for a row under a minute old, says `just now`
- * (`packages/render/src/format.ts`, `since`). `loop/research-bundle-reads.md` brief S1.
+ * (`packages/render/src/format.ts`, `since`).
  *
  * THE WORD IS READ FROM `since` ITSELF, not typed here, so the day the app's wording changes this
  * fails instead of agreeing with a copy of the old word. The site has no workspace dependency on

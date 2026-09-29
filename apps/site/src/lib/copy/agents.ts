@@ -15,7 +15,7 @@ const ORIGIN = 'https://brain.dog';
 const CLI_INSTALL_WINDOWS = `irm ${ORIGIN}/cli/install.ps1 | iex`;
 
 /**
- * THE ONE LINE A NEW MACHINE NEEDS AFTER THE INSTALL (contracts X55), exactly as every page and doc prints it.
+ * THE ONE LINE A NEW MACHINE NEEDS AFTER THE INSTALL, exactly as every page and doc prints it.
  * `apps/cli/src/setup.ts` runs `login`, `install`, the MCP registration, `tools write` and `skills sync` in turn.
  */
 const SETUP = `braindog setup ${ORIGIN}/app/<slug>`;
@@ -30,14 +30,14 @@ export const agents = {
    */
   agents: {
     title: 'Connect your AI agents.',
-    /* `loop/DIRECTION.md` §0: the record is the data layer agents write to and read from as they work. */
+    /* The product's first idea: the record is the data layer agents write to and read from as they work. */
     lead:
       'Claude, Codex, Cursor and any other MCP client can read and write your record. What your agents learn ' +
       'stays there for the next one, every change carries the name of the agent that made it, and a few ' +
       'things always need a person.',
 
     /**
-     * WHAT AN AGENT GIVES AND WHAT IT GETS BACK, `loop/DIRECTION.md` §0 in the reader's words. Each line names
+     * WHAT AN AGENT GIVES AND WHAT IT GETS BACK, the record as the agents' data layer in the reader's words. Each line names
      * the tool that does it in the comment beside it, and every tool is in `packages/mcp/src/index.ts` `TOOLS`.
      */
     value: {
@@ -100,7 +100,7 @@ export const agents = {
       title: 'Connect in a minute',
       ways: [
         {
-          /* AGT-3's OAuth at `/mcp` (`apps/worker/src/route.ts` `servesMcp`): the client opens the app to approve. */
+          /* The OAuth at `/mcp` (`apps/worker/src/route.ts` `servesMcp`): the client opens the app to approve. */
           head: 'By address',
           said: 'Add this address to your MCP client. It opens the app so you can approve it, once, and pick the record. No key is copied anywhere.',
           lines: [{ label: 'MCP address', code: MCP }],
@@ -141,7 +141,7 @@ export const agents = {
       },
       /**
        * THE AGENT SKILL, served at `links.ts` `SKILL` by `routes/agents/braindog/SKILL.md/+server.ts` from the
-       * repository's `skills/braindog/SKILL.md` (contracts X25), which `apps/cli/src/install.ts` places.
+       * repository's `skills/braindog/SKILL.md`, which `apps/cli/src/install.ts` places.
        */
       skill: {
         title: 'The Agent Skill',
@@ -152,8 +152,7 @@ export const agents = {
     },
 
     mcp: {
-      /* `packages/mcp/src/index.ts`: `TOOLS` holds sixteen entries, nine carrying `writes: false`. `triage` joined last
-         (`loop/finish/contracts.md` §6.2). */
+      /* `packages/mcp/src/index.ts`: `TOOLS` holds sixteen entries, nine carrying `writes: false`. `triage` joined last. */
       title: 'Sixteen tools, and nine of them only read.',
       lead: 'An agent reads the record the way a person does, and what it writes lands as an event carrying its name. Nothing here is a separate copy of your data.',
       readsTitle: 'Read',
@@ -176,7 +175,7 @@ export const agents = {
     },
 
     /**
-     * THE WAYS IN FROM OUTSIDE, EACH WITH ITS ONE CURL LINE AND ITS LIMITS (SCR-5, folded in by contracts X30).
+     * THE WAYS IN FROM OUTSIDE, EACH WITH ITS ONE CURL LINE AND ITS LIMITS.
      * They are ordered by how much they can do: a door takes what it is sent and reads nothing, a report key adds
      * rows to one list, and a key reads and writes as its scope allows.
      */

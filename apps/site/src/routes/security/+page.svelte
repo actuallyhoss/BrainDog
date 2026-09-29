@@ -323,7 +323,7 @@
     gap: var(--sp-2);
   }
 
-  /* THIRTY NIGHTS, ONE MARK EACH, the newest in ink and the rest in the chart's quiet grey (SYSTEM §7). */
+  /* THIRTY NIGHTS, ONE MARK EACH, the newest in ink and the rest in the chart's quiet grey (the design system). */
   .night-row {
     display: grid;
     grid-template-columns: repeat(30, minmax(0, 1fr));

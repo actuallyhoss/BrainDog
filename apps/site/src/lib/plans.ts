@@ -1,24 +1,24 @@
 /**
  * The plans and what each includes, in one place, for the pricing page and the home page's teaser.
  *
- * THE OWNER'S CALL, MADE ON 26 SEPTEMBER (`loop/DIRECTION.md` §33): a second hosted plan beside the
- * first, and extra usage priced per unit. That reverses decisions item 2's default of one plan and no
- * charge past it. Cloud's allowances are item 2's (15,000 runs, 150,000 requests, 1 GB fetched, 50
+ * THE OWNER'S CALL, MADE ON 26 SEPTEMBER: a second hosted plan beside the first, and extra usage
+ * priced per unit. That reverses the earlier default of one plan and no charge past it. Cloud's
+ * allowances are that plan's (15,000 runs, 150,000 requests, 1 GB fetched, 50
  * hours, 80 Slash asks). Cloud Plus's and every extra-usage price are the lead's proposal on the same
  * day, and are his to change here: every figure the site shows about a plan is read from this file.
  *
  * SLASH IS COUNTED IN CREDITS, AND MORE OF IT IS BOUGHT IN PACKS, NOT BY THE ASK. The owner, the same
  * day: "$0.1 per slash ask sounds so bad. maybe use slash credits?" One question or draft is one credit,
- * however much work it takes (contracts X41's rule for an ask, under a friendlier name); each plan
+ * however much work it takes (the rule for an ask, under a friendlier name); each plan
  * includes a month of them, and a pack adds more, used once the month's are gone and kept until spent.
  * A credit costs at most about $0.04 of model time (a record's ceiling is 300,000 neurons a month, about
- * $3.30, against 80 credits and the background work, decisions C19), so a pack at $0.05 or $0.04 a
+ * $3.30, against 80 credits and the background work), so a pack at $0.05 or $0.04 a
  * credit holds its margin even at that worst case, which few questions reach.
  *
  * Runs, requests, bytes and hours are the Worker's metered units; each is priced at several times
  * Cloudflare's own rate so a busy record never costs more to run than it pays.
  *
- * HELD TO THE CODE THAT CHARGES AND METERS, by `plans.test.ts` (`loop/finish/contracts.md` C8): each
+ * HELD TO THE CODE THAT CHARGES AND METERS, by `plans.test.ts`: each
  * plan's name and price to `HOSTED_PLANS` in `apps/worker/src/billing.ts`, what the checkout sells;
  * its runs, requests, gigabytes and hours to the Directory's `ALLOWANCE` in
  * `packages/record/src/directory.ts`, what the Worker holds a record to; Cloud's credits to

@@ -7,21 +7,21 @@
  * says what a record is for; the kernel, the record, the host and the rest run whatever a pack
  * declares. The day `packages/kernel` holds `if (list === 'gold')` or `'bank-hsbc-eg'`, one use case
  * has a branch nobody else can declare, and removing it is a migration rather than an uninstall.
- * `loop/research-shell-leftovers.md` measured the twelve core packages on 22 September with comments
- * stripped and found no such word in code, which is exactly the state that decays unwatched: every
- * earlier hit had been a comment, and nothing said so the day a real one landed.
+ * The twelve core packages were measured on 22 September with comments stripped, and held no such
+ * word in code, which is exactly the state that decays unwatched: every earlier hit had been a
+ * comment, and nothing said so the day a real one landed.
  *
  * WORDS, NOT SUBSTRINGS. The first version of the word list was a case-folded substring test, and
  * over `apps/web/src` it went red on `loadingOlder` five times, because `ngOlder` folds to a string
- * that contains `gold` (`loop/research-shell-next.md` M3). No core package has such an identifier
+ * that contains `gold`. No core package has such an identifier
  * yet, so the substring gate would have read green here until the first `pendingOlder` in the kernel
  * failed it on nothing. So every identifier and literal is split into parts at a case change, `_`,
  * `-`, `.` and `$`, the parts are case-folded, and a word is a hit when one part, or a run of
  * neighbouring parts joined, STARTS WITH it.
  *
- * STARTS WITH, AND NOT EQUALS, AND JOINED, AND NOT ONE PART AT A TIME. Measured by the checker over
+ * STARTS WITH, AND NOT EQUALS, AND JOINED, AND NOT ONE PART AT A TIME. Measured over
  * `apps/web/src`: a part that had to equal the word found 10 of the 17 real hits, dropping both
- * `Egyptian` lines because `egyptian` is not `egypt`. A part at a time would miss `legacyTool`, whose
+ * `Egyptian` lines because `egyptian` is not `egypt`. A part at a time would miss `instaPay`, whose
  * word is two parts. Starting a match only at a part boundary is what keeps `loadingOlder` out: its
  * parts are `loading` and `older`, and neither run begins `gold`. The negative directory holds one
  * file for each of those three shapes and one holding `loadingOlder`, so the rule is proved in both
@@ -31,7 +31,7 @@
  *
  * COMMENTS ARE NOT CODE, and they are found by a lexer rather than blanked by a pattern. A comment
  * that says why the kernel refuses a `gold` list is the kernel explaining itself, and a gate that
- * went red on it would be measuring the wrong thing. The survey's probe used
+ * went red on it would be measuring the wrong thing. The first probe used
  * `no-declarations-in-kernel`'s `decomment`, which is two regular expressions, and a regular
  * expression cannot tell a `//` inside a string or a regex literal from the start of a comment.
  * Measured on 23 September over the core this gate reads: it blanked 268 runs of real code in 31
@@ -45,15 +45,15 @@
  * it as green. And it holds the lexer's own first mistake, `seeded-template.ts`, which `uncomment`
  * explains where it happened.
  *
- * `salaries` IS NOT A HIT. `salary` is the word, and `salari...` does not start with it. The brief
- * offered the stem `salar` as an option; the tree has no `salaries` in scope today, so it is not
- * added on speculation.
+ * `salaries` IS NOT A HIT. `salary` is the word, and `salari...` does not start with it. The stem
+ * `salar` was an option; the tree has no `salaries` in scope today, so it is not added on
+ * speculation.
  *
- * HIS OWN NAMES CAME SECOND, and the gate passed his host until they did. `loop/research-legacy-parity.md`
- * brief B10 measured it on 25 September: ten words and not one of them `sam`, so a kernel file holding
- * `const HOST = 'brain.example.com'` read green, and so did `EGP`, `acme.example` and the rest of what his
- * record is about. `tools/gates/test/shell-words.test.mjs` holds each of those as a case that failed
- * against the gate before the words went in, and `negative/shell-words` seeds one per new place.
+ * A PRIVATE LIST BESIDE THE PUBLIC ONE. Some words are worth keeping out of the core and not worth
+ * publishing: the names of one owner's own products, hosts and people. They live in
+ * `private-words.local.json` beside this file, which git ignores, and a machine that has it guards
+ * them exactly as it guards `WORDS`. A machine without it reads the tracked list alone, and every
+ * seeded count in `self-test` is made of tracked words, so the file changes no count there.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -68,30 +68,57 @@ import { skipDir } from './lib.mjs';
  * boundary and why it may run on past one.
  */
 export const WORDS = [
-  'gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'acme', 'legacy',
-  'sam', 'egp', 'bake', 'quartz', 'acme', 'acme', 'trunk', 'Delta', 'nile', 'payday', 'goldapi',
+  'gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'egp', 'quartz', 'payday',
+  'goldapi',
 ];
+
+/**
+ * THE PRIVATE WORDS, READ WHEN THE FILE IS THERE. `private-words.local.json` is a JSON array; each
+ * entry is a word, or `{ "word": "...", "whole": true }` for one that must end where a part ends.
+ * `BRAINDOG_PRIVATE_WORDS` names another file, which is how a test aims the gate at a list of its own.
+ *
+ * A FILE THAT IS THERE AND CANNOT BE READ IS A THROW, never an empty list: a broken private list read
+ * as none would pass every word it was written to catch.
+ */
+const PRIVATE = process.env.BRAINDOG_PRIVATE_WORDS ?? fileURLToPath(new URL('./private-words.local.json', import.meta.url));
+
+function privateWords(file) {
+  if (!existsSync(file)) return [];
+  const list = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(list)) throw new Error(`${file} must hold a JSON array of words.`);
+  return list.map((e) => {
+    const entry = typeof e === 'string' ? { word: e, whole: false } : { word: e?.word, whole: e?.whole === true };
+    if (typeof entry.word !== 'string' || !/^[a-z0-9]+$/.test(entry.word))
+      throw new Error(`${file}: ${JSON.stringify(e)} is not a lower-case word.`);
+    return entry;
+  });
+}
+
+const PRIVATE_WORDS = privateWords(PRIVATE);
 
 /**
  * THE WORDS THAT MUST END WHERE A PART ENDS, because what starts with them is ordinary English.
  *
- * `bake` IS THE ONE, AND IT WAS MEASURED BEFORE IT WAS MADE ONE. On 25 September, with `bake` matched
- * the way every other word is, its one hit over the scope this gate reads was `'bakery'`, a signal the
- * guide reads to know a person runs a shop (`packages/seed/src/usecases/guide-kinds.ts:268`). That is
- * the `loadingOlder` mistake again, a word found inside a longer one it has nothing to do with. Whole,
- * `acme.example`, `acme-web`, `acmeweb` and `ACME_WEB` are still hits, and `bakery`, `baker` and `baked` are not.
- * The other new words were read the same way and have no such neighbour in the tree.
+ * NONE OF THE TRACKED WORDS IS ONE, AND A PRIVATE WORD MAY BE. The first such word was measured
+ * before it was made one: matched the way every other word is, its one hit over the scope this gate
+ * reads was `'bakery'`, a signal the guide reads to know a person runs a shop
+ * (`packages/seed/src/usecases/guide-kinds.ts`). That is the `loadingOlder` mistake again, a word
+ * found inside a longer one it has nothing to do with. Whole, a word is still a hit where a part, or
+ * a run of parts joined, equals it, and not in the longer English words that start with it.
  */
-const WHOLE = new Set(['bake']);
+const WHOLE = new Set(PRIVATE_WORDS.filter((e) => e.whole).map((e) => e.word));
+
+/** Every word this run reads: the tracked list and whatever the private file adds. */
+const ALL = [...new Set([...WORDS, ...PRIVATE_WORDS.map((e) => e.word)])];
 
 /**
  * Every package and every app is in scope by default, so a new core package is watched the day it exists.
  *
  * `packs` IS THE THIRD WORKSPACE ROOT AND IS LEFT OUT ON PURPOSE, the one text gate that does not read
- * it (audit sixty-one, finding 9, which found all four reading only these two). These words are the
- * use cases the core must not name, and a pack is exactly where a use case goes: `loop/DIRECTION.md`
- * section 22 says a gold rate or a bank's pattern lives in a record or a shared pack, never in
- * `packages/`. It is `packages/seed`'s exemption below, for the directory that took over its job.
+ * it (an audit found all four text gates reading only these two). These words are the use cases the
+ * core must not name, and a pack is exactly where a use case goes: a gold rate or a bank's pattern
+ * lives in a record or a shared pack, never in `packages/`. It is `packages/seed`'s exemption below,
+ * for the directory that took over its job.
  * Measured on 24 September with `hitsIn` over `packs/`: read as this gate reads, 2 files and 0 hits,
  * so adding it would have cost nothing today; and `packs/mercury/mercury.pack.json` names `mercury`
  * 11 times, so the first script that pack grows would have gone red for naming itself.
@@ -112,36 +139,36 @@ const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
  * WHAT IS OUT, AND WHY. Every entry is a path under the root, a directory or a file, and every
  * entry has to go on earning its place: an entry whose path is present and exempts no hit is itself
  * a finding, because an exemption that exempts nothing is a hole waiting for the next word. That is
- * why `apps/cli/src/install.ts`, which the brief named, is not here: measured on 23 September it
- * holds no word in code, so exempting it would only have hidden the first one.
+ * why `apps/cli/src/install.ts` is not here: measured on 23 September it holds no word in code, so
+ * exempting it would only have hidden the first one.
  *
  * `words`, WHERE AN ENTRY HAS IT, NARROWS THE ENTRY TO THOSE WORDS, each with its own reason.
  * `apps/cli/src/main.ts` is the whole command line, and exempting the file for one help line would
  * have exempted every other word written there too.
  *
  * AND AN ENTRY WHOSE REASON IS THE WORDS IT HOLDS HAS TO NAME THEM. The first version narrowed only
- * `main.ts`, and `apps/site`, `legacy.ts` and `import.ts` each exempted all ten words while their
- * reasons covered one or three. Measured by audit forty-four (finding 5) on a seeded root, and again
- * on 23 September over the `apps` half of `negative/shell-words`: `'bank-hsbc-eg'` in
- * `apps/site/src`, `'acme-payroll'` in `apps/cli/src/import.ts` and three more read green, the
- * gate saying `12 in the 6 exempted paths` and exit 0. Narrowed, it names all five.
+ * `main.ts`, and three other entries each exempted all ten words while their reasons covered one or
+ * three. Measured on a seeded root, and again on 23 September over the `apps` half of
+ * `negative/shell-words`: `'bank-hsbc-eg'` in `apps/site/src`, `'acme-payroll'` in
+ * `apps/cli/src/import.ts` and three more read green, the gate saying `12 in the 6 exempted paths`
+ * and exit 0. Narrowed, it names all five.
  * An exempted word that exempts no hit is a finding for the same reason an idle entry is: it is the
  * hole the next leak of that word walks through.
  *
- * NO ENTRY STAYS OUT WHOLE SINCE BRIEF B10 STEP 2. `packages/seed` was exempted whole while it held
- * the use-case packs, a bank's wordings and a person's holdings among them, and a pack is where a use
- * case is allowed to be named. Those are under `packs/` now (briefs B1 and B2), which this gate leaves
- * out by `WORKSPACES`, and what stays in `packages/seed` is the generic modules, the guide and the
- * sample, which is core and is read as core. `apps/web` was exempted whole while it waited for a gate
- * of its own. Measured on 25 September with the twenty-one words, the two held 5 and 2 hits, against
- * 82 and 11 on 23 September with ten; a sixth in the seed was `bakery`, which `WHOLE` explains. Each
- * became an entry naming its file and its words: an exemption the size of a tree is how a leak the
- * size of the kernel's in either would have read green.
+ * NO ENTRY STAYS OUT WHOLE. `packages/seed` was exempted whole while it held the use-case packs, a
+ * bank's wordings and a person's holdings among them, and a pack is where a use case is allowed to be
+ * named. Those are under `packs/` now, which this gate leaves out by `WORKSPACES`, and what stays in
+ * `packages/seed` is the generic modules, the guide and the sample, which is core and is read as core.
+ * `apps/web` was exempted whole while it waited for a gate of its own. Measured on 25 September with
+ * the full list, the two held 5 and 2 hits, against 82 and 11 on 23 September with ten words; a sixth
+ * in the seed was `bakery`, which `WHOLE` explains. Each became an entry naming its file and its
+ * words: an exemption the size of a tree is how a leak the size of the kernel's in either would have
+ * read green.
  *
  * AND FIVE OF THE SEVEN WERE REWORDED THE SAME DAY, so their entries went. Three were the Kiln
  * sample's `registrar` in the seed, and the web's two were `EGP` among the common currencies and the
- * web copy of the sample's `D41`. Measured when those words went and the entries had not: the gate
- * named every one of their files as exempted and idle and exited 1.
+ * web copy of the sample's own figure. Measured when those words went and the entries had not: the
+ * gate named every one of their files as exempted and idle and exited 1.
  *
  * AND THE SIXTH WENT WITH estate 1.3.0. Estate's Services line said a row held `a renewal date, a
  * registrar and a cost`, and it was kept out while it could not change: `holds` on `register.services`
@@ -149,7 +176,7 @@ const READ = { packages: ['src', 'grammars'], apps: ['src', 'scripts'] };
  * `origin/master` since `8b8915e4`, so a reword under 1.2.0 would have left a record holding the old
  * words while the pack said it declared the new ones. It says `who it is with` at 1.3.0, and its entry
  * went in the same change, because an entry left idle is a finding. What is left is the guide's
- * `payday`, which is a word a stranger types, and the public site's changelog.
+ * `payday`, which is a word a stranger types, and the public site's copy.
  *
  * `*.test.ts` and any `test` directory are out by rule rather than by entry, because a test asserts
  * on what a record was handed: `packages/record/test/ask-person-reach.test.ts` arrives
@@ -170,19 +197,18 @@ const OUT = {
   },
   'packages/seed/src/usecases/index.ts': {
     why: 're-exports Personal\'s own row builder by its own name, the way `founder-poll.ts`\'s `pollPack` sits beside it (2 hits).',
-    words: { payday: '`export { payDayRow, type PayDay } from \'./personal.ts\';`, requested for `propose.ts` by MOD-17: a name carried through, not a branch taken on it.' },
+    words: { payday: '`export { payDayRow, type PayDay } from \'./personal.ts\';`, requested for `propose.ts`: a name carried through, not a branch taken on it.' },
   },
   'apps/web/src/lib/start/propose.ts': {
-    why: 'the one call site MOD-17 named for `personal.ts`\'s own row builder (2 hits).',
+    why: 'the one call site named for `personal.ts`\'s own row builder (2 hits).',
     words: {
       payday: 'the import and the one call of `payDayRow`, only reached inside `u?.usecase === \'personal\'`: Personal\'s pack, not this shell, decided pay day is a row, and this file only carries its name to the one place `personal.ts` cannot seed it from.',
     },
   },
   'apps/site': {
-    why: 'the public site is prose about the product, not code that runs a record (5 hits).',
+    why: 'the public site is prose about the product, not code that runs a record (3 hits).',
     words: {
-      egypt: 'the changelog entry at `routes/changelog/entries.ts:580` says `Egyptian pounds` about a currency fix that shipped.',
-      sam: 'two changelog titles, at `routes/changelog/entries.ts:463` and `:617`, name the the old tool import as history.',
+      egypt: 'the changelog entry at `routes/changelog/entries.ts:569` says `Egyptian pounds` about a currency fix that shipped.',
       mercury: 'the home page names the Mercury pack twice, in `lib/copy/home.ts`: the inbox example ("connect Stripe and Mercury") and the packs line, exactly as it names Stripe, Money and Work.',
     },
   },
@@ -201,7 +227,7 @@ const OUT = {
 };
 
 /**
- * THE FILES A CORE PACKAGE SHIPS: its `src`, without tests, which is the scope Brief G names.
+ * THE FILES A CORE PACKAGE SHIPS: its `src`, without tests.
  * `.svelte` is read too, with its HTML comments blanked first, because a component's markup is code
  * a stranger's record runs.
  *
@@ -210,11 +236,11 @@ const OUT = {
  * `packages/mcp/src/index.ts` imports and serves as `braindog:grammar/script`, holds 9, all `gold`,
  * in its `script.gold-rate` example. Neither directory was read here.
  *
- * `grammars` AND `scripts` ARE READ SINCE BRIEF B10 STEP 2, on 25 September, after step 1 had rewritten
- * that example as a rate fetch against `api.example.com`: read then, the four `apps/*\/scripts`
- * directories and `packages/mcp/grammars` held 0 hits between them, so the scope widened on a clean
- * tree and the first example that names a use case there is the first red. `packages/render/svelte`
- * is still not read; the brief did not name it, and it held 0 hits on 23 September.
+ * `grammars` AND `scripts` ARE READ SINCE 25 SEPTEMBER, after that example was rewritten as a rate
+ * fetch against `api.example.com`: read then, the four `apps/*\/scripts` directories and
+ * `packages/mcp/grammars` held 0 hits between them, so the scope widened on a clean tree and the
+ * first example that names a use case there is the first red. `packages/render/svelte` is still not
+ * read; it held 0 hits on 23 September.
  */
 const SOURCE = /\.(ts|mts|js|mjs|svelte)$/;
 const TEST = /\.test\.(ts|mts|js|mjs)$/;
@@ -400,24 +426,29 @@ const endsAt = (parts, i, word) => {
  * The words one token holds: each one that a part, or a run of parts joined from there, starts with,
  * and for a word in `WHOLE`, each one that such a run equals.
  *
- * THE LONGEST WORD AT ONE PLACE, AND NOT EVERY WORD THAT FITS THERE. `sam` is a prefix of `legacy`
- * and `gold` of `goldapi`, so with both lists matched in full `legacyTool` was two hits and
- * `api.goldapi.io` two more, and every seeded count in `self-test` would have been a count of words
+ * THE LONGEST WORD AT ONE PLACE, AND NOT EVERY WORD THAT FITS THERE. `gold` is a prefix of `goldapi`,
+ * so with the list matched in full `api.goldapi.io` was two hits, and every seeded count in `self-test` would have been a count of words
  * rather than of places a word was written. Measured on 25 September with this rule taken out: the
  * seeded tree in `negative/shell-words` read 13 findings for its 10 places. A shorter word is dropped
  * only when a longer one starts at the same part; `goldHsbc` still names both, because they start at
  * different parts.
  */
-export function wordsIn(token) {
+export const wordsWith = ({ words, whole }) => (token) => {
   const parts = partsOf(token);
   const found = new Set();
   for (let i = 0; i < parts.length; i++) {
     const run = parts.slice(i).join('');
-    const here = WORDS.filter((word) => (WHOLE.has(word) ? endsAt(parts, i, word) : run.startsWith(word)));
+    const here = words.filter((word) => (whole.has(word) ? endsAt(parts, i, word) : run.startsWith(word)));
     for (const word of here) if (!here.some((other) => other !== word && other.startsWith(word))) found.add(word);
   }
   return [...found];
-}
+};
+
+/**
+ * `wordsIn` OVER THIS RUN'S LIST, the tracked words and the private ones. `wordsWith` is the same
+ * reading over a list a test hands it, so a test can prove the `WHOLE` rule without naming a private word.
+ */
+export const wordsIn = wordsWith({ words: ALL, whole: WHOLE });
 
 /** A token is a run of the characters an identifier or a slug is written in, separators included. */
 const TOKEN = /[A-Za-z0-9_$][A-Za-z0-9_$.-]*/g;
@@ -488,7 +519,7 @@ export default function shellWords(
     const rel = relative(ROOT, file).replace(/\\/g, '/');
     const hits = hitsIn(readFileSync(file, 'utf8'), file.endsWith('.svelte'));
     const out = outOf(rel);
-    const allowed = out === null ? null : OUT[out].words ? Object.keys(OUT[out].words) : WORDS;
+    const allowed = out === null ? null : OUT[out].words ? Object.keys(OUT[out].words) : ALL;
     if (out === null || OUT[out].words) read++;
     for (const h of hits) {
       if (allowed !== null && allowed.includes(h.word)) {
@@ -505,8 +536,8 @@ export default function shellWords(
     findings.push(`  ${p} is exempted and holds no use-case word in code. Take it out of OUT, so the next word there is seen.`);
 
   /* AND A WORD THAT EXEMPTS NOTHING IS ONE TOO, once its path is not already idle, because then the
-     line above has said it. Measured on a root holding only an `apps/cli/src/legacy.ts` with
-     `legacy` and `gold` in it and no `registrar`: with this block cut out the gate said `2 in
+     line above has said it. Measured on a root holding only a file exempted for
+     `gold` and `registrar`, with `gold` in it and no `registrar`: with this block cut out the gate said `2 in
      the 6 exempted paths` and exit 0, and the next `registrar` written there would have been
      exempted on a reason nothing in the file still had. */
   const idlePaths = new Set(idle.map(([p]) => p));

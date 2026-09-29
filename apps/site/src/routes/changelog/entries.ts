@@ -19,7 +19,7 @@
  * backlogs, comment repairs, bookkeeping and refactors nobody outside meets earn no entry however
  * large the diff, because this page is read by somebody deciding whether the product is alive and
  * a gate is not a thing he can open. That rule is why the log was 1,288 commits on 2026-09-21 and
- * this list is 88 entries: read over the whole history, most of those commits are the loop's own
+ * this list is 88 entries: read over the whole history, most of those commits are the repository's own
  * paperwork. The 1,288 moves every hour and the 88 does not, which is the point of the rule.
  *
  * AND NOTHING IS INVENTED. Every entry names the commits it is drawn from, its body says only what
@@ -86,10 +86,10 @@ export type Entry = {
  * checker only requires that a day never reappears after it has ended.
  */
 export const ENTRIES: Entry[] = [
-  /* THE FINISH LANDED AS A FEW LARGE COMMITS, NOT ONE PER THING. W1, W2 and W3 were each committed whole
+  /* THE LAST WORK LANDED AS A FEW LARGE COMMITS, NOT ONE PER THING. Each batch was committed whole
      (`c651475b`, `daba3453`, `4c204b5c`, `bfe14e39`), and an anchor must be unique, so each of those commits
-     carries one entry naming what a person notices most, and the rest of that workflow is not written up
-     here. W3 especially: one commit, so one entry, until its work has commits of its own to anchor to. */
+     carries one entry naming what a person notices most, and the rest of that work is not written up
+     here. The last especially: one commit, so one entry, until its work has commits of its own to anchor to. */
   {
     date: '2026-09-28',
     kind: 'shipped',
@@ -250,9 +250,8 @@ export const ENTRIES: Entry[] = [
        `test/slash.test.ts` fails if any other sentence on any page names Spark.
 
        ANCHORED ON THE DECISION, BECAUSE THE RENAME HAD NOT BEEN COMMITTED WHEN THIS WAS WRITTEN: it
-       ran as one wave across five lanes and was committed after. `bb960c22` is DIRECTION 31, his word
-       and the list of what moves, and `62fabc69` is the survey that mapped it. The wave's own commits
-       belong after them as evidence. */
+       was committed after. `bb960c22` is the decision, the owner's word and the list of what moves, and
+       `62fabc69` is the survey that mapped it. The rename's own commits belong after them as evidence. */
     title: 'Spark is now called Slash, and a self-host’s settings are renamed with it',
     body:
       'The assistant is called Slash in the app, the command line and the documents. ' +
@@ -458,16 +457,6 @@ export const ENTRIES: Entry[] = [
     commits: ['50a6874a', '545c95f6'],
   },
   {
-    date: '2026-09-22',
-    kind: 'fixed',
-    title: 'The the old tool import says what it could not carry, instead of dropping it',
-    body:
-      'A section it has no reader for is named with its row count. A word it does not know ' +
-      'arrives as the default, with a line saying so. Values from a closed list are proposed ' +
-      'rather than guessed, and seven fields it used to drop now arrive.',
-    commits: ['6700ad7c', '91bf07df', '67c3ce82', '3ec36550'],
-  },
-  {
     date: '2026-09-21',
     kind: 'shipped',
     title: 'A forwarded message can reach a hosted record, on an address you mint',
@@ -610,16 +599,6 @@ export const ENTRIES: Entry[] = [
       'forty pages can make eighty-six. Passing that ceiling ends the work of every other ' +
       'record in the same run. Each job reserves its worst case now, and one run always goes.',
     commits: ['9fc671fa'],
-  },
-  {
-    date: '2026-09-17',
-    kind: 'shipped',
-    title: 'A the old tool export moves into BrainDog with one command',
-    body:
-      'It reads the export and maps projects, tasks, people, numbers, questions, accounts and ' +
-      'bills onto Solo founder. Each row keeps its old key in its tags, so a second run updates ' +
-      'and never adds. No key value is read, and a row shaped like one is left out whole.',
-    commits: ['7f4489af'],
   },
   {
     date: '2026-09-17',
@@ -1194,10 +1173,10 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-05',
     kind: 'fixed',
-    title: 'Five ways the loop stopped working and reported that it was fine',
+    title: 'Five ways scheduled work stopped and reported that it was fine',
     body:
-      'An audit drove the loop, the rules and the figures over a day of work. It found five ' +
-      'ways the loop stopped while reporting success. It also found four rules acting wrongly ' +
+      'An audit drove the scheduler, the rules and the figures over a day of work. It found five ' +
+      'ways the scheduler stopped while reporting success. It also found four rules acting wrongly ' +
       'unobserved, and four numbers that came out plausible and wrong.',
     commits: ['7f9a53e7', '0b2a00f1', 'cb82e087'],
   },

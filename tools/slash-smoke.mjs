@@ -14,7 +14,7 @@
  * WHY IT EXISTS. Every Slash test drives the package over a canned model, so none of them says which model production
  * answers with, how long an ask takes there, or whether Workers AI accepts the strict `json_schema` the Worker's adapter
  * sends (`apps/worker/src/inference.ts`, `formatFor`). Those three are facts about a deployed host, and `docs/46` §7.1
- * records them from this script's output (`loop/finish/agents.md` AGT-30).
+ * records them from this script's output.
  *
  * A BROWSER SESSION AND NOT A TOKEN, because every Slash door refuses a bearer (`serveSlash` in
  * `packages/host/src/slash-ask.ts`, `NEEDS_BROWSER_SESSION`) and `automationRun` and `slash` are the owner's in a browser.

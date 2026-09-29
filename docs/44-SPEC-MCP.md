@@ -4,7 +4,7 @@ The agent surface of [10-MCP](10-MCP.md), typed to the file: the fixed tools of 
 (the addresses a client fills in), all three in `src/index.ts`, the server `instructions`, and the JSON-RPC 2.0 core that carries them,
 hand-rolled over the `Result` envelope of [33-CONTRACTS](33-CONTRACTS.md) §2, with the token budget of 10 §4 asserted
 by a test. Two transports wrap the core: stdio in `apps/cli` and streamable HTTP at `POST /mcp` on both hosts
-(`loop/research-agent-path.md` §1). Ninth in the build order of [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §4. Mode:
+. Ninth in the build order of [35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §4. Mode:
 ponytail.
 
 ---
@@ -24,7 +24,7 @@ with one exception that holds no caller's data: `tools()` keeps each register's 
 (§4.4).
 
 **Two transports wrap it.** Each does its own reading and writing around `handle`, so the two cannot drift in what
-they say (`loop/research-agent-path.md` §1.1):
+they say:
 
 | Transport | Where | For |
 |---|---|---|
@@ -337,7 +337,7 @@ names pages, and a page appears when its row does.
 | `meet` | `meet(args)` | `name?`, `email?`, `handle?`, `where` | yes |
 | `triage` | `triage(args)` | `arrival`, `register?`, `fields?`, `ignore?`, `note?` | yes |
 
-Fourteen of these are the fourteen of `loop/research-agent-path.md` §1.5. Five tools left to pay for the three that
+Fourteen of these are the set the agent path planned. Five tools left to pay for the three that
 plan added (`context`, `handoff`, `meet`): `pages`, `page` and `metric` were already resources (§4.7); `credentials`
 could never answer a token, because the vault refuses every one; and `dry_run` previews a rule, and has come back as
 part of `propose`'s answer rather than as a tool (below). One joined after, paid for inside the ceiling of §7 by
@@ -345,19 +345,18 @@ cutting descriptions that repeated their own schema or the instructions (the ari
 of `src/index.ts`):
 
 - **`activity`** (`7b6fd267`) is the record's whole log, newest first, held to what the caller may see. It is the one
-  tool of the old tool's twenty-one with no path here (`loop/research-switch.md` §1): `history` takes a row, and a session
+  tool of the predecessor's twenty-one with no path here: `history` takes a row, and a session
   picking up after another does not yet know which row to ask about. It takes a `limit` and no cursor, and answers
   `{ events }` with the record's cursor taken off, because an argument the tool does not take is one a model will try
   to send. It cost 117 tokens.
-- **`triage`**, listed last, files one arrival from the inbox as a row in a list, or sets it aside
-  (`loop/finish/contracts.md` §6.2). It is the record's `triage`, which admits a person as filing in the app does and a
+- **`triage`**, listed last, files one arrival from the inbox as a row in a list, or sets it aside.
+  It is the record's `triage`, which admits a person as filing in the app does and a
   token only when its owner gave it the `inbox` reach; every other token is refused `FORBIDDEN` in the record's
   sentence, relayed unchanged. The row it files comes back compact, as `create`'s would. It could not be paid for by
   cutting descriptions, so it is the one tool §7's ceiling was raised for, once, to 2,760. The command line routes it
   (`apps/cli/src/surface.ts`), so it answers over stdio as over `POST /mcp`.
 
-A second, **`money`** (`4da40586`), joined and then left in `48ac43a1` (`loop/research-m3-dynamic.md` section 3,
-B6). It read the seven figures that money-core declares, by id, through `metric`, and when none answered it refused
+A second, **`money`** (`4da40586`), joined and then left in `48ac43a1`. It read the seven figures that money-core declares, by id, through `metric`, and when none answered it refused
 `METRIC_UNKNOWN` naming that pack. So the one server every record speaks carried one pack's vocabulary, and a record
 keeping its money in any other pack could only be told to install ours. Nothing replaced it by name: a page that
 draws a pack's figures is `braindog:page/<slug>`, each figure it draws is `braindog:metric/<id>` (§4.7), and both
@@ -366,8 +365,7 @@ still come back as one amount each and no sum, because that was always the kerne
 (`test/money-out.test.ts`). The first rule of the instructions now says to read the Home page for what leads (§4.6).
 The 91 tokens it cost stay paid: the list measured 2,597 with it and 2,520 without.
 
-**AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL** (`loop/research-batch-sixty-two-audit.md` section 2,
-probe M1). Over a record with money-core installed as it ships, the nine reads, each called with its most helpful
+**AND THAT LEFT A CLIENT WITH TOOLS ALONE NO FIGURE AT ALL.** Over a record with money-core installed as it ships, the nine reads, each called with its most helpful
 arguments, answered nothing that named a figure, and `resources/list` offered a figure only where a page drew it: 18
 of money-core's 36. So two tools carry figures, generically and with no pack's ids: `record_index` names the figures
 the caller may read, and `get` reads one by its id through `metric`, whatever pack declared it. It cost 16 tokens and
@@ -832,8 +830,7 @@ the call.
 `ROUTE_UNKNOWN`, with the fifteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
-> **The ADMIN row is about a direct write, not about metadata (September 22nd 2026,
-> [DIRECTION §22](../loop/DIRECTION.md)).** An agent never calls `setDeclaration`, and it does not need to: it adds a
+> **The ADMIN row is about a direct write, not about metadata (September 22nd 2026).** An agent never calls `setDeclaration`, and it does not need to: it adds a
 > field, or a value to a closed list, by `propose` with `body_kind: 'change'` and `to: { add: { register, fields, values } }`,
 > which is merged onto whatever is live when it lands, so two additions never race (`packages/kernel/src/govern.ts`,
 > `addTo`). A new list is not an addition: `addTo` refuses one with `REGISTER_UNKNOWN`, and it is proposed whole. The owner's answer of September 22nd: an additive, optional one lands at once and is logged in history
@@ -888,8 +885,7 @@ counted once for this revision, by the same estimator over the same result.
 | A `list` page, the default of 20 rows | ≤ 2,000 | **1,728**, 4,745 bytes, for twenty seeded `tasks` (3,018 for all 27 before); 2,287 for twenty `obligations`: over | a real record with `@braindog/seed` installed, the whole JSON-RPC answer; no test asserts it |
 | `resources/list` | none | not in any turn; fetched when wanted | |
 
-*The first six rows measured on 24 September 2026, after `get` and `record_index` learned figures (audit sixty-two
-finding 2); the rest on 22 September. What `triage` and `log`'s row-less `spoken` add was counted by hand with §5.8's
+*The first six rows measured on 24 September 2026, after `get` and `record_index` learned figures; the rest on 22 September. What `triage` and `log`'s row-less `spoken` add was counted by hand with §5.8's
 estimator over the serialised tool list, 172 and 4, so 2,720 and 40 under the ceiling. `list`'s `fields` argument cost
 37 and saying "predicate" once in `list`'s description gave 6 back, so 2,751 and 9 under, counted on 28 September
 through `handle` over the stub surface; `budget.test.ts`'s diagnostic is the figure that holds. The `list` page row was
@@ -909,7 +905,7 @@ object, a ref and two days: a register of rows that dense wants a smaller `limit
 to its title and state is the next step if one is ever needed.
 
 **2,600, where an earlier revision set 1,800.** That ceiling was set for eight tools. The agent path needs fourteen,
-because `context`, `handoff` and `meet` are what an agent does every session (`loop/research-agent-path.md` §1.5),
+because `context`, `handoff` and `meet` are what an agent does every session,
 and those three cost 500 tokens with their schemas. The instructions grew from 268 to 352 for the same reason, and to
 392 since, as the money line learned each currency's decimals, the key line named the real command, the first line
 stopped naming one use case and the handoff line asked for `doing`, and to 400 when the first line said to read the
@@ -918,7 +914,7 @@ Home page for what leads. Their own ceiling moved from 300 to 400. Two more tool
 91, nine descriptions gave that back, and its leaving took the list from 2,597 to 2,520. Figures came back in
 clauses on `record_index` and `get` and not as a tool, for 16 tokens, 2,528 to 2,544. Automations and `script_try` cost the list nothing, because the one rides
 on `propose`'s answer and the other on its body, and their grammars are resources. **2,760 since `triage`**, the one
-tool the ceiling was raised for (`loop/finish/contracts.md` §6.1): a write of its own rides on no other tool's answer,
+tool the ceiling was raised for: a write of its own rides on no other tool's answer,
 and 56 tokens could not hold it. It moves once and never again. One more clause in a description is
 a clause out of another, and the test is the arbiter. The instructions are counted inside the figure, because every
 token of them sits in the context every turn.
@@ -963,7 +959,7 @@ and each case is named for what it holds.
 | `packages/mcp/test/index.test.ts` | every advertised tool reaches a method, asked over the wire; a surface with nothing optional darkens exactly `context`, `activity`, `handoff` and `meet`, and the resources go the same way; `credentials` is not a tool; the refusal for a name that is not a tool lists the fifteen |
 | `packages/mcp/test/activity.test.ts` | `activity` is a tool; its `limit` is the record's; a line's address replaces its parts and empty fields do not travel; a line about no row keeps `target`; a caller held to one register sees only its lines; a host without `recentHistory` says so |
 | `packages/mcp/test/money-out.test.ts` | there is no `money` tool: `TOOLS` holds sixteen, none of them `money`, no `MONEY_FIGURES` export, and a call by that name is refused `ROUTE_UNKNOWN` without reading the record; the source names no figure id of money-core, in code or in a comment; a pack's page and each figure it draws are offered as resources, and a figure over two currencies with no rate answers one amount per currency and no sum |
-| `packages/mcp/test/figures.test.ts` | audit sixty-two's M1 over money-core as it ships: `get` of a figure's id answers the record's reading, one amount per currency and no sum, for every figure the removed `money` tool read; `record_index` names figures and `get` answers each one it names; a figure's id goes to `metric` and a row to `get`; a figure the record refuses is `VALUE_MALFORMED` at `spoken` naming the row forms and `record_index`; a surface answering `figures` is listed whole, less what `metric` refuses; still sixteen tools, `TOOLS`' own count. One case is a `todo`: every declared figure named, which waits on the record's `figures` |
+| `packages/mcp/test/figures.test.ts` | money-core as it ships: `get` of a figure's id answers the record's reading, one amount per currency and no sum, for every figure the removed `money` tool read; `record_index` names figures and `get` answers each one it names; a figure's id goes to `metric` and a row to `get`; a figure the record refuses is `VALUE_MALFORMED` at `spoken` naming the row forms and `record_index`; a surface answering `figures` is listed whole, less what `metric` refuses; still sixteen tools, `TOOLS`' own count. One case is a `todo`: every declared figure named, which waits on the record's `figures` |
 | `packages/mcp/test/list-ref.test.ts` | `list` filtered by a ref reads the spoken id, the name and the row id alike; a ref that names nothing is refused |
 | `packages/mcp/test/teaching.test.ts` | the three sentences `context` teaches, the same on the resource, and no example row outside a project |
 | `packages/mcp/test/actions.test.ts` | `braindog:actions` is listed on a real record with each key by label only; a surface without `actions` does not list it |
@@ -980,7 +976,7 @@ and each case is named for what it holds.
 | `apps/worker/test/mcp.test.ts` | `/mcp` is one path; only a bearer is a caller; the Directory is asked before the record's object; `/mcp` is recorded as where a token was used; the headers are checked before the bearer |
 
 Not built, from an earlier revision of this section: the tokenizer calibration against `o200k_base`, which needs a
-real tokenizer outside the workspace (`loop/BACKLOG.md`); a fuzz test of the handler; and a verdict test that every
+real tokenizer outside the workspace; a fuzz test of the handler; and a verdict test that every
 routable method has a tool, a resource or a named refusal. `index.test.ts` is the nearest thing to the last: it holds
 every advertised tool and resource to a method, which is the other direction.
 
@@ -1033,7 +1029,7 @@ No JSON Schema validator and no Valibot: the record validates every argument and
 (§2), so neither the kernel nor the record is a prerequisite of `src/`; the tests run the tools over a real record,
 which is why `@braindog/record` is a dependency.
 
-**How it was built**, in the agent path's build order (`loop/research-agent-path.md`, item 2):
+**How it was built**, in the agent path's build order:
 
 | Step | What landed | Where |
 |---|---|---|
@@ -1044,8 +1040,8 @@ which is why `@braindog/record` is a dependency.
 | 8 | The record answers `context`, and `attach` returns it | `packages/record` |
 | 16 | The record answers `meet`, which switches the `meet` tool on, and the end hook sends it the authors of a session's commits | `packages/record`, `packages/host`, `packages/client`, `apps/cli/src/hooks.ts` |
 
-Beside step 8, `rpc.ts` gained `server/discover` and the version rule of §4.1, the two protocol gaps the forty-first
-pass left open (`loop/BACKLOG.md`).
+Beside step 8, `rpc.ts` gained `server/discover` and the version rule of §4.1, the two protocol gaps left open
+until then.
 
 **After the agent path**, each in the commit named, and none of them a numbered step:
 
@@ -1056,7 +1052,7 @@ pass left open (`loop/BACKLOG.md`).
 | `7b6fd267` | the `activity` tool, over `recentHistory`: fifteen tools |
 | `4da40586`, `ed4d421c` | the `money` tool, and `list_rows`: sixteen tools |
 | `48ac43a1` | the `money` tool leaves the core, and `MONEY_FIGURES` with it: fifteen tools again (§4.4) |
-| AGT-5 (W1b), not a commit of its own | `triage` and `braindog:inbox`, `inbox/{state}`: sixteen tools |
+| not a commit of its own | `triage` and `braindog:inbox`, `inbox/{state}`: sixteen tools |
 | `d7fb19bf` | the sentences `context` teaches |
 | `837b01c7`, `6ec8011d` | `braindog:automations`, `automation/{id}` and `grammar/automations`, and the dry run on a rule change |
 | `eafe8c20` | `braindog:grammar/script` |
@@ -1070,7 +1066,7 @@ line passes the surface `surfaceOver` builds over `@braindog/client`. So the rec
 `McpSurface<C>` as `(args, ctx) => Promise<Result<T>>`, with `boot` answering at least `{ registers: [{ id, name }] }`
 and `version` at least `{ version }`. `tsc` at each call site proves the shapes.
 
-Position: ninth in 31 §2's total order (35 §4); BUILD.md phase 6.
+Position: ninth in 31 §2's total order (35 §4); phase 6.
 
 ---
 
@@ -1122,7 +1118,7 @@ the documents that still cite the earlier decision.
 - [x] The record answers `meet` (build step 16), so its tool is live. A host older than that refuses it `NOT_IN_THIS_BUILD`.
 - [x] The command line's surface offers every optional method its client routes, `actions` among them.
 - [x] The tokenizer calibration of §9 is left out on purpose, as D2 records: it needs a real
-      `o200k_base` tokenizer, which is a dependency outside the workspace (`loop/BACKLOG.md`), and the estimator's
+      `o200k_base` tokenizer, which is a dependency outside the workspace, and the estimator's
       ceilings hold without it. The bias §5.8 claims is the design's, stated and not asserted; if the calibration is
       ever built and the band fails, the estimator's body is replaced and its signature kept.
 - [x] A default `list` page is at or under 10 §4's 2,000 tokens on the seeded Work list: twenty tasks, 1,728

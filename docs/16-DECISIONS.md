@@ -125,15 +125,14 @@ agent — and the product is already about agents.
 **Would reverse it:** a class of pack customers demonstrably need that no declaration plus an agent
 can express — and the answer would still be a ninth kind before a sandbox.
 
-**Amended September 22nd 2026, by the owner's answer "both" ([DIRECTION §22](../loop/DIRECTION.md)).**
+**Amended September 22nd 2026, by the owner's answer "both".**
 Never a script in the core; a person's or an agent's script is record content, run in a sandbox
 BrainDog hosts (metered, per account) or anywhere outside that pushes in through a door or the
 API. A person, Claude or Slash writes one and attaches it to a schedule or a door, and its writes
 arrive through the same API anything else uses, under its own actor. What survives of this ADR is
 the part that was load-bearing: a pack is data, nothing a pack declares executes inside the record,
 and no user code runs in the record's own object. What it no longer says is "no sandbox": the
-hosted sandbox is a convenience, never required, and its ceilings, metering and key handling are
-[research-shell-scripts.md](../loop/research-shell-scripts.md).
+hosted sandbox is a convenience, never required, and it carries its own ceilings, metering and key handling.
 
 ---
 
@@ -400,8 +399,7 @@ knowingly.
 
 ## ADR-017 · The assistant's first name (superseded by ADR-070)
 
-**Superseded** on September 25th 2026 by [ADR-070](16-DECISIONS.md): the assistant is called Slash
-([DIRECTION 31](../loop/DIRECTION.md)).
+**Superseded** on September 25th 2026 by [ADR-070](16-DECISIONS.md): the assistant is called Slash.
 
 This ADR chose the assistant's earlier name over *Pointer*, which a draft of it had recommended. Its
 argument was about that word, and an argument about one word does not survive being find-and-replaced
@@ -1091,7 +1089,7 @@ twelve packs is theatre, and a platform with a moderation queue is a company bef
 **Would reverse it:** a pack author asking to be paid — which brings Stripe Connect, tax and
 refunds, and is a company decision, not a format one.
 
-**Amended September 28th 2026, as built, on the default `loop/finish/platform.md` §5 item 1 sets
+**Amended September 28th 2026, as built, on a default that holds
 until the owner rules.** The Kennel is built now, before gate 2, because the direction asks for a
 registry and for publishing your own packs. It is the same format (an `index.json` over immutable
 files, each held to its checksum and, when signed, to its author's key) with a publish door in
@@ -1325,7 +1323,7 @@ ransom, which is the one thing the format exists to make impossible.
 
 **Would reverse it:** nothing about the guarantee; the 90-day figure moves with storage cost.
 
-**Amended September 28th 2026, as built (OPS-8, OPS-13, OPS-14, OPS-15; OPS-28 records it).** The
+**Amended September 28th 2026, as built.** The
 billing state is the Directory's `dir_billing` table, one row per record somebody pays for, with
 `state` in `active`, `past_due` and `lapsed`, `lapsed_at`, and `told`, the notices already sent in
 this lapse. Only a verified Stripe webhook event writes it, so a record with no row, which is every
@@ -1572,7 +1570,7 @@ never paused and never skipped silently. Metering started with the first run. Di
 data, and a customer's export should not carry the operator's meter; a refusal code at the limit, because
 nothing a caller asked for was refused and 30 §6 already has what an install needs; an install-time refusal
 against the allowance, because the record cannot see the Directory; overage charges, until a payment
-provider exists (research-scheduled-actions §4.8).
+provider exists.
 
 **Would reverse it:** a price per run rather than per record, which would move the allowance from the plan
 to an invoice line; or the owner choosing a different allowance, which changes `ALLOWANCE`
@@ -1584,7 +1582,7 @@ to an invoice line; or the owner choosing a different allowance, which changes `
 ## ADR-070 · The assistant is called Slash, on the owner's word
 
 **Decided.** The assistant is **Slash**. It was called Spark until September 25th 2026, when the
-owner asked for the change ([DIRECTION 31](../loop/DIRECTION.md)):
+owner asked for the change:
 
 > "hey, i want you to rename Spark to Slash. update ALL references please"
 
@@ -1594,7 +1592,6 @@ the spec ([46-SPEC-SLASH](46-SPEC-SLASH.md)), and the types, functions, tests an
 them. What a record already holds under the old name (an event's actor, a suggestion's opener, a
 person's prefs, a key's label, a parked step, a declaration's step) is renamed by a migration that
 runs when the record opens, so nothing is left answering to the old name.
-`loop/research-slash-rename.md` is the map, measured at `5c332af4`.
 
 **What it costs a self-hoster.** An environment that sets `SPARK_ENDPOINT`, `SPARK_MODEL` or
 `SPARK_KEY` has to rename them to `SLASH_ENDPOINT`, `SLASH_MODEL` and `SLASH_KEY` by hand. The host
@@ -1604,8 +1601,8 @@ than fails.
 **Not renamed.** `sparkline`, which is a kind of chart and not the name. The uses of "slash" that
 mean the `/` character: an identifier that means the character takes a `-key` or `Key` suffix, so
 `slash` alone only ever means the assistant. Other companies' products:
-GitHub Spark and Gemini Spark. His words where they are quoted. And history: the loop's reports and
-the earlier sections of DIRECTION record what was true on their day.
+GitHub Spark and Gemini Spark. His words where they are quoted. And history: earlier records
+say what was true on their day.
 
 **Kept from ADR-017, because they were never about the word.** The governance sentence:
 **Slash never decides. It points at what does.** And the first-use rule: always **"BrainDog Slash"**
@@ -1615,7 +1612,7 @@ the same category: chat and agent tools call the commands a person types after `
 
 **Rejected:** keeping the old names as aliases beside the new ones, because an alias is a second
 name somebody has to keep answering to, and nothing outside this repository depends on the old
-ones: the owner's `sam` record is the only record on the Cloud. And a text substitution on its own,
+ones: the owner's own record is the only record on the Cloud. And a text substitution on its own,
 because ADR-017's history shows what one does to a document whose subject is the name: the three
 passages that argue about the name (ADR-017, [11-ASSISTANT](11-ASSISTANT.md) §1 and
 [Q8](17-OPEN-QUESTIONS.md)) were rewritten by hand.

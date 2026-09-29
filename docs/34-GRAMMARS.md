@@ -97,7 +97,7 @@ A field that is **absent**, JSON `null`, the empty string or the empty list is *
 | every negative operator — `not not_in lacks` | **true** |
 | `none:` | `NOT (any: …)` over branches already made two-valued by the rows above |
 
-So `{ field: owner, not: sam }` matches a row with no owner, which is what a person means by it. In SQL a missing
+So `{ field: owner, not: alex }` matches a row with no owner, which is what a person means by it. In SQL a missing
 value has three spellings — `NULL`, `''` and `'[]'` — because a write never stores any of them (§3) but an import or
 an older row may carry one; `empty`/`present` test all three, and the property test's row generator emits all three.
 The compiler emits `(expr IS NULL OR expr <> ?)` for the negatives and a plain comparison for the positives, whose SQL

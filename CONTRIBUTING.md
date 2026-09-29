@@ -6,7 +6,7 @@ rather than reviewed.
 
 **The design is the source of truth.** [`docs/`](docs/) is 54 numbered documents and they decide what
 BrainDog is. Code that disagrees with them is a defect in one of the two, and the change fixes one
-and says which ([`BUILD.md`](BUILD.md)). Do not design in a pull request: if you think a document is
+and says which. Do not design in a pull request: if you think a document is
 wrong, amend the document in the same change and argue it there.
 
 ---
@@ -25,7 +25,7 @@ wrong, amend the document in the same change and argue it there.
 
 ## Building
 
-Toolchain, pinned ([ADR-039](docs/16-DECISIONS.md), [`BUILD.md`](BUILD.md)):
+Toolchain, pinned ([ADR-039](docs/16-DECISIONS.md)):
 
 - **Node 24.13.0.** Not 22, not 25. Node 24 strips TypeScript types, which is why there is no build
   step for most packages and why tests are `node --test` over `.ts` source.
@@ -104,9 +104,8 @@ comment. Nobody building BrainDog reads the predecessor's code; the design docum
 source, and every part is designed on its own merits. The predecessor's *behaviours* were traced into
 [`docs/32-PARITY.md`](docs/32-PARITY.md); its *code* stays where it is.
 
-`tools/gates/clean-room.mjs` enforces it by grepping every tracked text file — `docs/`, `BUILD.md`
-and the list itself excepted — for the identifiers in `tools/gates/clean-room.txt`, whole-word and
-case-insensitive. **It is a tripwire, not a proof.** The proof is the rule. Passing the gate is not
+`tools/gates/clean-room.mjs` enforces it by grepping every text file, `docs/` and the gates
+themselves excepted, for the identifiers in its `TRIPWIRES` list, case-insensitive. **It is a tripwire, not a proof.** The proof is the rule. Passing the gate is not
 evidence you followed it, and an empty list is red, because a tripwire nobody maintains reports "no
 findings" over a repository nobody checked.
 
@@ -166,7 +165,7 @@ dependencies, fewest files, no unrequested abstraction — and every simplificat
 ceiling is named in a `ponytail:` line so it is a decision rather than an oversight.
 
 **There are no `TODO`, `FIXME` or `HACK` markers**, anywhere. Zero in the kernel. If it is deferred,
-it is a `ponytail:` line with a reason, or a row in `loop/BACKLOG.md` with the file and line it was
+it is a `ponytail:` line with a reason, or an issue with the file and line it was
 reproduced at. If it is broken, it is a test.
 
 ---

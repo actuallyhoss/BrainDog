@@ -1,8 +1,8 @@
 /**
  * `clean-room`: a tripwire, not a proof.
  *
- * Nothing in BrainDog is ported from the predecessor at `C:\Tools\legacy`. Nobody building it reads
- * that code; the design documents are the only source, and every part is designed on its own merits.
+ * Nothing in BrainDog is ported from its predecessor, an earlier private tool. Nobody building it
+ * reads that code; the design documents are the only source, and every part is designed on its own merits.
  * Its BEHAVIOURS were traced into `docs/32-PARITY.md`; its CODE stays where it is.
  *
  * This looks for the predecessor's distinctive identifiers. It cannot prove a clean room. The proof
@@ -11,24 +11,33 @@
  * Usage:  node tools/gates/clean-room.mjs [root]
  */
 
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', '.git', 'shots', 'docs', 'loop']);
+
+/**
+ * THE PREDECESSOR'S OWN NAMES ARE NOT PUBLISHED, and a machine that knows them still guards them.
+ * `private-tripwires.local.json` beside this file, which git ignores, is a JSON array of more
+ * tripwires, read when it is there. A file that is there and is not an array of strings is a throw,
+ * never an empty list, because a broken list read as none would pass every name it was written for.
+ */
+function privateTripwires() {
+  const file = fileURLToPath(new URL('./private-tripwires.local.json', import.meta.url));
+  if (!existsSync(file)) return [];
+  const list = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(list) || list.some((t) => typeof t !== 'string' || t === ''))
+    throw new Error(`${file} must hold a JSON array of tripwire strings.`);
+  return list;
+}
 
 /**
  * Identifiers distinctive to the predecessor. Deliberately narrow: a tripwire that fires on
  * ordinary English is a tripwire somebody disables.
  */
-const TRIPWIRES = [
-  'brain.ps1',
-  'BRAIN_TOKEN',
-  'relay',
-  'legacy-tool',
-  'brain_api',
-  'brain-worker',
-  'entities.bake',
-];
+const TRIPWIRES = ['brain.ps1', 'BRAIN_TOKEN', 'brain_api', 'brain-worker', ...privateTripwires()];
 
 async function walk(dir, out = []) {
   for (const e of await readdir(dir, { withFileTypes: true })) {

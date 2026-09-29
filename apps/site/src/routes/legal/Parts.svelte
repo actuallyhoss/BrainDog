@@ -1,7 +1,7 @@
 <!--
   The trust pages' one skeleton: a band of tiles on the ground. /support and /legal draw with it.
 
-  THE LEAD TILE HOLDS THE PAGE'S HEADING, ITS LEDE AND ITS FIRST PART, as every page's opening tile does (SYSTEM §10),
+  THE LEAD TILE HOLDS THE PAGE'S HEADING, ITS LEDE AND ITS FIRST PART, as every page's opening tile does (the design system),
   so the one thing a reader came for is in the first tile and not under a heading on its own. Every part after it is a
   tile of its own, headed by an icon well, the way every tile on the site is headed.
 

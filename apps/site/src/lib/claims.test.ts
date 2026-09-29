@@ -1,7 +1,7 @@
 /**
  * Claims the site makes about the rest of the tree, each held to the file that settles it.
  *
- * WHY THESE AND WHY HERE. `loop/research-site-claims.md` (22 September) found claims like these false
+ * WHY THESE AND WHY HERE. A read of the site on 22 September found claims like these false
  * while `test/content.test.ts` passed 16 of 16: that suite reads the built HTML against the seed,
  * and none of these is a claim about the seed. Each went false because somebody changed a file in
  * another package and nothing on the site side was reading it. So each check below reads the other
@@ -76,8 +76,7 @@ test('every place nav.ts names is a route the site has', () => {
 });
 
 /**
- * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS (`loop/finish/contracts.md` §9, "The site's launch flags
- * mirror the Worker's vars"). There is no sign-up var: production's `BILLING` is both switches, so
+ * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS. There is no sign-up var: production's `BILLING` is both switches, so
  * `LAUNCH.signup` is on exactly when it is set, and `LAUNCH.billing` exactly when it is `live`. The support
  * address is the Worker's `SUPPORT_ADDRESS`, and `/support` shows `SUPPORT_EMAIL`, so the two are one address
  * or both empty. Each is read off the parsed config of production, because that is the environment the site
@@ -89,7 +88,7 @@ test("the launch flags and the support address match production's Worker vars", 
   assert.ok(billing !== undefined, 'no BILLING in the production environment of apps/worker/wrangler.jsonc, so nothing says whether sign-up is open');
   assert.equal(LAUNCH.signup, billing !== '', `production's BILLING is "${billing}", and LAUNCH.signup in src/lib/launch.ts is ${LAUNCH.signup}`);
   assert.equal(LAUNCH.billing, billing === 'live', `production's BILLING is "${billing}", and LAUNCH.billing in src/lib/launch.ts is ${LAUNCH.billing}`);
-  /* Absent reads as empty: the var is added the day the address routes to a person (`contracts.md` §8.4). */
+  /* Absent reads as empty: the var is added the day the address routes to a person. */
   const support = vars['SUPPORT_ADDRESS'] ?? '';
   assert.equal(SUPPORT_EMAIL, support, `production's SUPPORT_ADDRESS is "${support}", and SUPPORT_EMAIL in src/lib/links.ts is "${SUPPORT_EMAIL}"`);
 });
@@ -109,7 +108,7 @@ test('the hosted backup cell does not promise copies while the sealing key is a 
 });
 
 test('the hosted backup cell does not still wait on a sealing key once production has one', () => {
-  /* `loop/research-site-now.md`, section 3. Production's `AGE_RECIPIENT` became a real `age1` key on
+  /* Production's `AGE_RECIPIENT` became a real `age1` key on
      54a16ffb (22 September, 20:12) and the cell went on saying "None yet ... once we set the key"
      for a day, because the check above only speaks while the value is a placeholder and was green
      either way. This is the other half: a real recipient means the cell must not wait on one, and an

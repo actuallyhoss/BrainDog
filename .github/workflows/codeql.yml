@@ -89,7 +89,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           # NO BUILD, AND THAT IS NOT A SHORTCUT. Node 24 strips types and runs `.ts` directly, so
-          # there is no compile step to observe (BUILD.md, toolchain). A build mode that waited for
+          # there is no compile step to observe. A build mode that waited for
           # one would analyse nothing and report green, which is this repository's signature defect.
           build-mode: none
           # `security-and-quality` over the default `security-extended`: the quality queries are

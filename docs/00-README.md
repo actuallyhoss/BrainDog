@@ -4,12 +4,10 @@
 documents in this folder were written before that code, from 2 September 2026, and the code has since overtaken most of
 them. Where a document and the code disagree, the code is the truth.
 
-**The plan lives in the loop, not in this folder.** What BrainDog is for, in its owner's words, is
-[loop/DIRECTION.md](../loop/DIRECTION.md). The milestones are [loop/ROADMAP.md](../loop/ROADMAP.md), the work that
-finishes the product is [loop/FINISH.md](../loop/FINISH.md), and what is true today is
-[loop/STATUS.md](../loop/STATUS.md). [15-ROADMAP](15-ROADMAP.md) is an older, second roadmap, kept as history.
+**This folder is not the plan.** The milestones and what is true today are kept outside it, and
+[15-ROADMAP](15-ROADMAP.md) is an older roadmap, kept as history.
 
-BrainDog is the shell (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)): a typed record, doors in and out,
+BrainDog is the shell (September 22nd 2026): a typed record, doors in and out,
 schedules, pages and a vault, which a person and their agents shape to whatever they run. The code ships the primitives;
 use cases, integrations and metadata (a field, a list, a relation) are added at run time by people or agents, or
 brought by a pack somebody chose to install. Money, renewals, hosting and credentials, which many of these documents
@@ -53,7 +51,7 @@ the code too (`tools/gates/docs-counts.mjs`).
 | 12 | [Security](12-SECURITY.md) | REFERENCE | |
 | 13 | [The visual system](13-UI.md) | REFERENCE | |
 | 14 | [The Kennel and community](14-KENNEL-AND-COMMUNITY.md) | CONTRACT §1, the Kennel as built; HISTORICAL | |
-| 15 | [Roadmap](15-ROADMAP.md) | HISTORICAL | replaced by [loop/ROADMAP.md](../loop/ROADMAP.md) |
+| 15 | [Roadmap](15-ROADMAP.md) | HISTORICAL | replaced by a roadmap kept outside this folder |
 | 16 | [Decisions](16-DECISIONS.md) | REFERENCE | |
 | 17 | [Open questions](17-OPEN-QUESTIONS.md) | HISTORICAL | |
 | 18 | [Build toolkit](18-BUILD-TOOLKIT.md) | HISTORICAL | |
@@ -93,7 +91,7 @@ the code too (`tools/gates/docs-counts.mjs`).
 | 52 | [Spec · testing and CI](52-SPEC-TESTING-AND-CI.md) | HISTORICAL | |
 | 53 | [Spec · operations](53-SPEC-OPERATIONS.md) | REFERENCE | |
 
-A builder reads the CONTRACT sections the brief names, and nothing else here. To learn how a part works, read its code.
+A builder reads the CONTRACT sections a change touches, and nothing else here. To learn how a part works, read its code.
 
 ---
 
@@ -113,7 +111,7 @@ data in its schema, and each of those is a defect in a product that holds many p
 
 ### 2 · The assistant is called Slash, and whether the name collides is still open.
 
-The owner renamed it on September 25th 2026 ([ADR-070](16-DECISIONS.md), [DIRECTION 31](../loop/DIRECTION.md)); its
+The owner renamed it on September 25th 2026 ([ADR-070](16-DECISIONS.md)); its
 specification is [46-SPEC-SLASH](46-SPEC-SLASH.md). The new name has had no register check, which is
 [Q8](17-OPEN-QUESTIONS.md), and that blocks nothing: it is a feature name inside a product, and the register check that
 mattered was done for **BrainDog** itself. **Always "BrainDog Slash" on first use in any public surface**, never "Slash"
@@ -140,11 +138,10 @@ object, every declaration is a readable diffable file, and everything modular in
 follows from it. A script is not a declaration: it is a row the record stores, attached to a door or
 a schedule, and whatever it writes arrives through the same API anything else uses, under its own
 actor. Hosted is a convenience and never required; a Claude routine, a server or a cron that pushes
-in is the same thing to the record. The design is
-[research-shell-scripts.md](../loop/research-shell-scripts.md).
+in is the same thing to the record.
 
 *An earlier revision ended this rule "never a script". The owner answered "both" on September 22nd
-2026 ([DIRECTION §22](../loop/DIRECTION.md)): BrainDog hosts small sandboxed scripts for
+2026: BrainDog hosts small sandboxed scripts for
 convenience, and anything can run outside and push in.*
 
 ---
@@ -155,7 +152,7 @@ convenience, and anything can run outside and push in.*
 |---|---|
 | Real-time co-editing | ~15–20d plus permanent maintenance, and it is where Nimbalyst and AFFiNE already sit. Tier 4, not this year |
 | A double-entry accounting rewrite | 25–40d to reach parity with what Actual Budget and Firefly III give away free |
-| A plugin system that runs user code inside the record | See the rule above. User code never runs inside the record's own object, and that is what makes the platform possible rather than a limit on it. A person's or an agent's script is record content, run in a metered sandbox BrainDog hosts or outside it, pushing in through a door or the API ([research-shell-scripts.md](../loop/research-shell-scripts.md)) |
+| A plugin system that runs user code inside the record | See the rule above. User code never runs inside the record's own object, and that is what makes the platform possible rather than a limit on it. A person's or an agent's script is record content, run in a metered sandbox BrainDog hosts or outside it, pushing in through a door or the API |
 | Paid packs in v1 | Tax, VAT, refunds, chargebacks and moderation are a company, not a feature |
 | A shared vector index | Breaks self-host parity and the isolation proof. See [ADR-006](16-DECISIONS.md) |
 | Event tracking, funnels, sessions on customer data | This is a record, not an analytics product |

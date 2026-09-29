@@ -9,7 +9,7 @@ engine is [11-ASSISTANT](11-ASSISTANT.md).
 
 | Question | Answer |
 |---|---|
-| Where does it live? | **In the palette, in the queues, and on one page of its own.** A second mode of the command palette, offered for a query that matched no place or ends in a question mark; rows in queues that already exist; and `/slash`, which opens with Ask where the host has a model, then what was asked lately, then what Slash noticed and suggests (`loop/finish/agents.md` §5 item 8). What it spent is the Slash section of `/usage`. No panel, no widget, no chat. *(Until September 28th this row said "no page", which `/slash` made false)* |
+| Where does it live? | **In the palette, in the queues, and on one page of its own.** A second mode of the command palette, offered for a query that matched no place or ends in a question mark; rows in queues that already exist; and `/slash`, which opens with Ask where the host has a model, then what was asked lately, then what Slash noticed and suggests. What it spent is the Slash section of `/usage`. No panel, no widget, no chat. *(Until September 28th this row said "no page", which `/slash` made false)* |
 | Does it ship in v1? | **No conversational surface** — [ADR-030](16-DECISIONS.md). The §1b base ships no in-app model call; Phase A ships tier A-minimal plus *one job*, the ingest-pattern proposal; conversation arrives with tier B |
 | What shape is it? | **A proposal row**, identical in kind to the suggestion rows the decision gate already consumes; it carries `model`, `filed` and `read` beside its five fields, and a fifth body, `query`, is the palette's unfiled answer (§4, §10) |
 | What does it emit? | `{{path}}`, block fences, and row addresses. **Never a typed number** |
@@ -174,7 +174,7 @@ for the diff, which is why this is a fourth body and not a fourth screen.
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │ ?  Which November renewals move to the new card before it expires?       SG27   │
-│    ★ Slash · 3 options · 11 rows behind them              2 tasks · bake      │
+│    ★ Slash · 3 options · 11 rows behind them              2 tasks · shop      │
 ├────────────────────────────────────────────────────────────────────────────────┤
 │ ?  A pattern for the three HSBC texts nothing has parsed                SG31   │
 │    ★ Slash · from 3 messages · derived from untrusted content    ⚠  money     │
@@ -273,7 +273,7 @@ Four decisions:
 ```
   Rows to write                                               9 of 12 selected
   ─────────────────────────────────────────────────────────────────────────────
-  ☑  task   Renew clogs.example before {{date:2026-11-30}}       bake
+  ☑  task   Renew clogs.example before {{date:2026-11-30}}       shop
   ☐  task   Email Porkbun support                              no deadline stated
   ☐  task   Consider consolidating registrars                  no row behind this
   ─────────────────────────────────────────────────────────────────────────────
@@ -805,7 +805,7 @@ per-app off switch, a *"may contain errors"* warning, and the worst category dis
   ─────────────────────────────────────────────────────────────────────────────
   ★ codex      S24   task.add        #241  Rotate the Porkbun key      14:02
   ★ claude     S25   suggestion.add  SG31  A pattern for HSBC texts    14:06
-    sam             decide          D44 ← SG27                        14:11
+    sam              decide          D44 ← SG27                        14:11
   ★ slash            suggestion.add  SG32  Three renewals, one card    07:30
   ─────────────────────────────────────────────────────────────────────────────
   [ everyone ]  [ machines ]  [ sam ]  [ slash ]

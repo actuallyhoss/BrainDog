@@ -2,7 +2,7 @@
   An agent proposes, a person decides, and the record keeps who did which. Drawn, not photographed.
 
   THE APP'S `decide` SCREEN IS THE PRODUCT'S MOST DISTINCTIVE IDEA AND THE PAGE NEVER SHOWED IT.
-  `loop/research-site-now.md` (change 2) measured what stood in its place: a five-row table of
+  What stood in its place was a five-row table of
   records with ids in it, `tasks#12` among them, under a paragraph about registers. That proved
   "every change carries a name" to somebody who already reads ledgers. This proves it to everybody
   else in one movement: the agent drafts, the draft lands as a proposal card, a person accepts it,
@@ -42,7 +42,7 @@
   the names written beside them, drawn by the stylesheet from a data attribute and hidden from
   assistive technology, so they are never words in the markup.
 
-  TWO TILES, AS THE NEW APP DRAWS THEM (SYSTEM §6, 29 September): the question on the left, with an icon
+  TWO TILES, AS THE NEW APP DRAWS THEM (the design system): the question on the left, with an icon
   well on its heading, the agent that asks, the proposal and the verb; and the history on the right, the
   landing row arriving in the arrive wash. The figure is not a tile: it lays its two tiles in its own
   grid, so no tile holds another. Its glyphs are drawn inline from `icons.ts`'s set, because the
@@ -299,7 +299,7 @@
     box-shadow: var(--e1);
   }
 
-  /* THE HEADING ROW: an icon well, the title, and a meta line at the end (SYSTEM §6). */
+  /* THE HEADING ROW: an icon well, the title, and a meta line at the end (the design system). */
   .head {
     display: flex;
     align-items: center;
@@ -560,7 +560,7 @@
     background: currentColor;
   }
 
-  /* THE LANDING ROW ARRIVES in the arrive wash, the one fill that says "just now" (SYSTEM §2). Its quiet words step
+  /* THE LANDING ROW ARRIVES in the arrive wash, the one fill that says "just now" (the design system). Its quiet words step
      up to the second ink, which keeps its contrast on the wash. */
   .landing {
     background: var(--arrived-wash);

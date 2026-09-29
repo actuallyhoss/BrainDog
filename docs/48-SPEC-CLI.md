@@ -60,7 +60,7 @@ of four codes (§4.4).
 | `page pull <slug>` | `--out <file>` · `--host <host>` | `GET /api/context`, then `GET /api/arrangement { page }`: READ+, the page's stored declaration as the caller may read it; for a page made from a template, the template's. The answer is read with `storedOf` from `@braindog/dog`, the reader the app's source view shares | writes `dogText` of the stored body to `<page>.dog` (or `--out`), the same bytes the app's source view shows and downloads, and prints `<page> written to <file>.`, or for a template's page `<slug> is one of the pages <template> makes, one for each row, so <template>'s source was written to <file>.`; the value is `{ page, file, version }`, with `template` for a template's page. A refusal is the record's sentence | 0 · 1 · 3 |
 | `page push <file>` | `--host <host>` | reads the file with `parseDog`, then `POST /api/setDeclaration { body }` with the body exactly as read. ADMIN, and the record's `admin()` refuses every token before it reads the arguments (ADR-060), so from this command it answers `Open this from the app; a token cannot change what this record is.` A file the parser refuses is never sent | `<page> pushed to <host>.`; the value is `{ page, host }`. A parse failure prints `<file>, line <n>: <sentence>` | 0 · 1 · 3 |
 | `page check <file>` | none | nothing on the network. Reads the file with `parseDog`, then the kernel's `validateDeclaration` on `page.<page>` with no installed state, so a `requires` naming a list nobody installed is not asked about | `<page> reads as a page. Nothing was sent.`; the value is `{ page, blocks }`. A parse failure prints `<file>, line <n>: <sentence>`; a declaration the kernel refuses prints the kernel's sentence | 0 · 1 |
-| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers of `loop/research-agent-path.md` §3.4, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
+| `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
 | `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
@@ -87,8 +87,8 @@ of four codes (§4.4).
 Thirty commands plus `--version`, counted: the seventeen of the first design, then `mcp`, `serve`, `hook`
 (its two events in one row), `install`, `keys put` and `keys exec`, `skills sync`, `tools scan` and `tools write`,
 and the agent path's `logout`, `run`, `session` (its five verbs in one row) and `context`. `automations` and `scripts`
-came after the count, for DIRECTION 22, and have their five rows above.
-`setup` and `keys headers` came after it too, for the agent layer's finish (`loop/finish/agents.md` C9), and have
+came after the count, for the automations canvas, and have their five rows above.
+`setup` and `keys headers` came after it too, for the agent layer's finish, and have
 their rows above.
 `--json` **is built.** Exactly one JSON document on stdout, every progress line moved to stderr, and the flag is
 taken out of the arguments before dispatch so no command's own `parseArgs` has to know a global exists
@@ -106,7 +106,7 @@ offers `braindog-cli`. A checkout still runs `node apps/cli/src/main.ts`, which 
 Code's entry when it runs from one. `init` and `serve` are the self-host's, which has no `bin` of its own and tells
 people to type them, so this command claims the name and spawns the self-host for both.
 
-A new machine needs two lines, the install and then `setup` (`loop/finish/contracts.md` X55):
+A new machine needs two lines, the install and then `setup`:
 
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux; on Windows: irm https://brain.dog/cli/install.ps1 | iex
@@ -115,8 +115,7 @@ braindog setup https://brain.dog/app/<slug>
 
 `login` and `install` stay commands of their own, and `setup` runs both (§5.15).
 
-**`automations` and `scripts` are the automations canvas from a terminal** (`loop/DIRECTION.md` §22,
-`apps/cli/src/automations.ts`), over five record methods: the four the canvas and the MCP tools already call,
+**`automations` and `scripts` are the automations canvas from a terminal** (`apps/cli/src/automations.ts`), over five record methods: the four the canvas and the MCP tools already call,
 `automations`, `automationRun`, `cancelRun` and `resumeScript`, and the `scripts` read. Reading is open to any token the record lets read the lists
 involved; starting, stopping and resuming are ADMIN, and a token is refused at that door by the record, not by this
 command, so a person is told where the button is. **`scripts list` was refused here until the record could answer it**:
@@ -135,12 +134,12 @@ claude mcp add-json braindog '{"type":"stdio","command":"node","args":["<checkou
 
 `install` puts two entries in Claude Code's user settings. Each runs a shim in `apps/cli/hooks/`,
 `braindog-hook.ps1` on Windows and `braindog-hook.sh` elsewhere, which passes the event on stdin to
-`braindog hook start` or `braindog hook end` and exits 0 whatever happens. From a checkout at `C:\Repos\braindog`
+`braindog hook start` or `braindog hook end` and exits 0 whatever happens. From a checkout at `C:\src\braindog`
 the entries are:
 
 ```
-+ hooks.SessionStart: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Repos\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" start","timeout":20}]}
-+ hooks.SessionEnd: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Repos\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" end","timeout":15}]}
++ hooks.SessionStart: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\src\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" start","timeout":20}]}
++ hooks.SessionEnd: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\src\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" end","timeout":15}]}
 ```
 
 - **Start.** It attaches to the run, writes the session file, and prints the briefing, which Claude Code adds
@@ -608,7 +607,7 @@ print `token <id> · <name> · <scope> · expires <date>`, a blank line, the tok
 
 ### 5.13 · `runner enrol` · `runner repos` · `runner run` · `runner allow` (`runner.ts`)
 
-*(Rewritten on 27 September 2026 for `loop/finish/agents.md` C14, against `apps/cli/src/runner.ts`, and departing
+*(Rewritten on 27 September 2026 against `apps/cli/src/runner.ts`, and departing
 from the first design on purpose.)* The first design ran every job in an empty `mkdtemp` folder, allowed only
 `mcp__braindog__*` tools and checked the kind against four fixed prompts. A job that reads a repository needs the
 folder it lives in and `Read`, `Grep` and `Glob`, so what a run may do is now a `job.<id>` declaration: approved once
@@ -628,7 +627,7 @@ mode 0600, written atomically). A name has the shape the kernel's lint gives a k
 **Claude Code on the machine.** `claude --version` must parse to at least `2.1.248` (26 §5, `CLAUDE_LEAST`) at
 `enrol`, at the start of `run` and after every job; missing, silent about its version, or older is one sentence,
 and nothing is claimed. `claude --help` is read at the same moments, for the two flags of the first design that
-were never confirmed against an installed Claude Code (`loop/finish/agents.md` risk 9). On Windows a `claude.cmd`
+were never confirmed against an installed Claude Code. On Windows a `claude.cmd`
 is found through PATH and PATHEXT and started through `cmd.exe`, as `keys exec` starts one (`planCommand`).
 
 `run [--once] [--host <host>]`, one job at a time:
@@ -713,7 +712,7 @@ are [49-SPEC-SELFHOST](49-SPEC-SELFHOST.md)'s to implement (§13 D5).
 
 ### 5.15 · `setup <host>` (`setup.ts`)
 
-The one line a new machine needs (`loop/finish/agents.md` C9). Each step is a command of its own, and `setup` only
+The one line a new machine needs. Each step is a command of its own, and `setup` only
 runs them in order, stopping at the first that fails with that step's sentence:
 
 1. **Sign in.** A live login is the one `target` would send for the host: the hosts file's, unexpired, or
@@ -722,7 +721,7 @@ runs them in order, stopping at the first that fails with that step's sentence:
    `login <host>` runs as §5.3 says, with its six digits on stderr.
 2. **Hooks.** `install` is planned dry over the user profile (`CLAUDE_CONFIG_DIR`, else `~/.claude`). When it would
    add a hook, `install --apply` writes both, keeping the copy `settings.json.bak` first, and places the Agent Skill,
-   `skills/braindog/SKILL.md`, as it always does (OPS-26). Today the step asks only whether a hook is missing, so a
+   `skills/braindog/SKILL.md`, as it always does. Today the step asks only whether a hook is missing, so a
    profile that has both hooks and no skill is left without one until `braindog install --apply` is run by hand. A
    settings file `install` cannot read stops the run with its sentence, and nothing is written.
 3. **MCP server.** The profile's servers file (`~/.claude.json` for the default profile, `<profile>/.claude.json` for
@@ -742,7 +741,7 @@ already held; without one it says steps 4 and 5 were not read.
 
 ### 5.16 · `keys headers` and a tool's `headersHelper` (`keys.ts`, `tools.ts`)
 
-The one command that prints a key (`loop/finish/agents.md` C9, owner item 3). Claude Code runs an HTTP MCP server's
+The one command that prints a key. Claude Code runs an HTTP MCP server's
 `headersHelper` when it connects and reads the server's headers, as a JSON object, from that command's standard
 output and nowhere else, so a key an HTTP tool needs in a header reaches it no other way. `tools write` renders an
 HTTP tool whose `needs` hold `header:<Header>=credentials#N` as
@@ -1099,7 +1098,7 @@ address is the check").
 - [ ] every pack refusal fixture renders as its sentence (T18); `pack install` shows the diff, asks, applies with the `plan_hash`, and survives one `PLAN_STALE` (T19)
 - [ ] the runner refuses an unknown kind, a prose argument, a foreign tool and an old `claude`; distils the fixture to nine events; honours cancel; reports `interrupted` on 143 (T20, T21)
 - [ ] every `ponytail:` line of §10 appears as a comment at the place it describes
-- [ ] the fourteen amendments of §13 are applied to their documents in this revision, and BUILD.md logs the iteration
+- [ ] the fourteen amendments of §13 are applied to their documents in this revision
 - [ ] `braindog-cli@0.0.1` published by hand; trusted publishing wired for the next
 
 ---

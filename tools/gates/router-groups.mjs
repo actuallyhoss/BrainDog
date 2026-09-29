@@ -105,8 +105,8 @@ export default function routerGroups(
 
   /* ── the route table, as data. The handlers are never called. ─────────────── */
 
-  /* TWO HALVES SINCE ARC-6: `index.ts`'s own rows, and one file of rows per unit under `routes/`, which `index.ts`
-     concatenates after its own (`loop/finish/contracts.md` §0 point 5). A tree with no `routes/` folder has no rows
+  /* TWO HALVES: `index.ts`'s own rows, and one file of rows per area under `routes/`, which `index.ts`
+     concatenates after its own. A tree with no `routes/` folder has no rows
      there, and that is not a finding: `index.ts` is the file that must be there, and `read` still throws without it. */
   const host = read('packages/host/src/index.ts');
   const routesDir = join(root, 'packages', 'host', 'src', 'routes');

@@ -1,10 +1,10 @@
 <!--
   The drawn app in the hero: an example record for each of five kinds of person, drawn as the new app draws a record
-  (SYSTEM §5) by the product's own renderer.
+  by the product's own renderer.
 
   WHAT IT IS. On 22 September the owner asked for the screenshots to go and for the records in this window to open
-  different pages, and on 26 September kept it while the bands under it were rebuilt (`loop/DIRECTION.md` §33). On 29
-  September the app's look changed (§34), and the drawing changed with it: the ground and its light, the floating glass
+  different pages, and on 26 September kept it while the bands under it were rebuilt. On 29 September the app's look
+  changed, and the drawing changed with it: the ground and its light, the floating glass
   rail with its icon wells and Working now, the title row with its sentence and its toolbar, and the page's blocks as
   tiles with their charts. Every page is dialect text in `lib/examples/`, drawn by `Page.svelte` through
   `braindog-render/svelte`, so what a reader sees is what a record with those rows draws, and the Source switch in the
@@ -377,7 +377,7 @@
     display: none;
   }
 
-  /* The toolbar's Page and Source switch: glass, the chosen half a tile-white pill (SYSTEM §5). */
+  /* The toolbar's Page and Source switch: glass, the chosen half a tile-white pill (the design system). */
   .switch {
     display: inline-flex;
     gap: 2px;

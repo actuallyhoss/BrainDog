@@ -194,8 +194,8 @@ export default function graph(
    * mean the one package whose boundary has a legal consequence is the one the order cannot find.
    *
    * AND `packs/*`, THE THIRD LINE OF THAT FILE, which this list did not read for the day the four
-   * packs arrived (audit sixty-one, finding 9). So nothing could see the core come to import a pack,
-   * which is the core knowing a use case by name, `loop/DIRECTION.md` section 22's one refusal. A PACK
+   * packs arrived. So nothing could see the core come to import a pack, which is the core knowing a
+   * use case by name, the one thing the core refuses to do. A PACK
    * IS NAMED BY ITS MANIFEST, NOT ITS DIRECTORY: it has no row in `31 §2` for the directory to match,
    * and `packs/mercury` is `@braindog/pack-mercury`, so the name an import spells is the only one an
    * edge can be resolved by.
@@ -543,7 +543,7 @@ export default function graph(
    *
    * Measured the first time this gate read `packs/`, on 24 September: one finding in the whole tree,
    * `apps/web` declaring and importing `@braindog/pack-rates-poll`, and it was being written that
-   * morning. It is the move `272e5681` announced (M3 B7): the rates form had built its poll with
+   * morning. It is the move `272e5681` announced: the rates form had built its poll with
    * `ratesPollPack`, a function in `packages/seed`, which is the shell carrying a use case as code,
    * and it now reads the pack's own file as data and fills it with the pack's `fillRates`. That is
    * nearer the rule than what it replaced and still not the rule, because the web knows one pack by
@@ -553,7 +553,7 @@ export default function graph(
    * nothing is the hole the next edge walks through. Only while both ends are in the tree, so a seeded
    * fixture without them has nothing to say about it.
    */
-  /* EMPTY SINCE USE-5, which made the rates form a preset of the new-action sheet, so `apps/web` names no pack. */
+  /* EMPTY SINCE the rates form was made a preset of the new-action sheet, so `apps/web` names no pack. */
   const PACK_EDGES_HELD = {};
   const held = new Set();
 
@@ -578,7 +578,7 @@ export default function graph(
       add(e.where, 'edge into an app', `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. ${kind}`);
     }
 
-    /* THE CORE NEVER DEPENDS ON A PACK. `loop/DIRECTION.md` section 22: the code ships primitives and
+    /* THE CORE NEVER DEPENDS ON A PACK. The code ships primitives and
        never a use case, and a use case lives in a record or a shared pack. An edge from a package or an
        app into `packs/` is a use case the core cannot run without, which makes uninstalling it a
        release. A pack on a pack is left to the cycle check: that is one use case built on another,
@@ -588,7 +588,7 @@ export default function graph(
       add(
         e.where,
         'edge into a pack',
-        `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. The core ships primitives and never a use case (DIRECTION section 22), so a pack reaches the core as a file it installs, never as an import.`,
+        `${name(e.from)} → ${name(e.to)}, ${evidence(e)}. The core ships primitives and never a use case, so a pack reaches the core as a file it installs, never as an import.`,
       );
 
     /* AND A PACK HAS NO RANK TO CHECK. It sits above the whole order, as a record's own content does,
@@ -648,8 +648,8 @@ export default function graph(
    * gate that had nothing to read.
    *
    * AND THE SKIP NAMES THE ROOT IT LOOKED UNDER. It said only "no packages/*, apps/* or packs/* to
-   * read", so a mistyped `BRAINDOG_GATE_ROOT` was a skip with nothing in it pointing at the mistake
-   * (audit sixty-six, finding 11); `em-dash` and `secret-grep` name theirs, and `self-test`'s
+   * read", so a mistyped `BRAINDOG_GATE_ROOT` was a skip with nothing in it pointing at the mistake;
+   * `em-dash` and `secret-grep` name theirs, and `self-test`'s
    * `graph-empty` holds all three to it.
    */
   if (ws.length === 0) {

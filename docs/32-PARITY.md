@@ -1,13 +1,13 @@
 # 32 · Parity with the brain
 
-> *"Trace the current features that exist within the sam brain, especially the ones implemented
+> *"Trace the current features that exist within the brain, especially the ones implemented
 > recently. I need to make sure that ALL of these features are obtainable within BrainDog."*
 
 The brain is the working predecessor: a Cloudflare Worker of 7,780 lines, 32 migrations, 85 route
 shapes, a 22-tool MCP server with a refusal list, a 752-line agent contract with eleven reference
 files, ~50 Svelte screens, 27 browser harnesses, and 120 commits of recorded reasoning. Every one of
 its features was traced to its mechanism — the route, the table, the derivation, the test — and
-mapped onto BrainDog. **Traced on 2026-09-02 from `C:\Tools\legacy` at `14fe0d7`**, including the
+mapped onto BrainDog. **Traced on 2026-09-02 from the brain's repository at `14fe0d7`**, including the
 vault and job runner that landed on 2026-09-01 and are not yet in the brain's own skill — and **re-checked
 against `2451e4f`**, the five commits that followed the same day (§2.4), and **re-traced on
 2026-09-08 against `4521455`**, the five after that (§2.5). The second re-trace is the first to find
@@ -25,7 +25,7 @@ BrainDog mechanism produces it. **Where none did, this document adds the mechani
 | Brain features traced | **~190** | routes, tools, screens, derivations, rules, harnesses |
 | Already obtainable in BrainDog as designed | ~105 | a register, a page, a rule, a metric, or a kernel table already covers it |
 | Obtainable **after additions made in this pass** | ~60 | fourteen data-model additions, nine kernel tables added across the trace and this review — `member`, `device_grant`, `person`, `token`, `auth_fail`, `counter`, `vault_key`, `job`, `job_event` — one kernel register, a dialect extension. *(An earlier draft said "two kernel tables" and named neither.)* |
-| Stays **native code** | ~18 | crypto, the runner and the auth kinds are primitives and stay in the core. Bank SMS parsing, Mercury and Stripe sync and a merchant logo proxy are use cases: they become scripts or shared packs a person installs, never code in `packages/` ([DIRECTION §22](../loop/DIRECTION.md); §6 below) |
+| Stays **native code** | ~18 | crypto, the runner and the auth kinds are primitives and stay in the core. Bank SMS parsing, Mercury and Stripe sync and a merchant logo proxy are use cases: they become scripts or shared packs a person installs, never code in `packages/` (§6 below) |
 | **Not carried, deliberately** | 7 | §7 — each with the reason |
 
 > **The shape of the gaps was the finding.** They were not scattered. Nearly every one was a case
@@ -125,7 +125,7 @@ fields:
 of seven does not contain — and left `active → abandoned` out of the transitions, so the sweep's own
 write would have been refused at step 5.)*
 
-*(Amended September 11th 2026 for the agent path, `loop/research-agent-path.md` §3.2. New: the name
+*(Amended September 11th 2026 for the agent path. New: the name
 and the word `run`; `agent`, which is the face on screen; `project`, `remote`, `cwd`, `branch` and
 `head`; an idle run may hand off; and a done or abandoned run is re-attached rather than replaced.
 What that plan called `title` is `doing`, because `title` is a reserved field id and a register
@@ -395,7 +395,7 @@ Six first-party packs in all: `agents · work · portfolio · money-core · esta
 brain features; `people` is the counterparty register the money packs refer to, and it is listed so
 the count is stated once and does not drift.
 
-> **What these six are (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** The core
+> **What these six are (September 22nd 2026).** The core
 > ships as packs, and these six are examples in a shared catalogue, not a set the product is defined
 > by. Money, estate and portfolio are one person's use cases, and a use case not everyone needs is
 > not shipped with the code: a person installs one of these, or builds the same lists at run time
@@ -423,7 +423,7 @@ nothing. Onboarding installs a missing one through `planPack` and `installPack`.
 [24-SELF-IMPROVEMENT](24-SELF-IMPROVEMENT.md) designed an *automatic* loop and found the sensing
 half missing. **The brain has been running the *manual* half for a month**: a session records what
 a future session would otherwise get wrong, as a row with an id, with the failure that produced it
-as a mandatory field. **Capturing one needs nobody** (`loop/DIRECTION.md`): a learning lands
+as a mandatory field. **Capturing one needs nobody**: a learning lands
 `active` at the session's project, or everywhere when the session has none. What a human decides is
 the widening: making a project's learning hold everywhere is a proposal, and so is bringing back a
 learning that was superseded or reverted. That is the decision gate applied to instructions, at the
@@ -466,7 +466,7 @@ session does · generalises · a session without it would get it WRONG, not mere
 other home* — is the MCP resource's description, because it is the thing agents most often get
 wrong. **Calibration: most sessions record nothing, and that is the correct number.**
 
-**The other three registers**, declared field by field in `loop/research-agent-path.md` §5.2 and
+**The other three registers**, declared field by field and
 shipped in `packages/seed/src/packs/agents.ts`:
 
 | Register | What a row is | What it refuses |
@@ -510,7 +510,7 @@ rule: a `ref` to a row that itself has a parent is rewritten at write, not refus
 [04-PACKS](04-PACKS.md) §6 allows a native tier where craft beats configuration. These are the
 brain's features that land there, each with the reason it is not a declaration.
 
-> **Corrected September 22nd 2026 ([DIRECTION §22](../loop/DIRECTION.md)).** Vault crypto, passkeys,
+> **Corrected September 22nd 2026.** Vault crypto, passkeys,
 > the doors, the runner and screenshot mode are primitives and stay native. The SMS parser's bank
 > formats, Company sync (Mercury, Stripe) and the logo proxy are use cases: each becomes a script or
 > a shared pack a person installs, never code in `packages/`. Their rows are kept for what they
@@ -554,7 +554,7 @@ them**, and the design already has the mechanism — [29-EMERGENT-PAGES](29-EMER
 | Registers | none. **Zero.** The first row in a register proposes its page |
 | Packs | none installed. Pack selection is the *second* screen, optional forever |
 | Sessions | the register exists in the kernel and has **no page and no nav entry until an agent connects** |
-| The `agents` pack | **is proposed when the first agent token is minted**, and installs when the person accepts. Learnings, skills and keys are one way of using agents, and an install nobody accepted contradicts "the person accepts" ([DIRECTION](../loop/DIRECTION.md) §11, §5c, §22). *(An earlier revision had it install itself.)* |
+| The `agents` pack | **is proposed when the first agent token is minted**, and installs when the person accepts. Learnings, skills and keys are one way of using agents, and an install nobody accepted contradicts "the person accepts". *(An earlier revision had it install itself.)* |
 | Money, estate, portfolio | each one screen when its pack is installed, and its emergent pages after that |
 | Themes | one. The picker appears at the second theme |
 | Slash | absent without a model; present as a palette row with one line otherwise |

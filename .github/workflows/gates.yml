@@ -15,7 +15,7 @@ name: gates
 # THE CHOICE, MADE EXPLICITLY: every gate on a weekly schedule, on demand, and on a pull request
 # only when it carries the `full-gates` label; and `layout` and `a11y` alone on a push to master
 # that touches what those two read. This workflow ran on every merge to master until 16 September
-# 2026, and on none from then until OPS-1.
+# 2026, and on none from then until the CI split.
 #
 #   - NOT EVERY PULL REQUEST. Nineteen minutes on every push to every branch is a queue, and a
 #     queue is where `continue-on-error` gets added. The measurable cost of not doing it is that a
@@ -25,12 +25,12 @@ name: gates
 #   - NOT EVERY GATE ON EVERY MERGE TO MASTER, AND THIS IS A BUDGET DECISION RATHER THAN A DESIGN
 #     ONE. The argument for it stands and is worth keeping: master is the tree everything else is
 #     measured against, and a green master is the claim this workflow exists to keep true. What
-#     broke it was the loop pushing several times a day. Each push cancelled the run the previous
+#     broke it was pushing several times a day. Each push cancelled the run the previous
 #     push had started, so on 16 September nine runs began and five were cancelled partway, which
 #     spends most of eighteen to thirty minutes each time and proves nothing at all. The owner
 #     said the Actions minutes were running short, and a check that is killed before it finishes
 #     is the worst thing to spend them on.
-#   - BUT `layout` AND `a11y` ON A PUSH TO MASTER THAT TOUCHES WHAT THEY READ (W60-10). Without it
+#   - BUT `layout` AND `a11y` ON A PUSH TO MASTER THAT TOUCHES WHAT THEY READ. Without it
 #     a layout or contrast regression on master was found by the Monday run, by somebody
 #     dispatching this by hand, or not until it was in front of a person. Every other gate already
 #     runs on that push, in `ci.yml` or, for `deploy-parity`, in `deploy.yml`, so these two are the
@@ -151,7 +151,7 @@ jobs:
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
       # ON A HOSTED IMAGE ONLY. `~/.cache/ms-playwright` is where Playwright keeps browsers on Linux;
-      # on Windows it is %LOCALAPPDATA%\ms-playwright, so on studio-pc this step never once hit (the
+      # on Windows it is %LOCALAPPDATA%\ms-playwright, so on the self-hosted runner this step never once hit (the
       # 21 September run logged `Cache not found for input keys: ms-playwright-Windows-1.62.1`).
       # Pointing it at the Windows path would be no better: the self-hosted runner is a PC whose
       # browser is already installed and persists between runs, and the install below found it in
@@ -181,7 +181,7 @@ jobs:
       # seeded record and over its variant records (`tools/gates/record.mjs`: the Cloud's half of
       # every host branch, a record with machines and keys connected, and one with enough decisions
       # to overflow a search group), and `apps/site/build`, which is the first page a stranger sees.
-      # The variants were three more Vite builds until wave C2 of `loop/research-no-sample.md`; they
+      # The variants were three more Vite builds until they became records; they
       # differed only in the sample's constants, which no live screen reads, so they drew the same
       # screens as the main build and the branches they were for went unmeasured.
       #

@@ -7,8 +7,7 @@ The strategic frame is settled and not re-litigated here: **real-time co-editing
 and is not built this year.** Competitors collaborate on *code* artefacts — sessions, diffs,
 plans, bugs. None of them is a typed record with doors in and out, schedules, pages and a vault
 that a team and its agents shape to whatever the business runs; a money ledger, a domain register
-and a credential index are examples of what a team builds on it, not the pitch
-([DIRECTION §22](../loop/DIRECTION.md)). The differentiated thing is that shared typed
+and a credential index are examples of what a team builds on it, not the pitch. The differentiated thing is that shared typed
 **business** record, and the differentiated *feature* is the shared **decision**.
 
 ---
@@ -241,7 +240,7 @@ land, the design is wrong.**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ SG23  Which competitive mode does acme.example build?          proposed by      │
+│ SG23  Which competitive mode does the game ship?          proposed by      │
 │                                                            claude · 6d ago │
 ├──────────────────────┬──────────────────────┬──────────────────────────────┤
 │ The Same Oven        │ Nailed It            │ Relay chain                  │

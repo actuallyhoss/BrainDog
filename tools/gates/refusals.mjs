@@ -320,7 +320,7 @@ export default function refusals(
    * "has its own closed vocabulary (`TOO_MANY_PARAMS` and twelve more, §13); it is a separate list because it names
    * what the driver refused, not what the format refused". `37 §6` adds that the kernel never shows a `SqlError` to a
    * person, and a host answers one as a 500 `INTERNAL` whose `code` is not the `SqlError`'s. When `@braindog/ports`
-   * gained `src/sql.ts` (W60-3, 24 September 2026), `new SqlError('TOO_MANY_PARAMS', ...)` matched the constructor arm
+   * gained `src/sql.ts` (24 September 2026), `new SqlError('TOO_MANY_PARAMS', ...)` matched the constructor arm
    * above and eight adapter codes read as eight invented refusals, twelve against a budget of four. Registering them
    * in `30 §6` would have put `SYNTAX` and `UNKNOWN` in the agent contract as things a caller can fix.
    *

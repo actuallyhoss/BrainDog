@@ -1,7 +1,7 @@
 /**
  * The plans the site prices, held to the code that sells them and the code that meters them.
  *
- * WHY THIS TEST (`loop/finish/contracts.md` C8). `plans.ts` is where the owner changes a price or an
+ * WHY THIS TEST. `plans.ts` is where the owner changes a price or an
  * allowance, and three other files act on the same figures: the checkout sells `HOSTED_PLANS` in
  * `apps/worker/src/billing.ts`, the Directory holds a record to `ALLOWANCE` in
  * `packages/record/src/directory.ts`, and Slash starts a record at `ASK_CAP_DEFAULT` in

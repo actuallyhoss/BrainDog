@@ -1,6 +1,6 @@
 /**
  * `makePreview`: an add-on's pages as a record draws them, made for the catalogue to show before anybody installs it
- * (`loop/finish/platform.md` §4.0 C, the `Preview` in `packages/declare/src/catalogue.ts`).
+ * (the `Preview` in `packages/declare/src/catalogue.ts`).
  *
  * THE RECORD'S OWN ANSWER, NOT A PICTURE OF ONE. The pack is installed the way each pack's own test installs it
  * (`packs/pad/pad.test.ts`): a record in memory, `planPack`, then `installPack` with exactly what the plan asked to be

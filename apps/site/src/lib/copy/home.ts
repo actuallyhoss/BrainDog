@@ -7,7 +7,7 @@
 export const home = {
   hero: {
     /* THE SLOGAN, in two halves for the history of the thing, drawn as one sentence in one colour since 29 September:
-       red is the mark's alone (SYSTEM §10). The words are the owner's and unchanged, with no full stop. */
+       red is the mark's alone (the design system). The words are the owner's and unchanged, with no full stop. */
     title: 'Give your business',
     titleAccent: 'a memory',
     sub: 'Everything you keep track of, in one place arranged around you. You and your AI agents keep it up to date, and every change says who made it.',
@@ -52,7 +52,7 @@ export const home = {
   },
 
   /**
-   * THE HOME PAGE UNDER THE HERO (`loop/DIRECTION.md` §33). Each band shows one thing the product does,
+   * THE HOME PAGE UNDER THE HERO. Each band shows one thing the product does,
    * drawn working, with a heading that says what the reader gets and one sentence under it.
    */
   home: {

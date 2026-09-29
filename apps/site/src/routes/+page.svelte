@@ -2,8 +2,8 @@
   /**
    * brain.dog's home page.
    *
-   * THE PRODUCT DOING ONE THING PER BAND, DRAWN WORKING (`loop/DIRECTION.md` §33), in the look of 29 September (§34,
-   * `loop/design/SYSTEM.md` §10): every band is Bento tiles on the ground, a tile of words beside the tiles that draw
+   * THE PRODUCT DOING ONE THING PER BAND, DRAWN WORKING, in the look of 29 September (the design
+   * system): every band is Bento tiles on the ground, a tile of words beside the tiles that draw
    * the product, and every chart with its one written line.
    *
    *   hero     the promise, one action and the price, and the drawn app (`lib/app/Window.svelte`) under them.
@@ -14,7 +14,7 @@
    *   yours    why the record stays the reader's, and the plans, side by side.
    *   close    one line and the button.
    *
-   * THE SITE DESCRIBES THE FINISHED PRODUCT (§33) and is deployed with it, so nothing here says what is not open yet.
+   * THE SITE DESCRIBES THE FINISHED PRODUCT and is deployed with it, so nothing here says what is not open yet.
    *
    * EVERY WORD IS IN `lib/copy/home.ts`, read here directly, except the page's title and description
    * (`copy/shell.ts`) and the palette's demo, which `/slash` draws too (`copy/pricing.ts`).

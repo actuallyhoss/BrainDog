@@ -1,7 +1,7 @@
 /**
  * The New project example: somebody three weeks into starting something, with no template for it.
  *
- * ITS HOME IS THE PAGE `loop/DIRECTION.md` §28 SETS AS THE BAR, in its order: a sentence about where
+ * ITS HOME IS THE PAGE THE PRODUCT SETS AS THE BAR, in its order: a sentence about where
  * things stand, the areas as cards with their progress, a decision with its options shown, the path
  * of steps, a note with a second opinion under it, and the budget drawn as a range. Nothing on it
  * names the model that drafted it.

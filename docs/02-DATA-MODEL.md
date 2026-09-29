@@ -27,7 +27,7 @@ migration     -- applied kernel migrations: version, applied_at, checksum
 -- port. The record keeps what a .brain must resolve offline and what is scoped to one record.
 person        -- id ('p_' + ULID, minted by the Directory), email, name, suspended_at. Mirror; actors and members resolve here
               -- CORE, not a pack: "who are you" is answered here at sign-in, independent of whether
-              -- the `people` pack is installed or enabled, per `loop/research-modular.md` §2.3
+              -- the `people` pack is installed or enabled
 token         -- agent tokens, one record each: id, person_id, hash, scope CHECK (read|propose|write), label, created_at,
               -- last_used_at, last_surface, expires_at, revoked_at
 auth_fail     -- per-record lockouts (device codes, share tokens): key, n, until. Never exported
@@ -311,7 +311,7 @@ Three rules, all enforced at the validator rather than by convention:
 nothing could look a row up by.)* A converted total renders as `~$41,420 at 48.9 EGP/USD, 26 Aug 2026` — the
 approximation sign and the date are part of the value, not decoration.
 
-*(September 22nd 2026, DIRECTION §22: the kernel owns the money type and the rule that two
+*(September 22nd 2026: the kernel owns the money type and the rule that two
 currencies are never added, because those are primitives. Which register holds rates, and which
 setting names a home currency, belong to whoever installed that use case, and should be passed in
 rather than named by the kernel. Measured on that date, `packages/kernel/src/fx.ts:242` still
@@ -451,7 +451,7 @@ parses to these shapes and nothing else, and the `where:` compiler compares agai
 *(Amended September 15th 2026: a pack's settings, its manifest's `config:` ([04-PACKS](04-PACKS.md) §2), take these
 types, `text`, `enum`, `bool`, `money`, `day`, `duration` and `number` (a decimal), and are coerced to the same shapes by the same
 step. A `ref`, a `secret`, a `file` and every other type are refused `CONFIG_TYPE_UNSUPPORTED`. The chosen values are
-stored on the `pack` row's manifest, not in `entry`. Amended September 27th 2026 (PLT-7): one more, `list`, lines of
+stored on the `pack` row's manifest, not in `entry`. Amended September 27th 2026: one more, `list`, lines of
 text, at most 20 (a `max` narrows this), each coerced as a text setting's own line is.)*
 
 **A text never holds a key.** A `text` or `document` value, or a `list<text>` element, that looks like
@@ -640,16 +640,15 @@ Three field options the review found used and never defined, and one that was de
 
 ### `scopes:` and `scope:`, where a row applies
 
-A row applies everywhere, or in one project. There are two scopes and no third (the owner's words are in
-`loop/DIRECTION.md` §0). A project is a row of the one register that declares `scopes:`, which in the
+A row applies everywhere, or in one project. There are two scopes and no third, as the owner set it. A project is a row of the one register that declares `scopes:`, which in the
 shipped packs is `things`, labelled Projects.
 
 ```yaml
 register: things
 scopes: { repos: repos, folders: folders }   # the fields listing where each project lives
 fields:
-  - { id: repos,   type: list, of: { type: text } }   # github.com/sam/braindog, or a bare name: braindog
-  - { id: folders, type: list, of: { type: text } }   # C:\Repos\braindog
+  - { id: repos,   type: list, of: { type: text } }   # github.com/acme/shop, or a bare name: shop
+  - { id: folders, type: list, of: { type: text } }   # C:\Repos\shop
 
 register: skills
 fields:
@@ -682,8 +681,7 @@ move it by sending other hints. **Scope is not access**: scope says where a row 
 
 *(Amended September 15th 2026 for modularity: the register declaring `scopes:` is load-bearing rather
 than an ordinary module, because every other pack's `scope: {}` field is a `ref` into it. Disabling or
-uninstalling it while such a field still points at it is refused, naming what would orphan. See
-`loop/research-modular.md` §1.5.)*
+uninstalling it while such a field still points at it is refused, naming what would orphan.)*
 
 ### The caps, and where they come from
 
@@ -946,7 +944,7 @@ schema is worse than an outage. The procedure is [33-CONTRACTS](33-CONTRACTS.md)
 `applyMigrations` stays INTERNAL for the self-host path.
 
 **Declaration changes** are anyone's who goes through the proposal path, not only a pack's
-(corrected September 22nd 2026 under DIRECTION §22). A person in the register editor, or an agent
+(corrected September 22nd 2026). A person in the register editor, or an agent
 with a `change` proposal the person accepts, adds a field, a list or a relation to a live record
 at run time; a pack is one way to bring several at once. The core ships a thing with an identity
 and a history, and the metadata on it is added. Whoever makes the change, it never runs DDL **on a table** — no `CREATE TABLE`, no

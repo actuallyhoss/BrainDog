@@ -323,8 +323,8 @@ Instrumented **before** the first public commit, not after.
 | **1** | ~~500 npm downloads, week ending 2026-11-30~~ → **replaced. See below** | — | **the original gate cannot distinguish success from failure in either direction** |
 | **2** | 10 subscribers still paying at day 30 | **2027-02-28** | the price. A one-time sale is a purchase; a subscription is only real if it survives a month |
 | **3** | monthly churn under **5%** | ongoing | **the number that decides it.** Above it, MRR cannot compound |
-| **4** | ≥3 non-Sam records: >20 rows, >3 distinct days, present at day 14 | 3 months post-launch | whether it is a product at all. Not stars, not installs, not a Show HN score |
-| **5** | **5 packs by somebody who is not Sam** | 6 months post-platform | whether the PLATFORM is real. Zero means the declaration kinds are one person's shape |
+| **4** | ≥3 records not the owner's: >20 rows, >3 distinct days, present at day 14 | 3 months post-launch | whether it is a product at all. Not stars, not installs, not a Show HN score |
+| **5** | **5 packs by somebody who is not the owner** | 6 months post-platform | whether the PLATFORM is real. Zero means the declaration kinds are one person's shape |
 
 ### Gate 1 was broken, and it was the gate that gated spending
 
@@ -447,12 +447,12 @@ without changing them. That is the test for whether something belongs in this li
 | Never | Because |
 |---|---|
 | A tenant column | nine spoken id sequences. The second customer's first task would be #4,732 |
-| A plugin system that runs user code | a table survives a shared Worker; an `eval` does not. **This is not a limit on the platform — it is what makes it possible.** User code never runs inside the record's own object, whatever else is decided. A person's script is user content under DIRECTION §22, and whether BrainDog may run it in a hosted sandbox is the owner's open decision there ([research-shell-scripts.md](../loop/research-shell-scripts.md)) |
+| A plugin system that runs user code | a table survives a shared Worker; an `eval` does not. **This is not a limit on the platform — it is what makes it possible.** User code never runs inside the record's own object, whatever else is decided. A person's script is user content, and whether BrainDog may run it in a hosted sandbox was the owner's open decision at the time |
 | A double-entry accounting rewrite | 25–40d to reach parity with what Actual Budget and Firefly III give away, and the best-funded attempt archived at 54,315★ |
 | A port of the prior `analytics.js` | keep the ~80-line metric model, delete the other 906 |
 | Arbitrary SQL anywhere | an `eval` by another name. **This is what refuses PostHog's HogQL query API** — its own docs call it *"effectively a wrapper around ClickHouse SQL"*, and a shareable connector file would carry it |
 | A connector that fans out over a **fetched** list | it is 47% of real Airbyte connectors and it is still refused: host N+1 would come from response N, so the install diff could not name every host it will call |
-| A `poll:` state machine — create, poll, download | three requests, a termination condition and often a second host. That is a workflow DSL, and it is where Ansible and CloudFormation each crossed the line without noticing. The refusal is of a workflow DSL *inside a connector file*. DIRECTION §22 asks for an automations layer (trigger, steps, action), which is its own declared thing with its own caps and its own install diff, not a connector that grew a state machine |
+| A `poll:` state machine — create, poll, download | three requests, a termination condition and often a second host. That is a workflow DSL, and it is where Ansible and CloudFormation each crossed the line without noticing. The refusal is of a workflow DSL *inside a connector file*. The owner's direction asks for an automations layer (trigger, steps, action), which is its own declared thing with its own caps and its own install diff, not a connector that grew a state machine |
 | A bank connector | the format handles it in five minutes; **the credential does not exist.** UK open banking has no self-serve path at all since GoCardless closed signups, and unattended access is capped at four calls a day *by law* |
 | A shared vector index | breaks self-host parity and the isolation proof |
 | Templating the native screens on principle | two tiers instead, and the engine earns them one at a time |
@@ -476,7 +476,7 @@ Recorded now, while it is cheap to be honest.
 | Signal | Read |
 |---|---|
 | Gate 1a–1d all miss — no dependents, no outside issues, non-publish-day downloads under 150 | distribution does not exist. Do not build Phase B — this is the veto in [ADR-031](16-DECISIONS.md); passing them never authorises spending, gate 2 does. **A raw download count is not a valid stop signal** — see §5 |
-| Phase A ships and no non-Sam record reaches 20 rows in 3 months | the cold start won. The packs are the last idea; if they also fail, stop |
+| Phase A ships and no record but the owner's reaches 20 rows in 3 months | the cold start won. The packs are the last idea; if they also fail, stop |
 | A vendor ships a typed exportable store | the schema advantage is gone. Reassess the whole thesis, not the roadmap |
 | Churn above 8% at 10 subscribers | the product is not retained. Fix retention before acquisition, or stop |
 | Phase A slips past 90 working days | the estimate was wrong by 80%, which means the design is wrong somewhere. Find it before continuing |

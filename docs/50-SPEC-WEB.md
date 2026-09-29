@@ -1,6 +1,6 @@
 # 50 · `apps/web` — specification
 
-> **Not current.** This is the plan the web app was built from, and much of it no longer matches the app, its imports or its files; the truth is the code in `apps/web/src`, and the plan for finishing it is [loop/FINISH.md](../loop/FINISH.md) ([00-README](00-README.md)).
+> **Not current.** This is the plan the web app was built from, and much of it no longer matches the app, its imports or its files; the truth is the code in `apps/web/src` ([00-README](00-README.md)).
 
 The browser client of the record: the spine screens of [19-INTERFACE](19-INTERFACE.md) §2 as native code, every
 register as a dense grid, every declared page through one recursive interpreter, the palette, the keyboard model,

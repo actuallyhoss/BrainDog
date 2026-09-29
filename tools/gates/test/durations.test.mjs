@@ -3,8 +3,8 @@
  *
  *   node --test "tools/gates/test/*.test.mjs"
  *
- * WHY THIS EXISTS. `loop/research-ci-gates.md` had to price eight gates for `ci.yml` and the runner
- * printed no duration for any of them, so every figure in its table is the gap between one gate's
+ * WHY THIS EXISTS. Eight gates were once priced for `ci.yml` while the runner printed no duration
+ * for any of them, so every figure in that table was the gap between one gate's
  * `▸` header and the next one's in a GitHub step log: a subtraction of two timestamps per gate, and
  * no figure at all for the last gate of a run. One line after each gate turns the next survey of that
  * kind into a read.

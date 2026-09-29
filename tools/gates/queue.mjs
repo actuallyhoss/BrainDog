@@ -12,7 +12,7 @@
  * seeded Agents page (`packages/seed/src/packs/agents.ts`) opens with a `governance.open` queue, so
  * this gate drives `/p/agents` and nothing else.
  *
- * THE PRESS IS THE ANSWER, WHERE IT IS SHOWN (MOD-9). `QueueAnswer.svelte` never sends a pressed
+ * THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. `QueueAnswer.svelte` never sends a pressed
  * option to `/decide/[id]`: the card opens a reason line under itself, focused, and Enter sends it;
  * the card then becomes one line naming what was chosen, `.qa-done` and not `.queue-card`, so it
  * never breaks the ranking. So a run of this gate presses whatever a card offers, and checks three
@@ -54,13 +54,13 @@
  *
  * ITS OWN EPHEMERAL PORT (`server.listen(0)`), exactly as `passkey.mjs` takes one, and for the same
  * reason: a fixed port is one that a second run of the same gate finds taken. The self-hosted CI
- * runner is the PC the loop runs these gates on by hand, so a CI run and a desk run of one gate can
+ * runner is the PC these gates are also run on by hand, so a CI run and a desk run of one gate can
  * start within a minute of each other, and with a fixed port one of them goes red for a reason that
  * is not in the tree. An ephemeral port never collides, so this gate can be run by hand while a full
  * `pnpm gates` is going, the same claim `passkey.mjs` makes about itself.
  *
  * THIS PARAGRAPH USED TO SAY THE OTHER BROWSER GATES SHARE PORT 5189, and they never did. Read off
- * `budgets.json` and the `listen` calls on 22 September (`loop/research-ci-gates.md` §1): `layout`
+ * `budgets.json` and the `listen` calls on 22 September: `layout`
  * had 5189, `a11y` 5186, `prefs` 4183 and `keys` 4184, one each.
  */
 
@@ -300,7 +300,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
             const pressedLabel = (await press.innerText()).trim();
             const from = page.url();
             await press.click();
-            /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN (MOD-9). The record wants a reason, so the card opens one line
+            /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. The record wants a reason, so the card opens one line
                under itself, focused; Enter sends it, and the card becomes one line naming what was chosen. */
             const why = card.locator('.qa-reason input');
             const done = block.locator('.qa-done', { hasText: pressedLabel });

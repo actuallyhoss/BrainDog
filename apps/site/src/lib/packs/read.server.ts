@@ -1,7 +1,7 @@
 /**
  * The pack catalogue, read once at build time for `/packs` and every `/packs/<id>`.
  *
- * THROUGH `node:fs` AND NEVER AN IMPORT (site.md C9): the files are the web app's
+ * THROUGH `node:fs` AND NEVER AN IMPORT: the files are the web app's
  * (`apps/web/static/catalogue/`, written by `tools/catalogue/from-packs.mjs`), and an import would be an
  * edge from the site into another app that the `graph` gate refuses. Nothing is copied into this site's
  * `static/`, because a build that writes a tracked file fails CI's clean-tree check.

@@ -106,7 +106,7 @@ jobs:
       - name: Build the shell
         run: pnpm --filter ./apps/web build
 
-      # THE CLI, BUILT FROM THIS COMMIT AND SERVED BY THE SITE (`loop/finish/agents.md` C10).
+      # THE CLI, BUILT FROM THIS COMMIT AND SERVED BY THE SITE.
       # `apps/cli/scripts/bundle.mjs` makes `apps/cli/dist/braindog.mjs` and its `.sha256`, stamped
       # with the `BRAINDOG_BUILD` above so `braindog --version` names the same build as the Worker,
       # and both are copied into the site's `static/cli/` beside `install.ps1` and `install.sh`. The
@@ -166,14 +166,14 @@ jobs:
       # unchecked, so a missing `DEPLOY_HOST` has to be red rather than quiet.
       #
       # `DEPLOY_HOST` IS A REPOSITORY VARIABLE, AND IT STAYS `app.brain.dog` UNTIL PRODUCTION'S SITE
-      # BINDS THIS WORKER, push 3 of the one-domain move (`loop/research-one-domain-binding.md`
-      # sections 3 and 4, and the comment at the top of `apps/worker/wrangler.jsonc`). The gate asks
+      # BINDS THIS WORKER, the binding step of the one-domain move (the comment at the top of
+      # `apps/worker/wrangler.jsonc`). The gate asks
       # `/app/`, `/app/_app/version.json` and the build id; on `app.brain.dog` none of the three is
       # redirected before the flip, and through the site's binding all three answered the app's own
-      # bytes when measured locally. It becomes `brain.dog` after push 3 is green and before B2 is
-      # pushed, when both names answer the three the same way. Set before push 3, every deploy goes
-      # red here against the site's 404 page; set after B2's job starts, B2 goes red here with the
-      # flip already live. After B2 the old value turns red too, because `app.brain.dog/app/` is then
+      # bytes when measured locally. It becomes `brain.dog` after the binding is green and before the
+      # flip is pushed, when both names answer the three the same way. Set before the binding, every
+      # deploy goes red here against the site's 404 page; set after the flip's job starts, the flip goes
+      # red here already live. After the flip the old value turns red too, because `app.brain.dog/app/` is then
       # a 308 and this asks with `redirect: 'manual'`.
       - name: Parity
         id: parity
@@ -226,12 +226,12 @@ jobs:
       # `/app/`, a 401 at `/api/boot`, `/healthz`, a 308 from `/r/x` to `/app/r/x` on the same name,
       # and a POST to an `/in/` door that is served rather than redirected; `brain.dog` is not asked,
       # because the site does not hand it this Worker's doors yet. Once production's site binds this
-      # Worker (push 3) it adds `brain.dog`'s `/pricing`, `/app/`, `/api/boot` and `/healthz`, and
-      # after B2 it is the design's answers and `/healthz` (`loop/research-one-domain.md` section 3.5).
+      # Worker it adds `brain.dog`'s `/pricing`, `/app/`, `/api/boot` and `/healthz`, and after the
+      # flip it is the design's answers and `/healthz`.
       #
       # AFTER THE SITE, because `/pricing` is the site's answer and asking it before the site deploys
       # measures the previous site. It writes nothing. It asks `/healthz` on every name the app is on,
-      # and holds its `kernel` to the migration files in this checkout (defects H4).
+      # and holds its `kernel` to the migration files in this checkout.
       #
       # AND ONE SIGNED-IN QUESTION WHEN THE OPERATOR HAS MADE A CANARY RECORD: `SMOKE_TOKEN`, a read
       # token, and `SMOKE_SLUG`, its record, and then `boot` on that record must answer 200. It is the
@@ -244,7 +244,7 @@ jobs:
           SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
           SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
 
-      # AND THEN ONE SCRIPT, RUN IN THE CLOUD SANDBOX ON THE OPERATOR'S CANARY RECORD (SCR-4). Every question above is
+      # AND THEN ONE SCRIPT, RUN IN THE CLOUD SANDBOX ON THE OPERATOR'S CANARY RECORD. Every question above is
       # answered the same by a Worker with no `LOADER` binding, and such a Worker meters every script run "no sandbox"
       # and runs nothing, so a deploy that dropped `worker_loaders` from `wrangler.jsonc` was green here while every
       # person's scripts stopped. This asks `scriptTry` for a fixture that only logs one sentence, and goes red unless

@@ -1,8 +1,8 @@
 /**
  * `/build`: the address the guide to building an add-on was promised at, sent on to the pack docs.
  *
- * THE GUIDE IS THE DOCS, NOT A SECOND COPY OF THEM (`loop/finish/contracts.md` §3, X48). PLT-16 writes its pages
- * into `src/docs/06-packs/`, so this address only has to arrive there. It is not a line in `nav.ts`, whose list is
+ * THE GUIDE IS THE DOCS, NOT A SECOND COPY OF THEM. The pack guide's pages
+ * are in `src/docs/06-packs/`, so this address only has to arrive there. It is not a line in `nav.ts`, whose list is
  * final, and it asks not to be indexed, so a search engine keeps the docs page and never this one.
  *
  * AN ENDPOINT AND NOT A PAGE, for two tests that pull opposite ways. `src/lib/claims.test.ts` holds every top-level

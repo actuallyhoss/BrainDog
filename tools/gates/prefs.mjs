@@ -39,7 +39,7 @@
  * field the type no longer has. `sampleSaid` was the first kind and `previewDismissed` was the
  * second; one check catches both, and what follows is a description of its answer rather than the
  * record it is kept in. `sampleSaid` then went the other way: the sample bar it put away went with
- * the sample (`loop/DIRECTION.md` 26), and the check was red on this file's case for it until the
+ * the sample, and the check was red on this file's case for it until the
  * case went too.
  *
  * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `navShape`,
@@ -145,7 +145,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       values: [{ text: 'sm' }, { text: 'base' }, { text: 'md' }],
       /* A CELL IN `#main`, AND NEVER THE RAIL. The probe used to take the first of `.line-title, .td,
          .rail a[data-nav]` in document order, and the rail comes first: its rows are `--t-sm` on
-         purpose (DESIGN-SYSTEM 2, "rail"), a fixed step, so all three settings read 13px off a rail
+         purpose (the design system's "rail"), a fixed step, so all three settings read 13px off a rail
          link while the grid moved from 13 to 16. The grid cell is what the setting is for. */
       probe: () => {
         const el = document.querySelector('#main .td') ?? document.querySelector('#main .line-title');
@@ -245,7 +245,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       route: '/settings/navigation',
       values: [{}, { suggestPages: false }],
       /* THE SWITCH AND WHAT IT EMPTIES, not the pen's rows alone. The rows came from the sample record, and with it gone
-         (DIRECTION 26) a record with nothing waiting draws none either way, so the count read 0 for both values and the
+         a record with nothing waiting draws none either way, so the count read 0 for both values and the
          gate called a working switch dead. The switch's own state and the section's empty-state title are what a page
          load settles on any record. */
       probe: () => [
@@ -532,7 +532,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     /* AN EPHEMERAL PORT, AS `passkey.mjs` AND `queue.mjs` TAKE ONE. This gate used to bind a fixed
        port out of `budgets.json`, and the CI runner is the same PC where sessions run this gate by
        hand, so a CI run and a desk run of it could meet on one port and one of the two would go red
-       for a reason that is not in the tree (`loop/research-ci-gates.md` §2). Port 0 is a port the
+       for a reason that is not in the tree. Port 0 is a port the
        operating system hands out free at the moment of the bind, and every URL below is built from
        what it handed out. `localhost` still, because the bind names no host and takes the dual-stack
        `::`, which is what `localhost` reaches first on this machine. */

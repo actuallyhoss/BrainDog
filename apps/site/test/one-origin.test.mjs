@@ -6,11 +6,10 @@
  * ONE ORIGIN MEANS THE SESSION COOKIE AND THE MARKETING PAGES ANSWER FROM THE SAME PLACE. Once the
  * app is `brain.dog/app/` rather than `app.brain.dog`, a script injected into any page of this site
  * runs where the record's cookie is, and a crawler that follows `Allow: /` walks into `/app/`,
- * `/api/`, `/auth/` and `/account/`, which the Worker answers. `loop/research-one-domain.md` §2.6
+ * `/api/`, `/auth/` and `/account/`, which the Worker answers. The move to one domain
  * asked for a CSP and for those four to be disallowed.
  *
- * THE CSP IT WROTE DOWN KILLS THE DRAWN APP, measured on 23 September (`loop/research-site-now.md`
- * §2, `probe4.mjs`). SvelteKit prerenders an inline `<script>` that starts the page. Served with a
+ * THE CSP IT WROTE DOWN KILLS THE DRAWN APP, measured on 23 September. SvelteKit prerenders an inline `<script>` that starts the page. Served with a
  * header of `script-src 'self'; frame-ancestors 'none'`, the browser refused it ("Executing inline
  * script violates the following Content Security Policy directive"), and pressing "Solo founder" in
  * the hero left "Personal" selected: no tab, no rail, nothing in the window answered. So the script
@@ -21,7 +20,7 @@
  * A HEADER `script-src` ON TOP OF THE META TAG STILL BREAKS IT, because a browser enforces every
  * policy it is given and a script must pass all of them. That is the trap the last test guards,
  * and it passes on the commit that wrote this file: nothing had added the header yet. It is here
- * so the next person to read §2.6 does not add it.
+ * so the next person to read that CSP advice does not add it.
  */
 
 import { test } from 'node:test';
@@ -110,9 +109,9 @@ test('no _headers rule carries a script policy, which would block the inline sta
  * WHERE "OPEN THE APP" GOES FOLLOWS WHERE THE APP LIVES, READ FROM THE TWO `wrangler.jsonc` FILES.
  *
  * `APP` in `src/lib/copy.ts` is every "Open the app" on the site and the footer's sign-in. It was the absolute
- * `https://app.brain.dog`, which stays right only while production's `PUBLIC_HOST` is that name: with push B2's vars a
- * sign-in on `app.brain.dog` is refused at `origin` and a device start there answers 403
- * (`loop/research-one-domain-binding.md` section 2.4), so a link to it lands a reader where signing in fails. Once the
+ * `https://app.brain.dog`, which stays right only while production's `PUBLIC_HOST` is that name: with the one-domain vars a
+ * sign-in on `app.brain.dog` is refused at `origin` and a device start there answers 403,
+ * so a link to it lands a reader where signing in fails. Once the
  * app's `PUBLIC_HOST` is the site's own name, the link is the relative `/app`, which the site's script hands to its own
  * environment's app, so the alpha site's readers reach alpha's app and not production's. Before the flip `/app` on
  * `brain.dog` refuses sign-in too, so the link waits for the flip, and this test says which of the two it must be.

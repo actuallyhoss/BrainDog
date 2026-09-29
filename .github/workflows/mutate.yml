@@ -1,12 +1,12 @@
 name: mutate
 
-# THE GUARD TESTS, ASKED WHETHER THEY CAN FAIL (`loop/finish/ops.md` OPS-25, SC34).
+# THE GUARD TESTS, ASKED WHETHER THEY CAN FAIL.
 #
 # `tools/mutate.mjs` breaks each guard its `GUARDS` table names in a scratch copy of the tree, runs the tests written
 # to catch it, and is red for any guard whose tests stay green. The table is the one list of what is covered, and its
 # header has the whole argument; this file only says when it runs.
 #
-# WHEN (decisions C57): weekly, on a pull request that carries the `full-gates` label, and by hand. Not on every push:
+# WHEN: weekly, on a pull request that carries the `full-gates` label, and by hand. Not on every push:
 # a guard's test does not stop being able to fail between two commits that never touched it, and every row runs its
 # tests twice, once whole and once broken.
 #

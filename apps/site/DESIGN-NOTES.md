@@ -1,8 +1,7 @@
 # What the references actually do, measured
 
-The brief for this redesign is `loop/research-site-reference.md`, which measured PostHog, FirstLook,
-Linear and Supabase with Playwright and measured brain.dog's own screenshots with Pillow. This file
-is the second read, done from source before any of the markup below it was written, and it exists
+The redesign started from a first read that measured PostHog, FirstLook, Linear and Supabase with
+Playwright and measured brain.dog's own screenshots with Pillow. This file is the second read, done from source before any of the markup below it was written, and it exists
 so the next person can check the numbers rather than take a feeling.
 
 Every value has the URL it came from beside it. Nothing here is remembered.
@@ -39,7 +38,7 @@ button chrome has three colours of its own: `button-shadow #CD8407`, `button-bor
 **What is worth taking from this, and it is not the hues.** The ramp is twelve steps and the
 buttons get their own three. BrainDog's generated palette already carries twenty-three roles per
 scheme (`packages/skin/house.css`); the page spends four of them. The defect is spending, not
-supply, which is what `loop/research-site-reference.md` §5 concluded by counting pixels.
+supply, which is what the first read concluded by counting pixels.
 
 ### The button, `src/components/OSButton/index.tsx`
 
@@ -75,7 +74,7 @@ section:  max-w-screen-2xl mx-auto py-8 px-4
 `max-w-screen-2xl`, 1536px.
 
 Ours was 86.4px of heading and 192px between bands, so the reference is smaller type and a third
-of the air. `research-site-reference.md` §5 says the same thing from the other direction and adds
+of the air. The first read says the same thing from the other direction and adds
 that FirstLook spends 192px and Linear 256px, so spacing is not what these pages have in common.
 **Air was left alone in this redesign. Type came down.**
 
@@ -104,8 +103,7 @@ A CSS grid, not a `<table>` element, dividers on both axes, radius only on the f
 **Taken.** Three grids on the new home page are built this way: `gap: 1px` over a line-coloured
 ground with `overflow: hidden` and one radius on the outside, so every divider is the gap itself
 and there is exactly one border in the markup. FirstLook does the same thing at `.pillars` and
-`.systems` per `research-site-reference.md` §2, which is where the two references agree and
-therefore, by DIRECTION §14's own rule, where the signal is.
+`.systems`, which is where the two references agree and therefore where the signal is.
 
 ### Separation, `src/styles/global.css`
 
@@ -126,8 +124,7 @@ either a 1px `--line`, a change of ground, or both at once.
 
 ## 2. FirstLook, Linear, Supabase
 
-Measured in `loop/research-site-reference.md` §2 to §4 with Playwright on 21 September 2026, from
-the served documents. Not re-measured here; the four findings this redesign is built on:
+Measured in the first read with Playwright on 21 September 2026, from the served documents. Not re-measured here; the four findings this redesign is built on:
 
 1. **FirstLook flips its ground six times across ten sections**, and the flip from `#0B1B3A` to
    `#F5F7FA` is a **15.88:1** jump. It has no dark mode at all. Ten sections, ten layouts, no

@@ -2,7 +2,7 @@
   One page written for one kind of person, `/for/<who>`: what they would say, their example record drawn large
   enough to use, three things it does for them, the price and the one action.
 
-  THE LOOK IS SYSTEM §10's, after the Bento board `Light-Founders`: every band is tiles on the ground. The first tile
+  THE LOOK IS THE DESIGN SYSTEM'S: every band is tiles on the ground. The first tile
   holds the person's own question, the sentence under it and the action, and beside it the example record's answer:
   its Home's figures and the sentence its Home opens with. Then the record itself in one wide tile, then one tile per
   thing it does for them, each carrying its drawing, and the close.
@@ -85,7 +85,7 @@
     return lead?.type === 'block' ? lead.rows.map((r) => r.cells.join(' ')).join(' ').trim() : '';
   });
 
-  /* THE GLYPH ON A TILE'S HEADING says what its drawing is, from the set's own idea for it (ICONS.md). */
+  /* THE GLYPH ON A TILE'S HEADING says what its drawing is, from the icon set's own idea for it. */
   const KIND_GLYPH: Record<string, IconName> = {
     series: 'bars',
     progress: 'gauge',

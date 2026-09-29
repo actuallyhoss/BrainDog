@@ -6,7 +6,7 @@
  * this file is a dispatcher rather than a third runner. `e74a563b` (September 20th 2026) added
  * `packages/kernel/test/refusals-write.test.ts` for `via: write` and
  * `apps/web/test/refusals-render.test.ts` for `via: render`, and both drive their surface for real.
- * `loop/STATUS.md` §5 and `docs/40-SPEC-FIXTURES.md` §6 said none of the eight existed, a day after
+ * `docs/40-SPEC-FIXTURES.md` §6 said none of the eight existed, a day after
  * two did, and `40 §6` went on saying it until September 22nd 2026. So the gap is not "no runner drives a fixture", it is "seven of nine vias have no
  * driver and there is no one place that says which". Five of nine as of the `where` driver below:
  * `install`, `rpc`, `import`, `pull` and `ask`, which is what `DRIVERS` says in sentences. Four since

@@ -48,8 +48,8 @@
  *
  * WHERE IT READS, SINCE THE TABLE AND THE SURFACE ARE IN MORE THAN ONE FILE. Routes are the rows of
  * `packages/host/src/index.ts` and of every file under `packages/host/src/routes/`; methods are those of
- * `packages/record/src/index.ts` and of every file under `packages/record/src/methods/`
- * (`loop/finish/contracts.md` §0 point 5). A folder that is not there holds nothing, which is a tree from before the
+ * `packages/record/src/index.ts` and of every file under `packages/record/src/methods/`.
+ * A folder that is not there holds nothing, which is a tree from before the
  * folders existed, and not a finding: the two index files are what must be there.
  *
  * WHAT IT DOES NOT CHECK, SAID OUT LOUD. It reads the FIRST guard call and not the whole body, so a
@@ -95,7 +95,7 @@ const read = (root, ...parts) => {
  *
  * AN ABSENT FOLDER IS NOT A FINDING, and that is the difference from `read` above. The index files are the table and the
  * surface, and losing one is losing the gate's subject; `routes/` and `methods/` are where rows and methods written
- * since ARC-6 live, and a tree that has none (every seeded tree under `negative/` written before them) has nothing
+ * in their own files live, and a tree that has none (every seeded tree under `negative/` written before them) has nothing
  * there to check.
  */
 const folder = (root, ...parts) => {
@@ -225,7 +225,7 @@ export default function guards(
      to this gate without anybody remembering to add it. A file under `methods/` is written in the same
      shape, a function returning an object of methods at four spaces, and is read the same way, each
      file on its own so that no body runs on into the next file's. */
-  /* AND `jobs.ts`, WHERE THE JOBS METHODS LIVE (`loop/finish/contracts.md` §2.8), read in the same shape as a file under
+  /* AND `jobs.ts`, WHERE THE JOBS METHODS LIVE, read in the same shape as a file under
      `methods/` when it is there. */
   const jobs = read(root, 'packages', 'record', 'src', 'jobs.ts');
   const surfaces =

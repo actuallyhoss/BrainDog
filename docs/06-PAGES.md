@@ -427,8 +427,8 @@ four, with `Skills` as a pack; `skills` is a register inside `agents`.*
 *(Amended September 15th 2026: People is ticked here already, not offered as a choice. The first-run
 conversation's opening turn, "who are you," installs it with no diff to approve, the same exception
 this section already grants the register turn one's own screen chooses, and writes the person's own
-row before this picker is ever seen. `loop/research-modular.md` §2 has the flow, and §1.7 has why
-People, alone of the six, is a special case here.)*
+row before this picker is ever seen. People is the one special case of the six, because "who are you" is
+answered at sign-in whatever else is installed.)*
 
 *(Built September 15th 2026, for the row and not for the picker: the first run writes the person's
 own People row only while People is on, and this picker is still unbuilt.)*
@@ -439,7 +439,7 @@ exception as above. On a live record it turns on a pack that is off and does not
 record lacks, because the app holds no document per first-party pack; that is still this screen's
 job, with its diffs.)*
 
-*(Contradicts DIRECTION §22, noted September 22nd 2026: the sentence is read by a fixed word table,
+*(Contradicts the shell direction, noted September 22nd 2026: the sentence is read by a fixed word table,
 `LEXICON` in `apps/web/src/lib/shape.ts:65-73`, that maps words to the six first-party packs
 (domains and subscriptions turn on `estate`, invoices and VAT turn on `money-core`). A fixed keyword
 table is a list of use cases compiled into the app. The direction is that the sentence goes to
@@ -460,7 +460,7 @@ somebody fills in and a record somebody abandons.
 > the mitigation for the highest-ranked death in the record. That is the argument for building
 > the pack format first, before anything declarative.
 
-*(Revised September 22nd 2026 under DIRECTION §22: packs are one source against the cold start,
+*(Revised September 22nd 2026: packs are one source against the cold start,
 and optional. The others are the record proposing its own shape from the first rows
 ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §3, T1) and Slash proposing lists and fields from what the person
 says. The pack format is still built first, because it is the mechanism every one of those writes

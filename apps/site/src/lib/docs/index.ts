@@ -1,8 +1,8 @@
 /**
  * The docs, found in the tree: every `src/docs/<NN-section>/<NN-slug>.md` as a page, in reading order.
  *
- * THE GLOB IS THE LIST (site.md C7), so a unit adding a page adds a file and edits nothing here, and each
- * section's unit owns its own folder. The files are read raw at build time.
+ * THE GLOB IS THE LIST, so adding a page adds a file and edits nothing here, and each section owns its
+ * own folder. The files are read raw at build time.
  *
  * ONLY SERVER LOADS AND ENDPOINTS IMPORT THIS, so the text of every page rides in the prerendered files
  * and never in a script the browser loads for a page that shows one of them.

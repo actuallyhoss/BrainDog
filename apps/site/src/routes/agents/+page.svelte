@@ -1,7 +1,7 @@
 <!--
   For agents and services.
 
-  REBUILT ON 29 SEPTEMBER IN THE SITE'S NEW LOOK (`loop/design/SYSTEM.md` §10, the board `Light-Agents.dc.html`):
+  REBUILT ON 29 SEPTEMBER IN THE SITE'S NEW LOOK (the design system):
   every band is Bento tiles on the ground, and the tiles carry the product at work rather than prose about it.
 
     lead       the answer, the one action, and agents at work leaving what they found for the next one's briefing.
@@ -364,7 +364,7 @@
     border-radius: var(--r-md);
   }
 
-  /* An agent's face is a circle (SYSTEM §2): its maker's mark on a plain disc, or its initials in the second ink. */
+  /* An agent's face is a circle (the design system): its maker's mark on a plain disc, or its initials in the second ink. */
   .face {
     display: grid;
     flex: none;

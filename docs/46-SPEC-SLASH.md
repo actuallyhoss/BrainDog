@@ -203,7 +203,7 @@ spends one each time. A pass 2 whose rows came back empty calls no model (§5.5-
 one with an `ask_id` spends none and one without spends only its drafting `read`. `model = '-'` is the one row that
 called nothing, the `read` on a record with no lists (§5.4-3), and it is not billed.
 
-**As built since AGT-21: `b` is his own key, listed and not capped; `byo` is metered by the host.** His own key keeps
+**As built: `b` is his own key, listed and not capped; `byo` is metered by the host.** His own key keeps
 two more rows in `slash_meta` (as built, the tables carry Slash's names: `slash_settings`, `slash_call`, `slash_meta`):
 `own.provider`, `anthropic` or `openai`, and `own.base_url`, the `https:` public address he named, or no row for his
 provider's own. `status()` names the `source` (`included` or `key`), the `provider` on his key, and
@@ -277,16 +277,15 @@ said `glm-5.3-flash` whatever `SLASH_MODEL` said, for a question the endpoint ha
 
 **A status is not an answer, and what comes after a 200 is.** A provider's 429 or 503 is the endpoint saying it
 served no completion, and a hosted provider does not bill one; counted, a rate limit spent the owner's allowance and
-stopped the automation on its first rung, as wave 47 briefly had it (`loop/research-worker-spark.md` §6 Q8, whose
-default was taken). A body that is too large, is not JSON or breaks off came from a model that ran, and one that ran
+stopped the automation on its first rung, as an earlier build briefly had it. A body that is too large, is not JSON or breaks off came from a model that ran, and one that ran
 out the clock may have run to the end, so each is billed once and never asked again: the self-host measured one
 question answered with a 200 of 70,000 characters serve four completions of 16,000 tokens each while the ledger held
-four rows under `-` and `ask_cap` saw none (`loop/research-batch-forty-six-audit.md` finding 4). The host decides
+four rows under `-` and `ask_cap` saw none. The host decides
 which throws carry the mark (`SlashAnsweredError` in `packages/host/src/slash.ts`), and the package reads the mark
 and not the class, because it may not import the host (§5.1).
 
 **And a status no retry mends is final, still uncounted.** The rule above was written for a 429 and a 5xx and, until
-September 23rd, applied to every status: `loop/research-batch-forty-nine-audit.md` finding 4 measured a 400, a 401
+September 23rd, applied to every status: a measurement found a 400, a 401
 and a 404 to a good key on the Worker each asked eight times over about 266 minutes, the owner's key opened eight
 times, and the run ending "Slash could not be reached after 8 attempts" about a provider that answered every one.
 Such a status is the same answer on the next rung, so the host throws it with a `refused` mark carrying the status
@@ -449,7 +448,7 @@ The lists this record keeps:
 Which of these lists does it belong to? register: that list's id, or null when it belongs to none. actionable: true when a person would want it in their business record.
 ```
 
-*(Corrected September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md). An earlier revision classified every arrival
+*(Corrected September 22nd 2026. An earlier revision classified every arrival
 into a closed `kind`: money, renewal, invoice, receipt, alert, newsletter, other. Those are one owner's business kinds;
 triage classifies against the record's own lists, whatever they are. Triage has no caller in this tree yet
 (`packages/slash/src/index.ts`, the header), so nothing built changes.)*
@@ -584,18 +583,18 @@ or not one the host answers for is `403 FORBIDDEN` at `origin` (`serveSlash`, `p
 when the method is neither `GET` nor `HEAD`, so the app's own `fetch('/api/slash/status')` carries none and that rule
 would refuse every browser. Status therefore takes the rule the self-host's `forged()` already applies
 (`apps/selfhost/src/server.ts`): a named `Origin` outside the host's set, or a `Sec-Fetch-Site` other than `same-origin`
-or `none`, is `403 FORBIDDEN`, and a request carrying neither is admitted (`loop/research-spark-routes.md` F5). This is
+or `none`, is `403 FORBIDDEN`, and a request carrying neither is admitted. This is
 read from the standard's text and not measured in a browser.
 
 **What is mounted is four of the five cookie rows**, on both hosts: `read`, `status`, `settings` and `propose`.
 `servesSlash` matches those four paths and both hosts dispatch on it alone. `POST /api/slash/pattern` has no door,
-because `proposePattern` is neither metered nor capped (§5.3, F4) and a door in front of it would be an unmetered model
+because `proposePattern` is neither metered nor capped (§5.3) and a door in front of it would be an unmetered model
 call behind a button. Both hosts hand the door a `byok` wherever a key can be opened: the self-host when it has a
 key store (`slashDoor`, `apps/selfhost/src/slash.ts`), the Worker when `KEK` is bound (`workerSlashDoor`,
 `apps/worker/src/slash.ts`), and `apps/selfhost/test/slash-named.test.ts` saves tier `b` with 200. A host that can
 open no key hands the door no `byok`, and there the settings door refuses `tier: 'b'` with `501 NOT_IN_THIS_BUILD`
 at `tier` rather than store a tier no `propose` could serve. *(Until September 22nd this said neither host built
-`byok`; `bd8add33` built it on both, `loop/research-batch-thirty-one-audit.md` finding 6.)*
+`byok`; `bd8add33` built it on both.)*
 
 **The door asks `byok` for the session on a `read` as well as a `propose`**, after the engine is built
 (`serveSlash`, `packages/host/src/slash-ask.ts`). What it gets back is `slashOwnKeyFor`'s answer (§5.9): the
@@ -634,7 +633,7 @@ own key once he picks one (`workerSlashAnswers`). *(Until September 28th this sa
 was true while the Worker read `SLASH_ENDPOINT`.)*
 
 *(Overtaken September 28th: no host chooses a key by its label any more (`SLASH_KEY_LABEL` in
-`packages/host/src/slash.ts`, `loop/finish/defects.md` S1). His own key is the one he picked by its id in Settings;
+`packages/host/src/slash.ts`). His own key is the one he picked by its id in Settings;
 with none picked, the Worker's included model answers or the run stops `NOT_IN_THIS_BUILD` saying to pick one, and a
 self-host's own endpoint is called with its operator's `SLASH_KEY` or with none. §5.9's "On his own key, what an
 automation's question does" is what holds. The two paragraphs below are the label rule as it stood, kept for the
@@ -646,15 +645,14 @@ no `slash` grant. On the Worker the endpoint is a hosted provider on the owner's
 held or posted, `workerSlashAnswers` (`apps/worker/src/slash.ts`) refuses a job whose record has no live grant under
 that label: `FORBIDDEN`, no ledger row, and the run stops on *"rule.<id> asked Slash at step N, and this record's vault
 holds no key labelled slash, so the run stopped there. Put your model key in the vault under slash."* Without the
-check, the survey that set it measured one keyless POST, a 401, and, under the status rule wave 47 had then, an answer
-that blamed the model for a key nobody had put in (`loop/research-worker-spark.md` §3, W2). Under §4.1's rule as it
+check, the survey that set it measured one keyless POST, a 401, and, under the status rule of the time, an answer
+that blamed the model for a key nobody had put in. Under §4.1's rule as it
 stood then the same 401 was `UNREACHABLE`, so each rung of the ladder would have been another keyless POST. What each
 outcome costs is §4.1's table.
 
 **And a key that is there and will not open fails the same way.** The check above reads the label, and the key is
 opened on the call, so a grant labelled `slash` that the Worker cannot open (the record wrapped under another `KEK`,
-bytes that do not decrypt) passed it and went out with no `authorization`: `loop/research-batch-forty-nine-audit.md`
-finding 2 measured 8 keyless POSTs of 8 over the ladder after a `KEK` change. The rule's wire now asks the host's
+bytes that do not decrypt) passed it and went out with no `authorization`: a measurement found 8 keyless POSTs of 8 over the ladder after a `KEK` change. The rule's wire now asks the host's
 key path for `keyRequired`, the rule tier `b` keeps (§5.9): a `slash` grant that is missing or will not open is a
 throw before anything is sent, `answer` writes no ledger row for it, and the run stops on `FORBIDDEN`, *"rule.<id>
 asked Slash at step N, and the key labelled slash in this record's vault would not open on this Worker, so nothing was
@@ -682,7 +680,7 @@ Common steps, then the differences. Every job:
 5b. On a parse or schema failure, or a `register` the record does not hold, the verdict is `{ register: null, actionable: true }`: a wrong skip is the silent failure (07 §2), so failure lands in front of a person.
 Returns `{ shape, register, actionable, model }`. The ingest Workflow writes `inbox_raw.state` and `reason`; this package does not.
 
-**`proposePattern(samples, ctx)`** — 07 §4, 23 §4. The intent is three or more `RawPayload`s of one `shape` (24 §4.3's n_min 3). **The code does not keep either half.** `jobs.ts` refuses only an empty list (`VALUE_MALFORMED` at `samples`, no model call) and compares no `shape`: measured on 22 September, one sample reached the model and was accounted as a `pattern` row. The gap is open; the three-of-one-shape rule is today the caller's to keep, and no caller exists. Two more gaps sit beside it (`loop/research-spark-routes.md` F4): the job is not metered, because `asksUsed` does not count `kind = 'pattern'` and `proposePattern` never checks the cap, so `ask_cap: 0` does not stop it; and it always calls `deps.inference`, never a tier `b` adapter.
+**`proposePattern(samples, ctx)`** — 07 §4, 23 §4. The intent is three or more `RawPayload`s of one `shape` (24 §4.3's n_min 3). **The code does not keep either half.** `jobs.ts` refuses only an empty list (`VALUE_MALFORMED` at `samples`, no model call) and compares no `shape`: measured on 22 September, one sample reached the model and was accounted as a `pattern` row. The gap is open; the three-of-one-shape rule is today the caller's to keep, and no caller exists. Two more gaps sit beside it: the job is not metered, because `asksUsed` does not count `kind = 'pattern'` and `proposePattern` never checks the cap, so `ask_cap: 0` does not stop it; and it always calls `deps.inference`, never a tier `b` adapter.
 5a. `declare.validate('ingest', out.ingest)` — a refusal (e.g. `KIND_UNKNOWN`, `MATCH_FIELD_UNKNOWN`, `CONTAINS_TOO_LONG`) is returned as-is.
 5b. **The anchor check**: every string literal under `match.*.is|contains|starts|ends` and `extract.*.after|before|between[*]` must occur verbatim in at least one sample's `from`, `subject` or `body`. One that does not → `PROPOSAL_UNCITED` at its path (`extract.merchant.between[1]`). The model cannot invent an anchor the messages do not contain.
 5c. `writes.register` ∈ `index.registers`; `writes.confidence` is **overwritten** to `needs-review`; `on_conflict` to `skip`. So no Slash-derived pattern can write `exact` — 11 §9's injection suite passes by construction.
@@ -697,7 +695,7 @@ Returns `{ text }`; the host returns it to the record through `ackOutbox(id, 'do
 **`embed(texts)`**:
 5a. Chunk into ≤ 100 texts; truncate each at 8,000 bytes; `inference.embed(chunk)` per chunk; assert every reply's `dims` equals the first's.
 Returns `{ model, dims, vectors }`; the host writes `entry_vec` through `ackOutbox` as `system`. `tokens_in` for the account row is `Σ tokens(text)`.
-`infer.embed` stays queued and unserved until something reads `entry_vec` (PLT-11, W3); today only erase and purge delete from it.
+`infer.embed` stays queued and unserved until something reads `entry_vec`; today only erase and purge delete from it.
 
 **`analyseDraft(signal, ctx)`** — 24 §4.3–4.6, Phase C:
 5a. `declare.validate(signal.declaration.kind, out.to)`; a refusal returns as-is.
@@ -813,7 +811,7 @@ One statement claims; a second runner's identical statement finds nothing (`Idle
 
 ### 5.9 · Tiers a, b and byo: which key answers, and who may open it
 
-*(Rewritten for AGT-21, `loop/finish/agents.md`, September 2026: tier `b` became "Your own key", both passes go to it,
+*(Rewritten September 2026: tier `b` became "Your own key", both passes go to it,
 and no key is chosen by its label. The text after the two tables keeps the September 22nd description where it still
 holds and says where it no longer does.)*
 
@@ -825,7 +823,7 @@ the same builders on both hosts). Two keys can stand behind a Slash call:
 | the operator's `SLASH_KEY` | the self-host's environment. The Worker has no endpoint of its own and reads none | the self-host's own endpoint, on tiers `a` and `byo`; with none set that endpoint is called with no key, which is a local model working |
 | his own key | a live `api_token` grant in the vault he picked in Settings, by id (`settings.grant_id`), with `own.provider` and `own.base_url` in `slash_meta` (§4.1) | every call on tier `b`: both passes of a question, an automation's question, and the arranger's press and first plan |
 
-**The vault's `slash` label chooses nothing any more** (`loop/finish/defects.md` S1). It keyed the host's own model
+**The vault's `slash` label chooses nothing any more**. It keyed the host's own model
 for everybody, so a key an owner labelled `slash` for another reason went to that endpoint as its bearer. `slashGrantOf`
 is gone; `SLASH_KEY_LABEL` stays only because a script that names it is still refused (below).
 
@@ -845,7 +843,7 @@ on a self-host with an endpoint, chat completions with no address of his is sent
 was there. The address is `https:`, carries no name or password, and names a public host, checked at the settings door
 and again on every call (`slashBaseUrlOf`). The model he typed is sent for every call; `SLASH_MODEL` is not consulted.
 The grant must be live and of kind `api_token` on every call, and a key that will not open is a `SlashKeyClosedError`
-before anything is sent (`loop/finish/defects.md` S2): never a call with no key.
+before anything is sent: never a call with no key.
 
 **The vault gate** (`slashOwnKeyFor`). It runs on every palette `read`, `propose` and `pattern` where the tier is `b`,
 and on a settings save that picks his key, names a grant or names an address (`slashKeySave`), and nowhere else:
@@ -864,10 +862,10 @@ and on a settings save that picks his key, names a grant or names an address (`s
 
 So an owner's palette on his own key needs a proof in the last fifteen minutes, as the vault does. That is the tier
 `b` rule as it stood, now on every pass; whether a palette ask should need less than opening the vault by hand is the
-owner's call, and it is recorded as a question in AGT-21's report and not decided here.
+owner's call, and it is recorded as an open question and not decided here.
 
 Measured before the gate: a colleague at `read` whose last proof was fifty minutes old proposed with 200 and the
-proposal went out on the owner's key (`loop/research-batch-thirty-one-audit.md` §1). That is a case in
+proposal went out on the owner's key. That is a case in
 `apps/selfhost/test/slash-byok-guard.test.ts`.
 
 **Every opening is a `grant.read` signed by the asker.** The key is asked for on each model call and not when the
@@ -1004,11 +1002,11 @@ separately when `usage` reports it, so the meter reflects what a turn actually c
 
 Token heuristic: `ceil(utf8Bytes / 3)` — over-counts English by about a quarter and holds for Arabic. `ponytail:` swap for the provider's counter when the `usage.in ≤ 1.3×` assertion fails on a fixture.
 
-### 7.1 · Measured on a real host *(AGT-30)*
+### 7.1 · Measured on a real host
 
 Every number above is modelled or measured over a canned model. What production answers with is measured by two tools,
-and this table records what they found. There is no alpha (`loop/DIRECTION.md` §27), so the production column is filled
-from the owner's first asks after W3 is deployed, and until then it says so.
+and this table records what they found. There is no alpha, so the production column is filled
+from the owner's first asks once this build is deployed, and until then it says so.
 
 | What | Read from the code | On production |
 |---|---|---|
@@ -1224,7 +1222,7 @@ Position: eleventh of fifteen (31 §2); Phase B7 for the palette, Phase A for `t
 | 7 | **`CallContext.principal` gains `{ kind: 'runner'; id; name }`**, built only from a verified device grant or a socket attachment; the JOBS runner half checks it, the session half checks `person` at `owner` | 33 §2, 30 §10 |
 | 8 | **The self-host runner transport is the long-poll**; the hibernatable socket is Cloud-only. No `ws` dependency; the hold runs in the host process where wall time costs nothing | 26 §2.2 parity row: "✅ (`ws`)" → "long-poll, §46"; 33 §11 *Wait* |
 | 9 | **No Slash inference passes `tools`.** Every call is schema-constrained structured output; retrieval is `project()`; the dual-context split holds with one context | 11 §6 ("tool-call headroom" → the schema), 11 §7 *Dual-context* |
-| 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key. *Amended September 22nd 2026 to what is built (§5.9): the host asks the record's vault gate first, decrypts wherever its key store is (the Worker, or the self-host process), opens the key on each model call as the asker, and posts to `SLASH_ENDPOINT` directly with no gateway passthrough; the included model is held to the same gate when it is keyed from the vault; and tiers `b` and `byo` are metered by the host (§4.1).* *Amended again for AGT-21: tier `b` is "Your own key" in Settings, a provider (Anthropic Messages or OpenAI-compatible), an `https:` public address, a model and a vault key he picks by id, and it answers both passes, `ask_slash` and the arranger's press; it posts to his address, not to `SLASH_ENDPOINT`, except a self-host's chat completions with no address of his; no key is chosen by the label `slash`; and his asks are listed and not capped, with no operator ceiling (§4.1, §5.9)* | 11 §3 *Bring your own model*, 26 §1 and §6 |
+| 10 | **Tier B mechanics**: the host opens the grant under the asker's browser session per ask, decrypts in the Worker, and passes a per-call `Inference` adapter; one `grant.read` event per ask; the package never holds the key. *Amended September 22nd 2026 to what is built (§5.9): the host asks the record's vault gate first, decrypts wherever its key store is (the Worker, or the self-host process), opens the key on each model call as the asker, and posts to `SLASH_ENDPOINT` directly with no gateway passthrough; the included model is held to the same gate when it is keyed from the vault; and tiers `b` and `byo` are metered by the host (§4.1).* *Amended again: tier `b` is "Your own key" in Settings, a provider (Anthropic Messages or OpenAI-compatible), an `https:` public address, a model and a vault key he picks by id, and it answers both passes, `ask_slash` and the arranger's press; it posts to his address, not to `SLASH_ENDPOINT`, except a self-host's chat completions with no address of his; no key is chosen by the label `slash`; and his asks are listed and not capped, with no operator ceiling (§4.1, §5.9)* | 11 §3 *Bring your own model*, 26 §1 and §6 |
 | 11 | **`Proposal` carries `model`, `filed` and `read`** beside the five named fields, and `body_kind` admits `query` for the answer that is never filed | 23 §1, §4 (*one object, four bodies* — a fifth shape, `query`, is the palette's unfiled answer) |
 | 12 | **The palette is two calls**, `read` then `propose`, so pass 1 renders without a stream and Escape between them is a free cancellation: pass 2 is never called and never spent. Pass 1 has already spent its one ask by then (§4.1, one per model call) | 23 §7 |
 | 13 | **Lost jobs are re-claimed once** inside the claim statement; expiry is applied by `claimJob`; `preferred` is not built | 26 §2.4, 33 §11 *Lost* and *Expire* |

@@ -1,7 +1,7 @@
 <!--
   The site shell: a glass bar, the page, and the footer tile. Which pages the bar and the footer name is `nav.ts`'s.
 
-  THE SHELL IS SYSTEM §10's. The bar is glass, floating one inset below the top of the window and lined up with the
+  THE SHELL IS THE DESIGN SYSTEM'S. The bar is glass, floating one inset below the top of the window and lined up with the
   tiles under it: the mark and the name, the page links, GitHub, "Sign in" and "Start your record" as the one ink pill.
   The page is the ground with its light, and the footer is one tile, the last on every page.
 
@@ -176,7 +176,7 @@
     padding-inline: var(--site-gutter);
   }
 
-  /* GLASS, AND IT HOLDS ONLY CHROME: the frosted fill, its blur, the hairline pair and level two (SYSTEM §2, §4). */
+  /* GLASS, AND IT HOLDS ONLY CHROME: the frosted fill, its blur, the hairline pair and level two (the design system). */
   .bar-in {
     position: relative;
     display: flex;
@@ -294,7 +294,7 @@
     background: var(--hover-wash);
   }
 
-  /* UNDER THE BAR, the bar's own width: glass-strong at level two, where legibility over the page matters (SYSTEM §6). */
+  /* UNDER THE BAR, the bar's own width: glass-strong at level two, where legibility over the page matters (the design system). */
   .menu-panel {
     position: absolute;
     inset-block-start: calc(100% + var(--sp-2));

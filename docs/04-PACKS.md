@@ -11,11 +11,10 @@ A table survives a shared Worker; an `eval` does not. So nothing a pack author w
 by the record, and no user code runs inside the record's own object. Anything needing real
 computation is an agent with a skill and a schedule, or a script: a row attached to a door or a
 schedule, run in a metered sandbox BrainDog hosts or anywhere outside, whose writes arrive through
-the same API anything else uses. The design is
-[research-shell-scripts.md](../loop/research-shell-scripts.md).
+the same API anything else uses.
 
 *An earlier revision ended this rule "never a script". The owner answered "both" on September 22nd
-2026 ([DIRECTION §22](../loop/DIRECTION.md)): hosted for convenience, outside whenever the person
+2026: hosted for convenience, outside whenever the person
 prefers, and hosted is never required.*
 
 ---
@@ -42,14 +41,13 @@ is rebuilt to the same list whenever it grows: migration 12 for `script` (`0012_
 schedule, run in a metered sandbox BrainDog hosts or anywhere outside, and writing through the
 same API anything else uses.**
 
-*An earlier revision stopped at "it is an agent". DIRECTION §22 (September 22nd 2026) makes
+*An earlier revision stopped at "it is an agent". The owner's direction of September 22nd 2026 makes
 scripts record content and asks for an automations layer (trigger, steps, action) that a person
 draws and an agent edits through MCP. The automations are built as a composition, not a kind of
 their own: a `rule` can carry a trigger and steps, linted at install (`packages/kernel/src/flow-lint.ts`,
-[07-INGEST-AND-RULES](07-INGEST-AND-RULES.md)). A script was settled the other way
-([research-shell-scripts.md](../loop/research-shell-scripts.md) §0): it is the ninth kind, added in
+[07-INGEST-AND-RULES](07-INGEST-AND-RULES.md)). A script was settled the other way: it is the ninth kind, added in
 the same commit as the automations runner, which is why this heading said eight until then. `job` followed the
-same way (`loop/finish/agents.md` C13): a kind of run is approved once in Decide, and nothing a run carries widens
+same way: a kind of run is approved once in Decide, and nothing a run carries widens
 it. The heading no longer says a number, because `KINDS` is where the number is kept.*
 
 The closure is load-bearing rather than tidy: the security argument in §7 is an *enumeration*,
@@ -131,8 +129,7 @@ before anything is sent (`strayKeys` in `apps/cli/src/scratch.ts`).
 
 *(Amended September 15th 2026 for modularity: the manifest gains one more optional key, `config:`, a
 closed subset of field types (no `ref`, `secret` or `file`) that a pack declares and an owner fills
-at `/packs/<id>`, read back through `{{config:<key>}}`. `loop/research-modular.md` §1.3 has the shape
-and why the subset stays narrow.)*
+at `/packs/<id>`, read back through `{{config:<key>}}`. The subset stays narrow on purpose.)*
 
 *(Built September 15th 2026. A setting is `config: { <key>: { type, values?, default?, label?, note? } }`, at most 64
 of them, each key lower-case letters, digits and underscores. The type is text, enum, bool, money, day, duration, number or list,
@@ -295,7 +292,6 @@ by dropping them.
 > config intact, and **enable** reinstates it with no new plan or diff, because nothing about its
 > shape changed while it was off. Disabling a pack another active pack's `requires` still names is
 > refused, naming the dependents, the same way an install names a conflict before it applies.
-> `loop/research-modular.md` §1.2 and §1.5 have the mechanism.
 >
 > **Built September 15th 2026.** `pack.disabled_at` is migration 3. Disabling writes one `retire`
 > event aimed at the pack, listing the declarations that went off, and enabling brings back exactly
@@ -400,7 +396,7 @@ ecosystem that can silently change what a page says about your money.
 | Change | What happens |
 |---|---|
 | Remove a field | `retired: true` on the field. It stops rendering and stops being writable; the data stays in `fields`. A retired field may not be `required`, `index`, `unique`, or named in `search:` or `mobile:` |
-| Change a field's type | **refused as an ordinary pack update** — `FIELD_TYPE_CHANGED`: retire the field and add a new one. The governed conversion in [21-AUTHORING](21-AUTHORING.md) §5 (`previewRetype`, `retypeField`, GAP-8) is the only path that converts rows over an existing field, one owner's decision at a time; this refusal still stands for every other install |
+| Change a field's type | **refused as an ordinary pack update** — `FIELD_TYPE_CHANGED`: retire the field and add a new one. The governed conversion in [21-AUTHORING](21-AUTHORING.md) §5 (`previewRetype`, `retypeField`) is the only path that converts rows over an existing field, one owner's decision at a time; this refusal still stands for every other install |
 | Drop `index: true` | the index is dropped in the same transaction |
 | Add `required` to a populated register | refused — `REQUIRED_ON_POPULATED`, above; the same governed conversion (a `narrow`) is the only path that fills every row first and lands the requirement with them |
 | Rename an id | refused — `ID_RENAMED`, above. Ids are stable forever, and there is no alias key |
@@ -419,7 +415,7 @@ If the first registers are special-cased, the pack API is half-built forever. VS
 own languages as extensions for exactly this reason, and it is the difference between a platform
 and a product with a plugin folder.
 
-**What this rule does not mean (September 22nd 2026, DIRECTION §22).** The six are examples in a
+**What this rule does not mean (September 22nd 2026).** The six are examples in a
 shared catalogue, not the set the product is defined by. Money, estate and portfolio are one
 owner's use cases, and a use case not everyone needs is not shipped with the code. The code ships
 primitives; use cases, integrations and metadata are added to a record at run time by people or
@@ -494,7 +490,7 @@ record id in the query string — so there are none.
 scheduled GET to a host printed on the screen you approved.** Both are shown by the diff before it
 applies, and uninstalling reverses both without data loss.
 
-**Scheduled actions spend the same row twice more** *(September 15th 2026, `loop/DIRECTION.md` §0b)*. A
+**Scheduled actions spend the same row twice more** *(September 15th 2026)*. A
 `channel: call` posts to a literal https origin on a schedule, and a `channel: poll` fetches one and acts only
 when the answer changed ([25-CONNECTORS](25-CONNECTORS.md) §3.3). The diff prints each as
 `CALLS OUT <host> · every <n> · grant "<label>"`. The interval is fifteen minutes or the provider's floor,

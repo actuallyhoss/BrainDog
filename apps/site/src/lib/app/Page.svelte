@@ -6,7 +6,7 @@
   styles `@braindog/skin` ships. So a figure on the home page is the figure a record draws, and a row
   written wrong degrades to its fence here exactly as it would there.
 
-  `tiles` DRAWS THE PAGE AS THE NEW APP DOES (SYSTEM §6): each block an opaque tile with an icon well on its
+  `tiles` DRAWS THE PAGE AS THE NEW APP DOES (the design system): each block an opaque tile with an icon well on its
   heading, and under a chart the one written line that says what it means (`reads`, by segment). The page's
   opening sentence (`note lead`) is left out, because the title row above the page says it; `leadOf` finds it.
 
@@ -263,7 +263,7 @@
     margin-block-end: calc(-1 * var(--sp-3));
   }
 
-  /* A two-way segmented switch on glass, the toolbar's shape (SYSTEM §5): the chosen half a tile-white pill. */
+  /* A two-way segmented switch on glass, the toolbar's shape (the design system): the chosen half a tile-white pill. */
   .switch {
     display: inline-flex;
     gap: 2px;
@@ -335,7 +335,7 @@
     min-inline-size: 0;
   }
 
-  /* ── A block as a tile (SYSTEM §6) ─────────────────────────────────────── */
+  /* ── A block as a tile (the design system) ─────────────────────────────────────── */
 
   .tile-cell {
     position: relative;

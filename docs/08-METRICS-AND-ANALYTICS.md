@@ -258,7 +258,7 @@ figure is. The conversion is not declared per figure with `{ lookup: fx, as_of }
 because a person who holds money in two currencies means every figure when they choose a home one. The arithmetic
 is one module, `packages/kernel/src/fx.ts`, which the browser's reader imports.
 
-> **Which half is the kernel's (September 22nd 2026, [DIRECTION §22](../loop/DIRECTION.md)).** The
+> **Which half is the kernel's (September 22nd 2026).** The
 > kernel owns money and never adds two currencies: an amount is an integer in minor units with its
 > own currency, and a sum over several is parts, not a number. The rates register and the home
 > currency are a pack's: which list holds rates and which setting names a home currency are brought
@@ -503,7 +503,7 @@ test that fails if `writeDataPoint` is called with anything not on the list.
 Each maps to a gate in [15-ROADMAP](15-ROADMAP.md). Telemetry that answers no question is
 surveillance with a dashboard.
 
-1. Are there non-Sam records with >20 rows, >3 distinct days, still present at day 14?
+1. Are there records other than the owner's with >20 rows, >3 distinct days, still present at day 14?
 2. Which packs get installed, and which get uninstalled within a week?
 3. Does the ingest proposal loop converge — do proposed patterns get approved, and do approvals
    reduce model calls per record over time?

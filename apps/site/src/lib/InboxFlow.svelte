@@ -1,7 +1,7 @@
 <!--
   Three messages arrive, Slash learns their shape once, and every one is filed: `docs/07` §4, drawn.
 
-  THE INSIDE OF ONE TILE (SYSTEM §6, 29 September), three steps across it with an arrow between each: what arrives,
+  THE INSIDE OF ONE TILE (the design system), three steps across it with an arrow between each: what arrives,
   the shape Slash learned from it, and the list it fills. Each step has a heading row with an icon well; the messages,
   the learned fields and the filed rows sit in the tile's second fill, never in a tile of their own. The host draws the
   tile round it. Below 900 the steps stack and the arrows turn down.

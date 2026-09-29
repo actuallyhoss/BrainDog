@@ -3,8 +3,8 @@
  *
  *   node tools/gates/em-dash.mjs [root]
  *
- * `loop/LOOP.md`, under "How to write": *"No em dashes and no flippant register in anything a
- * stranger reads."* Nothing enforced it, so it drifted the way an unenforced rule always drifts:
+ * The house style: *"No em dashes and no flippant register in anything a stranger reads."*
+ * Nothing enforced it, so it drifted the way an unenforced rule always drifts:
  * not in one careless file but a sentence at a time, in refusals, fix lines and labels, across
  * eleven packages. A refusal is the most-read prose this product has, because it is the only prose
  * somebody meets at the moment they are stuck.
@@ -59,7 +59,7 @@ const WORKSPACES = ['packages', 'apps'];
  *
  * A pack has no `src`. It is `<id>.pack.json`, a script beside it and a test (`packs/README.md`), so
  * a member walked for `src` is a member that ships nothing, and that is how this gate read the four
- * packs the day they arrived: not at all (audit sixty-one, finding 9). THE PACK FILE IS THE PROSE.
+ * packs the day they arrived: not at all. THE PACK FILE IS THE PROSE.
  * Its `summary`, its `fill` hints and its labels are what a stranger reads on the plan before pressing
  * install, which is this rule's reader exactly. So the member is walked from its root, and a
  * `.pack.json` and a `.js` script are read beside `.ts` and `.svelte`. Measured on 24 September over

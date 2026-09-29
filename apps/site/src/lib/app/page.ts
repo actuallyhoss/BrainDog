@@ -83,7 +83,7 @@ export const isLead = (segment: Segment): boolean => segment.type === 'block' &&
 
 /**
  * THE PAGE'S OPENING SENTENCE, as plain words: the first `note lead` in its source, or `''` when it has none. The new
- * app says it under the page's title (SYSTEM §5, the sentence), so the drawn app reads it off the same text the page
+ * app says it under the page's title (the design system's sentence), so the drawn app reads it off the same text the page
  * is drawn from rather than keeping a second copy.
  */
 export function leadOf(src: string): string {

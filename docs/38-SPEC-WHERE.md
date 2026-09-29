@@ -928,7 +928,7 @@ run), { numRuns: FC_RUNS, endOnFailure: true })`. On failure fast-check prints `
 as `test/seeds/<yyyymmdd>-<n>.json` — `{ "seed": …, "path": "…", "note": "one sentence" }` — and **the test file
 replays every file in `test/seeds/` first**, each as `fc.assert(prop, { seed, path, numRuns: 1 })`, before the random
 runs. A counter-example is never deleted (30 §14). The `where-property` gate row of 33 §8 runs this file with
-`FC_RUNS=10000` under `node --test`, not Vitest (BUILD.md's recorded deviation; §13).
+`FC_RUNS=10000` under `node --test`, not Vitest (a recorded deviation; §13).
 
 ### 9.7 · Gates this spec owns
 
@@ -984,7 +984,7 @@ platform's, in Node and in every browser the web app targets.
 
 ## 12 · Build order
 
-**Needs first:** nothing but the toolchain of BUILD.md — Node 24.13.0, pnpm 11.25.0, TypeScript 6.0.3. `where` has
+**Needs first:** nothing but the pinned toolchain — Node 24.13.0, pnpm 11.25.0, TypeScript 6.0.3. `where` has
 in-degree 0 in the package graph (31 §2, position 3). It is written third only because `render` and `ports` are the
 first two artefacts of 30 §14 and share the phase.
 
@@ -997,13 +997,13 @@ first two artefacts of 30 §14 and share the phase.
 | `extract` 43 | `compile` over `INBOX_RAW` for `match:` |
 | `record` 45 | `compile` for `list`, pages, rules, metrics, alarms, locks, predictions; `evaluate` for the write path |
 | `apps/web` 50 | the browser entry for the query builder (21 §4) |
-| phase 0 close | "the property test runs 1,000 cases" (BUILD.md) is this package's `FC_RUNS` default |
+| phase 0 close | "the property test runs 1,000 cases" is this package's `FC_RUNS` default |
 
 ---
 
 ## 13 · Decisions taken here
 
-Four the brief asked for, then the smaller ones the design documents left open. Each names the document to amend
+Four asked for up front, then the smaller ones the design documents left open. Each names the document to amend
 in the same revision (35 §1).
 
 **1 · ASCII folding in the oracle.** The evaluator folds `A–Z` only, for `contains`, `starts`, `ends`, `matches` and
@@ -1039,7 +1039,7 @@ is `declare`'s".
 
 | Decision | Amend |
 |---|---|
-| `MATCH_OP_UNSUPPORTED` is the one code for *this test cannot apply here*: the six absent `inbox_raw` operators, an operator outside `APPLIES[type]` on either backend, a literal of the wrong JS type, `near` off the last leaf of the root `all`. No code for operator × type existed; a new one is refused by the brief; the precedent is `TRANSITION_ILLEGAL` — one code, two moments | 30 §6, its row |
+| `MATCH_OP_UNSUPPORTED` is the one code for *this test cannot apply here*: the six absent `inbox_raw` operators, an operator outside `APPLIES[type]` on either backend, a literal of the wrong JS type, `near` off the last leaf of the root `all`. No code for operator × type existed; no new one is added; the precedent is `TRANSITION_ILLEGAL` — one code, two moments | 30 §6, its row |
 | `FIELD_UNKNOWN` also covers an unknown `predicate:` name and a `via` target register that is not installed — the path and `fix` disambiguate | 30 §6, its row |
 | `RELATIVE_UNIT_FOR_DAY` is unreachable from `where` (34 §1.4 already says `h` is not a unit); its row moves to `declare`'s `remind:` check so the fixture gate has a producer | 30 §6 |
 | `PATTERN_OVER_CAP` measures the **escaped** `starts`/`ends` literal against 40 bytes — a 40-byte literal of `%` would escape to 80 and meet workerd's 50 — and also fires for a `matches` phrase over 200 bytes, which had a cap and no code | 34 §1.10, 30 §6 |
@@ -1049,7 +1049,7 @@ is `declare`'s".
 | `in` chunking is kept as written and bounds nothing: the 100-parameter ceiling is the adapter's and holds the predicate to ~95 literal values; the 130-value case in §9.5 pins the shape and is over the ceiling on purpose. The upgrade is one JSON parameter through `json_each(?)` — a fourth subquery form | 30 §7, 34 §1.10 |
 | `ctx` gains `schemas`; `ctx.now` is an RFC 3339 UTC string; `compile(null, ctx)` is the absent `where:` | 34 §1.11, 30 §7 |
 | `Refusal` is declared in `where`, the lowest package that raises one; `declare` and `kernel` import the type | 30 §6 |
-| `FC_RUNS` defaults to 1,000 (BUILD.md, phase 0); the `where-property` gate runs 10,000 nightly under `node --test` | 33 §8, its row |
+| `FC_RUNS` defaults to 1,000 (phase 0); the `where-property` gate runs 10,000 nightly under `node --test` | 33 §8, its row |
 | Spoken `register#seq` ref literals pass `validate` and are bound as given by `compile`; the record rewrites them to ids at install, because resolution needs rows and a fourth subquery is refused | 34 §1.1 |
 | The six kernel fields are typed: `id` ref · `seq` int · `created_at` `updated_at` instant · `version` int · `state` its enum, only when declared | 02 §6 |
 | `near` carries a `field:` (34 §1.2: "every other leaf has one") of type `text` or `document`; it validates, compiles to `uses.vec = true`, evaluates `true` | 34 §1.1 EBNF (its `leaf` rule shows `matches` without a subject) |
@@ -1077,7 +1077,7 @@ is `declare`'s".
 - [ ] The fourteen `GRAMMAR_CODES` each have a `fixtures/refusals/<kebab>.yaml` that `validate` produces, and the `refusal-fixtures` gate passes.
 - [ ] No compiled statement in any test contains `"`, an unlisted `'…'` literal, or a `?` count different from `params.length`.
 - [ ] The fourteen `ponytail:` comments of §10 are in the source, verbatim.
-- [ ] The amendments of §13 are applied to 02, 30, 31, 33 and 34 in the same revision, and BUILD.md's loop table records the iteration.
+- [ ] The amendments of §13 are applied to 02, 30, 31, 33 and 34 in the same revision.
 - [ ] `kernel`'s index DDL and `searchText` (41) and `declare`'s lint (42) import from this package and nowhere else.
 
 ---

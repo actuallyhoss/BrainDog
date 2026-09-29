@@ -60,7 +60,7 @@ const SAMPLES = {
      the refusal "the record was not reached", and a refusal on a route outside `MAY_REFUSE` is a finding. */
   '[view]': 'obligations.open',
   /* ANY TOKEN, AND ON PURPOSE. `9f2a7c41d8b3` was the one token that opened the sample's Money page; the sample is
-     gone (DIRECTION 26) and every token now draws the same card, "This link does not open a page". That card is still
+     gone and every token now draws the same card, "This link does not open a page". That card is still
      measured and not dropped: it is the whole of what `/s/[token]` draws, it is the one screen a stranger arrives at,
      and a route with no sample is a failure of both browser gates. The token names what it is rather than a page. */
   '[token]': 'no-page-yet',
@@ -71,8 +71,7 @@ const SAMPLES = {
  *  known by the `pack:` its declarations carry, and `braindog-starter` is only the document's name.
  *
  *  `/jobs/[id]` NOW READS THE RECORD, and `j_none` settles `empty` ("This run is not on this record")
- *  rather than drawing a refusal: the sample's `j_7Q2F` went with the sample (DIRECTION
- *  26), and an id naming no run is the calm not-found empty, not a failure.
+ *  rather than drawing a refusal: the sample's `j_7Q2F` went with the sample, and an id naming no run is the calm not-found empty, not a failure.
  *
  *  TWO APPS SHARE ONE PATTERN STRING. `/packs/[id]` is both the record app's pack detail (`people`, a
  *  pack the seeded record holds) and the site's public listing (`lib/packs/catalogue.ts`'s `listed()`,

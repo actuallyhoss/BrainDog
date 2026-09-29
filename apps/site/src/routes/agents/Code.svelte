@@ -80,7 +80,7 @@
     flex: none;
   }
 
-  /* THE TILE'S SECOND FILL, as a key cap and a field are (SYSTEM §2), in ink and the mono face: a panel inside a tile,
+  /* THE TILE'S SECOND FILL, as a key cap and a field are (the design system), in ink and the mono face: a panel inside a tile,
      never a tile of its own and never a dark slab dropped into a light one. */
   .code-text {
     margin: 0;

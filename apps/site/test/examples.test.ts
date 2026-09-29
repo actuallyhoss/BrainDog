@@ -92,7 +92,7 @@ test('the page ids of each example are unique, and its first page is its Home', 
 
 /**
  * EVERY READING LINE NAMES A SEGMENT THE PAGE HAS, and a block rather than prose. The drawn app sets `reads[at]` under
- * the tile of segment `at` (SYSTEM §6, a chart's one written line), so a fence added above it would move the sentence
+ * the tile of segment `at` (in the design system, a chart's one written line), so a fence added above it would move the sentence
  * onto the wrong chart without anything else failing.
  */
 test('every reading line sits under a block the page has', () => {

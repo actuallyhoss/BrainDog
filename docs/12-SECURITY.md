@@ -84,8 +84,7 @@ fallback code field.
 Every token records `last_used_at` and the surface it was used from, and the app lists them with
 a revoke button. A credential you cannot see being used is a credential you cannot know is stolen.
 
-**What sign-in became before a stranger could sign up** (*amended September 28th 2026 against the tree: OPS-6,
-OPS-7, OPS-10, OPS-17, OPS-21; OPS-28 records it*):
+**What sign-in became before a stranger could sign up** (*amended September 28th 2026 against the tree*):
 
 - **User verification is required** in both passkey ceremonies and the flag is checked, so a key that does not
   verify its holder is refused; a security key with no PIN is one, and the mailed link is the way in for it.
@@ -122,7 +121,7 @@ and permits request interleaving (a correctness bug), **and** an object that can
 cannot exfiltrate (a security property). When a correctness rule and a security rule want the same
 constraint, take it.
 
-*(Added September 22nd 2026 for scripts, DIRECTION §22.)* **A person's or an agent's script does not change this,
+*(Added September 22nd 2026 for scripts.)* **A person's or an agent's script does not change this,
 because the record never runs one.** A `script` declaration that is due writes one `script.run` outbox row, and a
 host leases it and runs the source in a sandbox: QuickJS on a self-host, a Dynamic Worker the record's object loads
 on the Cloud ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.23, [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.19). The record
@@ -274,7 +273,7 @@ Default off, because a founder locking themselves out of their own hosting crede
 likely disaster than us reading them. Offered prominently, with the consequence in the same
 sentence as the switch.
 
-*(Built September 26th 2026, `loop/finish/platform.md` §4.0 V.)* Two VAULT methods,
+*(Built September 26th 2026.)* Two VAULT methods,
 `setVaultPassphrase({ passphrase })` and `clearVaultPassphrase({ passphrase })`, held to rule 2's gate: an
 owner in a browser, proved in the last fifteen minutes, and every token refused. Each host answers them
 through `withVaultPassphrase` (`packages/host/src/passphrase.ts`), which takes the passphrase off the
@@ -315,7 +314,7 @@ handed wrapped bytes and a salt and never the passphrase or a key. The details:
 
 ```
 id           the grant id, `g_` + ULID, minted by `bindGrant` — the value a `secret` field stores
-label        "Cloudflare — Quartz account"
+label        "Cloudflare — main account"
 opens        ref → register.services #12
 kind         api_token | password | ssh_key | recovery_codes | note
 ciphertext   BLOB      nonce        BLOB      -- the current version
@@ -384,7 +383,7 @@ FOR" is structural rather than remembered.
    person, and the value leaves in the same one answer with `no-store`. The Keys screen is the only caller:
    it puts a key in, replaces one row's value, and reveals one for thirty seconds, clearing the clipboard after
    sixty. `/api/vault/deposit` and `/api/vault/open` are unchanged and still refuse a page, whatever its origin.)*
-   *(Amended September 25th 2026, `loop/finish/agents.md` C1: an agent may ADD a key with its login token, and only
+   *(Amended September 25th 2026: an agent may ADD a key with its login token, and only
    add one. `POST /api/vault/deposit` also takes `Authorization: Bearer <rec>.<token>`, a live token of scope `write`
    on the keys list, checked as every `/api` bearer is, and only when the bearer is not a vault grant. Its body is
    `{ label, opens, kind?, value }`; a `project` or a `credential` in it is `VALUE_MALFORMED`, because the key goes to
@@ -396,7 +395,7 @@ FOR" is structural rather than remembered.
    `no-store`, the events are `grant.add` and `create`, signed by the run, and the row's origin reads
    `<agent> on <machine>, S<n>`. `POST /api/vault/open` still takes a vault grant and nothing else. `braindog keys put`
    sends the vault grant when one is held and the login otherwise, and `braindog tools scan` deposits through it.)*
-   *(Added September 15th 2026, `loop/research-agent-path.md` step 18. `tools/gates/secret-grep.mjs` holds
+   *(Added September 15th 2026. `tools/gates/secret-grep.mjs` holds
    the value's shapes in the three files that may name it, and follows a call to a function in the same file
    whose return type names the brand.)*
    *(Added September 15th 2026, later the same day: the Worker's key store. `apps/worker/src/keys.ts` reads the
@@ -445,7 +444,7 @@ never opened the vault all ask the same way.
 | The grant is **revocable on its own**, without ending the session | it is a separate long-lived token, 90 days, stored as `token_hash`, because revocation is real. `expires` holds the code's ten minutes while pending and is rewritten when the poll exchanges an approved row (approved → active), once: a second poll is refused. A `login` exchange mints an ordinary `token` row through `createToken` (scope `write`, 90 days, the device's label, owned by the approver), so there is one bearer format and one verifier, and revoking the grant revokes that token. A device silent for 14 days, counted through its token for a login, is moved to `expired` by the hourly sweep and its token revoked |
 | **And it is the tier-C runner's enrolment flow too** — [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2.3 had a bespoke one; there is now one — **and the operation grant's** (§3), **and the vault grant's**. The row's `reach` says which: `login` · `runner` · `export` · `import` · `pack` · `token` · `vault` — seven values since kernel migration 4. A `runner` exchange returns the 90-day bearer; an operation reach returns a bearer that keeps the code's ten minutes and is spent on one call; a `vault` reach carries `scope`, a project row id or `*`, and returns a bearer that opens that scope's keys for 30 days, or 7 for `*`, checked by `vaultGrant` and never by `verifyToken` | one flow to secure, and it is a standard |
 
-**The `runner` reach, in use** *(added September 28th 2026, `loop/finish/agents.md` C13 and C14)*. `braindog runner
+**The `runner` reach, in use** *(added September 28th 2026)*. `braindog runner
 enrol <host>` asks with `reach: 'runner'`, and the 90-day bearer it gets back is kept in the hosts file beside the
 login, never in its place ([48-SPEC-CLI](48-SPEC-CLI.md) §5.13). That bearer reaches three doors and nothing else:
 `claimJob`, `postJobEvent` and `readCancel` (`packages/record/src/jobs.ts`). The host builds the runner's principal from
@@ -475,7 +474,7 @@ in §7 says so.
 
 ### 6.2 · Where a key may go, and who may open it
 
-*Added September 22nd 2026, for Slash's three tiers and for scripts, and revised the same day for wave thirty-seven,
+*Added September 22nd 2026, for Slash's three tiers and for scripts, and revised the same day,
 checked against `packages/host/src/actions.ts`, `packages/host/src/script.ts`, `packages/host/src/script-try.ts`,
 `packages/host/src/slash.ts`, `packages/kernel/src/script.ts` and both apps' `keyOpener` at `d23ac77d`.*
 
@@ -507,11 +506,10 @@ open one:
    The grant's `opens` is read as a host name when it parses as one (`api.gold.test`, `api.gold.test:8443` and
    `https://api.gold.test/v1` all name `api.gold.test`) and compared with the fetched URL's host exactly, with no
    subdomain let in: `opens: stripe.com` does not open `api.stripe.com`. An `opens` that names no host, such as "the
-   Bake test account", sends the key nowhere. A fetch that breaks this is `FORBIDDEN` and refuses the whole run,
-   however the script handles it, as an undeclared key does. Measured before it, by the audit of wave thirty-five
+   shop's test account", sends the key nowhere. A fetch that breaks this is `FORBIDDEN` and refuses the whole run,
+   however the script handles it, as an undeclared key does. Measured before it
    on the self-host runner: `goldapi`, whose row opens `api.gold.test`, was sent as a bearer to `collector.test`,
-   because that origin was also in the script's `egress:` (`loop/research-batch-thirty-five-audit.md` §2;
-   `apps/selfhost/test/script-key-egress.test.ts`).
+   because that origin was also in the script's `egress:` (`apps/selfhost/test/script-key-egress.test.ts`).
 5. **No script may name the vault's `slash` key**, whatever it opens, because on a host with no `SLASH_KEY` it is
    the key the included model answers everybody with, the same reason Slash refuses it as a tier `b` key. The kernel
    refuses it at install and before a trial (`scriptBody`, `FORBIDDEN` at `keys[i]`), and both hosts refuse a run
@@ -524,7 +522,7 @@ open one:
    upper-case and with lower-case hex; and base64, standard and URL-safe, at each of the three offsets the key can
    start at inside a longer encoded run, so `btoa('Bearer ' + key)` is caught as well as `btoa(key)`. Before it only
    the exact bytes were scrubbed, and a provider that echoed the header in any of the other spellings handed the key
-   to the script, and from there to a row or the run's log (the same audit's §4).
+   to the script, and from there to a row or the run's log.
 7. **Redirects stay on the approved origin**, three at most, each hop checked again.
 
 **What is not built.**
@@ -628,7 +626,7 @@ removes our access going forward, and removes it from the backups thirty days la
 
 ### A person's script: the sandbox and its ceilings
 
-*Added September 22nd 2026 for DIRECTION §22, and revised the same day for wave thirty-seven, checked against
+*Added September 22nd 2026, and revised the same day, checked against
 `packages/script`, `packages/kernel/src/script-run.ts`, `packages/record/src/index.ts` and both hosts at
 `d23ac77d`.* A script is somebody's code, so the argument is not that it is harmless but that
 everything it can reach is enumerated and each limit is held outside it.
@@ -660,13 +658,13 @@ refused `OUT_OF_BOUNDS` when the run starts. What else is held:
   script until the owner resumes it, in a browser.
 - **Each run starts clean on both hosts.** The self-host starts a new QuickJS instance per run; the Cloud loads a new
   Worker per run with `env.LOADER.load`, so nothing a run leaves on `globalThis` or in module state reaches the next.
-  Before that the Cloud cached one Worker per script version, and the audit of wave thirty-five measured a second
-  run reading what the first had left there (`apps/worker/test/script-isolation.test.ts`).
+  Before that the Cloud cached one Worker per script version, and a second run was measured
+  reading what the first had left there (`apps/worker/test/script-isolation.test.ts`).
 - **What a script logged is shown only to whoever may read what it touched.** A run's `ctx.log` is kept on its
   event with the lists its version read and wrote, and `recentHistory` and `whatsNew` hand the log only to an owner
   in a browser who reads every one of those lists (`logOf`, `packages/record/src/index.ts`); everybody else sees the
   run, its outcome and its counts, and `--redacted--` for the log. A token, the owner's included, never reads it.
-  Before that a member refused `list money` read a salary from a run's log line (the audit's §1).
+  Before that a member refused `list money` read a salary from a run's log line.
 - **A refused or failed run's note carries none of the script's words.** The note is on a line every whole-record
   reader sees, so it says only that the run did not finish and that its log says why; the reason, which can quote a
   thrown message or a list name the script made up, goes first in the guarded log (`finishScript`,
@@ -675,7 +673,7 @@ refused `OUT_OF_BOUNDS` when the run starts. What else is held:
   the caller's own reads instead of `system`'s, since nobody approved the draft's `reads:`, and with no vault for any
   caller but the owner signed in as a person (§6.2). It is metered as a run on the plan's allowance.
 
-The findings of `loop/research-batch-thirty-five-audit.md` about scripts (the log, the key's host, the `slash` key,
+The findings of the scripts audit (the log, the key's host, the `slash` key,
 the scrub, module state and `wall_ms`) are closed as above and in §6.2. **What is still open** is §6.2's *What is
 not built*: the install line does not say which host each key goes to, and a key whose `opens` is not among the
 script's origins is refused only when the script runs. The Cloud's memory ceiling is the platform's, and no deploy
@@ -690,7 +688,7 @@ Carried from the predecessor, where each was earned:
 | A `401` says only `UNAUTHORIZED`; a `500` is bare | recon gets nothing |
 | **No CORS, anywhere**; every JSON answer is `no-store` | — |
 | The login lockout **reserves the attempt before comparing**, compares ten attempts and refuses the eleventh with a bare `429` and `Retry-After` for fifteen minutes, sticky, on a capped counter that forgets a first strike fifteen minutes old and that a success clears for its address; the address is the socket's, or behind a proxy named with `BRAINDOG_TRUST_PROXY=1` the last `X-Forwarded-For` entry; it is keyed four ways — `ip:` `email:` `mint:` `device:` — and **fails closed** — a reservation that returns no row is a `503`, not a pass. Device codes and share tokens are locked out on the record's own `auth_fail`, logins on the Directory's ([49-SPEC-SELFHOST](49-SPEC-SELFHOST.md) §5.5) | the magic-link fallback code is short-lived and guessable in principle; the lockout is what makes any code field acceptable |
-| **Agent tokens bypass the lockout, deliberately** | *"an agent tripping the ten-strike IP block would lock Sam out of his own brain"* |
+| **Agent tokens bypass the lockout, deliberately** | *"an agent tripping the ten-strike IP block would lock the owner out of his own record"* |
 | Every sign-in failure is **one body**, `401 UNAUTHORIZED` "That did not sign you in.", whatever failed: a passkey, a link, the server key or a session. The reason is logged, not returned | the caller who deserves the reason is the owner, who reads the log |
 | Passkey registration requires an authenticated session **in place of attestation** | *"behind the gate… is the security model in one line"* |
 | **Two fleet-wide levers, both the host's**: the Directory's session, link and challenge hashes are HMAC-SHA-256 under the host's session key (`SESSION_SECRET` on the Worker; on a self-host, HKDF over the key file with the info `braindog/session`, or `BRAINDOG_SESSION_SECRET`), and `TOKENS_VALID_FROM` refuses anything minted before it | rotate one secret and every session is gone; set one date and every token is gone — an incident response that walks no rows ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.11) |
@@ -719,7 +717,7 @@ The rules for `file` and the `/a/<sha256>` route, all from the predecessor and a
 - Served with `nosniff`, `default-src 'none'; sandbox`, `private`, immutable, so a file opened as a page
   runs nothing and no shared cache keeps it.
 - 2 MB, checked against `Content-Length` before reading and against the bytes as they arrive.
-- **The route is `/api/files`, and it asks who you are** (OPS-20). The earlier `/a/<sha256>` was
+- **The route is `/api/files`, and it asks who you are.** The earlier `/a/<sha256>` was
   never forwarded by the site, and "the URL is the capability" made a hash seen once a key for
   ever. Now `PUT /api/files` takes a session cookie from the page's own origin, or a `write` bearer,
   and the server hashes what arrived and answers `{ sha256, mime, bytes }`; `GET

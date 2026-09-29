@@ -129,12 +129,12 @@ test('the files that once waited on a seed subpath are red if they read the root
 });
 
 /* A WORD THAT ENDS IN `import` IS NOT AN IMPORT. The pattern opened on `\bimport`, and `\b` sits between `-` and `i`, so
-   the words `legacy-import` in a component's markup, which no lexer blanks, read as a bare import of whatever string
+   the words `csv-import` in a component's markup, which no lexer blanks, read as a bare import of whatever string
    came next; a method called `import` on an object read as a dynamic one. */
 test('an import keyword is not read out of a longer word, a method or a property', () => {
   const code = uncommented(
     [
-      "<p>Run legacy-import './fixtures/sample.ts' to fill it.</p>",
+      "<p>Run csv-import './fixtures/sample.ts' to fill it.</p>",
       "loader.import('./fixtures/two.ts');",
       "const $import = (p) => p; $import('./fixtures/three.ts');",
       "const re-export = 1; re-export * from './fixtures/four.ts';",

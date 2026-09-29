@@ -22,7 +22,7 @@ export const cases = {
     /* The phone's fourth tab, and what its list of the other pages is called, as `apps/web` says both. */
     more: 'More',
     morePages: 'More pages',
-    /* THE RAIL'S ASK FIELD AND ITS AGENTS, in the new app's words (SYSTEM §5). Both are drawn, not pressed. */
+    /* THE RAIL'S ASK FIELD AND ITS AGENTS, in the new app's words (the design system). Both are drawn, not pressed. */
     ask: 'Ask, add or find',
     working: 'Working now',
     toDecide: (n: number) => `${n} to decide`,
@@ -38,7 +38,7 @@ export const cases = {
       'An example record, drawn by BrainDog’s own renderer. Pick who it is for, open a page, or answer a question. ' +
       'Every page shows its source.',
     /* THE PAGE WRITTEN FOR EACH KIND OF PERSON, by the example's id (`lib/examples/types.ts`). The
-       addresses are the site's own prerendered pages under `/for/` (SIT-15). */
+       addresses are the site's own prerendered pages under `/for/`. */
     moreFor: {
       personal: { href: '/for/personal', label: 'More for personal records' },
       student: { href: '/for/students', label: 'More for students' },

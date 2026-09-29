@@ -3,7 +3,7 @@
  *
  * THE FILE AS WRITTEN, title line and fences included, so an agent reads what a person sees drawn and
  * can write a page of its own from the same grammar. Prerendered like the page beside it, from the same
- * glob, so the two addresses exist together or not at all (site.md C7).
+ * glob, so the two addresses exist together or not at all.
  *
  * `text/markdown` IS SAID HERE for the dev server and the prerender. Once built, the file is served by
  * the static host, which names its type from the `.md` on the end.

@@ -33,8 +33,8 @@ export default {
        resolves to `/_app/` and the page was whole; at `/a/b`, `/changelog/x`, `/app/signin` or
        `/api/` it resolves to `/a/_app/` and the like, which is itself a path with no file, so all
        16 stylesheets and modules came back as the 404 page's HTML. Chromium drew it in "Times New
-       Roman" and threw "Failed to fetch dynamically imported module" on 23 September
-       (`loop/research-batch-fifty-audit.md` §1). The site is only ever served at the root of its
+       Roman" and threw "Failed to fetch dynamically imported module" on 23 September.
+       The site is only ever served at the root of its
        host, so nothing else moves. `test/not-found-depth.test.mjs` holds the built page to it. */
     paths: { relative: false },
     /* THE SCRIPT POLICY IS HERE AND NOT IN `static/_headers`, because a header cannot name the one

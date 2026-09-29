@@ -4,7 +4,7 @@
   /* ===========================================================================================
      THE MARKETING SITE, AND SINCE THE ONE-DOMAIN FLIP THE ADDRESS THE APP IS REACHED THROUGH.
 
-     ONE DOMAIN (`loop/DIRECTION.md` §26). This Worker holds `brain.dog` as its Custom Domain and
+     ONE DOMAIN. This Worker holds `brain.dog` as its Custom Domain and
      answers everything on it: the site's own pages from its assets, and the app's doors (`/app`,
      `/api/*`, `/auth/*`, `/account/*`, `/mcp`, `/in/*` and OAuth's `/oauth/*`, with the build id,
      OAuth's metadata under `/.well-known/` and `/healthz` beside them) handed to the app Worker
@@ -22,8 +22,8 @@
      no `main` because a script here would never execute on the happy path "and executes on every
      404", a place for logic to accumulate. The second half is not what happens with
      `not_found_handling` "404-page": a miss is answered by the asset layer and never reaches the
-     script. Measured through `wrangler dev -c site -c app` on 23 September
-     (`loop/research-one-domain-binding.md` section 2.1): `/nope/deep/er` with and without an
+     script. Measured through `wrangler dev -c site -c app` on 23 September:
+     `/nope/deep/er` with and without an
      `Accept`, a POST and a PUT to it and a POST to `/pricing` answered the 404 page or a 405, and
      the script's log line appeared for none of them; it appeared for every path in
      `run_worker_first` and for no other. So `src/worker.ts` is one line that hands those paths to
@@ -96,10 +96,10 @@
   "env": {
     /* PRODUCTION IS THE ONE ENVIRONMENT DEPLOYED. It holds `brain.dog`, the one domain, and hands
        the app's routes to `braindog-production`. The app keeps no name of its own beyond
-       `app.brain.dog`, which sends a browser to `brain.dog` (`loop/DIRECTION.md` §26).
+       `app.brain.dog`, which sends a browser to `brain.dog`.
 
        `env.alpha` BELOW IS KEPT ONLY FOR A FUTURE REHEARSAL, AND IT IS NOT DEPLOYED. Its app Worker,
-       `braindog-alpha`, was deleted on 25 September (`loop/DIRECTION.md` §27), so an alpha site
+       `braindog-alpha`, was deleted on 25 September, so an alpha site
        deployed now would hand every door to a service that does not exist. `deploy.yml` runs its
        alpha steps only when the repository variable `DEPLOY_ALPHA` is `true`, so that variable stays
        unset while the app Worker is gone. The block stays so that a rehearsal, the day one is wanted
@@ -108,7 +108,7 @@
        THE APEX, AND `www` IS NOT HERE. A Worker can hold several Custom Domains, but this one's code
        runs only for the app's doors, and widening it to move `www` to the apex would be writing a
        request handler for a redirect Cloudflare performs at the edge for free. The `www` to apex
-       redirect is a single dashboard Redirect Rule; REPORT.md §1 has it as a numbered step. */
+       redirect is a single dashboard Redirect Rule. */
     "production": {
       "routes": [{ "pattern": "brain.dog", "custom_domain": true }],
       "services": [{ "binding": "APP", "service": "braindog-production" }],
@@ -122,8 +122,7 @@
       "send_email": [{ "name": "EMAIL" }]
     },
 
-    /* EACH ENVIRONMENT HANDS ITS APP'S DOORS TO ITS OWN APP, alpha from push 1 and production
-       from push 3 (`loop/research-one-domain-binding.md` section 4). A service binding in place of
+    /* EACH ENVIRONMENT HANDS ITS APP'S DOORS TO ITS OWN APP. A service binding in place of
        zone routes means no route is written, so the deploy token needs no Zone permission, and
        everything the move adds lives in the site's version, so undoing it is `wrangler rollback`.
 
@@ -131,22 +130,22 @@
        off it answers the site's 404 page on the site's own name and nothing fails at deploy time;
        `/a`, `/s` and `/ws` are in the app's own list and unbuilt, so they stay the site's 404 page
        here. `/mcp/` is listed beside `/mcp` because `servesMcp` accepts the slash and an MCP client
-       configured with it reached the site's 404 page in the survey (section 2.6). The bare `/auth`,
-       `/api`, `/in` and `/account` are not listed, as A2's zone routes did not list them. The Worker
+       configured with it reached the site's 404 page. The bare `/auth`,
+       `/api`, `/in` and `/account` are not listed, as the old zone routes did not list them. The Worker
        claims `/.well-known/braindog-build` and the OAuth `.well-known` paths by name, never
        `/.well-known/*`, because `security.txt` is the site's.
 
-       OAUTH IS A DOOR OF THE APP (`loop/finish/agents.md` C4): `/oauth/*` is where an MCP client
+       OAUTH IS A DOOR OF THE APP: `/oauth/*` is where an MCP client
        registers, sends the person's browser to sign in and trades its code, and the metadata it
        discovers from `/mcp`'s 401 is the protected resource's (with its `/mcp` form under it, as
        RFC 9728 inserts a resource's path) and the authorization server's. `oauth.ts` in the app
        answers every path under them, a 404 in OAuth's words for one that names nothing.
 
        `/healthz` IS THE APP'S LIVENESS ANSWER (deb5b703), matched in its `src/index.ts` ahead of
-       every predicate in `src/route.ts`, and it was off this list for a wave: `alpha.brain.dog/healthz`
+       every predicate in `src/route.ts`, and it was off this list for a while: `alpha.brain.dog/healthz`
        was this site's 404 page, a monitor's red from the wrong Worker, while
        `apps/worker/test/site-binding.test.ts` stayed green because it read only six of those
-       predicates (`loop/research-batch-fifty-five-audit.md` section 3). That test now reads every
+       predicates. That test now reads every
        branch the app's `route()` takes on a path and holds this list to them in both directions.
 
        `APP` NAMES THE SAME ENVIRONMENT'S APP. A site bound to the other environment's app would

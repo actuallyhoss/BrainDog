@@ -17,7 +17,7 @@ const C = budget('colourGrep');
 
 /* `negative` IS THE GATES' OWN SEEDED VIOLATIONS. `self-test.mjs` aims each gate AT that directory
    on purpose; an ordinary run must not find the violations that are there to be found. */
-/* `docs` and `loop` are prose about colours rather than colours, and `negative` is this gate's
+/* `docs` and the untracked notes folder are prose about colours rather than colours, and `negative` is this gate's
    own seeded violation. Everything else a gate never walks into is `skipDir`. */
 const SKIP = new Set(['docs', 'loop', 'negative']);
 

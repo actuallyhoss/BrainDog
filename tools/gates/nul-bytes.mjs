@@ -22,7 +22,7 @@
  * and eight more had already landed.
  *
  * THREE WERE A WORD-BOUNDARY ESCAPE THAT LOST ITS BACKSLASH and left a literal BACKSPACE behind.
- * The loop's own instructions named a scratch directory under TEMP that no shell would resolve; a
+ * A set of working instructions named a scratch directory under TEMP that no shell would resolve; a
  * research note named the repository it was about with two separators missing; and, with a straight
  * face, a comment in `clean-room.mjs` explaining what a regex word boundary does had eaten the
  * boundary. All three read correctly to a human eye, which is the whole of the problem.

@@ -54,7 +54,7 @@ const CASES = [
      header) plus the two rules the table does not number, and this is where the finding that started
      this work landed: the gate seeded TWO cases for TWELVE-ish rules, so one working rule
      (`unknown-property`, below) made every other one look alive, including the four that had never
-     fired once. `loop/finding-css-rules.md` is the record of it. One fixture per rule now, each one
+     fired once. One fixture per rule now, each one
      crafted so it trips EXACTLY the rule under test and nothing else. A fixture that also fires
      `unknown-property` on an incidental `var()` would assert a count that means something else. */
   { gate: 'css-rules-colour', run: 'css-rules', expect: /never a colour/, findings: 1 },
@@ -202,7 +202,7 @@ const CASES = [
      the record enforces moved away from `budgets.json`'s `report.rowsPerMinute`. One each, so both halves are proved. */
   { gate: 'guards-report', run: 'guards', expect: /spends no reportBudget/, findings: 1 },
   { gate: 'guards-report-budget', run: 'guards', expect: /report.rowsPerMinute is/, findings: 1 },
-  /* AND THE HALF OF THE SURFACE WRITTEN SINCE ARC-6: a row under `packages/host/src/routes/` and its method under
+  /* AND THE HALF OF THE SURFACE WRITTEN IN ITS OWN FILES: a row under `packages/host/src/routes/` and its method under
      `packages/record/src/methods/`, where `triage` is routed DATA and guarded `admin(ctx)`. A gate that read only the
      two index files would find no row to check and pass. */
   { gate: 'guards-methods', run: 'guards', expect: /routed as DATA and is guarded by admin\(\)/, findings: 1 },
@@ -269,18 +269,6 @@ const CASES = [
      through it, because one line still named the bypass. `total` makes that second line a failure. */
   { gate: 'slash-actor', expect: /slash wrote \w+, in the seed record/, findings: 1, total: 1 },
 
-  /* THE ONE GATE THAT STANDS A HOST UP, and the fixture is a miniature of the whole arrangement for
-     the reason `slash-actor`'s is: what is under test is the gate as CI runs it, which here means an
-     onboarding, an install, a command that talks over a socket and a record that can say no. The
-     seeded violation is that last part and only that part: `things.name` is at most eight characters
-     on the fixture's record, and the planner emits `Lanternly`, which is nine.
-
-     TWO PLANNED ROWS AND ONE FINDING. `Tidepool` is eight and goes in, so a count of one is what
-     proves the gate reads refusals rather than counting the rows it planned; a count of two would
-     mean it had gone red about the import as a whole. The fixture's own command reads the list
-     before it writes, as the real one does, so running it twice adds nothing and the idempotency
-     check does not fire a second finding nobody seeded. */
-  { gate: 'import', expect: /record refused/, findings: 1 },
   /* TWO IN TOTAL, the missing code and its family's size, and the second number is the one a rename
      breaks. Renaming the assistant's family in the gate and not in this fixture's `30 §6` copy made
      the gate print 22 findings here (no Slash family, no SLASH array, and every one of the family's
@@ -304,12 +292,10 @@ const CASES = [
      finding dead ones. */
   { gate: 'flags', expect: /a branch nobody takes/, findings: 1 },
   { gate: 'no-declarations-in-kernel', expect: /declaration written in the kernel/, findings: 1 },
-  /* FIVE SINCE 25 SEPTEMBER: the importer left `apps/cli` for `packs/legacy-import` (brief B2), and its two exemptions and their two seeded files went with it.
-
-     AND TEN SINCE BRIEF B10 STEP 2, the same day, each new one a place the gate did not look or a word
-     it did not know: his host in the kernel, `api.goldapi.io` in a grammar, `acme.example` in an app script,
-     `EGP` in `packages/seed` and `legacyTool` in `apps/web`, the last two once exempted whole. Measured
-     against the gate before the step: it named the first five, and said `packages/seed` was an
+  /* TEN, each a place the gate once did not look or a shape it once did not read: a host in the kernel,
+     a word split over two parts, `api.goldapi.io` in a grammar, `api.mercury.com` in an app script,
+     `EGP` in `packages/seed` and `payrollRun` in `apps/web`, the last two once exempted whole. Measured
+     against the gate before it read those places: it named the first five, and said `packages/seed` was an
      exemption holding nothing, which is a sixth finding this case did not seed. `total` is what turns
      that sixth line into a failure rather than a pass that happened to count five. */
   { gate: 'shell-words', expect: /a use case named in the core/, findings: 10, total: 10 },
@@ -328,14 +314,14 @@ const CASES = [
      it was rendered. */
   { gate: 'dead-copy-orphan', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
 
-  /* AND THE AGGREGATE (ARC-8): `copy` types nothing and spreads an area file, so the seeded sentence is found only
+  /* AND THE AGGREGATE: `copy` types nothing and spreads an area file, so the seeded sentence is found only
      by following the spread to the file that types it. A gate reading only the aggregate finds no key and passes. */
   { gate: 'dead-copy-spread', run: 'dead-copy', expect: /nobody reads/, findings: 1 },
 
   /* `packs/`, THE THIRD WORKSPACE ROOT, ONE FIXTURE PER TEXT GATE THAT READS IT. Each tree holds a
      violation under `packs/` and nothing a gate reading only `packages` and `apps` could find, so
-     dropping `packs` from a gate's list turns its case red here. That is the defect audit sixty-one
-     found (finding 9): all four text gates had the pair written in, and read green over four shipped
+     dropping `packs` from a gate's list turns its case red here. That is the defect an audit
+     found: all four text gates had the pair written in, and read green over four shipped
      packs they had never opened. `tools/gates/test/packs-read.test.mjs` proves the same four under
      `node --test`; this is the copy `run.mjs` runs, so it cannot be skipped by a run that does not
      reach the unit tests. Measured on 24 September by deleting `packs` from each gate's list in a
@@ -358,7 +344,7 @@ const CASES = [
 
   /* AN EMPTY ROOT, ONE PER TEXT GATE, AND THE ANSWER IS A SKIP. Each fixture holds nothing but its
      `expect.txt`, so no `packages/`, `apps/` or `packs/` at all, which is what a mistyped
-     `BRAINDOG_GATE_ROOT` looks like from inside a gate. Audit sixty-six (finding 11) measured the
+     `BRAINDOG_GATE_ROOT` looks like from inside a gate. An audit measured the
      three on such a tree: `em-dash` exited 3, `graph` exited 3 without saying where it had looked, and
      `secret-grep` exited 0, "0 plaintexts reach a sink, over 0 files", which `run.mjs` counts as a
      pass. A gate that read nothing has not passed, and a gate that read nothing somewhere it does not

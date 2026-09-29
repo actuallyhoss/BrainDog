@@ -180,7 +180,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
       {
         name: 'capture typed',
         run: async (page) => {
-          /* BELOW 640 THE CAPTURE LINE IS A SHEET BEHIND THE HEAD'S "+" (design DSN-7), so the act opens it first. */
+          /* BELOW 640 THE CAPTURE LINE IS A SHEET BEHIND THE HEAD'S "+", so the act opens it first. */
           if (!(await page.locator('#capture').isVisible())) await page.click('.capture-open', { timeout: 4000 });
           await page.fill('#capture', 'a');
           await page.waitForSelector('.capture-go, [data-capture-go]:not([disabled])', { timeout: 4000 });
@@ -321,7 +321,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* AN EPHEMERAL PORT, AS `passkey.mjs` AND `queue.mjs` TAKE ONE. This gate used to bind a fixed
        port out of `budgets.json`, and the CI runner is the same PC where sessions run this gate by
        hand, so a CI run and a desk run of it could meet on one port and one of the two would go red
-       for a reason that is not in the tree (`loop/research-ci-gates.md` §2). Port 0 is a port the
+       for a reason that is not in the tree. Port 0 is a port the
        operating system hands out free at the moment of the bind, and every URL below is built from
        what it handed out. `localhost` still, because the bind names no host and takes the dual-stack
        `::`, which is what `localhost` reaches first on this machine. */
@@ -388,9 +388,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
            *
            * `packages/skin/a11y.css` states the rule and names the exact failure it is written against:
            * *"Both axes: a control grown only in height measures 38x44 and fails."* `13 §7` designs the
-           * targets at 44 x 44 CSS px counting `::before`, and `REPORT.md` has claimed for weeks that
-           * every route was measured on a phone with no target under 44px. Measured by hand, once, with
-           * no gate behind it. A review then found the six-option level segment on `/settings/people` at
+           * targets at 44 x 44 CSS px counting `::before`, and every route had been measured on a phone with
+           * no target under 44px by hand, once, with no gate behind it. A review then found the six-option level segment on `/settings/people` at
            * **43 x 36**, on the primary control of that screen.
            *
            * WCAG 2.5.8 is 24px and this product designs to 44. The gate holds the product's number.

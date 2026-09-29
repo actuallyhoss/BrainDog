@@ -1,7 +1,7 @@
 <!--
   One docs page: the section nav, the page drawn by the product's renderer in tiles, and the list of its parts.
 
-  THE LOOK IS SYSTEM §10's, after the Bento board `Light-Docs`: at a desk the nav is a tile at the start, the page is a
+  THE LOOK IS THE DESIGN SYSTEM'S: at a desk the nav is a tile at the start, the page is a
   column of tiles (its opening, then one tile for each `##` part), and "On this page" is a tile at the end; the two
   side tiles stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
   disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list. A code

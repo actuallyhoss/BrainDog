@@ -3,7 +3,7 @@
  *
  *   node --test --experimental-strip-types "apps/site/test/slash.test.ts"
  *
- * DIRECTION 31 RENAMED IT ON 25 SEPTEMBER, AND THE SITE IS WHERE A STRANGER MEETS THE NAME. Measured
+ * THE OWNER RENAMED IT ON 25 SEPTEMBER, AND THE SITE IS WHERE A STRANGER MEETS THE NAME. Measured
  * on a fresh `vite build` of the tree as it stood that morning: `changelog.html` said `Spark` four
  * times, in two entry titles and one body, and no page said `Slash` at all. The changelog is the
  * page a visitor reads to decide whether the product is alive, and it was naming a thing that no
@@ -58,7 +58,7 @@ const words = (html: string): string =>
     .replace(/&([a-z]+);/gi, (whole, name: string) => NAMED[name.toLowerCase()] ?? whole)
     .replace(/\s+/g, ' ');
 
-/* `sparkline` IS A KIND OF CHART AND NOT THE NAME (DIRECTION 31, "Not renamed"), so it is not a hit. */
+/* `sparkline` IS A KIND OF CHART AND NOT THE NAME (the rename's own "Not renamed" list), so it is not a hit. */
 const SPARK = /spark(?!line)/gi;
 
 const announcing = ENTRIES.filter((e) => /\bSlash\b/.test(e.title) && /SPARK_/.test(e.body) && /SLASH_/.test(e.body));

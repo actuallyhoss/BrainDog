@@ -77,7 +77,7 @@ jobs:
       # BEFORE THE 21ST. This job does not build, so under CI `passkey` and `queue` are refused for
       # want of `web-build`, `deploy-parity` for want of `DEPLOY_HOST`, and `self-test` exits red
       # without a build: four red gates on every tag, by construction, found by reading rather than
-      # by a tag push (`loop/research-ci-gates.md` §5). When `ci.yml`'s list changes, this one does.
+      # by a tag push. When `ci.yml`'s list changes, this one does.
       - run: pnpm gates -- --except bundle,keys,prefs,layout,a11y,passkey,queue,self-test,deploy-parity
 
   # AND THE APP TAG STILL HAS TO BUILD. Not to produce an asset, which is what this job used to be
@@ -197,7 +197,7 @@ jobs:
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
-      # AGT-1's `apps/cli/scripts/bundle.mjs` for the CLI and `tsc -p tsconfig.build.json` for the
+      # `apps/cli/scripts/bundle.mjs` for the CLI and `tsc -p tsconfig.build.json` for the
       # renderer, each as its own `build` script. There is no second bundler.
       - run: pnpm --filter ${{ steps.preflight.outputs.name }} run build
 

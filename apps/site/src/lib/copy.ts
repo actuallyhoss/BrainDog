@@ -12,11 +12,11 @@
  *   - Say the limits out loud. A page that lists only strengths is a page nobody believes twice.
  *   - NO EM DASHES, anywhere a person reads. Write two sentences, or use a colon.
  *
- * AND A SIXTH, THE OWNER'S (`loop/DIRECTION.md` §19): a figure earns its place by answering a question
+ * AND A SIXTH, THE OWNER'S: a figure earns its place by answering a question
  * the reader was already asking. The home page counts none of the product's own parts; `/agents` may,
  * because a reader arrives there to ask exactly that.
  *
- * The site describes the finished product in the present tense (`loop/DIRECTION.md` §33). A sentence
+ * The site describes the finished product in the present tense. A sentence
  * that is true only after launch reads a flag in `launch.ts`.
  */
 import { agents } from './copy/agents.ts';

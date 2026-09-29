@@ -26,7 +26,7 @@ So this is not a new kind. **`ingest` gains a `fetch:` block when `channel: pull
 pack kinds stay eight.**
 
 *(Revised September 22nd 2026. A connector is still not a new kind. The kinds grew for other reasons: `script`, a
-person's or an agent's code, joined them in kernel migration 12 under DIRECTION §22, and `job` since; `KINDS` in
+person's or an agent's code, joined them in kernel migration 12, and `job` since; `KINDS` in
 `packages/kernel/src/declare.ts` is the list. §12 says how a script stands beside a connector, and why neither
 replaces the other.)*
 
@@ -209,7 +209,7 @@ token; an unverified payload is stored `untriaged` and never matched ([12-SECURI
 
 ### 3.3 · `call` and `poll`, the scheduled actions
 
-*(Added September 15th 2026 for `loop/DIRECTION.md` §0b.)* Two more channels sit beside `pull` inside the
+*(Added September 15th 2026.)* Two more channels sit beside `pull` inside the
 same `ingest` kind. A **`call`** posts to an endpoint on a schedule. A **`poll`** fetches an endpoint on a
 schedule and acts through a rule only when the answer changes. Both are smaller than a `pull`: one literal
 address, one key and one interval.
@@ -743,7 +743,7 @@ long as UK consent.**
 > already solves the actual job — *knowing what left the account*. If it is ever built, the shape to
 > copy is `we-promise/sure`: a per-household app id and PEM, encrypted at rest.
 
-*(Revised September 22nd 2026 under DIRECTION §22. Ship paste as a door, because a door is a
+*(Revised September 22nd 2026. Ship paste as a door, because a door is a
 primitive. An HSBC SMS pattern is one owner's use case: it belongs in a shared pack a person
 chooses to install, or in their own script or agent writing through the API, and not in the code.
 Measured on that date, `packages/seed` still ships a `bank-from-out-sms` ingest, which is the first
@@ -798,15 +798,15 @@ the same `transactions` list, and the roll above would read it with no change.
 
 ---
 
-## 12 · Scripts beside connectors (DIRECTION §22)
+## 12 · Scripts beside connectors
 
-*Added September 22nd 2026, and revised the same day for wave thirty-seven, checked against
+*Added September 22nd 2026, and revised the same day, checked against
 `packages/kernel/src/script.ts`, `script-run.ts`, `actions.ts` (`scriptEgress`), `packages/script`,
 `packages/host/src/script.ts`, `packages/host/src/script-try.ts`, `packages/mcp/src/index.ts` and both hosts at
 `d23ac77d`, and checked again on September 28th against the same files, `packages/kernel/src/ingest.ts` (the door)
 and `packages/kernel/src/flow.ts` (the rule's step).*
 
-The owner's rule of that day ([DIRECTION §22](../loop/DIRECTION.md)): BrainDog is the shell. The code ships
+The owner's rule of that day: BrainDog is the shell. The code ships
 primitives, doors in and out, schedules, scripts, registers, pages, automations and the vault, and never a use case.
 A currency rate or a message a payment provider posts is something a person or an agent builds on those. For this
 document that settles three things.

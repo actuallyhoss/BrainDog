@@ -8,7 +8,7 @@
  * the record makes about what it holds. `08 §5` says what a point may carry, a short list of columns, and says "never
  * written: field values, note text, register names a customer invented, credential labels, email subjects, amounts".
  * A rule like that is kept by review until the day one extra blob is added for a good reason, so this gate keeps it
- * instead (`52 §5.2`, `loop/finish/ops.md` OPS-23). Three checks:
+ * instead (`52 §5.2`). Three checks:
  *
  * 1. `writeDataPoint(` occurs exactly once under `apps/`, which is `51 §5.18`'s one point per request from one place.
  *    A second call is a second shape nobody compared with the table, and none at all is telemetry that was removed

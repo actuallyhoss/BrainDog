@@ -690,7 +690,7 @@ checksum (K21: `retired` never goes back to 0); then `UPDATE pack SET disabled_a
 `to_v` the same list, all in one transaction; then the cache is rebuilt and derived schedule rows re-armed. The pack's
 version and every `entry` row are unchanged. It reads no pack setting: each body comes back exactly as it went off.
 
-**Pack settings** (`declare.ts`, the 2026-09-15 build, widened for `list` by PLT-7). `readConfig(config)` checks a
+**Pack settings** (`declare.ts`, the 2026-09-15 build, later widened for `list`). `readConfig(config)` checks a
 manifest's `config:` map: at most 32 keys matching `^[a-z][a-z0-9_]{0,31}$` (`OUT_OF_BOUNDS`, `PACK_MALFORMED`), the
 sub-keys `type`, `values`, `max`, `default`, `label` and `note` (`FIELD_UNKNOWN`), a type from text, enum, bool, money,
 day, duration, number and list (`CONFIG_TYPE_UNSUPPORTED` otherwise), an enum's one to 64 distinct values
@@ -1052,7 +1052,7 @@ ULIDs monotonic within one millisecond; spoken ids round-trip.
 - `ponytail:` **erase is a full scan of nine text columns with `instr`** — a second per million events. Upgrade: none planned; erasure is rare and a one-month clock is generous.
 - `ponytail:` **`delete: refuse_while_referenced` scans referrers without `index: true`**. Upgrade: the install diff already says so; add `index: true` to the referring field.
 - `ponytail:` **the `op_id` replay returns the row as it is now** with the original version number, not a stored snapshot of the original result. Upgrade: a `result` column on `event`'s first row if exact replay is ever required.
-- `ponytail:` **`TEXT_ESCAPED_NEWLINE` exempts a value that reads as a Windows path, and so has known false negatives.** This note once called the false positive permanent ("Upgrade: never"). It was reversed when `loop/research-import-real.md` (finding 1) measured a real export refused on two agent runs' `cwd`, each a drive-letter path with a folder starting with `n`; 186 of that export's 198 `cwd` values were Windows paths, and the refusal's repair, "send a real newline", cannot be applied to a path. The rule still refuses rather than repairs, and `hasEscapedNewline` stays textual (`C:\next` is still backslash-n to it); `coerce` skips the refusal when `readsAsWindowsPath` holds. The price, measured against the kernel: a double-encoded text that opens with a single letter and a colon (`a:\nsecond line`, `Q:\nnote`) or with `.` or `..` (`.\nfirst then second`, `..\nfirst`) and holds no second colon, quote, pipe or tab is now accepted as a path. `Note:\nsecond` and `C:\nat 10:30` are still refused. Upgrade: none planned; a text that opens that way is rare, and it is stored exactly as sent, so it can be found and rewritten.
+- `ponytail:` **`TEXT_ESCAPED_NEWLINE` exempts a value that reads as a Windows path, and so has known false negatives.** This note once called the false positive permanent ("Upgrade: never"). It was reversed when a real export was measured and found refused on two agent runs' `cwd`, each a drive-letter path with a folder starting with `n`; 186 of that export's 198 `cwd` values were Windows paths, and the refusal's repair, "send a real newline", cannot be applied to a path. The rule still refuses rather than repairs, and `hasEscapedNewline` stays textual (`C:\next` is still backslash-n to it); `coerce` skips the refusal when `readsAsWindowsPath` holds. The price, measured against the kernel: a double-encoded text that opens with a single letter and a colon (`a:\nsecond line`, `Q:\nnote`) or with `.` or `..` (`.\nfirst then second`, `..\nfirst`) and holds no second colon, quote, pipe or tab is now accepted as a path. `Note:\nsecond` and `C:\nat 10:30` are still refused. Upgrade: none planned; a text that opens that way is rare, and it is stored exactly as sent, so it can be found and rewritten.
 - `ponytail:` **`lower()` is ASCII** in SQLite without ICU; erase and `contains` fold ASCII case only. Arabic has no case; other scripts match exactly. Upgrade: none.
 - `ponytail:` **compiled locks are cached per UTC day**, so a lock with `today` recompiles at most once a day and may be stale by up to a day's `tz` offset around midnight. Upgrade: key the cache on the record's local day if a lock ever hinges on it.
 - `ponytail:` **done reminder rows are never pruned** — they are the once_per memory. Upgrade: purge `done` rows older than a year when the table is measured to matter.
@@ -1096,7 +1096,7 @@ kernel and may be written in parallel; `record` marries the two.
 
 ## 13 · Decisions taken here
 
-Twenty, counted. Each amends the named document in the same revision loop ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §5).
+Twenty, counted. Each amends the named document in the same revision round ([35-SPEC-OVERVIEW](35-SPEC-OVERVIEW.md) §5).
 
 | # | Decision | Amend |
 |---|---|---|
@@ -1134,7 +1134,7 @@ Twenty, counted. Each amends the named document in the same revision loop ([35-S
 - [ ] `test/bench.test.ts` passes its CI column and prints the budget column's numbers for the log.
 - [ ] `tsc --noEmit` clean under `strict`, `verbatimModuleSyntax`, `erasableSyntaxOnly`; no `node:*`, `cloudflare:*`, `fetch`, `Buffer` under `src/` (the path-scoped lint).
 - [ ] `graph` gate: `kernel` imports only `ports` (types) and `where`.
-- [ ] Every decision in §13 is written into its design document, and [BUILD.md](../BUILD.md) records the iteration.
+- [ ] Every decision in §13 is written into its design document.
 
 ---
 

@@ -201,7 +201,7 @@ export function buildVariants(root) {
 }
 
 /**
- * WHERE THE APP IS SERVED, AND WHERE ITS SHELL IS ON DISK (`loop/research-one-domain.md` §3.2).
+ * WHERE THE APP IS SERVED, AND WHERE ITS SHELL IS ON DISK.
  *
  * The app is `brain.dog/app`, so `svelte.config.js` writes it to `build/app` and the Worker serves `build/` as it did.
  * Every browser gate serves `build/` at the root the same way and opens `/app<route>`; its SPA fallback is this shell,

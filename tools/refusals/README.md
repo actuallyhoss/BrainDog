@@ -19,8 +19,7 @@ this runner drove nothing at all.
 
 ## Two of the nine runners already existed
 
-`loop/STATUS.md` §5 and `docs/40-SPEC-FIXTURES.md` §6 both say none of the eight exists. Both are
-stale by one day. `e74a563b`, *"The first two via runners, so a fixture is driven instead of merely
+`docs/40-SPEC-FIXTURES.md` §6 says none of the eight exists. It is stale by one day. `e74a563b`, *"The first two via runners, so a fixture is driven instead of merely
 counted"*, Sunday 20 September 2026, added:
 
 | `via` | Fixtures | Runner |
@@ -168,8 +167,8 @@ moved the other way.
 **Five `install` fixtures were `lint` all along, and now say so.** `ACTION_NOT_HTTPS`,
 `ACTION_HOST_COMPUTED`, `ACTION_GRANT_MISSING`, `ACTION_INTERVAL_TOO_SHORT` and `ACTION_EVALUATES` are
 raised by `actionFault` in `packages/kernel/src/declare.ts`, which `validate()` calls, and which reads
-the record only for a `sends:` check none of the five uses. `loop/research-via-runners.md` measured
-them against `validate` alone; that is not the `lint` driver's order, so on 22 September 2026 each was
+the record only for a `sends:` check none of the five uses. They had been measured against
+`validate` alone; that is not the `lint` driver's order, so on 22 September 2026 each was
 refiled as `via: lint` with its own `pack:` (one register, one `poll` or `call` declaration) and put
 through `normalise` first. None was refused by `normalise`, and all five answer their own code at their
 own address:
@@ -323,7 +322,7 @@ EXIT=1
 ```
 
 Then the same file with a legal YAML flow collection that is not JSON, `{ field: what, contains:
-yaml-but-not-json }`, which is the shape the third runner's own checker found taking a whole run down:
+yaml-but-not-json }`, which is the shape a review of the third runner found taking a whole run down:
 
 ```
   FAIL zz-temporary-red-proof.yaml

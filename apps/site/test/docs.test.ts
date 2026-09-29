@@ -1,7 +1,7 @@
 /**
  * The docs at `/docs`, held to the shape `src/lib/docs/pages.ts` reads them in and to the list an agent reads.
  *
- * THE FOLDER IS THE LIST (site.md C7): a page is a file under `src/docs/<NN-section>/<NN-slug>.md`, and
+ * THE FOLDER IS THE LIST: a page is a file under `src/docs/<NN-section>/<NN-slug>.md`, and
  * `lib/docs/index.ts` finds them with a Vite glob. So this walks the same folder and hands each file to
  * `docOf`, the function the site builds each page with, under the key the glob gives it. A file that breaks
  * the shape stops the build; this says which file, and why, without anybody having to build first.

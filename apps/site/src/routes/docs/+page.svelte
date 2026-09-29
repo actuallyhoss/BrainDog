@@ -1,11 +1,11 @@
 <!--
   /docs: the opening tile with the search, then every section of the docs as a tile with its pages.
 
-  THE LOOK IS SYSTEM §10's: tiles on the ground, each section's tile headed by its glyph in a well, its name and how
+  THE LOOK IS THE DESIGN SYSTEM'S: tiles on the ground, each section's tile headed by its glyph in a well, its name and how
   many pages it holds, then its sentence and its pages as a quiet list.
 
-  A SECTION WITH NO PAGE YET IS STILL A TILE, saying so, because the sections are the shape of the docs (site.md C7)
-  and each fills as its unit writes it. Its title links nowhere until it has a page to open, so no tile sends a reader
+  A SECTION WITH NO PAGE YET IS STILL A TILE, saying so, because the sections are the shape of the docs
+  and each fills as its pages are written. Its title links nowhere until it has a page to open, so no tile sends a reader
   to an address with nothing at it.
 
   `/llms.txt` IS LINKED FROM HERE, so the prerender crawler reaches it from a page as well as from the sitemap, and so a

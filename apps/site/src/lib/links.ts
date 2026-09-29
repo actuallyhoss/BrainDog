@@ -21,14 +21,13 @@ export const STATUS: string | null = null;
 
 /** The skill an agent installs, served from `static/agents/`. */
 export const SKILL = '/agents/braindog/SKILL.md';
-/** Where an MCP client connects: `servesMcp` in `apps/worker/src/route.ts`, with OAuth from AGT-3. */
+/** Where an MCP client connects: `servesMcp` in `apps/worker/src/route.ts`, with OAuth. */
 export const MCP = 'https://brain.dog/mcp';
 /** The changelog's Atom feed, prerendered beside the page. */
 export const FEED = '/changelog.xml';
 
 /**
- * The support address a person writes to. `decisions.md` item 14 (SIT-4, contracts §12.2 O12/X39) now
- * routes `support@brain.dog`: every reader (mail footers, Settings > About, `/support` here and
+ * The support address a person writes to. The owner's decision now routes `support@brain.dog`: every reader (mail footers, Settings > About, `/support` here and
  * `security.txt`'s Contact) shows it, and this stays equal to the Worker's `SUPPORT_ADDRESS` in
  * `apps/worker/wrangler.jsonc`'s production environment, the one source for the app and the mail.
  */

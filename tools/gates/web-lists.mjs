@@ -5,7 +5,7 @@
  *
  * THE WEB DRAWS WHAT THE RECORD DECLARES, AND A LIST ID WRITTEN INTO IT IS THE WEB KNOWING A PACK. Home asked Money's
  * three figures of every record that held `obligations`, a new block bound itself to `obligations` when the page said
- * nothing, and the reporting panel looked for a list called `datapoints` (`loop/finish/shell.md` USE-2). Each of those
+ * nothing, and the reporting panel looked for a list called `datapoints`. Each of those
  * is a screen that works on the one record it was written against and answers wrongly on every other: a student's, a
  * team's, a record set up from a stranger's pack. The rule that ends the class is that a shipped file under
  * `apps/web/src` does not write a first-party list id or pack id as a string, and this is what holds it.
@@ -24,14 +24,14 @@
  * `self-test` aims the gate at a seeded tree that holds no seed of its own.
  *
  * AND A CURRENCY NOBODY CHOSE. `currencyFor(...) ?? 'GBP'` wrote every amount typed into a new row as sterling on a
- * record in any other currency (`loop/finish/defects.md` M1). A currency is one somebody chose: typed, held on the
+ * record in any other currency. A currency is one somebody chose: typed, held on the
  * row, declared on the field, or the record's home currency, never a code the web falls back to. So a currency code
  * after `??` or `||` is a finding, and a code is one `Intl` knows as a currency, so `|| 'UTC'` is not one. The two
  * tables that map what a person types to a code (`lib/record/currencies.ts`, `lib/shape.ts`) are where a code is
- * data, and are not read for this rule (`loop/finish/defects.md` §4.2).
+ * data, and are not read for this rule.
  *
  * `HELD` IS THE ONE ALLOWLIST, and every entry in it is a file that still names an id today, with the ids and why.
- * Some are debt a named unit pays (the first run's module map, the hand-built Work screen); some are a word the web
+ * Some are debt a later change pays (the first run's module map, the hand-built Work screen); some are a word the web
  * uses for something else that happens to be spelled like a list (a block kind called `steps`, a settings area
  * called `people`). An entry that holds an id its file no longer names is itself a finding, so the list only
  * shrinks: take the line out in the change that takes the last literal out.
@@ -54,7 +54,7 @@ const SOURCE = /\.(ts|js|mjs|svelte)$/u;
 /** A test or a test's helper, which `apps/web`'s bare `node --test` runs and the product never loads. */
 const TEST = /\.test\.(ts|js|mjs)$|^test-/u;
 
-/** The two tables where a currency code is data (`loop/finish/defects.md` §4.2). */
+/** The two tables where a currency code is data. */
 const CURRENCY_TABLES = new Set(['apps/web/src/lib/record/currencies.ts', 'apps/web/src/lib/shape.ts']);
 
 /**
@@ -64,8 +64,8 @@ const CURRENCY_TABLES = new Set(['apps/web/src/lib/record/currencies.ts', 'apps/
  * like anywhere else.
  */
 const HELD = {
-  /* The first run hears packs by the catalogue's signals since USE-3; what is left is the rows a sentence fills, which
-     are Projects', People's and Money's, and the Projects every other list points at. PGS-20 owns it next. */
+  /* The first run hears packs by the catalogue's signals; what is left is the rows a sentence fills, which
+     are Projects', People's and Money's, and the Projects every other list points at. */
   'apps/web/src/lib/shape.ts': {
     ids: ['money-core', 'obligations', 'people', 'portfolio', 'things', 'work'],
     why: "the first rows a sentence fills (a project, a person, an invoice), the Projects module every other list leans on, and `work` and `people` among the English words the language guess counts.",
@@ -121,7 +121,7 @@ const HELD = {
     why: "a bill on Today links into Money's bills by the list id `today-live.ts` read it from.",
   },
 
-  /* The hand-built Work screen, which a declared page replaces (`loop/finish/shell.md` §3, the M4 seam). */
+  /* The hand-built Work screen, which a declared page replaces. */
   'apps/web/src/lib/record/track-live.ts': {
     ids: ['tasks', 'things', 'tracks', 'updates'],
     why: 'the hand-built Work screen reads Work and Projects by their list ids.',

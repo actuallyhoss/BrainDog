@@ -4,7 +4,7 @@
  *   node tools/mutate.mjs                     every row of `GUARDS`
  *   node tools/mutate.mjs --only limit-key    the rows named, by id, comma-separated
  *
- * A GUARD TEST THAT CANNOT FAIL IS THE CLASS THE AUDITS KEPT FINDING (`loop/finish/ops.md` SC34). A test written beside
+ * A GUARD TEST THAT CANNOT FAIL IS THE CLASS THE AUDITS KEPT FINDING. A test written beside
  * a ceiling, a key or a compare-and-set can pass for a reason that has nothing to do with the guard: a fixture that
  * never reaches the boundary, an assertion on the wrong field, a stub that answers yes to everything. Reading the test
  * does not show that, and a green run cannot, because green is exactly what such a test prints. The only proof is to
@@ -24,9 +24,8 @@
  * already red is reported as such rather than as a kill: a test that fails for another reason fails under the mutant
  * too, and that proves nothing about the guard.
  *
- * A ROW PER GUARD, ADDED BY WHOEVER ADDS THE GUARD. The rows below are the guards the tree holds as this file landed
- * (`loop/finish/ops.md` OPS-25). The Stripe signature comparison and the lapse cap are not built yet; each unit that
- * builds a guard of this kind adds its row here in the same change, with the test that is meant to catch its removal.
+ * A ROW PER GUARD, ADDED BY WHOEVER ADDS THE GUARD. The rows below are the guards the tree holds as this file landed.
+ * The Stripe signature comparison and the lapse cap are not built yet; each change that builds a guard of this kind adds its row here in the same change, with the test that is meant to catch its removal.
  *
  * `.github/workflows/mutate.yml` runs this weekly and on a pull request labelled `full-gates`. It exits 1 when a row
  * survives, is stale, or has red tests before its mutant, and 2 for a selection that names no row.

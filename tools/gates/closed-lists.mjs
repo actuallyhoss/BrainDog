@@ -344,7 +344,7 @@ export default function closedLists(
 
   /**
    * Every place a sentence about the block kinds is written: `docs/`, the source and the drawers of
-   * every package, every app's source, the READMEs, and `loop/*.md`.
+   * every package, every app's source, the READMEs, and the top level of an untracked notes folder.
    *
    * `.ts` AND `.svelte` ON BOTH SIDES, which the first cut of this check got wrong in a way that
    * mattered: it read `packages/**\/svelte/**\/*.svelte` but not the `.ts` beside them, and
@@ -353,8 +353,8 @@ export default function closedLists(
    * `apps/web/src/routes/p/[slug]/+page.svelte`), so the gate would have passed a tree it was supposed
    * to fail. A search scope that is narrower than the thing being searched is a gate with a blind spot.
    *
-   * `loop/*.md` is one level only, on purpose: `loop/iteration-1/` and its kin are a session's scratch
-   * record, not a place a count is meant to stay true.
+   * That folder is read one level only, on purpose: its subfolders are a session's scratch record, not a
+   * place a count is meant to stay true.
    */
   function inSearchScope(rel) {
     return (

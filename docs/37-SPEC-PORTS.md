@@ -230,7 +230,7 @@ function bootProbe(caps: Capabilities, driver: string): void;      // throws Sql
 function guarded<S extends Sql>(sql: S): S;                        // §2.4.1; the wrapper a host returns
 ```
 
-#### 2.4.1 · As built (W60-3, 24 September 2026): the port this tree has, and `guarded`
+#### 2.4.1 · As built (24 September 2026): the port this tree has, and `guarded`
 
 The tree's `Sql` is not §2.1's. It has `exec(sql, ...params): void`, `all`, `one` and `transactionSync`, and no
 `Cursor`, `execScript` or `caps`; both hosts send a zero-parameter `exec` to the driver's multi-statement entry, so
@@ -239,8 +239,8 @@ that call is the script door. `src/sql.ts` therefore ships the five functions ab
 `guardScript`, every other call by `guard`, and a driver error whose sentence carries one of §5.8's eleven fragments is
 rethrown as a `SqlError` carrying the same sentence and the driver's error as `cause`. An `UNKNOWN` one passes through
 unchanged, so a caller that reads the driver's own error keeps reading it. `transactionSync` is the host's own.
-`Capabilities` is a standalone type, since the port has no `caps` to hang it on. The hosts adopt `guarded` in W60-6
-(Worker) and W60-7 (self-host).
+`Capabilities` is a standalone type, since the port has no `caps` to hang it on. Both hosts adopt `guarded`, the
+Worker and the self-host.
 
 *The boot probe departs from §5.1 step 4, and this is the amendment.* Nothing in the tree calls `openNodeSqlite`, which
 does not exist, so there is no open for `bootProbe` to throw from, and a throw at open is the failure being replaced:
@@ -436,8 +436,8 @@ Steps 1–7 are `guard(query, params)`, shared by both adapters. Steps 8–12 ar
    `TextEncoder` runs only for statements over 33 333 characters.
    *Measured on local workerd, 24 September 2026:* 99 999 and 100 000 bytes answered, 100 001 refused
    (`statement too long: SQLITE_TOOBIG`); in two-byte characters 100 000 answered and 100 002 refused. So "over
-   100 000" stands. The hardening survey's "refused at exactly 100 000" (`loop/research-hardening.md` §0 item 6,
-   §2.5) came from a probe whose padding was one byte longer than its label. The built guard counts bytes in a loop
+   100 000" stands. An earlier "refused at exactly 100 000" came from a probe whose padding was one byte longer
+   than its label. The built guard counts bytes in a loop
    rather than encoding, which is the same number without a second copy of the statement.
 3. **Parameter count.** `params.length > 100` → `TOO_MANY_PARAMS`.
 4. **Parameter types**, for each index `i`:
@@ -566,7 +566,7 @@ compile_options` and does not mean a missing module. Its other sentences carried
 `LIKE or GLOB pattern too complex: SQLITE_ERROR`, `too many SQL variables at offset 213: SQLITE_ERROR`,
 `statement too long: SQLITE_TOOBIG`, `Expression tree is too large (maximum depth 100): SQLITE_ERROR`.
 
-*For whoever wires the guard (W60-6, W60-7).* `attempt()` in `packages/kernel/src/tx.ts` issues a raw `SAVEPOINT`
+*For whoever wires the guard.* `attempt()` in `packages/kernel/src/tx.ts` issues a raw `SAVEPOINT`
 and recognises the DO's refusal by `/storage\.transaction/` on its message, then falls back to a nested
 `transactionSync`. Step 1 refuses `SAVEPOINT` on both hosts before the driver, with this spec's sentence, which that
 test does not match, so `attempt()` rethrows. The kernel needs to recognise `TXN_STATEMENT_FORBIDDEN` by code, and the
@@ -761,7 +761,7 @@ disagreement there is a finding, not a flake.
 | Gate | Where | Asserts |
 |---|---|---|
 | `conformance-count` | script | every host's `ran` is equal to every other's and to `CASES.length − skips`; every skip printed; once `apps/worker` exists, `reference.json` has `provisional: false` |
-| `boot-probe` | `node --test` (Vitest arrives in phase 5, BUILD.md) | `bootProbe({ …caps, fts5: false }, 'node:sqlite')` throws with the exact four-line text |
+| `boot-probe` | `node --test` (Vitest arrives in phase 5) | `bootProbe({ …caps, fts5: false }, 'node:sqlite')` throws with the exact four-line text |
 | `graph` · lint layer 4 | script · ESLint | no `node:*` under `packages/**` except `packages/ports/src/node-sqlite.ts`; `src/index.ts` does not import it |
 
 No property test lives here; the compiler's depth and compound assertions are spec 38's (30 §7).
@@ -882,8 +882,8 @@ host to print; `throws` and `skip` had no caller. *Amend 33 §3, 30 §13 ("six m
 live in `apps/selfhost`. Lint layer 4 exempts that one path. *Amend 31 §1, §3 (layer 4), §8 (the tree's `ports`
 line).*
 
-**D9 · Two implementations, no fakes, no `better-sqlite3`.** `node:sqlite` at `:memory:` is the memory adapter
-(BUILD.md already records it); a `Clock` or `Scheduler` fake is an object literal in the test that needs it;
+**D9 · Two implementations, no fakes, no `better-sqlite3`.** `node:sqlite` at `:memory:` is the memory adapter;
+a `Clock` or `Scheduler` fake is an object literal in the test that needs it;
 `better-sqlite3` is not built under the Node pin. *Amend 33 §1 ("one memory implementation each", "three
 adapters"), 33 §6 (`BRAINDOG_SQLITE`), 31 §8.*
 
@@ -913,7 +913,7 @@ finding that amends 30 §13's divergence table. *Amend 30 §12 #5, 17 Q12.*
       second run without the flag is green
 - [ ] the boot-probe test matches the four-line text byte for byte
 - [ ] `test/bench.ts` prints the §7 table; the measured `exec` SELECT is under 25 µs and the guard under 1 µs
-- [ ] the twelve amendments of §13 are applied to 30, 31, 33 and 17, and BUILD.md's loop log names this revision
+- [ ] the twelve amendments of §13 are applied to 30, 31, 33 and 17 in the same revision
 - [ ] spec 51's `sql-do.ts` section cites §5.6 and imports only the main entry and `./conformance`
 
 ---

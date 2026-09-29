@@ -18,13 +18,13 @@
  * reader there was no demo and no record to look at, when the one thing the app did for a stranger
  * was show them one.
  *
- * THE THIRD TURNED OVER ON 25 SEPTEMBER. `loop/DIRECTION.md` §26 removed the sample and demo mode
- * together: the app only ever shows a real record, and without a session it is the sign-in screen
- * (`loop/research-no-sample.md`, brief A9 for this site). So the rule that required the site to name
+ * THE THIRD TURNED OVER ON 25 SEPTEMBER. The owner removed the sample and demo mode
+ * together: the app only ever shows a real record, and without a session it is the sign-in screen.
+ * So the rule that required the site to name
  * the sample now refuses it, and the first screen has to say sign-in instead.
  *
- * THE GITHUB LINK STAYS, ON THE OWNER'S WORD, AND THIS FILE DOES NOT FIGHT IT. `loop/DIRECTION.md`
- * §10 records it verbatim: "link the github repo on the brain.dog site, even though it's private rn".
+ * THE GITHUB LINK STAYS, ON THE OWNER'S WORD, AND THIS FILE DOES NOT FIGHT IT. In the owner's
+ * words: "link the github repo on the brain.dog site, even though it's private rn".
  * What this file refuses is every OTHER address into the repository (a README, a build page, a
  * release), because those are the links that 404 with nothing beside them saying why, and it
  * requires the legal page to keep the sentence that says the repository is private.
@@ -103,7 +103,7 @@ const INSTALL = [
 ];
 
 /* THE ONE INSTALL LINE THE SITE MAY SHOW IS ITS OWN: `CLI_INSTALL` in `copy.ts` fetches the script this site
-   serves at `/cli/install.sh` (`apps/cli/README.md`), which is published with the product (`loop/DIRECTION.md` §33). */
+   serves at `/cli/install.sh` (`apps/cli/README.md`), which is published with the product. */
 const OWN_INSTALL = /https:\/\/brain\.dog\/cli\/install\.(sh|ps1)/;
 
 /**
@@ -159,7 +159,7 @@ test('the only GitHub address is the bare repository the owner asked for', () =>
 });
 
 /**
- * THE SITE DESCRIBES THE FINISHED PRODUCT (`loop/DIRECTION.md` §33, 26 September): "I want the marketing site to
+ * THE SITE DESCRIBES THE FINISHED PRODUCT (the owner, 26 September): "I want the marketing site to
  * reflect what the FINAL product would be, not where it would stand". The tests that held the opposite (that the
  * first screen say the app opens to sign-in, that no sentence offer what a stranger could not have yet, and that the
  * legal page call the repository private) went that day. This one keeps the old sentences from coming back: a page

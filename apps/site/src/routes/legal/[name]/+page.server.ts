@@ -7,7 +7,7 @@
  *
  * THE FOLDER IS OUTSIDE `src` so a company's name in a legal text never meets the `shell-words` gate.
  * Vite reads it through the glob below at build time, which is why a missing file is an absent key
- * and not a failed import: OPS-27 drafts the files in W3, and this page is built before them.
+ * and not a failed import: the owner drafts the files, and this page is built before them.
  *
  * A SERVER LOAD, so the texts ride in the prerendered HTML and never in a script the browser loads.
  */
@@ -17,7 +17,7 @@ import type { EntryGenerator, PageServerLoad } from './$types';
 
 export const prerender = true;
 
-/** The texts drawn in W1 to W3. `acceptable-use` and `refunds` sit in the folder too and are not drawn yet. */
+/** The texts drawn. `acceptable-use` and `refunds` sit in the folder too and are not drawn yet. */
 const NAMES = ['terms', 'privacy', 'processing'] as const;
 type Name = (typeof NAMES)[number];
 

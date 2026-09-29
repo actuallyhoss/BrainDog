@@ -9,8 +9,7 @@ Its **interface** is in [13-UI](13-UI.md).
 
 > ### **Slash**
 
-**The owner named it Slash on September 25th 2026** ([ADR-070](16-DECISIONS.md),
-[DIRECTION 31](../loop/DIRECTION.md)). It had carried an earlier name since the first drafts, kept
+**The owner named it Slash on September 25th 2026** ([ADR-070](16-DECISIONS.md)). It had carried an earlier name since the first drafts, kept
 twice at his word over *Pointer*, which a draft of this section recommended. This section records
 what a name costs here, and leaves the register question open rather than settled.
 
@@ -97,7 +96,7 @@ Full architecture, costs, the terms-of-service position and the runner protocol:
 | Explain a figure by naming its source rows | act on a schedule without a human having approved the rule |
 
 The enforcement is architectural, not a prompt instruction: **Slash is handed no write method.** It
-runs inside the record's own object, its store in that object's storage (`loop/finish/agents.md` §5 item 10), and
+runs inside the record's own object, its store in that object's storage, and
 the only record it can reach is `slashRecord`'s (`packages/host/src/slash.ts`): `project` to read and `propose` to
 file, and nothing that writes a row. There is no write path to compromise. A perfect jailbreak of the model
 yields a proposal, and a proposal is a row in `suggestion` that a human has to accept — filed once,
@@ -122,7 +121,7 @@ too weak for conversation. Prices from Workers AI, read 2026-08-31, at $0.011 pe
 
 | Job | Model | Why | $/M in | $/M out |
 |---|---|---|---|---|
-| Triage: is this raw payload a known shape? | `llama-3.2-1b` | binary-ish classification with a 1.5k prompt; the `shape` itself is deterministic (channel, sender domain, digit-blanked subject), and the model contributes only which of the record's own lists it belongs to, or none, and `actionable`: never a fixed set of business kinds, since the lists are whatever this record holds ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5, DIRECTION §22) | 0.027 | 0.201 |
+| Triage: is this raw payload a known shape? | `llama-3.2-1b` | binary-ish classification with a 1.5k prompt; the `shape` itself is deterministic (channel, sender domain, digit-blanked subject), and the model contributes only which of the record's own lists it belongs to, or none, and `actionable`: never a fixed set of business kinds, since the lists are whatever this record holds ([46-SPEC-SLASH](46-SPEC-SLASH.md) §5) | 0.027 | 0.201 |
 | Extraction proposal from 3 examples | **`glm-5.3-flash`** | needs to reason over structure and emit YAML | **0.150** | **0.500** |
 | Conversation and proposals | **`glm-5.3-flash`** | schema-constrained structured output over a projection, and the cheapest model that is good enough to talk to | **0.150** | **0.500** |
 | Long write-up drafting | `glm-5.3` *(opt-in)* | quality where the output is read many times | 1.400 | 4.400 |

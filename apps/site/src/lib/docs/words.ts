@@ -1,8 +1,8 @@
 /**
  * Every word the docs frame says: the landing page, the sections, the page furniture and `/llms.txt`.
  *
- * THE UNIT'S OWN WORDS, beside the code that reads them (site.md C3 gives each W3 page its own copy
- * file, and this frame owns `lib/docs/`). The pages themselves are dialect text in `src/docs/`, so
+ * THE DOCS' OWN WORDS, beside the code that reads them (each page has its own copy file, and this
+ * one belongs to `lib/docs/`). The pages themselves are dialect text in `src/docs/`, so
  * nothing here describes the product beyond what a section of the docs is about.
  */
 import type { IconName } from '../icons.ts';
@@ -22,8 +22,8 @@ export const docsWords = {
   /** The link to `/llms.txt`, under the lede. */
   forAgents: 'The list for agents',
 
-  /* WHAT EACH SECTION IS ABOUT, in the order of `SECTIONS`. Each names what its unit writes (site.md
-     SIT-3, SIT-12, SIT-13 and SIT-14), not what the product does. */
+  /* WHAT EACH SECTION IS ABOUT, in the order of `SECTIONS`. Each names what its section covers, not
+     what the product does. */
   sections: {
     start: { label: 'Start here', blurb: 'What BrainDog is, and where to go next.', glyph: 'rocket' },
     use: { label: 'Using BrainDog', blurb: 'Home, pages, lists, Decide, Slash, automations, the inbox and sharing.', glyph: 'home' },

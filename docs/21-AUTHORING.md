@@ -127,11 +127,11 @@ Width    [ Full ] Half  Third        ← 12 / 6 / 4
 │ OUTLINE     ⌕  │  ┌──── phone ──── desktop ────┐   │ overdue          ⌕ filter │
 │ ⠿ heading      │                                   │ ───────────────────────── │
 │ ⠿ pick project │   Renewals                        │ Show me                   │
-│ ⠿ overdue   ◀  │   [ bake ▾ ]   ← reader control   │  [ domains          ▾ ]   │
+│ ⠿ overdue   ◀  │   [ shop ▾ ]   ← reader control   │  [ domains          ▾ ]   │
 │ ⠿ soon         │                                   │  ⌐ or from  [ pick … ▾ ]  │
 │ ⠿ rate         │   ┌─ Overdue ───────────────┐     │ that is                   │
-│                │   │ example.com  14 Sep  ⚠    │ ▸   │  [ overdue          ▾ ]   │
-│ + Add block    │   │ quartz.gg  19 Sep  ⚠    │     │ as                        │
+│                │   │ acme.shop  14 Sep  ⚠    │ ▸   │  [ overdue          ▾ ]   │
+│ + Add block    │   │ beans.dev  19 Sep  ⚠    │     │ as                        │
 │                │   └─────────────────────────┘     │  [ table            ▾ ]   │
 │ WHERE IT LIVES │                                   │                           │
 │ slug /renewals │   [ Data │ Empty │ Loading ]      │ Matches 2 of 41.          │
@@ -508,8 +508,8 @@ Matches 4 of 320.     Sample 5 ▸     Nearly matched 3 ▸
 
 ```
 Nearly matched 3
-   example.com      fails:  status is unpaid   (it is "paid")
-   quartz.gg      fails:  due before +7d     (due in 19 days)
+   acme.shop      fails:  status is unpaid   (it is "paid")
+   beans.dev      fails:  due before +7d     (due in 19 days)
 ```
 
 **Zero-match guard**, with relax chips that state the count each would yield:
@@ -567,7 +567,7 @@ better organisation.
 
 ### Type change is a conversion preview, not a warning
 
-> **This preview is built** (GAP-8): `previewRetype` draws it over the list's live rows and writes nothing;
+> **This preview is built**: `previewRetype` draws it over the list's live rows and writes nothing;
 > `retypeField` files the answered conversion as one `change` body — `{ retype: { register, field, as, answers } }`
 > for a field whose type moves, `{ narrow: ... }` for one that only tightens — and lands only once every failing
 > row has an answer of `clear`, `keep` (a sibling text field beside it) or `{ to: <value> }` (typed by hand). An
@@ -603,7 +603,7 @@ and blast-radius line; a declaration id is never renamed (`ID_RENAMED`, [04-PACK
 
 ## 6 · The theme editor
 
-*Built by GAP-3 (W2), as Settings > Appearance "Edit the look": every role, its three tabs, the scales chosen
+*Built as Settings > Appearance "Edit the look": every role, its three tabs, the scales chosen
 never typed, and the specimen beside it, as this section specifies.*
 
 **Roles, and only roles.** Every role is a **light/dark pair in one row, two swatches** — there is no
@@ -877,8 +877,8 @@ closure is computed and visible** — checking a page auto-checks the registers 
 ```
 Found 4 things that are yours, not the pack's.
 
-  ☑  notify goes to        Sam's phone     →  input  notify_to    (person)
-  ☑  page filters on       project "bake"   →  input  project      (ref → projects)
+  ☑  notify goes to        Sam's phone      →  input  notify_to    (person)
+  ☑  page filters on       project "shop"   →  input  project      (ref → projects)
   ☑  metric target         90%              →  input  target_rate  (percent, default 90)
   ☐  currency              EGP              →  keep as written
 ```

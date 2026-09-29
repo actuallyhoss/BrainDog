@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * Pricing, drawn as Bento tiles on the ground (`loop/design/SYSTEM.md` §10, the Light-Pricing board).
+   * Pricing, drawn as Bento tiles on the ground (the design system).
    *
-   * TWO PLANS, WHAT EACH INCLUDES, AND WHAT MORE COSTS, on the owner's ask of 26 September (`loop/DIRECTION.md` §33):
+   * TWO PLANS, WHAT EACH INCLUDES, AND WHAT MORE COSTS, on the owner's ask of 26 September:
    * "include the credits/usages offered on the plans, show extra usage pricings, add another extended plan". Every
    * figure is read from `plans.ts`, which is the one file to edit when a price or an allowance changes, and which
    * `plans.test.ts` holds to the Worker's own `HOSTED_PLANS` and `ALLOWANCE`. Every sentence is read from
@@ -16,7 +16,7 @@
    *   close     one line and the button.
    *
    * NO PRE-LAUNCH VARIANT. The site describes the product as it is on launch day and is not deployed with this copy
-   * before then (`loop/DIRECTION.md` §33), so the buttons go to sign-up and no line says what is not open yet.
+   * before then, so the buttons go to sign-up and no line says what is not open yet.
    */
   import Icon from '$lib/Icon.svelte';
   import { SIGNUP, site } from '$lib/copy.ts';
@@ -282,7 +282,7 @@
     display: flex;
   }
 
-  /* A person is a circle with an initial (ICONS.md, Faces); they overlap as a group does. */
+  /* A person is a circle with an initial (the icon set's faces); they overlap as a group does. */
   .face {
     display: grid;
     place-items: center;

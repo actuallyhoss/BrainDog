@@ -4,8 +4,7 @@
  * IT RUNS ONLY FOR THE PATHS `wrangler.jsonc` LISTS IN `run_worker_first`, AND ONLY WHERE THE SAME ENVIRONMENT BINDS
  * `APP`. Every other path is a file or the site's `404.html`, answered by the asset layer before this runs: through
  * `wrangler dev -c site -c app` on 23 September, `/pricing`, `/nope/deep/er`, a POST and a PUT to `/nope/deep/er` and a
- * POST to `/pricing` never reached this function, and every listed door did (`loop/research-one-domain-binding.md`
- * section 2.1). So a 404 costs no invocation, and a miss is never a place for logic to run.
+ * POST to `/pricing` never reached this function, and every listed door did. So a 404 costs no invocation, and a miss is never a place for logic to run.
  *
  * NOTHING IS COPIED, ADDED OR REWRITTEN. The app reads its host from the URL, its CSRF check from `Origin` and its
  * session from `Cookie`, and a service binding carries the request as it arrived: the app saw the URL, method, body and

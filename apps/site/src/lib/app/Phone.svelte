@@ -2,7 +2,7 @@
   The drawn app's page area: below 900px the new app's phone round one page of an example record, and at 900px and
   wider the title row and the page beside the rail.
 
-  THE PHONE IS SYSTEM §9's: the ground and its light, a large title with the ask field as a 44px glass circle at the
+  THE PHONE IS THE DESIGN SYSTEM'S: the ground and its light, a large title with the ask field as a 44px glass circle at the
   top right, the page's sentence under the title, the tiles full width, and a glass tab bar floating one inset from
   the bottom with Home, Decide, Inbox and More, Decide carrying its count. More opens the record's other pages as a
   list, where the product opens its navigation sheet, because the declared pages are never a fifth tab.
@@ -34,7 +34,7 @@
     children,
   }: {
     title: string;
-    /** The page's opening sentence, said under the title (SYSTEM §5). */
+    /** The page's opening sentence, said under the title (the design system). */
     sentence?: string;
     pages: readonly Entry[];
     current: string;
@@ -134,7 +134,7 @@
     box-shadow: var(--e3);
   }
 
-  /* The large title, 30/36, with the ask field as a glass circle at its end (SYSTEM §9). */
+  /* The large title, 30/36, with the ask field as a glass circle at its end (the design system). */
   .head {
     display: grid;
     gap: var(--sp-2);
@@ -312,7 +312,7 @@
       display: contents;
     }
 
-    /* THE TITLE ROW (SYSTEM §5): the title at 28, the toolbar at the right, and the sentence under it. */
+    /* THE TITLE ROW (the design system): the title at 28, the toolbar at the right, and the sentence under it. */
     .head {
       grid-area: head;
       gap: 2px;

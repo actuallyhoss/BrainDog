@@ -2,7 +2,7 @@
   Support: where to get help, and what to put in a report.
 
   EVERY CHANNEL HERE IS ONE THAT IS READ. The address is `SUPPORT_EMAIL`, which stays empty until the
-  owner routes it to an inbox (decisions.md item 14), and while it is empty the page says when it
+  owner routes it to an inbox, and while it is empty the page says when it
   arrives instead of printing an address nobody reads. GitHub's Issues and Discussions answer 404
   while the repository is private, so they are listed only once `LAUNCH.repo` is on.
 -->

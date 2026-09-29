@@ -32,7 +32,7 @@
  *
  * Run `node apps/site/scripts/shot.mjs` first: this re-encodes what that wrote.
  *
- * It writes into `%TEMP%/braindog-loop/` and prints the paths, because these are for sending once
+ * It writes into `%TEMP%/braindog-shots/` and prints the paths, because these are for sending once
  * and not for keeping.
  */
 import { mkdir, readFile } from 'node:fs/promises';
@@ -41,7 +41,7 @@ import { join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const SHOTS = join(import.meta.dirname, '..', 'shots');
-const OUT = join(process.env.TEMP ?? '/tmp', 'braindog-loop');
+const OUT = join(process.env.TEMP ?? '/tmp', 'braindog-shots');
 const NAME = process.argv[2] ?? 'home';
 const PORT = 5178;
 

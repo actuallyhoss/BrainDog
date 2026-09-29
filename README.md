@@ -45,7 +45,7 @@ node apps/selfhost/src/main.ts init <record name> --owner <your email>
 node apps/selfhost/src/main.ts
 ```
 
-[BUILD.md](BUILD.md) has the rest, and [docs/49-SPEC-SELFHOST.md](docs/49-SPEC-SELFHOST.md) every
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest, and [docs/49-SPEC-SELFHOST.md](docs/49-SPEC-SELFHOST.md) every
 setting the server reads.
 
 ### The container

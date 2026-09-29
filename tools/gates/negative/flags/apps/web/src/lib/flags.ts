@@ -20,7 +20,7 @@ export type Flag = {
 export const FLAGS = {
   shipped: {
     why: 'The live one. It is read by Seeded.svelte, so the gate has something to be green about and the seeded count means what it says.',
-    owner: 'Sam',
+    owner: 'studio',
     since: '2099-01-01',
     until: '2099-02-01',
     issue: 'tasks#1',
@@ -29,7 +29,7 @@ export const FLAGS = {
   },
   neverTaken: {
     why: 'The seeded one. Nothing reads it, so it is a branch nobody takes - which is what this fixture exists to make the gate say.',
-    owner: 'Sam',
+    owner: 'studio',
     since: '2099-01-01',
     until: '2099-02-01',
     issue: 'tasks#2',

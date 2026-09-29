@@ -53,7 +53,7 @@
     list-style: none;
   }
 
-  /* A STEP IN THE TILE'S SECOND FILL, radius 12: a card inside a tile is a well, never a tile (SYSTEM §4). */
+  /* A STEP IN THE TILE'S SECOND FILL, radius 12: a card inside a tile is a well, never a tile (the design system). */
   .step {
     display: grid;
     gap: var(--sp-1);

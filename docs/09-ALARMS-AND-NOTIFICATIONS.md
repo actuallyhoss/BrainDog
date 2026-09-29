@@ -29,10 +29,9 @@ CREATE INDEX schedule_due ON schedule(state, due_at);
 **Ten kinds, and the `CHECK` is the count** — the same DDL as [30-BLUEPRINT](30-BLUEPRINT.md) §1. *(An
 earlier draft here listed six, had no `CHECK`, and left `attempts` nullable.)*
 
-*(Amended September 15th 2026 for `DIRECTION.md` §0b: the `CHECK` gains `call` and `poll` beside
+*(Amended September 15th 2026: the `CHECK` gains `call` and `poll` beside
 `pull`, the outbound and watching halves of a scheduled action. The DDL above is migration 1's and stays
-pinned. Migration 5, `0005_schedule_actions`, rebuilds the table with twelve kinds and copies every row.
-`loop/research-modular.md` §3.2 and §3.3 have the detail.)*
+pinned. Migration 5, `0005_schedule_actions`, rebuilds the table with twelve kinds and copies every row.)*
 
 **The scheduled actions' runner, built September 15th 2026.** One kernel function, `runActions(execute)`,
 runs `pull`, `call` and `poll`. It claims their due rows through `drainSchedule`, limited to those three
@@ -278,7 +277,7 @@ default is the vault's own: a credential expiring inside 48 hours. Which other r
 payment failing, a domain expiring inside 7 days) is declared by whoever built that list, a person,
 an agent or a pack, and anything a pack marks urgent shows in the install diff as `interrupts you`.
 *(An earlier revision made a failed payment and an expiring domain core defaults. Those are one
-owner's use cases, and [DIRECTION §22](../loop/DIRECTION.md) keeps use cases out of the core.)*
+owner's use cases, and use cases stay out of the core.)*
 
 **3 · Quiet hours, per record, on by default.** 22:00–08:00 in the record's timezone. A
 non-urgent notification due inside quiet hours moves to the next opening. This is why the record

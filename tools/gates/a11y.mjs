@@ -165,7 +165,7 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..')) {
      * the routes where that record differs: the point is that the other side is drawn at all and passes the same
      * rules, not a second sweep of the same screens. They were three builds, `build-cloud/`, `build-quiet/` and
      * `build-busy/`, that differed only in the sample's constants, so once no screen read those they audited the main
-     * build's screens again (wave C2 of `loop/research-no-sample.md`). A record is always there to be asked, so
+     * build's screens again. A record is always there to be asked, so
      * a variant is never skipped for want of a build.
      */
     /* `states` IS NOT `spa`, AND THEY WERE ONE FLAG. `spa` says *serve the shell for a route with no
@@ -405,7 +405,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     /* AN EPHEMERAL PORT, AS `passkey.mjs` AND `queue.mjs` TAKE ONE. This gate used to bind a fixed
        port out of `budgets.json`, and the CI runner is the same PC where sessions run this gate by
        hand, so a CI run and a desk run of it could meet on one port and one of the two would go red
-       for a reason that is not in the tree (`loop/research-ci-gates.md` §2). Port 0 is a port the
+       for a reason that is not in the tree. Port 0 is a port the
        operating system hands out free at the moment of the bind, and every URL below is built from
        what it handed out. `localhost` still, because the bind names no host and takes the dual-stack
        `::`, which is what `localhost` reaches first on this machine. */

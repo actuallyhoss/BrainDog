@@ -19,7 +19,7 @@
  * sentence names both, because "you logged a secret" is only actionable if it says which.
  *
  * AND `Plaintext` LIVES IN THREE MODULES. `52 §5.2`: the brand appears in the two hosts' vault steps,
- * where a key is sealed and opened, and `loop/research-agent-path.md` §8 adds the CLI's `keys.ts`,
+ * where a key is sealed and opened, and the agent path adds the CLI's `keys.ts`,
  * where an agent's key is read in and handed to one command. Anywhere else is a plaintext that has travelled,
  * and a type that has travelled is a value that has.
  */
@@ -150,7 +150,7 @@ const SINKS = [
   { id: 'an outbound request', re: /(?<![.\w])fetch\s*\(/g, wire: false },
   /* AND STANDARD OUTPUT, where a key is one line away from a terminal's scrollback or an agent's transcript. ONE
      COMMAND PRINTS A KEY, `braindog keys headers`, and one function in it, `headersOne` in the CLI's `keys.ts`, is
-     exempt below (`loop/finish/agents.md` C9, owner item 3). It exists because Claude Code's `headersHelper` reads
+     exempt below, at the owner's request. It exists because Claude Code's `headersHelper` reads
      an HTTP server's headers only from a command's standard output, so a key an HTTP tool needs in a header reaches
      it no other way; the command refuses a terminal before it opens anything, so what it prints goes to a program.
      Every other function, in that file and everywhere else, is still a finding, which the seeded negative
@@ -397,7 +397,7 @@ export default function secretGrep(
      worst. Everything under `packages` and `apps` is walked, tests included.
 
      AND `packs`, THE THIRD WORKSPACE ROOT, which this list did not have for the day the four packs
-     arrived (audit sixty-one, finding 9). A pack's script is the file nearest a key: `mercury` names
+     arrived. A pack's script is the file nearest a key: `mercury` names
      a grant that the host opens and sends as a bearer token, and a script that logged what it pulled
      with is the leak this gate exists for, in the one directory it was not reading. Measured on 24
      September: 6 more files, two scripts and four tests, and 0 findings in them. */
@@ -452,8 +452,8 @@ export default function secretGrep(
     }
 
   /* A GATE THAT READ NOTHING HAS NOT PASSED, and this one said it had. Over a root holding no
-     `packages`, `apps` or `packs` it printed "0 plaintexts reach a sink, over 0 files" and exited 0
-     (audit sixty-six, finding 11), so a mistyped `BRAINDOG_GATE_ROOT` read green in the one gate that
+     `packages`, `apps` or `packs` it printed "0 plaintexts reach a sink, over 0 files" and exited 0,
+     so a mistyped `BRAINDOG_GATE_ROOT` read green in the one gate that
      guards the product's founding promise. Exit 3 is `run.mjs`'s skip, as `em-dash` answers the same
      tree, and the line names the root so the reader can see which one was wrong. After the findings
      check, not before it: a finding is an answer whatever else is missing. */

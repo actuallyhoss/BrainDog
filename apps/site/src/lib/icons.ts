@@ -1,10 +1,10 @@
 /**
- * The glyphs this site draws: BrainDog's one icon set, `loop/design/bento/ICONS.md`, copied shape for shape.
+ * The glyphs this site draws: BrainDog's one icon set, the app's, copied shape for shape.
  *
  * COPIED AND NOT IMPORTED, because the site depends on `@braindog/skin` and not on the app, and a marketing page
  * that could not build without the app's source is a dependency the site refuses. The shapes are the set's own:
- * a 24 grid, strokes only, round caps and joins, drawn by `Icon.svelte` at 1.75 (SYSTEM §6, Glyphs). Each value is
- * the inner markup of the `<svg>`, exactly as ICONS.md gives it, so a glyph here is the glyph a visitor meets again
+ * a 24 grid, strokes only, round caps and joins, drawn by `Icon.svelte` at 1.75 (the design system's glyphs). Each value is
+ * the inner markup of the `<svg>`, exactly as the set gives it, so a glyph here is the glyph a visitor meets again
  * inside the product.
  *
  * EVERY NAME THE SITE ASKED FOR BEFORE STILL RESOLVES. The older names (`arrow`, `close`, `rows`, `back`, `board`,
@@ -137,6 +137,6 @@ export const isIconName = (name: string): name is IconName => Object.hasOwn(GLYP
 /**
  * The three hues a mark may take, each a TEXT role so it reads against the surface it sits on in
  * both schemes. `--brand` is not one of them: it paints the logo and nothing else. `--danger` is
- * not one either, because on the site red is the mark's alone (SYSTEM §10).
+ * not one either, because on the site red is the mark's alone (the design system).
  */
 export type Hue = 'info' | 'earn' | 'warn';

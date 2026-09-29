@@ -2,7 +2,7 @@
   One glyph from `icons.ts`, inline, in `currentColor` and nothing else. Always decorative here:
   every glyph on this site sits beside the words that say what it means.
 
-  THE SET'S OWN STROKE, 1.75, with round caps and joins (SYSTEM §6, Glyphs), and 2.75 for the two glyphs
+  THE SET'S OWN STROKE, 1.75, with round caps and joins (the design system's glyphs), and 2.75 for the two glyphs
   drawn as dots. The shapes are the set's markup, written in by `{@html}` because a glyph is circles,
   rects and paths and not one path; every string is a constant in `icons.ts`, never a reader's text.
 -->
@@ -52,7 +52,7 @@
     block-size: var(--icon-xl);
   }
 
-  /* IN AN ICON WELL THE GLYPH IS 18, whatever size was asked for (SYSTEM §6): the well sets the size, so every
+  /* IN AN ICON WELL THE GLYPH IS 18, whatever size was asked for (the design system): the well sets the size, so every
      heading row on the site draws the same glyph in the same box. Written here because a component's own rule
      outranks the site sheet's layer. */
   :global(.well) > .icon[data-size] {

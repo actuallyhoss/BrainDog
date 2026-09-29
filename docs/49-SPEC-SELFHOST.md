@@ -5,7 +5,7 @@ One Node process that is the whole product for a self-hoster: the nine ports wir
 surface of [33-CONTRACTS](33-CONTRACTS.md) §4 served by `node:http`. Derives from 33 §1, §4, §6, §9, §10;
 [12-SECURITY](12-SECURITY.md) §3, §6, §8; [30-BLUEPRINT](30-BLUEPRINT.md) §5, §8, §13; [22-FRONTEND](22-FRONTEND.md)
 §5, §9; [26-BYO-INTELLIGENCE](26-BYO-INTELLIGENCE.md) §2, §5; [09-ALARMS](09-ALARMS-AND-NOTIFICATIONS.md) §1. Built
-in phase 2 of [BUILD.md](../BUILD.md); the passkey, inbound and share routes below are marked with the phase that
+in build phase 2; the passkey, inbound and share routes below are marked with the phase that
 first exercises them.
 
 Mode: ponytail. `node:http`, `node:sqlite` through `packages/ports`, `crypto.webcrypto`, one `setTimeout` per
@@ -53,7 +53,7 @@ type Config = {
   port: number;            // PORT                 default 8080
   sqlite: 'node:sqlite' | 'better-sqlite3';       // BRAINDOG_SQLITE   default 'node:sqlite'
   origin: string;          // BRAINDOG_ORIGIN      default `http://localhost:${port}` — magic-link URLs, rpId, CSRF
-  smtp?: { url: URL; from: string };              // BRAINDOG_SMTP_URL smtps://u:p@host:465 | smtp://u:p@host:587 ; BRAINDOG_MAIL_FROM (amended by OPS-19)
+  smtp?: { url: URL; from: string };              // BRAINDOG_SMTP_URL smtps://u:p@host:465 | smtp://u:p@host:587 ; BRAINDOG_MAIL_FROM (amended)
 };
 
 type HostDeps = { clock: Clock; keys: KeyStore; dispatch: Dispatch; http: Http; blobs: (recId: RecordId) => Blobs;
@@ -193,7 +193,7 @@ else is ignored with one log line.
 
 The raw buffer is zero-filled after the three derivations. `byId(id)` answers the current key or `null`.
 
-*Amended September 28th 2026 (OPS-16; OPS-28 records it).* During a rotation the previous key sits beside the key file
+*Amended September 28th 2026.* During a rotation the previous key sits beside the key file
 as `<file>.prev`, the same 32 bytes and mode. `openKeyStore` opens both: `current()` is the key file, and `byId`
 answers either id, so every row wrapped under the old key still opens. The first start that finds a `.prev` re-wraps
 every record's keys under the current one before anything is served (`rewrapAtStart`), and says so. Unless
@@ -372,7 +372,7 @@ handful of typos from one address over a month added up to a lock.
 1. `POST /auth/magic/start { email }`: reserve `mint:<ip>`, then `email:<addr>`. A live person with that address
    gets a `magic` link; none → the same 200 `{}` and no mail (no enumeration; sign-up is closed on a self-host,
    §13 #15). With no mail transport the route is 404 and `/auth/methods` says `magic: false`, so the screen never
-   offers it, and a link is never printed instead. *Amended by OPS-19:* with `BRAINDOG_SMTP_URL` and
+   offers it, and a link is never printed instead. *Amended:* with `BRAINDOG_SMTP_URL` and
    `BRAINDOG_MAIL_FROM` set, the host sends through §5.20's client, `magic` is true, and an invitation's mailbox proof
    works too; with either unset it stays off, and notification mail waits in the outbox, said once at each start.
 2. `t` = 32 random bytes, base64url; `INSERT INTO dir_link (hash, person, purpose, expires)` with the HMAC of `t`,
@@ -528,7 +528,7 @@ options: [{ id: 'retry', label: 'Run it now' }, { id: 'ignore', label: 'Ignore' 
 — the visible item 12 §8 requires. `POST /api/snapshot` is `take('manual')`; `GET /api/snapshots` is `list()`;
 `GET /api/snapshots/:id` streams the file with `Content-Disposition: attachment`.
 
-*Amended September 28th 2026 against the tree (OPS-19 and the restore work; OPS-28 records it).* Three things above
+*Amended September 28th 2026 against the tree (the mail and restore work).* Three things above
 are not what was built:
 
 - **The clock.** The nightly copy falls due once a day at `BRAINDOG_BACKUP_AT`, `03:20` UTC by default
@@ -639,7 +639,7 @@ stay at the root and are answered before the shell is reached, and `/app/<slug>/
 4. Headers `From`, `To`, `Subject` (RFC 2047 `=?utf-8?B?…?=` when non-ASCII), `Date`, `Message-ID: <ulid@host>`, `MIME-Version: 1.0`, `Content-Type: text/plain; charset=utf-8`, `Content-Transfer-Encoding: base64`; body base64 in 76-column CRLF lines — no line can start with `.`, so no dot-stuffing; terminate `\r\n.\r\n` → 250; `QUIT` → 221.
 5. Any 4xx/5xx → throw `SmtpError { code }`; socket timeout 30 s; one message per connection. `html` is ignored (§10).
 
-*Amended September 28th 2026 (OPS-19; OPS-28 records it).* Built as `src/smtp.ts` over `node:net` and `node:tls`
+*Amended September 28th 2026.* Built as `src/smtp.ts` over `node:net` and `node:tls`
 with no dependency, configured by `BRAINDOG_SMTP_URL` and `BRAINDOG_MAIL_FROM` and off unless both are set. The
 password is read once and never written anywhere: not in a line on stderr, not in an error the retry ladder stores,
 not in the boot summary, which names the host and port alone. A server's reply text is never quoted either, since it
@@ -655,9 +655,9 @@ HTML.
 
 ### 5.23 · A person's script, in QuickJS
 
-*Added September 22nd 2026 for DIRECTION 22 ("scripts run hosted and outside"), from `apps/selfhost/src/script.ts`,
+*Added September 22nd 2026 ("scripts run hosted and outside"), from `apps/selfhost/src/script.ts`,
 `packages/host/src/script.ts`, `packages/host/src/script-try.ts`, `packages/script/src/quickjs.ts` and
-`packages/kernel/src/script-run.ts`, revised the same day for wave thirty-seven at `d23ac77d`. [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.19 is the Cloud's half; the record's half, and why the record
+`packages/kernel/src/script-run.ts`, revised the same day at `d23ac77d`. [51-SPEC-WORKER](51-SPEC-WORKER.md) §5.19 is the Cloud's half; the record's half, and why the record
 never runs a script, is [04-PACKS](04-PACKS.md) §1 and [25-CONNECTORS](25-CONNECTORS.md) §12.*
 
 A `script` declaration is the ninth kind. When its `runs.every` is due the record writes one `script.run` outbox
@@ -1039,7 +1039,7 @@ so its row is what this spec needs from it:
 |---|---|---|
 | 37 | `openNodeSqlite(path): NodeSql` at `./node-sqlite` (`:memory:` is the memory adapter; runs `measureCaps` and `bootProbe`, throws `SqlError('NO_SUCH_MODULE')`) · `bootProbe(caps, driver)` · `blobKey(recId, sha256)` · `SqlError` | 37 §2.4–§2.5, §5.1 |
 | 41 | `openRecord(sql, clock): Kernel`; `Kernel.applyMigrations() · refused() · pendingWork() · version() · declarations() · exportBrainl(cursor)`; the `CallContext` and `Result` types; `dog_manifest` excludes itself and `dog_sig` (K25) | 41 §2, §13 #1 |
-| 44 | `serveMcp(request, surface, ctx \| null, { maxBodyBytes? }): Promise<Response>`, with `gate(request)` and `unauthorized()` beside it, from `@braindog/mcp/http`; `surface` is the `RecordApi` | `loop/research-agent-path.md` §1.7 |
+| 44 | `serveMcp(request, surface, ctx \| null, { maxBodyBytes? }): Promise<Response>`, with `gate(request)` and `unauthorized()` beside it, from `@braindog/mcp/http`; `surface` is the `RecordApi` | the agent path |
 | 47 | `runPull(job: OutboxRow<'pull.fetch'>, deps: { http, keys, clock, record, ctx }): Promise<PullResult>` — acks itself | 47 §2 |
 | 48 | `apps/selfhost/src/main.ts` with `init <slug>` and `dev`; `POST /auth/device { slug?, reach, label, subject? }` → `DeviceCode`; `POST /auth/device/token { device_code }` → `DevicePoll`; `Reach`; operation grants and `device_grant.reach`; `createToken listTokens revokeToken`; `POST /api/export` as streamed `text/plain`; `#dog` / `#table` block order with `dog_sig` last | 48 §4.2, §5.2–§5.3, §5.12, §5.14, §13 D1–D3 |
 | 50 | `@braindog/web/node` → `handler(req, res, next)`; `/app/signin?next=`; `/decide/[id]`; `/settings/<area>` — `agents` for the code entry (`verification_uri`), `recovery` for the first passkey; `/r/<register>/<seq>` | 50 §2.2, §5.13, §13 #1–#2; 19 §2 |
@@ -1051,7 +1051,7 @@ so its row is what this spec needs from it:
 
 | # | Decision | Amend |
 |---|---|---|
-| 1 | **Passkeys are specified here (§5.10) and land in phase 3 with the web app; phase 2 closes with the magic link and the token exchange.** WebAuthn is a browser ceremony and phase 2 has no browser to drive it; ES256 and RS256, no attestation, registration behind a session | BUILD.md phase 3 row: "+ `/auth/passkey/*`"; 12 §3 self-host row |
+| 1 | **Passkeys are specified here (§5.10) and land in phase 3 with the web app; phase 2 closes with the magic link and the token exchange.** WebAuthn is a browser ceremony and phase 2 has no browser to drive it; ES256 and RS256, no attestation, registration behind a session | build phase 3: "+ `/auth/passkey/*`"; 12 §3 self-host row |
 | 2 | `POST /auth/token` exchanges `BRAINDOG_TOKEN` for an owner session — the browser bootstrap without SMTP, and the session a first passkey is registered behind; refused when the Directory holds more than one person | 33 §6 Auth row; 12 §3 |
 | 3 | **Inbound email on a self-host is a forwarding webhook**, `POST /in/email/<token>`, raw RFC 5322 in the body; the forwarding MTA's `Authentication-Results` pass is what makes a row eligible to match; no SMTP receive, no DKIM in-process | 33 §4 (a row); 07 §1 self-host column: "a forwarding webhook, or your own MX" |
 | 4 | **Phase 2 polls; `/ws` is 404.** The client's own 15 s fallback is the live channel; a WebSocket is §10's first line | 33 §4 `/ws` row: "Cloud; self-host phase 2: 404, the client polls" |
@@ -1074,7 +1074,7 @@ so its row is what this spec needs from it:
 | 21 | `main.ts` carries `init <slug> [--owner]` and `dev [--port]` (48 §5.14's contract); a slug is `^[a-z][a-z0-9-]{1,31}$`; `init` generates the record DEK, the connector DEK and the Ed25519 signing pair, wraps them under the KEK and hands them to `createRecord`; the inbound-email capability lives at `<slug>/inbound.token` (0600); `dev` prints mail and its throwaway `BRAINDOG_TOKEN` to stderr | 33 §5 `init` row (the owner flag, the token file); 34 §4 (a slug grammar row); 33 §6 |
 | 22 | `POST /api/export` answers streamed `text/plain` on this host too — 48 §13 D3's one exception to the `Result` envelope — and the host, not the record, emits the `dog_sig` line last (#19 names the key) | 33 §4 `/api/<method>` row (the export exception); 48 §13 D2 (who writes `dog_sig`) |
 | 23 | `createToken` · `listTokens` · `revokeToken` are routable ADMIN methods on this host, reached by a cookie or a `token` operation grant | 30 §5 ADMIN row (the three methods 48 §5.12 calls; 41 → 44 becomes 47 methods) |
-| 24 | **A script runs on this host in QuickJS compiled to WebAssembly**, one instance per run, leased with the scheduled actions and admitted on their count; its `ctx.fetch` is their send loop, and its reads are the record's own `list` and `get` as the script's actor. Not `node:vm`, which is not a boundary, and not `isolated-vm`, a native build on every self-hoster's machine (`loop/research-shell-scripts.md` §4) | 31 §2 row 23 (done); 12 §8 (the ceilings) |
+| 24 | **A script runs on this host in QuickJS compiled to WebAssembly**, one instance per run, leased with the scheduled actions and admitted on their count; its `ctx.fetch` is their send loop, and its reads are the record's own `list` and `get` as the script's actor. Not `node:vm`, which is not a boundary, and not `isolated-vm`, a native build on every self-hoster's machine | 31 §2 row 23 (done); 12 §8 (the ceilings) |
 
 Twenty-four, counted.
 
@@ -1095,7 +1095,7 @@ Twenty-four, counted.
 - [ ] `POST /a` stores a PNG and refuses an SVG; `GET /a/<sha>` carries the four headers.
 - [ ] `GET /D41` and `GET /tasks%237` redirect; the shell answers everything else from `apps/web/build`.
 - [ ] `secret-grep` finds nothing in `apps/selfhost/src`; no response ever carries `Access-Control-Allow-Origin`.
-- [ ] The phase-2 round trip of BUILD.md — `init → pack install → create → export → verify` — passes against this process over HTTP. **Not tickable today**: of those steps the CLI dispatches `init` alone, `pack install`, `export` and `verify` being none of its eleven commands (48 §2).
+- [ ] The phase-2 round trip — `init → pack install → create → export → verify` — passes against this process over HTTP. **Not tickable today**: of those steps the CLI dispatches `init` alone, `pack install`, `export` and `verify` being none of its eleven commands (48 §2).
 - [ ] Every amendment in §13 is applied to its design document in the same revision.
 
 ---

@@ -153,13 +153,13 @@ test('no backtick reaches the reader outside code', when(NO_BUILD), () => {
 });
 
 /**
- * EVERY LINK GOES SOMEWHERE. An audit of the live site counted seven rendered instances across four
+ * EVERY LINK GOES SOMEWHERE. A read of the live site counted seven rendered instances across four
  * URLs, every one a 404 to a stranger, including the only outbound action in the free plan and the
  * only one in the changelog's status block. `SOURCE`, `DOCS` and `BUILD` are `null` so that every
  * call site has to decide what to draw when there is no address; this is what checks that each one
  * still draws nothing rather than the word `null`.
  *
- * A PATH THE SITE HANDS TO THE APP GOES TO THE APP, NOT TO `build/`. Since push B2 "Open the app" is
+ * A PATH THE SITE HANDS TO THE APP GOES TO THE APP, NOT TO `build/`. Since the move to one domain "Open the app" is
  * `/app` on this site's own name, and this failed on it with "index.html has href="/app", and build/
  * holds none of app, app.html, app/index.html", which is true and beside the point: the site's
  * `run_worker_first` sends `/app` to its script and the script to the app. So a path on that list is
@@ -251,8 +251,8 @@ test('every page links GitHub and the legal page', when(NO_BUILD), () => {
  * THE HOME PAGE DOES NOT USE THE WORD `register`.
  *
  * One sentence on the home page once taught a stranger the word by naming three of them, and this checked
- * each against the registers the seed declared. The sentence left on 2026-09-22 (`loop/research-site-now.md`
- * ranked a word of the product's plumbing on the first screen as the fault), and since 26 September the
+ * each against the registers the seed declared. The sentence left on 2026-09-22 (a word of the product's plumbing on the first screen
+ * was the fault), and since 26 September the
  * product on the page is drawn from the example records in `src/lib/examples/`, which name no register and
  * are checked by `examples.test.ts`. So the half of the old check that walked the seed went, and what is
  * left is the half a reader meets: a word nobody on the page has defined.
@@ -270,8 +270,8 @@ test('the home page does not use the word register', when(NO_BUILD), () => {
  * rows the way the record writes them (`Moved tasks#12 from open to done`, `Created services#6`),
  * and this test held every `register#n` it served to a register the seed declares. It caught real
  * renames. What it could not catch was that the addresses were the fault: a stranger has no record,
- * `tasks#12` is a thing they cannot look up, and `loop/research-site-now.md` read the band as a
- * table of record ids, which is the "all records and text" of §19 in its purest form. The ledger
+ * `tasks#12` is a thing they cannot look up, and a stranger read the band as a
+ * table of record ids, which is the owner's "all records and text" in its purest form. The ledger
  * gave way to a drawn decision whose history names what changed in words, so the anchor this test
  * needed is gone on purpose, and the rule is the opposite one: no address at all.
  *
@@ -302,7 +302,7 @@ test('the home page names no row by its address', when(NO_BUILD), async () => {
  * THE FIRST SCREEN'S SENTENCE SAYS WHAT A READER GETS, NOT HOW THE STORAGE WORKS.
  *
  * `hero.sub` read *Every change is an event, and the log only grows*: true, audited, and the most
- * technical words above the fold, on the one screen §19 is explicit about (*shows the value, not
+ * technical words above the fold, on the one screen the owner was explicit about (*shows the value, not
  * what it does technically, at least not for the first blocks*). The words below are the ones that
  * sentence and its predecessors reached for. They are all still allowed further down, where the
  * mechanism band is about mechanism on purpose.
@@ -318,7 +318,7 @@ test('the hero sentence names no mechanism', async () => {
 /**
  * EVERY KIND OF PERSON THE PRODUCT IS FOR IS NAMED ON THE HOME PAGE, and each can be reached.
  *
- * The owner's word, 2026-09-17 (`loop/DIRECTION.md` §11): the product is for everyone, and the site
+ * The owner's word, 2026-09-17: the product is for everyone, and the site
  * read as a product for small businesses. Five use cases are named and none may quietly drop out.
  *
  * THE PHOTOGRAPHS ARE GONE ON PURPOSE and that half of this check went with them. Five screenshots
@@ -365,7 +365,7 @@ test('every image a page asks for is in the build', when(NO_BUILD), () => {
  * THE HOME PAGE COUNTS NONE OF THE PRODUCT'S OWN PARTS AT A STRANGER.
  *
  * The owner read the page on 2026-09-21 and named the figures on it: *less of those silly ai-looking
- * stats of tools, templates, etc.* (`loop/DIRECTION.md` §19). Four of them sat in a row under the
+ * stats of tools, templates, etc.* Four of them sat in a row under the
  * hero, `16 tools an agent can call`, `5 resource templates beside them`, `1 file holds your record`
  * and `30 nightly backups, either host`, and the sixteen tool names were drawn again as a grid two
  * bands down with five resource-template grammars as chips beside them.
@@ -413,7 +413,7 @@ test('the home page counts none of the product own parts at a stranger', when(NO
 /**
  * THE HOME PAGE IS AT MOST FIVE BANDS, THE PRODUCT IS IN THE FIRST ONE, AND IT IS DRAWN.
  *
- * Two measurements, one test, because they are the same complaint. `loop/DIRECTION.md` §19:
+ * Two measurements, one test, because they are the same complaint. The owner's words:
  * *i dont like how it's so long, and it's all records and text. i want it to be more graphical, and
  * shows the value, not what it does technically (at least not for the first blocks).*
  *
@@ -438,9 +438,9 @@ test('the home page counts none of the product own parts at a stranger', when(NO
  */
 /*
  * EIGHT BANDS FROM 26 SEPTEMBER, AND THE BOUND MOVED WITH THEM. The owner asked for the page under the hero to be
- * rebuilt and for Slash to have a section of its own (`loop/DIRECTION.md` §33), and each band now shows one thing the
+ * rebuilt and for Slash to have a section of its own, and each band now shows one thing the
  * product does, drawn, rather than a paragraph about it: Slash, agents, the inbox, pages, why it is yours, the plans
- * and the close. The complaint §19 answered was prose and length for their own sake, so the bound is the page as
+ * and the close. The complaint this answered was prose and length for their own sake, so the bound is the page as
  * built, and a ninth band is the argument to have first.
  */
 test('the home page is at most eight bands, opens on the drawn product, and holds no screenshot', when(NO_BUILD), () => {
@@ -548,8 +548,8 @@ test('_headers caches hashed assets immutably and the screenshots for a day', ()
  * It said "And five addresses a client can read directly" and listed five, under a comment naming
  * `RESOURCES` as the array it came from. The array is `TEMPLATES` (`RESOURCES` does not exist; the
  * fixed resources are `FIXED`), and it held six: the count was true on 21 September when it was
- * written, and `braindog:automation/{id}` landed the next day without the page hearing of it
- * (`loop/research-batch-forty-audit.md` §10). Nothing failed, because the page was a hand count and
+ * written, and `braindog:automation/{id}` landed the next day without the page hearing of it.
+ * Nothing failed, because the page was a hand count and
  * nothing compared it with the code.
  *
  * SO THIS IMPORTS THE ARRAYS THEMSELVES. The addresses are held to `TEMPLATES` in order, the read

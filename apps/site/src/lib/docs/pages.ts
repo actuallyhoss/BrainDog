@@ -9,7 +9,7 @@
  */
 import { parse, type Segment } from 'braindog-render';
 
-/** The sections, in the order the docs are read (site.md C7). A folder is `NN-<section>`, numbered from 01. */
+/** The sections, in the order the docs are read. A folder is `NN-<section>`, numbered from 01. */
 export const SECTIONS = ['start', 'use', 'agents', 'api', 'dialect', 'packs'] as const;
 export type Section = (typeof SECTIONS)[number];
 
@@ -136,7 +136,7 @@ export function partsOf(body: string): { parts: Part[]; headings: Heading[] } {
 }
 
 /**
- * The first paragraph of the body's prose: the page's summary (site.md C7). A heading, a list or a rule
+ * The first paragraph of the body's prose: the page's summary. A heading, a list or a rule
  * is not a paragraph, so the summary is the first run of ordinary lines, joined as the renderer joins them.
  */
 export function summaryOf(body: string): string {

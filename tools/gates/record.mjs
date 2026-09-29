@@ -29,7 +29,7 @@
  * pass every width and every contrast rule. `answers` asks the gate's own port for `boot` before
  * anything is measured and throws unless the record answered it.
  *
- * AND THE VARIANTS ARE RECORDS NOW, NOT BUILDS (wave C2 of `loop/research-no-sample.md`). See `VARIANTS`.
+ * AND THE VARIANTS ARE RECORDS NOW, NOT BUILDS. See `VARIANTS`.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -53,7 +53,7 @@ const VARIANT_OF = new Map();
  *
  * THEY WERE THREE MORE BUILDS OF THE APP. `BRAINDOG_VARIANT` swapped constants in the sample (`DEPLOYMENT`, `DEVICES`,
  * `TOKENS`, `DECIDED`) and `build:variants` wrote `build-cloud/`, `build-quiet/` and `build-busy/` for `layout` and `a11y`
- * to serve against this record. Once the screens read the record and not the sample, which wave A did screen by screen,
+ * to serve against this record. Once the screens read the record and not the sample, screen by screen,
  * none of those constants reached a screen, so each variant build drew exactly what the main build drew and the branches
  * it existed for went unmeasured, at three Vite builds a CI run. A variant is a record that holds something different,
  * which is what the build flag's own comment said it should be.

@@ -3,7 +3,7 @@
  *
  * ONE LIST FOR FOUR READERS: the header, the footer, the 404's list and `/sitemap.xml`, so a page is
  * never named by one and missing from another. A page is shown only once its
- * route folder holds a `+page.svelte`, so a unit that adds a page never edits this file, and a link to
+ * route folder holds a `+page.svelte`, so adding a page never edits this file, and a link to
  * a page that does not exist yet can never be drawn, which would also stop the strict prerender.
  */
 import { shell } from './copy/shell.ts';
@@ -42,7 +42,7 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
  *
  * THE HEADER'S ROW IS FINAL: Slash, For agents, Packs, Pricing, Docs, Changelog, and then GitHub, which
  * `+layout.svelte` adds from `SOURCE` in `links.ts` because it is not a page of this site. Slash leads
- * because it has a page of its own since the redesign of 26 September (`loop/DIRECTION.md` §33).
+ * because it has a page of its own since the redesign of 26 September.
  */
 export const PLACES: readonly Place[] = [
   place('/slash', 'slash', 'product', true),

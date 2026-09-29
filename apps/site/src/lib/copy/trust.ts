@@ -3,7 +3,7 @@
  * and nowhere else a reader meets it.
  *
  * THE SUPPORT ADDRESS IS NOT TYPED HERE. It is `SUPPORT_EMAIL` in `links.ts`, the one constant the
- * pages read, and it stays empty until the owner routes it to an inbox (decisions.md item 14). A
+ * pages read, and it stays empty until the owner routes it to an inbox. A
  * sentence that shows it is a function of it, and each has a twin for the day it is empty, so no
  * page ever prints an address nobody reads. `/.well-known/security.txt` follows the same rule: it is
  * added beside `static/` the day the address is set, because RFC 9116 makes `Contact` required and a
@@ -26,7 +26,7 @@ export const trust = {
     },
     terms: {
       title: 'Terms and privacy',
-      /* NOT WRITTEN HERE. The legal texts are OPS-27's (W3), drafted in `apps/site/legal/` and his to
+      /* NOT WRITTEN HERE. The legal texts are drafted in `apps/site/legal/` and the owner's to
          approve; a marketing redesign does not invent a legal term. Before `LAUNCH.legal` the index
          says so in one sentence; after it, it lists the three pages below. */
       body: 'The Terms of Service, the Privacy Policy and the Data Processing Addendum are published on this page before sign-up opens, and each says when it last changed.',

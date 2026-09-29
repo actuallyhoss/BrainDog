@@ -1,5 +1,5 @@
 <!--
-  The drawn app's rail, 900px and wider: the new app's floating rail card (SYSTEM §5), cut down to what an example
+  The drawn app's rail, 900px and wider: the new app's floating rail card (the design system), cut down to what an example
   record shows.
 
   THE SAME ORDER AS THE PRODUCT'S. The record switcher at the top (the mark, the record's name and its chevron), the
@@ -9,7 +9,7 @@
 
   GLASS, AND IT HOLDS ONLY CHROME. The chosen place has an ink well with the glyph in the on-ink colour and its row in
   the tile fill. Decide's count is the square badge, drawn in ink here rather than red: on the site, red is the mark's
-  and nothing else's (SYSTEM §10), and the app draws it red.
+  and nothing else's (the design system), and the app draws it red.
 
   EACH PLACE IS A BUTTON THAT OPENS ITS PAGE in the drawn app's page area, and the place on show carries
   `aria-current`. Focus stays on the row pressed, which is still there. The ask field and the agents' rows are drawn,
@@ -118,7 +118,7 @@
 </div>
 
 <style>
-  /* THE RAIL CARD: glass, radius 22, padding 10, floating one inset from the window's edge (SYSTEM §5). */
+  /* THE RAIL CARD: glass, radius 22, padding 10, floating one inset from the window's edge (the design system). */
   .rail {
     display: flex;
     flex-direction: column;

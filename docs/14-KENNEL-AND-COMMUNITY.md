@@ -50,7 +50,7 @@ per-minute write budget the record doors use, before its body is read.
 ### The default the owner has not yet ruled on
 
 [ADR-031](16-DECISIONS.md) put the Kennel after gate 2, and ADR-047 described it as pull requests to a
-public repository. The Kennel as built follows the default `loop/finish/platform.md` §5 sets until the
+public repository. The Kennel as built follows this default until the
 owner rules:
 
 - **Now, not after gate 2**, because the direction asks for a registry and for publishing your own packs.
@@ -89,7 +89,7 @@ The answer BrainDog gives: the mechanism is not what is sold — **the hosting i
 distribution channel. If that stops being true, this is a framework, and frameworks in this niche
 monetise at zero (n8n at 203k★, priced at zero to an individual).
 
-The gate that measures it: **5 packs by somebody who is not Sam.** Zero at six months means the
+The gate that measures it: **5 packs by somebody who is not the owner.** Zero at six months means the
 declaration kinds (`KINDS` in `packages/kernel/src/declare.ts`, [04-PACKS](04-PACKS.md) §1) are one
 person's shape, not a general one.
 

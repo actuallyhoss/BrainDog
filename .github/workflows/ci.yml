@@ -12,8 +12,8 @@ name: ci
 # FOUR LEGS AND A GATES JOB, BECAUSE ONE JOB COULD NO LONGER HOLD A WORKFLOW'S WORTH OF TESTS. The
 # single `check` job that did all of this took 19 min 13 s in run 35931879146 on 24 September, the
 # next run was killed at its 20-minute ceiling in the middle of the gates with nothing hung, and
-# `loop/finish/ops.md` (OPS-1) records the last run before this split at 23 min 44 s against a
-# ceiling of 30. A finish workflow lands three areas' worth of new tests at once, so that ceiling
+# the last run before this split took 23 min 44 s against a ceiling of 30. A large change can land
+# three areas' worth of new tests at once, so that ceiling
 # would have been reached by the tree growing rather than by anything hanging. Split, each leg has
 # a ceiling of its own, and a red leg names the part of the tree it covers.
 #
@@ -81,7 +81,7 @@ jobs:
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # PER LEG, AND A CEILING FOR A HANG RATHER THAN A BUDGET. 52 §7 budgets the workflow at 20
-    # minutes, and OPS-1 set 25 for each leg: a leg holds part of what the single job ran in
+    # minutes, and the split set 25 for each leg: a leg holds part of what the single job ran in
     # 19 min 13 s, so a leg has room to grow by a workflow of tests, and 25 is still far short of the
     # six hours the ceiling exists to stop.
     timeout-minutes: 25
@@ -139,9 +139,9 @@ jobs:
 
       # ONLY WHERE A TEST LAUNCHES CHROMIUM, and a hosted image has none cached (the first run on
       # ubuntu-latest, 22 September, failed four tests on a missing chrome-headless-shell). On
-      # studio-pc this found the browser already installed and cost a second. On a hosted image, a
+      # the self-hosted runner this found the browser already installed and cost a second. On a hosted image, a
       # leg that gains a browser test without this flag is red with Playwright's own sentence naming
-      # the missing browser; on studio-pc it passes on the browser already there.
+      # the missing browser; on the self-hosted runner it passes on the browser already there.
       - if: matrix.browser
         run: pnpm exec playwright install --with-deps chromium
 
@@ -210,24 +210,24 @@ jobs:
     # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # Four Vite builds for the app (the shipped record plus the cloud, quiet and busy variants), one
-    # for the site, and six gates that read them. The job took 2 min 39 s on studio-pc on 21
+    # for the site, and six gates that read them. The job took 2 min 39 s on the self-hosted runner on 21
     # September before the gates were added, and the first three (`bundle`, `passkey`, `queue`) measured 6.4 s in `gates.yml` run
     # 35587734418. `self-test`, `prefs` and `keys` add about 4.5 minutes (measured once), which is
     # why the ceiling moved from 15 to 20: a ceiling for a hang, not a budget. The two dry runs
-    # (OPS-1) have not been measured in this job yet.
+    # have not been measured in this job yet.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
       - run: pnpm --filter @braindog/web build
-      # THE BUILT-SHELL HALF OF THE CSP TEST (OPS-22): it skips under plain `node --test` when
+      # THE BUILT-SHELL HALF OF THE CSP TEST: it skips under plain `node --test` when
       # `apps/web/build` is absent, which is every `test` leg, so only a job that builds first can
       # run it on every push.
       - run: node --test apps/web/test/csp.test.ts
       - run: pnpm --filter @braindog/site build
       # THE CLI BUNDLE TOO, so a change esbuild cannot bundle is red on the push and not first at the deploy, which
-      # builds it before anything goes live (AGT-1).
+      # builds it before anything goes live.
       - run: pnpm --filter braindog-cli build
       - run: node apps/cli/dist/braindog.mjs --version
 
@@ -265,7 +265,7 @@ jobs:
           unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
           pnpm --filter ./apps/site exec wrangler deploy --dry-run --env production --outdir "$RUNNER_TEMP/site"
 
-      # THE BROWSER, WHICH IS ALREADY ON studio-pc. `passkey` and `queue` launch chromium. The
+      # THE BROWSER, WHICH IS ALREADY ON THE SELF-HOSTED RUNNER. `passkey` and `queue` launch chromium. The
       # install found it in %LOCALAPPDATA%\ms-playwright and took one second in the 21 September
       # `gates.yml` run; the step is here for the day CI_RUNNER points back at a hosted image, where
       # it is a download of about 150 MB and a minute or two with no cache.
@@ -284,7 +284,7 @@ jobs:
       # cancelled `ci` is a deploy that never starts. They stay in `gates.yml`.
       #
       # `prefs`, `keys` AND `self-test` JOINED ONCE NO GATE HELD A FIXED PORT (`a9897f7a`). This
-      # runner is the PC the loop runs the same gates on by hand, and while `prefs` bound 4183, `keys`
+      # runner is the PC the same gates are run on by hand, and while `prefs` bound 4183, `keys`
       # 4184, `layout` 5189 and `a11y` 5186, a CI run and a desk run of one gate could collide and
       # go red for a reason that is about the machine rather than the tree. All four take port 0 now,
       # proven on 22 September by a desk run of all four, green. `run.mjs` runs a selection in
@@ -293,13 +293,13 @@ jobs:
 
   windows:
     # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which
-    # no other job here is sure to run on, since each follows `vars.CI_RUNNER` (`loop/finish/ops.md`
-    # OPS-25, SC33). The steps are `windows.yml`'s, called
+    # no other job here is sure to run on, since each follows `vars.CI_RUNNER`.
+    # The steps are `windows.yml`'s, called
     # rather than copied, because that file also runs them weekly on a schedule of its own: a
     # schedule on this workflow would make every weekly run a production deploy through
     # `deploy.yml`, which is the reason it is not here.
     #
-    # ON A PULL REQUEST THAT CARRIES `full-gates`, AND NOWHERE ELSE (decisions C57). A hosted Windows
+    # ON A PULL REQUEST THAT CARRIES `full-gates`, AND NOWHERE ELSE. A hosted Windows
     # minute is billed at twice a Linux one on a private repository, so it is not spent on every
     # push; on a push to master there is no pull request, and the job is skipped rather than red.
     # The label is read when a run starts, so one added to an open pull request takes effect from

@@ -5,7 +5,7 @@
  * SVELTE.CONFIG.JS PROMISES THE WHOLE SITE READABLE WITH SCRIPTING OFF, and the drawn app broke the
  * promise once without anything noticing. Every case's panel is stacked in one grid cell and only the
  * chosen one is `visibility: visible`, so with no script to choose another, four of the five cases
- * never appeared. `loop/research-site-now.md` measured it in Chromium with `javaScriptEnabled: false`
+ * never appeared. It was measured in Chromium with `javaScriptEnabled: false`
  * at 1440 and again at 390: 1 of 5 panels visible, and pressing "Solo founder" left "Personal"
  * chosen. The layout gate cannot see it, because it drives the page with scripting on.
  *

@@ -12,7 +12,7 @@
  *   - THE PHYSICAL-PROPERTY RULE is a day's work now and a manual audit of hundreds of declarations
  *     later, which is why it is in the first commit rather than after sixteen block kinds exist.
  *
- * `52 §5.2` NAMES TWELVE RULES AND THIS FILE HOLDS ELEVEN OF THEM (`loop/finding-css-rules.md`).
+ * `52 §5.2` NAMES TWELVE RULES AND THIS FILE HOLDS ELEVEN OF THEM.
  * ROW 12 (every semantic colour token has a `pairs.json` entry) IS SKIPPED, NOT FAKED: `pairs.json`
  * is not a file that exists anywhere in this source tree. `39-SPEC-THEME.md` D14 says it is
  * apps/web's to emit, and the only consumer named anywhere in this repo is a browser-based

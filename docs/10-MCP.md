@@ -101,7 +101,7 @@ without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (�
 ## 3 · The tool surface is DYNAMIC and per-customer
 
 A customer's registers come from *their* installed packs and from what they and their agents added
-at run time ([DIRECTION §22](../loop/DIRECTION.md)). A freelancer with `money-core` and `freelancer-uk` has
+at run time. A freelancer with `money-core` and `freelancer-uk` has
 different registers from a studio with `products` and `people`, and the same sixteen tools reach all of them.
 
 ### The generation rule
@@ -130,7 +130,7 @@ Instead:
 **Sixteen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
 *arguments*, as in `list(register: "obligations", where: {...})`, and in the resources, which are fetched when
 needed. Fourteen and not the eight an earlier revision named, because the agent path added three things every
-session does: `context`, `handoff` and `meet` (`loop/DIRECTION.md` §0). Five went to pay for them: `pages`, `page` and
+session does: `context`, `handoff` and `meet`. Five went to pay for them: `pages`, `page` and
 `metric` are resources, `credentials` could never answer a token, and `dry_run` left the list, to come back later on
 `propose`'s answer for a rule change. Then two joined, and each was paid for inside the same ceiling by cutting
 descriptions that said twice what their schema or the instructions already say: `activity`, because `history` takes a
@@ -312,14 +312,14 @@ server ← resultType: "input_required"
            question: "Cancel Cloudflare Workers Paid ($5/mo, renews 2026-09-01)?",
            options: [
              {id:"cancel", label:"Cancel it",  because:"Nothing has deployed in 60 days"},
-             {id:"keep",   label:"Keep it",    because:"acme.example's worker is on this plan"}
+             {id:"keep",   label:"Keep it",    because:"the shop's worker is on this plan"}
            ],
            requires_reason: true
          }]
 
 human sees this in their own client, chooses, types a reason
 
-agent → update(…, inputResponses:[{id:"keep", reason:"acme.example still deploys weekly"}])
+agent → update(…, inputResponses:[{id:"keep", reason:"the shop still deploys weekly"}])
 
 server ← { ok:false, decided:"D42", reason_recorded:true }
 ```
@@ -459,9 +459,9 @@ ask. A limit answers a bare `429` with `Retry-After`; no refusal code is minted 
 ### The refusal list, and the test that drives it
 
 The predecessor refuses five things **at the MCP layer**, before any request leaves, each with a
-reason an agent reads: deciding a suggestion (*"deciding is Sam's, never an agent's"*), the one-time
+reason an agent reads: deciding a suggestion (*"deciding is the owner's, never an agent's"*), the one-time
 import, every sign-in route (*"registering a passkey would mint a permanent way in that he never
-approved"*), the job surface (*"arbitrary code execution … ask Sam to run it from Spark"*), and every
+approved"*), the job surface (*"arbitrary code execution … ask the owner to run it from Spark"*), and every
 vault route (*"the highest-value thing prompt injection could ask for"*). BrainDog's equivalents are
 the four RPC groups outside DATA and READ+ in [30-BLUEPRINT](30-BLUEPRINT.md) §5, forty-three of
 the sixty-six methods, each refused to every MCP token **with a reason**, plus `by: decide` on the

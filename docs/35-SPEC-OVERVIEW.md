@@ -6,7 +6,7 @@ must never look at it, can type the files without a design meeting. One spec per
 of [31-STACK](31-STACK.md) §2, one per app, and two cross-cutting: testing and operations.
 
 > **Clean room.** Nothing here is ported. Nobody writing or building from these documents reads the predecessor's
-> code at `C:\Tools\legacy`; its behaviours were traced into [32-PARITY](32-PARITY.md), its code stays where it is,
+> code; its behaviours were traced into [32-PARITY](32-PARITY.md), its code stays where it is,
 > and every part below is designed on its own merits. A spec that would be easier to write by looking is a spec
 > that has not understood the problem yet.
 
@@ -19,7 +19,7 @@ responsibility, every algorithm as numbered steps with the exact SQL where SQL i
 its code, every test as a case a runner can execute, and every deliberate simplification with the condition that
 would remove it. Where a spec needs a decision the design documents did not take, it takes it, lists it under
 *Decisions taken here*, and the design document is amended in the same revision — the two never disagree for
-longer than one loop iteration.
+longer than one revision.
 
 The mode is **ponytail** (lazy senior engineering): the standard library before a dependency, a native platform
 feature before code, the fewest files that hold, no abstraction with one implementation, deletion before
@@ -96,7 +96,7 @@ wire shapes — never prose.
 
 Eighteen specifications, counted.
 
-## 5 · The revision loop
+## 5 · The revision rounds
 
 Specifications are written and revised in rounds until two consecutive audits find nothing.
 
@@ -106,9 +106,7 @@ Specifications are written and revised in rounds until two consecutive audits fi
    the same signature?), *buildability* (could a builder type this without a question — and is anything here
    more than the problem needs?).
 3. **Revise** — every finding applied; every decision taken written into §13 and the design document amended.
-4. **Exit** — an audit round with zero findings, twice in a row. Until then the loop continues.
-
-The loop's log is [BUILD.md](../BUILD.md): iteration number, what changed, what the audit found.
+4. **Exit** — an audit round with zero findings, twice in a row. Until then the rounds continue.
 
 ---
 

@@ -104,7 +104,7 @@ export class ThemeError extends Error { code: ThemeCode; at: string; found?: str
 ```
 
 Error contract: `parseTheme` throws `ThemeError`; nothing else throws on a parsed input. `build` never throws.
-Signatures differ from the brief in two places, both recorded: `parseTheme` takes JSON, not YAML (§13 D1); `toCSS`
+Signatures differ from the first sketch in two places, both recorded: `parseTheme` takes JSON, not YAML (§13 D1); `toCSS`
 takes the scheme from the palette, not as a second argument (a palette has exactly one scheme).
 
 ---
@@ -896,7 +896,7 @@ Eighteen, counted.
 - [ ] `perf.test.ts` holds `build` under 50 ms.
 - [ ] `package.json` has zero runtime dependencies and the `exports` map of §2; `tsc --noEmit` is clean under `erasableSyntaxOnly`.
 - [ ] The eighteen amendments of §13 are applied to 04, 05, 13, 16, 18, 22, 28, 30, 31, 32, 35 in the same revision.
-- [ ] `BUILD.md` records the iteration.
+
 
 ---
 

@@ -3,9 +3,9 @@
  *
  *   node tools/gates/docs-counts.mjs
  *
- * THE CLASS IS DOC (`loop/finish/defects.md` §4.1): a count written in prose goes stale the day the list it counts
+ * A count written in prose goes stale the day the list it counts
  * moves, and nothing notices. The documents gave sizes for the MCP tools, the resource templates and the kinds of
- * declaration that the code no longer had (defects T6 to T8), and the README counted the gates beside a runner that
+ * declaration that the code no longer had, and the README counted the gates beside a runner that
  * registered more. Every one of those was found by somebody counting by eye. The house rule is to write no count at all
  * and to name where the code keeps it; this is the rule's enforcement for the lists a stranger is most likely to be
  * told the size of.
@@ -35,7 +35,7 @@
  * whole, because an unlabelled document has not been excused of anything.
  *
  * TWO LEDGERS, AND AN ENTRY THAT EXCUSES NOTHING IS RED. `DEBT` is what was already stale when this gate landed, by
- * file and line: the unit that makes a listed line true deletes its entry. `NOT_A_TOTAL` is a count that is not about
+ * file and line: the change that makes a listed line true deletes its entry. `NOT_A_TOTAL` is a count that is not about
  * the whole list today (a decision's title, a size the text says the list used to have, a subset), each with its
  * reason. Both are matched on the words and the file rather than the line, so an entry follows its sentence when the
  * document above it is edited. An entry whose words are no longer there is a finding at the repository's own root, as
@@ -177,7 +177,7 @@ const CLAIMS = {
 /**
  * What was stale when this gate landed, read off the tree on 26 September 2026.
  *
- * `line` IS WHERE THE WORDS WERE THAT DAY, for a reader to find them; the match is on `file` and `said`. The unit that
+ * `line` IS WHERE THE WORDS WERE THAT DAY, for a reader to find them; the match is on `file` and `said`. The change that
  * makes a line true deletes its entry here in the same change, and the gate is red until it does.
  */
 const DEBT = [
@@ -185,7 +185,7 @@ const DEBT = [
     file: 'docs/16-DECISIONS.md',
     line: 1255,
     said: 'a hundred and twelve codes in nine families',
-    owner: 'no unit yet: ADR-057 states the registry at the size it had when it was written',
+    owner: 'nothing yet: ADR-057 states the registry at the size it had when it was written',
   },
 ];
 

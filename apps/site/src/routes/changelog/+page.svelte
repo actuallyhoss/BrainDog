@@ -6,7 +6,7 @@
   `./entries.ts`, where `../../../scripts/changelog.mjs` holds them against `git log`. The chart and its one line are
   counted from the same entries when the page is built, so neither can drift from the list.
 
-  THE PAGE IS TILES ON THE GROUND (SYSTEM §10). The opening tile holds the heading, the count, the feed and the three
+  THE PAGE IS TILES ON THE GROUND (the design system). The opening tile holds the heading, the count, the feed and the three
   kinds as filters; beside it every entry is drawn by the day it shipped, stacked by kind. Under them, the newest day
   is open in full, and each month is a tile of folded days, a row each.
 

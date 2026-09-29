@@ -8,7 +8,7 @@
   filters nothing with scripting off is a control that cannot act. Without a script the section list
   beside it is the way in.
 
-  THE FIELD IS SYSTEM §6's: the label above it, the tile's second fill, radius 12, 40 high and 44 on a
+  THE FIELD IS THE DESIGN SYSTEM'S: the label above it, the tile's second fill, radius 12, 40 high and 44 on a
   phone, the search glyph at its start and the 2px ink ring on focus. The hits are a list in the tile.
 -->
 <script lang="ts">

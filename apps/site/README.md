@@ -2,7 +2,7 @@
 
 The marketing site. Prerendered: every page is finished HTML on disk, with no fallback and no client
 router, and the whole of it reads with scripting off. It describes the finished product in the
-present tense (`loop/DIRECTION.md` §33) and ships with that product.
+present tense and ships with that product.
 
 ```sh
 pnpm dev              # http://localhost:5184

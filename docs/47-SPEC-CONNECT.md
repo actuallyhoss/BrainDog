@@ -679,7 +679,7 @@ the memory `Http`); `where` (§4.3's `readPath`); `extract` (43: `extract()` ove
 schedule writes, the `pull` row's `paused` state — §13 D1, D8). **Unblocks:** the Worker's queue consumer for `pull.fetch`
 and the bind route's `proveScopes` (51); the self-host's outbox poller (49); the Sources screen's `ok / failing /
 paused` rows (50, from `PullResult` via the receipts and the schedule row); `braindog pull run <ingest>` if the CLI
-ever gains it (48, not planned). Phase 4 of [BUILD.md](../BUILD.md) delivers it beside ingest and alarms.
+ever gains it (48, not planned). Build phase 4 delivers it beside ingest and alarms.
 
 ## 13 · Decisions taken here
 
@@ -709,7 +709,7 @@ ever gains it (48, not planned). Phase 4 of [BUILD.md](../BUILD.md) delivers it 
 | D20 | **A duration may be `<int>(s\|m\|h\|d)`**, where §4.1's type block writes `<int>(m\|h\|d)` — and four rows below it gives `limits.timeout` a default of `6s` and a range of `1s`–`30s`. Every timeout a declaration could legally state was unreadable by the shared parser, fell through to the default, and did it silently: a declaration saying `30s` against a slow provider was abandoned at six. Seconds go in the grammar rather than a second parser going beside it | §4.1 |
 | D21 | **`page.param` is applied by `resolveRequest`**, and a `link_header` state replaces the whole URL there. §5.1 step 6.1 and §5.2 both describe the request without saying where the paginator's own key goes, and `25 §3.2`'s Stripe example declares `param: starting_after` with no `query:` at all — so a run that only substituted `{page}` asked for page one, got page one, and asked again until `max_pages`. A register deduplicates forty identical pages into silence; a `flow` series adds them up. The parameter replaces a declared pair of the same name rather than repeating it, and the next link is origin-checked again where the request is built | §5.1 step 6.1; §5.2; §5.3; 25 §3.2 |
 
-Twenty-one, counted. Each amendment lands in the same revision loop iteration as this draft ([BUILD.md](../BUILD.md)).
+Twenty-one, counted. Each amendment lands in the same revision round as this draft (35 §5).
 
 ## 14 · Done when
 

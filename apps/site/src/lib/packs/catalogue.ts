@@ -128,7 +128,7 @@ export function entriesOf(doc: unknown): Entry[] {
 export const offered = (e: Entry): Version | null => e.versions.find((v) => v.yanked === undefined) ?? null;
 
 /**
- * WHAT IS PUBLIC: in the index, not `unlisted`, and with a version nobody withdrew (contracts §11 X7). An
+ * WHAT IS PUBLIC: in the index, not `unlisted`, and with a version nobody withdrew. An
  * unlisted pack is installable by its address in the app and is never named here.
  */
 export const isPublic = (e: Entry): boolean => !e.unlisted && offered(e) !== null;

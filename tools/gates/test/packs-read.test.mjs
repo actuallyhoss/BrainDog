@@ -3,9 +3,9 @@
  *
  *   node --test "tools/gates/test/*.test.mjs"
  *
- * WHY THIS FILE EXISTS. `packs/` became the third workspace root on 24 September (`pnpm-workspace.yaml`,
- * `loop/DIRECTION.md` sections 22 and 24), and every text gate that walks workspaces had `packages`
- * and `apps` written into it. Audit sixty-one, finding 9: `em-dash`, `secret-grep`, `graph` and
+ * WHY THIS FILE EXISTS. `packs/` became the third workspace root on 24 September (`pnpm-workspace.yaml`),
+ * and every text gate that walks workspaces had `packages`
+ * and `apps` written into it. An audit found `em-dash`, `secret-grep`, `graph` and
  * `shell-words` each hard-coded the pair, so a pack could carry a spaced em dash in the summary a
  * stranger reads before installing it, log a plaintext, or be imported by the core, and all four
  * read green because none of them had opened the directory. A gate that does not look is not a

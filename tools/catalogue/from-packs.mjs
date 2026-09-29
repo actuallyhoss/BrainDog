@@ -1,6 +1,6 @@
 /**
  * `from-packs`: every pack in `packs/` published into the catalogue the web app ships, so Browse lists it and a host
- * resolves its id (brief B3 of `loop/research-legacy-parity.md`).
+ * resolves its id.
  *
  *   node tools/catalogue/from-packs.mjs [--packs <folder>] [--to <catalogue folder>] [--previews]
  *
@@ -29,13 +29,13 @@
  * NOTHING IS WRITTEN UNLESS EVERY PACK PASSES, so a refused pack leaves the catalogue as it was rather than half moved.
  *
  * A YANK COMES FROM A PACK'S OWN `yanked.json`, NEVER FROM A HAND EDIT OF THE CATALOGUE (`apps/web/static/catalogue`
- * is generated and rule 7 of `loop/finish/rules.md` §9 keeps it that way). `packs/<folder>/yanked.json` maps a
+ * is generated, and a hand edit there is overwritten by the next run). `packs/<folder>/yanked.json` maps a
  * catalogue id that folder publishes to why it is withdrawn; this run stamps each onto the matching index entry's
  * matching versions, and a version already carrying a reason keeps it, so a second run writes nothing new.
  *
- * EVERY ENTRY SAYS WHAT A MARKETPLACE SHOWS (`loop/finish/platform.md` §4.0 C): BrainDog as its publisher, its
- * categories worked out from its latest file by `categoriesOf`, and `unlisted` when that file says so (decisions.md
- * C41: a pack named for one person or one bank stays in the index, so it installs by id, and out of every listing). The
+ * EVERY ENTRY SAYS WHAT A MARKETPLACE SHOWS: BrainDog as its publisher, its
+ * categories worked out from its latest file by `categoriesOf`, and `unlisted` when that file says so (a pack
+ * named for one person or one bank stays in the index, so it installs by id, and out of every listing). The
  * index is not hashed, only the files are, so an entry published before these fields existed is given them here without
  * a new version, and a new version's `changes` becomes its `notes` through `publishTo`.
  *

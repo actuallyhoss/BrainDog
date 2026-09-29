@@ -7,7 +7,7 @@
   reading, where Page lays blocks on twelve, and its `##` headings need anchors for the contents list, which the
   renderer's prose does not give. So `partsOf` cuts the headings out of the prose and this file draws them with ids.
 
-  EACH `##` STARTS A TILE (the Bento board `Light-Docs`): the heading row with its glyph in a well, then the part.
+  EACH `##` STARTS A TILE: the heading row with its glyph in a well, then the part.
   What comes before the first heading is the page's opening, and it goes in the first tile under `head`, which the
   page fills with where the page sits, its title and the ways to take it as text.
 

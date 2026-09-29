@@ -663,7 +663,7 @@ Twenty-one, counted. Each names the document to amend in the same revision (35 �
 - [ ] The `closed-lists` gate reads 20 · 8 · 4 + 4 + 1 · 8 · 4 from `dist/index.js` and matches 34 §6.
 - [ ] The `licence-closure` gate passes on `npm pack --dry-run --json`.
 - [ ] `dialect-arity` and `dialect-kind-unknown` fixtures produce their codes.
-- [ ] The eleven design documents named in §13 carry their amendments, and [BUILD.md](../BUILD.md) logs this iteration.
+- [ ] The eleven design documents named in §13 carry their amendments.
 - [ ] `braindog-render@0.0.1` is published by hand; trusted publishing is wired for `0.0.2`.
 - [ ] The `a11y-tree` parity row is filed against spec 50 as its stage-3 owner.
 

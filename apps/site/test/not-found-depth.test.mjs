@@ -11,7 +11,7 @@
  * level down it is `/a/_app/...`, which is itself a path with no file, so every stylesheet and
  * module was answered with the 404 page's own HTML: Chromium drew the page in "Times New Roman" and
  * threw "Failed to fetch dynamically imported module .../a/_app/immutable/entry/start.js"
- * (`loop/research-batch-fifty-audit.md` §1, measured at 16 assets failed on each of five paths).
+ * (measured at 16 assets failed on each of five paths).
  *
  * THE START SCRIPT HAD THE SAME FAULT IN A SECOND PLACE. With relative paths it sets SvelteKit's
  * base to `new URL(".", location).pathname`, so at `/a/b` the client would have believed the whole

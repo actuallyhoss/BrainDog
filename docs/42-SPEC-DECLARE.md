@@ -24,7 +24,7 @@ and then does exactly that, once, in one transaction.
 | retire a pack: `retired = 1`, one `uninstall` event, every row kept | delete anything, ever |
 
 **May import:** `braindog-render` (`KINDS`, `PRIMITIVES`, `PRIMITIVES_VERSION` — the kinds table of 34 §2.4, one
-TypeScript table per BUILD.md's recorded deviation), `@braindog/where` (`parse`, `flatten`, `validate`, `INBOX_RAW`, `jcs`), `valibot`.
+TypeScript table, a recorded deviation), `@braindog/where` (`parse`, `flatten`, `validate`, `INBOX_RAW`, `jcs`), `valibot`.
 The `./yaml` subpath alone imports `yaml`. Nothing else — not `ports`, not `kernel`, not `theme`.
 
 ---
@@ -891,7 +891,7 @@ Who may call `install` is the record's concern (a browser session, ADR-060); `de
 | `codes.test.ts` | a grep of `src/**` finds no `UPPER_SNAKE` refusal code outside 30 §6 as amended by §13 D4 |
 
 CI rows this package feeds (33 §8): `refusal-fixtures` · `closed-lists` · `graph` (no `yaml` reachable from `apps/worker` or
-`packages/record`) · `clean-room` (BUILD.md).
+`packages/record`) · `clean-room`.
 
 ---
 
@@ -941,9 +941,9 @@ keys), `PRIMITIVES` (eight), `PRIMITIVES_VERSION` (36 §2); `@braindog/where` �
 downgrade's retirements and a pack's seeds share the install transaction (04 §3: nothing is left behind); `@braindog/ports`'
 `node:sqlite` adapter (37); `@braindog/fixtures` — `PACKS`, `REFUSALS`, `text` (40 §2).
 
-**Interface notes for the loop.** 48 §11 names `parsePack(files) → { pack?, refusals }`, `lintPack(pack)` and a synchronous
+**Interface notes.** 48 §11 names `parsePack(files) → { pack?, refusals }`, `lintPack(pack)` and a synchronous
 `packChecksum(pack)`; this spec's are `parsePack(files) → Pack | Refusal[]`, `lint(pack, null)` and the async `checksum` — one of the
-two aligns next iteration. 48 §13 D12 defers `--force` and expects the record to refuse an orphaning downgrade "until the code
+two aligns in the next revision. 48 §13 D12 defers `--force` and expects the record to refuse an orphaning downgrade "until the code
 exists": the code is `WOULD_ORPHAN` (§13 D4). 43 §13 D6 requires this schema to accept exactly its ingest keys, 47 §4.1 its `FetchDecl`
 — §4.7 is written against both. 44 imports the `Refusal` type from here; 50 imports `schemas` and `./yaml`; 40 §6 counts
 seventy-five fixtures and gains D4's five.
@@ -952,7 +952,7 @@ seventy-five fixtures and gains D4's five.
 `packages/record` (#10 — `planPack` = `normalise` + `plan`, `installPack` = `plan` + `install`, `uninstallPack` = `uninstall`,
 `setDeclaration` through the same schemas); `packages/slash` (#11 — proposes ingest declarations); `apps/cli` (#12 — `pack lint |
 plan | install | uninstall`, importing `./yaml`); `apps/web` (#13 — the paste installer through `./yaml` by `import()`, generated
-forms from `schemas`). BUILD.md places it in phase 1 beside the kernel.
+forms from `schemas`). It sits in phase 1 beside the kernel.
 
 ---
 
@@ -996,7 +996,7 @@ Nineteen, counted.
 - [ ] `install` builds the batch the kernel applies — declaration rows with version and checksum, supersession, indexes, seeds tagged `example`, the `install`/`upgrade`/`declare`/`retire` events (41 §5.6); a stale plan, a conflict, an orphaning retire or a failing seed leaves nothing behind.
 - [ ] `uninstall` retires, keeps every row, drops the pack row and its indexes, and a reinstall shows the rows again.
 - [ ] `graph` proves `yaml` unreachable from `apps/worker` and `packages/record`; `closed-lists` and `refusal-fixtures` are green.
-- [ ] Every §13 amendment is applied to its design document in the same revision; BUILD.md's loop log records this spec.
+- [ ] Every §13 amendment is applied to its design document in the same revision.
 
 ---
 

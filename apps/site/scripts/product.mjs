@@ -11,7 +11,7 @@
  * app's Work board at 1440 by 900 at a device scale of 2, and the card was a 288 KB screenshot of
  * the app on every page's preview. On 22 September the owner said of the screenshots on the home
  * page *i hate those screenshots. they look terrible. dont just add scnreehots like that*
- * (`loop/DIRECTION.md` section 23), and the preview was the last one left. It had also stopped
+ * and the preview was the last one left. It had also stopped
  * running: it looked for `apps/web/build/index.html`, and the record app now builds under
  * `apps/web/build/app/`, so a run printed "no record-app build" and exited 1.
  *
@@ -105,7 +105,7 @@ if (BRAND && brand !== BRAND) {
    rather than named here, so the card follows the hero whichever ground the page gives it: the
    section says `data-ground="page"` and its own rule paints `--sunk`, and the computed colour is the
    one a reader sees. The accent is on the slogan's last two words and nowhere else, as on
-   the page (`loop/finish/site.md` C10): the accent bar the old card carried along its foot is gone.
+   the page: the accent bar the old card carried along its foot is gone.
    The classes the build gave the lifted elements keep the page's rules for colour and face; the rules
    below only size and place them, since a 1200-wide card is not the 1440-wide page. */
 const drew = await page.evaluate(() => {

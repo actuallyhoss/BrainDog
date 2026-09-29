@@ -40,7 +40,7 @@
  * it exports, because that is how a use of its keys is written, and the allow-list is qualified the
  * same way so two modules cannot excuse each other's sentences by accident.
  *
- * AND `copy.ts` IS AN AGGREGATE NOW (ARC-8). It types no sentence: its object spreads one object per
+ * AND `copy.ts` IS AN AGGREGATE NOW. It types no sentence: its object spreads one object per
  * web area, each exported by a file under `lib/copy/`, and a use of any of their keys is still
  * written `copy.<key>`. So the gate follows each spread to the file its import names and reads that
  * file's object as though it were written inside `copy`. The module list did not grow, because the
@@ -90,12 +90,12 @@ const ALLOWED = new Map([
      `copy.rankedBy` left it the same way, and its excuse had been wrong twice over: it read "19 §6's
      For You ordering", and what `19 §8` risk 6 asks for is the queue ranked by cost of being wrong,
      which `/decide` now says over the list it ranks. */
-  /* `saveAsView` LEFT THIS LIST IN W59-3, and its excuse was half wrong for as long as it stood. It read "a saved
+  /* `saveAsView` LEFT THIS LIST, and its excuse was half wrong for as long as it stood. It read "a saved
      view is seeded, never created from the grid", while `⌥V` on the grid had been creating one through `saveView()`
      all along. What was missing was the button, and the gate failed on this key alone when the line was taken out
      before the button existed. */
   ['copy.includesExample', 'UNBUILT. 19 §6 mechanism 2: the example row, marked and deletable in one click.'],
-  /* `stale` LEFT THIS LIST IN W56, when the register list began re-asking on the record's version and got a mark to
+  /* `stale` LEFT THIS LIST when the register list began re-asking on the record's version and got a mark to
      wear when more than one page of the old answer is in hand. The three below stayed, each for its own reason now,
      because the poll that landed with it draws the hairline and the hairline is `aria-hidden` with no words in it. */
   ['copy.offline', 'CORRECT. "New records only." promises a write that can still be made offline, and nothing in the web app queues one. It waits for a sentence that says what a failed poll means.'],
@@ -255,7 +255,7 @@ export default async function deadCopy(root = process.env.BRAINDOG_GATE_ROOT ?? 
   };
 
   /**
-   * A SPREAD IN THE OBJECT IS FOLLOWED TO THE FILE THAT TYPES IT (ARC-8).
+   * A SPREAD IN THE OBJECT IS FOLLOWED TO THE FILE THAT TYPES IT.
    *
    * `copy` is `{ ...shell, ...lists, ... }`, and each name is an object another file exports. The
    * module's own relative imports say which file, so the spread is read there, with the same pattern

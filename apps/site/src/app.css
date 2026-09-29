@@ -1,7 +1,7 @@
 /**
  * The site's own half of the stylesheet. Everything else is `@braindog/skin`.
  *
- * THE LOOK IS `loop/design/SYSTEM.md` §10: the app's system with fewer screens. The page is the ground (`--sunk`)
+ * THE LOOK IS THE DESIGN SYSTEM'S SITE: the app's system with fewer screens. The page is the ground (`--sunk`)
  * with its one soft light from the top (`--ground-light`); the header is a glass bar floating 12 in; every band is
  * Bento tiles on that ground, and the tiles carry drawings of the product at work; the footer is one tile. Content is
  * opaque and chrome is glass, and glass never holds content. Red is the mark's and nothing else's here.
@@ -19,7 +19,7 @@
     --site-gutter: var(--inset);
 
     /**
-     * THE SITE'S TYPE, beside the app's steps (SYSTEM §10): the hero's heading is 56/60 at a desk, every other heading
+     * THE SITE'S TYPE, beside the app's steps (the design system): the hero's heading is 56/60 at a desk, every other heading
      * is `--t-lead` (34/40), and text for reading is 17/28. The hero steps down in a straight line to 40 at 390, so a
      * phone's first screen still holds the slogan and the action under it.
      */
@@ -59,14 +59,14 @@
     font-size: var(--t-site-body);
     font-variant-numeric: tabular-nums;
     /**
-     * NOTHING ON THE SITE IS SET UNDER 14PX (`loop/finish/site.md` C10), and this is where that holds. The app's two
+     * NOTHING ON THE SITE IS SET UNDER 14PX, and this is where that holds. The app's two
      * smallest steps are 12 and 13, sized for a dense record read at a desk; raising them here lifts every label on a
      * page at once. It is set on `body` and not `:root` so `:root` still holds the app's values for the rule below.
      */
     --t-xs: var(--t-site-small);
     --t-sm: var(--t-site-small);
     /**
-     * RED IS THE MARK'S ALONE ON THE SITE (SYSTEM §10). The drawings are the product's own renderer, which paints a
+     * RED IS THE MARK'S ALONE ON THE SITE (the design system). The drawings are the product's own renderer, which paints a
      * late bill or a budget run over in `--danger`; here that state takes the amber the product uses for a soft
      * warning, which is still a hue that means "look", and the words beside it still say what is wrong. The mark
      * paints in `--brand` and keeps its red.
@@ -85,7 +85,7 @@
     --t-sm: var(--t-app-sm);
   }
 
-  /* HEADINGS IN GEIST, as every word is (SYSTEM §3). The skin's base still names the display face for the app. */
+  /* HEADINGS IN GEIST, as every word is (the design system). The skin's base still names the display face for the app. */
   h1,
   h2,
   h3,
@@ -175,7 +175,7 @@
   /* ── The tile ────────────────────────────────────────────────────────────── */
 
   /**
-   * CONTENT IS AN OPAQUE TILE (SYSTEM §4, §6): the tile fill, radius 22, level one, and no border. It never holds a
+   * CONTENT IS AN OPAQUE TILE (the design system): the tile fill, radius 22, level one, and no border. It never holds a
    * tile and never sits on glass. A tile that leads a band, with a heading and words to read, takes the lead padding.
    */
   .tile {
@@ -288,7 +288,7 @@
     text-wrap: balance;
   }
 
-  /* Every other heading on the site: `--t-lead`, 34/40, one plain sentence in one colour (DIRECTION §33). */
+  /* Every other heading on the site: `--t-lead`, 34/40, one plain sentence in one colour. */
   .h2 {
     margin: 0;
     color: var(--ink);
@@ -353,7 +353,7 @@
   /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
   /**
-   * THE BUTTON IS A PILL, and exactly one per view is filled. The filled one is ink with the on-ink word (SYSTEM §6);
+   * THE BUTTON IS A PILL, and exactly one per view is filled. The filled one is ink with the on-ink word (the design system);
    * the quiet one is the tile's second fill; the glass one sits on the ground or on chrome. No hue is spent on an
    * action, and red is never a fill.
    *
