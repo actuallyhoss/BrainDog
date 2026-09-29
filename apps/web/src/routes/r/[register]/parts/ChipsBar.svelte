@@ -1,7 +1,10 @@
 <!--
   The bar over the list: the search box, the filters as pills, menus or one phone button, the list
-  clauses a pill cannot draw, Clear, Save as a view and Display. And the phone's filter sheet, which
-  is the same filters behind the one button.
+  clauses a pill cannot draw, Clear and Save as a view. And the phone's filter sheet, which is the
+  same filters behind the one button. Display is the toolbar's now (SYSTEM §5), beside the view switch.
+
+  IT IS A CONTROL ON THE GROUND, NOT CHROME (SYSTEM §6): the search box is a field, the `--s1` well, and the pills are
+  wash pills with the chosen value a white pill in them. No glass: glass is for what floats.
 
   THE BAR APPEARS WHEN THERE IS SOMETHING TO SIFT, which is `shown`, the page's answer. Below eight
   rows it was a search box, six chips and a keyboard strip standing over a list you could already
@@ -63,7 +66,6 @@
     dropFilter,
     setQuery,
     saveView,
-    ondisplay,
   }: {
     /** Whether the list is big enough to sift, or is being sifted already. */
     shown: boolean;
@@ -82,10 +84,9 @@
     dropFilter: (at: number) => void;
     setQuery: (value: string) => void;
     saveView: () => void;
-    ondisplay: () => void;
   } = $props();
 
-  /* The phone's filter sheet: every enum field and Clear, behind one button beside Display. */
+  /* The phone's filter sheet: every enum field and Clear, behind one button beside the search box. */
   let filterOpen = $state(false);
 
   /* This part's own words: the phone's Filter button, named with what is chosen in it. */
@@ -185,9 +186,9 @@
     ON A PHONE THE FIELDS ARE ONE BUTTON AND A SHEET. Three field menus, Clear filters and Display
     measured past 390 on Services with one filter on, so Clear and Display were reached by
     scrolling the bar sideways, and a control nobody knows is there is a control that is not
-    there. The sheet holds every field and Clear, and Display sits beside it.
+    there. The sheet holds every field and Clear, and Display is in the toolbar above.
 
-    AND THE BUTTON IS 44px SQUARE, so the phone's bar is one row: search, Filter, Display (design
+    AND THE BUTTON IS 44px SQUARE, so the phone's bar is one row: search and Filter (design
     SYS-6, DSN-7). It said "Filter" and every chosen value in words, which took a second line under
     the search box. How many values are on is the figure beside the glyph, and what they are is in
     its name for a screen reader and in the sheet it opens.
@@ -282,34 +283,12 @@
     <span class="bar-clear"><Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button></span>
   {/if}
 
-  <!-- DISPLAY WAS A KEY AND NOTHING ELSE. `v` opens its sheet, the keymap sheet prints it, and
-       on a phone neither of those is reachable, so which columns you see and what the list is
-       sorted by were both unreachable on the device where the table that carries them is
-       `display: none`. `19 §4` makes the key an accelerator OVER a visible control; there was
-       no control to accelerate.
-
-       IT IS IN THE BAR, which appears at eight rows. Below that there is nothing to sort and
-       nothing worth hiding. -->
-  <!-- AT THE END OF THE BAR, where a keyboard strip used to stand. It printed four bindings
-       to every visitor on every visit, `j k` move, `p` peek, Enter open and archive: a screen
-       explaining its own interface to people who had not asked. The bindings are untouched.
-       The `?` sheet lists them by reading the registry, and the row menu prints each verb's
-       key beside it, which is where somebody learning them is already looking. -->
-  <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It stands
-       before Display because both are about the list as a whole, and Display stays last as the
-       one that changes how it looks. On a phone with filters it lives in the filter sheet
-       instead, beside Clear, for the reason Clear does. -->
+  <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It ends the
+       bar, because it is about the list as a whole. On a phone with filters it lives in the filter
+       sheet instead, beside Clear, for the reason Clear does. -->
   {#if filtered && !sheeted}
     <span class="bar-save"><ViewsMenu {saveView} /></span>
   {/if}
-  <!-- ITS NAME IS "Display" AT EVERY WIDTH. On a phone the word is hidden and the glyph is the
-       44px control, and the word stays in the button for a screen reader and for the gates that
-       press it by name. -->
-  <span class="bar-end">
-    <Button weight="bare" onclick={ondisplay}>
-      <Icon name="settings" size="m" /><span class="bar-word">{copy.display}</span>
-    </Button>
-  </span>
 </div>
 {/if}
 
@@ -389,10 +368,10 @@
   }
 
   /**
-   * THE FILTERS ARE PILLS: one rounded track on a raised surface, and the chosen value a pill in it
-   * on the selected ground with its word in ink (design D-2: pills for what you press and choose).
-   * `controls.css` asks for the state to be a SHAPE and not a shade, and this keeps that. Scoped to
-   * this screen, so every other segmented control keeps the shared rule.
+   * THE FILTERS ARE WASH PILLS ON THE GROUND: one rounded track in the ground's wash, and the chosen value a white pill
+   * in it lifted by a tiny shadow (`controls.css`), with its word in ink. The bar is a control on the ground and not
+   * chrome, so the track sheds the toolbar's glass (SYSTEM §5, §6). The state is a SHAPE and not a shade. Scoped to this
+   * screen, so every other segmented control keeps the shared rule.
    *
    * THE COUNT SITS BESIDE THE WORD AND QUIETER THAN IT, so a pill says what it holds before it is
    * pressed. The weight does not change when a pill is chosen, so the bar does not shift under the
@@ -400,16 +379,19 @@
    * record stores and the empty state quotes.
    */
   .segmented {
-    background: var(--s1);
-    border-radius: var(--r-pill);
+    background: var(--hover-wash);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
   }
 
   .segment {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 6px;
     border-radius: var(--r-pill);
     color: var(--ink2);
+    font-size: var(--t-sm);
     font-weight: 500;
   }
 
@@ -421,11 +403,8 @@
     }
   }
 
-  /* `--selected`, which darkens in light, where `--s3` was a lighter pill on a light track that could
-     not be found (design SYS-5). */
+  /* THE CHOSEN VALUE IS `controls.css`'s white pill with its shadow and hairline; the weight holds, so nothing moves. */
   .segment[data-on] {
-    background: var(--selected);
-    color: var(--ink);
     font-weight: 500;
   }
 
@@ -439,34 +418,41 @@
 
   .segment-n {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
 
-  /* A FIELD AS ONE CONTROL, drawn as the pills' own track: the same surface, radius and height, its
+  /* A FIELD AS ONE CONTROL, drawn as the pills' own track: the same wash, radius and height, its
      name in the second ink, and what is chosen in it in ink after the name. */
   .sift {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 6px;
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--hover-wash);
     border-radius: var(--r-pill);
     color: var(--ink2);
+    font-size: var(--t-sm);
     font-weight: 500;
     white-space: nowrap;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   /* Hover only where there is one: a phone keeps `:hover` on the last thing tapped. */
   @media (hover: hover) and (pointer: fine) {
-    :global(.menu-trigger):hover .sift {
-      background: var(--hover-wash);
+    :global(.menu-trigger):hover .sift:not([data-on]) {
+      background: var(--hold-wash);
     }
   }
 
+  /* A FIELD WITH A VALUE CHOSEN IN IT IS THE WHITE PILL, as a chosen segment is. */
   .sift[data-on] {
-    background: var(--selected);
+    background: var(--bg);
+    box-shadow:
+      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
+      0 0 0 0.5px var(--line);
+    color: var(--ink);
   }
 
   .sift-chosen {
@@ -501,7 +487,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .sift-build:hover {
-      background: var(--hover-wash);
+      background: var(--hold-wash);
     }
   }
 
@@ -546,37 +532,29 @@
     color: var(--ink);
   }
 
-  /* THE SEARCH BOX IS A FIELD, with the radius every field has (design D-2), on the pills' surface. */
+  /* THE SEARCH BOX IS A FIELD (SYSTEM §6): `controls.css`'s `--s1` well, 40 tall, radius `--r-md`, as wide as a
+     phrase and no wider, so the pills beside it keep their room. */
   .bar > .field {
-    background: var(--s1);
-    border-radius: var(--r-md);
+    flex: 0 1 280px;
+    min-inline-size: 180px;
   }
 
-  /* Display ends the bar: it changes how the list looks, not what it holds. Save as a view, when it
-     is drawn, stands just before it, and the two are pushed to the end together. */
-  .bar-end {
-    margin-inline-start: auto;
-  }
-
+  /* Save as a view ends the bar: it is about the list as a whole, not one of its filters. */
   .bar-save {
     margin-inline-start: auto;
   }
 
-  .bar-save + .bar-end {
-    margin-inline-start: 0;
-  }
-
-  /* The menu rows: the same 34px and the same tint-on-hover as every menu row on this screen. */
+  /* The menu rows: 32 tall and the same wash on hover as every menu row (SYSTEM §6). */
   .mi {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: 34px;
+    min-block-size: 32px;
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-ui);
@@ -627,11 +605,11 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: 34px;
+    min-block-size: 36px;
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
     text-align: start;
@@ -680,19 +658,19 @@
 
   @media (width < 640px) {
     /**
-     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX, FILTER AND DISPLAY (design SYS-6, DSN-7).
+     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX AND FILTER (design SYS-6, DSN-7).
      *
      * The bar was two lines on a phone, the search box across the first and a sideways scroller of
      * Filter, its chosen values and Display across the second, under a capture line of its own, so
-     * three rows of controls stood over the first card. The capture line went behind the head's "+"
-     * and Filter became one square button, and what is left fits one row at 320: the search box
-     * takes the width Filter and Display leave.
+     * three rows of controls stood over the first card. The capture line went behind the head's "+",
+     * Filter became one square button and Display went up into the toolbar, and what is left fits one
+     * row at 320: the search box takes the width Filter leaves.
      *
      * WHAT DOES NOT FIT IS A SECOND LINE, AND ONLY WHILE THERE IS SOMETHING ON IT. A list clause from
-     * the address, and Clear and Save on a list with no fields to filter, come after Display and wrap
-     * under the row. The search box's floor leaves room for two square buttons and nothing more, so
-     * they cannot squeeze it. `min-inline-size: 0` keeps the bar inside the panel, which is the 30px
-     * sideways scroll the comment above `.bar` records fixing once.
+     * the address, and Clear and Save on a list with no fields to filter, wrap under the row. The
+     * search box's floor leaves room for one square button and nothing more, so they cannot squeeze
+     * it. `min-inline-size: 0` keeps the bar inside the panel, which is the 30px sideways scroll the
+     * comment above `.bar` records fixing once.
      */
     .bar {
       min-inline-size: 0;
@@ -700,7 +678,7 @@
 
     .bar > .field {
       flex: 1 1 0;
-      min-inline-size: calc(100% - 2 * var(--tap) - 2 * var(--sp-2));
+      min-inline-size: calc(100% - var(--tap) - var(--sp-2));
     }
 
     .listed,
@@ -712,25 +690,6 @@
 
     .bar-save {
       margin-inline-start: 0;
-    }
-
-    .bar-save + .bar-end {
-      margin-inline-start: auto;
-    }
-
-    /* DISPLAY IS ITS GLYPH, 44px square, and its word stays in the button for a screen reader. */
-    .bar-end :global(.btn) {
-      min-inline-size: var(--tap);
-      padding-inline: 0;
-    }
-
-    .bar-word {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
   }
 </style>

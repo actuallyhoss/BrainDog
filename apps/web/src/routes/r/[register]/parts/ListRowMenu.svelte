@@ -121,18 +121,18 @@
 </RowMenu>
 
 <style>
-  /* The menu rows: the same 34px, the same tint-on-hover, and each printing the key it stands in
-     for, so using the menu teaches the key that replaces it. */
+  /* The menu rows (SYSTEM §6): 32 tall with an icon, a word and a key cap, the wash on hover, and each printing the key
+     it stands in for, so using the menu teaches the key that replaces it. */
   .mi {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: 34px;
+    min-block-size: 32px;
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-ui);

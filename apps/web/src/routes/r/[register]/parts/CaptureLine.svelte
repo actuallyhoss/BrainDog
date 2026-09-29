@@ -130,26 +130,32 @@
     white-space: nowrap;
   }
 
-  /* ONE FRIENDLY FIELD: a rounded line on the first raised surface with a plus at its head, which
-     is the shape "add" has in every list a person has used. */
-  /* ONE HEIGHT FOR THE WHOLE HEAD (DESIGN-SYSTEM APPENDIX C8). This was 47px over a 34px search and
-     32px filters, three sizes of box in two rows; it is `--ctl-h` now, 32 under a mouse and 44 under
-     a thumb, with the radius a field has (design D-2: fields are `--r-md`, what you press a pill). */
+  /* ONE FRIENDLY FIELD, AS EVERY FIELD IS (SYSTEM §6): 40 tall and 44 under a thumb, the `--s1` well with no border,
+     radius `--r-md`, and a plus at its head in the second ink, which is the shape "add" has in every list a person has
+     used. It sits on the ground at the top of the list, where the blend draws it under the sentence. */
   .capture-field {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3) var(--sp-1);
+    gap: 10px;
+    min-block-size: 40px;
+    padding-inline: var(--sp-3) 6px;
     background: var(--s1);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--r-md);
-    color: var(--dim);
-    transition: border-color var(--d-state) var(--ease-out);
+    color: var(--ink2);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .capture-field:hover {
-    border-color: var(--edge);
+  @media (hover: hover) and (pointer: fine) {
+    .capture-field:hover {
+      background: var(--s2);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .capture-field {
+      min-block-size: var(--tap);
+    }
   }
 
   /* THE RING IS ON THE BOX AND NOT ON THE INPUT, because the submit control is inside the box: a
@@ -160,17 +166,24 @@
   .capture-input {
     flex: 1;
     align-self: stretch;
-    /* OVER THE BOX'S TWO BORDERS, so the field a thumb presses is the box's full `--ctl-h` and not 42px inside it. The
-       input draws nothing of its own, so nothing moves. */
-    margin-block: -1px;
     min-inline-size: 0;
     padding-block: 0;
     background: none;
     border: 0;
     color: var(--ink);
     font: inherit;
-    /* 16px in every input at every width (design-brief §3), so a phone never zooms into the field. */
-    font-size: var(--t-md);
+    /* The body size under a mouse, and 16px under a thumb (design-brief §3), so a phone never zooms into the field. */
+    font-size: var(--t-base);
+  }
+
+  @media (pointer: coarse) {
+    .capture-input {
+      font-size: var(--t-md);
+    }
+  }
+
+  .capture-input::placeholder {
+    color: var(--dim);
   }
 
   .capture-input:focus-visible {
@@ -180,13 +193,14 @@
     box-shadow: none;
   }
 
+  /* THE ADD, AN INK PILL INSIDE THE FIELD, drawn only once there is something to add. */
   .capture-go {
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3);
     background: var(--ink);
-    border: 1px solid var(--ink);
+    border: 0;
     border-radius: var(--r-pill);
-    color: var(--bg);
+    color: var(--on-ink);
     font-size: var(--t-sm);
     font-weight: 500;
     cursor: pointer;

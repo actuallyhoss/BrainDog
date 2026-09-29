@@ -1,5 +1,10 @@
 <!--
-  Peek: a drawer, with the list still visible, for triage. `p`, and Peek on the row's menu.
+  Peek: the row beside the list, for triage. `p`, and Peek on the row's menu.
+
+  THE DOCKED PANEL (SYSTEM §5): from 900px up it stands at the window's end edge, 440 wide, and the list narrows
+  beside it and stays in view, so `j` and `k` go on walking the list and `p` peeks the next row. Its head is glass (the
+  close circle, the row's title, and "Open the row" with its key); its body is white. Below 900px it is a bottom sheet.
+  It is a `<dialog>` either way, so what reads an open peek as `dialog[open]` still finds one.
 
   It needs a VISIBLE affordance: Linear's own docs admit the flaw that Peek can only be launched with
   the keyboard shortcut, and users do not press `?` to discover what they do not know exists (19 §4).
@@ -13,7 +18,7 @@
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Sheet from '$lib/ui/Sheet.svelte';
+  import Panel from '$lib/ui/Panel.svelte';
   import Icon from '$lib/ui/Icon.svelte';
 
   let {
@@ -37,11 +42,10 @@
   } = $props();
 </script>
 
-<Sheet
-  open={seq !== null}
-  title={String(entry?.fields[title] ?? '')}
-  onclose={() => peek(null)}
->
+<Panel open={seq !== null} title={(entry ? display(register, title, entry.fields[title], now, names) : null) ?? ''} onclose={() => peek(null)}>
+  {#snippet verbs()}
+    <Button weight="primary" size="sm" href="/r/{register}/{seq}" kbd="↵"><Icon name="external" size="s" />{copy.openRow}</Button>
+  {/snippet}
   {#if entry}
     <!-- FORMATTED, through the same `display` every other surface goes through.
 
@@ -54,35 +58,42 @@
          Labels go through `labelOf` for the same reason: the drawer was printing raw field ids. -->
     <dl class="peek">
       {#each readableFields(register) as f}
-        <dt>{labelOf(f)}</dt>
-        <dd dir={dirOf(register, f.id)}>{display(register, f.id, entry.fields[f.id], now, names) ?? MISSING}</dd>
+        <div>
+          <dt>{labelOf(f)}</dt>
+          <dd dir={dirOf(register, f.id)}>{display(register, f.id, entry.fields[f.id], now, names) ?? MISSING}</dd>
+        </div>
       {/each}
     </dl>
   {/if}
-  {#snippet footer()}
-    <Button weight="primary" href="/r/{register}/{seq}"><Icon name="external" size="s" />{copy.openRow}</Button>
-    <Button weight="bare" onclick={() => peek(null)}><Icon name="close" size="s" />{copy.close}</Button>
-  {/snippet}
-</Sheet>
+</Panel>
 
 <style>
+  /* LABEL OVER VALUE, one field under another: 13/500 in the quiet ink over the value at the body size, 16 between
+     fields. A two-column grid in a 440 panel left the values a third of it. */
   .peek {
     display: grid;
-    grid-template-columns: minmax(0, 12ch) minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-3);
+    gap: var(--sp-4);
     margin: 0;
+  }
+
+  .peek > div {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   .peek dt {
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 500;
+    line-height: 18px;
   }
 
   .peek dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
+    line-height: 20px;
     overflow-wrap: anywhere;
   }
 </style>

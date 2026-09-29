@@ -9,11 +9,11 @@
  * runes.
  */
 
-import type { Tone } from 'braindog-render';
+import { day, money, shortDay, since, symbolFigure, type Tone } from 'braindog-render';
 import { copy } from '../../../../lib/copy.ts';
 import { seqWidth } from '../../../../lib/record/api.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
-import type { Entry, FieldDecl, Filter, RegisterDecl } from '../../../../lib/record/schema.ts';
+import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
 
 /**
  * WHAT JUST HAPPENED TO A ROW, DRAWN WHERE THE ROW WAS.
@@ -233,4 +233,297 @@ export function boxOf(type: string | undefined): { type: string; inputmode: 'dec
   if (type === 'ref') return { type: 'text', inputmode: 'numeric' };
   if (type === 'url' || type === 'email') return { type, inputmode: undefined };
   return { type: 'text', inputmode: undefined };
+}
+
+/* ── what the list says about itself: the sentence, the board's lanes, the summary tile ──────────────────────── */
+
+const DAY_MS = 86_400_000;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/u;
+
+/**
+ * THE THREE WAYS A LIST IS DRAWN FROM 640PX UP (SYSTEM §5, the toolbar's segmented control): the table, the board
+ * and the cards. Below 640 a list is always the phone's cards, whatever the address asks for.
+ *
+ * IN THE ADDRESS, as `?view=board`, beside the filters and the sort: a link to a board opens on the board. The table
+ * is the list's own shape and has no parameter, so every address written before the switch existed still opens as it
+ * did. A board is asked for only where the list has lanes to draw (`laneFieldOf`); anywhere else it is the table.
+ */
+export type View = 'table' | 'board' | 'cards';
+
+export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): View =>
+  asked === 'cards' ? 'cards' : asked === 'board' && laneFieldOf(decl) ? 'board' : 'table';
+
+/**
+ * THE FIELD A BOARD'S LANES ARE, which is the list's declared state: an enum of two to twelve values. A list with no
+ * state has nothing to lay out in lanes, and a state of forty values is a table read sideways.
+ */
+export function laneFieldOf(decl: RegisterDecl | undefined): FieldDecl | undefined {
+  const f = decl?.state ? decl.fields.find((x) => x.id === decl.state) : undefined;
+  const n = f?.values?.length ?? 0;
+  return f?.type === 'enum' && n >= 2 && n <= 12 ? f : undefined;
+}
+
+/** One lane of a board: a declared value and the rows in it, or `null` for the rows whose state is unset. */
+export type Lane = { value: string | null; entries: Entry[] };
+
+/**
+ * THE ROWS IN LANES, one per declared value in the order the list declares them, and each lane in the order the rows
+ * came. A row whose state is empty, or holds a value the list no longer declares, goes in a last lane of its own, drawn
+ * only when it holds something: a row is never left off the board because its state is not one of the lanes.
+ */
+export function lanesOf(decl: RegisterDecl | undefined, entries: readonly Entry[]): Lane[] {
+  const f = laneFieldOf(decl);
+  if (!f) return [];
+  const values = f.values ?? [];
+  const lanes: Lane[] = values.map((value) => ({ value, entries: [] }));
+  const rest: Entry[] = [];
+  for (const e of entries) {
+    const at = values.indexOf(String(e.fields[f.id] ?? ''));
+    if (at < 0) rest.push(e);
+    else lanes[at]!.entries.push(e);
+  }
+  return rest.length > 0 ? [...lanes, { value: null, entries: rest }] : lanes;
+}
+
+/** Whether a row is in one of the list's finished states ("Paid", "Done"). */
+export const isDone = (decl: RegisterDecl | undefined, e: Entry): boolean =>
+  Boolean(decl?.state && decl.done?.includes(String(e.fields[decl.state] ?? '')));
+
+/**
+ * WHETHER A ROW IS LATE, BY THE SAME CLOCK AS ITS DOT: its declared deadline is behind the record's instant and it is
+ * not finished. The noon anchor is `toneOf`'s (`lib/record/api.ts`), so the sentence never counts a row late that the
+ * list draws on time, or the other way round.
+ */
+export function isLate(decl: RegisterDecl | undefined, e: Entry, now: number): boolean {
+  const dated = deadlineOf(decl);
+  const due = dated ? e.fields[dated] : undefined;
+  if (typeof due !== 'string' || !DAY_RE.test(due) || isDone(decl, e)) return false;
+  return (Date.parse(`${due}T12:00:00Z`) - now) / DAY_MS < 0;
+}
+
+/** Calendar days from the record's instant to a day, as a card counts them. */
+const daysTo = (iso: string, now: number): number => Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY_MS) - Math.floor(now / DAY_MS);
+
+/** A day inside a sentence: "today", "tomorrow", "in 3 days", or the date itself past two weeks. */
+export function dayWord(iso: string, now: number): string {
+  const n = daysTo(iso, now);
+  if (n <= 0) return words.today;
+  if (n === 1) return words.tomorrow;
+  if (n <= 13) return words.inDays(n);
+  return words.onDay(iso.slice(0, 4) === String(new Date(now).getUTCFullYear()) ? shortDay(iso) : day(iso));
+}
+
+/**
+ * WHEN A ROW IS DUE, AS A BOARD CARD SAYS IT: "2 days late" when it is past its deadline, which is the one phrase on
+ * the card drawn in red (SYSTEM §6), and "Due tomorrow" when it is not. A finished row, and a row with no deadline,
+ * says nothing about one.
+ */
+export function dueOf(decl: RegisterDecl | undefined, e: Entry, now: number): { text: string; late: boolean } | null {
+  const dated = deadlineOf(decl);
+  const due = dated ? e.fields[dated] : undefined;
+  if (typeof due !== 'string' || !DAY_RE.test(due) || isDone(decl, e)) return null;
+  if (isLate(decl, e, now)) {
+    const n = -daysTo(due, now);
+    return { text: n <= 0 ? words.dueToday : words.daysLate(n), late: true };
+  }
+  return { text: words.due(dayWord(due, now)), late: false };
+}
+
+/** The list's name for how many rows, "1 bill" or "12 bills". */
+const counted = (decl: RegisterDecl, n: number): string => `${n} ${(n === 1 ? decl.one : decl.name).toLowerCase()}`;
+
+/* This module's own words, the sentence and the tile's reading lines. */
+const words = {
+  open: (n: number) => `${n} open`,
+  nothingOpen: 'Nothing is open',
+  late: (n: number) => `${n} late`,
+  noneLate: 'none late',
+  nextDue: (when: string) => `the next due ${when}`,
+  newest: (when: string) => `newest ${when}`,
+  match: (n: number, of: number) => `${n} of ${of} ${n === 1 ? 'matches' : 'match'}.`,
+  today: 'today',
+  tomorrow: 'tomorrow',
+  inDays: (n: number) => `in ${n} days`,
+  onDay: (said: string) => `on ${said}`,
+  due: (when: string) => `Due ${when}`,
+  dueToday: 'Due today',
+  daysLate: (n: number) => `${n} ${n === 1 ? 'day' : 'days'} late`,
+  allDone: (n: number) => (n === 1 ? 'The one here is finished.' : `All ${n} are finished.`),
+  allOpen: (n: number) => (n === 1 ? 'The one here is still open' : `All ${n} are still open`),
+  mostOpen: 'Most are still open',
+  halfOpen: 'Half are still open',
+  mostDone: 'Most are finished',
+  lateTail: (n: number) => `; ${n} ${n === 1 ? 'is' : 'are'} late.`,
+  most: (label: string, n: number, of: number) => `${label} holds the most, ${n} of ${of}.`,
+  share: (label: string, pct: number) => `${label} holds ${pct}% of it.`,
+  whole: (label: string) => `${label} holds all of it.`,
+  largest: (title: string, pct: number) => `${title} is the largest, ${pct}% of the total.`,
+  only: (title: string) => `${title} is the whole of it.`,
+} as const;
+
+/** The sentence under the title, cut round the phrase that needs him, which `PageHead` draws in red. */
+export type Reading = { before: string; needs: string; after: string };
+
+const plain = (text: string): Reading => ({ before: text, needs: '', after: '' });
+
+/**
+ * THE ONE LINE UNDER THE LIST'S TITLE (SYSTEM §5): what is open, what is late, and when the next thing falls due.
+ *
+ * "12 open, 3 late, the next due tomorrow." with "3 late" red and nothing else, and "none late" when nothing is. A list
+ * that declares no deadline stops after what is open; one with neither a state nor a deadline says how many it holds
+ * and how new the newest is. Filtered, it says how many of the list match, which is the one fact the reader has just
+ * asked for.
+ *
+ * IT SAYS NOTHING WHILE THE LIST IS STILL BEING PAGED (`whole` false): a count of the rows in hand, printed as the
+ * list's, is the quiet lie paging introduces, and the head's own count already says `200+`.
+ */
+export function readingOf(
+  decl: RegisterDecl | undefined,
+  entries: readonly Entry[],
+  now: number,
+  at: { whole: boolean; filtered: boolean; matched: number; total: number },
+): Reading | null {
+  if (!decl) return null;
+  if (at.filtered) return plain(words.match(at.matched, at.total));
+  if (!at.whole || entries.length === 0) return null;
+  const dated = deadlineOf(decl);
+  if (!decl.state && !dated) {
+    const newest = entries.reduce<string>((best, e) => (e.created > best ? e.created : best), '');
+    return plain(newest ? `${counted(decl, entries.length)}, ${words.newest(since(newest, now))}.` : `${counted(decl, entries.length)}.`);
+  }
+  const open = entries.filter((e) => !isDone(decl, e));
+  if (open.length === 0) return plain(`${words.nothingOpen}.`);
+  const lead = decl.state ? words.open(open.length) : counted(decl, open.length);
+  if (!dated) return plain(`${lead}.`);
+  const late = open.filter((e) => isLate(decl, e, now)).length;
+  const next = open
+    .map((e) => e.fields[dated])
+    .filter((v): v is string => typeof v === 'string' && DAY_RE.test(v) && (Date.parse(`${v}T12:00:00Z`) - now) / DAY_MS >= 0)
+    .sort()[0];
+  const tail = next ? `, ${words.nextDue(dayWord(next, now))}.` : '.';
+  return late > 0 ? { before: `${lead}, `, needs: words.late(late), after: tail } : plain(`${lead}, ${words.noneLate}${tail}`);
+}
+
+/** One state's share of a list: the value, how many rows hold it, and whether it is a finished one. */
+export type StatePart = { value: string; count: number; done: boolean };
+
+/**
+ * THE LIST COUNTED BY STATE, for the "By state" tile: a list whose state has two to six values, each counted over the
+ * rows in hand. Counted only where those rows are the whole list, which is the caller's to know (`whole`); a list
+ * nobody has put anything in, or whose rows hold none of the declared values, has no tile.
+ */
+export function byStateOf(decl: RegisterDecl | undefined, entries: readonly Entry[]): StatePart[] | null {
+  const f = decl?.state ? decl.fields.find((x) => x.id === decl.state) : undefined;
+  const values = f?.type === 'enum' ? (f.values ?? []) : [];
+  if (!decl || values.length < 2 || values.length > 6) return null;
+  const parts = values.map((value) => ({
+    value,
+    count: entries.filter((e) => String(e.fields[f!.id] ?? '') === value).length,
+    done: decl.done?.includes(value) ?? false,
+  }));
+  return parts.some((p) => p.count > 0) ? parts : null;
+}
+
+/**
+ * WHAT THE "BY STATE" TILE'S CHART MEANS, in one line. "Most are still open; 3 are late." on a list that declares its
+ * finished states; on one that declares none, which state holds the most.
+ */
+export function stateReading(
+  decl: RegisterDecl,
+  parts: readonly StatePart[],
+  entries: readonly Entry[],
+  now: number,
+  label: (value: string) => string,
+): string {
+  const all = parts.reduce((n, p) => n + p.count, 0);
+  if (!decl.done?.length) {
+    const top = parts.reduce((a, b) => (b.count > a.count ? b : a));
+    return words.most(label(top.value), top.count, all);
+  }
+  const done = parts.filter((p) => p.done).reduce((n, p) => n + p.count, 0);
+  const open = all - done;
+  if (open === 0) return words.allDone(all);
+  const late = entries.filter((e) => isLate(decl, e, now)).length;
+  const lead = done === 0 ? words.allOpen(open) : open > done ? words.mostOpen : open === done ? words.halfOpen : words.mostDone;
+  return late > 0 ? `${lead}${words.lateTail(late)}` : `${lead}.`;
+}
+
+/** The figure types a list can total. */
+const FIGURES = new Set(['money', 'int', 'decimal']);
+
+/** A list's number column, totalled: the field, the currency a money field is in, and the sum. */
+export type Figured = { field: FieldDecl; currency: string | null; total: number; valueOf: (e: Entry) => number | null };
+
+/**
+ * THE LIST'S NUMBER, WHEN IT HAS ONE, ADDED UP: the first figure its card declares, else the first figure field it
+ * has. A money field is totalled only when every row is in one currency, because a sum of eight sterling invoices and
+ * one euro one is a number, and it looks exactly like a right one. A column no row has filled has no total.
+ */
+export function figureOf(decl: RegisterDecl | undefined, entries: readonly Entry[]): Figured | null {
+  if (!decl) return null;
+  const ids = [...decl.mobile.slice(1), ...decl.fields.map((f) => f.id)];
+  const field = ids.map((id) => decl.fields.find((f) => f.id === id)).find((f) => f !== undefined && FIGURES.has(f.type));
+  if (!field) return null;
+  const currencies = new Set<string>();
+  const valueOf = (e: Entry): number | null => {
+    const v = e.fields[field.id];
+    if (field.type === 'money') return isMoney(v) ? v.amount : null;
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  };
+  let total = 0;
+  let seen = 0;
+  for (const e of entries) {
+    const n = valueOf(e);
+    if (n === null) continue;
+    const v = e.fields[field.id];
+    if (isMoney(v)) currencies.add(v.currency.toUpperCase());
+    total += n;
+    seen += 1;
+  }
+  if (seen === 0 || currencies.size > 1) return null;
+  return { field, currency: field.type === 'money' ? ([...currencies][0] ?? null) : null, total, valueOf };
+}
+
+/** A figure as a tile or a bar says it: money with its symbol ("£4,800.00"), anything else grouped ("9,800"). */
+export function figureSaid(fig: Pick<Figured, 'currency'>, n: number): string {
+  if (fig.currency) {
+    const said = money(Math.round(n), fig.currency);
+    return symbolFigure(said) ?? said;
+  }
+  return n.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+}
+
+/**
+ * WHERE THE LIST'S NUMBER SITS, as bars and the line saying what they mean: split by state when the list has one (each
+ * state's share of the total), else its five largest rows by name. Only parts that hold something are drawn.
+ */
+export function figureSplit(
+  decl: RegisterDecl,
+  fig: Figured,
+  entries: readonly Entry[],
+  label: (value: string) => string,
+  titleOf: (e: Entry) => string,
+): { items: { label: string; value: number }[]; reading: string } | null {
+  const lanes = lanesOf(decl, entries).filter((l) => l.value !== null);
+  const sum = (rows: readonly Entry[]) => rows.reduce((n, e) => n + (fig.valueOf(e) ?? 0), 0);
+  const items =
+    lanes.length > 0
+      ? lanes.map((l) => ({ label: label(l.value!), value: sum(l.entries) })).filter((i) => i.value > 0)
+      : entries
+          .map((e) => ({ label: titleOf(e), value: fig.valueOf(e) ?? 0 }))
+          .filter((i) => i.value > 0)
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5);
+  if (items.length === 0 || fig.total <= 0) return null;
+  const top = items.reduce((a, b) => (b.value > a.value ? b : a));
+  const pct = Math.round((top.value / fig.total) * 100);
+  const reading =
+    lanes.length > 0
+      ? items.length === 1
+        ? words.whole(top.label)
+        : words.share(top.label, pct)
+      : items.length === 1 && pct === 100
+        ? words.only(top.label)
+        : words.largest(top.label, pct);
+  return { items, reading };
 }

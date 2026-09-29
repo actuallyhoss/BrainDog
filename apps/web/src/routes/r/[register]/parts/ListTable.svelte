@@ -304,6 +304,8 @@
         {:else if f && isFile(f)}
           <!-- A FILE IS CHOSEN, NEVER TYPED (OPS-20): the picker sends the bytes and the draft holds what came back,
                saved through the same commit as any other cell once the row is left. -->
+          <!-- The box only keeps a click inside the cell from opening the row; the picker in it is the control. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <span class="cell-box" onclick={(e) => e.stopPropagation()} onfocusout={leftTheRow}>
             <FileField bind:value={editValue} label={labelOf(f)} />
           </span>
@@ -540,6 +542,42 @@
   }
 
   /**
+   * A CLEAN TABLE ON THE GROUND (SYSTEM §6): the heads at the meta size in the quiet ink, a hairline between rows,
+   * and a rounded wash under the row a pointer is on. Only the hooks `Table` already draws are reached for here.
+   *
+   * THE ROW IS THE READER'S ROW HEIGHT, `--row-h`: 44 at Comfortable, and Compact and Roomy move it, which the
+   * table's own `--table-row-h` does not. Under a thumb it never falls below the 44 a target needs.
+   *
+   * THE GRID HANGS ONE CELL'S PADDING INTO THE GUTTER, so the first column's words start on the title's edge above
+   * them and a washed row has room round its words, as every list of rows on the ground does (`rows.css`).
+   */
+  .table-slot {
+    --table-row-h: var(--row-h);
+    margin-inline: calc(-1 * var(--sp-3));
+  }
+
+  @media (pointer: coarse) {
+    .table-slot {
+      --table-row-h: max(var(--row-h), var(--tap));
+    }
+  }
+
+  .table-slot :global(.th) {
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .table-slot :global(.th-row) {
+    min-block-size: var(--ctl-h);
+  }
+
+  /* THE KEYBOARD'S ROW IS THE WASH, as the cursor row is on every list (SYSTEM §6), and not a raised band; the focus
+     ring still marks it while the grid has focus. A selected row keeps `--selected`. */
+  .table-slot :global(.rowgroup .tr[data-focused]:not([aria-selected='true'])) {
+    background: var(--hover-wash);
+  }
+
+  /**
    * THE CELL IS THE BOX, AND THE PENCIL FLOATS OVER IT.
    *
    * This was an `inline-flex` holding the value and the pencil side by side, and the pencil is
@@ -665,26 +703,41 @@
     justify-content: flex-end;
   }
 
+  /* A ROW'S VERBS ARE PILLS (SYSTEM §6): 28 tall, the meta size at 500, and a round 28 for a verb that is its glyph.
+     On a row that is already washed, the pill under the pointer takes the held wash, one step deeper. */
   .verb {
-    padding: 1px var(--sp-2);
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-weight: 500;
     cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  /* Beside a receipt the column is narrow, so the word keeps less air round it. */
+  .said .verb {
+    padding-inline: var(--sp-2);
   }
 
   .verb.icon {
     display: grid;
     place-items: center;
-    padding: var(--sp-1);
-    color: var(--dim);
+    inline-size: var(--ctl-h-sm);
+    padding: 0;
+    color: var(--ink2);
   }
 
   .verb:hover,
   .verb:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hold-wash);
     color: var(--ink);
   }
 
@@ -711,14 +764,17 @@
   .pick {
     display: grid;
     place-items: center;
-    inline-size: 16px;
-    block-size: 16px;
+    inline-size: 18px;
+    block-size: 18px;
     padding: 0;
     background: none;
-    border: 1px solid var(--edge);
+    border: 1.5px solid var(--edge);
     border-radius: var(--r-sm);
     color: var(--on-ink);
     cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out);
   }
 
   .pick[data-on] {

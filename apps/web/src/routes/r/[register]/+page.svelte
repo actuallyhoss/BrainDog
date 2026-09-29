@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, DOM_CAP, iconFor, identityFor, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, identityFor, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -48,13 +48,16 @@
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { draftOf, editable, patchOf, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
-  import { chipOn, dropChip, filterableOf, listedOf, nextSort, toggleChip, weighed, type Receipt } from './parts/list.ts';
+  import { chipOn, dropChip, filterableOf, laneFieldOf, listedOf, nextSort, readingOf, toggleChip, viewOf, weighed, type Receipt, type View } from './parts/list.ts';
   import CaptureLine from './parts/CaptureLine.svelte';
   import CapturePlus from './parts/CapturePlus.svelte';
   import ChipsBar from './parts/ChipsBar.svelte';
   import ListEmpty from './parts/ListEmpty.svelte';
   import BulkBar from './parts/BulkBar.svelte';
   import ListCards from './parts/ListCards.svelte';
+  import ListBoard from './parts/ListBoard.svelte';
+  import ListSummary from './parts/ListSummary.svelte';
+  import ViewSwitch from './parts/ViewSwitch.svelte';
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
   import RowPeek from './parts/RowPeek.svelte';
@@ -828,6 +831,37 @@
   const whole = $derived(cursor === null && !truncated);
 
   /**
+   * HOW THE LIST IS DRAWN FROM 640PX UP: the table, the board or the cards (`parts/list.ts` `viewOf`), and it is the
+   * address's, `?view=board`, so a link to a board opens on the board and Back undoes a switch. It is not part of the
+   * question (`question` above), because the rows are the same rows whichever way they are laid out, so switching
+   * asks the record nothing. A phone draws cards whatever it says.
+   */
+  const view = $derived(viewOf(page.url.searchParams.get('view'), decl));
+  const boardable = $derived(laneFieldOf(decl) !== undefined);
+  const setView = (v: View) =>
+    setParam((p) => {
+      if (v === 'table') p.delete('view');
+      else p.set('view', v);
+    });
+
+  /**
+   * THE ROWS THE LIST'S OWN FIGURES ARE OVER: the rows the record holds, without a line still being typed in and
+   * without a row archived on this screen, which the list keeps in its place wearing its receipt but no longer holds.
+   */
+  const standing = $derived(result.entries.filter((e) => e.seq > 0 && receipts.get(e.seq)?.mark !== copy.markArchived));
+
+  /**
+   * THE SENTENCE UNDER THE TITLE (SYSTEM §5): what is open, what is late in red, and when the next thing falls due
+   * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
+   */
+  const reading = $derived(
+    readingOf(decl, standing, now, { whole, filtered: filters.length > 0 || q !== '', matched: result.matched, total: result.total }),
+  );
+
+  /** A row's title as the list says it, for the summary tile's largest rows. */
+  const titleSaid = (e: Entry): string => (decl ? display(id, decl.title, e.fields[decl.title], now, result.names ?? undefined) : null) ?? copy.thisRow;
+
+  /**
    * `aria-rowcount`, which `50 §5.2` step 4 gives three states and this screen gave one.
    *
    * *"`N` from `index` when unfiltered, `-1` while filtered and paging, the exact count once
@@ -890,6 +924,8 @@
     void whole;
     void loaded;
     void rowsAsCards();
+    /* AND WHICH OF THE THREE LAYOUTS IS DRAWN, since the board and the cards end in a sentinel of their own. */
+    void view;
     const el = body?.querySelector('.sentinel');
     if (!el) return;
     /* THE ROOT IS THE APP'S SCROLLER, NOT THE VIEWPORT. `+layout.svelte` makes `#main` "the ONE
@@ -1045,7 +1081,7 @@
    */
   async function showRow(seq: number) {
     await tick();
-    const el = body?.querySelector(`[data-fresh="${seq}"]`)?.closest('.tr, .card-line');
+    const el = body?.querySelector(`[data-fresh="${seq}"]`)?.closest('.tr, .card-line, .bcard');
     const scroller = body?.closest('#main');
     if (!el || !scroller) return;
     const row = el.getBoundingClientRect();
@@ -1780,7 +1816,10 @@
       e.preventDefault();
       const row = result.entries[focus.row];
       const field = columns[focus.col]?.field;
-      if (row && field) openEditor(row.seq, field);
+      /* A CARD HAS NO CELL TO BECOME THE EDITOR, on the board, the cards or a phone, so `e` opens the row, where every
+         value is edited. An editor opened here would be drawn nowhere and hold the list's re-ask until it closed. */
+      if (row && (view !== 'table' || rowsAsCards())) void goto(at(`/r/${id}/${row.seq}`));
+      else if (row && field) openEditor(row.seq, field);
     }
   }
 
@@ -1816,9 +1855,13 @@
        opening at all — the a11y gate's own scenario caught it. It had never really worked there
        either: a `display: none` row still matches a selector and reports a zero rect, so the menu
        used to open in the top-left corner of the window rather than beside the row. */
+    /* AND ON THE BOARD AND THE CARDS, WHERE A ROW'S PLACE ON THE SCREEN IS NOT ITS PLACE IN THE ANSWER, the card
+       is found by its number. */
+    const seq = result.entries[focus.row]?.seq;
     const el =
       document.querySelectorAll('.rowgroup .tr')[focus.row] ??
-      document.querySelectorAll('.cards > li')[focus.row];
+      document.querySelectorAll('.cards > li')[focus.row] ??
+      (seq === undefined ? undefined : document.querySelector(`[data-row-seq="${seq}"]`));
     if (!el) return;
     const r = el.getBoundingClientRect();
     menuAt = { x: r.x + 24, y: r.y, height: r.height };
@@ -2177,27 +2220,48 @@
   </div>
   <ListEditor bind:open={makeOpen} register={null} {owner} name={nameFromId(id)} onmade={made} />
 {:else}
+  <!-- THE SENTENCE, cut round the phrase that needs him, which `PageHead` draws in red (`data-needs`). -->
+  {#snippet readingSaid()}{reading?.before}{#if reading?.needs}<span data-needs>{reading.needs}</span>{/if}{reading?.after}{/snippet}
+
+  <!-- THE SCREEN NARROWS BESIDE THE DOCKED PEEK, AND NEVER GOES UNDER IT (SYSTEM §5). `--dock-w` is what an open docked
+       panel takes from the window's end edge, and nothing otherwise; the head's and the list's own gutter already
+       stand inside it, so what is added is the rest. -->
+  <div class="list-screen">
   <PageHead icon={iconFor(decl.icon, 'rows')}
     title={decl.name}
     count={whole ? result.matched : drawn}
     atLeast={!whole && !truncated && drawn < DOM_CAP}
     total={denominator}
+    sentence={reading ? readingSaid : undefined}
   >
     {#snippet actions()}
+      <!-- THE TOOLBAR (SYSTEM §5): glass, 36 high and 6 apart, the view switch first and the one ink primary last. -->
+      {#if result.total > 0}<ViewSwitch {view} board={boardable} onview={setView} />{/if}
+      <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows (GAP-11). -->
+      {#if handedToMeHref}<Button weight="glass" href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
+      <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
+      {#if proposes}<Button weight="glass" onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>{/if}
+      <!-- DISPLAY: the order and the columns, what YOU see and never what the record says. `v`, printed on it. It was the
+           end of the filter bar, which is drawn only once a list is long enough to sift, so on a short list the only way
+           to it was a key; in the toolbar it is there for every list. Its name is "Display" at every width: on a phone
+           the word is hidden and the glyph is a 44px circle, and the word stays in the button for a screen reader and
+           for the gates that press it by name. -->
+      <span class="tb-display">
+        <Button weight="glass" kbd="v" title={copy.display} onclick={() => (displayOpen = true)}>
+          <Icon name="settings" size="m" /><span class="tb-word">{copy.display}</span>
+        </Button>
+      </span>
       <!-- ON A PHONE THE FIELD IS THE WAY IN, AND THIS GOES. The capture field and this button both
            started a row, one under the other, and on a phone the button took a line of its own over
            the field that does the same thing in fewer presses. It stays while the field is hidden
-           (`?first`), and on a laptop, where it opens the whole form and sits beside the title. -->
+           (`?first`), and on a laptop, where it opens the whole form and ends the toolbar as its one
+           ink primary. -->
       {#if adds}
         <span class="new-row" data-alone={arriving ? '' : undefined}>
-          <Button weight="primary" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
+          <Button weight="primary" kbd="n" onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{said('new_row')} {decl.one}</Button>
         </span>
         {#if !arriving}<CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />{/if}
       {/if}
-      <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows (GAP-11). -->
-      {#if handedToMeHref}<Button href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
-      <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->
-      {#if proposes}<Button onclick={() => (fieldsOpen = true)} data-fields-open>{sheetWords.open}</Button>{/if}
     {/snippet}
   </PageHead>
   {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
@@ -2238,8 +2302,13 @@
       {dropFilter}
       {setQuery}
       saveView={() => void saveView()}
-      ondisplay={() => (displayOpen = true)}
     />
+
+    <!-- THE LIST'S FIGURES, over the whole list only (`ListSummary` says why): "By state" as a stacked bar, which the
+         board's own lanes already are, and the list's number added up. Above the rows, 12 from them. -->
+    {#if whole && !arriving && standing.length > 0}
+      <ListSummary {decl} entries={standing} {now} byState={view !== 'board' && filters.length === 0 && q === ''} titleOf={titleSaid} />
+    {/if}
 
     {#if rows.length === 0}
       <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
@@ -2247,7 +2316,7 @@
       <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS TWO BODIES. Putting the branch in the
            markup rather than in the stylesheet swallowed this into the card arm, so a desktop
            selection raised no bulk bar at all, which is the whole reason the branch had to be
-           measured rather than assumed. It sits above the rows it acts on in both. -->
+           measured rather than assumed. It floats over the rows it acts on, in every body. -->
       {#if picked.length > 0}
         <BulkBar
           count={picked.length}
@@ -2262,9 +2331,9 @@
         />
       {/if}
 
-      <!-- ONE BODY AT A TIME, IN THE DOM: cards below 640px (`ListCards` says why), the grid above.
-           `body` wraps both, so the observer finds whichever sentinel is drawn and `showRow` finds
-           whichever row is new. -->
+      <!-- ONE BODY AT A TIME, IN THE DOM: cards below 640px (`ListCards` says why), and above it the
+           view the address asks for, the grid, the board or the cards. `body` wraps them all, so the
+           observer finds whichever sentinel is drawn and `showRow` finds whichever row is new. -->
       <div class="body-slot" bind:this={body}>
       {#if rowsAsCards()}
         <ListCards
@@ -2278,7 +2347,7 @@
           {receiptFor}
           {openCardMenu}
         />
-      {:else}
+      {:else if view === 'table'}
         <ListTable
           register={id}
           {decl}
@@ -2313,6 +2382,25 @@
           archive={changes ? archive : undefined}
           {openCardMenu}
         />
+      {:else}
+        <!-- THE BOARD AND THE CARDS: the same rows as white cards on the ground, in lanes by state or in one grid. A card
+             moves lanes by being dragged, through the same `setRowState` its menu's "Set to" presses. -->
+        <ListBoard
+          register={id}
+          {decl}
+          mode={view === 'board' ? 'board' : 'cards'}
+          entries={result.entries.slice(0, DOM_CAP)}
+          {now}
+          names={result.names ?? undefined}
+          {selected}
+          cursor={result.entries[focus.row]?.seq ?? null}
+          {fresh}
+          {arrived}
+          more={cursor !== null && loaded < DOM_CAP}
+          {receiptFor}
+          {openCardMenu}
+          setRowState={changes && states.length > 0 ? setRowState : undefined}
+        />
       {/if}
 
       <!--
@@ -2341,7 +2429,9 @@
          nothing in it draws its own empty state. -->
   </div>
 
-  <!-- Peek: a drawer, with the list still visible, for triage. `?row=7` is which row. -->
+  </div>
+
+  <!-- Peek: the docked panel, with the list still visible beside it, for triage. `?row=7` is which row. -->
   <RowPeek register={id} seq={peeked} entry={peekedEntry} title={decl.title} {now} names={result.names ?? undefined} {peek} />
 
   <!-- Put this filter on a page as a block. `⌥B`, and it was a toast until now.
@@ -2411,6 +2501,35 @@
 <style>
   /* EVERY OTHER RULE THIS SCREEN DRAWS IS IN THE PART THAT DRAWS ITS MARKUP (`parts/`), because a
      `<style>` block styles only what its own file writes. What is left here is the page's frame. */
+
+  /* THE ROOM THE DOCKED PEEK TAKES, less the gutter the head and the list already keep at their end, so the list's
+     edge stands 12 from the panel (SYSTEM §4, "12 to a docked panel"). It moves with the panel's own 220ms. */
+  .list-screen {
+    padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));
+    transition: padding-inline-end var(--d-move) var(--ease-out);
+  }
+
+  /* DISPLAY IS A 44PX GLASS CIRCLE ON A PHONE, its word kept in the button for a screen reader and a tooltip on it. */
+  .tb-display {
+    display: contents;
+  }
+
+  @media (width < 640px) {
+    .tb-display :global(.btn) {
+      min-inline-size: var(--tap);
+      padding-inline: 0;
+    }
+
+    .tb-word {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
   .page {
     display: flex;
     flex-direction: column;

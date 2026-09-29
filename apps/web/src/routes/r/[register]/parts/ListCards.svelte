@@ -46,6 +46,7 @@
   } = $props();
 </script>
 
+<div class="list-cards">
 <RowCards {register} {entries} {now} {names} picked={selected}>
   {#snippet action(e)}
     <!-- THE ROW'S VERBS, REACHABLE BY THUMB. Every one of them existed and every one was a
@@ -100,6 +101,7 @@
     {/if}
   {/snippet}
 </RowCards>
+</div>
 
 <!-- A SENTINEL MEANS "THERE MAY BE MORE". The card list has its own for the reason `Table` has
      one: with the grid absent from the document there is nothing else for the page's observer to
@@ -119,6 +121,11 @@
    * the row on this device, and half a row that does nothing when tapped is worse than no control.
    */
   @media (width < 640px) {
+    /* A PHONE'S ROW IS 60 (SYSTEM §9), the size a thumb reads a list at. */
+    .list-cards :global(.card) {
+      min-block-size: 60px;
+    }
+
     /* THE `Put back` BESIDE A RECEIPT ON A CARD. `.verb` is the grid's, sized for a row 34px tall
        and a fine pointer; this one is under a thumb, so it takes `--tap` from `.tap` and reads as a
        word rather than as an icon. */

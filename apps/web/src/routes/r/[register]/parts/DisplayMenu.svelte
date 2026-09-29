@@ -195,11 +195,11 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: 34px;
+    min-block-size: 36px;
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
     text-align: start;

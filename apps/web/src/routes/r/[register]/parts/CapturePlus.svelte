@@ -8,6 +8,9 @@
 
   A BUTTON NAMED BY WHAT IT DOES, "Add an item", since a bare "+" says nothing to a screen reader.
   The page owns whether the sheet is open, so this only asks for it.
+
+  IT IS THE PHONE'S ONE PRIMARY (SYSTEM §5): an ink circle with the plus in the tile's colour, where the laptop's
+  "New" pill stands, which a phone does without.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -16,7 +19,7 @@
   let { one, onclick }: { one: string; onclick: () => void } = $props();
 </script>
 
-<button type="button" class="capture-open tap" aria-label={copy.captureIn(one)} aria-haspopup="dialog" {onclick}>
+<button type="button" class="capture-open tap" aria-label={copy.captureIn(one)} title={copy.captureIn(one)} aria-haspopup="dialog" {onclick}>
   <Icon name="plus" size="l" />
 </button>
 
@@ -25,8 +28,7 @@
     display: none;
   }
 
-  /* 44 ON BOTH AXES AND A PILL, the shape of a thing you press (design D-2), drawn by its edge the
-     way a secondary button is, since a list's head has no primary on a phone. */
+  /* 44 ON BOTH AXES UNDER A THUMB, AND INK: the toolbar's one primary as a circle (SYSTEM §5). */
   @media (width < 640px) {
     .capture-open {
       display: inline-grid;
@@ -34,11 +36,17 @@
       inline-size: var(--tap);
       block-size: var(--tap);
       padding: 0;
-      background: none;
-      border: 1px solid var(--edge);
+      background: var(--ink);
+      border: 0;
       border-radius: var(--r-pill);
-      color: var(--ink);
+      color: var(--on-ink);
       cursor: pointer;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .capture-open {
+      border: 1px solid ButtonText;
     }
   }
 </style>

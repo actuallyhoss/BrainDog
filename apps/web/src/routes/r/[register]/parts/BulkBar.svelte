@@ -8,7 +8,12 @@
 
   THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS TWO BODIES. Putting the body's branch in the markup
   rather than in the stylesheet once swallowed this into the card arm, so a desktop selection raised
-  no bulk bar at all. The page draws it above whichever body is on the screen.
+  no bulk bar at all. The page draws it whichever body is on the screen.
+
+  IT IS CHROME THAT FLOATS (SYSTEM §5): a glass pill at the bottom centre of the window, over the list, with the count,
+  the verbs and Esc to let go. Its glass is on a pseudo-element, because a `backdrop-filter` makes its element the box
+  every fixed descendant is placed against, and the state menu is one. Glass never holds glass, so the verbs in it are
+  the quiet wash pills.
 
   Every verb is the page's write (`copyIds`, `setPickedState`, `archiveSelected`), and `count` is the
   selection cut to the answer on screen, so what a verb acts on is what the reader is looking at.
@@ -19,6 +24,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Kbd from '$lib/ui/Kbd.svelte';
 
   let {
     count,
@@ -73,21 +79,51 @@
       <Icon name="archive" size="s" />{copy.archiveSelected}
     </Button>
   {/if}
-  <button type="button" class="picked-clear" onclick={() => onclear()}>{copy.clear}</button>
+  <button type="button" class="picked-clear tap" aria-label={copy.clear} title={copy.clear} onclick={() => onclear()}>
+    <Icon name="close" size="s" /><span class="picked-esc" aria-hidden="true"><Kbd keys="Esc" /></span>
+  </button>
 </div>
 
 <style>
+  /* THE FLOATING PILL: bottom centre, 12 above the window's edge twice over, and above the phone's tab bar there. The
+     glass is the `::before`; the bar itself holds no filter, so the state menu inside it places itself on the window. */
   .picked-bar {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: calc(env(safe-area-inset-bottom) + var(--inset) * 2);
+    z-index: var(--z-sheet);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2);
-    margin-block-end: var(--sp-3);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    justify-content: center;
+    gap: 6px;
+    inline-size: fit-content;
+    max-inline-size: calc(100vw - 2 * var(--inset));
+    margin-inline: auto;
+    padding: 6px 6px 6px var(--sp-4);
+    border-radius: calc(var(--ctl-h) / 2 + 6px);
     color: var(--ink2);
     font-size: var(--t-sm);
+    animation: picked-in var(--d-enter) var(--ease-out);
+  }
+
+  .picked-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--e2);
+    pointer-events: none;
+  }
+
+  @keyframes picked-in {
+    from {
+      transform: translateY(12px);
+    }
   }
 
   .picked-word {
@@ -102,32 +138,48 @@
 
   .picked-n {
     color: var(--ink);
-    font-weight: 500;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
 
+  /* LET GO: a round close with the Esc cap beside the glyph, the key that does the same. */
   .picked-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2) 0 var(--sp-3);
     background: none;
     border: 0;
-    padding: 0;
-    color: inherit;
+    border-radius: var(--r-pill);
+    color: var(--ink2);
     font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 0.18em;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  /* The menu rows: the same 34px and the same tint-on-hover as every menu row on this screen. */
+  @media (hover: hover) and (pointer: fine) {
+    .picked-clear:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+  }
+
+  .picked-esc {
+    display: inline-flex;
+  }
+
+  /* The menu rows: 32 tall with the same wash on hover as every menu row (SYSTEM §6). */
   .mi {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: 34px;
+    min-block-size: 32px;
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-ui);
@@ -141,6 +193,10 @@
     .mi {
       min-block-size: var(--tap);
     }
+
+    .picked-esc {
+      display: none;
+    }
   }
 
   .mi:hover,
@@ -151,5 +207,31 @@
 
   .mi-name {
     flex: 1;
+  }
+
+  /* NO RAIL BELOW 900PX, AND THE FLOATING TAB BAR OWNS THE BOTTOM EDGE, so the pill stands over it and over the toast
+     that sits on it. */
+  @media (width < 900px) {
+    .picked-bar {
+      inset-block-end: calc(var(--tabbar) + var(--inset) * 3 + var(--tap));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .picked-bar {
+      animation-name: picked-fade;
+    }
+  }
+
+  @keyframes picked-fade {
+    from {
+      opacity: 0.6;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .picked-bar::before {
+      border: 1px solid CanvasText;
+    }
   }
 </style>
