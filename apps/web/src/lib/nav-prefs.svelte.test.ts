@@ -64,6 +64,13 @@ test('ON A RECORD, WHAT BOOT SAID IS ADOPTED ONCE, and a hide and a show are eac
   assert.deepEqual(prefs.hidden, ['/p/kiln']);
 });
 
+test('READING BOOT WRITES NOTHING, even where the record keeps no shape or switch of its own', () => {
+  const prefs = new NavPrefs({ order: [], hidden: [], shape: 'menu', suggest: false });
+  prefs.adopt({}, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+  prefs.adopt({ 'nav.shape': 'bar', 'pen.suggest': true }, 'https://app.example', recorder(() => assert.fail('a second boot sent one')).send);
+  assert.equal(prefs.kept, true);
+});
+
 test('A REFUSED CHANGE IS PUT BACK, and says the record sentence', async () => {
   const prefs = new NavPrefs({ order: [], hidden: [] });
   prefs.adopt({}, 'https://app.example', recorder(() => ({ from: 'refused', fix: 'Sign in again.' })).send);

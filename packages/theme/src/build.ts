@@ -331,8 +331,12 @@ export const HIGH_CONTRAST_PROFILE: Profile = {
     light: { sunk: 0.955, bg: 1, s1: 0.985, s2: 0.975, s3: 0.965 },
   },
   groundC: { dark: 0.012, light: 0.005 },
-  /* The design system's colours are where high contrast starts too; its higher floors decide how far each one moves. */
-  aim: SYSTEM_AIM,
+  /* The design system's colours are where high contrast starts too; its higher floors decide how far each one moves.
+     EXCEPT LIGHT'S INK, WHICH STARTS DARKER. The house ink already clears 16:1 on this ladder's lightest ground, so a
+     floor alone never moved it and the light high-contrast page drew its words in exactly the house ink: the palette
+     changed the grounds and the quieter inks and left the one colour a reader turns it on for. Dark's ink is pushed
+     to near-white by its floor, so it moves on its own. */
+  aim: { dark: SYSTEM_AIM.dark, light: { ...SYSTEM_AIM.light, ink: { L: 0.13, C: 0.008 } } },
   /* The design system: "High contrast makes glass opaque." */
   chrome: 'opaque',
   intentFill: 4.5,

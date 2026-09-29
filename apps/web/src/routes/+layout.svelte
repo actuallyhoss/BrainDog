@@ -491,7 +491,7 @@
           ontoggle={toggleRail}
           main={flat.main}
           more={flat.more}
-          pages={flat.pages}
+          groups={flat.groups}
           hidden={hiddenCount}
           pen={data.pen}
           record={data.index.name}

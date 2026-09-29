@@ -135,8 +135,12 @@ export type FlatWords = { today: string; activity: string; decide: string };
 /**
  * The flat nav: the rows drawn in the one list, the sections that did not fit (drawn under More), and the other pages of
  * every section that are not a row's own page (also under More).
+ *
+ * `groups` IS THE RAIL'S MORE, section by section: every page a section holds past the one its row opens, a row's own
+ * page included, in the reader's arrangement. The rail has the room to name a project and folds each section on its
+ * own (`railShut`); the sheet and the top bar keep to `pages`.
  */
-export type Flat<T> = { main: FlatItem[]; more: FlatItem[]; pages: T[] };
+export type Flat<T> = { main: FlatItem[]; more: FlatItem[]; pages: T[]; groups: [string, T[]][] };
 
 /**
  * THE MOST ROWS THE LIST HOLDS, Today, Activity and Decide included. The owner's old tool had six in one bar and read them
@@ -215,10 +219,14 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
   /* THE OTHER PAGES A SECTION HOLDS, a Board beside Work, and never a row's own page (`row`), which its list's page opens.
      A section whose row opens the Work screen keeps its lead page here too, called "Work page" so it is not a second
      "Work" under More. */
-  const pages = rows.flatMap((r) =>
-    r.entries.flatMap((e) => (e.row ? [] : e !== r.lead ? [e] : r.screen ? [{ ...e, title: `${e.title} page` }] : [])),
-  );
-  return { main, more, pages };
+  const past = (r: Row): T[] => r.entries.flatMap((e) => (e !== r.lead ? [e] : r.screen ? [{ ...e, title: `${e.title} page` }] : []));
+  const pages = rows.flatMap((r) => past(r).filter((e) => !e.row));
+  /* IN THE ORDER THE SECTIONS ARE DRAWN, so More reads down the way the list above it does. */
+  const groups = [...body, ...after, ...under].flatMap((r): [string, T[]][] => {
+    const held = past(r);
+    return held.length > 0 ? [[r.section, held]] : [];
+  });
+  return { main, more, pages, groups };
 }
 
 /** What the Work screen's row says on a record whose sections do not name Work. */

@@ -111,6 +111,11 @@ test('THE FOUNDER`S NAV IS ONE FLAT LIST OF SEVEN AT MOST: Today, the three sect
   assert.deepEqual(flat.more.map((i) => i.label), ['Dashboard']);
   /* A section's other pages are under More too, and a project's, a book's or an organisation's own page is not. */
   assert.deepEqual(flat.pages.map((p) => p.href), ['/p/work-board']);
+  /* The rail's More names them section by section, a project's own page with its section, in the order drawn. */
+  assert.deepEqual(
+    flat.groups.map(([section, list]) => [section, list.map((p) => p.href)]),
+    [['Work', ['/p/work-board']], ['Projects', ['/p/project-1']], ['Money', ['/p/book-1']], ['Dashboard', ['/p/org-1']]],
+  );
 });
 
 test('DECIDE IS A ROW ONLY WHILE SOMETHING WAITS, with its count, and what no longer fits folds under More', () => {

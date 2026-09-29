@@ -37,6 +37,7 @@
   import { said } from '../voice.svelte.ts';
   import { OVERVIEW, isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
+  import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import Icon, { type IconName } from './Icon.svelte';
   import IconWell from './IconWell.svelte';
@@ -54,7 +55,7 @@
   let {
     main,
     more = [],
-    pages = [],
+    groups = [],
     hidden = 0,
     pen,
     record,
@@ -71,8 +72,8 @@
     main: readonly FlatItem[];
     /** The sections that did not fit in it, each one row. */
     more?: readonly FlatItem[] | undefined;
-    /** A section's other pages, a Board beside Work. */
-    pages?: readonly NavEntry[] | undefined;
+    /** Each section's pages past the one its row opens, a Board beside Work and a project's own page (`flatNav`). */
+    groups?: readonly (readonly [string, readonly NavEntry[]])[] | undefined;
     /** How many pages the reader hid from the nav, so the way back is on the rail. */
     hidden?: number | undefined;
     /** The holding pen's offers (`boot`'s `pen`); the rail says only how many. */
@@ -188,13 +189,27 @@
   const inMore = $derived(
     path === OVERVIEW ||
       more.some((i) => isHere(i, path)) ||
-      pages.some((e) => under(e.href)) ||
+      groups.some(([, list]) => list.some((e) => under(e.href))) ||
       tools.some((t) => under(t.href)) ||
       path.startsWith('/r/') ||
       path.startsWith('/v/') ||
       path.startsWith('/settings'),
   );
   const moreShut = $derived(!icons && !moreAsked && !inMore);
+
+  /**
+   * A SECTION UNDER MORE FOLDS ON ITS OWN, AND STAYS FOLDED (`railShut`, per device): a person who does not run projects
+   * folds Projects once. A section holding the screen you are on is never shut, so the rail never loses "here", and the
+   * narrow rail folds nothing, since it has no heading to press.
+   */
+  let shut = $state(new Set(pref.read().railShut ?? []));
+  function fold(section: string) {
+    const next = new Set(shut);
+    if (!next.delete(section)) next.add(section);
+    shut = next;
+    pref.write({ railShut: [...next] });
+  }
+  const isShut = (section: string, list: readonly NavEntry[]) => !icons && shut.has(section) && !list.some((e) => under(e.href));
 
   /* MORE OPENS DOWNWARDS FROM THE FOOT, so the rail's scroller is moved to put its heading at the top and what it
      holds in view. By hand and not `scrollIntoView`, which would also scroll the window this shell holds still. */
@@ -370,14 +385,36 @@
               </a>
             </li>
           {/each}
-          {#each pages as entry (entry.href)}
-            <li>
-              <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={path === entry.href ? 'page' : undefined}>
-                <IconWell name={entry.icon} tone={path === entry.href ? 'ink' : undefined} /><span class="item-name">{entry.title}</span>
-              </a>
-            </li>
-          {/each}
         </ul>
+
+        <!-- EACH SECTION'S OTHER PAGES UNDER ITS OWN NAME, in the reader's order. A section of one is a row and not a
+             folder; the fold's text is the section's name, so it is announced "Projects, collapsed, button". -->
+        {#snippet page(entry: NavEntry)}
+          <li>
+            <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={path === entry.href ? 'page' : undefined}>
+              <IconWell name={entry.icon} tone={path === entry.href ? 'ink' : undefined} /><span class="item-name">{entry.title}</span>
+            </a>
+          </li>
+        {/snippet}
+        {#each groups as [section, list] (section)}
+          {#if list.length === 1}
+            <ul class="group">{@render page(list[0]!)}</ul>
+          {:else}
+            {@const folded = isShut(section, list)}
+            {#if icons}
+              <hr class="sep" />
+            {:else}
+              <h3 class="sub">
+                <button type="button" class="fold tap" aria-expanded={!folded} onclick={() => fold(section)}>
+                  {section}<span class="fold-mark" aria-hidden="true" data-shut={folded ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+                </button>
+              </h3>
+            {/if}
+            <ul class="group" data-shut={folded ? '' : undefined} inert={folded || undefined}>
+              {#each list as entry (entry.href)}{@render page(entry)}{/each}
+            </ul>
+          {/if}
+        {/each}
 
         <!-- THE LISTS, UNDER THEIR OWN WORD. Native, never pack-positioned: a page can go with the add-on that declared
              it, and the rows underneath still have to be reachable. "New list" is the last row. -->
@@ -732,7 +769,8 @@
   }
 
   /* AN AUTHOR RULE, because `hidden` is a user-agent one and loses to any `display` written here. */
-  .more-body[data-shut] {
+  .more-body[data-shut],
+  .group[data-shut] {
     display: none;
   }
 
@@ -755,6 +793,23 @@
     font-size: var(--t-sm);
     font-weight: 500;
     letter-spacing: 0;
+  }
+
+  /* A SECTION'S HEADING UNDER MORE IS ITS FOLD: the name, then the mark that turns. */
+  .sub .fold {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .sub .fold:hover {
+    color: var(--ink);
   }
 
   .tools {

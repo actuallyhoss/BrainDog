@@ -150,10 +150,10 @@ export class NavPrefs {
    * What `boot` said this person arranged. `undefined` is no person on a record (the sample, or a refusal), and the
    * device's copy stands. `send` is for a test; the app sends to its own origin.
    *
-   * A SHAPE OR A SWITCH THE RECORD HAS NEVER HEARD OF IS MOVED IN ONCE. Before the record could hold them they lived only
-   * in this device's cookie, and a person who chose a top bar there would otherwise find the rail back on the day the
-   * record started answering. It is sent without waiting and without putting anything back: a refusal leaves the choice
-   * on this screen for this tab, which is where it was before.
+   * A SHAPE OR A SWITCH THE RECORD HAS NEVER HEARD OF IS THIS DEVICE'S, AND STAYS HERE. Reading `boot` writes nothing:
+   * it used to send the cookie's copy to the record whenever the record held none, so opening the app with a top bar
+   * in one browser's cookie set the top bar for the person everywhere, and a second browser's menu then lost to it. The
+   * record learns a shape or a switch when somebody chooses one (`setShape`, `setSuggest`).
    */
   adopt(prefs: Prefs | undefined, base: string, send: Send = sendTo(base)): void {
     if (prefs === undefined) return;
@@ -169,13 +169,9 @@ export class NavPrefs {
 
     const held = pref.read();
     const shape = prefs['nav.shape'];
-    if (isShape(shape)) this.shape = shape;
-    else if (held.navShape !== undefined) void this.#commit('nav.shape', held.navShape, () => {});
-    else this.shape = 'rail';
+    this.shape = isShape(shape) ? shape : (held.navShape ?? 'rail');
     const suggest = prefs['pen.suggest'];
-    if (typeof suggest === 'boolean') this.suggest = suggest;
-    else if (held.suggestPages !== undefined) void this.#commit('pen.suggest', held.suggestPages, () => {});
-    else this.suggest = true;
+    this.suggest = typeof suggest === 'boolean' ? suggest : (held.suggestPages ?? true);
     pref.write({ navShape: this.shape, suggestPages: this.suggest });
 
     const kept = strings(prefs['pen.dismissed']);
