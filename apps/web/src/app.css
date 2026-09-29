@@ -13,18 +13,27 @@
  */
 
 @layer components {
-  /* The window is the CANVAS — the darkest surface, which the chrome sits directly on. The work
-     sits in a panel lifted off it. `sunk` is not a hole in the page; it is the desk the page is on.
+  /* The window is THE GROUND (SYSTEM §2, §5): `--sunk`, with one soft light from the top of the
+     window painted on it, `--ground-light`, the only gradient in the product. The rail floats on it
+     as glass and the work sits straight on it; nothing is lifted into a panel any more.
 
-     And the panel is the ONE scroll container. Without this the document scrolls too and the window
-     shows two scrollbars: the panel's, and an outer one for a page that has nowhere to go. This is
-     the rule the shared base deliberately does not carry — the marketing site is a document, and a
-     document scrolls. */
+     And the shell's `.body` is the ONE scroll container. Without this the document scrolls too and
+     the window shows two scrollbars: the work's, and an outer one for a page that has nowhere to go.
+     This is the rule the shared base deliberately does not carry — the marketing site is a
+     document, and a document scrolls. */
   html,
   body {
     block-size: 100%;
     overflow: hidden;
     background: var(--sunk);
+  }
+
+  /* THE LIGHT IS A LAYER OF ITS OWN, so a ground without it is still the ground: were the image
+     written into the `background` shorthand above, a light that failed to resolve would take the
+     colour down with it. */
+  body {
+    background-image: var(--ground-light);
+    background-repeat: no-repeat;
   }
 
   /* EVERY HEADING IN THE RECORD IS GEIST (DESIGN-SYSTEM 2.1). The shared base sets headings in the

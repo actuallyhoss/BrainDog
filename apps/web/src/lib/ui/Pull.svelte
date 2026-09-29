@@ -158,13 +158,14 @@
     }
   }
 
+  /* ON THE GROUND, INSIDE THE WORK'S GUTTER: a rounded line in the warn wash, not a band across the window. */
   .pull-offline {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-1) var(--sp-3);
-    margin: 0;
+    margin: var(--inset) var(--gutter) 0;
     padding: var(--sp-2) var(--sp-4);
-    border-block-end: 1px solid var(--line-soft);
+    border-radius: var(--r-md);
     background: var(--warn-wash);
     color: var(--ink);
     font-size: var(--t-sm);

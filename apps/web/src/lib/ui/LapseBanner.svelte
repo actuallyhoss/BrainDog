@@ -83,16 +83,19 @@
 {/if}
 
 <style>
+  /* A TILE ON THE GROUND, over whatever screen is open (SYSTEM §6): opaque, radius 22, level 1, inside the work's own
+     gutter. Red is the glyph and nothing else, because this is the one line on the screen that needs him. */
   .lapse {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-2) var(--sp-3);
-    margin: 0;
-    padding: var(--sp-2) var(--sp-4);
-    border-block-end: 1px solid color-mix(in oklab, var(--danger) 35%, transparent);
-    background: color-mix(in oklab, var(--danger) 8%, var(--bg));
+    margin: var(--inset) var(--gutter) 0;
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    box-shadow: var(--e1);
     color: var(--ink);
   }
 
@@ -103,7 +106,7 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     line-height: var(--lh-body);
   }
 

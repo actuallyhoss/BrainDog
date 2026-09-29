@@ -157,8 +157,13 @@ function leadOf<T extends { title: string; row?: boolean | undefined }>(entries:
   return entries.find((e) => plainOf(e.title) === 'overview') ?? entries.find((e) => !e.row) ?? entries[0];
 }
 
+/* THE PLACES THE SHELL DRAWS WITH ITS OWN GLYPH (`loop/design/bento/ICONS.md`), whatever the lead page declares, so the
+   rail's Projects is the same picture on every record. Any other section wears its lead page's glyph. */
+const SECTION_ICONS: Readonly<Record<string, string>> = { projects: 'projects', work: 'work' };
+
 function sectionItem<T extends { href: string; icon: string }>(section: string, lead: T, entries: readonly T[]): FlatItem {
-  return { key: `section:${section}`, href: lead.href, label: section, icon: lead.icon, near: entries.map((e) => e.href) };
+  const icon = SECTION_ICONS[plainOf(section)] ?? lead.icon;
+  return { key: `section:${section}`, href: lead.href, label: section, icon, near: entries.map((e) => e.href) };
 }
 
 /**
@@ -183,9 +188,9 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
      screen, and the section's own pages go under More with the others; a record with tasks and no Work section gets
      the row all the same, where Work sits among the sections a day runs through. */
   if (work !== null) {
-    const item: FlatItem = { key: 'work', href: work, label: WORK_WORD, icon: 'task', near: [work] };
+    const item: FlatItem = { key: 'work', href: work, label: WORK_WORD, icon: 'work', near: [work] };
     const held = rows.find((r) => plainOf(r.section) === 'work');
-    if (held) Object.assign(held, { item: { ...item, label: held.section, icon: held.lead?.icon ?? 'task' }, screen: true });
+    if (held) Object.assign(held, { item: { ...item, label: held.section }, screen: true });
     else rows.unshift({ section: WORK_WORD, lead: undefined, entries: [], item, screen: true });
   }
   const rank = (section: string, list: readonly string[]) => list.indexOf(plainOf(section));
@@ -194,8 +199,8 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
   const after = rows.filter((r) => rank(r.section, AFTER) >= 0).sort((a, b) => rank(a.section, AFTER) - rank(b.section, AFTER));
   const under = rows.filter((r) => rank(r.section, UNDER) >= 0);
 
-  const today: FlatItem = { key: 'today', href: '/', label: words.today, icon: 'home', near: ['/'], exact: true };
-  const activity: FlatItem = { key: 'activity', href: '/audit', label: words.activity, icon: 'clock', near: ['/audit'] };
+  const today: FlatItem = { key: 'today', href: '/', label: words.today, icon: 'today', near: ['/'], exact: true };
+  const activity: FlatItem = { key: 'activity', href: '/audit', label: words.activity, icon: 'activity', near: ['/audit'] };
   const decide: FlatItem[] = open > 0 ? [{ key: 'decide', href: '/decide', label: words.decide, icon: 'decide', count: open, near: ['/decide'] }] : [];
 
   const body = [...first, ...others];

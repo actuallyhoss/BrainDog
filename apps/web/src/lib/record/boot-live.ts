@@ -15,7 +15,7 @@
  */
 
 import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
-import { railRoom } from '@braindog/kernel';
+import { isStale, railRoom } from '@braindog/kernel';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until wave C1, then a hand copy in `modules.ts` until each module's
    own manifest said it (USE-3). */
@@ -32,6 +32,7 @@ import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import type { Level } from './schema.ts';
 import { levelsFrom } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
+import { AGENT_GLYPHS, agentKindOf } from '../ui/face.ts';
 /* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws (PGS-16). */
 import { penOf, type PenItem } from '../design/pen.ts';
 import type { Prefs } from '../nav-prefs.svelte.ts';
@@ -225,6 +226,66 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
  * asking. A host older than the field says nothing, and is asked as before.
  */
 export const signsIn = (b: Boot): boolean => (b as Boot & { signIn?: unknown }).signIn !== false;
+
+/**
+ * One agent at work, as the rail's Working now draws it (SYSTEM §5): the run, the kind of agent, the project it was
+ * placed in, what it says it is doing, when the run began, and whether it has gone quiet.
+ */
+export type Working = { seq: number | null; agent: string; glyph: IconName; project: string | null; doing: string; since: string | null; quiet: boolean };
+
+/** The most runs the rail lists; Today and the run pages hold the rest. */
+const WORKING_SHOWN = 5;
+
+/**
+ * THE AGENTS AT WORK, READ THE WAY TODAY READS THEM (`drawn` in `today-live.ts`): the record draws `sessions.live` as a
+ * page it holds nowhere, so the rail and Today name the same runs under the same project names. Only the runs still
+ * `active`, most recently heard from first, as the record orders them.
+ *
+ * A REFUSAL IS NOBODY WORKING, never a failure of the shell: a colleague who may not read the runs sees no group, and
+ * the screen beside the rail is not told anything went wrong. `now` is the clock "gone quiet" is judged against.
+ */
+export async function readWorking(base: string, io?: Fetch, now = Date.now()): Promise<Working[]> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const body = {
+    page: 'working',
+    title: 'Working now',
+    blocks: [
+      {
+        kind: 'table',
+        heading: 'Working now',
+        source: 'sessions.live',
+        where: 'state is active',
+        columns: [{ field: 'agent' }, { field: 'doing' }, { field: 'last_seen' }],
+        limit: WORKING_SHOWN,
+      },
+    ],
+  };
+  const out = await client.call<{ blocks?: unknown }>('previewPage', { body });
+  if (!out.ok) return [];
+  const table = (Array.isArray(out.value.blocks) ? out.value.blocks : [])[0] as { rows?: unknown; scopes?: unknown } | undefined;
+  const scopes = Array.isArray(table?.scopes) ? (table.scopes as unknown[]) : [];
+  const rows = Array.isArray(table?.rows) ? (table.rows as unknown[]) : [];
+  const said = (v: unknown): string => (typeof v === 'string' ? v : '');
+  return rows.flatMap((r, i): Working[] => {
+    if (typeof r !== 'object' || r === null) return [];
+    const row = r as { seq?: unknown; fields?: unknown; created_at?: unknown; updated_at?: unknown };
+    const fields = (typeof row.fields === 'object' && row.fields !== null ? row.fields : {}) as Record<string, unknown>;
+    const scope = scopes[i];
+    const kind = agentKindOf(said(fields.agent));
+    return [
+      {
+        seq: typeof row.seq === 'number' ? row.seq : null,
+        agent: said(fields.agent) || 'other',
+        /* The agent's own glyph (`face.ts`), chosen here so the rail's chunk does not carry the names behind it. */
+        glyph: kind === 'slash' ? 'slash' : AGENT_GLYPHS[kind],
+        project: (typeof scope === 'string' && scope !== '' ? scope : null) ?? (said(fields.project) || null),
+        doing: said(fields.doing),
+        since: said(row.created_at) || null,
+        quiet: isStale({ fields: fields as Parameters<typeof isStale>[0]['fields'], updated_at: said(row.updated_at) }, now),
+      },
+    ];
+  });
+}
 
 /** Drop the kept answer, and the refusal beside it, so the next screen asks the record again. */
 export function forget(): void {

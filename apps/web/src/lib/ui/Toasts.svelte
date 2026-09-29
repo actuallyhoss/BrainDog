@@ -1,10 +1,16 @@
 <!--
-  The toast stack, bottom-LEFT.
+  The toast stack, bottom-left of the work (SYSTEM §6): one glass-strong pill, the verb, the thing, and Undo with its key.
 
-  Not bottom-right, and not centred. The launcher owns the bottom-right corner of every screen, and
-  a toast that lands on top of it covers the one control that is on every surface; a centred toast
-  covers the work. Bottom-left is the corner with nothing in it, on the side the eye returns to
-  after reading a row.
+  Not bottom-right, and not centred. The launcher owns the bottom-right corner on the shapes that have one, and a toast
+  that lands on top of it covers the one control that is on every surface; a centred toast covers the work.
+  Bottom-left, beside the rail, is the corner with nothing in it, on the side the eye returns to after reading a row.
+
+  THE VERB LEADS. A receipt that offers an undo is "Archived obligations#4", the past tense and then the thing, so the
+  verb is set at 600 and the thing after it at the body's weight. A toast that only reports is a sentence and is drawn
+  as one.
+
+  THE KEY ON UNDO IS THE ONE THAT WORKS: `⌘Z` (Ctrl+Z off a Mac, which `Kbd` says), the stack's own chord in the
+  layout. SYSTEM draws a bare `z`, and no such binding exists.
 
   ONE live region for the whole stack, and it is `polite`. `role="alert"` for "archived
   obligations#4" interrupts whatever a screen-reader user was reading in order to tell them about
@@ -13,6 +19,7 @@
 <script lang="ts">
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
+  import Kbd from './Kbd.svelte';
   import { toasts } from './toast.svelte.ts';
 
   /** The newest is nearest the corner, so the stack grows away from the thumb rather than under it. */
@@ -24,6 +31,12 @@
      carried the meaning on its own (13 §2.3), and it did it because the icon set had `check` and
      `alert` but nothing for `bad` or `info`. It has both now. */
   const GLYPH = { good: 'check', warn: 'alert', bad: 'ban' } as const;
+
+  /** A receipt's verb and the thing it was done to; `null` for a toast that only reports. */
+  const parts = (text: string): [string, string] | null => {
+    const at = text.indexOf(' ');
+    return at > 0 ? [text.slice(0, at), text.slice(at)] : null;
+  };
 </script>
 
 <div
@@ -37,13 +50,14 @@
   onfocusout={() => toasts.release()}
 >
   {#each stack as toast (toast.id)}
+    {@const said = toast.undo ? parts(toast.text) : null}
     <div class="toast" data-intent={toast.intent}>
       {#if toast.intent}
         <span class="tone" aria-hidden="true"><Icon name={GLYPH[toast.intent]} size="s" /></span>
       {/if}
-      <span class="text">{toast.text}</span>
+      <span class="text">{#if said}<span class="verb">{said[0]}</span>{said[1]}{:else}{toast.text}{/if}</span>
       {#if toast.undo}
-        <button type="button" class="undo" onclick={() => toasts.run(toast.id)}>{copy.undo}</button>
+        <button type="button" class="undo tap" onclick={() => toasts.run(toast.id)}>{copy.undo}<Kbd keys="⌘Z" /></button>
       {/if}
       <button type="button" class="close tap" onclick={() => toasts.dismiss(toast.id)} aria-label={copy.close}>
         <Icon name="close" size="s" />
@@ -55,13 +69,14 @@
 <style>
   .stack {
     position: fixed;
-    inset-block-end: var(--sp-5);
-    inset-inline-start: calc(var(--rail) + var(--sp-5));
+    inset-block-end: calc(env(safe-area-inset-bottom) + var(--inset) * 2);
+    inset-inline-start: calc(var(--inset) + var(--rail) + 20px);
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: var(--sp-2);
-    max-inline-size: min(420px, calc(100vw - var(--sp-6)));
+    max-inline-size: min(480px, calc(100vw - var(--sp-6)));
     pointer-events: none;
   }
 
@@ -69,24 +84,26 @@
     pointer-events: auto;
   }
 
-  /* Over the page, so it is allowed `--e2`: s1, a hairline, no accent (DESIGN-BRIEF 4.9).
-
-     A PILL, because a toast is the answer to something you pressed and speaks in the same shape
-     (design D-2). The start pads a full step and the end half of one, so the text clears the curve
-     and the close glyph sits inside it. */
+  /**
+   * ONE GLASS-STRONG PILL, AT LEVEL 2 (SYSTEM §6): the stack floats over whatever the work is showing, and
+   * `glass-strong` is the fill legible over busy content. The filter is on the pill itself, which holds no fixed
+   * descendant. The start pads a full step and the end half of one, so the text clears the curve and the close glyph
+   * sits inside it.
+   */
   .toast {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding-block: var(--sp-2);
-    padding-inline: var(--sp-5) var(--sp-2);
-    background: var(--s1);
-    border: 1px solid var(--line);
+    min-block-size: 44px;
+    padding-block: var(--sp-1);
+    padding-inline: var(--sp-4) var(--sp-1);
+    background: var(--glass-strong);
     border-radius: var(--r-pill);
-    box-shadow: var(--e2);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
     color: var(--ink);
     font-size: var(--t-base);
-    /* Ease-out, as the sheet: no overshoot on a report. */
+    /* Swift out, as everything arriving (SYSTEM §8): no overshoot on a report. */
     animation: toast-in var(--d-enter) var(--ease-out);
   }
 
@@ -114,26 +131,32 @@
   .text {
     flex: 1;
     min-inline-size: 0;
+    color: var(--ink2);
   }
 
-  /* The undo is the loud thing in the toast: a secondary button in ink, not an accent link, drawn
-     as `Button`'s secondary is, a pill with an `--edge` border. */
-  /* AND IT IS A 44px TARGET ON A THUMB. It was 28: the only control in the product that gives you
-     your data back, on a countdown, at two thirds of the floor. */
+  .verb {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* THE UNDO IS THE LOUD THING IN THE TOAST: the word in ink at 600 and its key cap, on the pill's own glass rather
+     than a second surface on it. A 44px target on a thumb (`tap`), because it is the only control in the product that
+     gives you your data back, on a countdown. */
   .undo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
     flex: none;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-4);
+    min-block-size: 32px;
+    padding: 0 var(--sp-2) 0 var(--sp-3);
     background: none;
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-pill);
     color: var(--ink);
     font: inherit;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      border-color var(--d-state) var(--ease-out);
+    transition: background var(--d-state) var(--ease-out);
   }
 
   /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH. `a11y.css`'s `.tap::before` grows a small
@@ -164,22 +187,24 @@
     }
   }
 
-  /* A THUMB READS THE TOAST AND ITS UNDO AT THE CONTROL SIZE, 16 (design DSN-2). */
+  /* A THUMB READS THE TOAST AND ITS UNDO AT THE CONTROL SIZE, 16 (design DSN-2), and has no key to press. */
   @media (pointer: coarse) {
     .toast {
       font-size: var(--t-md);
     }
+
+    .undo :global(.kbd-run) {
+      display: none;
+    }
   }
 
-  /* No rail below 900px, and the tab bar owns the bottom edge. */
+  /* No rail below 900px, and the floating tab bar owns the bottom edge. */
   @media (width < 900px) {
     .stack {
-      inset-inline: var(--sp-3);
-      /* THE TAB BAR PAYS `env(safe-area-inset-bottom)` AND THIS DID NOT. On a phone with a home
-         indicator the bar is 91px tall and this sat 68px up — 23px of toast over the tab labels,
-         and `--z-toast` beats `--z-sheet`, so it painted on top of them. The inset is the same
-         number in both places or the two disagree by exactly the height of the indicator. */
-      inset-block-end: calc(var(--tabbar) + var(--sp-3));
+      inset-inline: var(--inset);
+      /* ABOVE THE FLOATING BAR: `--tabbar` is the bar and the home indicator, and the bar floats `--inset` over that. */
+      inset-block-end: calc(var(--tabbar) + var(--inset) * 2);
+      align-items: stretch;
       max-inline-size: none;
     }
 
@@ -187,6 +212,13 @@
        bar, so the height this clears is not there any more and the keyboard is. */
     :global(html[data-kb]) .stack {
       inset-block-end: calc(var(--kb) + var(--sp-3));
+    }
+  }
+
+  /* FORCED COLOURS DROP THE GLASS AND ITS SHADOWS, so the floating surface keeps an edge to be told from the ground by. */
+  @media (forced-colors: active) {
+    .toast {
+      border: 1px solid CanvasText;
     }
   }
 </style>

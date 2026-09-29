@@ -24,6 +24,8 @@
   import { copy } from '../copy.ts';
   import { isHere, placeOf, type FlatItem } from '../nav.ts';
   import Icon, { type IconName } from './Icon.svelte';
+  import IconWell from './IconWell.svelte';
+  import Mark from './Mark.svelte';
 
   let {
     entries,
@@ -42,11 +44,15 @@
 </script>
 
 <nav class="topbar" aria-label="Record">
+  <!-- THE MARK FIRST, as the rail's head wears it: the strip is the same nav in another shape. -->
+  <span class="bar-mark" aria-hidden="true"><Mark height={18} /></span>
   <!-- THE FLAT LIST, at most seven, so it fits the 900px this shape is ever drawn at with its names intact. -->
   {#each entries as item (item.key)}
     <a class="bar-item tap" href={at(item.href)} aria-current={isHere(item, path) ? 'page' : undefined}>
-      <Icon name={item.icon as IconName} size="m" /><span class="bar-name">{item.label}</span>
-      {#if item.count}<span class="tally num" data-intent="warn">{item.count}<Icon name="decide" size="s" title={copy.openQuestions} /></span>{/if}
+      <IconWell name={item.icon as IconName} tone={isHere(item, path) ? 'ink' : undefined} /><span class="bar-name">{item.label}</span>
+      {#if item.count}<span class="tally num" data-waiting={item.key === 'decide' ? '' : undefined} aria-label={`${item.count} ${copy.openQuestions}`}
+          >{item.count}</span
+        >{/if}
     </a>
   {/each}
 
@@ -64,76 +70,131 @@
 </nav>
 
 <style>
-  /* THE SAME GROUND THE RAIL HAS. Navigation is how you get to the work; the work is what should be
-     bright, and a strip in the page's own colour reads as the first row of the page. */
+  /**
+   * A FLOATING GLASS BAR, the rail's treatment laid across the top (SYSTEM §5, §10): glass, radius 22, 12 in from the
+   * window (the shell's `.bar-slot`), and level 2. The glass is on a pseudo-element for the rail's reason: a
+   * `backdrop-filter` here would be the box a fixed descendant is placed against.
+   */
   .topbar {
+    position: relative;
+    isolation: isolate;
     display: flex;
     align-items: center;
-    gap: var(--sp-1);
+    gap: 2px;
     min-inline-size: 0;
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--sunk);
-    border-block-end: 1px solid var(--line);
+    padding: 6px;
+    border-radius: var(--r-lg);
     /* THE STRIP CLIPS RATHER THAN THE DOCUMENT SCROLLING SIDEWAYS. A name too long for the width it
        is drawn at is a name with an ellipsis; a page that slides under the thumb is the most visible
        bug a responsive layout can have. */
     overflow: hidden;
   }
 
+  .topbar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
+    pointer-events: none;
+  }
+
+  .bar-mark {
+    display: grid;
+    place-items: center;
+    flex: none;
+    padding-inline: var(--sp-2) var(--sp-3);
+  }
+
+  /* A PLACE, as the rail draws one: an 18px glyph in a 26px well, the name 14/500, 36 tall. */
   .bar-item {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
     min-block-size: var(--rail-item-h);
-    padding-inline: var(--sp-2);
+    padding: 0 10px 0 5px;
     border: 0;
     background: none;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     font-weight: 500;
     text-decoration: none;
     cursor: pointer;
     white-space: nowrap;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  /* The rail's 26px well, with the wash for its rest fill on glass (`Sidebar.svelte`). */
+  .bar-item :global(.well) {
+    inline-size: 26px;
+    block-size: 26px;
+  }
+
+  .bar-item :global(.well:not([data-tone])) {
+    background: var(--hover-wash);
   }
 
   .bar-item:hover {
-    background: var(--s2);
+    background: var(--hover-wash);
     color: var(--ink);
   }
 
-  /* Where you are, said the way the rail says it: `s2` and full ink, no accent. */
+  /* Where you are, said the way the rail says it: an ink well, the name at 600 and a white row. */
   .bar-item[aria-current='page'] {
-    background: var(--s2);
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
     color: var(--ink);
+    font-weight: 600;
   }
 
   .bar-name {
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
 
   .bar-more {
     /* AT THE END, ALWAYS, and never squeezed out by the names in front of it. It is the only way to
        the lists, the add-ons, the vault and settings at this shape. */
     flex: 0 0 auto;
     margin-inline-start: auto;
+    padding-inline: var(--sp-3);
   }
 
-  /* ONE TREATMENT FOR EVERY NUMBER, the rail's rule: a quiet tabular figure, with `--tone` carrying
-     the intent rather than a bordered pill that reads as an alert. */
+  /* ONE TREATMENT FOR EVERY NUMBER, the rail's rule: a quiet tabular figure in `--dim`. */
   .tally {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
   }
 
-  .tally[data-intent='warn'] {
-    color: var(--warn);
+  /* And Decide's is the red square, the one filled badge. */
+  .tally[data-waiting] {
+    display: inline-grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-inline-size: 20px;
+    block-size: 20px;
+    padding: 0 5px;
+    background: var(--danger);
+    border-radius: var(--r-sm);
+    color: var(--on-ink);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* FORCED COLOURS DROP THE GLASS AND ITS SHADOWS, so the floating surface keeps an edge to be told from the ground by. */
+  @media (forced-colors: active) {
+    .topbar::before {
+      border: 1px solid CanvasText;
+    }
   }
 </style>

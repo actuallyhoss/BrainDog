@@ -62,6 +62,7 @@
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { OVERVIEW, WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
+  import type { Working } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
@@ -158,7 +159,7 @@
   const USAGE = 'Usage';
   const places = $derived([
     ...(spine.includes('inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
-    ['/slash', copy.suggestions, 'star'],
+    ['/slash', copy.suggestions, 'slash'],
     ['/automations', copy.automations, 'refresh'],
     ['/jobs', copy.jobs, 'play'],
     ['/packs', copy.packs, 'packs'],
@@ -335,6 +336,38 @@
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
+  /**
+   * WHO IS WORKING NOW, FOR THE RAIL (SYSTEM §5), asked as Today asks it (`readWorking` in `record/boot-live.ts`) and
+   * again whenever the poll hears the record move, so a run that starts or stops shows up without a reload.
+   *
+   * NOT THROUGH `read()`, WHICH IS A SCREEN'S. `read` brackets every call in the screen's readiness count, and a rail
+   * read refused for a colleague who may not see the runs would mark the screen beside it refused. Keyed on the
+   * record's address rather than on `page.url`, so moving between screens asks nothing; a refusal is an empty group.
+   * Asked only while the rail is drawn, since no other shape has the group.
+   */
+  let working = $state.raw<Working[]>([]);
+  const workingAt = $derived(!bare && shape === 'rail' && data.live === true && !data.refused ? apiBase(page.url) : null);
+  $effect(() => {
+    const base = workingAt;
+    void live.version;
+    if (base === null) {
+      working = [];
+      return;
+    }
+    let gone = false;
+    void import('$lib/record/boot-live.ts')
+      .then((m) => m.readWorking(base))
+      .then(
+        (w) => {
+          if (!gone) working = w;
+        },
+        () => undefined,
+      );
+    return () => {
+      gone = true;
+    };
+  });
+
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
   /* `g s` IS HERE NOW. It was removed on the grounds that "search is not a place you go, it is the
      thing under the launcher" — true while the palette was the only search, and contradicted by
@@ -466,6 +499,7 @@
           registers={data.index.registers}
           {spine}
           inbox={data.inbox}
+          {working}
         />
       </div>
     {:else}
@@ -761,24 +795,35 @@
     overscroll-behavior: contain;
   }
 
-  /* Rail and canvas on the sunk ground, the work lifted onto `bg` in its own panel. The panel is the
-     ONE scroll container, so the rail never moves and the window shows exactly one scrollbar. */
   /**
-   * ONE COLUMN THAT SIZES TO THE RAIL, AT BOTH OF THE RAIL'S WIDTHS.
+   * THE GROUND, AND ON IT A FLOATING RAIL AND THE WORK (SYSTEM §5).
    *
-   * There were four rules here and a `--rail-back` variable, all of them arithmetic for the state
-   * where the rail was gone: a grid that had to be rewritten to one column, a 40px gutter for the
-   * restore button, and a note recording that the first version of the fix reproduced its own bug
-   * one breakpoint down. None of it is needed to make a rail narrower. `auto` measures whatever the
-   * rail says it is, so the collapsed width is the rail's own declaration and this grid never has
-   * to know which state it is in.
+   * The work no longer sits in a lifted panel: the page IS the ground (`--sunk` with `--ground-light`, painted on
+   * `body` in `app.css`), the rail is a glass card floating 12 in from the window, and the content sits straight on the
+   * ground 20 from the rail and 28 from the right. `.body` is still the ONE scroll container, so the rail never moves
+   * and the window shows exactly one scrollbar.
+   *
+   * ONE COLUMN THAT SIZES TO THE RAIL, AT BOTH OF THE RAIL'S WIDTHS. `auto` measures whatever the rail says it is, so
+   * the narrow width is the rail's own declaration and this grid never has to know which state it is in.
    */
   .shell {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     block-size: 100dvh;
     overflow: hidden;
-    background: var(--sunk);
+  }
+
+  /* The card, 12 in from the window at the top, the start and the bottom.
+
+     AT THE MENU'S LEVEL, because the card is a stacking context of its own (its glass sits under it at `z-index: -1`),
+     and the record switcher's menu opens inside it: at `auto` the work's sticky title row, later in the page and at
+     `--z-sheet`, was drawn over any part of the menu that reached past the card. */
+  .rail-slot {
+    position: relative;
+    z-index: var(--z-palette);
+    display: flex;
+    padding-block: var(--inset);
+    padding-inline-start: var(--inset);
   }
 
   /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
@@ -790,39 +835,50 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
+  /* The strip floats 12 in from the window, as the rail does. */
   .bar-slot {
     min-inline-size: 0;
+    padding: var(--inset) var(--inset) 0;
   }
 
-  /* The hairline belongs to the boundary between the nav and the work, and with the nav above the
-     work that boundary is the strip's own bottom edge rather than a line down the left of the page. */
-  .shell[data-shape='bar'] .body,
-  .shell[data-shape='menu'] .body {
-    margin-block-start: 0;
-    margin-inline-start: var(--sp-2);
-  }
-
-  /* One button, at the start of the strip, at the size every other target in the shell is. */
+  /* One glass pill, at the start of the strip, at the size every other target in the shell is. */
   .menu-open {
+    position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
-    margin: var(--sp-2) var(--sp-3);
-    padding-inline: var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
+    padding-inline: var(--sp-3) var(--sp-4);
+    background: none;
+    border: 0;
     /* A pill, because it is pressed (design D-2). */
     border-radius: var(--r-pill);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     font-weight: 500;
     cursor: pointer;
   }
 
-  .menu-open:hover {
-    background: var(--s2);
+  /* THE GLASS ON A PSEUDO-ELEMENT, as the rail's: a `backdrop-filter` on the control would be the box a fixed
+     descendant is placed against. */
+  .menu-open::before,
+  .launcher::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .menu-open:hover::before,
+  .launcher:hover::before {
+    background: var(--glass-strong);
   }
 
   /**
@@ -846,15 +902,19 @@
     }
   }
 
+  /**
+   * THE WORK, ON THE GROUND. No fill, no hairline, no radius: the tiles in it are the only raised things.
+   *
+   * THE GUTTER IS SET HERE, ONCE, for every screen under it. Screens pad their content by `--gutter`, so 20 here puts
+   * the content 20 from the rail card, and the 8 at the end makes it 28 from the window's right edge. On the other two
+   * shapes nothing is at the start, so the content sits 28 in on both sides.
+   */
   .body {
+    --gutter: 20px;
+
     animation: arrive var(--d-move) var(--ease-out) backwards;
     min-inline-size: 0;
-    /* The lifted panel (DESIGN-BRIEF 4.4): `bg` on the sunk canvas, a hairline, `--r-md`, inset from
-       the window edges, and no shadow. */
-    margin: var(--sp-2) var(--sp-2) var(--sp-2) 0;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    padding-inline-end: 8px;
     overflow-y: auto;
     overscroll-behavior: contain;
     /* THE PAGE'S FOOT, and on the top bar and menu shapes the room the search button in the bottom
@@ -863,34 +923,35 @@
     padding-block-end: calc(var(--tap) + var(--sp-5));
   }
 
+  .shell[data-shape='bar'] .body,
+  .shell[data-shape='menu'] .body {
+    --gutter: 28px;
+
+    padding-inline-end: 0;
+  }
+
   /* Below 900px the rail becomes a tab bar; above it, the tab bar does not exist. */
   .tab-slot {
     display: none;
   }
 
-  /* A QUIET RAISED CIRCLE WITH A MAGNIFIER: a surface a step above the page, with the soft shadow a
-     sheet has, because a thing that floats over the page should look like it does. */
+  /* A GLASS CIRCLE WITH A MAGNIFIER, floating over the page in the corner, 44 across. */
   .launcher {
     position: fixed;
-    inset-block-end: calc(env(safe-area-inset-bottom) + var(--sp-5));
-    inset-inline-end: var(--sp-5);
+    inset-block-end: calc(env(safe-area-inset-bottom) + var(--inset) * 2);
+    inset-inline-end: calc(var(--inset) * 2);
     z-index: var(--z-hint);
+    isolation: isolate;
     display: grid;
     place-items: center;
-    inline-size: 52px;
-    block-size: 52px;
+    inline-size: var(--tap);
+    block-size: var(--tap);
     padding: 0;
-    background: var(--s1);
-    border: 1px solid var(--line);
+    background: none;
+    border: 0;
     border-radius: var(--r-pill);
-    box-shadow: var(--e2);
     color: var(--ink);
     cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .launcher:hover {
-    background: var(--s2);
   }
 
   @media (width < 900px) {
@@ -915,13 +976,16 @@
       grid-template-rows: minmax(0, 1fr);
     }
 
-    .body {
-      margin: 0;
-      border: 0;
-      border-radius: 0;
+    /* THE PHONE'S OWN GUTTER, 16, whatever the shape (SYSTEM §9). */
+    .body,
+    .shell[data-shape='bar'] .body,
+    .shell[data-shape='menu'] .body {
+      --gutter: var(--sp-4);
+
+      padding-inline-end: 0;
       /* THE LAST ROW ENDS 16px ABOVE THE TAB BAR (design 6.6). `--tabbar` is the bar and the home
-         indicator under it, summed once in `tokens.css`, so this adds only the breathing room. */
-      padding-block-end: calc(var(--tabbar) + var(--sp-4));
+         indicator under it, summed once in `tokens.css`; the bar floats `--inset` above that. */
+      padding-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-4));
     }
 
     .tab-slot {
@@ -943,7 +1007,7 @@
     gap: var(--sp-1);
   }
 
-  /* SEARCH, DRAWN AS THE FIELD IT OPENS: a field's edge and radius, 44px, the words in `--dim`. */
+  /* SEARCH, DRAWN AS THE FIELD IT OPENS: a field's fill and radius, 44px, the words in `--dim` (SYSTEM §6). */
   .more-find {
     display: flex;
     align-items: center;
@@ -951,8 +1015,8 @@
     min-block-size: var(--tap);
     margin-block-end: var(--sp-3);
     padding-inline: var(--sp-3);
-    background: var(--bg);
-    border: 1px solid var(--edge);
+    background: var(--s1);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--dim);
     font: inherit;
