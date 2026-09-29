@@ -147,8 +147,8 @@
     display: flex;
     gap: 2px;
     margin-inline-start: auto;
-    padding: 2px;
-    background: var(--hover-wash);
+    padding: 3px;
+    background: var(--s2);
     border: 0;
     border-radius: var(--r-pill);
   }
@@ -223,7 +223,7 @@
     block-size: 26px;
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     color: var(--dim);
     cursor: pointer;
   }
