@@ -1,6 +1,7 @@
 <!--
-  WHILE THE RECORD IS ANSWERING. DESIGN-SYSTEM 4.8: hold the final geometry with `s2` blocks, no
-  shimmer, and only after 300ms.
+  WHILE THE RECORD IS ANSWERING. DESIGN-SYSTEM 4.8: hold the final geometry, no shimmer, and only
+  after 300ms. The geometry is a list's (SYSTEM §6): rows the height of a row, each with the 32px
+  well a row leads with and one bar where its title goes.
 
   Eight screens drew nothing at all here, on the argument that a placeholder list is rows that are
   not there. That argument is about the SAMPLE flashing over a live record, and it still holds: these
@@ -26,14 +27,14 @@
   <span class="said">{copy.waiting}</span>
   {#if head}<span class="bar title" aria-hidden="true"></span>{/if}
   {#each { length: rows } as _, i}
-    <span class="bar" style:inline-size={WIDTHS[i % WIDTHS.length]} aria-hidden="true"></span>
+    <span class="row" aria-hidden="true"><span class="well"></span><span class="bar" style:inline-size={WIDTHS[i % WIDTHS.length]}></span></span>
   {/each}
 </div>
 
 <style>
   .waiting {
     display: grid;
-    gap: var(--sp-5);
+    gap: 0;
     animation: waiting-in var(--d-state) var(--ease-out) 300ms backwards;
   }
 
@@ -42,18 +43,34 @@
     padding: var(--sp-5) var(--gutter);
   }
 
+  .row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--row-h);
+  }
+
+  /* THE HOLD WASH AND NOT A SURFACE STEP: ink at a fixed strength reads on the ground and on a tile alike, where a
+     `--s*` step is all but invisible on one of them. */
+  .well {
+    flex: none;
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+    background: var(--hover-wash);
+    border-radius: var(--r-well);
+  }
+
   .bar {
     display: block;
-    block-size: var(--sp-3);
-    /* `s3`, not the `s2` 4.8 first named: on the light ground `s2` measured all but invisible. */
-    background: var(--s3);
-    border-radius: var(--r-sm);
+    block-size: 10px;
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
   }
 
   .bar.title {
     inline-size: min(240px, 60%);
     block-size: var(--sp-5);
-    margin-block-end: var(--sp-3);
+    margin-block-end: var(--sp-4);
   }
 
   .said {

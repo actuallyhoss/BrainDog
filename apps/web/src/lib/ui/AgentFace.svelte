@@ -7,8 +7,8 @@
   can be told apart from the other at a glance. The disc keeps the hue after the run stops, so an old line in the
   history still says which run wrote it; only the ring goes.
 
-  THE RING IS WHERE THE RUN IS: solid while it works, dashed once it has gone quiet but is still open, and absent when
-  it has stopped. A shape and not a colour, so the three read the same in both schemes and to a reader who does not
+  THE RING IS WHERE THE RUN IS, in `--live`: solid while it works, dashed once it has gone quiet but is still open, and
+  absent when it has stopped. A shape and not a colour, so the three read the same in both schemes and to a reader who does not
   see the hue.
 
   A DOOR TO THE RUN. A face that names a run is a link to the run's own page, which reads as a handoff (`r/[register]/
@@ -82,7 +82,7 @@
     box-sizing: border-box;
     inline-size: 32px;
     block-size: 32px;
-    background: var(--hold-wash);
+    background: var(--s1);
     border: 2px solid transparent;
     border-radius: var(--r-pill);
     color: var(--ink);
@@ -100,10 +100,12 @@
     background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg));
   }
 
-  /* THE RING, with a hair of the ground inside it so it reads as a ring around the disc and not as a darker disc. */
+  /* THE RING IS `--live`, the one hue that means "alive" (SYSTEM §2): an agent working right now wears it, solid, and
+     one gone quiet wears it dashed. A hair of the tile inside it, so it reads as a ring round the disc and not as a
+     darker disc. The disc keeps the run's own hue, which is what tells two runs apart. */
   .agent-face[data-hued][data-live='working'],
   .agent-face[data-hued][data-live='quiet'] {
-    border-color: oklch(var(--mark-l) var(--mark-c) var(--run-hue));
+    border-color: var(--live);
     box-shadow: inset 0 0 0 1px var(--bg);
   }
 

@@ -58,27 +58,37 @@
   .kbd-run {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-1);
     white-space: nowrap;
   }
 
+  /* THE CAP (SYSTEM §6): Geist Mono 12 on the `--s1` fill, an 18px square at its smallest, radius `--r-sm`, and no
+     border. The old raised cap with a thicker bottom edge was a picture of a keyboard; this is a label. */
   .kbd {
-    display: inline-block;
-    min-inline-size: 20px;
-    padding: 1px 5px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-block-end-width: 2px;
+    display: inline-grid;
+    place-items: center;
+    box-sizing: border-box;
+    min-inline-size: 18px;
+    block-size: 18px;
+    padding: 0 var(--sp-1);
+    background: var(--s1);
     border-radius: var(--r-sm);
-    color: var(--dim);
+    color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-xs);
-    line-height: 1.5;
+    font-weight: 500;
+    line-height: 1;
     text-align: center;
   }
 
   .kbd-or {
     color: var(--dim);
     font-size: var(--t-xs);
+  }
+
+  @media (forced-colors: active) {
+    .kbd {
+      border: 1px solid CanvasText;
+    }
   }
 </style>

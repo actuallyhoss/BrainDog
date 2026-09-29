@@ -8,6 +8,9 @@
   Three rules the copy obeys: be specific about what WILL be here; a CTA is Verb + Noun, never
   "Get Started"; and the CTA is a real button or link, so it joins the tab order.
 
+  DRAWN IN THE NEW LANGUAGE (SYSTEM §6): the kind's glyph in a 32px icon well, the title, the one line,
+  and the action as the primary ink pill, which the caller passes as `Button weight="primary"`.
+
   `cleared` has no action, because nobody manufactures work.
 -->
 <script lang="ts">
@@ -17,6 +20,7 @@
   import type { Snippet } from 'svelte';
 
   import Icon from './Icon.svelte';
+  import IconWell from './IconWell.svelte';
   import { inline } from 'braindog-render';
   import { Text } from 'braindog-render/svelte';
   import { drew, undrew } from './screen.svelte.ts';
@@ -109,6 +113,16 @@
 
   const shown = $derived(glyph ?? GLYPH[kind]);
 
+  /* THE WELL TAKES THE KIND'S TONE WHERE THERE IS ONE: a failure is the red that needs him, a cleared list is done's
+     green, and absence is not an alarm, so nothing-yet and no-results stay the neutral well. */
+  const TONE: Record<EmptyKind, 'danger' | 'earn' | undefined> = {
+    'no-data-yet': undefined,
+    'no-results': undefined,
+    cleared: 'earn',
+    'no-permission': undefined,
+    error: 'danger',
+  };
+
   /**
    * THE HALF OF THE READINESS CONTRACT THAT COSTS NO ROUTE ANYTHING.
    *
@@ -145,7 +159,7 @@
 </script>
 
 <div class="empty" data-kind={kind} class:compact>
-  {#if shown && !compact}<span class="empty-glyph" aria-hidden="true"><Icon name={shown} size="xl" /></span>{/if}
+  {#if shown && !compact}<span class="empty-glyph" aria-hidden="true"><IconWell name={shown} size="l" tone={TONE[kind]} /></span>{/if}
   {#if heading}
     <h1 class="empty-title">{#if icon}<Text nodes={inline(title, { icon })} opts={{ icon }} />{:else}{title}{/if}</h1>
   {:else}
@@ -204,43 +218,32 @@
     cursor: pointer;
   }
 
-  /* No box: the state sits on the page's own ground, the way the rows it stands in for do. */
+  /* No box: the state sits on the page's own ground, the way the rows it stands in for do. Nothing is centred:
+     centring one block in a column of left-aligned ones is worse than not marking it at all (19 §6). */
   .empty {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: var(--sp-2);
     max-inline-size: 56ch;
-    padding-block: var(--sp-4);
+    padding-block: var(--sp-5);
   }
 
-  /* Nothing is centred: centring one line in a row of left-aligned ones is worse than not marking
-     it at all, and a tight empty state inside a block's own frame keeps the page's shape (19 §6). */
-  /* The bare glyph, no tile. It takes the kind's tone where there is one and the dim ink where
-     there is not. Absence is not an alarm: `no-data-yet` and `no-results` are ordinary and must not
-     arrive in the danger colour just because they are empty. */
+  /* THE WELL, 32px, carrying the kind's tone where there is one (the `TONE` table above). */
   .empty-glyph {
     display: flex;
-    margin-block-end: var(--sp-1);
-    color: var(--dim);
+    margin-block-end: var(--sp-2);
   }
 
-  .empty[data-kind='error'] .empty-glyph {
-    color: var(--danger);
-  }
-
-  .empty[data-kind='cleared'] .empty-glyph {
-    color: var(--earn);
-  }
-
-  /* THE UI FACE, AT THE SIZE OF A SECTION'S LEAD. An empty state is a sentence, not a poster, and
-     the display face here made every not-found page louder than the Home it should lead back to. */
+  /* THE GROUP HEADING'S STEP, `--t-group` at 600: an empty state is a sentence, not a poster, and it leads the space
+     the rows would fill the way a group heading would. */
   .empty-title {
+    margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-md);
+    font-size: var(--t-group);
     font-weight: 600;
-    line-height: 1.35;
-    letter-spacing: -0.01em;
+    line-height: 24px;
     text-wrap: balance;
   }
 
@@ -342,17 +345,20 @@
     flex-basis: 100%;
   }
 
+  /* THE ONE LINE: the body size in the quiet ink, at the measure. */
   .empty-body,
   .empty-agent {
+    margin: 0;
     color: var(--dim);
+    font-size: var(--t-base);
+    line-height: 20px;
     max-inline-size: var(--measure);
   }
 
   .empty-query code,
   .empty-rid code {
     padding: 2px 6px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    background: var(--s1);
     border-radius: var(--r-sm);
     font-family: var(--font-id);
     font-size: var(--t-sm);

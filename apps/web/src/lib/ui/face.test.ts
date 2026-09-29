@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { initialOf } from './face.ts';
+import { initialOf, initialsOf } from './face.ts';
 
 test('a name gives its first letter, uppercased', () => {
   assert.equal(initialOf('Claude'), 'C');
@@ -25,4 +25,12 @@ test('leading space is ignored', () => {
 test('an empty name still draws a mark', () => {
   assert.equal(initialOf(''), '?');
   assert.equal(initialOf('   '), '?');
+});
+
+test('a project or a record wears two initials at most, the first of its first two words', () => {
+  assert.equal(initialsOf('Portage'), 'P');
+  assert.equal(initialsOf('Marlow & Co'), 'MC');
+  assert.equal(initialsOf('backup vendor review'), 'BV');
+  assert.equal(initialsOf('The Fenwick Group'), 'FG');
+  assert.equal(initialsOf('  '), '?');
 });

@@ -399,7 +399,7 @@
   .box-label {
     color: var(--ink2);
     font-size: var(--t-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .box-line {
@@ -412,18 +412,20 @@
   .box-input {
     flex: 1 1 18ch;
     min-inline-size: 0;
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-md);
   }
 
-  .box-input:hover {
-    border-color: var(--edge);
+  @media (hover: hover) and (pointer: fine) {
+    .box-input:hover {
+      background: var(--s2);
+    }
   }
 
   .box-over {

@@ -124,11 +124,11 @@
   }
 
   .add-kind {
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-ui);

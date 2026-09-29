@@ -90,9 +90,9 @@
   .day[data-fit='field'] {
     flex: 1 1 18ch;
     inline-size: 100%;
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     font-size: var(--t-md);
   }

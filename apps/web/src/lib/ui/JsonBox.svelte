@@ -69,9 +69,9 @@
      page's Save and Cancel go under it rather than beside it. */
   .json[data-fit='field'] {
     flex: 1 1 100%;
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding: var(--sp-2) var(--sp-3);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     font-size: var(--t-md);
     line-height: var(--lh-body);

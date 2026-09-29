@@ -160,11 +160,11 @@
   .quantity[data-fit='field'] .quantity-number,
   .quantity[data-fit='field'] .quantity-typed,
   .quantity[data-fit='field'] .quantity-pick {
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     /* THE COLOUR AND NOT THE SHORTHAND, so the menu keeps the chevron `controls.css` draws in its image. */
     background-color: var(--s1);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     font-size: var(--t-md);
   }

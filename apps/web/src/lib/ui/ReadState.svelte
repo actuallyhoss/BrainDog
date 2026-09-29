@@ -33,7 +33,7 @@
 </script>
 
 {#snippet retry()}
-  <Button onclick={() => onretry?.()}>{copy.readRetry}</Button>
+  <Button weight="primary" onclick={() => onretry?.()}>{copy.readRetry}</Button>
 {/snippet}
 
 {#if state === 'waiting'}

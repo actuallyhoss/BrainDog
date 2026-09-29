@@ -402,10 +402,10 @@
   }
 
   .rt-select {
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
@@ -481,7 +481,7 @@
   }
 
   /* ONE CARD A FAILING ROW: its title, what it holds and why it will not carry over, then its answers. The card keeps a
-     quiet edge until it is answered, so a scan down the list finds the ones still waiting. */
+     soft fill until it is answered, so a scan down the list finds the ones still waiting. */
   .rt-card,
   .rt-sample {
     display: flex;
@@ -490,17 +490,19 @@
     min-block-size: var(--row-h-2);
     padding: var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-lg);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
   }
 
+  /* AN ANSWERED CARD LETS ITS FILL GO, so a scan down the list finds the ones still waiting by their fill. */
   .rt-card[data-answered='yes'] {
-    border-color: var(--line-soft);
+    background: transparent;
+    border-color: var(--line);
   }
 
   .rt-sample {
     background: transparent;
-    border-color: var(--line-soft);
+    border-color: var(--line);
   }
 
   .rt-card-title {

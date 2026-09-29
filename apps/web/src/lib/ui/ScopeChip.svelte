@@ -65,12 +65,12 @@
     max-inline-size: 100%;
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
-    background: var(--hold-wash);
+    background: var(--hover-wash);
     border: 0;
     border-radius: var(--r-pill);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
     line-height: var(--lh-tight);
     vertical-align: middle;
@@ -88,7 +88,7 @@
   /* A WASH ONLY UNDER A MOUSE: a tapped chip on a phone would keep it after the finger lifted (design-brief §6). */
   @media (hover: hover) and (pointer: fine) {
     .scope-move:hover {
-      background: var(--hover-wash);
+      background: var(--hold-wash);
       color: var(--ink);
     }
   }

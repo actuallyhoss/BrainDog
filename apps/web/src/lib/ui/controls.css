@@ -6,12 +6,11 @@
  * filter bar, the search page and the onboarding step each grew their own, and by the time anyone
  * looked they disagreed about the surface, the radius and what focus does.
  *
- * A FIELD IS A HOLE CUT INTO THE PAGE, and on this palette that means the RAISED surface and a real
- * border. The instinct is the other way round — a field is where you put something, so it should
- * look recessed — and on a cream ground it is exactly wrong: `sunk` and the page are within a couple
- * of points of each other, so a "recessed" field is a flat slab of the same colour as everything
- * around it and stops looking like somewhere you can type. Depth here is a luminance ladder and the
- * ladder only has room in one direction.
+ * A FIELD IS A SOFT WELL (SYSTEM §6, Fields): 40 tall, 44 under a thumb, the `--s1` fill with no border, radius
+ * `--r-md`, and its label above it in `--t-sm` `--ink2`. Focus is the 2px ink ring offset 2, the same ring every other
+ * control takes from the a11y layer. A segmented control is a glass pill on the ground (and an `--s1` one inside a
+ * tile), with the chosen segment a `--bg` pill lifted by a tiny shadow. Switches, checkboxes and radios are ink when
+ * they are on.
  */
 
 @layer components {
@@ -43,7 +42,8 @@
   .tab:active,
   .seg:active,
   .segment:active,
-  .tile:active,
+  button.tile:active,
+  a.tile:active,
   .choice:active,
   .mi:active {
     opacity: var(--press-dim);
@@ -83,31 +83,41 @@
     transform: scale(var(--press-scale));
   }
 
+  /* THE LABEL SITS ABOVE THE FIELD, in the meta size and the second ink. A screen that sizes its own label in its
+     scoped style outranks this whole layer, so this is the default and not a fight. */
+  .field-label {
+    display: block;
+    margin-block-end: 6px;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
+  }
+
+  /* 40 TALL AND 44 UNDER A THUMB, on the `--s1` fill with no border. A FIELD IS NOT A PILL: the pill is for what you
+     press or choose, and a field is somewhere you put something, so it keeps the `--r-md` corner (design D-2). */
   .field {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
+    box-sizing: border-box;
+    min-block-size: 40px;
     padding: 0 var(--sp-3);
     background: var(--s1);
-    /* An input is where the boundary is the affordance, so it takes `edge` (DESIGN-BRIEF 4.1). */
-    border: 1px solid var(--edge);
-    /* A FIELD IS NOT A PILL. The pill is for what you press or choose; a field is somewhere you
-       put something, and it keeps the card's corner (design D-2). */
+    border: 0;
     border-radius: var(--r-md);
     color: var(--dim);
-    transition: border-color var(--d-state) var(--ease-out);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  /* ONE FOCUS, ON THE WRAPPER, AND THE SAME ONE EVERY BARE FIELD GETS IN `a11y.css`: an `--ink2`
-     edge where the border is and the soft `--focus-halo` outside it. The input inside has no border
-     of its own, so it draws nothing, or a focused field is two boxes. It was the accent, and a red
-     edge round a field nobody had typed in yet read as a validation error (design SYS-1). */
+  /* ONE FOCUS, ON THE WRAPPER: the 2px ink ring offset 2 (SYSTEM §6), which is the a11y layer's ring for every other
+     control. The input inside draws nothing, or a focused field is two boxes. It was the accent once, and a red edge
+     round a field nobody had typed in yet read as a validation error (design SYS-1). */
   .field:focus-within,
   .capture-field:focus-within {
-    outline: 1px solid var(--ink2);
-    outline-offset: -1px;
-    box-shadow: 0 0 0 3px var(--focus-halo);
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+    box-shadow: none;
   }
 
   .field .field-input:focus-visible {
@@ -134,17 +144,21 @@
     opacity: 1;
   }
 
-  /* UNDER A MOUSE THE WRAPPER IS THE CONTROL HEIGHT, BORDER INCLUDED. The stretched input's own
-     `--ctl-h` floor made the box 34 beside 32px filters and buttons (DESIGN-SYSTEM APPENDIX C8). The
-     coarse-pointer floor below is untouched: that one is the thumb's. */
+  /* UNDER A MOUSE THE INPUT IS THE FIELD'S 40, and under a thumb the field is 44 and so is the input. */
   @media (pointer: fine) {
     .field:not(.field-lg) .field-input {
-      min-block-size: calc(var(--ctl-h) - 2px);
+      min-block-size: 40px;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .field {
+      min-block-size: var(--tap);
     }
   }
 
   .field-lg {
-    min-block-size: 44px;
+    min-block-size: var(--tap);
     padding-inline: var(--sp-4);
     gap: var(--sp-3);
   }
@@ -159,10 +173,8 @@
   .field-input {
     flex: 1;
     align-self: stretch;
-    /* AND THE STRETCH IS TWO PIXELS SHORT. The wrapper is `--ctl-h` INCLUDING its 1px border, so a
-       stretched child fills the content box and measures 42 on a coarse pointer — under the rule the
-       wrapper was sized to meet, on the element that actually takes the pointer. `13 §7` counts the
-       target, not its container. */
+    /* AND THE INPUT HOLDS THE FLOOR ITSELF, not only its wrapper: `13 §7` counts the target, not its container, and
+       under a thumb `--ctl-h` is the 44 the rule asks for. */
     min-block-size: var(--ctl-h);
     min-inline-size: 0;
     border: 0;
@@ -193,103 +205,87 @@
     color: var(--dim);
   }
 
-  /* A SEGMENTED CONTROL, and the same rule as the field: one quiet track, and the chosen option is a
-     pill sitting in it. The selected state has to be a SHAPE and not a shade: a slightly
-     lighter grey behind one word out of four is the single most-missed control in dense software. */
   /**
-   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there.
+   * A SEGMENTED CONTROL IS A GLASS PILL WITH PILLS IN IT (SYSTEM §5, toolbar controls): the frosted fill and its
+   * hairline pair on the ground, and the chosen segment a `--bg` pill lifted by a tiny shadow. The selected state has to
+   * be a SHAPE and not a shade: a slightly lighter grey behind one word out of four is the single most-missed control
+   * in dense software.
    *
-   * The segments are separately rounded chips in a track rather than one fused pill, so a
-   * second line costs nothing visually. Once they became 44px tall on a coarse pointer, five of them
-   * measured 342px inside a 320px screen and `/r/tasks` scrolled sideways by 38 — the register
-   * whose bar carries `open doing blocked done dropped`.
+   * INSIDE A TILE, A SHEET OR THE PANEL'S BODY IT IS THE `--s1` PILL INSTEAD, because glass never sits on content, and
+   * a frosted white over a white tile is no track at all.
    *
-   * Not `overflow-x: auto`: the settings rail was a scroller, and nine of twelve areas were
-   * unreachable for exactly as long, because a strip that scrolls with nothing peeking past its edge
-   * looks like a strip that ends. Every state a register can be filtered by is on screen or the
-   * control is lying about the register.
+   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there. The segments are
+   * separately rounded chips, so a second line costs nothing visually; five of them at 44 on a coarse pointer measured
+   * 342px inside a 320px screen, and a strip that scrolls with nothing peeking past its edge looks like a strip that
+   * ends.
+   *
+   * THE RADIUS IS THE SEGMENT'S PLUS THE 3px ROUND IT, NOT `--r-pill`. On one line the two are the same curve; a track
+   * that wraps is twice as tall, and `--r-pill` would draw its ends as one curve tall enough that a chosen first or
+   * last segment's corner stood outside the track. Concentric with the segment, the corners stay inside.
    */
-  /* A QUIET TRACK: the field's own surface and hairline, so a segmented control sits in a form as
-     one more field and not as a dark well with a tile in it. A PILL, with pills in it, because a
-     segmented control is a set of things you press (design D-2).
-
-     THE RADIUS IS THE SEGMENT'S PLUS THE 3px BETWEEN THEM, NOT `--r-pill`. On one line the two are
-     the same curve: half of a 44px segment plus the track's 2px padding and 1px border is half of the
-     50px track. A track that wraps is twice as tall, and `--r-pill` then drew its ends as one curve
-     tall enough that a chosen first or last segment's corner stood outside the hairline. Concentric
-     with the segment, the corners stay inside at any number of lines. */
   .segmented {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
-    padding: 2px;
+    padding: 3px;
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 0;
+    border-radius: calc(var(--ctl-h) / 2);
+    box-shadow: var(--glass-edge);
+  }
+
+  :is(.tile, .sheet, [data-surface='tile']) .segmented {
     background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: calc(var(--ctl-h) / 2 + 3px);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
   }
 
   /**
-   * A SEGMENT IS 28px HIGH AND THE POINTER DECIDES OTHERWISE.
+   * THE WHOLE CONTROL IS `--ctl-h` UNDER A MOUSE (36) and each segment 44 under a thumb: density follows the POINTER,
+   * never the width (`05 §6`, `13 §7`). `min-block-size`, not `block-size`: a segment whose label wraps grows.
    *
-   * `05 §6` and `13 §7`: density follows the POINTER, never the width — a control is 44px on a
-   * coarse pointer and 32 on a fine one, and `--ctl-h` already resolves to exactly that. This read
-   * `28px`, flat, and consulted neither. Measured on a phone: ten of these on `/r/services`, nine on
-   * `/audit`, twenty on `/settings/people` at 43x28 with 2px between them — a 28px band with three
-   * targets in it, which is the classic wrong-chip tap.
-   *
-   * The gap goes with it. `--tap` is 44 and the space between two of these was 2px, so even at the
-   * right height a thumb landing between two chips is a coin toss. Four pixels on a coarse pointer
-   * is not enough on its own — the height is what fixes it — but two is a rounding error.
-   *
-   * `min-block-size`, not `block-size`: a segment whose label wraps grows, and 44 is the floor
-   * rather than the size.
+   * THE LABEL IS THE CONTROL SIZE, 14 UNDER A MOUSE AND 16 UNDER A THUMB (design DSN-2).
    */
-  /* THE LABEL IS THE CONTROL SIZE, 14 UNDER A MOUSE AND 16 UNDER A THUMB (design DSN-2). It was
-     13, a step below every button and field beside it, so a filter bar read as captions. */
   .segment {
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
     background: none;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: var(--r-pill);
-    color: var(--dim);
+    color: var(--ink2);
     font-size: var(--t-base);
     font-weight: 500;
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
   }
 
-  /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it,
-     so a segment answered a tap by staying washed after the finger had gone. */
+  /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it. */
   @media (hover: hover) and (pointer: fine) {
     .segment:hover:not([data-on]) {
       background: var(--hover-wash);
-      color: var(--ink2);
+      color: var(--ink);
     }
   }
 
-  /* THE SAME HEIGHT AS THE FIELD BESIDE IT under a mouse: the track's 2px padding and 1px border
-     come off the segment, so the whole control is `--ctl-h`. Under a thumb the segment keeps 44. */
+  /* UNDER A MOUSE the track's 3px padding comes off the segment, so the whole control is `--ctl-h`. */
   @media (pointer: fine) {
     .segment {
       min-block-size: calc(var(--ctl-h) - 6px);
     }
-
-    /* The segment is 6px under the control height here, so the track's concentric radius is half
-       the control height itself. */
-    .segmented {
-      border-radius: calc(var(--ctl-h) / 2);
-    }
   }
 
-  /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM, and each is 44 wide as well as
-     44 tall: "On" and "Off" are narrower than a thumb, and a target is both axes. After the base
-     rules, so the thumb's size is the one that wins. */
+  /* AND THE CHIPS STAND APART WHERE A THUMB PICKS BETWEEN THEM, each 44 wide as well as 44 tall: "On" and "Off" are
+     narrower than a thumb, and a target is both axes. The track's radius follows the taller segment. */
   @media (pointer: coarse) {
     .segmented {
       gap: var(--sp-1);
+      border-radius: calc(var(--ctl-h) / 2 + 3px);
     }
 
     .segment {
@@ -298,15 +294,14 @@
     }
   }
 
-  /* The chosen option is a shape in the track, not only a shade: the `--selected` ground and a
-     hairline, ink text, and no shadow or weight change, so choosing does not make it the loudest
-     thing on the form. It was `s2`, which the light ladder puts ABOVE the page, so in light the
-     chosen segment was a near-white pill on a near-white track and could not be found (design
-     SYS-5). `--selected` is ink mixed into the ground and darkens in light by construction. */
+  /* THE CHOSEN SEGMENT: a `--bg` pill with a tiny shadow and a hairline in `--line`, so it is a shape on the glass in
+     light and in dark, where a shadow alone does not show. Ink text, and no weight change, so choosing does not make it
+     the loudest thing in the bar. */
   .segment[data-on] {
-    background: var(--selected);
-    border-color: var(--line);
-    box-shadow: none;
+    background: var(--bg);
+    box-shadow:
+      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
+      0 0 0 0.5px var(--line);
     color: var(--ink);
   }
 
@@ -334,17 +329,18 @@
     cursor: pointer;
   }
 
+  /* OFF IS THE `--edge` TRACK, the 3:1 boundary ink the theme holds against every surface, with the tile's own colour
+     for its thumb; ON IS THE INK TRACK. The thumb is one lifted disc in both states, so the switch reads as one object
+     that moved rather than two drawings. No border: the fill is the boundary. */
   .switch-track {
     position: relative;
     display: block;
     inline-size: 36px;
-    block-size: 20px;
-    background: var(--s3);
-    border: 1px solid var(--edge);
+    block-size: 22px;
+    background: var(--edge);
+    border: 0;
     border-radius: var(--r-pill);
-    transition:
-      background var(--d-state) var(--ease-out),
-      border-color var(--d-state) var(--ease-out);
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .switch-track::after {
@@ -352,10 +348,11 @@
     position: absolute;
     inset-block-start: 2px;
     inset-inline-start: 2px;
-    inline-size: 14px;
-    block-size: 14px;
-    background: var(--dim);
+    inline-size: 18px;
+    block-size: 18px;
+    background: var(--bg);
     border-radius: var(--r-pill);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 18%, transparent);
     transition:
       translate var(--d-state) var(--ease-out),
       background var(--d-state) var(--ease-out);
@@ -363,18 +360,17 @@
 
   .switch[aria-checked='true'] .switch-track {
     background: var(--on);
-    border-color: var(--on);
   }
 
   .switch[aria-checked='true'] .switch-track::after {
-    translate: 16px 0;
+    translate: 14px 0;
     background: var(--on-ink);
   }
 
   /* THE THUMB TRAVELS THE OTHER WAY IN A RIGHT-TO-LEFT PAGE. `translate` is physical, and the thumb
      starts at the inline start, so in Arabic an "on" switch slid its thumb out of the track. */
   .switch[aria-checked='true']:dir(rtl) .switch-track::after {
-    translate: -16px 0;
+    translate: -14px 0;
   }
 
   .switch:disabled {
@@ -396,7 +392,7 @@
    * screen set `accent-color`, with the operating system's chevron on every select and a native
    * thumb on every slider, so one form spoke three design languages (design §6.8 rule 10).
    * `appearance: none` takes the browser's drawing away and the rules below put the product's back:
-   * ink for what is on, `--edge` for the boundary, `--r-md` for a field and a pill for a thumb.
+   * ink for what is on, `--edge` for a box's boundary, the `--s1` fill and `--r-md` for a field, a pill for a thumb.
    *
    * `:where()` AROUND EVERY ELEMENT, SO A SCREEN CAN STILL SIZE AND PLACE ITS OWN. A block that gives
    * its checkbox 18px, or a form that pads its select wider, does it with a class; at zero
@@ -417,8 +413,8 @@
     inline-size: var(--icon-m);
     block-size: var(--icon-m);
     vertical-align: middle;
-    background: var(--s1);
-    border: 1px solid var(--edge);
+    background: var(--bg);
+    border: 1.5px solid var(--edge);
     border-radius: var(--r-sm);
     cursor: pointer;
     transition:
@@ -474,7 +470,7 @@
   }
 
   /**
-   * A SELECT IS A FIELD WITH THE HOUSE CHEVRON: bordered like an input, as tall as one, and the
+   * A SELECT IS A FIELD WITH THE HOUSE CHEVRON: the field's `--s1` fill, as tall as one, and the
    * chevron drawn in `--dim` from two gradient strokes, because the icon set cannot reach inside a
    * `<select>` and a `data:` image would have to spell its colour as a literal.
    *
@@ -488,10 +484,10 @@
    */
   :where(select:not([multiple], [size])) {
     appearance: none;
-    min-block-size: var(--ctl-h);
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline-start: var(--sp-3);
     background-color: var(--s1);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     cursor: pointer;
@@ -519,10 +515,10 @@
      `--sp-3` of padding here would set its value a step further in than every text field beside it. */
   :where(input:is([type='date'], [type='time'], [type='datetime-local'], [type='month'], [type='week']):not(.field-input)) {
     appearance: none;
-    min-block-size: var(--ctl-h);
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     background-color: var(--s1);
-    border: 1px solid var(--edge);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font-variant-numeric: tabular-nums;

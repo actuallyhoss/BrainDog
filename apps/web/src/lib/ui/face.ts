@@ -23,6 +23,24 @@ export const initialOf = (name: string): string => {
   return first ? first.toUpperCase() : '?';
 };
 
+/**
+ * A project's or a record's initials, for its rounded square (SYSTEM §2: "Faces are a rounded square with the project's
+ * initials").
+ *
+ * TWO LETTERS AT MOST, the first of the first two words, so "Marlow & Co" is "MC" and "Portage" is "P". A word that is
+ * not a word (an ampersand, a dash) is passed over, and a leading article is not the name, as it is not for a person.
+ */
+export const initialsOf = (name: string): string => {
+  const words = name
+    .trim()
+    .replace(/^the\s+/i, '')
+    .split(/\s+/u)
+    .filter((w) => /[\p{L}\p{N}]/u.test(w));
+  const letters = words.slice(0, 2).map((w) => [...w].find((ch) => /[\p{L}\p{N}]/u.test(ch)) ?? '');
+  const said = letters.join('').toUpperCase();
+  return said === '' ? '?' : said;
+};
+
 /** The names `names.ts` gives an agent, so a face handed only a name still knows one. */
 const AGENT_SAID = new Set<string>([...Object.values(AGENT_NAMES), nameWords.agent]);
 

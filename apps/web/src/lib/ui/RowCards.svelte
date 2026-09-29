@@ -429,7 +429,7 @@
     }
 
     .card-line[data-picked] {
-      background: var(--sunk);
+      background: var(--selected);
     }
 
     .picked-tick {

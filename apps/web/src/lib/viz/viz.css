@@ -1,0 +1,198 @@
+/**
+ * The chart primitives' one stylesheet: the grey ramp, the tones, and the marks (SYSTEM §7).
+ *
+ * EVERY CHART IMPORTS IT, so a screen that draws one chart gets the lot and a screen that draws none
+ * gets nothing. It is global rather than scoped because the tones are shared by nine components, and
+ * nine copies of one ramp is how a ramp drifts. Every class here starts with `viz`.
+ *
+ * THE RAMP IS INK MIXED INTO THE TILE, never a literal. SYSTEM §2's light steps (`#4A505B`,
+ * `#8C939E`, `#C5CAD2`, `#DEE2E8` on white) are ink at about 76%, 48%, 24% and 13%, and the same
+ * mixes give the dark steps, so one rule serves both schemes and the high-contrast theme.
+ *
+ * `--c` IS THE MARK'S COLOUR. A `data-tone` sets it from a token; a project's own colour arrives
+ * inline (`style:--c`), which beats any rule here, and that is the only way a colour the theme does
+ * not own reaches the page.
+ */
+
+@layer components {
+  :where(.viz) {
+    --viz-g1: color-mix(in srgb, var(--ink) 76%, var(--bg));
+    --viz-g2: color-mix(in srgb, var(--ink) 48%, var(--bg));
+    --viz-g3: color-mix(in srgb, var(--ink) 24%, var(--bg));
+    --viz-g4: color-mix(in srgb, var(--ink) 13%, var(--bg));
+    /* A chart's track: SYSTEM's tile-2, mixed rather than `--s1` so it still shows in the
+       high-contrast theme, where `--s1` sits a hair off the tile. */
+    --viz-track: color-mix(in srgb, var(--ink) 6%, var(--bg));
+    --c: var(--ink);
+
+    display: block;
+    position: relative;
+    inline-size: 100%;
+    min-inline-size: 0;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 1 unit is 1px: each chart draws at the width it measured, so its text keeps its size. */
+  .viz > svg {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    overflow: visible;
+  }
+
+  .viz [data-tone='ink'] { --c: var(--ink); }
+  .viz [data-tone='g1'] { --c: var(--viz-g1); }
+  .viz [data-tone='g2'] { --c: var(--viz-g2); }
+  .viz [data-tone='g3'] { --c: var(--viz-g3); }
+  .viz [data-tone='g4'] { --c: var(--viz-g4); }
+  .viz [data-tone='track'] { --c: var(--viz-track); }
+  .viz [data-tone='danger'] { --c: var(--danger); }
+  .viz [data-tone='earn'] { --c: var(--earn); }
+  .viz [data-tone='warn'] { --c: var(--warn); }
+  .viz [data-tone='live'] { --c: var(--live); }
+
+  /* ── marks ─────────────────────────────────────────────────────────────── */
+
+  .viz-fill {
+    fill: var(--c);
+  }
+
+  /* An outline mark: the current step, drawn as a ring of its tone. */
+  .viz-outline {
+    fill: none;
+    stroke: var(--c);
+    stroke-width: 1.5;
+  }
+
+  .viz-track {
+    fill: var(--viz-track);
+  }
+
+  /* A line is 2px with round joins (SYSTEM §7). */
+  .viz-line {
+    fill: none;
+    stroke: var(--c);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .viz-line[data-projected] {
+    stroke-dasharray: 2 4;
+  }
+
+  /* The area under a line is the line's colour at 8%. */
+  .viz-area {
+    fill: var(--c);
+    fill-opacity: 0.08;
+    stroke: none;
+  }
+
+  /* The ring round a dot, in the tile's own colour, so a dot on a line reads as a point on it. */
+  .viz-dot {
+    fill: var(--c);
+    stroke: var(--bg);
+    stroke-width: 1.5;
+  }
+
+  .viz-grid {
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  /* A projection or a threshold: a dashed rule, quiet. */
+  .viz-rule {
+    stroke: var(--viz-g2);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+
+  /* The now or today line, and its pill: `live` is the one hue that means "alive". */
+  .viz-now {
+    stroke: var(--live);
+    stroke-width: 1.5;
+  }
+
+  .viz-pill {
+    fill: var(--live);
+  }
+
+  .viz-pill-text {
+    fill: var(--on-ink);
+    font-size: var(--t-xs);
+    font-weight: 500;
+  }
+
+  /* ── words ─────────────────────────────────────────────────────────────── */
+
+  /* A direct label: 12 in `dim` (SYSTEM §3 keeps 12 for chart labels). */
+  .viz-label {
+    fill: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 400;
+  }
+
+  .viz-label[data-strong] {
+    fill: var(--ink);
+    font-weight: 500;
+  }
+
+  .viz-value {
+    fill: var(--ink);
+    font-size: var(--t-xs);
+    font-weight: 500;
+  }
+
+  /* The words a screen reader reads where a sentence will not do: a table, kept off the page. */
+  .viz-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* FORCED COLOURS: the palette is the user's. Marks go to the text colour and the greys to GrayText, so
+   the shape still reads; the words a screen reader hears were never in the colour to begin with. */
+@media (forced-colors: active) {
+  .viz {
+    --viz-g1: CanvasText;
+    --viz-g2: GrayText;
+    --viz-g3: GrayText;
+    --viz-g4: GrayText;
+    --viz-track: Canvas;
+  }
+
+  .viz > svg {
+    forced-color-adjust: none;
+  }
+
+  .viz [data-tone] {
+    --c: CanvasText;
+  }
+
+  .viz .viz-track {
+    stroke: GrayText;
+    stroke-width: 1;
+  }
+
+  .viz .viz-label,
+  .viz .viz-value {
+    fill: CanvasText;
+  }
+
+  .viz .viz-now {
+    stroke: Highlight;
+  }
+
+  .viz .viz-pill {
+    fill: Highlight;
+  }
+
+  .viz .viz-pill-text {
+    fill: HighlightText;
+  }
+}

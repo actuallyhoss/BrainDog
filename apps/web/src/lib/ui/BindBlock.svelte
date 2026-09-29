@@ -268,10 +268,10 @@
      that is not there. */
   .row-input {
     inline-size: 100%;
-    min-block-size: var(--ctl-h);
+    min-block-size: max(40px, var(--ctl-h));
     padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
+    background: var(--s1);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
@@ -284,8 +284,8 @@
     align-items: start;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--sunk);
-    border: 1px solid var(--line);
+    background: var(--s1);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--dim);
     font-size: var(--t-sm);

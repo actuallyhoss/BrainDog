@@ -198,7 +198,6 @@
     inline-size: auto;
     block-size: auto;
     object-fit: contain;
-    border: 1px solid var(--line);
     border-radius: var(--r-md);
   }
 
@@ -213,14 +212,16 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: max(var(--ctl-h), var(--tap));
+    min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     background-color: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-md);
+    border: 0;
+    /* A PILL, because it is something you press: the quiet button's shape, not a field's. */
+    border-radius: var(--r-pill);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
+    font-weight: 500;
     cursor: pointer;
   }
 

@@ -1,24 +1,23 @@
 /**
- * The list shape every spine screen uses: one surface, hairlines between the rows inside it, and
- * one column per kind of thing so the eye can run down a figure or a date.
+ * The list shape every screen uses: rows sitting straight on the ground, grouped under a `Section` heading, with no
+ * box round them (SYSTEM §6, "Lists are neither").
  *
- * It lives in one file rather than in each screen's `<style>` because it is one contract, not eight,
- * and a rule declared in a stylesheet that nothing emits reads as live and is what somebody edits
- * by mistake (22 §7).
+ * It lives in one file rather than in each screen's `<style>` because it is one contract, not eight, and a rule
+ * declared in a stylesheet that nothing emits reads as live and is what somebody edits by mistake (22 §7).
  *
- * A ROW AT 1440 IS `--table-row-h` WITH ONE SOFT HAIRLINE BETWEEN ROWS AND NONE AROUND THE LIST
- * (design-brief §5, design DSN-7), the same row the register's grid draws, so a row is a row
- * wherever it is drawn.
+ * A ROW IS 44 WITH ONE LINE AND 56 WITH A TITLE AND A META LINE. The title is `--t-row` at 500, the meta `--t-sm` in
+ * `--dim`. Hover and selection are a rounded `--r-md` fill (`--hover-wash`, `--selected`) with no border; the cursor
+ * row is the wash too, and a row that just arrived is `--arrived-wash`, fading. Hairlines run only between the rows of
+ * one group, and step aside for a washed row so the fill is never cut by a line.
+ *
+ * THE CLASS NAMES ARE A CONTRACT WITH THE GATES (`#main .ledger li`, `.line-title`, `li.q[data-cursor]`), so this file
+ * restyles and never renames.
  */
 
 @layer components {
-  /* UNBOXED, AND IT WAS A CARD. A surface, a border, a radius and a shadow went round every list on
-     Home, Decide, Inbox, Audit and Vault, so each screen was a stack of framed panels, which is the
-     look of an admin console. The reference product draws a list as rows on the page with a hairline
-     between them and nothing around them, and space does the grouping the frame did. */
+  /* The rows reach a step past the text column on both sides, so a row's words line up with the heading above them
+     and its rounded wash still has somewhere to be. */
   .ledger {
-    /* The rows reach a step past the text column on both sides, so a row's words line up with the
-       heading above them and its hover and hairline still have somewhere to be. */
     margin: 0 calc(-1 * var(--sp-3));
     padding: 0;
     list-style: none;
@@ -27,45 +26,109 @@
     padding-inline: var(--sp-3);
   }
 
-  .ledger > li + li > .line,
-  .ledger > .line + .line {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
   .line {
+    position: relative;
     display: grid;
     grid-template-columns: 12ch minmax(0, 1fr) auto 9ch;
     align-items: center;
     gap: var(--sp-4);
-    min-block-size: var(--table-row-h);
-    padding: var(--sp-2) var(--sp-4);
+    min-block-size: var(--row-h);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     text-align: start;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A TINT, not a rung. `--s2` is one step up the surface ladder from the `--s1` the ledger sits on,
-     and in the light scheme that is two points of luminance: a hover state you cannot see, on the
-     rows that carry most of what a person clicks. The same mix the table rows use, so a row is a
-     row wherever it is drawn. */
-  a.line:hover,
-  button.line:hover {
+  /* THE HAIRLINE BETWEEN TWO ROWS OF ONE GROUP. Drawn as `::after` rather than a border, because a border on a
+     rounded row curves at its corners, and inset by the row's own padding so it runs under the words and not under
+     the wash's curve. `::after` and never `::before`: `.tap` and the layout gate both own `::before`. */
+  .ledger > li + li > .line::after,
+  .ledger > .line + .line::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--sp-3);
+    block-size: 1px;
+    background: var(--rule);
+    pointer-events: none;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  /* INSIDE A TILE OR A SHEET THE WASHES ARE THE TILE'S OWN INNER FILL. On the ground the wash lifts toward white
+     (the generated `--hover-wash`); on a white surface that lift would not show, so the scope re-points it. */
+  :where(.tile, .sheet, [data-surface='tile']) {
+    --hover-wash: var(--s1);
+    --selected: var(--s1);
+  }
+
+  /* THE ROW'S STATES, ONE FILL EACH. Selection is `--selected`; the cursor row (the keyboard's place) and a hovered
+     row are the wash. A washed row's hairline and the one under it step aside, so the fill is one clean shape. */
+  .line:is([aria-selected='true'], [data-selected]),
+  .ledger > li:is([aria-selected='true'], [data-selected]) > .line {
+    background: var(--selected);
+  }
+
+  .line[data-cursor],
+  .ledger > li[data-cursor] > .line {
     background: var(--hover-wash);
   }
 
-  .line-tall {
-    align-items: start;
-    min-block-size: var(--row-h-2);
-    padding-block: var(--sp-3);
+  .ledger > li:is([data-cursor], [aria-selected='true'], [data-selected]) > .line::after,
+  .ledger > li:is([data-cursor], [aria-selected='true'], [data-selected]) + li > .line::after,
+  .ledger > li:has(> .line:is([data-cursor], [aria-selected='true'], [data-selected])) > .line::after,
+  .ledger > li:has(> .line:is([data-cursor], [aria-selected='true'], [data-selected])) + li > .line::after,
+  .ledger > .line:is([data-cursor], [aria-selected='true'], [data-selected])::after,
+  .ledger > .line:is([data-cursor], [aria-selected='true'], [data-selected]) + .line::after {
+    opacity: 0;
   }
 
-  /* A tall row has room for two lines, so its detail wraps rather than truncating. An ellipsis in
-     the middle of the sentence explaining why a decision is expensive is the one place truncation
-     costs the reader the whole point of the row. */
+  /* HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last row tapped. */
+  @media (hover: hover) and (pointer: fine) {
+    a.line:hover,
+    button.line:hover {
+      background: var(--hover-wash);
+    }
+
+    .ledger > li:has(> :is(a, button).line:hover) > .line::after,
+    .ledger > li:has(> :is(a, button).line:hover) + li > .line::after,
+    .ledger > :is(a, button).line:hover::after,
+    .ledger > :is(a, button).line:hover + .line::after {
+      opacity: 0;
+    }
+  }
+
+  /* A ROW THAT ARRIVED WHILE THE READER LOOKED: the tint under it fades over a second and a half, and nothing moves
+     (SYSTEM §8). Under reduced motion it holds and then goes in one step. */
+  .line:is(.arrived, [data-arrived]),
+  .ledger > li:is(.arrived, [data-arrived]) > .line {
+    animation: line-arrived 1.5s var(--ease-out);
+  }
+
+  @keyframes line-arrived {
+    from {
+      background-color: var(--arrived-wash);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .line:is(.arrived, [data-arrived]),
+    .ledger > li:is(.arrived, [data-arrived]) > .line {
+      animation: line-arrived 1.5s step-end;
+    }
+  }
+
+  .line-tall {
+    align-items: center;
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  /* A tall row has room for two lines, so its detail wraps rather than truncating. An ellipsis in the middle of the
+     sentence explaining why a decision is expensive is the one place truncation costs the reader the whole point. */
   .line-tall .line-detail {
-    overflow: visible;
     text-overflow: clip;
     white-space: normal;
     display: -webkit-box;
@@ -75,25 +138,12 @@
   }
 
   .line-short {
-    min-block-size: 34px;
+    min-block-size: var(--ctl-h);
   }
 
   /**
-   * AND UNDER A THUMB THE ROW IS 44, WHICH IS THE ONE `13 §7` NUMBER THIS FILE NEVER PAID.
-   *
-   * `.line` is `--table-row-h` and `.line-short` is 34, and `.line` is the tap target on Home,
-   * `/decide`, `/audit`, `/inbox`, `/vault`, `/packs` and `/jobs/<id>`. `/decide` already writes
-   * `min-block-size: 44px` by hand inside its own `@media (width >= 640px)` guard, which is one
-   * screen fixing a rule that belongs to the row.
-   *
-   * THE POINTER AND NOT THE WIDTH, which is why it was invisible. Below 640 a row is a two-line
-   * card and measures 83 to 166px, so `layout.mjs` finds nothing and is right not to; the gate
-   * runs its target rule below 640 only. The desktop row is what a coarse pointer gets ABOVE that
-   * breakpoint, which is a tablet, and nothing has ever measured one. `05 §6`: density follows the
-   * pointer, and `--ctl-h` in `tokens.css` already goes to 44 in this exact condition.
-   *
-   * THE INTERACTIVE ONES ONLY. A `.line` is a link, a button or neither, and growing a row nobody
-   * can press is a density change rather than a target fix.
+   * UNDER A THUMB THE ROW IS 44 (13 §7). The pointer and not the width: a tablet's desktop row is what a coarse
+   * pointer gets above 640, and `--ctl-h` already goes to 44 in this exact condition. The interactive ones only.
    */
   @media (pointer: coarse) {
     a.line,
@@ -104,36 +154,22 @@
     }
   }
 
-  /* The id is a COLUMN, not a badge. These are strings a person says out loud, so they line up the
-     way line numbers line up in a ledger: one fixed width, one quiet ink. */
-  /* A ROW, because the id may be preceded by a type glyph. `Icon` renders a block-level `svg`, so
-     without this the mark stacks on top of the id and every line grows a second line.
-
-     The glyph is quiet on purpose: it says WHICH KIND of row this is, on a home page that
-     interleaves three of them in one list, and three columns of accent down the left would make
-     the one red thing on the screen mean nothing. */
+  /* The id is a COLUMN, not a badge: strings a person says out loud, lined up the way line numbers line up, in one
+     quiet ink. A row, because the id may be preceded by a type glyph. Clipped, with the ellipsis the child's
+     (`text-overflow` does nothing on a flex container). */
   .seq {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
     color: var(--dim);
-    /* THE BODY FACE, AND IT WAS THE IDENTIFIER ONE. What lands in this column is mostly words, a
-       sender's domain on Inbox and "API token" on Vault, and a column of monospace down the left of
-       every list is what made them read as a terminal. Tabular figures keep an id lined up. */
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
-    /* CLIPPED, AND THE ELLIPSIS IS THE CHILD'S. `text-overflow` does nothing on a flex container
-       (it applies to a block container's own inline content), so this declared a behaviour it did not
-       have, and a caller putting long text here got a hard cut with nothing to say it happened.
-       `fenwick.example.com` read `fenwick.examp`, six senders in a row. Whoever puts text longer
-       than a spoken id in here wraps it in a span and ellipsises that; `css-rules` is red on the
-       declaration that pretends otherwise. */
     overflow: hidden;
     white-space: nowrap;
   }
 
-  .seq > :global(svg) {
+  .seq > svg {
     flex: none;
   }
 
@@ -145,61 +181,49 @@
   }
 
   .line-title {
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  /* THE META LINE: `--t-sm` in `--dim`, with the project's face and name first where the row has one. */
   .line-detail {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  /* WHAT THE RECORD WOULD DO, under the reason it matters. It reads as a conclusion rather than as
-     more detail, so it is the ink the row's own title uses rather than the dimmed one: a
-     recommendation set in the same grey as the supporting sentence is a recommendation nobody
-     reads. It never wraps, because the option titles are short by design and a two-line conclusion
-     under a two-line reason is a card, not a row. */
+  /* WHAT THE RECORD WOULD DO, under the reason it matters: a conclusion rather than more detail, so it is the second
+     ink rather than the dim one. It never wraps. */
   .line-pick {
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  /* THE FIGURE, TABULAR, at the row's own size so a column of amounts reads as figures and not as captions. */
   .line-amount {
-    color: var(--ink2);
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     text-align: end;
   }
 
   /**
-   * THE DATE IS NOT THE TONE, AND IT COULD NOT AFFORD TO BE.
-   *
-   * `color: var(--tone, var(--dim))` put an overdue date in red on the home ledger, which is the
-   * strongest thing on that screen and is the reason it is being written down here rather than
-   * quietly deleted. It measured, in dark, `--danger` on `--s1` at 5.14 and on the HOVERED row at
-   * **4.36**, under the 4.5 floor for text this size. Hover lightens the ground in dark, the ink
-   * of a dark scheme being light, so pointing at the row is what breaks the pair.
-   *
-   * IT WAS A REGRESSION THIS FILE CAUSED AN HOUR EARLIER. `.line:hover` was `--ink 4%` and became
-   * `--hover-wash`, which is 6%, when nine hand-written strengths of one tint were unified. At 4%
-   * the pair measured about 4.6 and passed. So the option of putting one site back to 4% exists
-   * and is worse than this: a pair that clears the floor only while a shared token stays at one
-   * particular value is a pair that breaks again the next time anybody touches the token, and it
-   * would put the ninth strength back into the system to buy a margin of one tenth.
-   *
-   * WHAT IS LOST AND WHAT IS NOT. `13 §5.1` requires colour never to carry meaning alone, and it
-   * never did here: `+page.svelte` glyphs every toned date, so the row still says late by shape.
-   * What goes is the red, and it goes for the same reason and by the same rule that took it off
-   * the selected row (`blocks.css:1030`), off an intent chip, and off a bare intent button: a
-   * glyph is text too, so it takes the pair that has to survive the check, and an intent has no
-   * headroom over a tint of anything.
+   * THE TIME IS NOT THE TONE. `--danger` over a hovered row measured 4.36 in dark, under the floor, and a pair that
+   * clears it only while a shared token holds one value breaks the next time anybody touches the token. The screen
+   * glyphs every toned date, so a late row still says so by shape; "2 days late" in red is `.line-late`, whose words
+   * are the meaning.
    */
   .line-when {
     display: flex;
@@ -207,18 +231,116 @@
     justify-content: flex-end;
     gap: 5px;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
+  /* "2 DAYS LATE", THE ROW'S ONE RED. The words carry it, at 500 so the red is never a hairline of colour. */
+  .line-late {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
   /**
-   * A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH.
-   *
-   * The 12ch id column exists so spoken ids line up. A list of passkeys, backups or records has no
-   * id, and the same 12ch left a key icon floating a hand's width from its own name. Here the
-   * glyph sits against the title, and the trailing column may wrap, because what lands in it on
-   * these screens is a sentence (why a backup failed) rather than a date.
+   * THE LEADING MARK (SYSTEM §6): a 20px round check for a task, a 32px icon well (`IconWell size="l"`) for anything
+   * else, or a face. `.ledger-lead` gives the list a 32px lead column, so a check, a well and a face all start their
+   * titles on one edge.
+   */
+  .ledger-lead .line {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    gap: var(--sp-3);
+  }
+
+  .line-mark {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: var(--well-l);
+    min-block-size: 20px;
+  }
+
+  /* THE CHECK: an open ring for a task to do, filled ink with the tick for done, dashed amber while it waits on
+     somebody, and a `live` arc while an agent holds it. The tick is the icon inside, in `currentColor`, which is
+     transparent until it is done. A check that is a button takes `.tap`, so its target is 44. */
+  .line-check {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    inline-size: 20px;
+    block-size: 20px;
+    padding: 0;
+    background: none;
+    border: 1.5px solid var(--dim);
+    border-radius: var(--r-pill);
+    color: transparent;
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .line-check > svg {
+    inline-size: 12px;
+    block-size: 12px;
+  }
+
+  .line-check:is([data-state='done'], [aria-checked='true'], [aria-pressed='true']) {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .line-check[data-state='waiting'] {
+    border-style: dashed;
+    border-color: var(--warn);
+  }
+
+  .line-check[data-state='held'] {
+    border-color: var(--line);
+    border-block-start-color: var(--live);
+    border-inline-end-color: var(--live);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .line-check:not([data-state='done'], [aria-checked='true'], [aria-pressed='true']):hover {
+      border-color: var(--ink2);
+      color: var(--dim);
+    }
+  }
+
+  /**
+   * THE VERBS: pills with key caps at the row's trailing edge, shown on hover, on selection and on the cursor row, and
+   * always on a row that needs him (`[data-needs]`). Hidden by opacity and not by `display`, so the row keeps its
+   * width when they appear, and shown on `:focus-within` so a keyboard that tabs into one sees it. A phone has no
+   * hover, so there they always show.
+   */
+  .line-verbs {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  :is(.line, .ledger > li):is(:hover, :focus-within, [data-cursor], [aria-selected='true'], [data-selected], [data-needs]) .line-verbs,
+  .line-verbs:focus-within {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    .line-verbs {
+      opacity: 1;
+    }
+  }
+
+  /**
+   * A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH. A list of passkeys, backups or records has no id, and the 12ch id column
+   * left a key icon floating a hand's width from its own name. Here the glyph sits against the title, and the trailing
+   * column may wrap, because what lands in it on these screens is a sentence rather than a date.
    */
   .ledger-glyph .line {
     grid-template-columns: var(--icon-m) minmax(0, 1fr) auto auto;
@@ -230,6 +352,13 @@
     max-inline-size: 44ch;
     white-space: normal;
     text-align: end;
+  }
+
+  /* ON A PHONE A TWO-LINE ROW IS 60 (SYSTEM §9), the size a thumb reads a list at. */
+  @media (width < 900px) {
+    .line-tall {
+      min-block-size: 60px;
+    }
   }
 
   /* Below 640px a row becomes a two-line card. It is the register's three declared `mobile:` fields

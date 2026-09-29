@@ -126,8 +126,8 @@
     gap: var(--sp-2);
     margin-block-end: var(--sp-2);
     padding: 4px 4px 4px var(--sp-2);
-    background: var(--s2);
-    border: 1px solid var(--edge);
+    background: var(--s1);
+    border: 0;
     border-radius: var(--r-md);
   }
 
@@ -148,18 +148,18 @@
     gap: 2px;
     margin-inline-start: auto;
     padding: 2px;
-    background: var(--sunk);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    background: var(--hover-wash);
+    border: 0;
+    border-radius: var(--r-pill);
   }
 
   .width {
     min-block-size: 22px;
     padding: 0 var(--sp-2);
     background: none;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    color: var(--dim);
+    border: 0;
+    border-radius: var(--r-pill);
+    color: var(--ink2);
     font-size: var(--t-xs);
     font-weight: 500;
     cursor: pointer;
@@ -170,11 +170,13 @@
     color: var(--ink2);
   }
 
+  /* THE CHOSEN WIDTH IS THE SEGMENTED CONTROL'S CHOSEN PILL: the tile's colour with a tiny shadow. */
   .width[data-on] {
-    background: var(--s3);
-    border-color: var(--line);
+    background: var(--bg);
+    box-shadow:
+      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
+      0 0 0 0.5px var(--line);
     color: var(--ink);
-    font-weight: 600;
   }
 
   .moves {

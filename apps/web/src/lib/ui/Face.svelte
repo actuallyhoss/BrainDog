@@ -15,12 +15,15 @@
 
   THREE SIZES, THE DESIGN BRIEF'S THREE (design-brief.md, `Face`): `s` is 20px, for an entry that
   is one line and not two (a row, a row's history), where a larger disc would set the line's
-  height; `m` is 24px, a feed's; `l` is 32px, a person's own page. design.md SYS-7 gives 28 and 48
-  for the last two, and the brief is the one every screen is drawn to.
+  height; `m` is 24px, a feed's; `l` is 32px, a row's leading mark and a person's own page.
+
+  TWO SHAPES (SYSTEM §2, §6). People and agents are circles; projects and records are rounded squares
+  with their initials. `of="project"` or `of="record"` draws the square for a thing that is not an
+  actor at all, and BrainDog, the record itself, wears the square too.
 -->
 <script lang="ts">
   import type { ActorKind } from '../record/names.ts';
-  import { faceKindOf, hueFor, initialOf, type RunLive } from './face.ts';
+  import { faceKindOf, hueFor, initialOf, initialsOf, type RunLive } from './face.ts';
   import AgentFace from './AgentFace.svelte';
   import Icon from './Icon.svelte';
   import Mark from './Mark.svelte';
@@ -33,6 +36,7 @@
     hue,
     run = null,
     live = 'stopped',
+    of,
   }: {
     name: string;
     you?: boolean | undefined;
@@ -45,9 +49,13 @@
     run?: string | null | undefined;
     /** Where that run is, which its ring says; a line in a log does not know, so it is drawn as stopped. */
     live?: RunLive | undefined;
+    /** A project or a record, which is a thing and not an actor: its rounded square with its initials, in its hue. */
+    of?: 'project' | 'record' | undefined;
   } = $props();
 
-  const drawn = $derived<ActorKind>(you ? 'you' : (kind ?? faceKindOf(name)));
+  const drawn = $derived<ActorKind | 'project' | 'record'>(of ?? (you ? 'you' : (kind ?? faceKindOf(name))));
+  /* THE SQUARE FOR A THING, THE CIRCLE FOR WHOEVER ACTS. BrainDog is the record speaking, so it is a thing's shape. */
+  const square = $derived(drawn === 'project' || drawn === 'record' || drawn === 'system' || drawn === 'sample');
   /* THE MARK A LITTLE UNDER HALF THE DISC, in the height `Mark` takes, so its width (which follows the artwork) stays inside it. */
   const markHeight = $derived(size === 's' ? 8 : size === 'l' ? 14 : 10);
 </script>
@@ -59,11 +67,11 @@
      names the run, at the size a line of text takes and the list size for a page's own. -->
 {#if drawn === 'agent'}
   <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 's'} />
-{:else}<span class="face" data-kind={drawn} data-size={size} style="--hue:{hue ?? hueFor(name)}" aria-hidden="true"
+{:else}<span class="face" data-kind={drawn} data-size={size} data-shape={square ? 'square' : 'circle'} style="--hue:{hue ?? hueFor(name)}" aria-hidden="true"
   >{#if drawn === 'automation' || drawn === 'rule'}<Icon name="refresh" size={size === 's' ? 's' : 'm'} />{:else if drawn === 'slash'}<svg
       class="face-slash"
       viewBox="0 0 24 24"><path d="M15.5 4.5 8.5 19.5" /></svg
-    >{:else if drawn === 'system' || drawn === 'sample'}<Mark height={markHeight} tone="inherit" />{:else}{initialOf(name)}{/if}</span
+    >{:else if drawn === 'system' || drawn === 'sample'}<Mark height={markHeight} tone="inherit" />{:else if drawn === 'project' || drawn === 'record'}{initialsOf(name)}{:else}{initialOf(name)}{/if}</span
   >{/if}
 
 <style>
@@ -73,11 +81,13 @@
     place-items: center;
     inline-size: 24px;
     block-size: 24px;
-    background: var(--hold-wash);
+    background: var(--s1);
     border-radius: var(--r-pill);
     color: var(--ink2);
     font-size: var(--t-xs);
     font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
   .face[data-size='s'] {
@@ -91,22 +101,32 @@
     font-size: var(--t-sm);
   }
 
-  /* A PERSON ON THEIR OWN HUE, as a project wears its mark: the theme's mark lightness and chroma at
-     the person's hue, washed into the ground, with the letter in ink. The letter is never drawn in
-     the hue itself, so it reads the same in both schemes whichever hue it sits on. */
-  .face[data-kind='person'] {
+  /* A THING'S SQUARE: the corner a small well has at each size, so a project's face and an icon well beside it are
+     one family of shape. */
+  .face[data-shape='square'] {
+    border-radius: var(--r-sm);
+  }
+
+  .face[data-shape='square'][data-size='l'] {
+    border-radius: var(--r-well);
+  }
+
+  /* A PERSON, A PROJECT OR A RECORD ON ITS OWN HUE: the theme's mark lightness and chroma at that hue, washed into the
+     tile, with the letters in ink. The letters are never drawn in the hue itself, so they read the same in both
+     schemes whichever hue they sit on. */
+  .face:is([data-kind='person'], [data-kind='project'], [data-kind='record']) {
     background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--hue)) 36%, var(--bg));
     color: var(--ink);
   }
 
-  /* YOU ARE THE INK DISC, NOT THE ACCENT ONE. The brand colour is kept for a short list of places
-     (DESIGN-SYSTEM 1.3), and a face repeated down a log is a badge, which is not one of them. */
+  /* YOU ARE THE INK DISC, NOT THE ACCENT ONE. The brand colour is kept for the mark and "needs you", and a face
+     repeated down a log is a badge, which is neither. */
   .face[data-kind='you'] {
-    background: var(--ink2);
-    color: var(--bg);
+    background: var(--ink);
+    color: var(--on-ink);
   }
 
-  /* SLASH AND BRAINDOG IN INK on the neutral disc, so neither is mistaken for you. */
+  /* SLASH AND BRAINDOG IN INK on the neutral fill, so neither is mistaken for you. */
   .face[data-kind='slash'],
   .face[data-kind='system'],
   .face[data-kind='sample'] {
@@ -120,5 +140,11 @@
     stroke: currentColor;
     stroke-width: 2.5;
     stroke-linecap: round;
+  }
+
+  @media (forced-colors: active) {
+    .face {
+      border: 1px solid CanvasText;
+    }
   }
 </style>
