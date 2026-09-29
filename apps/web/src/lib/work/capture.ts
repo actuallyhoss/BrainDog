@@ -17,7 +17,8 @@
  * PURE: the day and the projects are handed in, so `capture.test.ts` drives every rule.
  */
 
-import { addDays, daySaid, nextMonday, weekdayOf } from './board.ts';
+import type { Fields } from '../record/schema.ts';
+import { addDays, daySaid, nextMonday, weekdayOf, type Shape } from './board.ts';
 
 export type CaptureContext = {
   /** The reader's day, `YYYY-MM-DD`. */
@@ -171,4 +172,31 @@ export function isQuestion(typed: string): boolean {
   if (t.endsWith('?')) return true;
   const first = t.split(/\s+/)[0]!.toLowerCase().replace(/[^a-z']/g, '');
   return ASKING.has(first);
+}
+
+/**
+ * The fields a new task is written with: its words, the list's state for new work, and what the line said, the
+ * project filter standing in for a project the line did not name. A part the list lacks is never written.
+ */
+export function freshFields(c: Capture, s: Shape, filed: number | null): Fields {
+  const out: Fields = { [s.title]: c.text };
+  if (s.state && s.fresh) out[s.state] = s.fresh;
+  const project = c.project ?? filed;
+  if (s.project && project !== null) out[s.project.field] = project;
+  if (s.due && c.due) out[s.due] = c.due;
+  if (s.priority && c.priority) out[s.priority.field] = c.priority;
+  if (s.agent && c.agent) out[s.agent] = c.agent;
+  return out;
+}
+
+/** What the line can be read against, from the list's shape, the reader's day and the projects. */
+export function contextOf(s: Shape, today: string, projects: CaptureContext['projects']): CaptureContext {
+  const p = s.priority;
+  return {
+    today,
+    projects: s.project ? projects : [],
+    priorities: p ? p.values.map((value) => ({ value, said: p.said[value] ?? value })) : null,
+    due: s.due !== null,
+    agent: s.agent !== null,
+  };
 }

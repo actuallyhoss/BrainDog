@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { captureOf, captureSaid, isQuestion, projectNamed, type CaptureContext } from './capture.ts';
+import { REGISTERS as SEED } from '@braindog/seed';
+
+import type { RegisterDecl } from '../record/schema.ts';
+import { shapeOf } from './board.ts';
+import { captureOf, captureSaid, contextOf, freshFields, isQuestion, projectNamed, type CaptureContext } from './capture.ts';
 
 /* A TUESDAY, the seed's own day. */
 const ctx: CaptureContext = {
@@ -83,4 +87,18 @@ test('a question is told from a thing to do', () => {
   assert.equal(isQuestion('Chase Halden on the invoice'), false);
   assert.equal(isQuestion('Call mum tomorrow'), false);
   assert.equal(isQuestion(''), false);
+});
+
+test('a new task is written with the state for new work, the line, and the filter standing in for a project', () => {
+  const s = shapeOf(SEED.tasks as unknown as RegisterDecl);
+  const c = contextOf(s, '2026-09-29', ctx.projects);
+  assert.deepEqual(freshFields(captureOf('Chase Halden tomorrow !urgent', c), s, 2), {
+    what: 'Chase Halden',
+    state: 'open',
+    thing: 2,
+    by: '2026-09-30',
+    priority: 'urgent',
+  });
+  assert.deepEqual(freshFields(captureOf('Chase Halden #portage', c), s, 2), { what: 'Chase Halden', state: 'open', thing: 3 });
+  assert.deepEqual(freshFields(captureOf('Chase Halden', c), s, null), { what: 'Chase Halden', state: 'open' });
 });
