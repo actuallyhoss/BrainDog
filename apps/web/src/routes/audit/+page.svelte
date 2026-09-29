@@ -4,10 +4,14 @@
   Of four comparable products surveyed, three ship a MUTABLE history: one has a "Clear revision
   history" button whose result cannot be retrieved, one lets authors delete published updates, and
   one never claims append-only. This one is append-only BY CONSTRUCTION, because there is one write
-  path — not because a policy says so (20 §9).
+  path, not because a policy says so (20 §9).
 
   Which is why there is no delete control on this screen and no filter that can hide a row. A
   history you can edit is a history, and a history you cannot is a record.
+
+  THE SHAPE (SYSTEM §5 to §7, `loop/design/SCREENS.md` Activity): the title and its sentence, the three filters in
+  the toolbar, the stream on the ground grouped by hour, and beside it three tiles, each with its chart and the one
+  line that says what the chart means: who worked in the last day, what changed, and the busy hours of the week.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -15,22 +19,29 @@
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import Button from '$lib/ui/Button.svelte';
-  import { day as fmtDay, since, stamp } from 'braindog-render';
+  import { day as fmtDay } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { DOM_CAP } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
-  import { Block } from 'braindog-render/svelte';
-  import type { Block as Drawn } from 'braindog-render';
-  import '@braindog/skin/blocks-charts.css';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Bars from '$lib/viz/Bars.svelte';
+  import HeatGrid from '$lib/viz/HeatGrid.svelte';
+  import Stacked from '$lib/viz/Stacked.svelte';
+  import Swimlanes from '$lib/viz/Swimlanes.svelte';
   import { runOf } from '$lib/ui/face.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
+  import { listen } from '$lib/page/listen.svelte.ts';
+  import { ARRIVED_MS } from '$lib/data/optimistic.ts';
   /* THE URL IS NOT TYPED. `?kind=` carries whatever somebody pasted, and the words this screen
-     shows come from a map over the forty — so the string is checked against the vocabulary before
+     shows come from a map over the forty, so the string is checked against the vocabulary before
      it is used as a place in it, rather than indexing the map with a stranger and rendering
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
   import { isEventKind } from '@braindog/kernel';
@@ -39,13 +50,38 @@
   import { untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
-  /* WHO, IN WORDS. This screen's three person-shaped slots (the actor column, the `by` filter, and
+  /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
      the target of an access row) all printed raw `p_` ids on a record with more than one person on
      it. `who.ts` holds the reason and the measurement. */
   import { actorSaid, offeredActors, targetSaid } from './who.ts';
-  /* WHAT THE LOG SAYS, IN WORDS: the lead, the twelve weeks, a row by its title and list, and a burst as one line.
-     `lines.ts` holds each rule and why. */
-  import { burstsOf, heatRows, historyWords, listOf, sinceGroups, sinceSaid, thingOf } from './lines.ts';
+  /* WHAT THE LOG SAYS, IN WORDS AND IN FIGURES: the sentence, the bands, a row by its title and list, a burst as one
+     line, and the three tiles' counts and readings. `lines.ts` holds each rule and why. */
+  import {
+    awaySaid,
+    below,
+    burstsOf,
+    busyOf,
+    busySaid,
+    clockOf,
+    dayOf,
+    dayWord,
+    fold,
+    GROUP_TONES,
+    groupWords,
+    historyWords,
+    hourGroups,
+    HOURS,
+    isAgent,
+    keyOf,
+    LANE_SPAN_MS,
+    lanesOf,
+    lanesSaid,
+    listOf,
+    reaches,
+    tallyOf,
+    tallySaid,
+    thingOf,
+  } from './lines.ts';
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
      `readUnseen` with it: one module both imported and imported lazily is neither split nor shared, only warned about. */
   import { declaredOf, readUnseen } from '$lib/record/history-live.ts';
@@ -140,7 +176,17 @@
   /* THE SAMPLE'S LOG AND ITS 3 SEPTEMBER CLOCK WERE THE OTHER HALF OF THESE TWO LINES, behind `route.data.live`, which
      every shell sets `true` since wave A (`no-sample-b4.test.ts` says why it is no witness). */
   const LOG = $derived(live?.events ?? []);
-  const clock = Date.now();
+
+  /**
+   * NOW, WHICH MOVES. The lanes end at it and draw their now line there, a line under a minute old is an agent's live
+   * one, and "Today" is the day it is in. It moves when the log is read again and once a minute besides, so a screen
+   * left open does not go on calling yesterday today.
+   */
+  let clock = $state(Date.now());
+  $effect(() => {
+    const tick = setInterval(() => (clock = Date.now()), 60_000);
+    return () => clearInterval(tick);
+  });
 
   /**
    * WHO THE READER IS, AND WHAT THE RECORD TOLD THEM THE OTHERS ARE CALLED.
@@ -175,10 +221,11 @@
   });
 
   /**
-   * WHAT IS NEW SINCE THE READER LAST LOOKED, which the screen leads with: who signed it, counted.
+   * WHAT IS NEW SINCE THE READER LAST LOOKED, which the title's sentence says: how many things, and how many of them
+   * the agents did.
    *
-   * A LEAD, NOT THE SCREEN. The log below is what History is for, so a refusal here draws no lead and settles nothing:
-   * the call closes as answered, and the log's own read is the one that says the record could not be reached.
+   * A SENTENCE, NOT THE SCREEN. The log below is what Activity is for, so a refusal here draws no sentence and settles
+   * nothing: the call closes as answered, and the log's own read is the one that says the record could not be reached.
    */
   let unseen = $state<{ actors: string[]; capped: boolean } | null>(null);
   $effect(() => {
@@ -191,7 +238,7 @@
       .catch(() => undefined)
       .finally(() => closed(true, at));
   });
-  const lead = $derived(unseen ? sinceSaid(sinceGroups(unseen.actors, me, names), unseen.capped) : null);
+  const lead = $derived(unseen ? awaySaid(unseen.actors, me, names, unseen.capped) : undefined);
 
   /**
    * THE PAGE BELOW, WHEN ASKED FOR. A log longer than one page says so with a control instead of stopping at two hundred
@@ -201,14 +248,16 @@
   let older = $state(false);
   let olderFix = $state<string | null>(null);
   async function loadOlder() {
-    const had = live;
-    if (!had || had.cursor === null || older) return;
+    if (!live || live.cursor === null || older) return;
+    const from = live.cursor;
     older = true;
     olderFix = null;
     try {
       const m = await import('$lib/record/news-live.ts');
-      const out = await m.readLog(apiBase(), me, undefined, had.cursor);
-      if (out.from === 'live') live = { events: [...had.events, ...out.events], names: new Map([...had.names, ...out.names]), cursor: out.cursor };
+      const out = await m.readLog(apiBase(), me, undefined, from);
+      /* UNDER WHAT IS HELD NOW, which a line arriving meanwhile may have added to. */
+      if (out.from === 'live' && live)
+        live = { events: below(live.events, out.events), names: new Map([...live.names, ...out.names]), cursor: out.cursor };
       else if (out.from === 'refused') olderFix = out.fix;
     } finally {
       older = false;
@@ -216,33 +265,61 @@
   }
 
   /**
+   * THE LOG LISTENS. When the record moves (the shell's version poll, `lib/data/live.svelte.ts`), the newest page is read
+   * again and what arrived goes on top, tinted for a second and a half (SYSTEM §8): an agent's line appears under the
+   * reader's eye rather than on the next visit. Never while an older page is on its way, which it would land under.
+   */
+  let fresh = $state<ReadonlySet<string>>(new Set());
+  let fading: ReturnType<typeof setTimeout> | null = null;
+  $effect(() => () => {
+    if (fading !== null) clearTimeout(fading);
+  });
+
+  listen(
+    async () => {
+      if (!route.data.live || !live) return;
+      const at = opened();
+      try {
+        const m = await import('$lib/record/news-live.ts');
+        const out = await m.readLog(apiBase(), me);
+        if (out.from !== 'live' || !live) return;
+        const f = fold(live.events, out.events);
+        live = f.joined
+          ? { events: f.events, names: new Map([...live.names, ...out.names]), cursor: live.cursor }
+          : { events: out.events, names: out.names, cursor: out.cursor };
+        clock = Date.now();
+        if (f.added.length > 0) {
+          fresh = new Set(f.added);
+          if (fading !== null) clearTimeout(fading);
+          fading = setTimeout(() => ((fresh = new Set()), (fading = null)), ARRIVED_MS);
+        }
+      } finally {
+        closed(true, at);
+      }
+    },
+    () => older,
+  );
+
+  /**
    * WHAT IT WAS DONE TO, IN WORDS AND NEVER AS A KEY.
    *
-   * Every line read "Created services#6", and then "Created Object storage services#6" once the
-   * record's title led: a column of lists and numbers a stranger had to open one by one, and a
-   * `transactions#36` down the phone's History (modules.md M9). A row is now its title and its list,
-   * "Object storage, in Services"; the number stays in the address the line links to and in the
-   * row's own Details, which is where somebody who wants to say it goes (design.md SYS-3).
+   * Every line read "Created services#6": a column of lists and numbers a stranger had to open one by one. A row is its
+   * title now, with its list said at the line's trailing edge; the number stays in the address the line links to and in
+   * the row's own Details, which is where somebody who wants to say it goes (design.md SYS-3).
    *
    * A PERSON FIRST, because an `access.grant` line's target IS somebody and `targetSaid` says them
    * by name with no link: there is no person route in this build. Everything else is `thingOf`'s,
    * with the title the record sent beside the line (`readLog`'s `names`). `null` is a target with
    * nothing to say that is not an id, and the verb then stands alone.
    */
-  const thingFor = (target: string): { text: string; href: string | null } | null => {
+  const thingFor = (target: string): { text: string; href: string | null; list: string | null } | null => {
     const person = targetSaid(target, me, names);
-    if (person) return { text: person.name, href: null };
+    if (person) return { text: person.name, href: null, list: null };
     return thingOf(target, live?.names.get(target) ?? null);
   };
 
   /**
-   * WHO, AND WHAT KIND OF CHANGE. The two questions this screen exists to answer.
-   *
-   * IT HAD NO CONTROLS AT ALL. Eight rows, a footer saying the record is at version 4,192, and
-   * nothing on the page to reach any of the other four thousand — no search, no actor, no kind, no
-   * range, no pagination. So the surface stated a number and then refused to let anybody use it,
-   * which is worse than not stating it: "who changed obligations#1 last month" is the whole job of
-   * an audit log and it could not be done.
+   * WHO, WHAT KIND OF CHANGE, AND WHICH DAY. The questions this screen exists to answer, in the toolbar.
    *
    * IN THE URL, LIKE EVERY OTHER FILTER IN THIS PRODUCT. `19 §5`: what defines which rows you are
    * looking at must be shareable, and "what did the renewal rule do" is exactly the thing somebody
@@ -251,37 +328,36 @@
    * AND THEY APPEAR WHEN THERE IS SOMETHING TO CHOOSE BETWEEN. One actor is not a filter; it is a
    * fact, and a control offering it is a control that cannot change anything.
    */
-  /* AND A CHIP HAS TO SAY WHICH ONE IT MEANS. Once an actor is said by name rather than by id, two
-     people the record has no name for carry the same four words, and seven identical chips each
+  /* AND A CHOICE HAS TO SAY WHICH ONE IT MEANS. Once an actor is said by name rather than by id, two
+     people the record has no name for carry the same four words, and seven identical choices each
      filtering to one of seven is a control that lies about what it does. `offeredActors` withholds
      the offer, never the filter: a `?by=` somebody pasted still narrows the log (`19 §5`). */
   const actors = $derived(offeredActors([...new Set(LOG.map((e) => e.by))], me, names));
   const kinds = $derived([...new Set(LOG.map((e) => e.kind))]);
+  const perKind = $derived(LOG.reduce((m, e) => m.set(e.kind, (m.get(e.kind) ?? 0) + 1), new Map<EventKind, number>()));
+
+  /* A SEGMENTED CONTROL WHERE THE NAMES ARE FEW AND SHORT, as the board draws "Everyone | claude | codex", and a menu
+     where they are not: seven names in a strip is a toolbar wider than the title. */
+  const segmented = $derived(actors.length <= 4 && actors.every((a) => actorSaid(a, me, names).name.length <= 14));
 
   const who = $derived(route.url.searchParams.get('by') ?? '');
   const what = $derived(route.url.searchParams.get('kind') ?? '');
 
   /**
-   * THE DAY, WHICH IS THE ONE FILTER THIS SCREEN IS SENT FOR AND DID NOT HAVE.
+   * THE DAY, WHICH IS THE ONE FILTER THIS SCREEN IS SENT FOR.
    *
-   * The point-in-time restore setting says *"find the moment"* and links here. What arrived was a
-   * list filtered by actor and by kind, with no way to narrow by WHEN at all, on the surface whose
-   * whole subject is when things happened. Somebody who knows it was the Tuesday before last had to
-   * scroll.
-   *
-   * ONE DAY AND NOT A RANGE. `19 §5`'s rule is that a filter is what defines which rows you are
-   * looking at and has to be shareable, and a day is the unit a person actually says: the ledger's
-   * own rows are stamped to the minute now, so a day narrows to something readable and the minute in
-   * each row's tooltip finishes the job. A range is two controls and a validity rule for a question nobody asked.
-   *
-   * AND IT APPEARS WHEN THERE IS SOMETHING TO CHOOSE BETWEEN, like the two beside it: a log whose
-   * every entry is on one day has nothing to narrow.
+   * The point-in-time restore setting says *"find the moment"* and links here. ONE DAY AND NOT A RANGE: a day is the
+   * unit a person actually says, and the minute in each row's tooltip finishes the job. A `<select>` and not a
+   * segmented control, because the number of days a log covers grows with use. On the reader's clock, like the bands
+   * the stream is drawn in, so the day chosen and the band it draws are one day.
    */
-  const days = $derived([...new Set(LOG.map((e) => e.at.slice(0, 10)))].sort().reverse());
+  const days = $derived([...new Set(LOG.map((e) => dayOf(e.at)))].sort().reverse());
   const when = $derived(route.url.searchParams.get('on') ?? '');
+  /* A DAY AS A PERSON SAYS IT, from its local noon so no clock change moves it into its neighbour. */
+  const daySaid = (d: string): string => dayWord(new Date(`${d}T12:00`).getTime(), clock);
 
   /* ONE LIST, WHICH TODAY LINKS TO: "12 changes to Tasks since you were last here" opens here narrowed to Tasks. It has no
-     control of its own, since a list is chosen from Today or pasted, and the chip below says it and takes it off. */
+     control of its own, since a list is chosen from Today or pasted, and the pill in the toolbar says it and takes it off. */
   const list = $derived(route.url.searchParams.get('list') ?? '');
   const listName = $derived(route.data.lists?.find((l: { id: string; name: string }) => l.id === list)?.name ?? list);
 
@@ -290,21 +366,54 @@
       (e) =>
         (!who || e.by === who) &&
         (!what || e.kind === what) &&
-        (!when || e.at.slice(0, 10) === when) &&
+        (!when || dayOf(e.at) === when) &&
         (!list || listOf(e.target) === list),
     ),
   );
   /* THE LOG GROWS WITH WRITES, NOT WITH ROWS, so on a record of any size this is the longest list in
-     the product — and it was the one rendering every entry it held. `13 §4.3`'s cap, and the line
-     that admits it. */
+     the product. `13 §4.3`'s cap, and the line that admits it. */
   const shown = $derived(matched.slice(0, DOM_CAP));
   /* A BURST IS ONE LINE (`burstsOf`), folded from what is drawn, so the cap above still counts lines of the log and
      the cap line under the list still says how many of them there are. */
   const told = $derived(burstsOf(shown));
+  /* AND THE LINES SIT IN BANDS ON THE GROUND: today's by the hour, an older day as one (`hourGroups`). */
+  const bands = $derived(hourGroups(told, clock));
 
-  /* THE TWELVE WEEKS, over every line read so far and not only the filtered ones: the strip is how busy the record
-     was, and a filter is a question about part of it. The render package's `heat` draws it, as every page's does. */
-  const heat = $derived<Drawn>({ type: 'block', kind: 'heat', heading: historyWords.strip, rows: heatRows(LOG), raw: '', start: 0, end: 0 });
+  /**
+   * THE THREE TILES, and what each counts.
+   *
+   * WHO WORKED and BUSY HOURS count every line read, filtered or not: they say how the record has been, and a filter is
+   * a question about part of it. WHAT CHANGED counts the lines the filters match, because its figure is the title's.
+   *
+   * EACH SAYS WHEN IT IS PARTIAL. There is no read of a time range yet, so a window the pages read so far do not reach
+   * back through is counted over what was read, and the tile's foot says so: a quiet morning the log has not reached is
+   * not a quiet morning.
+   */
+  const more = $derived(live !== null && live.cursor !== null);
+  const lanes = $derived(lanesOf(LOG, clock, me, names));
+  const tally = $derived(tallyOf(matched, me, names));
+  const busy = $derived(busyOf(LOG, clock));
+  const groupParts = $derived(tally.groups.map((g) => ({ label: groupWords[g.group], value: g.count, tone: GROUP_TONES[g.group] })));
+  const topKinds = $derived(
+    tally.kinds.slice(0, 5).map((k, i) => ({
+      label: kindOf(k.kind).word,
+      value: k.count,
+      /* ONE BAR IN INK, the biggest, and only when it is the biggest alone. */
+      tone: i === 0 && (tally.kinds[1]?.count ?? 0) < k.count ? 'ink' : undefined,
+    })),
+  );
+  const tallyMeta = $derived.by(() => {
+    const agents = tally.groups.find((g) => g.group === 'agent')?.count ?? 0;
+    const yours = tally.groups.find((g) => g.group === 'you')?.count ?? 0;
+    return [agents ? historyWords.byAgents(agents) : '', yours ? historyWords.byYou(yours) : ''].filter(Boolean).join(' · ') || undefined;
+  });
+  const tallyReading = $derived(
+    tallySaid(
+      tally.kinds.map((k) => ({ word: kindOf(k.kind).word, count: k.count, agents: k.agents })),
+      tally.total,
+    ),
+  );
+  const tiles = $derived(lanes.length > 0 || matched.length > 0 || busy.total > 0);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(route.url.searchParams);
@@ -313,14 +422,15 @@
     void goto(`?${next}`, { replaceState: false, noScroll: true, keepFocus: true });
   };
 
+  /* THE MINUTE, ON THE SAME CLOCK AS THE ROW. The time on a line is the reader's, so its tooltip is too. */
+  const stampOf = (iso: string): string => `${fmtDay(dayOf(iso))}, ${clockOf(iso)}`;
+
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
    *
    * `data-screen` on `<main id="main">` is what lets anything outside the page tell a drawn screen
-   * from a shell that has fetched nothing. Four browser gates waited on `#main` having a child,
-   * with the wait swallowed by a `catch`, which is satisfied by a page heading and means nothing
-   * the day a screen fetches. `Empty` says `empty` or `refused` for the states it draws; this is
-   * the other claim, and it is true of this screen today.
+   * from a shell that has fetched nothing. `Empty` says `empty` or `refused` for the states it draws;
+   * this is the other claim, and it is true of this screen today.
    *
    * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
    * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
@@ -331,516 +441,570 @@
 
 <svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
 
-<PageHead icon="history" title={copy.audit} count={matched.length} total={LOG.length} />
+{#snippet tools()}
+  <div class="tools">
+    {#if list}
+      <!-- THE ONE LIST IT WAS OPENED ON, as a pill that takes itself off. -->
+      <Button weight="glass" onclick={() => setParam('list', '')} aria-label={historyWords.everyList(listName)}
+        >{historyWords.onlyList(listName)}<Icon name="close" size="s" /></Button
+      >
+    {/if}
 
-<div class="page">
-  <!-- THE LEAD SAYS WHAT IS NEW BEFORE THE LOG SAYS EVERYTHING: who signed the lines since the reader last looked,
-       counted, in one line of context under the head (design-brief §5). -->
-  {#if lead}<p class="since">{lead}</p>{/if}
-
-  <!-- HOW BUSY THE RECORD HAS BEEN, twelve weeks by weekday. It counts what this screen has read, and says so while
-       there is more below, because a quiet week the log has not reached yet is not a quiet week. -->
-  {#if LOG.length > 0}
-    <div class="strip">
-      <Block block={heat} opts={{ now: clock }} />
-      {#if live && live.cursor !== null}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
-    </div>
-  {/if}
-
-  <!-- A CHOICE APPEARS WHEN THERE IS ONE TO MAKE. Two actors and two kinds is a filter; one of
-       either is a fact about the record, and a segmented control over it changes nothing. -->
-  {#if actors.length > 1 || kinds.length > 1 || days.length > 1 || list}
-    <div class="bar">
-      {#if list}
-        <span class="filter-label">{historyWords.onlyList(listName)}</span>
-      {/if}
-      {#if actors.length > 1}
-        <div class="filter" role="group" aria-labelledby="f-who">
-          <span class="filter-label" id="f-who">{copy.auditWho}</span>
-          <span class="toggles">
-          {#each actors as a}
+    {#if actors.length > 1}
+      {#if segmented}
+        <div class="segmented" role="group" aria-label={copy.auditWho}>
+          <button type="button" class="segment" data-on={who === '' ? '' : undefined} aria-pressed={who === '' ? 'true' : 'false'} onclick={() => setParam('by', '')}
+            >{historyWords.everyone}</button
+          >
+          {#each actors as a (a)}
             <button
               type="button"
-              class="toggle"
+              class="segment"
               data-on={who === a ? '' : undefined}
               aria-pressed={who === a ? 'true' : 'false'}
-              onclick={() => setParam('by', who === a ? '' : a)}
+              onclick={() => setParam('by', who === a ? '' : a)}>{actorSaid(a, me, names).name}</button
             >
-              {#if who === a}<Icon name="check" size="s" />{/if}{actorSaid(a, me, names).name}
+          {/each}
+        </div>
+      {:else}
+        <Menu label={copy.auditWho} align="end">
+          {#snippet trigger()}
+            <span class="pill" data-on={who ? '' : undefined}>
+              <Icon name="people" size="s" /><span class="pill-word">{who ? actorSaid(who, me, names).name : historyWords.everyone}</span><Icon
+                name="chevronDown"
+                size="s"
+              />
+            </span>
+          {/snippet}
+          <button type="button" class="mi" role="menuitem" aria-current={who === '' ? 'true' : undefined} onclick={() => setParam('by', '')}>
+            <Icon name="people" size="s" /><span class="mi-name">{historyWords.everyone}</span>{#if who === ''}<Icon name="check" size="s" />{/if}
+          </button>
+          {#each actors as a (a)}
+            {@const by = actorSaid(a, me, names)}
+            <button type="button" class="mi" role="menuitem" aria-current={who === a ? 'true' : undefined} onclick={() => setParam('by', a)}>
+              <Face name={by.name} you={by.you} kind={by.kind} size="s" /><span class="mi-name">{by.name}</span>{#if who === a}<Icon name="check" size="s" />{/if}
             </button>
           {/each}
+        </Menu>
+      {/if}
+    {/if}
+
+    {#if kinds.length > 1}
+      <Menu label={copy.auditWhat} align="end">
+        {#snippet trigger()}
+          <span class="pill" data-on={what ? '' : undefined}>
+            <Icon name={isEventKind(what) ? kindOf(what).icon : 'filter'} size="s" /><span class="pill-word"
+              >{isEventKind(what) ? kindOf(what).word : historyWords.everyKind}</span
+            ><Icon name="chevronDown" size="s" />
           </span>
-        </div>
-      {/if}
+        {/snippet}
+        <button type="button" class="mi" role="menuitem" aria-current={what === '' ? 'true' : undefined} onclick={() => setParam('kind', '')}>
+          <Icon name="filter" size="s" /><span class="mi-name">{historyWords.everyKind}</span><span class="mi-n num">{LOG.length}</span>
+        </button>
+        {#each kinds as k (k)}
+          <button type="button" class="mi" role="menuitem" aria-current={what === k ? 'true' : undefined} onclick={() => setParam('kind', k)}>
+            <Icon name={kindOf(k).icon} size="s" /><span class="mi-name">{kindOf(k).word}</span><span class="mi-n num">{perKind.get(k) ?? 0}</span>
+          </button>
+        {/each}
+      </Menu>
+    {/if}
 
-      {#if kinds.length > 1}
-        <div class="filter" role="group" aria-labelledby="f-what">
-          <span class="filter-label" id="f-what">{copy.auditWhat}</span>
-          <span class="toggles">
-          {#each kinds as k}
-            <button
-              type="button"
-              class="toggle"
-              data-on={what === k ? '' : undefined}
-              aria-pressed={what === k ? 'true' : 'false'}
-              onclick={() => setParam('kind', what === k ? '' : k)}
-            >
-              {#if what === k}<Icon name="check" size="s" />{/if}{kindOf(k).word}
-            </button>
-          {/each}
-          </span>
-        </div>
-      {/if}
+    {#if days.length > 1}
+      <select class="on-select" aria-label={copy.auditWhen} value={when} onchange={(e) => setParam('on', e.currentTarget.value)}>
+        <option value="">{copy.auditAnyDay}</option>
+        {#each days as d (d)}<option value={d}>{daySaid(d)}</option>{/each}
+      </select>
+    {/if}
 
-      <!-- A `<select>` AND NOT A SEGMENTED CONTROL, because the number of days a log covers is
-           unbounded and grows with use, which is the same argument `RowForm` makes for an enum of
-           more than four values. The label is visible: a placeholder disappears exactly when
-           somebody needs it (06 §8). -->
-      {#if days.length > 1}
-        <label class="filter on">
-          <span class="filter-label">{copy.auditWhen}</span>
-          <select class="on-select" value={when} onchange={(e) => setParam('on', e.currentTarget.value)}>
-            <option value="">{copy.auditAnyDay}</option>
-            {#each days as d}<option value={d}>{fmtDay(d)}</option>{/each}
-          </select>
-        </label>
-      {/if}
+    {#if who || what || when || list}
+      <Button weight="bare" href="/audit"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+    {/if}
+  </div>
+{/snippet}
 
-      {#if who || what || when || list}
-        <Button weight="bare" href="/audit"><Icon name="close" size="s" />{copy.clearFilters}</Button>
-      {/if}
-    </div>
-  {/if}
+<PageHead
+  icon="history"
+  title={copy.audit}
+  count={matched.length}
+  total={LOG.length}
+  sentence={lead}
+  actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list ? tools : undefined}
+/>
 
+<div class="page">
   <!--
-    THE SAME FIVE STATES EVERY OTHER LIST DRAWS, and this drew a grey sentence.
-
-    `/audit?by=codex&kind=entry.create` gave a header reading `0 of 8` and one line — "Nothing in
-    the log matches that." — which names neither the actor nor the kind. `19 §6` for `no-results`
-    says quote the query verbatim, and the register gets it exactly right on the same record:
-    `38 rows, none matching: zzzzz`, the term in a code chip, Clear filters inside the state.
-
-    AND THE OTHER HALF WAS UNREACHABLE. `grep -c "<Empty"` on this file was 0, so a log with nothing
-    in it — which is every record for about a minute — had the same sentence as a filter that missed:
-    `no-data-yet` and `no-results` collapsed, which `19 §6` calls the failure.
+    THE SAME FIVE STATES EVERY OTHER LIST DRAWS. `19 §6` for `no-results` says quote the query verbatim, and a log with
+    nothing in it, which is every record for about a minute, is `no-data-yet` and not the same sentence as a filter that
+    missed.
   -->
   {#if refused}
     <Empty kind="error" title={refused}>
       {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if route.data.live && !live}
-    <!-- Bars while the live log is on its way, rather than a blank panel under the title. -->
+    <!-- Bars while the live log is on its way, rather than a blank page under the title. -->
     <Waiting />
-  {:else if matched.length === 0 && (!route.data.live || live)}
-    <Empty
-      kind={LOG.length === 0 ? 'no-data-yet' : 'no-results'}
-      title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(LOG.length, 'entries')}
-      query={LOG.length === 0
-        ? undefined
-        : [who ? actorSaid(who, me, names).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
-      body={LOG.length === 0 ? copy.auditHolds : undefined}
-    >
-      {#snippet actions()}
-        {#if who || what}<Button href="/audit">{copy.clearFilters}</Button>{/if}
-      {/snippet}
-    </Empty>
   {/if}
 
-  <ul class="ledger">
-    {#each told as t}
-      {@const e = t.e}
-      {@const by = actorSaid(e.by, me, names)}
-      {@const declared = e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
-      <li>
-        <div class="line line-short">
-          <!-- ITS OWN COLUMN, NOT `.seq`. That one is 12ch of monospace for spoken ids, and
-               `rows.css` says in as many words that anything longer needs a span of its own, so
-               "renewal rule" arrived as `the renewal r…`. An actor is a name. -->
-          <!-- A face beside the name, so the log reads as who passed through rather than as a
-               column of names. -->
-          <!-- AND THE FACE TOOK ITS INITIALS FROM AN ID. It was handed `actorOf(e.by)`, which gave
-               a `p_` id straight back, so on a record with seven colleagues every face in the
-               column was two characters of a ULID. It is handed the same words the column prints
-               now, and the kind `actor` said beside them (`by.kind`), so a rule wears the rule
-               glyph, an agent its face and the reader their own disc: a live record signs the
-               reader's own writes with their id, and it is `news-live.ts` and `actor` between them
-               that know the id is theirs. -->
-          <span class="who">
-            <!-- AN AGENT'S LINE WEARS ITS RUN (AGT-13): the run's hue, and a door to the run's handoff. -->
-            <Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" />
-            <span class="who-name">{by.name}</span>
-          </span>
-          <span class="line-main">
-            <!-- The target is a LINK, and that is not decoration. This page was a list of spans:
-                 nothing in it could be reached by Tab, so the one scrolling container in the app
-                 had no focusable descendant and a keyboard user could not scroll the log at all
-                 (WCAG 2.1.1). Making the row's subject reachable is the fix that a reader also
-                 wanted anyway: an audit line names a row, and the next question is always what
-                 that row says now. -->
-            <!-- AND A NIGHTLY BACKUP IS ABOUT NO ROW. `target` is nullable in the DDL and the
-                 ledger now has kinds that use the nullability, so the link is drawn when there is
-                 something to link to and the verb stands alone when there is not, rather than an
-                 empty anchor, which is a keyboard stop that goes nowhere and reads as nothing. -->
-            <!-- AND A PERSON IS NOT A ROW. An access row's target IS somebody, so this printed
-                 `Gave access p_01M1KJ7RG0TYYA0AX15QPGJJ4` and linked it to a route that resolves to
-                 nothing. Measured on a record driven with eight people on it: all 8 of its
-                 `access.grant` lines. A person is said in the words the rest of the product uses
-                 for one, carries no spoken id (a `p_` id is not a number anybody says out loud),
-                 and is not a link, because there is nowhere in this build to send a reader who
-                 clicks a colleague. -->
-            <!-- AND A BURST IS ONE LINE, "Created 14 rows in Payments", linked to the list it
-                 filled; the rows themselves are one press away there, and fourteen lines of one
-                 rule's work here buried what anybody did by hand (`burstsOf`). -->
-            <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. A `declare` line read "Changed the page" with "Added domain."
-                 beside it, which named the wrong thing and not the list; `declaredOf` makes "Added domain to Projects"
-                 of the line's target and note, and that sentence is the whole line, so the note is not said twice. -->
-            {#if declared !== null}<span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{declared}</span></span>
-            {:else}<span class="line-title"><span class="kind"><Icon name={kindOf(e.kind).icon} size="s" />{kindOf(e.kind).word}</span>
-              {#if t.many}<a class="target tap" href={at(t.many.href)}><bdi class="target-name">{t.many.text}</bdi></a
-                >{:else if e.target}{@const thing = thingFor(e.target)}{#if thing?.href}<a class="target tap" href={at(thing.href)}
-                    ><bdi class="target-name">{thing.text}</bdi></a
-                  >{:else if thing}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span>{/if}
-          </span>
-          <span class="line-amount note">{declared === null ? t.note : ''}</span>
-          <!--
-            HOW LONG AGO, WITH THE MOMENT BEHIND IT.
+  <div class="board">
+    {#if tiles}
+      <!-- THE TILES FIRST IN THE DOCUMENT, so a screen reader meets what the stream means before the stream; at 1440
+           they stand in a column to its right, and on a phone above it. -->
+      <div class="side">
+        {#if lanes.length > 0}
+          <Tile icon="session" title={historyWords.whoWorked} meta={historyWords.lastDay}>
+            <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} />
+            <p class="reading">{lanesSaid(lanes)}</p>
+            {#if !reaches(LOG, more, clock - LANE_SPAN_MS)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
+          </Tile>
+        {/if}
 
-            The band is what makes a log scannable. The minute and the version, which the footer says
-            is how you name a moment, are its tooltip: stacked under it they made every entry three
-            lines tall for two numbers somebody wants once they have found the line.
-          -->
-          <span class="line-when">
-            <!-- AND NO VERSION WHERE THE RECORD SENT NONE. A member held to named lists is sent no rowid, so `readLog`
-                 gives her lines `version: 0`, and "v0" is a place in the log that is no place. -->
-            <!-- A BURST'S TOOLTIP IS ITS SPAN, from its first line to its newest, since one minute
-                 would name one of its lines and not the burst. -->
-            <time
-              datetime={e.at}
-              title={t.count > 1
-                ? historyWords.between(stamp(t.from), stamp(e.at))
-                : e.version > 0
-                  ? `${stamp(e.at)} · v${e.version.toLocaleString('en')}`
-                  : stamp(e.at)}>{since(e.at, clock)}</time
-            >
-          </span>
+        {#if matched.length > 0}
+          <Tile icon="history" title={historyWords.whatChanged} count={matched.length} meta={tallyMeta}>
+            <Stacked parts={groupParts} subject={historyWords.groupsSubject} />
+            <Bars items={topKinds} subject={historyWords.kindsSubject} />
+            <p class="reading">{tallyReading}</p>
+            {#if more}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
+          </Tile>
+        {/if}
+
+        {#if busy.total > 0}
+          <Tile icon="clock" title={historyWords.busyHours} meta={historyWords.lastWeek}>
+            <HeatGrid rows={busy.rows} cols={HOURS} values={busy.values} subject={historyWords.heatSubject} />
+            <p class="reading">{busySaid(busy.values)}</p>
+            {#if !reaches(LOG, more, busy.start)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
+          </Tile>
+        {/if}
+      </div>
+    {/if}
+
+    <div class="feed">
+      {#if !refused && matched.length === 0 && (!route.data.live || live)}
+        <Empty
+          kind={LOG.length === 0 ? 'no-data-yet' : 'no-results'}
+          title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(LOG.length, 'entries')}
+          query={LOG.length === 0
+            ? undefined
+            : [who ? actorSaid(who, me, names).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
+          body={LOG.length === 0 ? copy.auditHolds : undefined}
+        >
+          {#snippet actions()}
+            {#if who || what || when || list}<Button href="/audit">{copy.clearFilters}</Button>{/if}
+          {/snippet}
+        </Empty>
+      {/if}
+
+      {#each bands as band (band.key)}
+        <Section title={band.title} count={band.lines.length}>
+          <ul class="ledger">
+            {#each band.lines as t (t.key)}
+              {@const e = t.e}
+              {@const by = actorSaid(e.by, me, names)}
+              {@const declared = e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
+              {@const thing = t.many ?? (declared === null && e.target ? thingFor(e.target) : null)}
+              {@const note = declared === null ? t.note : ''}
+              <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE; a row that came into being wears
+                   the green of done. Nothing here is red: a log is history, not need. -->
+              {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : e.kind === 'create' ? 'earn' : undefined}
+              <li data-arrived={fresh.has(keyOf(e)) ? '' : undefined}>
+                <div class="line line-tall act">
+                  <IconWell name={kindOf(e.kind).icon} size="l" {tone} />
+                  <span class="line-main">
+                    <!-- THE TARGET IS A LINK, AND THE WHOLE ROW IS ITS TARGET. Its hit box (`.tap`'s `::before`) is
+                         placed against the row, so a press anywhere on the line opens what it names; the words stay
+                         the link's name, and a keyboard reaches it in one stop (WCAG 2.1.1). A line about no row (a
+                         nightly backup) or about a person (an access line) is not a link at all, rather than an
+                         anchor that goes nowhere. -->
+                    <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. `declaredOf` makes "Added domain to Projects" of the
+                         line's target and note, and that sentence is the whole line, so the note is not said twice. -->
+                    {#if declared !== null}<span class="line-title">{declared}</span>
+                    {:else}<span class="line-title"
+                        ><span class="verb">{kindOf(e.kind).word}</span>{#if thing}{' '}{#if thing.href}<a class="target tap" href={at(thing.href)}
+                              ><bdi class="target-name">{thing.text}</bdi></a
+                            >{:else}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span
+                      >{/if}
+                    <span class="line-detail">
+                      <!-- AN AGENT'S LINE WEARS ITS RUN (AGT-13): the run's hue, and a door to the run's handoff. -->
+                      <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
+                      <span class="detail-text"
+                        >{by.name}{#if note}<span class="note" title={note}> · {note}</span>{/if}{#if thing?.list}<span class="where-inline">
+                            · {thing.list}</span
+                          >{/if}</span
+                      >
+                    </span>
+                  </span>
+                  <span class="where">{thing?.list ?? ''}</span>
+                  <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
+                       its newest; no version where the record sent none (a member held to named lists is sent `0`). -->
+                  <span class="line-when">
+                    <time
+                      datetime={e.at}
+                      title={t.count > 1
+                        ? historyWords.between(stampOf(t.from), stampOf(e.at))
+                        : e.version > 0
+                          ? `${stampOf(e.at)} · v${e.version.toLocaleString('en')}`
+                          : stampOf(e.at)}>{clockOf(e.at)}</time
+                    >
+                  </span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        </Section>
+      {/each}
+
+      <CapLine shown={shown.length} total={matched.length} />
+      {#if route.data.live && live && live.cursor !== null}
+        <div class="older">
+          <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
         </div>
-      </li>
-    {/each}
-  </ul>
-  <CapLine shown={shown.length} total={matched.length} />
-  {#if route.data.live && live && live.cursor !== null}
-    <div class="older">
-      <Button weight="quiet" onclick={loadOlder} disabled={older}>{copy.olderEntries}</Button>
+      {/if}
+      {#if olderFix}<p class="foot">{olderFix}</p>{/if}
+      <!-- WHAT THE VERSION IS FOR: it is how you name a moment when you talk to somebody about it. Not for a reader who
+           was sent no version, whose lines carry `version: 0` (`loop/research-history-cursor.md`). -->
+      {#if LOG[0] && LOG[0].version > 0}
+        <p class="foot">{copy.auditVersion(LOG[0].version.toLocaleString('en'))}</p>
+      {/if}
     </div>
-  {/if}
-  {#if olderFix}<p class="foot">{olderFix}</p>{/if}
-  <!-- IT EXPLAINED THE DATA MODEL TO SOMEBODY WHO CAME TO SEE WHO CHANGED WHAT. "The log and the
-       version are the same fact, so a version number is a place in this list" is true, and it is a
-       sentence about how the record is built. What a reader needs from the number is what it is
-       FOR: it is how you name a moment when you talk to somebody about it. -->
-  <!-- AND NOT FOR A READER WHO WAS SENT NO VERSION. For a member invited to one list this said "version 4,192" off the
-       rowid of her newest line, which is a count of every write on the record, hers or not
-       (`loop/research-history-cursor.md`). She is sent none now, and her lines carry `version: 0`. -->
-  {#if LOG[0] && LOG[0].version > 0}
-    <p class="foot">{copy.auditVersion(LOG[0].version.toLocaleString('en'))}</p>
-  {/if}
+  </div>
 </div>
 
 <style>
-  .older {
+  /**
+   * THE PAGE IS A CONTAINER, so the stream and its tiles decide their columns by the room the page actually has (the
+   * rail and a docked panel both take from it), not by the window's width.
+   */
+  .page {
+    container-type: inline-size;
     display: flex;
-    margin-block: var(--sp-3);
+    flex-direction: column;
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    max-inline-size: var(--page-max);
   }
 
-  /* WIDE ENOUGH FOR A NAME, in the reading face rather than the id face. It sits in the grid slot
-     `.seq` would have taken, so the ledger's columns still line up down the page. */
-  /* A NAME WRAPS ON A CARD TOO. `reply rule` and `renewal rule` are two words and the card's first
-     column is 94px; truncating a four-actor filter's own labels leaves `reply r…` as the only thing
-     saying who did it. */
-  .who {
+  /* ONE COLUMN UNTIL THERE IS ROOM FOR TWO: the tiles over the stream, side by side where they fit. */
+  .board {
+    display: grid;
+    grid-template-areas: 'side' 'feed';
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-5);
+  }
+
+  .side {
+    grid-area: side;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  .feed {
+    grid-area: feed;
     display: flex;
-    align-items: center;
-    gap: var(--sp-2);
+    flex-direction: column;
+    gap: var(--sp-5);
     min-inline-size: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
   }
 
-  /* `text-overflow` does nothing on a flex container, so the ellipsis is the name's own. */
-  .who-name {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* AT 1440 THE TILES ARE A 320 COLUMN AT THE STREAM'S RIGHT (SCREENS, Activity), 12 apart like any two tiles. */
+  @container (width >= 860px) {
+    .board {
+      grid-template-areas: 'feed side';
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: var(--sp-6);
+    }
+
+    .side {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
-  /* ONE LINE PER QUESTION, EACH WITH ITS NAME. The filters were two unlabelled bordered tracks, so a
-     row of names and a row of verbs had to be told apart by reading them, and a track with nothing
-     chosen looked like a control with a broken state. Now a label leads each line and a choice is a
-     quiet toggle that takes a surface when it is on. */
-  .bar {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    align-items: center;
-    gap: var(--sp-2) var(--sp-4);
-    margin-block-end: var(--sp-4);
+  /* ON A PHONE ONE TILE, THE FIRST THAT HAS SOMETHING TO SAY, and the stream straight under it. */
+  @media (width < 640px) {
+    .side > :global(.tile:not(:first-child)) {
+      display: none;
+    }
   }
 
-  .filter {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    align-items: center;
+  /* THE ONE LINE UNDER EACH CHART that says what it means (SYSTEM §6), at body size in ink, at the tile's foot. */
+  .reading {
+    margin: 0;
+    margin-block-start: auto;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  .filter-label {
+  .foot {
+    margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
-  .toggles {
+  /* A TILE'S FOOT SITS UNDER ITS READING, a step closer than the tile's own gap. */
+  .reading + .foot {
+    margin-block-start: calc(var(--sp-2) - var(--sp-4));
+  }
+
+  .older {
+    display: flex;
+  }
+
+  /* ── the toolbar ─────────────────────────────────────────────────────── */
+
+  .tools {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-1);
+    justify-content: flex-end;
+    gap: 6px;
     min-inline-size: 0;
   }
 
-  .on-select {
-    justify-self: start;
+  /* A MENU'S TRIGGER IS A GLASS PILL (SYSTEM §5): an icon, the word, and the chevron, 36 high. The focus ring follows
+     the pill, since the button round it is the thing focused. */
+  .tools :global(.menu-trigger) {
+    border-radius: var(--r-pill);
   }
 
-  /* On a phone the label sits over its line rather than beside it. */
-  @media (width < 640px) {
-    .bar {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-1);
-    }
-
-    .filter + .filter,
-    .filter + :global(.btn) {
-      margin-block-start: var(--sp-2);
-    }
-
-    /* ONE STRIP PER QUESTION, scrolled sideways, the way the settings areas are: fourteen wrapped
-       pills took half a phone before the first entry of the log it filters. */
-    .toggles {
-      flex-wrap: nowrap;
-      margin-inline: calc(var(--gutter) * -1);
-      padding-inline: var(--gutter);
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .toggle {
-      flex: none;
-      white-space: nowrap;
-    }
-  }
-
-  .toggle {
+  .pill {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-1);
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 1px solid var(--line);
+    gap: var(--sp-2);
+    box-sizing: border-box;
+    min-block-size: var(--ctl-h);
+    max-inline-size: 28ch;
+    padding: 0 var(--sp-3) 0 var(--sp-4);
+    background: var(--glass);
+    backdrop-filter: var(--glass-blur);
     border-radius: var(--r-pill);
+    box-shadow: var(--glass-edge);
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  /* A MENU WITH A CHOICE MADE IS THE CHOSEN SEGMENT'S SHAPE: the tile's fill, lifted, so a narrowed stream says so. */
+  .pill[data-on] {
+    background: var(--bg);
+    box-shadow: var(--glass-edge), var(--e1);
+  }
+
+  .pill-word {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .tools :global(.menu-trigger:hover .pill:not([data-on])) {
+      background: var(--glass-strong);
+    }
+  }
+
+  /* THE DAY IS A GLASS PILL TOO. `controls.css` gives every select its field fill and the house chevron; the fill is
+     taken back here and the chevron kept. */
+  .on-select {
+    min-block-size: var(--ctl-h);
+    background-color: var(--glass);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-pill);
+    box-shadow: var(--glass-edge);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+  }
+
+  /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the controls in it drop their own. */
+  :global(.head[data-under]) .pill,
+  :global(.head[data-under]) .on-select,
+  :global(.head[data-under]) .segmented {
+    background-color: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  /* A MENU ROW: an icon, the word, and how many lines of that kind were read, the chosen one ticked. */
+  .mi {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    inline-size: 100%;
+    background: none;
+    border: 0;
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
+    text-align: start;
     cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
   }
 
-  .toggle:hover:not([data-on]) {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .toggle[data-on] {
-    padding-inline-start: var(--sp-2);
-    background: var(--s2);
-    border-color: var(--edge);
+  .mi[aria-current='true'] {
     color: var(--ink);
     font-weight: 500;
   }
 
+  .mi:hover,
+  .mi:focus-visible {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  .mi-name {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .mi-n {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
   @media (pointer: coarse) {
-    .toggle {
+    .mi {
       min-block-size: var(--tap);
     }
   }
 
-  /* THE LABEL IS VISIBLE AND IT IS BESIDE THE CONTROL, not inside it: a placeholder disappears
-     exactly when a person needs it and fails contrast in most themes (06 §8). */
-  .on-select {
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-2);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    background: var(--s3);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-sm);
-  }
+  /* ── a line of the stream ────────────────────────────────────────────── */
 
-  .bar > :global(.btn) {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  @media (width < 640px) {
-    .bar > :global(.btn) {
-      grid-column: 1;
-    }
-  }
-
-  .page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max); /* One cap for every list page (DESIGN-SYSTEM 3.1, appendix C12). */
-  }
-
-  /* 20ch FOR THE ACTOR AND ITS FACE, because it is a name and not a spoken id. The ledger's default first column
-     is 10ch of monospace, which "renewal rule" does not fit in — and once `rule.renewal` became
-     English, every rule in the log truncated. */
   /**
-   * A DESKTOP TRACK LIST IS A DESKTOP RULE, AND HAS TO SAY SO.
-   *
-   * `rows.css` turns a row into a two-line card below 640px. This override said nothing about width,
-   * and it is more specific than the card rule — Svelte compiles `.ledger :global(.line)` to
-   * `.ledger.svelte-xxx .line`, three classes against one — so it won at every size. The children
-   * took their card placements and the parent kept four desktop tracks underneath them: computed at
-   * 390, `144px 63px 0px 81px`, a zero-width track with a nowrap note in it.
-   *
-   * The cost is measurable. The longest note in the audit log was 19% visible — `added a n…` — and
-   * `/decide` lost 227px of a 551px sentence. Eight entries, none readable, on the two screens whose
-   * whole job is to say what changed and why. Every desktop screenshot looked correct.
-   *
-   * `@layer components` alone does NOT fix it: within one layer the more specific rule still wins.
-   * The width query is what makes the two rules describe two different screens instead of arguing
-   * about one.
+   * THE KIND'S WELL, WHAT WAS DONE AND BY WHOM, THE LIST, AND THE MINUTE. The row shape is `rows.css`'s (56 tall, a
+   * title and a meta line, the wash, the hairline); the four columns are this screen's.
    */
-  /* THE WHAT AND THE NOTE SHARE WHAT IS LEFT EVENLY, and the what had 22ch of it. That was room for
-     "Created services#6"; it is not room for "Created Object storage services#6", which is what the
-     line says now that it names the thing, and the note beside it had 531px at 1440 while the
-     name was being cut. */
-  @media (width >= 640px) {
-    .ledger :global(.line) {
-      grid-template-columns: 20ch minmax(0, 1fr) minmax(0, 1fr) 9ch;
+  .act {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    gap: var(--sp-3);
+  }
+
+  .act .line-main {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .act .line-when {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  /* THE VERB IN THE SECOND INK, WHAT IT WAS DONE TO IN INK: the thing is what a reader scans for. */
+  .verb {
+    color: var(--ink2);
+  }
+
+  .target {
+    /* STATIC, so the hit box `.tap` draws is placed against the whole row (which `rows.css` positions), not the words. */
+    position: static;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .target:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* THE WHOLE ROW WASHES UNDER THE POINTER, since the whole row is the link; and the hairlines beside it step aside. */
+  @media (hover: hover) and (pointer: fine) {
+    .ledger > li:has(.target:hover) > .line {
+      background: var(--hover-wash);
+    }
+
+    .ledger > li:has(.target:hover) > .line::after,
+    .ledger > li:has(.target:hover) + li > .line::after {
+      opacity: 0;
     }
   }
 
-  /* A word and a glyph, not an identifier. It is still the quiet half of the line, because the
-     interesting part is what changed rather than the verb that changed it. */
-  .kind {
-    display: inline-flex;
+  .line-detail {
+    display: flex;
     align-items: center;
-    gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    gap: 6px;
+    min-inline-size: 0;
   }
 
-  .note {
-    color: var(--dim);
-    font-size: var(--t-xs);
-    text-align: start;
+  /* ABOVE THE ROW'S HIT BOX, so an agent's face stays the door to its run. The meta line's own height is set below. */
+  .who {
+    position: relative;
+    z-index: var(--z-raise);
+    display: inline-grid;
+    flex: none;
+  }
+
+  /* THE FACE AT THE META LINE'S HEIGHT under a mouse. Under a thumb it keeps its size, because an agent's face is a door
+     and a door a thumb presses is 44 however small it is drawn (`.tap`), which scaling it down would shrink too. */
+  @media (pointer: fine) {
+    .who :global(.agent-face) {
+      zoom: 0.75;
+    }
+
+    .who :global(.face:not(.agent-face)) {
+      zoom: 0.9;
+    }
+  }
+
+  .detail-text {
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  /* AND ON A CARD IT WRAPS, because a card has a line to spare and a truncated note is the one
-     thing this screen must not do: the note IS what changed. */
-  @media (width < 640px) {
-    .note,
-    .who-name {
-      overflow: visible;
-      text-overflow: clip;
-      white-space: normal;
-    }
-
-    /* THE ACTOR GETS A LINE. On a card the row is two tracks, and `.who` is not one of the four
-       cells the card layout places — so it fell into whatever was left, which was nothing: measured
-       `clientWidth: 0` against 29px of text. Who did it is half of what this log says. */
-    /* AND THE LINE IT GOT WAS ALREADY TAKEN. `.who` went across both tracks of row 1, and the note
-       is `.line-amount`, which `rows.css` puts in row 1 column 2: measured at 390, `.who` at x 33
-       to 357 on y 462 and the note at x 139 to 357 on y 463. "the assistant" and "Two services on
-       the Fenwick invoice" were printed on top of each other, and any actor wider than about 106px
-       did the same.
-
-       SO ROW 1 IS WHO AND WHEN, row 2 is what was done to what, and row 3 is the note, which gets
-       the whole width because it is the one thing on the line that must not be cut. */
-    .who {
-      grid-column: 1;
-      grid-row: 1;
-    }
-
-    .line-when {
-      grid-column: 2;
-      grid-row: 1;
-    }
-
-    .note {
-      grid-column: 1 / -1;
-      grid-row: 3;
-    }
-  }
-
-  /* It is a link, so it says so on hover and on focus — but not with a permanent underline, which
-     at eight rows of monospace turns the column into a ladder. */
-  .target {
-    color: inherit;
-    text-decoration: none;
-    border-block-end: 1px solid transparent;
-  }
-
-  .target:hover,
-  .target:focus-visible {
-    border-block-end-color: currentColor;
-  }
-
-  /* THE LEAD IS THE ONE LINE OF CONTEXT UNDER THE HEAD, in the secondary ink so the head stays the
-     title, at body size so it is read and not skimmed as a caption. */
-  .since {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
-  }
-
-  /* THE STRIP SITS ON THE PAGE'S OWN RHYTHM. A block keeps a gap under itself for a page of blocks,
-     and here the page's column gap already spaces it from the filters. */
-  .strip {
-    display: grid;
-    gap: var(--sp-1);
-  }
-
-  .strip :global(.block) {
-    margin: 0;
-  }
-
-  .foot {
+  .where {
+    grid-column: 3;
+    grid-row: 1;
+    max-inline-size: 18ch;
+    overflow: hidden;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
+  .where-inline {
+    display: none;
   }
 
-  /* BODY ON A PHONE IS THE PHONE'S BODY SIZE (design-brief §3). */
+  /* A TIME IN A FEED IS GEIST MONO (SYSTEM §3), tabular, in the quiet ink. */
+  .line-when time {
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+  }
+
+  /**
+   * ON A PHONE THE LIST GOES INTO THE META LINE and the row is three columns: the well, the words, the minute. The
+   * title and the note wrap rather than cut, because on a phone a line has room to, and the note is what changed.
+   */
   @media (width < 640px) {
-    .since {
-      font-size: var(--t-md);
+    .act {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      align-items: start;
+    }
+
+    .act .line-when {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .where {
+      display: none;
+    }
+
+    .where-inline {
+      display: inline;
+    }
+
+    .line-detail {
+      align-items: start;
+    }
+
+    .detail-text {
+      white-space: normal;
     }
   }
 </style>
