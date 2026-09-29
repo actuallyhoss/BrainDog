@@ -3,7 +3,7 @@
   Slash and an agent nobody names.
 
   THE OWNER ASKED FOR THE REAL ONES (30 September 2026, "for stuff like claude codex logos etc please use real ones"),
-  so Claude is its clay spark, Codex is OpenAI's, Cursor its cube, and so on, each at the size the glyph it replaces had.
+  so Claude is its clay starburst, Codex is OpenAI's, Cursor its cube, and so on, each at the size the glyph it replaces had.
   Claude and Gemini wear their makers' colours (`--agent-claude`, `--agent-gemini`); the marks drawn in black or white
   are `currentColor`, the ink of whatever holds them, so they turn over with the scheme.
 

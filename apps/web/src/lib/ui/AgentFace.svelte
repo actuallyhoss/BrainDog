@@ -2,7 +2,7 @@
   An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a ring while the run is open.
 
   A NAMED AGENT WEARS ITS MAKER'S MARK on a plain disc (the owner, 30 September 2026: "use real ones"): Claude's clay
-  spark, Codex's knot, Cursor's cube. A maker's logo on a washed disc is two colours arguing, so the run's hue is kept for
+  starburst, Codex's knot, Cursor's cube. A maker's logo on a washed disc is two colours arguing, so the run's hue is kept for
   the faces that wear the app's own glyph (a runner, an agent nobody names), where it is still what tells two apart.
 
   ON A GLYPH'S FACE, THE GLYPH SAYS WHAT AND THE HUE SAYS WHICH. Two runners at once share a glyph, so the colour comes
