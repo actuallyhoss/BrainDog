@@ -111,7 +111,8 @@
   </div>
 </section>
 
-<section class="band" aria-label={w.title}>
+<!-- No name of its own: the band above is the region the page title names, and this one named the same was a second landmark with that name. -->
+<section class="band">
   <div class="in">
     {#if data.cards.length === 0}
       <div class="tiles">

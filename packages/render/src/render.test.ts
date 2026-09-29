@@ -1530,7 +1530,7 @@ test('a stored value is drawn as a word: a lane head starts with a capital, a ch
   assert.equal(valueWord('cli', true), 'CLI');
   const html = toHTML(parse('```chips\nglyph | 6 | saas\n```\n\n```board\nopen | Chase Halden\n```'));
   assert.match(html, /<span class="pill-word">SaaS<\/span>/);
-  assert.match(html, /<h4 class="board-head">Open<span class="board-count num">1<\/span><\/h4>/);
+  assert.match(html, /<h3 class="board-head">Open<span class="board-count num">1<\/span><\/h3>/);
 });
 
 /* ── stat's trend and lead, and sparkline ─────────────────────────────────── */

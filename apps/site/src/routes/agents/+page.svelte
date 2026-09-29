@@ -250,25 +250,30 @@
           <p class="lede">{a.outside.lead}</p>
         </div>
         <div class="reach-chart">
-          <ol class="ladder" role="img" aria-label={a.outside.order}>
-            {#each a.outside.ways as way, i (way.head)}
-              <li class="rung">
-                <span class="rung-name">{way.head}</span>
-                <span class="segs">
-                  {#each a.outside.reach as step, s (step)}
-                    <span class="seg" class:on={s <= i} title={step}></span>
-                  {/each}
-                </span>
-                <span class="rung-step">{a.outside.reach[i]}</span>
-              </li>
-            {/each}
-          </ol>
+          <!-- The picture is the wrapper, because a list cannot take the `img` role and keep its items. -->
+          <div role="img" aria-label={a.outside.order}>
+            <ol class="ladder">
+              {#each a.outside.ways as way, i (way.head)}
+                <li class="rung">
+                  <span class="rung-name">{way.head}</span>
+                  <span class="segs">
+                    {#each a.outside.reach as step, s (step)}
+                      <span class="seg" class:on={s <= i} title={step}></span>
+                    {/each}
+                  </span>
+                  <span class="rung-step">{a.outside.reach[i]}</span>
+                </li>
+              {/each}
+            </ol>
+          </div>
           <p class="reading">{a.outside.order}</p>
         </div>
       </div>
 
       {#each a.outside.ways as way, i (way.head)}
-        <section class="tile span-4 way-tile" aria-labelledby="way-{i}">
+        <!-- AN `article`, NOT A `section`: each tile's code block is a region named by the same words, so a
+             labelled section here was a second landmark with that name. -->
+        <article class="tile span-4 way-tile" aria-labelledby="way-{i}">
           <header class="tile-head">
             <span class="well"><Icon name={WAYS[i] ?? 'plug'} /></span>
             <h3 class="tile-title" id="way-{i}">{way.head}</h3>
@@ -283,7 +288,7 @@
               </div>
             {/each}
           </dl>
-        </section>
+        </article>
       {/each}
     </div>
   </div>
@@ -305,8 +310,7 @@
         <dl class="rows">
           {#each a.cannot.rows as one, i (one.what)}
             <div class="row">
-              <span class="well l"><Icon name={CANNOT[i] ?? 'lock'} /></span>
-              <dt>{one.what}</dt>
+              <dt><span class="well l"><Icon name={CANNOT[i] ?? 'lock'} /></span>{one.what}</dt>
               <dd>{one.said}</dd>
             </div>
           {/each}
@@ -790,14 +794,14 @@
     margin: 0;
   }
 
+  /* THE WELL IS IN THE TERM, because a `dl`'s groups hold only terms and descriptions, and it is lifted out to
+     the row's start beside both lines, where a grid column of its own used to put it. One track now; the skin's
+     `.row` still gives the gap, the inline padding and the phone step. */
   .row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      'well what'
-      'well said';
-    column-gap: var(--sp-3);
+    --lead: calc(var(--well-l) + var(--sp-3));
+    grid-template-columns: minmax(0, 1fr);
     padding-block: var(--sp-4);
+    padding-inline-start: calc(var(--sp-3) + var(--lead));
     border-block-end: 1px solid var(--line);
   }
 
@@ -806,18 +810,21 @@
   }
 
   .row .well {
-    grid-area: well;
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: calc(-1 * var(--lead));
   }
 
+  /* The term's first line ends level with the well's lower edge, where the grid's baseline alignment set it. */
   .row dt {
-    grid-area: what;
+    position: relative;
+    padding-block-start: calc(var(--well-l) - 1lh);
     color: var(--ink);
     font-size: var(--t-row);
     font-weight: 600;
   }
 
   .row dd {
-    grid-area: said;
     margin: 2px 0 0;
     color: var(--ink2);
     font-size: var(--t-site-small);

@@ -322,7 +322,7 @@ function grid(b: Block, o: RenderOptions): string {
         /* HOW MANY ARE UNDER IT, which `Grid.svelte` has drawn on every column since it was written
            and this did not: the two renderers differed on the head of every board in the record, and
            no shape in `parity.test.ts` was a board, so nothing said so. */
-        return `<div class="board-col"><h4 class="board-head">${escape(valueWord(col, true))}<span class="board-count num">${cards.length}</span></h4>${cards
+        return `<div class="board-col"><h3 class="board-head">${escape(valueWord(col, true))}<span class="board-count num">${cards.length}</span></h3>${cards
           .map((r) => `<div class="card">${cell('card-title', r.cells[1], o)}${cell('card-detail', r.cells[2], o)}</div>`)
           .join('')}</div>`;
       })

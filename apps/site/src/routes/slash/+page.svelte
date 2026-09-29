@@ -220,8 +220,7 @@
         <dl class="rules">
           {#each s.rules as r, i (r.head)}
             <div>
-              <span class="well l"><Icon name={ruleGlyph(i)} /></span>
-              <dt>{r.head}</dt>
+              <dt><span class="well l"><Icon name={ruleGlyph(i)} /></span>{r.head}</dt>
               <dd>{r.said}</dd>
             </div>
           {/each}
@@ -234,15 +233,18 @@
           <a class="onward" href="/pricing">{s.allowance.more}<Icon name="arrow" size="s" /></a>
         </header>
         <p class="lede">{s.allowance.lead}</p>
-        <ul class="cbars" role="img" aria-label={d.creditsLabel}>
-          {#each credits as c, i (i)}
-            <li>
-              <span class="cb-label">{c.label}</span>
-              <span class="hb-track"><span class="hb-bar" class:ink={c.ink} style="--w:{(c.n / creditMax) * 100}%"></span></span>
-              <span class="cb-val num">{c.shown}</span>
-            </li>
-          {/each}
-        </ul>
+        <!-- The picture is the wrapper, because a list cannot take the `img` role and keep its items. -->
+        <div role="img" aria-label={d.creditsLabel}>
+          <ul class="cbars">
+            {#each credits as c, i (i)}
+              <li>
+                <span class="cb-label">{c.label}</span>
+                <span class="hb-track"><span class="hb-bar" class:ink={c.ink} style="--w:{(c.n / creditMax) * 100}%"></span></span>
+                <span class="cb-val num">{c.shown}</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
         <p class="reading">{d.creditsReading(word(plus.allowance.credits / cloud.allowance.credits))}</p>
         <p class="meta">{s.allowance.packsN(PACKS[0]?.credits ?? 0)} {s.allowance.packsUnit(PACKS)}</p>
       </article>
@@ -569,14 +571,12 @@
     margin: 0;
   }
 
+  /* THE WELL IS IN THE TERM, because a `dl`'s groups hold only terms and descriptions, and it is lifted out to
+     the rule's start beside both lines, where a grid column of its own used to put it. */
   .rules div {
-    display: grid;
-    grid-template-columns: var(--well-l) minmax(0, 1fr);
-    grid-template-areas:
-      'well head'
-      'well said';
-    column-gap: var(--sp-4);
+    --lead: calc(var(--well-l) + var(--sp-4));
     padding-block: var(--sp-4);
+    padding-inline-start: var(--lead);
     border-block-start: 1px solid var(--line);
   }
 
@@ -586,18 +586,19 @@
   }
 
   .rules .well {
-    grid-area: well;
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: calc(-1 * var(--lead));
   }
 
   .rules dt {
-    grid-area: head;
+    position: relative;
     color: var(--ink);
     font-size: var(--t-md);
     font-weight: 600;
   }
 
   .rules dd {
-    grid-area: said;
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-site-small);

@@ -273,6 +273,10 @@
   {#if unsaved}<span class="card-mark">{NOT_SAVED}</span>{/if}
 {/snippet}
 
+{#snippet laneHead(name: string, count: number)}
+  <h3 class="board-head">{valueWord(name, true)}<span class="board-count num">{count}</span></h3>
+{/snippet}
+
 {#if block.kind === 'cards'}
   <Cards {block} {opts} />
 {:else if block.kind === 'heat'}
@@ -349,8 +353,15 @@
       >
         <!-- The count is the column's whole reason to have a header. A board is read by comparing
              heights, and heights lie the moment one column scrolls and another does not — so the
-             number sits beside the name rather than being inferred from the stack. -->
-        <h4 class="board-head" role={live ? 'rowheader' : undefined}>{valueWord(lane.name, true)}<span class="board-count num">{lane.cards.length}</span></h4>
+             number sits beside the name rather than being inferred from the stack.
+             An `h3`, one step under the block's own `h2` title, so the outline never skips a level. A live
+             board wraps it in the `rowheader` the grid needs, because a heading element cannot take that
+             role itself, and the heading stays a heading inside it. -->
+        {#if live}
+          <div role="rowheader">{@render laneHead(lane.name, lane.cards.length)}</div>
+        {:else}
+          {@render laneHead(lane.name, lane.cards.length)}
+        {/if}
         {#each lane.cards as card (card.at)}
           <div
             class="card"
