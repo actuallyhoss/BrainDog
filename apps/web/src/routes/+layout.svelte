@@ -62,6 +62,7 @@
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { OVERVIEW, WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
+  import { TASKS } from '$lib/work/list.ts';
   import type { Working } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { spineOf } from '$lib/spine.ts';
@@ -181,7 +182,7 @@
    * sections a day runs through, Activity, Decide while something waits, seven at most, and everything else under More.
    */
   /* AND WORK OPENS THE WORK SCREEN ON A RECORD THAT HOLDS TASKS (`lib/work/Work.svelte`), empty or not. */
-  const holdsTasks = $derived(data.lists.some((l) => l.id === 'tasks'));
+  const holdsTasks = $derived(data.lists.some((l) => l.id === TASKS));
   const flat = $derived(
     flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
   );

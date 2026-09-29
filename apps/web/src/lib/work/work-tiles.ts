@@ -221,7 +221,7 @@ export function tierCounts(rows: readonly Task[], s: Shape, mine: (owner: number
   return { parts: all, people, yours: all.reduce((n, t) => n + t.yours, 0), agents: all.reduce((n, t) => n + t.agents, 0) };
 }
 
-const tasks = (n: number): string => (n === 1 ? 'task' : 'tasks');
+const tasks = (n: number): string => `task${n === 1 ? '' : 's'}`;
 
 /**
  * The tier chart's one line: who holds the top tier, and how many of the agents' ones wait on your review. "Agents hold

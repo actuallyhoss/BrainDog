@@ -218,7 +218,7 @@ export function describeWeek(days: readonly WeekDay[], today: string, subject?: 
       const bare = d.items.filter((it) => !it.label);
       const late = bare.filter((it) => it.late).length;
       if (bare.length > 0)
-        named.push(`${bare.length} ${bare.length === 1 ? 'thing' : 'things'}${late > 0 ? `, ${late} late` : ''}`);
+        named.push(`${bare.length} thing${bare.length === 1 ? '' : 's'}${late > 0 ? `, ${late} late` : ''}`);
       return `${dayName(d.date)}${d.date === today ? ', today' : ''}: ${listed(named)}`;
     });
   const tail = said.length > 0 ? ` ${said.join('. ')}.` : ' Nothing is dated.';

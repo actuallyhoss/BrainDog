@@ -19,6 +19,8 @@ import type { Call } from '../ui/webhook-doors.ts';
 import { forget } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
 import { listName } from './names.ts';
+import { READINGS } from './reporting.ts';
+import { KEYS_REGISTER } from './vault.ts';
 
 /** What the sheet makes. */
 export type ActionKind = 'door' | 'action';
@@ -160,7 +162,7 @@ export const PRESETS: Record<string, ActionDraft> = {
   numbers: {
     ...blankDraft('door'),
     name: 'Numbers from a project',
-    register: 'datapoints',
+    register: READINGS,
     map: [
       { field: 'name', from: 'answer', text: 'name' },
       { field: 'value', from: 'answer', text: 'value' },
@@ -170,7 +172,7 @@ export const PRESETS: Record<string, ActionDraft> = {
     ...blankDraft('action'),
     name: 'A number to watch',
     channel: 'poll',
-    register: 'datapoints',
+    register: READINGS,
     map: [
       { field: 'name', from: 'fixed', text: '' },
       { field: 'value', from: 'answer', text: '' },
@@ -376,7 +378,7 @@ export async function fileDraft(call: Call, decl: Declared, said: string): Promi
  * the label as typed text instead, because the declaration names a key by its label and nothing else.
  */
 export async function keyLabels(call: Call): Promise<string[] | null> {
-  const out = await call('list', { register: 'credentials', limit: 200 });
+  const out = await call('list', { register: KEYS_REGISTER, limit: 200 });
   if (!out.ok) return null;
   const rows = ((out.value as { rows?: unknown } | null)?.rows ?? []) as { fields?: Record<string, unknown>; state?: unknown }[];
   const labels = rows

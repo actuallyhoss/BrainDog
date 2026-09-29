@@ -15,7 +15,7 @@
  * `keys.svelte.ts` RE-EXPORTS EVERYTHING HERE, so no screen changed and no import moved.
  */
 
-export type Scope = 'document' | 'today' | 'work' | 'grid' | 'board' | 'page' | 'decide' | 'gate' | 'inbox' | 'palette' | 'nav';
+export type Scope = 'document' | 'today' | 'workscreen' | 'grid' | 'board' | 'page' | 'decide' | 'gate' | 'inbox' | 'palette' | 'nav';
 
 
 export type Binding = {
@@ -102,16 +102,16 @@ export const BINDINGS: Binding[] = [
   /* THE WORK SCREEN (`lib/work/Work.svelte`), the owner's old tool's keys: the screen he did 85% of his writing on was
      worked with them, and a board of seventy rows with no keys is worked one row at a time. They act on the task the
      cursor is on, and never while a box has the caret. */
-  { id: 'work-move', scope: 'work', key: 'j  k', label: 'The next or the previous task', bare: true },
-  { id: 'work-tick', scope: 'work', key: 'x', label: 'Tick it, or take the tick off', bare: true },
-  { id: 'work-edit', scope: 'work', key: 'e', label: 'Change its words where it is', bare: true },
-  { id: 'work-due', scope: 'work', key: 'd', label: 'Set the day it is due', bare: true },
-  { id: 'work-lane', scope: 'work', key: 'm', label: 'Move it to another state or project', bare: true },
-  { id: 'work-delete', scope: 'work', key: 'Delete', label: 'Delete it, with an undo', bare: false },
-  { id: 'work-open', scope: 'work', key: '↵', label: 'Open it', bare: false },
-  { id: 'work-new', scope: 'work', key: 'n  c', label: 'Type a new task', bare: true },
-  { id: 'work-find', scope: 'work', key: '/', label: 'Search the tasks', bare: true },
-  { id: 'work-leave', scope: 'work', key: 'Esc', label: 'Cancel, or leave the box', bare: false },
+  { id: 'work-move', scope: 'workscreen', key: 'j  k', label: 'The next or the previous task', bare: true },
+  { id: 'work-tick', scope: 'workscreen', key: 'x', label: 'Tick it, or take the tick off', bare: true },
+  { id: 'work-edit', scope: 'workscreen', key: 'e', label: 'Change its words where it is', bare: true },
+  { id: 'work-due', scope: 'workscreen', key: 'd', label: 'Set the day it is due', bare: true },
+  { id: 'work-lane', scope: 'workscreen', key: 'm', label: 'Move it to another state or project', bare: true },
+  { id: 'work-delete', scope: 'workscreen', key: 'Delete', label: 'Delete it, with an undo', bare: false },
+  { id: 'work-open', scope: 'workscreen', key: '↵', label: 'Open it', bare: false },
+  { id: 'work-new', scope: 'workscreen', key: 'n  c', label: 'Type a new task', bare: true },
+  { id: 'work-find', scope: 'workscreen', key: '/', label: 'Search the tasks', bare: true },
+  { id: 'work-leave', scope: 'workscreen', key: 'Esc', label: 'Cancel, or leave the box', bare: false },
 
   { id: 'row-down', scope: 'grid', key: 'j  ↓', label: 'Row down, keeping the column', bare: true },
   { id: 'row-up', scope: 'grid', key: 'k  ↑', label: 'Row up, keeping the column', bare: true },
@@ -193,4 +193,4 @@ export const BINDINGS: Binding[] = [
   { id: 'nav-menu', scope: 'nav', key: '⇧F10', label: 'Move up, Move down, Move to top, Hide', bare: false },
 ];
 
-export const SCOPE_ORDER: Scope[] = ['document', 'today', 'work', 'grid', 'board', 'page', 'decide', 'gate', 'inbox', 'palette', 'nav'];
+export const SCOPE_ORDER: Scope[] = ['document', 'today', 'workscreen', 'grid', 'board', 'page', 'decide', 'gate', 'inbox', 'palette', 'nav'];

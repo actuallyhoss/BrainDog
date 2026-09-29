@@ -546,7 +546,7 @@
 
   /* ROWS THAT ARRIVED WHILE YOU LOOKED, by whoever wrote them, tinted for a moment. The first answer is the baseline. */
   const arrivals = liveArrivals();
-  const arrived = $derived(answer ? arrivals.see('work', rows.filter((r) => r.seq > 0).map((r) => String(r.seq))) : new Set<string>());
+  const arrived = $derived(answer ? arrivals.see(TASKS, rows.filter((r) => r.seq > 0).map((r) => String(r.seq))) : new Set<string>());
 
   /* ── writing ────────────────────────────────────────────────────────────── */
 

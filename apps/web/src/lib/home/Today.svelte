@@ -58,6 +58,7 @@
   import type { RowWriter } from '$lib/record/rows-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { dayOf, daySaid, dueSaid } from '$lib/work/board.ts';
+  import { TASKS } from '$lib/work/list.ts';
   import { captureOf, contextOf, freshFields, isQuestion } from '$lib/work/capture.ts';
   import {
     cashReading,
@@ -135,8 +136,8 @@
   const t = $derived(today.value);
   const day = $derived(t ? dayOf(t.now) : dayOf(data.now));
 
-  const takesTasks = $derived(data.lists.some((l) => l.id === 'tasks') && may(data, 'append', 'tasks'));
-  const mayWrite = $derived(data.lists.some((l) => l.id === 'tasks') && may(data, 'write', 'tasks'));
+  const takesTasks = $derived(data.lists.some((l) => l.id === TASKS) && may(data, 'append', TASKS));
+  const mayWrite = $derived(data.lists.some((l) => l.id === TASKS) && may(data, 'write', TASKS));
 
   /* ── the capture line ──────────────────────────────────────────────────────── */
 
@@ -235,7 +236,7 @@
       apply: () => hide(task.seq),
       revert: () => show(task.seq),
       send: async () => {
-        const out = await (await writes()).update('tasks', task.seq, { state: 'done' }, task.version);
+        const out = await (await writes()).update(TASKS, task.seq, { state: 'done' }, task.version);
         return out.ok ? { ok: true as const, value: out.entry } : { ok: false as const, fix: out.fix };
       },
       settle: () => void today.reread(),
@@ -244,7 +245,7 @@
         apply: () => show(task.seq),
         revert: () => hide(task.seq),
         send: async () => {
-          const out = await (await writes()).update('tasks', task.seq, { state: back }, entry.version);
+          const out = await (await writes()).update(TASKS, task.seq, { state: back }, entry.version);
           return out.ok ? { ok: true as const, value: out.entry } : { ok: false as const, fix: out.fix };
         },
         settle: () => void today.reread(),
@@ -291,7 +292,7 @@
 
   const tasks = $derived((t?.tasks ?? []).filter((x) => !gone.has(x.seq)));
   const bills = $derived(t?.money?.due ?? []);
-  const taskNeed = (task: TaskRow): Need => ({ kind: 'task', key: `t${task.seq}`, href: `/r/tasks/${task.seq}`, task });
+  const taskNeed = (task: TaskRow): Need => ({ kind: 'task', key: `t${task.seq}`, href: `/r/${TASKS}/${task.seq}`, task });
   const billNeed = (bill: DueRow): Need => ({ kind: 'bill', key: `b${bill.seq}`, href: `/r/obligations/${bill.seq}`, bill });
 
   /* THE ORDER THE BOARD READS IN: the questions answered in place, then what is late, what was handed back, what is due
@@ -340,7 +341,7 @@
 
   type Later = { day: string; key: string; href: string } & ({ kind: 'task'; task: DayRow } | { kind: 'bill'; bill: DueRow });
   const later = $derived.by((): Later[] => [
-    ...coming.map((task): Later => ({ kind: 'task', day: task.day, key: `c${task.seq}`, href: `/r/tasks/${task.seq}`, task })),
+    ...coming.map((task): Later => ({ kind: 'task', day: task.day, key: `c${task.seq}`, href: `/r/${TASKS}/${task.seq}`, task })),
     ...bills.filter((b) => b.due !== null && b.due > day).map((bill): Later => ({ kind: 'bill', day: bill.due!, key: `b${bill.seq}`, href: `/r/obligations/${bill.seq}`, bill })),
   ]);
   const groups = $derived(dayGroups(later, day));
@@ -556,7 +557,7 @@
                 {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
               </span>
             {/if}
-            {#if data.lists.some((l) => l.id === 'tasks')}
+            {#if data.lists.some((l) => l.id === TASKS)}
               <a class="aside-link tap" href={at('/?work')}>{words.openWork}<Icon name="arrow" size="s" /></a>
             {/if}
           {/snippet}

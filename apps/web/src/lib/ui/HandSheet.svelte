@@ -64,9 +64,10 @@
   const allowed = $derived(hand !== null && may(shell, 'write', register));
   const me = $derived(String(shell.me?.person ?? ''));
 
-  /* The list a person is handed a row by, and the field it names them with. */
+  /* The list a person is handed a row by, and the field it names them with: the list `hand.person` links to, which the
+     record refuses to be anything but a link (`handFault`). A list that hands to no person reads none. */
   const peopleList = $derived.by(() => {
-    const to = decl.fields.find((f) => f.id === hand?.person)?.to ?? 'people';
+    const to = decl.fields.find((f) => f.id === hand?.person)?.to ?? '';
     return { register: to, title: REGISTERS[to]?.title ?? 'name' };
   });
 

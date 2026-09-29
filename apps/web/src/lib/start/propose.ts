@@ -14,6 +14,7 @@
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
  */
 
+import { moduleOfList } from '@braindog/seed/packs/modules';
 import { alongside, modulesFor, payDayRow, type UseCase } from '@braindog/seed/usecases';
 import { claimedBy } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
@@ -134,10 +135,11 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
      sentence turns on: Personal's own pack seeds no rows of its own kind, so this is written alongside the others
      rather than in `personal.ts` (MOD-17). A sentence that names pay but leaves out an amount or a day is not
      written half-formed: `missing` says which field payDayRow could not read, and only a row with neither missing
-     is proposed. */
-  if (u?.usecase === 'personal' && modules.includes('money-core')) {
+     is proposed. THE MODULE IS THE ONE THAT DECLARES THE ROW'S LIST (`moduleOfList`), not a pack named here. */
+  if (u?.usecase === 'personal') {
     const pd = payDayRow(said, today);
-    if (pd && pd.missing.length === 0) rows.push({ register: pd.register, fields: { ...pd.fields } });
+    const brings = pd ? moduleOfList(pd.register)?.id : undefined;
+    if (pd && pd.missing.length === 0 && brings !== undefined && modules.includes(brings)) rows.push({ register: pd.register, fields: { ...pd.fields } });
   }
 
   return {

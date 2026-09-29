@@ -30,7 +30,7 @@
   const TITLE: Record<Scope, string> = {
     document: copy.scopeDocument,
     today: copy.scopeToday,
-    work: copy.scopeWork,
+    workscreen: copy.scopeWork,
     grid: copy.scopeGrid,
     board: copy.scopeBoard,
     page: copy.scopePage,
@@ -45,7 +45,7 @@
   const GLYPH = {
     document: 'home',
     today: 'today',
-    work: 'task',
+    workscreen: 'task',
     grid: 'rows',
     board: 'board',
     page: 'doc',

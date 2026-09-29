@@ -162,8 +162,9 @@
   const proposes = $derived(owner || may(shell, 'append'));
   /* A BOUND KEY DOES NOT ANSWER WITH SILENCE (`openEditor`), so `n`, `e` and `⌫` say to a Reads colleague why. */
   const readOnlySaid = () => void toasts.push(reachWords.readOnly(decl?.name ?? nameFromId(id)), { intent: 'warn' });
+  /* THE LIST `hand.person` LINKS TO, as `HandSheet` reads it: the record refuses a person part that is not a link. */
   const peopleList = $derived.by(() => {
-    const to = decl?.fields.find((f) => f.id === hand?.person)?.to ?? 'people';
+    const to = decl?.fields.find((f) => f.id === hand?.person)?.to ?? '';
     return { register: to, title: REGISTERS[to]?.title ?? 'name' };
   });
   let handedSeq = $state<number | null>(null);

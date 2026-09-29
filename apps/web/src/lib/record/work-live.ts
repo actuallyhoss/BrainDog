@@ -18,9 +18,10 @@ import type { Fetch } from './row-live.ts';
 import type { Entry, RegisterDecl } from './schema.ts';
 import type { Result } from '../data/read.ts';
 import { shapeOf, type Shape } from '../work/board.ts';
+import { TASKS } from '../work/list.ts';
 
-/** The list the screen works on. */
-export const TASKS = 'tasks';
+/** The list the screen works on (`lib/work/list.ts`). */
+export { TASKS };
 
 /** A project or a person a task points at: its number and its name. */
 export type Named = { seq: number; name: string };

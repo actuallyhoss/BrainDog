@@ -67,12 +67,12 @@ const HELD = {
   /* The first run hears packs by the catalogue's signals since USE-3; what is left is the rows a sentence fills, which
      are Projects', People's and Money's, and the Projects every other list points at. PGS-20 owns it next. */
   'apps/web/src/lib/shape.ts': {
-    ids: ['money-core', 'obligations', 'people', 'portfolio', 'things'],
-    why: "the first rows a sentence fills (a project, a person, an invoice) and the Projects module every other list leans on.",
+    ids: ['money-core', 'obligations', 'people', 'portfolio', 'things', 'work'],
+    why: "the first rows a sentence fills (a project, a person, an invoice), the Projects module every other list leans on, and `work` and `people` among the English words the language guess counts.",
   },
   'apps/web/src/lib/who.ts': {
-    ids: ['people'],
-    why: "onboarding's introduction asks whether the People pack is on before it meets the person.",
+    ids: ['hello', 'people'],
+    why: "onboarding's introduction asks whether the People pack is on before it meets the person, and `hello` is a greeting that opens a sentence without being a name.",
   },
   'apps/web/src/routes/inbox/+page.svelte': {
     ids: ['agents'],
@@ -86,7 +86,7 @@ const HELD = {
   },
   'apps/web/src/lib/record/reporting.ts': {
     ids: ['datapoints'],
-    why: '`READINGS`, the list a report key writes into, which the reporting panel asks for by name.',
+    why: '`READINGS`, the list a report key writes into, which the reporting panel and the number presets of a new action ask for by name.',
   },
   'apps/web/src/lib/page/panels/Reporting.svelte': {
     ids: ['organisations', 'things'],
@@ -100,6 +100,26 @@ const HELD = {
     ids: ['credentials', 'things'],
     why: "the vault lists the Agents pack's credentials and the projects each is for.",
   },
+  'apps/web/src/lib/record/vault.ts': {
+    ids: ['credentials'],
+    why: "`KEYS_REGISTER`, the Agents pack's credentials list, which the Keys index and a new action's key picker read by its id.",
+  },
+  'apps/web/src/lib/record/action-draft.ts': {
+    ids: ['fx'],
+    why: "the exchange-rate preset of a new action writes a day's rate into Money's rates list by its id.",
+  },
+  'apps/web/src/routes/r/[register]/[seq]/+page.svelte': {
+    ids: ['credentials', 'tools'],
+    why: "a key's or a tool's row lists the runs that used it, and knows it is one by the Agents pack's list ids.",
+  },
+  'apps/web/src/lib/record/today-live.ts': {
+    ids: ['accounts', 'books', 'obligations', 'things'],
+    why: "Today reads Money's accounts, books and bills, and the projects its tasks are filed under, by their list ids, because `boot` names no list by the part it plays.",
+  },
+  'apps/web/src/lib/home/Today.svelte': {
+    ids: ['obligations'],
+    why: "a bill on Today links into Money's bills by the list id `today-live.ts` read it from.",
+  },
 
   /* The hand-built Work screen, which a declared page replaces (`loop/finish/shell.md` §3, the M4 seam). */
   'apps/web/src/lib/record/track-live.ts': {
@@ -109,6 +129,10 @@ const HELD = {
   'apps/web/src/routes/t/[track]/+page.svelte': {
     ids: ['tasks', 'tracks', 'updates'],
     why: 'the hand-built Work screen writes an update and links into Work by its list ids.',
+  },
+  'apps/web/src/lib/work/list.ts': {
+    ids: ['tasks'],
+    why: "`TASKS`, the one list the hand-built Work screen, Today's tasks and the shell's Work row read by its id.",
   },
 
   /* NOT A LIST AT ALL: a word the web uses for something else, spelled like one. */
@@ -124,9 +148,69 @@ const HELD = {
     ids: ['choices', 'things'],
     why: 'the plural words of two counted sentences, "Drawn from 3 things that came in" and "adds 2 choices", which are English and not the lists.',
   },
+  'apps/web/src/lib/record/block-edit.ts': {
+    ids: ['agents', 'steps'],
+    why: 'block kinds called `agents` and `steps`, which are not the lists.',
+  },
+  'apps/web/src/lib/page/BlockSlot.svelte': {
+    ids: ['steps'],
+    why: 'the block kind called `steps`, which is not the list.',
+  },
+  'apps/web/src/lib/page/page-writes.ts': {
+    ids: ['steps'],
+    why: 'the block kind called `steps`, which is not the list.',
+  },
   'apps/web/src/lib/flow/flow.ts': {
+    ids: ['choices', 'steps'],
+    why: "an automation's `steps:` key and an Ask Slash step's `choices:`, which are not the guide's lists.",
+  },
+  'apps/web/src/lib/flow/flow.svelte.ts': {
     ids: ['steps'],
     why: "an automation's `steps:` key, which is not the guide's list.",
+  },
+  'apps/web/src/lib/flow/RunView.svelte': {
+    ids: ['steps'],
+    why: "an automation's `steps:` key, which is not the guide's list.",
+  },
+  'apps/web/src/lib/flow/source.ts': {
+    ids: ['steps'],
+    why: "an automation's `steps:` key, which is not the guide's list.",
+  },
+  'apps/web/src/lib/design/pen.ts': {
+    ids: ['people'],
+    why: 'the `people` glyph a list of contacts, clients or a team is drawn with.',
+  },
+  'apps/web/src/lib/home/today-tiles.ts': {
+    ids: ['people'],
+    why: 'the `people` icon on the line that says access changed.',
+  },
+  'apps/web/src/lib/ui/RowCards.svelte': {
+    ids: ['people'],
+    why: 'the `people` glyph a list declares, which is how a list of people is known without its id.',
+  },
+  'apps/web/src/lib/ui/RowMenu.svelte': {
+    ids: ['people'],
+    why: 'the `people` icon on Hand to.',
+  },
+  'apps/web/src/lib/nav.ts': {
+    ids: ['people', 'services', 'work'],
+    why: "the section names the nav orders a day by, the Work row's key and glyph, and the `work` word of the Work screen's address `/?work`.",
+  },
+  'apps/web/src/routes/+page.svelte': {
+    ids: ['work'],
+    why: 'the `work` word in the query that opens the Work screen at `/?work`.',
+  },
+  'apps/web/src/lib/work/work-tiles.ts': {
+    ids: ['agents'],
+    why: "the Work screen's view of the tasks agents hold (yours, agents', all), which is not the Agents pack.",
+  },
+  'apps/web/src/lib/work/Work.svelte': {
+    ids: ['agents'],
+    why: "the tier chart's side for the tasks agents hold, which is not the Agents pack.",
+  },
+  'apps/web/src/routes/packs/+page.svelte': {
+    ids: ['updates'],
+    why: "the Packs screen's Updates tab.",
   },
   'apps/web/src/routes/automations/[id]/+page.svelte': {
     ids: ['steps'],

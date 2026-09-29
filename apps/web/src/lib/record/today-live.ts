@@ -18,6 +18,7 @@ import { money } from 'braindog-render';
 
 import type { Fetch } from './boot-live.ts';
 import { moneyInText } from './money.ts';
+import { TASKS } from '../work/list.ts';
 
 /**
  * A task that needs you: past its day, handed back to be checked, due today, or marked urgent.
@@ -493,15 +494,15 @@ async function thingsOf(client: Client): Promise<{ names: Map<string, string>; h
 export const AHEAD_DAYS = 14;
 
 async function tasksFor(client: Client, held: ReadonlySet<string>, today: string): Promise<{ tasks: TaskRow[]; coming: DayRow[] } | null> {
-  if (!held.has('tasks')) return null;
+  if (!held.has(TASKS)) return null;
   const live = 'state is not done or dropped';
   /* FOUR READS, ONE PREDICATE EACH, because the record answers one a read: what is late or due today, what was handed
      back to be checked, what is urgent, and what falls due in the next two weeks. A read refused is left out. */
   const [due, urgent, review, ahead, things] = await Promise.all([
-    rows(client, 'tasks', `${live}, by before +1d`, { field: 'by', dir: 'asc' }, 25),
-    rows(client, 'tasks', `${live}, priority is urgent`, null, 15),
-    rows(client, 'tasks', 'state is review', null, 10).catch(() => []),
-    rows(client, 'tasks', `${live}, by after today, by before +${AHEAD_DAYS + 1}d`, { field: 'by', dir: 'asc' }, 60).catch(() => []),
+    rows(client, TASKS, `${live}, by before +1d`, { field: 'by', dir: 'asc' }, 25),
+    rows(client, TASKS, `${live}, priority is urgent`, null, 15),
+    rows(client, TASKS, 'state is review', null, 10).catch(() => []),
+    rows(client, TASKS, `${live}, by after today, by before +${AHEAD_DAYS + 1}d`, { field: 'by', dir: 'asc' }, 60).catch(() => []),
     held.has('things') ? thingsOf(client).catch(() => ({ names: new Map<string, string>(), hues: new Map<string, number>() })) : Promise.resolve({ names: new Map<string, string>(), hues: new Map<string, number>() }),
   ]);
   const tasks = tasksOf(due, urgent, today, things.names, review, things.hues);
