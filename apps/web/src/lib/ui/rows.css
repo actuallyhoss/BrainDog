@@ -505,4 +505,18 @@
   .thing-glyph[data-shape=""] {
     background: none;
   }
+
+  /* A LEAD COLUMN KEEPS ITS PLACE ON A PHONE. The card above moves `.line-main` under the top line, and in a list with a
+     check, a well or a face in front that put the words under the mark. The mark keeps column 1 and the words sit beside
+     it on the first line, as they do at 1440. */
+  @media (width < 640px) {
+    .ledger-lead .line {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    }
+
+    .ledger-lead .line-main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+  }
 }

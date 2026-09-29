@@ -27,6 +27,7 @@
     hrefLabel,
     actions,
     children,
+    class: extra,
     ...rest
   }: {
     /** The glyph in the heading's well. */
@@ -43,13 +44,15 @@
     hrefLabel?: string | undefined;
     actions?: Snippet | undefined;
     children: Snippet;
+    /** Added to `tile`, never in its place. A caller's scoped style does not reach in here, so style it with `:global` or a data attribute. */
+    class?: string | undefined;
     [key: string]: unknown;
   } = $props();
 
   const head = $derived(Boolean(icon || title || actions || meta || (href && hrefLabel)));
 </script>
 
-<section class="tile" data-lead={lead ? '' : undefined} {...rest}>
+<section class={['tile', extra]} data-lead={lead ? '' : undefined} {...rest}>
   {#if head}
     <header class="tile-head">
       {#if icon}<IconWell name={icon} size="m" />{/if}

@@ -410,8 +410,9 @@
     backdrop-filter: var(--glass-blur);
   }
 
-  /* AND IN THE COMPACT BAR IT DROPS ITS OWN GLASS: the bar is glass already, and glass never holds glass. */
-  .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])) {
+  /* AND IN THE COMPACT BAR IT DROPS ITS OWN GLASS, a segmented track as well: the bar is glass already, and glass never holds glass. */
+  .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
+  .head[data-under] .head-actions :global(.segmented) {
     background: transparent;
     box-shadow: none;
     backdrop-filter: none;
@@ -597,7 +598,8 @@
     }
 
     /* The toolbar keeps its glass on a phone: nothing glass is behind it here. */
-    .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])) {
+    .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
+    .head[data-under] .head-actions :global(.segmented) {
       background: var(--glass);
       box-shadow: var(--glass-edge);
       backdrop-filter: var(--glass-blur);
