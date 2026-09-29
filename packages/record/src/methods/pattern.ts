@@ -1,7 +1,6 @@
 /**
  * The ingest pattern builder's two reads: `tryPattern`, the dry run, and `anchorsFor`, the ways to find a selection
- * again (`loop/finish/platform.md` §4.0 T, `loop/finish/contracts.md` rows `tryPattern` and `anchorsFor`). The reading
- * itself is `../pattern.ts`; this file is who may ask and what they may send.
+ * again. The reading itself is `../pattern.ts`; this file is who may ask and what they may send.
  *
  * READ+, AND THE INBOX'S OWN GATE AFTER IT. Both read arrivals, and the inbox holds whatever was sent in, about any
  * list or none, so they are asked what `inbox` asks: an owner, or a token an owner gave the `inbox` reach, over the

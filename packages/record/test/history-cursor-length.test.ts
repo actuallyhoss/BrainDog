@@ -1,10 +1,10 @@
 /**
  * A sealed cursor is one length whatever rowid it seals.
  *
- * AES-GCM KEEPS THE PLAINTEXT'S LENGTH, and the plaintext was `String(rowid)`. `loop/research-batch-nineteen-audit.md`
- * (finding 6) measured 41 characters for rowid 7, 45 for 1000 and 48 for 100000, so the `s.` cursor a member held to
- * named lists is handed past the 5,000-line walk told her whether the log was past ten thousand events or a hundred
- * thousand. The cursor still opens to the rowid it sealed, at every width.
+ * AES-GCM KEEPS THE PLAINTEXT'S LENGTH, and the plaintext was `String(rowid)`. Measured: 41 characters for rowid 7, 45
+ * for 1000 and 48 for 100000, so the `s.` cursor a member held to named lists is handed past the 5,000-line walk told
+ * her whether the log was past ten thousand events or a hundred thousand. The cursor still opens to the rowid it
+ * sealed, at every width.
  */
 
 import { test } from 'node:test';

@@ -4,9 +4,9 @@
  *
  * `declare`'s `plan-widen.test.ts` hands `plan` a parser of its own, and measured there the plan names the figure whose
  * words only the closed list could read. The record handed it none, so `diff.misreads` was `[]` on every real plan and
- * `declare`'s install refusal never fired outside those tests (declare-plan-presenter, blocked item A). And the kernel's
- * `stageInstall`, which every pack install stages through, ran `unreadable` and `lintBatch` and not `stranded`, so a
- * batch that reached it past the plan widened the list with the figure's answer moving from 1 to 0 (item B).
+ * `declare`'s install refusal never fired outside those tests. And the kernel's `stageInstall`, which every pack
+ * install stages through, ran `unreadable` and `lintBatch` and not `stranded`, so a batch that reached it past the plan
+ * widened the list with the figure's answer moving from 1 to 0.
  */
 
 import { test } from 'node:test';

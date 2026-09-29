@@ -1,6 +1,6 @@
 /**
- * A colleague's own agent: `createOwnToken`, `ownTokens` and `revokeOwnToken`, DATA (`loop/finish/contracts.md` §2.8,
- * `docs/20-COLLABORATION.md` §2, tier 0).
+ * A colleague's own agent: `createOwnToken`, `ownTokens` and `revokeOwnToken`, DATA (`docs/20-COLLABORATION.md` §2,
+ * tier 0).
  *
  * WHY A MEMBER MINTS AT ALL. `createToken` is the owner's, and an "Adds only" colleague cannot even open the app,
  * because every screen reads first; an agent adding rows through MCP is the one way in their level was made for. So any

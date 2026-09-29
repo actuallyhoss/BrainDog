@@ -1,15 +1,15 @@
 /**
- * Metadata added to a live list by agents, through `propose` and an owner's accept (DIRECTION §22).
+ * Metadata added to a live list by agents, through `propose` and an owner's accept.
  *
- * `loop/research-shell-schema.md` blocker 1, measured at `a00b3d2c`: two agents each added one field to Projects from
- * the same reading, the owner accepted both, and the second install replaced the whole register with its own copy, so
- * `domain` was erased with a value still under it and every decision said "accept". The house rule is "never resend the
- * copy you held", and the record broke it itself: `decide` called `kernel.install([decl])` with no `expect`, while
- * `setDeclaration` has always passed one. Blocker 7: the only change an agent could file was the whole register, so
- * adding one optional field meant copying twenty others and sending them back, which is both the cost and the race.
+ * MEASURED at `a00b3d2c`: two agents each added one field to Projects from the same reading, the owner accepted both,
+ * and the second install replaced the whole register with its own copy, so `domain` was erased with a value still under
+ * it and every decision said "accept". The house rule is "never resend the copy you held", and the record broke it
+ * itself: `decide` called `kernel.install([decl])` with no `expect`, while `setDeclaration` has always passed one. And
+ * the only change an agent could file was the whole register, so adding one optional field meant copying twenty others
+ * and sending them back, which is both the cost and the race.
  *
- * B1 holds a whole-body change to the version it was drawn from. B3 adds `to: { add: {...} }`, merged onto whatever
- * is live when the owner presses, so two additions never race at all.
+ * The first half below holds a whole-body change to the version it was drawn from. The second adds
+ * `to: { add: {...} }`, merged onto whatever is live when the owner presses, so two additions never race at all.
  */
 
 import { test } from 'node:test';
@@ -60,9 +60,9 @@ const idOf = (out: Out): string => {
   return (out.value as { id: string }).id;
 };
 
-/* ── B1: a whole-body change lands against the version it was drawn from ── */
+/* ── a whole-body change lands against the version it was drawn from ── */
 
-test('B1: THE SECOND OF TWO WHOLE-BODY CHANGES DRAWN FROM ONE READING REOPENS, and the first one survives', async () => {
+test('THE SECOND OF TWO WHOLE-BODY CHANGES DRAWN FROM ONE READING REOPENS, and the first one survives', async () => {
   const { sql, file, accept, live, status } = await record();
   const a = idOf(await file({ declaration_id: 'register.things', to: plus({ id: 'domain', type: 'url' }) }));
   const b = idOf(await file({ declaration_id: 'register.things', to: plus({ id: 'launched', type: 'day' }) }));
@@ -87,7 +87,7 @@ test('B1: THE SECOND OF TWO WHOLE-BODY CHANGES DRAWN FROM ONE READING REOPENS, a
   sql.close();
 });
 
-test('B1: A VERSION ABOVE THE LIVE ONE IS STAMPED WITH THE LIVE ONE, and one at or below it is kept', async () => {
+test('A VERSION ABOVE THE LIVE ONE IS STAMPED WITH THE LIVE ONE, and one at or below it is kept', async () => {
   const { sql, file, stored } = await record();
   const id = idOf(await file({ declaration_id: 'register.things', from_version: 99, to: plus({ id: 'domain', type: 'url' }) }));
   assert.equal(stored(id).from_version, 1);
@@ -102,7 +102,7 @@ test('B1: A VERSION ABOVE THE LIVE ONE IS STAMPED WITH THE LIVE ONE, and one at 
   sql.close();
 });
 
-test('B1: A SINGLE WHOLE-BODY CHANGE STILL INSTALLS', async () => {
+test('A SINGLE WHOLE-BODY CHANGE STILL INSTALLS', async () => {
   const { sql, file, accept, live, status } = await record();
   const a = idOf(await file({ declaration_id: 'register.things', to: plus({ id: 'domain', type: 'url' }) }));
   assert.ok((await accept(a)).ok);
@@ -111,9 +111,9 @@ test('B1: A SINGLE WHOLE-BODY CHANGE STILL INSTALLS', async () => {
   sql.close();
 });
 
-/* ── B3: a field-level change, merged at acceptance ── */
+/* ── a field-level change, merged at acceptance ── */
 
-test('B3: TWO ADDITIONS FILED FROM ONE READING BOTH LAND, because each is merged onto what is live when accepted', async () => {
+test('TWO ADDITIONS FILED FROM ONE READING BOTH LAND, because each is merged onto what is live when accepted', async () => {
   const { sql, api, file, accept, live, status, stored } = await record();
   const a = idOf(await file({ declaration_id: 'register.things', to: { add: { register: 'things', fields: [{ id: 'domain', type: 'url' }] } } }));
   const b = idOf(
@@ -139,7 +139,7 @@ test('B3: TWO ADDITIONS FILED FROM ONE READING BOTH LAND, because each is merged
   sql.close();
 });
 
-test('B3: AN ADDITION TAKES NOTHING AWAY AND RETYPES NOTHING', async () => {
+test('AN ADDITION TAKES NOTHING AWAY AND RETYPES NOTHING', async () => {
   const { sql, file } = await record();
   const refused = async (add: Record<string, unknown>, declaration_id = 'register.things') => {
     const out = await file({ declaration_id, to: { add } });
@@ -161,7 +161,7 @@ test('B3: AN ADDITION TAKES NOTHING AWAY AND RETYPES NOTHING', async () => {
   sql.close();
 });
 
-test('B3: AN ADDITION THAT A RACE HAS MADE A DUPLICATE IS REFUSED AT ACCEPTANCE, and stays open', async () => {
+test('AN ADDITION THAT A RACE HAS MADE A DUPLICATE IS REFUSED AT ACCEPTANCE, and stays open', async () => {
   const { sql, file, accept, live, status } = await record();
   const a = idOf(await file({ declaration_id: 'register.things', to: { add: { register: 'things', fields: [{ id: 'domain', type: 'url' }] } } }));
   const b = idOf(await file({ declaration_id: 'register.things', to: { add: { register: 'things', fields: [{ id: 'domain', type: 'text' }] } } }));

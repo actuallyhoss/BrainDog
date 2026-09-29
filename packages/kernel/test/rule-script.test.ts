@@ -1,20 +1,18 @@
 /**
- * An automation's `script` step starts a script (`docs/07-INGEST-AND-RULES.md` §6.2, the step table; W59-1 in
- * `loop/research-living-in-it.md` §7).
+ * An automation's `script` step starts a script (`docs/07-INGEST-AND-RULES.md` §6.2, the step table).
  *
- * WHAT WAS MEASURED BEFORE THIS FILE. W59-1 stopped on 24 September at `8a489d4c` because neither way a rule could reach
- * a script composed: `run:` names a declared call and nothing else, and a `script` step installed and failed every run
- * with "a step that waits on a script is not in this build (NOT_IN_THIS_BUILD)". The first test below failed on that
- * sentence. A script declared `runs: { rule: true }` was read by the egress line that tells the owner about it and by
- * nothing that starts one.
+ * WHAT WAS MEASURED BEFORE THIS FILE. At `8a489d4c` neither way a rule could reach a script worked: `run:` names a
+ * declared call and nothing else, and a `script` step installed and failed every run with "a step that waits on a
+ * script is not in this build (NOT_IN_THIS_BUILD)". The first test below failed on that sentence. A script declared
+ * `runs: { rule: true }` was read by the egress line that tells the owner about it and by nothing that starts one.
  *
  * THE STEP HANDS OFF AND DOES NOT WAIT. The record never runs a script (`script.ts`): the step queues ONE `script.run`
  * outbox row, exactly as a clock's fire does, and the host that leases it applies what the script wrote through
  * `finishScript`. What comes back does not resume the run, so the step is done when the row is queued, and `as:` holds
  * the id of the job it queued.
  *
- * NOTHING HERE IS ABOUT TASKS. The kernel is a shell (DIRECTION §22): the lists below are a generic parent and child, and
- * the cascade the Work pack builds on this is the pack's own script.
+ * NOTHING HERE IS ABOUT TASKS. The kernel is a shell: the lists below are a generic parent and child, and the cascade
+ * the Work pack builds on this is the pack's own script.
  */
 
 import { test } from 'node:test';
@@ -128,11 +126,11 @@ test('A SCRIPT THAT DOES NOT SAY runs: { rule: true } IS NOT STARTED BY A RULE, 
   sql.close();
 });
 
-/* THE CHECKER'S REFUSAL OF THE FIRST ATTEMPT, on 24 September: `startScript` read the declaration and never the
-   script's schedule row, so a script paused after three refused runs was queued again by the next write that fired the
-   rule. The clock honours that row (`drainSchedule` fires only a pending one), and a rule is a second way in, so it
-   reads the same row. The row is paused in SQL here because what pauses it is `pauseAfterRefusals` in
-   `script-run.ts`, which `script-run.test.ts` measures; this file measures who honours it. */
+/* WHAT THE FIRST ATTEMPT MISSED: `startScript` read the declaration and never the script's schedule row, so a script
+   paused after three refused runs was queued again by the next write that fired the rule. The clock honours that row
+   (`drainSchedule` fires only a pending one), and a rule is a second way in, so it reads the same row. The row is
+   paused in SQL here because what pauses it is `pauseAfterRefusals` in `script-run.ts`, which `script-run.test.ts`
+   measures; this file measures who honours it. */
 test('A PAUSED SCRIPT IS NOT STARTED BY A RULE, the run says so, and once it is resumed a rule starts it again', async () => {
   const { k, sql } = await record(script('close_children', { rule: true }), onDone('close_children', 'close_children'));
   sql.exec("UPDATE schedule SET state = 'paused' WHERE kind = 'script' AND key = 'close_children'");
@@ -185,8 +183,8 @@ test('A SCRIPT THAT IS NOT INSTALLED FAILS THE RUN WITH A SENTENCE NAMING IT, an
 });
 
 /* RETIRED IS THE SAME AS MISSING, and it is the gate a pack turned off meets too, since turning a pack off retires its
-   scripts. The checker found nothing held this: with `AND retired = 0` taken out of `startScript`'s query, all seven
-   tests above and below still passed, and a retired script would have been queued by the next write. */
+   scripts. Nothing held this before: with `AND retired = 0` taken out of `startScript`'s query, all seven tests above
+   and below still passed, and a retired script would have been queued by the next write. */
 test('A RETIRED SCRIPT IS NOT STARTED BY A RULE, and the run says there is no such script', async () => {
   const { k, sql } = await record(script('close_children', { rule: true }), onDone('close_children', 'close_children'));
   const retired = k.retire(['script.close_children'], { actor: 'p_1' });

@@ -62,7 +62,7 @@ test('A LABEL THAT READS AS ANOTHER VALUE IS REFUSED, because a filter saying it
   assert.equal(blank.ok, false);
 });
 
-/* THIS PINNED A TO Z BY LABEL AND NOW PINS THE DECLARED ORDER (W56-3, his call 1 taken as the survey's default). It asserted
+/* THIS PINNED A TO Z BY LABEL AND NOW PINS THE DECLARED ORDER, the owner's call. It asserted
    `'Money in comes before Money out'`, `owed_to_me` first ascending, because Money in is the earlier label; `values` is
    `['owed_by_me', 'owed_to_me']`, so declared order puts `owed_by_me` first. `enum-order.test.ts` holds the rule. */
 test('A LABELLED ENUM SORTS IN THE ORDER ITS VALUES WERE DECLARED, not by its labels, and pages the same way', async () => {

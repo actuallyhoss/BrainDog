@@ -1,5 +1,5 @@
 /**
- * A bank text filed by an account's printed tail waits for one confirmation (`loop/DIRECTION.md` §25 A2).
+ * A bank text filed by an account's printed tail waits for one confirmation.
  *
  * `lookup`'s masked-tail rule reads digits printed behind stars as the end of one row's longer value, so a line that
  * prints `***518` lands on the account whose number ends 518. That is a guess about money, and a misfiled transfer is

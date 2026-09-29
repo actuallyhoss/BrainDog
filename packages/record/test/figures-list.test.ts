@@ -1,5 +1,5 @@
 /**
- * Every figure the record declares, listed, and not only the ones a page draws (audit sixty-two finding 2).
+ * Every figure the record declares, listed, and not only the ones a page draws.
  *
  * WHAT WAS MISSING. `metric` reads one figure by an id the caller already knows, and `pages` and `page` name a figure
  * only where a block draws it. Nothing the record answered listed its metric declarations, so on a record holding
@@ -33,7 +33,7 @@ const value = <T>(r: { ok: boolean }): T => {
   return (r as unknown as { value: T }).value;
 };
 
-/** Audit sixty-two's M1 record: the three first-party packs money-core needs, through the owner's door as they ship. */
+/** The money record: the three first-party packs money-core needs, through the owner's door as they ship. */
 async function money() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
@@ -54,9 +54,10 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
     declared.map((d) => d.id.slice('metric.'.length)).sort(),
     `${listed.length} of ${declared.length} listed`,
   );
-  /* Measured on this record before the method existed: 36 declared and 18 drawn; money-core 3.0.0 made it 41, and its books and a project's monthly
-     series (the second finish workflow) made it 47, and a project page's month (money-core 3.2.0) made it 51. The number
-     is asserted so that a pack shipping fewer figures is noticed here rather than read as the finding closing on its own. */
+  /* Measured on this record before the method existed: 36 declared and 18 drawn; money-core 3.0.0 made it 41, and its
+     books and a project's monthly series made it 47, and a project page's month (money-core 3.2.0) made it 51. The
+     number is asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its
+     own. */
   assert.equal(declared.length, 51);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late to you', format: 'money', list: 'obligations', pack: 'money-core', param: false });

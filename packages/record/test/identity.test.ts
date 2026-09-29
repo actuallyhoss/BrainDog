@@ -306,7 +306,7 @@ test('THE LOCKOUT: ten wrong keys are compared, the eleventh is not, and the rig
 });
 
 test('AND IT FORGETS: strikes whose first is fifteen minutes old start again at one', async () => {
-  /* Without this, a handful of typos spread over a month from one office add up to a lock (the plan's finding 5). */
+  /* Without this, a handful of typos spread over a month from one office add up to a lock. */
   const { clock, d } = setup();
   const ip = '198.51.100.9';
   for (let i = 0; i < 10; i++) notYou(await keyIn(d, { ip, key: 'wrong' }));
@@ -789,9 +789,9 @@ test('A SWITCH ASKS THE RECORD ITSELF, and a name that only folds to a slug open
 /* ── a request that names its record ──────────────────────────────────── */
 
 test('A SESSION ASKED WITH A SLUG ANSWERS THAT RECORD FOR A MEMBER, the same 403 for everybody else, and writes no row', async () => {
-  /* THE BROWSER NOW NAMES ITS RECORD IN THE PATH (`/app/<slug>/api/…`, `loop/research-one-domain.md` §2.4), and this is
-     the check that runs before the Worker addresses anything. It is `switch`'s own question without `switch`'s write:
-     it runs on every request, and the Directory is the one writer the whole installation signs in through. */
+  /* THE BROWSER NOW NAMES ITS RECORD IN THE PATH (`/app/<slug>/api/…`), and this is the check that runs before the
+     Worker addresses anything. It is `switch`'s own question without `switch`'s write: it runs on every request, and
+     the Directory is the one writer the whole installation signs in through. */
   const raw = openSqlite();
   const writes: string[] = [];
   const note = (text: string) => {

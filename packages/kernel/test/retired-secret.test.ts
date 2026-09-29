@@ -1,19 +1,18 @@
 /**
- * A secret field retired and then dropped from its list is still a secret: `loop/research-batch-fifty-five-audit.md` §4.
+ * A secret field retired and then dropped from its list is still a secret.
  *
  * WHAT WAS MEASURED, BEFORE THE REPAIR. `pin` on Obligations is secret, a row holds `hunter2` in it, and the list then
  * retires `pin` and drops it, which the kernel allows because a retired field's values were put away on purpose
  * (`index.ts`'s `contradicted`). The row keeps the value. `sealedOf` read the list's declaration as it stands, which no
  * longer names `pin`, so the run-time check had no secret to guard, and the lint read the same declaration through
- * `declare.ts`'s `knownTo`. Each of the audit's four rules below installed and wrote `hunter2`: into the note event for
- * the three notes, and into `memo` for the set.
+ * `declare.ts`'s `knownTo`. Each of the four rules below installed and wrote `hunter2`: into the note event for the
+ * three notes, and into `memo` for the set.
  *
- * TWO LINES, AND EACH IS HELD HERE ON ITS OWN. The lint refuses the rule at install, which is the audit's brief ("S1's
- * right half, asserted refused"). The run-time line is for a rule the lint never saw that way: one installed before
- * `pin` was declared at all passes, since adding a field to a list asks nothing of the rules already on it (measured on
- * 23 September), and so does every rule stored before this repair. Those are installed first here and must still write
- * the value nowhere. The first held draft of this repair had the run-time line alone, so the four rules still installed,
- * and its checker refused it for that.
+ * TWO LINES, AND EACH IS HELD HERE ON ITS OWN. The lint refuses the rule at install. The run-time line is for a rule
+ * the lint never saw that way: one installed before `pin` was declared at all passes, since adding a field to a list
+ * asks nothing of the rules already on it (measured), and so does every rule stored before this repair. Those are
+ * installed first here and must still write the value nowhere. The run-time line alone is not enough, because the four
+ * rules would still install.
  */
 
 import { test } from 'node:test';

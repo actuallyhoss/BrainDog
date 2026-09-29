@@ -1,5 +1,5 @@
 /**
- * Turning a pack off and on (`loop/research-modular.md` §1.2, §1.5).
+ * Turning a pack off and on.
  *
  * What is asserted is that nothing is lost. A disabled pack's registers leave the cache, its pages
  * stop reading, its indexes go, and every row stays exactly as it was; enabling brings back the same
@@ -161,7 +161,7 @@ test('DISABLE THEN ENABLE OVER A REGISTER HOLDING ROWS, and nothing is lost', as
   assert.deepEqual(indexesOf(sql, 'notes'), [], 'a disabled register kept its indexes');
   assert.deepEqual(rowsOf(sql, 'notes'), rows, 'a row changed when the pack went off');
   assert.ok(disabledAt(sql, 'notebook'));
-  /* `requires` is what the stored manifest asks of other packs (audit forty-two, finding 1), and the notebook asks nothing. */
+  /* `requires` is what the stored manifest asks of other packs, and the notebook asks nothing. */
   assert.deepEqual(k.packs().map((p) => ({ ...p })), [{ id: 'notebook', version: '1.0.0', requires: {} }], 'the pack row went');
 
   const on = value(await k.enablePack('notebook'));

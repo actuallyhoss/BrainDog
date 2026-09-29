@@ -1,6 +1,5 @@
 /**
- * The lists a block reads BESIDE its source, named, and the block keys the layouts audit found unread or unheld
- * (`loop/research-audit-2026-09-25-layouts.md` findings 1, 6 and 7).
+ * The lists a block reads BESIDE its source, named, and the block keys once found unread or unheld.
  *
  * `registersOf` is what the record holds a block by, and it named only a block's `source`. Four reads went round it,
  * each measured before this file: a card's `as: next` and `as: ring` read every row of the list of steps under the
@@ -32,7 +31,7 @@ const BESIDE = {
   projects: () => 'things',
 };
 
-/* ── finding 1: the lists a card reads beside its own ─────────────────────────────────────────────────── */
+/* ── the lists a card reads beside its own ────────────────────────────────────────────────────────────── */
 
 test('A CARD WHOSE COLUMN IS as: next OR as: ring NAMES EVERY LIST OF STEPS UNDER ITS CARDS, which it reads whole', () => {
   for (const as of ['next', 'ring'] as const) {
@@ -67,7 +66,7 @@ test("A PROGRESS BLOCK'S spent: AND toward: NAME THE LIST THEIR FIGURE COUNTS, a
   }
 });
 
-/* ── finding 6: `where:` on inputs, which nothing read ────────────────────────────────────────────────── */
+/* ── `where:` on inputs, which nothing read ───────────────────────────────────────────────────────────── */
 
 const CHECKS: Declaration = {
   id: 'register.checks',
@@ -97,7 +96,7 @@ test('where: ON AN inputs BLOCK IS REFUSED AT INSTALL AND AT READ, because the r
   assert.deepEqual(read.rows, []);
 });
 
-/* ── finding 7: what a read answers, in one list ─────────────────────────────────────────────────────── */
+/* ── what a read answers, in one list ────────────────────────────────────────────────────────────────── */
 
 test('EVERY KEY A READ ANSWERS IS IN ANSWER_KEYS, so a steps block read back with its open count is not refused for it', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));

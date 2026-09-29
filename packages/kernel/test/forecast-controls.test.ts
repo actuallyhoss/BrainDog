@@ -2,11 +2,11 @@
  * What a step of the cash walk carries so the forecast's controls can act on it without a second query.
  *
  * THE CONTROLS ARE ARITHMETIC OVER THE STEPS THE HOST SENT (`packages/render/src/forecast.ts`), and before this a step
- * said only its day, its label and its converted amount. Two of the five controls the old tool has cannot be done from
- * that. A rate drift needs to know which steps were converted and from what: measured at the render layer, a USD
- * salary walked into EGP beside EGP rent crossed zero on 2 January with a 10% yearly drift and with none, because
- * nothing could tell the salary from the rent. And counting a plan in or out needs to know which steps are one plan:
- * an instalment's label is `Proofing press, 3 of 8`, so a label is a different word for every part.
+ * said only its day, its label and its converted amount. Two of the forecast's five controls cannot be done from that.
+ * A rate drift needs to know which steps were converted and from what: measured at the render layer, a USD salary
+ * walked into EGP beside EGP rent crossed zero on 2 January with a 10% yearly drift and with none, because nothing
+ * could tell the salary from the rent. And counting a plan in or out needs to know which steps are one plan: an
+ * instalment's label is `Proofing press, 3 of 8`, so a label is a different word for every part.
  *
  * BOTH ARE SET ONLY WHEN TRUE, so a walk in one currency with no group is the walk it was, key for key.
  */

@@ -1,8 +1,7 @@
 /**
  * A record on money-core 1.5.0 whose owner edited one money-core declaration in the app, offered the current version
- * (`loop/research-pack-update-edited.md`, the probes `p1`, `p2` and the checker's `c1` made into assertions). The probe
- * was offered 1.6.0. 1.6.0 was never released, so a record on 1.5.0 is now offered 1.7.0 directly, and what is kept and
- * what is refused is the same.
+ * (three probes made into assertions). The first probe was offered 1.6.0. 1.6.0 was never released, so a record on
+ * 1.5.0 is now offered 1.7.0 directly, and what is kept and what is refused is the same.
  *
  * THE UPDATE WAS OFFERED AND THEN REFUSED. `arrangement` compared versions and offered 1.6.0; `propose` planned it, found
  * the edited `spent-30d` with `pack_id` null, called it `PROVIDES_CONFLICT`, and told the owner to retire the figure they
@@ -55,8 +54,8 @@ const leaveAt = (version: string) => new RegExp(`leave money-core at ${version.r
 
 /**
  * The only bank patterns 1.5.0 had. Every other one, mail pattern or SMS twin, arrived with a later version. Since
- * money-core 3.0.0 the card patterns live in `packs/card-alerts` (USE-1), so the current document carries none and
- * `BANK` is empty: the "did not arrive" loop below guards the day a pattern comes back, and checks nothing today.
+ * money-core 3.0.0 the card patterns live in `packs/card-alerts`, so the current document carries none and `BANK` is
+ * empty: the "did not arrive" loop below guards the day a pattern comes back, and checks nothing today.
  */
 const IN_150 = ['bank-card-in', 'bank-card-out'];
 const BANK = (firstPartyDocument('money-core') as unknown as Doc).declarations
@@ -64,12 +63,12 @@ const BANK = (firstPartyDocument('money-core') as unknown as Doc).declarations
   .filter((i): i is string => typeof i === 'string' && !IN_150.includes(i));
 
 /**
- * AN OLDER money-core STANDING IN FOR 1.5.0, rebuilt from the current document: called 1.5.0, every bank pattern but the
- * two 1.5.0 had taken out, and Spent and Received counting 31 days again. It was once exactly 1.5.0 (fingerprint
- * `6442babb13c81d12`, measured on 22 September 2026 against the document built from `aeef01c5^`). It is no longer: the
- * current document has no bank pattern to take out, and 3.0.0 changed the figures (each money target is now a setting),
- * so this is today's declarations under an older number and the two older windows. That is all these tests need: an
- * installed version below the current one, and a `spent-30d` whose `where` the update would rewrite.
+ * AN OLDER money-core STANDING IN FOR 1.5.0, rebuilt from the current document: called 1.5.0, every bank pattern but
+ * the two 1.5.0 had taken out, and Spent and Received counting 31 days again. It was once exactly 1.5.0 (fingerprint
+ * `6442babb13c81d12`, measured against the document built from `aeef01c5^`). It is no longer: the current document has
+ * no bank pattern to take out, and 3.0.0 changed the figures (each money target is now a setting), so this is today's
+ * declarations under an older number and the two older windows. That is all these tests need: an installed version
+ * below the current one, and a `spent-30d` whose `where` the update would rewrite.
  */
 const v150 = (): Doc => {
   const d = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
@@ -179,9 +178,10 @@ test('a declaration another pack owns is still a conflict', async () => {
   sql.close();
 });
 
-/* p2's case, which the conflict used to hide: the page stays the owner's, and the update drops the figure its first tile
-   reads. Measured before the guard, the install succeeded and the page drew a tile for a figure that no longer existed.
-   Both shapes of the next version: one still shipping the page (so the page is kept), and the probe's, which ships none. */
+/* The second probe's case, which the conflict used to hide: the page stays the owner's, and the update drops the figure
+   its first tile reads. Measured before the guard, the install succeeded and the page drew a tile for a figure that no
+   longer existed. Both shapes of the next version: one still shipping the page (so the page is kept), and the probe's,
+   which ships none. */
 for (const ships of [true, false])
   test(`a kept page reading a figure the update retires is refused, and nothing is written (next version ${ships ? 'ships' : 'drops'} the page)`, async () => {
     const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
@@ -206,9 +206,9 @@ for (const ships of [true, false])
     sql.close();
   });
 
-/* The checker's c1: a kept LIST the update changes. Left out as the kept rule leaves a declaration, the install went
-   through with nothing retired and nothing unresolved, and the record held a live metric summing a field its list did not
-   have. The kernel does not catch that either (`c2`, `sum: 'nosuch'`, is also ok), so the kept rule has to. */
+/* The third probe: a kept LIST the update changes. Left out as the kept rule leaves a declaration, the install went
+   through with nothing retired and nothing unresolved, and the record held a live metric summing a field its list did
+   not have. The kernel does not catch that either (`sum: 'nosuch'` is also ok), so the kept rule has to. */
 test('a kept list the update changes is refused, and nothing is written', async () => {
   const next = structuredClone(firstPartyDocument('money-core')) as unknown as Doc;
   next.version = NEXT;
@@ -249,8 +249,8 @@ test('a kept list the update does not change is kept', async () => {
   sql.close();
 });
 
-/* An owner who arranges Money twice has two rows with `pack_id` null above the pack's. The brief's "latest earlier version"
-   reads the second edit's predecessor, which is the owner's first, and would call the page never the pack's. */
+/* An owner who arranges Money twice has two rows with `pack_id` null above the pack's. A rule of "latest earlier
+   version" reads the second edit's predecessor, which is the owner's first, and would call the page never the pack's. */
 test('a page edited twice is still kept', async () => {
   const { sql, api, k } = await recordWith(v150(), 'page.money');
   const r = k.declarations().find((x) => x.id === 'page.money')!;

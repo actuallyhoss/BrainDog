@@ -3,9 +3,9 @@
  *
  * 2cf9ef9c changed `upTo: null` to `upTo: 0` for this case, because the client types `upTo` as a number and the
  * self-host answered 0 on an empty log before `markRead` learned to walk down to an event the caller may see. The
- * commit carried no test, and `loop/research-batch-sixteen-audit.md` finding 9 measured it holding with nothing to
- * stop it going back. Null here is not only a type error in the client: `seen_at` would still be right, so the only
- * thing that says the mark did not move is this number.
+ * commit carried no test, and it was measured holding with nothing to stop it going back. Null here is not only a type
+ * error in the client: `seen_at` would still be right, so the only thing that says the mark did not move is this
+ * number.
  */
 
 import { test } from 'node:test';

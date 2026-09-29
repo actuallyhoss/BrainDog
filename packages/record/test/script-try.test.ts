@@ -1,6 +1,6 @@
 /**
- * `scriptTry`, the record's half of trying a draft script before it is proposed (`loop/research-shell-scripts.md`
- * section 7; the host half is `@braindog/host/script-try`).
+ * `scriptTry`, the record's half of trying a draft script before it is proposed (the host half is
+ * `@braindog/host/script-try`).
  *
  * THE RECORD CHECKS AND HANDS OVER, AND RUNS NOTHING. It holds the caller to `propose`, refuses a body an install would
  * refuse by the kernel's own `scriptBody`, and hands the host's `tryScript` the record, the body, the input, reads bound

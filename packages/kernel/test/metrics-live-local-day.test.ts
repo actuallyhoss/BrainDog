@@ -1,13 +1,12 @@
 /**
  * The live figure and the list read the record's local day, as the stored night point does.
  *
- * `01d9a93a` SAID EVERY LIST'S OWN TIMESTAMPS ARE READ IN THE LOCAL DAY, AND ONLY THE NIGHT POINT WAS.
- * `localInstants` ran only where `ctx.tz` was set, and only `snapshot` set it: the kernel's `metric`
- * and the page layer's `read` passed an `evalContext()` with no zone, `list` never called
- * `localInstants`, and `resolveDay` dated `today` from the UTC date of the clock. The audit
- * (`loop/research-batch-twenty-eight-audit.md` §4) opened a record in `Asia/Tokyo` at 15:05 UTC on
- * 5 September, which is 00:05 on the 6th there and the moment the night alarm stores the 5th, over
- * four rows created at 14:00Z and 16:00Z on the 4th and 10:00Z and 15:01Z on the 5th, and measured
+ * `01d9a93a` SAID EVERY LIST'S OWN TIMESTAMPS ARE READ IN THE LOCAL DAY, AND ONLY THE NIGHT POINT WAS. `localInstants`
+ * ran only where `ctx.tz` was set, and only `snapshot` set it: the kernel's `metric` and the page layer's `read` passed
+ * an `evalContext()` with no zone, `list` never called `localInstants`, and `resolveDay` dated `today` from the UTC
+ * date of the clock. Measured: a record opened in `Asia/Tokyo` at 15:05 UTC on 5 September, which is 00:05 on the 6th
+ * there and the moment the night alarm stores the 5th, over four rows created at 14:00Z and 16:00Z on the 4th and
+ * 10:00Z and 15:01Z on the 5th, read
  *
  *     created_at is today       live 1100 | list sum 1100 | night point 110
  *     created_at is yesterday   live 11   | list sum 11   | night point 1
@@ -43,8 +42,8 @@ const DATAPOINTS: Declaration = {
   } as never,
 };
 
-/* The audit's four rows. `on` is the local date each was created on in Tokyo, so the declared `day`
-   field and the kernel's `created_at` ask the same question about the same rows. */
+/* The four measured rows. `on` is the local date each was created on in Tokyo, so the declared `day` field and the
+   kernel's `created_at` ask the same question about the same rows. */
 const ROWS: ReadonlyArray<[created: string, weight: number, on: string]> = [
   ['2026-09-04T14:00:00.000Z', 1, '2026-09-04'],
   ['2026-09-04T16:00:00.000Z', 10, '2026-09-05'],
@@ -100,14 +99,12 @@ for (const [where, want] of [
     assert.deepEqual(got, { live: want, list: want });
   });
 
-/* AND A METRIC READ AS OF A PAST DAY IN A ZONE FINDS ITS WINDOW'S FIRST DAY ON THE LOCAL CALENDAR, AND
-   ENDS `created_at` AT THAT NIGHT'S LOCAL MIDNIGHT. `evaluateMetric` resolves through `resolvedOf` and not
-   the exported `predicateOf`, because `endedAt` reads a window's first day off its lower bound, and
-   `predicateOf` hands back that bound as the instant the local day starts at, whose UTC date east of UTC
-   is the day before. `created_at after -1d` as of the 5th is the local 5th, which holds the rows made at
-   01:00 and 19:00 there (10 and 100): 110. A window beginning on the as-of day took no end before
-   `loop/finish/defects.md` M17, which put the row made at 00:01 on the 6th (1000) in the night point
-   for the 5th. */
+/* AND A METRIC READ AS OF A PAST DAY IN A ZONE FINDS ITS WINDOW'S FIRST DAY ON THE LOCAL CALENDAR, AND ENDS
+   `created_at` AT THAT NIGHT'S LOCAL MIDNIGHT. `evaluateMetric` resolves through `resolvedOf` and not the exported
+   `predicateOf`, because `endedAt` reads a window's first day off its lower bound, and `predicateOf` hands back that
+   bound as the instant the local day starts at, whose UTC date east of UTC is the day before. `created_at after -1d` as
+   of the 5th is the local 5th, which holds the rows made at 01:00 and 19:00 there (10 and 100): 110. A window beginning
+   on the as-of day once took no end, which put the row made at 00:01 on the 6th (1000) in the night point for the 5th. */
 test('a metric as of a past day in Tokyo reads its window as the local day, ended at its midnight', async () => {
   const { sql } = await recordIn('Asia/Tokyo');
   const schema: Schema = { register: 'datapoints', fields: { what: { type: 'text' }, weight: { type: 'int' }, on: { type: 'day' } } } as Schema;

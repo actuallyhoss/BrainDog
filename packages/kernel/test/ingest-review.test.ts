@@ -2,11 +2,11 @@
  * `on_conflict: review`: an arrival that looks like a row the register already holds is held for a person, not dropped.
  *
  * A NEAR MATCH WAS EITHER A SKIP OR A SECOND ROW, and neither can be right for a message that may be a real second
- * charge. `loop/research-bank-real.md` found two card alerts in a hundred real texts with the same amount, merchant and
- * day a few minutes apart, whose available limits differ by exactly the charge. `skip` stored the second as
- * `transactions#N already says this` and no screen ever asked; `new` would file every forwarded mail and its SMS twin
- * twice. Measured before `review` existed: a declaration carrying it installed clean (nothing checks the value at
- * install) and then behaved as `new`, writing the second row at `exact` with no reason on it.
+ * charge. A hundred real texts held two card alerts with the same amount, merchant and day a few minutes apart, whose
+ * available limits differ by exactly the charge. `skip` stored the second as `transactions#N already says this` and no
+ * screen ever asked; `new` would file every forwarded mail and its SMS twin twice. Measured before `review` existed: a
+ * declaration carrying it installed clean (nothing checks the value at install) and then behaved as `new`, writing the
+ * second row at `exact` with no reason on it.
  *
  * SO `review` STORES THE ARRIVAL AS `review` AND OPENS A ROWSET NAMING THE ROW IT RESEMBLES. Accepting it files the
  * second row; declining it leaves the register as it was. Nothing is written until a person has said which it is.
@@ -88,7 +88,7 @@ test('A SECOND ARRIVAL LIKE A ROW ALREADY FILED IS HELD FOR A PERSON, naming the
   const raw = sql.one<{ state: string; reason: string }>('SELECT state, reason FROM inbox_raw WHERE id = ?', second.raw);
   assert.deepEqual({ ...raw }, { state: 'review', reason: second.reason }, 'the stored row says the same as the answer');
   /* THE MATCH EVENT SAYS WHAT LEVEL IT MATCHED AT, as every other held arm's does. Deleting the `note` call left all
-     three tests above green when the checker tried it on 23 September, so this is the line that notices. */
+     three tests above green when it was tried, so this is the line that notices. */
   const matched = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'match' AND target = ?", `inbox_raw:${second.raw}`);
   assert.equal(matched?.to_v, 'needs-review');
 
@@ -138,10 +138,10 @@ test('AN ARRIVAL THAT RESEMBLES NOTHING IS FILED AS BEFORE, and skip still skips
 });
 
 /**
- * A `near` KEY'S DAY AND PREFIX ARE NOT "THE SAME", and the reason said they were. Measured on 23 September with the
- * shape of the seed's `SAME_MOVEMENT` (`{ near: { on: [amount, account], day: on, prefix: what } }`) and two alerts a
- * day apart whose merchants only started alike: the reason read "with the same amount, account, on and what". The
- * reader is a stub that agrees with every candidate, because the fold is `extract`'s and the sentence is the kernel's.
+ * A `near` KEY'S DAY AND PREFIX ARE NOT "THE SAME", and the reason said they were. Measured with the shape of the
+ * seed's `SAME_MOVEMENT` (`{ near: { on: [amount, account], day: on, prefix: what } }`) and two alerts a day apart
+ * whose merchants only started alike: the reason read "with the same amount, account, on and what". The reader is a
+ * stub that agrees with every candidate, because the fold is `extract`'s and the sentence is the kernel's.
  */
 test('A NEAR KEY SAYS WHICH FIELDS ARE EQUAL AND WHICH ARE ONLY CLOSE', async () => {
   const sql = openSqlite();

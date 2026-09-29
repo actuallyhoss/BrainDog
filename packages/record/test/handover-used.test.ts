@@ -1,12 +1,11 @@
 /**
- * The record says which doors it has put to work, so money-core's update hands on only those
- * (`loop/research-batch-thirty-four-audit.md` §8, the record's half).
+ * The record says which doors it has put to work, so money-core's update hands on only those (the record's half).
  *
- * `plan` learned to hand a `hands` entry only when the record uses it (`Installed.used`), and a caller that says nothing
- * gets everything handed as before. The record said nothing, so on every real record money-core 1.8.0 still handed all
- * twelve HSBC Egypt doors to `bank-hsbc-eg`, a pack the owner never chose. `installedState` now names every ingest that
- * has filed an arrival (`ingest_receipt`) and every webhook door that holds a token (`heldDigest`), and, since audit
- * thirty-six's finding 2, every door that has claimed an arrival at all, which is a door whose lines wait in review.
+ * `plan` learned to hand a `hands` entry only when the record uses it (`Installed.used`), and a caller that says
+ * nothing gets everything handed as before. The record said nothing, so on every real record money-core 1.8.0 still
+ * handed all twelve HSBC Egypt doors to `bank-hsbc-eg`, a pack the owner never chose. `installedState` now names every
+ * ingest that has filed an arrival (`ingest_receipt`) and every webhook door that holds a token (`heldDigest`), and
+ * every door that has claimed an arrival at all, which is a door whose lines wait in review.
  *
  * THE UPDATE PLANNED IS money-core WITH THE `hands` IT SHIPPED FROM 1.8.0 UNTIL 2.4.0 STOPPED NAMING OTHER PACKS
  * (`seed/test/pack-files.ts`), because what this holds is the record's half of a handover, and today's document hands
@@ -77,7 +76,7 @@ test('THE RECORD NAMES WHAT IT USES, SO THE UPDATE HANDS A DOOR THAT FILED A ROW
   sql.close();
 });
 
-test('A DOOR WHOSE ARRIVALS WAIT IN REVIEW IS A DOOR IN USE, so bank-from-unsure is handed and not retired (audit thirty-six, finding 2)', async () => {
+test('A DOOR WHOSE ARRIVALS WAIT IN REVIEW IS A DOOR IN USE, so bank-from-unsure is handed and not retired', async () => {
   /* THE CASE ABOVE PUTS THE ACCOUNT ON FILE SO THE LINE FILES A ROW, which is exactly the one that passed. Measured on
      the record as it stood: `bank-from-unsure` files at `needs-review` by design, so it leaves a suggestion and never an
      `ingest_receipt`, and the plan retired it with the other eleven; after money-core 1.8.0 installed, the next such

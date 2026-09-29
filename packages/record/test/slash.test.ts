@@ -1,6 +1,6 @@
 /**
- * Slash reading how a record is used (`src/slash.ts`, `loop/research-spark.md` S15): what it notices, what it proposes, and
- * that every proposal goes through the same door as a token's and changes nothing until the owner accepts it.
+ * Slash reading how a record is used (`src/slash.ts`): what it notices, what it proposes, and that every proposal goes
+ * through the same door as a token's and changes nothing until the owner accepts it.
  *
  * THE RECORDS ARE REAL. Packs are installed by an accepted proposal, rows are written through the kernel with the clock moved
  * day by day, and pages are opened and lists read through the API, so the observations are the ones a browser leaves.
@@ -574,7 +574,7 @@ test('SLASH LOOKS ONCE A DAY ON ITS OWN, keeps to three waiting, never asks a di
   sql.close();
 });
 
-/* ── a press by an owner held from a list (the checker of `loop/research-audit-2026-09-25-layouts.md` finding 8) ── */
+/* ── a press by an owner held from a list ───────────────────────────────── */
 
 /** Work with a second list nobody writes, so what is left of Work once Tasks leaves a reading looks untouched. */
 const WORK_TWO = { ...manifest('work'), declarations: [list('work', 'tasks', 'Tasks'), list('work', 'someday', 'Someday'), page('work', 'Work', 'tasks', 'Work')] };

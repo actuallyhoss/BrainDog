@@ -1,6 +1,6 @@
 /**
- * An automation's question is held to the readers of the list its run is about, and it is answered only by somebody
- * who could have made the change the run makes on the answer (`loop/research-batch-thirty-seven-audit.md` finding 1).
+ * An automation's question is held to the readers of the list its run is about, and it is answered only by somebody who
+ * could have made the change the run makes on the answer.
  *
  * WHAT WAS MEASURED. `ask_person` fills its question from the run's row and files it as an `options` suggestion whose
  * body names the run and the step and no list. `holds` sends a question that names no list to whoever reads the whole
@@ -36,7 +36,7 @@ const MONEY = {
   } as never,
 };
 
-/* The audit's rule: ask on every new Money row, and set its note when the answer is `pay`. */
+/* The rule: ask on every new Money row, and set its note when the answer is `pay`. */
 const PAYIT = {
   id: 'rule.payit',
   kind: 'rule' as const,
@@ -52,7 +52,7 @@ const PAYIT = {
 };
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
-/** The audit's member: may decide on the record, held to `append` on Money. */
+/** The member: may decide on the record, held to `append` on Money. */
 const appender: CallContext = { principal: { kind: 'person', id: 'p_m', level: 'decide' }, levels: { money: 'append' } };
 /** Reads Money and may not change a row of it. */
 const reader: CallContext = { principal: { kind: 'person', id: 'p_r', level: 'decide' }, levels: { money: 'read' } };
@@ -152,9 +152,9 @@ test("A RULE'S INLINE suggest IS FILLED FROM ITS ROW THE SAME WAY, and is held t
   sql.close();
 });
 
-/* THE CHECKER'S TWO CASES. Taking the `note` line and the `create` line out of `answersNot` left every test above
-   green, so neither rung was held by anything: a member at `read` on Money answered a run whose only later step is a
-   note, and a member at `write` on Money answered a run that adds a row to a list she only reads. */
+/* TWO MORE CASES. Taking the `note` line and the `create` line out of `answersNot` left every test above green, so
+   neither rung was held by anything: a member at `read` on Money answered a run whose only later step is a note, and a
+   member at `write` on Money answered a run that adds a row to a list she only reads. */
 test('A NOTE ON THE ROW NEEDS APPEND ON ITS LIST, AND A NEW ROW NEEDS APPEND WHERE IT LANDS, before the answer is taken', async () => {
   const LEDGER = {
     id: 'register.ledger',
@@ -210,10 +210,10 @@ test('A PROPOSER WHO PUTS A RUN ON HER OWN QUESTION DOES NOT FILE IT UNDER THAT 
   sql.close();
 });
 
-/* WAVE THIRTY-NINE'S CHECKER, ON f7c88f98. `answersNot` walked every step of the rule, so a step the run took before it
-   asked held the answer too: `[set note, ask_person, if yes then notify]` refused a member at `read` on Money whose
-   answer leads only to a notify, because of the `set` the run had already made. Only the steps a run can still reach
-   from the one it waits on are what the answer lets it do. */
+/* MEASURED ON f7c88f98. `answersNot` walked every step of the rule, so a step the run took before it asked held the
+   answer too: `[set note, ask_person, if yes then notify]` refused a member at `read` on Money whose answer leads only
+   to a notify, because of the `set` the run had already made. Only the steps a run can still reach from the one it
+   waits on are what the answer lets it do. */
 const rule = (name: string, steps: unknown[]) => ({
   id: `rule.${name}`,
   kind: 'rule' as const,
@@ -303,7 +303,7 @@ test('A schedule AFTER THE ASK NEEDS WHAT A NOTE NEEDS: append on the row\'s lis
   sql.close();
 });
 
-/* AUDIT THIRTY-NINE, FINDING 1. An arrival's run names a list only when the arrival wrote a row, and a question that
+/* A QUESTION FROM AN ARRIVAL. An arrival's run names a list only when the arrival wrote a row, and a question that
    names no list went to every whole-record reader. The run's scope carries the arrival's own words as `trigger.body`,
    so "Arrived: {{trigger.body}}" put the inbox in front of a member at `decide` whom `inbox` itself refuses: measured,
    the arrival wrote `[]`, her `inbox` was `FORBIDDEN`, and her `governance` named Omar. The body is the owner's alone,
@@ -364,10 +364,10 @@ test('A STEP suggest FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD TO THE OWN
   sql.close();
 });
 
-/* AUDIT THIRTY-NINE, FINDING 6. A question with no run is placed by its rule's body, and that was read `ORDER BY version
-   DESC`, today's body and not the one that asked. Measured: `rule.chase` on Money suggested "Chase Salary: Omar?", held
-   back from a member at `append` on Money, and the moment the owner re-declared the rule on Inbox the same question,
-   still about the Money row, reached her `governance` and `whatsNew`. */
+/* A QUESTION WITH NO RUN. A question with no run is placed by its rule's body, and that was read
+   `ORDER BY version DESC`, today's body and not the one that asked. Measured: `rule.chase` on Money suggested "Chase
+   Salary: Omar?", held back from a member at `append` on Money, and the moment the owner re-declared the rule on Inbox
+   the same question, still about the Money row, reached her `governance` and `whatsNew`. */
 test('AN INLINE suggest STAYS WITH THE LIST ITS RULE WAS ON WHEN IT ASKED, after the rule moves to another list', async () => {
   const INBOX = {
     id: 'register.inbox',
@@ -397,12 +397,12 @@ test('AN INLINE suggest STAYS WITH THE LIST ITS RULE WAS ON WHEN IT ASKED, after
   sql.close();
 });
 
-/* AUDIT THIRTY-NINE, FINDING 8, THE `run` HALF: DECIDED, AND HELD TO NO LEVEL. The walk counts every verb that changes
-   the record, and `run` changes nothing in it: it queues one call carrying the fields its `sends:` names, to the host
-   and with the key the owner approved when the call was installed. Measured here, a member at `read` on Money answers,
-   the call is queued, and the row is as it was. What she is shown is already held: the lint keeps a call's `sends:` on
-   its rule's list and `holds` asks her to read that list first, so she has read every field the call sends. If this
-   goes red because a level was added, that is a change of the decision, and the comment on `answersNot` changes too. */
+/* THE `run` HALF: DECIDED, AND HELD TO NO LEVEL. The walk counts every verb that changes the record, and `run` changes
+   nothing in it: it queues one call carrying the fields its `sends:` names, to the host and with the key the owner
+   approved when the call was installed. Measured here, a member at `read` on Money answers, the call is queued, and the
+   row is as it was. What she is shown is already held: the lint keeps a call's `sends:` on its rule's list and `holds`
+   asks her to read that list first, so she has read every field the call sends. If this goes red because a level was
+   added, that is a change of the decision, and the comment on `answersNot` changes too. */
 test('A run AFTER THE ASK IS ANSWERED BY A MEMBER WHO READS THE LIST: the call is queued and nothing on the row changes', async () => {
   const POST = {
     id: 'ingest.post_money',

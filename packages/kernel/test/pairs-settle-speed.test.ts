@@ -1,14 +1,13 @@
 /**
  * The install pass that settles a list under a new `pairs:` finishes inside one request, whatever the ledger's shape.
  *
- * `loop/research-batch-sixty-five-audit.md` finding 3 (probe A2). The pass was measured at 1.8 to 2.9 s on 10,000 rows of
- * fifty amounts, and it grew much faster than the ledger once most rows shared a size: 10,000 rows of three amounts in
- * one year took 80 to 146 s, and one amount did not finish in 20 minutes. A Durable Object request gets 30 s, so a pack
- * update changing `pairs:` on such a record was killed on every retry and could never be installed. Re-measured for this
- * repair: rows of one amount packed as densely took 23 s for 200, 279 s for 500 and 1,659 s for 2,000, and this file's
- * first case was stopped at its 120 s deadline. Each `settle` call walked the same 140 rows again for one new seed,
- * reading every window afresh, and asked `markPinned` 622,665 times for 200 rows. After it: 2.8 s for this file's first
- * case, 0.13 s for the 500 rows.
+ * The pass was measured at 1.8 to 2.9 s on 10,000 rows of fifty amounts, and it grew much faster than the ledger once
+ * most rows shared a size: 10,000 rows of three amounts in one year took 80 to 146 s, and one amount did not finish in
+ * 20 minutes. A Durable Object request gets 30 s, so a pack update changing `pairs:` on such a record was killed on
+ * every retry and could never be installed. Re-measured for this repair: rows of one amount packed as densely took 23 s
+ * for 200, 279 s for 500 and 1,659 s for 2,000, and this file's first case was stopped at its 120 s deadline. Each
+ * `settle` call walked the same 140 rows again for one new seed, reading every window afresh, and asked `markPinned`
+ * 622,665 times for 200 rows. After it: 2.8 s for this file's first case, 0.13 s for the 500 rows.
  *
  * RUN IN A WORKER THREAD WITH A DEADLINE, because the pass is synchronous and a test timeout cannot stop it: the red run
  * of this file would otherwise have sat for twenty minutes before saying anything.
@@ -23,7 +22,7 @@ import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 30, 12);
 const PERSON = { actor: 'p_1' };
-/* MONEY-CORE 2.2.0'S CLAUSE, as the audit's probe installed it. */
+/* MONEY-CORE 2.2.0'S CLAUSE, as the measure installed it. */
 const TIGHT = {
   on: ['abs(amount)'],
   opposite: 'direction',
@@ -61,8 +60,9 @@ const made = (r: unknown): Entry => {
 };
 
 /**
- * The audit's ledger: a third of the rows the two legs of a move from CIB to HSBC a day or so apart, the rest single card
- * rows in any of four accounts, every amount one of `sizes` round ones. The same seed writes the same ledger every run.
+ * The measured ledger: a third of the rows the two legs of a move from CIB to HSBC a day or so apart, the rest single
+ * card rows in any of four accounts, every amount one of `sizes` round ones. The same seed writes the same ledger every
+ * run.
  */
 function fill(write: (fields: Record<string, unknown>) => void, rows: number, days: number, sizes: number): void {
   let seed = 3;
@@ -121,11 +121,11 @@ if (!isMainThread) {
     });
 
   /* THE BOUND STARTED AT A THIRD OF THE REQUEST (10 s), so a CI runner two or three times slower than this machine
-     still fit. Under the CHECK pass's `--workspace-concurrency=2`, many workspaces' tests run at once and this
-     worker thread contends with them for CPU: the install pass measured 11.6 s against that 10 s bound, though it
-     is still 2.8 s on an unloaded run. Doubled off that failure, so a CI runner under real contention still fits
-     comfortably inside a request (30 s) while a return to the old O(n^2) walk (minutes, or 20 minutes unfinished)
-     still trips it. The deadline adds the fill, which writes 10,000 rows through `create` before the clock starts. */
+     still fit. Under a parallel run's `--workspace-concurrency=2`, many workspaces' tests run at once and this worker
+     thread contends with them for CPU: the install pass measured 11.6 s against that 10 s bound, though it is still 2.8
+     s on an unloaded run. Doubled off that failure, so a CI runner under real contention still fits comfortably inside
+     a request (30 s) while a return to the old O(n^2) walk (minutes, or 20 minutes unfinished) still trips it. The
+     deadline adds the fill, which writes 10,000 rows through `create` before the clock starts. */
   const BOUND_MS = 20_000;
 
   test('10,000 ROWS OF ONE AMOUNT IN ONE YEAR, the shape that did not finish in 20 minutes, settle well inside a request', async () => {

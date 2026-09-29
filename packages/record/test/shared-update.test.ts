@@ -37,8 +37,8 @@ test('an update that takes a list away files what it retires and the rows kept, 
   value(await api.create({ register: 'meetings', fields: { name: 'June' } }, owner));
 
   /* A LIST WITH ROWS IS NOT FILED AS RETIRED, because the accept refuses to orphan them. This was filed with
-     `retires: [{ id: 'register.meetings', rows: 1 }]`, and accepting it answered `WOULD_ORPHAN` (measured on the held
-     wave forty-six tree): a question the owner could only lose. `planAll` now asks `installFault` as the accept does. */
+     `retires: [{ id: 'register.meetings', rows: 1 }]`, and accepting it answered `WOULD_ORPHAN` (measured on an earlier
+     tree): a question the owner could only lose. `planAll` now asks `installFault` as the accept does. */
   const next = (await api.propose({ question: 'Update Reading club?', body_kind: 'pack', body: { file: file('2.0.0', [BOOKS]) } } as never, agent)) as Out;
   assert.equal(next.ok, false, 'filed an update the accept refuses');
   assert.deepEqual([next.refusal?.code, next.refusal?.at], ['WOULD_ORPHAN', 'body.packs']);

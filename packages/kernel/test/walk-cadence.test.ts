@@ -1,5 +1,5 @@
 /**
- * The cash walk at any cadence and any length (modules C4, MOD-2).
+ * The cash walk at any cadence and any length.
  *
  * A LEG COULD ONLY COUNT MONTHS, AND ONLY SIXTY-FOUR OF THEM. A weekly cleaner or a fortnightly salary had no way to
  * be said except as a fraction of a month, which the walk refuses, and a monthly salary on the ten-year horizon a

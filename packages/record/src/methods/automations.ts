@@ -1,7 +1,7 @@
 /**
- * The record's automation methods beside `automations` (`loop/finish/contracts.md` §2.2): check a body, try it over a
- * sample, switch one on or off, start a finished run again, and read one rule's versions. The editor (EDT-1) is built
- * on all five, and an agent reaches `tryAutomation` through `propose`'s `try` (`automation_try`).
+ * The record's automation methods beside `automations`: check a body, try it over a sample, switch one on or off, start
+ * a finished run again, and read one rule's versions. The editor is built on all five, and an agent reaches
+ * `tryAutomation` through `propose`'s `try` (`automation_try`).
  *
  * THE KERNEL DOES THE WORK AND THIS FILE ASKS WHO MAY. Checking is the install's own lint (`kernel.lint`), trying is the
  * real runner inside the kernel's `rehearse` (`kernel.tryAutomation`, `flow-try.ts`), switching is an install of the
@@ -59,7 +59,7 @@ export type Switched = { rule: string; version: number; enabled: boolean; change
  */
 export const VERSIONS_SHOWN = 50;
 
-/** The keys a try's sample takes (`loop/finish/contracts.md` §2.2). */
+/** The keys a try's sample takes. */
 const SAMPLE_TAKES = ['row', 'arrival', 'payload', 'at'] as const;
 
 const isObject = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -130,7 +130,7 @@ export function methods(deps: RecordDeps) {
   const bodyOf = (given: unknown): Result<{ id: string; body: Body }> => {
     if (given === undefined) return no('REQUIRED_MISSING', 'body is the automation as it would be installed: its rule, what starts it and its steps.', { at: 'body' });
     if (!isObject(given)) return no('VALUE_MALFORMED', 'body is one automation as it would be installed, such as {"rule":"chase","on":{"manual":true},"steps":[...]}.', { at: 'body' });
-    /* BEFORE ANYTHING WALKS IT, as `dryRun` refuses one (audit thirty-six, finding 8): the walks below recurse. */
+    /* BEFORE ANYTHING WALKS IT, as `dryRun` refuses one: the walks below recurse. */
     if (deeperThan(given)) return no('OUT_OF_BOUNDS', `This body nests more than ${BODY_DEPTH} levels deep, and no rule needs half that. Send the rule as it would be installed.`, { at: 'body' });
     if (typeof given.rule !== 'string' || given.rule === '') return no('REQUIRED_MISSING', 'body.rule is the automation\'s name, as its id says it: rule.<name>.', { at: 'body.rule' });
     return ok({ id: `rule.${given.rule}`, body: given });
@@ -141,12 +141,12 @@ export function methods(deps: RecordDeps) {
 
   return {
     /**
-     * Whether an automation body would install, without installing it: `{ id, path }`, or the install's own refusal with
-     * its `at` path inside the body (`loop/finish/contracts.md` §2.2). READ+.
+     * Whether an automation body would install, without installing it: `{ id, path }`, or the install's own refusal
+     * with its `at` path inside the body. READ+.
      *
-     * THE INSTALL'S LINT AND NOT A COPY OF IT: `kernel.lint` runs every check an install runs before it writes, the host's
-     * own (whether it answers Slash) among them, so what this passes an install passes, and the editor never draws a
-     * second opinion (`loop/finish/rules.md` §6, M2E).
+     * THE INSTALL'S LINT AND NOT A COPY OF IT: `kernel.lint` runs every check an install runs before it writes, the
+     * host's own (whether it answers Slash) among them, so what this passes an install passes, and the editor never
+     * draws a second opinion.
      */
     async checkAutomation(args: { body?: unknown } | undefined, ctx: CallContext): Promise<Result<Checked>> {
       const stop = scoped(ctx, 'read');
@@ -261,9 +261,9 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
-     * One rule's versions, newest first, each with its body, when it was installed, by whom and whether it ran
-     * (`loop/finish/contracts.md` §2.2). READ+, and held as `automations` holds a rule: a caller who cannot see the newest
-     * version is told there is no such automation, and a version that touched a list they cannot read is left out.
+     * One rule's versions, newest first, each with its body, when it was installed, by whom and whether it ran READ+,
+     * and held as `automations` holds a rule: a caller who cannot see the newest version is told there is no such
+     * automation, and a version that touched a list they cannot read is left out.
      */
     async automationVersions(args: { rule?: unknown } | undefined, ctx: CallContext): Promise<Result<{ rule: string; versions: AutomationVersion[] }>> {
       const stop = scoped(ctx, 'read');

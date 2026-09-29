@@ -1,17 +1,17 @@
 /**
- * An arrival a person filed or archived goes back to the inbox: `returnArrival`, M4 wave three's first brief.
+ * An arrival a person filed or archived goes back to the inbox: `returnArrival`.
  *
  * THERE WAS NO WAY BACK. `fileArrival` and `archiveArrival` each move an arrival out of `untriaged` or `review` and
  * nothing moved one in again, so a person who filed a message into the wrong list had a row to delete by hand and an
  * arrival the inbox would never show them again. The DDL (`0001_kernel.ts:202`) forbids no move back; only the verb was
  * missing, and every case below failed first on `k.returnArrival is not a function`.
  *
- * THE FIFTH CORRECTION IS THE LAST CASE (`loop/research-m4-wave-three.md`). A return makes an unverified arrival
- * rescuable again, because the ingest re-runs an `untriaged` row whose `reason` is `UNVERIFIED` when a verified
- * delivery brings the same bytes (`ingest.ts:669-673`), and the rescue files a row with no `state` event. `filedAs`
- * read the newest event whose `to_v` was `matched`, which is the person's old filing, so the return would archive a
- * row it had already archived and `fileArrival` would answer "already filed" with that dead row. Only the arrival's
- * NEWEST `state` event may be read as a person's settlement, and only when it put the arrival where it is now.
+ * THE LAST CASE IS A RESCUE. A return makes an unverified arrival rescuable again, because the ingest re-runs an
+ * `untriaged` row whose `reason` is `UNVERIFIED` when a verified delivery brings the same bytes (`ingest.ts:669-673`),
+ * and the rescue files a row with no `state` event. `filedAs` read the newest event whose `to_v` was `matched`, which
+ * is the person's old filing, so the return would archive a row it had already archived and `fileArrival` would answer
+ * "already filed" with that dead row. Only the arrival's NEWEST `state` event may be read as a person's settlement, and
+ * only when it put the arrival where it is now.
  */
 
 import { test } from 'node:test';
@@ -152,8 +152,8 @@ test('AN ARCHIVED ARRIVAL GOES BACK WITH NO ROW TOUCHED AND ITS VERSION UNREAD',
   sql.close();
 });
 
-/* EVERY OTHER CASE LEFT FROM `untriaged`, so a return that always wrote `untriaged` passed them all: the checker
-   hard-coded it in place of `back` and nothing went red. This one leaves from `review` and must land there again. */
+/* EVERY OTHER CASE LEFT FROM `untriaged`, so a return that always wrote `untriaged` passed them all: with it hard-coded
+   in place of `back`, nothing went red. This one leaves from `review` and must land there again. */
 test('AN ARRIVAL FILED FROM REVIEW GOES BACK TO REVIEW, not to untriaged', async () => {
   const { k, sql } = await record();
   const held = value(k.arrive({ channel: 'email', headers: { from: 'bank@example.com', subject: 'Held' }, body: `held: ${PAID}`, sha256: 'h1' }));

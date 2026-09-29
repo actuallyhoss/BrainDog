@@ -1,11 +1,11 @@
 /**
  * A Windows path is not a line break somebody forgot to decode.
  *
- * THE IMPORT OF A REAL EXPORT WAS REFUSED ON TWO ROWS FOR IT. `loop/research-import-real.md` (finding 1) measured two
- * agent runs refused on `cwd` with `TEXT_ESCAPED_NEWLINE`: both values began with a drive letter, both had a folder
- * whose name starts with `n`, and so both held the two characters backslash and `n` with no line break anywhere. 186 of
- * the 198 `cwd` values in that export were Windows paths, and every one whose folder happens to start with `n` would
- * have been refused, with a repair ("send a real newline") that nobody can apply to a path.
+ * THE IMPORT OF A REAL EXPORT WAS REFUSED ON TWO ROWS FOR IT. Measured: two agent runs refused on `cwd` with
+ * `TEXT_ESCAPED_NEWLINE`: both values began with a drive letter, both had a folder whose name starts with `n`, and so
+ * both held the two characters backslash and `n` with no line break anywhere. 186 of the 198 `cwd` values in that
+ * export were Windows paths, and every one whose folder happens to start with `n` would have been refused, with a
+ * repair ("send a real newline") that nobody can apply to a path.
  *
  * AND THE REFUSAL IT EXISTS FOR STAYS. A multi-line text that was JSON-encoded once too often reads as a sentence with
  * `\n` in it; it does not begin with a drive letter, a UNC share or `.\`, and it usually carries a space-free run, a

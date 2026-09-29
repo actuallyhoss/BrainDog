@@ -1,7 +1,6 @@
 /**
- * Sign-in hardened before strangers arrive: the challenge lockout, the mailbox count, the ninety-day proof, the
- * fresh proof for passkeys, the session list, signing out everywhere, and an invited address proving its mailbox
- * (`loop/finish/ops.md` OPS-6, `loop/finish/contracts.md` §2.6).
+ * Sign-in hardened before strangers arrive: the challenge lockout, the mailbox count, the ninety-day proof, the fresh
+ * proof for passkeys, the session list, signing out everywhere, and an invited address proving its mailbox.
  *
  * AGAINST A FIXED CLOCK, AT THE EDGES, as `identity.test.ts` is: each window is tried the millisecond before it
  * closes and the millisecond it does, because an off-by-one there is a session, a link or a proof that outlives

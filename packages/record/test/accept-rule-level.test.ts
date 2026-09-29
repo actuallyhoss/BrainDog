@@ -1,14 +1,13 @@
 /**
- * Accepting a `change` that installs a rule is held to the door `setDeclaration` is held to: an owner, in a browser
- * (`loop/research-batch-forty-nine-audit.md` finding 3).
+ * Accepting a `change` that installs a rule is held to the door `setDeclaration` is held to: an owner, in a browser.
  *
- * TWO ROADS TO ONE INSTALL, AND A GATE ON ONE. `setDeclaration` asks `admin(ctx)`, whose comment names ADR-060: a rule is
- * what runs while nobody is looking. `decide` asked `guard(ctx, 'decide')` and held an accept to `admin` only for `pack`,
- * `settings` and `arrange`. The audit's P4, a person at `decide` who is not the owner, measured on `36407cc1`:
+ * TWO ROADS TO ONE INSTALL, AND A GATE ON ONE. `setDeclaration` asks `admin(ctx)`, whose comment names ADR-060: a rule
+ * is what runs while nobody is looking. `decide` asked `guard(ctx, 'decide')` and held an accept to `admin` only for
+ * `pack`, `settings` and `arrange`. A person at `decide` who is not the owner, measured on `36407cc1`:
  *
- *     P4 setDeclaration at decide: LEVEL_REQUIRED This needs owner, and you have decide access.
- *     P4 accept at decide: ok
- *     P4 filed 1 posts 1 owner key true reads ["rule:rate"]
+ *     setDeclaration at decide: LEVEL_REQUIRED This needs owner, and you have decide access.
+ *     accept at decide: ok
+ *     filed 1 posts 1 owner key true reads ["rule:rate"]
  *
  * The rule a colleague proposed and then accepted herself asked Slash on the owner's key, which `workerSlashAnswers`
  * and `docs/07` rest on installing being the owner's consent. Here the post is the `infer.ask` job the run queues: the
@@ -23,7 +22,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 23, 12);
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
-/** The audit's colleague: at `decide` on the whole record, and not the owner. */
+/** The colleague: at `decide` on the whole record, and not the owner. */
 const colleague: CallContext = { principal: { kind: 'person', id: 'p_c', level: 'decide' } };
 
 const OBLIGATIONS = {
@@ -69,7 +68,7 @@ async function record() {
   return { sql, api, file, accept, asks, installed, open };
 }
 
-test('P4: A COLLEAGUE AT DECIDE WHO MAY NOT SET A RULE MAY NOT ACCEPT ONE EITHER, and no question goes out', async () => {
+test('A COLLEAGUE AT DECIDE WHO MAY NOT SET A RULE MAY NOT ACCEPT ONE EITHER, and no question goes out', async () => {
   const { sql, api, file, accept, asks, installed, open } = await record();
   /* THE ROAD THAT WAS ALREADY HELD, so the two are seen to answer the same. */
   const set = (await api.setDeclaration({ body: RATE } as never, colleague)) as Out;
@@ -97,7 +96,7 @@ test('A RULE INSIDE A BUNDLE IS HELD THE SAME, and a bundle with no rule is not'
   assert.equal(installed(), false);
 
   /* NOT WIDENED PAST RULES. A change to a list's fields is what `decide` was given for, and stays so until a D-number
-     says otherwise (the audit's brief). */
+     says otherwise. */
   const list = await file(colleague, 'register.obligations', { declarations: [WITH_DUE] });
   value(await accept(list, colleague));
   sql.close();

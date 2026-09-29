@@ -1,16 +1,15 @@
 /**
  * A verb only a step has, `if` first among them, is refused in a `then:` that runs inside the write.
  *
- * `loop/research-batch-forty-audit.md` FINDING 3. `pathOf` sends a body with `then:` and a plain write trigger to the
- * inline pass, which has an arm for each of the twelve actions and none for `if`: it walks `then` and acts on the first
- * action each item carries. The lint walked an `if`'s arms and never the verbs beside it, so the audit's L2,
- * `{ if, then: [], set: { to: 5 } }`, installed and threw out of every write to its list; and L8, an `if` whose arm sets a
- * field, installed, was listed as `inline`, and its arm never ran.
+ * WHY. `pathOf` sends a body with `then:` and a plain write trigger to the inline pass, which has an arm for each of
+ * the twelve actions and none for `if`: it walks `then` and acts on the first action each item carries. The lint walked
+ * an `if`'s arms and never the verbs beside it, so `{ if, then: [], set: { to: 5 } }` installed and threw out of every
+ * write to its list; and an `if` whose arm sets a field, installed, was listed as `inline`, and its arm never ran.
  *
- * MEASURED AGAIN ON 23 SEPTEMBER, after wave forty-one's `fill` guard. L2 no longer throws, and so the `set` beside the
- * `if` is acted on: the Water row was written holding `note: "5"`, whatever the condition said. L8 left the row holding
- * `what` alone. `wait: 1h` beside a `set` installed and the note was written at once, `set_var` and `ask_person`
- * installed and did nothing at all. Each is the same fault, a step the pass has no arm for, so each is refused here.
+ * MEASURED AGAIN after the `fill` guard. The first no longer throws, and so the `set` beside the `if` is acted on: the
+ * Water row was written holding `note: "5"`, whatever the condition said. The second left the row holding `what` alone.
+ * `wait: 1h` beside a `set` installed and the note was written at once, `set_var` and `ask_person` installed and did
+ * nothing at all. Each is the same fault, a step the pass has no arm for, so each is refused here.
  */
 
 import { test } from 'node:test';
@@ -43,7 +42,7 @@ const refused = async (then: unknown[]) => {
   return { code: codeOf(out), fix: fixOf(out) ?? '', at: (out as { refusal?: { at?: string } }).refusal?.at };
 };
 
-test('L2: AN if WITH A set BESIDE IT IS REFUSED, rather than setting the field whatever the condition says', async () => {
+test('AN if WITH A set BESIDE IT IS REFUSED, rather than setting the field whatever the condition says', async () => {
   const r = await refused([{ if: 'what is x', then: [], set: { field: 'note', to: 5 } }]);
   assert.equal(r.code, 'NOT_IN_THIS_BUILD');
   assert.equal(r.at, 'then[0].if');
@@ -53,7 +52,7 @@ test('L2: AN if WITH A set BESIDE IT IS REFUSED, rather than setting the field w
   );
 });
 
-test('L8: AN if WHOSE ARM SETS A FIELD IS REFUSED, rather than installing a branch that never runs', async () => {
+test('AN if WHOSE ARM SETS A FIELD IS REFUSED, rather than installing a branch that never runs', async () => {
   const r = await refused([{ if: 'what is Water', then: [{ set: { field: 'note', to: 'seen' } }] }]);
   assert.equal(r.code, 'NOT_IN_THIS_BUILD');
   assert.equal(r.at, 'then[0].if');

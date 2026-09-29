@@ -1,13 +1,13 @@
 /**
  * A step may read `{{vars.x}}` only where an earlier step certainly kept `x`.
  *
- * WHAT WAS MEASURED BEFORE THE LINT CHANGED, on 24 September at HEAD `896dd8b` (audit sixty-six, finding 7, probe B1).
- * `[{ script: { id: 'tidy' } }, { set: { field: 'note', to: 'queued as {{vars.job}}' } }]` linted clean, installed,
- * the run ended `done` with no sentence, and the note read `queued as —`: `fill` writes a dash for a path that reaches
- * nothing (`flow.ts`'s `pathValue`). Making a script's `as:` optional (`db7074ad`) widened this, and it was not new. The
- * same body with a `call` step that keeps nothing, and a `{{vars.nope}}` that no step anywhere keeps, both linted clean
- * too: the walk checked that a name was well formed where it was KEPT and never asked whether a name READ was kept at
- * all, for any kind. The first test below failed on every one of those bodies before `unkeptIn` was asked.
+ * WHAT WAS MEASURED BEFORE THE LINT CHANGED, at HEAD `896dd8b`.
+ * `[{ script: { id: 'tidy' } }, { set: { field: 'note', to: 'queued as {{vars.job}}' } }]` linted clean, installed, the
+ * run ended `done` with no sentence, and the note read `queued as —`: `fill` writes a dash for a path that reaches
+ * nothing (`flow.ts`'s `pathValue`). Making a script's `as:` optional (`db7074ad`) widened this, and it was not new.
+ * The same body with a `call` step that keeps nothing, and a `{{vars.nope}}` that no step anywhere keeps, both linted
+ * clean too: the walk checked that a name was well formed where it was KEPT and never asked whether a name READ was
+ * kept at all, for any kind. The first test below failed on every one of those bodies before `unkeptIn` was asked.
  */
 
 import { test } from 'node:test';
@@ -62,7 +62,7 @@ async function record(...decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSq
 }
 
 test('A READ OF A NAME NO EARLIER STEP KEEPS IS REFUSED, for every kind that keeps one, naming the step and the name', () => {
-  /* B1 exactly: the script step keeps nothing, and the set after it reads the name it used to keep. */
+  /* The measured body exactly: the script step keeps nothing, and the set after it reads the name it used to keep. */
   assert.equal(
     said(rule([{ script: { id: 'tidy' } }, { set: { field: 'note', to: 'queued as {{vars.job}}' } }])),
     'rule.t reads {{vars.job}} at steps[0].then[1], and no step keeps an answer called job, so the run would write a dash in its place. Keep it with as: job on the step that makes it, or take {{vars.job}} out.',
@@ -91,8 +91,8 @@ test('A BRANCH KEEPS A NAME FOR WHAT FOLLOWS IT ONLY WHEN BOTH ARMS DO', () => {
   /* ONE ARM: the other way through reaches the read with nothing kept, and `if` with no `else` has an empty one. */
   assert.match(said(manual([branch([keep('x')]), reads('x')])) ?? '', /reads \{\{vars\.x\}\} at steps\[1\], and x is kept only by a step that does not certainly run/u);
   assert.match(said(manual([branch([keep('x')], [{ stop: true }]), reads('x')])) ?? '', /reads \{\{vars\.x\}\} at steps\[1\]/u);
-  /* KEPT ONLY IN THE `else` IS STILL KEPT SOMEWHERE, so the sentence is the wrong-place one. With `keptAnywhere` blind to
-     the `else` arm the checker measured this saying "no step keeps an answer called x", and every other case passing. */
+  /* KEPT ONLY IN THE `else` IS STILL KEPT SOMEWHERE, so the sentence is the wrong-place one. With `keptAnywhere` blind
+     to the `else` arm this was measured saying "no step keeps an answer called x", and every other case passing. */
   assert.match(said(manual([branch([{ stop: true }], [keep('x')]), reads('x')])) ?? '', /reads \{\{vars\.x\}\} at steps\[1\], and x is kept only by a step that does not certainly run/u);
   /* NOT IN THE OTHER ARM EITHER: no run takes the `else` after the `then`. */
   assert.match(said(manual([branch([keep('x')], [reads('x')])])) ?? '', /reads \{\{vars\.x\}\} at steps\[0\]\.else\[0\]/u);
@@ -112,7 +112,7 @@ test('WHAT KEEPS A NAME STILL LETS IT BE READ: every kind, and a deeper path int
   assert.equal(said(manual([{ notify: { say: '{{trigger.at}}' } }])), null);
 });
 
-test('B1 IS REFUSED AT INSTALL, and nothing is queued or written', async () => {
+test('THE MEASURED BODY IS REFUSED AT INSTALL, and nothing is queued or written', async () => {
   const { k, sql, out: ready } = await record(TIDY);
   assert.ok(ready.ok, fixOf(ready));
   /* THE RULE ALONE, SO THE LIST AND THE SCRIPT STAY: install takes a batch whole or not at all. */

@@ -143,7 +143,7 @@ test('A SELL FIGURE IN ANOTHER CURRENCY IS NOT OFFERED, rather than counted as t
 });
 
 test('A WALK WITH NOTHING DUE STILL OFFERS THE SELL FIGURE, in the money its opening figure is', async () => {
-  /* NO BILLS AT ALL, so the walk has no step to take a currency from. Measured on 25 September: with the opening's unit
+  /* NO BILLS AT ALL, so the walk has no step to take a currency from. Measured: with the opening's unit
      taken out as the fallback, `sells` came back empty here and every other test in this file still passed. */
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   value(await k.install([ACCOUNTS, BILLS, STORE, figure('cash-now', 'Cash now', 'register.accounts', 'balance', 'money.GBP'), figure('store-value', 'Store value', 'register.store', 'worth', 'money.GBP')]));

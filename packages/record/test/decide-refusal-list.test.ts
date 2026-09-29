@@ -3,15 +3,15 @@
  * somebody invited to the whole record. Not that the question belongs to the whole record, and not to open a list she
  * has open.
  *
- * `loop/research-appender-landing.md` finding 7. `decide` asks `guard(ctx, 'decide')` with no list, so a member invited
- * to Tasks at `decide`, answering the owner's question about Tasks, was refused with `allows`'s sentence for a call about
- * the record itself: "This belongs to the whole record, and you were invited to Tasks, and to nothing else. Open it, or
- * ask the owner to invite you to the whole record." The question was about Tasks, and "Open it" sent her to the list
- * she was already reading it from.
+ * MEASURED BEFORE THIS FILE. `decide` asks `guard(ctx, 'decide')` with no list, so a member invited to Tasks at
+ * `decide`, answering the owner's question about Tasks, was refused with `allows`'s sentence for a call about the
+ * record itself: "This belongs to the whole record, and you were invited to Tasks, and to nothing else. Open it, or ask
+ * the owner to invite you to the whole record." The question was about Tasks, and "Open it" sent her to the list she
+ * was already reading it from.
  *
- * WHETHER A LIST'S `decide` SHOULD DECIDE THAT LIST'S QUESTIONS IS THE OWNER'S D5, and this does not answer it: she is
- * still refused. Only the sentence changes. It is said before the id is read, so a question about a list she cannot see,
- * and an id that names nothing, are refused in the same words and tell her nothing about either.
+ * WHETHER A LIST'S `decide` SHOULD DECIDE THAT LIST'S QUESTIONS IS THE OWNER'S CALL, and this does not answer it: she
+ * is still refused. Only the sentence changes. It is said before the id is read, so a question about a list she cannot
+ * see, and an id that names nothing, are refused in the same words and tell her nothing about either.
  */
 
 import { test } from 'node:test';
@@ -70,7 +70,7 @@ test('(1) A MEMBER OF ONE LIST IS TOLD THAT DECIDING IS FOR THE WHOLE RECORD, an
   assert.equal(fen.principal.kind === 'person' && fen.principal.level, null, 'she holds a list and not the record');
 
   const out = (await api.decide({ id: tasks, decide: verdict }, fen)) as Out;
-  assert.equal(out.ok, false, 'a list`s decide is the owner`s D5, and this does not answer it');
+  assert.equal(out.ok, false, 'a list`s decide is the owner`s call, and this does not answer it');
   assert.equal(out.refusal!.code, 'FORBIDDEN');
   const fix = out.refusal!.fix;
   assert.doesNotMatch(fix, /\bOpen (?:it|one of those)\b/u, `she was told to open the list she has open: ${fix}`);

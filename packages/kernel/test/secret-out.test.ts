@@ -1,12 +1,11 @@
 /**
- * What a secret or a file field held, followed out of the record: a call a rule queues (SEC-2) and a digest's webhook
- * (KRN-13).
+ * What a secret or a file field held, followed out of the record: a call a rule queues and a digest's webhook.
  *
- * WHAT WAS MEASURED BEFORE THE REPAIR (audit fifty-two §3, again on 23 September against this file). `queueCall`'s
- * second line collected the strings the row's secret and file fields held at the moment of the call, and left out a
- * sent field that contained one. So a copy of a key made before the key changed was sent: with `rule.copy` writing
- * `party` from `{{token}}` on create and `rule.post` running `paid_hook` on paid, a grant revoked and deposited again
- * between the two queued `party: '<the old grant id>'`, and so did a token cleared from the row. A file field holds
+ * WHAT WAS MEASURED BEFORE THE REPAIR, against this file. `queueCall`'s second line collected the strings the row's
+ * secret and file fields held at the moment of the call, and left out a sent field that contained one. So a copy of a
+ * key made before the key changed was sent: with `rule.copy` writing `party` from `{{token}}` on create and `rule.post`
+ * running `paid_hook` on paid, a grant revoked and deposited again between the two queued
+ * `party: '<the old grant id>'`, and so did a token cleared from the row. A file field holds
  * `{ sha256, mime, bytes, name }`, and the loop collected strings only, so a copy of `doc.name` or `doc.sha256` went
  * out with nothing held back. And a run that wrote `party` from the token, parked on a wait, and ran the call after the
  * token changed sent the old value, although the run's own `-unsent` (`flow.ts`) already said `party` was written from
@@ -17,9 +16,9 @@
  *
  * THE COPY IS PUT IN BY SQL, AS A ROW AN EARLIER BUILD WROTE HOLDS IT. These tests stored a rule that copied the key
  * into `party` past the lint and let it run, and pinned that the row kept the copy. That copy is the leak: every reader
- * of the list sees `party`. Since wave fifty-five the runner refuses it as the lint does (the first test below), so a
- * stored rule no longer makes the copy these tests need, and a record that already holds one is what the second line
- * is for. Where the run's own `-unsent` is the case, the run is put where that build left it, past its write.
+ * of the list sees `party`. Now the runner refuses it as the lint does (the first test below), so a stored rule no
+ * longer makes the copy these tests need, and a record that already holds one is what the second line is for. Where the
+ * run's own `-unsent` is the case, the run is put where that build left it, past its write.
  */
 
 import { test } from 'node:test';
@@ -146,7 +145,7 @@ test('A RULE STORED PAST THE LINT THAT COPIES THE KEY OR THE FILE INTO party IS 
   assert.deepEqual(wrong, []);
 });
 
-/* ── SEC-2: a copy made before the secret changed ─────────────────────────── */
+/* ── a copy made before the secret changed ────────────────────────────────── */
 
 /**
  * The row is made through the vault door, so `token` holds a real grant id, and `party` is given that id by SQL, as an
@@ -185,7 +184,7 @@ test('AND NOT WHEN THE TOKEN IS CLEARED FROM THE ROW after the copy', async () =
   sql.close();
 });
 
-/* ── SEC-2: a file field's name and hash ──────────────────────────────────── */
+/* ── a file field's name and hash ─────────────────────────────────────────── */
 
 for (const part of ['name', 'sha256'] as const)
   test(`A COPY OF A FILE FIELD'S ${part.toUpperCase()} IS NOT SENT, as a copy of a secret is not`, async () => {
@@ -212,7 +211,7 @@ test('AND NOT AFTER THE FILE WAS REPLACED: the name it held is in the log, and i
   sql.close();
 });
 
-/* ── SEC-2: the run's carried set ─────────────────────────────────────────── */
+/* ── the run's carried set ────────────────────────────────────────────────── */
 
 test('A RUN THAT WROTE A FIELD FROM THE SECRET DOES NOT SEND IT after the secret changed under its wait', async () => {
   /* PLAINTEXT, NOT A GRANT ID, so the vault's ids cannot be what holds it back: the only thing left that says `party`
@@ -251,7 +250,7 @@ test('WHAT NO SECRET OR FILE EVER HELD IS SENT AS IT WAS, with a key and a file 
   sql.close();
 });
 
-/* ── KRN-13: a digest's webhook grant ─────────────────────────────────────── */
+/* ── a digest's webhook grant ─────────────────────────────────────────────── */
 
 const DIGEST = (webhook: Record<string, unknown>, extra: Record<string, unknown> = {}): Declaration => ({
   id: 'digest.weekly',

@@ -1,7 +1,6 @@
 /**
- * The record's doors for a file (`loop/research-restore.md` §2 to §4, brief W55-2): an operation grant opens one ADMIN
- * door, an import can replace the record it came from, the signing key can be asked for, and a restore can hand the
- * object back to a host that reopens it.
+ * The record's doors for a file: an operation grant opens one ADMIN door, an import can replace the record it came
+ * from, the signing key can be asked for, and a restore can hand the object back to a host that reopens it.
  *
  * WHAT WAS MEASURED BEFORE ANY OF IT. An `import` device grant, approved and exchanged, was verified by nothing, and
  * `admin()` refused every bearer, so the CLI had no way in on the Cloud but a browser. A record `createRecord` made was

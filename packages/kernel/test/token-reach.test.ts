@@ -1,6 +1,5 @@
 /**
- * A token's reach: what the owner names, when they mint it, beyond the token's scope (parity brief B7, pick P2 in
- * `loop/DIRECTION.md` section 30).
+ * A token's reach: what the owner names, when they mint it, beyond the token's scope.
  *
  * WHAT WAS MEASURED BEFORE THIS. The record's inbox gate (d41ec831) admits a whole-record owner token whose principal
  * carries `reach: ['inbox']`, and nothing could ever put it there. `createToken` wrote `{ scope, label, days }` and

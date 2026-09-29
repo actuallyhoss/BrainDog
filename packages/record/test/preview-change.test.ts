@@ -1,5 +1,5 @@
 /**
- * A whole change drawn before anybody accepts it: `previewChange` (`loop/finish/contracts.md` §2.4, pages C2).
+ * A whole change drawn before anybody accepts it: `previewChange`.
  *
  * WHAT COULD NOT BE DRAWN BEFORE. `previewPage` draws one page against the record as it is, so the launch desk, whose
  * pages read lists the same change brings, could not be seen at all until its lists were accepted, and its page per
@@ -10,13 +10,13 @@
  * SO THE TESTS ASK TWO THINGS OF EVERY CALL: what was drawn, and that nothing stayed. The rehearsal's rollback is the
  * SQL's, and the list cache is put back by hand (`packages/kernel/src/api/rehearse.ts`), so the cache is read after
  * each call as well as the tables: a list the rehearsal installed and the cache kept would be a list the record does
- * not hold and every later write would read (`loop/finish/pages.md` §6.4 risk 2).
+ * not hold and every later write would read.
  *
- * THE DESK IN THREE CALLS, NOT ONE. A preview takes at most `PREVIEW_DECLARATIONS_MOST` declarations (§2.4), and the
- * whole desk with the pad's notes is more than that, so the brief's one call (`loop/finish/pages.md`, PGS-6) is three
- * here. Its Desk and part pages with the lists and figures they read fit in one call, Numbers with its own in another,
- * which the Numbers test holds to the ceiling exactly, and the rule and the script that add a price check's costs up in
- * a third, beside the list they watch.
+ * THE DESK IN THREE CALLS, NOT ONE. A preview takes at most `PREVIEW_DECLARATIONS_MOST` declarations, and the whole
+ * desk with the pad's notes is more than that, so what would be one call is three here. Its Desk and part pages with
+ * the lists and figures they read fit in one call, Numbers with its own in another, which the Numbers test holds to the
+ * ceiling exactly, and the rule and the script that add a price check's costs up in a third, beside the list they
+ * watch.
  */
 
 import { test } from 'node:test';

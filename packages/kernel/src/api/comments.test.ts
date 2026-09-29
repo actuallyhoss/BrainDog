@@ -1,5 +1,5 @@
 /**
- * Comments, the kernel's half (`api/comments.ts`, `loop/finish/contracts.md` §2.5, `docs/20-COLLABORATION.md` §5).
+ * Comments, the kernel's half (`api/comments.ts`, `docs/20-COLLABORATION.md` §5).
  *
  * THE EXTENSION IS CALLED ON ITS OWN, over the parts it reads, and not through `makeKernel`: what is proved here is how a
  * comment is written and read back, and that holds whether or not `api/index.ts` has spread it onto the kernel yet. Who

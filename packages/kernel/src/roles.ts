@@ -3,23 +3,21 @@
  *
  * A LIST DECLARES THE ROLE, AND THE KERNEL NO LONGER GUESSES IT FROM THE LIST'S NAME. Before this file the rates were
  * the rows of whatever list was called `fx`, read by four fixed field names, and `meet` wrote the list called `people`
- * by six. Measured on 22 September (`loop/research-seed-roles.md` R1, R2): the same rates under the id `rates`, or under
- * `fx` called `from`, `to`, `price` and `day`, converted nothing, and a list called `contacts` with exactly People's
- * fields could not be met into. A register now says `rates: { currency, base, rate, as_of }` or `meets: { name, email,
- * met, merged_into, handles?, projects? }`, each part naming the field that plays it, beside `scopes:` which already
- * works this way.
+ * by six. Measured: the same rates under the id `rates`, or under `fx` called `from`, `to`, `price` and `day`,
+ * converted nothing, and a list called `contacts` with exactly People's fields could not be met into. A register now
+ * says `rates: { currency, base, rate, as_of }` or `meets: { name, email, met, merged_into, handles?, projects? }`,
+ * each part naming the field that plays it, beside `scopes:` which already works this way.
  *
  * ONE KEY PER ROLE, EVERY PART NAMED. A generic `role: rates` would have had to fix the field names again, which is
- * half of what R1 measured. `handles` and `projects` are the two parts `meet` can do without: without `projects` it
- * links nobody to a project and still records the person, which is the record with no Projects the seed installs for
+ * half of what was measured above. `handles` and `projects` are the two parts `meet` can do without: without `projects`
+ * it links nobody to a project and still records the person, which is the record with no Projects the seed installs for
  * a student, and without `handles` a handle has nowhere to go and is refused.
  *
- * THE NAME STILL READS, FOR RECORDS ON PACK VERSIONS OLDER THAN THE KEYS, AND ONLY WHILE NO LIST DECLARES THE ROLE.
- * A record installed before the seed declares either key has `fx` and `people` with no key, and turning its figures
- * into parts on the day this landed would be a regression nobody asked for. So with no declaring list, the list named
- * `fx` is the rates and `people` the people, under today's field names. This is scaffolding with an end: once the
- * seed's own lists declare the keys (`loop/research-shell-next.md` Brief S), a record reaches the fallback only until
- * its next pack update.
+ * THE NAME STILL READS, FOR RECORDS ON PACK VERSIONS OLDER THAN THE KEYS, AND ONLY WHILE NO LIST DECLARES THE ROLE. A
+ * record installed before the seed declares either key has `fx` and `people` with no key, and turning its figures into
+ * parts on the day this landed would be a regression nobody asked for. So with no declaring list, the list named `fx`
+ * is the rates and `people` the people, under today's field names. This is scaffolding with an end: once the seed's own
+ * lists declare the keys, a record reaches the fallback only until its next pack update.
  *
  * NOTHING HERE IMPORTS THE REST OF THE KERNEL. `declare.ts` checks a declared mapping with the same table at install,
  * and `index.ts` reads it at run time, and the two must agree about what a part's field may be.
@@ -85,12 +83,12 @@ const named = (key: RoleKey): Record<string, string> => Object.fromEntries(PARTS
  * by hand, and choosing one of them would convert at one list's rates, or file a person in one list, on a guess. That
  * is `resolveProject`'s rule for two lists declaring `scopes:`, for the same reason.
  *
- * THE NAMED LIST IS READ WHATEVER ITS SHAPE, while `legacyShaped` decides only whether it blocks a second holder.
- * `loop/research-shell-next.md` recommended one rule for both, and `packages/kernel/test/people.test.ts` measured why
- * not: its `people` with a name and a plain-text email, and none of `met` or `merged_into`, is refused `FIELD_UNKNOWN at
- * handles`, naming the first field it lacks. Read by shape it would be no list at all and `REGISTER_UNKNOWN`, which
- * tells the owner less about a list that is there. For rates it makes no difference: rows without the four fields hold
- * no rate, and `ratesFrom` skips them.
+ * THE NAMED LIST IS READ WHATEVER ITS SHAPE, while `legacyShaped` decides only whether it blocks a second holder. One
+ * rule for both was the obvious design, and `packages/kernel/test/people.test.ts` measured why not: its `people` with a
+ * name and a plain-text email, and none of `met` or `merged_into`, is refused `FIELD_UNKNOWN at handles`, naming the
+ * first field it lacks. Read by shape it would be no list at all and `REGISTER_UNKNOWN`, which tells the owner less
+ * about a list that is there. For rates it makes no difference: rows without the four fields hold no rate, and
+ * `ratesFrom` skips them.
  */
 function roleOf(key: RoleKey, lists: Iterable<RoleList>): Role<Record<string, string>> | null {
   const all = [...lists];
@@ -133,19 +131,19 @@ export function aims(part: Part, field: RoleField, self: string, projects?: stri
  * with a type that plays it.
  *
  * BY SHAPE, AND NAMING NO PACK. The named list counts as a holder, so a second list cannot take the role from under
- * yesterday's rows. The roles survey's checker raised what that costs, read and not driven: a list called `fx` of sound
- * effects, or `people` as a cast list, would have blocked every pack declaring the role with a fix pointing at a pack
- * that does not own the list. So only a list shaped like the rates or the people counts, and the other kind blocks
- * nothing; both are driven in `test/roles.test.ts`.
+ * yesterday's rows. What that costs, read and not driven: a list called `fx` of sound effects, or `people` as a cast
+ * list, would have blocked every pack declaring the role with a fix pointing at a pack that does not own the list. So
+ * only a list shaped like the rates or the people counts, and the other kind blocks nothing; both are driven in
+ * `test/roles.test.ts`.
  *
  * ASKED AT INSTALL OF EITHER LIST. `declare.ts`'s `roleBody` asks it of the list declaring the key, and `keylessBeside`
- * of the keyless one. This paragraph said a keyless, rates-shaped `fx` arriving AFTER a list declared `rates:` was made
- * by hand and nobody made it by accident; audit forty-seven (finding 2) made it with an install, and the declaring
- * list's next update was then refused, told to declare `rates:` on `fx`. It is now refused at the keyless list's own
- * install. A RECORD THAT REACHED THE PAIR BEFORE THAT GUARD IS REFUSED ON BOTH LISTS' UPDATES, measured by installing
- * the pair with `keylessBeside` switched off and then updating each with it on: the declaring list is told to declare
- * `rates:` on `fx`, and `fx` is told to install under another id, which an installed list cannot. Both refusals come
- * from `Known` laying the batch over the record, which cannot tell the live holder from a new one.
+ * of the keyless one. A keyless, rates-shaped `fx` arriving AFTER a list declared `rates:` looks like something made by
+ * hand that nobody makes by accident, but an install makes it, and the declaring list's next update was then refused,
+ * told to declare `rates:` on `fx`. It is now refused at the keyless list's own install. A RECORD THAT REACHED THE PAIR
+ * BEFORE THAT GUARD IS REFUSED ON BOTH LISTS' UPDATES, measured by installing the pair with `keylessBeside` switched
+ * off and then updating each with it on: the declaring list is told to declare `rates:` on `fx`, and `fx` is told to
+ * install under another id, which an installed list cannot. Both refusals come from `Known` laying the batch over the
+ * record, which cannot tell the live holder from a new one.
  */
 export function legacyShaped(key: RoleKey, list: RoleList): boolean {
   if (list.id !== LEGACY[key] || list[key] !== undefined) return false;

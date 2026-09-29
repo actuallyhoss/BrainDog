@@ -97,15 +97,15 @@ const agent = (session: SessionHints = {}): WriteContext => ({
   session,
 });
 
-/** Three projects: BrainDog by remote, name and folder; Site by a parent folder; Bake off Windows. */
+/** Three projects: BrainDog by remote, name and folder; Site by a parent folder; Studio off Windows. */
 async function record(): Promise<{ k: Kernel; sql: NodeSql; ids: string[] }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([PROJECTS, SKILLS, TASKS, PEOPLE]));
   const ids = [
-    { name: 'BrainDog', repos: ['github.com/sam/braindog', 'braindog'], folders: ['C:\\Repos\\braindog'] },
-    { name: 'Site', repos: ['git@github.com:Sam/site.git'], folders: ['C:\\Repos'] },
-    { name: 'Bake', repos: ['https://gitlab.com/bake/acme-web'], folders: ['/home/sam/bake'] },
+    { name: 'BrainDog', repos: ['github.com/acme/braindog', 'braindog'], folders: ['C:\\Repos\\braindog'] },
+    { name: 'Site', repos: ['git@github.com:Acme/site.git'], folders: ['C:\\Repos'] },
+    { name: 'Studio', repos: ['https://gitlab.com/studio/studio-web'], folders: ['/home/sam/studio'] },
   ].map((row) => value<Entry>(k.create('things', row, OWNER)).id);
   return { k, sql, ids };
 }
@@ -122,16 +122,16 @@ const runs = (sql: NodeSql): number => sql.all("SELECT 1 FROM entry WHERE regist
 test('A REMOTE MATCHES whatever form it is written in, and it wins over the folder', async () => {
   const { k, sql } = await record();
   for (const remote of [
-    'https://sam@GitHub.com/sam/braindog.git',
-    'ssh://git@github.com:22/sam/braindog',
-    'git@github.com:sam/braindog.git',
-    'github.com/sam/braindog/',
+    'https://sam@GitHub.com/acme/braindog.git',
+    'ssh://git@github.com:22/acme/braindog',
+    'git@github.com:acme/braindog.git',
+    'github.com/acme/braindog/',
   ])
     assert.deepEqual(placed(k, { remote }), { project: 'things#1 by remote', ambiguous: [] }, remote);
 
   /* The project wrote its remote in the scp form, and a run may say it any way. */
-  assert.deepEqual(placed(k, { remote: 'https://github.com/Sam/site' }), { project: 'things#2 by remote', ambiguous: [] });
-  assert.deepEqual(placed(k, { remote: 'https://gitlab.com/bake/acme-web.git', cwd: 'C:\\Repos\\braindog' }), {
+  assert.deepEqual(placed(k, { remote: 'https://github.com/Acme/site' }), { project: 'things#2 by remote', ambiguous: [] });
+  assert.deepEqual(placed(k, { remote: 'https://gitlab.com/studio/studio-web.git', cwd: 'C:\\Repos\\braindog' }), {
     project: 'things#3 by remote',
     ambiguous: [],
   });
@@ -152,8 +152,8 @@ test('A FOLDER MATCHES as Windows writes it, and the longest folder wins', async
   assert.equal(at('C:\\Repos\\braindog\\'), 'things#1 by folder');
   assert.equal(at('C:\\Repos\\other'), 'things#2 by folder');
   assert.equal(at('C:\\Repos\\braindogs'), 'things#2 by folder', 'a longer name is not a folder inside');
-  assert.equal(at('/home/sam/bake/src'), 'things#3 by folder');
-  assert.equal(at('/HOME/sam/bake'), null, 'case is ignored on a drive letter only');
+  assert.equal(at('/home/sam/studio/src'), 'things#3 by folder');
+  assert.equal(at('/HOME/sam/studio'), null, 'case is ignored on a drive letter only');
   assert.equal(at('D:\\tmp'), null);
   sql.close();
 });
@@ -169,11 +169,11 @@ test('A BARE REPO NAME MATCHES LAST, and only a repos entry with no slash', asyn
 
 test('TWO PROJECTS AT THE SAME STRENGTH LEAVE THE RUN GLOBAL, and are named', async () => {
   const { k, sql } = await record();
-  value(k.create('things', { name: 'Fork', repos: ['https://github.com/sam/braindog'], folders: ['c:/repos/braindog/'] }, OWNER));
+  value(k.create('things', { name: 'Fork', repos: ['https://github.com/acme/braindog'], folders: ['c:/repos/braindog/'] }, OWNER));
 
   assert.deepEqual(placed(k, { cwd: 'C:\\Repos\\braindog\\docs' }), { project: null, ambiguous: ['things#1', 'things#4'] });
   /* A tie at the remote is not settled by the folder, which is a weaker rung. */
-  assert.deepEqual(placed(k, { remote: 'git@github.com:sam/braindog.git', cwd: 'C:\\Repos\\braindog' }), {
+  assert.deepEqual(placed(k, { remote: 'git@github.com:acme/braindog.git', cwd: 'C:\\Repos\\braindog' }), {
     project: null,
     ambiguous: ['things#1', 'things#4'],
   });
@@ -184,7 +184,7 @@ test('TWO PROJECTS AT THE SAME STRENGTH LEAVE THE RUN GLOBAL, and are named', as
 
 test('A RUN OPENED IN A MATCHING REPO GETS ITS PROJECT, and a run re-attached elsewhere is placed again', async () => {
   const { k, sql } = await record();
-  value(k.create('tasks', { what: 'Wire scope' }, agent({ client_id: 'cc-1', remote: 'git@github.com:sam/braindog.git', host: 'h' })));
+  value(k.create('tasks', { what: 'Wire scope' }, agent({ client_id: 'cc-1', remote: 'git@github.com:acme/braindog.git', host: 'h' })));
   const run = k.get('S1')!;
   assert.equal(run.fields.project, 'things#1');
 
@@ -192,15 +192,15 @@ test('A RUN OPENED IN A MATCHING REPO GETS ITS PROJECT, and a run re-attached el
   assert.equal(k.get('S2')?.fields.project, undefined, 'a run opened nowhere in particular is global');
 
   /* Named by its spoken id from another folder, the run keeps its place. */
-  value(k.create('tasks', { what: 'Still here' }, agent({ spoken: 'S1', cwd: '/home/sam/bake' })));
+  value(k.create('tasks', { what: 'Still here' }, agent({ spoken: 'S1', cwd: '/home/sam/studio' })));
   assert.equal(k.get('S1')?.fields.project, 'things#1');
 
   /* By its client id with no place given, likewise. */
   value(k.create('tasks', { what: 'No hints' }, agent({ client_id: 'cc-1' })));
   assert.equal(k.get('S1')?.fields.project, 'things#1');
 
-  /* Re-attached from Bake's folder, it is in Bake, and the record noting that is not an edit. */
-  value(k.create('tasks', { what: 'Moved' }, agent({ client_id: 'cc-1', cwd: '/home/sam/bake/src' })));
+  /* Re-attached from Studio's folder, it is in Studio, and the record noting that is not an edit. */
+  value(k.create('tasks', { what: 'Moved' }, agent({ client_id: 'cc-1', cwd: '/home/sam/studio/src' })));
   const moved = k.get('S1')!;
   assert.equal(moved.fields.project, 'things#3');
   assert.equal(moved.version, run.version);
@@ -227,7 +227,7 @@ test('THE CREATE DEFAULT: what a token adds lands in its run’s project, and a 
     'a global run adds global rows',
   );
   /* widen is any on a task, so a token may say another project outright. */
-  assert.equal(value<Entry>(k.create('tasks', { what: 'Bake', thing: 'things#3' }, here)).fields.thing, ids[2]);
+  assert.equal(value<Entry>(k.create('tasks', { what: 'Studio', thing: 'things#3' }, here)).fields.thing, ids[2]);
   sql.close();
 });
 
@@ -257,7 +257,7 @@ test('A TOKEN NEVER WIDENS: it may narrow a global row, and moving a row out of 
   assert.equal(value<Entry>(k.update('skills', global.id, { project: 'things#3' }, here)).fields.project, ids[2]);
   /* A global run may narrow what it adds in the same way. */
   const away = agent({ client_id: 'cc-2', cwd: 'D:\\tmp' });
-  assert.equal(value<Entry>(k.create('skills', { name: 'bake-only', project: 'things#3' }, away)).fields.project, ids[2]);
+  assert.equal(value<Entry>(k.create('skills', { name: 'studio-only', project: 'things#3' }, away)).fields.project, ids[2]);
 
   /* The move outward is the owner's, one press. */
   assert.equal(value<Entry>(k.update('skills', mine.id, { project: null }, OWNER)).fields.project, undefined);

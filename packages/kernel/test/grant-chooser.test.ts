@@ -2,21 +2,21 @@
  * Which live vault entry a name opens, when the vault holds more than one under it: `grantChosen`, and the two SQL
  * readers that now hand their rows to it.
  *
- * SPK-3, THE HALF THE SLASH PASS COULD NOT REACH. The vault admits two live grants under one label (`bindGrant` checks no
+ * ONE CHOOSER, NOT FIVE COPIES OF ITS ORDER. The vault admits two live grants under one label (`bindGrant` checks no
  * label for uniqueness), and at `afb3b1b2` four places each wrote the newest-first order out for themselves: `keyNamed`
- * and `opensNamed` here as `ORDER BY created_at DESC, id DESC`, `grantNamed` in `@braindog/host/script` as a `sort`, and
- * `slashGrantOf` in `@braindog/host/slash` as a loop over `newerThan`. The audit of wave forty-nine found the fifth,
- * Slash's `grants().find(...)`, answering the OLDEST key while every action named `slash` sent the newest, and the only
- * thing that had kept the other four agreeing was that each author copied the same clause. This file holds the kernel's
- * half of one chooser: the two SQL readers filter and `grantChosen` orders. One more copy of the clause, `sealedGrant`'s for a
- * signed post, was found by the audit of wave fifty-five (§7) and asks the chooser now too; `vault-webhook-grant.test.ts`
- * holds it, over a tie that SQL and the chooser would have broken two ways.
+ * and `opensNamed` here as `ORDER BY created_at DESC, id DESC`, `grantNamed` in `@braindog/host/script` as a `sort`,
+ * and `slashGrantOf` in `@braindog/host/slash` as a loop over `newerThan`. A fifth, Slash's `grants().find(...)`,
+ * answered the OLDEST key while every action named `slash` sent the newest, and the only thing that had kept the other
+ * four agreeing was that each author copied the same clause. This file holds the kernel's half of one chooser: the two
+ * SQL readers filter and `grantChosen` orders. One more copy of the clause, `sealedGrant`'s for a signed post, asks the
+ * chooser now too; `vault-webhook-grant.test.ts` holds it, over a tie that SQL and the chooser would have broken two
+ * ways.
  *
  * THE ORDER AS IT STOOD IS WRITTEN OUT BELOW (`BEFORE`), verbatim from `keyNamed` at `afb3b1b2`, and every case asserts the
  * chooser picks what that query picked. The move was to put the order in one place, not to change which key wins, and a
  * case that only compared `keyNamed` with `grantChosen` would stay green if both had moved together.
  *
- * RED BEFORE THE MOVE, MEASURED ON 23 SEPTEMBER: the file did not load, `grantChosen` not exported by `actions.ts`. That is
+ * RED BEFORE THE MOVE, MEASURED: the file did not load, `grantChosen` not exported by `actions.ts`. That is
  * the only red there was. `packages/host/test/grant-named.test.ts`, run against the four copies as they stood, passed 8 of
  * 8, so the repair here is one copy of the order and not a different winner. With the move in, `grantChosen`'s id
  * tie-break reversed by hand failed case 2 here and nothing else, which is the case that holds it.

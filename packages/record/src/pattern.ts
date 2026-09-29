@@ -1,6 +1,5 @@
 /**
- * The ingest pattern builder, the record's half: `tryPattern` and `anchorsFor` (`loop/finish/platform.md` §4.0 T,
- * `loop/finish/contracts.md` rows `tryPattern` and `anchorsFor`).
+ * The ingest pattern builder, the record's half: `tryPattern` and `anchorsFor`.
  *
  * A PERSON MAKES A RULE BY POINTING, NEVER BY WRITING ONE. The builder shows a few messages that arrived alike; she
  * selects the amount in one of them and the record answers the ways it could be found again (`anchorsFor`), each scored

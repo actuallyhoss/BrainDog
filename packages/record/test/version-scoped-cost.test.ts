@@ -1,7 +1,7 @@
 /**
  * `version()` for a caller who is not handed rowids costs the lines written since she last asked, not the whole log.
  *
- * `loop/research-batch-twenty-eight-audit.md` finding 2. `versionFor` walked the log down from the top until it met a
+ * MEASURED. `versionFor` walked the log down from the top until it met a
  * line `lineOf` shows her, with no cap and nothing remembered between calls, so a member whose newest line sat under a
  * busy list she may not read paid for every line above it on every call: 578.6 ms at 20,000 Diary rows and 2,650.4 ms
  * at 100,000, where the owner paid 0.2 ms. `apps/web/src/routes/+layout.ts` awaits it on a tab's first navigation.

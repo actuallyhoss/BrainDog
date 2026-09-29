@@ -1,7 +1,7 @@
 /**
  * A run-path `if` the run cannot read is refused at install, with the sentence the run would have failed with.
  *
- * FOUND BY THE CHECKER OF THE RECORD-REACH WAVE, on the way. `steps: [{ if: 'amount more than 1000', then: [...] }]`
+ * FOUND ON THE WAY TO SOMETHING ELSE. `steps: [{ if: 'amount more than 1000', then: [...] }]`
  * installed: the lint asked only that `if` was a string or a tree (`flow-lint.ts`, `case 'if'`), and `unreadable` reads a
  * rule's `when:` and not its steps. Every run then failed at that step, "could not read its condition at step 1: amount
  * more than 1000: more is not something a filter can say", on the automation's page, for a mistake that was plain the
@@ -73,7 +73,7 @@ test('AN if THE RUN CANNOT READ IS REFUSED AT INSTALL, in the words the run woul
 });
 
 test('AND THE if THIS FILE WAS FOUND ON IS READ NOW, at install and at the run', async () => {
-  /* `amount more than 1000` WAS THIS FILE'S UNREADABLE CONDITION UNTIL M4 brief 6 taught the sentence the five ordered
+  /* `amount more than 1000` WAS THIS FILE'S UNREADABLE CONDITION UNTIL the sentence was taught the five ordered
      words, and the two tests above went red on it: it installed, and the run answered `done`. They ask `over` now, which
      neither grammar reads. This is the other half, so the lint is seen passing the words it used to refuse and the run
      is seen finishing on the step it used to fail at. */

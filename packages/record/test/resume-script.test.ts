@@ -1,5 +1,5 @@
 /**
- * `resumeScript`, the door that starts a script paused by three refused runs again (`loop/DIRECTION.md` §22).
+ * `resumeScript`, the door that starts a script paused by three refused runs again.
  *
  * Guarded as `resumeAction` is: an owner in a browser, no stray argument, a script named. The pause itself is made the
  * real way, by the kernel's pass leasing `script.run` and a host's sandbox refusing three runs in a row.

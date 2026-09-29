@@ -1,6 +1,6 @@
 /**
- * The record's links to one page (`loop/finish/platform.md` §4.0 H, `loop/finish/contracts.md` §2.5 and §2.7): `openShare`,
- * `closeShare` and `shares` for the owner, and `sharedPage` for whoever holds a link.
+ * The record's links to one page: `openShare`, `closeShare` and `shares` for the owner, and `sharedPage` for whoever
+ * holds a link.
  *
  * NO TABLE AND NO KEY. A link is two events of kinds the ledger already has: `share.open` when the owner opens it and
  * `share.close` when it is closed, each on `target: 'share:<id>'` with the page's slug in `field`, and `share.open`

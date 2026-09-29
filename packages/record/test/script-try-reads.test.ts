@@ -1,16 +1,15 @@
 /**
- * A trial reads what the scheduled run of the same body reads, and no more than its caller may
- * (`loop/research-batch-thirty-seven-audit.md` finding 4).
+ * A trial reads what the scheduled run of the same body reads, and no more than its caller may.
  *
  * WHAT WAS MEASURED. `scriptTry` handed the host the record's `list` and `get` under the caller's own context, while a
  * scheduled run reads through the host's `scriptReads`: as `system` held to the body's `reads:`, with secret fields
- * taken off every row and a filter on one refused. The audit tried one source by a propose token and then ran it on its
- * clock. The trial listed Acme with its `token` (a grant id), read `seen#1` from a list outside `reads:`, and answered a
+ * taken off every row and a filter on one refused. One source was tried by a propose token and then run on its clock.
+ * The trial listed Acme with its `token` (a grant id), read `seen#1` from a list outside `reads:`, and answered a
  * filter on the secret; the scheduled run listed Acme without the field, read `null`, and was refused the filter. So a
  * trial showed an agent writes the accepted script would never make.
  *
- * NOT A LEAK, AS THE AUDIT SAID: the token read the grant id through its own `list`. The promise was the fault, and
- * this holds the promise: the same three reads, asked of a trial and of the host's own `scriptReads`, answer alike.
+ * NOT A LEAK: the token read the grant id through its own `list`. The promise was the fault, and this holds the
+ * promise: the same three reads, asked of a trial and of the host's own `scriptReads`, answer alike.
  */
 
 import { test } from 'node:test';
@@ -48,7 +47,7 @@ const agent: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'prop
 
 type Reads = Parameters<NonNullable<RecordDeps['tryScript']>>[0]['reads'];
 
-/** The audit's three reads, and a `get` of the row that holds the key, as lines a log would carry. */
+/** The three reads, and a `get` of the row that holds the key, as lines a log would carry. */
 async function probe(reads: Reads): Promise<string[]> {
   const out: string[] = [];
   const say = async (label: string, f: () => Promise<unknown>) => {

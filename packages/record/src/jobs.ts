@@ -1,5 +1,5 @@
 /**
- * The record's job methods (`loop/finish/agents.md` C13, `docs/30-BLUEPRINT.md` §5 JOBS): the owner's, in a browser,
+ * The record's job methods (`docs/30-BLUEPRINT.md` §5 JOBS): the owner's, in a browser,
  * and a runner's, for a machine enrolled as one.
  *
  * THE QUEUE IS THE KERNEL'S (`kernel.jobs`, `packages/kernel/src/jobs.ts`), and each method here is its door: the guard

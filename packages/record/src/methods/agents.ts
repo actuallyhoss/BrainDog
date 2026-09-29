@@ -1,10 +1,10 @@
 /**
- * The record's methods for agents (`loop/finish/contracts.md` §2.3), written beside `index.ts` rather than inside it.
+ * The record's methods for agents, written beside `index.ts` rather than inside it.
  *
- * `usedBy` IS THE FIRST, built as the worked example of `methods/` (ARC-6, on AGT-4's behalf): a real method a later
- * unit needs, so the first push that carries the mechanism proves it end to end, from this file through
- * `methods/index.ts` and the route row in `host/src/routes/agents.ts` to a caller. `triage` is beside it: the one door
- * an agent's token files or sets aside an arrival by (agents C2).
+ * `usedBy` IS THE FIRST, built as the worked example of `methods/`: a real method a caller needs, so the first change
+ * that carries the mechanism proves it end to end, from this file through `methods/index.ts` and the route row in
+ * `host/src/routes/agents.ts` to a caller. `triage` is beside it: the one door an agent's token files or sets aside an
+ * arrival by.
  */
 
 import type { Result } from '@braindog/ports';
@@ -62,14 +62,14 @@ type Use = { actor: string; count: number; at: string };
 
 /**
  * What `triage` takes. Exactly one of `register`, `ignore` or `back`; `fields` and `note` only with `register`, and
- * `version` only with `back`, where it is the filed row's (`loop/finish/contracts.md` §2.3).
+ * `version` only with `back`, where it is the filed row's.
  */
 export type TriageArgs = { arrival: string; register?: string; fields?: Patch; ignore?: true; note?: string; back?: true; version?: number };
 
 /** The keys `triage` takes, named in the sentence that refuses any other. */
 const TRIAGE_TAKES = ['arrival', 'register', 'fields', 'ignore', 'note', 'back', 'version'] as const;
 
-/** The sentence every token without the `inbox` reach is given, whatever else it holds (agents C2). */
+/** The sentence every token without the `inbox` reach is given, whatever else it holds. */
 const NO_REACH = 'Triage needs a token its owner gave the inbox reach.';
 
 export function methods(deps: RecordDeps) {
@@ -188,7 +188,7 @@ export function methods(deps: RecordDeps) {
 
     /**
      * File one arrival from the inbox as a row in a list, or set it aside: `fileArrival` or `archiveArrival`, behind
-     * one door an agent can be given (agents C2).
+     * one door an agent can be given.
      *
      * A PERSON IS ADMITTED AS THOSE TWO ADMIT ONE: an owner, in a browser, reading the whole record. A TOKEN ONLY WHEN
      * ITS OWNER GAVE IT THE `inbox` REACH, the same test `inbox` makes: an owner's token for the whole record whose row
@@ -202,10 +202,10 @@ export function methods(deps: RecordDeps) {
      * AGAIN IS THE SAME ANSWER, as the kernel's verbs give it: an arrival already filed answers with its row and writes
      * nothing, so an agent retrying a lost answer files one row.
      *
-     * `back` TAKES A FILING OR AN ARCHIVING BACK, through the kernel's `returnArrival` and no verb of its own, so an agent
-     * that filed the wrong thing puts it back through the same door it filed by (contracts X34). A filed arrival's row is
-     * archived at the `version` the caller saw, so the caller needs the right to archive a row in that row's list; a rule's
-     * filing is refused in the kernel's sentence, since there is nothing a person did to take back.
+     * `back` TAKES A FILING OR AN ARCHIVING BACK, through the kernel's `returnArrival` and no verb of its own, so an
+     * agent that filed the wrong thing puts it back through the same door it filed by. A filed arrival's row is
+     * archived at the `version` the caller saw, so the caller needs the right to archive a row in that row's list; a
+     * rule's filing is refused in the kernel's sentence, since there is nothing a person did to take back.
      */
     async triage(args: TriageArgs, ctx: CallContext): Promise<Result<ArrivalSettled>> {
       const stop = scoped(ctx, 'read');

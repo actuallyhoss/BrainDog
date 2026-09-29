@@ -81,7 +81,7 @@ export type RuleAction =
   | { stop: true };
 
 /**
- * What starts an automation. `loop/research-shell-automations.md` §3 and §4.1.
+ * What starts an automation.
  *
  * ABSENT MEANS `written`, WHICH IS WHAT EVERY RULE MEANT BEFORE THIS TYPE EXISTED. That is the whole reason an automation
  * is a rule that grew a trigger rather than a ninth kind: the rules already installed in somebody's record are
@@ -111,8 +111,8 @@ export type Trigger =
  * One step of an automation: a branch, a transform, something that waits, or any action a rule already has.
  *
  * EVERY STEP IS A CLOSED VERB THAT NAMES A DECLARATION, never an address and never code. `call` names a declared call
- * whose host, key and fields were approved at install, and `script` names a `script.<id>` whose runtime is another
- * brief's; that is what keeps 04 §7's security argument an enumeration over closed lists.
+ * whose host, key and fields were approved at install, and `script` names a `script.<id>` whose runtime lives
+ * elsewhere; that is what keeps 04 §7's security argument an enumeration over closed lists.
  */
 export type Step =
   | { if: Predicate | string; then: Step[]; else?: Step[] }
@@ -379,10 +379,10 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
 
     for (const [i, action] of then.entries()) {
       /* A VERB ONLY A STEP HAS IS NOT ACTED ON, NOR IS WHAT SITS BESIDE IT. `inlineFault` refuses one at install, and a
-         body stored before that lint still reaches here (`loop/research-batch-forty-two-audit.md` finding 3): measured
-         on 23 September, `{ if: 'what is Nothing', then: [], set: note }` set the note on a row the condition excluded,
-         because the chain below takes the first action an item carries, and `{ wait: 1h, set: note }` wrote the note at
-         once. The lint is asked of the one item, so the pass and the install cannot disagree about which verbs those are. */
+         body stored before that lint still reaches here: measured, `{ if: 'what is Nothing', then: [], set: note }` set
+         the note on a row the condition excluded, because the chain below takes the first action an item carries, and
+         `{ wait: 1h, set: note }` wrote the note at once. The lint is asked of the one item, so the pass and the
+         install cannot disagree about which verbs those are. */
       const step = inlineFault(`rule.${rule.rule}`, { ...rule, then: [action] } as FlowDecl);
       if (step?.code === 'NOT_IN_THIS_BUILD') {
         const here = `then[${i}]`;
@@ -390,9 +390,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         continue;
       }
       /* A TAG OR A MOVE THAT IS NOT TEXT IS LEFT OUT OF THE PATCH, since the list refuses it and the rule's whole patch
-         went with it: a stored `tag: 5` (audit forty-one, finding 3) and `move: 5` (forty-two, finding 3) each left the
-         Water row without the `set` beside them. No `fill` reads either word, so neither has `fill`'s guard. The verb is
-         found in the chain's own order, so the word asked about is the one the chain below would act on. */
+         went with it: a stored `tag: 5` and `move: 5` each left the Water row without the `set` beside them. No `fill`
+         reads either word, so neither has `fill`'s guard. The verb is found in the chain's own order, so the word asked
+         about is the one the chain below would act on. */
       const verb = 'tag' in action ? 'tag' : 'untag' in action ? 'untag' : 'set' in action ? 'set' : 'move' in action ? 'move' : null;
       const word = verb === 'tag' || verb === 'untag' || verb === 'move' ? (action as Record<string, unknown>)[verb] : '';
       if (typeof word !== 'string') {
@@ -419,7 +419,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         /* A `set` IS FILLED ONCE AND REFUSED WHERE IT WOULD COPY A SECRET INTO A FIELD THAT MAY LEAVE, as every other
            text here is (`said`), unless the field it writes never leaves either. The lint refuses it at install
            (`flow-lint.ts`, `writeFault`); this is the second line, for a rule stored before it did and for a run's
-           step. Wave fifty-four left the `set` out and wrote the copy, holding it back from what leaves (`queueCall`'s
+           step. An earlier build left the `set` out and wrote the copy, holding it back from what leaves (`queueCall`'s
            second line, a run's `-unsent`), because four test files stored such a copy to reach those lines. Measured at
            HEAD `b7409d2d`: `set: { field: memo, to: 'x {{pin}}' }` stored past the lint wrote `x hunter2` into `memo`,
            which every reader of the list sees. The field is left unclaimed, so a later rule may still set it. */
@@ -697,7 +697,7 @@ const DAY_MS = 86_400_000;
  *
  * A TEMPLATE THAT IS NOT TEXT IS WRITTEN AS ITS WORDS, NOT THROWN. The lint refuses one at install (`fillFault` in
  * `flow-lint.ts`), but a rule installed before that lint, or written straight into the declaration row, still holds
- * `set: { to: 5 }` or `note: 7`, and this line was `template.replace`: measured on 23 September, such a rule threw
+ * `set: { to: 5 }` or `note: 7`, and this line was `template.replace`: measured, such a rule threw
  * `template.replace is not a function` out of every write to its list, and the row a person asked for was lost with it.
  */
 export function fill(template: string, row: Entry, nowMs = Date.now()): string {
@@ -735,10 +735,9 @@ export const present = (value: unknown): boolean => value !== null && value !== 
  * ONE `replace`, SO NOTHING ONE SPELLING WROTE IS READ AGAIN AS ANOTHER. The fills used to run one after the other:
  * `withEach` wrote a create's tuple in, then `fill` read the row's `{{field}}`s out of the result, and `flow.ts` wrote
  * the run's paths into a step before the pass filled it from the row. So a value holding the words `{{pin}}` was filled
- * a second time, as the secret. Measured on 23 September at HEAD `afb3b1b2`: a `kinds` item `{{pin}}` crossed by `each:
- * [kinds]` into `what: 'x {{each.0}}'` wrote `x hunter2` into a Payments row, and a run's `note: 'is
- * {{trigger.row.note}}'` over a `note` holding `{{pin}}` wrote `is hunter2` into the note event. No lint can see either,
- * since the braces are data.
+ * a second time, as the secret. Measured at HEAD `afb3b1b2`: a `kinds` item `{{pin}}` crossed by `each: [kinds]` into
+ * `what: 'x {{each.0}}'` wrote `x hunter2` into a Payments row, and a run's `note: 'is {{trigger.row.note}}'` over a
+ * `note` holding `{{pin}}` wrote `is hunter2` into the note event. No lint can see either, since the braces are data.
  *
  * THE SECRET IS NAMED BY WHERE IT WAS READ, NEVER BY WHAT IT HOLDS. A field is counted when `sealed` has it and it holds
  * a value, and a path when the run says so. Comparing the words written against the secret's words would refuse a row
@@ -775,11 +774,11 @@ export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy
  * keep its value. `actions.ts` reads a call's sends the same way, for the same reason.
  *
  * AND EVERY VERSION OF IT, NOT ONLY THE ONE STANDING, which is `declare.ts`'s `sealedEver` and says why. Reading only
- * the standing version lost `pin` the moment it was dropped: `loop/research-batch-fifty-five-audit.md` §4 installed
- * `note 'x {{pin}}'`, `note 'x {{trigger.row.pin}}'`, `note 'x {{trigger.row}}'` and `set memo to {{pin}}` after the
- * drop, and each wrote `hunter2`; a field retyped from secret to text by way of a retire wrote it too (measured by the
- * checker on 23 September). The lint reads the same function now and refuses those rules at install, so this line is
- * for a rule stored before it did, or before the field was secret at all (`retired-secret.test.ts`).
+ * the standing version lost `pin` the moment it was dropped: measured, `note 'x {{pin}}'`,
+ * `note 'x {{trigger.row.pin}}'`, `note 'x {{trigger.row}}'` and `set memo to {{pin}}` installed after the drop each
+ * wrote `hunter2`; a field retyped from secret to text by way of a retire wrote it too (measured). The lint reads the
+ * same function now and refuses those rules at install, so this line is for a rule stored before it did, or before the
+ * field was secret at all (`retired-secret.test.ts`).
  *
  * THE HISTORY AND NOT A REFUSED DROP. A refusal would guard only the drops still to come, and a record that dropped a
  * retired secret before this line exists already, its rows holding the value; reading the history closes those too, and
@@ -855,19 +854,19 @@ const moneyWords = (m: { amount: number; currency: string }): string => moneyTex
  * rates), in its own unit, or the dash where the record holds no such figure or the figure refuses to be read.
  *
  * MONEY IS WRITTEN AS A MONEY FIELD IS, `GBP 1,234.50`, so a sentence holding `{{amount}}` and `{{metric.cash-now}}`
- * says both the same way. The survey's brief wrote `1234.50 GBP`; that is the quantity order (`3 h`), and a note that
- * put the currency first for the row and last for the figure would read as two kinds of number. Money in several
- * currencies that no rate adds up is each amount, as a page writes it (`pages.ts`'s `valueAt`).
+ * says both the same way. An earlier draft wrote `1234.50 GBP`; that is the quantity order (`3 h`), and a note that put
+ * the currency first for the row and last for the figure would read as two kinds of number. Money in several currencies
+ * that no rate adds up is each amount, as a page writes it (`pages.ts`'s `valueAt`).
  *
  * WHETHER THE UNIT IS A CURRENCY IS ASKED OF THE FIELD THE FIGURE ADDS UP, never of the unit's spelling.
  * `metrics.ts`'s `isMoneyFigure` says why: `KGS` is a weight in one list and the Kyrgyz som in another, and a quantity
  * written through `exponentOf` would be a hundredth of itself.
  *
- * THE AGGREGATE ONLY, NEVER A ROW. `value` and its unit are the whole figure; `groups` is never read, so a figure grouped
- * by a field hands no row's word into a run. Over a list with a secret field, measured on 24 September, `sum`, `min`,
- * `max` and `avg` of the secret are refused at install ("max reads a number, and pin is a secret"), and `count` and
- * `distinct` of it install, which are numbers of rows. So the run's `sealed` answers `false` for a figure: the number of
- * keys a vault holds is not a key. `group_by` a secret field installs too, and is why `groups` stays unread here.
+ * THE AGGREGATE ONLY, NEVER A ROW. `value` and its unit are the whole figure; `groups` is never read, so a figure
+ * grouped by a field hands no row's word into a run. Over a list with a secret field, measured, `sum`, `min`, `max` and
+ * `avg` of the secret are refused at install ("max reads a number, and pin is a secret"), and `count` and `distinct` of
+ * it install, which are numbers of rows. So the run's `sealed` answers `false` for a figure: the number of keys a vault
+ * holds is not a key. `group_by` a secret field installs too, and is why `groups` stays unread here.
  */
 export function figureText(deps: Pick<RulesDeps, 'sql' | 'ctx'>, id: string): string {
   const row = deps.sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
@@ -972,14 +971,14 @@ function expand(deps: RulesDeps, name: string, spec: CreateSpec, from: Standing)
 
   /* WITH NO ROW TO STAND ON, THE BOUND IS A DAY'S, as the grammar says it. On a row the bound caps one matrix, and the
      row's `once_per` keeps it to one matrix a row; a clock or a button has no row, so a bound per run capped nothing
-     that mattered: the audit of 25 September (C6) had `bound: 1` on a fifteen-minute clock make 200 rows in 50 hours.
-     Counted over the rows this rule made in any list, read by the `_rule` the unique index leads with, less the ones
-     this parent made, so a turn taken again finds its own rows and not a spent day.
+     that mattered: measured, `bound: 1` on a fifteen-minute clock made 200 rows in 50 hours. Counted over the rows this
+     rule made in any list, read by the `_rule` the unique index leads with, less the ones this parent made, so a turn
+     taken again finds its own rows and not a spent day.
 
      A CLOCK'S DAY IS THE DAY BEFORE ITS TURN, NOT BEFORE THE WALL CLOCK. A drain that comes back after three months off
      takes every missed monthly turn in one pass (`flow.ts`'s `onClock`), all at one wall instant, so a day counted by
-     `created_at` let the first turn make its row and refused every later one: the missed months' tasks (C2) still not
-     made, only now failed with a sentence. A clocked parent is `<rule>@<turn>`, the turn an ISO instant, and every ISO
+     `created_at` let the first turn make its row and refused every later one: the missed months' tasks still not made,
+     only now failed with a sentence. A clocked parent is `<rule>@<turn>`, the turn an ISO instant, and every ISO
      instant sorts as its time does, so the rows whose parent falls between this turn less a day and this turn are the
      ones the turns of that day made. Anything else (a button, an arrival) has no turn and is counted by when its rows
      were made. */
@@ -1054,8 +1053,7 @@ function expand(deps: RulesDeps, name: string, spec: CreateSpec, from: Standing)
 
     /* A VALUE THAT IS NOT TEXT GOES THROUGH AS IT WAS WRITTEN. `withEach` called `.replace` on each one, so a create
        holding `tags: ["late"]`, installed before the lint refused it, threw out of every write to the parent's list
-       (measured on 23 September). Passed through, the list reads it as its own type, or refuses it as it would any
-       other value.
+       (measured). Passed through, the list reads it as its own type, or refuses it as it would any other value.
 
        AND THE TUPLE IS FILLED IN THE SAME PASS AS THE ROW. `withEach` wrote it in first and `fill` then read the
        result, so a `kinds` item holding the words `{{pin}}` became the secret (`filling` says what was measured). */
@@ -1086,19 +1084,19 @@ type Standing = { entry: Entry | null; parent: string; register: string | null; 
 /**
  * A `create` step taken by a run that has no row: a clock, a button, an arrival that wrote nothing.
  *
- * MEASURED BEFORE THIS, on 25 September: such a create installed, armed, ran on time and failed every run with "this run
- * has none to act on", because `flow.ts`'s `act` sent every step with no subject away from `runRules`, and `runRules` is
- * the only thing that reached `expand`. So a rule could not make the next task each month, which is the one thing a
- * monthly clock with a create is for (`clock-monthly.test.ts`).
+ * MEASURED BEFORE THIS: such a create installed, armed, ran on time and failed every run with "this run has none to act
+ * on", because `flow.ts`'s `act` sent every step with no subject away from `runRules`, and `runRules` is the only thing
+ * that reached `expand`. So a rule could not make the next task each month, which is the one thing a monthly clock with
+ * a create is for (`clock-monthly.test.ts`).
  *
- * THE TURN IS THE PARENT ON A CLOCK, AND THE RUN ANYWHERE ELSE. `expand` makes a tuple once per parent, and on a row the
- * parent is the row. A clock has none, and a parent of the rule alone would make the first month's task and then find
- * it already there every month after. The run was the parent at first, one per turn, and the audit of 25 September
- * (C5) delivered one turn twice and got two rows: two runs, two parents. So a clocked run passes `parent` as
- * `<rule>@<turn>` (`flow.ts`'s `advance`), and two runs of one turn find each other's row. A button or an arrival has no
- * turn, so its run stays the parent, and the same run taken again from its create after a drain died between the write
- * and the save finds the row it made (`clock-create.test.ts`). The bound, the ceiling and the refusal of a copied secret
- * are `expand`'s, as they are on a row.
+ * THE TURN IS THE PARENT ON A CLOCK, AND THE RUN ANYWHERE ELSE. `expand` makes a tuple once per parent, and on a row
+ * the parent is the row. A clock has none, and a parent of the rule alone would make the first month's task and then
+ * find it already there every month after. The run was the parent at first, one per turn, and a turn delivered twice
+ * got two rows: two runs, two parents. So a clocked run passes `parent` as `<rule>@<turn>` (`flow.ts`'s `advance`), and
+ * two runs of one turn find each other's row. A button or an arrival has no turn, so its run stays the parent, and the
+ * same run taken again from its create after a drain died between the write and the save finds the row it made
+ * (`clock-create.test.ts`). The bound, the ceiling and the refusal of a copied secret are `expand`'s, as they are on a
+ * row.
  */
 export function createAlone(deps: RulesDeps, rule: string, spec: CreateSpec, run: string, by?: RunFill, parent: string = run): { refusals: Refusal[]; grew: boolean } {
   return expand(deps, rule, spec, { entry: null, parent, register: null, batch: run, ...(by ? { run: by } : {}) });
@@ -1229,18 +1227,18 @@ export type DryRun = {
  *
  * `reads` IS WHO IS ASKING, AS `list` TAKES IT, AND IT NARROWS THE CANDIDATE ALONE. A `ref` value in the candidate's
  * `when` is a title the compiler looks up in the list the ref points at, and with the plain context it looked there
- * whoever asked: `loop/research-batch-thirty-eight-audit.md` finding 1 had a member held to `append` on Clients preview
- * `client is Acme Holdings` over Money as `matches 1 of 1` and `client is Bolt Ltd` as `0 of 1`, one guess per call at
- * which client her rows belong to, while `list` answered 0 rows for both.
+ * whoever asked: measured, a member held to `append` on Clients could preview `client is Acme Holdings` over Money as
+ * `matches 1 of 1` and `client is Bolt Ltd` as `0 of 1`, one guess per call at which client her rows belong to, while
+ * `list` answered 0 rows for both.
  *
  * AND THE RULES IT IS RANKED AGAINST ARE ASKED WITH THE SAME `reads`. They were left on the pass's context, on the
  * grounds that an installed rule runs on every write whoever makes it, but this walk is not a write: it names, row by
- * row, which rule takes each one. `loop/research-batch-forty-audit.md` finding 8 installed `rule.acme` (`client is Acme
- * Holdings`, setting `note`) after three Billed rows were written, so it had run on none of them, and a member refused
- * Clients previewing a rule that sets `note` read `takenBy: { acme: 1 }` and "acme sets note first" on `billed#1`
- * alone: the Acme row among three, told apart by a title she may not read. Asked with her reads, the installed rule's
- * `when` answers her what `list` answers her, and the preview says the same whether that title is on a row or on none.
- * The audit's brief counted such a row as `withheld` instead, and a count of rows withheld is the count of Acme's rows.
+ * row, which rule takes each one. Measured: `rule.acme` (`client is Acme Holdings`, setting `note`) was installed after
+ * three Billed rows were written, so it had run on none of them, and a member refused Clients previewing a rule that
+ * sets `note` read `takenBy: { acme: 1 }` and "acme sets note first" on `billed#1` alone: the Acme row among three,
+ * told apart by a title she may not read. Asked with her reads, the installed rule's `when` answers her what `list`
+ * answers her, and the preview says the same whether that title is on a row or on none. Counting such a row as
+ * `withheld` instead would not do, since a count of rows withheld is the count of Acme's rows.
  */
 export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, reads?: (register: string) => boolean): Result<DryRun> {
   const schema = deps.schemaOf(candidate.register);
@@ -1253,9 +1251,8 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
   const asker: RulesDeps = reads === undefined ? deps : { ...deps, ctx: { ...deps.ctx, reads } };
   const said = predicateOf(candidate.when, schema, asker.ctx);
   if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
-  /* A PREVIEW OF A BODY THE INSTALL REFUSES IS THE PREVIEW BEING WRONG: measured on 23 September after the fill guard,
-     note: 5 and notify.say: true were previewed as "note 5" and "notify true" for bodies install refuses (audit forty,
-     finding 6). */
+  /* A PREVIEW OF A BODY THE INSTALL REFUSES IS THE PREVIEW BEING WRONG: measured after the fill guard, note: 5 and
+     notify.say: true were previewed as "note 5" and "notify true" for bodies install refuses. */
   const linted = inlineFault(`rule.${candidate.rule}`, candidate as FlowDecl);
   if (linted) return { ok: false, refusal: linted };
 

@@ -31,7 +31,7 @@ import { finishPull, pullFinishOf, type PullFinished } from './pull.ts';
  *
  * `script.run` IS MIGRATION 12'S: one run of a `script` declaration, leased by a host that runs it in a sandbox.
  *
- * `infer.ask` IS AN AUTOMATION'S QUESTION TO SLASH (`flow.ts`, Brief C): `{ run, rule, step, question, shape, choices?,
+ * `infer.ask` IS AN AUTOMATION'S QUESTION TO SLASH (`flow.ts`): `{ run, rule, step, question, shape, choices?,
  * about? }`, answered by an ack whose `result.text` is the answer, or whose `result.failed` is the sentence the run
  * ends on when the host refused to ask. The `CHECK` that admits it is a migration of its own.
  */
@@ -102,13 +102,12 @@ export function lease(sql: Sql, deps: AckDeps, kinds: readonly OutboxKind[], n: 
   const nowMs = deps.nowMs;
   const marks = wanted.map(() => '?').join(', ');
 
-  /* AN EXPIRED LEASE ON A QUESTION NO RUN IS WAITING ON IS FINISHED, AND NOT HANDED OUT AGAIN. `release()` leaves a leased
-     Slash job to its ack, and wave fifty taught the ack's failed branch to read the run; a host that never acked came
-     through here instead, where only the clock was read. Wave fifty's checker measured it and
-     `lease-cancelled-run.test.ts` counts it: a job leased, its run cancelled and never acked was handed out seven more
-     times over 24 minutes of clock, each a post on the owner's key in the name of a rule that is gone, and ended `dead`
-     with `attempts` 8, a dead letter addressed to a run that had already stopped. `done` with the expiry counted, as
-     the failed ack counts it, because a host was handed it.
+  /* AN EXPIRED LEASE ON A QUESTION NO RUN IS WAITING ON IS FINISHED, AND NOT HANDED OUT AGAIN. `release()` leaves a
+     leased Slash job to its ack, and the ack's failed branch reads the run; a host that never acked came through here
+     instead, where only the clock was read. Measured, and `lease-cancelled-run.test.ts` counts it: a job leased, its
+     run cancelled and never acked was handed out seven more times over 24 minutes of clock, each a post on the owner's
+     key in the name of a rule that is gone, and ended `dead` with `attempts` 8, a dead letter addressed to a run that
+     had already stopped. `done` with the expiry counted, as the failed ack counts it, because a host was handed it.
 
      BEFORE THE DEAD-LETTER SWEEP BELOW, or a job on its last rung is dead-lettered for a run that is over.
 
@@ -204,7 +203,7 @@ export const backoffMs = (attempts: number): number => Math.min(2 ** attempts * 
  *
  * A QUESTION NO RUN IS WAITING ON IS FINISHED INSTEAD, with its attempt count as it was. `release()` deletes a pending
  * Slash job only at the moment its run ends, so one handed back to `pending` after that was a job nothing would ever
- * delete, and the next lease posted it: one more question asked for a run already `cancelled` (wave fifty's checker).
+ * delete, and the next lease posted it: one more question asked for a run already `cancelled` (measured).
  * A call a `call` step made is finished the same way, since `release()` deletes it only as its run ends too.
  */
 export function unlease(sql: Sql, args: { id: string; leasedUntil: string }): void {
@@ -381,7 +380,7 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
        `result.failed` FIRST, AS THE RUN'S OWN SENTENCE. It is how the host's pass acks a refusal that no retry mends, a
        month's asks spent or a job with no rule to ask in the name of (`slash-answers.ts`), and this branch read `text` alone: put
        through the real kernel, a spent month ended the run on "Slash answered job ... with no text", and the sentence
-       that says what to do was thrown away (`loop/research-infer-ask-next.md` §1.3, A). */
+       that says what to do was thrown away. */
     if (row.kind === 'infer.ask') {
       const asked = JSON.parse(row.payload) as { run?: unknown; step?: unknown };
       const said = args.result as { text?: unknown; failed?: unknown } | undefined;
@@ -465,11 +464,11 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
   }
 
   /* A QUESTION WHOSE RUN IS NO LONGER WAITING ON IT IS FINISHED HERE, AND NOT RETRIED. `release()` in `flow.ts` takes a
-     run's Slash job out of the outbox when the run ends, but only while nobody holds it: a job a host had leased is left
-     to this ack. The failed branch read the job and never the run, so a rule retired, switched off or its pack turned off
-     while its question was out armed a `retry` like any other, and the audit's Worker probe (audit forty-nine §1) walked
-     all eight rungs on the owner's key, eight posts and eight `grant.read` events for a run already `cancelled`, and a
-     rung that was answered was billed and counted. `done` and not deleted, because a host did try it.
+     run's Slash job out of the outbox when the run ends, but only while nobody holds it: a job a host had leased is
+     left to this ack. The failed branch read the job and never the run, so a rule retired, switched off or its pack
+     turned off while its question was out armed a `retry` like any other, and a probe on the Worker walked all eight
+     rungs on the owner's key, eight posts and eight `grant.read` events for a run already `cancelled`, and a rung that
+     was answered was billed and counted. `done` and not deleted, because a host did try it.
 
      THE RUN AND THE STEP ROW BOTH, the pair `answerStep` holds an answer to. `release()` leaves the step row `waiting`
      after it cancels the run, so the step row alone passed a cancelled run's job straight through; and a run still
@@ -562,7 +561,7 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
  * row holding this job's id, which is the pair `answerStep` in `flow.ts` holds an answer to. A payload without a run
  * and a step answers nothing, and reads as not awaited.
  *
- * THE STEP ROW'S OWN STATE IS NOT READ, BECAUSE THE RUN'S ALREADY SAYS IT. Wave fifty's query also asked for
+ * THE STEP ROW'S OWN STATE IS NOT READ, BECAUSE THE RUN'S ALREADY SAYS IT. An earlier query also asked for
  * `s.state = 'waiting'`, and taking it out failed none of the kernel's 1476 tests. Nothing reachable needs it:
  * `advance` parks a run `waiting` at step i only straight after writing step i's row `waiting`, and every write that
  * moves that row on moves the run too, either to `pending` at i + 1 (`answerStep`), or to `failed` first (`finish`),

@@ -1,14 +1,14 @@
 /**
- * Which lists a declaration touches: the one walk the filing check and Decide both ask (`loop/research-decide-reach.md`).
+ * Which lists a declaration touches: the one walk the filing check and Decide both ask.
  *
  * THERE WERE TWO COPIES, AND THEY DISAGREED. `listsNamed` in `govern.ts` was the filing check's and `listsIn` in the
- * record was Decide's, and each was patched one audit at a time (thirty-seven to forty, and wave forty-two's checker).
- * Measured over 32 proposals and five callers at `bccc7ea8`: the kernel refused a rule on Inbox under `register.inbox`
- * as reading a list called `trigger` (K4), and filed under that name a script reading Money, a script writing it, an
- * arrival rule on the payroll door, a clock rule, a script naming no list and a door that polls (N1, N2, N4, K8, K9,
- * K7), each of which the record then held from the member invited to Inbox alone. The record in turn marked every page,
- * door, figure and digest `whole` because its copy could not see a page's `sessions.live` or `working: true`, and that
- * over-held 22 of the 160 answers, among them a bundle under `register.inbox` carrying a page over Inbox alone (R1).
+ * record was Decide's, and each was patched one gap at a time. Measured over 32 proposals and five callers at
+ * `bccc7ea8`: the kernel refused a rule on Inbox under `register.inbox` as reading a list called `trigger`, and filed
+ * under that name a script reading Money, a script writing it, an arrival rule on the payroll door, a clock rule, a
+ * script naming no list and a door that polls, each of which the record then held from the member invited to Inbox
+ * alone. The record in turn marked every page, door, figure and digest `whole` because its copy could not see a page's
+ * `sessions.live` or `working: true`, and that over-held 22 of the 160 answers, among them a bundle under
+ * `register.inbox` carrying a page over Inbox alone.
  *
  * ITS OWN FILE, IMPORTING NOTHING FROM `govern.ts` OR `pages.ts`. `pages.ts` reads `BODY_KINDS` from `govern.ts` as it
  * loads, which is why `listsNamed` said it could not be imported by the record's side; a module with neither import
@@ -101,9 +101,9 @@ function walk(body: unknown, kind: Kind, resolve: Resolve, self?: string): Touch
       /* A FORECAST'S `late:` AND A SERIES LINE'S `then:` AND `each:` ARE FIGURES TOO, which a check reading only `metric`
          keys let through: a forecast whose late mark counted Diary was filed under `register.obligations`. */
       else if (page && (key === 'late' || key === 'then' || key === 'each')) figure(node);
-      /* A PAGE SOURCE THAT IS NO LIST READS THE RUNS OR THE RECORD AS A WHOLE, as `pages.ts` names it. The record's copy
-         lacked this line, and wave forty-two's checker handed a member held to `append` on Session the change declaring
-         a page over `sessions.live` while `page` answered her `PAGE_UNKNOWN` for the same page. */
+      /* A PAGE SOURCE THAT IS NO LIST READS THE RUNS OR THE RECORD AS A WHOLE, as `pages.ts` names it. The record's
+         copy lacked this line, and handed a member held to `append` on Session the change declaring a page over
+         `sessions.live` while `page` answered her `PAGE_UNKNOWN` for the same page. */
       else if (page && key === 'source' && !PAGE_SOURCES.has(node)) lists.add(node === 'sessions.live' ? 'session' : ACROSS);
       for (const m of node.matchAll(/\{\{\s*(?:[a-z]+:)?\s*([a-z][a-z0-9_]*)(?:#\d+)?\.[A-Za-z]/g))
         if (!(kind === 'rule' && RUN_SCOPE.has(m[1]!))) lists.add(m[1]!);

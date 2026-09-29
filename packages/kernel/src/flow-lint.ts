@@ -1,5 +1,5 @@
 /**
- * The lint of an automation: a rule that has grown a trigger and steps (`loop/research-shell-automations.md` §2 to §4).
+ * The lint of an automation: a rule that has grown a trigger and steps.
  *
  * AN AUTOMATION IS NOT A KIND OF ITS OWN. `04 §1` closes the list (nine since `script` joined it, `declare.ts`'s
  * `KINDS`) and enforces it in three places, so a `rule` body grows `on:` and `steps:` instead, and every rule installed before either existed is already an automation whose
@@ -14,7 +14,7 @@
  *
  * THE RUNNER IS `flow.ts`, AND THIS FILE REFUSES WHAT IT WOULD NOT DO. What installs and what runs is one row each in
  * `capabilities.ts`, which this file, the runner and the grammar an agent reads all ask, so none of the three says a
- * capability the others do not. `ask_person` runs (Brief C), so its shape is held here to what the runner and the gate
+ * capability the others do not. `ask_person` runs, so its shape is held here to what the runner and the gate
  * accept: two options or more, each once, since `propose` refuses a choice of one; its `to:` is its row's to allow.
  * `ask_slash` is held to its shape and to what its question may carry, and no further: whether THIS host answers the
  * `infer.ask` job it queues is a fact about the host, which a context-free lint cannot know, so that refusal is
@@ -100,9 +100,9 @@ export const UNSENDABLE: readonly string[] = ['secret', 'file'];
  *
  * A `list<T>` IS READ BY ITS ELEMENT TYPE, as the write path reads it (`index.ts` seals `field.of === 'secret'`) and
  * `redacts` reads a `list<money>`. Asking the field's own type, which is `list`, let a `list<secret>` stored past
- * `declare.ts`'s refusal of one be put in a question, named in `about:` and copied into a text field; measured on 23
- * September through the runner, a stored rule queued `Rate for hunter2 ["hunter2"]?` with `about: { keys: ['hunter2'] }`.
- * `flow.ts` asks this too, so the lint and the runner cannot come to read one field two ways.
+ * `declare.ts`'s refusal of one be put in a question, named in `about:` and copied into a text field; measured through
+ * the runner, a stored rule queued `Rate for hunter2 ["hunter2"]?` with `about: { keys: ['hunter2'] }`. `flow.ts` asks
+ * this too, so the lint and the runner cannot come to read one field two ways.
  */
 export const sealedAs = (field: { type?: unknown; of?: unknown } | undefined): string | null => {
   const kind = String(field?.type === 'list' ? field.of : field?.type);
@@ -253,9 +253,9 @@ function rowOf(decl: FlowDecl, trigger: string, installed: Known): string | null
  * `rowOf` for a caller that holds the doors some other way: the register of the row a run of this rule acts on and
  * reads its `if` against, given a lookup from a door's id to its body.
  *
- * EXPORTED FOR THE READERS OF A LIST, which `subjectOf` alone undercounted. `loop/research-batch-thirty-six-audit.md` §1
- * opened `lane` to text under an automation started by arrivals at a door writing Projects: its `if: lane is Parked`
- * answered "then" before and "else" after, and the widening refusal never asked it, because its subject is `null`.
+ * EXPORTED FOR THE READERS OF A LIST, which `subjectOf` alone undercounted. Measured: opening `lane` to text under an
+ * automation started by arrivals at a door writing Projects: its `if: lane is Parked` answered "then" before and "else"
+ * after, and the widening refusal never asked it, because its subject is `null`.
  */
 export function rowRegisterOf(decl: FlowDecl, doorOf: (door: string) => unknown): string | null {
   const trigger = triggerOf(decl);
@@ -299,10 +299,10 @@ const ROW_FILL = /\{\{(\w+)(?::(\w+))?\}\}/g;
  * What a `create` would fill from a row, said of a run that has none, or `null`: `each:`, or a row's `{{field}}` in one
  * of its fields. `at` is under the create. `run` says which run: the one failing, or the ones a trigger starts.
  *
- * ONE SENTENCE FOR THE LINT AND THE RUNNER. `rules.ts`'s `expand` refused both at the run on 25 September, and the lint
- * let both install, so a monthly rule the owner was told was sound failed at every turn with a sentence nobody saw at
- * install (`clock-create.test.ts`). Both ask this now, so the refusal an owner reads when installing is the one a run
- * stored before the lint fails with.
+ * ONE SENTENCE FOR THE LINT AND THE RUNNER. `rules.ts`'s `expand` refused both at the run, and the lint let both
+ * install, so a monthly rule the owner was told was sound failed at every turn with a sentence nobody saw at install
+ * (`clock-create.test.ts`). Both ask this now, so the refusal an owner reads when installing is the one a run stored
+ * before the lint fails with.
  *
  * `ROW_FILL` AND NOT `rules.ts`'s `SPELLED`, which is the same for this question: a run's path, a figure and `{{each.0}}`
  * each have a dot, which `\w` does not take, so the only spellings `ROW_FILL` finds are the row's. A text that is not a
@@ -389,16 +389,16 @@ function hiddenOf(installed: Known, register: string | null): Map<string, string
  *
  * THE FIELD IS READ AS TYPED, AND SO IT HAS TO BE THE FIELD. `set: { field: '{{vars.f}}', to: '{{pin}}' }` with `f` set
  * to `note` installed, and the pass wrote `note`: the lint read the braces and found no field to follow, and the
- * runner's `writes()` held back `{{vars.f}}` rather than `note`, so the question after it went out as `Rate for
- * hunter2?` (`loop/research-batch-fifty-one-audit.md` §3, L4). A field the list does not have fails every run at the
- * write path, which refuses it `FIELD_UNKNOWN`, so it is refused here with that code. `tags` is one every list takes.
+ * runner's `writes()` held back `{{vars.f}}` rather than `note`, so the question after it went out as
+ * `Rate for hunter2?`. A field the list does not have fails every run at the write path, which refuses it
+ * `FIELD_UNKNOWN`, so it is refused here with that code. `tags` is one every list takes.
  *
  * A SECRET IS COPIED ONLY WHERE IT STILL NEVER LEAVES. The walk used to follow a field a step wrote from `pin` to the
  * questions and calls later in the same list, and a record has more than one rule: `rule.write` wrote `note` from
  * `{{pin}}` on create, `rule.ask` asked about `note` on an ordinary edit, each installed clean, and the edit queued
- * `Rate for hunter2?` with `about: { note: 'hunter2' }` (the same audit, L1). The write also put the secret in a text
- * field every reader of the list sees. Refusing the copy closes every reader at once, in this rule or any other, so no
- * reader follows a written field any more; a field typed secret or file is already one no reader may send.
+ * `Rate for hunter2?` with `about: { note: 'hunter2' }`. The write also put the secret in a text field every reader of
+ * the list sees. Refusing the copy closes every reader at once, in this rule or any other, so no reader follows a
+ * written field any more; a field typed secret or file is already one no reader may send.
  *
  * `run: false` IS THE INLINE PATH, where nothing fills `{{trigger.…}}` or a tag and no variable exists, so only a
  * `set`'s row fill is read (`hiddenIn`'s `runFill`).
@@ -516,11 +516,11 @@ function placeOf(path: readonly string[], spec: Record<string, unknown>): string
  * spelling that fills it, put into any place its verb puts text, unless that place is a field of another list that
  * never leaves either. `set` and `tag` are `writeFault`'s, and a question to Slash has its own checks in the walk.
  *
- * THE CHECK FOLLOWED `set` AND `tag` AND NOTHING ELSE, measured on 23 September at HEAD `afb3b1b2` over a list whose
- * `pin` is secret (`flow-secret-verbs.test.ts`): `note`, `notify`, `schedule`, `create` into another list's text field,
- * `suggest` and `link` each installed holding `{{pin}}` on the inline path and `{{trigger.row.pin}}`, `{{trigger.row}}`
- * or a variable set from `pin` as a step, and so did a `move`, a script's `input`, a question to a person, and a
- * `create` crossing `each: [pin]`. Every one of those writes where the list's readers, or another list's, can see it.
+ * THE CHECK FOLLOWED `set` AND `tag` AND NOTHING ELSE, measured at `afb3b1b2` over a list whose `pin` is secret
+ * (`flow-secret-verbs.test.ts`): `note`, `notify`, `schedule`, `create` into another list's text field, `suggest` and
+ * `link` each installed holding `{{pin}}` on the inline path and `{{trigger.row.pin}}`, `{{trigger.row}}` or a variable
+ * set from `pin` as a step, and so did a `move`, a script's `input`, a question to a person, and a `create` crossing
+ * `each: [pin]`. Every one of those writes where the list's readers, or another list's, can see it.
  *
  * `run: false` IS THE INLINE PATH, where only the texts the pass fills are filled, from the row alone, and no variable
  * exists. On the run path every string of the step is filled from the run first, so every one is read.
@@ -604,11 +604,11 @@ function keptBy(verb: string, step: Record<string, unknown>): string | null {
 /**
  * The first `{{vars.x}}` a step reads whose `x` no step before it certainly kept, as the refusal, or `null`.
  *
- * NOTHING ASKED THIS FOR ANY KIND UNTIL 24 SEPTEMBER. `stepFault` held a name to `NAME` where it was kept and nothing
- * looked at a name where it was read, so `{{vars.nope}}` with no step keeping `nope`, a read after a `call` with no
- * `as:`, and (once `db7074ad` made its `as:` optional) a read after a `script` with none, each linted clean, installed
- * and ran `done`, and `fill` wrote a dash where the name was (`flow.ts`'s `pathValue`). Audit sixty-six, finding 7,
- * measured the note reading "queued as —" (`flow-lint-as-read.test.ts`).
+ * NOTHING ASKED THIS FOR ANY KIND AT FIRST. `stepFault` held a name to `NAME` where it was kept and nothing looked at a
+ * name where it was read, so `{{vars.nope}}` with no step keeping `nope`, a read after a `call` with no `as:`, and
+ * (once `db7074ad` made its `as:` optional) a read after a `script` with none, each linted clean, installed and ran
+ * `done`, and `fill` wrote a dash where the name was (`flow.ts`'s `pathValue`): measured, the note read "queued as —"
+ * (`flow-lint-as-read.test.ts`).
  *
  * EVERY STRING OF THE STEP IS A READ, because on the run path `fill` fills every one from the run before the step acts,
  * a condition's included; an `if`'s arms are its children and are walked as their own steps. Only the first segment is
@@ -629,8 +629,7 @@ function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here:
     for (const m of text.matchAll(RUN_PATH)) {
       if (m[1] !== 'vars') continue;
       /* A PATH WITH AN EMPTY PART NAMES NO ANSWER, and is said as the hole it is. Read as a name, `{{vars..x}}` was
-         refused for keeping no answer called nothing, a sentence with a gap where the name goes (`loop/finish/defects.md`
-         A8). */
+         refused for keeping no answer called nothing, a sentence with a gap where the name goes. */
       if (m[2]!.split('.').some((part) => part === ''))
         return hole(id, m[0], here, 'it names no answer', 'A path is vars. and the name an as: keeps, then any path into it, as {{vars.total}} or {{vars.a.rate}}.');
       const name = m[2]!.split('.')[0]!;
@@ -656,7 +655,7 @@ function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here:
  * The refusal for a hole nothing fills: the spelling, where it is, and why, in one sentence for every kind of hole.
  *
  * ONE SENTENCE, because each of these installed and then wrote its braces, or a dash, where a value was meant, and a
- * person reading one refusal learns to read them all (`loop/finish/defects.md` A8, A9).
+ * person reading one refusal learns to read them all.
  */
 function hole(id: string, spelled: string, at: string, why: string, fix: string): Refusal {
   return bad('DECLARATION_INVALID', `${id} holds ${spelled} at ${at}, and ${why}, so nothing would fill it. ${fix}`, at);
@@ -666,11 +665,11 @@ function hole(id: string, spelled: string, at: string, why: string, fix: string)
  * A run's path or a lone single-brace word in a text the rule writes, where nothing fills it, or `null`.
  *
  * AN INLINE RULE HAS NO RUN, so `{{vars.q}}` and `{{trigger.row.x}}` in its `then:` are left as typed by the pass
- * (`rules.ts`'s `filling`, which reads them only with a run's paths beside it), and the row got the braces. Measured by
- * the audit behind `loop/finish/defects.md` A8: an inline `{{vars.q}}` installed and wrote itself into the note.
+ * (`rules.ts`'s `filling`, which reads them only with a run's paths beside it), and the row got the braces. Measured:
+ * an inline `{{vars.q}}` installed and wrote itself into the note.
  *
- * A LONE `{what}` IS FILLED BY NOTHING ON EITHER PATH. Every fill in this tree reads two braces, so one brace reaches the
- * outbox as typed (A9). Only a single word in single braces is taken as a hole: a text may hold braces for its own
+ * A LONE `{what}` IS FILLED BY NOTHING ON EITHER PATH. Every fill in this tree reads two braces, so one brace reaches
+ * the outbox as typed. Only a single word in single braces is taken as a hole: a text may hold braces for its own
  * reasons, as a JSON sample in a note does, and a word alone in them is the one shape that reads as a field meant.
  */
 function holeIn(id: string, decl: FlowDecl): Refusal | null {
@@ -689,7 +688,7 @@ function holeIn(id: string, decl: FlowDecl): Refusal | null {
   return null;
 }
 
-/** One word, or `kind:word`, in single braces with no brace either side: the hole A9 names. */
+/** One word, or `kind:word`, in single braces with no brace either side: the hole above. */
 const LONE_BRACE = /(?<!\{)\{\w+(?::\w+)?\}(?!\})/;
 
 /**
@@ -720,10 +719,10 @@ export function slashAskAt(decl: FlowDecl): string | null {
  * Every `tag` and `untag` of a rule that a list's declared `tags` would refuse, with where it sits and, for a
  * `list<enum>`, the word the enum lacks. Empty when the list takes every one.
  *
- * THE SHAPE ALONE WAS THE FIRST QUESTION, AND IT REFUSED A LIST THAT WORKS. Wave thirty-eight's check read any `tags` that
- * was not `list<text>` as refusing every tag, so `tags: list<enum>` of `[late, chase]` under `rule.late` tagging `late` was
- * refused `FIELD_TYPE_CHANGED` "would refuse every tag it writes", though every write that rule makes is a value the enum
- * takes. An enum is asked word by word:
+ * THE SHAPE ALONE WAS THE FIRST QUESTION, AND IT REFUSED A LIST THAT WORKS. The first check read any `tags` that was
+ * not `list<text>` as refusing every tag, so `tags: list<enum>` of `[late, chase]` under `rule.late` tagging `late` was
+ * refused `FIELD_TYPE_CHANGED` "would refuse every tag it writes", though every write that rule makes is a value the
+ * enum takes. An enum is asked word by word:
  *
  *   - A `tag` whose word the values lack is refused, since the pass writes the row's tags plus that word in one patch with
  *     everything else the rule does. Measured over `[chase]` with `then: [{ tag: late }, { set: note }]`: the Rent went
@@ -736,9 +735,9 @@ export function slashAskAt(decl: FlowDecl): string | null {
  * ANY OTHER SHAPE REFUSES EVERY ONE, `untag` included, because the pass always writes an array.
  *
  * AND SO DOES A RETIRED `tags`, WHATEVER ITS SHAPE. Both callers passed over a retired one ("not a shape this check
- * reads"), and the write path answers `FIELD_UNKNOWN` for a field put away, so the pass's one patch went whole: the
- * audit of wave thirty-nine (finding 3) retired a `list<text>` under `rule.late` doing `[{ tag: late }, { set: note }]`,
- * and the Rent went in holding `what` alone. It was let through where `tags: int` under the same rule is refused.
+ * reads"), and the write path answers `FIELD_UNKNOWN` for a field put away, so the pass's one patch went whole:
+ * measured, a `list<text>` retired under `rule.late` doing `[{ tag: late }, { set: note }]`, and the Rent went in
+ * holding `what` alone. It was let through where `tags: int` under the same rule is refused.
  */
 export function tagsRefusing(
   decl: FlowDecl,
@@ -968,10 +967,10 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
           }
       }
       /* A VARIABLE CARRIES WHAT IT WAS SET FROM. `set_var` fills `to` from the whole row, before `sendable` is anywhere
-         near it, so the question's own braces were checked and a variable was not: audit forty-six measured, through a
-         real self-host, `set_var: { to: '{{trigger.row.pin}}' }` then `{{vars.p}}` installing clean and the model's
-         request body holding "What rate applies to Rent, given hunter2?". A variable set from another carried one
-         carries it too, and the refusal names the `set_var` where the field went in. */
+         near it, so the question's own braces were checked and a variable was not: measured through a real self-host,
+         `set_var: { to: '{{trigger.row.pin}}' }` then `{{vars.p}}` installing clean and the model's request body
+         holding "What rate applies to Rent, given hunter2?". A variable set from another carried one carries it too,
+         and the refusal names the `set_var` where the field went in. */
       if (verb === 'set_var') {
         const spec = step.set_var as { name: string; to: string };
         const direct = hidden.size === 0 ? null : hiddenIn(spec.to, hidden);
@@ -1005,9 +1004,9 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
       }
       /* AND THE QUESTION ITSELF LEAVES THE RECORD, so what it names is held to the rule `about:` is. `about:` was
          checked and the question was not: over a list whose `pin` is secret, `{{pin}}` in the question installed, and
-         the checker measured on 23 September, through `ask_person`, whose question is filled the same way, that
-         `{{trigger.row.pin}}` and `{{ trigger.row.pin }}` were asked as `hunter2` and `{{trigger.row}}` as the JSON of
-         the whole row, `pin` in it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_PATH`). */
+         measured through `ask_person`, whose question is filled the same way, `{{trigger.row.pin}}` and
+         `{{ trigger.row.pin }}` were asked as `hunter2` and `{{trigger.row}}` as the JSON of the whole row, `pin` in
+         it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_PATH`). */
       if (verb === 'ask_slash' && !rowless) {
         const found = hidden.size === 0 ? null : hiddenIn(String((step.ask_slash as { question: unknown }).question), hidden);
         if (found)
@@ -1020,10 +1019,10 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
           );
       }
       /* A CALL THAT SENDS A ROW NEEDS ONE, AS A STEP OR AS `run:`. `run:` was refused on a clock by `ROW_VERBS` and the
-         same call as a step installed on a clock, a button and any arrival (audit thirty-two, section 4): an hourly
-         post of a row nobody handed it, and a pattern of sending the owner approved as once per row and never saw.
-         A call that sends nothing, the price GET of `07 §6.2`, needs no row and installs on a clock. `written` is
-         `callFault`'s to check, against the register the rule is about. */
+         same call as a step installed on a clock, a button and any arrival: an hourly post of a row nobody handed it,
+         and a pattern of sending the owner approved as once per row and never saw. A call that sends nothing, the price
+         GET of `07 §6.2`, needs no row and installs on a clock. `written` is `callFault`'s to check, against the
+         register the rule is about. */
       if (installed !== undefined && trigger !== 'written' && (verb === 'call' || verb === 'run')) {
         const name = verb === 'call' ? (step.call as { ingest?: unknown }).ingest : step.run;
         const from = sendsFrom(installed.get(`ingest.${String(name)}`) as { sends?: unknown } | undefined);
@@ -1096,9 +1095,9 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
     }
     return null;
   };
-  /* A FIGURE IS NAMED AT INSTALL, as a trigger's `metric.id` is. Measured on 24 September before this was asked:
-     `{{metric.nope}}` installed and wrote `x —`, and `{{metric:total}}` wrote the same dash, into a row nobody would
-     trace back to the rule. */
+  /* A FIGURE IS NAMED AT INSTALL, as a trigger's `metric.id` is. Measured before this was asked: `{{metric.nope}}`
+     installed and wrote `x —`, and `{{metric:total}}` wrote the same dash, into a row nobody would trace back to the
+     rule. */
   return (
     choice(body.steps ?? body.then, body.steps !== undefined ? 'steps' : 'then') ??
     fillFault(id, decl, installed) ??
@@ -1110,19 +1109,20 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
 /**
  * What the inline path refuses about the items of `then:`, alone: a verb only a step has, then every value the pass
  * fills or writes that is not text. `flowFault` asks it at install, and it is exported for a caller holding a body that
- * never came through install, which is the dry run (`loop/research-batch-forty-audit.md` finding 6).
+ * never came through install, which is the dry run.
  *
  * THE INLINE PASS HAS AN ARM FOR EACH OF `ACTIONS` AND FOR NOTHING ELSE (`rules.ts`'s `runRules`). It walks `then` and
  * acts on the first action each item carries, so a step's verb there is read as nothing and whatever sits beside it is
- * acted on. Audit forty, finding 3: `{ if, then: [], set: { to: 5 } }` installed and threw out of every write, and an
- * `if` whose arm set a field installed and its arm never ran. Measured on 23 September, after the `fill` guard: the
- * first now sets the field whatever the condition says, `wait: 1h` beside a `set` wrote the note at once, and `set_var`
- * and `ask_person` did nothing at all. `actionsOf` walks an `if`'s arms and not the verbs beside it, which is why the
- * fill lint never saw that `set`; refusing the `if` here means nothing on this path is beside one.
+ * acted on. Measured: `{ if, then: [], set: { to: 5 } }` installed and threw out of every write, and an `if` whose arm
+ * set a field installed and its arm never ran. Measured again after the `fill` guard: the first now sets the field
+ * whatever the condition says, `wait: 1h` beside a `set` wrote the note at once, and `set_var` and `ask_person` did
+ * nothing at all. `actionsOf` walks an `if`'s arms and not the verbs beside it, which is why the fill lint never saw
+ * that `set`; refusing the `if` here means nothing on this path is beside one.
  *
  * ONLY ON THE INLINE PATH, SINCE A RUN'S `then:` IS A LIST OF STEPS. `flowFault` asks this only once `pathOf` said
- * `inline`, but a dry run need not: checked on 23 September, `{ on: { written: { register: jobs, op: [create] } },
- * then: [{ if, then: [...] }] }` installs, and this refused it "does not branch" before the path was asked here.
+ * `inline`, but a dry run need not: checked,
+ * `{ on: { written: { register: jobs, op: [create] } }, then: [{ if, then: [...] }] }` installs, and this refused it
+ * "does not branch" before the path was asked here.
  */
 export function inlineFault(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
   const then: unknown = decl.then;
@@ -1149,10 +1149,10 @@ export function inlineFault(id: string, decl: FlowDecl, installed?: Known): Refu
  * THE INLINE PASS READS THE LIST ITS OWN WAY, so this is not the walk `flowFault` takes over steps. It fills a `set`'s
  * `to` with `rules.ts`'s `fill` alone, which reads `{{field}}` and `{{kind:field}}` and leaves `{{trigger.row.token}}`
  * as typed, and it reads no variable, since the pass has none. A `tag` is filled by nothing here, so it copies nothing.
- * This replaced a check that followed a `set` from a secret to a `run:` of the same `then:`: measured on 23 September
- * before that check, `then: [{ set: { field: party, to: '{{token}}' } }, { run: paid_hook }]` queued `party:
- * 'hunter2'`, and a second rule running the same call queued it too, which no check of one body could see. The copy
- * is the fault in both, and it is refused whichever rule would send it.
+ * This replaced a check that followed a `set` from a secret to a `run:` of the same `then:`: measured before that
+ * check, `then: [{ set: { field: party, to: '{{token}}' } }, { run: paid_hook }]` queued `party: 'hunter2'`, and a
+ * second rule running the same call queued it too, which no check of one body could see. The copy is the fault in both,
+ * and it is refused whichever rule would send it.
  */
 function inlineWrites(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
   if (installed === undefined || pathOf(decl) !== 'inline' || !Array.isArray(decl.then) || typeof decl.register !== 'string') return null;
@@ -1188,10 +1188,9 @@ function statesOf(decl: FlowDecl, installed?: Known): { register: string; values
  *
  * `fill`'s FIRST LINE IS `template.replace`, AND NOTHING BEFORE IT ASKS WHAT THE TEMPLATE IS. So a create field holding
  * `[late]` installed, and every write to its list then threw `TypeError: template.replace is not a function` out of the
- * write (`loop/research-batch-thirty-eight-audit.md`, found outside the wave). The brief allowed numbers and booleans,
- * and probing each value once found they throw the same way: `n: 5`, `b: true` and `null` in a create, `set.to: 5`,
- * `note: 5` and the rest below. Text is the one form that works, and `n: '5'` made a row holding the number 5, so the
- * sentence for a number or a boolean hands back its quoted form.
+ * write. Numbers and booleans looked allowed, and probing each value once found they throw the same way: `n: 5`,
+ * `b: true` and `null` in a create, `set.to: 5`, `note: 5` and the rest below. Text is the one form that works, and
+ * `n: '5'` made a row holding the number 5, so the sentence for a number or a boolean hands back its quoted form.
  *
  * BOTH PATHS. A step is filled first by the run, which leaves anything but text as it is, and is then acted through the
  * same pass, so on the run path the same value fails the run at that step instead of failing the write.
@@ -1223,11 +1222,10 @@ function fillSites(action: Record<string, unknown>, at: string): { where: string
 
 function fillFault(id: string, decl: FlowDecl, installed?: Known): Refusal | null {
   for (const { action, at } of actionsOf(decl)) {
-    /* AND A MOVE'S WORD, WHICH NO `fill` READS EITHER, so `fillSites` never listed it (`loop/research-batch-forty-audit.md`
-       finding 11). The pass writes the word into the list's state field as it is, the enum refuses a number, and the
-       rule's whole patch goes: measured on 23 September, `then: [{ move: 5 }, { set: note }]` installed over Jobs and the
-       Water row was written holding `what` alone. The states are named where the list is known, since the one word that
-       helps is one of them. */
+    /* AND A MOVE'S WORD, WHICH NO `fill` READS EITHER, so `fillSites` never listed it. The pass writes the word into
+       the list's state field as it is, the enum refuses a number, and the rule's whole patch goes: measured,
+       `then: [{ move: 5 }, { set: note }]` installed over Jobs and the Water row was written holding `what` alone. The
+       states are named where the list is known, since the one word that helps is one of them. */
     if ('move' in action && typeof action.move !== 'string') {
       const word = action.move;
       const where = `${at}.move`;
@@ -1242,11 +1240,11 @@ function fillFault(id: string, decl: FlowDecl, installed?: Known): Refusal | nul
         : bad('DECLARATION_INVALID', `${id}'s ${where} is ${shown}, and a move names one state. Write it as text.`, where);
     }
     /* AND A TAG'S WORD, WHICH NO `fill` READS BUT WHICH FAILS THE SAME WAY. `tagsRefusing` passed over a word that was
-       not a string and nothing else asked (`loop/research-batch-thirty-nine-audit.md` finding 10), so `tag: 5`
-       installed; the pass put the 5 into the row's tags as it was, `coerce` refused a number in a `list<enum>` and in
-       the `list<text>` every list takes, and the rule's whole patch went, a `set` beside it included. AN `untag` DOES NOT
-       FAIL THAT WAY, and is refused for another reason: it untags nothing. Measured by this wave's checker, `untag: 5` and
-       `untag: ["late"]` beside a `set` over a Rent tagged `late` kept the note and the `late` alike, in silence. */
+       not a string and nothing else asked, so `tag: 5` installed; the pass put the 5 into the row's tags as it was,
+       `coerce` refused a number in a `list<enum>` and in the `list<text>` every list takes, and the rule's whole patch
+       went, a `set` beside it included. AN `untag` DOES NOT FAIL THAT WAY, and is refused for another reason: it untags
+       nothing. Measured: `untag: 5` and `untag: ["late"]` beside a `set` over a Rent tagged `late` kept the note and
+       the `late` alike, in silence. */
     for (const verb of ['tag', 'untag'] as const) {
       if (!(verb in action)) continue;
       const word = action[verb];
@@ -1389,9 +1387,9 @@ function shapeFault(id: string, kind: string, value: unknown, on: Record<string,
     }
     case 'arrival': {
       if (!isObject(value)) return bad('DECLARATION_INVALID', `${id}'s arrival: is { ingest, channel, state, unverified }, each optional.`, at);
-      /* `unverified: true` IS HOW A RULE HEARS AN ARRIVAL NOTHING VERIFIED, and without it `onArrival` starts nothing for
-         one (audit thirty-three §5). A rule that wants to know about wrong tokens asks for that in writing; `'yes'`
-         would have read as absent and silently heard nothing, so anything but true or false is refused. */
+      /* `unverified: true` IS HOW A RULE HEARS AN ARRIVAL NOTHING VERIFIED, and without it `onArrival` starts nothing
+         for one. A rule that wants to know about wrong tokens asks for that in writing; `'yes'` would have read as
+         absent and silently heard nothing, so anything but true or false is refused. */
       if (value.unverified !== undefined && typeof value.unverified !== 'boolean')
         return bad('DECLARATION_INVALID', `${id}'s unverified: is true or false. True also starts it for arrivals nothing verified.`, `${at}.unverified`);
       if (value.ingest !== undefined) {
@@ -1419,8 +1417,8 @@ function shapeFault(id: string, kind: string, value: unknown, on: Record<string,
           'on.late',
         );
       /* A CLOCK OF MONTHS IS `clock.ts`'s AND IS READ BEFORE THE INTERVAL, because `mo` is not a unit `intervalMs` has
-         and never should be: a month is no number of milliseconds. Measured on 25 September, `1mo` was refused here as
-         not a clock, and a bill on the last day of each month could only be carried forward by hand. */
+         and never should be: a month is no number of milliseconds. `1mo` was once refused here as not a clock, and a
+         bill on the last day of each month could only be carried forward by hand. */
       if (monthsIn(value) !== null) return calendarFault(id, String(value), on as Record<string, unknown>);
       const ms = typeof value === 'string' ? intervalMs(value) : null;
       if (ms === null)
@@ -1570,8 +1568,8 @@ function stepFault(
       if (spec.input !== undefined && (!isObject(spec.input) || Object.values(spec.input).some((v) => typeof v !== 'string')))
         return bad('DECLARATION_INVALID', `${id}'s ${at}.script.input is a map of names to text.`, `${at}.script.input`);
       /* `as:` IS OPTIONAL, AS `call`'S IS. It holds the id of the queued job, `startScript` writes it only when it is a
-         string, and until 24 September this refused a step with none, so the canvas had to require a name the run never
-         needed (`flow-lint-script-as.test.ts`). An `as` that is present is still held to the name rules. */
+         string, and this once refused a step with none, so the canvas had to require a name the run never needed
+         (`flow-lint-script-as.test.ts`). An `as` that is present is still held to the name rules. */
       return spec.as === undefined ? null : named(spec.as, `${at}.script.as`);
     }
     case 'call': {

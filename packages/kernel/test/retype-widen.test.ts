@@ -1,11 +1,11 @@
 /**
  * Opening a closed list is not a retype: an `enum` becoming `text` over rows that hold values installs.
  *
- * MEASURED IN `loop/research-shell-seed-next.md` N2. One money-core step up with `holdings.kind` as `text` in place of the
- * four-value `enum` was refused `FIELD_TYPE_CHANGED` by the kernel as well as by `declare`, with the fix "Retire the field
- * and add a new one". For `enum` to `ref` that is right: a stored `"premises"` is not a row id. For `enum` to `text` it
- * is not: every stored value is already valid text, nothing is lost, and the fix would split one column into two. So
- * `updates.by` could not become open text on any record holding an update.
+ * MEASURED: one money-core step up with `holdings.kind` as `text` in place of the four-value `enum` was refused
+ * `FIELD_TYPE_CHANGED` by the kernel as well as by `declare`, with the fix "Retire the field and add a new one". For
+ * `enum` to `ref` that is right: a stored `"premises"` is not a row id. For `enum` to `text` it is not: every stored
+ * value is already valid text, nothing is lost, and the fix would split one column into two. So `updates.by` could not
+ * become open text on any record holding an update.
  *
  * THE REST STAY REFUSED, each for a value it would misread: `enum` to `ref` (a word is not a row id), `text` to `enum` (a
  * word outside the values), `text` to `int` (a word is not a number).

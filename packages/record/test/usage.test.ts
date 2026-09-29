@@ -1,5 +1,5 @@
 /**
- * The usage ledger, per account, in the Directory (`loop/DIRECTION.md` §0b; research-scheduled-actions §4).
+ * The usage ledger, per account, in the Directory.
  *
  * WHAT IS HELD HERE IS WHAT BILLING WOULD STAND ON. A run counted twice is a bill somebody disputes, a run
  * never counted is a meter that lies, and a limit reached in silence is an action that stopped with no

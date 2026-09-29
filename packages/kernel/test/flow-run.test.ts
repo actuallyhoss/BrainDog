@@ -1,6 +1,5 @@
 /**
- * An automation runs: a rule on the run path is started by its trigger, walks its steps and leaves one row per step
- * (`loop/research-shell-automations.md` §4.1, §4.2, §4.5, Brief B).
+ * An automation runs: a rule on the run path is started by its trigger, walks its steps and leaves one row per step.
  *
  * WHAT WAS MEASURED BEFORE THE RUNNER. Every body below installed or was refused by the lint alone, and then nothing
  * read it: a clock rule drained past its due time left no event, a steps-only rule was refused by the kernel's own
@@ -8,9 +7,9 @@
  * test here failed on that line first.
  *
  * THE MIGRATION IS APPLIED HERE WHEN THE RECORD HAS NOT. `0011_automation_run.ts` is registered by one line in
- * `migrate.ts`, which this brief does not own; until that line lands a record opened by `openRecord` has no
- * `automation_run`, and `withRuns` below adds it the way the runner would find it. Once the line is in, the table is
- * already there and `withRuns` does nothing.
+ * `migrate.ts`; until that line lands a record opened by `openRecord` has no `automation_run`, and `withRuns` below
+ * adds it the way the runner would find it. Once the line is in, the table is already there and `withRuns` does
+ * nothing.
  */
 
 import { test } from 'node:test';
@@ -108,7 +107,7 @@ const value = <T>(r: unknown): T => {
   return x.value;
 };
 
-/* ── the red the brief asked for ───────────────────────────────────────── */
+/* ── a clock rule runs ─────────────────────────────────────────────────── */
 
 test('A RULE ON A FIFTEEN-MINUTE CLOCK RUNS WHEN THE CLOCK COMES ROUND: one run, one event, one metered line', async () => {
   const { k, sql, clock } = await record(rule({ rule: 'tick', on: { every: '15m' }, steps: [{ notify: { say: 'Look at the gold rate.' } }] }));
@@ -132,12 +131,12 @@ test('A RULE ON A FIFTEEN-MINUTE CLOCK RUNS WHEN THE CLOCK COMES ROUND: one run,
   sql.close();
 });
 
-/* ── the two things the wave-thirty-two checker left ───────────────────── */
+/* ── what a steps: body is told ────────────────────────────────────────── */
 
 test('A steps: BODY WITH A register: BESIDE IT IS TOLD WHAT IS WRONG, not that it says nothing', async () => {
-  /* MEASURED, AND NARROWER THAN THE FINDING. A `steps:` body with `on:` and no `register:` already installed, because
-     `undeclarable` is reached only for a body with a top-level `register:`. For that body it answered first, with
-     `REQUIRED_MISSING at then`, a sentence about a key the person was right to leave out, and the lint's sentence
+  /* MEASURED, AND NARROWER THAN IT FIRST LOOKED. A `steps:` body with `on:` and no `register:` already installed,
+     because `undeclarable` is reached only for a body with a top-level `register:`. For that body it answered first,
+     with `REQUIRED_MISSING at then`, a sentence about a key the person was right to leave out, and the lint's sentence
      about the key they should move was never seen. */
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
@@ -318,18 +317,18 @@ test('A RUN STARTED BY A RULE WRITE ONLY WHERE from_rules SAYS SO, and the chain
   sql.close();
 });
 
-/* ── audit thirty-three: sections 1, 4 and 5 ─────────────────────────── */
+/* ── a step that throws, and a run that waits ────────────────────────── */
 
 test('A STEP THAT THROWS FAILS THE RUN WITH A SENTENCE, and nothing it already did is done again', async () => {
-  /* `loop/research-batch-thirty-three-audit.md` §1, `f6.mts`. A throw left `advance` for the drain's ladder, the run
-     stayed `running` at the step it had saved, and the next attempt took every step before the throw again: with a wait
-     first, the wait's row already said `done`, so it parked again and the ladder was reset, and the notify went out
-     every two hours for as long as the probe ran; without one, eight notifies and a run that never ended.
+  /* A throw left `advance` for the drain's ladder, the run stayed `running` at the step it had saved, and the next
+     attempt took every step before the throw again: with a wait first, the wait's row already said `done`, so it parked
+     again and the ladder was reset, and the notify went out every two hours for as long as the probe ran; without one,
+     eight notifies and a run that never ended.
 
      THE BODY IS WRITTEN UNDER THE LINT, straight into the declaration row, because what is under test is a throw from
-     any step (a driver error, a full disk, a bug) and not the one malformed shape the audit happened to find. It was
-     `{ note: { text } }` until the fill guard (wave forty-one) made a non-text note harmless; a `link` whose `to` is
-     null still throws inside the step (`action.link.to.by`), which is all this needs. */
+     any step (a driver error, a full disk, a bug) and not the one malformed shape that happened to show it. It was
+     `{ note: { text } }` until the fill guard made a non-text note harmless; a `link` whose `to` is null still throws
+     inside the step (`action.link.to.by`), which is all this needs. */
   const on = { written: { register: 'paid', op: ['create'] } };
   const { k, sql, clock } = await record(
     rule({ rule: 'chase', on, once_per: ['entry'], steps: [{ wait: '1h' }, { notify: { say: 'Chase {{merchant}}' } }, { note: 'x' }] }),

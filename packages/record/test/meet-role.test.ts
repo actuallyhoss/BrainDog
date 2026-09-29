@@ -1,6 +1,6 @@
 /**
- * `meet` through the record into a list that declares `meets:`, which is the kernel half of the roles brief proven end
- * to end for the callers the record already lets through.
+ * `meet` through the record into a list that declares `meets:`, which is the kernel half of the roles proven end to end
+ * for the callers the record already lets through.
  *
  * MEASURED BEFORE THE KERNEL HALF: the same calls were `DECLARATION_INVALID ... declares meets, and there is no such key`
  * at install, and without the key `meet` into `contacts` was `REGISTER_UNKNOWN`, and into a `people` list without
@@ -13,8 +13,8 @@
  *
  * WHEN NO LIST PLAYS THE PART, THE GUARD ASKS ABOUT THE RECORD, and the kernel's `REGISTER_UNKNOWN` answers. The
  * fallback asked about `people` whether or not the record had one, so with the `meets:` pack switched off a token held
- * to `contacts` was told "This token does not reach people. It reaches contacts." and sent to ask for a grant that would
- * not have helped it (audit forty-seven, finding 5). The last test holds that.
+ * to `contacts` was told "This token does not reach people. It reaches contacts." and sent to ask for a grant that
+ * would not have helped it. The last test holds that.
  */
 
 import { test } from 'node:test';
@@ -106,8 +106,8 @@ test('A RUN IN A PROJECT IS RECORDED AND LINKED TO NOTHING, because the list has
 
 /*
  * THE GUARD ASKS ABOUT THE LIST THE KERNEL WRITES. It asked `propose` on `people` whatever list declared `meets:`, so a
- * token held to `contacts` was refused at a list the record does not have, and the checker of the roles brief measured
- * the other direction: a token held to `people` got `ok` and `contacts#1`, a row in a list outside its grant.
+ * token held to `contacts` was refused at a list the record does not have, and it was measured in the other direction:
+ * a token held to `people` got `ok` and `contacts#1`, a row in a list outside its grant.
  */
 test('A TOKEN THAT MAY PROPOSE ON contacts ALONE MEETS INTO contacts, the list declaring meets:', async () => {
   const { api, sql } = await record();

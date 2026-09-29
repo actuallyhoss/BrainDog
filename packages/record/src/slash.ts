@@ -1,12 +1,12 @@
 /**
- * Slash reading how a BrainDog is used, and what it proposes about it (`loop/research-spark.md` S15, `loop/DIRECTION.md` §11).
+ * Slash reading how a BrainDog is used, and what it proposes about it.
  *
- * TIER A READ A SENTENCE; THIS READS THE RECORD. Which lists grow, which pages are opened, what nothing has touched in a
- * quarter, and what agents write. From that it says what it noticed, in plain sentences, and drafts at most a few
- * proposals in the kinds an agent already files (`pack`, `settings`, `arrange`, and a `rowset` for a skill a use case names),
- * each with its reason as the question. The words it may change are only those the speaking use case declares (S8). A
- * model may also draft a `change` that builds a register, an ingest, a rule, a metric, a page or a script (`fromModel`, Brief D), and
- * when the owner describes what they want (`asked`), that description is what it drafts from.
+ * TIER A READ A SENTENCE; THIS READS THE RECORD. Which lists grow, which pages are opened, what nothing has touched in
+ * a quarter, and what agents write. From that it says what it noticed, in plain sentences, and drafts at most a few
+ * proposals in the kinds an agent already files (`pack`, `settings`, `arrange`, and a `rowset` for a skill a use case
+ * names), each with its reason as the question. The words it may change are only those the speaking use case declares.
+ * A model may also draft a `change` that builds a register, an ingest, a rule, a metric, a page or a script
+ * (`fromModel`), and when the owner describes what they want (`asked`), that description is what it drafts from.
  *
  * IT RECOMMENDS AND NEVER REARRANGES (§5c, `docs/29` §1). Nothing here writes a row, a pack or a setting. A draft becomes a
  * question only through `arranger().prepare`, the same door and the same validation a token's proposal goes through, or
@@ -155,7 +155,7 @@ export type Offered = {
   modules: readonly string[];
   /** Whether the pack's own pages show what agents are doing, so it is worth offering when agents write here. */
   showsAgents: boolean;
-  /** The skills a use case names for agents working in it (`research-spark.md` S9), offered once it is on. */
+  /** The skills a use case names for agents working in it, offered once it is on. */
   skills?: readonly { name: string; trigger: string }[] | undefined;
 };
 
@@ -179,13 +179,13 @@ export function pageShowsAgents(body: unknown): boolean {
  *
  * READ ONLY, and bounded to ninety days of the log, so it is one pass over a quarter rather than over a record's life.
  *
- * `reads` IS THE CALLER'S OWN READ, ASKED OF EACH LIST, and a list it refuses is not in the reading at all: not as a list,
- * not among what a page reads, not among what an agent writes, not in the counts of writes, not as a word the speaking use
- * case says for it, and Skills' names not when Skills is one of them. `loop/research-audit-2026-09-25-layouts.md` finding
- * 8: an owner held to `append` on Skills and Payroll, whose own `list` refused both, pressed Slash with a description asking
- * the model to repeat what it was shown, and read back a question on Decide saying "Skills: acme-bank-reconcile (uses key
- * BANK_PROD). Rows: payroll=7". The reading was the whole record's whoever asked. Absent, the reading is the whole record's,
- * which is right for the daily look, where nobody asked (`test/slash-asked.test.ts`).
+ * `reads` IS THE CALLER'S OWN READ, ASKED OF EACH LIST, and a list it refuses is not in the reading at all: not as a
+ * list, not among what a page reads, not among what an agent writes, not in the counts of writes, not as a word the
+ * speaking use case says for it, and Skills' names not when Skills is one of them. Measured: an owner held to `append`
+ * on Skills and Payroll, whose own `list` refused both, pressed Slash with a description asking the model to repeat
+ * what it was shown, and read back a question on Decide saying "Skills: acme-bank-reconcile (uses key BANK_PROD). Rows:
+ * payroll=7". The reading was the whole record's whoever asked. Absent, the reading is the whole record's, which is
+ * right for the daily look, where nobody asked (`test/slash-asked.test.ts`).
  */
 export function readUsage(
   sql: Sql,
@@ -435,12 +435,12 @@ const OF_THE_WHOLE: ReadonlySet<Noticed['kind']> = new Set(['untouched', 'agents
  *
  * `nowMs` is the reading's own moment; `offered` is the host's catalogue as Slash needs it.
  *
- * `partial` IS A READING WITH LISTS LEFT OUT, the one an owner held from some list is handed (`readUsage`'s `reads`), and
- * then no rule drafts at all and nothing is said of the whole record. Every rule concludes from a count or an absence, and
- * over a partial reading the conclusion is false: an owner held to `append` on Tasks, which was written eighteen times,
- * pressed Slash and was filed "Turn off Work? Nothing in it has been opened or changed in ninety days", since Tasks had
- * left her reading and what was left of Work was untouched (the checker of audit 2026-09-25 finding 8,
- * `test/slash.test.ts`). What she reads whole and is said of one list or page she can open stays.
+ * `partial` IS A READING WITH LISTS LEFT OUT, the one an owner held from some list is handed (`readUsage`'s `reads`),
+ * and then no rule drafts at all and nothing is said of the whole record. Every rule concludes from a count or an
+ * absence, and over a partial reading the conclusion is false: an owner held to `append` on Tasks, which was written
+ * eighteen times, pressed Slash and was filed "Turn off Work? Nothing in it has been opened or changed in ninety days",
+ * since Tasks had left her reading and what was left of Work was untouched (`test/slash.test.ts`). What she reads whole
+ * and is said of one list or page she can open stays.
  */
 export function noticeUsage(usage: Usage, offered: readonly Offered[], partial = false): { noticed: Noticed[]; drafts: SlashDraft[]; quiet: string | null } {
   const read = noticeWhole(usage, offered);
@@ -657,7 +657,7 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
     }
   }
 
-  /* THE SKILLS A USE CASE NAMES (S9), once it is on and the record keeps skills: each one it does not hold yet is a row for
+  /* THE SKILLS A USE CASE NAMES, once it is on and the record keeps skills: each one it does not hold yet is a row for
      the owner to accept, never one written for them. */
   if (usage.skills !== null) {
     const held = new Set(usage.skills);
@@ -754,7 +754,7 @@ export type SlashModelInput = {
   /**
    * THE GRAMMARS A DESCRIPTION IS DRAFTED IN, present whenever `asked` is (`describedGrammar` in `grammar.ts`). The
    * instructions named grammars and the record sent none of them, so a list's keys were learnt from the refusals Decide
-   * showed the owner (`loop/finish/defects.md` G1).
+   * showed the owner.
    */
   grammar?: { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest?: unknown };
   /** The page a description is about, as it is declared (a page drawn per row is its template's declaration). */
@@ -767,9 +767,10 @@ export type SlashModelInput = {
 };
 
 /**
- * The longest description the owner may type. A sentence or a few, which is what the ask field is for: `D2`'s own example
- * of a launch desk is 124 characters, so a thousand leaves room for a page spelled out part by part. It goes into the
- * model's input whole and is billed with it, so the bound is on what one ask may spend as much as on what reads well.
+ * The longest description the owner may type. A sentence or a few, which is what the ask field is for: the owner's own
+ * example of a launch desk is 124 characters, so a thousand leaves room for a page spelled out part by part. It goes
+ * into the model's input whole and is billed with it, so the bound is on what one ask may spend as much as on what
+ * reads well.
  */
 export const SLASH_ASKED_MOST = 1_000;
 
@@ -779,11 +780,11 @@ const DESCRIBED_KEPT = 50;
 /**
  * What stops a description reaching the model before anything is spent, and one ask per description at a time.
  *
- * NOTHING WAS CHECKED BEFORE THE SPEND. `loop/research-audit-2026-09-25-layouts.md` finding 18: twenty presses of one
- * description made twenty model calls and twenty ledger rows and filed one question, since every answer after the first
- * was "asked before"; with three of Slash's questions already waiting, eight presses made eight calls and filed
- * `[1,1,1,0,0,0,0,0]`, the last five spent on answers the cap then skipped. The ledger held the month's ceiling throughout,
- * so this is about the asks under it, which are shared with a person's reads at the palette and an automation's questions.
+ * NOTHING WAS CHECKED BEFORE THE SPEND. Measured: twenty presses of one description made twenty model calls and twenty
+ * ledger rows and filed one question, since every answer after the first was "asked before"; with three of Slash's
+ * questions already waiting, eight presses made eight calls and filed `[1,1,1,0,0,0,0,0]`, the last five spent on
+ * answers the cap then skipped. The ledger held the month's ceiling throughout, so this is about the asks under it,
+ * which are shared with a person's reads at the palette and an automation's questions.
  *
  * `held` answers why this description is not sent now, or `null`: Decide full, or the same words already filed and still
  * waiting there. The words are compared as typed, less case and spacing. `once` makes presses of one description sent
@@ -829,25 +830,23 @@ export type SlashKind = 'pack' | 'settings' | 'arrange' | 'change';
 const QUESTION_MAX = 280;
 
 /**
- * THE DECLARATIONS A MODEL MAY BUILD WITH A `change` (`loop/research-shell-mcp.md` §4 Brief D, `DIRECTION.md` §22): a list,
- * a door in or out, a rule, a figure, a page. A gold rate on a schedule is an `ingest` into a register, and before this Slash
- * dropped it with "Slash files only pack, settings and arrange", so the one use case the owner named could not be built by
- * Slash.
+ * THE DECLARATIONS A MODEL MAY BUILD WITH A `change`: a list, a door in or out, a rule, a figure, a page. A gold rate
+ * on a schedule is an `ingest` into a register, and before this Slash dropped it with "Slash files only pack, settings
+ * and arrange", so the one use case the owner named could not be built by Slash.
  *
- * A METRIC JOINED ON 25 SEPTEMBER (`loop/research-dynamic-layouts.md` §6 brief D2). A page that opens on "1 of 2 steps are
- * done" says a figure, and a figure is a metric: with `metric` left out, a model that drafted the figure beside the page
- * had it dropped as "Proposal 1 was a change to a metric, and Slash changes only a register, an ingest, a rule or a page",
- * while the page itself was filed and would have answered nothing where the number goes (`test/slash-asked.test.ts`).
- * The old reason for leaving it out, that nothing Slash reads says what a figure should be, stopped holding once the owner
- * can describe the page they want: the description says it.
+ * A METRIC JOINED LATER. A page that opens on "1 of 2 steps are done" says a figure, and a figure is a metric: with
+ * `metric` left out, a model that drafted the figure beside the page had it dropped as "Proposal 1 was a change to a
+ * metric, and Slash changes only a register, an ingest, a rule or a page", while the page itself was filed and would
+ * have answered nothing where the number goes (`test/slash-asked.test.ts`). The old reason for leaving it out, that
+ * nothing Slash reads says what a figure should be, stopped holding once the owner can describe the page they want: the
+ * description says it.
  *
- * A SCRIPT JOINED IN THE SECOND FINISH WORKFLOW (`loop/finish/agents.md` S12 and AGT-27, `loop/finish/contracts.md` X42).
- * "Fetch the price hourly into Rates" is a script: a clock, the origin it fetches from, and the list it writes. With
- * `script` left out, Slash dropped that answer as a change to a script, so the brief's own example could not be drafted
- * at all. Its every reach beyond the record is in its header, `egress` and `keys` (`scriptBody` in `kernel/src/script.ts`),
- * which the kernel refuses when computed and prints as the outside calls line Decide draws (`egressOf`), so where it
- * sends is never the model's to leave unsaid. Filing it runs nothing: a clock is armed only when the owner accepts, and
- * a trial is `scriptTry`, which nothing here calls.
+ * A SCRIPT JOINED AFTER THAT. "Fetch the price hourly into Rates" is a script: a clock, the origin it fetches from, and
+ * the list it writes. With `script` left out, Slash dropped that answer as a change to a script, so the owner's own
+ * example could not be drafted at all. Its every reach beyond the record is in its header, `egress` and `keys`
+ * (`scriptBody` in `kernel/src/script.ts`), which the kernel refuses when computed and prints as the outside calls line
+ * Decide draws (`egressOf`), so where it sends is never the model's to leave unsaid. Filing it runs nothing: a clock is
+ * armed only when the owner accepts, and a trial is `scriptTry`, which nothing here calls.
  *
  * A theme, a digest or a block is still left to a person or an agent, because nothing Slash reads or hears says what one
  * should look like, and `kernel.propose` reviews a metric exactly as it reviews the page beside it.
@@ -858,22 +857,21 @@ const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metr
 const aKind = (kind: string): string => `${/^[aeiou]/u.test(kind) ? 'an' : 'a'} ${kind}`;
 
 /**
- * WHAT A DESCRIPTION MAY BUILD: `BUILDS`, EACH HELD TO WHAT IT MAY REACH. `loop/research-audit-2026-09-25-layouts.md`
- * finding 14 filed an abused model's answer to "A desk for my launch" as one change holding `ingest.launchsync`, a call to
- * collector.evil.example sending payroll's names and salaries, under the question "Build the launch desk you described?".
- * `SLASH_INSTRUCTIONS` told the model to answer only lists, figures, pages and rules here, and nothing in the record held
- * it to that.
+ * WHAT A DESCRIPTION MAY BUILD: `BUILDS`, EACH HELD TO WHAT IT MAY REACH. Measured: the record filed an abused model's
+ * answer to "A desk for my launch" as one change holding `ingest.launchsync`, a call to collector.evil.example sending
+ * payroll's names and salaries, under the question "Build the launch desk you described?". `SLASH_INSTRUCTIONS` told
+ * the model to answer only lists, figures, pages and rules here, and nothing in the record held it to that.
  *
- * A SCRIPT IS LET THROUGH, HELD TO WHAT `describedScript` ALLOWS (`loop/finish/contracts.md` X42). An owner asking for
- * something fetched is asking for exactly the call a script makes, its origins and keys are written in its header where
- * the kernel checks them, and the record says them in the question in its own words (`scriptSays`). What stays out is
- * what finding 14 used: rows handed to code that fetches.
+ * A SCRIPT IS LET THROUGH, HELD TO WHAT `describedScript` ALLOWS. An owner asking for something fetched is asking for
+ * exactly the call a script makes, its origins and keys are written in its header where the kernel checks them, and the
+ * record says them in the question in its own words (`scriptSays`). What stays out is what that abused answer used:
+ * rows handed to code that fetches.
  *
- * AND SO IS AN INGEST THAT ONLY READS, IN THE THIRD FINISH WORKFLOW (`loop/finish/shell.md` SLS-1, X42). "Fetch the rate
- * hourly" is a poll: one address read on a clock and written into a list, which is a script's fetch with no code in it.
- * Held to `describedIngest`, it sends no row and takes nothing anybody posts, and the record says where it fetches from,
- * which key goes with it and which list it writes (`ingestSays`). A door others post to and a call that sends are still
- * finding 14's shape and are asked for on their own, where the question is about the door.
+ * AND SO IS AN INGEST THAT ONLY READS. "Fetch the rate hourly" is a poll: one address read on a clock and written into
+ * a list, which is a script's fetch with no code in it. Held to `describedIngest`, it sends no row and takes nothing
+ * anybody posts, and the record says where it fetches from, which key goes with it and which list it writes
+ * (`ingestSays`). A door others post to and a call that sends are still the abused answer's shape and are asked for on
+ * their own, where the question is about the door.
  */
 const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metric', 'page', 'script']);
 
@@ -885,9 +883,10 @@ const DESCRIBED_BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'ru
 const READS_IN: ReadonlySet<string> = new Set(['poll', 'pull']);
 
 /**
- * The verbs by which a rule reaches beyond the record, and what each would do, in a dropped line. `run` starts an ingest or
- * an action that calls out, `call` is a step's own request, and `ask_slash` sends rows to a model. A rule a description
- * builds acts inside the record or is not filed: the same finding's bundle paired its ingest with a rule that ran it.
+ * The verbs by which a rule reaches beyond the record, and what each would do, in a dropped line. `run` starts an
+ * ingest or an action that calls out, `call` is a step's own request, and `ask_slash` sends rows to a model. A rule a
+ * description builds acts inside the record or is not filed: the same abused answer's bundle paired its ingest with a
+ * rule that ran it.
  *
  * AND `script`, WHICH WAS LEFT OFF: a script fetches from the origins its own `egress` names (`kernel/src/script.ts`) and
  * `input:` hands it the row, so a rule starting one on each new Payroll row was filed under a description until it was
@@ -937,9 +936,9 @@ const holdsKey = (value: unknown): boolean => !coerce({ id: 'change', type: 'jso
 /**
  * Why a script drafted from a description is dropped, or `null` when it may be filed.
  *
- * ON ITS CLOCK ONLY. `runs.door` hands it each arrival at a door and `runs.rule` lets a rule hand it a row, and a row handed
- * to code that fetches beyond the record is finding 14's shape, where a rule sent each new row of a list to a collector.
- * Either is asked for on its own, as an ingest is.
+ * ON ITS CLOCK ONLY. `runs.door` hands it each arrival at a door and `runs.rule` lets a rule hand it a row, and a row
+ * handed to code that fetches beyond the record is the abused answer's shape, where a rule sent each new row of a list
+ * to a collector. Either is asked for on its own, as an ingest is.
  *
  * AND IT READS NO LIST, WHEN IT FETCHES. `reads` are the lists `ctx.record` may read while it runs, and read by code that
  * also fetches they are rows that can leave in the next request. The list it writes is no exception: writing grants no
@@ -963,11 +962,12 @@ function describedScript(d: { id?: unknown; body?: unknown }, n: number): string
 /**
  * What a script would do on its own once accepted, in the record's words, added to the question Decide draws.
  *
- * THE MODEL'S QUESTION NAMES ONLY WHAT IT CHOOSES TO. Finding 14's was "Build the launch desk you described?" over a change
- * that called a collector, so which lists a script reads, where it fetches from, which keys go with it and which lists it
- * writes are said here from its own header, on every path, beside the kernel's line under "Calls out" (`egressOf`). Every
- * start the header names is said, because a script with a clock and a door runs on both. The header is the model's, so
- * each name is cut to a length; a header the kernel then refuses is never filed, and neither is this line.
+ * THE MODEL'S QUESTION NAMES ONLY WHAT IT CHOOSES TO. The abused answer's was "Build the launch desk you described?"
+ * over a change that called a collector, so which lists a script reads, where it fetches from, which keys go with it
+ * and which lists it writes are said here from its own header, on every path, beside the kernel's line under "Calls
+ * out" (`egressOf`). Every start the header names is said, because a script with a clock and a door runs on both. The
+ * header is the model's, so each name is cut to a length; a header the kernel then refuses is never filed, and neither
+ * is this line.
  */
 function scriptSays(d: { id?: unknown; body?: unknown }): string {
   const body = (d.body ?? {}) as { runs?: unknown; egress?: unknown; keys?: unknown; reads?: unknown; writes?: unknown };
@@ -998,7 +998,7 @@ const partOf = (value: unknown): Record<string, unknown> => (value !== null && t
 /**
  * Why a door drafted from a description is dropped, or `null` when it may be filed: it reads on a clock (`READS_IN`) or
  * it is not filed. WHAT A POLL MAY CARRY IS THE KERNEL'S TO SAY, and it refuses a `trigger` or a `sends` on one
- * (`ingestBody` in `kernel/src/declare.ts`), so a reading door can never be the call finding 14 filed.
+ * (`ingestBody` in `kernel/src/declare.ts`), so a reading door can never be the call the abused answer filed.
  */
 function describedIngest(d: { id?: unknown; body?: unknown }, n: number): string | null {
   const channel = partOf(d.body).channel;
@@ -1046,14 +1046,15 @@ function ingestSays(d: { id?: unknown; body?: unknown }): string | null {
  * to change nothing: with it removed the gold-rate test still found no trace of the model's host in the filed row, and
  * `stableKey` never reads either field, so a model that varies the egress it writes is still asked once.
  *
- * `described` IS A CHANGE DRAFTED FROM WHAT THE OWNER TYPED, held to `DESCRIBED_BUILDS`, to a rule that stays inside the
- * record and to a door that only reads, and `says` is what the record itself adds to the question about what already
- * exists: the declarations it would replace, and the existing list a rule would change rows of. The same finding filed
- * `page.home` at version 1, swapped to read Payroll, and Decide drew it as a new page; the question was the model's own
- * words and named nothing it replaced. A script adds its own line on every path, described or not (`scriptSays`), a door
- * drafted from a description adds its own (`ingestSays`), and no change body a model drafts is filed with a key written
- * out in it (`holdsKey`). A door from a plain press keeps the question it always had, with the kernel's outside calls
- * line beside it on Decide, since a press drafts from how the record is used and not from words anybody typed.
+ * `described` IS A CHANGE DRAFTED FROM WHAT THE OWNER TYPED, held to `DESCRIBED_BUILDS`, to a rule that stays inside
+ * the record and to a door that only reads, and `says` is what the record itself adds to the question about what
+ * already exists: the declarations it would replace, and the existing list a rule would change rows of. The same abused
+ * answer filed `page.home` at version 1, swapped to read Payroll, and Decide drew it as a new page; the question was
+ * the model's own words and named nothing it replaced. A script adds its own line on every path, described or not
+ * (`scriptSays`), a door drafted from a description adds its own (`ingestSays`), and no change body a model drafts is
+ * filed with a key written out in it (`holdsKey`). A door from a plain press keeps the question it always had, with the
+ * kernel's outside calls line beside it on Decide, since a press drafts from how the record is used and not from words
+ * anybody typed.
  */
 function changeBody(
   body: Record<string, unknown>,
@@ -1183,7 +1184,7 @@ const draftsIn = (raw: unknown): unknown[] | null =>
 
 /**
  * One item of a model's answer as a draft, or why it is dropped, numbered `n` in the sentence. `fromModel` and
- * `describe` both read an answer through this, so a description's repair round holds a draft exactly as its first ask.
+ * `describe` both read an answer through this, so a description's repair ask holds a draft exactly as its first ask.
  */
 function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) => number) | undefined, described: boolean): { draft: SlashDraft } | { why: string } {
   const d = x as { question?: unknown; body_kind?: unknown; body?: unknown };
@@ -1205,7 +1206,7 @@ function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) =>
   return { draft: { key: stableKey(body), question, body_kind: d.body_kind, body, by: name } };
 }
 
-/* ── a description, drafted, tried and repaired (`loop/finish/pages.md` C3) ──── */
+/* ── a description, drafted, tried and repaired ──────────────────────────────── */
 
 /**
  * The most repair asks one press makes, after the first ask, and every one is held and settled in Slash's ledger against
@@ -1227,8 +1228,8 @@ export type SlashDecl = { id: string; kind: string; body: Record<string, unknown
 export type SlashRows = Record<string, Record<string, Json>[]>;
 
 /**
- * A page `previewChange` drew (`PreviewedPage`, `loop/finish/contracts.md` §2.4), carried to the caller as it came. Read
- * here only for its id and each block's refusals, so nothing else of its shape is written twice.
+ * A page `previewChange` drew (`PreviewedPage`), carried to the caller as it came. Read here only for its id and each
+ * block's refusals, so nothing else of its shape is written twice.
  */
 export type SlashPreviewedPage = { id: string; blocks: readonly { refusals?: readonly Refusal[] }[]; [key: string]: unknown };
 
@@ -1247,7 +1248,7 @@ export type SlashAsk = (input: SlashModelInput) => Promise<{ raw: unknown } | { 
 /** A draft from a description, with the rows it would be drawn over and what it drew. */
 export type DescribedDraft = SlashDraft & { rows: SlashRows; preview: SlashPreview };
 
-/** `slashDraft`'s answer (`loop/finish/contracts.md` §2.4). `SlashDraft` is the arranger's draft and is another type. */
+/** `slashDraft`'s answer. `SlashDraft` is the arranger's draft and is another type. */
 export type SlashDrafted = {
   by: string;
   drafts: { question: string; change: { to: SlashDecl | { declarations: SlashDecl[] } }; rows: SlashRows; preview: SlashPreview }[];
@@ -1269,8 +1270,8 @@ export const DESCRIBED_NO_PREVIEW = 'This BrainDog cannot draw a change before i
 /**
  * `asked`, checked: text of a sentence or a few, at most `SLASH_ASKED_MOST` characters once trimmed.
  *
- * CHARACTERS ARE CODE POINTS, as the contract counts them (`loop/finish/contracts.md` §2.4, defects P11). `length` counts
- * UTF-16 units, so a description written in an alphabet outside the first plane was refused at half the bound.
+ * CHARACTERS ARE CODE POINTS, as the contract counts them. `length` counts UTF-16 units, so a description written in an
+ * alphabet outside the first plane was refused at half the bound.
  */
 export function askedFault(asked: unknown): Refusal | null {
   const text = typeof asked === 'string' ? asked.trim() : '';
@@ -1312,7 +1313,7 @@ const RULES_TRIED_MOST = 5;
 
 /**
  * Each rule of a change taken over its sample by `tryAutomation`, after `previewChange` drew it clean, or the refusal
- * that stops it (`loop/finish/shell.md` SLS-1: a drafted automation is tried first).
+ * that stops it: a drafted automation is tried first.
  *
  * THE DRAW LINTS A RULE AND THE TRY RUNS IT. `previewChange` holds every declaration to the install's lint, the change laid
  * over the record, and writes the sample rows through every rule a real row meets. A rule that starts on a clock meets no
@@ -1416,11 +1417,11 @@ const opening = (text: string): string => `${text.charAt(0).toUpperCase()}${text
  * A description drafted by the model, each draft tried with `previewChange` (and its rules with `tryAutomation`, through
  * `previewerOf`), and what it refused handed back to be mended.
  *
- * THE RECORD FILED WHATEVER PASSED `fromModel` FROM ONE ASK, WITH NO GRAMMAR IN IT (`loop/finish/pages.md` R5), so a
- * page naming a field its list lacks reached Decide and was found wrong when the owner accepted it. Now every draft is
- * drawn first, inside a rehearsal that keeps nothing, and every refusal goes back once as `repair`: at most
- * `SLASH_REPAIRS_MOST` repair asks, each through `ask`, which holds and settles it in Slash's ledger. A draft still
- * refused after the last is dropped with the record's own sentence, and one that draws clean is kept as it drew.
+ * THE RECORD FILED WHATEVER PASSED `fromModel` FROM ONE ASK, WITH NO GRAMMAR IN IT, so a page naming a field its list
+ * lacks reached Decide and was found wrong when the owner accepted it. Now every draft is drawn first, inside a
+ * rehearsal that keeps nothing, and every refusal goes back once as `repair`: at most `SLASH_REPAIRS_MOST` repair asks,
+ * each through `ask`, which holds and settles it in Slash's ledger. A draft still refused after the last is dropped
+ * with the record's own sentence, and one that draws clean is kept as it drew.
  *
  * NOTHING HERE WRITES. `preview` rolls back everything it drew, and the caller files what is kept, or only shows it.
  */
@@ -1789,7 +1790,7 @@ export function catalogueDrafts(offers: readonly CatalogueOffer[]): SlashDraft[]
   });
 }
 
-/* ── a skill's next version, from what its learnings taught (GAP-12) ─────── */
+/* ── a skill's next version, from what its learnings taught ──────────────── */
 
 /** The most skills one daily look drafts: the briefing's own three (`apps/cli/src/brief.ts` `MAX_BEARING`). */
 export const SKILL_DRAFTS_A_DAY = 3;

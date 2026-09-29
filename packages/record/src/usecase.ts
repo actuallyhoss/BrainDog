@@ -1,5 +1,5 @@
 /**
- * A BrainDog's arrangement shared as a use case, and a shared one planned for this record (`loop/research-spark.md` S14).
+ * A BrainDog's arrangement shared as a use case, and a shared one planned for this record.
  *
  * WHAT GOES OUT IS WHAT MAKES THE ARRANGEMENT, AND NONE OF THE RECORD'S ROWS BY DEFAULT. The first-party modules that
  * are on; the enabled use case's own lists and pages; the pages the person placed themselves; the voice and labels as
@@ -145,8 +145,8 @@ export function useCases(d: UseCaseDeps) {
     const lastShared = typeof values[SHARED_VERSION] === 'string' ? (values[SHARED_VERSION] as string) : null;
     const version = args.version ?? nextVersion(laterVersion(speaking?.version, lastShared), args.step ?? 'patch');
     if (!SEMVER.test(version)) return refuse('VALUE_MALFORMED', `${version} is not a version. Write 1.0.1.`, 'version');
-    /* FREE TEXT ON ONE LINE (shell.md USE-3): `declare`'s AUDIENCES are suggestions, never a closed list, so an
-       audience outside them is accepted here too, up to the same 40 bytes `declare` checks it against on the way in. */
+    /* FREE TEXT ON ONE LINE: `declare`'s AUDIENCES are suggestions, never a closed list, so an audience outside them is
+       accepted here too, up to the same 40 bytes `declare` checks it against on the way in. */
     if (args.audience !== undefined && (/[\r\n]/u.test(args.audience) || args.audience.trim() === '' || new TextEncoder().encode(args.audience).length > AUDIENCE_BYTES))
       return refuse('VALUE_MALFORMED', `Say who this is for in a few words on one line, such as ${AUDIENCES.join(', ')}.`, 'audience');
 
@@ -239,8 +239,8 @@ export function useCases(d: UseCaseDeps) {
       }
     }
 
-    /* A SHARED USE CASE MAY STAND ON ANY INSTALLED PACK, not only the six first-party modules (shell.md USE-3):
-       every other enabled pack goes out by id, and a use case never names its own family. */
+    /* A SHARED USE CASE MAY STAND ON ANY INSTALLED PACK, not only the six first-party modules: every other enabled pack
+       goes out by id, and a use case never names its own family. */
     const modules = on.map((s) => s.id).filter((id) => !id.startsWith(USE_CASE));
     const title = args.title ?? id.charAt(0).toUpperCase() + id.slice(1).replaceAll('-', ' ');
     const built = exportUseCase({

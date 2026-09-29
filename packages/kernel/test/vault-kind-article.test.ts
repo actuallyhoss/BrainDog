@@ -1,6 +1,6 @@
 /**
- * A rotation that names another kind is refused in a sentence a person reads: `loop/research-batch-fifty-five-audit.md`
- * named the slip at `vault.ts`'s rotation refusal, which wrote `is a ${kind}` and so said "is a api_token".
+ * A rotation that names another kind is refused in a sentence a person reads. The slip was at `vault.ts`'s rotation
+ * refusal, which wrote `is a ${kind}` and so said "is a api_token".
  */
 
 import { test } from 'node:test';

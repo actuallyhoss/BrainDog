@@ -1,6 +1,6 @@
 /**
  * The kernel schema, migration 11: `automation_run` and `automation_step`, a run of an automation and what each of its
- * steps did (`loop/research-shell-automations.md` §4.5).
+ * steps did.
  *
  * WHAT WAS MISSING WAS A RUN THAT SURVIVES BETWEEN STEPS. Rules finish inside one write, scheduled actions hand off and
  * forget, and neither can wait an hour and then carry on. A run is a row that says which step comes next, and each step

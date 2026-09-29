@@ -1,6 +1,5 @@
 /**
- * `touches`, the one walk the filing check and Decide both ask, over each kind of declaration it places
- * (`loop/research-decide-reach.md`, the table under "The rule").
+ * `touches`, the one walk the filing check and Decide both ask, over each kind of declaration it places.
  *
  * IT COULD NOT BE RED FIRST: the export did not exist. The red half is `govern-bundle-scope.test.ts` (six riders filed
  * under `register.obligations` at `bccc7ea8`, and a rule saying `{{trigger.row.what}}` refused as reading
@@ -40,11 +39,11 @@ test('a register names its own id and nothing else, a ref field included', () =>
 test("a rule names its row's list and every list the walk finds, and skips the run's own scope", () => {
   assert.equal(said('rule.seen', { rule: 'seen', register: 'inbox', then: [{ tag: 'seen' }] }), 'inbox');
   assert.equal(said('rule.file-it', { rule: 'file-it', register: 'inbox', then: [{ create: { register: 'money', bound: 1 } }] }), 'inbox money');
-  /* K4: `{{trigger.row.what}}` was a list called `trigger` to the filing check. */
+  /* `{{trigger.row.what}}` was a list called `trigger` to the filing check. */
   assert.equal(said('rule.says', { rule: 'says', on: { written: { register: 'inbox' } }, steps: [{ notify: { say: '{{trigger.row.what}} and {{vars.x}} and {{each.0}}' } }] }), 'inbox');
-  /* N4: an arrival's row is the list its door writes, read through `resolve`. */
+  /* An arrival's row is the list its door writes, read through `resolve`. */
   assert.equal(said('rule.arrived', { rule: 'arrived', on: { arrival: { ingest: 'payroll' } }, steps: [{ notify: { say: 'In.' } }] }), 'money');
-  /* K8: a rule on a clock has no row, and `automations` shows it only to whoever reads every list. */
+  /* A rule on a clock has no row, and `automations` shows it only to whoever reads every list. */
   assert.equal(said('rule.nightly', { rule: 'nightly', on: { every: '1d' }, steps: [{ notify: { say: 'Night.' } }] }), ANY_LIST);
 });
 
@@ -60,16 +59,16 @@ test('a page names its lists, each figure through its metric, the runs, and a re
   assert.equal(said('page.said', { page: 'said', blocks: [{ kind: 'note', body: '{{inbox-count}} rows, `{{money-count}}` is text' }] }), 'inbox');
   assert.equal(said('page.runs', { page: 'runs', blocks: [{ kind: 'table', source: 'sessions.live' }] }), 'session');
   assert.equal(said('page.working', { page: 'working', blocks: [{ kind: 'table', source: 'register.inbox', working: true }] }), 'inbox session');
-  /* K1: a log block reads across the record, and `page` refuses it to anybody who does not read all of it. */
+  /* A log block reads across the record, and `page` refuses it to anybody who does not read all of it. */
   assert.equal(said('page.feed', { page: 'feed', blocks: [{ kind: 'feed', source: 'activity' }] }), ACROSS);
   assert.equal(said('page.ahead', { page: 'ahead', blocks: [{ kind: 'forecast', source: 'forecast.runway', from: [{ register: 'money' }] }] }), 'money');
-  /* K5: prose that counts nothing names nothing, which the record reads as the record as a whole. */
+  /* Prose that counts nothing names nothing, which the record reads as the record as a whole. */
   assert.equal(said('page.about', { page: 'about', blocks: [{ kind: 'note', body: 'Nothing here counts.' }] }), '');
   assert.equal(said('page.lost', { page: 'lost', blocks: [{ kind: 'stat', cells: [{ metric: 'nowhere-count' }] }] }), '| nowhere-count');
 });
 
 test("a template's {{field}} is the row's, resolved through the list it is for, and {{spoken}} is too", () => {
-  /* K3: the record read `{{from}}` as a figure nothing resolved, and held the bundle from Inbox's readers. */
+  /* The record read `{{from}}` as a figure nothing resolved, and held the bundle from Inbox's readers. */
   assert.equal(said('page.each-letter', { page: 'each-letter', for: { register: 'inbox' }, blocks: [{ kind: 'note', body: '{{from}} as {{spoken}}' }] }), 'inbox');
   assert.equal(said('page.each-letter', { page: 'each-letter', for: { register: 'inbox' }, blocks: [{ kind: 'note', body: '{{salary}}' }] }), 'inbox | salary');
   assert.equal(said('page.said', { page: 'said', blocks: [{ kind: 'note', body: 'This is {{spoken}}.' }] }), '| spoken');
@@ -78,7 +77,7 @@ test("a template's {{field}} is the row's, resolved through the list it is for, 
 test('a door names every list it writes, and a read across the record when it calls out', () => {
   assert.equal(said('ingest.payroll', DOORS.payroll), 'money');
   assert.equal(said('ingest.split', { ingest: 'split', channel: 'email', route: [{ writes: { register: 'money' } }, { writes: { register: 'inbox' } }] }), 'inbox money');
-  /* K6: `actions` refuses the gold door's host to anybody who does not read the whole record. */
+  /* `actions` refuses the gold door's host to anybody who does not read the whole record. */
   for (const channel of ['pull', 'call', 'poll']) assert.equal(said('ingest.gold', { ingest: 'gold', channel, writes: { register: 'inbox' } }), `${ACROSS} inbox`, channel);
 });
 

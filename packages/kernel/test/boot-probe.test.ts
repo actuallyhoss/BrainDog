@@ -1,12 +1,12 @@
 /**
- * The boot probe: a SQLite that cannot host a record opens as a refusal (`30 §13`, `37 §5.1` step 4, W60-3).
+ * The boot probe: a SQLite that cannot host a record opens as a refusal (`30 §13`, `37 §5.1` step 4).
  *
- * MEASURED BEFORE THIS FILE EXISTED, 24 September 2026, over the kernel's own `openSqlite()`: an adapter that refuses
- * `USING fts5` made `applyMigrations` throw `no such module: fts5` out of migration 1, so `openRecord` and everything
- * above it threw instead of answering. And an adapter that opened a file whose migrations were already applied, and
- * refused only reads of `entry_fts`, opened clean: `applyMigrations` never touches `entry_fts` once it is built, so the
- * record answered every method until the first search, and then failed there with a driver sentence and no code. The
- * second is the one a self-hoster meets, because a `.brain` file written on one machine is opened on another.
+ * MEASURED BEFORE THIS FILE EXISTED, over the kernel's own `openSqlite()`: an adapter that refuses `USING fts5` made
+ * `applyMigrations` throw `no such module: fts5` out of migration 1, so `openRecord` and everything above it threw
+ * instead of answering. And an adapter that opened a file whose migrations were already applied, and refused only reads
+ * of `entry_fts`, opened clean: `applyMigrations` never touches `entry_fts` once it is built, so the record answered
+ * every method until the first search, and then failed there with a driver sentence and no code. The second is the one
+ * a self-hoster meets, because a `.brain` file written on one machine is opened on another.
  *
  * `RECORD_UNAVAILABLE` IS THE CODE because `30 §6` maps it to 503, and a 503 says the one thing that is true here: the
  * caller's request was fine and a deploy (a Node that bundles FTS5) fixes it. The adapter's own `NO_SUCH_MODULE` never

@@ -1,6 +1,6 @@
 /**
  * The kernel schema, migration 19: `member.row_where`, a list grant narrowed to the rows matching one `where`
- * (`loop/finish/platform.md` §4.0 W, `loop/finish/contracts.md` X24, `20-COLLABORATION` §1).
+ * (`20-COLLABORATION` §1).
  *
  * ONE NULLABLE COLUMN ON THE GRANT ROW. A member's grant on a list is one row of `member` (a person, a list, a level),
  * and the rows of that list the grant reaches are a property of the same grant, so the rule sits beside the level it

@@ -979,7 +979,7 @@ test('A CHANGE THAT WOULD NOT INSTALL IS REFUSED WHEN IT IS PROPOSED, so the own
   sql.close();
 });
 
-/* ── the three bodies that arrange a BrainDog (`loop/research-spark.md` S12) ─────────────────────── */
+/* ── the three bodies that arrange a BrainDog ───────────────────── */
 
 test('A PACK, A SETTINGS CHANGE AND AN ARRANGEMENT ARE FILED, AND ACCEPTING ONE CHANGES NOTHING BY ITSELF', async () => {
   /* The gate hands the body back for the record to apply, as it does a `change`: installing is

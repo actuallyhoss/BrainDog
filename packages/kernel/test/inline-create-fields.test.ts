@@ -1,20 +1,20 @@
 /**
  * A value a rule writes is filled from text, so a value that is not text is refused where the rule is written.
  *
- * MEASURED IN `loop/research-batch-thirty-eight-audit.md`, "Found on the way, outside the wave", first bullet. The body
+ * MEASURED. The body
  * `{ rule: late, register: jobs, then: [{ create: { register: bills, bound: 1, fields: { what: Rent, tags: [late] } } }] }`
  * installed, and then every write to Jobs threw `TypeError: template.replace is not a function` out of the write, from
  * `withEach` in `rules.ts`, which calls `.replace` on each field value. A host answers each of those writes `INTERNAL`.
  *
- * THE AUDIT'S BRIEF ALLOWED NUMBERS AND BOOLEANS, AND THEY THROW TOO. Probed on 23 September against the working tree,
- * one body per value, each installed and then written once: `tags: [late]`, `n: 5`, `b: true`, `n: null` and
- * `what: { a: 1 }` in a create's fields all threw on the write, and so did `set: { to: 5 }`, `note: 5`,
- * `notify: { say: 5 }`, `schedule: { note: 5 }`, `link: { to: { value: 5 } }` and `suggest: { question: 5 }`, because
- * every one of them reaches `fill`, whose first line is `template.replace`. The same values written as text, `n: '5'`
- * and `b: 'true'`, made a Bills row holding `n: 5` and `b: true`: the list reads text as its own type, so the one form
- * that works is text, and the lint refuses the rest with the quoted form in the sentence.
+ * NUMBERS AND BOOLEANS THROW TOO. Probed against the working tree, one body per value, each installed and then written
+ * once: `tags: [late]`, `n: 5`, `b: true`, `n: null` and `what: { a: 1 }` in a create's fields all threw on the write,
+ * and so did `set: { to: 5 }`, `note: 5`, `notify: { say: 5 }`, `schedule: { note: 5 }`, `link: { to: { value: 5 } }`
+ * and `suggest: { question: 5 }`, because every one of them reaches `fill`, whose first line is `template.replace`. The
+ * same values written as text, `n: '5'` and `b: 'true'`, made a Bills row holding `n: 5` and `b: true`: the list reads
+ * text as its own type, so the one form that works is text, and the lint refuses the rest with the quoted form in the
+ * sentence.
  *
- * THE AUDIT'S BODY AS WRITTEN IS REFUSED ALREADY, for a different key: a create with no `once_per` is refused
+ * THE BODY AS WRITTEN IS REFUSED ALREADY, for a different key: a create with no `once_per` is refused
  * `REQUIRED_MISSING` first. `once_per: [entry]` is added below so that the body reaches the fault under test.
  */
 
@@ -41,8 +41,8 @@ const list = (id: string): Declaration => ({
 });
 const rule = (body: Record<string, unknown>): Declaration => ({ id: 'rule.late', kind: 'rule', body: { rule: 'late', ...body } as never });
 
-/** The audit's body, with the `once_per` it needs to get past the check that comes first. */
-const AUDIT = { register: 'jobs', once_per: ['entry'], then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', tags: ['late'] } } }] };
+/** That body, with the `once_per` it needs to get past the check that comes first. */
+const LATE = { register: 'jobs', once_per: ['entry'], then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', tags: ['late'] } } }] };
 
 async function open(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
@@ -58,8 +58,8 @@ const refusal = async (body: Record<string, unknown>) => {
 
 const bills = (sql: NodeSql) => sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'bills' AND deleted_at IS NULL").map((r) => JSON.parse(r.fields) as Record<string, unknown>);
 
-test('THE AUDIT BODY IS REFUSED AT INSTALL, naming the step and the field, rather than throwing out of every write to Jobs', async () => {
-  const r = await refusal(AUDIT);
+test('THE LATE-TAGGING BODY IS REFUSED AT INSTALL, naming the step and the field, rather than throwing out of every write to Jobs', async () => {
+  const r = await refusal(LATE);
   assert.equal(r.code, 'DECLARATION_INVALID');
   assert.equal(r.at, 'then[0].create.fields.tags');
   assert.equal(
@@ -69,20 +69,20 @@ test('THE AUDIT BODY IS REFUSED AT INSTALL, naming the step and the field, rathe
 });
 
 test('A NUMBER OR A BOOLEAN IN A CREATE IS REFUSED WITH ITS QUOTED FORM, and the quoted form installs and makes the row', async () => {
-  const n = await refusal({ ...AUDIT, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', n: 5 } } }] });
+  const n = await refusal({ ...LATE, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', n: 5 } } }] });
   assert.equal(n.at, 'then[0].create.fields.n');
   assert.equal(
     n.fix,
     'rule.late creates a bills row at then[0] with n: 5, and a rule fills every value it writes from text. Write n: "5", which the field reads as its own type.',
   );
-  const b = await refusal({ ...AUDIT, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', b: true } } }] });
+  const b = await refusal({ ...LATE, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', b: true } } }] });
   assert.equal(b.at, 'then[0].create.fields.b');
   assert.match(b.fix, /Write b: "true", which the field reads as its own type\.$/);
 
   /* THE SENTENCE'S OWN ADVICE, TAKEN. A fix that told a person to quote a value the list then refused would be a
      second defect behind the first. */
   const { k, sql } = await open();
-  const out = await k.install([list('jobs'), list('bills'), rule({ ...AUDIT, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', n: '5', b: 'true' } } }] })]);
+  const out = await k.install([list('jobs'), list('bills'), rule({ ...LATE, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', n: '5', b: 'true' } } }] })]);
   assert.ok(out.ok, fixOf(out));
   assert.ok(k.create('jobs', { what: 'x' }, { actor: 'p_1' }).ok);
   assert.deepEqual(bills(sql).map(({ what, n, b }) => ({ what, n, b })), [{ what: 'Rent', n: 5, b: true }]);
@@ -105,19 +105,19 @@ test('EVERY OTHER VALUE THE INLINE PASS FILLS IS HELD TO TEXT, each named where 
 });
 
 test('A STEP WITH TWO VERBS IS HELD TO TEXT IN BOTH, whichever one the pass acts on', async () => {
-  /* THE PASS'S `if` CHAIN TAKES `set` BEFORE `create`, and the lint's walk took `create` first and stopped there. Found
-     by the checker on 23 September: this body installed, and the next write to Jobs threw `template.replace is not a
-     function` from the `set`, which the lint had never looked at. */
-  const r = await refusal({ ...AUDIT, then: [{ set: { field: 'n', to: 5 }, create: { register: 'bills', bound: 1, fields: { what: 'Rent' } } }] });
+  /* THE PASS'S `if` CHAIN TAKES `set` BEFORE `create`, and the lint's walk took `create` first and stopped there.
+     Found: this body installed, and the next write to Jobs threw `template.replace is not a function` from the `set`,
+     which the lint had never looked at. */
+  const r = await refusal({ ...LATE, then: [{ set: { field: 'n', to: 5 }, create: { register: 'bills', bound: 1, fields: { what: 'Rent' } } }] });
   assert.equal(r.code, 'DECLARATION_INVALID');
   assert.equal(r.at, 'then[0].set.to');
 });
 
 test('THE RUN PATH IS HELD TO THE SAME, inside a branch too, because a step acts through the same pass', async () => {
   /* A STEP'S VALUES ARE FILLED TWICE: `{{vars.…}}` by the run, which leaves anything but text as it is, and then the
-     row's own `{{field}}`s by the pass. So a list in a step's create reaches the same `.replace`. Measured on 23
-     September with the flat body below: the write to Jobs went in, the drain ran it, and the run ended `failed`,
-     "rule.late broke at step 1: template.replace is not a function", with no Bills row. */
+     row's own `{{field}}`s by the pass. So a list in a step's create reaches the same `.replace`. Measured with the
+     flat body below: the write to Jobs went in, the drain ran it, and the run ended `failed`, "rule.late broke at step
+     1: template.replace is not a function", with no Bills row. */
   const on = { written: { register: 'jobs', op: ['create'] } };
   const flat = await refusal({ on, once_per: ['entry'], steps: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent', tags: ['late'] } } }] });
   assert.equal(flat.at, 'steps[0].create.fields.tags');
@@ -126,10 +126,10 @@ test('THE RUN PATH IS HELD TO THE SAME, inside a branch too, because a step acts
 });
 
 test('A TAG OR AN UNTAG WHOSE WORD IS NOT TEXT IS REFUSED AT INSTALL, over a list<enum> and over the list<text> every list takes', async () => {
-  /* `loop/research-batch-thirty-nine-audit.md` finding 10, T1 and T1b. `tagsRefusing` passed over a word that was not a
-     string and nothing else asked, so `tag: 5` installed; the pass added the 5 to the row's tags as it was, `coerce`
-     refused a number in either list, and the rule's whole patch went. Measured by the audit: over `[late]` the Rent went
-     in as `{"what":"Rent"}`, and over `list<text>` with `then: [{ tag: 5 }, { set: note }]` it lost the note too. */
+  /* `tagsRefusing` passed over a word that was not a string and nothing else asked, so `tag: 5` installed; the pass
+     added the 5 to the row's tags as it was, `coerce` refused a number in either list, and the rule's whole patch went.
+     Measured: over `[late]` the Rent went in as `{"what":"Rent"}`, and over `list<text>` with
+     `then: [{ tag: 5 }, { set: note }]` it lost the note too. */
   const enumJobs: Declaration = {
     id: 'register.jobs',
     kind: 'register',
@@ -163,12 +163,12 @@ test('TEXT STILL INSTALLS, templates and all', async () => {
 
 test('A RULE ALREADY INSTALLED WITH A LIST IN ITS CREATE DOES NOT THROW OUT OF THE WRITE', async () => {
   /* THE BODY IS WRITTEN UNDER THE LINT, straight into the declaration row, because a record installed before the lint
-     refused it still holds it. Measured on 23 September: this write throws `TypeError: template.replace is not a
-     function`, and so the Jobs row a person asked for is not written either. */
+     refused it still holds it. Measured: this write throws `TypeError: template.replace is not a function`, and so the
+     Jobs row a person asked for is not written either. */
   const { k, sql } = await open();
-  const out = await k.install([list('jobs'), list('bills'), rule({ ...AUDIT, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent' } } }] })]);
+  const out = await k.install([list('jobs'), list('bills'), rule({ ...LATE, then: [{ create: { register: 'bills', bound: 1, fields: { what: 'Rent' } } }] })]);
   assert.ok(out.ok, fixOf(out));
-  sql.exec("UPDATE declaration SET body = json_set(body, '$.then', json(?)) WHERE id = 'rule.late'", JSON.stringify(AUDIT.then));
+  sql.exec("UPDATE declaration SET body = json_set(body, '$.then', json(?)) WHERE id = 'rule.late'", JSON.stringify(LATE.then));
 
   const wrote = k.create('jobs', { what: 'x' }, { actor: 'p_1' });
   assert.ok(wrote.ok);
@@ -178,9 +178,9 @@ test('A RULE ALREADY INSTALLED WITH A LIST IN ITS CREATE DOES NOT THROW OUT OF T
 });
 
 test('A RULE ALREADY INSTALLED WITH A NUMBER IN A set OR A note DOES NOT THROW OUT OF THE WRITE EITHER', async () => {
-  /* EVERY OTHER SITE REACHES `fill` DIRECTLY, not through `withEach`, and `fill`'s first line was `template.replace`. Measured
-     on 23 September before the guard: this body, written under the lint, threw `template.replace is not a function` out
-     of the Jobs write, the same as the create above. */
+  /* EVERY OTHER SITE REACHES `fill` DIRECTLY, not through `withEach`, and `fill`'s first line was `template.replace`.
+     Measured before the guard: this body, written under the lint, threw `template.replace is not a function` out of the
+     Jobs write, the same as the create above. */
   const { k, sql } = await open();
   const out = await k.install([list('jobs'), list('bills'), rule({ register: 'jobs', once_per: ['entry'], then: [{ set: { field: 'n', to: '1' } }] })]);
   assert.ok(out.ok, fixOf(out));
@@ -206,10 +206,10 @@ const STATED: Declaration = {
 };
 
 test('A move WHOSE WORD IS NOT TEXT IS REFUSED AT INSTALL, naming the states the list has', async () => {
-  /* `loop/research-batch-forty-audit.md` finding 11. `fillSites` did not list `move`, since nothing fills it, and so
-     nothing asked what it held. Measured on 23 September, before this check: `then: [{ move: 5 }, { set: note }]`
-     installed over Jobs, and the Water row was written holding `what` alone, the move and the note both lost, because
-     the pass puts the 5 into the enum as it is and the write refuses the rule's whole patch. */
+  /* `fillSites` did not list `move`, since nothing fills it, and so nothing asked what it held. Measured before this
+     check: `then: [{ move: 5 }, { set: note }]` installed over Jobs, and the Water row was written holding `what`
+     alone, the move and the note both lost, because the pass puts the 5 into the enum as it is and the write refuses
+     the rule's whole patch. */
   const { k } = await open();
   const five = await k.install([STATED, rule({ register: 'jobs', then: [{ move: 5 }, { set: { field: 'note', to: 'seen' } }] })]);
   assert.equal(five.ok, false, 'move: 5 installed');
@@ -242,15 +242,14 @@ test('A move WRITTEN AS TEXT STILL INSTALLS AND MOVES THE ROW, the note beside i
 });
 
 /**
- * `loop/research-batch-forty-audit.md` FINDING 6, THE DRY RUN'S HALF. Wave forty-one's guard in `rules.ts`'s `fill`
- * (`7869be84`) stopped every throw the audit measured, L1's and L4's; L4 is the two stored-rule tests above. Measured on
- * 23 September after it: the kernel's `dryRun` of `note: 5`, `set.to: 5`, `notify.say: true` and `schedule.note: 5`
- * answered `ok`, each previewing its value as words ("note 5", "notify true"), for bodies `install` refuses. A preview
- * that promises what the install then refuses is the preview being wrong about the feature it exists to explain, so the
- * dry run should refuse them in the install's words. `inlineFault` is those words for a body that did not come through
- * `install`.
+ * THE DRY RUN'S HALF. The guard in `rules.ts`'s `fill` (`7869be84`) stopped every throw measured here, the bodies below
+ * and the two stored-rule tests above. Measured after it: the kernel's `dryRun` of `note: 5`, `set.to: 5`,
+ * `notify.say: true` and `schedule.note: 5` answered `ok`, each previewing its value as words ("note 5", "notify
+ * true"), for bodies `install` refuses. A preview that promises what the install then refuses is the preview being
+ * wrong about the feature it exists to explain, so the dry run should refuse them in the install's words. `inlineFault`
+ * is those words for a body that did not come through `install`.
  */
-const L1: [Record<string, unknown>, string][] = [
+const NOT_TEXT: [Record<string, unknown>, string][] = [
   [{ note: 5 }, 'then[0].note'],
   [{ set: { field: 'n', to: 5 } }, 'then[0].set.to'],
   [{ notify: { say: true } }, 'then[0].notify.say'],
@@ -258,9 +257,9 @@ const L1: [Record<string, unknown>, string][] = [
   [{ link: { field: 'what', to: { register: 'bills', by: 'what', value: 5 } } }, 'then[0].link.to.value'],
 ];
 
-test('inlineFault ANSWERS EACH OF L1\'S BODIES WITH THE REFUSAL install GIVES IT, word for word', async () => {
+test('inlineFault ANSWERS EACH OF THE NOT-TEXT BODIES WITH THE REFUSAL install GIVES IT, word for word', async () => {
   const { inlineFault } = await import('../src/flow-lint.ts');
-  for (const [then, at] of L1) {
+  for (const [then, at] of NOT_TEXT) {
     const body = { register: 'jobs', once_per: ['entry'], then: [then] };
     const installed = await refusal(body);
     const linted = inlineFault('rule.late', { rule: 'late', ...body } as never);
@@ -269,21 +268,21 @@ test('inlineFault ANSWERS EACH OF L1\'S BODIES WITH THE REFUSAL install GIVES IT
   }
   assert.equal(inlineFault('rule.late', { rule: 'late', register: 'jobs', then: [{ if: 'what is x', then: [{ note: 'x' }] }] } as never)?.code, 'NOT_IN_THIS_BUILD');
   assert.equal(inlineFault('rule.late', { rule: 'late', register: 'jobs', then: [{ note: 'Made {{id}}' }] } as never), null);
-  /* A RUN'S then: IS A LIST OF STEPS, AND AN if THERE BRANCHES. Checked on 23 September: this body installs, and the
-     first cut of `inlineFault` refused it "does not branch", so a dry run asking it of a run-path body would have
-     refused what install takes. Its value is still held to text, since a step acts through the same pass. */
+  /* A RUN'S then: IS A LIST OF STEPS, AND AN if THERE BRANCHES. Checked: this body installs, and the first cut of
+     `inlineFault` refused it "does not branch", so a dry run asking it of a run-path body would have refused what
+     install takes. Its value is still held to text, since a step acts through the same pass. */
   const run = { rule: 'late', on: { written: { register: 'jobs', op: ['create'] } }, once_per: ['entry'], then: [{ if: 'what is x', then: [{ note: 'seen' }] }] };
   assert.equal(inlineFault('rule.late', run as never), null);
   assert.equal(inlineFault('rule.late', { ...run, then: [{ if: 'what is x', then: [{ note: 5 }] }] } as never)?.at, 'then[0].then[0].note');
 });
 
 test(
-  'THE KERNEL\'S DRY RUN REFUSES L1\'S BODIES IN THE INSTALL\'S WORDS, rather than previewing their values as words',
+  'THE KERNEL\'S DRY RUN REFUSES THE NOT-TEXT BODIES IN THE INSTALL\'S WORDS, rather than previewing their values as words',
   async () => {
     const { k } = await open();
     assert.ok((await k.install([list('jobs'), list('bills')])).ok);
     assert.ok(k.create('jobs', { what: 'x' }, { actor: 'p_1' }).ok);
-    for (const [then, at] of L1) {
+    for (const [then, at] of NOT_TEXT) {
       const out = k.dryRun({ rule: 'late', register: 'jobs', once_per: ['entry'], then: [then] } as never);
       assert.equal(out.ok, false, `previewed ${JSON.stringify(then)}`);
       assert.equal((out as { refusal?: { at?: string } }).refusal?.at, at);

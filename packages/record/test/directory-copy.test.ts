@@ -1,11 +1,11 @@
 /**
  * A copy of the Directory: dumped from one, loaded into an empty one, and what comes back.
  *
- * THE DIRECTORY IS THE ONE THING NOTHING COPIED. `loop/research-restore.md` §6: without it every record survives and
- * nobody can reach one, because no slug, session or passkey leads to `idFromName(rec_id)` any more. So the test is not
- * that rows round-trip but that the loaded Directory answers the questions a person's next visit asks: which record a
- * name means, whether their passkey is theirs, and whether the cookie they had before still opens anything (it must
- * not: a copy that revived sessions would sign back in people who had signed out).
+ * THE DIRECTORY IS THE ONE THING NOTHING COPIED. Without it every record survives and nobody can reach one, because no
+ * slug, session or passkey leads to `idFromName(rec_id)` any more. So the test is not that rows round-trip but that the
+ * loaded Directory answers the questions a person's next visit asks: which record a name means, whether their passkey
+ * is theirs, and whether the cookie they had before still opens anything (it must not: a copy that revived sessions
+ * would sign back in people who had signed out).
  *
  * THE CEREMONIES ARE REAL, signed by the software authenticator in `fixtures/webauthn/`, as `identity.test.ts` does,
  * so "knows the passkey" is a passkey assertion the loaded Directory verifies, not a row that happens to be there.
@@ -54,8 +54,8 @@ const refusalOf = (r: { ok: boolean }): { code: string; fix: string } =>
 const count = (sql: NodeSql, table: string): number => Number(sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`)?.n ?? 0);
 
 /**
- * A Directory with the five things the brief names: a person, a passkey, a slug, a member and a session. Plus a
- * released name, a counted run and a forwarding digest, because each is a carried table a restore must not drop.
+ * A Directory with the five things a restore must bring back: a person, a passkey, a slug, a member and a session. Plus
+ * a released name, a counted run and a forwarding digest, because each is a carried table a restore must not drop.
  */
 async function populated() {
   const { d, sql, clock } = fresh();

@@ -1,11 +1,10 @@
 /**
- * What `loop/finish/shell.md` AUT-2 says a run now does (`loop/finish/contracts.md` §2.2 and §4.1): a `call` step waits
- * and hands its answer back into the run, a question may be put to one member and is held to them, a hole nothing
- * fills is refused at install, a `create` fills a money field, and a body is tried over a sample by the real runner
- * with nothing kept.
+ * What a run now does: a `call` step waits and hands its answer back into the run, a question may be put to one member
+ * and is held to them, a hole nothing fills is refused at install, a `create` fills a money field, and a body is tried
+ * over a sample by the real runner with nothing kept.
  *
- * WRITTEN BEFORE ANYTHING RAN (`loop/DIRECTION.md` §32). Each test names the contract line it holds, so a red here is
- * the contract and the code disagreeing, and the sentence says which.
+ * WRITTEN BEFORE ANYTHING RAN. Each test names the contract line it holds, so a red here is the contract and the code
+ * disagreeing, and the sentence says which.
  */
 
 import { test } from 'node:test';

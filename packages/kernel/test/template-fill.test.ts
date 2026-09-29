@@ -1,7 +1,6 @@
 /**
  * A template's pages, filled from rows whose names hold the grammar's own marks, a capture that presets a link, and the
- * order a template's pages come in (`loop/research-dynamic-layouts.md` section 7, measured while building
- * `packs/launch-desk`).
+ * order a template's pages come in (measured while building `packs/launch-desk`).
  *
  * A NAME IS ONE VALUE, WHATEVER IT HOLDS. `fill` wrote a row's name into a block's `where` as it stood, so a part called
  * `Wax, wick and scent` made `part is Wax, wick and scent` two clauses, and every block filtered by the part on its page

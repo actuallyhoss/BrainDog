@@ -1,10 +1,9 @@
 /**
  * A retire leaves a `declare` line naming who took the declaration off, as a change does.
  *
- * MEASURED IN `loop/research-batch-thirty-two-audit.md` §8. `declared()` was called only from `install`, and `retire`
- * wrote nothing: `setDeclaration` wrote `Added name.` by `p_1`, `retireDeclaration` then retired Projects, and the
- * `declare` lines were unchanged, one row. "Who took Projects off" had no answer, which is blocker 5 of
- * `loop/research-shell-schema.md` the other way round.
+ * MEASURED BEFORE THIS FILE. `declared()` was called only from `install`, and `retire` wrote nothing: `setDeclaration`
+ * wrote `Added name.` by `p_1`, `retireDeclaration` then retired Projects, and the `declare` lines were unchanged, one
+ * row. "Who took Projects off" had no answer.
  */
 
 import { test } from 'node:test';

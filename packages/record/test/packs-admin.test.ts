@@ -1,5 +1,5 @@
 /**
- * Turning a pack off and on from the app: the ADMIN half of `loop/research-modular.md` §4 step 6.
+ * Turning a pack off and on from the app: the ADMIN half.
  *
  * The kernel's own test holds the mechanism. What is held here is the door: only an owner in a
  * browser turns a pack, an argument the call does not take is refused, a refusal names what to do,

@@ -2,15 +2,15 @@
  * OAuth's store: the apps that may ask, the sign-ins waiting for a person, and the one-time codes that finish them.
  *
  * ON THE DIRECTORY'S SQL, BECAUSE NONE OF IT IS A RECORD'S. A client, a waiting request and a code exist before the
- * person has said which record they are for, so they cannot live inside one (`loop/finish/agents.md` C4). The Cloud
- * runs this over the Directory object's storage and a self-host over its `directory.sqlite`, through the one `Sql` port.
+ * person has said which record they are for, so they cannot live inside one. The Cloud runs this over the Directory
+ * object's storage and a self-host over its `directory.sqlite`, through the one `Sql` port.
  *
  * ITS OWN TABLES, MADE ON FIRST USE, AND `directory.ts` NEVER NAMES THEM. They are not in `SCHEMA`, `CARRIED` or
- * `LEFT_OUT` (`loop/finish/contracts.md` §1.3): `load()` counts the rows of every listed table, which would throw on a
- * table a Directory that never saw an OAuth client has not made. A Directory restored from a copy therefore comes back
- * without them, and that loses nothing a person holds: a client registers again (RFC 7591), and a request or a code
- * lives for minutes. No CHECK constraint either, because a closed list written into SQL is one the `closed-lists`
- * gate reads, and every value here is checked in `packages/host/src/oauth.ts` before it is written.
+ * `LEFT_OUT`: `load()` counts the rows of every listed table, which would throw on a table a Directory that never saw
+ * an OAuth client has not made. A Directory restored from a copy therefore comes back without them, and that loses
+ * nothing a person holds: a client registers again (RFC 7591), and a request or a code lives for minutes. No CHECK
+ * constraint either, because a closed list written into SQL is one the `closed-lists` gate reads, and every value here
+ * is checked in `packages/host/src/oauth.ts` before it is written.
  *
  * NO COLUMN HOLDS A PERSON'S WORDS. A client's name and redirect addresses are the app's; a request holds the app's
  * PKCE challenge and its `state`; a code holds the record's id and a bearer sealed under the code itself, so this table
@@ -58,7 +58,7 @@ export type OAuthAnswers = {
 export type OAuthAnswer = OAuthAnswers[OAuthCall['op']];
 
 /**
- * The ceilings on what a stranger can make this store hold, each a named number (`loop/finish/rules.md` §6 COST).
+ * The ceilings on what a stranger can make this store hold, each a named number.
  *
  * CLIENTS ARE KEPT, REQUESTS AND CODES ARE NOT. A registered client is what an app reconnects with after its token
  * ends, so it is never pruned, and registration is counted per address (`COUNTED_MOST`) as the other bound. A request
@@ -70,9 +70,9 @@ const REQUESTS_MOST = 10_000;
 const CODES_MOST = 10_000;
 
 /**
- * What one address may ask of `/oauth/register` or `/oauth/authorize` in a window, as device starts are counted
- * (`loop/finish/agents.md` C4), and then a wait until the window that began with the first one ends. Each door counts
- * under its own key, so connecting one app, which registers and then authorizes, spends one of each.
+ * What one address may ask of `/oauth/register` or `/oauth/authorize` in a window, as device starts are counted, and
+ * then a wait until the window that began with the first one ends. Each door counts under its own key, so connecting
+ * one app, which registers and then authorizes, spends one of each.
  */
 const COUNTED_MOST = 10;
 const COUNTED_WINDOW = 15 * 60_000;

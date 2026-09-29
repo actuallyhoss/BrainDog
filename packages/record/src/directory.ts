@@ -76,10 +76,10 @@ const RESERVED = new Set([
   /* And the words a name would read as the platform's rather than somebody's. */
   'admin', 'app', 'assets', 'static', 'www', 'new',
   /* AND EVERY TOP-LEVEL WORD THE APP ROUTES, because the app now lives at `brain.dog/app/<slug>/…` and the first
-     segment after `/app/` is a page or a record's name by this set alone (`loop/research-one-domain.md` §2.4). A
-     record called `settings` would make `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue`
-     are the static folders served under `/app` beside the pages. `test/directory.test.ts` reads the app's route and
-     static folders and fails for any this set does not hold, so a route added later cannot fall behind it. */
+     segment after `/app/` is a page or a record's name by this set alone. A record called `settings` would make
+     `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue` are the static folders served under
+     `/app` beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
+     set does not hold, so a route added later cannot fall behind it. */
   'audit', 'automations', 'catalogue', 'connect', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
   'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
 ]);
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS dir_fail (
 );
 
 -- USAGE. What each record's scheduled actions used, by UTC day, scope and action: the account's ledger,
--- kept here and not in the record, because billing concerns the account (loop/DIRECTION.md 0b). A month is
+-- kept here and not in the record, because billing concerns the account. A month is
 -- the sum of its days, and an account is the sum of the records it owns. The host counts, from each run's
 -- pull event, starting from the first run.
 CREATE TABLE IF NOT EXISTS dir_usage_day (
@@ -261,7 +261,7 @@ CREATE INDEX IF NOT EXISTS dir_usage_run_at ON dir_usage_run(record, at);
 -- The record keeps every ask in its own slash_call, and that is where its ceiling is held; this is the account's copy,
 -- which the host hands across whole days at a time (meterSlash below), so a day's row is a total and not a sum of calls.
 -- A TABLE AND NOT A COLUMN ON dir_usage_day, for the reason dir_inbound gives below: a column is a TO_5, and a TO_5
--- makes a Worker rollback an outage (loop/finish/contracts.md X4). Created on the next open, DIRECTORY_VERSION unmoved.
+-- makes a Worker rollback an outage. Created on the next open, DIRECTORY_VERSION unmoved.
 CREATE TABLE IF NOT EXISTS dir_usage_slash (
   record  TEXT NOT NULL,
   day     TEXT NOT NULL,                    -- 'YYYY-MM-DD', UTC
@@ -301,7 +301,7 @@ CREATE INDEX IF NOT EXISTS dir_inbound_record ON dir_inbound(record);
 -- NEW TABLES AND NOT ONE NEW COLUMN, for the reason dir_inbound gives above: a table that does not exist is
 -- what CREATE TABLE IF NOT EXISTS is for, so every Directory at version 4 gains them on its next open and
 -- DIRECTORY_VERSION does not move. A bump would make an older Worker refuse the Directory, and the Directory is one
--- object for every record, so rolling a Worker back would be an outage for everybody (loop/finish/ops.md 4.0 Rule 0).
+-- object for every record, so rolling a Worker back would be an outage for everybody.
 --
 -- NO CHECK ON ANY OF THEM, for the same reason: a CHECK is a list an older build cannot widen. purpose and state
 -- are checked in code, in billing() below and in the sign-up flows that write dir_pending.
@@ -354,10 +354,10 @@ export type Membership = { record: string; slug: string | null; closed: boolean 
  *
  * `level: null` ON ITS OWN MEANT TWO THINGS, and the switcher could tell neither from the other. A person the record
  * has removed answers `null`, and so does a person invited to one list, because `kernel.access` gives somebody with
- * only register rows no record-wide level. `research-invite-landing.md` probe3 measured what that cost: a colleague
- * who owned `books-co` and accepted one list on `the-studio` was shown `[books-co]` and nothing else, so the record
- * that had just admitted them was unreachable from every screen. `lists` is the second answer: absent or empty is
- * "not on this record", and a non-empty list with a `null` level is "on it, with these lists only".
+ * only register rows no record-wide level. What that cost, measured: a colleague who owned `books-co` and accepted one
+ * list on `the-studio` was shown `[books-co]` and nothing else, so the record that had just admitted them was
+ * unreachable from every screen. `lists` is the second answer: absent or empty is "not on this record", and a non-empty
+ * list with a `null` level is "on it, with these lists only".
  */
 export type SwitcherAsk = { level: string | null; name: string | null; lists?: readonly string[] | null };
 /**
@@ -398,8 +398,7 @@ export type Directory = ReturnType<typeof createDirectory>;
 
 /**
  * The plans a record can be on. `hosted` is Cloud, the record at $12 a month; `plus` is Cloud Plus, at $29 a month with
- * a larger allowance (`loop/DIRECTION.md` §33, `HOSTED_PLANS` in `apps/worker/src/billing.ts`); `selfhost` is counted
- * and never limited.
+ * a larger allowance (`HOSTED_PLANS` in `apps/worker/src/billing.ts`); `selfhost` is counted and never limited.
  */
 export const PLANS = ['hosted', 'plus', 'selfhost'] as const;
 export type Plan = (typeof PLANS)[number];
@@ -410,9 +409,8 @@ export type Allowance = { runs: number; requests: number; bytes: number; ms: num
 /**
  * What each plan allows a record's scheduled actions in a calendar month, UTC.
  *
- * THE OWNER'S DEFAULTS until he says otherwise (`loop/research-scheduled-actions.md` §4.4 and its first
- * question): twenty hourly actions are 14,600 runs, so 15,000 is the hosted record's allowance. `null` is
- * no limit.
+ * THE OWNER'S DEFAULTS until he says otherwise: twenty hourly actions are 14,600 runs, so 15,000 is the hosted record's
+ * allowance. `null` is no limit.
  */
 export const ALLOWANCE: Record<Plan, Allowance | null> = {
   hosted: { runs: 15_000, requests: 150_000, bytes: 1_000_000_000, ms: 50 * 3_600_000 },
@@ -440,7 +438,7 @@ export type RecordUsage = {
   counted: ({ action: string } & UsageTotals)[];
   /**
    * Slash's asks over the range and the neurons they spent, by day (`dir_usage_slash`): counted, and in none of the
-   * totals above, because the record's own `ask_cap` holds them and the allowance never does (`loop/finish/contracts.md` X41).
+   * totals above, because the record's own `ask_cap` holds them and the allowance never does.
    */
   slash: { asks: number; neurons: number; days: SlashDay[] };
 };
@@ -482,7 +480,7 @@ export const SLASH_DAYS = 40;
  *
  * COUNTED SO THE ACCOUNT CAN SEE THEM, NEVER LIMITED, because neither is work the record chose to run: one is a notice
  * it owes somebody and the other is a message somebody sent it. A scheduled action's run is named by its ingest and an
- * automation's by `rule:<id>`, and both count against the allowance (`loop/finish/decisions.md` C34).
+ * automation's by `rule:<id>`, and both count against the allowance.
  */
 export const COUNTED_ONLY = ['deliver:', 'in:'] as const;
 
@@ -504,8 +502,8 @@ const LIMITED = `NOT (${COUNTED}) AND action NOT LIKE '${NOTICE}%'`;
 /**
  * How far into an allowance the owner is told it is running out: the share of any one of the four meters.
  *
- * ONE NOTE AT THIS SHARE AND ONE WHEN FIRST HELD, a month (`loop/finish/shell.md` MTR-2), so an owner hears before the
- * record stops and hears again when it has, and never once a run.
+ * ONE NOTE AT THIS SHARE AND ONE WHEN FIRST HELD, a month, so an owner hears before the record stops and hears again
+ * when it has, and never once a run.
  */
 export const NOTICE_AT = 0.8;
 
@@ -638,7 +636,6 @@ const TO_4 = ["ALTER TABLE dir_record ADD COLUMN plan TEXT NOT NULL DEFAULT 'hos
 
 /**
  * The tables a copy of the Directory carries, in the order `dump` writes them and `load` reads them back.
- * `loop/research-restore.md` §6.
  *
  * EVERYTHING THAT SAYS WHO SOMEBODY IS AND WHERE A NAME LEADS. Without these every record survives a lost Directory
  * and nobody can reach one: `idFromName(rec_id)` still opens the object, and no slug, session or passkey leads there.
@@ -734,7 +731,7 @@ const attempt = <T>(fn: () => T): T | null => {
  * The states a paid record can be in, checked here because `dir_billing` carries no CHECK (see `SCHEMA`).
  *
  * A RECORD WITH NO ROW IS IN NONE OF THEM, and that is not a fourth state written down: it is not billed and never
- * lapses (`loop/finish/ops.md` 4.0 Rule 1). Every record the operator provisioned is one.
+ * lapses. Every record the operator provisioned is one.
  */
 const BILLING_STATES = ['active', 'past_due', 'lapsed'] as const;
 export type BillingState = (typeof BILLING_STATES)[number];
@@ -791,7 +788,7 @@ export type BillingSet = {
  */
 export type BillingDue = { record: string; person: string; email: string | null; slug: string | null; lapsed_at: number; told: string };
 
-/** One question of the Directory's billing group (`loop/finish/ops.md` 4.0 B). */
+/** One question of the Directory's billing group. */
 export type BillingCall =
   | { op: 'of'; record: string }
   | { op: 'for'; person: string }
@@ -826,7 +823,7 @@ const numberOrNull = (v: unknown): number | null => (v === null || v === undefin
 const toldWith = (told: string, day: LadderDay): string =>
   [...new Set([...told.split(',').filter((d) => d !== '').map(Number), day])].sort((a, b) => a - b).join(',');
 
-/* ── a person's own name and sign-in address (GAP-7) ─────────────────────────── */
+/* ── a person's own name and sign-in address ─────────────────────────────────── */
 
 /** The longest name a person may give themselves, in code points: the kernel's `PERSON_NAME_MOST`, bounded here too. */
 const PERSON_NAME_MOST = 80;
@@ -969,8 +966,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
    * cap a lapsed record read the flag from there. Absent means not lapsed, which is what every other record answers.
    */
   const signIn = createAuth(sql, clock, auth);
-  /* THE KEY A NEW SIGN-IN ADDRESS'S LINK IS MACED UNDER (GAP-7), imported now and not when a link is minted, because
-     the host may zero its copy of the key once the Directory is built, as `createAuth` above allows. */
+  /* THE KEY A NEW SIGN-IN ADDRESS'S LINK IS MACED UNDER, imported now and not when a link is minted, because the host
+     may zero its copy of the key once the Directory is built, as `createAuth` above allows. */
   const emailKey = auth ? crypto.subtle.importKey('raw', new Uint8Array(auth.mac), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']) : null;
   const signInMarked = (async (call: AuthCall | SessionAsk | AccountCall): Promise<AuthResult> => {
     /* CLOSING AND SUSPENDING ARE THE ACCOUNT'S AND NOT SIGN-IN'S, so the pair beside `billing` answers them. They ride
@@ -1071,8 +1068,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     });
 
   /**
-   * The billing group's one entry, as the doors and the night call it (`loop/finish/ops.md` 4.0 B). Not generic, so
-   * each `op` narrows the call; `billing` below gives the caller the answer its `op` asked for.
+   * The billing group's one entry, as the doors and the night call it. Not generic, so each `op` narrows the call;
+   * `billing` below gives the caller the answer its `op` asked for.
    */
   const billingAnswer = (call: BillingCall): BillingAnswer => {
     switch (call.op) {
@@ -1157,7 +1154,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     }
   };
 
-  /* ── closing and suspending an account (OPS-21) ── */
+  /* ── closing and suspending an account ── */
 
   /**
    * An account closed: the person's ways in, their memberships and their row, in one transaction.
@@ -1357,7 +1354,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         return ok(sql.one<Person>('SELECT id, email, name, created_at FROM dir_person WHERE id = ?', id)!);
       }),
 
-    /* ── a person changes their own name and sign-in address (GAP-7, `loop/finish/contracts.md` §12.1) ── */
+    /* ── a person changes their own name and sign-in address ── */
 
     /**
      * A person's own name, moved here after their record has accepted it (`renamePerson`), so the next record they
@@ -2156,8 +2153,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     },
 
     /**
-     * Who pays for which record, and whether it has lapsed: one group, in the shape `auth(call)` has, so the
-     * Worker's `Directory$` carries it as one RPC (`loop/finish/ops.md` 4.0 B).
+     * Who pays for which record, and whether it has lapsed: one group, in the shape `auth(call)` has, so the Worker's
+     * `Directory$` carries it as one RPC.
      *
      * ONLY A VERIFIED STRIPE EVENT MOVES A RECORD INTO OR OUT OF A LAPSE. `set` and `seen` are called by the Worker's
      * webhook and `told` by its night, and none by anything a person can reach; a self-host opens these tables with the rest of `SCHEMA` and never

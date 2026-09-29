@@ -1,13 +1,13 @@
 /**
  * The switcher, for a colleague invited to one list on somebody else's record who also owns a record of their own.
  *
- * `research-invite-landing.md` finding 2, `probe3`. The colleague owns `books-co`, accepts an invitation to the
- * Expenses list on `the-studio`, and the Cloud's switcher then listed `books-co` and nothing else: `kernel.access`
- * answers `level: null` for somebody holding lists and no record-wide row, and `switcherRows` read that null as "not on
- * this record". So a person the record had just admitted had no row to press, and `Open BrainDog` opened their own.
+ * MEASURED: the colleague owns `books-co`, accepts an invitation to the Expenses list on `the-studio`, and the Cloud's
+ * switcher then listed `books-co` and nothing else: `kernel.access` answers `level: null` for somebody holding lists
+ * and no record-wide row, and `switcherRows` read that null as "not on this record". So a person the record had just
+ * admitted had no row to press, and `Open BrainDog` opened their own.
  *
- * NOTHING HERE IS A STUBBED LEVEL. The probe handed `switcherRows` an `ask` that answered `{ level: null }` by hand;
- * this builds the real record, mints the real invitation, spends it the way `/auth/invite` does (the record's
+ * NOTHING HERE IS A STUBBED LEVEL. The first measure handed `switcherRows` an `ask` that answered `{ level: null }` by
+ * hand; this builds the real record, mints the real invitation, spends it the way `/auth/invite` does (the record's
  * `acceptInvite`, then the Directory's `join`), and asks the record through `switcherAsk`, which is the function
  * `Record$.switcherRow` on the Worker and the self-host's `records` callback both call.
  */

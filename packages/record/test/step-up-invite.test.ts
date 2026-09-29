@@ -1,6 +1,6 @@
 /**
- * Inviting somebody and minting a token ask a session for a proof in the last fifteen minutes, as deleting the
- * record does. `loop/finish/ops.md` OPS-7, `loop/finish/contracts.md` §2.7.
+ * Inviting somebody and minting a token ask a session for a proof in the last fifteen minutes, as deleting the record
+ * does.
  *
  * ONLY A SESSION IS ASKED. `provedAt` is set by a host from a session row and nowhere else, so its absence is a caller
  * with no session at all (a self-host's server key, open mode), which both methods answer as before.

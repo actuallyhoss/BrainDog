@@ -1,5 +1,5 @@
 /**
- * `rewrapKeys` and `wrappedKeys` (`api/keys.ts`, `loop/finish/contracts.md` §2.6): a root key rotation, walked through
+ * `rewrapKeys` and `wrappedKeys` (`api/keys.ts`): a root key rotation, walked through
  * the record the way a host walks it (`53 §5.6`).
  *
  * THE HOST'S HALF IS WRITTEN OUT HERE, OVER WEBCRYPTO, because the kernel never holds a key and a kernel test cannot

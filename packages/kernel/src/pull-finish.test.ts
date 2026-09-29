@@ -1,5 +1,5 @@
 /**
- * `finishPull`: a paged connector's run, finished by its ack (`pull.ts`, `outbox.ts`; `loop/finish/contracts.md` §2.1).
+ * `finishPull`: a paged connector's run, finished by its ack (`pull.ts`, `outbox.ts`).
  *
  * THE HALF THAT WAS NEVER BUILT. `@braindog/connect` hands back a cursor, a next due instant, a pause and a rotated
  * key on every ack, and the ack marked the job finished and dropped all four, so a windowed connector fetched its first

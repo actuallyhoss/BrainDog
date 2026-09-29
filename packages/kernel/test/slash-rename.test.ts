@@ -1,12 +1,12 @@
 /**
- * Spark is called Slash now (`loop/DIRECTION.md` section 31), and a record written before the rename still holds the
- * old name in eight places (`loop/research-slash-rename.md` section 2.1): the actor on a model's events, `opened_by` on
- * its suggestions, its person's prefs and their two keys, the vault label of the included model's key, a parked run's
- * step kind, inside two kinds of declaration body, and inside an open change's `to` holding either kind of body.
+ * Spark is called Slash now, and a record written before the rename still holds the old name in eight places: the actor
+ * on a model's events, `opened_by` on its suggestions, its person's prefs and their two keys, the vault label of the
+ * included model's key, a parked run's step kind, inside two kinds of declaration body, and inside an open change's
+ * `to` holding either kind of body.
  *
  * WHAT WAS MEASURED BEFORE THE MIGRATION. Every one of those values opened unchanged under the renamed build, and each
- * is read by the new name: the daily look's switch and its last day read as unset, the audit no longer called the old
- * actor an agent, the included model's key did not open, a parked `ask_spark` step was never resumed, and a rule
+ * is read by the new name: the daily look's switch and its last day read as unset, the audit log no longer called the
+ * old actor an agent, the included model's key did not open, a parked `ask_spark` step was never resumed, and a rule
  * holding one failed its own lint. The two bodies are the ones SQL cannot fix: a declaration's checksum is SHA-256 of
  * its JCS body, so rewriting the body in a migration's text would leave a checksum that no longer verifies.
  *

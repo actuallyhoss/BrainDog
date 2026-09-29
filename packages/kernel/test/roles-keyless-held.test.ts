@@ -1,13 +1,13 @@
 /**
- * A keyless `fx` or `people` the record ALREADY holds beside a list declaring the role, from before wave forty-eight's
- * guard (`keylessBeside`), is told what an installed list can do when its own update is refused.
+ * A keyless `fx` or `people` the record ALREADY holds beside a list declaring the role, from before the guard
+ * (`keylessBeside`), is told what an installed list can do when its own update is refused.
  *
  * THE GUARD'S SENTENCE IS FOR A LIST ARRIVING. "Install fx under another id" is right for a keyless `fx` somebody is
- * about to add, and it was the sentence the roles checker measured on the record that had one already: `rates`
- * declaring `rates:`, an `fx` of money-core's shape beside it put there before the guard, and the next update of `fx`
- * refused with a fix an installed list cannot follow, since a declaration's id is what it is and nothing renames one.
- * The arriving case keeps its sentence (`roles-keyless-second.test.ts`). The record here is made the way it was made
- * then, by writing the `fx` row under the guard rather than through it, since no install path lets it in now.
+ * about to add, and it was the sentence measured on the record that had one already: `rates` declaring `rates:`, an
+ * `fx` of money-core's shape beside it put there before the guard, and the next update of `fx` refused with a fix an
+ * installed list cannot follow, since a declaration's id is what it is and nothing renames one. The arriving case keeps
+ * its sentence (`roles-keyless-second.test.ts`). The record here is made the way it was made then, by writing the `fx`
+ * row under the guard rather than through it, since no install path lets it in now.
  */
 
 import { test } from 'node:test';

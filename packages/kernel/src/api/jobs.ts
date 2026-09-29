@@ -1,5 +1,5 @@
 /**
- * `jobs`: the kernel's half of the job queue, as one member of the kernel (`loop/finish/agents.md` C13).
+ * `jobs`: the kernel's half of the job queue, as one member of the kernel.
  *
  * THE LOGIC IS `../jobs.ts` AND THIS IS ITS SEAM. Every function there takes `TokenDeps`, because a claim mints the job's
  * bearer and an end revokes it through `token.ts`; this builds that from the record's own parts, the way `index.ts`

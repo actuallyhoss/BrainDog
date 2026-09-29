@@ -1,12 +1,13 @@
 /**
- * A launch desk described to Slash, drafted, refused, repaired and drawn before anybody is asked
- * (`loop/finish/pages.md` PGS-23 and C3, `loop/DIRECTION.md` §28's measure of done: the desk rebuilt by describing it).
+ * A launch desk described to Slash, drafted, refused, repaired and drawn before anybody is asked (the measure of done:
+ * the desk rebuilt by describing it).
  *
- * THE DESK IN `packs/launch-desk` WAS WRITTEN BY AN AGENT AS JSON AND FED BACK (`packages/mcp/test/compose-page.test.ts`),
- * so "by describing it" was never measured. Here the model is a stub whose answers are fixed, because what is measured is
- * the record's half: what it sends the model, which of the model's faults it catches before the owner sees anything, how
- * it hands them back, and what it files once the repair draws clean. Whether a real model writes this desk from a
- * sentence is the owner's own acceptance, a desk described to Slash on brain.dog (`pages.md` §5, item 3).
+ * THE DESK IN `packs/launch-desk` WAS WRITTEN BY AN AGENT AS JSON AND FED BACK
+ * (`packages/mcp/test/compose-page.test.ts`), so "by describing it" was never measured. Here the model is a stub whose
+ * answers are fixed, because what is measured is the record's half: what it sends the model, which of the model's
+ * faults it catches before the owner sees anything, how it hands them back, and what it files once the repair draws
+ * clean. Whether a real model writes this desk from a sentence is the owner's own acceptance, a desk described to Slash
+ * on brain.dog.
  *
  * THE FIRST ANSWER CARRIES TWO FAULTS A MODEL MAKES: a card's colour named by a field the list does not have (`colour`
  * where the parts carry `hue`), and a path filtered by a field no step has (`stage`). Both are refused on the blocks
@@ -14,10 +15,10 @@
  *
  * THE COST IS DESCRIBED TOO, AS A SCRIPT ON A CLOCK. The pack adds a price check's costs with a script a rule starts on
  * each write (`packs/launch-desk/cost.js`), and a description may not build that: from a description Slash builds a
- * script that runs only on its clock (`describedScript` in `packages/record/src/slash.ts`), since a rule handing rows to
- * code is the shape the audit's finding 14 filed. So the described desk carries the same source under `runs.every`, and
- * its costs are added on that clock rather than the moment one is typed. The last case holds the rule-started form to
- * being dropped with the record's own sentence.
+ * script that runs only on its clock (`describedScript` in `packages/record/src/slash.ts`), since a rule handing rows
+ * to code is the shape an abused model's answer once filed. So the described desk carries the same source under
+ * `runs.every`, and its costs are added on that clock rather than the moment one is typed. The last case holds the
+ * rule-started form to being dropped with the record's own sentence.
  *
  * Every row here is invented, for a small product launch in parts. Nothing names a person, a label or a place.
  */

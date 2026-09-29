@@ -8,10 +8,10 @@
  * reads a kind of its own. A kind that is not here is read exactly as it was, by the code in `pages.ts`, so nothing
  * that already draws moved when this file arrived.
  *
- * ADDING A KIND is three files and three lines, one in each registry: this table and `kinds/<kind>.ts` beside it;
- * the web's `apps/web/src/lib/page/kinds/index.ts` and its `<kind>.ts`; and the renderer's row in
- * `packages/render/src/kinds.ts` `TABLE`, which is the renderer owner's to write. Every sentence that counts the
- * kinds is the integrator's, once per workflow, so no kind unit writes a number.
+ * ADDING A KIND is three files and three lines, one in each registry: this table and `kinds/<kind>.ts` beside it; the
+ * web's `apps/web/src/lib/page/kinds/index.ts` and its `<kind>.ts`; and the renderer's row in
+ * `packages/render/src/kinds.ts` `TABLE`, which is the renderer's to write. No kind file writes a count of the kinds,
+ * so adding one never edits a sentence elsewhere.
  *
  * NOT NAMED `KINDS`, because the kernel already exports `KINDS` for the kinds of declaration (`declare.ts`).
  *

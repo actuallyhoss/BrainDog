@@ -1,8 +1,8 @@
 /**
- * A proposal's step says what a pack lays on another pack's list and which values an update takes off stay, so Decide can
- * say both (`loop/research-held-landing.md`, brief E of wave forty-eight).
+ * A proposal's step says what a pack lays on another pack's list and which values an update takes off stay, so Decide
+ * can say both.
  *
- * THE STEP CARRIED `adds`, `changes`, `retires`, `keeps` AND `examples`, and neither of these. Measured on HEAD with the
+ * THE STEP CARRIED `adds`, `changes`, `retires`, `keeps` AND `examples`, and neither of these. Measured with the
  * seed catalogue before this landed: Personal set up on a fresh record filed its step as
  * `["pack","version","adds","examples"]`, so the five roles it lays on People (family, friend, landlord, tradesperson and
  * adviser) reached Decide as nothing at all. A People update that sheds `registrar` from a Personal record holding a
@@ -51,9 +51,9 @@ async function recordOf() {
                second record of this file was set up with a People that had no `registrar` to create Ada under. */
             const given = e.doc(o);
             if (given === null) return given;
-            /* AND BEFORE `shed()` IT HOLDS `registrar` AGAIN, as People did until 2.0.0 took it out of the shipped document
-               (M3 B9, `814ca32c`): the record this file measures is one made while the value was offered, so Ada's create
-               was `ENUM_VALUE_UNKNOWN` once the shipped People lost it (CI 35938679271). */
+            /* AND BEFORE `shed()` IT HOLDS `registrar` AGAIN, as People did until 2.0.0 took it out of the shipped
+               document: the record this file measures is one made while the value was offered, so Ada's create was
+               `ENUM_VALUE_UNKNOWN` once the shipped People lost it (CI 35938679271). */
             const doc = structuredClone(given);
             for (const d of doc.declarations as Decl[])
               for (const f of d.register === 'people' ? (d.fields ?? []) : [])

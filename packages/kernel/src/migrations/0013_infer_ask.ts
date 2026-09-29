@@ -1,10 +1,9 @@
 /**
  * The kernel schema, migration 13: `infer.ask`, an automation's question to Slash, on the outbox's `CHECK`.
  *
- * `loop/research-shell-automations.md` section 4.3, Brief C. A run that reaches `ask_slash` queues one `infer.ask` row,
- * `{ run, step, question, shape, choices?, about? }`, and the ack's `result.text` is the answer (`flow.ts`,
- * `outbox.ts`). Without this the insert failed on SQLite's own CHECK text, which listed every outbox kind to the owner
- * as the reason the run stopped.
+ * A run that reaches `ask_slash` queues one `infer.ask` row, `{ run, step, question, shape, choices?, about? }`, and
+ * the ack's `result.text` is the answer (`flow.ts`, `outbox.ts`). Without this the insert failed on SQLite's own CHECK
+ * text, which listed every outbox kind to the owner as the reason the run stopped.
  *
  * ONE REBUILD, THE OUTBOX'S, the way `0012` rebuilt it for `script.run`: every row copied across unchanged and its one
  * index made again. Section 4.5 also planned `flow` on the `schedule` CHECK, and a run's wake is still a `rule` row told

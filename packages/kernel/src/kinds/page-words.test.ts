@@ -1,7 +1,6 @@
 /**
- * The page words the kernel learned for the app to draw (`loop/finish/pages.md` PGS-3): the `calendar`, `link`,
- * `gallery` and `embed` kinds, a state's count in a `{{path}}`, a column's label read as a heading is, and a roadmap
- * over a list that names no columns.
+ * The page words the kernel learned for the app to draw: the `calendar`, `link`, `gallery` and `embed` kinds, a state's
+ * count in a `{{path}}`, a column's label read as a heading is, and a roadmap over a list that names no columns.
  *
  * THE FOUR KINDS ARE REGISTERED HERE BEFORE THE KERNEL LOADS, where the registry does not hold them already, because
  * `declare.ts` and `block-keys.ts` build their lists from the registry when they load (`kinds/index.ts`). So only the

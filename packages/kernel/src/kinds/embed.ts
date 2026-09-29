@@ -5,14 +5,14 @@
  * there are none. The shape is `16:9` (the default), `4:3`, `1:1` or `9:16`. An embed reads no list, so it takes no
  * `source:`.
  *
- * ONLY THE PLAYERS IN `EMBED_PROVIDERS`, refused at install with each of them named. A page is drawn inside the app,
- * so an address from anywhere else would be a frame of somebody's choosing on a record's own screen. The host draws a
+ * ONLY THE PLAYERS IN `EMBED_PROVIDERS`, refused at install with each of them named. A page is drawn inside the app, so
+ * an address from anywhere else would be a frame of somebody's choosing on a record's own screen. The host draws a
  * named player as a facade first and loads it only when it is pressed, and a Worker policy that names what may be
- * framed names exactly these players' origins (`loop/finish/pages.md` C4 and C10).
+ * framed names exactly these players' origins.
  *
  * A COPY OF `EMBED_PROVIDERS` IN `packages/render/src/embed.ts`, which also rewrites each address into the player's
- * own, and nothing checks the two agree at build (`loop/finish/contracts.md` §5.2). The kernel does not import the
- * renderer, for the reason `declare.ts` gives of `BLOCK_KINDS`, so a player added is added in both.
+ * own, and nothing checks the two agree at build. The kernel does not import the renderer, for the reason `declare.ts`
+ * gives of `BLOCK_KINDS`, so a player added is added in both.
  *
  * A LEAF: nothing of the kernel is imported at run time, for the reason `kinds/listed.ts` gives.
  */

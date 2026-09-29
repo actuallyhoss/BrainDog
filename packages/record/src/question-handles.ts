@@ -2,11 +2,10 @@
  * The name a question or a decision goes out under to somebody who does not read every list, in place of its number.
  *
  * THE NUMBER COUNTED WHAT SHE WAS NOT SHOWN. `SG<n>` and `D<n>` come from one counter each over the whole record
- * (`allocate` in the kernel), so `loop/research-hidden-questions.md` measured a member invited to Obligations reading
- * `SG1` then `SG6` and `D1` then `D4` with four Diary questions and two Diary decisions between them, and an `append`
- * member's own `propose` answering `SG7`, the six questions filed before hers on every list, from one call. Numbering
- * per list is not the way out: the number is the primary key of `suggestion` and `decision`, so two lists cannot both
- * hold an `SG3`.
+ * (`allocate` in the kernel), so a member invited to Obligations was measured reading `SG1` then `SG6` and `D1` then
+ * `D4` with four Diary questions and two Diary decisions between them, and an `append` member's own `propose` answering
+ * `SG7`, the six questions filed before hers on every list, from one call. Numbering per list is not the way out: the
+ * number is the primary key of `suggestion` and `decision`, so two lists cannot both hold an `SG3`.
  *
  * `q.<id>` IS THE ID OF THE QUESTION'S FIRST `suggest` EVENT, and `d.<id>` the id of the decision's `decide` event: a
  * line she is already shown, so the handle says nothing the line did not. Every path that allocates an `SG` writes that

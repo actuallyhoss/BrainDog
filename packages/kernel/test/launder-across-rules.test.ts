@@ -1,23 +1,23 @@
 /**
- * A secret copied into a field every reader of the list sees, refused where it is written: audit fifty-one §3.
+ * A secret copied into a field every reader of the list sees, refused where it is written.
  *
- * WHAT THE AUDIT MEASURED. The lint followed a secret into the row within one rule's steps and no further: it held a
- * set of what each step list wrote from `pin`, and refused a question or a call later in THE SAME list that read one
- * of those fields. A record has more than one rule. `rule.write` (on create, `set: { field: note, to: '{{pin}}' }`)
- * and `rule.ask` (on an ordinary edit of `what`, `ask_slash: 'Rate for {{note}}?', about: [note]`) each installed
- * clean, since neither body says both, and the edit queued `Rate for hunter2?` with `about: { note: 'hunter2' }`. The
- * runner's `-unsent` is one run's too, so it held nothing back. And `set: { field: '{{vars.f}}', to: '{{pin}}' }`
- * with `f` set to `note` passed the lint and the runner alike, because both read the field as written, braces and all,
- * while the pass wrote the field the braces were filled to.
+ * WHAT WAS MEASURED. The lint followed a secret into the row within one rule's steps and no further: it held a set of
+ * what each step list wrote from `pin`, and refused a question or a call later in THE SAME list that read one of those
+ * fields. A record has more than one rule. `rule.write` (on create, `set: { field: note, to: '{{pin}}' }`) and
+ * `rule.ask` (on an ordinary edit of `what`, `ask_slash: 'Rate for {{note}}?', about: [note]`) each installed clean,
+ * since neither body says both, and the edit queued `Rate for hunter2?` with `about: { note: 'hunter2' }`. The runner's
+ * `-unsent` is one run's too, so it held nothing back. And `set: { field: '{{vars.f}}', to: '{{pin}}' }` with `f` set
+ * to `note` passed the lint and the runner alike, because both read the field as written, braces and all, while the
+ * pass wrote the field the braces were filled to.
  *
  * THE REPAIR IS AT THE WRITE, NOT AT EVERY READER. A `set` or a `tag` whose value reaches a secret or file field, by
  * any spelling the question check knows, is refused unless the field it writes never leaves the record either; and a
  * `set` names a field of its list as written. Once nothing can copy a secret into a field that may leave, no reader in
  * this rule or another has anything to follow, which is why the per-question walk over what a step wrote is gone.
  *
- * AND SINCE WAVE FIFTY-FIVE THE RUNNER REFUSES THAT WRITE TOO, for a rule stored past the lint, where before it wrote the
- * copy and held the field back from what leaves. So the test of that holding back now starts from a run an earlier
- * build took past its write, put in by SQL, and a stored rule is held to writing nothing from the secret.
+ * AND THE RUNNER REFUSES THAT WRITE TOO, for a rule stored past the lint, where before it wrote the copy and held the
+ * field back from what leaves. So the test of that holding back now starts from a run an earlier build took past its
+ * write, put in by SQL, and a stored rule is held to writing nothing from the secret.
  *
  * AND A `list<secret>` IS A SECRET HERE, as the write path already reads it (`index.ts`, `field.of === 'secret'`).
  * `declare.ts` refuses such a field at install, so only a list stored past that lint holds one; the lint and the
@@ -138,7 +138,7 @@ test('WHAT COPIES NO SECRET INTO A FIELD THAT MAY LEAVE STILL INSTALLS', async (
     ['inline: into another secret field', inline([{ set: { field: 'spare', to: '{{pin}}' } }])],
     /* THE WORDS AS TYPED: the run fills a tag from `{{vars.…}}` and `{{trigger.…}}` only, so this does not read `pin`.
        An inline `set` of the run's braces was a case here too, and the lint now refuses it as a hole nothing fills
-       (`flow-lint.ts`'s `holeIn`, `loop/finish/defects.md` A8). */
+       (`flow-lint.ts`'s `holeIn`). */
     ['run: a tag of the braces', steps([{ tag: '{{pin}}' }])],
     ['run: a variable set plainly again before the write', steps([{ set_var: { name: 'p', to: '{{pin}}' } }, { set_var: { name: 'p', to: '{{what}}' } }, { set: { field: 'note', to: '{{vars.p}}' } }])],
     ['run: fields that may leave', steps([{ set: { field: 'note', to: '{{what}} {{trigger.row.what}}' } }])],
@@ -151,7 +151,8 @@ test('WHAT COPIES NO SECRET INTO A FIELD THAT MAY LEAVE STILL INSTALLS', async (
 
 test('A SET NAMES THE FIELD IT WRITES AS ONE OF ITS LIST\'S FIELD IDS, on both paths', async () => {
   const { k, sql } = await opened();
-  /* THE PROBE'S L4. `f` is `note`, the pass writes `note`, and the lint and the runner both read `{{vars.f}}`. */
+  /* A FIELD NAMED BY A VARIABLE. `f` is `note`, the pass writes `note`, and the lint and the runner both read
+     `{{vars.f}}`. */
   const templated = refusal(
     (await k.install([steps([{ set_var: { name: 'f', to: 'note' } }, { set: { field: '{{vars.f}}', to: '{{pin}}' } }, { ask_slash: { question: 'Rate for {{note}}?', about: ['note'], as: 'rate' } }])])) as Result<unknown>,
   );
@@ -172,7 +173,7 @@ test('A SET NAMES THE FIELD IT WRITES AS ONE OF ITS LIST\'S FIELD IDS, on both p
   sql.close();
 });
 
-/** L4 as a step list: `f` is `note`, and the `set` names its field as `{{vars.f}}`. */
+/** The same as a step list: `f` is `note`, and the `set` names its field as `{{vars.f}}`. */
 const BRACED = [
   { set_var: { name: 'f', to: 'note' } },
   { set: { field: '{{vars.f}}', to: '{{pin}}' } },
@@ -210,9 +211,9 @@ test('A RULE STORED PAST THE LINT WITH ITS FIELD IN BRACES IS REFUSED AT THE FIE
 });
 
 test('A RUN A BUILD BEFORE -unsent TOOK PAST THAT WRITE HOLDS THE FIELD THE BRACES FILLED TO BACK FROM SLASH', async () => {
-  /* THE SECOND LINE, for L4: `writes()` read the step's `field` as written, so `-unsent` held `{{vars.f}}` and the
-     question read `note` as the step left it. Measured before the repair through this harness: `Rate for hunter2
-     hunter2?` with `about: { note: 'hunter2', what: 'Rent' }`.
+  /* THE SECOND LINE, for a field named by a variable: `writes()` read the step's `field` as written, so `-unsent` held
+     `{{vars.f}}` and the question read `note` as the step left it. Measured before the repair through this harness:
+     `Rate for hunter2 hunter2?` with `about: { note: 'hunter2', what: 'Rent' }`.
 
      THE WRITE IS PUT IN BY SQL, as that build left it, since this build refuses it (the test above): `note` holds
      `hunter2`, the step rows say the `set_var` answered `note` and the `set` was done, and the column holds `-sendable`

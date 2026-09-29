@@ -1,6 +1,6 @@
 /**
  * The Directory's account state: who pays for which record, the lapse and its ladder, the Stripe events already
- * applied, and the `lapsed` flag a session answer carries (`loop/finish/ops.md` 4.0 A and B).
+ * applied, and the `lapsed` flag a session answer carries.
  *
  * THE TRANSITIONS ARE THE CONTRACT. Entering `lapsed` starts the ladder once, staying there does not restart it, and
  * paying again ends it; the webhook and the night are built against exactly that, so each step is asserted on the row

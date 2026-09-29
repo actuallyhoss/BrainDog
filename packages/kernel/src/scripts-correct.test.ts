@@ -1,5 +1,5 @@
 /**
- * Scripts correct (SCR-1): what the kernel promises about a script, held by what it does.
+ * Scripts correct: what the kernel promises about a script, held by what it does.
  *
  * FIVE PROMISES, EACH ONE A PLACE A SCRIPT SAID SOMETHING THAT DID NOT HAPPEN. A header over the sandbox's ceilings
  * installed and was refused at every run; a script sending two keys could never be accepted, because accept looked the

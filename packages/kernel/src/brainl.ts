@@ -138,13 +138,13 @@ export function encode(value: unknown): unknown {
 /**
  * One value, as the format reads it, `at` being the `table.column` it goes into.
  *
- * AN OBJECT WITHOUT `b64` IS REFUSED, AND IT IS WHAT THE WORKER WROTE FOR EVERY BLOB. A Durable Object hands a BLOB back
- * as an `ArrayBuffer`, `encode` passed that through, and `JSON.stringify` wrote it as `{}`: every grant's ciphertext and
- * every wrapped key in every hosted export and nightly copy until the adapter in `apps/worker/src/index.ts` was repaired
- * (`loop/research-batch-forty-five-audit.md` §1). Those copies are signed and their manifests hash the `{}`, so nothing
- * before this line can tell them from a whole file. Taken as it stood, a Durable Object stored the text
- * `[object Object]` where a wrapped key was and answered `ok`, and `node:sqlite` threw a driver's sentence that named
- * a parameter number. Refused here, both hosts say the same thing and name the column.
+ * AN OBJECT WITHOUT `b64` IS REFUSED, AND IT IS WHAT THE WORKER WROTE FOR EVERY BLOB. A Durable Object hands a BLOB
+ * back as an `ArrayBuffer`, `encode` passed that through, and `JSON.stringify` wrote it as `{}`: every grant's
+ * ciphertext and every wrapped key in every hosted export and nightly copy until the adapter in
+ * `apps/worker/src/index.ts` was repaired. Those copies are signed and their manifests hash the `{}`, so nothing before
+ * this line can tell them from a whole file. Taken as it stood, a Durable Object stored the text `[object Object]`
+ * where a wrapped key was and answered `ok`, and `node:sqlite` threw a driver's sentence that named a parameter number.
+ * Refused here, both hosts say the same thing and name the column.
  */
 export function decode(value: unknown, at?: string): string | number | null | Uint8Array {
   if (value === null || value === undefined) return null;
@@ -471,12 +471,12 @@ async function signatureOf(
     );
 
   /* A PINNED KEY IS COMPARED BY ITS ID, AND THEN IT, NOT THE FILE'S, IS THE ONE THE SIGNATURE MUST
-     VERIFY UNDER. `loop/research-restore.md` §3.5 measured the hole this closes: one row edited, the
-     manifest recomputed and the file signed again by a stranger's fresh key passed every check above,
-     because every check above asks the file about itself. The id comparison is what names the fault
-     (`dog_sig.key_id`, and both ids in the sentence, because a rotated key and a stranger's key are
-     two different repairs). Verifying under the pinned bytes rather than the file's is what keeps a
-     64-bit id from being the whole of the proof. */
+     VERIFY UNDER. The hole this closes, measured: one row edited, the manifest recomputed and the file
+     signed again by a stranger's fresh key passed every check above, because every check above asks the
+     file about itself. The id comparison is what names the fault (`dog_sig.key_id`, and both ids in the
+     sentence, because a rotated key and a stranger's key are two different repairs). Verifying under
+     the pinned bytes rather than the file's is what keeps a 64-bit id from being the whole of the
+     proof. */
   let under = key;
   if (pin !== undefined) {
     const named = unb64url(pin);

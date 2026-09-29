@@ -1,12 +1,11 @@
 /**
- * `context` over a run written the way the the old tool import writes one: a repository and a next step, and no
- * `project` or `last_seen`, because both are `KERNEL_WRITTEN` and an import is a caller like any other.
+ * `context` over a run written the way an import writes one: a repository and a next step, and no `project` or
+ * `last_seen`, because both are `KERNEL_WRITTEN` and an import is a caller like any other.
  *
- * MEASURED BEFORE THE REPAIR (`loop/research-agent-first-day.md`, finding 4, brief 51-B): an agent attaching in the
- * repository that run named was told `handoff: null`, because the handoff query keyed on `project` whenever a project
- * resolved and the import could not write one; and the same run was listed live, `stale: false`, `age_s: 60`, because
- * a run with no `last_seen` was aged from its row's `updated_at`, which is the import's own write. The body is the
- * survey's `redcheck-handoff.ts`, which printed exactly that against the tree at `7e84f021`.
+ * MEASURED BEFORE THE REPAIR: an agent attaching in the repository that run named was told `handoff: null`, because the
+ * handoff query keyed on `project` whenever a project resolved and the import could not write one; and the same run was
+ * listed live, `stale: false`, `age_s: 60`, because a run with no `last_seen` was aged from its row's `updated_at`,
+ * which is the import's own write. The body below printed exactly that against the tree at `7e84f021`.
  */
 
 import { test } from 'node:test';
@@ -35,8 +34,8 @@ const agent = (session: CallContext['session']): CallContext => ({
 
 /**
  * The seed with Projects placed by repository, a project `Probe` in `probe-repo`, and a run written as the import
- * writes one (the agent runs in `packs/legacy-import/adapter.ts`): by a token, naming the repository, with no hints to attach
- * it by. A minute later a second agent attaches in the same repository and asks where it stands.
+ * writes one: by a token, naming the repository, with no hints to attach it by. A minute later a second agent attaches
+ * in the same repository and asks where it stands.
  */
 async function seeded() {
   const sql = openSqlite();
@@ -54,7 +53,7 @@ async function seeded() {
   const write = async (id: string, fields: Record<string, unknown>) =>
     value<Entry>(
       await api.create(
-        { register: 'session', fields: { client_id: `legacy:session:${id}`, agent: 'claude', doing: `the old tool run ${id}`, repo: 'probe-repo', ...fields } },
+        { register: 'session', fields: { client_id: `import:session:${id}`, agent: 'claude', doing: `Imported run ${id}`, repo: 'probe-repo', ...fields } },
         agent({}),
       ),
     );
@@ -100,10 +99,9 @@ test('a run nobody attached is not listed live, by context, boot or sessions/liv
 
 /**
  * WIDENING THE PLACE TO THE REPOSITORY MUST NOT WIDEN IT TO ANOTHER PROJECT. With the `project: empty` half of the
- * repository clause taken out, every test above still passed (measured by the checker of this repair), so nothing held
- * the sentence the repair's own comment says: a run placed on another project is not here, whatever repository it
- * names. Here `probe-repo` belonged to `Other` when the first agent left its next step, and to `Probe` when the second
- * agent asked where it stands.
+ * repository clause taken out, every test above still passed (measured), so nothing held the sentence the repair's own
+ * comment says: a run placed on another project is not here, whatever repository it names. Here `probe-repo` belonged
+ * to `Other` when the first agent left its next step, and to `Probe` when the second agent asked where it stands.
  */
 test('a run placed on another project is not the handoff, although it names this repository', async () => {
   const sql = openSqlite();
@@ -137,9 +135,8 @@ test('a run placed on another project is not the handoff, although it names this
 /**
  * SEVERAL IMPORTED RUNS IN ONE REPOSITORY, AND NONE OF THEM HEARD FROM. The handoff query ordered by `last_seen`, which
  * no imported run has, so the tie fell to the kernel's `id DESC` and the handoff was whichever run the import wrote
- * last, `done` and `abandoned` included (wave fifty-one's checker of `f1720e4e`). Here the import writes the run that
- * asked to be picked up first and two finished runs after it, and the agent asking where it stands was handed the
- * abandoned one.
+ * last, `done` and `abandoned` included (measured at `f1720e4e`). Here the import writes the run that asked to be
+ * picked up first and two finished runs after it, and the agent asking where it stands was handed the abandoned one.
  */
 test('among imported runs, the one waiting to be picked up is the handoff, not the one the import wrote last', async () => {
   const { sql, write, ask } = await seeded();

@@ -1,12 +1,11 @@
 /**
  * What a figure over `thing is Kiln` counts when one Kiln was deleted and another made since.
  *
- * `723905b5` MADE A TITLE NAME EVERY ROW BEARING IT, DELETED ONES TOO, AND IT DID SO IN THE SHARED
- * `evalContext()`. The reason was `list`'s (`loop/research-batch-twenty-two-audit.md` §5): a deleted
- * row's jobs still point at it, so its name has to find them, as its spoken id and its row id do. The
- * same context reads every metric and every page `where`, so a figure "jobs on Kiln" now counts the
- * jobs pointing at a deleted Kiln beside the jobs on the live one. Before, the lookup was `deleted_at
- * IS NULL ... LIMIT 1` and the figure counted the live Kiln's alone. Measured here, before deciding:
+ * `723905b5` MADE A TITLE NAME EVERY ROW BEARING IT, DELETED ONES TOO, AND IT DID SO IN THE SHARED `evalContext()`. The
+ * reason was `list`'s: a deleted row's jobs still point at it, so its name has to find them, as its spoken id and its
+ * row id do. The same context reads every metric and every page `where`, so a figure "jobs on Kiln" now counts the jobs
+ * pointing at a deleted Kiln beside the jobs on the live one. Before, the lookup was `deleted_at IS NULL ... LIMIT 1`
+ * and the figure counted the live Kiln's alone. Measured here, before deciding:
  *
  *     k.metric(thing is Kiln, count)   value 3   (Glaze and Fire on the deleted Kiln, Throw on the live one)
  *     k.list(thing is Kiln)            Fire, Glaze, Throw

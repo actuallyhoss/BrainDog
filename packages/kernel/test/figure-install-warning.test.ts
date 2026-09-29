@@ -1,10 +1,10 @@
 /**
- * The owner is told at install that a figure over another list would be written `--withheld--` into the row (audit
- * sixty-four, finding 1, as he decided it on 24 September: `loop/DIRECTION.md` section 25).
+ * The owner is told at install that a figure over another list would be written `--withheld--` into the row, as he
+ * decided it.
  *
- * WHAT WAS MEASURED BEFORE THIS. With the run writing `--withheld--` for every figure over a list other than the one the
- * row is in (`hiddenFigure` in `flow.ts`), F1's own rule, `filed; payroll {{metric.payroll}}` into each new Inbox row
- * over a figure summing Salaries, still installed without a word, and the first the owner heard of it was the
+ * WHAT WAS MEASURED BEFORE THIS. With the run writing `--withheld--` for every figure over a list other than the one
+ * the row is in (`hiddenFigure` in `flow.ts`), the measured rule, `filed; payroll {{metric.payroll}}` into each new
+ * Inbox row over a figure summing Salaries, still installed without a word, and the first the owner heard of it was the
  * placeholder in the row. Every refusal below was `null` from `figureFault`, and the rule went in.
  *
  * A REFUSAL, BECAUSE INSTALL HAS NO WARNING TO CARRY. `install` answers `Result<Installed[]>`, whose value is each
@@ -44,7 +44,7 @@ const onInbox = { written: { register: 'inbox', op: ['create'] } };
 const onSalaries = { written: { register: 'salaries', op: ['create'] } };
 const rule = (body: Record<string, unknown>): Declaration => ({ id: `rule.${body.rule as string}`, kind: 'rule', body: body as never });
 
-test("F1'S OWN RULE IS REFUSED AT INSTALL, and the refusal says the note would read --withheld-- and why", async () => {
+test("THE MEASURED RULE IS REFUSED AT INSTALL, and the refusal says the note would read --withheld-- and why", async () => {
   const body = { rule: 'file', on: onInbox, steps: [{ set: { field: 'note', to: 'filed; payroll {{metric.payroll}}' } }] };
   const said = figureFault('rule.file', body, 'run', known);
   assert.equal(said?.code, 'DECLARATION_INVALID');

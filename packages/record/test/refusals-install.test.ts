@@ -42,12 +42,11 @@
  *
  * ─── THE THREE THEME CODES ─────────────────────────────────────────────────────────────────────
  *
- * `contrast-floor`, `intent-inseparable` and `theme-ladder-order` were skipped by name here while
- * nothing on the install path called `packages/theme/src/checks.ts`, and a pack carrying a theme
- * below the contrast floor installed clean on both hosts (`loop/research-via-runners.md` §2 finding 3).
- * `@braindog/record` now takes `@braindog/theme` and reads every pack through `src/theme-check.ts`, so
- * they are driven like the rest. `theme-install.test.ts` drives the same three through `installPack`
- * and `setDeclaration` as well, and holds the three doors to one sentence.
+ * `contrast-floor`, `intent-inseparable` and `theme-ladder-order` were skipped by name here while nothing on the
+ * install path called `packages/theme/src/checks.ts`, and a pack carrying a theme below the contrast floor installed
+ * clean on both hosts. `@braindog/record` now takes `@braindog/theme` and reads every pack through
+ * `src/theme-check.ts`, so they are driven like the rest. `theme-install.test.ts` drives the same three through
+ * `installPack` and `setDeclaration` as well, and holds the three doors to one sentence.
  */
 
 import { test } from 'node:test';

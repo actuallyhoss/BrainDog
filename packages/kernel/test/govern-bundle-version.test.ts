@@ -1,7 +1,7 @@
 /**
  * Every declaration a bundle installs lands against the version it was drawn from, not only the one it is filed under.
  *
- * `loop/research-batch-thirty-four-audit.md` finding 2, measured at `eafe8c20` with `drawn.mts`: `propose` stamped
+ * MEASURED AT `eafe8c20`: `propose` stamped
  * `from_version` for `declaration_id` alone, and `decide` turned it into ONE `expect`, so every other member of
  * `{ declarations: [...] }` installed with no version at all. A change filed under a metric carrying a Projects body read
  * at v1 erased the `domain` another accepted change had added at v2, and a change filed under Projects at its live
@@ -69,7 +69,7 @@ const conflictOn = (out: Result<unknown>, id: string, version: number): string |
   return out.ok ? 'accepted and installed' : c !== null ? `conflict on ${String(c.current?.id)} at ${c.version}` : `${codeOf(out)}: ${fixOf(out)}`;
 };
 
-test('B, AS THE AUDIT RAN IT: a bundle filed under the metric carrying Projects as read at v1 comes back, and domain survives', async () => {
+test('AS MEASURED: a bundle filed under the metric carrying Projects as read at v1 comes back, and domain survives', async () => {
   const { sql, file, accept, idOf, fieldsOf, status, live } = await record();
   assert.ok((await accept(idOf(file('register.things', WITH_DOMAIN, 1)))).ok);
   assert.equal(live('register.things').version, 2);
@@ -84,10 +84,11 @@ test('B, AS THE AUDIT RAN IT: a bundle filed under the metric carrying Projects 
   sql.close();
 });
 
-test('B, FILED BEFORE THE OTHER CHANGE LANDED, with a version for the metric only: Projects is held to the version live at filing', async () => {
-  /* THE RACE schema-add B1 CLOSED FOR ONE DECLARATION, OPEN FOR THE REST OF A BUNDLE. This is the audit's own body, from
-     `from_version: 1` under the metric, filed while Projects was still v1. The proposer said nothing about Projects, so
-     the version live at filing is the one it is held to, as an absent `from_version` is for a single declaration. */
+test('A BUNDLE FILED BEFORE THE OTHER CHANGE LANDED, with a version for the metric only: Projects is held to the version live at filing', async () => {
+  /* THE RACE `schema-add.test.ts` CLOSED FOR ONE DECLARATION, OPEN FOR THE REST OF A BUNDLE. This is the measured body,
+     from `from_version: 1` under the metric, filed while Projects was still v1. The proposer said nothing about
+     Projects, so the version live at filing is the one it is held to, as an absent `from_version` is for a single
+     declaration. */
   const { sql, file, accept, idOf, fieldsOf, status, stored } = await record();
   const b = idOf(file('metric.earning', { declarations: [metric('lane is earning', 'Earning (renamed)'), THINGS] }, 1));
   assert.ok((await accept(idOf(file('register.things', WITH_DOMAIN, 1)))).ok);
@@ -100,7 +101,7 @@ test('B, FILED BEFORE THE OTHER CHANGE LANDED, with a version for the metric onl
   sql.close();
 });
 
-test('C: a bundle filed under Projects at its live version, carrying the metric as first read, comes back naming the metric', async () => {
+test('A bundle filed under Projects at its live version, carrying the metric as first read, comes back naming the metric', async () => {
   const { sql, file, accept, idOf, live, status } = await record();
   assert.ok((await accept(idOf(file('metric.earning', metric('lane is parked'), 1)))).ok);
   assert.equal(live('metric.earning').version, 2);

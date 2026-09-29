@@ -129,10 +129,9 @@ test('and a name that is not a name, or is the platform’s, is refused before i
 });
 
 test('A NAME IS A PATH SEGMENT UNDER /app, SO EVERY WORD THE APP ROUTES AND EVERY SPOKEN ID IS REFUSED', async () => {
-  /* `brain.dog/app/<first segment>/…` is either one of the app's own pages or a record's name (`loop/research-one-domain.md`
-     §2.4), and the Worker tells them apart by this set alone. A record called `settings` would make
-     `/app/settings/agents` two pages at once, and the name is permanent, so the refusal has to exist before the first
-     customer claims one. */
+  /* `brain.dog/app/<first segment>/…` is either one of the app's own pages or a record's name, and the Worker tells
+     them apart by this set alone. A record called `settings` would make `/app/settings/agents` two pages at once, and
+     the name is permanent, so the refusal has to exist before the first customer claims one. */
   const { d, sql } = directory();
   value<Person>(d.person$('ada@example.com'));
   for (const slug of ['settings', 'signin', 'start', 'invite', 'catalogue', 'automations', 'decide', 'packs', 'vault', 'fonts'])

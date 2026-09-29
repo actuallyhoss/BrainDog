@@ -1,19 +1,19 @@
 /**
  * What a person's mark on a leg means, and which field can say a bare number's currency.
  *
- * `loop/research-batch-sixty-audit.md` findings 3 and 6, driven with the audit's own probes (X1, X2, X2b). `974319fb`
- * made any mark a person wrote "his" and took the row out of the pairing for good. Two ordinary flows then counted money
- * that only moved: a transfer he typed and ticked before the bank sent the other leg (X2, GBP 4,000.00 read as received),
- * and a row an agent sent back whole with `moved: false` carried along unchanged (X2b, the same 4,000.00). Both were right
- * on `974319fb^`. And the currency guard asked only whether `on` held some text, enum or ref, so `state` passed it and
- * EGP -1000 paired with USD +1000 (X1).
+ * `974319fb` made any mark a person wrote "his" and took the row out of the pairing for good. Two ordinary flows then
+ * counted money that only moved: a transfer he typed and ticked before the bank sent the other leg (GBP 4,000.00 read
+ * as received), and a row an agent sent back whole with `moved: false` carried along unchanged (the same 4,000.00).
+ * Both were right on `974319fb^`. And the currency guard asked only whether `on` held some text, enum or ref, so
+ * `state` passed it and EGP -1000 paired with USD +1000.
  *
- * X2b AND X1 ARE MENDED HERE, AND X2 IS NOT, ON PURPOSE. A ticked transfer and a ticked card bill are the same write, a
- * person's `true` on an out leg with a bank line of the same size arriving beside it, and `41 §13 #10` says a
- * person-pinned mark skips the pairing whichever way it is pinned. The first attempt at this (held61) let a pinned `true`
- * take a partner, and it turned `pairs-undo.test.ts`'s P3b red (the card bill took the REFUND) and
- * `packages/seed/test/money-pairs.test.ts`'s sample record red (its two typed legs paired each other). So X2 below holds
- * the rule as the spec states it and names what it costs, and changing it is the owner's call.
+ * THE ROW SENT BACK AND THE CURRENCY GUARD ARE MENDED HERE, AND THE TICKED TRANSFER IS NOT, ON PURPOSE. A ticked
+ * transfer and a ticked card bill are the same write, a person's `true` on an out leg with a bank line of the same size
+ * arriving beside it, and `41 §13 #10` says a person-pinned mark skips the pairing whichever way it is pinned. The
+ * first attempt at this let a pinned `true` take a partner, and it turned a card-bill test in `pairs-undo.test.ts` red
+ * (the card bill took the REFUND) and `packages/seed/test/money-pairs.test.ts`'s sample record red (its two typed legs
+ * paired each other). So the ticked-transfer test below holds the rule as the spec states it and names what it costs,
+ * and changing it is the owner's call.
  *
  * EVERY FIGURE HERE IS READ THE WAY THE LEDGER PAGE READS IT, as `pairs-undo.test.ts` reads it: `k.list` with Money's
  * `received-30d` sentence minus the date window.
@@ -37,7 +37,7 @@ const made = (r: unknown): Entry => {
   return x.value;
 };
 
-/* ─────────────── finding 6: the currency guard ─────────────── */
+/* ─────────────── the currency guard ─────────────── */
 
 /** `02 §5`'s signed shape over an `int`, with `on` and the fields it may name handed in. */
 const POSTINGS = (on: string[], extra: Record<string, unknown>[] = []): Declaration => ({
@@ -61,7 +61,7 @@ const POSTINGS = (on: string[], extra: Record<string, unknown>[] = []): Declarat
   } as never,
 });
 
-test('X1: AN ENUM THAT IS NOT A CURRENCY DOES NOT PASS THE CURRENCY GUARD, so EGP -1000 never pairs with USD +1000', async () => {
+test('AN ENUM THAT IS NOT A CURRENCY DOES NOT PASS THE CURRENCY GUARD, so EGP -1000 never pairs with USD +1000', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   /* `state` IS NOT A CURRENCY, and it is what every row that counts holds alike. Before the repair this installed and
      paired the two rows below: `{ installed: true, paired: true }`. */
@@ -78,7 +78,7 @@ test('X1: AN ENUM THAT IS NOT A CURRENCY DOES NOT PASS THE CURRENCY GUARD, so EG
   assert.ok(installed.refusal?.fix.includes('currency'), installed.refusal?.fix);
 });
 
-test('X1b: A REF IS REFUSED AND AN ENUM OF CODES INSTALLS, because one holds a row id and the other a currency', async () => {
+test('A REF IS REFUSED AND AN ENUM OF CODES INSTALLS, because one holds a row id and the other a currency', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const ref = (await k.install([POSTINGS(['bank', 'abs(amount)'], [{ id: 'bank', type: 'ref', to: 'postings' }])])) as {
     ok: boolean;
@@ -91,7 +91,7 @@ test('X1b: A REF IS REFUSED AND AN ENUM OF CODES INSTALLS, because one holds a r
   assert.ok(codes.ok, JSON.stringify(codes));
 });
 
-test('X1c: A TEXT IN `on` PAIRS ONLY ROWS WHOSE TEXT IS A CURRENCY, so a text naming anything else is no currency', async () => {
+test('A TEXT IN `on` PAIRS ONLY ROWS WHOSE TEXT IS A CURRENCY, so a text naming anything else is no currency', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   /* A TEXT CAN HOLD ANYTHING, so the declaration is taken at its word and each row is held to it. `note` here holds
      the same word on both rows and says nothing about which money they are in. */
@@ -111,7 +111,7 @@ test('X1c: A TEXT IN `on` PAIRS ONLY ROWS WHOSE TEXT IS A CURRENCY, so a text na
   assert.equal(j.get(out.id)!.fields._pair, back.id);
 });
 
-/* ─────────────── finding 3: a pin is a person's word, not a resend ─────────────── */
+/* ─────────────── a pin is a person's word, not a resend ─────────────── */
 
 const LEDGER: Declaration = {
   id: 'register.ledger',
@@ -149,7 +149,7 @@ const received = (k: Kernel): number =>
     0,
   );
 
-test('X2: A LEG HE TICKED STAYS HIS AND PAIRS NOTHING (`41 §13 #10`), and the leg the bank sends later is counted: the cost of the rule', async () => {
+test('A LEG HE TICKED STAYS HIS AND PAIRS NOTHING (`41 §13 #10`), and the leg the bank sends later is counted: the cost of the rule', async () => {
   const k = await ledger();
   /* He types the transfer out of current and ticks "Between your own accounts", as the field's label invites. */
   const out = made(k.create('ledger', { what: 'TO SAVINGS', on: DAY(0), direction: 'out', amount: gbp(400_000), account: 'current', moved: true }, PERSON));
@@ -157,8 +157,9 @@ test('X2: A LEG HE TICKED STAYS HIS AND PAIRS NOTHING (`41 §13 #10`), and the l
   assert.equal(k.get(out.id)!.fields.moved, true, 'his tick was written over');
   assert.equal(k.get(out.id)!.fields._pair, undefined);
   assert.equal(k.get(arrived.id)!.fields._pair, undefined);
-  /* THE AUDIT'S MEASURE, KEPT: GBP 4,000.00 that only moved reads as received until he ticks the second leg too. With a
-     pinned `true` let through as a partner (held61) this read 0, and P3b's card bill took a REFUND the same way. */
+  /* THE MEASURE, KEPT: GBP 4,000.00 that only moved reads as received until he ticks the second leg too. With a pinned
+     `true` let through as a partner this read 0, and the card bill in `pairs-undo.test.ts` took a REFUND the same way.
+     */
   assert.equal(received(k), 400_000);
 
   /* AND THE WAY OUT IS HIS, as it is for the card bill: he ticks the other leg as well, and neither is counted. */
@@ -166,7 +167,7 @@ test('X2: A LEG HE TICKED STAYS HIS AND PAIRS NOTHING (`41 §13 #10`), and the l
   assert.equal(received(k), 0);
 });
 
-test('X2b: A WHOLE ROW SENT BACK WITH THE MARK CARRIED ALONG UNCHANGED IS NOT A PIN, and the row pairs when its leg arrives', async () => {
+test('A WHOLE ROW SENT BACK WITH THE MARK CARRIED ALONG UNCHANGED IS NOT A PIN, and the row pairs when its leg arrives', async () => {
   const k = await ledger();
   const out = made(k.create('ledger', { what: 'TO SAVINGS', on: DAY(0), direction: 'out', amount: gbp(400_000), account: 'current' }, BANK));
   /* An agent speaking for him categorises the line and sends the row back whole, the mark unchanged. Before the repair:
@@ -179,13 +180,13 @@ test('X2b: A WHOLE ROW SENT BACK WITH THE MARK CARRIED ALONG UNCHANGED IS NOT A 
   assert.equal(received(k), 0);
 });
 
-test('X2e: A WHOLE ROW SENT BACK WITH NOTHING CHANGED AT ALL IS NOT A PIN either, which the history alone cannot tell from his lone false', async () => {
+test('A WHOLE ROW SENT BACK WITH NOTHING CHANGED AT ALL IS NOT A PIN either, which the history alone cannot tell from his lone false', async () => {
   const k = await ledger();
   const out = made(k.create('ledger', { what: 'TO SAVINGS', on: DAY(0), direction: 'out', amount: gbp(400_000), account: 'current' }, BANK));
-  /* THE CHECKER'S CASE AGAINST held61. An agent reads the row and writes it back as read. Nothing moved, so the write is
-     one bare event and the mark's resend beside it, exactly the two rows P3b's lone `{ moved: false }` leaves; reading
-     the history for "carried beside another field" found no other field and pinned it. Only the patch knows it named
-     every field, so the write path decides. */
+  /* THE CASE AGAINST READING THE HISTORY ALONE. An agent reads the row and writes it back as read. Nothing moved, so
+     the write is one bare event and the mark's resend beside it, exactly the two rows a person's lone
+     `{ moved: false }` leaves; reading the history for "carried beside another field" found no other field and pinned
+     it. Only the patch knows it named every field, so the write path decides. */
   const whole: Record<string, unknown> = { ...k.get(out.id)!.fields };
   delete whole._pair;
   made(k.update('ledger', out.id, whole, PERSON));
@@ -194,7 +195,7 @@ test('X2e: A WHOLE ROW SENT BACK WITH NOTHING CHANGED AT ALL IS NOT A PIN either
   assert.equal(received(k), 0);
 });
 
-test('X2c: A FALSE HE SET BY ITSELF IS NOT UNDONE BY A WHOLE ROW SENT BACK LATER, which carried his false along', async () => {
+test('A FALSE HE SET BY ITSELF IS NOT UNDONE BY A WHOLE ROW SENT BACK LATER, which carried his false along', async () => {
   const k = await ledger();
   const rent = made(k.create('ledger', { what: 'RENT', on: DAY(0), direction: 'out', amount: gbp(100_000), account: 'current' }, BANK));
   const client = made(k.create('ledger', { what: 'CLIENT', on: DAY(1), direction: 'in', amount: gbp(100_000), account: 'business' }, BANK));
@@ -211,7 +212,7 @@ test('X2c: A FALSE HE SET BY ITSELF IS NOT UNDONE BY A WHOLE ROW SENT BACK LATER
   assert.equal(k.get(later.id)!.fields._pair, undefined);
 });
 
-test('X2d: A MARK HE CHANGES IN THE SAME WRITE AS ANOTHER FIELD IS HIS, so unticking a paired row while categorising it unpairs it', async () => {
+test('A MARK HE CHANGES IN THE SAME WRITE AS ANOTHER FIELD IS HIS, so unticking a paired row while categorising it unpairs it', async () => {
   const k = await ledger();
   const rent = made(k.create('ledger', { what: 'RENT', on: DAY(0), direction: 'out', amount: gbp(100_000), account: 'current' }, BANK));
   const client = made(k.create('ledger', { what: 'CLIENT', on: DAY(1), direction: 'in', amount: gbp(100_000), account: 'business' }, BANK));

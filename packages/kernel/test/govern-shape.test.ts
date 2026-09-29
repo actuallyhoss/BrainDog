@@ -1,12 +1,12 @@
 /**
  * What a `change` carries to install, held to the shape `install` reads, at the moment it is proposed.
  *
- * `checkBody` asked only that `to` be an object, so `{ values: [...] }` was filed. Accepting it committed the
- * decision and resolved the suggestion inside the gate's transaction, and then `install([to])` read
- * `decl.body.writes` off `undefined` and threw a `TypeError` out of the record's `decide`, before `reopen` could run.
- * `loop/research-scoped-audit.md` drove that through the record and read the state afterwards: SG1 `resolved`,
- * D1 `accept`, nothing installed. That is the decision that resolved before its change landed, which the comment on
- * `decide` exists to rule out, reached from any `propose` token with one malformed body.
+ * `checkBody` asked only that `to` be an object, so `{ values: [...] }` was filed. Accepting it committed the decision
+ * and resolved the suggestion inside the gate's transaction, and then `install([to])` read `decl.body.writes` off
+ * `undefined` and threw a `TypeError` out of the record's `decide`, before `reopen` could run. Driven through the
+ * record, with the state read afterwards: SG1 `resolved`, D1 `accept`, nothing installed. That is the decision that
+ * resolved before its change landed, which the comment on `decide` exists to rule out, reached from any `propose` token
+ * with one malformed body.
  */
 
 import { test } from 'node:test';

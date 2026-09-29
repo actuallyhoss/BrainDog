@@ -107,9 +107,9 @@ test('NONE AND AN EMPTY CYCLE ARE A ONE-OFF, AND SAY NOTHING, because that is ex
   );
 });
 
-/* THE TWO SILENCES THE REPAIR CLAIMS, HELD. Deleting `recurs.of.length` from the count, or reading a
-   table-named zero as unknown, left all three tests above green: the checker ran both mutations and
-   neither went red. These two go red on each. */
+/* THE TWO SILENCES THE REPAIR CLAIMS, HELD. Deleting `recurs.of.length` from the count, or reading a table-named zero
+   as unknown, left all three tests above green: both mutations were run and neither went red. These two go red on each.
+   */
 test('A ROW WHOSE FIRST DAY IS PAST THE HORIZON IS MISSING NOTHING, and says nothing', async () => {
   const out = await walk([{ what: 'Cleaner', amount: gbp(10_000), due: day(90), repeats: 'weekly' }]);
   assert.deepEqual(out.steps, []);

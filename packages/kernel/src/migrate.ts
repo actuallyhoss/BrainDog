@@ -141,10 +141,10 @@ export const instant = (ms: number): string => new Date(ms).toISOString();
 /**
  * The refusal a SQLite without `fts5` or `json` opens as: `30 §13`'s boot-probe block, in one sentence.
  *
- * `RECORD_UNAVAILABLE` AND NOT THE ADAPTER'S `NO_SUCH_MODULE`, because this is what a caller reads and `30 §6` maps
- * it to 503: the request was fine and a deploy fixes it. Measured on 24 September 2026 before this existed: an
- * adapter refusing `USING fts5` made `applyMigrations` throw out of migration 1, so `openRecord` threw and the host
- * answered nothing with a code in it.
+ * `RECORD_UNAVAILABLE` AND NOT THE ADAPTER'S `NO_SUCH_MODULE`, because this is what a caller reads and `30 §6` maps it
+ * to 503: the request was fine and a deploy fixes it. Measured before this existed: an adapter refusing `USING fts5`
+ * made `applyMigrations` throw out of migration 1, so `openRecord` threw and the host answered nothing with a code in
+ * it.
  *
  * THE VERSION IS READ HERE, not remembered, because the operator's next move is to find out which SQLite they are
  * running, and `sqlite_version()` answers on every build including the ones this refuses. A throw from it is not
@@ -172,10 +172,10 @@ const lacks = (e: unknown, module: 'fts5' | 'json'): boolean => {
 /**
  * Whether the probe's read failed because the index ITSELF is damaged, on a SQLite that has FTS5.
  *
- * THE TWO SENTENCES ARE THE TWO MEASURED, and nothing wider (audit sixty-four, finding 4): a file with
- * `entry_fts_config` dropped says `vtable constructor failed: entry_fts`, and one whose `entry_fts` schema row was
- * removed says `no such table: entry_fts`. A guarded port keeps the driver's sentence verbatim, so both read the same
- * through it. `disk I/O error` names no table and is the file's failure, not the index's, so it still throws.
+ * THE TWO SENTENCES ARE THE TWO MEASURED, and nothing wider: a file with `entry_fts_config` dropped says
+ * `vtable constructor failed: entry_fts`, and one whose `entry_fts` schema row was removed says
+ * `no such table: entry_fts`. A guarded port keeps the driver's sentence verbatim, so both read the same through it.
+ * `disk I/O error` names no table and is the file's failure, not the index's, so it still throws.
  */
 const damagedIndex = (e: unknown): boolean =>
   /(?:vtable constructor failed|no such table): entry_fts$/.test(e instanceof Error ? e.message : String(e));
@@ -196,17 +196,17 @@ const INDEX_TABLES = ['entry_fts', ...SHADOWS.map((s) => `entry_fts_${s}`)];
 /**
  * Whether every table the index is made of is in the schema: the half of the damage probe the `LIMIT 0` read cannot see.
  *
- * FOUR OF SIX DAMAGES GOT PAST THE READ (audit sixty-five, finding 5). Compiling `SELECT rowid FROM entry_fts` connects
- * to the table, which reads `entry_fts_config` and no other shadow, so a file with `data`, `idx`, `content` or
- * `docsize` dropped opened without a rebuild, and then every search and every write to a searchable list threw
+ * FOUR OF SIX DAMAGES GOT PAST THE READ (measured). Compiling `SELECT rowid FROM entry_fts` connects to the table,
+ * which reads `entry_fts_config` and no other shadow, so a file with `data`, `idx`, `content` or `docsize` dropped
+ * opened without a rebuild, and then every search and every write to a searchable list threw
  * (`database disk image is malformed`, or `no such table: main.entry_fts_content`). A missing table is what all four
  * are, and the schema says so without touching the index.
  *
- * WHAT IT COSTS ON EVERY OPEN: one read of `sqlite_master`, which has no index on `name` and so is a scan of the schema,
- * 103 rows on a record with one list installed, whatever the number of rows. Measured on 24 September 2026 over the
- * test port on a file record holding 2,000 rows, 10,000 probes, statement prepared each time as the port does: 15 to 17
- * microseconds each, against 5 for the `LIMIT 0` read beside it. FTS5's own `integrity-check` was the other candidate
- * and it reads every line of the index: 1.0 to 1.2 milliseconds on the same file, growing with the record. Not taken.
+ * WHAT IT COSTS ON EVERY OPEN: one read of `sqlite_master`, which has no index on `name` and so is a scan of the
+ * schema, 103 rows on a record with one list installed, whatever the number of rows. Measured over the test port on a
+ * file record holding 2,000 rows, 10,000 probes, statement prepared each time as the port does: 15 to 17 microseconds
+ * each, against 5 for the `LIMIT 0` read beside it. FTS5's own `integrity-check` was the other candidate and it reads
+ * every line of the index: 1.0 to 1.2 milliseconds on the same file, growing with the record. Not taken.
  */
 const indexWhole = (sql: Sql): boolean =>
   sql.one<{ n: number }>(
@@ -240,9 +240,9 @@ function searchedLists(sql: Sql): Map<string, { fields: RegisterDecl['fields']; 
  *
  * PROJECTED FROM `entry`, WHICH IS THE RECORD, and not refilled from `entry_fts_content`, the index's own copy of each
  * line. The refill was what 151295ca shipped, and a file that lost the content table opened with an empty index: every
- * row read and exported and none was found by search until an import (audit sixty-five, finding 5, measured). The index
- * is derived, so the rows are the only copy worth rebuilding from, and `rebuild` is the projection an import runs.
- * No row is written: the transaction touches `entry_fts` and its shadows and nothing else.
+ * row read and exported and none was found by search until an import (measured). The index is derived, so the rows are
+ * the only copy worth rebuilding from, and `rebuild` is the projection an import runs. No row is written: the
+ * transaction touches `entry_fts` and its shadows and nothing else.
  *
  * THE CONFIG ROW IS PUT BACK FIRST, because FTS5 connects to a table before it drops one, and with the config table
  * gone `DROP TABLE entry_fts` throws the same `vtable constructor failed` the probe did (measured). Version 4 is what
@@ -348,11 +348,10 @@ export async function applyMigrations(
      row read by id, and `export` threw `no such module: fts5` with no code (measured); a row by id still reads now,
      because `get` does not consult the refusal, so what changed is that the export says why it will not run.
 
-     AND A DAMAGED INDEX IS NOT A MISSING MODULE, so it is rebuilt here and the record opens (audit sixty-four,
-     finding 4). This read rethrew every other failure, so a file with `entry_fts_config` dropped, or with the table's
-     schema row removed, threw out of `openRecord` and no method answered, where every row was intact and the index is
-     derived from them. The read sees only those two damages; `indexWhole` sees the other four (audit sixty-five,
-     finding 5), and `boot-damaged-index.test.ts` has all six. */
+     AND A DAMAGED INDEX IS NOT A MISSING MODULE, so it is rebuilt here and the record opens. This read rethrew every
+     other failure, so a file with `entry_fts_config` dropped, or with the table's schema row removed, threw out of
+     `openRecord` and no method answered, where every row was intact and the index is derived from them. The read sees
+     only those two damages; `indexWhole` sees the other four, and `boot-damaged-index.test.ts` has all six. */
   let damaged = false;
   try {
     sql.all('SELECT rowid FROM entry_fts LIMIT 0');

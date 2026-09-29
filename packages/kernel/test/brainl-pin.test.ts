@@ -1,13 +1,12 @@
 /**
  * A file checked against a key somebody named, not only against the key it carries.
  *
- * THE FORGERY BELOW PASSED `checkBrainl` AT `b7409d2d`, and that is what this file is for.
- * `loop/research-restore.md` §3.5 measured it on a real Cloud copy: one row edited, that table's
- * manifest hash recomputed, the old `dog_sig` row removed, and the file signed again by a stranger's
- * fresh Ed25519 key. `checkBrainl` answered `{"ok":true}` and the file imported. That is `03 §4`'s
- * narrow claim working as written, because the key inside a file proves only that nothing changed
- * since that key signed it. Which key it had to be is a fact from outside the file, and `48 §5.6`
- * gives it the one place it can come in: `--key`, which reaches the kernel as `{ key }`.
+ * THE FORGERY BELOW PASSED `checkBrainl` AT `b7409d2d`, and that is what this file is for. Measured on a real Cloud
+ * copy: one row edited, that table's manifest hash recomputed, the old `dog_sig` row removed, and the file signed again
+ * by a stranger's fresh Ed25519 key. `checkBrainl` answered `{"ok":true}` and the file imported. That is `03 §4`'s
+ * narrow claim working as written, because the key inside a file proves only that nothing changed since that key signed
+ * it. Which key it had to be is a fact from outside the file, and `48 §5.6` gives it the one place it can come in:
+ * `--key`, which reaches the kernel as `{ key }`.
  *
  * SO THE SAME FORGERY IS RUN TWICE. Unpinned it still opens, and says so (`pinned: false`), because
  * refusing it there would claim a check nothing made. Pinned to the record's own key it is refused at

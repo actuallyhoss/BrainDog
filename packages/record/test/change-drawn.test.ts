@@ -1,15 +1,15 @@
 /**
  * A whole-body change lands against the version it was drawn from, not the one live when it was filed.
  *
- * `loop/research-batch-thirty-two-audit.md` section 2, measured at `545c95f6`: `propose` stamped every whole-body change
- * with the version live AT FILING and dropped whatever the proposer wrote. That closed the race `schema-add.test.ts` B1
- * draws (two changes filed from one reading before either is accepted) and nothing else. An agent that read Projects at
- * v1, spent its turn building the body, and filed it after another change had taken the list to v2 was stamped v2, so
- * the owner's accept installed it over v2 and `domain` went, with both decisions reading "accept".
+ * Measured at `545c95f6`: `propose` stamped every whole-body change with the version live AT FILING and dropped
+ * whatever the proposer wrote. That closed the race `schema-add.test.ts` draws (two changes filed from one reading
+ * before either is accepted) and nothing else. An agent that read Projects at v1, spent its turn building the body, and
+ * filed it after another change had taken the list to v2 was stamped v2, so the owner's accept installed it over v2 and
+ * `domain` went, with both decisions reading "accept".
  *
  * The proposer is the only one who knows which reading its body came from, so its `from_version` is taken when it names
  * a version that has been live. One above the live version names a reading nobody could have made and is stamped with
- * the live one, which keeps B1's guard against a guess at what will be live at acceptance.
+ * the live one, which keeps that guard against a guess at what will be live at acceptance.
  */
 
 import { test } from 'node:test';
@@ -65,8 +65,8 @@ test('A BODY DRAWN AT v1 AND FILED AFTER THE LIST REACHED v2 COMES BACK, and the
   assert.equal(live().version, 2);
 
   /* FILED NOW, DRAWN THEN. Before this, the stamp was 2 and the accept below installed `launched` over `domain`. No row
-     holds a `domain` value, for the reason schema-add B1 gives: with one, `WOULD_ORPHAN` refuses on its own and this
-     test would pass with no version at all. */
+     holds a `domain` value, for the reason `schema-add.test.ts` gives: with one, `WOULD_ORPHAN` refuses on its own and
+     this test would pass with no version at all. */
   const b = idOf(await file({ declaration_id: 'register.things', from_version: 1, to: plus({ id: 'launched', type: 'day' }) }));
 
   const second = await accept(b);
@@ -80,7 +80,7 @@ test('A BODY DRAWN AT v1 AND FILED AFTER THE LIST REACHED v2 COMES BACK, and the
 
 test('A VERSION ABOVE THE LIVE ONE, OR NONE, OR NULL, IS STAMPED WITH THE LIVE ONE; one that is not a version is refused', async () => {
   const { sql, file, stored } = await record();
-  /* ABOVE IS A GUESS AT WHAT WILL BE LIVE WHEN THE OWNER PRESSES, which is the race B1 closed. */
+  /* ABOVE IS A GUESS AT WHAT WILL BE LIVE WHEN THE OWNER PRESSES, which is the race `schema-add.test.ts` closed. */
   assert.equal(stored(idOf(await file({ declaration_id: 'register.things', from_version: 7, to: plus({ id: 'domain', type: 'url' }) }))).from_version, 1);
   assert.equal(stored(idOf(await file({ declaration_id: 'register.things', to: plus({ id: 'domain', type: 'url' }) }))).from_version, 1);
   assert.equal(stored(idOf(await file({ declaration_id: 'register.things', from_version: null, to: plus({ id: 'domain', type: 'url' }) }))).from_version, 1);

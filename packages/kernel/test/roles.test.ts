@@ -1,12 +1,11 @@
 /**
  * The kernel reads rates and people by the role a list declares, `rates:` and `meets:`, and not by the list's name.
  *
- * WHAT WAS MEASURED BEFORE THIS FILE (`loop/research-seed-roles.md` R1 and R2, re-driven at HEAD by
- * `loop/research-shell-next.md`): a founder's rates under the list id `rates`, or under `fx` with its own field names,
- * converted nothing and the figure said `USD to EGP` was missing; `meet` into a list called `contacts` with exactly
- * the fields `people` has was `REGISTER_UNKNOWN`; and a `people` list without `projects`, which is what the seed gives a
- * record that holds no Projects, was `FIELD_UNKNOWN at projects` at the first agent's call. Every case below was run
- * against that code first and failed, and the failures are in the report that landed this file.
+ * WHAT WAS MEASURED BEFORE THIS FILE: a founder's rates under the list id `rates`, or under `fx` with its own field
+ * names, converted nothing and the figure said `USD to EGP` was missing; `meet` into a list called `contacts` with
+ * exactly the fields `people` has was `REGISTER_UNKNOWN`; and a `people` list without `projects`, which is what the
+ * seed gives a record that holds no Projects, was `FIELD_UNKNOWN at projects` at the first agent's call. Every case
+ * below was run against that code first and failed, and the failures are in the report that landed this file.
  *
  * THE NAMED LISTS STILL READ. A record installed before the seed declares either key has `fx` and `people` with no
  * key, so the fallback is held here too, beside `fx.test.ts` and `people.test.ts`, which stay as they were.
@@ -174,8 +173,8 @@ test('A rates: THAT NAMES A WRONG FIELD IS REFUSED AT INSTALL, naming the part',
     [{ ...RATES_ROLE, as_of: 'nowhere' }, 'rates', /nowhere for its as_of/],
     [{ currency: 'currency', base: 'base', rate: 'rate' }, 'rates', /as_of/],
     [{ ...RATES_ROLE, source: 'currency' }, 'rates', /source/],
-    /* ONE FIELD FOR TWO PARTS installed clean before the checker's pass, and every row then had its currency equal to
-       its base, which `ratesFrom` skips: the list held rates and converted nothing, with no refusal anywhere. */
+    /* ONE FIELD FOR TWO PARTS installed clean before this check, and every row then had its currency equal to its base,
+       which `ratesFrom` skips: the list held rates and converted nothing, with no refusal anywhere. */
     [{ ...RATES_ROLE, base: 'currency' }, 'currency', /base.*currency|currency.*base/],
   ];
   for (const [role, at, says] of cases) {
@@ -300,8 +299,8 @@ test('A meets: THAT NAMES A TEXT FIELD AS met IS REFUSED AT INSTALL, naming met'
     /* A LIST OF REFS IS NOT A LIST OF TEXT. Nothing drove the `of` half of the check before this row: with it removed,
        every other case here still passed. */
     [role, PEOPLE_FIELDS.map((f) => (f.id === 'handles' ? { id: 'handles', type: 'list', of: 'ref', to: 'things' } : f)), 'handles'],
-    /* ONE FIELD FOR TWO PARTS, measured before the checker's pass: `met: 'handles'` installed clean, and the first
-       meet with a handle wrote `handles: ['2026-09-17 · commit abc']`, the handle overwritten by the line saying where. */
+    /* ONE FIELD FOR TWO PARTS, measured before this check: `met: 'handles'` installed clean, and the first meet with a
+       handle wrote `handles: ['2026-09-17 · commit abc']`, the handle overwritten by the line saying where. */
     [{ ...role, met: 'handles' }, PEOPLE_FIELDS, 'handles'],
   ];
   for (const [r, f, at] of wrong) {

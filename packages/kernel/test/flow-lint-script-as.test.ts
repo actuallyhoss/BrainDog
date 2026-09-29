@@ -1,14 +1,13 @@
 /**
  * A `script` step's `as:` is optional, as a `call` step's is, because nothing in the run needs it.
  *
- * WHAT WAS MEASURED BEFORE THE LINT CHANGED, on 24 September. `validateDeclaration` refused `{ script: { id: 'tidy' } }`
- * with "steps[0].script.as is undefined, and an answer's name is lower-case letters, digits and underscores": the
- * `script` case in `flow-lint.ts` called `named(spec.as, ...)` with no `undefined` escape, where `call` had one. The
- * runner never needed it. `startScript` queues the job and the step writes `vars[as]` only when `as` is a string
- * (`flow.ts`), and what lands there is the queued job's id, which no step in a rule has yet been measured reading.
- * So the record demanded a name for a value almost nobody reads, and the canvas had to demand it too, in a sentence
- * apologising for the record. The first test failed on that refusal; the second is the proof the lint was the only
- * thing in the way.
+ * WHAT WAS MEASURED BEFORE THE LINT CHANGED. `validateDeclaration` refused `{ script: { id: 'tidy' } }` with
+ * "steps[0].script.as is undefined, and an answer's name is lower-case letters, digits and underscores": the `script`
+ * case in `flow-lint.ts` called `named(spec.as, ...)` with no `undefined` escape, where `call` had one. The runner
+ * never needed it. `startScript` queues the job and the step writes `vars[as]` only when `as` is a string (`flow.ts`),
+ * and what lands there is the queued job's id, which no step in a rule has yet been measured reading. So the record
+ * demanded a name for a value almost nobody reads, and the canvas had to demand it too, in a sentence apologising for
+ * the record. The first test failed on that refusal; the second is the proof the lint was the only thing in the way.
  */
 
 import { test } from 'node:test';

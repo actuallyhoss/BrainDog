@@ -1,5 +1,5 @@
 /**
- * A script's run, applied: the record's half of `loop/research-shell-scripts.md` Brief 3.
+ * A script's run, applied: the record's half.
  *
  * THE HOST RUNS THE SOURCE AND THE RECORD DECIDES WHAT IT WROTE. Everything a sandbox hands back is a request, checked
  * here against the declaration's own `writes:` and applied through the ordinary write path in one savepoint, so a run

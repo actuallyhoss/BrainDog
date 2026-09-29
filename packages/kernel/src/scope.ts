@@ -1,10 +1,10 @@
 /**
  * Where a row applies, and how a run learns which project it is in.
  *
- * TWO SCOPES AND NO THIRD (`loop/DIRECTION.md` §0). A row is global, or it belongs to one row of the
- * register that declares `scopes:`, which is the record's list of projects. A project lists its
- * repositories and folders, and a run started in one of them is in that project; a run started
- * anywhere else is global. `resolveProject` only reads: the ladder writes its answer onto the run.
+ * TWO SCOPES AND NO THIRD. A row is global, or it belongs to one row of the register that declares `scopes:`, which is
+ * the record's list of projects. A project lists its repositories and folders, and a run started in one of them is in
+ * that project; a run started anywhere else is global. `resolveProject` only reads: the ladder writes its answer onto
+ * the run.
  */
 
 import type { Sql } from '@braindog/ports';
@@ -111,8 +111,8 @@ function matchProject(projects: readonly Candidate[], where: Whereabouts): Resol
 /**
  * A remote as `host/owner/name`: no scheme, no `user@`, no trailing `.git`, and the host lower-cased.
  *
- * `git@github.com:sam/braindog` names its path after the colon. Behind a scheme the colon is a port
- * instead, and a port says nothing about which repository it is.
+ * `git@github.com:acme/braindog` names its path after the colon. Behind a scheme the colon is a port instead, and a
+ * port says nothing about which repository it is.
  */
 function remoteKey(said: string): string {
   let s = said.trim().replace(/\/+$/, '').replace(/\.git$/i, '');

@@ -40,10 +40,10 @@ export type GovernRegister = (typeof GOVERNANCE)[number];
 /**
  * The bodies a suggestion carries: the four of `33-CONTRACTS` §2, and the three that arrange a BrainDog.
  *
- * `pack`, `settings` AND `arrange` ARE HOW AN AGENT OR SLASH CHANGES WHAT A RECORD IS (`loop/research-spark.md`
- * S12, `DIRECTION.md` §11). Installing a pack and changing a pack's settings are an owner's, in a browser, and
- * no token of any scope reaches them. A proposal is the one way an agent asks for either, and the owner's
- * press is what applies it. `arrange` is several of them, and pages, as one reviewable question.
+ * `pack`, `settings` AND `arrange` ARE HOW AN AGENT OR SLASH CHANGES WHAT A RECORD IS. Installing a pack and changing a
+ * pack's settings are an owner's, in a browser, and no token of any scope reaches them. A proposal is the one way an
+ * agent asks for either, and the owner's press is what applies it. `arrange` is several of them, and pages, as one
+ * reviewable question.
  *
  * A fifth of the original kind, `query`, is Slash's palette answer and is never filed.
  */
@@ -58,7 +58,7 @@ const arranging = (kind: string): kind is Arranging => (ARRANGING as readonly st
 /** What a `pack` proposal asks for. Exactly one, naming one pack. */
 export const PACK_VERBS = ['install', 'enable', 'disable'] as const;
 
-/** Slash's own ceiling (`research-spark.md` §3.2, ADR-051): more open arrangements than this is a queue nobody reads. */
+/** Slash's own ceiling (ADR-051): more open arrangements than this is a queue nobody reads. */
 export const OPEN_ARRANGEMENTS = 3;
 
 /** A pack id as `normalise` takes one. */
@@ -121,10 +121,10 @@ export type GovernDeps = {
   /**
    * What a `change` would send out of the record, if it declares or changes a scheduled action.
    *
-   * ONE PROPOSAL, ONE PRESS (`loop/research-scheduled-actions.md` step 13). The record lints the declarations the change
-   * carries, with the checks the install runs when it is accepted, and works out, from them alone, every host they call,
-   * how often, the key by label and the fields sent. It answers a refusal when the declarations would not install, and
-   * otherwise `null` when the change sends nothing new.
+   * ONE PROPOSAL, ONE PRESS. The record lints the declarations the change carries, with the checks the install runs
+   * when it is accepted, and works out, from them alone, every host they call, how often, the key by label and the
+   * fields sent. It answers a refusal when the declarations would not install, and otherwise `null` when the change
+   * sends nothing new.
    */
   review?: (to: Record<string, unknown>) => Result<{ egress: Egress[]; approve: string[] } | null>;
   /**
@@ -323,21 +323,20 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     body = rest;
     /* AND THE VERSION IT WAS DRAWN FROM, WHICH ONLY THE PROPOSER KNOWS AND ONLY THE RECORD MAY BOUND. Accepted with no
        version to land against, the second of two changes drawn from one reading replaced the first whole: `domain` went
-       with a value still under it, and both decisions read "accept" (`loop/research-shell-schema.md` blocker 1,
-       `record/test/schema-add.test.ts`). Stamped with the version live AT FILING, that race closed and the wider one
-       stayed open: a body read at v1 and filed after another change reached v2 was stamped v2, accepted, and erased the
-       other change's fields (`loop/research-batch-thirty-two-audit.md` section 2, `record/test/change-drawn.test.ts`).
-       So the proposer's version is kept when it names one that has been live, and the live one stands in when it is
-       absent. One ABOVE the live version is a guess at what will be live when the owner presses, which is the race B1
-       closed, so it is the live one too. An `add` needs none: it is merged onto whatever is live at the press, and a
-       `retire` is merged the same way.
+       with a value still under it, and both decisions read "accept" (`record/test/schema-add.test.ts`). Stamped with
+       the version live AT FILING, that race closed and the wider one stayed open: a body read at v1 and filed after
+       another change reached v2 was stamped v2, accepted, and erased the other change's fields
+       (`record/test/change-drawn.test.ts`). So the proposer's version is kept when it names one that has been live, and
+       the live one stands in when it is absent. One ABOVE the live version is a guess at what will be live when the
+       owner presses, which is the race the filing stamp closed, so it is the live one too. An `add` needs none: it is
+       merged onto whatever is live at the press, and a `retire` is merged the same way.
 
        AND EVERY MEMBER OF A BUNDLE GETS ONE, stored as `{ "<id>": n }`. Stamped for `declaration_id` alone, the rest of
-       `{ declarations: [...] }` installed with no version at all: a change filed under a metric carrying Projects as read
-       at v1 erased the `domain` another change had added at v2, and one filed under Projects at its live version carried a
-       stale metric over somebody else's edit to it (`loop/research-batch-thirty-four-audit.md` finding 2,
-       `govern-bundle-version.test.ts`). The proposer may send the map, and a plain number still means the member the
-       change is filed under; every member it says nothing about is stamped live, as an absent number is. */
+       `{ declarations: [...] }` installed with no version at all: a change filed under a metric carrying Projects as
+       read at v1 erased the `domain` another change had added at v2, and one filed under Projects at its live version
+       carried a stale metric over somebody else's edit to it (`govern-bundle-version.test.ts`). The proposer may send
+       the map, and a plain number still means the member the change is filed under; every member it says nothing about
+       is stamped live, as an absent number is. */
     if (!fieldLevel(body.to)) {
       const named = String(body.declaration_id);
       const members = membersOf(body.to);
@@ -373,9 +372,9 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
       const read: Result<{ egress: Egress[]; approve: string[] } | null> = deps.review && !isRetype(body.to) ? deps.review(to.value.to) : ok(null);
       if (!read.ok) return read as Result<{ id: string }>;
       /* AND A DIGEST'S WEBHOOK, which `review` does not ask `egressOf` about: it reads an ingest or a script and passes
-         every other kind by, so audit fifty-one's digest posting Notes to `collector.example.com` was filed with
-         `approve: null` (`egress-digest-pattern.test.ts`). Worked out here beside it, and a line `review` already said is
-         not said twice, so the day it asks about digests too this adds nothing. */
+         every other kind by, so a digest posting Notes to `collector.example.com` was filed with `approve: null`
+         (`egress-digest-pattern.test.ts`). Worked out here beside it, and a line `review` already said is not said
+         twice, so the day it asks about digests too this adds nothing. */
       const theirs = read.value?.egress ?? [];
       const digests = newEgress(deps.sql, declared(to.value.to).filter((d) => d.kind === 'digest')).filter((e) => !theirs.some((t) => t.line === e.line));
       if (digests.length > 0) body = { ...body, egress: [...theirs, ...digests], approve: approvalLines([...theirs, ...digests]) };
@@ -383,9 +382,9 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     }
   }
 
-  /* A PATTERN INSTALLS AN INGEST, AND AN INGEST CAN POLL. It was filed with no `approve` at all, because the lines above
-     were worked out for a `change` alone: audit fifty-one filed an ingest polling `api.goldapi.io` every hour on the key
-     `goldapi` as a pattern and read `approve: null`, so the owner accepted a clock and a key he was never shown. The
+  /* A PATTERN INSTALLS AN INGEST, AND AN INGEST CAN POLL. It was filed with no `approve` at all, because the lines
+     above were worked out for a `change` alone: an ingest polling `api.goldapi.io` every hour on the key `goldapi` was
+     filed as a pattern and read `approve: null`, so the owner accepted a clock and a key he was never shown. The
      proposer's own lines are dropped for the reason they are dropped from a change. */
   if (p.body_kind === 'pattern') {
     const { egress: _theirs, approve: _theirLines, ...rest } = body;
@@ -576,10 +575,10 @@ const NAMED_BODIES = ['rule', 'script', 'digest', 'metric'] as const;
  * What a pattern's `ingest` is when it is not an ingest, in the words the refusal names it by, or `null` when it is one.
  *
  * AN INGEST IN EITHER OF ITS TWO SHAPES. Slash's prompt (`slash/src/prompts.ts`) asks for ONE ingest declaration BODY
- * and `slash/src/jobs.ts` filed it bare until A7, and files the declaration now; an agent or a person files the whole
- * declaration, as the probe of audit fifty-one did. Wave fifty-one's check knew only the second, and was held because it
- * refused every pattern Slash proposes. A bare body is told apart by carrying neither `id` nor `kind`, and no ingest
- * body carries either: `IngestDecl` and `ActionDecl` have no such key, and name themselves in `ingest`.
+ * and `slash/src/jobs.ts` once filed it bare, and files the declaration now; an agent or a person files the whole
+ * declaration. A check that knew only the second would refuse every pattern Slash proposes. A bare body is told apart
+ * by carrying neither `id` nor `kind`, and no ingest body carries either: `IngestDecl` and `ActionDecl` have no such
+ * key, and name themselves in `ingest`.
  *
  * AND A BARE BODY IN A RULE'S SHAPE IS A RULE. Its own name says so, or its steps: `accept-rule-level.test.ts` filed a
  * rule as a pattern with its `id` and `kind` on, and taking them off must not be the way round this.
@@ -669,7 +668,7 @@ const isRetire = (to: unknown): to is { retire: unknown } => isMap(to) && 'retir
  */
 const fieldLevel = (to: unknown): boolean => isAdd(to) || isRetire(to) || isRetype(to);
 
-/* ── retype: one field retyped or narrowed over its rows (GAP-8, `api/retype.ts`) ── */
+/* ── retype: one field retyped or narrowed over its rows (`api/retype.ts`) ── */
 
 /**
  * Whether a change's `to` retypes or narrows one field of a live list, `{ retype: {...} }` or `{ narrow: {...} }`.
@@ -775,10 +774,10 @@ const ROLE_SAID: Record<(typeof LIST_ROLES)[number], string> = { title: 'title',
 /**
  * The keys of a list's body that name its fields inside an object, and what each reads them for, as the refusal says it.
  *
- * `LIST_ROLES` WAS THE WHOLE OF THIS, AND THESE THREE WERE MISSING (defects L1). A retire of the field a list's `steps`
- * names as `done` installed, and the list lost its steps without a word; `scopes` the same. The install's lint reads a
- * retired field as present for those two, because `retired` keeps its value on every row, so nothing after this caught
- * it. A `pairs` field it does refuse, but only at install, after somebody was asked and accepted.
+ * `LIST_ROLES` WAS THE WHOLE OF THIS, AND THESE THREE WERE MISSING. A retire of the field a list's `steps` names as
+ * `done` installed, and the list lost its steps without a word; `scopes` the same. The install's lint reads a retired
+ * field as present for those two, because `retired` keeps its value on every row, so nothing after this caught it. A
+ * `pairs` field it does refuse, but only at install, after somebody was asked and accepted.
  */
 const LIST_PARTS = ['steps', 'scopes', 'pairs'] as const;
 type ListPart = (typeof LIST_PARTS)[number];
@@ -815,11 +814,11 @@ const partHolds = (id: string, part: ListPart, name: string, then: string): stri
 /**
  * The first field a whole list body retires that the body still reads by, as a refusal, or `null`.
  *
- * A WHOLE BODY COULD DO WHAT A RETIRE MAY NOT (`loop/BACKLOG.md`, defects L1): `retired: true` on the title, or on the
- * field `steps`, `scopes` or `pairs` names, installed as any other edit, and the list lost what that field held up. So
- * each list a change installs is asked what `retireIn` asks, for every field it retires that the live list does not.
- * A field already retired on the live list is left as it is, so a list filed again as it stands is not refused for a
- * field it lost before this check existed.
+ * A WHOLE BODY COULD DO WHAT A RETIRE MAY NOT: `retired: true` on the title, or on the field `steps`, `scopes` or
+ * `pairs` names, installed as any other edit, and the list lost what that field held up. So each list a change installs
+ * is asked what `retireIn` asks, for every field it retires that the live list does not. A field already retired on the
+ * live list is left as it is, so a list filed again as it stands is not refused for a field it lost before this check
+ * existed.
  */
 function retiresRead(sql: Sql, to: unknown): Refusal | null {
   for (const d of declared(to)) {
@@ -876,8 +875,8 @@ function movesNeeding(fields: readonly Record<string, unknown>[], id: string, go
  * Leaving the field out instead is `WOULD_ORPHAN` while any row holds it, so a retire that dropped the entry would be
  * refused at the press for the very rows it exists to keep.
  *
- * AND IT ALWAYS WAITS. It is not an `add`, so `additiveFault` holds it and the record's `byRule` never sends it: DIRECTION
- * §22 has removing wait for the owner's press, the owner's own filing included.
+ * AND IT ALWAYS WAITS. It is not an `add`, so `additiveFault` holds it and the record's `byRule` never sends it:
+ * removing waits for the owner's press, the owner's own filing included.
  */
 function retireIn(sql: Sql, to: { retire: unknown }, named: unknown): Result<{ to: Record<string, unknown>; version: number }> {
   const retire = to.retire;
@@ -942,10 +941,10 @@ const ADD_KEYS = ['register', 'fields', 'values'];
 /**
  * An addition to a live list: new fields, and new values at the end of a closed list, and nothing else.
  *
- * AN AGENT THAT WANTED ONE OPTIONAL FIELD HAD TO SEND THE WHOLE LIST. `to` was a whole declaration or nothing, so adding
- * `hosting: text` to Projects meant reading twenty-odd fields, copying them and sending them back, and `{ field: {...} }`
- * was refused `VALUE_MALFORMED` (`loop/research-shell-schema.md` blocker 7). DIRECTION §22 has metadata added this way as
- * the ordinary case, by people and agents alike.
+ * AN AGENT THAT WANTED ONE OPTIONAL FIELD HAD TO SEND THE WHOLE LIST. `to` was a whole declaration or nothing, so
+ * adding `hosting: text` to Projects meant reading twenty-odd fields, copying them and sending them back, and
+ * `{ field: {...} }` was refused `VALUE_MALFORMED`. Metadata added this way is the ordinary case, by people and agents
+ * alike.
  *
  * ADDITIVE BY CONSTRUCTION. A field id the list already has, retired ones included, is refused rather than replaced, and
  * there is no key that removes anything: a retype or a removal is a whole-body change and is read as one. The merged
@@ -1004,10 +1003,10 @@ export const ADDITIVE_RULE = 'rule:additive';
  * The keys that make an added field something other than loose metadata: it asks every writer for a value, it refuses
  * a value another row holds, or it builds an index. `search` is the full-text index, so it counts as one.
  *
- * AND `scope`, WHICH SAYS WHERE ROWS APPLY. It was not here, and `loop/research-batch-thirty-three-audit.md` §6 added
- * `project` with a scope to Money from an agent's key: it landed by rule, and a second agent's `context` went from no
- * registers to Money's three row titles, because `context` sends every readable list with a scope field into the brief.
- * From then on `scopeFault` also holds a key's writes to Money to its project. Neither is an optional field.
+ * AND `scope`, WHICH SAYS WHERE ROWS APPLY. It was not here, and `project` with a scope was added to Money from an
+ * agent's key: it landed by rule, and a second agent's `context` went from no registers to Money's three row titles,
+ * because `context` sends every readable list with a scope field into the brief. From then on `scopeFault` also holds a
+ * key's writes to Money to its project. Neither is an optional field.
  */
 const HELD_KEYS = ['required', 'required_when', 'unique', 'index', 'search', 'scope'] as const;
 
@@ -1024,11 +1023,11 @@ const HELD_AS: Record<(typeof HELD_KEYS)[number], string> = {
 /**
  * Why a change cannot land by the additive rule, or `null` when it can.
  *
- * THE OWNER'S ANSWER OF SEPTEMBER 22ND (DIRECTION §22): an agent's purely additive, optional field lands at once and is
- * logged, and removing, retyping, requiring or narrowing still waits for his press. `addTo` already makes an `add`
- * additive by construction (no field it names may exist, and values are only appended), so what is left to hold back is
- * a field that constrains the rows: `required` refuses every writer who does not know the new field, `unique` and
- * `index` build on the table, and all three are what "loop/research-shell-schema.md" put outside the narrow rule.
+ * THE OWNER'S RULE: an agent's purely additive, optional field lands at once and is logged, and removing, retyping,
+ * requiring or narrowing still waits for his press. `addTo` already makes an `add` additive by construction (no field
+ * it names may exist, and values are only appended), so what is left to hold back is a field that constrains the rows:
+ * `required` refuses every writer who does not know the new field, `unique` and `index` build on the table, and all
+ * three are outside the narrow rule.
  *
  * A KEY SET TO `false` IS NOT A CONSTRAINT, so `required: false` still lands; any other value holds it back, because
  * the install's lint is the one that decides what `required: "yes"` means, and it should do so with the owner watching.
@@ -1056,11 +1055,11 @@ const ADDITIVE_REASON = 'It only adds optional fields or values, and those land 
  * A `change` is about the declaration it names: `to` is that declaration, or a bundle that holds it.
  *
  * THE PROPOSER CHOSE WHO WAS ASKED. The record reads the list a change is about from `declaration_id` and nothing else,
- * and nothing held `to` to it, so `loop/research-batch-seventeen-audit.md` §1 filed `declaration_id: register.obligations`
- * over a new Diary from the owner's `propose` token: it was shown whole to a member invited to Obligations alone, with
- * Diary's schema in it, and accepting it installed Diary at v2. Filed the other way round, a change to Obligations was
- * held back from the member whose list it changed. The prediction a change carries is written under the same id, so a
- * grade about one list was read by whoever reads the other.
+ * and nothing held `to` to it, so `declaration_id: register.obligations` was filed over a new Diary from the owner's
+ * `propose` token: it was shown whole to a member invited to Obligations alone, with Diary's schema in it, and
+ * accepting it installed Diary at v2. Filed the other way round, a change to Obligations was held back from the member
+ * whose list it changed. The prediction a change carries is written under the same id, so a grade about one list was
+ * read by whoever reads the other.
  *
  * A BUNDLE HOLDS WHAT IT IS NAMED FOR, AND UNDER A LIST'S NAME NO OTHER LIST. A bundle is several declarations under one
  * name (a pack update's two actions), so it cannot be held to one id; but a bundle named for `register.obligations`
@@ -1104,21 +1103,21 @@ function namesFault(sql: Sql, body: Record<string, unknown>): Refusal | null {
 /**
  * A declaration in a bundle filed under a list's name that reads, writes or mails another list, or the whole record.
  *
- * A SECOND REGISTER WAS THE ONLY THING KEPT OUT, and `loop/research-batch-nineteen-audit.md` §4 filed a rule over Diary
- * under `register.obligations` from the owner's `propose` token: the member invited to Obligations alone read the rule
- * whole in the queue, and accepting it installed it. A metric over Diary, a page with a table of it, an ingest that
- * writes it and a digest that mails its rows rode in the same way, one declaration each (`govern-bundle-scope.test.ts`
- * filed all eight before this). So each declaration is asked which lists it NAMES, not only which it declares.
+ * A SECOND REGISTER WAS THE ONLY THING KEPT OUT, and a rule over Diary was filed under `register.obligations` from the
+ * owner's `propose` token: the member invited to Obligations alone read the rule whole in the queue, and accepting it
+ * installed it. A metric over Diary, a page with a table of it, an ingest that writes it and a digest that mails its
+ * rows rode in the same way, one declaration each (`govern-bundle-scope.test.ts` filed all eight before this). So each
+ * declaration is asked which lists it NAMES, not only which it declares.
  *
  * AND WHICH IT TOUCHES AS ITS OWN READ PLACES IT, through `touches` (`reach.ts`), which the record asks too. The walk
  * here was a page's walk over every kind, so it read neither a script's `reads` and `writes` nor an arrival rule's
- * door, and audit forty's finding 1 filed a script reading Money, one writing it and a rule on the payroll door into
- * Money, each beside Inbox's new field under `register.inbox` (N1, N2, N4 in `loop/research-decide-reach.md`). A rule
- * with no row, a script naming no list and a door that polls were filed the same way (K8, K9, K7), and Decide then held
- * all six from Inbox's readers, since `automations`, `scripts` and `actions` refuse them each: filed as a change to a
- * list whose readers would never be shown it. Each of those now names `ANY_LIST` or `ACROSS`, and is refused with the
- * whole-record sentence. The page walk also read `{{trigger.row.what}}` in a rule as a list called `trigger`, and
- * refused a rule on Inbox under Inbox's own name (K4); a rule's run scope is skipped now.
+ * door, and a script reading Money, one writing it and a rule on the payroll door into Money were each filed beside
+ * Inbox's new field under `register.inbox`. A rule with no row, a script naming no list and a door that polls were
+ * filed the same way, and Decide then held all six from Inbox's readers, since `automations`, `scripts` and `actions`
+ * refuse them each: filed as a change to a list whose readers would never be shown it. Each of those now names
+ * `ANY_LIST` or `ACROSS`, and is refused with the whole-record sentence. The page walk also read `{{trigger.row.what}}`
+ * in a rule as a list called `trigger`, and refused a rule on Inbox under Inbox's own name; a rule's run scope is
+ * skipped now.
  *
  * A FIGURE IS READ THROUGH ITS METRIC, and only a metric the bundle carries can be read here: this runs on the body
  * alone, when it is filed and again when it is accepted. A page of figures names no list itself, which is how the Money
@@ -1246,26 +1245,26 @@ function pageOfOthers(
 /**
  * The list other than `list` that the installed declaration under `id` is about, if there is one.
  *
- * WHAT A DECLARATION REPLACES IS ABOUT A LIST TOO, and reading only the new body let it through:
- * `loop/research-batch-twenty-two-audit.md` §7 filed `metric.diary-count` redefined over Obligations under
- * `register.obligations`, it was accepted and installed, and every page reading the Diary figure then read Obligations
- * behind a question the queue showed as a change to Obligations. A rule, a page and a digest under a Diary id with an
- * Obligations body were filed the same way (`govern-bundle-scope.test.ts`). The installed body's figures are read
- * through the installed metrics, and its door as installed, since those are what it reads now.
+ * WHAT A DECLARATION REPLACES IS ABOUT A LIST TOO, and reading only the new body let it through: `metric.diary-count`
+ * redefined over Obligations was filed under `register.obligations`, it was accepted and installed, and every page
+ * reading the Diary figure then read Obligations behind a question the queue showed as a change to Obligations. A rule,
+ * a page and a digest under a Diary id with an Obligations body were filed the same way
+ * (`govern-bundle-scope.test.ts`). The installed body's figures are read through the installed metrics, and its door as
+ * installed, since those are what it reads now.
  *
  * AN INSTALLED BODY WHOSE EVERY FIGURE HAS NO LIVE METRIC IS NOBODY'S TO REPLACE, and it answers `null`. This once
  * dropped the figures it could not resolve, so a stat of a retired Diary figure, a stat of one never declared, a note
  * whose prose read a retired one and a digest whose only section was one each read as about no list, and all four were
- * filed under `register.obligations`, accepted and installed with Obligations bodies (`loop/research-bundle-reads.md`
- * §2), while `pageOfOthers` refused the same figure redefined from the same question. The rule is now the one
- * `pageOfOthers` keeps: an unknown is not a licence. A body that names a list besides its dead figure is judged by that
- * list, since the page is already shown to whoever reads it and the dead figure draws nothing.
+ * filed under `register.obligations`, accepted and installed with Obligations bodies, while `pageOfOthers` refused the
+ * same figure redefined from the same question. The rule is now the one `pageOfOthers` keeps: an unknown is not a
+ * licence. A body that names a list besides its dead figure is judged by that list, since the page is already shown to
+ * whoever reads it and the dead figure draws nothing.
  *
- * AND AN INSTALLED BODY THAT NAMES NO LIST AND NO FIGURE IS THE OWNER'S, and answers `null` too (defects S4). It
- * answered `undefined`, which the caller reads as "about no other list", so a page of prose, a digest with no list in
- * it or a theme was replaced from one list's question, and Decide showed the whole-record change as a change to that
- * list to a colleague who decides only on it. A body nobody's list places is the whole record's, and only whoever
- * reads the whole record is asked about it, when it is proposed under its own name.
+ * AND AN INSTALLED BODY THAT NAMES NO LIST AND NO FIGURE IS THE OWNER'S, and answers `null` too. It answered
+ * `undefined`, which the caller reads as "about no other list", so a page of prose, a digest with no list in it or a
+ * theme was replaced from one list's question, and Decide showed the whole-record change as a change to that list to a
+ * colleague who decides only on it. A body nobody's list places is the whole record's, and only whoever reads the whole
+ * record is asked about it, when it is proposed under its own name.
  */
 function replacedAbout(sql: Sql, id: string, list: string, fields: ReadonlySet<string>): string | null | undefined {
   const was = liveBody(sql, id);
@@ -1565,9 +1564,9 @@ export type Decided = {
    */
   apply?: { kind: Arranging; body: Record<string, unknown> };
   /**
-   * An accepted retype or narrowing (GAP-8), for the caller to land through `retypeLanding` and `retypeLand`: its `to`
-   * as filed, and the version of the list it was merged onto. Landing asks for that version again, and the caller
-   * reopens the question if it will not land.
+   * An accepted retype or narrowing, for the caller to land through `retypeLanding` and `retypeLand`: its `to` as
+   * filed, and the version of the list it was merged onto. Landing asks for that version again, and the caller reopens
+   * the question if it will not land.
    */
   retype?: { to: Record<string, unknown>; expect?: { id: string; version: number } };
 };
@@ -1592,11 +1591,11 @@ type SentLine = { key?: unknown; paged?: unknown; channel?: unknown; ingest?: un
 /**
  * The vault labels one approved line sends, each to be looked up alone.
  *
- * A SCRIPT'S LINE HOLDS ITS KEYS JOINED, "a, b", because `Egress.key` is one string (`scriptEgress` in `actions.ts`), and
- * accept looked the joined text up as one label, so a script that sends two keys could never be accepted: the answer
- * was "Add the key called "a, b"" (shell S16). So a script's labels are read from the declaration being accepted,
- * whose `keys` is the list, and every other line's key is the one label it always was. A script line whose declaration
- * is not in what is installed falls back to its one string, which refuses rather than passes.
+ * A SCRIPT'S LINE HOLDS ITS KEYS JOINED, "a, b", because `Egress.key` is one string (`scriptEgress` in `actions.ts`),
+ * and accept looked the joined text up as one label, so a script that sends two keys could never be accepted: the
+ * answer was "Add the key called "a, b"". So a script's labels are read from the declaration being accepted, whose
+ * `keys` is the list, and every other line's key is the one label it always was. A script line whose declaration is not
+ * in what is installed falls back to its one string, which refuses rather than passes.
  */
 function labelsSent(out: unknown, install: unknown): string[] {
   if (!isMap(out)) return [];
@@ -1747,8 +1746,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
      revisit, and the whole point of writing it down is that somebody will want to. But a question a rule or Slash
      opened whose band is `call` (`weigh.ts`) changes no row, declaration, access or money when it is answered: the
      other button tomorrow undoes it. Asking a sentence for that teaches people to type "ok", which is the failure 20 §3
-     warns of, so it is answered in one press (decisions C25). Every other question still refuses without one, and the
-     decision still carries a sentence, because `decision.reason` is what renders wherever it is cited. */
+     warns of, so it is answered in one press. Every other question still refuses without one, and the decision still
+     carries a sentence, because `decision.reason` is what renders wherever it is cited. */
   if (!reason?.trim()) {
     const light = oneAnswer(deps, id, row.body_kind, row.body, option);
     if (light === null) return no<Decided>('REQUIRED_MISSING', 'A decision carries the reason for it.', { at: 'reason' });
@@ -1898,9 +1897,9 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
         }
     }
 
-    /* A RETYPE IS HANDED BACK TO BE LANDED, NEVER INSTALLED (GAP-8). The install counts the rows and would refuse the
-       type change it exists to make, so the record lands it through `api/retype.ts` instead: the list and every answered
-       row in one transaction, or nothing and the question reopened, as a change that will not install is. */
+    /* A RETYPE IS HANDED BACK TO BE LANDED, NEVER INSTALLED. The install counts the rows and would refuse the type
+       change it exists to make, so the record lands it through `api/retype.ts` instead: the list and every answered row
+       in one transaction, or nothing and the question reopened, as a change that will not install is. */
     if (row.body_kind === 'change' && isRetype(body.to) && install !== undefined) {
       retype = { to: body.to, ...(expect === undefined ? {} : { expect }) };
       install = undefined;

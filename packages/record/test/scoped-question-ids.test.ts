@@ -1,10 +1,10 @@
 /**
  * Somebody invited to named lists is handed no `SG` or `D` number; they may type one.
  *
- * `loop/research-hidden-questions.md` §1 and §2. Every `SG<n>` and `D<n>` is drawn from one counter over the whole
- * record, so a member invited to Obligations read `SG1` then `SG6` and `D1` then `D4` with four Diary questions (two of
- * them decided) between, and an `append` member's own `propose` answered `SG7`, six hidden questions before hers, from
- * one call. The counts on `boot` were already filtered; the names were not.
+ * Every `SG<n>` and `D<n>` is drawn from one counter over the whole record, so a member invited to Obligations read
+ * `SG1` then `SG6` and `D1` then `D4` with four Diary questions (two of them decided) between, and an `append` member's
+ * own `propose` answered `SG7`, six hidden questions before hers, from one call. The counts on `boot` were already
+ * filtered; the names were not.
  *
  * SO SHE IS HANDED THE ID OF A LINE SHE CAN ALREADY READ. `q.<ULID>` is the id of a question's first `suggest` event and
  * `d.<ULID>` the id of a decision's `decide` event: its first ten characters are the millisecond she was shown as
@@ -69,7 +69,7 @@ async function settle(api: Awaited<ReturnType<typeof createRecordApi>>, id: stri
 }
 
 /**
- * The shape the survey measured: one Obligations question decided, four Diary questions with two decided, a second
+ * The measured shape: one Obligations question decided, four Diary questions with two decided, a second
  * Obligations question decided and a third left open. The owner's numbers come out `SG1`, `SG2` to `SG5`, `SG6`, `SG7`
  * and `D1`, `D2`, `D3`, `D4`, so Wren's own read `SG1 SG6 SG7` and `D1 D4` if the names reach her.
  */
@@ -102,7 +102,7 @@ async function busy() {
   return { sql, api, member, diary };
 }
 
-/** Every answer the survey's `fields.ts` found a number in, as one string. */
+/** Every answer a number was found in, as one string. */
 async function everything(api: Awaited<ReturnType<typeof createRecordApi>>, ctx: CallContext): Promise<string> {
   return JSON.stringify([
     value(await api.governance({ status: 'all' }, ctx)),
@@ -131,7 +131,7 @@ test('(1) A READER WITH ONE LIST HELD TO APPEND IS HANDED NO NUMBER EITHER, sinc
   /* NOT `wholeRecord`, WHICH ASKS ONLY ABOUT THE CEILING. Iris reads the record with Diary held to `append`, so she has
      no ceiling and `wholeRecord` calls her whole, while `holds` hides every Diary question from her because `append`
      does not read. Handed numbers, she read `SG1 SG6 SG7` and `D1 D4`, the same four hidden questions and two hidden
-     decisions as Wren, which is batch nineteen's finding 3 again for these two counters. */
+     decisions as Wren, the same leak again for these two counters. */
   const { sql, api, member } = await busy();
   const iris = await member({ level: 'read', registers: { diary: 'append' } });
   const said = await everything(api, iris);

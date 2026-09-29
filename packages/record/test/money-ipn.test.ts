@@ -1,19 +1,19 @@
 /**
  * What each of the money pack's bank patterns WRITES, on a record that has the readers wired.
  *
- * WHY THIS FILE EXISTS. The checker of `aeef01c5` flipped `bank-ipn-in`'s `direction` from `in` to
- * `out` and every test stayed green. `packages/seed/test/money-bank.test.ts` opens a bare kernel,
- * because `@braindog/seed` may not import `@braindog/extract` (`tools/gates/graph.mjs`), and a bare
- * kernel cannot read `DD-MM-YYYY`, so for the three InstaPay messages it could only prove which pattern
- * claimed each one and that the date was the field left unread. No row was ever written, so nothing
- * looked at the sign, the figure, the code, the description or the account that a row would carry.
+ * WHY THIS FILE EXISTS. A mutation of `aeef01c5` flipped `bank-ipn-in`'s `direction` from `in` to `out` and every test
+ * stayed green. `packages/seed/test/money-bank.test.ts` opens a bare kernel, because `@braindog/seed` may not import
+ * `@braindog/extract` (`tools/gates/graph.mjs`), and a bare kernel cannot read `DD-MM-YYYY`, so for the three InstaPay
+ * messages it could only prove which pattern claimed each one and that the date was the field left unread. No row was
+ * ever written, so nothing looked at the sign, the figure, the code, the description or the account that a row would
+ * carry.
  *
  * THIS PACKAGE CAN, because `createRecordApi` hands `scanMoney`, `scanDates` and `matchLiterals` down to
  * the kernel it opens, the same way production does. So every wording is forwarded here through the
  * real record over `installSeed`, and the row it writes is read back field by field.
  *
- * THE BANK'S SIX ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample carried them until 25 September, and
- * this file was one of the reasons it did; it now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
+ * THE BANK'S SIX ARE ITS PACK FILE'S, INSTALLED ON TOP OF THE SEED. The sample used to carry them, and this file was
+ * one of the reasons it did; it now installs `packs/bank-hsbc-eg/bank-hsbc-eg.pack.json` itself
  * (`seed/test/pack-files.ts`), so what is read here is what a person who installs that pack reads. Measured with the
  * sample's twelve gone and nothing in their place: ten of this file's fourteen tests failed.
  *
@@ -109,10 +109,9 @@ const WORDINGS: Want[] = [
     body: 'Your HSBC Account ***846 was debited with IPN outward transfer for EGP 3,250.00 on 07-08-2026 16:42 to MARLOW JOINERY with reference 9c4e1f7a2b',
     direction: 'out', amount: 325_000, currency: 'EGP', what: 'MARLOW JOINERY', on: '2026-08-07', account: 'current',
   },
-  /* THE PURCHASE NAMES ITS PAYEE AFTER `from`, and this fixture said `to`, which is the transfer's word.
-     `loop/research-bank-real.md`, *The three that did not read*, item 1: the one real purchase in the window
-     was claimed, read in every field but `what`, and held for a person. Measured red here before the anchor
-     moved: `review`, `bank-ipn-out could not read what out of this one.` */
+  /* THE PURCHASE NAMES ITS PAYEE AFTER `from`, and this fixture said `to`, which is the transfer's word. Measured on
+     real messages: the one real purchase in the window was claimed, read in every field but `what`, and held for a
+     person. Measured red here before the anchor moved: `review`, `bank-ipn-out could not read what out of this one.` */
   {
     ingest: 'bank-ipn-out',
     body: 'Your HSBC Account ***846 was debited with IPN purchase for EGP 615.75 on 19-08-2026 21:10 from GRANARY MARKET with reference 0f7d2c91e4',
@@ -128,9 +127,9 @@ const WORDINGS: Want[] = [
     body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP 2500.00- Your available balance is EGP 31,040.25',
     direction: 'out', amount: 250_000, currency: 'EGP', what: '16AUG26 ATM Cash Withdrawal', on: '2026-08-16', account: 'current',
   },
-  /* THE CODE AGAINST THE FIGURE. `loop/research-batch-eighteen-audit.md` section 2 filed this line `matched`,
-     `exact`, as an OUT of GBP 0.00, because `scanMoney` read `EGP2500.00` as the `00` after its point in the
-     fallback currency. Nothing measured says HSBC Egypt glues the code; the reader was wrong either way. */
+  /* THE CODE AGAINST THE FIGURE. This line was filed `matched`, `exact`, as an OUT of GBP 0.00, because `scanMoney`
+     read `EGP2500.00` as the `00` after its point in the fallback currency. Nothing measured says HSBC Egypt glues the
+     code; the reader was wrong either way. */
   {
     ingest: 'bank-from-out',
     body: 'From HSBC: 16AUG26 ATM Cash Withdrawal from 310-527***-846 EGP2500.00- Your available balance is EGP 31,040.25',
@@ -150,12 +149,11 @@ type Held = Omit<Want, 'direction'> & { why: string };
 /**
  * THE `From HSBC:` LINES WHOSE SIGN IS A HYPHEN THAT DOES NOT TOUCH THE FIGURE, held for a person and not written.
  *
- * `loop/research-batch-eighteen-audit.md` section 3: `match:` was the substring `- your available balance`, so a
- * hyphen with a space either side satisfied it, and a transfer IN printed that way was filed OUT at `exact`.
- * Measured red here before the repair: the first line below came back `matched`, `bank-from-out`, `exact`, a row
- * with `direction: out`. Whether a spaced hyphen is the bank's sign or a separator the bank never printed is
- * not something one line can settle, so the answer is a person, with the figure, the day and the account
- * already read and the direction left for them to say.
+ * `match:` was the substring `- your available balance`, so a hyphen with a space either side satisfied it, and a
+ * transfer IN printed that way was filed OUT at `exact`. Measured red here before the repair: the first line below came
+ * back `matched`, `bank-from-out`, `exact`, a row with `direction: out`. Whether a spaced hyphen is the bank's sign or
+ * a separator the bank never printed is not something one line can settle, so the answer is a person, with the figure,
+ * the day and the account already read and the direction left for them to say.
  */
 const HELD: Held[] = [
   {
@@ -237,10 +235,9 @@ test('THE `From HSBC:` CREDIT IS STORED AND CLAIMED BY NOTHING, because its only
 });
 
 /**
- * ONE ACCOUNT, PRINTED TWO WAYS. `loop/research-bank-real.md`, *The three that did not read*, item 3: the InstaPay
- * messages print his EGP account as stars and four digits, the `From HSBC:` lines as a branch code, three stars and
- * the last three of those four. `lookup` answered only the row whose `last4` is a WHOLE TOKEN in the slice, so
- * whichever form he typed, one family went to `review` with `account` unread.
+ * ONE ACCOUNT, PRINTED TWO WAYS. The InstaPay messages print his EGP account as stars and four digits, the `From HSBC:`
+ * lines as a branch code, three stars and the last three of those four. `lookup` answered only the row whose `last4` is
+ * a WHOLE TOKEN in the slice, so whichever form he typed, one family went to `review` with `account` unread.
  *
  * READ NOW BY `lookup`'s SUFFIX RULE (`matchLiterals` in `packages/extract/src/extractors.ts`, asked for by name
  * from `packages/kernel/src/ingest.ts`): digits printed behind stars are the tail of the one row whose longer value
@@ -253,7 +250,7 @@ test('A `last4` OF FOUR DIGITS IS THE ACCOUNT A LINE PRINTING ITS LAST THREE BEH
   assert.ok(four.ok, JSON.stringify(four));
 
   const out = forward(r.k, 'From HSBC: 03AUG26 ATM Cash Withdrawal from 310-527***-518 EGP 900.00- Your available balance is EGP 4,100.00', 'money-ipn-suffix');
-  /* THE FIRST LINE FILED BY ITS PRINTED TAIL WAITS FOR ONE CONFIRMATION (`loop/DIRECTION.md` §25 A2), and accepting it files the row. */
+  /* THE FIRST LINE FILED BY ITS PRINTED TAIL WAITS FOR ONE CONFIRMATION, and accepting it files the row. */
   assert.equal(out.state, 'proposed', out.reason ?? '');
   assert.equal(out.reason, 'Filed to Cairo savings by its last digits 518. Confirm it once and later ones file straight away.');
   const yes = r.k.decide(out.suggestion!, { decide: { option: 'accept', reason: 'the savings account' } }, 'p_seed');

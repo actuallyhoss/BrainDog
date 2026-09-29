@@ -1,5 +1,5 @@
 /**
- * A dry run answers only about lists its caller reads (`loop/research-batch-thirty-six-audit.md` finding 6).
+ * A dry run answers only about lists its caller reads.
  *
  * `dryRun` guarded the list a rule is about and nothing else, and the kernel's walk looks up every `link` target in
  * whatever list the step names (`rules.ts` `describe`). Measured before the fix, with a member at `write` held to
@@ -39,7 +39,7 @@ const linking = (value: string) => ({ rule: 'probe', register: 'projects', then:
 /** What a person reads off the answer: the sample's lines, or the refusal's code and sentence. */
 const read = (a: Answer): string => (a.ok ? JSON.stringify(a.value.sample?.map((s) => s.would)) : `${a.refusal.code}: ${a.refusal.fix}`);
 
-test('D1: A MEMBER WHO CANNOT READ MONEY IS TOLD THE SAME THING WHETHER A NAMED ROW IS THERE OR NOT', async () => {
+test('A MEMBER WHO CANNOT READ MONEY IS TOLD THE SAME THING WHETHER A NAMED ROW IS THERE OR NOT', async () => {
   const { sql, api } = await record();
   assert.equal((await api.list({ register: 'money' }, member)).ok, false, 'the member reads Money, so this is not the case');
 
@@ -62,7 +62,7 @@ test('THE SAME REACH IS REFUSED WHEREVER THE STEP SITS: inside a branch, as a cr
   const run = { rule: 'probe', on: { written: { register: 'projects', op: ['create'] } }, steps: [{ wait: '1h' }, { link: { field: 'payee', to: { register: 'money', by: 'what', value: 'x' } } }] };
   /* A STEP THAT CARRIES `if` AND `link` TOGETHER. The kernel's `describe` has no `if` case and reads the `link` on it,
      and the guard skipped any step with an `if` once it had walked its branches, so this was answered "link payee" for
-     a name that was in Money and "nothing bears that name" for one that was not. Measured by the checker. */
+     a name that was in Money and "nothing bears that name" for one that was not. Measured. */
   const both = { rule: 'probe', register: 'projects', then: [{ if: 'name is set', link: { field: 'payee', to: { register: 'money', by: 'what', value: 'Salary: Omar' } } }] };
   for (const [name, rule] of Object.entries({ branch, creates, run, both })) {
     const out = (await api.dryRun({ rule }, member)) as Answer;
@@ -75,13 +75,13 @@ test('THE SAME REACH IS REFUSED WHEREVER THE STEP SITS: inside a branch, as a cr
   sql.close();
 });
 
-/* AUDIT THIRTY-EIGHT, FINDING 1: THE `when` LOOKS UP A TITLE TOO. A `ref` field's value in a sentence is the title of a row
+/* THE `when` LOOKS UP A TITLE TOO. A `ref` field's value in a sentence is the title of a row
    in the list the ref points at, and the kernel resolved it against that list whoever was asking. Measured before the
    fix, with a member who reads Money and is held to `append` on Clients, so she sees a Money row's `client` only as a
    row id and `get` of that id answers null: the dry run of `client is Acme Holdings` answered `matches 1 of 1`, and of
    `Bolt Ltd`, a client that exists and that no Money row names, `0 of 1`. `list` with the same sentence answered 0 rows
    for both, because it passes `reads` and the dry run did not. */
-test('D1: THE DRY RUN OF A when OVER A REF ANSWERS THE SAME FOR EVERY TITLE IN A LIST ITS CALLER CANNOT READ', async () => {
+test('THE DRY RUN OF A when OVER A REF ANSWERS THE SAME FOR EVERY TITLE IN A LIST ITS CALLER CANNOT READ', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const CLIENTS = { id: 'register.clients', kind: 'register', body: { id: 'clients', name: 'Clients', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } };
@@ -112,12 +112,12 @@ test('D1: THE DRY RUN OF A when OVER A REF ANSWERS THE SAME FOR EVERY TITLE IN A
   sql.close();
 });
 
-/* AUDIT FORTY, FINDING 8: THE INSTALLED RULES THE CANDIDATE IS RANKED AGAINST LOOKED THE TITLE UP TOO. The candidate's
+/* THE INSTALLED RULES THE CANDIDATE IS RANKED AGAINST LOOKED THE TITLE UP TOO. The candidate's
    `when` was narrowed to the asker and the installed rules kept the owner's context, and the sample says per row which
    rule takes it. Measured before the fix, with `rule.acme` (`client is Acme Holdings`, sets `note`) installed after
    the rows, so it had run on none of them: a member refused Clients read `takenBy: { acme: 1 }` and `billed#1` alone
    "acme sets note first", which is the Acme row among three, told apart by a title she may not read. */
-test('DR3: THE RULES A DRY RUN RANKS AGAINST ARE ASKED WITH THE READS OF WHOEVER ASKS, so no row is told apart by a title she cannot read', async () => {
+test('THE RULES A DRY RUN RANKS AGAINST ARE ASKED WITH THE READS OF WHOEVER ASKS, so no row is told apart by a title she cannot read', async () => {
   const CLIENTS = { id: 'register.clients', kind: 'register', body: { id: 'clients', name: 'Clients', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } };
   const BILLED = {
     id: 'register.billed',

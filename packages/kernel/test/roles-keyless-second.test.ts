@@ -2,13 +2,12 @@
  * One list holds each role in either install order: a keyless `fx` or `people` shaped like the role is refused when it
  * arrives AFTER a list declaring `rates:` or `meets:`, as the declaring list is refused when it arrives after them.
  *
- * MEASURED BEFORE THIS FILE (`research-batch-forty-seven-audit.md` finding 2, `probes/roles-order.mts`): a list
- * declaring `rates:`, then a keyless `fx` of money-core's shape, both installed; a USD to EGP rate written into `fx`
- * left cash saying `missing: ["USD to EGP"]`, because the declaring list is the one read; and the declaring list's
- * next update was then refused, telling its owner to declare `rates:` on `fx`, a list another pack owns. `meets:`
- * then a People-shaped `people` did the same. `roleBody` asked the question only of the list declaring the key, so the
- * order that installs the keyless list second was never asked it. Both cases below failed against that code: the
- * keyless list installed `ok`.
+ * MEASURED BEFORE THIS FILE: a list declaring `rates:`, then a keyless `fx` of money-core's shape, both installed; a
+ * USD to EGP rate written into `fx` left cash saying `missing: ["USD to EGP"]`, because the declaring list is the one
+ * read; and the declaring list's next update was then refused, telling its owner to declare `rates:` on `fx`, a list
+ * another pack owns. `meets:` then a People-shaped `people` did the same. `roleBody` asked the question only of the
+ * list declaring the key, so the order that installs the keyless list second was never asked it. Both cases below
+ * failed against that code: the keyless list installed `ok`.
  */
 
 import { test } from 'node:test';

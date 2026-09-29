@@ -1,13 +1,13 @@
 /**
  * A repeating row stops walking on the last day its leg's `ends` field names, and not the night after.
  *
- * A LEG HAD NO END DAY. The the old tool import closes a line only on the first night after its `ends_on` has passed,
- * so between the night it learns the end and that night, the kernel walked the row to the horizon: measured against
- * the walk before `Leg.ends`, the USD 1,000.00 monthly salary below, ending on 20 October 2026, walked twelve cheques
- * over 365 days, 15 October 2026 to 15 September 2027, where the old tool's own forecast counts one.
+ * A LEG HAD NO END DAY. An import can close a line only on the first night after its `ends_on` has passed, so between
+ * the night it learns the end and that night, the kernel walked the row to the horizon: measured against the walk
+ * before `Leg.ends`, the USD 1,000.00 monthly salary below, ending on 20 October 2026, walked twelve cheques over 365
+ * days, 15 October 2026 to 15 September 2027, where the source's own forecast counts one.
  *
- * THE END IS INCLUSIVE, because it is set from the old tool's `ends_on` and that is the last payday there: `payDays`
- * keeps a payday on the day and drops every one after it. The reasoning is on `Leg.ends`.
+ * THE END IS INCLUSIVE, because it is set from an imported `ends_on` and that is the last payday there: `payDays` keeps
+ * a payday on the day and drops every one after it. The reasoning is on `Leg.ends`.
  */
 
 import { test } from 'node:test';

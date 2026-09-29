@@ -1,5 +1,5 @@
 /**
- * `ops-revoke` (`53 §5.11` (c) step 3, `loop/finish/ops.md` OPS-10): the operator's cut-off, `TokenDeps.validFrom`.
+ * `ops-revoke` (`53 §5.11` (c) step 3): the operator's cut-off, `TokenDeps.validFrom`.
  *
  * WHAT IS PROVED IS THE KERNEL'S HALF, WHICH IS ALL OF THE RULE. Both hosts read their setting (`TOKENS_VALID_FROM`,
  * `BRAINDOG_TOKENS_VALID_FROM`) and hand it down per call, and every bearer either host takes is checked by one of the

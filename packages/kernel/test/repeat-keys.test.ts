@@ -2,8 +2,8 @@
  * A `repeat:` key the record does not read is refused at install, naming the key.
  *
  * `validate` read `freq` out of a field's `repeat:` and nothing else, so every other key installed and was ignored.
- * Driven through `install` and `expandRepeat` from an anchor of 2026-09-15 (`loop/research-living-in-it.md` section
- * 4.2), all three of these installed and walked as though the extra key were not there:
+ * Driven through `install` and `expandRepeat` from an anchor of 2026-09-15, all three of these installed and walked as
+ * though the extra key were not there:
  *
  *     { freq: monthly, bymonthday: [15, -1] }        ->  09-15, 10-15, 11-15        (never the last day)
  *     { freq: weekly, byday: [TU, TH], count: 4 }    ->  09-15, 09-22, 09-29, 10-06 (never a Thursday)

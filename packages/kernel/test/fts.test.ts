@@ -249,12 +249,11 @@ async function crowded(): Promise<{ k: Kernel; sql: NodeSql }> {
 
 test('A FULL PAGE IS NOT A TOTAL, and the screen printed the page', async () => {
   /**
-   * `loop/research-at-scale.md`, *Wrong, not slow* 3: `/search?q=revenue` drew **100** under the
-   * heading and **"All 100 in Datapoints"** beside the group while 140 rows matched. `the` matched
-   * 304 and said 100; `bake` matched 577 and said 100. The clamp is not the fault: `list` clamps in
-   * silence too. The fault is that a bare array of 100 is character-for-character the answer to a
-   * query with exactly 100 matches, so nothing downstream could tell the two apart, and the one
-   * surface for finding anything in 2,243 rows stated a number that was not true.
+   * Measured at scale: `/search?q=revenue` drew **100** under the heading and **"All 100 in Datapoints"** beside the
+   * group while 140 rows matched. `the` matched 304 and said 100; `bake` matched 577 and said 100. The clamp is not the
+   * fault: `list` clamps in silence too. The fault is that a bare array of 100 is character-for-character the answer to
+   * a query with exactly 100 matches, so nothing downstream could tell the two apart, and the one surface for finding
+   * anything in 2,243 rows stated a number that was not true.
    *
    * THE ASSERTION THAT MATTERS IS THE SECOND ONE. The first says the page is still capped, which is
    * the old behaviour and is fine; the second is what makes the cap tellable from a total.

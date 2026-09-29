@@ -1,18 +1,18 @@
 /**
  * A BLOB column the export wrote as `{}` is refused at import, by name, on every host.
  *
- * WHAT WENT WRONG. A Durable Object's `sql.exec(...).toArray()` hands a BLOB back as an `ArrayBuffer`, where `node:sqlite`
- * hands back a `Uint8Array`. `encode` writes `{ b64 }` only for a `Uint8Array` and passes anything else through, and
- * `JSON.stringify` writes an `ArrayBuffer` as `{}`. So every export the Worker made, the nightly copy included, carried
- * `{}` for every grant's ciphertext and every wrapped key, and was signed over those bytes and looked whole
- * (`loop/research-batch-forty-five-audit.md` §1). The adapter in `apps/worker/src/index.ts` is repaired to hand the
- * kernel a `Uint8Array`, and `apps/worker/test/kernel-in-do.test.ts` holds that on workerd.
+ * WHAT WENT WRONG. A Durable Object's `sql.exec(...).toArray()` hands a BLOB back as an `ArrayBuffer`, where
+ * `node:sqlite` hands back a `Uint8Array`. `encode` writes `{ b64 }` only for a `Uint8Array` and passes anything else
+ * through, and `JSON.stringify` writes an `ArrayBuffer` as `{}`. So every export the Worker made, the nightly copy
+ * included, carried `{}` for every grant's ciphertext and every wrapped key, and was signed over those bytes and looked
+ * whole. The adapter in `apps/worker/src/index.ts` is repaired to hand the kernel a `Uint8Array`, and
+ * `apps/worker/test/kernel-in-do.test.ts` holds that on workerd.
  *
  * THIS FILE HOLDS THE OTHER HALF: A COPY WRITTEN BEFORE THE REPAIR. It exists in R2 and in whatever the owner
- * downloaded, and `decode` took `{}` as it stood. Measured in that audit, a Durable Object bound it and stored the text
- * `[object Object]` where the wrapped key was, and answered `ok`; `node:sqlite` threw "Provided value cannot be bound to
- * SQLite parameter 6", which reached the caller as `FILE_MALFORMED` with no `at` and the driver's sentence. Neither says
- * which column is empty. `decode` now refuses an object without `b64`, naming the table and the column, before any
+ * downloaded, and `decode` took `{}` as it stood. Measured: a Durable Object bound it and stored the text
+ * `[object Object]` where the wrapped key was, and answered `ok`; `node:sqlite` threw "Provided value cannot be bound
+ * to SQLite parameter 6", which reached the caller as `FILE_MALFORMED` with no `at` and the driver's sentence. Neither
+ * says which column is empty. `decode` now refuses an object without `b64`, naming the table and the column, before any
  * driver sees it.
  *
  * THE FILE IS MADE THE WAY THE WORKER MADE IT, not edited into shape: the record is opened on a `Sql` that answers

@@ -1,9 +1,8 @@
 /**
- * A `change` that carries a script's line is refused at acceptance when the line now reads differently
- * (`loop/research-batch-thirty-eight-audit.md` finding 4, its M).
+ * A `change` that carries a script's line is refused at acceptance when the line now reads differently.
  *
- * WHAT WAS MEASURED. A script's line names the host its key goes to, which is what the key's vault entry opens, and that
- * is read once, when the change is filed. The audit filed `script.gold-rate` (egress `api.goldapi.io` and
+ * WHAT WAS MEASURED. A script's line names the host its key goes to, which is what the key's vault entry opens, and
+ * that is read once, when the change is filed. Measured: `script.gold-rate` was filed (egress `api.goldapi.io` and
  * `collector.test`, key `goldapi`) while the `goldapi` entry opened `api.goldapi.io`, so the owner read "key "goldapi"
  * to api.goldapi.io". It then revoked the entry, bound a new `goldapi` that opens `collector.test`, and pressed accept:
  * the script installed, and its key went to `collector.test`, a host the line the owner approved never paired with it.

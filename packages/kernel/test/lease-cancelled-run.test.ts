@@ -1,12 +1,12 @@
 /**
- * A question to Slash a host was holding when its run ended, and that host never acked it (wave fifty's checker).
+ * A question to Slash a host was holding when its run ended, and that host never acked it.
  *
- * WHAT WAS MEASURED. Wave fifty taught the ack's failed branch to read the run, and left two roads that did not. `lease()`
- * handed an expired lease back out without reading anything but the clock, so a job leased, its run cancelled and never
- * acked was leased again every time its window ran out: against the build before this file's fix the first test below
- * counted 7 further hand-outs over 24 minutes of clock, each one a post a host would make in the name of a rule that is
- * gone, and the job ended `dead` with `attempts` 8, where it expects none and `done` with 1. `unlease()` put such a job
- * back to `pending` after `release()` had run, where nothing would ever delete it again and the next lease posted it.
+ * WHAT WAS MEASURED. The ack's failed branch had been taught to read the run, and two roads had not. `lease()` handed
+ * an expired lease back out without reading anything but the clock, so a job leased, its run cancelled and never acked
+ * was leased again every time its window ran out: against the build before this file's fix the first test below counted
+ * 7 further hand-outs over 24 minutes of clock, each one a post a host would make in the name of a rule that is gone,
+ * and the job ended `dead` with `attempts` 8, where it expects none and `done` with 1. `unlease()` put such a job back
+ * to `pending` after `release()` had run, where nothing would ever delete it again and the next lease posted it.
  *
  * THE JOIN IS THE ACK'S, one helper in `outbox.ts` read by all three: the run `waiting` at the payload's step, and that
  * step's row holding this job's id.

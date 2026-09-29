@@ -1,6 +1,6 @@
 /**
- * Arranging a BrainDog by proposal: what an agent or Slash reads first, what it may ask for, and what
- * the owner's press applies (`loop/research-spark.md` S12, `loop/DIRECTION.md` §11).
+ * Arranging a BrainDog by proposal: what an agent or Slash reads first, what it may ask for, and what the owner's press
+ * applies.
  *
  * THE RECORD HAD NO WAY TO BE ARRANGED BY ANYBODY BUT ITS OWNER IN A BROWSER. Installing a pack, turning
  * one on or off and changing its settings are `ADMIN`, and no token of any scope reaches them (ADR-060).
@@ -80,7 +80,7 @@ export type CatalogueEntry = {
    * proposal or any other caller, after the install and before its examples are linked. OPTIONAL, and never a reason to fail.
    */
   carry?: (io: CarryIo, from: string) => Promise<number>;
-  /** The skills a use case names for agents working in it, which Slash offers once it is on (`loop/research-spark.md` S9). */
+  /** The skills a use case names for agents working in it, which Slash offers once it is on. */
   skills?: readonly { name: string; trigger: string }[] | undefined;
   /**
    * WHAT A USE CASE GROWS INTO, and when: once every figure test holds, Slash asks on Decide to install these packs beside it
@@ -390,8 +390,8 @@ export function arranger(d: ArrangeDeps) {
   async function planAll(asked: readonly string[], docs: ReadonlyMap<string, Body>): Promise<Result<Planned>> {
     const base = d.installed();
     /* IN THE ORDER THAT INSTALLS, and not the order asked. The owner can only accept an arrangement, and `base` 2.0.0
-       named before the `leaf` 1.1.0 that takes it was filed and refused `PACK_REQUIRED` at the accept, telling him to do
-       "first" an update that was already in it (`loop/research-batch-forty-four-audit.md` finding 3). */
+       named before the `leaf` 1.1.0 that takes it was filed and refused `PACK_REQUIRED` at the accept, telling him to
+       do "first" an update that was already in it. */
     const coming: { id: string; version: string; requires: Readonly<Record<string, string>> }[] = [];
     for (const id of asked) {
       const read = await packOf(id, docs, heldBy(base), useCaseFor(asked, id));
@@ -418,22 +418,22 @@ export function arranger(d: ArrangeDeps) {
       /* AND EVERY OTHER REFUSAL THE ACCEPT WOULD GIVE, from the same function `install` asks, so what is filed installs. */
       const fault = installFault(pack, diff);
       if (fault) return { ok: false, refusal: { ...fault, at: 'body.packs' } };
-      /* AND WHAT THE KERNEL REFUSES AT `host.stage`, which `installFault` cannot see: it reads the diff, and the stage is
-         the kernel's `stageInstall` over the batch with the record laid under it. Two packs each declaring `scopes:`, as
-         one arrangement, were filed, and the accept installed the first and answered "register.things already declares
-         scopes: ... Already applied, and kept: one." (`loop/research-batch-forty-seven-audit.md` finding 1,
-         `test/arrange-kernel-lint.test.ts`). Asked of the batch `install` stages, against `state`, the record as the packs
-         before this one leave it, so a list an earlier update in the same arrangement retires is not held against this one.
+      /* AND WHAT THE KERNEL REFUSES AT `host.stage`, which `installFault` cannot see: it reads the diff, and the stage
+         is the kernel's `stageInstall` over the batch with the record laid under it. Two packs each declaring
+         `scopes:`, as one arrangement, were filed, and the accept installed the first and answered "register.things
+         already declares scopes: ... Already applied, and kept: one." (`test/arrange-kernel-lint.test.ts`). Asked of
+         the batch `install` stages, against `state`, the record as the packs before this one leave it, so a list an
+         earlier update in the same arrangement retires is not held against this one.
 
-         `kernel.lint` WITH THE PLANNED RECORD, AND NOT `declare`'s `stagedFault`, which wave forty-eight used and which
-         asks `validate` alone. The rest of what `stageInstall` asks read the table, and five arrangements were filed that
-         the accept refused: a narrowed `tags` under a live rule, a rule tagging a list the pack before it types `int`, a
-         page filtering a list the pack before it declares on a field it lacks, a rule asking Slash on a host that answers
-         none, and (for the pages, below) a `where:` over `rates` beside an update retiring `fx`. */
+         `kernel.lint` WITH THE PLANNED RECORD, AND NOT `declare`'s `stagedFault`, which an earlier build used and which
+         asks `validate` alone. The rest of what `stageInstall` asks read the table, and five arrangements were filed
+         that the accept refused: a narrowed `tags` under a live rule, a rule tagging a list the pack before it types
+         `int`, a page filtering a list the pack before it declares on a field it lacks, a rule asking Slash on a host
+         that answers none, and (for the pages, below) a `where:` over `rates` beside an update retiring `fx`. */
       const staging = kernel.lint(stagedBatch(pack, diff) as Declaration[], ...plannedOf(state));
       if (staging) return { ok: false, refusal: { ...staging, at: 'body.packs' } };
       /* A REBASED LIST IS NOT KEPT: its update installs, with what the owner or another pack laid put back on it. Filed
-         as `keeps`, Decide said "This update's version of it is not taken" of an update that was (finding 2). */
+         as `keeps`, Decide said "This update's version of it is not taken" of an update that was. */
       const kept = new Set(diff.kept.filter((k) => k.rebased === undefined).map((k) => k.id));
       const rebased = diff.kept.filter((k) => k.rebased !== undefined).map((k) => k.id);
       const changes = [...diff.changes.map((c) => c.id), ...rebased.filter((k) => !diff.changes.some((c) => c.id === k))];
@@ -445,11 +445,11 @@ export function arranger(d: ArrangeDeps) {
         version: pack.manifest.version,
         adds: diff.adds.map((a) => a.id),
         ...(changes.length === 0 ? {} : { changes }),
-        /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. AND `to` FOR WHAT IT
-           HANDS ON INSTEAD: copied as `{ id, rows }`, the HSBC door money-core hands to `bank-hsbc-eg` and keeps live was
-           filed exactly as one it retires (`loop/research-batch-thirty-four-audit.md` §8, `declare`'s
-           `test/plan-handover-shown.test.ts`). `to_name` IS THAT PACK AS THE CATALOGUE CALLS IT, since it is not installed and
-           Decide has nothing else to name it by: "Bank hsbc eg", from its id, is not what the owner would look for. */
+        /* WHAT AN UPDATE TAKES AWAY, with the rows it keeps, so Decide says it beside what it adds. AND `to` FOR WHAT
+           IT HANDS ON INSTEAD: copied as `{ id, rows }`, the HSBC door money-core hands to `bank-hsbc-eg` and keeps
+           live was filed exactly as one it retires (`declare`'s `test/plan-handover-shown.test.ts`). `to_name` IS THAT
+           PACK AS THE CATALOGUE CALLS IT, since it is not installed and Decide has nothing else to name it by: "Bank
+           hsbc eg", from its id, is not what the owner would look for. */
         ...(diff.retires.length === 0
           ? {}
           : {
@@ -465,20 +465,20 @@ export function arranger(d: ArrangeDeps) {
            seed catalogue, the step was `["pack","version","adds","examples"]`. A list that has everything already lays
            nothing, which is every later update of the same pack, so it says nothing either. */
         ...((laid) => (laid.length === 0 ? {} : { extends: laid }))(diff.extends.flatMap((e) => (e.adds.length === 0 || e.refusal !== undefined ? [] : [{ id: e.id, adds: e.adds }]))),
-        /* AND THE VALUES AN UPDATE TAKES OFF A LIST HOLDING ROWS, WHICH STAY ON IT. The People update that sheds `registrar`
-           from a record holding a registrar row was filed as `changes: ["register.people"]` and nothing else, the same
-           step as an update that did take the choice away. `body` is the install's, not Decide's. `holding` AND `binned`
-           GO WITH IT, how many rows hold each value and how many of those are deleted, since Decide says both: copied as
-           `{ id, values, rows }`, the count wave forty-nine taught Decide to say never reached it. */
+        /* AND THE VALUES AN UPDATE TAKES OFF A LIST HOLDING ROWS, WHICH STAY ON IT. The People update that sheds
+           `registrar` from a record holding a registrar row was filed as `changes: ["register.people"]` and nothing
+           else, the same step as an update that did take the choice away. `body` is the install's, not Decide's.
+           `holding` AND `binned` GO WITH IT, how many rows hold each value and how many of those are deleted, since
+           Decide says both: copied as `{ id, values, rows }`, the count Decide says never reached it. */
         ...(diff.stays.length === 0 ? {} : { stays: diff.stays.map(({ body: _install, ...stay }) => stay) }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));
       out.config.set(id, pack.manifest.config ?? {});
       out.packs.set(id, pack);
-      /* THE RECORD AS THE INSTALL LEAVES IT, from `declare`, which stages it. The fold this replaced carried `{ id,
-         version }` with no `requires` and nothing an `extends` laid, so a second pack laying `domain` on the same list
-         was planned against a list with none, filed, and refused half-way at the accept (finding 3). */
+      /* THE RECORD AS THE INSTALL LEAVES IT, from `declare`, which stages it. The fold this replaced carried
+         `{ id, version }` with no `requires` and nothing an `extends` laid, so a second pack laying `domain` on the
+         same list was planned against a list with none, filed, and refused half-way at the accept. */
       state = plannedState(state, pack, diff);
     }
     return ok({ ...out, state });
@@ -749,12 +749,12 @@ export function arranger(d: ArrangeDeps) {
        scopes:", a page nobody wrote wrong. Each pack has met the kernel's checks in `planAll` by now, so a fault here is a
        page's.
 
-       ONE QUESTION, AND THE WHOLE OF IT. Wave forty-eight asked `validate` of the planned record, and then `kernel.lint`
-       of the pages beside the lists they read, laid on the live record, for the `where:` and `sign:` only `unreadable`
-       reads; and where those lists alone were refused on the live record, as `rates` is beside an `fx` an earlier update
-       in the arrangement retires, it asked the page nothing more. A page over `rates` filtering on `nosuch` was filed and
-       refused at the accept, after both packs had installed. The planned record holds the lists as the packs leave them,
-       so `lint` reads each page against those and nothing is skipped. */
+       ONE QUESTION, AND THE WHOLE OF IT. An earlier build asked `validate` of the planned record, and then
+       `kernel.lint` of the pages beside the lists they read, laid on the live record, for the `where:` and `sign:` only
+       `unreadable` reads; and where those lists alone were refused on the live record, as `rates` is beside an `fx` an
+       earlier update in the arrangement retires, it asked the page nothing more. A page over `rates` filtering on
+       `nosuch` was filed and refused at the accept, after both packs had installed. The planned record holds the lists
+       as the packs leave them, so `lint` reads each page against those and nothing is skipped. */
     const staged = pages.map((p) => ({ id: String(p.id), kind: 'page' as const, body: p.body as never }));
     const unfit = staged.length === 0 ? null : kernel.lint(staged, ...plannedOf(planned.value.state));
     if (unfit) return { ok: false, refusal: { ...unfit, at: `body.pages${unfit.at ? `: ${unfit.at}` : ''}` } };

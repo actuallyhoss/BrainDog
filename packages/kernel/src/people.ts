@@ -84,10 +84,10 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
   if (!list) return no<Met>('REGISTER_UNKNOWN', 'No list declares meets:, so nobody can be met. Nothing was written.', { at: 'register' });
   const at = list.fields;
   const own = list.register;
-  /* ASKED AGAIN HERE THOUGH INSTALL ASKS IT, because the named `people` list is never asked at install, and a
-     declaring list's row can be written by hand. The fix no longer says "The agents pack declares it": the agents pack
-     declares none of these fields, People does, and the first roles survey measured that sentence pointing at the
-     wrong pack. The target of `merged_into` and `projects` is install's to check; the named list was never asked it. */
+  /* ASKED AGAIN HERE THOUGH INSTALL ASKS IT, because the named `people` list is never asked at install, and a declaring
+     list's row can be written by hand. The fix no longer says "The agents pack declares it": the agents pack declares
+     none of these fields, People does, and that sentence was measured pointing at the wrong pack. The target of
+     `merged_into` and `projects` is install's to check; the named list was never asked it. */
   for (const part of PARTS.meets) {
     const field = at[part.part as keyof MeetsFields];
     if (field === undefined && part.optional === true && list.declared) continue;

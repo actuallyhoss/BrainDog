@@ -1,6 +1,6 @@
 /**
- * A pack's settings (`loop/research-modular.md` §1.3, §4 step 4): the closed subset of types, the
- * placeholder a declaration reads one through, and the two record methods over the `pack` row.
+ * A pack's settings: the closed subset of types, the placeholder a declaration reads one through, and the two record
+ * methods over the `pack` row.
  *
  * What is asserted is that a setting is a value a person can read and nothing more. A ref, a secret
  * and a file are refused by type, a default is coerced as a field of that type would be, a body that

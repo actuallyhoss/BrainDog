@@ -1,12 +1,11 @@
 /**
  * A bundle filed under a list's name carries nothing about another list.
  *
- * `loop/research-batch-nineteen-audit.md` §4. `namesFault` kept a second REGISTER out of a bundle filed as
- * `register.obligations`, and nothing else, so a rule over Diary rode in one: filed by the owner's `propose` token,
- * shown whole to the member invited to Obligations alone, and installed at acceptance. The same held for a metric
- * whose `source` is Diary, a page whose table or figure reads Diary, an ingest that writes Diary and a digest that
- * mails Diary's rows. Each case below was filed before the guard asked which lists a declaration names, not only
- * which it declares.
+ * `namesFault` kept a second REGISTER out of a bundle filed as `register.obligations`, and nothing else, so a rule over
+ * Diary rode in one: filed by the owner's `propose` token, shown whole to the member invited to Obligations alone, and
+ * installed at acceptance. The same held for a metric whose `source` is Diary, a page whose table or figure reads
+ * Diary, an ingest that writes Diary and a digest that mails Diary's rows. Each case below was filed before the guard
+ * asked which lists a declaration names, not only which it declares.
  */
 
 import { test } from 'node:test';
@@ -128,7 +127,7 @@ const filed = (sql: NodeSql) => sql.all('SELECT 1 FROM suggestion').length;
 const accept = { decide: { option: 'accept' as const, reason: 'yes' } };
 
 const RIDERS: [string, Declaration[], RegExp][] = [
-  /* The audit's own. */
+  /* The first case measured. */
   ['a rule on Diary', [rule('diary')], /rule\.diary-watch.*diary/],
   /* A rule on Obligations that writes rows into Diary is about Diary as much as one that watches it. */
   ['a rule on Obligations that creates Diary rows', [rule('obligations', [{ create: { register: 'diary', bound: 1, fields: { body: '{what}' } } }], ['row'])], /diary/],
@@ -162,14 +161,13 @@ test('A BUNDLE NAMED FOR OBLIGATIONS THAT CARRIES ANYTHING ABOUT DIARY IS REFUSE
 });
 
 /**
- * What the filing check did not read, and the record held from the list's readers anyway (`loop/research-decide-reach.md`
- * N1, N2, N4, K7, K8 and K9, from audit forty's finding 1).
+ * What the filing check did not read, and the record held from the list's readers anyway.
  *
- * THE CHECK WALKED EVERY BODY AS IF IT WERE A PAGE'S, so a script's `reads` and `writes`, an arrival rule's door, a rule
- * with no row, a script naming no list and a door that calls out all named nothing but Obligations to it. Measured at
- * `bccc7ea8`, all six below were filed under `register.obligations` ("N1 kernel half ... AssertionError: filed"), and
- * Decide then held each one from the member invited to Obligations alone, since `scripts`, `automations` and `actions`
- * refuse her the same declarations. So the kernel filed them as a change to a list whose readers it would not show.
+ * THE CHECK WALKED EVERY BODY AS IF IT WERE A PAGE'S, so a script's `reads` and `writes`, an arrival rule's door, a
+ * rule with no row, a script naming no list and a door that calls out all named nothing but Obligations to it. Measured
+ * at `bccc7ea8`, all six below were filed under `register.obligations`, and Decide then held each one from the member
+ * invited to Obligations alone, since `scripts`, `automations` and `actions` refuse her the same declarations. So the
+ * kernel filed them as a change to a list whose readers it would not show.
  */
 const script = (id: string, reads: string[], writes: string[]): Declaration => ({
   id: `script.${id}`,
@@ -221,7 +219,7 @@ test('A BUNDLE NAMED FOR OBLIGATIONS CARRYING A SCRIPT, AN ARRIVAL RULE, A CLOCK
 });
 
 /* `{{trigger.row.what}}` IS THE RUN'S ROW, NOT A LIST CALLED `trigger`. Measured at `bccc7ea8`: a rule on Obligations
-   saying what came in was refused under `register.obligations` as reading `register.trigger` (K4). */
+   saying what came in was refused under `register.obligations` as reading `register.trigger`. */
 test("a rule on Obligations whose step says {{trigger.row.what}} is filed under register.obligations, since trigger is the run's", async () => {
   const { k, sql } = await record();
   const says: Declaration = {
@@ -272,10 +270,10 @@ test('a bundle filed under a name that is not a list is not held to one', async 
 /**
  * A declaration under the id of one installed about Diary, with a body about Obligations.
  *
- * `loop/research-batch-twenty-two-audit.md` §7. The guard read each declaration's new body and not what it replaces:
- * `metric.diary-count` redefined over Obligations was filed under `register.obligations` and installed, and every page
- * reading the Diary figure then read Obligations under a question the queue showed as a change to Obligations. The same
- * held for the rule, the page and the digest below, each measured filed before the guard read the installed body.
+ * The guard read each declaration's new body and not what it replaces: `metric.diary-count` redefined over Obligations
+ * was filed under `register.obligations` and installed, and every page reading the Diary figure then read Obligations
+ * under a question the queue showed as a change to Obligations. The same held for the rule, the page and the digest
+ * below, each measured filed before the guard read the installed body.
  */
 const renamed = (d: Declaration, id: string): Declaration => {
   const [kind, name] = id.split('.') as [string, string];
@@ -410,11 +408,11 @@ test('and a bundle that defines a figure only a page of Obligations reads is sti
 /**
  * A declaration under the id of an installed one whose every figure has no live metric, replaced under Obligations.
  *
- * `loop/research-bundle-reads.md` §2. `replacedAbout` read the installed body's lists and dropped the figures it could
- * not resolve, so a page or digest whose only figure was Diary's, retired or never declared, read as about no list at
- * all, and a bundle under `register.obligations` replaced it with an Obligations body: all four shapes below were
- * measured filed, accepted and installed (`{"ok":true,"value":{"id":"SG1"}}`). The same figure redefined from the same
- * question was already refused by `pageOfOthers`, so the guard disagreed with itself about one page.
+ * `replacedAbout` read the installed body's lists and dropped the figures it could not resolve, so a page or digest
+ * whose only figure was Diary's, retired or never declared, read as about no list at all, and a bundle under
+ * `register.obligations` replaced it with an Obligations body: all four shapes below were measured filed, accepted and
+ * installed (`{"ok":true,"value":{"id":"SG1"}}`). The same figure redefined from the same question was already refused
+ * by `pageOfOthers`, so the guard disagreed with itself about one page.
  */
 const tabled: Declaration = { ...table('obligations'), id: 'page.figures', body: { ...(table('obligations').body as object), page: 'figures' } as never };
 const mailing = (sections: unknown[]): Declaration => ({
@@ -470,9 +468,9 @@ test('and a bundle that replaces an Obligations page also reading a dead figure 
 /**
  * A page per skill, as `packages/seed/src/packs/agents.ts` writes `page.skill`, filed under `register.skills`.
  *
- * `loop/research-bundle-reads.md` §3. The guard read the diff's `row: '{{spoken}}'` as a figure the bundle did not
- * carry and refused the seed's own page under the list it is `for` ("reads the figure spoken, which it does not
- * carry"), while `pages.ts` `fill` answers `{{spoken}}` with the row's spoken id before it reads a field or a metric.
+ * The guard read the diff's `row: '{{spoken}}'` as a figure the bundle did not carry and refused the seed's own page
+ * under the list it is `for` ("reads the figure spoken, which it does not carry"), while `pages.ts` `fill` answers
+ * `{{spoken}}` with the row's spoken id before it reads a field or a metric.
  */
 const SKILLS_FIELDS: Field[] = [
   { id: 'name', type: 'text', required: true },

@@ -1,11 +1,11 @@
 /**
- * What `propose` files for an arrangement is what the accept does (`loop/research-batch-forty-four-audit.md` findings 2
- * and 3, the arranger's half; `declare`'s `plan-all-refusals.test.ts` holds the three functions this reads).
+ * What `propose` files for an arrangement is what the accept does (the arranger's half; `declare`'s
+ * `plan-all-refusals.test.ts` holds the three functions this reads).
  *
  * THE ARRANGER FILED WHAT THE ACCEPT REFUSED, HALF-WAY, and said an update was not taken when it was. `planAll` asked
  * each pack `unresolvedFault` and `conflictFault` and nothing else `install` refuses, carried `{ id, version }` and the
  * pack's file forward as the next pack's record, planned in the order it was given, and put every `kept` entry in the
- * step's `keeps`, a rebased one included. Measured by the audit's probes, re-run on the held wave forty-six tree:
+ * step's `keeps`, a rebased one included. Measured before the fix:
  *
  *     base 2.0.0, leaf 1.1.0       filed   accept PACK_REQUIRED "... Update leaf ... first"
  *     plus, then quux              filed   accept PROVIDES_CONFLICT "folk has a field called domain already ..."

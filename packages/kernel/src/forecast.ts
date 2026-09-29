@@ -57,16 +57,16 @@ export type Leg = {
   /**
    * The field holding the last day a row's money moves on. Nothing after it is walked; a step on the day itself is.
    *
-   * A LEG HAD NO END, SO A REPEATING ROW WALKED FOR EVER UNTIL SOMETHING CLOSED IT. The the old tool import closes a line
-   * the night after its `ends_on` passes, and until then a salary ending on 20 October walked 15 November, 15 December
-   * and every month to the horizon: measured in `test/forecast-ends.test.ts`, a USD 1,000.00 monthly line read
-   * USD 12,000.00 over a 365-day walk where the old tool itself counts one cheque. A runway too high is the one direction
-   * this walk must never be wrong in.
+   * A LEG HAD NO END, SO A REPEATING ROW WALKED FOR EVER UNTIL SOMETHING CLOSED IT. An importer that closes a line only
+   * the night after its `ends_on` passes leaves a gap, and until then a salary ending on 20 October walked 15 November,
+   * 15 December and every month to the horizon: measured in `test/forecast-ends.test.ts`, a USD 1,000.00 monthly line
+   * read USD 12,000.00 over a 365-day walk where the source itself counts one cheque. A runway too high is the one
+   * direction this walk must never be wrong in.
    *
-   * THE LAST PAYDAY, NOT THE LAST DAY WORKED, because that is what the old tool means by the value it is set from.
-   * `payDays` in its `app/src/lib/derive/money.js` drops a payday strictly after `ends_on` and keeps one on it, its
-   * money sheet labels the field "Until", and nothing there adds a final cheque after the day. So the end is inclusive
-   * and it bounds the day money moves, which is the only day this walk knows about. An empty value is no end.
+   * THE LAST PAYDAY, NOT THE LAST DAY WORKED, because that is what an `ends_on` means where it is set from: the source
+   * drops a payday strictly after `ends_on` and keeps one on it, labels the field "Until", and adds no final cheque
+   * after the day. So the end is inclusive and it bounds the day money moves, which is the only day this walk knows
+   * about. An empty value is no end.
    */
   ends?: string;
   /**
@@ -550,8 +550,9 @@ function occurrences(row: Held, until: number, today: string): { of: { day: stri
   const { first, last, cadence } = row;
   const start = noon(first);
   if (!Number.isFinite(start)) return { of: [], capped: false };
-  /* A ROW ENDED BEFORE ITS FIRST DAY WALKS NOTHING, one-off or not: see `Leg.ends`. The import writes a monthly row due
-     1 October for a line that ends on 28 September when the next payday is past the end, and that row is no cheque. */
+  /* A ROW ENDED BEFORE ITS FIRST DAY WALKS NOTHING, one-off or not: see `Leg.ends`. An import can write a monthly row
+     due 1 October for a line that ends on 28 September when the next payday is past the end, and that row is no cheque.
+     */
   if (last !== null && first > last) return { of: [], capped: false };
   if (cadence === null) return { of: start <= until ? [{ day: first, at: start }] : [], capped: false };
 
@@ -615,14 +616,12 @@ function* stepsOf(first: string, start: number, cadence: NonNullable<Cadence>): 
      AN `instant` IS NOT EXEMPT. `runway` holds a row's first day as `dayOf(first)`, the instant's
      first ten characters, so an instant on a month's last day is a month end here exactly as a `day` is.
 
-     EXCEPT ON A CYCLE OF WHOLE YEARS, which never leaves the month it started in. Audit fifty-eight
-     finding 10 walked a yearly bill taken on 28 February 2027 to 29 February 2028: an annual renewal
-     falls on its anniversary, and the anniversary of the 28th is the 28th. February is the only month
-     whose length changes from one year to the next, so it is the only one where the two readings
-     differ, and the clamp in `resolveDay` already gives a leap-day start the reading a person means:
-     28 February in a common year and 29 February again in the next leap year. A cycle that is not a
-     whole number of years does leave February, and there the end of February is still the end of
-     August or May. */
+     EXCEPT ON A CYCLE OF WHOLE YEARS, which never leaves the month it started in. Measured: a yearly bill taken on 28
+     February 2027 was walked to 29 February 2028: an annual renewal falls on its anniversary, and the anniversary of
+     the 28th is the 28th. February is the only month whose length changes from one year to the next, so it is the only
+     one where the two readings differ, and the clamp in `resolveDay` already gives a leap-day start the reading a
+     person means: 28 February in a common year and 29 February again in the next leap year. A cycle that is not a whole
+     number of years does leave February, and there the end of February is still the end of August or May. */
   if (cadence.kind === 'months') {
     const monthEnd = cadence.months % 12 !== 0 && endOfMonth(first) === first;
     for (let n = 1; ; n++) {

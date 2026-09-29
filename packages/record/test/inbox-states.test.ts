@@ -1,12 +1,12 @@
 /**
- * The inbox by state, with a count for each (`loop/research-legacy-keeps.md` section 8, K1).
+ * The inbox by state, with a count for each.
  *
  * WHAT WAS MEASURED BEFORE ANY OF THIS. `inbox` read only `untriaged` and `review` and checked no key it was handed, so
  * `api.inbox({ state: 'skipped' }, owner)` on a record holding one skipped and two untriaged arrivals answered the two
  * untriaged ones, as if the question had been the default, and carried no counts. An arrival a pattern skipped could
  * not be read back by anybody, and a skip pattern that is too wide is only ever found by reading what it skipped.
  *
- * THE TOKEN HALF IS NOT HERE. Whether an agent's record-wide token reads the inbox is his pick P2, and until he makes it
+ * THE TOKEN HALF IS NOT HERE. Whether an agent's record-wide token reads the inbox is a grant of its own, and without it
  * the owner reads it and every token is refused, as `read.test.ts` asserts. The last test holds the new argument to the
  * same refusal, so asking for a state is not a way round it.
  */

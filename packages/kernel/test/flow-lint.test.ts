@@ -1,5 +1,5 @@
 /**
- * An automation is a rule that has grown a trigger and steps (`loop/research-shell-automations.md` §2, §3).
+ * An automation is a rule that has grown a trigger and steps.
  *
  * WHAT IS ASSERTED HERE IS THE DEFINITION AND ITS LINT, NOT THE RUNNER. A rule whose trigger is a clock installs, a rule
  * that would install and then do nothing is refused with a sentence, and every rule written before `on:` existed still
@@ -63,7 +63,7 @@ async function install(...decls: Declaration[]) {
   return k.install([OBLIGATIONS, ...decls]);
 }
 
-/* ── the red the brief asked for, measured ─────────────────────────────── */
+/* ── what failed first, measured ───────────────────────────────────────── */
 
 test('A RULE ON A CLOCK, WITH NO REGISTER, INSTALLS, and answers that it runs as a run', async () => {
   const hourly = rule({ rule: 'hourly', on: { every: '1h' }, then: [{ notify: { say: 'Look at the gold rate.' } }], once_per: ['rule'] });
@@ -128,9 +128,9 @@ test('A ROW VERB ON A TRIGGER WITH NO ROW IS REFUSED, since it would reach for a
 });
 
 test('A CREATE ON A TRIGGER WITH NO ROW FILLS NOTHING FROM ONE, refused at install in the sentence its run would fail with', async () => {
-  /* MEASURED BEFORE THIS, on 25 September: `each: [party]` on a monthly clock and `{{what}}` on a button both installed,
-     and each run of either failed at its create (`clock-create.test.ts`), every month or every press, for a rule the
-     lint had called sound. The sentence is the runner's own (`rowlessCreate`), so the two cannot come to say it apart. */
+  /* MEASURED BEFORE THIS: `each: [party]` on a monthly clock and `{{what}}` on a button both installed, and each run of
+     either failed at its create (`clock-create.test.ts`), every month or every press, for a rule the lint had called
+     sound. The sentence is the runner's own (`rowlessCreate`), so the two cannot come to say it apart. */
   const crossed = rule({ rule: 'crossed', on: { every: '1mo', day: 1, at: '09:00' }, then: [{ create: { register: 'obligations', each: ['party'], fields: { what: 'Rent {{each.0}}' }, bound: 3 } }] });
   const copied = rule({ rule: 'copied', on: { manual: true }, steps: [{ set_var: { name: 'n', to: 'x' } }, { create: { register: 'obligations', fields: { what: 'Rent', party: 'for {{party}}' }, bound: 1 } }] });
   const a = validateDeclaration(crossed);
@@ -207,8 +207,8 @@ test('A CALL STEP NAMES A DECLARED CALL, never an address', () => {
   const calls = (to: string) => rule({ rule: 'poster', on: { written: { register: 'obligations', op: ['create'] } }, steps: [{ call: { ingest: to } }], once_per: ['what'] });
   assert.equal(code(calls('https://hooks.example.test')), 'DECLARATION_INVALID');
   assert.equal(code(calls('post_invoice')), null);
-  /* NOT INSTALLED: a `steps` body with no `then` is refused by the kernel's own `undeclarable` in `index.ts`, which
-     this brief does not own. The lint alone is asked, against the call as installed. */
+  /* NOT INSTALLED: a `steps` body with no `then` is refused by the kernel's own `undeclarable` in `index.ts`. The lint
+     alone is asked, against the call as installed. */
   const known = new Map([OBLIGATIONS, HOOK].map((d) => [d.id, d.body as Record<string, never>]));
   assert.equal(validateDeclaration(calls('post_nothing'), known)?.code, 'DECLARATION_UNKNOWN');
   assert.equal(validateDeclaration(calls('post_invoice'), known), null);
@@ -257,11 +257,11 @@ test('THE EXAMPLE IN 07 §6.2 LINTS AS PRINTED, so the page a stranger copies fr
   assert.equal(code(gold), null);
 });
 
-/* ── what the checker found untested ──────────────────────────────────── */
+/* ── what was untested ────────────────────────────────────────────────── */
 
 test('A TRIGGER NAMES WHAT IS INSTALLED: a register for writes, an ingest for arrivals, a day for a weekly clock', () => {
-  /* EACH OF THESE CHECKS COULD BE DELETED AND THE FILE ABOVE STAYED GREEN. Measured on 22 September by removing the
-     line and rerunning: the unknown register, the unknown ingest and the weekly clock with no day all survived. */
+  /* EACH OF THESE CHECKS COULD BE DELETED AND THE FILE ABOVE STAYED GREEN. Measured by removing the line and rerunning:
+     the unknown register, the unknown ingest and the weekly clock with no day all survived. */
   const known = new Map([OBLIGATIONS, HOOK].map((d) => [d.id, d.body as Record<string, never>]));
   const writes = rule({ rule: 'ghost', on: { written: { register: 'nobody', op: ['create'] } }, steps: [{ stop: true }] });
   assert.equal(validateDeclaration(writes, known)?.code, 'REGISTER_UNKNOWN');

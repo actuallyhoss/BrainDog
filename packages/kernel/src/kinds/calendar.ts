@@ -5,14 +5,12 @@
  * `instant` field. It may instead write its rows out, each `{ cells: [title, day] }`. `back:` and `ahead:` are how many
  * whole months it shows before and after this one, up to `MONTHS_MOST` each, `BACK` and `AHEAD` when it says neither.
  *
- * THE DEFAULTS ARE THE CONTRACT'S, IN THE ORDER IT NAMES THE KEYS. `loop/finish/contracts.md` §4.3 and
- * `loop/finish/pages.md` C4 both write "`ahead`, `back` ... defaults 0 and 2", so a calendar that says neither shows
- * this month and the two before it. A calendar meant to look forward says `ahead:`.
+ * THE DEFAULTS ARE THE CONTRACT'S, IN THE ORDER IT NAMES THE KEYS: "`ahead`, `back` ... defaults 0 and 2", so a
+ * calendar that says neither shows this month and the two before it. A calendar meant to look forward says `ahead:`.
  *
  * THE KERNEL READS THE MONTHS AND THE HOST DRAWS THEM. The answer carries `window`, the first day of the first month,
  * the last day of the last and today, all in the record's own zone, and every row whose day falls between the first
- * two, so a phone's agenda and a desk's month grid are drawn from one read and neither needs a second
- * (`loop/finish/pages.md` C4).
+ * two, so a phone's agenda and a desk's month grid are drawn from one read and neither needs a second.
  *
  * EVERY ROW OR NONE. A calendar that drew only the first rows it read would show empty days that are not empty, so
  * past `CALENDAR_MOST` it is refused, as a block that adds its rows up is (`pages.ts` `SUMS`), and it takes no `limit:`.

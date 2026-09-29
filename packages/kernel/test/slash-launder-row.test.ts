@@ -1,22 +1,22 @@
 /**
- * A secret carried into a question to Slash by way of a field of the row: audit forty-nine §7.
+ * A secret carried into a question to Slash by way of a field of the row.
  *
- * WHAT THE AUDIT MEASURED. The lint and the runner followed a secret field into a variable (`slash-vars-hidden.test.ts`)
- * and not into the row. A `set` step wrote `pin`'s value into `note`, a text field that may leave, and the question read
+ * WHAT WAS MEASURED. The lint and the runner followed a secret field into a variable (`slash-vars-hidden.test.ts`) and
+ * not into the row. A `set` step wrote `pin`'s value into `note`, a text field that may leave, and the question read
  * `note` from the row as it then was: `{{note}}`, `{{trigger.row.note}}`, `about: [note]`, and a `set_var` filled from
  * `note`, each installed clean and each sent `hunter2`. It also wrote the secret into a text field every reader of the
  * list sees, which is why the lint refuses it at install rather than only cleaning the question.
  *
- * AND SINCE AUDIT FIFTY-ONE §3 THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag`, and no longer the question that
- * reads it: a second rule on a later edit read `note` and sent `hunter2`, and no walk of one body could see that
+ * AND THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag`, and no longer the question that reads it: a second rule
+ * on a later edit read `note` and sent `hunter2`, and no walk of one body could see that
  * (`launder-across-rules.test.ts`). So each refusal below names the step that writes the field, and the bodies that
  * installed because nothing after the write read it are refused now too.
  *
- * AND SINCE WAVE FIFTY-FIVE THE RUNNER REFUSES THE COPY TOO. The stored cases let a rule written past the lint copy
- * `pin` into `note` and pinned that the row kept it, to reach the question after it; that copy is the leak, since every
- * reader of the list sees `note`. So a stored rule is now held to writing nothing from the secret, and the runner's
- * second line is measured over a run an earlier build took past its write: the step rows, the field and the run's
- * column are put in by SQL as that build left them, and this build takes the steps after.
+ * AND THE RUNNER REFUSES THE COPY TOO. The stored cases let a rule written past the lint copy `pin` into `note` and
+ * pinned that the row kept it, to reach the question after it; that copy is the leak, since every reader of the list
+ * sees `note`. So a stored rule is now held to writing nothing from the secret, and the runner's second line is
+ * measured over a run an earlier build took past its write: the step rows, the field and the run's column are put in by
+ * SQL as that build left them, and this build takes the steps after.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `slash-vars-hidden.test.ts` puts it, so the
  * pin is in the row before the run takes its first step. In use a secret field holds a vault grant's id and nothing

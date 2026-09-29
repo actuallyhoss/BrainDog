@@ -2,10 +2,9 @@
  * An enum sorts in the order it was declared.
  *
  * `tasks.priority` is declared `urgent, high, normal, low`, and ordered by it ascending the record answered
- * `high, low, normal, urgent`: A to Z by the stored word, or by the label where one was written. Pressing the
- * Priority header put Urgent last, or somewhere among the rest, in either direction
- * (`loop/research-living-in-it.md` section 5, measured at 07ba6dbd). His call 1 in that survey's section 8 chooses
- * between the two orders; W56-3 takes declared order as the survey's default, and the comment in `list` says so.
+ * `high, low, normal, urgent`: A to Z by the stored word, or by the label where one was written. Pressing the Priority
+ * header put Urgent last, or somewhere among the rest, in either direction (measured at 07ba6dbd). Which of the two
+ * orders is the owner's call; declared order is the default, and the comment in `list` says so.
  *
  * The same rows are sorted by the browser in `apps/web/src/lib/record/enum-order.test.ts`, so the two engines are
  * held to one order.

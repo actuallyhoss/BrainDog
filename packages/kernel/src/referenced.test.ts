@@ -1,6 +1,5 @@
 /**
- * `referencedBy`, the check behind a list's `delete: refuse_while_referenced` (`referenced.ts`,
- * `loop/finish/contracts.md` §2.1 and §4.2).
+ * `referencedBy`, the check behind a list's `delete: refuse_while_referenced` (`referenced.ts`).
  *
  * IT IS DRIVEN HERE ON ITS OWN, against a real record, because its one call in the write path's delete branch is
  * written into `index.ts` by that file's owner. What this proves is the answer that call hands back: who points at a

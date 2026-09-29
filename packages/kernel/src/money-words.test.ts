@@ -1,5 +1,5 @@
 /**
- * A sentence a rule fills writes money the way every other sentence the record keeps does (design DSN-4).
+ * A sentence a rule fills writes money the way every other sentence the record keeps does.
  *
  * THE KERNEL HAD TWO SPELLINGS. `rules.ts`'s `moneyWords` wrote `toFixed` with no grouping and a hyphen for a minus, so a
  * question or a note stored `GBP 2400.00` and `GBP -39.00`, while `ingest.ts`'s `moneyText`, which a digest writes

@@ -1,8 +1,8 @@
 /**
  * A rule that tags and a list whose `tags` is typed, installed in either order, and a `list<enum>` that holds the word.
  *
- * TWO GAPS LEFT BY WAVE THIRTY-EIGHT's CHECK (`loop/BACKLOG.md`, "Left by wave thirty-eight"). That check asked a list's
- * `tags` about the rules that tag it only when the list's declaration arrived, and it asked the shape alone:
+ * TWO GAPS LEFT BY THE FIRST CHECK. That check asked a list's `tags` about the rules that tag it only when the list's
+ * declaration arrived, and it asked the shape alone:
  *
  *   - `tags: list<enum>` with `late` among its values, under `rule.late` tagging `late`, was refused "would refuse every
  *     tag it writes", though every write that rule makes is a value the enum takes. Driven before this file: refused
@@ -243,7 +243,7 @@ test("A PACK'S RULE STAGED OVER A NARROWED tags IS REFUSED TOO, since every pack
   assert.match(fixOf(staged), /rule\.late tags jobs at then\[0\], so int would refuse every tag it writes/);
 });
 
-/* ─── (3) THE ORDERS WAVE THIRTY-NINE LEFT (`loop/research-batch-thirty-nine-audit.md` findings 3, 5 and 9) ─── */
+/* ─── (3) THE ORDERS STILL UNASKED: A RETIRED tags, A STAGED LIST, A MOVED DOOR ─── */
 
 const RETIRED = { id: 'tags', type: 'list', of: 'text', retired: true };
 const NOTING: Declaration = {
@@ -254,9 +254,9 @@ const NOTING: Declaration = {
 const NOTE = { id: 'note', type: 'text' };
 
 test('RETIRING tags UNDER A RULE THAT TAGS IS REFUSED, in either order, as tags: int is', async () => {
-  /* FINDING 3. Both halves skipped a retired `tags` on purpose, and the write path then answers `FIELD_UNKNOWN` for it,
-     so the pass's one patch went whole. Measured by the audit's `tags3.mts` before this: retired under `rule.late`
-     installed, and the Rent went in as `{"what":"Rent"}`, without its tag and without the `set` of `note` beside it. */
+  /* Both halves skipped a retired `tags` on purpose, and the write path then answers `FIELD_UNKNOWN` for it, so the
+     pass's one patch went whole. Measured before this: retired under `rule.late` installed, and the Rent went in as
+     `{"what":"Rent"}`, without its tag and without the `set` of `note` beside it. */
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok((await k.install([jobs(NOTE), NOTING])).ok);
   const out = await k.install([jobs(NOTE, RETIRED)]);
@@ -288,9 +288,9 @@ test('A LIST RESENT WITH THE tags IT ALREADY HAD RETIRED UNDER A RULE is not bla
 });
 
 test("A PACK THAT NARROWS tags UNDER AN INSTALLED RULE IS REFUSED BY stageInstall, which asked only the rule half", async () => {
-  /* FINDING 5, T3 and T3b. `stageInstall` asked `taggingRefused` (a rule in the batch) and never `taggerOf` (a list in
-     the batch), and `plan`'s own FIELD_TYPE_CHANGED asks only about rows. Measured by the audit before this: both staged,
-     applied, and the next Rent held no tag. */
+  /* `stageInstall` asked `taggingRefused` (a rule in the batch) and never `taggerOf` (a list in the batch), and
+     `plan`'s own FIELD_TYPE_CHANGED asks only about rows. Measured before this: both staged, applied, and the next Rent
+     held no tag. */
   for (const tags of [enumTags('chase'), { id: 'tags', type: 'int' }, RETIRED]) {
     const k = await open(LATE);
     const staged = await k.stageInstall([{ ...jobs(tags), pack: 'third' }]);
@@ -302,9 +302,9 @@ test("A PACK THAT NARROWS tags UNDER AN INSTALLED RULE IS REFUSED BY stageInstal
 });
 
 test('RE-POINTING A DOOR UNDER AN ARRIVAL RULE THAT TAGS IS ASKED, alone and beside the rule resent unchanged', async () => {
-  /* FINDING 9. An arrival rule's list is its door's `writes.register`, so a batch holding only the door moved the rule
-     to Bills and neither half asked. Measured by the audit before this: both installed, and the next arrival's run
-     failed at its `tag` step and took no step after it. */
+  /* An arrival rule's list is its door's `writes.register`, so a batch holding only the door moved the rule to Bills
+     and neither half asked. Measured before this: both installed, and the next arrival's run failed at its `tag` step
+     and took no step after it. */
   const door = (register: string): Declaration => ({
     id: 'ingest.jobs_in',
     kind: 'ingest',
@@ -339,10 +339,10 @@ test('RE-POINTING A DOOR UNDER AN ARRIVAL RULE THAT TAGS IS ASKED, alone and bes
   const same = await k.install([door('jobs')]);
   assert.ok(same.ok, fixOf(same));
 
-  /* AND OVER A LIST THAT ALREADY REFUSES THE TAG, which is the case the resend above cannot tell apart: Jobs takes every
-     tag, so a check that read every door in the batch as moved answered the same there. The door is written straight into
-     the table at Bills, as an earlier build let it install, and resent as it stands; the checker of this wave mutated
-     the move to "every door sent" and the three cases above still passed. */
+  /* AND OVER A LIST THAT ALREADY REFUSES THE TAG, which is the case the resend above cannot tell apart: Jobs takes
+     every tag, so a check that read every door in the batch as moved answered the same there. The door is written
+     straight into the table at Bills, as an earlier build let it install, and resent as it stands; with the move
+     mutated to "every door sent" the three cases above still passed. */
   const sql = openSqlite();
   const before = await openRecord(sql, fixedClock(NOW));
   assert.ok((await before.install([jobs(), bills, door('jobs'), arrived])).ok);
@@ -353,8 +353,8 @@ test('RE-POINTING A DOOR UNDER AN ARRIVAL RULE THAT TAGS IS ASKED, alone and bes
 });
 
 test('A RULE RESENT WITH THE SAME BYTES OVER A LIST THAT ALREADY REFUSES ITS TAG IS NOT BLAMED; ANY EDIT TO IT IS', async () => {
-  /* A RECORD AN EARLIER BUILD LEFT: `rule.late` installed, and then `tags: int` under it, which the build before wave
-     thirty-eight let through. Written into the table as that build left it, and read by a record opened over it. */
+  /* A RECORD AN EARLIER BUILD LEFT: `rule.late` installed, and then `tags: int` under it, which an earlier build let
+     through. Written into the table as that build left it, and read by a record opened over it. */
   const sql = openSqlite();
   const first = await openRecord(sql, fixedClock(NOW));
   assert.ok((await first.install([jobs(), LATE])).ok);

@@ -1,5 +1,5 @@
 /**
- * The grammars a description is drafted in, held to the lint that decides (`packages/record/src/grammar.ts`, PGS-7).
+ * The grammars a description is drafted in, held to the lint that decides (`packages/record/src/grammar.ts`).
  *
  * A GRAMMAR IS A REFERENCE AND THE LINT IS THE JUDGE, so a grammar that drifts from the lint teaches a model to write what
  * is then refused. Each list of keys here is held to the `allowed` the lint's own refusal names, each rule trigger and

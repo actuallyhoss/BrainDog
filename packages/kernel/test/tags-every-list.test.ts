@@ -1,13 +1,13 @@
 /**
  * Every list takes `tags`, declared or not, the way every row takes an id.
  *
- * MEASURED IN `loop/research-shell-seed-next.md` N3. `tags` is the record's own marker field: the `example` marker, `formed`,
- * the `tag` and `untag` rule actions and Slash's "not an example" count all read or write it, and none of them names a
- * field. It existed only because the seed appends it to its own lists (`packages/seed/src/index.ts` `withTags`), so a list
- * declared any other way had none. Driven through `openRecord`, a list `jobs` without `tags` and a rule
+ * MEASURED. `tags` is the record's own marker field: the `example` marker, `formed`, the `tag` and `untag` rule actions
+ * and Slash's "not an example" count all read or write it, and none of them names a field. It existed only because the
+ * seed appends it to its own lists (`packages/seed/src/index.ts` `withTags`), so a list declared any other way had
+ * none. Driven through `openRecord`, a list `jobs` without `tags` and a rule
  * `then: [{ tag: late }, { note: 'late one' }]`: the rule installed, fired, and its patch was refused `FIELD_UNKNOWN`,
- * which took the note in the same rule with it. The row had no tags, the log had only the `create`, and the one trace was
- * a `write.refused` observation counter nobody reads.
+ * which took the note in the same rule with it. The row had no tags, the log had only the `create`, and the one trace
+ * was a `write.refused` observation counter nobody reads.
  *
  * THE DECLARED FIELD LIST STAYS WHAT SOMEBODY DECLARED. An agent reading `register(id)` to learn what a list holds should
  * not find a field nobody wrote down; the predicate vocabulary (`schemaOf`) is where `tags` appears, because a
@@ -117,12 +117,12 @@ test('A LIST THAT DECLARES ITS OWN tags KEEPS ITS DECLARATION, an enum refusing 
   assert.equal(k.create('jobs', { what: 'y', tags: ['sideways'] }, { actor: 'p_1' }).ok, false);
 });
 
-/* THE LIST THAT USED TO DECLARE `tags` MAY STOP DECLARING IT. Measured by the checker on 22 September: a list declaring
-   `tags` as `list<text>` over one tagged row, changed to leave `tags` out, was refused `WOULD_ORPHAN` with "Mark it
-   retired rather than leaving it out", though the field every list takes reads those values exactly as before. Following
-   that fix made it worse: a retired `tags` is a choice the list made, so the next `tag` was `FIELD_UNKNOWN`. It also
-   blocked the seed ever dropping the `tags` it appends to its own lists on a record with a tagged row. A `tags` of
-   another shape is still a field the implicit one would misread, so a `text` one left out is still refused. */
+/* THE LIST THAT USED TO DECLARE `tags` MAY STOP DECLARING IT. Measured: a list declaring `tags` as `list<text>` over
+   one tagged row, changed to leave `tags` out, was refused `WOULD_ORPHAN` with "Mark it retired rather than leaving it
+   out", though the field every list takes reads those values exactly as before. Following that fix made it worse: a
+   retired `tags` is a choice the list made, so the next `tag` was `FIELD_UNKNOWN`. It also blocked the seed ever
+   dropping the `tags` it appends to its own lists on a record with a tagged row. A `tags` of another shape is still a
+   field the implicit one would misread, so a `text` one left out is still refused. */
 test('LEAVING OUT A DECLARED tags THE IMPLICIT ONE READS IS NOT AN ORPHAN, and the row stays tagged and taggable', async () => {
   for (const declared of [
     { id: 'tags', type: 'list', of: 'text' },

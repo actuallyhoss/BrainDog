@@ -1,12 +1,11 @@
 /**
  * What somebody invited to one list is told when they reach for the record itself.
  *
- * `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `whoami`, `members`, `slash`,
- * `listGrants`, `actions`, `planPack`, `decide`) answering a one-list colleague with "Name one of those, or ask the
- * owner for a record-wide token." That sentence is right for an agent's token, which is what it was written for. The
- * colleague is a person who signed in from an invitation, holds no token and was never offered one, and it is the
- * sentence on `/inbox`, `/slash`, `/packs` and every `/start` tile. A person is told about their invitation; a token
- * is still told about tokens.
+ * Measured: nine methods (`inbox`, `packs`, `whoami`, `members`, `slash`, `listGrants`, `actions`, `planPack`,
+ * `decide`) answering a one-list colleague with "Name one of those, or ask the owner for a record-wide token." That
+ * sentence is right for an agent's token, which is what it was written for. The colleague is a person who signed in
+ * from an invitation, holds no token and was never offered one, and it is the sentence on `/inbox`, `/slash`, `/packs`
+ * and every `/start` tile. A person is told about their invitation; a token is still told about tokens.
  */
 
 import { test } from 'node:test';
@@ -25,7 +24,7 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; allowed?: readonly string[] } };
 
-test('A PERSON INVITED TO ONE LIST IS NOT TOLD TO ASK FOR A TOKEN, by `allows` or by the methods finding 6 measured', async () => {
+test('A PERSON INVITED TO ONE LIST IS NOT TOLD TO ASK FOR A TOKEN, by `allows` or by the methods measured', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 22, 12)) });
   assert.ok((await api.kernel.install([TASKS])).ok);
@@ -72,9 +71,9 @@ test('and a token held to one list is still told about tokens, because a wider o
 
 /**
  * AND THE LIST IS NAMED AS `boot` NAMES IT. `allows` joined `ctx.registers`, which are ids, so a member of the seed's
- * Money list read "you were invited to obligations and nothing else" on the screen whose rail said Money
- * (`loop/research-scoped-leftovers.md` §2). The name is the declaration's; `allowed` stays ids, since an agent sends one
- * of those back, and a token is still told the id for the same reason.
+ * Money list read "you were invited to obligations and nothing else" on the screen whose rail said Money. The name is
+ * the declaration's; `allowed` stays ids, since an agent sends one of those back, and a token is still told the id for
+ * the same reason.
  */
 test('A PERSON IS TOLD THE NAMES OF THE LISTS THEY WERE INVITED TO, joined as a sentence, and `allowed` keeps the ids', async () => {
   const MONEY = {

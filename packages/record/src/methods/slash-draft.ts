@@ -1,6 +1,6 @@
 /**
  * `slashDraft`: what the owner described, drafted by Slash's model, every draft tried with `previewChange` and mended at
- * most twice, and nothing filed (`loop/finish/contracts.md` §2.4, `loop/finish/pages.md` C3).
+ * most twice, and nothing filed.
  *
  * IT IS `slashPropose({ asked })` WITHOUT THE LAST STEP. A page that asks Slash for a desk, and the first run, show the
  * drafts drawn before anything is written, and the owner keeps one or asks again; `slashPropose` files what this would

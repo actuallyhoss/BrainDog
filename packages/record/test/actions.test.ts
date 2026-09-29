@@ -1,5 +1,5 @@
 /**
- * `resumeAction`, the door that starts a paused scheduled action again (`loop/DIRECTION.md` §0b).
+ * `resumeAction`, the door that starts a paused scheduled action again.
  *
  * The kernel's own test holds the mechanism. What is held here is the door: a 401 pauses a `poll`, only an
  * owner in a browser resumes it, an argument the call does not take is refused, and an action that is not

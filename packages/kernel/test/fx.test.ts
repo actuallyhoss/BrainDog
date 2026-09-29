@@ -52,11 +52,10 @@ test('ACROSS: one currency is one amount, every rate converts, and one missing r
     { currency: 'USD', amount: 10_050, day: '2026-09-16' },
   ];
   assert.deepEqual(across(amounts.slice(1), 'USD', [], '2026-09-17'), { kind: 'one', currency: 'USD', amount: 350_050 });
-  /* Each amount at the rate as of its own day: 3,400 at 48 and 100.50 at 50.
-     `asOf` IS THE OLDEST OF THE TWO RATES USED AND NOT THE NEWEST. It read the newest until
-     September 20th, which made a figure sound more current than it was: half of this one is
-     converted at the 1st and the answer said the 15th. A figure is only as current as the
-     stalest rate behind it, which is what `rateFor`'s via rule one function away already said. */
+  /* Each amount at the rate as of its own day: 3,400 at 48 and 100.50 at 50. `asOf` IS THE OLDEST OF THE TWO RATES USED
+     AND NOT THE NEWEST. It once read the newest, which made a figure sound more current than it was: half of this one
+     is converted at the 1st and the answer said the 15th. A figure is only as current as the stalest rate behind it,
+     which is what `rateFor`'s via rule one function away already said. */
   assert.deepEqual(across(amounts, 'EGP', RATES, '2026-09-17'), {
     kind: 'converted',
     currency: 'EGP',

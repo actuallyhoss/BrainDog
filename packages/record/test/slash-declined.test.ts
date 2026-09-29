@@ -1,20 +1,21 @@
 /**
- * A press the included model's ceiling turned away before anything was sent, said as that and not as a model that did not
- * answer (`loop/research-batch-sixty-four-audit.md` finding 5).
+ * A press the included model's ceiling turned away before anything was sent, said as that and not as a model that did
+ * not answer.
  *
- * WHAT WAS MEASURED BEFORE THIS FILE. The audit's R4 record, 300 lists, puts a prompt of 51,152 bytes on the press, and
- * the Worker's `includedInference` reckons its worst case past the 232 neurons the operator's ceiling counts an ask at, so
+ * WHAT WAS MEASURED BEFORE THIS FILE. A record of 300 lists puts a prompt of 51,152 bytes on the press, and the
+ * Worker's `includedInference` reckons its worst case past the 232 neurons the operator's ceiling counts an ask at, so
  * it throws `NotSent` (`sent: false`) before the binding: the hold released, no `call` row, nothing asked. The record's
- * catch had one sentence for every throw, "The model did not answer, so Slash's own rules drafted these.", and the press
- * returned nothing else a screen could read, so the Slash screen kept saying the included model drafts on a record where
- * every press and every daily look will be the rules' until the record shrinks. The refusal's own fix ("Raise the ceiling
- * for this job, or send fewer rows") is the operator's, and the owner can do neither, so it is not what he is told.
+ * catch had one sentence for every throw, "The model did not answer, so Slash's own rules drafted these.", and the
+ * press returned nothing else a screen could read, so the Slash screen kept saying the included model drafts on a
+ * record where every press and every daily look will be the rules' until the record shrinks. The refusal's own fix
+ * ("Raise the ceiling for this job, or send fewer rows") is the operator's, and the owner can do neither, so it is not
+ * what he is told.
  *
- * THE MODELS BELOW THROW AS THE HOSTS DO: `NotSent` is an `Error` with `sent: false` under the model `included`, and the
- * endpoint's `SlashKeyClosedError` is an `Error` with `sent: false` under `endpoint`, the only other `sent: false` either
- * host throws (`grep -rn "sent = false" apps packages`). A key that would not open is not a record too large, so that one
- * keeps the old sentence. RED BEFORE THE FIX, measured on 24 September: 0 pass, 2 fail, `large` undefined on both presses
- * and the dropped line the old one.
+ * THE MODELS BELOW THROW AS THE HOSTS DO: `NotSent` is an `Error` with `sent: false` under the model `included`, and
+ * the endpoint's `SlashKeyClosedError` is an `Error` with `sent: false` under `endpoint`, the only other `sent: false`
+ * either host throws (`grep -rn "sent = false" apps packages`). A key that would not open is not a record too large, so
+ * that one keeps the old sentence. RED BEFORE THE FIX, measured: 0 pass, 2 fail, `large` undefined on both presses and
+ * the dropped line the old one.
  */
 
 import { test } from 'node:test';

@@ -1294,10 +1294,10 @@ test('NO FOURTH LIST: nothing outside two named places decides for itself what a
      `Intl` and SUBTRACTS a handful of codes that are not money anybody keeps books in, each with
      its reason, which can only ever fail to offer a code and can never admit one the write refuses.
 
-     AND A LONG LIST OF REAL CODES IS THE OTHER SHAPE, caught by counting rather than by name. The
-     threshold is deliberately well above the twelve `currencies.ts` legitimately holds. The rates
-     form's list of what one rates source publishes was allowed here until USE-5 made rates a preset
-     of the new-action sheet and the list went with the form. */
+     AND A LONG LIST OF REAL CODES IS THE OTHER SHAPE, caught by counting rather than by name. The threshold is
+     deliberately well above the twelve `currencies.ts` legitimately holds. The rates form's list of what one rates
+     source publishes was allowed here until rates became a preset of the new-action sheet and the list went with the
+     form. */
   const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
   const CLAIMS_THE_STANDARD = /(?:function|const|let|var|type|interface)\s+(ISO_?4217\w*|ALL_CURRENCIES|CURRENCY_CODES)\b/u;
 

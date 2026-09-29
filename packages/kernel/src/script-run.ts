@@ -1,10 +1,10 @@
 /**
  * A script's run, applied: what the record does with a `script.run` job before and after a host's sandbox runs it.
  *
- * `loop/research-shell-scripts.md` Brief 3, and DIRECTION section 22. `script.ts` fires one `script.run` outbox row.
- * The pass (`actions.ts` `runActions`) leases it with every other job, `prepareScript` turns it into a `Scripted` job
- * carrying the declaration at the version it fired under, the host runs the source, and `finishScript` applies what came
- * back. This file never runs anything, for the reason `script.ts` gives.
+ * `script.ts` fires one `script.run` outbox row. The pass (`actions.ts` `runActions`) leases it with every other job,
+ * `prepareScript` turns it into a `Scripted` job carrying the declaration at the version it fired under, the host runs
+ * the source, and `finishScript` applies what came back. This file never runs anything, for the reason `script.ts`
+ * gives.
  *
  * THE SANDBOX'S ANSWER IS A REQUEST, NOT A WRITE. Each write it asks for is checked against the declaration's own
  * `writes:` here, on the record's side, and then goes through the ordinary write path as `script:<id>@v<n>`, so the
@@ -17,8 +17,8 @@
  * and a refusal is a value here rather than a throw, which is exactly the case `attempt` was written for.
  *
  * WHY THE ANSWER TYPE IS COPIED AND NOT IMPORTED. `@braindog/script` is rank 12 and the kernel is rank 7 (`31-STACK`
- * section 2), so the shape is written out here structurally, as `PullHandoff` is for the connector. Brief 4's
- * self-host test hands a real `ScriptAnswer` to this file, and that is where a drift between the two goes red.
+ * section 2), so the shape is written out here structurally, as `PullHandoff` is for the connector. The self-host's
+ * test hands a real `ScriptAnswer` to this file, and that is where a drift between the two goes red.
  */
 
 import type { Result } from '@braindog/ports';
@@ -114,9 +114,9 @@ export const LOG_BYTES = 8 * 1024;
  * THE CEILING AND NOT THE DEFAULT OF 200, for the reason `FETCHES_UNSAID` in `actions.ts` gives: both are copies, and
  * if the sandbox's default is ever raised a copied default would refuse every honest run above the old number, where a
  * copied ceiling still holds the line no declaration can move. It also caps a declared `limits.writes` on a script
- * installed before `scriptBody` refused one over `SCRIPT_CEILINGS` (`script.ts`). Audit thirty-four measured
- * 5,000 creates from a script with no limit applied in one transaction of 1.0 to 3.4 seconds, and on a Durable Object
- * that is the record's one thread.
+ * installed before `scriptBody` refused one over `SCRIPT_CEILINGS` (`script.ts`). Measured: 5,000 creates from a script
+ * with no limit applied in one transaction of 1.0 to 3.4 seconds, and on a Durable Object that is the record's one
+ * thread.
  */
 export const WRITES_CEILING = 1_000;
 
@@ -146,12 +146,12 @@ function cutLog(log: string): string {
  *
  * AND THE LISTS THE VERSION READ AND WROTE GO BESIDE IT, as `to_v.lists`, because the log quotes them and nobody else
  * should read it. A run line is about a declaration, and the record hands a line about a declaration to every
- * whole-record reader, so a member at `write` held to `append` on Money, refused `list money`, read "Salary: Omar 91000"
- * off the run line in `recentHistory` and `whatsNew` (`loop/research-batch-thirty-five-audit.md` §1). `lineOf` in
- * `@braindog/record` now hands the log only to an owner who reads every one of these lists, and `--redacted--` to
- * everybody else, as the ledger hands a money field. They are kept here rather than looked up there because the run
- * outlives its version: the list a retired version read is the one its log quotes. The writes count too, because a
- * log can quote what a fetch brought back before it was written into a list the reader is refused.
+ * whole-record reader, so a member at `write` held to `append` on Money, refused `list money`, read "Salary: Omar
+ * 91000" off the run line in `recentHistory` and `whatsNew`. `lineOf` in `@braindog/record` now hands the log only to
+ * an owner who reads every one of these lists, and `--redacted--` to everybody else, as the ledger hands a money field.
+ * They are kept here rather than looked up there because the run outlives its version: the list a retired version read
+ * is the one its log quotes. The writes count too, because a log can quote what a fetch brought back before it was
+ * written into a list the reader is refused.
  *
  * AN EMPTY LOG ADDS NOTHING, so a script that says nothing leaves the event exactly as a `call`'s.
  */
@@ -299,7 +299,7 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   }
 
   /* THE COUNT IS CHECKED HERE TOO, AND FIRST. The sandbox stops at `limits.writes`, but the count is what a host could
-     get wrong in the way that costs the most: audit thirty-four handed back 500 creates from a script declaring 2 and
+     get wrong in the way that costs the most: a host measured handing back 500 creates from a script declaring 2 and
      all 500 landed. Refused before a single register is resolved, so an oversized answer costs one comparison. */
   const declared = decl.limits?.writes;
   if (answer.writes.length > Math.min(declared ?? WRITES_CEILING, WRITES_CEILING)) {
@@ -338,9 +338,9 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   const note = `Written by ${actor}.`;
   let lost = false;
   let failedAt = -1;
-  /* UNDER THE CHAIN THAT QUEUED THE JOB, when a rule's step queued it (`Chain` in `flow.ts`). Without it the writes below
-     reached the rules as a stranger's, at depth 0, and a rule whose script wrote the row that fired it started itself
-     again on every run: audit sixty-four's L1 ran the script twelve times from one update and was still going. */
+  /* UNDER THE CHAIN THAT QUEUED THE JOB, when a rule's step queued it (`Chain` in `flow.ts`). Without it the writes
+     below reached the rules as a stranger's, at depth 0, and a rule whose script wrote the row that fired it started
+     itself again on every run: measured, it ran the script twelve times from one update and was still going. */
   const chain = chainOfJob(deps.sql, job.id);
   const applied = underChain(deps.sql, chain, () => attempt<unknown>(deps.sql, deps.transaction, () => {
     /* THE ACK GOES FIRST AND INSIDE. A lease that lapsed while the sandbox ran belongs to whoever reclaimed it, and
@@ -352,10 +352,10 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     }
     /* AN UPDATE WITH NO WHOLE-NUMBER VERSION IS WRITTEN WITHOUT COMPARING, which is what the write path offers any
        caller that leaves `version` out. Handed on as it came, `ctx.update(spoken, patch)` reached the write as `NaN`
-       (or `null` over JSON) and was refused with "Leave it out to write without comparing", a fix no script can
-       follow, so every such run was refused and the third paused the script (audit thirty-four, finding 6). Reading
-       NaN as "none" gives a script nothing it could not already have by passing the row's current version, and the
-       prelude refuses a version that was given but is not a whole number, so a typo is not silently read as "none". */
+       (or `null` over JSON) and was refused with "Leave it out to write without comparing", a fix no script can follow,
+       so every such run was refused and the third paused the script. Reading NaN as "none" gives a script nothing it
+       could not already have by passing the row's current version, and the prelude refuses a version that was given but
+       is not a whole number, so a typo is not silently read as "none". */
     for (const [i, w] of answer.writes.entries()) {
       const version = w.op === 'update' && Number.isSafeInteger(w.version) ? { version: w.version } : {};
       const out =
@@ -410,13 +410,13 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
  * because a door or a rule can still queue runs the schedule row does not gate, and each of those would otherwise be
  * another notification about the same stop.
  *
- * ONLY RUNS OF THE SOURCE NOW INSTALLED ARE COUNTED (audit thirty-four, finding 9). The streak read the last three
- * events whatever wrote them, and two things were measured wrong. Two refusals under v1 and one under the owner's fixed
- * v2 paused v2 on its first failure, "its last 3 runs were refused", so only events signed `script:<id>@v<active>`
- * count, and installing a version starts the count again. And a `failed`, `held` or `dropped` between refusals broke
- * the streak, so six refusals interleaved with six host failures paused nothing, though none of those three ran the
- * source; they are skipped, so they neither break the streak nor count in it. A resume is written with no `to_v` and
- * is kept in the read, so it still breaks the streak.
+ * ONLY RUNS OF THE SOURCE NOW INSTALLED ARE COUNTED. The streak read the last three events whatever wrote them, and two
+ * things were measured wrong. Two refusals under v1 and one under the owner's fixed v2 paused v2 on its first failure,
+ * "its last 3 runs were refused", so only events signed `script:<id>@v<active>` count, and installing a version starts
+ * the count again. And a `failed`, `held` or `dropped` between refusals broke the streak, so six refusals interleaved
+ * with six host failures paused nothing, though none of those three ran the source; they are skipped, so they neither
+ * break the streak nor count in it. A resume is written with no `to_v` and is kept in the read, so it still breaks the
+ * streak.
  */
 function pauseAfterRefusals(deps: ScriptRunDeps, script: string): void {
   const active = activeScript(deps.sql, script);

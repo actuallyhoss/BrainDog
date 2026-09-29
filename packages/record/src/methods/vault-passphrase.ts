@@ -1,6 +1,6 @@
 /**
  * The vault passphrase, the record's half: `setVaultPassphrase` and `clearVaultPassphrase`, VAULT, and `unlockVault`,
- * INTERNAL (`loop/finish/contracts.md` §2.5 and §2.8, `docs/12-SECURITY.md` §6, "The optional second factor").
+ * INTERNAL (`docs/12-SECURITY.md` §6, "The optional second factor").
  *
  * THE VAULT GATE COMES FIRST AND THE HOST'S STEP ONLY AFTER IT. Each host hands these a step holding the passphrase and
  * its root key (`withVaultPassphrase` and `unlockedKey` in `packages/host/src/passphrase.ts`), and the kernel calls it

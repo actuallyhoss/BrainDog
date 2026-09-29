@@ -1,6 +1,6 @@
 /**
- * Stopping a member and letting them back in, as `suspendMember` answers it (`loop/finish/contracts.md` §2.5, X11), and
- * the question a door asks before it chooses `STOPPED` as its sentence (`stopped`).
+ * Stopping a member and letting them back in, as `suspendMember` answers it, and the question a door asks before it
+ * chooses `STOPPED` as its sentence (`stopped`).
  *
  * CALLED ON `members.ts` ITSELF, and not through `makeKernel`: what is proved here is what `suspend` answers and what
  * `stopped` says, which holds whether or not the kernel's facade has passed the answer through yet.

@@ -1,10 +1,9 @@
 /**
- * Every trigger starts (`loop/finish/shell.md` AUT-1, `loop/finish/contracts.md` §4.1): a figure crossing its line, a
- * decision in Decide, a clock's `late:`, a clock edited while its turn is pending, and one clock turn delivered twice.
+ * Every trigger starts: a figure crossing its line, a decision in Decide, a clock's `late:`, a clock edited while its
+ * turn is pending, and one clock turn delivered twice.
  *
- * WRITTEN BY READING, NOT RUN, as the finish's builders work (`loop/finish/rules.md` §10): each test drives the kernel's
- * own doors (`install`, `create`, `decide`, `purge`, `drain`) and reads the tables the runner writes, so it holds the
- * behaviour the contract names and not the source that gives it.
+ * WRITTEN BY READING: each test drives the kernel's own doors (`install`, `create`, `decide`, `purge`, `drain`) and
+ * reads the tables the runner writes, so it holds the behaviour the contract names and not the source that gives it.
  */
 
 import { test } from 'node:test';

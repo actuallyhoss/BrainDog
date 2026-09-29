@@ -1,6 +1,6 @@
 /**
- * The record's method for trying a whole change before anybody accepts it (`loop/finish/contracts.md` §2.4, pages C2).
- * What it does is `../preview-change.ts`; this file is the door, and its first statement is the guard.
+ * The record's method for trying a whole change before anybody accepts it. What it does is `../preview-change.ts`; this
+ * file is the door, and its first statement is the guard.
  *
  * HANDED `index.ts`'s WAY OF HOLDING A PAGE AS WELL AS `RecordDeps`, which is why `index.ts` spreads this file itself
  * rather than through `methods/index.ts`, as it spreads `jobs.ts`. `RecordDeps` carries the guards every method needs;

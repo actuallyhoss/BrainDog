@@ -1,11 +1,11 @@
 /**
- * An added `ref` lands by rule only into a list the key reads (`loop/research-batch-thirty-five-audit.md` finding 5).
+ * An added `ref` lands by rule only into a list the key reads.
  *
  * `byRule` asked whether the key is the owner's and reaches the list the field is added to, and never about the list a
- * `ref` points at. The audit's `reads.mts ref` measured an owner's key held to Projects adding `paid_by: ref to money`
- * with no press (Projects at version 2), then writing `money#1` into it and being answered `ok`, and `money#99` and
- * being told "there is no such row": the write path's own check, used as an oracle for which Money rows exist, by a
- * key that is refused `list money`. The owner had declared no such field; the key added the reference itself.
+ * `ref` points at. Measured: an owner's key held to Projects added `paid_by: ref to money` with no press (Projects at
+ * version 2), then wrote `money#1` into it and was answered `ok`, and `money#99` and was told "there is no such row":
+ * the write path's own check, used as an oracle for which Money rows exist, by a key that is refused `list money`. The
+ * owner had declared no such field; the key added the reference itself.
  */
 
 import { test } from 'node:test';
@@ -23,7 +23,7 @@ const reg = (id: string, name: string, fields: unknown[] = []) => ({
 });
 
 const session = { host: 'kiln-mbp', repo: 'kiln', agent: 'claude' };
-/** The audit's key: the owner's, at `write`, held to Projects alone. */
+/** The key: the owner's, at `write`, held to Projects alone. */
 const held: CallContext = { principal: { kind: 'token', id: 'tok_h', scope: 'write', person: 'p_1', level: 'owner' }, registers: ['things'], session };
 
 type Out = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: string; fix: string } };

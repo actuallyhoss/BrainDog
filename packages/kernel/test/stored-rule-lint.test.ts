@@ -1,16 +1,16 @@
 /**
  * A rule stored before the inline lint, or written straight into the declaration row, is held to what the lint says.
  *
- * `loop/research-batch-forty-two-audit.md` FINDING 3, AND FORTY-ONE'S FINDING 3 WITH IT. `inlineFault` refuses a verb
- * only a step has in an inline `then:`, and `fillFault` a `move` or a `tag` that is not text, both at install. Nothing
- * asked either of a body already stored, and the pass acts on the first action each item carries. Measured by the audit
- * on 23 September with a lint-clean rule on Jobs installed and its `then` then rewritten in the row: `{ if: 'what is
- * Nothing', then: [], set: note }` set the note on a row the condition excluded, `{ wait: 1h, set: note }` wrote the note
- * at once, and `move: 5` beside a `set` left the row holding `what` alone, since the enum refused the 5 and the rule's
- * whole patch went with it. Forty-one measured the same drop for a stored `tag: 5`.
+ * WHY. `inlineFault` refuses a verb only a step has in an inline `then:`, and `fillFault` a `move` or a `tag` that is
+ * not text, both at install. Nothing asked either of a body already stored, and the pass acts on the first action each
+ * item carries. Measured with a lint-clean rule on Jobs installed and its `then` then rewritten in the row:
+ * `{ if: 'what is Nothing', then: [], set: note }` set the note on a row the condition excluded,
+ * `{ wait: 1h, set: note }` wrote the note at once, and `move: 5` beside a `set` left the row holding `what` alone,
+ * since the enum refused the 5 and the rule's whole patch went with it. The same drop was measured for a stored
+ * `tag: 5`.
  *
  * SO THE ITEM IS LEFT UNDONE AND SAYS SO, and the rest of the rule still acts. Each case below rewrites the stored body
- * the way the audit's probe did, reopens the kernel so nothing cached answers for the row, and writes one row.
+ * the way that measure did, reopens the kernel so nothing cached answers for the row, and writes one row.
  */
 
 import { test } from 'node:test';
@@ -81,7 +81,7 @@ test('A STORED move: 5 IS LEFT UNDONE AND THE set AFTER IT IS STILL WRITTEN, rat
   assert.deepEqual(observed(sql), ['jobs.rule.r.then[0].move:DECLARATION_INVALID']);
 });
 
-test('A STORED tag: 5 OR untag: 5 IS LEFT UNDONE AND THE set BESIDE IT IS STILL WRITTEN (audit forty-one, finding 3)', async () => {
+test('A STORED tag: 5 OR untag: 5 IS LEFT UNDONE AND THE set BESIDE IT IS STILL WRITTEN', async () => {
   for (const verb of ['tag', 'untag'] as const) {
     const { k, lint } = await stored([{ [verb]: 5 }, { set: { field: 'note', to: 'seen' } }]);
     assert.equal(lint, 'DECLARATION_INVALID', verb);

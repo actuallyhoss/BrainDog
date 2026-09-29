@@ -1,6 +1,5 @@
 /**
- * A person changes their own name: `renamePerson`, DATA, a person's own as `setPref` is (`loop/finish/contracts.md`
- * §12.1, GAP-7; ROADMAP M3 "a name can be changed"; backlog PRV-4).
+ * A person changes their own name: `renamePerson`, DATA, a person's own as `setPref` is.
  *
  * ONLY THE CALLER'S OWN NAME, AND ONLY A PERSON. A token acts for somebody and is not them, and a shared link is
  * nobody at all, so both are refused: a name is how everybody else in the record knows who wrote a row, and changing

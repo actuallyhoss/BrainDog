@@ -1,13 +1,12 @@
 /**
- * What a block read beside its own list, held from somebody who may not read that list, and what a held block kept
- * (`loop/research-audit-2026-09-25-layouts.md` findings 1, 7 and 15, and the reads the same walk found beside them).
+ * What a block read beside its own list, held from somebody who may not read that list, and what a held block kept.
  *
- * THE AUDIT'S OWN PROOFS, AS TESTS. Wren is invited to Areas alone and `list('steps')` refuses her. Before this file a
+ * THE MEASURED CASES, AS TESTS. Wren is invited to Areas alone and `list('steps')` refuses her. Before this file a
  * cards block over Areas with `{ field: salary, as: next }` drew her the hidden list's salary, through `page`, through
  * `previewPage` with the field her own choice, through an agent token held to Areas as MCP calls it, and through MCP
  * itself; a field that is not there answered `FIELD_UNKNOWN` naming Steps and listing its whole schema. `as: ring` drew
- * the done share of the same steps. Walking every other read a block makes beside its source found four more of the same
- * shape, each measured red here first: `as: scope` drew a hidden project's title, a live run's card drew the same,
+ * the done share of the same steps. Walking every other read a block makes beside its source found four more of the
+ * same shape, each measured red here first: `as: scope` drew a hidden project's title, a live run's card drew the same,
  * `spent:` and `toward:` drew a Payroll total, and a ring's `of:` answered a hidden project's title with a row and a
  * wrong one with `REF_UNKNOWN`.
  *
@@ -120,14 +119,14 @@ const blind = (drawn: unknown, said: string) => {
   for (const word of HIDDEN) assert.equal(text.includes(word), false, `${said} carried ${word}: ${text.slice(0, 600)}`);
 };
 
-test('P0 THE PREMISE: Wren may not list Steps, Things or Payroll', async () => {
+test('THE PREMISE: Wren may not list Steps, Things or Payroll', async () => {
   const { api, wren } = await record();
   for (const register of ['steps', 'things', 'payroll']) assert.equal((await api.list({ register } as never, wren)).ok, false, register);
 });
 
-/* ── finding 1: as: next and as: ring ────────────────────────────────────────────────────────────────── */
+/* ── as: next and as: ring ───────────────────────────────────────────────────────────────────────────── */
 
-test('P1 AN INSTALLED CARD GRID WITH as: next IS HELD FROM WREN, and carries no next step', async () => {
+test('AN INSTALLED CARD GRID WITH as: next IS HELD FROM WREN, and carries no next step', async () => {
   const { api, wren } = await record();
   const b = value<{ blocks: Block[] }>(await api.page({ slug: 'areas-cards' }, wren)).blocks[0]!;
   assert.equal(b.refusals[0]?.code, 'FORBIDDEN', JSON.stringify(b));
@@ -139,7 +138,7 @@ test('P1 AN INSTALLED CARD GRID WITH as: next IS HELD FROM WREN, and carries no 
   assert.deepEqual(own.nexts, ['Tell the bank about the overdraft']);
 });
 
-test('P2 A PREVIEW NAMING A FIELD OF THE HIDDEN STEPS, OR ONE THAT IS NOT THERE, IS HELD THE SAME WAY and names neither', async () => {
+test('A PREVIEW NAMING A FIELD OF THE HIDDEN STEPS, OR ONE THAT IS NOT THERE, IS HELD THE SAME WAY and names neither', async () => {
   const { api, wren } = await record();
   const hit = await preview(api, wren, cardsWith('salary', 'next'));
   const miss = await preview(api, wren, cardsWith('nosuch', 'next'));
@@ -149,7 +148,7 @@ test('P2 A PREVIEW NAMING A FIELD OF THE HIDDEN STEPS, OR ONE THAT IS NOT THERE,
   assert.equal(JSON.stringify(miss).replaceAll('nosuch', 'salary'), JSON.stringify(hit), 'a field that is there and one that is not answered differently');
 });
 
-test('P5 AN AGENT TOKEN HELD TO AREAS, AS MCP CALLS previewPage, IS HELD THE SAME WAY', async () => {
+test('AN AGENT TOKEN HELD TO AREAS, AS MCP CALLS previewPage, IS HELD THE SAME WAY', async () => {
   const { api } = await record();
   const agent = { principal: { kind: 'token', id: 't_1', scope: 'read', person: 'p_1', level: 'owner' }, registers: ['areas'] } as unknown as CallContext;
   assert.equal((await api.list({ register: 'steps' } as never, agent)).ok, false);
@@ -158,7 +157,7 @@ test('P5 AN AGENT TOKEN HELD TO AREAS, AS MCP CALLS previewPage, IS HELD THE SAM
   blind(b, 'token preview');
 });
 
-test('P5 MCP: a propose with try, from a token held to Areas, draws nothing of the hidden steps', async () => {
+test('OVER MCP: a propose with try, from a token held to Areas, draws nothing of the hidden steps', async () => {
   const { api } = await record();
   const agent = { principal: { kind: 'token', id: 't_2', scope: 'propose', person: 'p_1', level: 'owner' }, registers: ['areas'] } as unknown as CallContext;
   const body = { page: 'mine', title: 'Mine', requires: ['register.areas'], blocks: [cardsWith('salary', 'next'), cardsWith('what', 'ring')] };
@@ -169,14 +168,14 @@ test('P5 MCP: a propose with try, from a token held to Areas, draws nothing of t
   blind(drawn, 'MCP page_preview');
 });
 
-test('P6 A RING OVER THE HIDDEN STEPS IS HELD, and carries no done share', async () => {
+test('A RING OVER THE HIDDEN STEPS IS HELD, and carries no done share', async () => {
   const { api, wren } = await record();
   const b = await preview(api, wren, cardsWith('what', 'ring'));
   assert.equal(b.refusals[0]?.code, 'FORBIDDEN');
   assert.equal('rings' in b, false, JSON.stringify(b));
 });
 
-/* ── the same walk, beside finding 1 ─────────────────────────────────────────────────────────────────── */
+/* ── the same walk, beside as: next ──────────────────────────────────────────────────────────────────── */
 
 test('as: scope AND A LIVE RUN DRAW NO TITLE FROM THE PROJECTS LIST WREN MAY NOT OPEN', async () => {
   const { api, wren } = await record();
@@ -216,9 +215,9 @@ test("A RING'S of: IS ASKED AS ITS where IS, so a hidden project's title and a w
   assert.equal(JSON.stringify(miss).replaceAll('Nothing Here', 'Secret Kiln'), JSON.stringify(hit));
 });
 
-/* ── finding 7: what a held block kept ───────────────────────────────────────────────────────────────── */
+/* ── what a held block kept ──────────────────────────────────────────────────────────────────────────── */
 
-test('P3 A HELD steps BLOCK AND A HELD inputs BLOCK KEEP NO ANSWER KEY, and the inputs shell names no list, row or field', async () => {
+test('A HELD steps BLOCK AND A HELD inputs BLOCK KEEP NO ANSWER KEY, and the inputs shell names no list, row or field', async () => {
   const { api, wren } = await record();
   const [, steps, inputs] = value<{ blocks: Block[] }>(await api.page({ slug: 'mixed' }, wren)).blocks as [Block, Block, Block];
   /* THE EMPTIES A HOST READS OFF A HELD BLOCK, and the one sentence that says why. */
@@ -246,7 +245,7 @@ test('EVERY KEY THE KERNEL ANSWERS IS TAKEN OFF A HELD BLOCK, so an answer key a
   assert.deepEqual(Object.keys(b).filter((key) => b[key] === MARK), [], JSON.stringify(b));
 });
 
-/* ── finding 15: the queue ───────────────────────────────────────────────────────────────────────────── */
+/* ── the queue ───────────────────────────────────────────────────────────────────────────────────────── */
 
 test('Q1 A QUEUE IS HELD FROM A MEMBER WHO DOES NOT READ EVERY LIST, as governance holds the rowset back from her', async () => {
   const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(NOW) });

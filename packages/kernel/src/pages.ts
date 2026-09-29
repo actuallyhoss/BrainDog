@@ -160,8 +160,8 @@ export type PageBlock = {
   stale?: { field: string; after: string };
   /**
    * A `ring` over a register's: the rows its dial is set against, as a sentence over the same list. Without it the
-   * whole is every row the block's scope admits, the page's project when it inherits and the list otherwise, and
-   * the `where` is always the part (`DIRECTION.md` §25).
+   * whole is every row the block's scope admits, the page's project when it inherits and the list otherwise, and the
+   * `where` is always the part.
    */
   of?: string;
   /**
@@ -279,7 +279,7 @@ export type BlockResult = PageBlock & {
   /**
    * And the record's home currency, or `null` when it has none, which a bare figure typed into an empty money box is
    * written in. The browser's own guess was the sample's rows, which a shipped build never fills, so it wrote GBP on a
-   * record in EGP (`loop/research-audit-2026-09-25-layouts.md` finding 2).
+   * record in EGP.
    */
   home?: string | null;
   /** A `feed` block's rows, newest first, a burst being one row. */
@@ -568,11 +568,11 @@ const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.o
 /* `ReadonlySet` BECAUSE IT LEAVES THE PACKAGE, which `SLASH_KINDS` in `slash.ts` is declared as for
    the same reason: a bare `new Set` exported hands every caller `add` and `delete` on the set the
    kernel refuses by. */
-/* `heat` IS ONE OF THEM BECAUSE IT ADDS THE ROWS ON ONE DAY TOGETHER (`render/src/heat.ts`), and it was left out
-   when the kind landed. Measured over a register of sixty rows on sixty days: fifty rows, `matched: 60`, no
-   refusal, so ten busy days were drawn as gaps. `ring` IS NOT, though the brief that added this line named it:
-   over a register it draws one row it counts (`ringOf`), two `matched` figures and never a row read, so a
-   ceiling would refuse a ring over 201 tasks for a limit it never meets. */
+/* `heat` IS ONE OF THEM BECAUSE IT ADDS THE ROWS ON ONE DAY TOGETHER (`render/src/heat.ts`), and it was left out when
+   the kind landed. Measured over a register of sixty rows on sixty days: fifty rows, `matched: 60`, no refusal, so ten
+   busy days were drawn as gaps. `ring` IS NOT, though it can look like one: over a register it draws one row it counts
+   (`ringOf`), two `matched` figures and never a row read, so a ceiling would refuse a ring over 201 tasks for a limit
+   it never meets. */
 export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat', 'progress', 'split']);
 
 /**
@@ -659,11 +659,11 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
   };
 
   /* THE ADDRESSES ARE CLAIMED IN AN ORDER THAT DOES NOT MOVE: the pages somebody wrote first, then the templates, each
-     by its declaration's id. They were claimed in the order the record handed the declarations over, and that read
-     has no `ORDER BY`, so whichever template the store answered first took the bare name: two templates over one list
-     could trade `/p/<name>`, and re-installing one could move it (`loop/finish/defects.md` P1). A page somebody wrote
-     goes first because its name is the author's word for it, where a template's is a row's title that happens to
-     match. The ids are compared by code unit and not by `localeCompare`, so every host sorts them alike.
+     by its declaration's id. They were claimed in the order the record handed the declarations over, and that read has
+     no `ORDER BY`, so whichever template the store answered first took the bare name: two templates over one list could
+     trade `/p/<name>`, and re-installing one could move it. A page somebody wrote goes first because its name is the
+     author's word for it, where a template's is a row's title that happens to match. The ids are compared by code unit
+     and not by `localeCompare`, so every host sorts them alike.
 
      ONLY THE CLAIMING IS SORTED. The pages still come out in the order the record handed them over, which is the
      order `boot`, `pages` and the rail read them in, because this is about addresses and not about places. */
@@ -717,9 +717,9 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
        `review-pr` and `review-pr-1`, which says nothing about which is which, and which of them took the bare
        name turned on the order the rows were listed in. So the row that applies everywhere keeps the name, and a
        row scoped to a place is named for it too: `review-pr-kiln`. */
-    /* A TEMPLATE'S PAGES KEEP ONE ORDER. They share the template's one `nav.order`, so the order they were listed in was
-       the order a rail and a strip of tabs drew them in, and that was the list's default, the row changed last first:
-       editing a part moved its tab (measured on a pack with a page per part, September 25th). So they come in the list's
+    /* A TEMPLATE'S PAGES KEEP ONE ORDER. They share the template's one `nav.order`, so the order they were listed in
+       was the order a rail and a strip of tabs drew them in, and that was the list's default, the row changed last
+       first: editing a part moved its tab (measured on a pack with a page per part). So they come in the list's
        declared order, which is its `steps:` order where it is a list of steps, a row with none after the rest, and
        otherwise, and between equals, the order the rows were written in. */
     const order = ownSteps(deps, decl.for.register, schema)?.order;
@@ -820,14 +820,13 @@ export function railRoom(): (about: { register: string; section: string } | null
 export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
   const every = resolvePages(deps);
   const found = every.find((p) => p.slug === slug);
-  /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per
-     row is named after the row's title, so listing those slugs listed every row title of every templated list,
-     and this function cannot tell who is asking. Measured in `loop/research-scoped-audit.md` §1: a member invited
-     to Obligations alone asked for `nope` and was handed `dinner-with-the-auditor` and
-     `told-sam-about-the-redundancy-list` from a Diary she cannot read, while `pages` in the same run listed her
-     `desk` and nothing else. A written page's slug is the author's word for a page, so the owner who types `dsek`
-     still gets `desk`; one who mistypes a project's page is sent to `pages`, which answers each caller with what
-     that caller may open. */
+  /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
+     named after the row's title, so listing those slugs listed every row title of every templated list, and this
+     function cannot tell who is asking. Measured: a member invited to Obligations alone asked for `nope` and was handed
+     `dinner-with-the-auditor` and `told-sam-about-the-redundancy-list` from a Diary she cannot read, while `pages` in
+     the same run listed her `desk` and nothing else. A written page's slug is the author's word for a page, so the
+     owner who types `dsek` still gets `desk`; one who mistypes a project's page is sent to `pages`, which answers each
+     caller with what that caller may open. */
   if (!found)
     return no<PageResult>('PAGE_UNKNOWN', `There is no page at ${slug}. A page made for each row of a list is not named here; pages lists every page you can open.`, {
       at: 'slug',
@@ -988,10 +987,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     if (value === undefined || key === 'of' || !kinds || kinds.includes(block.kind)) continue;
     unread.push({ code: 'DECLARATION_INVALID', fix: wrongKindKey(key, block.kind), at: key });
   }
-  /* PLT-8: A PACK'S OWN KIND (`block.<id>`) IS INSTALLED LIKE ANY OTHER (`declare.ts` `pageBody`), so it is read like
-     any other: it falls through the arms below exactly as an unregistered built-in kind would, and a `source:` naming
-     a register draws through the same grid primitive a `table` does. The early refusal this file answered before
-     PLT-8 landed left an installed block drawing a hole on the page; nothing here still says a deploy is owed. */
+  /* A PACK'S OWN KIND (`block.<id>`) IS INSTALLED LIKE ANY OTHER (`declare.ts` `pageBody`), so it is read like any
+     other: it falls through the arms below exactly as an unregistered built-in kind would, and a `source:` naming a
+     register draws through the same grid primitive a `table` does. The early refusal this file once answered left an
+     installed block drawing a hole on the page; nothing here still says a deploy is owed. */
   /* `of:` IS READ BY ONE KIND OVER ONE KIND OF SOURCE, and anywhere else it would be a sentence the block drew
      without, which is the misspelt key above by another route. */
   if (block.of !== undefined && !(block.kind === 'ring' && typeof block.source === 'string' && block.source.startsWith('register.')))
@@ -1375,10 +1374,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      `matched` is still the whole list's, asked apart, and `open` is this read's own count: the drawer's "more" is the
      open steps it did not draw, so it is counted from `open` and not from `matched`, which holds the done ones too. */
   const short = path && block.first !== undefined ? path : null;
-  /* `first: 0` DRAWS NO STEPS, which is what it says, as `limit: 0` draws no rows. `Math.max(1, …)` drew one, so a hand-made
-     block asking for none got the first open step (`loop/research-audit-2026-09-25-layouts.md` §19). The open steps are
-     still asked, one row, because the read's count is what the drawer's "more" is made from, and the kernel's `list`
-     reads a limit of 0 as no limit given and answers its default. */
+  /* `first: 0` DRAWS NO STEPS, which is what it says, as `limit: 0` draws no rows. `Math.max(1, …)` drew one, so a
+     hand-made block asking for none got the first open step. The open steps are still asked, one row, because the
+     read's count is what the drawer's "more" is made from, and the kernel's `list` reads a limit of 0 as no limit given
+     and answers its default. */
   const drawn = short ? Math.min(limit, Math.floor(block.first!)) : limit;
   const listed = short ? ask(openOf(said.predicate, short.done), Math.max(1, drawn)) : ask(said.predicate, limit);
   if (!listed.ok) return { ...base, refusals: refused(listed) ? also(listed.refusal) : also() };
@@ -1465,9 +1464,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const rows = read;
   const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
   /* A PATH'S NEXT STEP IS ITS FIRST OPEN STEP IN THE ORDER ITS LIST DECLARES, not the first open one drawn. Under
-     `order: rank desc` a path drew S3, S2, S1 and marked S2 as next while the card over the same steps said S1
-     (`loop/research-audit-2026-09-25-layouts.md` §19). So it is picked by `nextSteps`, the rule a card's next step is
-     picked by, with every drawn row put under one parent so that its one answer is the whole path's. */
+     `order: rank desc` a path drew S3, S2, S1 and marked S2 as next while the card over the same steps said S1. So it
+     is picked by `nextSteps`, the rule a card's next step is picked by, with every drawn row put under one parent so
+     that its one answer is the whole path's. */
   const lead = path
     ? nextSteps(
         rows.map((r, at) => ({ seq: r.seq, at, fields: { path: 1, done: r.fields[path.done], rank: path.order === undefined ? null : r.fields[path.order] } })),
@@ -1599,7 +1598,7 @@ function nextsOf(deps: PageDeps, block: PageBlock, register: string, rows: reado
 /**
  * The field type each card role that draws a stored value must name: a `picture` leads the card with a file the record
  * holds, drawn through the host's `RenderOptions.file`, and a `hue` is a whole number of degrees on the colour wheel,
- * drawn only on the card's mark (`loop/finish/contracts.md` §4.3).
+ * drawn only on the card's mark.
  */
 const ROLE_TYPES: Readonly<Record<string, string>> = { picture: 'file', hue: 'int' };
 
@@ -1923,13 +1922,13 @@ const RING_COLUMNS = [{ field: 'label' }, { field: 'value' }, { field: 'target' 
 /**
  * A `ring` over a register: ONE ROW OF PROGRESS, the rows its `where` matches against the rows its scope admits.
  *
- * THE WHOLE IS THE BLOCK'S SCOPE AND THE `where` IS THE PART, which is the owner's call (`DIRECTION.md` §25) on
- * the question the checker refused the first cut over. That cut set every ring against every row of the list, so
- * `list is work, state is done` over 4 work chores (2 done) and 96 home ones drew 2%, where the work list is half
- * done. The sentence does not say which of its clauses is the whole, so the record does not guess: without `of:`
- * the whole is the list, or the page's project and the rows that apply everywhere when the block inherits, and
- * 2 of 100 is the right answer to the block as written. `of: list is work` says the other whole and draws 2 of 4.
- * The part is counted inside the whole, `where` and `of` together, so a part can never be larger than its whole.
+ * THE WHOLE IS THE BLOCK'S SCOPE AND THE `where` IS THE PART, which is the owner's call. The first cut set every ring
+ * against every row of the list, so `list is work, state is done` over 4 work chores (2 done) and 96 home ones drew 2%,
+ * where the work list is half done. The sentence does not say which of its clauses is the whole, so the record does not
+ * guess: without `of:` the whole is the list, or the page's project and the rows that apply everywhere when the block
+ * inherits, and 2 of 100 is the right answer to the block as written. `of: list is work` says the other whole and draws
+ * 2 of 4. The part is counted inside the whole, `where` and `of` together, so a part can never be larger than its
+ * whole.
  *
  * THE LIST READ WAS THE WRONG QUESTION. Measured on ten tasks with three done, `where: state is done` answered the
  * three done rows, and `ringPlan` reads two to five rows as PARTS of a whole, so the dial set the done tasks
@@ -2288,7 +2287,7 @@ function captureBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also:
  *
  * ONLY TYPES THE KERNEL DECLARES (`FIELD_TYPES` in `coerce.ts`). `number`, `pct` and `boolean` sat here beside them,
  * names no field can have, so they admitted nothing and read as if they did. A `quantity` stays out until a host has a
- * box that takes a figure and its unit together (MOD-22 in `loop/finish/modules.md`); until then it is edited on the row.
+ * box that takes a figure and its unit together; until then it is edited on the row.
  */
 const TYPABLE = new Set(['text', 'url', 'email', 'enum', 'int', 'decimal', 'money', 'day', 'instant', 'bool', 'duration']);
 
@@ -2304,10 +2303,10 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
   const register = block.register;
   if (typeof register !== 'string' || register === '')
     return { ...base, refusals: also({ code: 'REQUIRED_MISSING', fix: 'Inputs name the list whose row they edit, as register: checks.', at: 'register' }) };
-  /* `where:` IS REFUSED, NOT READ, because nothing here read it and the row it seemed to pick was the list's first:
-     `loop/research-audit-2026-09-25-layouts.md` finding 6 installed `where: name is Two` and typing into the block wrote
-     row One. `06 §1.1` names the row with `row:` alone, so a page installed before `declare.ts` refused the key draws no
-     row to type into rather than the wrong one. */
+  /* `where:` IS REFUSED, NOT READ, because nothing here read it and the row it seemed to pick was the list's first: a
+     block installed with `where: name is Two` wrote, when typed into, row One. `06 §1.1` names the row with `row:`
+     alone, so a page installed before `declare.ts` refused the key draws no row to type into rather than the wrong one.
+     */
   if (block.where !== undefined)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `Inputs edit the one row that row: names, such as ${register}#2, and read no where:. Name the row with row:.`, at: 'where' }) };
   const schema = deps.schemaOf(register);
@@ -2317,9 +2316,9 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
      named: answering its type handed the host a box to type a row id or a document into. */
   /* AND ONLY THE ONES A PERSON MAY TYPE INTO. A field changed only by an accepted proposal (`by: decide`), one that
      keeps its first value (`immutable`), one the record computes (`derived`) and one the list retired were each drawn
-     as a box, and typing into the first was answered `FORBIDDEN approved_price changes only by an accepted proposal`
-     (`loop/research-audit-2026-09-25-layouts.md` §19). The schema a block reads carries types and not these, so they
-     are read off the list's own declaration; a host that hands no `lists` leaves them to the write to refuse. */
+     as a box, and typing into the first was answered `FORBIDDEN approved_price changes only by an accepted proposal`.
+     The schema a block reads carries types and not these, so they are read off the list's own declaration; a host that
+     hands no `lists` leaves them to the write to refuse. */
   const shut = new Set(
     (deps.lists?.().find((l) => l.id === register)?.fields ?? [])
       .filter((f) => {
@@ -2375,7 +2374,7 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
  *   by a title is resolved to a row id here but not by the sample engine, which reads the reader's prose, and a title
  *   is a guess at a row besides, so it is not preset. A link named by its spoken id (`about is parts#2`, which is what a
  *   template's `{{spoken}}` writes) or its row id names exactly one row in any engine, and is preset: without it a
- *   pad filtered to one part hid every note typed beside it (measured on a pack with a page per part, September 25th).
+ *   pad filtered to one part hid every note typed beside it (measured on a pack with a page per part).
  *   `byId` is the sentence read with no title lookup, and a link is preset only where it reads the same row there.
  *
  *   NEVER THE TITLE, because the title is what the person is typing.
@@ -2633,9 +2632,9 @@ const RUNS_ON: Schema = {
  * The lists `runs_on` reads, in the order it draws them, each with what one of its rows is called there and the field
  * said beside its name: what a key opens, how a tool is reached, which version a skill is at.
  *
- * NAMED BY THE AGENTS PACK'S LIST IDS (`loop/finish/agents.md` C6), and each is read only where the record holds it and
- * places its rows in projects of the kind `about:` names: a record without the pack has none of them, and the block
- * draws its `empty:` rather than refusing for a list somebody chose not to install.
+ * NAMED BY THE AGENTS PACK'S LIST IDS, and each is read only where the record holds it and places its rows in projects
+ * of the kind `about:` names: a record without the pack has none of them, and the block draws its `empty:` rather than
+ * refusing for a list somebody chose not to install.
  */
 const RUNS_ON_LISTS = [
   { register: 'credentials', kind: 'key', detail: 'opens' },
@@ -2864,8 +2863,8 @@ const PARAM = '{{it}}';
  * `held` the whole register it has always been. Narrowing on a disjunct would be a smaller number
  * than the truth, and a `held` under `rows` is a reading that contradicts itself.
  *
- * AND A SENTENCE WITH A `, or` IS THAT `any`, SO IT ANSWERS NOTHING TOO. `parseWhere` reads `a, or b` as `{ any: [a, b] }`
- * since M4 wave two brief 7, and this went on splitting it on the comma. Measured over five obligations with Halden as the
+ * AND A SENTENCE WITH A `, or` IS THAT `any`, SO IT ANSWERS NOTHING TOO. `parseWhere` reads `a, or b` as
+ * `{ any: [a, b] }` and this went on splitting it on the comma. Measured over five obligations with Halden as the
  * parameter: `party is {{it}}, or state is paid` read `rows: 2, held: 1`, and `state is paid, or party is {{it}}` kept
  * ` or party is Halden` as its scope and was refused `FIELD_UNKNOWN` for a field called `or` (`scope-any.test.ts`). The
  * test is `parseWhere`'s own: a condition after the first that begins with the word `or`. A sentence that mixes the two
@@ -2901,13 +2900,12 @@ const SENTENCES = new Set(['where', 'of', 'within']);
  * predicate, in a heading, in an empty state and in a metric id, and a substitution that walked only
  * the fields somebody remembered is a substitution that leaves `{{name}}` on a screen.
  *
- * A VALUE FILLED INTO A SENTENCE IS ONE VALUE THERE. A part called `Wax, wick and scent` made
- * `part is {{name}}` the two clauses `part is Wax` and `wick and scent`, and every block filtered by the
- * part on its page was refused `FIELD_UNKNOWN`, "parts has no field called wick" (measured on
- * a pack with a page per part, September 25th). So under a key in `SENTENCES` the value is written by the grammar's
- * own `quoteValue`: bare where the bare words read back as that one value, which is every name a page
- * printed before, and quoted where they would not, a comma, an `or`, a quote mark or a leading `not`.
- * A heading, a title and a body get the value as it stands.
+ * A VALUE FILLED INTO A SENTENCE IS ONE VALUE THERE. A part called `Wax, wick and scent` made `part is {{name}}` the
+ * two clauses `part is Wax` and `wick and scent`, and every block filtered by the part on its page was refused
+ * `FIELD_UNKNOWN`, "parts has no field called wick" (measured on a pack with a page per part). So under a key in
+ * `SENTENCES` the value is written by the grammar's own `quoteValue`: bare where the bare words read back as that one
+ * value, which is every name a page printed before, and quoted where they would not, a comma, an `or`, a quote mark or
+ * a leading `not`. A heading, a title and a body get the value as it stands.
  *
  * A PARAMETER ALSO SETS `within` ON WHAT IT FILLS, and only a parameter: the clauses it landed in are
  * the figure's scope rather than its filter, and `evaluateMetric` counts `held` inside them. It is
@@ -2940,9 +2938,9 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
     return value === null ? null : String(value);
   };
   /* A LIST IN A SENTENCE IS ITS VALUES JOINED BY `or`, which is how the grammar reads several values after `is`
-     (`state is open or doing`). Written with `String` it was `a,b`, and the comma cut the clause in two
-     (`loop/research-audit-2026-09-25-layouts.md` §19). A quote holds one value, so a list holding a value that has to be
-     quoted has no sentence it can be written as, and it is left unfilled, as a field holding nothing is. */
+     (`state is open or doing`). Written with `String` it was `a,b`, and the comma cut the clause in two. A quote holds
+     one value, so a list holding a value that has to be quoted has no sentence it can be written as, and it is left
+     unfilled, as a field holding nothing is. */
   const saidOf = (key: string): string | null => {
     const value = heldOf(key);
     if (!Array.isArray(value)) return value === null ? null : quoteValue(String(value));
@@ -2956,9 +2954,9 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
       if (!sentence) return valueOf(key) ?? whole;
       /* A HOLE THE AUTHOR ALREADY QUOTED IS NOT QUOTED AGAIN. `what contains "{{it}}"` took the value quoted by
          `quoteValue` inside the author's own marks, and a value that needed quoting came out as two quotes the grammar
-         reads as neither (§19 of the same audit). So where the marks round the hole are a quote by the grammar's own
-         reading (`unquoted`, opening at the start of a word and closing before a comma or the end), the value goes in
-         as it stands with each closing mark written twice, which the grammar reads back as one mark of the value. */
+         reads as neither. So where the marks round the hole are a quote by the grammar's own reading (`unquoted`,
+         opening at the start of a word and closing before a comma or the end), the value goes in as it stands with each
+         closing mark written twice, which the grammar reads back as one mark of the value. */
       const close = s[at + whole.length];
       if (
         close === undefined ||
@@ -3015,11 +3013,11 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
  * out.
  *
  * AND THE LISTS A BLOCK READS BESIDE ITS SOURCE, WHICH ARE NAMED BY DECLARATIONS AND NOT BY THE BLOCK, through
- * `beside`. `loop/research-audit-2026-09-25-layouts.md` finding 1 measured a member invited to Areas alone drawn a
- * hidden list's `salary` by a card's `as: next`, because `nextsOf` reads every row of the steps under the cards and
- * this named only Areas; `as: ring` read the same rows, and `as: scope`, `inherit` and the live runs read the titles
- * of the projects list the same way. A caller that holds blocks passes `beside`, as it passes `metric`; without it
- * these are not named, which is what this answered before.
+ * `beside`. Measured: a member invited to Areas alone was drawn a hidden list's `salary` by a card's `as: next`,
+ * because `nextsOf` reads every row of the steps under the cards and this named only Areas; `as: ring` read the same
+ * rows, and `as: scope`, `inherit` and the live runs read the titles of the projects list the same way. A caller that
+ * holds blocks passes `beside`, as it passes `metric`; without it these are not named, which is what this answered
+ * before.
  */
 export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl | null, beside?: ListsBeside): string[] {
   const named = new Set<string>();
@@ -3039,10 +3037,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     /* INPUTS READ A ROW OF `register:` AND DRAW ITS FIGURES, so the list is the block's as a source's is. A capture's is
        not: it reads nothing. */
     if (block.kind === 'inputs' && typeof block.register === 'string') named.add(block.register);
-    /* A CASH WALK READS EVERY LIST ITS LEGS WALK, and this read only the list its opening figure counts. So a
-       walk over Bills was a block about Accounts, and `loop/research-scoped-audit.md` §2 measured a member invited
-       to Obligations alone reading *Severance for Sam*, -1,250,000, off the Desk page while `list('bills')` refused
-       her. A leg is JSON somebody wrote, so one with no list names nothing here and the walk refuses it when it runs. */
+    /* A CASH WALK READS EVERY LIST ITS LEGS WALK, and this read only the list its opening figure counts. So a walk over
+       Bills was a block about Accounts, and a member invited to Obligations alone read *Severance for Sam*, -1,250,000,
+       off the Desk page while `list('bills')` refused her. A leg is JSON somebody wrote, so one with no list names
+       nothing here and the walk refuses it when it runs. */
     if (Array.isArray(block.from))
       for (const leg of block.from as unknown[])
         if (leg !== null && typeof leg === 'object' && typeof (leg as { register?: unknown }).register === 'string')
@@ -3159,7 +3157,7 @@ export function pathsOf(block: PageBlock): string[] {
   /* A FIGURE'S OWN NOTE NAMES FIGURES TOO: `in {{cash-accounts}} account(s)` under Cash now. */
   const notes = (Array.isArray(block.cells) ? (block.cells as unknown[]) : []).map((c) => (c !== null && typeof c === 'object' ? (c as { note?: unknown }).note : undefined));
   /* AND A COLUMN'S LABEL IS READ AS A HEADING IS: `Open ({{tasks.open}})` over a column was drawn with the braces in
-     it, because the heading above it was filled and the label beside it was never asked (`loop/finish/pages.md` P9). */
+     it, because the heading above it was filled and the label beside it was never asked. */
   const labels = Array.isArray(block.columns) ? block.columns.map((c) => (c !== null && typeof c === 'object' ? (c as { label?: unknown }).label : undefined)) : [];
   for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes, ...labels]) {
     if (typeof text !== 'string') continue;

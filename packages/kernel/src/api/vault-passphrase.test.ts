@@ -1,5 +1,5 @@
 /**
- * The vault passphrase, the kernel's half (`api/vault-passphrase.ts` over `vault.ts`; `loop/finish/platform.md` §4.0 V).
+ * The vault passphrase, the kernel's half (`api/vault-passphrase.ts` over `vault.ts`).
  *
  * THE HOST'S STEP IS A STAND-IN HERE, because the kernel never holds a key and a kernel test cannot import a host: it
  * hands back bytes of the right shape, or the refusal a host would give. What is proved is the record's half: exactly

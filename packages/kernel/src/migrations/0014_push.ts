@@ -1,10 +1,10 @@
 /**
  * The kernel schema, migration 14: `push_sub`, where one person's phone or browser asked to be told.
  *
- * `loop/research-living-in-it.md` section 3.2 and brief W58-2. A Web Push subscription is an address a push service
- * minted for one browser on one device, and `51 §5` has the record drop it when that service answers 404 or 410, so it
- * is the record's to keep and not the Worker's. One row per person per endpoint: two people signed in on one shared
- * tablet are two rows, and each is taken away only by the person who made it.
+ * A Web Push subscription is an address a push service minted for one browser on one device, and `51 §5` has the record
+ * drop it when that service answers 404 or 410, so it is the record's to keep and not the Worker's. One row per person
+ * per endpoint: two people signed in on one shared tablet are two rows, and each is taken away only by the person who
+ * made it.
  *
  * `id` IS WHAT A `notify.push` JOB NAMES, AND NEVER THE ENDPOINT. The outbox is in the `data` section and travels in
  * every `.brain` file, so an endpoint written into a payload would leave the record in the next export, which is

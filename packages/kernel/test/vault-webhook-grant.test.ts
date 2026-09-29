@@ -1,5 +1,5 @@
 /**
- * The key that signs a digest's webhook, opened on the strength of the lease on that one post (KRN-13, delivery half).
+ * The key that signs a digest's webhook, opened on the strength of the lease on that one post (the delivery half).
  *
  * MEASURED AT afb3b1b2, BEFORE THIS FILE: `digest.ts` queues `notify.webhook { url, body, grant: 'collector' }`, and the
  * one door a host could open that grant through under the job's lease refused the job outright. `sealedGrant` read
@@ -139,7 +139,7 @@ const signs = (k: Kernel): string => {
 test('A TIE ON created_at IS BROKEN BY THE ID, and the post signs with the key a call naming the label sends', async () => {
   /* BOUND IN ONE INSTANT, THE LARGER ID FIRST, so a reader that fell back to the order the rows came back in would sign
      with the smaller. This one passed before `sealedGrant` asked `grantChosen` and passes after: over ids the vault
-     mints, `ORDER BY created_at DESC, id DESC` and the chooser answer alike, as the audit of wave fifty-five said. */
+     mints, `ORDER BY created_at DESC, id DESC` and the chooser answer alike. */
   const { k, sql } = await record();
   const larger = value<GrantRow>(k.bindGrant({ ...COLLECTOR, sealed_for: { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5ZZZ', version: 1 } }, 'p_1'));
   const smaller = value<GrantRow>(k.bindGrant({ ...COLLECTOR, ciphertext: b(30), sealed_for: { id: 'g_01JZ8QK3F7R2M9V4XN6TCB5AAA', version: 1 } }, 'p_1'));

@@ -1,5 +1,5 @@
 /**
- * The holding pen's block and column items on `boot` (`loop/finish/pages.md` PGS-17, contracts §7.4).
+ * The holding pen's block and column items on `boot`.
  *
  * WHAT IS HELD: a page that draws a list without the block its shape asks for is offered that block, appended after
  * everything already on the page, as the page's whole declaration, and the declaration passes the lint accepting it

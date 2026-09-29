@@ -1,6 +1,6 @@
 /**
- * A figure takes `reads` as `list` does, so a ref in its `where` into a list the caller cannot read names no row
- * (SEC-10's fuller fix, `loop/ROADMAP.md` W55).
+ * A figure takes `reads` as `list` does, so a ref in its `where` into a list the caller cannot read names no row (the
+ * fuller fix of a hidden list read through a figure).
  *
  * WHAT WAS MEASURED BEFORE THIS. `metric(decl)` resolved every ref against the whole record: a figure over Jobs whose
  * `where` named a client by title or by `clients#1` counted that client's jobs whoever asked, because it took no second

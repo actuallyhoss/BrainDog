@@ -1,6 +1,6 @@
 /**
  * Try an automation before anybody installs it: its steps taken by the real runner over a sample, and an account of
- * each step handed back (`loop/finish/shell.md` §4.0, `tryAutomation`; `loop/finish/contracts.md` §2.2).
+ * each step handed back (`tryAutomation`).
  *
  * THE REAL RUNNER AND NOT A SECOND ONE. A try that walked the steps with its own reading of them would say what a
  * second engine does, and the first time the two disagreed the owner would install a rule the try had passed. So this
@@ -54,8 +54,8 @@ const REACHES_OUT = new Set(['call', 'script', 'ask_person', 'ask_slash', 'notif
  * What an answer read from a variable set from a secret or file field says in its place.
  *
  * THE SAME SPELLING AS THE HISTORY'S OWN REDACTION (`index.ts`, `REDACTED`), so a reader who has met one knows the
- * other. A try is read by whoever may edit an automation, and a variable filled from `{{trigger.row.pin}}` holds the pin;
- * the step's answer is what the defects list names as the new sink (`loop/finish/defects.md` §5.2, AUT-2).
+ * other. A try is read by whoever may edit an automation, and a variable filled from `{{trigger.row.pin}}` holds the
+ * pin; the step's answer would be a new place for it to leak.
  */
 const SEALED_SAID = '--redacted--';
 

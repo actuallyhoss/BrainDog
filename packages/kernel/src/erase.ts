@@ -185,9 +185,9 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   tomb('job', 'id', ['args', 'result', 'error']);
   /* `job_event` has no single key, so its rowid is the one. */
   tomb('job_event', 'rowid', ['body']);
-  /* THE LAST SIX (OPS-21). An invitation is an address; a saved view keeps a name, a search and a filter somebody typed;
-     a rule's run keeps its variables and what it said, and each step what it was answered; an agent token keeps the
-     label its maker gave it; an uninstalled pack keeps the settings chosen for it for thirty days. An invitation whose
+  /* THE LAST SIX. An invitation is an address; a saved view keeps a name, a search and a filter somebody typed; a
+     rule's run keeps its variables and what it said, and each step what it was answered; an agent token keeps the label
+     its maker gave it; an uninstalled pack keeps the settings chosen for it for thirty days. An invitation whose
      address goes can no longer be accepted, since acceptance matches the address. */
   tomb('invitation', 'id', ['email']);
   tomb('view', 'rowid', ['name', 'search', 'filter'], ['filter']);

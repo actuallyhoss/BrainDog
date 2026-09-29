@@ -2,8 +2,8 @@
  * A redelivery is the same bytes at the same door that were accepted, not any earlier sighting of them.
  *
  * THE KEY WAS `channel` AND `sha256` ALONE, CHECKED BEFORE ANY MATCHING. So the first door to see a set of bytes
- * decided what they were for good. Two orders of events that are ordinary and not attacks lost a write that way,
- * and both answered 202 at the door (`loop/research-batch-thirty-audit.md` 1, `research-batch-thirty-one-audit.md` 2):
+ * decided what they were for good. Two orders of events that are ordinary and not attacks lost a write that way, and
+ * both answered 202 at the door:
  *
  *   - a Shortcut set up before the token was minted, or after a rotation, posts a message with the old token. It is
  *     stored `untriaged` with `UNVERIFIED` on it. The same message sent again with the right token came back
@@ -42,8 +42,8 @@ const REGISTER = (id: string): Declaration => ({
   } as never,
 });
 
-/* THE TWINS, AS THE AUDIT'S PROBE HAD THEM: one reads withdrawals into `out` and one reads credits into `in`, and
-   neither pattern accepts the other's text, which is what makes the first door's answer `untriaged`. */
+/* THE TWINS, AS THE PROBE HAD THEM: one reads withdrawals into `out` and one reads credits into `in`, and neither
+   pattern accepts the other's text, which is what makes the first door's answer `untriaged`. */
 const HOOK = (ingest: string, word: string, register: string): Declaration => ({
   id: `ingest.${ingest}`,
   kind: 'ingest',
@@ -161,9 +161,9 @@ test('AN UNVERIFIED RETRY OF AN UNVERIFIED ARRIVAL IS STILL ONE ROW, and nothing
   sql.close();
 });
 
-/* THE CHECKER'S TWO, ADDED AFTER MUTATING THE REPAIR. Every case above names an ingest, so the rescue condition cut
-   down to `arrival.ingest !== undefined` passed all six, and so did the no-change branch widened to every rescue.
-   The first case below fails under the first mutation and the second under the other. */
+/* TWO MORE, ADDED AFTER MUTATING THE REPAIR. Every case above names an ingest, so the rescue condition cut down to
+   `arrival.ingest !== undefined` passed all six, and so did the no-change branch widened to every rescue. The first
+   case below fails under the first mutation and the second under the other. */
 test('A WRONG TOKEN FIRST IS RESCUED WHEN THE ARRIVAL NAMES NO INGEST', async () => {
   const { k, sql } = await record();
   arrived(k.arrive({ channel: 'webhook', body: PAID, sha256: 'g1', verified: false }));

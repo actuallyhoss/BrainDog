@@ -1,11 +1,10 @@
 /**
- * A door a live pattern names is not retired out from under it (`loop/research-batch-forty-two-audit.md` finding 4 (c)).
+ * A door a live pattern names is not retired out from under it.
  *
  * MEASURED BEFORE THIS FILE: the door retired `ok`, and left its pattern installed naming a door no text can arrive at,
- * which is the declaration `doorFault` refuses at install. The first attempt at this guard, on 23 September, stopped
- * money-core's own update because the plan retired `bank-from-out-sms` while handing the pattern naming it; the plan
- * now hands the door with its pattern (`packages/declare/test/door-follows-patterns.test.ts`), which is what lets the
- * guard stand.
+ * which is the declaration `doorFault` refuses at install. The first attempt at this guard stopped money-core's own
+ * update because the plan retired `bank-from-out-sms` while handing the pattern naming it; the plan now hands the door
+ * with its pattern (`packages/declare/test/door-follows-patterns.test.ts`), which is what lets the guard stand.
  */
 
 import { test } from 'node:test';
@@ -89,7 +88,7 @@ test('A DISABLE THAT TAKES THE DOOR AND ITS PATTERN IN TWO PACKS GOES, and the d
 });
 
 /* ON THE DISABLE ROAD THE FIX IS alsoDisable, NOT A RETIRE. Measured when this test was written, against the guard as
-   wave 47 landed it: `disablePack('door-pack')` was refused "Retire it in the same call, or keep ingest.door.", which
+   it first landed: `disablePack('door-pack')` was refused "Retire it in the same call, or keep ingest.door.", which
    names an act a disable caller cannot take, since `disablePack` retires by pack and takes no ids. The refusal now
    names the pattern's pack for `alsoDisable`, as `PACK_REQUIRED` does, and says to leave the asked pack on. */
 test('A DISABLE REFUSED FOR THE DOOR SAYS TO ADD THE PATTERN\'S PACK TO alsoDisable, and a pattern no pack owns is named to retire', async () => {

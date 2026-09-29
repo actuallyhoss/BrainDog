@@ -1,6 +1,6 @@
 /**
  * What an automation can do, one row per trigger and per step: whether it installs, whether a run takes it, on which
- * hosts, and the words said where it does not (`loop/finish/defects.md` §4.2, "one capability table").
+ * hosts, and the words said where it does not: one capability table.
  *
  * ONE ROW, BECAUSE FOUR PLACES SAID IT AND THEY DRIFTED. What a trigger or a step could do was written into the lint
  * (`flow-lint.ts`, at install), the runner (`flow.ts`, at the run), the grammar an agent reads

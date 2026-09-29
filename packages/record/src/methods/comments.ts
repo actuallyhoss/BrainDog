@@ -1,7 +1,7 @@
 /**
- * The record's methods for comments: `comments`, `comment` and `resolveComment` (`loop/finish/contracts.md` §2.5,
- * `docs/20-COLLABORATION.md` §5). The kernel's half, how a comment is written and read back, is
- * `packages/kernel/src/api/comments.ts`; the route rows are `packages/host/src/routes/comments.ts`.
+ * The record's methods for comments: `comments`, `comment` and `resolveComment` (`docs/20-COLLABORATION.md` §5). The
+ * kernel's half, how a comment is written and read back, is `packages/kernel/src/api/comments.ts`; the route rows are
+ * `packages/host/src/routes/comments.ts`.
  *
  * WHO SEES WHAT A COMMENT IS ON IS ASKED ONCE, BY `sightOf`, and every method here asks it. `sightOf` is `index.ts`'s,
  * because it is the question `lineOf` already asks of a row, a question and a decision (`readable`, `holds`, `nameOf`),
@@ -32,8 +32,8 @@ const GOVERNED = { suggestion: 'q.', decision: 'd.' } as const;
 /**
  * The sentence for a thing that is not there and for a thing the caller may not see, which must be the same sentence.
  *
- * IT QUOTES NO EXAMPLE ID, because a refusal's words may reach a screen (COL-8 shows them) and no id is shown to a
- * person there (`loop/finish/rules.md` §2). The shapes `on` takes are in the route row and `docs/20` §5.
+ * IT QUOTES NO EXAMPLE ID, because a refusal's words may reach a screen (the app shows them) and no id is shown to a
+ * person there. The shapes `on` takes are in the route row and `docs/20` §5.
  */
 const NOTHING = 'There is nothing by that name you can read. Name a row as it is spoken, or a question or a decision by the name you were given for it.';
 

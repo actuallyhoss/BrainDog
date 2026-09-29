@@ -119,15 +119,13 @@ type Ask = { registers?: readonly string[] | undefined; limit?: number };
 /**
  * A search's whole answer: the page of hits, and how many rows there were to have.
  *
- * A BARE ARRAY CANNOT TELL A HUNDRED FROM A HUNDRED OF A HUNDRED AND FORTY, AND THE SCREEN PRINTED
- * THE WRONG ONE. Driven at the owner's size (`loop/research-at-scale.md`, *Wrong, not slow* 3):
- * `/search?q=revenue` drew **100** under the heading and **"All 100 in Datapoints"** beside the
- * group when 140 rows matched, counted against the record file itself. `the` matched 304 and said
- * 100; `bake` matched 577 and said 100. The clamp below is not the fault. `list` clamps above its
- * own ceiling in silence too, and says so at `packages/record/src/index.ts:2038`, but `list` answers
- * a page with a cursor and a `matched`, so a clamped read arrives downstream looking like one. This
- * answered an array, so nothing that received it could know what it was missing, and the surface
- * that exists to find anything in 2,243 rows stated a number that was not true.
+ * A BARE ARRAY CANNOT TELL A HUNDRED FROM A HUNDRED OF A HUNDRED AND FORTY, AND THE SCREEN PRINTED THE WRONG ONE.
+ * Driven at a real record's size: `/search?q=revenue` drew **100** under the heading and **"All 100 in Datapoints"**
+ * beside the group when 140 rows matched, counted against the record file itself. `the` matched 304 and said 100;
+ * `bake` matched 577 and said 100. The clamp below is not the fault. `list` clamps above its own ceiling in silence
+ * too, and says so at `packages/record/src/index.ts:2038`, but `list` answers a page with a cursor and a `matched`, so
+ * a clamped read arrives downstream looking like one. This answered an array, so nothing that received it could know
+ * what it was missing, and the surface that exists to find anything in 2,243 rows stated a number that was not true.
  *
  * SO THE COUNT TRAVELS WITH THE HITS, AND IT IS PER REGISTER RATHER THAN ONE NUMBER. The results
  * screen groups by register and prints a count per group, so a single grand total would fix the
@@ -147,11 +145,11 @@ type Ask = { registers?: readonly string[] | undefined; limit?: number };
  * for it and still leaves the reader to guess whether "more" is 3 or 477. The mark falls out of the
  * count anyway, as `sum(matched) > hits.length`.
  *
- * WHAT IT COSTS, MEASURED. One more query over the same MATCH, with no `bm25` and no `ORDER BY`. At
- * the size the survey used, 2,243 rows in `node:sqlite`, median of nine warm runs: the ranked page of
- * 100 takes 0.31 to 0.73 ms and the count takes 0.24 to 0.76 ms over five queries matching between 0
- * and 1,122 rows, so the count is cheaper than the page it counts on four of the five and the pair is
- * about twice one page. The whole `search` route measured 3 ms at that size.
+ * WHAT IT COSTS, MEASURED. One more query over the same MATCH, with no `bm25` and no `ORDER BY`. At a
+ * measured size of 2,243 rows in `node:sqlite`, median of nine warm runs: the ranked page of 100 takes
+ * 0.31 to 0.73 ms and the count takes 0.24 to 0.76 ms over five queries matching between 0 and 1,122
+ * rows, so the count is cheaper than the page it counts on four of the five and the pair is about twice
+ * one page. The whole `search` route measured 3 ms at that size.
  */
 export type Searched = {
   /** The best matches, `limit` of them at most, best first. */

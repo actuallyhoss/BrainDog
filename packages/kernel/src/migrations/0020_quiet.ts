@@ -1,6 +1,5 @@
 /**
- * The kernel schema, migration 20: `record.quiet`, the record's quiet hours (`09 §5` rule 3, `loop/finish/contracts.md`
- * §12.1, decisions C74).
+ * The kernel schema, migration 20: `record.quiet`, the record's quiet hours (`09 §5` rule 3).
  *
  * ONE COLUMN ON THE RECORD, AND NOT A PERSON'S PREFERENCE. The digest is one schedule row for the whole record, and the
  * outbox has no column to hold a notice back per person, so a window kept per person would be a window nothing could

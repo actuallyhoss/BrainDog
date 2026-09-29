@@ -20,7 +20,7 @@ import { authoredCells, invalid, listedFault, readListed } from './listed.ts';
 /** How many links a block draws when it says no `limit:`, as a table does (`pages.ts`). */
 const LINKS_DRAWN = 50;
 
-/** The drawer's own sentence for an address it cannot draw as a link (`loop/finish/contracts.md` §5.2). */
+/** The drawer's own sentence for an address it cannot draw as a link. */
 export const LINK_SAID = 'A link is an https address, a mailto or a path of this BrainDog.';
 
 /**

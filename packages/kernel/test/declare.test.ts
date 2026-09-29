@@ -706,8 +706,8 @@ test('and a source is a register or a series, not a bare name', () => {
 test('and money names its currency on the record, not in the format, because 02 §3 says a bare number is not money', () => {
   /* A `format` of `money` is added up in the record's home currency, else the one its rows are in, else one amount per
      currency (`metrics.ts` `evaluateMetric`), so it is never a bare number. A pack cannot know which currency the
-     record it lands on keeps, which is why the format no longer has to say one (`loop/finish/modules.md` C1).
-     `money.<CUR>` is still read, and a code that is not three capitals is still refused. */
+     record it lands on keeps, which is why the format no longer has to say one. `money.<CUR>` is still read, and a code
+     that is not three capitals is still refused. */
   assert.equal(refusedWith(metric({ format: 'money' })), null);
   assert.equal(refusedWith(metric({ format: 'money.EGP' })), null);
   for (const format of ['int', 'decimal', 'pct', 'days', 'duration'])
@@ -917,9 +917,8 @@ test('A BLOCK KIND IS ONE OF THE TWENTY, and the closure is what the security ar
 });
 
 test('A PAGE DECLARING A FEED AND A DIFF INSTALLS, with the keys each reads', async () => {
-  /* `loop/research-agent-path.md` §7: what the brain learned lately, as a `feed`, and a skill's
-     versions, as a `diff`. The page lint holds no closed list of block keys, so `since`, `first`,
-     `row`, `field` and `versions` need no rule of their own here. */
+  /* What a record learned lately, as a `feed`, and a skill's versions, as a `diff`. The page lint holds no closed list
+     of block keys, so `since`, `first`, `row`, `field` and `versions` need no rule of their own here. */
   const { k, sql } = await record();
   value(await k.install([OBLIGATIONS]));
   const lately = page({
@@ -1592,13 +1591,12 @@ test('A DATE FORMAT NOTHING COULD READ INSTALLED, AND THE FIELD STAYED EMPTY ON 
   assert.equal(nested?.code, 'DATE_FORMAT_INVALID');
   assert.equal(nested?.at, 'ingest.hsbc_sms.extract.due.first[0].date.format');
 
-  /* A FORMAT THE GRAMMAR ADMITS NOW INSTALLS, because the build is no longer behind the grammar.
-     These three were `NOT_IN_THIS_BUILD` until September 20th 2026 — the one refusal in the tree
-     whose repair was a deploy — and the reason was that `ingest.ts` held a second date grammar of
-     four named formats beside `@braindog/extract`'s, which reads the token set. A record reaches
-     that reader now, so there is no shorter list to refuse against and the list is deleted rather
-     than extended. What each of them READS is asserted where both halves exist, over `43 §9.3`'s
-     own table: `packages/record/test/dates.test.ts`. */
+  /* A FORMAT THE GRAMMAR ADMITS NOW INSTALLS, because the build is no longer behind the grammar. These three were once
+     `NOT_IN_THIS_BUILD`, the one refusal in the tree whose repair was a deploy, and the reason was that `ingest.ts`
+     held a second date grammar of four named formats beside `@braindog/extract`'s, which reads the token set. A record
+     reaches that reader now, so there is no shorter list to refuse against and the list is deleted rather than
+     extended. What each of them READS is asserted where both halves exist, over `43 §9.3`'s own table:
+     `packages/record/test/dates.test.ts`. */
   for (const format of ['DD.MM.YYYY', 'D/M/YY', 'DDMMYYYY']) assert.equal(refusedWith(dated(format)), null, format);
 
   /* AND THE TOKEN CHECK IS STILL THE CHECK. `DATE_FORMAT_INVALID` is about a format's own tokens,
@@ -2021,9 +2019,8 @@ test('A `starts` PATTERN IS MEASURED AS THE `LIKE` PATTERN IT BECOMES, not as th
  *     edit a POSTED row              ACCEPTED, narrative="Rewritten after posting"
  *     delete a POSTED row            ACCEPTED, deleted_at=2026-09-05T12:00:00.000Z
  *
- * The severity was never the missing feature. `REPORT.md` puts the kernel at about a third. It is
- * that a bookkeeping pack ships a lock in its register body, the install diff shows the register,
- * and the lock is decoration until an auditor asks.
+ * The severity was never the missing feature. It is that a bookkeeping pack ships a lock in its register body, the
+ * install diff shows the register, and the lock is decoration until an auditor asks.
  */
 const POSTINGS: Declaration = {
   id: 'register.postings',
@@ -2077,11 +2074,10 @@ test('`02 §6.1`’s OWN LEDGER IS REFUSED AT INSTALL, rather than installed wit
 });
 
 test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, one at a time', () => {
-  /* Each of these was reproduced as ACCEPTED against `validate` before the closed list existed, and
-     each is a rule rather than a decoration: an upsert key that duplicates yesterday and a
-     predicate name no `where:` can reach. `pairs` left the list with W57-1, when the write path
-     began marking a transfer's two legs (`pairs.test.ts`), and `delete` with OPS-12, when the write
-     path began refusing to delete a row that live rows point at (`referenced.test.ts`). */
+  /* Each of these was reproduced as ACCEPTED against `validate` before the closed list existed, and each is a rule
+     rather than a decoration: an upsert key that duplicates yesterday and a predicate name no `where:` can reach.
+     `pairs` left the list when the write path began marking a transfer's two legs (`pairs.test.ts`), and `delete` when
+     the write path began refusing to delete a row that live rows point at (`referenced.test.ts`). */
   const cases: [string, Record<string, unknown>][] = [
     ['key', { series: true, key: ['what'] }],
     ['predicates', { predicates: { overdue: { field: 'what', is: 'x' } } }],

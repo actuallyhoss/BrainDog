@@ -2,17 +2,16 @@
  * A member who reads the record but holds one list down to `append` pages the log the way a member invited to one list
  * does: no event rowid out, none taken in.
  *
- * `loop/research-batch-nineteen-audit.md` finding 3. `7acff83d` sent a rowid to whoever `wholeRecord` said read the whole
- * record, and `wholeRecord` asked only whether the caller's ceiling was `'*'`. Iris, invited at `read` with Diary held to
- * `append`, has no ceiling, so she was "whole record": `lineOf` hid Diary from her, since `append` does not read, and
- * `shown` left the rowid on the lines it did not hide. The probe read her two lines as 10 and 6 with the three Diary
- * writes she cannot see sitting at 7, 8 and 9. The question that decides the rowid is `lineOf`'s own: does she read every
- * list.
+ * WHY. `7acff83d` sent a rowid to whoever `wholeRecord` said read the whole record, and `wholeRecord` asked only
+ * whether the caller's ceiling was `'*'`. Iris, invited at `read` with Diary held to `append`, has no ceiling, so she
+ * was "whole record": `lineOf` hid Diary from her, since `append` does not read, and `shown` left the rowid on the
+ * lines it did not hide. The probe read her two lines as 10 and 6 with the three Diary writes she cannot see sitting at
+ * 7, 8 and 9. The question that decides the rowid is `lineOf`'s own: does she read every list.
  *
- * AND READING EVERY LIST WAS NOT ENOUGH EITHER. A bookkeeper at `read` with one list raised to `write` reads every list,
- * and this file said she kept the rowid as the owner does. `lineOf` keeps the owner's invitations from her, so the gap
- * between two of her lines counted them (`loop/research-batch-twenty-one-audit.md` finding 4, measured again in
- * `reader-rowid-gap.test.ts`). Only an owner holds a rowid now.
+ * AND READING EVERY LIST WAS NOT ENOUGH EITHER. A bookkeeper at `read` with one list raised to `write` reads every
+ * list, and this file said she kept the rowid as the owner does. `lineOf` keeps the owner's invitations from her, so
+ * the gap between two of her lines counted them (measured in `reader-rowid-gap.test.ts`). Only an owner holds a rowid
+ * now.
  */
 
 import { test } from 'node:test';
@@ -46,7 +45,7 @@ const value = <T>(r: unknown): T => {
   return x.value as T;
 };
 
-/** One of hers, three of the diary's, one of hers again: the shape the audit's probe measured. */
+/** One of hers, three of the diary's, one of hers again: the shape the probe measured. */
 async function busy() {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 5, 12)) });
@@ -105,8 +104,8 @@ test('(2) A READER WHOSE HELD LIST STILL READS IS HANDED NO ROWID EITHER, and th
   assert.equal(value<Page>(await api.recentHistory({ cursor: second!.rowid, limit: 1 } as never, owner)).events[0]!.id, third!.id);
 
   /* BEA READS EVERY LIST AND IS STILL NOT SHOWN THE INVITATIONS, which are the owner's lines, so the gap between two of
-     hers counted them. This asserted she kept the rowid, over its own note that she was not shown them
-     (`loop/research-batch-twenty-one-audit.md` finding 4). She pages on the cursors Iris pages on. */
+     hers counted them. This asserted she kept the rowid, over its own note that she was not shown them. She pages on
+     the cursors Iris pages on. */
   const hers = value<Page>(await api.recentHistory({ limit: 200 } as never, bea));
   assert.ok(hers.events.some((e) => e.register === 'diary'), 'Bea reads the diary');
   assert.ok(!hers.events.some((e) => 'rowid' in e), `her lines carry rowids: ${hers.events.map((e) => e.rowid).join(' ')}`);

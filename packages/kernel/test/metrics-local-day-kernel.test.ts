@@ -1,13 +1,12 @@
 /**
  * The local day for the two instants every row has, `created_at` and `updated_at`.
  *
- * `9ba4fcd1` DATED A DECLARED `instant` ON THE RECORD'S LOCAL DAY AND LEFT THE KERNEL'S OWN TWO ON THE
- * UTC ONE. `localInstants` and `endedAt` both asked `schema.fields` whether a field was an instant, and
- * `created_at` and `updated_at` are not in it: they are `KERNEL_FIELDS`, read off `entry`'s columns, and
- * addressable in any `where` without a register declaring them. So `created_at after -30d`, which is
- * "rows added, 30 days" and the figure an owner is most likely to write next, got neither the local
- * bounds nor the as-of end. The audit (`loop/research-batch-twenty-four-audit.md` §3) wrote the five rows
- * of `metrics-instant-day.test.ts` with each instant in `at` and in `created_at` and measured
+ * `9ba4fcd1` DATED A DECLARED `instant` ON THE RECORD'S LOCAL DAY AND LEFT THE KERNEL'S OWN TWO ON THE UTC ONE.
+ * `localInstants` and `endedAt` both asked `schema.fields` whether a field was an instant, and `created_at` and
+ * `updated_at` are not in it: they are `KERNEL_FIELDS`, read off `entry`'s columns, and addressable in any `where`
+ * without a register declaring them. So `created_at after -30d`, which is "rows added, 30 days" and the figure an owner
+ * is most likely to write next, got neither the local bounds nor the as-of end. Measured: the five rows of
+ * `metrics-instant-day.test.ts` with each instant in `at` and in `created_at` and measured
  *
  *     America/New_York  at after -30d          2026-09-04 10011
  *     America/New_York  created_at after -30d  2026-09-04 11111

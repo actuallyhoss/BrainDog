@@ -1,10 +1,9 @@
 /**
  * Money figures in the record's own currency, cash rolled forward, and figures over the walk ahead.
  *
- * `loop/finish/modules.md` MOD-1: C1 (`format: money`), C3 (`value: { rolled }`), C4's walk-reading figure
- * (`source: forecast.runway`) and C7 (`home:`, `sellable:`). Every figure here is read through the kernel's `metric`,
- * the one door a tile, a page and the night's `snapshot` all use, and installed through `install`, where the
- * declaration is checked.
+ * The shapes held here: `format: money`, `value: { rolled }`, the walk-reading figure (`source: forecast.runway`) and
+ * `home:` and `sellable:`. Every figure here is read through the kernel's `metric`, the one door a tile, a page and the
+ * night's `snapshot` all use, and installed through `install`, where the declaration is checked.
  */
 
 import { test } from 'node:test';

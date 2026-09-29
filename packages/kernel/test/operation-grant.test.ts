@@ -1,6 +1,6 @@
 /**
  * An operation grant: a device grant of reach `export`, `import`, `pack` or `token`, checked for the one ADMIN call it
- * was approved for (`12-SECURITY` §6.1, `30 §10`, `loop/research-restore.md` §2.1 and W55-2).
+ * was approved for (`12-SECURITY` §6.1, `30 §10`).
  *
  * WHAT WAS MEASURED BEFORE THIS EXISTED. The kernel accepted a device start with reach `import`, an owner approved it,
  * and the exchange handed the device a bearer that lived ten minutes (`lifeMs`). Nothing read it again: the only reader

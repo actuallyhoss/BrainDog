@@ -1,15 +1,15 @@
 /**
  * `pairs:` finds the two legs of a transfer and marks both.
  *
- * MONEY MOVED BETWEEN TWO OF HIS OWN ACCOUNTS IS NOT SPENT, and the ledger counted it as spent. Every Ledger figure says
- * `transfer is false`, the field defaults to false, and the import writes a move between his accounts as two ordinary
- * rows (`loop/research-living-in-it.md` section 4.1), so until somebody marks both legs by hand the money leaving is
- * spend and the money landing is income. `02 §5` specifies the register option that finds them, and until this build it
- * sat on `REGISTER_UNBUILT`, refused at install as `NOT_IN_THIS_BUILD`.
+ * MONEY MOVED BETWEEN TWO OF HIS OWN ACCOUNTS IS NOT SPENT, and the ledger counted it as spent. Every Ledger figure
+ * says `transfer is false`, the field defaults to false, and the import writes a move between his accounts as two
+ * ordinary rows, so until somebody marks both legs by hand the money leaving is spend and the money landing is income.
+ * `02 §5` specifies the register option that finds them, and until this build it sat on `REGISTER_UNBUILT`, refused at
+ * install as `NOT_IN_THIS_BUILD`.
  *
  * TWO SHAPES OF THE SAME RULE ARE DRIVEN HERE, because a ledger says which way money went in one of two ways. `02 §5`'s
  * own example signs the amount (`opposite: amount`, `-1000` and `+1000`); money-core keeps the amount positive and
- * says the way in an enum (`opposite: direction`, `out` and `in`), which is the declaration W57-4 gives `transactions`.
+ * says the way in an enum (`opposite: direction`, `out` and `in`), which is the declaration money-core gives `transactions`.
  */
 
 import { test } from 'node:test';
@@ -84,7 +84,7 @@ const leg = (k: Kernel, what: string, on: string, direction: 'in' | 'out', amoun
 const now = (k: Kernel, id: string): Entry => k.get(id)!;
 
 test('AT HEAD `pairs:` IS REFUSED AT INSTALL, and after, a register declaring it installs', async () => {
-  /* BEFORE W57-1 BOTH WERE REFUSED, and this file's red run quoted the refusal: `NOT_IN_THIS_BUILD` at `pairs`,
+  /* BEFORE PAIRING WAS BUILT BOTH WERE REFUSED, and this file's red run quoted the refusal: `NOT_IN_THIS_BUILD` at `pairs`,
      "ledger declares pairs, which the documents publish and this build reads nowhere, so it would install and be kept
      by nothing. The repair is a deploy, not an edit." */
   const k = await openRecord(openSqlite(), fixedClock(NOW));
@@ -132,8 +132,8 @@ test('PAIRED ONCE: of two equal rows, the nearer takes the leg and the other sta
   const a = leg(k, 'out', DAY(0), 'out', 50_000, 'current');
   const b = leg(k, 'in', DAY(1), 'in', 50_000, 'reserve');
   const c = leg(k, 'in again', DAY(0), 'in', 50_000, 'savings');
-  /* THIS ASSERTED a WITH b UNTIL AUDIT FIFTY-EIGHT, because b arrived first and a paired row was nobody's candidate.
-     c is on a's own day and b a day off, so c is a's leg, and b, which W57-1 had marked, is given back to Spent. */
+  /* THIS ONCE ASSERTED a WITH b, because b arrived first and a paired row was nobody's candidate. c is on a's own
+     day and b a day off, so c is a's leg, and b, which first-come pairing had marked, is given back to Spent. */
   assert.equal(now(k, a.id).fields._pair, c.id);
   assert.equal(now(k, c.id).fields._pair, a.id);
   assert.equal(now(k, b.id).fields.moved, false);
@@ -180,8 +180,8 @@ test('A LEG WRITTEN LATER BY AN UPDATE IS PAIRED, and the nearest candidate is t
   assert.equal(now(k, far.id).fields._pair, undefined);
 
   /* AN UPDATE TO A PAIRED ROW IS SETTLED AGAIN, as the ledger it leaves stands. This asserted the old pair held, which
-     is the first-come rule audit fifty-eight found hiding the wrong row: a day from `far` and two from `near`, `late`
-     is `far`'s leg now, and `near` is unmarked with the history saying so. */
+     is the first-come rule, which hid the wrong row: a day from `far` and two from `near`, `late` is `far`'s leg now,
+     and `near` is unmarked with the history saying so. */
   made(k.update('ledger', late.id, { on: DAY(1) }, OWNER));
   assert.equal(now(k, late.id).fields._pair, far.id);
   assert.equal(now(k, far.id).fields._pair, late.id);
@@ -201,8 +201,8 @@ test('`02 §5`’S OWN EXAMPLE: a signed amount pairs with its negation, in the 
   const other = post('in, dollars', DAY(1), 1000, 'USD', 'hsbc');
   const b = post('in', DAY(2), 1000, 'EGP', 'hsbc');
   const c = post('in again', DAY(1), 1000, 'EGP', 'nbe');
-  /* `c` IS A DAY FROM `a` AND `b` TWO, so `c` is the leg. This asserted `b`, the first to arrive, until audit
-     fifty-eight; the point that stands is that the one not taken stays unmarked. */
+  /* `c` IS A DAY FROM `a` AND `b` TWO, so `c` is the leg. This once asserted `b`, the first to arrive; the point that
+     stands is that the one not taken stays unmarked. */
   assert.equal(now(k, a.id).fields._pair, c.id);
   assert.equal(now(k, c.id).fields.moved, true);
   assert.equal(now(k, other.id).fields._pair, undefined);

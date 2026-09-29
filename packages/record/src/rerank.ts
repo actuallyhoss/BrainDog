@@ -1,5 +1,5 @@
 /**
- * `search`'s full-text hits, put in order again by what they mean, where the rows have vectors (PLT-11).
+ * `search`'s full-text hits, put in order again by what they mean, where the rows have vectors.
  *
  * THE RECORD NEVER EMBEDS A QUERY (`docs/45-SPEC-RECORD.md` §13 #9), so the query's vector is the hits' own: the mean of
  * the vectors of the few hits the words ranked best. Each hit is then scored by how close its vector is to that mean, and

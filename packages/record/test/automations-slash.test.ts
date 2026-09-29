@@ -1,5 +1,5 @@
 /**
- * What the dry run says of an `ask_slash` step on a host that answers Slash (`research-worker-spark.md` Brief I).
+ * What the dry run says of an `ask_slash` step on a host that answers Slash.
  *
  * MEASURED BEFORE THIS: a record opened with `answersSlash: true` installed a rule that asks Slash and ran it to
  * `waiting` with one `infer.ask` job queued, and its dry run still ended the step with "Not in this build: a rule with

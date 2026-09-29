@@ -1,6 +1,5 @@
 /**
- * What a refused script run leaves on its run line, for everybody who reads the record as a whole (the record-log-and-ref
- * checker of wave thirty-seven, its one open finding).
+ * What a refused script run leaves on its run line, for everybody who reads the record as a whole.
  *
  * `script-log-visibility.test.ts` holds the log to the owner who reads every list the script touched. A thrown error's
  * message is script-controlled free text just as `ctx.log` is, and it reached the run line's `note`, which `logOf` leaves

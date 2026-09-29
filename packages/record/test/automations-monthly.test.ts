@@ -1,5 +1,5 @@
 /**
- * What the record says starts an automation on a monthly clock (`loop/research-legacy-parity.md` B2).
+ * What the record says starts an automation on a monthly clock.
  *
  * MEASURED BEFORE THIS: `said`'s trigger line for `{ every: 1mo, day: last, at: 09:00 }` was "Every 1mo at 09:00 on
  * last.", the weekly sentence with a month's words dropped into it, which a person reads on Decide as a clock nobody

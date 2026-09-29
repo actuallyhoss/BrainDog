@@ -47,8 +47,8 @@ test('a backslash-n where a line break was meant is refused', () => {
   /* THE HELPER STAYS TEXTUAL, AND COERCE IS WHERE A PATH IS EXEMPTED. A Windows path whose next
      character is `n` holds exactly the same two characters as an escaped newline, so
      `hasEscapedNewline` says yes to `C:\\next` and is right to. This used to be the accepted cost
-     of the rule, until a real export was refused on two agent runs' `cwd` for it
-     (`loop/research-import-real.md`, finding 1). `coerce` now skips the refusal when
+     of the rule, until a real export was refused on two agent runs' `cwd` for it.
+     `coerce` now skips the refusal when
      `readsAsWindowsPath` holds; that side is asserted in `escaped-newline-path.test.ts`. */
   assert.ok(hasEscapedNewline('C:\\next'), 'the rule is textual and this is the cost of it');
   assert.ok(!hasEscapedNewline('C:\\next\nand a real break'), 'a real newline anywhere clears it');

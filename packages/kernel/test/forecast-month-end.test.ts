@@ -1,13 +1,12 @@
 /**
  * A monthly movement whose first day is the last day of its month stays on the last day.
  *
- * EVERY LATER DATE WAS STEPPED FROM THE DAY OF THE MONTH IT STARTED ON, AND 30 SEPTEMBER IS DAY
- * THIRTY. Measured through `resolveDay` before the repair: a monthly bill due `2026-09-30` walked
- * `2026-10-30, 2026-11-30, 2026-12-30`, so the October charge landed a day before the month it is
- * paid for ends and December's landed a day early too. A bill set on the last day of a month is a
- * bill on "the end of the month", which is what a person means when they pick the 30th of a
- * thirty-day month. That reading is still open as his call 3 in `loop/research-living-in-it.md`
- * section 8, and W57-2 assumes it; a bill that really is "the 30th" now walks to 31 October.
+ * EVERY LATER DATE WAS STEPPED FROM THE DAY OF THE MONTH IT STARTED ON, AND 30 SEPTEMBER IS DAY THIRTY. Measured
+ * through `resolveDay` before the repair: a monthly bill due `2026-09-30` walked `2026-10-30, 2026-11-30, 2026-12-30`,
+ * so the October charge landed a day before the month it is paid for ends and December's landed a day early too. A bill
+ * set on the last day of a month is a bill on "the end of the month", which is what a person means when they pick the
+ * 30th of a thirty-day month. That reading is still the owner's call, and this assumes it; a bill that really is "the
+ * 30th" now walks to 31 October.
  *
  * ANY OTHER DAY STEPS EXACTLY AS BEFORE. The 15th stays the 15th, and a start on the 31st was
  * already on every month's last day through the clamp, so neither moves.
@@ -88,9 +87,9 @@ test('A QUARTERLY BILL ON 30 SEPTEMBER IS ON THE LAST DAY OF EVERY THIRD MONTH',
   assert.deepEqual(await days('2026-09-30', 'quarterly', 365), ['2026-09-30', '2026-12-31', '2027-03-31', '2027-06-30']);
 });
 
-/* A YEARLY BILL TAKEN ON 28 FEBRUARY RENEWS ON 28 FEBRUARY, leap year or not. Audit fifty-eight
-   finding 10: the month-end rule read 28 February 2027 as "the end of the month" and walked it to
-   29 February 2028, a day after the anniversary the bill was actually taken on. */
+/* A YEARLY BILL TAKEN ON 28 FEBRUARY RENEWS ON 28 FEBRUARY, leap year or not. Measured before the repair: the month-end
+   rule read 28 February 2027 as "the end of the month" and walked it to 29 February 2028, a day after the anniversary
+   the bill was actually taken on. */
 test('A YEARLY BILL ON 28 FEBRUARY OF A COMMON YEAR STAYS ON THE 28TH IN A LEAP YEAR', async () => {
   assert.deepEqual(await days('2027-02-28', 'yearly', 3000), ['2027-02-28', '2028-02-28', '2029-02-28', '2030-02-28', '2031-02-28', '2032-02-28', '2033-02-28', '2034-02-28']);
 });

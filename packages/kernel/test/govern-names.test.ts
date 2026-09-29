@@ -1,12 +1,12 @@
 /**
  * A `change` is about the declaration it names, and what it installs has to be true of the rows already there.
  *
- * TWO HALVES OF ONE FAULT, from `loop/research-batch-seventeen-audit.md` §1 and §6. The record decides who is asked a
- * change by its `declaration_id`, and the kernel installed whatever `to` held: `declaration_id: register.obligations`
- * over a new Diary was filed, shown whole to a member invited to Obligations alone, and on acceptance installed Diary.
- * And a `to` that was a well-formed declaration was installed over rows it contradicted: `state` narrowed to `paid`
- * over two open rows, `what` turned from text to int, a new required field with no default, and a ref to a list
- * called nowhere were each accepted, and each came out as a new version of the register.
+ * TWO HALVES OF ONE FAULT. The record decides who is asked a change by its `declaration_id`, and the kernel installed
+ * whatever `to` held: `declaration_id: register.obligations` over a new Diary was filed, shown whole to a member
+ * invited to Obligations alone, and on acceptance installed Diary. And a `to` that was a well-formed declaration was
+ * installed over rows it contradicted: `state` narrowed to `paid` over two open rows, `what` turned from text to int, a
+ * new required field with no default, and a ref to a list called nowhere were each accepted, and each came out as a new
+ * version of the register.
  *
  * `packages/declare` already refuses two of those on a pack's path (`FIELD_TYPE_CHANGED`, `REQUIRED_ON_POPULATED`,
  * `04 §5`), and `REGISTER_UNRESOLVED` for a list nothing holds. A change reaches `install` without passing through
@@ -72,7 +72,7 @@ const accept = { decide: { option: 'accept' as const, reason: 'yes' } };
 test('A CHANGE NAMED FOR ONE LIST AND CARRYING ANOTHER IS REFUSED WHEN IT IS PROPOSED', async () => {
   const { k, sql } = await record();
   for (const [named, to, said] of [
-    /* The audit's own: filed under Obligations, a new Diary. */
+    /* The measured case: filed under Obligations, a new Diary. */
     ['register.obligations', DIARY_SHARED, /register\.diary.*register\.obligations/],
     /* And the reverse, which hid a change to Obligations from the member it changes. */
     ['register.diary', WIDER, /register\.obligations.*register\.diary/],
@@ -207,7 +207,7 @@ test('AND BY INSTALL ITSELF, which is where the in-app declare lands and what a 
 
 test('A ROW THE LIST ALREADY REFUSED does not hold back a change that leaves it as it was, and a row is counted once', async () => {
   const { k, sql } = await record(1);
-  /* As the audit's narrowing left a record before this build: `state` at `[paid]`, over a row that holds `open`. */
+  /* As an earlier narrowing left a record before this build: `state` at `[paid]`, over a row that holds `open`. */
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.state', 'gone') WHERE register = 'obligations'");
   const note = await k.install([obligations([...OBLIGATIONS_FIELDS, { id: 'note', type: 'text' }])]);
   assert.ok(note.ok, fixOf(note));

@@ -1,6 +1,5 @@
 /**
- * Arranging a record by proposal (`loop/research-spark.md` S12): what a token reads, what it may ask for,
- * and what only the owner's press applies.
+ * Arranging a record by proposal: what a token reads, what it may ask for, and what only the owner's press applies.
  *
  * THE DOOR IS WHAT IS HELD HERE. A token reads the arrangement and files questions; it never installs, turns
  * a pack or changes a setting. A member who may decide other questions may not accept one of these. And

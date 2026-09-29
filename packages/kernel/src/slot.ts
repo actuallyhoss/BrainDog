@@ -1,6 +1,5 @@
 /**
- * When a scheduled action runs next: counted from its slot, and on a wall clock when it names one (`loop/finish/shell.md`
- * DOR-5).
+ * When a scheduled action runs next: counted from its slot, and on a wall clock when it names one.
  *
  * THE SLOT AND THE DUE INSTANT ARE TWO NUMBERS. The slot is where the schedule says a run belongs, and the due instant is
  * the slot plus the action's jitter. Counting the next run from the instant the alarm happened to ring adds every late

@@ -1,6 +1,5 @@
 /**
- * The record's half of rotating the root key: `rewrapKeys`, INTERNAL (`loop/finish/contracts.md` §2.6 and §2.8,
- * `docs/30` §5).
+ * The record's half of rotating the root key: `rewrapKeys`, INTERNAL (`docs/30` §5).
  *
  * NO GUARD, BECAUSE NO CALLER REACHES IT BUT A HOST. It is on no route (`docs/30` §5 lists it among the INTERNAL methods,
  * and the `router-groups` gate refuses a route that names one), and the one caller is the host that holds the root keys:

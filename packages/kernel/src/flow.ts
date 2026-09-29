@@ -1,6 +1,5 @@
 /**
- * The runner of an automation: start a run, take its steps, park it on a wait, resume it, cancel it, prune it
- * (`loop/research-shell-automations.md` §4.1, §4.2, §4.5; Brief B).
+ * The runner of an automation: start a run, take its steps, park it on a wait, resume it, cancel it, prune it.
  *
  * A RUN IS A ROW AND EACH STEP IT TOOK IS A ROW. `automation_run.step` says which step comes next, so a wait of a day
  * survives a deploy: the drain reads the row and carries on from it. Nothing is held in memory between two steps, and
@@ -16,7 +15,7 @@
  * run with no row, `notify`, `suggest` and `create` go past it: the first two straight to the note and the queue, and a
  * `create` to the same `expand` by way of `createAlone`.
  *
- * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT (Brief C). `ask_person` opens an `options`
+ * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT. `ask_person` opens an `options`
  * suggestion whose body names the run and the step, and the kernel's `decide` hands the pick to `answerStep` in the
  * decision's own transaction; with `to:` the question is put to one member, whom `govern.ts`'s `decide` holds it to.
  * `ask_slash` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's text to `answerStep` in the
@@ -124,7 +123,7 @@ export const ASK_PERSON_WAIT = '7d';
  */
 export const ASK_SLASH_WAIT_MS = DAY_MS;
 /**
- * How long a run waits on a call's answer before it stops: a day, the contract's bound (`loop/finish/contracts.md` §4.1).
+ * How long a run waits on a call's answer before it stops: a day, the contract's bound.
  *
  * THE LADDER USUALLY ANSWERS FIRST. A call the provider refuses, or one the record holds, answers at once with its
  * sentence, and eight failed attempts end in about four hours with theirs (`outbox.ts`'s `deadLetter`). This is for a
@@ -132,9 +131,9 @@ export const ASK_SLASH_WAIT_MS = DAY_MS;
  */
 export const CALL_WAIT_MS = DAY_MS;
 /**
- * How long a run waits on a job it started before it stops: a day, the contract's bound for `run_job`
- * (`loop/finish/contracts.md` §4.1). The job itself is not stopped with the run, since the owner approved its kind and
- * started nothing that needs the run to finish it; its own page says how it ends.
+ * How long a run waits on a job it started before it stops: a day, the contract's bound for `run_job`. The job itself
+ * is not stopped with the run, since the owner approved its kind and started nothing that needs the run to finish it;
+ * its own page says how it ends.
  */
 export const RUN_JOB_WAIT_MS = DAY_MS;
 /**
@@ -148,9 +147,9 @@ export const RUN_JOB_WAIT_MS = DAY_MS;
  */
 export const RUN_JOB_LOOK_MS = 5 * 60_000;
 /**
- * How a job's end reads to the steps after it (C13's statuses, `JOB_ENDS` in `jobs.ts`): the three words the contract
- * names. Every other end (refused, limit, interrupted, cancelled) is `error` to a condition, and the step's own row
- * keeps which it was.
+ * How a job's end reads to the steps after it (`JOB_ENDS` in `jobs.ts`): the three words the contract names. Every
+ * other end (refused, limit, interrupted, cancelled) is `error` to a condition, and the step's own row keeps which it
+ * was.
  */
 const JOB_ANSWERS: Readonly<Record<string, string>> = { ok: 'ok', needs_decision: 'needs_decision' };
 /** A job still going, whose run keeps waiting on it. */
@@ -277,17 +276,17 @@ export type RunTrigger = {
 };
 
 /**
- * Where a write a rule-started script makes sits in the chain that started the script (audit sixty-four, finding 2).
+ * Where a write a rule-started script makes sits in the chain that started the script.
  *
- * MEASURED BEFORE THIS (`script-chain.test.ts`, the audit's probe L1): `onWritten` stops a rule's own write unless the
- * trigger says `from_rules`, and stops a chain past `CHAIN_CEILING`, but it knows a rule's write by the actor, and a
- * script writes as `script:<id>@v<n>`. So a rule whose script wrote the row that fired it started itself again on every
- * run, at depth 0: one update ran the script twelve times in twelve rounds and was still going, each run a sandbox and
- * each a row version. The only stop was `runs_per_day`.
+ * MEASURED BEFORE THIS (`script-chain.test.ts`): `onWritten` stops a rule's own write unless the trigger says
+ * `from_rules`, and stops a chain past `CHAIN_CEILING`, but it knows a rule's write by the actor, and a script writes
+ * as `script:<id>@v<n>`. So a rule whose script wrote the row that fired it started itself again on every run, at depth
+ * 0: one update ran the script twelve times in twelve rounds and was still going, each run a sandbox and each a row
+ * version. The only stop was `runs_per_day`.
  *
- * `depth` is the depth of the run whose script step queued the job, and a write under the chain is one deeper.
- * `seen` is each run on the chain as `<rule>@<row>`, the run that queued the job last: a rule never starts again on a
- * row it has already run for in the same chain. That is what ends L1 at its first run, and two rows that each write
+ * `depth` is the depth of the run whose script step queued the job, and a write under the chain is one deeper. `seen`
+ * is each run on the chain as `<rule>@<row>`, the run that queued the job last: a rule never starts again on a row it
+ * has already run for in the same chain. That is what ends such a rule at its first run, and two rows that each write
  * the other at their second, where a check on the queuing run's own row alone let the pair go on to the ceiling.
  *
  * `stopped` is filled while the script's writes go through, one line per rule a write would have started had the chain
@@ -334,8 +333,8 @@ export function underChain<R>(sql: Sql, chain: Chain | null, fn: () => R): R {
  * the chain is the deeper depth and both lists of runs.
  *
  * READ BY `automation_step_answer`, the index migration 17 made, so it finds the steps by the job's id. Before it this
- * read every script step the record keeps, once per finished script run: the checker measured 8.7 ms a finished
- * script at 90,000 runs.
+ * read every script step the record keeps, once per finished script run: measured, 8.7 ms a finished script at 90,000
+ * runs.
  */
 export function chainOfJob(sql: Sql, job: string): Chain | null {
   const runs = sql.all<{ rule: string; trigger: string; depth: number }>(
@@ -397,10 +396,10 @@ const KEPT = '-sendable';
  * then reads as if the list did not have them: `sendable` takes them out with the secret fields themselves.
  *
  * BESIDE `-sendable`, UNDER A KEY NO VARIABLE CAN HAVE, for the same reason: a run parks between the `set` and the
- * question, and what it holds has to be in its row. Audit forty-nine §7 measured, with the lint's check off, a `set` of
- * `note` from `{{pin}}` then `{{note}}`, `{{trigger.row.note}}` and `about: [note]` each queueing `hunter2` for Slash.
- * Written whenever `-sendable` is, empty when nothing is held, so a column with `-sendable` and without this is one a
- * build before it parked, and `advance` rebuilds it.
+ * question, and what it holds has to be in its row. Measured with the lint's check off: a `set` of `note` from
+ * `{{pin}}` then `{{note}}`, `{{trigger.row.note}}` and `about: [note]` each queueing `hunter2` for Slash. Written
+ * whenever `-sendable` is, empty when nothing is held, so a column with `-sendable` and without this is one a build
+ * before it parked, and `advance` rebuilds it.
  */
 const UNSENT = '-unsent';
 
@@ -440,9 +439,9 @@ function unpack(stored: string): { vars: Vars; kept: Kept | null; unsent: string
  *
  * FOR A RUN A BUILD BEFORE `-sendable` PARKED. That build wrote `vars` alone, so a run it parked on a wait or an ask
  * between the `set_var` and the question woke under this build with nothing kept, and its question to Slash was filled
- * from `vars`: measured on 23 September, `Given hunter2, plain, r hunter2?`. This build writes the key on every save,
- * empty when nothing is kept (`pack`), so a column with none is that build's or a run not yet saved, which has no
- * step rows and rebuilds to nothing.
+ * from `vars`: measured, `Given hunter2, plain, r hunter2?`. This build writes the key on every save, empty when
+ * nothing is kept (`pack`), so a column with none is that build's or a run not yet saved, which has no step rows and
+ * rebuilds to nothing.
  *
  * FILLED FROM THE ROW AS IT IS NOW, since the row as it was at the `set_var` is not kept. A variable is kept wherever
  * the clean fill differs from what its step row recorded, so a text field edited since the `set_var` puts its new
@@ -470,11 +469,11 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
     if (done.kind === 'set' || done.kind === 'tag') {
       const step = program[done.n]?.step && emptied(done.kind, program[done.n]!.step, { vars, trigger: started, metric }, row);
       const w = step && row && cleaned ? writes(deps, done.kind, step, { vars, trigger: started, metric }, { vars: { ...vars, ...kept }, trigger, metric }, row, cleaned) : null;
-      /* AND A FIELD THAT DOES NOT HOLD WHAT THE CLEAN FILL WOULD HAVE WRITTEN IS HELD BACK TOO. Two fills of the row as it
-         is now agree once the secret is cleared during the wait, while the field still holds what the step wrote from
-         it: measured on 23 September, `pin` removed while the run waited on a person and the question went out as
-         `Rate for hunter2?` with `about: { note: 'hunter2' }`. A field a person edited since is held back as well, which
-         costs a question a value it could have carried, on a run only a build before `-unsent` parked. */
+      /* AND A FIELD THAT DOES NOT HOLD WHAT THE CLEAN FILL WOULD HAVE WRITTEN IS HELD BACK TOO. Two fills of the row as
+         it is now agree once the secret is cleared during the wait, while the field still holds what the step wrote
+         from it: measured, `pin` removed while the run waited on a person and the question went out as
+         `Rate for hunter2?` with `about: { note: 'hunter2' }`. A field a person edited since is held back as well,
+         which costs a question a value it could have carried, on a run only a build before `-unsent` parked. */
       const tags = row?.fields.tags;
       const held = w !== null && row !== null && (done.kind === 'set' ? String(row.fields[w.field] ?? '') !== w.clean : !(Array.isArray(tags) && tags.includes(w.clean)));
       mark(unsent, done.kind, w && { field: w.field, carries: w.carries || held });
@@ -505,10 +504,10 @@ function rebuilt(deps: FlowDeps, run: string, program: Op[], started: Record<str
  * and `advance` fills a tag's word from the run alone. Two fills that agree wrote nothing a question could not already
  * carry.
  *
- * AND THE FIELD IS THE ONE THE RUN FILLS IT TO, since `act` hands the pass the filled step. Read as written, `field:
- * '{{vars.f}}'` with `f` set to `note` held back `{{vars.f}}`, the pass wrote `note` from `{{pin}}`, and the question
- * after it went out as `Rate for hunter2 hunter2?` with `about: { note: 'hunter2' }` (audit fifty-one §3, L4). The lint
- * refuses a field in braces at install; this is the second line, for a rule stored before it did.
+ * AND THE FIELD IS THE ONE THE RUN FILLS IT TO, since `act` hands the pass the filled step. Read as written,
+ * `field: '{{vars.f}}'` with `f` set to `note` held back `{{vars.f}}`, the pass wrote `note` from `{{pin}}`, and the
+ * question after it went out as `Rate for hunter2 hunter2?` with `about: { note: 'hunter2' }`. The lint refuses a field
+ * in braces at install; this is the second line, for a rule stored before it did.
  */
 function writes(
   deps: FlowDeps,
@@ -548,9 +547,9 @@ function mark(unsent: Set<string>, verb: 'set' | 'tag', w: { field: string; carr
  * its key for the same reason.
  *
  * WITH NOTHING KEPT THE KEY IS STILL WRITTEN, EMPTY. The key's presence is the only sign this build parked the run.
- * Leaving it off when nothing was kept made every such run read as an earlier build's and rebuilt from the row as it
- * is now: measured on 23 September, `p` set from `note` while it said `plain`, `note` edited during the wait, and Slash
- * asked `Given changed?` about a variable holding `plain`, in a rule with no secret in it.
+ * Leaving it off when nothing was kept made every such run read as an earlier build's and rebuilt from the row as it is
+ * now: measured, `p` set from `note` while it said `plain`, `note` edited during the wait, and Slash asked
+ * `Given changed?` about a variable holding `plain`, in a rule with no secret in it.
  */
 function pack(vars: Vars, kept: Kept | null, unsent: Iterable<string> | null, sealed: Iterable<string> | null): string {
   return JSON.stringify(
@@ -619,11 +618,11 @@ const parsed = new WeakMap<Sql, Map<string, Installed | null>>();
  * so a rule is run by exactly one of the two, and a rule installed before `on:` existed is never started twice.
  *
  * A BODY IS PARSED ONCE PER VERSION. This is read on every write of every register, and it ran `JSON.parse` and
- * `pathOf` over every active rule each time: measured on 22 September with sixty rules of twenty steps, 0.55 ms a call,
- * paid by writes that no automation is about, and 0.18 ms with this cache, which is the select of sixty short rows.
- * The key carries the checksum as well as the version because a version number can be reused: an install that rolls
- * back leaves the next install the same number for different bytes. The bodies handed back are shared between calls,
- * so nothing here or in a caller writes to one.
+ * `pathOf` over every active rule each time: measured with sixty rules of twenty steps, 0.55 ms a call, paid by writes
+ * that no automation is about, and 0.18 ms with this cache, which is the select of sixty short rows. The key carries
+ * the checksum as well as the version because a version number can be reused: an install that rolls back leaves the
+ * next install the same number for different bytes. The bodies handed back are shared between calls, so nothing here or
+ * in a caller writes to one.
  */
 export function installed(sql: Sql): Installed[] {
   const was = parsed.get(sql);
@@ -657,11 +656,10 @@ function pinned(sql: Sql, rule: string, version: number): FlowDecl | null {
 /**
  * Why a run of this rule may not take another step, or `null` when the rule is still on.
  *
- * THE PIN IS FOR WHAT A RUN DOES, NOT FOR WHETHER IT MAY. `loop/research-batch-thirty-three-audit.md` §4 installed
- * `enabled: false` as version 2, and then retired the rule, while a run of version 1 waited an hour: both times the run
- * woke, wrote `note: chased` and notified, because `startRun` was the only place that read `enabled`. A plain edit still
- * leaves the run on the steps it started with, as migration 11 promises; only a live version that is off, or none at
- * all, stops it.
+ * THE PIN IS FOR WHAT A RUN DOES, NOT FOR WHETHER IT MAY. Measured: a rule installed with `enabled: false` as version
+ * 2, and then retired the rule, while a run of version 1 waited an hour: both times the run woke, wrote `note: chased`
+ * and notified, because `startRun` was the only place that read `enabled`. A plain edit still leaves the run on the
+ * steps it started with, as migration 11 promises; only a live version that is off, or none at all, stops it.
  */
 function stopped(sql: Sql, rule: string): string | null {
   const live = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'rule' AND superseded_at IS NULL AND retired = 0", `rule.${rule}`);
@@ -675,9 +673,9 @@ function stopped(sql: Sql, rule: string): string | null {
  *
  * CALLED IN THE TRANSACTION THAT STOPS THE RULE, so the screen that switched it off never shows a run still waiting
  * under it: an install that says `enabled: false`, the kernel's `retire`, and a pack turned off. The last retires its
- * rules in `declare.ts` and did not come through here until audit thirty-five §3 measured why it must: a pack turned off
- * and on again before the wake had its run wake under the rule turned back on, write its row and notify. `advance` still
- * asks at every wake, for a record an earlier build left holding a run of a rule already gone.
+ * rules in `declare.ts` and did not come through here until it was measured why it must: a pack turned off and on again
+ * before the wake had its run wake under the rule turned back on, write its row and notify. `advance` still asks at
+ * every wake, for a record an earlier build left holding a run of a rule already gone.
  *
  * `because` IS THE SENTENCE WHEN THE CALLER KNOWS MORE THAN THE ROW DOES. A pack's rule reads as retired, and "retired"
  * sends the owner looking for a retire nobody made.
@@ -890,11 +888,11 @@ export function onArrival(
   for (const rule of rules) {
     if (triggerOf(rule.body) !== 'arrival') continue;
     const spec = (rule.body.on as Extract<Trigger, { arrival: unknown }>).arrival as Extract<Trigger, { arrival: unknown }>['arrival'] & { unverified?: boolean };
-    /* AN ARRIVAL NOTHING VERIFIED STARTS NOTHING UNLESS THE RULE ASKED FOR IT IN WRITING. Audit thirty-three §5: five
-       posts with a wrong token each started a run on `channel: webhook`, spent a `runs_per_day` of five, and wrote the
-       sender's own text into five notes, and the owner's real message after them started nothing. A rule keyed on an
-       `ingest:` was already safe, because an unverified arrival is stored with none; a rule on a channel or on
-       `state: [untriaged]` was not. */
+    /* AN ARRIVAL NOTHING VERIFIED STARTS NOTHING UNLESS THE RULE ASKED FOR IT IN WRITING. Measured: five posts with a
+       wrong token each started a run on `channel: webhook`, spent a `runs_per_day` of five, and wrote the sender's own
+       text into five notes, and the owner's real message after them started nothing. A rule keyed on an `ingest:` was
+       already safe, because an unverified arrival is stored with none; a rule on a channel or on `state: [untriaged]`
+       was not. */
     if (!a.verified && spec.unverified !== true) continue;
     if (spec.ingest !== undefined && spec.ingest !== a.ingest) continue;
     if (spec.channel !== undefined && spec.channel !== a.channel) continue;
@@ -935,12 +933,12 @@ export const MISSED_TURNS_CEILING = 12;
 /**
  * A clock rule's turn, and every turn after it the drain has also passed: each one recorded, and the next turn ahead.
  *
- * NEVER FOLDED. The first form took the turn it was handed and asked the clock for its next turn from now, so a host that
- * was off from 31 January to 2 May made the January task and none of February's, March's or April's, and said nothing
- * (the audit of 25 September, C2). Each turn from when this one was due up to now is now its own run, stamped with its
- * own instant, or, where the clock says `late:` and the turn is later than that, a run recorded as skipped and not
- * taken (`skipTurn`). Past `MISSED_TURNS_CEILING` turns, the rest are not taken either, and one skipped run says how
- * many and from when, so a clock of fifteen minutes back from a week away is not a thousand runs in one drain.
+ * NEVER FOLDED. The first form took the turn it was handed and asked the clock for its next turn from now, so a host
+ * that was off from 31 January to 2 May made the January task and none of February's, March's or April's, and said
+ * nothing. Each turn from when this one was due up to now is now its own run, stamped with its own instant, or, where
+ * the clock says `late:` and the turn is later than that, a run recorded as skipped and not taken (`skipTurn`). Past
+ * `MISSED_TURNS_CEILING` turns, the rest are not taken either, and one skipped run says how many and from when, so a
+ * clock of fifteen minutes back from a week away is not a thousand runs in one drain.
  *
  * EACH NEXT TURN COUNTS FROM THE TURN BEFORE IT, not from when the drain reached it, so an hourly rule stays on the hour
  * it was installed at and a monthly one on its day. A clock of months is asked the calendar from the turn and never
@@ -1022,11 +1020,11 @@ function takeTurn(deps: FlowDeps, rule: Installed, turn: number): void {
  * A turn recorded and not taken: a run `cancelled` with its sentence, and one step `{ n: 0, kind: 'late', state:
  * 'skipped' }`, which the runs list draws as Skipped.
  *
- * `cancelled` AND NOT A STATE OF ITS OWN, because `automation_run.state`'s CHECK has none for it and a rebuild would cost
- * a migration (`loop/finish/contracts.md` X13); the step row is what tells it from a run somebody stopped. Written
- * without `startRun`, so `runs_per_day` never refuses the record of a turn, and `startRun` does not count it, so a
- * record of a turn never spends the day of a turn that is taken. Finished through `finish`, so it writes the free
- * metered line every cancelled run writes.
+ * `cancelled` AND NOT A STATE OF ITS OWN, because `automation_run.state`'s CHECK has none for it and a rebuild would
+ * cost a migration; the step row is what tells it from a run somebody stopped. Written without `startRun`, so
+ * `runs_per_day` never refuses the record of a turn, and `startRun` does not count it, so a record of a turn never
+ * spends the day of a turn that is taken. Finished through `finish`, so it writes the free metered line every cancelled
+ * run writes.
  */
 function skipTurn(deps: FlowDeps, rule: Installed, turn: number, say: string): void {
   const id = deps.mint();
@@ -1210,9 +1208,9 @@ export const SWEPT_ROWS = 1000;
  * start the rule and a day passing writes nothing. `due before today` becomes true of a bill nobody touched, and a rule
  * read only on writes would never see it.
  *
- * MEASURED BEFORE THIS, on 22 September: such a rule installed, its row went past due, and a sweep by hand started
- * nothing, because the hourly re-read handed every rule to `applyRule`, which finds rows by a top-level `register:` and
- * a run-path rule has none. The lint then refused the body as `NOT_IN_THIS_BUILD` until this read it.
+ * MEASURED BEFORE THIS: such a rule installed, its row went past due, and a sweep by hand started nothing, because the
+ * hourly re-read handed every rule to `applyRule`, which finds rows by a top-level `register:` and a run-path rule has
+ * none. The lint then refused the body as `NOT_IN_THIS_BUILD` until this read it.
  */
 export function onTime(deps: FlowDeps, rules: readonly Installed[]): number {
   let started = 0;
@@ -1267,9 +1265,9 @@ export function advance(deps: FlowDeps, id: string): number | null {
     finish(deps, run, 'cancelled', off);
     return null;
   }
-  /* AT THE RECORD'S MONTHLY ALLOWANCE A RUN THAT HAS NOT STARTED WAITS FOR THE FIRST OF NEXT MONTH, with the Directory's
-     sentence on its row (`loop/finish/decisions.md` C34). The answer is the run's next due time, so its schedule row
-     wakes it then; a run already under way finishes what it started, and a body being tried is never held. */
+  /* AT THE RECORD'S MONTHLY ALLOWANCE A RUN THAT HAS NOT STARTED WAITS FOR THE FIRST OF NEXT MONTH, with the
+     Directory's sentence on its row. The answer is the run's next due time, so its schedule row wakes it then; a run
+     already under way finishes what it started, and a body being tried is never held. */
   const held = deps.trial ? null : deps.held;
   if (held && held.until > deps.nowMs && run.state === 'pending' && run.step === 0) {
     deps.sql.exec('UPDATE automation_run SET say = ? WHERE id = ?', held.say, run.id);
@@ -1325,9 +1323,9 @@ export function advance(deps: FlowDeps, id: string): number | null {
     return null;
   };
 
-  /* WHERE THE RUN IS, SAVED AFTER EVERY STEP THAT IS DONE. This was written only at a wait and at the end, so a run that
-     stopped between two steps started again from its last wait and took every step since a second time: audit
-     thirty-three §1 counted six notifies in twelve hours from one row. A step that finished is never taken again. */
+  /* WHERE THE RUN IS, SAVED AFTER EVERY STEP THAT IS DONE. This was written only at a wait and at the end, so a run
+     that stopped between two steps started again from its last wait and took every step since a second time: measured,
+     six notifies in twelve hours from one row. A step that finished is never taken again. */
   const saved = (next: number): number => {
     deps.sql.exec('UPDATE automation_run SET step = ?, vars = ? WHERE id = ?', next, pack(vars, kept, unsent, sealedVars), id);
     return next;
@@ -1380,10 +1378,10 @@ export function advance(deps: FlowDeps, id: string): number | null {
         if (value.length > VAR_BYTES) return fail(i, 'set_var', `rule.${run.rule} sets ${spec.name} to ${value.length} characters, and one answer holds ${VAR_BYTES}.`);
         /* AND FILLED A SECOND TIME, FROM WHAT A QUESTION TO SLASH MAY CARRY: the row `sendable` leaves, and every
            variable already kept here read as it was kept, so one set from another carries the cleaning with it. The
-           first fill alone is what audit forty-six measured leaving through a real self-host: `set_var: { to:
-           '{{trigger.row.pin}}' }` then `{{vars.p}}` put "given hunter2" in the model's request body, and `to:
-           '{{trigger.row}}'` put the row's JSON there with `pin` in it. The lint refuses both at install; this is the
-           second line, for a rule an earlier build let install.
+           first fill alone is what was measured leaving through a real self-host:
+           `set_var: { to: '{{trigger.row.pin}}' }` then `{{vars.p}}` put "given hunter2" in the model's request body,
+           and `to: '{{trigger.row}}'` put the row's JSON there with `pin` in it. The lint refuses both at install; this
+           is the second line, for a rule an earlier build let install.
 
            BOTH FILLS READ `vars` AS IT WAS BEFORE THIS STEP. The second was taken after the new value went in, so
            `to: '{{vars.p}} more'` read its own result, the fills differed, and Slash was asked `plain more more` about
@@ -1517,8 +1515,8 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const started = startScript(deps, run.rule, step, i, read(), paths());
         if (!started.ok) return fail(i, op.verb, started.say);
         /* THE JOB ID TAKES THE NAME OFF WHATEVER IT HELD, as an answer does in `answerStep`. Left in `kept` and
-           `sealedVars`, a name first set from a secret still read as one: the checker measured `set_var: job` from `pin`,
-           then `script: { as: job }`, then `set: { what: 'queued {{vars.job}}' }` failing the run as a secret copy. */
+           `sealedVars`, a name first set from a secret still read as one: measured, `set_var: job` from `pin`, then
+           `script: { as: job }`, then `set: { what: 'queued {{vars.job}}' }` failing the run as a secret copy. */
         const spec = step.script as { as?: unknown };
         if (typeof spec.as === 'string') {
           vars[spec.as] = started.job;
@@ -1530,14 +1528,14 @@ export function advance(deps: FlowDeps, id: string): number | null {
         continue;
       }
 
-      /* A WRITE TO THE ROW IS FILLED BOTH WAYS TOO, before it is taken, since the row it is filled from is the row as it
-         stands now. The field it writes is held back from every question to Slash after it when the two differ, and
-         given back by a plain `set` of it: a question reads the row as the step left it, and audit forty-nine §7
-         measured `set: { field: note, to: '{{pin}}' }` then `{{note}}`, `{{trigger.row.note}}`, `about: [note]` and a
-         `set_var` from `note` each queueing `hunter2` for Slash. The lint refuses those at install, and since wave
-         fifty-five the step below is refused at run time as well, so for a secret this now marks only a copy into a
-         field that never leaves either; what it still guards is a run an earlier build took past such a write, whose
-         `-unsent` this column carries on or `rebuilt` replays. */
+      /* A WRITE TO THE ROW IS FILLED BOTH WAYS TOO, before it is taken, since the row it is filled from is the row as
+         it stands now. The field it writes is held back from every question to Slash after it when the two differ, and
+         given back by a plain `set` of it: a question reads the row as the step left it, and it was measured that
+         `set: { field: note, to: '{{pin}}' }` then `{{note}}`, `{{trigger.row.note}}`, `about: [note]` and a `set_var`
+         from `note` each queueing `hunter2` for Slash. The lint refuses those at install, and the step below is refused
+         at run time as well, so for a secret this now marks only a copy into a field that never leaves either; what it
+         still guards is a run an earlier build took past such a write, whose `-unsent` this column carries on or
+         `rebuilt` replays. */
       const cleanRow = (op.verb === 'set' || op.verb === 'tag') && subject ? sendable(deps, subject, unsent) : null;
       const wrote =
         cleanRow && subject && (op.verb === 'set' || op.verb === 'tag')
@@ -1545,8 +1543,7 @@ export function advance(deps: FlowDeps, id: string): number | null {
           : null;
       /* A STEP THAT WRITES ANYWHERE BUT THE RUN'S OWN ROW COPIES NO SECRET, unless into a field that never leaves
          either. The lint refuses such a step at install (`flow-lint.ts`, `copyFault`); this is the second line, for a
-         rule stored before it did.
-         Measured on 23 September at HEAD `afb3b1b2` with the rule written into the table: `note`, `notify`,
+         rule stored before it did. Measured at `afb3b1b2` with the rule written into the table: `note`, `notify`,
          `schedule`, `create` into another list, `suggest`, `tag` and `set` each wrote `hunter2` from
          `{{trigger.row.pin}}`, `{{trigger.row}}` or a variable set from `pin`, into the note event, a Payments row, the
          schedule, the question queue and the row itself. The texts the pass fills are handed to it as typed with the
@@ -1556,20 +1553,20 @@ export function advance(deps: FlowDeps, id: string): number | null {
       const by = paths();
       /* A CREATE'S FIELDS GO TO THE PASS AS TYPED WITH OR WITHOUT A ROW, since `createAlone` fills them as `runRules`
          does, and the copy of a secret is refused by the create either way. Filled here as well, they were filled
-         twice: measured on 25 September, a button's `set_var: { to: 'a {{what}} b' }` then `what: 'x {{vars.label}}'`
-         reached the create as `x a {{what}} b` and was refused as reading a row the run does not have, where the
-         braces were only what the variable held (`clock-create.test.ts`). */
+         twice: measured, a button's `set_var: { to: 'a {{what}} b' }` then `what: 'x {{vars.label}}'` reached the
+         create as `x a {{what}} b` and was refused as reading a row the run does not have, where the braces were only
+         what the variable held (`clock-create.test.ts`). */
       const handed = handOn(step, by, subject !== null || op.verb === 'create');
       /* A `tag` OF THE RUN'S OWN ROW IS REFUSED WITH THE REST, and a `set` is refused by the pass, which fills its `to`
-         (`rules.ts`). Wave fifty-four wrote both and held the field back from what leaves; measured at HEAD `b7409d2d`,
+         (`rules.ts`). A first repair wrote both and held the field back from what leaves; measured at `b7409d2d`,
          `tag: 'x {{trigger.row.pin}}'` stored past the lint put `x hunter2` in the row's tags, which every reader of
          the list sees. `mark` below is left holding back only what a `set` copies into a field that never leaves
          either, and a field no live declaration types.
 
-         AN `untag` IS LET THROUGH, as the lint lets it install (`flow-lint.ts`'s `COPIERS`). At HEAD `b7409d2d` it
-         installed and then failed its run whenever the secret held anything, because this check read every string of
-         the step and exempted `set` and `tag` alone. It writes the row's own tags back less one word and adds none,
-         so what it tells a reader is whether a tag equalled the secret, which an `if` on the field already tells. */
+         AN `untag` IS LET THROUGH, as the lint lets it install (`flow-lint.ts`'s `COPIERS`). At `b7409d2d` it installed
+         and then failed its run whenever the secret held anything, because this check read every string of the step and
+         exempted `set` and `tag` alone. It writes the row's own tags back less one word and adds none, so what it tells
+         a reader is whether a tag equalled the secret, which an `if` on the field already tells. */
       if (handed.secret !== null && op.verb !== 'untag')
         return fail(
           i,
@@ -1585,11 +1582,11 @@ export function advance(deps: FlowDeps, id: string): number | null {
       i = saved(i + 1);
     }
   } catch (e) {
-    /* A STEP THAT THROWS IS A STEP THAT FAILED, and the run ends here with a sentence. Left to the drain, the throw walked
-       its retry ladder over a run still `running`, and each attempt took again every step since the last save; the run
-       was never finished, so `pruneRuns` never took it and it held no metered line. What threw in the audit was
-       `{ note: { text } }`, which the lint let through and `fill` could not read, but a driver error or a full disk
-       arrives the same way. */
+    /* A STEP THAT THROWS IS A STEP THAT FAILED, and the run ends here with a sentence. Left to the drain, the throw
+       walked its retry ladder over a run still `running`, and each attempt took again every step since the last save;
+       the run was never finished, so `pruneRuns` never took it and it held no metered line. What threw when it was
+       measured was `{ note: { text } }`, which the lint let through and `fill` could not read, but a driver error or a
+       full disk arrives the same way. */
     const why = e instanceof Error ? e.message : String(e);
     return fail(i, program[i]?.verb ?? 'step', `rule.${run.rule} broke at step ${i + 1}: ${why}`);
   }
@@ -1645,9 +1642,9 @@ function act(
         say: `rule.${rule}'s ${verb} step acts on ${gone.seq === null ? gone.id : `${gone.register}#${gone.seq}`}, which was deleted, and a step does not write to a deleted row.`,
       };
     /* A CREATE MAKES A ROW AND NEEDS NONE TO STAND ON, so it is taken here, keyed on the clock's turn or the run
-       (`createAlone` says why). Sent on to the sentence below, a create on a weekly or monthly clock installed and failed
-       every turn (measured on 25 September, `clock-monthly.test.ts`). Its fields reach here as typed (`handOn`), so the
-       create fills them once. */
+       (`createAlone` says why). Sent on to the sentence below, a create on a weekly or monthly clock installed and
+       failed every turn (measured, `clock-monthly.test.ts`). Its fields reach here as typed (`handOn`), so the create
+       fills them once. */
     if ('create' in action) {
       const grown = createAlone(r, rule, action.create, batch, run, parent);
       const first = grown.refusals[0];
@@ -1677,10 +1674,10 @@ function act(
  * ordinary write path. The record never runs the source. What the script hands back does not resume this run, so the
  * step does not wait: it is done when the row is queued.
  *
- * MEASURED BEFORE THIS ARM (`packages/kernel/test/rule-script.test.ts`, and W59-1's stop on 24 September at `8a489d4c`):
- * every run that reached a script step failed with "a step that waits on a script is not in this build", and a script
- * declaring `runs: { rule: true }` was read by the egress line that tells the owner about it and by nothing that
- * started one. So a rule could not close a task's follow-ups, and the Work pack declared no cascade.
+ * MEASURED BEFORE THIS ARM (`packages/kernel/test/rule-script.test.ts`, at `8a489d4c`): every run that reached a script
+ * step failed with "a step that waits on a script is not in this build", and a script declaring `runs: { rule: true }`
+ * was read by the egress line that tells the owner about it and by nothing that started one. So a rule could not close
+ * a task's follow-ups, and the Work pack declared no cascade.
  *
  * ONLY A SCRIPT THAT SAYS `runs: { rule: true }`. The owner approved each script's header at install, and `runs:` is the
  * part of it that says when it may start; a script written for a clock is not handed a row because a rule named it.
@@ -1692,11 +1689,11 @@ function act(
  * is the second line for a rule stored before it did.
  *
  * AND EVERY GATE A CLOCK'S FIRE PASSES, because a rule is a second way into the same queue and the owner's controls are
- * the script's, not the clock's. The first attempt read the declaration and nothing else, and the checker refused it on
- * 24 September: a script paused after three refused runs (`pauseAfterRefusals` in `script-run.ts`) was queued again by
- * the next write that fired the rule, so "it will not run again until somebody resumes it" was not true, and each of
- * those runs would have been refused a fourth, fifth and sixth time. `rule-script.test.ts` measured it: the run finished
- * `done` with one row queued for a paused script. The gates, in the order a fire meets them:
+ * the script's, not the clock's. The first attempt read the declaration and nothing else, and that was not enough: a
+ * script paused after three refused runs (`pauseAfterRefusals` in `script-run.ts`) was queued again by the next write
+ * that fired the rule, so "it will not run again until somebody resumes it" was not true, and each of those runs would
+ * have been refused a fourth, fifth and sixth time. `rule-script.test.ts` measured it: the run finished `done` with one
+ * row queued for a paused script. The gates, in the order a fire meets them:
  *   - installed and active, which is `activeScript`'s query and so also refuses one retired or whose pack is off;
  *   - its schedule row not paused, which `drainSchedule` honours for the clock by firing only a pending row. A record
  *     with no row for the script (installed before migration 12 armed one) has nothing paused to honour;
@@ -1959,8 +1956,7 @@ function ask(
   }
   /* `rule` IS WHO ASKS. The host's pass refuses a job without it and never calls Slash (`slash-answers.ts` `askOf`),
      because Slash's ledger row is written as `rule.<id> step <n>` and the owner's key is opened as `rule:<id>`: a job
-     queued without it ended its run on "no text", measured through the real kernel (`loop/research-infer-ask-next.md`
-     §1.3, B). */
+     queued without it ended its run on "no text", measured through the real kernel. */
   const job = enqueue(deps.sql, deps.mint, deps.nowMs, 'infer.ask', {
     run,
     rule,
@@ -2082,13 +2078,13 @@ function answerCall(deps: FlowDeps, run: RunRow, step: number, answer: string, s
  * Let go of what a run's waiting ask still holds, as the run ends: the question comes out of the queue, and a Slash
  * job nobody has leased yet comes out of the outbox.
  *
- * WITHOUT THIS A CANCELLED RUN LEFT ITS QUESTION OPEN, and the person who answered it a day later was answering nothing:
- * `answerStep` reads the run as over and the pick goes nowhere. A job a host already holds is left to its ack, for the
- * reason `answerStep` gives, and the ack finishes it: `outbox.ts`'s failed branch reads this run and its step row, and a
- * job whose run is no longer waiting on it is marked `done` with no `retry`, so a question out when its rule stopped is
- * asked once and not eight times (audit forty-nine section 1). The step row is left `waiting` here, so the ack reads the
- * run's own state as well. The Slash job is deleted rather than marked `done`, because nothing was delivered, and its
- * `retry` row goes with it.
+ * WITHOUT THIS A CANCELLED RUN LEFT ITS QUESTION OPEN, and the person who answered it a day later was answering
+ * nothing: `answerStep` reads the run as over and the pick goes nowhere. A job a host already holds is left to its ack,
+ * for the reason `answerStep` gives, and the ack finishes it: `outbox.ts`'s failed branch reads this run and its step
+ * row, and a job whose run is no longer waiting on it is marked `done` with no `retry`, so a question out when its rule
+ * stopped is asked once and not eight times. The step row is left `waiting` here, so the ack reads the run's own state
+ * as well. The Slash job is deleted rather than marked `done`, because nothing was delivered, and its `retry` row goes
+ * with it.
  */
 function release(deps: FlowDeps, run: RunRow, say: string | null): void {
   const held = deps.sql.all<{ kind: string; answer: string | null }>(
@@ -2321,23 +2317,22 @@ const landsOf = (program: readonly Op[], row: Entry | null): Set<string> => {
 };
 
 /**
- * Whether one of `lands` is a list other than the one figure `id` adds up, so that the figure is withheld (audit
- * sixty-two, finding 4, and audit sixty-four, finding 1).
+ * Whether one of `lands` is a list other than the one figure `id` adds up, so that the figure is withheld.
  *
- * MEASURED BEFORE THIS (`figure-privacy.test.ts`, the audit's probe F1): an owner's rule on each new Inbox row set its
- * note to `filed; payroll {{metric.payroll}}`, over a figure summing Salaries. A member invited to Inbox alone is
- * refused `payroll` by the record as a figure that does not exist, and her own Inbox read `filed; payroll GBP 5200.00`.
- * The figure was read with the run's context and nobody was asked who would read where it landed.
+ * MEASURED BEFORE THIS (`figure-privacy.test.ts`): an owner's rule on each new Inbox row set its note to
+ * `filed; payroll {{metric.payroll}}`, over a figure summing Salaries. A member invited to Inbox alone is refused
+ * `payroll` by the record as a figure that does not exist, and her own Inbox read `filed; payroll GBP 5200.00`. The
+ * figure was read with the run's context and nobody was asked who would read where it landed.
  *
  * THE SAME QUESTION THE RECORD ASKS HER, ONE FIGURE WIDE. Its `metric` refuses a figure over a list she does not read
  * (`packages/record/src/index.ts`, "the same leak one number wide"), and reads nothing else of it, so this asks of the
  * figure's `source` alone. A figure over no list, a `series.`, is read by whoever reads a page, and is not hidden.
  *
- * NOT WHO IS A MEMBER AT THE RUN, WHICH WAS THE FIRST REPAIR, BECAUSE THE ROW OUTLIVES THE RUN (audit sixty-four,
- * finding 1). The first form asked the `member` rows when the figure was filled, and that held for every note written
- * after an invitation and for none written before it: V1 (`figure-privacy-before.test.ts`) filed one Inbox row, invited
- * Bea to Inbox alone, and she read `filed; payroll GBP 5200.00` in it. A script whose `reads:` names Inbox and not
- * Salaries was never asked either, and it may send what it reads out through its `egress:`.
+ * NOT WHO IS A MEMBER AT THE RUN, WHICH WAS THE FIRST REPAIR, BECAUSE THE ROW OUTLIVES THE RUN. The first form asked
+ * the `member` rows when the figure was filled, and that held for every note written after an invitation and for none
+ * written before it: `figure-privacy-before.test.ts` filed one Inbox row, invited Bea to Inbox alone, and she read
+ * `filed; payroll GBP 5200.00` in it. A script whose `reads:` names Inbox and not Salaries was never asked either, and
+ * it may send what it reads out through its `egress:`.
  *
  * SO THE FIGURE IS WRITTEN ONLY WHERE IT ADDS UP THE LIST IT LANDS IN. That is the one rule that holds for a reader who
  * does not exist yet: whoever reads a row of Salaries, today or after next month's invitation, a person or a script,
@@ -2412,12 +2407,11 @@ const SPELLING = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.\\
  *
  * THE DASH IS FOR A HOLE IN A SENTENCE, NOT FOR A WHOLE VALUE. `Paid {{vars.x}}` with nothing in `x` writes `Paid —`,
  * because `Paid ` alone reads as a bug. A text that is nothing but the hole has no sentence around it, and writing the
- * dash there wrote a value where there was none: measured on 25 September, a `set` from `{{trigger.row.note}}` over an
- * empty note wrote the memo as `—`, and a `packs/pad` question acked `done` with empty text set the note's reply to
- * `—` with `once_per` then never asking again. (`packages/slash`'s own pass refuses a blank answer before it acks, so
- * that second one reaches a record only through a host that acks the outbox itself.) A `day` field refuses the dash,
- * so a `create` whose due day filled with nothing failed its run instead of leaving the day blank
- * (`flow-empty-answer.test.ts`).
+ * dash there wrote a value where there was none: measured, a `set` from `{{trigger.row.note}}` over an empty note wrote
+ * the memo as `—`, and a `packs/pad` question acked `done` with empty text set the note's reply to `—` with `once_per`
+ * then never asking again. (`packages/slash`'s own pass refuses a blank answer before it acks, so that second one
+ * reaches a record only through a host that acks the outbox itself.) A `day` field refuses the dash, so a `create`
+ * whose due day filled with nothing failed its run instead of leaving the day blank (`flow-empty-answer.test.ts`).
  *
  * A FIGURE, A TUPLE, AN `{{id}}` AND A ROW'S FIELD WITH NO ROW ARE NEVER NOTHING HERE: a figure writes its words or
  * `WITHHELD`, a tuple is filled by the create, the id always holds something, and a field with no row is refused by
@@ -2446,10 +2440,10 @@ const varText = (text: string, scope: Record<string, unknown>): string => (nothi
  * field is and what it is is nothing; a stale value left in its place would say the rule wrote it. A `create` leaves
  * the field out, and a required one is then refused by the list in its own words rather than holding a dash.
  *
- * THE EMPTY `set` CLEARS A TEXT FIELD AND NOTHING ELSE. Measured by the checker on 25 September: a `set` of a `day`
- * field from nothing still fails the run (`due takes a day, as YYYY-MM-DD`), as it did on the dash, and a `money` one
- * fails the same way, so those two are no worse and no better. And a `create` whose required title filled from an
- * empty field used to make a row titled `—` and now fails the run on `tasks needs what.`, which is the refusal meant.
+ * THE EMPTY `set` CLEARS A TEXT FIELD AND NOTHING ELSE. Measured: a `set` of a `day` field from nothing still fails the
+ * run (`due takes a day, as YYYY-MM-DD`), as it did on the dash, and a `money` one fails the same way, so those two are
+ * no worse and no better. And a `create` whose required title filled from an empty field used to make a row titled `—`
+ * and now fails the run on `tasks needs what.`, which is the refusal meant.
  */
 function emptied(verb: string, step: Record<string, unknown>, scope: Record<string, unknown>, row: Entry | null): Record<string, unknown> {
   if (verb === 'set' && isObject(step.set) && typeof step.set.to === 'string' && nothingIn(step.set.to, scope, row)) return { ...step, set: { ...step.set, to: '' } };
@@ -2467,13 +2461,13 @@ const pathsOf = (scope: Record<string, unknown>): RunFill => ({ value: (head, pa
  * variable in `tainted` that holds something, `{{trigger.row.pin}}` where `pin` never leaves and holds something, and
  * `{{trigger.row}}` where any such field of the row holds something.
  *
- * BY WHERE THE PATH GOES, NEVER BY WHAT IT HOLDS, and by the declared types alone. The held attempt of wave fifty-three
- * compared the step filled from the row with the step filled from `sendable`'s row, which also drops every field the
- * live list does not declare. Measured on 23 September with that diff applied to `afb3b1b2`: on Jobs, a list declaring
- * no secret field, a `note` of `x {{trigger.row.what}} {{vars.v}}` failed "would copy what old holds", because `v` was
- * set from `{{trigger.row}}` and the row carried a value under `old`, a field the list no longer declares. Such a value
- * has no type saying it may not leave, so a question to Slash goes without it, and a note the list's own readers see
- * may carry it. Comparing words would be no better: a `note` that happens to say what `pin` says is not a copy.
+ * BY WHERE THE PATH GOES, NEVER BY WHAT IT HOLDS, and by the declared types alone. A first attempt compared the step
+ * filled from the row with the step filled from `sendable`'s row, which also drops every field the live list does not
+ * declare. Measured with that attempt applied to `afb3b1b2`: on Jobs, a list declaring no secret field, a `note` of
+ * `x {{trigger.row.what}} {{vars.v}}` failed "would copy what old holds", because `v` was set from `{{trigger.row}}`
+ * and the row carried a value under `old`, a field the list no longer declares. Such a value has no type saying it may
+ * not leave, so a question to Slash goes without it, and a note the list's own readers see may carry it. Comparing
+ * words would be no better: a `note` that happens to say what `pin` says is not a copy.
  */
 function sealedPaths(scope: Record<string, unknown>, row: Entry | null, fields: ReadonlySet<string>, tainted: ReadonlySet<string>): RunFill {
   const vars = scope.vars as Vars;

@@ -2,10 +2,10 @@
  * What a digest's webhook and a pattern's poll send reaches the owner, in the approval lines a proposal is filed with.
  *
  * `propose` worked out a proposal's egress for a `change` alone, and `egressOf` read an ingest or a script and no other
- * kind. Audit fifty-one (`loop/research-batch-fifty-one-audit.md` section 2) filed both from nobody in particular and read
- * the stored body: a digest posting a table of Notes to `https://collector.example.com/in` carried `approve: null`, and so
- * did a `pattern` whose ingest polls `api.goldapi.io` every hour on the key `goldapi`. The owner pressing accept on either
- * read a title, and nothing of where it sends or with which key.
+ * kind. Both, filed from nobody in particular with the stored body read back, showed it: a digest posting a table of
+ * Notes to `https://collector.example.com/in` carried `approve: null`, and so did a `pattern` whose ingest polls
+ * `api.goldapi.io` every hour on the key `goldapi`. The owner pressing accept on either read a title, and nothing of
+ * where it sends or with which key.
  */
 
 import { test } from 'node:test';
@@ -25,7 +25,7 @@ const NOTES: Declaration = {
   body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never,
 };
 
-/** The probe's H: a weekly digest whose one channel posts a table of Notes to an address outside the record. */
+/** A weekly digest whose one channel posts a table of Notes to an address outside the record. */
 const HOOK = (over: Record<string, unknown> = {}) => ({
   digest: 'out',
   schedule: { day: 'mon', at: '08:00' },
@@ -35,7 +35,7 @@ const HOOK = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** The probe's C: an ingest that polls the gold price every hour, sending the vault's `goldapi`. */
+/** An ingest that polls the gold price every hour, sending the vault's `goldapi`. */
 const POLL = {
   id: 'ingest.gold',
   kind: 'ingest',
@@ -70,7 +70,7 @@ test("A DIGEST'S WEBHOOK IS EGRESS, said as where it posts, when, and what it ca
   assert.equal(egressOf(HOOK({ schedule: { at: '07:30' }, sections: [{ heading: 'Done', source: 'metric.done', as: 'stat' }, { heading: 'Rows', source: 'register.notes' }] }))?.line, 'CALLS OUT collector.example.com · daily at 07:30 · a stat of metric.done and a table of register.notes');
 });
 
-test('H: A CHANGE TO A DIGEST THAT POSTS OUT IS FILED WITH THE LINE THE OWNER APPROVES, and asks nothing again once it is in', async () => {
+test('A CHANGE TO A DIGEST THAT POSTS OUT IS FILED WITH THE LINE THE OWNER APPROVES, and asks nothing again once it is in', async () => {
   const { k, sql } = await record();
   const decl = { id: 'digest.out', kind: 'digest', body: HOOK() };
   const filed = filedBody(sql, file(k, 'change', { declaration_id: 'digest.out', to: decl }));
@@ -85,7 +85,7 @@ test('H: A CHANGE TO A DIGEST THAT POSTS OUT IS FILED WITH THE LINE THE OWNER AP
   sql.close();
 });
 
-test("C: A PATTERN WHOSE INGEST POLLS IS FILED WITH ITS LINE AND ITS KEY, worked out here and never taken from the proposer", async () => {
+test("A PATTERN WHOSE INGEST POLLS IS FILED WITH ITS LINE AND ITS KEY, worked out here and never taken from the proposer", async () => {
   const { k, sql } = await record();
   const filed = filedBody(sql, file(k, 'pattern', { ingest: POLL, samples: ['raw_1'], approve: ['CALLS OUT nowhere'], egress: [] }));
   assert.ok(filed.approve?.some((l) => l.includes('api.goldapi.io') && l.includes('goldapi')), `the approval lines were ${JSON.stringify(filed.approve ?? null)}`);

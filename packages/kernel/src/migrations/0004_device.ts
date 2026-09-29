@@ -2,7 +2,7 @@
  * The kernel schema, migration 4: `device_grant` rebuilt with a seventh reach and a scope.
  *
  * `vault` is the reach an agent's machine asks for to open keys, and `scope` says which: a project's
- * row id, or `*` for the keys that belong to no project (`loop/research-agent-path.md` §2.2, §5.7).
+ * row id, or `*` for the keys that belong to no project.
  *
  * A REBUILD AND NOT AN ALTER, because SQLite cannot change a CHECK in place, and the list of reaches
  * is a CHECK so that the database refuses an eighth. The table is `local`: it never travels, no

@@ -1,6 +1,6 @@
 /**
  * One webhook door, several patterns: a pattern may say `door: <ingest id>`, and an arrival named for that door is
- * offered the door's own pattern and then every pattern naming it (`loop/research-switch-recheck.md` §3, gap 3).
+ * offered the door's own pattern and then every pattern naming it.
  *
  * ONE ADDRESS READ ONE WORDING, AND HIS PHONE SENDS SIX. An arrival named for an ingest was offered that ingest's
  * pattern and no other (`arrive-ingest.test.ts` holds why), so the Shortcut that posts his bank's texts needed six
@@ -140,8 +140,8 @@ test('A DOOR THAT IS NOT INSTALLED, OR NOT A WEBHOOK, OR TAKES NO TOKEN, IS REFU
   const wrongSide = await refused([HOOK('a', 'paid', 'one'), mailNaming]);
   assert.deepEqual([wrongSide.code, wrongSide.at], ['DECLARATION_INVALID', 'door'], wrongSide.fix);
 
-  /* BY ITS OWN SENTENCE, NOT THE GHOST'S. With the type check taken out, `door: 7` was still refused at `door`, as
-     "no ingest 7 is installed", so the code and the key alone held nothing (measured 23 September). */
+  /* BY ITS OWN SENTENCE, NOT THE GHOST'S. With the type check taken out, `door: 7` was still refused at `door`, as "no
+     ingest 7 is installed", so the code and the key alone held nothing (measured). */
   const notText = await refused([HOOK('a', 'paid', 'one'), HOOK('b', 'withdrew', 'two', { door: 7 })]);
   assert.deepEqual([notText.code, notText.at], ['DECLARATION_INVALID', 'door'], notText.fix);
   assert.match(notText.fix ?? '', /7 is not one/u);
@@ -166,8 +166,8 @@ test('AN ARRIVAL NAMED FOR A DOOR WITH A WRONG TOKEN IS OFFERED NO PATTERN AND S
 });
 
 test('HSBC EGYPT\'S SIX TEXT TWINS SHARE ONE DOOR: a card text posted to bank-from-out-sms is filed by the card twin', async () => {
-  /* THE BANK'S PACK FILE ON THE SEED, since the sample stopped carrying its twelve on 25 September
-     (`seed/test/pack-files.ts`): with the seed alone this text arrived at a door the record did not have. */
+  /* THE BANK'S PACK FILE ON THE SEED, since the sample stopped carrying its twelve (`seed/test/pack-files.ts`): with
+     the seed alone this text arrived at a door the record did not have. */
   const { installSeed, day } = await import('../../seed/src/index.ts');
   const { HSBC_EG_SMS_INGESTS, bankDeclarations } = await import('../../seed/test/pack-files.ts');
   const twins = Object.values(HSBC_EG_SMS_INGESTS) as unknown as { ingest: string; door?: string }[];

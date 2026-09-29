@@ -1,6 +1,6 @@
 /**
  * Automations as a person and an agent read them: the list, one with its runs, and what a body would do before it is
- * installed (`loop/research-shell-automations.md` section 5, Brief D).
+ * installed.
  *
  * THE RUNNER HAD LANDED AND NOTHING OUTSIDE THE KERNEL COULD SEE IT. `automation_run` and `automation_step` held every run
  * and every step's outcome from 94ba1ad8 on, and the only reader of either was the runner itself: no method listed an
@@ -62,7 +62,7 @@ export function subjectOf(body: Body): string | null {
  * the lint and the runner read too: a step whose row does not run (`flow.ts` fails a run that reaches it with
  * `NOT_IN_THIS_BUILD`, after taking every step before it), and one that runs only on a host that answers Slash, which
  * the lint refuses at install elsewhere. `ask_person` is not here: it opens its question in Decide and the decision
- * wakes the run (Brief C). Nor is `script`: `flow.ts`'s `startScript` queues the script's run and the run goes on.
+ * wakes the run. Nor is `script`: `flow.ts`'s `startScript` queues the script's run and the run goes on.
  *
  * A LIST WRITTEN BY HAND HERE WENT STALE ONCE ALREADY: it named `script` after the runner stopped failing it, and the dry
  * run of Work's `rule.close_follow_ups` ended its one step with "Not in this build: a run stops here", on a record
@@ -103,9 +103,10 @@ export type Said = {
  * How deep `words` prints a value before it names what is left by its kind and size.
  *
  * `words` WAS `JSON.stringify`, WHICH RECURSES INTO ANY VALUE. `SAID_DEPTH` bounds `if` nesting and nothing else, so a
- * 40 KB body off the wire with a 20,000-deep array in one `notify.say` threw `RangeError: Maximum call stack size
- * exceeded` out of here through the READ+ `dryRun` (audit thirty-six, finding 8). Eight levels print every predicate
- * tree the lint lets install in full, which is what an `if` line shows, and past that a reader learns the shape.
+ * 40 KB body off the wire with a 20,000-deep array in one `notify.say` threw
+ * `RangeError: Maximum call stack size exceeded` out of here through the READ+ `dryRun`. Eight levels print every
+ * predicate tree the lint lets install in full, which is what an `if` line shows, and past that a reader learns the
+ * shape.
  */
 export const PRINT_DEPTH = 8;
 
@@ -250,11 +251,11 @@ function started(body: Body): string {
  * How deep a branch may nest before the dry run stops saying it: the lint's `DEPTH_CEILING` (3) and a margin.
  *
  * THE DRY RUN IS A READ, AND IT RAN BEFORE THE LINT. `propose` lints first and refuses depth over 3, but the READ+
- * `dryRun` route takes any body a read token sends, and a body nested some 2,000 `if` levels deep (about 50 KB) blew the
- * stack in `stepLines`, so the host answered INTERNAL. Past this depth the record refuses instead, and `stepLines` stops
- * descending on its own. That bounded the branches and not the values: this comment said `said` was then safe whoever
- * calls it, and a deep array in one step still blew the stack in `words` (audit thirty-six, finding 8). `PRINT_DEPTH`
- * bounds the values, and only the two together make it so.
+ * `dryRun` route takes any body a read token sends, and a body nested some 2,000 `if` levels deep (about 50 KB) blew
+ * the stack in `stepLines`, so the host answered INTERNAL. Past this depth the record refuses instead, and `stepLines`
+ * stops descending on its own. That bounded the branches and not the values: this comment said `said` was then safe
+ * whoever calls it, and a deep array in one step still blew the stack in `words`. `PRINT_DEPTH` bounds the values, and
+ * only the two together make it so.
  */
 export const SAID_DEPTH = 3 + 5;
 
@@ -364,7 +365,7 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
     return line(`Ask in Decide ${JSON.stringify(words(ask.question))}, ${listed(ask.options)}, and keep the answer as ${words(ask.as)}. If nobody answers within ${wait}, the run stops here.${to}`);
   }
   if ('meet' in s) {
-    /* WHO IT MEETS AND WHERE IT SAYS THEY WERE MET, which is what the owner accepting it is asked (AGT-16). */
+    /* WHO IT MEETS AND WHERE IT SAYS THEY WERE MET, which is what the owner accepting it is asked. */
     const meet = spec('meet');
     const who = ['name', 'email', 'handle'].filter((k) => meet[k] !== undefined).map((k) => `${k} ${JSON.stringify(words(meet[k]))}`).join(', ');
     return line(`Meet the person with ${who} into People, as met at ${JSON.stringify(words(meet.where))}: matched by email or handle, added when nobody matches, and a merge asked in Decide when the name is somebody else's. Nobody is met when all of it is empty.`);
@@ -386,8 +387,8 @@ function stepLines(step: unknown, depth: number, out: string[], slash: boolean):
   if ('notify' in s) return line(`Tell the owner: ${words(spec('notify').say)}${spec('notify').urgent === true ? ' At once, as an interrupt.' : ''}`);
   if ('schedule' in s) return line(`In ${words(spec('schedule').in)}, come back to the row: ${words(spec('schedule').note)}`);
   if ('create' in s) {
-    /* THE LIST AND WHAT IT FILLS, which is what the owner accepting it is asked (`loop/finish/defects.md` A11): the fields
-       by name, since their values are filled when the run takes the step and a dry run reads no row. */
+    /* THE LIST AND WHAT IT FILLS, which is what the owner accepting it is asked: the fields by name, since their values
+       are filled when the run takes the step and a dry run reads no row. */
     const create = spec('create');
     const filled = isObject(create.fields) ? Object.keys(create.fields) : [];
     const fields = filled.length === 0 ? '' : `, filling ${filled.length === 1 ? filled[0] : `${filled.slice(0, -1).join(', ')} and ${filled.at(-1)}`}`;
@@ -471,7 +472,7 @@ export type AutomationRun = {
  */
 export type Automation = AutomationRow & { body: Body; runs: AutomationRun[]; older: string | null };
 
-/** How many runs one automation shows. The brief's ten: the list is for reading what just happened, not an archive. */
+/** How many runs one automation shows. Ten: the list is for reading what just happened, not an archive. */
 export const RUNS_SHOWN = 10;
 
 /**
@@ -538,8 +539,8 @@ const LIVE = "kind = 'rule' AND superseded_at IS NULL AND retired = 0";
  *
  * `shown` IS ASKED OF THE WHOLE BODY, BEFORE A RUN IS COUNTED. The record's door filtered the rows afterwards by
  * `register`, which is the list a rule's row lives in and nothing more, so an Inbox rule whose step creates Money rows
- * reached the member invited to Inbox alone (SEC-4). Who may see a rule is every list its body touches, which only the
- * body says, and a rule held back costs no query of its runs.
+ * reached the member invited to Inbox alone. Who may see a rule is every list its body touches, which only the body
+ * says, and a rule held back costs no query of its runs.
  */
 export function automations(sql: Sql, nowMs: number, shown: (id: string, body: Body) => boolean = () => true): AutomationRow[] {
   return sql

@@ -1,12 +1,11 @@
 /**
- * A pack turned off ends its automations' unfinished runs, in the transaction that turns it off
- * (`loop/research-batch-thirty-five-audit.md` §3).
+ * A pack turned off ends its automations' unfinished runs, in the transaction that turns it off.
  *
  * WHAT WAS MEASURED BEFORE THE FIX. `disablePack` retires a pack's declarations through `declare.ts`'s own
  * `retireDeclarations`, which is not the kernel's `retire`, so nothing cancelled the run: it stayed `waiting` under a
- * rule that was off, and `enablePack` before the wake put the rule back live, so the wake found nothing stopped and took
- * every step. The audit's `packoff.mts` read "after enablePack waiting -> after the wake done; row note "chased";
- * notified ["Chased Rent"]", and the second test below failed on that line first.
+ * rule that was off, and `enablePack` before the wake put the rule back live, so the wake found nothing stopped and
+ * took every step. A probe read "after enablePack waiting -> after the wake done; row note "chased"; notified ["Chased
+ * Rent"]", and the second test below failed on that line first.
  */
 
 import { test } from 'node:test';

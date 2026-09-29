@@ -1,11 +1,10 @@
 /**
- * `list` by a ref, against the six findings `loop/research-batch-twenty-two-audit.md` raised on `5fde092b`.
+ * `list` by a ref, against six faults measured on `5fde092b`.
  *
- * ONE TEST PER FINDING, AND EACH ONE WAS WATCHED FAILING FIRST. `where-ref.test.ts` holds what the
- * commit claimed and still holds; these are the six places the audit broke it by running it: an
- * oracle on a list the caller cannot read, a shared title answered with one row's jobs, a rule over
- * a row not yet written that installed dead, a row id taken on trust, a deleted row refused by the
- * id the record itself names it with, and a mismatch that depended on install order.
+ * ONE TEST PER FAULT, AND EACH ONE WAS WATCHED FAILING FIRST. `where-ref.test.ts` holds what the commit claimed and
+ * still holds; these are the six places running it broke it: an oracle on a list the caller cannot read, a shared title
+ * answered with one row's jobs, a rule over a row not yet written that installed dead, a row id taken on trust, a
+ * deleted row refused by the id the record itself names it with, and a mismatch that depended on install order.
  *
  * THE FIRST ONE IS DRIVEN AT THE KERNEL, through `list`'s `reads`, because the kernel is where the
  * lookup happens and it cannot know who is asking. The record's `list` is what has to hand it over,
@@ -202,9 +201,9 @@ test('5: a deleted row is found by its spoken id, its title and its row id alike
   ])
     assert.deepEqual(whats(k.list({ register: 'jobs', where: where as never })), ['Orphan'], JSON.stringify(where));
 
-  /* AND ONCE PURGED, `nameOf` HANDS OUT THE BARE ROW ID, so that is what the filter has to take. This
-     held before the repair only because a row id was never looked up; finding 4's lookup would have
-     refused it as naming no row, had the purge's own record of the list been left unread. */
+  /* AND ONCE PURGED, `nameOf` HANDS OUT THE BARE ROW ID, so that is what the filter has to take. This held before the
+     repair only because a row id was never looked up; the row-id lookup would have refused it as naming no row, had the
+     purge's own record of the list been left unread. */
   assert.equal(k.purge({ cutoffMs: NOW + 86_400_000 }).rows, 1);
   assert.equal(k.nameOf(gone), gone);
   for (const where of [{ field: 'thing', is: gone }, `thing is ${gone}`])

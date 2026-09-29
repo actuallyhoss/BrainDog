@@ -167,10 +167,10 @@ export const hasEscapedNewline = (s: string): boolean => s.includes('\\n') && !s
  * A whole value that reads as a Windows path: anchored at a drive (`C:\`, `C:/`), a UNC share (`\\host\`), the long-path
  * prefix (`\\?\C:\`) or `.\` and `..\`, and holding nothing a Windows filename cannot hold after that.
  *
- * WHY IT EXISTS. `loop/research-import-real.md` (finding 1) measured a real export refused on two agent runs' `cwd`:
- * both were drive-letter paths with a folder starting with `n`, which is backslash and `n` with no line break, so
- * `hasEscapedNewline` fired on a value that was never text. 186 of that export's 198 `cwd` values were Windows paths,
- * and the refusal's repair, "send a real newline", cannot be applied to one.
+ * WHY IT EXISTS. A real export was refused on two agent runs' `cwd`: both were drive-letter paths with a folder
+ * starting with `n`, which is backslash and `n` with no line break, so `hasEscapedNewline` fired on a value that was
+ * never text. 186 of that export's 198 `cwd` values were Windows paths, and the refusal's repair, "send a real
+ * newline", cannot be applied to one.
  *
  * WHY THE ANCHOR AND NOT ANY BACKSLASH. `Work\notes` and `first\nsecond` are the same shape, and a bare word pair is
  * exactly what a double-encoded two-line text looks like, so an unanchored relative path is still refused. A text
@@ -208,7 +208,7 @@ const KEY_SHAPES: readonly RegExp[] = [
   /discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]{20,}/u,
   /\b[a-z][a-z0-9+.-]{0,31}:\/\/[^\s/:@]+:[^\s/@]+@/iu,
   /* A TELEGRAM BOT'S TOKEN IS ITS URL'S PATH, `api.telegram.org/bot<id>:<35>/sendMessage`, so the path exemption below
-     let the whole token through (audit of 25 September, S2). The `bot` prefix is what makes it a shape. */
+     let the whole token through. The `bot` prefix is what makes it a shape. */
   /\bbot\d{5,}:[A-Za-z0-9_-]{30,}/u,
   /* HEX, WHICH THE RANDOM-RUN TEST NEVER READS because a key made of it has no capitals. A digest is hex too and is
      let through, so what makes one of these a key is its issuer's prefix (DigitalOcean, Mailgun) or a name in front
@@ -251,11 +251,11 @@ function basicCredential(text: string): boolean {
  * What a text looks like once the characters nobody can see are gone.
  *
  * ONE ZERO-WIDTH SPACE IN THE MIDDLE OF A KEY BROKE EVERY SHAPE ABOVE IN TWO, and the key was stored with it
- * (`ghp_...<U+200B>...`, audit of 25 September, S2). A key copied out of a chat or a document picks these up without
- * anyone seeing them, and a key with one in it still works once it is cleaned. Unicode's default-ignorable set is
- * exactly the characters a renderer draws as nothing: zero-width spaces and joiners, the soft hyphen, the word joiner,
- * the byte-order mark, direction marks and variation selectors. Removing them only joins what sits either side, so
- * Arabic with a direction mark in it and an emoji family joined by ZWJ still read as what they are.
+ * (`ghp_...<U+200B>...`). A key copied out of a chat or a document picks these up without anyone seeing them, and a key
+ * with one in it still works once it is cleaned. Unicode's default-ignorable set is exactly the characters a renderer
+ * draws as nothing: zero-width spaces and joiners, the soft hyphen, the word joiner, the byte-order mark, direction
+ * marks and variation selectors. Removing them only joins what sits either side, so Arabic with a direction mark in it
+ * and an emoji family joined by ZWJ still read as what they are.
  */
 const INVISIBLE = /\p{Default_Ignorable_Code_Point}/gu;
 
@@ -272,7 +272,7 @@ const KEY_RUN = /[A-Za-z0-9+/=_-]{32,4096}/gu;
  *
  * THE SCHEME IS BOUNDED AT 32. Unbounded, every word boundary in `a.a.a.a...` started a scan to the end of the text for a
  * `://` that never came: 16 KB of it took half a second here and in the password-in-a-URL shape above, and a 512 KB
- * document took 288 seconds (measured 25 September). A link's scheme is `https`, `mailto` or a word like them; one past
+ * document took 288 seconds (measured). A link's scheme is `https`, `mailto` or a word like them; one past
  * 32 is not read as a link, and its path is judged as plain text, which is the stricter reading.
  */
 const URL_PARTS = /\b([a-z][a-z0-9+.-]{0,31}:\/\/([^\s/?#]*))([^\s?#]*)(\?[^\s#]*)?/giu;
@@ -281,7 +281,7 @@ const URL_PARTS = /\b([a-z][a-z0-9+.-]{0,31}:\/\/([^\s/?#]*))([^\s?#]*)(\?[^\s#]
  * The words that make a URL an endpoint rather than a link, as its host's first label or one of its path's segments.
  *
  * AN ENDPOINT'S PATH IS WHERE AN INTEGRATION PUTS ITS SECRET, and the exemption for links let it through: Zapier's
- * MCP address is `mcp.zapier.com/api/mcp/s/<secret>/mcp`, and the audit's `https://mcp.example.com/api/mcp/s/<48>/sse`
+ * MCP address is `mcp.zapier.com/api/mcp/s/<secret>/mcp`, and a probe's `https://mcp.example.com/api/mcp/s/<48>/sse`
  * was stored in every text field it tried. A Google Doc, a Drive file, a SharePoint share and a Figma file carry none
  * of these words, so their ids stay links.
  */
@@ -293,7 +293,7 @@ const ENDPOINT = /^(?:api|mcp|hooks?|webhooks?|keys?|tokens?|secrets?)$/iu;
  *
  * THE RUN, NOT THE SEGMENT, is what is measured. A Teams link's segment is `19%3ameeting_<48>%40thread.v2`, 73 long,
  * and measured whole it was judged, its 58-long run read as random and an ordinary meeting link was refused
- * (checker, 25 September). What could be a key is a run, so a run is what has to reach 64.
+ * (measured). What could be a key is a run, so a run is what has to reach 64.
  */
 const LONGEST_ID = 64;
 
@@ -397,7 +397,7 @@ export function looksLikeCredential(text: string): boolean {
  *
  * A WALK WITH ITS OWN STACK, NOT A RECURSION. Recursing a call per level, a document about 3,500 levels deep threw
  * `RangeError` out of `coerce`, which the write path answers as a failure of its own rather than a refusal the caller
- * can read (checker, 25 September). An array's indexes are not read as names: they are numbers.
+ * can read (measured). An array's indexes are not read as names: they are numbers.
  */
 function holdsKey(value: unknown): boolean {
   const stack: unknown[] = [value];
@@ -425,8 +425,8 @@ function holdsKey(value: unknown): boolean {
  * The one refusal for a key, in every type that can hold text. No `found`, because the value may be the key.
  *
  * `url`, `email` AND `json` HAD NO CHECK AT ALL, and `https://admin:<password>@git.example.com/skills.git` and
- * `ghp_<36>@example.com` were both stored through the kernel (audit of 25 September, S3). The import checks first, so
- * it could not reach them, and an agent over MCP or a caller of the API could.
+ * `ghp_<36>@example.com` were both stored through the kernel. The import checks first, so it could not reach them, and
+ * an agent over MCP or a caller of the API could.
  */
 const keyRefused = (at: string): Coerced =>
   bad('VALUE_MALFORMED', `${at} holds what looks like a key, and a key never goes in a row. Deposit it in the vault, and write here what it opens.`, at);
@@ -481,9 +481,9 @@ export type Lookups = {
    * `LN8` to `learnings` and 8, by the prefixes the record has installed, or `null` when no register owns the prefix.
    *
    * A PREFIX IS THE RECORD'S OWN WORD FOR A ROW, and this case read only `register#number`. Every answer an agent reads
-   * names a learning `LN8`, so the MCP package qualified a prefix on the way into `create` and `update`, and `propose`'s
-   * `rowset` went round it: filed, then refused `because[0] takes a row id or a spoken id` at the owner's accept
-   * (audit fifty-two section 1). Read here, every writer of a row reads a prefix, the accept among them.
+   * names a learning `LN8`, so the MCP package qualified a prefix on the way into `create` and `update`, and
+   * `propose`'s `rowset` went round it: filed, then refused `because[0] takes a row id or a spoken id` at the owner's
+   * accept. Read here, every writer of a row reads a prefix, the accept among them.
    */
   prefixed?: (said: string) => { register: string; seq: number } | null;
   /** Whether `obligations#41` is a row that was deleted, so a refusal says that rather than that it never existed. */

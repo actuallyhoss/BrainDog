@@ -1,17 +1,17 @@
 /**
- * A question to Slash that a host was holding when its run ended (audit forty-nine §1).
+ * A question to Slash that a host was holding when its run ended.
  *
  * WHAT WAS MEASURED. `release()` in `flow.ts` deletes a run's Slash job only while it is `pending` or `failed`, and
- * leaves a `leased` one to its ack. The ack's failed branch read the job and never the run, so a job leased when its rule
- * was retired, switched off or its pack turned off came back on the ladder: in the audit's Worker probe, 8 posts and 8
- * `grant.read` events on the owner's key for a run already `cancelled`, and a rung that was answered billed and counted.
- * Against the build before this file's fix the first test below read a `retry` row armed and the job leased again after
- * its rung, where it expects the job `done` and nothing to lease.
+ * leaves a `leased` one to its ack. The ack's failed branch read the job and never the run, so a job leased when its
+ * rule was retired, switched off or its pack turned off came back on the ladder: in a Worker probe, 8 posts and 8
+ * `grant.read` events on the owner's key for a run already `cancelled`, and a rung that was answered billed and
+ * counted. Against the build before this file's fix the first test below read a `retry` row armed and the job leased
+ * again after its rung, where it expects the job `done` and nothing to lease.
  *
- * THE RUN IS READ AND NOT ONLY THE STEP ROW, because `release()` leaves the step row `waiting` after it cancels the run:
- * wave forty-nine's checker measured that a check of the step row alone passes a cancelled run's job straight through,
- * and it was measured again here: with `r.state = 'waiting'` taken out of the ack's query, the three switch tests below
- * fail on the armed `retry` and the other two pass.
+ * THE RUN IS READ AND NOT ONLY THE STEP ROW, because `release()` leaves the step row `waiting` after it cancels the
+ * run: it was measured that a check of the step row alone passes a cancelled run's job straight through, and it was
+ * measured again here: with `r.state = 'waiting'` taken out of the ack's query, the three switch tests below fail on
+ * the armed `retry` and the other two pass.
  */
 
 import { test } from 'node:test';

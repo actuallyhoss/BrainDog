@@ -1,11 +1,10 @@
 /**
- * Slash's press and its first plan, held to the same monthly cap and settled in the same ledger as every other ask
- * (`loop/research-batch-sixty-audit.md` finding 2).
+ * Slash's press and its first plan, held to the same monthly cap and settled in the same ledger as every other ask.
  *
- * WHAT WAS MEASURED BEFORE THIS FILE. The audit's S2 probe, a record 20 days old over the Worker's own included model:
- * 25 presses made 25 model calls, and nothing anywhere counted them. `slashFile` asked `model.draft` whenever a model was
- * configured, and `slashForm` asked `model.form` again after every answer it could not file, and neither wrote a `call`
- * row or read `ask_cap`. Each draft is up to 2,048 tokens out on the operator's account.
+ * WHAT WAS MEASURED BEFORE THIS FILE. A record 20 days old over the Worker's own included model: 25 presses made 25
+ * model calls, and nothing anywhere counted them. `slashFile` asked `model.draft` whenever a model was configured, and
+ * `slashForm` asked `model.form` again after every answer it could not file, and neither wrote a `call` row or read
+ * `ask_cap`. Each draft is up to 2,048 tokens out on the operator's account.
  *
  * THE LAST CASE IS THE WHOLE PATH, with the host's meter (`packages/host/src/slash-ask.ts` `slashRecordMeter`) over the package's own
  * ledger, so "the same cap" is measured against the engine's `status()` and its own refusal of a read, not a fake's count.
@@ -33,7 +32,7 @@ const value = <T>(r: unknown): T => {
 };
 type Filed = { by: string; filed: { id: string }[]; dropped: string[] };
 
-/** The audit's S2 record: one list, one open row, and the clock moved past Slash's first fortnight. */
+/** The measured record: one list, one open row, and the clock moved past Slash's first fortnight. */
 const TASKS = {
   id: 'register.tasks',
   kind: 'register' as const,

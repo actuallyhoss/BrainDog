@@ -363,9 +363,9 @@ export const isMoneyFormat = (format: unknown): boolean => format === 'money' ||
  *
  * ONE RULE FOR EVERY KIND OF FIGURE, a sum over a list, a rolled balance or a walk (`money-figures.ts`), so a tile's
  * verdict does not depend on which file read its number. A target is set in a currency: the one a `money.<CUR>` format
- * declares, else the one its setting was typed in (`liveTarget` in `declare.ts` writes it there), else none, and then it
- * is read as it is in whatever currency the figure came back in (`loop/finish/modules.md` C1). A figure in a currency
- * other than its target's is judged against the target converted at the latest rate, and has no verdict without one.
+ * declares, else the one its setting was typed in (`liveTarget` in `declare.ts` writes it there), else none, and then
+ * it is read as it is in whatever currency the figure came back in. A figure in a currency other than its target's is
+ * judged against the target converted at the latest rate, and has no verdict without one.
  *
  * A TARGET WITH NO NUMBER TO HOLD THE FIGURE TO HAS NO VERDICT, rather than the `false` that comparing against nothing
  * would give: every figure is judged here, so whatever leaves a target without its bound leaves the figure unjudged.
@@ -487,14 +487,13 @@ const conjuncts = (p: Predicate): Record<string, unknown>[] =>
 /**
  * The type a `where` leaf's field has, from the register or from the record's own columns.
  *
- * `created_at` AND `updated_at` ARE INSTANTS THAT NO REGISTER DECLARES. They are `KERNEL_FIELDS`, read
- * off `entry`'s columns and addressable in any `where`, and `schema.fields` does not hold them. `endedAt`
- * and `localInstants` asked `schema.fields` alone, so `created_at after -30d` got neither an as-of end
- * nor local bounds: the audit (`loop/research-batch-twenty-four-audit.md` §3) measured the point stored
- * under 4 September at 11111, every row, in New York, Tokyo and UTC, where the same instants in a
- * declared `at` gave 10011, 10101 and 10101 (`test/metrics-local-day-kernel.test.ts`). This is the lookup
- * `@braindog/where`'s `specOf` makes, so the compiler, these two and `resolveRelative` before them agree
- * on which names are instants. The inbox's schema keeps no kernel columns, and its `ts` is declared.
+ * `created_at` AND `updated_at` ARE INSTANTS THAT NO REGISTER DECLARES. They are `KERNEL_FIELDS`, read off `entry`'s
+ * columns and addressable in any `where`, and `schema.fields` does not hold them. `endedAt` and `localInstants` asked
+ * `schema.fields` alone, so `created_at after -30d` got neither an as-of end nor local bounds: the point stored under 4
+ * September measured 11111, every row, in New York, Tokyo and UTC, where the same instants in a declared `at` gave
+ * 10011, 10101 and 10101 (`test/metrics-local-day-kernel.test.ts`). This is the lookup `@braindog/where`'s `specOf`
+ * makes, so the compiler, these two and `resolveRelative` before them agree on which names are instants. The inbox's
+ * schema keeps no kernel columns, and its `ts` is declared.
  */
 const typeOf = (schema: Schema, field: string): string | undefined =>
   Object.hasOwn(schema.fields, field)
@@ -539,29 +538,26 @@ function endedAt(shifted: Predicate | undefined, current: Predicate | undefined 
       .sort()
       .at(-1);
 
-  /* AND AN AS-OF END ONLY FOR A WINDOW THAT LOOKS BACK. `5ae403ff` ended every such window at the
-     as-of day, and `due after today` became `due > asOf and due < asOf + 1`, which holds nothing: the
-     audit (`loop/research-batch-nineteen-audit.md` §5) measured two open bills due 3 and 12 days
-     ahead at 300,000 live on the day and 0 as of that day, and the same for `due after -1d`. A
-     window whose first day is the as-of day or later is a question about what is coming, and the
-     rows it counts were there to be counted on that day; only one that begins before the day has
-     rows from after it that had not happened yet. `test/metrics-asof-forward.test.ts` holds both.
+  /* AND AN AS-OF END ONLY FOR A WINDOW THAT LOOKS BACK. `5ae403ff` ended every such window at the as-of day, and
+     `due after today` became `due > asOf and due < asOf + 1`, which holds nothing: two open bills due 3 and 12 days
+     ahead measured 300,000 live on the day and 0 as of that day, and the same for `due after -1d`. A window whose first
+     day is the as-of day or later is a question about what is coming, and the rows it counts were there to be counted
+     on that day; only one that begins before the day has rows from after it that had not happened yet.
+     `test/metrics-asof-forward.test.ts` holds both.
 
-     AND NEVER ON A FIELD THE REGISTER DECLARES A DEADLINE, WHEREVER THE WINDOW BEGINS. The first day
-     was a guess at the real question, which is whether a row dated after the as-of day could have
-     been there on it: a payment `on` the 10th had not happened on the 5th, and a bill `due` the 10th
-     was already owed. `due after -7d` over bills due 2 days before and 3 and 12 after read 350,000
-     live on the day and 50,000 as of it, `due after -2d` 300,000 and 0 (the audit,
-     `loop/research-batch-twenty-one-audit.md` §6). `deadline: true` is the register saying which
-     kind a field is; `test/metrics-past-window.test.ts` holds both, and that a field without it
-     still ends at the day.
+     AND NEVER ON A FIELD THE REGISTER DECLARES A DEADLINE, WHEREVER THE WINDOW BEGINS. The first day was a guess at the
+     real question, which is whether a row dated after the as-of day could have been there on it: a payment `on` the
+     10th had not happened on the 5th, and a bill `due` the 10th was already owed. `due after -7d` over bills due 2 days
+     before and 3 and 12 after read 350,000 live on the day and 50,000 as of it, `due after -2d` 300,000 and 0.
+     `deadline: true` is the register saying which kind a field is; `test/metrics-past-window.test.ts` holds both, and
+     that a field without it still ends at the day.
 
      AND ALWAYS ON `created_at` AND `updated_at`, WHEREVER THE WINDOW BEGINS. The record stamps them when a row is
      written, so a row stamped after the as-of day was not there on it, which is the one question the first-day rule
-     above guesses at and these two answer outright. `created_at after -1d` stored as the night of the 5th begins on
-     the 5th, so under that rule it took no end and counted every row written since, the next morning's included
-     (`loop/finish/defects.md` M17). `test/metrics-live-local-day.test.ts` holds it in Tokyo, where that night ends at
-     15:00 UTC. A declared `instant` keeps the first-day rule, because nothing says who wrote it or when. */
+     above guesses at and these two answer outright. `created_at after -1d` stored as the night of the 5th begins on the
+     5th, so under that rule it took no end and counted every row written since, the next morning's included.
+     `test/metrics-live-local-day.test.ts` holds it in Tokyo, where that night ends at 15:00 UTC. A declared `instant`
+     keeps the first-day rule, because nothing says who wrote it or when. */
   if (current === null) {
     const asOfDay = new Date(thenMs).toISOString().slice(0, 10);
     for (const field of [...started]) {
@@ -622,13 +618,12 @@ const dayStartsAt = (day: string, tz: string): string => {
 /**
  * A bare day bounding an `instant` field, rewritten as the instants the day starts and ends at in `tz`.
  *
- * THE COMPILER COMPARES A BARE DAY WITH AN INSTANT'S FIRST TEN CHARACTERS, WHICH ARE ITS UTC DATE.
- * `snapshot` asks each day's question at noon UTC of the record's local date, so every day in the
- * predicate is a local day, and for a `day` field that is the whole of it. An `instant` was still
- * dated in UTC: `loop/research-batch-twenty-audit.md` §5 measured the point stored under 4 September
- * in `America/New_York` at 10101 where the local thirty days hold 10011, because ten at night on the
- * 4th is the 5th by UTC and ten at night on 5 August is the 6th (`test/metrics-instant-day.test.ts`).
- * Solo founder's `datapoints-30d` is that window over that type.
+ * THE COMPILER COMPARES A BARE DAY WITH AN INSTANT'S FIRST TEN CHARACTERS, WHICH ARE ITS UTC DATE. `snapshot` asks each
+ * day's question at noon UTC of the record's local date, so every day in the predicate is a local day, and for a `day`
+ * field that is the whole of it. An `instant` was still dated in UTC: the point stored under 4 September in
+ * `America/New_York` measured 10101 where the local thirty days hold 10011, because ten at night on the 4th is the 5th
+ * by UTC and ten at night on 5 August is the 6th (`test/metrics-instant-day.test.ts`). Solo founder's `datapoints-30d`
+ * is that window over that type.
  *
  * SO THE BOUND BECOMES AN INSTANT, which the compiler compares whole: `after D` is from the start of
  * the day after, `before D` is up to the start of D, and `is`, `between` and `in` hold the instants
@@ -691,13 +686,12 @@ export type EvalContext = {
   /**
    * The record's zone, which dates an `instant` on its local day (`localInstants`).
    *
-   * `snapshot` SET IT AND THE KERNEL'S LIVE READS DID NOT, so a night point and the tile above it
-   * answered different days. `snapshot` asks at noon UTC of the local date, which makes `today` and
-   * `-30d` local days; a live read named them from the UTC date of `nowMs`. In `Asia/Tokyo` at 00:05
-   * on the 6th, `created_at is today` read 1100 live and in the list, and 110 in the point stored
-   * for the 5th (`loop/research-batch-twenty-eight-audit.md` §4). Now the kernel's `evalContext`
-   * carries the record's zone, and a live read with one names its days from noon UTC of the local
-   * date (`clockOf`), so the day's name and the instants it holds are the same local day.
+   * `snapshot` SET IT AND THE KERNEL'S LIVE READS DID NOT, so a night point and the tile above it answered different
+   * days. `snapshot` asks at noon UTC of the local date, which makes `today` and `-30d` local days; a live read named
+   * them from the UTC date of `nowMs`. In `Asia/Tokyo` at 00:05 on the 6th, `created_at is today` read 1100 live and in
+   * the list, and 110 in the point stored for the 5th. Now the kernel's `evalContext` carries the record's zone, and a
+   * live read with one names its days from noon UTC of the local date (`clockOf`), so the day's name and the instants
+   * it holds are the same local day.
    */
   tz?: string | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
@@ -765,14 +759,12 @@ export function clockOf(ctx: EvalContext): number {
 /**
  * `predicateOf` without the local instants, for `evaluateMetric`, which needs the bare days.
  *
- * `endedAt` finds a window's first day with `startOf`, which takes the first ten characters of a
- * bound. Handed the instants `localInstants` writes, that is the UTC date of local midnight, the day
- * before east of UTC, so a window over a declared `instant` that begins on the as-of day would read as
- * one beginning the day before and take an as-of end it should not have. It was measured on
- * `created_at` in `Asia/Tokyo` (`test/metrics-live-local-day.test.ts`), which no longer shows it:
- * `created_at` and `updated_at` now take the end wherever the window begins (`endedAt`,
- * `loop/finish/defects.md` M17). So the metric resolves here, writes its ends, and dates the instants
- * last, which is the order `snapshot` has always read in.
+ * `endedAt` finds a window's first day with `startOf`, which takes the first ten characters of a bound. Handed the
+ * instants `localInstants` writes, that is the UTC date of local midnight, the day before east of UTC, so a window over
+ * a declared `instant` that begins on the as-of day would read as one beginning the day before and take an as-of end it
+ * should not have. It was measured on `created_at` in `Asia/Tokyo` (`test/metrics-live-local-day.test.ts`), which no
+ * longer shows it: `created_at` and `updated_at` now take the end wherever the window begins (`endedAt`). So the metric
+ * resolves here, writes its ends, and dates the instants last, which is the order `snapshot` has always read in.
  */
 function resolvedOf(
   where: Predicate | string | undefined,
@@ -805,12 +797,11 @@ const ADDRESSED = ['is', 'not', 'in', 'not_in'] as const;
 /**
  * A ref leaf in the tree form, read the way a ref field is written.
  *
- * `{field: 'thing', is: 'things#1'}` REACHED SQL AS THE STRING, and no row's `thing` holds the string
- * `things#1`: it holds the row id `create` resolved that same string to. Measured over the seed
- * (`loop/research-mcp-parity.md` §3), the tree the `list` tool teaches answered ok with 0 rows on a
- * project with 14 tasks, `{is: 'Kiln'}` answered 0, `{not: 'things#1'}` answered all 27 tasks with
- * Kiln's 14 among them, and `{is: 'Nowhere'}` answered ok with 0 where a refusal was owed. That is
- * 80 of the 93 task reads Sam's agents make, returning an empty board that reads as "nothing to do".
+ * `{field: 'thing', is: 'things#1'}` REACHED SQL AS THE STRING, and no row's `thing` holds the string `things#1`: it
+ * holds the row id `create` resolved that same string to. Measured over the seed, the tree the `list` tool teaches
+ * answered ok with 0 rows on a project with 14 tasks, `{is: 'Kiln'}` answered 0, `{not: 'things#1'}` answered all 27
+ * tasks with Kiln's 14 among them, and `{is: 'Nowhere'}` answered ok with 0 where a refusal was owed. That is 80 of the
+ * 93 task reads one working set of agents made, returning an empty board that reads as "nothing to do".
  *
  * THE ORDER IS THE ONE `coerce` WRITES WITH, then the sentence's title, and it is `lookupRef` in
  * `@braindog/where` so the two forms cannot drift again. A row id is looked up, deleted rows
@@ -987,7 +978,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      all — which is precisely the class this file exists to prevent. */
   const bound = decl.target && ('lte' in decl.target ? decl.target.lte : decl.target.gte);
   /* A TARGET THAT NAMES A SETTING AND NO BOUND IS WAITING FOR A PERSON TO TYPE ONE, which is how a money ceiling ships:
-     it has no verdict until then (`verdictOf`), and it is not malformed (`loop/finish/contracts.md` §7.5). */
+     it has no verdict until then (`verdictOf`), and it is not malformed. */
   const shape = decl.target as { lte?: unknown; gte?: unknown; setting?: unknown } | undefined;
   const waiting = shape !== undefined && typeof shape.setting === 'string' && shape.lte === undefined && shape.gte === undefined;
   if (decl.target && typeof bound !== 'number' && !waiting)
@@ -1043,10 +1034,10 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    * of groups is a second dimension of arithmetic this build does not do, so it says so.
    *
    * WHEN A ROW WAS WRITTEN GROUPS TOO: `created_at` and `updated_at`, the two instants the record stamps (`isStamped`).
-   * No register declares them, so this asked `schema.fields` alone and refused `group_by: created_at` as `FIELD_UNKNOWN`,
-   * and a count of what was added each week could not be declared over any list (`loop/finish/agents.md` C12). The
-   * other names the record keeps in a column, `id`, `seq` and `version`, are not dates, and a grouping by one is a bar
-   * per row, so they are still refused.
+   * No register declares them, so this asked `schema.fields` alone and refused `group_by: created_at` as
+   * `FIELD_UNKNOWN`, and a count of what was added each week could not be declared over any list. The other names the
+   * record keeps in a column, `id`, `seq` and `version`, are not dates, and a grouping by one is a bar per row, so they
+   * are still refused.
    */
   if (decl.group_by !== undefined) {
     const by = typeof decl.group_by === 'string' ? decl.group_by : null;
@@ -1131,13 +1122,12 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   /**
    * AND UNDER `asOfMs` THE CURRENT WINDOW ENDS AT THE AS-OF DAY, as the window before ends at its own.
    *
-   * A start with no end ends at the clock, and the clock the rows are compared against is the real
-   * one, which under `asOfMs` is days or months later than the day asked about. `on after -30d` read
-   * as of sixty days back counted every row dated after that day up to now: the audit
-   * (`loop/research-batch-seventeen-audit.md` §3) measured 14,300,000 in four rows where the thirty
-   * days to the as-of day hold 300,000 in two, and `snapshot` backfills every missing day this way.
-   * `test/metrics-asof-end.test.ts` holds it. A live read is not given the end, because a live window
-   * has always counted a row dated ahead of today and that is not what was wrong here.
+   * A start with no end ends at the clock, and the clock the rows are compared against is the real one, which under
+   * `asOfMs` is days or months later than the day asked about. `on after -30d` read as of sixty days back counted every
+   * row dated after that day up to now: it measured 14,300,000 in four rows where the thirty days to the as-of day hold
+   * 300,000 in two, and `snapshot` backfills every missing day this way. `test/metrics-asof-end.test.ts` holds it. A
+   * live read is not given the end, because a live window has always counted a row dated ahead of today and that is not
+   * what was wrong here.
    */
   const current = localInstants(
     ctx.asOfMs === undefined ? said.predicate : endedAt(said.predicate, null, schema, ctx.asOfMs),
@@ -1490,11 +1480,10 @@ const isMoneyFigure = (schema: Schema, value: Value): boolean =>
  * exactly this, and chose between them on the FIELD'S DECLARED TYPE, which is not what the rows
  * turned out to hold.
  *
- * THE `ratio` SENTENCE WAS NOT ONE OF THE TWO, said here because an audit counted it as a third.
- * That arm is reached only when both halves match the regex, so it is about two currencies whenever
- * it speaks at all. The `?? 'no unit'` in both pair sentences is unreachable for the same reason: the
- * `diff` arm needs both units non-empty and the `ratio` arm needs both to be codes. They keep the
- * fallback so the mark is spelled in one place and not so that it prints.
+ * THE `ratio` SENTENCE WAS NOT ONE OF THE TWO, said here because it is easy to count it as a third. That arm is reached
+ * only when both halves match the regex, so it is about two currencies whenever it speaks at all. The `?? 'no unit'` in
+ * both pair sentences is unreachable for the same reason: the `diff` arm needs both units non-empty and the `ratio` arm
+ * needs both to be codes. They keep the fallback so the mark is spelled in one place and not so that it prints.
  *
  * SO THE WORD FOLLOWS THE SET AND THE CODE FOLLOWS THE FIELD. `04 §5` gives `MIXED_CURRENCY` and
  * `QUANTITY_MIXED_UNIT` separate rows, so an agent branching on the code still learns which kind of
@@ -1753,8 +1742,7 @@ function one(
   if (type === 'day' && kind === 'avg') return aggregate(sql, field, 'decimal', `(julianday(${expr}) - 2440587.5)`, where, params, kind, fn, rows);
   /* AN AVERAGE BOOL COUNTS A ROW NOBODY MARKED AS NOT YET, never as absent: SQL's `avg` skips a null, so two essential
      steps with one done and one cleared to null averaged 1 and the desk said "All 2 essential steps are done" with one
-     open (`loop/research-audit-2026-09-25-layouts.md` finding 13). The browser reads it the same way (`apps/web`
-     `metrics.ts` `one`). */
+     open. The browser reads it the same way (`apps/web` `metrics.ts` `one`). */
   if (type === 'bool' && kind === 'avg') return aggregate(sql, field, type, `coalesce(${expr}, 0)`, where, params, kind, fn, rows);
   return aggregate(sql, field, type, expr, where, params, kind, fn, rows, fx);
 }
@@ -2046,9 +2034,9 @@ export function scorePrediction(
      stands behind is a fact about the world rather than about the change, and the reason is where
      that gets said. `system` opens it; nobody can answer their own question here.
 
-     AND IT NAMES THE PREDICTION IT GRADES, so the record holds it as it holds that prediction. Without the id the record
-     matched the question's words, and two predictions in the same words, one over Money and one over Inbox, both
-     answered, so the Inbox miss was held from the member who reads Inbox (`loop/research-decide-reach.md`, E1). */
+     AND IT NAMES THE PREDICTION IT GRADES, so the record holds it as it holds that prediction. Without the id the
+     record matched the question's words, and two predictions in the same words, one over Money and one over Inbox, both
+     answered, so the Inbox miss was held from the member who reads Inbox. */
   if (met === false && row.on_miss === 'suggest' && deps.propose)
     deps.propose(
       {

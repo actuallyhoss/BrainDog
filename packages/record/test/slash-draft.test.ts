@@ -1,6 +1,6 @@
 /**
  * Slash drafts from a description, tries each draft with `previewChange`, and hands what the record refused back to be
- * mended (`loop/finish/pages.md` C3, PGS-7; `loop/finish/contracts.md` §2.4).
+ * mended.
  *
  * BEFORE THIS, ONE ASK WITH NO GRAMMAR IN IT, AND WHATEVER PASSED `fromModel` WAS FILED. A page naming a block kind the
  * record has not got reached Decide and was found wrong when the owner accepted it, and the model was told to write in
@@ -183,7 +183,7 @@ test('WHAT slashDraft TAKES IS HELD BEFORE ANY ASK: the words in characters, and
   assert.equal((await refused({ asked: 'A desk.', about: 'desk' }))?.code, 'FIELD_UNKNOWN');
   assert.equal((await refused({ asked: 'A desk.', page: '' }))?.at, 'page');
   /* CHARACTERS ARE CODE POINTS: a thousand letters outside the first plane are two thousand UTF-16 units, and the bound
-     is a thousand characters, so they are taken and one more is not (defects P11). */
+     is a thousand characters, so they are taken and one more is not. */
   const script = '\u{1D49C}';
   assert.equal((await refused({ asked: script.repeat(1001) }))?.code, 'VALUE_MALFORMED');
   assert.equal(heard.length, 0, 'a refused description reached the model');

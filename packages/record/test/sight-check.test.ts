@@ -1,6 +1,6 @@
 /**
- * Two doors that placed what a caller may read by one list and answered from another (`loop/ROADMAP.md` W53, backlog
- * rows SEC-4 and SEC-10, recurring class 4: access decided at one door and assumed at the others).
+ * Two doors that placed what a caller may read by one list and answered from another: access decided at one door and
+ * assumed at the others.
  *
  * WHAT WAS MEASURED BEFORE THE REPAIR. `automations` asked only the list a rule's row lives in, so an Inbox rule whose
  * step files a Money row for Omar at 91000 was listed, and opened in full, for the member invited to Inbox alone and
@@ -33,14 +33,14 @@ const reg = (id: string, name: string, fields: Record<string, unknown>[], title 
 
 type Out = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string } };
 
-/* ── SEC-4: a rule is placed by every list it touches, not by its row's list alone ── */
+/* ── a rule is placed by every list it touches, not by its row's list alone ── */
 
 const MONEY = reg('money', 'Money', [
   { id: 'amount', type: 'int' },
   { id: 'payee', type: 'text' },
 ]);
 const INBOX = reg('inbox', 'Inbox', []);
-/** The backlog's probe: a rule about Inbox rows whose one step creates a Money row paying Omar 91000. */
+/** The measured case: a rule about Inbox rows whose one step creates a Money row paying Omar 91000. */
 const FILE_IT = {
   id: 'rule.file-it',
   kind: 'rule' as const,
@@ -99,7 +99,7 @@ test('AN INBOX RULE THAT FILES MONEY ROWS IS SHOWN ONLY TO WHOEVER READS MONEY T
   sql.close();
 });
 
-/* ── SEC-10: a figure filled with a caller's words resolves them only against lists she reads ── */
+/* ── a figure filled with a caller's words resolves them only against lists she reads ── */
 
 const CLIENTS = reg('clients', 'Clients', [], 'name');
 const JOBS = reg('jobs', 'Jobs', [{ id: 'client', type: 'ref', to: 'clients' }]);
@@ -172,13 +172,13 @@ test('A FIGURE FILLED WITH A CLIENT SHE CANNOT READ COUNTS WHAT HER LIST OF JOBS
   sql.close();
 });
 
-/* ── audit fifty-four, finding 3: a ref written into a list the writer cannot read ── */
+/* ── a ref written into a list the writer cannot read ── */
 
 /**
- * WHAT WAS MEASURED BEFORE THE REPAIR (`loop/research-batch-fifty-four-audit.md` §3, probe R1). The write path resolved
- * a ref against the whole record, so the member invited to Jobs alone at `write`, whose `list` of Clients is refused,
- * filed a Job at `clients#1` and at `CL1` and was answered `ok`, at `clients#2` and `CL2` was told "which was deleted",
- * and at `clients#9` and `CL9` "there is no such row": three answers where `list`'s rule gives one.
+ * WHAT WAS MEASURED BEFORE THE REPAIR. The write path resolved a ref against the whole record, so the member invited to
+ * Jobs alone at `write`, whose `list` of Clients is refused, filed a Job at `clients#1` and at `CL1` and was answered
+ * `ok`, at `clients#2` and `CL2` was told "which was deleted", and at `clients#9` and `CL9` "there is no such row":
+ * three answers where `list`'s rule gives one.
  */
 test('A JOB POINTED AT A CLIENT SHE CANNOT READ IS REFUSED IN ONE SENTENCE, LIVE, DELETED OR NEVER THERE, and the owner is told which', async () => {
   const sql = openSqlite();
@@ -208,8 +208,8 @@ test('A JOB POINTED AT A CLIENT SHE CANNOT READ IS REFUSED IN ONE SENTENCE, LIVE
   const own = (await api.create({ register: 'jobs', fields: { what: 'No client yet' } } as never, wren)) as Out;
   assert.ok(own.ok, JSON.stringify(own));
 
-  /* AND AN UPDATE IS ASKED AS A CREATE IS, which the checker found no test holding: `reads` taken off `update` left
-     every test here green. Her own Job, pointed at each spelling in turn, is answered one sentence for all six. */
+  /* AND AN UPDATE IS ASKED AS A CREATE IS, which no test held: `reads` taken off `update` left every test here green.
+     Her own Job, pointed at each spelling in turn, is answered one sentence for all six. */
   const seq = (own.value as { seq: number }).seq;
   const pointed = new Set<string>();
   for (const it of ['clients#1', 'clients#2', 'clients#9', 'CL1', 'CL2', 'CL9']) {

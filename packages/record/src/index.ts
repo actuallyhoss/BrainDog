@@ -158,8 +158,8 @@ export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, typ
  * (`packages/host/src/ingest.ts`, `hook`). The record may not import the host's type: the edge points the
  * other way (`31 §2`), so this is structural and the door's parameter is what checks the two agree.
  *
- * `hmac_sha256` AND `stripe` CARRY THE KEY OPENED, AND ONLY WHEN A HOST HANDED `ingestVerify` AN OPENER
- * (DOR-3). The record cannot open a key; the host's opener can, and this is its answer passed straight on
+ * `hmac_sha256` AND `stripe` CARRY THE KEY OPENED, AND ONLY WHEN A HOST HANDED `ingestVerify` AN OPENER.
+ * The record cannot open a key; the host's opener can, and this is its answer passed straight on
  * to the one comparison in `hook`. A GitHub door is `hmac_sha256` under `X-Hub-Signature-256`, which is
  * exactly what GitHub sends, so the door has one HMAC check and not two. `tolerance` is in seconds, the unit
  * `verifyStripe` takes.
@@ -225,9 +225,9 @@ const sha256Hex = async (text: string): Promise<string> =>
  *
  * A PREVIEW IS A BODY THE CALLER WRITES AND `page` DRAWS ONE THE OWNER INSTALLED, and `page`'s ceilings were set for the
  * second. At them, a `read`-level caller's 24 cash walks at 3,650 days over 2,000 monthly bills ran 128,000 steps each:
- * 15.7 s here and 25 to 35 s in the audit, and a 333.8 MB answer (audit sixty-six finding 2, probe `d2-preview-cost`),
- * past the 30 s a Worker request gets. The shipped Money pages walk 365 days and 30, one walk each, so a year and a
- * day and two walks draw every page this repository ships. Rows and bytes are measured on what was drawn, since a row
+ * 15.7 s here and 25 to 35 s in a second measurement, and a 333.8 MB answer, past the 30 s a Worker request gets. The
+ * shipped Money pages walk 365 days and 30, one walk each, so a year and a day and two walks draw every page this
+ * repository ships. Rows and bytes are measured on what was drawn, since a row
  * is as long as its list lets it be. The same 24 walks at 366 days now draw two walks of 24,000 steps each and are
  * refused on rows in 365 ms; 24 tables at `limit: 500` are refused on rows, and four over rows of 4,000 bytes on bytes
  * (`test/preview-page-guard.test.ts`).
@@ -273,7 +273,7 @@ export type Level = (typeof LEVELS)[number];
  * else, and it does not lift the token to `owner` anywhere.
  *
  * NOT A FOURTH SCOPE, because a scope is a prefix of the ladder and this is one door off it. An owner's agents triage the
- * arrivals no rule filed (`loop/DIRECTION.md` section 30, P2), and every other thing `owner` guards stays a person's.
+ * arrivals no rule filed, and every other thing `owner` guards stays a person's.
  */
 export const TOKEN_REACHES = ['inbox'] as const;
 export type TokenReach = (typeof TOKEN_REACHES)[number];
@@ -297,7 +297,7 @@ export type Principal =
   | { kind: 'token'; id: string; scope: Scope; person: string; level: Level | null; reach?: readonly TokenReach[] | undefined }
   /**
    * A machine that runs jobs: a device grant of reach `runner` (`packages/kernel/src/device.ts`), built by a host from
-   * that verified grant and never from anything the caller sent (`loop/finish/agents.md` C13).
+   * that verified grant and never from anything the caller sent.
    *
    * NO LEVEL AND NO SCOPE, BECAUSE IT HOLDS NEITHER. It claims a queued job, reports on it and reads whether it was
    * stopped, and `allows` refuses it every rung of the ladder, so every guard in this file refuses it too. Only the
@@ -326,7 +326,7 @@ export type CallContext = {
   levels?: Readonly<Record<string, Level>> | undefined;
 
   /**
-   * One `where` per list this caller's grant narrows, filled by a host wherever `levels` is (COL-9).
+   * One `where` per list this caller's grant narrows, filled by a host wherever `levels` is.
    *
    * A ROW PREDICATE, NOT A CEILING. `registers` and `levels` say which lists exist for this caller and what they may
    * do with one; this says which ROWS of a list they may do it to, when their grant is narrowed rather than whole.
@@ -386,7 +386,7 @@ export type CallContext = {
  * How recent a session's last proof must be for the vault and for approving a device: `12 §6`, `33 §10`.
  *
  * EXPORTED FOR THE FILES UNDER `methods/`, so a method that asks for a recent proof asks this one window and none
- * declares its own (`loop/finish/contracts.md` §2.7).
+ * declares its own.
  */
 export const FRESH = 15 * 60_000;
 
@@ -446,7 +446,7 @@ export type SealTarget = {
   aad: string;
   key: { wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null };
   /**
-   * Which of the record's two data keys the bytes are sealed under (DOR-2): `'record'`, the key `depositGrant` has
+   * Which of the record's two data keys the bytes are sealed under: `'record'`, the key `depositGrant` has
    * always used, or `'connector'`, for a key deposited for a scheduled connector, never from a caller's own body.
    * Absent reads as `'record'`, so a host built before this field still seals where it always did.
    */
@@ -552,7 +552,7 @@ const vague = (next: string): boolean => VAGUE.has(next.toLowerCase().replace(/[
 /** The runtime's own id for a run, in the grammar its header has (`44 §4.2`). */
 const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
-/* ── what `context` shows (`loop/research-agent-path.md` §6.3) ──────────── */
+/* ── what `context` shows ──────────────────────────────────────────────── */
 
 /** A register's rows `context` shows from the project, and again from everywhere, newest first. */
 const SHOWN = 20;
@@ -631,14 +631,14 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
      the answer: either the call belongs to one of them, or it belongs to the record and this caller
      was never given the record.
 
-     AND A PERSON IS TOLD ABOUT THEIR INVITATION, NOT ABOUT A TOKEN. The sentence was written for an agent, and
-     `loop/research-invite-landing.md` finding 6 measured nine methods (`inbox`, `packs`, `planPack`, `decide`
-     among them) saying it to a colleague invited to one list, who signed in from a link, holds no token and was
-     never offered one. It was the sentence on `/inbox`, `/slash`, `/packs` and every `/start` tile. The token's
-     wording stays, because a wider token is exactly what its owner can mint.
+     AND A PERSON IS TOLD ABOUT THEIR INVITATION, NOT ABOUT A TOKEN. The sentence was written for an agent, and it was
+     measured on nine methods (`inbox`, `packs`, `planPack`, `decide` among them) saying it to a colleague invited to
+     one list, who signed in from a link, holds no token and was never offered one. It was the sentence on `/inbox`,
+     `/slash`, `/packs` and every `/start` tile. The token's wording stays, because a wider token is exactly what its
+     owner can mint.
 
      AND THE PERSON IS TOLD THE LISTS' NAMES. This joined the ids, so a member of the seed's Money list read "invited to
-     obligations" on the screen whose rail said Money (`loop/research-scoped-leftovers.md` §2). `nameOf` is the record's
+     obligations" on the screen whose rail said Money. `nameOf` is the record's
      own lookup, passed by `createRecordApi`, since `CallContext` carries ids and this function has no kernel. A token
      keeps the ids, because "Name one of those" asks an agent to send one back, and `allowed` stays ids for the same
      reason. */
@@ -739,7 +739,7 @@ export function reaches(ctx: CallContext, register: string): Refusal | null {
 export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 
 /**
- * The keys `setPref` takes. A closed list, so a typo is refused rather than kept for ever (`loop/finish/contracts.md` §7.3).
+ * The keys `setPref` takes. A closed list, so a typo is refused rather than kept for ever.
  *
  * THE RAIL'S TWO, THE NAVIGATION'S SHAPE AND THE HOLDING PEN'S TWO. Each is the person's own and follows them to every
  * device, which a cookie or `localStorage` cannot do, and `29 §4` says a dismissal is terminal on every device. The
@@ -788,7 +788,7 @@ export type Boot = {
    * The record's own name, which the shell draws above everything else. `null` before it is provisioned.
    *
    * `currency` IS THE HOME CURRENCY A PERSON CHOSE, `null` when nobody has, and every amount on a screen is written on
-   * its terms (`loop/finish/contracts.md` §7.4). It is the kernel's `homeCurrency`, the one every figure is added up in,
+   * its terms. It is the kernel's `homeCurrency`, the one every figure is added up in,
    * so the shell never names a currency the figures do not.
    */
   record: { slug: string; name: string; locale: string; currency: string | null } | null;
@@ -861,14 +861,14 @@ export type Boot = {
    * Which host is serving this record, copied from `Build.host`.
    *
    * THE HOST SETS IT, AND ABSENT MEANS THE HOST DID NOT SAY. Billing told a self-host from the Cloud by whether
-   * `/api/inbound/mint` answered 404 (`loop/research-held-landing.md` friction 5), because this answer named the record
+   * `/api/inbound/mint` answered 404, because this answer named the record
    * and the caller and nothing about the host. A test, the CLI and a host older than the field say nothing, and a
    * reader then falls back to whatever it inferred before, rather than being handed a value nobody gave.
    */
   host?: 'cloud' | 'self-host';
   /**
    * The record's installed look, drawn: each scheme's custom properties by name without the `--`, or `null` when no
-   * `theme` declaration is installed and the house theme is what everybody sees (GAP-3, `28 §5`).
+   * `theme` declaration is installed and the house theme is what everybody sees (`28 §5`).
    *
    * THE SAME BUILD THE INSTALL CHECKED. `themeBuilt` in `theme-check.ts` solves the declaration's seed under the house
    * profile and lays its `roles` over it, which is exactly the palette `themeFault` refused or admitted, so what is drawn
@@ -886,7 +886,7 @@ export type Boot = {
 export type EventLine = Omit<LogLine, 'rowid'> & {
   /**
    * The event's place in the log. SENT TO A CALLER WHO READS THE WHOLE RECORD, AND TO NOBODY ELSE: between two lines of
-   * a member invited to one list it is a count of the events she was not shown (`loop/research-history-cursor.md`).
+   * a member invited to one list it is a count of the events she was not shown.
    */
   rowid?: number;
   /**
@@ -979,7 +979,7 @@ export type LiveBrief = {
 };
 
 /**
- * `context`: where an agent stands, in one call (`loop/research-agent-path.md` §6.3). It never writes,
+ * `context`: where an agent stands, in one call. It never writes,
  * and it never opens a run.
  */
 export type Context = {
@@ -1066,7 +1066,7 @@ export type SlashMeter = {
   hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
   /**
    * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 60 a month), never one of his: the daily look's skill
-   * drafts (GAP-12). OPTIONAL, AND A METER WITHOUT IT DRAFTS NO SKILL, because `hold` counts against his asks and a
+   * drafts. OPTIONAL, AND A METER WITHOUT IT DRAFTS NO SKILL, because `hold` counts against his asks and a
    * background draft must never spend one of those.
    */
   background?(): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
@@ -1165,7 +1165,7 @@ export type RecordDeps = {
    * The ledger `slashModel`'s asks are held and settled in: Slash's own monthly cap and `call` rows, the ones a person's read
    * at the palette and an automation's question are spent from (`packages/host/src/slash-ask.ts` `slashRecordMeter`).
    * Asked before every press's draft and every first plan; a refusal means the model is not asked. Absent, the model is
-   * asked unmetered, as it was on every host before `loop/research-batch-sixty-audit.md` finding 2.
+   * asked unmetered, as it was on every host before the meter.
    */
   slashMeter?: SlashMeter | undefined;
   /**
@@ -1178,7 +1178,7 @@ export type RecordDeps = {
    * `owner` is whether the vault's own gate would open for this caller, and the host opens a key only on it; `stale` is
    * `true` when the one thing keeping it shut is a proof older than the vault allows, which changes what the run is told.
    * `config` is the draft's own pack's settings values, the record's alone to read (`kernel.packConfig`), which the
-   * host passes the run through as `ctx.config` (platform PLT-7).
+   * host passes the run through as `ctx.config`.
    */
   tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; config: Record<string, JsonValue>; input: unknown; reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
   /**
@@ -1446,7 +1446,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The refusal a record-wide appender meets on an owner's list, or `null` when this caller is not one or the list is not.
    *
    * ONLY THE RECORD-WIDE LEVEL, AND ONLY `append`. A grant naming the list is the owner saying so, and reaches it; `read`,
-   * `write` and `decide` are unchanged, because widening them is the owner's call (`loop/finish/platform.md` §4.0 A). The
+   * `write` and `decide` are unchanged, because widening them is the owner's call. The
    * sentence names the list by the name the rail gives it, never its id. Asked first for `append`, so every other
    * caller pays nothing for it.
    */
@@ -1571,7 +1571,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * Whether a row this caller can already read on the register is one their own narrowed grant still admits
-   * (COL-9). `list` and register counts hand `whereFor(ctx.wheres, register)` straight to the kernel, which narrows
+   * `list` and register counts hand `whereFor(ctx.wheres, register)` straight to the kernel, which narrows
    * there; a reader that answers one row read some other way (`get`, `history`, a block or question rowset, a search
    * hit, an MCP tool, a Slash read) has no `where` of its own to hand the kernel, so it asks this instead: the row is
    * read again, filtered on its own `seq` and the same rule, and it is admitted only if that still finds it. `seq:
@@ -1809,12 +1809,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     rows: kernel.census(),
     /* HOW MANY ROWS HOLD EACH VALUE AN UPDATE WOULD TAKE OFF A LIST, so `declare`'s `laidBack` keeps only a value a row
        holds. Without it the list's live count stood in, and a Personal record whose three People rows were all Family
-       was filed as keeping Agency, "because it holds 3 rows that may use it" (audit forty-eight, §4). Asked only for a
-       list a plan takes a value off, one `GROUP BY` each. A `list<enum>` is an array, each element its own value.
-       A DELETED ROW IS A HOLDER, and `binned` says how many are. Wave forty-nine's handed-off query had `deleted_at IS
-       NULL`, and its checker measured the cost: a registrar row in the bin was no holder, registrar went, and the row's
-       restore was `ENUM_VALUE_UNKNOWN` "role has no value registrar" (`test/arrange-steps.test.ts`). The kernel's
-       `WOULD_ORPHAN` counts the bin for the same reason: a row holds its values until the purge. */
+       was filed as keeping Agency, "because it holds 3 rows that may use it". Asked only for a list a plan takes a
+       value off, one `GROUP BY` each. A `list<enum>` is an array, each element its own value.
+       A DELETED ROW IS A HOLDER, and `binned` says how many are. A query with `deleted_at IS NULL` was measured to cost
+       this: a registrar row in the bin was no holder, registrar went, and the row's restore was `ENUM_VALUE_UNKNOWN`
+       "role has no value registrar" (`test/arrange-steps.test.ts`). The kernel's `WOULD_ORPHAN` counts the bin for the
+       same reason: a row holds its values until the purge. */
     holding: (list, fields) => {
       const out: Record<string, Record<string, { held: number; binned: number }>> = {};
       if (fields.length === 0) return out;
@@ -1840,7 +1840,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        Egypt doors on every record (`test/handover-used.test.ts`).
        AND EVERY DOOR THAT HAS CLAIMED AN ARRIVAL, WHATEVER IT FILED. A receipt is written only on the exact path, so a
        door whose lines wait in review filed none and was retired as unused: `bank-from-unsure` files at `needs-review`
-       by design, and was retired on every record (audit thirty-six, finding 2). Every claim leaves an event signed
+       by design, and was retired on every record. Every claim leaves an event signed
        `ingest:<id>`, so that is read too. It scans `event`, which has no index on `actor`: 32 ms over 500,000 rows,
        measured, once per plan an owner asks for. */
     used: [
@@ -1896,14 +1896,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
   });
 
-  /** The caller's own read of each list, which is all of the record Slash is handed for her (`readUsage`, audit 8). */
+  /** The caller's own read of each list, which is all of the record Slash is handed for her (`readUsage`). */
   const readsOf = (ctx: CallContext) => (list: string) => readable(ctx, list) === null;
 
   /**
    * One reading for Slash: how the record is used, what the host offers, what that says, and what Slash has asked already.
    * A catalogue pack is built to see whether its pages show agents only when an agent has written here.
    *
-   * `ctx` IS WHO ASKED, and the reading is her own read of each list (`readUsage`, audit 8). Held from any list, the reading
+   * `ctx` IS WHO ASKED, and the reading is her own read of each list (`readUsage`). Held from any list, the reading
    * is `partial`: no rule drafts and nothing said of the whole record (`noticeUsage`), and `shown` is only the waiting
    * questions `governance` would show her. `waiting` stays whole, since it counts the slots on Decide. Absent, as on the
    * daily look, nobody asked and the reading is the whole record's.
@@ -1951,10 +1951,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `slashModel` asked once, held and settled in Slash's ledger when the host gave one (`deps.slashMeter`). The press and
    * the first plan both ask through this and nothing else asks the record's model.
    *
-   * THEY WERE THE TWO UNMETERED ASKS ON THE OPERATOR'S ACCOUNT. `loop/research-batch-sixty-audit.md` finding 2, the S2
-   * probe: a record 20 days old over the Worker's included model, 25 presses, 25 model calls, and no `call` row or look at
-   * `ask_cap` anywhere, while a person's read at the palette was held to both. A plan that answered something unusable
-   * was asked again on every try. `test/slash-press-cap.test.ts` drives both at a cap: 3 calls of 25 presses, 2 of 5 plans.
+   * THEY WERE THE TWO UNMETERED ASKS ON THE OPERATOR'S ACCOUNT. Measured: a record 20 days old over the Worker's
+   * included model, 25 presses, 25 model calls, and no `call` row or look at `ask_cap` anywhere, while a person's read
+   * at the palette was held to both. A plan that answered something unusable was asked again on every try.
+   * `test/slash-press-cap.test.ts` drives both at a cap: 3 calls of 25 presses, 2 of 5 plans.
    *
    * `spent` IS THE METER'S REFUSAL, and the model is not asked. A throw is settled and thrown on, so each caller keeps its
    * own sentence for a model that did not answer: `UNREACHABLE` with the reading's estimate, as the package bills a model
@@ -2085,7 +2085,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
       } catch (e) {
         /* A PRESS THE INCLUDED MODEL'S CEILING TURNED AWAY WAS NEVER ASKED, and said "did not answer" it read as a model
-           that might answer next time. `loop/research-batch-sixty-four-audit.md` finding 5: at 300 lists the prompt is
+           that might answer next time. Measured: at 300 lists the prompt is
            51,152 bytes and the Worker's `NotSent` refuses it before the binding, on this press and every one after, until
            the record shrinks. The refusal's own fix is the operator's ceiling, which the owner cannot raise, so he is told
            only what is true for him. `sent: false` alone is not enough: the endpoint's `SlashKeyClosedError` carries it
@@ -2120,11 +2120,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * THE DAILY LOOK'S SKILL STEP (GAP-12): each skill that active learnings bear on and its `because` does not carry yet
+   * THE DAILY LOOK'S SKILL STEP: each skill that active learnings bear on and its `because` does not carry yet
    * (`skillBearings`, the briefing's rule over the whole record) gets its next version drafted by the model and filed as
    * one `rowset` on `skills`, which Decide draws as a diff, one press takes, and Put back undoes.
    *
-   * THE BACKGROUND ALLOWANCE AND NEVER HIS ASKS (`loop/finish/contracts.md` §7.5). Each draft holds one of the meter's
+   * THE BACKGROUND ALLOWANCE AND NEVER HIS ASKS. Each draft holds one of the meter's
    * `background` asks; a meter without that way to count draws nothing, since `hold` spends his. With no meter at all, as
    * in a build that keeps no ledger, the model is asked unmetered, as the press is there.
    *
@@ -2271,7 +2271,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * What the owner described, drafted and tried, and the drafts that drew clean filed on Decide: what `slashDraft` would
-   * answer, filed (`loop/finish/contracts.md` §2.4).
+   * answer, filed.
    *
    * THE SPEND IS CHECKED FIRST: with Decide full, or the same words already filed and still waiting, the model is not asked
    * (`describedPresses`). Only a filing path asks this, since `slashDraft` files nothing and so fills no slot.
@@ -2336,10 +2336,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * The computed sources that read across the whole record rather than any one list: the log, the scheduled actions and
-   * the open questions. `loop/research-scoped-audit.md` §2 measured the last two on a Desk page handing a member invited
-   * to Obligations a diary rowset's question and a bank key's host and label, while `governance` and `actions` both held
-   * those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name
-   * something for it, so the block is held whether or not the kernel's answer carries a name for the whole record.
+   * the open questions. Measured: the last two on a Desk page handed a member invited to Obligations a diary rowset's
+   * question and a bank key's host and label, while `governance` and `actions` both held those back from her. The
+   * record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
+   * block is held whether or not the kernel's answer carries a name for the whole record.
    */
   const ACROSS = new Set(['activity', 'actions', 'governance.open']);
 
@@ -2365,7 +2365,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * live run is named from. `pages.ts` `registersOf` names them when it is handed `ListsBeside`, which `kernel.pages` and
    * `kernel.blockRegisters` now hand it; the record reads the same declarations here too, over every list of projects.
    *
-   * MEASURED BEFORE (`loop/research-audit-2026-09-25-layouts.md` finding 1 and `test/audit-layouts-privacy.test.ts`):
+   * MEASURED BEFORE (`test/audit-layouts-privacy.test.ts`):
    * Wren, invited to Areas alone, was drawn `GBP 44,500` from a hidden list's `salary` by `{ field: salary, as: next }`,
    * the done share of the same steps by `as: ring`, and `Secret Kiln`, a row of a projects list she may not open, by
    * `as: scope` and by a live run's card. A miss was worse: `as: next` over a field nobody declared answered
@@ -2397,27 +2397,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * What a refused block drew, taken back. The empties that were blanked before stay as empties, so a host that reads
    * `readings` of a refused `stat` still finds a list; everything else a block computes goes. `walk` did not, so a cash
    * walk refused for its legs would still have carried every step, and `where` is a filter a person wrote with a field
-   * value in it (`body is Dinner with the auditor`, measured in §6). `sells` is a forecast's `sell:` figure read, the
+   * value in it (`body is Dinner with the auditor`, measured). `sells` is a forecast's `sell:` figure read, the
    * total of a list: a walk refused for that list still carried it, so a member not invited to the list was handed its
    * total to the minor unit (`test/forecast-sell-held.test.ts`).
    */
   /* AND EVERY KEY THE KERNEL ANSWERS (`ANSWER_KEYS` in `packages/kernel/src/block-keys.ts`), BUILT FROM THAT LIST AND
      NOT COPIED FROM IT. Copied, seven were left off: a held steps block kept `open: 2`, the open steps of a list its
      reader may not open, with `done_now` and `next` beside it, a held inputs block kept `types`, the schema `schema`
-     refuses her (`loop/research-audit-2026-09-25-layouts.md` finding 7), and a block written with every answer key and
-     held kept `nexts`, `fills` and `drawn` as written. `fills` is what a capture's `where` presets, which is the `where`
-     above in other words. The empties among them (`rows`, `matched`, `refusals` and the rest) go too, and `shellOf`
-     puts each back empty. */
+     refuses her, and a block written with every answer key and held kept `nexts`, `fills` and `drawn` as written.
+     `fills` is what a capture's `where` presets, which is the `where` above in other words. The empties among them
+     (`rows`, `matched`, `refusals` and the rest) go too, and `shellOf` puts each back empty. */
   const DRAWN: readonly string[] = ['where', ...ANSWER_KEYS];
 
   /**
-   * AND WHAT A REFUSED BLOCK WAS WRITTEN TO READ, which is the names of lists and figures she cannot open.
-   * `loop/research-batch-seventeen-audit.md` finding 4 measured a member invited to Obligations reading
-   * `cells: [{ metric: 'diary-count' }]` off a refused figures block, and `from: [{ register: 'bills' }]` with
-   * `opening: 1000000` off a refused cash walk: two list names `boot` hides from her and, on a hand-written page, an
-   * opening balance. The legs and the cells are what `blockRegisters` and `alsoReads` judged the block by, so what is
-   * refused is exactly what they name. `sell` is the same kind of name, the figure a forecast's sell control offers, and
-   * `about` is the spoken id of the row a `runs_on` block is about, in a list she may not open.
+   * AND WHAT A REFUSED BLOCK WAS WRITTEN TO READ, which is the names of lists and figures she cannot open. Measured: a
+   * member invited to Obligations read `cells: [{ metric: 'diary-count' }]` off a refused figures block, and
+   * `from: [{ register: 'bills' }]` with `opening: 1000000` off a refused cash walk: two list names `boot` hides from
+   * her and, on a hand-written page, an opening balance. The legs and the cells are what `blockRegisters` and
+   * `alsoReads` judged the block by, so what is refused is exactly what they name. `sell` is the same kind of name, the
+   * figure a forecast's sell control offers, and `about` is the spoken id of the row a `runs_on` block is about, in a
+   * list she may not open.
    *
    * `source` IS NOT HERE YET. `register.diary` on a refused table is the same kind of name, and
    * `test/scoped-audit.test.ts` finds that block by it; the test has to find it another way before `source` can go.
@@ -2452,7 +2451,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     for (const key of [...DRAWN, ...WRITTEN]) delete kept[key];
     /* AND WHAT IT READS, WHEN THAT IS A LIST OR A FIGURE. A refused Diary block still said `source: register.diary`,
        the id `boot` leaves out of her rail, and `columns` with Diary's field ids, which is the schema `schema`
-       refuses her; a figure's said `source: metric.diary-count` (`loop/research-scoped-leftovers.md` §1). The web
+       refuses her; a figure's said `source: metric.diary-count`. The web
        reads neither off a refused block: `blockOf` draws the shell, headed from `refusals`, the moment one is
        there. A source that names a view and no list stays, since it says nothing she could not guess: the `log`
        ones, and the two below, which are the kernel's computed sources that `ACROSS` does not hold. */
@@ -2511,8 +2510,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* AND THE OPEN QUESTIONS AND THE SCHEDULED ACTIONS ARE THE SAME KIND OF READ (`ACROSS`). */
     /* THE OPEN QUESTIONS ASK MORE THAN THE CEILING, because `governance` holds a rowset about a list back from a reader
        who may not read that list, and a member at `read` with Diary held to `append` has no ceiling: `wholeRecord` called
-       her whole, and the queue drew her the Diary rowset's question that `governance` held back
-       (`loop/research-audit-2026-09-25-layouts.md` finding 15). So a queue is for whoever reads every list. */
+       her whole, and the queue drew her the Diary rowset's question that `governance` held back. So a queue is for
+       whoever reads every list. */
     const whole = b.source === 'governance.open' ? readsEveryList(ctx) : wholeRecord(ctx);
     const log: Refusal | null =
       typeof b.source === 'string' && ACROSS.has(b.source) && (!whole || allows(ctx, 'read') !== null)
@@ -2543,9 +2542,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A FIGURE SHE CANNOT READ IS A FIGURE THAT DOES NOT EXIST, AS `metric` SAYS IT. `heldBy` shut a block over such a figure
    * `FORBIDDEN`, and a name nobody declared was drawn: a `stat` cell's `METRIC_UNKNOWN`, a `series`'
    * `DECLARATION_INVALID`. So Wren, invited to Notes alone, wrote `diary-count` and `nosuch-count` into a preview and was
-   * told which one this record keeps (audit sixty-six finding 9). Renamed, the kernel draws the hidden figure exactly as
-   * it draws an unknown one, in every place a block names a figure, and the drawing is given her words back, so the two
-   * answers differ only in the name she chose. Her own figures and the owner's are never renamed.
+   * told which one this record keeps. Renamed, the kernel draws the hidden figure exactly as it draws an unknown one,
+   * in every place a block names a figure, and the drawing is given her words back, so the two answers differ only in
+   * the name she chose. Her own figures and the owner's are never renamed.
    *
    * THE PLACES ARE THE ONES `touches` WALKS FOR A PAGE (`packages/kernel/src/reach.ts`): a `metric`, `late`, `then` or
    * `each` key, a `source` of `metric.<id>`, and a bare `{{id}}` in prose, which in a template is the row's field when
@@ -2600,10 +2599,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * THE KERNEL DRAWS A BLOCK WITH ITS REFS RESOLVED AGAINST THE WHOLE RECORD, AND `list` RESOLVES THEM WITH `reads`. Wren,
    * invited to Notes alone, wrote a table over Notes with `client is Acme Redundancy Plan` and was drawn the note about
    * Acme, while `client is Nobody Ltd` answered `REF_UNKNOWN`, "there is no clients called Nobody Ltd.": an exact-title
-   * oracle into Clients, one guess at a time, where `list` answers 0 rows to both (audit sixty-six finding 1, SEC-10
-   * again). `kernel.block` takes no `reads`, so the words are asked of `list` first, with her `reads`, and whether they
-   * made it ask about a list she cannot read is the answer. A ref field into Clients asks about Clients whatever the
-   * value, so a title that is there and one that is not are the same held block.
+   * oracle into Clients, one guess at a time, where `list` answers 0 rows to both. `kernel.block` takes no `reads`, so
+   * the words are asked of `list` first, with her `reads`, and whether they made it ask about a list she cannot read is
+   * the answer. A ref field into Clients asks about Clients whatever the value, so a title that is there and one that
+   * is not are the same held block.
    *
    * AND A SPOKEN ID INTO A HIDDEN LIST, IN A FIELD SHE READS, IS WORDS. The kernel answered `topic is diary#1` with
    * `REF_REGISTER_MISMATCH` naming Diary where `topic is nosuch#1` was `REF_UNKNOWN`; `list` calls both a topic nobody
@@ -2720,23 +2719,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * A RULE'S QUESTION IS FILLED FROM ITS ROW AND NAMED NO LIST. `ask_person` fills `{{what}}` and `{{trigger.row.…}}` and
    * files the result as an `options` body carrying the run and the step, and `holds` sent a body that names no list to
-   * every whole-record reader. `loop/research-batch-thirty-seven-audit.md` finding 1: a member at `decide` with Money held
-   * to `append`, refused `list money`, read "Pay Salary: Omar, 91000" in `governance` and `whatsNew`. The kernel's `ask`
-   * does not put the list on the body, so the list is found where the kernel already keeps it: the run's own row, whose
-   * trigger names the list of a written row and of the row an arrival wrote. A run pruned after its ninety days leaves the
-   * rule, whose row list is `rowRegisterOf`'s answer, and the same answer places a rule's inline `suggest`, which fills
-   * its question from the row in the same way and carries no run at all.
+   * every whole-record reader. Measured: a member at `decide` with Money held to `append`, refused `list money`, read
+   * "Pay Salary: Omar, 91000" in `governance` and `whatsNew`. The kernel's `ask` does not put the list on the body, so
+   * the list is found where the kernel already keeps it: the run's own row, whose trigger names the list of a written
+   * row and of the row an arrival wrote. A run pruned after its ninety days leaves the rule, whose row list is
+   * `rowRegisterOf`'s answer, and the same answer places a rule's inline `suggest`, which fills its question from the
+   * row in the same way and carries no run at all.
    *
    * `opened_by` IS WHAT MAKES IT THE RULE'S. The gate lets a proposer put any `run` on an options body; only the rule's own
    * `propose` signs `rule:<name>`, and a run is believed only when its rule is the one that signed. A body naming a run
    * of another rule is somebody else's question and is read as naming no list.
    *
    * `inbox` IS A QUESTION ABOUT AN ARRIVAL THAT WROTE NO ROW, and it is the owner's alone. Such a run names no list, and
-   * its scope carries the arrival's own words as `trigger.body`: `loop/research-batch-thirty-nine-audit.md` finding 1
-   * filled "Arrived: {{trigger.body}}" from a webhook no door claimed, and a member at `decide` whom `inbox` refuses
-   * `FORBIDDEN` read "Payroll: Omar 91000" in `governance`. So `holds` asks it what `inbox` asks. It is a flag and not a
-   * list id, because a record may declare a list called `inbox`, and `every` and `manual` keep the whole record, since
-   * their scope carries no row and no arrival.
+   * its scope carries the arrival's own words as `trigger.body`: a probe filled "Arrived: {{trigger.body}}" from a
+   * webhook no door claimed, and a member at `decide` whom `inbox` refuses `FORBIDDEN` read "Payroll: Omar 91000" in
+   * `governance`. So `holds` asks it what `inbox` asks. It is a flag and not a list id, because a record may declare a
+   * list called `inbox`, and `every` and `manual` keep the whole record, since their scope carries no row and no
+   * arrival.
    */
   const ruleAsked = (row: Record<string, unknown>): { rule: string; run: { id: string; version: number } | null; list: string | null; inbox?: true } | null => {
     if (row.body_kind !== 'options' || typeof row.opened_by !== 'string' || !row.opened_by.startsWith('rule:')) return null;
@@ -2751,7 +2750,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return { rule, run: { id: body.run, version: run.version }, list, ...(list === null && said.kind === 'arrival' ? { inbox: true as const } : {}) };
       }
     }
-    /* THE BODY THAT ASKED, NOT TODAY'S (audit thirty-nine, finding 6). This read `ORDER BY version DESC`, so re-declaring
+    /* THE BODY THAT ASKED, NOT TODAY'S. This read `ORDER BY version DESC`, so re-declaring
        `rule.chase` from Money onto Inbox handed its open "Chase Salary: Omar?", still about the Money row, to a member
        held to `append` on Money, in `governance` and `whatsNew`. A version is live from its `created_at`, so the one that
        asked is the newest created by the time the question was opened, and a door is read at the same moment. Where no
@@ -2776,7 +2775,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * Why this caller may not answer a question a run is waiting on, or `null` when they may.
    *
-   * AN ANSWER IS THE LAST THING BETWEEN A PERSON AND THE RULE'S WRITES, SO IT NEEDS WHAT THEY NEED. In the audit the member
+   * AN ANSWER IS THE LAST THING BETWEEN A PERSON AND THE RULE'S WRITES, SO IT NEEDS WHAT THEY NEED. Measured: a member
    * at `append` on Money picked `pay`, and the run's next step set `note` on the Money row, signed by the rule: a change
    * her own level refuses her by hand. So the answerer is held to every write the rule's steps can make: a field, a tag,
    * a move or a link on the run's row needs `write` on its list, a note on it and a new row anywhere need `append`. Every
@@ -2786,7 +2785,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * ONLY THE STEPS STILL AHEAD OF THE RUN, AND IT WAS EVERY STEP OF THE RULE. Walking the declared tree counted a `set`
    * the run had made before it asked, so `[set note, ask_person, if yes then notify]` refused a member at `read` on Money
-   * whose answer leads only to a notify (wave thirty-nine's checker, on f7c88f98), and a `set` on an arm the run had
+   * whose answer leads only to a notify (measured on f7c88f98), and a `set` on an arm the run had
    * already left refused her the same way. A waiting run keeps its place as an index into the kernel's flat plan of the
    * version it started under, so the steps are read off that plan from the one after the wait, following each `if` both
    * ways and each `jump` where it goes, which is every step the runner can still take.
@@ -2795,10 +2794,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * due writes a `note` event on the row signed by the rule; a member at `read` answered a run whose only later step
    * was one, and may not add a note by hand.
    *
-   * `run` IS HELD TO NO LEVEL, AND ON PURPOSE (audit thirty-nine, finding 8, decided). It queues one run of a declared
+   * `run` IS HELD TO NO LEVEL, AND ON PURPOSE. It queues one run of a declared
    * call with the fields of the run's row that the call's `sends:` names, and writes nothing in the record: a `call`'s
    * answer lands no row (`finishAction` writes back for a `poll` or a `pull` only). The levels are what a person may
-   * change here, so `write`, the level the audit asked about, says nothing about a call. Measured, with `run:` on
+   * change here, so `write`, the obvious level to ask, says nothing about a call. Measured, with `run:` on
    * Money's creates: a member at `append` set the call off by adding a row and so did one at `write`, a member at
    * `read` was refused the row, and `automationRun` refused a member at `write` `LEVEL_REQUIRED`, since every route
    * that starts a call by name (`automationRun`, `resumeAction`, `ruleApply`) is an owner's in a browser. So `write`
@@ -2886,33 +2885,33 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const holds = (ctx: CallContext, row: Record<string, unknown>): boolean => {
     /* A DECISION IS HELD BACK EXACTLY WHEN THE QUESTION IT SETTLED IS. It has no `body_kind`, so every branch below
        answered `false` and a member invited to one list read the question and the reason of every decision on the
-       record: batch fourteen's audit listed a diary decision to a colleague who could see only Obligations. It names no
-       register itself, and the register it is about is the one its suggestion's body named, so the rule is the
-       suggestion's rule, asked of the suggestion (`SETTLED` in the kernel pairs them by adjacent log lines). A decision
-       whose question cannot be found is about nothing this caller can be shown to reach, so only somebody who reads the
-       whole record sees it, which is the rule `lineOf` keeps for a line about nothing in particular. */
+       record: a diary decision was listed to a colleague who could see only Obligations. It names no register itself,
+       and the register it is about is the one its suggestion's body named, so the rule is the suggestion's rule, asked
+       of the suggestion (`SETTLED` in the kernel pairs them by adjacent log lines). A decision whose question cannot be
+       found is about nothing this caller can be shown to reach, so only somebody who reads the whole record sees it,
+       which is the rule `lineOf` keeps for a line about nothing in particular. */
     if (typeof row.decided_by === 'string' && 'answer' in row) {
       const settled = typeof row.suggestion === 'string' ? kernel.governanceRow('suggestion', row.suggestion) : null;
       return settled === null ? !wholeRecord(ctx) : holds(ctx, settled);
     }
     /* A PREDICTION IS ABOUT THE DECLARATION IT NAMES, and it named none this function asked about. It has no `body_kind`,
-       so it fell to the last line and went to everyone: `loop/research-scoped-audit.md` §3 read a prediction about the
-       diary, its claim, its measure and `baseline: 2`, off `governance` as a member invited to Obligations, while the
-       change it grades and that change's decision were held back from her in the same run. `for_decl` is read as the
-       `change` branch reads `declaration_id`: a list's declaration asks that list, and anything else (a page, a rule) is
-       about the record as a whole.
+       so it fell to the last line and went to everyone: a probe read a prediction about the diary, its claim, its
+       measure and `baseline: 2`, off `governance` as a member invited to Obligations, while the change it grades and
+       that change's decision were held back from her in the same run. `for_decl` is read as the `change` branch reads
+       `declaration_id`: a list's declaration asks that list, and anything else (a page, a rule) is about the record as
+       a whole.
 
-       AND ABOUT THE FIGURE IT MEASURES, which is what its baseline counts (`loop/research-batch-forty-audit.md` finding
-       2). Held to `for_decl` alone, a prediction counting Omar's Money rows filed on a change to Inbox reached the member
-       invited to Inbox alone with `where: payee is Omar` and `baseline: 2`, and filed on a change to a rule it reached a
-       member held to `append` on Money. So `predictionHeld` asks both, and places a rule or a script as a change to it
-       is placed rather than on the whole record. */
+       AND ABOUT THE FIGURE IT MEASURES, which is what its baseline counts. Held to `for_decl` alone, a prediction
+       counting Omar's Money rows filed on a change to Inbox reached the member invited to Inbox alone with
+       `where: payee is Omar` and `baseline: 2`, and filed on a change to a rule it reached a member held to `append` on
+       Money. So `predictionHeld` asks both, and places a rule or a script as a change to it is placed rather than on
+       the whole record. */
     if (typeof row.for_decl === 'string') return predictionHeld(ctx, row);
     /* THE QUESTION A MISSED PREDICTION FILES IS HELD AS THAT PREDICTION IS. The kernel files it as `system` with an
-       `options` body, so it went to every whole-record reader with "predicted >=5, observed 3" in it (audit forty,
-       finding 2, E1). The body names the prediction it grades (`metrics.ts`, since `loop/research-decide-reach.md`), and
-       only `system` opens one, so the id is believed. A miss filed before that names none, and its prediction is found
-       by the words the kernel wrote it in; a question no prediction matches keeps the rule for a question about no list. */
+       `options` body, so it went to every whole-record reader with "predicted >=5, observed 3" in it. The body names
+       the prediction it grades (`metrics.ts`), and only `system` opens one, so the id is believed. A miss filed before
+       that names none, and its prediction is found by the words the kernel wrote it in; a question no prediction
+       matches keeps the rule for a question about no list. */
     if (row.body_kind === 'options' && row.opened_by === 'system') {
       const named = (row.body as { prediction?: unknown } | undefined)?.prediction;
       if (typeof named === 'string') {
@@ -2927,12 +2926,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (row.body_kind === 'options' && row.opened_by === SLASH) return !readsEveryList(ctx);
     const body = row.body as Record<string, unknown> | undefined;
     /* A QUESTION FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD AS THE INBOX IS, to the owner reading the whole record
-       (`ruleAsked`, audit thirty-nine finding 1). */
+       (`ruleAsked`). */
     if (row.body_kind === 'options' && ruleAsked(row)?.inbox === true) return allows(ctx, 'owner', listName) !== null || !wholeRecord(ctx);
     /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
        declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
        a register and both used to pass unfiltered while the one that carries ROWS was filtered. An `options` question a
-       rule opened is about its row, and names that row's list through `ruleAsked` (audit thirty-seven, finding 1). */
+       rule opened is about its row, and names that row's list through `ruleAsked`. */
     const named =
       row.body_kind === 'rowset'
         ? body?.register
@@ -2950,18 +2949,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* A QUESTION THAT NAMES NO LIST IS ABOUT THE WHOLE RECORD, and goes where `lineOf` sends a line about the whole record:
        to somebody who reads all of it. This answered `false` for any body that named no list, so an `options` question,
        its answer and the owner's reason (*The auditor must not see his salary line*) reached a member invited to
-       Obligations through `governance`, `whatsNew` and `recentHistory` (§5), and so did the question a missed prediction
-       files, whose body carries only its two options (§3). A `pack` or `settings` proposal is about what the record is,
+       Obligations through `governance`, `whatsNew` and `recentHistory`, and so did the question a missed prediction
+       files, whose body carries only its two options. A `pack` or `settings` proposal is about what the record is,
        and so takes the same rule.
 
        A `CHANGE` IS SHOWN TO A CALLER WHO COULD READ EVERY NAME THE KERNEL'S ONE WALK GIVES for every copy of every
-       declaration it carries (`changeTouches`, `loop/research-decide-reach.md`): a list as `list` reads it, `ACROSS` as
+       declaration it carries (`changeTouches`): a list as `list` reads it, `ACROSS` as
        `wholeRecord` reads it, `ANY_LIST` as `readsEveryList` reads it, and a change that names nothing as a question
        about the whole record. The list it is filed under is always one of its names, asked first: an addition is stored
        as `{ add }` with no `id`, so the walk finds nothing in it, and without the name the member held to `append` on
-       Money was shown "Add salary band to Money?" (the wave forty-two checker, with this line removed). And the name is
+       Money was shown "Add salary band to Money?" (measured with this line removed). And the name is
        not the only one asked, because the filing check once did not read a script's `reads` and `writes` or an arrival
-       rule's door (audit forty, finding 1), and a row filed before it did is still in the queue. */
+       rule's door, and a row filed before it did is still in the queue. */
     if (row.body_kind === 'change') {
       if (typeof named === 'string' && named !== '' && readable(ctx, named) !== null) return true;
       const names = changeTouches(body, typeof row.opened_at === 'string' ? row.opened_at : null);
@@ -2969,7 +2968,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return !sees(ctx, names);
     }
     /* A `rowset`'S OWN ROWS ARE HELD BACK TOO, when the caller's grant on the register is narrowed by a `where`
-       (COL-9): the register may be readable while a row a `rowset` names by `at` is not one the grant admits, and
+       the register may be readable while a row a `rowset` names by `at` is not one the grant admits, and
        a rowset carries every field value of the rows it names. The whole question is held back, as a plan's rows
        are above, rather than the rowset drawn with the one row missing. A row the rowset adds names no `at` and is
        not an existing row this caller could already be denied. */
@@ -2992,32 +2991,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Every name the kernel's one walk (`touches`, `packages/kernel/src/reach.ts`) gives for every copy of every
    * declaration a `change` carries, with `ANY_LIST` for any figure it could not place.
    *
-   * EACH KIND IS PLACED AS THE READ OF THAT KIND PLACES IT. Audit thirty-eight's finding 3 handed a member held to
-   * `append` on Money a rule on Money and a script reading it, filed under a rule's name, though `automations` and
-   * `scripts` refused her both; audit forty's finding 4 handed her a page, a door and a figure over Money while `page`
-   * and `metric` answered her as if they did not exist. Both are the walk's rule and script and page branches now.
+   * EACH KIND IS PLACED AS THE READ OF THAT KIND PLACES IT. A member held to `append` on Money was handed a rule on
+   * Money and a script reading it, filed under a rule's name, though `automations` and `scripts` refused her both, and
+   * a page, a door and a figure over Money while `page` and `metric` answered her as if they did not exist. Both are
+   * the walk's rule and script and page branches now.
    *
    * ONE WALK, THE FILING CHECK'S. The record kept its own copy (`listsIn`), which said it read what the kernel's
    * `listsNamed` read and did not: it had no line for a page source that is no list or a block marked `working: true`
-   * (audit forty-two, finding 2: a member held to `append` on Session was handed the change declaring a page over
-   * `sessions.live` while `page` answered her `PAGE_UNKNOWN`), and it read a template's `{{field}}` as a figure. Its
-   * answer for every page, door, figure and digest was `whole` beside the lists, and that over-held: a bundle under
-   * `register.inbox` carrying a page over Inbox alone (R1 in `loop/research-decide-reach.md`, the wave forty-two
-   * checker's regression) and a bundle under a rule on Inbox carrying the same page (T38-page) were held from the member
-   * invited to Inbox alone, whom `page` shows that page. Measured by the research's probe over 32 proposals and five
-   * callers, the copies answered 138 right at `bccc7ea8` and this answers 156, leaking none either way; the four it still
-   * holds back are a prose page and a page with a log block from members invited to named lists (K1, K5), on purpose.
+   * (a member held to `append` on Session was handed the change declaring a page over `sessions.live` while `page`
+   * answered her `PAGE_UNKNOWN`), and it read a template's `{{field}}` as a figure. Its answer for every page, door,
+   * figure and digest was `whole` beside the lists, and that over-held: a bundle under `register.inbox` carrying a page
+   * over Inbox alone and a bundle under a rule on Inbox carrying the same page were held from the member invited to
+   * Inbox alone, whom `page` shows that page. Measured by a probe over 32 proposals and five callers, the copies
+   * answered 138 right at `bccc7ea8` and this answers 156, leaking none either way; the four it still holds back are a
+   * prose page and a page with a log block from members invited to named lists, on purpose.
    *
    * AND THE LIVE COPY OF EACH, because accepting a change to a rule on Money changes what Money's rows set off, whatever
    * list the new body names. The filing check asks the replaced declaration the same question (`govern.ts`
    * `replacedAbout`).
    *
    * AND THE COPY THAT WAS LIVE WHEN THE CHANGE WAS OPENED, because once it is accepted the live copy is the one it
-   * installed. Audit forty's finding 5 moved `rule.omar-pay` off Money onto Inbox: held from the member invited to Inbox
-   * alone while it was open, the question, the decision and the owner's reason reached her `governance` and `whatsNew`
-   * the moment it was accepted, since the Money body had been superseded and the check no longer read it. A version is
-   * live from its `created_at` until its `superseded_at`, so the ones that were live are those whose span holds
-   * `opened`, ends included, since a change filed and accepted in one millisecond ties the two.
+   * installed. Measured with a change moving `rule.omar-pay` off Money onto Inbox: held from the member invited to
+   * Inbox alone while it was open, the question, the decision and the owner's reason reached her `governance` and
+   * `whatsNew` the moment it was accepted, since the Money body had been superseded and the check no longer read it. A
+   * version is live from its `created_at` until its `superseded_at`, so the ones that were live are those whose span
+   * holds `opened`, ends included, since a change filed and accepted in one millisecond ties the two.
    */
   const changeTouches = (body: Record<string, unknown> | undefined, opened: string | null = null): Set<string> => {
     const to = body?.to as { declarations?: unknown } | undefined;
@@ -3027,7 +3025,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* EVERY VERSION WHOSE LIFE TOUCHES `opened`, and not the newest created by then. The accept installs its body at
        the decision's instant and supersedes the old one at that same instant, so a change filed and accepted inside
        one millisecond had its own new body as the newest created by `opened`, and the member invited to Inbox alone
-       read the accepted move and the owner's reason again (the checker's same-millisecond case). In that tie both
+       read the accepted move and the owner's reason again (the same-millisecond case). In that tie both
        versions were live at `opened` as far as the record can tell, and both are asked. */
     const then = (id: string): unknown[] =>
       opened === null
@@ -3037,7 +3035,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             .map((v) => parsed(v.body));
     const proposed = (id: string): unknown => bundle.find((d) => d.id === id)?.body;
     const figure = (id: string): unknown[] => [proposed(`metric.${id}`), liveBody(`metric.${id}`), ...then(`metric.${id}`)];
-    /* A TEMPLATE'S LIST AS THE BUNDLE LEAVES IT, so a field the bundle adds (K3's `from`) is the row's and not a figure. */
+    /* A TEMPLATE'S LIST AS THE BUNDLE LEAVES IT, so a field the bundle adds (a `from`, say) is the row's and not a
+       figure. */
     const fields = (list: string): ReadonlySet<string> => fieldsOf(proposed(`register.${list}`) ?? liveBody(`register.${list}`));
     const names = new Set<string>();
     for (const d of bundle) {
@@ -3065,20 +3064,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * list are read (`readsEveryList`, every list she holds at a level of its own).
    *
    * TWO READINGS AND NOT ONE. With every sentinel read as `readsEveryList`, a member held to `append` on Money was held
-   * from a page with a log block and from a door that polls, both of which `page` and `actions` show her
-   * (`loop/research-decide-reach.md`, K1, K6 and K7).
+   * from a page with a log block and from a door that polls, both of which `page` and `actions` show her.
    *
-   * ONE PREDICATE BECAUSE THE DOORS THAT EACH ASKED THEIR OWN QUESTION DISAGREED (recurring class 4 in `loop/ROADMAP.md`:
-   * access decided at one door and assumed at the others). Decide asked this of every list a change's rule touches,
+   * ONE PREDICATE BECAUSE THE DOORS THAT EACH ASKED THEIR OWN QUESTION DISAGREED (access decided at one door and
+   * assumed at the others). Decide asked this of every list a change's rule touches,
    * and `automations` asked `readable` of the rule's row list alone, so an Inbox rule whose step files a Money row for
    * Omar at 91000 was held from the member invited to Inbox alone in `governance` and handed to her whole by
-   * `automations`, as it was to the member held to `append` on Money (SEC-4). `metric` asked it of the figure's source
+   * `automations`, as it was to the member held to `append` on Money. `metric` asked it of the figure's source
    * and let the kernel resolve a caller's `{{it}}` against a list she cannot read, so the member invited to Jobs alone
-   * was told `ok` for a hidden client and REF_UNKNOWN for a made-up one (SEC-10). Both now ask this.
+   * was told `ok` for a hidden client and REF_UNKNOWN for a made-up one. Both now ask this.
    * `sight-check.test.ts` holds `automations` to the answer Decide gives and `metric` to one answer whatever the row.
    *
-   * THE DOORS STILL DECIDING SIGHT THEIR OWN WAY, for the next wave to move onto this:
-   *   - `wholeRecord`, which asks the ceiling and not `ctx.levels`, so an appender reads as whole-record (SEC-11), and
+   * THE DOORS STILL DECIDING SIGHT THEIR OWN WAY, still to be moved onto this:
+   *   - `wholeRecord`, which asks the ceiling and not `ctx.levels`, so an appender reads as whole-record, and
    *     every door that asks it directly: `lineOf` (so `whatsNew` and `recentHistory`), `holds` for a body that is not
    *     a change, the `ACROSS` block check in `page` and a figure section in `digestToday`.
    *   - `boot`'s rail and its sessions, `briefing` (so `context`), `page`'s `beyond` and `search`, which each ask
@@ -3153,9 +3151,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * The predictions whose miss filed this question, found by the words `scorePrediction` files it in, for a miss whose
-   * body names no prediction. That is every miss filed before the kernel put `prediction` on the body
-   * (`loop/research-decide-reach.md`, E1), and only those: two predictions with the same claim and target both answer
-   * here, and the question is held if either is, which held the Inbox twin of a Money miss from Inbox's readers.
+   * body names no prediction. That is every miss filed before the kernel put `prediction` on the body, and only those:
+   * two predictions with the same claim and target both answer here, and the question is held if either is, which held
+   * the Inbox twin of a Money miss from Inbox's readers.
    */
   const missedBy = (row: Record<string, unknown>): Record<string, unknown>[] => {
     const question = typeof row.id === 'string' ? kernel.question(row.id) : null;
@@ -3182,10 +3180,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * A REF INTO A LIST THE WRITER CANNOT READ NAMES NO ROW, ON THE WAY IN AS ON THE WAY OUT. Without it the member invited
    * to Jobs alone filed a Job at `clients#1` and was answered `ok`, at `clients#2` "which was deleted", and at
-   * `clients#9` "there is no such row" (`loop/research-batch-fifty-four-audit.md` §3, `test/sight-check.test.ts`).
-   * Whether she should be able to point a Job at a client she cannot see at all is a question the audit leaves to a
-   * D-number, and until one answers it the sentence does not: every spelling reads as a number nobody was issued. A raw
-   * row id is taken as it is, as it always was, which tells her nothing about whether the row exists.
+   * `clients#9` "there is no such row" (`test/sight-check.test.ts`). Whether she should be able to point a Job at a
+   * client she cannot see at all is a question for a decision (a D-number), and until one answers it the sentence does
+   * not: every spelling reads as a number nobody was issued. A raw row id is taken as it is, as it always was, which
+   * tells her nothing about whether the row exists.
    */
   const refsSeen = (ctx: CallContext) => (register: string): boolean => readable(ctx, register) === null;
 
@@ -3229,11 +3227,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * sent none.
    *
    * ONLY A RUN SOMEBODY HEARD FROM IS LIVE. The ladder stamps `last_seen` on every run it opens or hears from, and no
-   * caller can write it (`packages/seed/src/index.ts:397`), so a row without one was written, not run: the the old tool
-   * import's runs are all like that. Aged from `updated_at`, which is the import's own write, each one read
-   * `stale: false` for the 45 minutes after an import, beside the agents actually working (finding 4 of
-   * `loop/research-agent-first-day.md`). `isStale` keeps its fallback on purpose, for the rows that reach it by
-   * another road; this list does not ask it about rows nobody heard from.
+   * caller can write it (`packages/seed/src/index.ts:397`), so a row without one was written, not run: runs an import
+   * writes are all like that. Aged from `updated_at`, which is the import's own write, each one read `stale: false` for
+   * the 45 minutes after an import, beside the agents actually working. `isStale` keeps its fallback on purpose, for
+   * the rows that reach it by another road; this list does not ask it about rows nobody heard from.
    */
   const live = (ctx: CallContext): LiveRun[] => {
     const rows = kernel.list({
@@ -3293,8 +3290,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * A LEVEL THAT READS, NOT ONLY A RECORD-WIDE ONE. This asked for any record-wide level and no ceiling, so a colleague
    * who adds across the record and reads nothing was read as whole: a question about no list and the log's lines about
-   * the record itself went to the one level whose point is that it does not read (`20 §1`, `loop/finish/platform.md`
-   * §2.5). A token's scope always reads, so its person's level is what is asked. A link to one page is never whole.
+   * the record itself went to the one level whose point is that it does not read (`20 §1`). A token's scope always
+   * reads, so its person's level is what is asked. A link to one page is never whole.
    */
   const wholeRecord = (ctx: CallContext): boolean =>
     ctx.principal.kind === 'system' ||
@@ -3336,7 +3333,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          and `row.suggestion` is its answer. */
       const spokenSettles = e.kind === 'decide' && kind === 'decision' && typeof row?.suggestion === 'string' ? row.suggestion : null;
       /* AND BOTH NUMBERS ARE HANDED AS `nameOf` HANDS THEM, the one in `target` and the one in `settles`: these two
-         fields were how the survey's walk found `SG7` and `D4` in a scoped member's `recentHistory` and `whatsNew`. On a
+         fields were how a walk of the log found `SG7` and `D4` in a scoped member's `recentHistory` and `whatsNew`. On a
          question's first `suggest` line the handle is `q.` and that line's own `id`, so it tells her nothing twice. */
       const own = nameOf(ctx, kind, id);
       const settles = spokenSettles === null ? null : nameOf(ctx, 'suggestion', spokenSettles);
@@ -3365,7 +3362,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * THE OWNER WHO ADMINISTERS THE SCRIPT, AND WHO READS EVERY LIST IT TOUCHED. The run line is about a declaration, and
    * `lineOf` hands those to every whole-record reader, so a member at `write` held to `append` on Money, refused
    * `list money`, read "Salary: Omar 91000" off it in `recentHistory` and `whatsNew`, while the row the same run wrote
-   * showed its money field as `--redacted--` (`loop/research-batch-thirty-five-audit.md` §1, `script-log-visibility.test.ts`).
+   * showed its money field as `--redacted--` (`script-log-visibility.test.ts`).
    * The log is free text, so no field redaction reaches into it: the only redaction there is is to whom it is shown.
    * `admin` is the door that resumes the script, so a token, even the owner's, never reads it; an owner another owner
    * held to `append` on Money is not shown it either, and one held lower on a list the script never touched is.
@@ -3451,9 +3448,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * NOT `wholeRecord`, WHICH ASKS ONLY ABOUT THE CEILING. A member invited at `read` with Diary held to `append` has no
    * ceiling, so `wholeRecord` called her whole, and `lineOf` hid Diary from her because `append` does not read: her two
-   * lines came back as rowids 10 and 6 with the three Diary writes she cannot see at 7, 8 and 9
-   * (`loop/research-batch-nineteen-audit.md` finding 3). So this asks `lineOf`'s own question of every list she holds at
-   * a level of its own. A list raised to `write` still reads. Who holds a rowid is `holdsRowids`, which asks this and more.
+   * lines came back as rowids 10 and 6 with the three Diary writes she cannot see at 7, 8 and 9. So this asks
+   * `lineOf`'s own question of every list she holds at a level of its own. A list raised to `write` still reads. Who
+   * holds a rowid is `holdsRowids`, which asks this and more.
    */
   const readsEveryList = (ctx: CallContext): boolean =>
     wholeRecord(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
@@ -3464,7 +3461,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * AN OWNER, AND NOBODY ELSE. This was `readsEveryList`, and reading every list is not reading every line: `lineOf`
    * keeps every `grant`, `access.*`, `share.*`, `member`, `person` and `vault_key` line for an owner. A colleague at
    * `read` with no list held apart read two lines at rowids 3 and 7 with the owner's three `access.grant` lines between
-   * them, so the gap was a count of the people he had invited (`loop/research-batch-twenty-one-audit.md` finding 4).
+   * them, so the gap was a count of the people he had invited.
    * Everybody else is on the `e.` and `s.` cursors a member invited to one list already pages with. A question's number
    * stays with `readsEveryList`, because `holds` shows her every question and the gap between two numbers counts none.
    *
@@ -3526,9 +3523,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     out.ok && !readsEveryList(ctx) ? ok({ ...out.value, id: nameOf(ctx, 'suggestion', out.value.id) ?? '' }) : out;
 
   /**
-   * Whether an agent's `change` is one the additive rule may answer (DIRECTION §22): an `add`, from a key, about a list
-   * that key reaches. The gate then decides whether its fields are loose enough (`additiveFault`), so this only says who
-   * may be answered by rule at all.
+   * Whether an agent's `change` is one the additive rule may answer: an `add`, from a key, about a list that key
+   * reaches. The gate then decides whether its fields are loose enough (`additiveFault`), so this only says who may be
+   * answered by rule at all.
    *
    * A KEY AND NOBODY ELSE. The owner's answer was about agents; a person who proposes is asking somebody, and a member at
    * `propose` answering her own question by rule would be the member at `decide` she was not invited to be.
@@ -3536,22 +3533,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * AND A LIST THE KEY REACHES. Filing names no register to `guard`, so a key held to Diary may ask about Projects; it
    * may not change Projects on its own, and its question waits for the owner as it did before.
    *
-   * AND THE OWNER'S KEY, NOT ANY MEMBER'S. This asked for a token and for `propose` on the list, and never whose token:
-   * `loop/research-batch-thirty-three-audit.md` §3 measured a key of a person at `append`, at `write` and at `decide`
-   * each landing `colour` on Projects with no press, while the same person proposing in her own name waited. A member's
-   * key is that member, and `field-write.ts` holds her app to "a field on everybody's rows is the owner's call". So the
-   * record's own level must be `owner`, which is what `ownsRecord` asks in the web, AND the list's level must not hold
-   * it lower, because `members.ts` lets one owner hold another to `append` on a list, and on that list he is not its
-   * owner. Reading the list's level INSTEAD of the record's was tried first and was wrong the other way: `members.ts`
-   * also accepts a member at `append` invited as `owner` of Projects alone, and her key landed `colour` at version 2,
-   * while `decide` refuses her for want of the whole record.
+   * AND THE OWNER'S KEY, NOT ANY MEMBER'S. This asked for a token and for `propose` on the list, and never whose token.
+   * Measured: a key of a person at `append`, at `write` and at `decide` each landing `colour` on Projects with no
+   * press, while the same person proposing in her own name waited. A member's key is that member, and `field-write.ts`
+   * holds her app to "a field on everybody's rows is the owner's call". So the record's own level must be `owner`,
+   * which is what `ownsRecord` asks in the web, AND the list's level must not hold it lower, because `members.ts` lets
+   * one owner hold another to `append` on a list, and on that list he is not its owner. Reading the list's level
+   * INSTEAD of the record's was tried first and was wrong the other way: `members.ts` also accepts a member at `append`
+   * invited as `owner` of Projects alone, and her key landed `colour` at version 2, while `decide` refuses her for want
+   * of the whole record.
    *
    * AND EVERY LIST AN ADDED FIELD POINTS AT, THE KEY READS. A `ref` (or a `list` of them) names a second list in its
-   * `to`, and this asked only about the first. `loop/research-batch-thirty-five-audit.md` §5 measured an owner's key held
-   * to Projects adding `paid_by: ref to money` with no press, and then writing `money#1` into it (answered `ok`) and
-   * `money#99` (answered "there is no such row"): which Money rows exist, learned through the write path's own check by
-   * a key that `list money` refuses. So a field whose `to` names a list the key cannot read is filed and waits, and the
-   * owner who presses it is the one deciding that Projects may point into Money. `add-ref-probe.test.ts` is the probe.
+   * `to`, and this asked only about the first. Measured: an owner's key held to Projects adding `paid_by: ref to money`
+   * with no press, and then writing `money#1` into it (answered `ok`) and `money#99` (answered "there is no such row"):
+   * which Money rows exist, learned through the write path's own check by a key that `list money` refuses. So a field
+   * whose `to` names a list the key cannot read is filed and waits, and the owner who presses it is the one deciding
+   * that Projects may point into Money. `add-ref-probe.test.ts` is the probe.
    */
   const byRule = (args: Proposal, ctx: CallContext): boolean => {
     if (ctx.principal.kind !== 'token' || args?.body_kind !== 'change') return false;
@@ -3596,12 +3593,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * Why `decide` refuses a person invited to named lists, said as the rule it is.
    *
-   * `allows`'S SENTENCE IS FOR A CALL ABOUT THE RECORD ITSELF, AND A QUESTION IS OFTEN ABOUT HER LIST. A member invited to
-   * Tasks at `decide`, answering the owner's question about Tasks, was told "This belongs to the whole record ... Open
-   * it", and she was reading it from the list she had open (`loop/research-appender-landing.md` finding 7). What is true
-   * is that answering any question is for somebody invited to the whole record, whatever the question is about; whether
-   * a list's `decide` should answer that list's questions is the owner's D5 and is not decided here. The sentence is said
-   * before the id is read, so a question about a list she cannot see and an id that names nothing get the same words.
+   * `allows`'S SENTENCE IS FOR A CALL ABOUT THE RECORD ITSELF, AND A QUESTION IS OFTEN ABOUT HER LIST. A member invited
+   * to Tasks at `decide`, answering the owner's question about Tasks, was told "This belongs to the whole record ...
+   * Open it", and she was reading it from the list she had open. What is true is that answering any question is for
+   * somebody invited to the whole record, whatever the question is about; whether a list's `decide` should answer that
+   * list's questions is the owner's call and is not decided here. The sentence is said before the id is read, so a
+   * question about a list she cannot see and an id that names nothing get the same words.
    */
   const decidesNot = (ctx: CallContext, stop: Refusal): Refusal => {
     const p = ctx.principal;
@@ -3638,18 +3635,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Whether what an accept installs runs while nobody is looking, alone or in a bundle: a `change`'s `to`, or a
    * `pattern`'s `ingest`, which the kernel's accept installs the same way. What `decide` holds to `admin` at the accept.
    *
-   * EVERY KIND THAT RUNS UNATTENDED, AND NOT ONLY THE ONE ITS AUDIT NAMED. Held to `rule` alone, audit fifty-one
-   * (finding 1) had the same colleague at `decide` file and accept, herself, a script every hour on the owner's key
-   * `goldapi`, a poll on that key as a `change` and as a `pattern`, a digest with `prose: slash`, a digest to her own
-   * webhook that fired carrying the owner's row, and a new `source` for the script the owner had installed: 7 roads of
-   * 7 installed and armed (`test/accept-unattended.test.ts`). A `script`, a `digest` and an `ingest` each arm a clock at
-   * install, and `setDeclaration` asks `admin` for every kind, so the accept is held for all four.
+   * EVERY KIND THAT RUNS UNATTENDED, AND NOT ONLY RULES. Held to `rule` alone, a colleague at `decide` could file and
+   * accept, herself, a script every hour on the owner's key `goldapi`, a poll on that key as a `change` and as a
+   * `pattern`, a digest with `prose: slash`, a digest to her own webhook that fired carrying the owner's row, and a new
+   * `source` for the script the owner had installed: 7 roads of 7 installed and armed
+   * (`test/accept-unattended.test.ts`). A `script`, a `digest` and an `ingest` each arm a clock at install, and
+   * `setDeclaration` asks `admin` for every kind, so the accept is held for all four.
    *
    * BY `kind`, AS THE KERNEL'S `install` READS IT, and not by `declaration_id`: a bundle is filed under whichever id the
-   * proposer names, and the audit's colleague could have filed her rule under `register.obligations`.
+   * proposer names, and that colleague could have filed her rule under `register.obligations`.
    *
    * AND A PATTERN TOO. The kernel asks a pattern's `ingest` only to be an object, so held to `change` alone, the same
-   * colleague filed the same rule as a pattern's `ingest`, accepted it, and the next row queued an `infer.ask`
+   * colleague could file the same rule as a pattern's `ingest`, accept it, and the next row queued an `infer.ask`
    * (`test/accept-rule-level.test.ts`).
    */
   const UNATTENDED = new Set(['rule', 'script', 'digest', 'ingest']);
@@ -3771,7 +3768,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * ANYBODY ELSE SENDS WHAT THEY WERE HANDED: `e.<id>` of a line `lineOf` shows them, or an `s.` this instance sealed. A
    * whole number, an id nobody minted, an id of an event they were not shown and a seal that does not open are all the
    * same sentence, because a refusal that differed would say which of them it was, and "that event exists but is not
-   * yours" is the fact the cursor exists to withhold (door 7 of `loop/research-scoped-audit.md`).
+   * yours" is the fact the cursor exists to withhold.
    */
   const cursorOf = async (ctx: CallContext, given: unknown, at: 'cursor' | 'upTo'): Promise<number | Refusal> => {
     if (holdsRowids(ctx)) {
@@ -3805,12 +3802,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The number `version()` answers this caller: `MAX(event.rowid)` to whoever holds rowids, and to anybody else a number
    * drawn from the id of the newest line `lineOf` shows them, or 0 when it shows them none.
    *
-   * `MAX(event.rowid)` WENT TO EVERY READER, AFTER `99caef53` TOOK THE ROWID OUT OF THEIR HISTORY. A colleague at `read`
-   * polled 4 and then 9 across three invitations she is shown none of and two Diary rows, and a member at `read` with
-   * Diary held to `append` polled 9 and then 14 across the same (`loop/research-batch-twenty-four-audit.md` finding 2):
-   * the gap was the count `holdsRowids` exists to withhold. So the number is keyed to what she can see. It moves when a
-   * line she reads is written and stands still while only lines she cannot read are, and it is a hash of an id she is
-   * already handed as an `e.` cursor, so it tells her nothing she could not read off her own history.
+   * `MAX(event.rowid)` WENT TO EVERY READER, AFTER `99caef53` TOOK THE ROWID OUT OF THEIR HISTORY. A colleague at
+   * `read` polled 4 and then 9 across three invitations she is shown none of and two Diary rows, and a member at `read`
+   * with Diary held to `append` polled 9 and then 14 across the same: the gap was the count `holdsRowids` exists to
+   * withhold. So the number is keyed to what she can see. It moves when a line she reads is written and stands still
+   * while only lines she cannot read are, and it is a hash of an id she is already handed as an `e.` cursor, so it
+   * tells her nothing she could not read off her own history.
    *
    * IT IS NOT ORDERED FOR HER, AND NOTHING READS IT AS ORDERED. Nothing in `apps/web` compares the number: `+layout.ts`
    * and `start` read `slash` off this call and nothing else, and `recentHistory` refuses a whole number as a cursor from
@@ -3821,14 +3818,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * AND IT IS REMEMBERED, BECAUSE HER NEWEST LINE IS NOT USUALLY NEAR THE TOP. A member at `read` with Diary held to
    * `append` was walked down every Diary row to her own line on every call, and `+layout.ts` awaits this on a tab's
-   * first navigation: 2,650.4 ms at 100,000 Diary rows where the owner paid 0.2 ms
-   * (`loop/research-batch-twenty-eight-audit.md` finding 2), and 1,205 rows read for one Diary row written since she
-   * last asked (`version-scoped-cost.test.ts` (1)). So each caller's answer is kept with the top of the log it was taken
-   * at, and the next ask reads only the lines above that. One she is shown is her new answer, as a cold walk would find
-   * it first. When none is, the old answer stands only if every line above was a plain write to a row: those cannot
-   * change what `lineOf` says of an older line, and anything else (a purge, an erasure, a pack going off, an access
-   * change) might, so she is walked on down as before. The event at the remembered top is read back by id, so a log
-   * that was replaced underneath (a restore) is walked cold rather than trusted.
+   * first navigation: 2,650.4 ms at 100,000 Diary rows where the owner paid 0.2 ms, and 1,205 rows read for one Diary
+   * row written since she last asked (`version-scoped-cost.test.ts` (1)). So each caller's answer is kept with the top
+   * of the log it was taken at, and the next ask reads only the lines above that. One she is shown is her new answer,
+   * as a cold walk would find it first. When none is, the old answer stands only if every line above was a plain write
+   * to a row: those cannot change what `lineOf` says of an older line, and anything else (a purge, an erasure, a pack
+   * going off, an access change) might, so she is walked on down as before. The event at the remembered top is read
+   * back by id, so a log that was replaced underneath (a restore) is walked cold rather than trusted.
    */
   const versionFor = (ctx: CallContext): number => {
     if (holdsRowids(ctx)) return kernel.version();
@@ -3936,7 +3932,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The `theme` declaration the record is drawn in, or `null` (GAP-3).
+   * The `theme` declaration the record is drawn in, or `null`.
    *
    * ONE LOOK AT A TIME, AND THE ONE SET FROM THE APP FIRST. A theme saved in Settings > Appearance is written by
    * `setDeclaration` with no pack behind it, and it is the owner's own answer to how the record looks, so it wins over a
@@ -3979,9 +3975,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * The corners and the row height a declaration's `scale` names, as the custom properties the app reads.
    *
-   * THE HEIGHTS ARE `packages/skin/tokens.css`'s own three, one per density, so a theme that says roomy draws the rows a
-   * person who picked Roomy gets. The kernel's `themeBody` already held each radius to a whole number from 0 to 24 and
-   * the density to its three words, so anything else here is a row written before that check, and it is left out.
+   * THE HEIGHTS ARE `packages/skin/tokens.css`'s own three, one per density, so a theme that says roomy draws the rows
+   * a person who picked the roomy density gets. The kernel's `themeBody` already held each radius to a whole number
+   * from 0 to 24 and the density to its three words, so anything else here is a row written before that check, and it
+   * is left out.
    */
   const themeScale = (body: unknown): Record<string, string> => {
     const out: Record<string, string> = {};
@@ -4033,8 +4030,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           nav: page.nav,
           icon: page.icon,
           list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
-          /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`, M4 wave two brief 5). This
-             map copied four keys and dropped the kernel's fifth, so on his record 72 of 72 rail pages arrived with no
+          /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`). This
+             map copied four keys and dropped the kernel's fifth, so on a large record 72 of 72 rail pages arrived with no
              `about` and the shell drew one entry per project, service and skill where the sample, which has the key,
              draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
           about: page.about,
@@ -4042,7 +4039,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
         /* AN OWNER, AND A TOKEN AN OWNER GAVE THE `inbox` REACH, held to the whole record as `inbox` itself is: the agent
-           set up to triage the arrivals was told `null` about how many there were (S9). */
+           set up to triage the arrivals was told `null` about how many there were. */
         inbox: allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx)) ? kernel.inboxWaiting() : null,
         /* EVERY DECISION THIS CALLER MAY READ, for a screen that reads them a page at a time. Somebody who reads the whole
            record is held back from none, so theirs is the table's count. A member invited to named lists is held back from
@@ -4100,7 +4097,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 
   /**
-   * Where the caller stands, in one read of each thing (`loop/research-agent-path.md` §6.3). It never
+   * Where the caller stands, in one read of each thing. It never
    * writes and never opens a run, and every part is held to what the caller may read.
    *
    * THE PLACE IS RESOLVED AS `attach` RESOLVES IT: from the hints the caller sent, or, when it sent none,
@@ -4133,10 +4130,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /* THE RUNS, when the caller may read them: the newest other one here that left a next step, and
        the others live now. Here is the project, or with no project the repository.
-       A RUN THAT NAMES NO PROJECT BUT THIS REPOSITORY IS HERE TOO. `project` is `KERNEL_WRITTEN`, so a run the Sam
-       Brain import wrote carries only `repo`, and keying on `project` alone answered `handoff: null` in the very
-       repository its next step was left in (`loop/research-agent-first-day.md`, finding 4). A run placed on another
-       project is not here, whatever repository it names. */
+       A RUN THAT NAMES NO PROJECT BUT THIS REPOSITORY IS HERE TOO. `project` is `KERNEL_WRITTEN`, so a run an import
+       wrote carries only `repo`, and keying on `project` alone answered `handoff: null` in the very repository its next
+       step was left in. A run placed on another project is not here, whatever repository it names. */
     const runs = !readable(ctx, SESSION);
     const here = project
       ? repo
@@ -4350,7 +4346,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* ONE TRANSACTION, SO ONE MOMENT. A second connection to the same file, a CLI beside a running
          self-host, could commit between the counts and the feed, and the rail said one row beside a
          feed announcing two. SQLite holds a read transaction to the snapshot of its first read. */
-      /* THE LOOK IS READ IN THE SAME MOMENT AND DRAWN AFTER IT (GAP-3). The row is read inside the transaction with
+      /* THE LOOK IS READ IN THE SAME MOMENT AND DRAWN AFTER IT. The row is read inside the transaction with
          everything else, and solved outside it, because the solve loads `@braindog/theme` on demand and a read
          transaction held open across an `await` is a snapshot another connection's writes wait behind. */
       const [answer, look] = kernel.transaction(() => {
@@ -4383,7 +4379,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * What a register holds, so a caller can write a correct row on the first try.
      *
-     * `blocks` CARRIES EVERY INSTALLED PACK KIND (PLT-8), keyed by its declaration id (`block.<id>`), for
+     * `blocks` CARRIES EVERY INSTALLED PACK KIND, keyed by its declaration id (`block.<id>`), for
      * `RenderOptions.kinds` and `ParseOptions.kinds`; `installedKinds(schema)` in the web reads exactly this.
      * Not narrowed to the register asked for: a page may draw any installed kind, whichever register it names.
      */
@@ -4451,8 +4447,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       args: {
         register: string;
         /* A SENTENCE OR A TREE, AS THE KERNEL TAKES IT. `kernel.list` reads both, and this signature named the tree
-           alone, so the web turned a person's chips into a tree for a record that reads the chips' own words
-           (`loop/finish/architecture.md` ARC-2). */
+           alone, so the web turned a person's chips into a tree for a record that reads the chips' own words. */
         where?: Predicate | string;
         limit?: number;
         cursor?: string | null;
@@ -4527,8 +4522,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
       /* A REF INTO A LIST THE CALLER CANNOT READ NAMES NO ROW, WHETHER OR NOT THE ROW EXISTS. The kernel
          resolves refs and only this layer knows who is asking, so without `reads` a member invited to
-         Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not
-         (audit twenty-two, finding 1). */
+         Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not. */
       return kernel.list({ ...args, reads: (register) => readable(ctx, register) === null }, whereFor(ctx.wheres, args.register));
     },
 
@@ -4691,7 +4685,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * How this BrainDog is arranged, and what may be proposed about it (`loop/research-spark.md` S12).
+     * How this BrainDog is arranged, and what may be proposed about it.
      *
      * ONE READ FOR WHAT AN AGENT NEEDS BEFORE IT PROPOSES AN ARRANGEMENT, and compact, because it is read
      * in a turn: the packs and whether each is on, what else the host offers, the voice and other settings,
@@ -4713,7 +4707,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * What Slash noticed about how this BrainDog is used, and what it would propose (`slash.ts`, `loop/research-spark.md` S15).
+     * What Slash noticed about how this BrainDog is used, and what it would propose (`slash.ts`).
      *
      * AN OWNER'S, IN A BROWSER, because it reads the use of every list, and a token has `arrangement` for what it may propose.
      * It writes nothing and asks no model: each draft says whether it is already a question, and which.
@@ -4866,7 +4860,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * This BrainDog's arrangement as a use-case file somebody else can install (`loop/research-spark.md` S14).
+     * This BrainDog's arrangement as a use-case file somebody else can install.
      *
      * A READ, like `arrangement`, and for the same callers, so the CLI can save one with its token. It carries the
      * modules, the use case's lists and pages, the pages placed by hand, the voice and the labels, and no row unless
@@ -4965,11 +4959,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (typeof args?.slug !== 'string' || !args.slug)
         return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
       /* A PAGE THIS CALLER CANNOT SEE IS A PAGE THAT DOES NOT EXIST, AND `allowed` IS WHAT THEY MAY OPEN.
-         `loop/research-scoped-audit.md` §1 and §6: `pages` hid a page and `page` served it by its slug, so a member invited
-         to Obligations read a diary entry's full text as the title and body of the page made for its row, and an ordinary
-         page's title, prose, a `where` literal and its version off a page over the diary. One wrong slug gave the slugs,
-         each a row title, since the kernel's refusal listed every page and cannot tell who is asking. So a caller who
-         does not read the whole record is answered the way `pages` lists, with one refusal for both cases, and the sentence
+         Measured: `pages` hid a page and `page` served it by its slug, so a member invited to Obligations read a diary
+         entry's full text as the title and body of the page made for its row, and an ordinary page's title, prose, a
+         `where` literal and its version off a page over the diary. One wrong slug gave the slugs, each a row title,
+         since the kernel's refusal listed every page and cannot tell who is asking. So a caller who does not read the
+         whole record is answered the way `pages` lists, with one refusal for both cases, and the sentence
          for a page they cannot see is the sentence for one nobody declared: the kernel's own, asked of a name no slug can
          be (`slugify` leaves no capital and no space) and given back with theirs in it. The owner's answer is the
          kernel's, unchanged: somebody who reads the whole record with no level of their own on any list reads every
@@ -5008,7 +5002,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * A page body nobody has installed, drawn as `page` would draw it once it were: what an agent's proposed page holds,
-     * shown on Decide before anybody accepts it (M4 wave two brief 5).
+     * shown on Decide before anybody accepts it.
      *
      * DECIDE DREW A PROPOSED PAGE AS LINES, its place in the sidebar, the headings of its blocks and the lists it reads,
      * because `page` draws only a declared page and accepting was the one way to see what the blocks would hold. This
@@ -5027,7 +5021,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * AND THE BODY IS THE CALLER'S, WHICH A DECLARED PAGE'S IS NOT, so every word in it is a question she chose. A `where`
      * is answered as `list` answers her (`whereHeld`), a figure as `metric` does (`unplaced`), and what one call may draw
-     * is bounded by `PREVIEW_WALKS_MOST` and the five beside it (audit sixty-six, `test/preview-page-guard.test.ts`).
+     * is bounded by `PREVIEW_WALKS_MOST` and the five beside it (`test/preview-page-guard.test.ts`).
      */
     async previewPage(args: { body?: unknown } | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
@@ -5091,7 +5085,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return { ok: false as const, refusal: JSON.parse(text) as typeof fault };
       }
 
-      /* WHAT ONE PREVIEW MAY COST, ASKED OF THE BLOCKS BEFORE ANY IS DRAWN (audit sixty-six finding 2). The lint holds a
+      /* WHAT ONE PREVIEW MAY COST, ASKED OF THE BLOCKS BEFORE ANY IS DRAWN. The lint holds a
          preview to `page`'s own ceilings, 24 blocks and a walk of 3,650 days, and at those a `read`-level caller's 24 cash
          walks over 2,000 monthly bills ran 128,000 steps each: 15.7 s and 333.8 MB for one call. `page` spends that only
          on a body the owner installed. So a walk past `PREVIEW_HORIZON_MOST` days, or past the first
@@ -5251,7 +5245,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
       /* AND THE CALLER'S OWN WORDS ARE RESOLVED ONLY AGAINST LISTS SHE READS, BY THE KERNEL, AS `list` RESOLVES THEM. The
          member invited to Jobs alone asking `client-jobs:<title>` was answered `ok` for a client on the Clients list she
-         cannot read and REF_UNKNOWN for a title nobody holds, and the same for `clients#1` against `clients#9` (SEC-10).
+         cannot read and REF_UNKNOWN for a title nobody holds, and the same for `clients#1` against `clients#9`.
          The first repair listed twice here and refused all four `FORBIDDEN` in a sentence of its own, because the
          kernel's `metric` took no `reads`: one answer, and not the one her list of Jobs gives for the same words, which
          is `ok` with nothing matched (`test/sight-check.test.ts`). It takes `reads` now, and a ref into a hidden list
@@ -5266,7 +5260,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * Every figure the record declares that this caller may read: its id, its name, how it is written, the list it is
      * over, the pack that declared it and whether it takes a parameter after a colon. Never a reading.
      *
-     * NOTHING LISTED THEM (audit sixty-two finding 2). `metric` answers an id already known, and `pages` and `page` name
+     * NOTHING LISTED THEM. `metric` answers an id already known, and `pages` and `page` name
      * a figure only where a block draws it: on a record holding money-core as it ships that was 18 of the 36 declared,
      * and `late-in`, what is late coming in, was not among the 18. MCP's `record_index` and `resources/list` could name
      * no more than that, so an agent that had not been told an id could not find it.
@@ -5329,16 +5323,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
       if (nestedPast(body.steps ?? body.then))
         return no('OUT_OF_BOUNDS', `This nests a branch more than ${SAID_DEPTH} deep, and 3 is the most a rule may. Lift the inner branch into its own step.`, { at: 'rule.steps' });
-      /* AND A VALUE NESTED PAST ANY RULE'S IS REFUSED BEFORE ANYTHING READS IT (audit thirty-six, finding 8). The branch
+      /* AND A VALUE NESTED PAST ANY RULE'S IS REFUSED BEFORE ANYTHING READS IT. The branch
          cap above let a 20,000-deep array in one `notify.say` through, and it blew the stack in `said`. */
       if (deeperThan(body))
         return no('OUT_OF_BOUNDS', `This body nests more than ${BODY_DEPTH} levels deep, and no rule needs half that. Send the rule as it would be installed.`, { at: 'rule' });
-      /* EVERY OTHER LIST IT REACHES IS GUARDED AS THE ONE IT IS ABOUT, before the kernel is asked (audit thirty-six,
-         finding 6). The kernel's walk looks up each `link` target in its list and says whether one row, none or two bear
-         the value, so a member held to `append` on Money, refused `list money`, read "link payee" for a name that was
-         there and "nothing bears that name" for one that was not. Refused on both paths, so a body cannot be reshaped
-         from `then:` to `steps:` to be answered, and with `guard`'s own sentence, which `list` gives her already. */
-      /* A CREATE ON THE RUN PATH IS HELD TO THE RUNG A CREATE NEEDS, NOT TO READING (`loop/finish/defects.md` A11). The run
+      /* EVERY OTHER LIST IT REACHES IS GUARDED AS THE ONE IT IS ABOUT, before the kernel is asked. The kernel's walk
+         looks up each `link` target in its list and says whether one row, none or two bear the value, so a member held
+         to `append` on Money, refused `list money`, read "link payee" for a name that was there and "nothing bears that
+         name" for one that was not. Refused on both paths, so a body cannot be reshaped from `then:` to `steps:` to be
+         answered, and with `guard`'s own sentence, which `list` gives her already. */
+      /* A CREATE ON THE RUN PATH IS HELD TO THE RUNG A CREATE NEEDS, NOT TO READING. The run
          path is said and not walked (`said`), so nothing of the list a create writes into is looked up, and a member who
          may add rows to Money and not read them was refused the account of her own rule. A `link` still reads its
          target on either path, and a create inside the write is still held to reading, since the kernel's walk runs
@@ -5354,9 +5348,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (!body.register || !Array.isArray(body.then))
         return no('VALUE_MALFORMED', 'A rule names a register and what it would then do.', { at: 'rule' });
-      /* AND A TITLE IN ITS `when` IS LOOKED UP ONLY IN A LIST THE CALLER READS, the line `list` has (audit thirty-eight,
-         finding 1). The guard above cannot see the list a `ref` points at, and the kernel resolved `client is Acme
-         Holdings` in Clients for a member refused Clients: `matches 1 of 1`, where a client no row names said `0 of 1`. */
+      /* AND A TITLE IN ITS `when` IS LOOKED UP ONLY IN A LIST THE CALLER READS, the line `list` has. The guard above
+         cannot see the list a `ref` points at, and the kernel resolved `client is Acme Holdings` in Clients for a
+         member refused Clients: `matches 1 of 1`, where a client no row names said `0 of 1`. */
       const rows = kernel.dryRun(body as RuleDecl, args.limit, { reads: (register) => readable(ctx, register) === null });
       return rows.ok ? ok({ ...rows.value, ...saidOf(body, { answersSlash: deps.answersSlash === true }) }) : rows;
     },
@@ -5382,9 +5376,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const bad = scriptBody({ id: `script.${String(b.script)}`, body: b });
       if (bad) return { ok: false as const, refusal: bad };
       if (!deps.tryScript) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot try a script yet, so nothing ran. Propose it, and the owner reads the source in Decide.');
-      /* THE RUN'S READS, WITH THE CALLER'S AS A FURTHER LIMIT (audit thirty-seven, finding 4). These were the caller's
+      /* THE RUN'S READS, WITH THE CALLER'S AS A FURTHER LIMIT. These were the caller's
          `list` and `get` and nothing else, while a scheduled run reads through the host's `scriptReads`: held to the
-         body's `reads:`, a secret field off every row, a filter on one refused. The audit tried one source by a propose
+         body's `reads:`, a secret field off every row, a filter on one refused. A probe tried one source by a propose
          token and then ran it on its clock: the trial listed Acme's grant id, read `seen#1` outside `reads:` and answered
          a filter on the secret, and the run read none of the three. So the ceiling is narrowed to the lists the body
          reads, and every rule `scriptReads` keeps is kept here in its words, since the record cannot import the host.
@@ -5418,7 +5412,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return row.value === null ? null : unsealed(row.value);
         },
       };
-      /* THE VAULT'S OWN GATE, AND NOT `level === 'owner'` (audit thirty-eight, finding 2). The host opens a key for a
+      /* THE VAULT'S OWN GATE, AND NOT `level === 'owner'`. The host opens a key for a
          trial on `owner` alone, and this said it for any person at owner: a session proved two hours ago, which the
          vault refuses `listGrants` with `NEEDS_BROWSER_SESSION`, tried a draft that sent her key and left a `grant.read`
          in her name. `vault()` is asked, and held to a person, because `allows` lets `system` through everything and
@@ -5428,7 +5422,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const shut = vault(ctx);
       const p = ctx.principal;
       const who = kernel.identity();
-      /* THE DRAFT'S OWN PACK'S SETTINGS, since the record is the only side that can read them (platform PLT-7); a
+      /* THE DRAFT'S OWN PACK'S SETTINGS, since the record is the only side that can read them; a
          script that names no pack, or one this record does not hold, tries with none. */
       const config: Record<string, JsonValue> = typeof b.pack === 'string' ? ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(b.pack)) : {};
       return ok(
@@ -5494,11 +5488,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return ok(
         kernel.digestToday(args?.digest).map((d) => {
           /* A SECTION OVER A FIGURE READS THE FIGURE'S LIST. The kernel reads `metric.<id>` through the metric's own
-             declaration (`digest.ts`), and this kept any source that did not start with `register.`, so §4 of
-             `loop/research-scoped-audit.md` read `Monday: Diary 2` and a reading of 2 off a figure over the diary, while
-             `metric('diary-count')` answered the same member METRIC_UNKNOWN. So the figure's own source is asked, as
-             `metric` asks it, and a figure over no list, or one that is not declared, is kept only for somebody who reads
-             the whole record. A section the kernel wrote about the digest itself (`Not sent`) names no source. */
+             declaration (`digest.ts`), and this kept any source that did not start with `register.`, so a member read
+             `Monday: Diary 2` and a reading of 2 off a figure over the diary, while `metric('diary-count')` answered
+             the same member METRIC_UNKNOWN. So the figure's own source is asked, as `metric` asks it, and a figure over
+             no list, or one that is not declared, is kept only for somebody who reads the whole record. A section the
+             kernel wrote about the digest itself (`Not sent`) names no source. */
           const sections = d.sections.filter((s) => {
             /* AND EVERY LIST THE FIGURE READS, not its source alone (`figureLists`), as `metric` asks. */
             const decl = s.source.startsWith('metric.') ? kernel.metricDecl(s.source.slice('metric.'.length)) : null;
@@ -5544,8 +5538,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const asked = args?.upTo === undefined ? null : await cursorOf(ctx, args.upTo, 'upTo');
       if (asked !== null && typeof asked !== 'number') return { ok: false as const, refusal: asked };
       /* AND THE MARK LANDS ON AN EVENT THE CALLER MAY SEE. The answer is that event's own `ts`, so marking a hidden
-         event handed a member invited to one list the exact time the owner wrote in another, one rowid per call; the
-         audit read a diary write's instant this way. So `upTo` is walked down to the newest event at or below it that
+         event handed a member invited to one list the exact time the owner wrote in another, one rowid per call; a
+         probe read a diary write's instant this way. So `upTo` is walked down to the newest event at or below it that
          `lineOf` shows this caller, which is the same sight `whatsNew` answers with, and a caller who can see nothing
          there keeps the mark they had. For an owner the first event walked is the one asked for, so nothing moves. */
       const landed = walk(ctx, (asked ?? kernel.newestEvent()) + 1, 1, 1).lines[0] ?? null;
@@ -5853,7 +5847,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * Someone met in the work: matched by email or handle, or added, with where they were met, and linked to
-     * the project of the caller's run (`loop/research-agent-path.md` §5.6). Needs `propose` on the list it writes.
+     * the project of the caller's run. Needs `propose` on the list it writes.
      *
      * THE KERNEL WRITES AS THE CALLER'S RUN, found by the ladder as every token write is, so the person is
      * signed by the run and placed in its project. A person in the app is never a run, and links none.
@@ -5908,8 +5902,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with.', { at: 'cursor' });
       /* A CURSOR ON A ROW YOU MAY NOT SEE IS ANSWERED AS ONE ON NO ROW AT ALL. The kernel resolves the cursor over the
          whole table before this ceiling runs, so a member scoped to one list could ask for `SG<n>` a number at a time
-         and read which ones exist, which is how many questions and decisions the record holds (research-scoped-audit
-         §7). The sentence is the kernel's own, byte for byte, so the two answers cannot be told apart. */
+         and read which ones exist, which is how many questions and decisions the record holds. The sentence is the
+         kernel's own, byte for byte, so the two answers cannot be told apart. */
       if (cursor !== undefined) {
         const at = kernel.governanceRow(register, cursor);
         if (at && holds(ctx, at)) return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with. Start from the first page.', { at: 'cursor' });
@@ -5993,10 +5987,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const given = String(args.id);
       args = { ...args, id: spokenIn(given) };
       /* A QUESTION YOU MAY NOT SEE IS ONE YOU MAY NOT ANSWER, and it is answered as a missing one is, in the words the
-         kernel uses and with the id as the caller gave it. No suggestion asked this before audit thirty-seven: the
-         member held to `append` on Money read the run's question nowhere she was entitled to, decided it by its number,
-         and woke the run. Not through `settledAs`, which would swap the number for the question's handle and so say
-         that it exists. */
+         kernel uses and with the id as the caller gave it. Nothing asked this before: a member held to `append` on
+         Money read the run's question nowhere she was entitled to, decided it by its number, and woke the run. Not
+         through `settledAs`, which would swap the number for the question's handle and so say that it exists. */
       const target = kernel.governanceRow('suggestion', String(args.id));
       if (target && holds(ctx, target)) return no('OUT_OF_BOUNDS', `There is no suggestion called ${given}.`, { at: 'id' });
       const run = target && args.decide !== undefined ? ruleAsked(target) : null;
@@ -6029,23 +6022,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (owner) return { ok: false as const, refusal: owner };
         }
         /* AND A CHANGE OR A PATTERN THAT INSTALLS WHAT RUNS UNATTENDED, ALONE OR IN A BUNDLE, IS HELD TO THE DOOR
-           `setDeclaration` IS. A rule, a script, a digest or an ingest is what runs while nobody is looking, and installing
-           one that asks Slash or calls out is the owner's consent to it going out on the owner's key. Audit forty-nine
-           (finding 3) had a colleague at `decide` refused `setDeclaration` `LEVEL_REQUIRED`, propose the same rule, accept
-           it herself, and the next row's question went out keyed (`test/accept-rule-level.test.ts`); audit fifty-one
-           (finding 1) did the same with the other three kinds once rules were held (`test/accept-unattended.test.ts`).
-           Held to every one and not only one that asks or calls out, as ADR-060 states it; a narrower door is a decision
-           for the owner, not for this line. */
+           `setDeclaration` IS. A rule, a script, a digest or an ingest is what runs while nobody is looking, and
+           installing one that asks Slash or calls out is the owner's consent to it going out on the owner's key. A
+           colleague at `decide` refused `setDeclaration` `LEVEL_REQUIRED` could propose the same rule, accept it
+           herself, and the next row's question went out keyed (`test/accept-rule-level.test.ts`); the same held for the
+           other three kinds once rules were held (`test/accept-unattended.test.ts`). Held to every one and not only one
+           that asks or calls out, as ADR-060 states it; a narrower door is a decision for the owner, not for this
+           line. */
         if (runsUnattended(kind, asked?.body)) {
           const owner = admin(ctx, 'accept a change to what runs while nobody is looking');
           if (owner) return { ok: false as const, refusal: owner };
         }
-        /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE VAULT AS IT IS NOW. A script's line names
-           the host its key's vault entry opens, read when the change was filed, and nothing read it again: the audit of
-           wave thirty-eight (finding 4) filed "key "goldapi" to api.goldapi.io", replaced the entry with one that opens
-           `collector.test`, and the accept installed a script whose key went to `collector.test`. A pack's plan is
-           refused `PLAN_STALE` for the same drift (`arrange.ts`), and so is this. It is asked before the kernel decides,
-           so nothing is decided and the question stays open (`test/change-script-stale.test.ts`). */
+        /* THE SCRIPT LINES THE OWNER IS PRESSING ARE WORKED OUT AGAIN, WITH THE VAULT AS IT IS NOW. A script's line
+           names the host its key's vault entry opens, read when the change was filed, and nothing read it again: a
+           probe filed "key "goldapi" to api.goldapi.io", replaced the entry with one that opens `collector.test`, and
+           the accept installed a script whose key went to `collector.test`. A pack's plan is refused `PLAN_STALE` for
+           the same drift (`arrange.ts`), and so is this. It is asked before the kernel decides, so nothing is decided
+           and the question stays open (`test/change-script-stale.test.ts`). */
         if (kind === 'change') {
           const stale = staleScriptLines(asked?.body);
           if (stale.length > 0)
@@ -6054,7 +6047,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
       /* AN ACCEPTED RETYPE OR NARROWING LANDS HERE, when the owner accepts it rather than the caller who filed it
-         (GAP-8): `govern.decide` hands back `retype` in place of `install`, since it stages the list's next version
+         `govern.decide` hands back `retype` in place of `install`, since it stages the list's next version
          through the pack path rather than an ordinary declaration write, and `landRetype` is the one place both
          `decide` and `retypeField`'s own accept call it from. Reopens the question with its own sentence when it will
          not land, as every other kind that lands late does. */
@@ -6111,7 +6104,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * a record that moved and a pack that was edited between the plan and the install are both
      * `PLAN_STALE` — and the second one is the case no version number can see.
      *
-     * AND WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS (`loop/research-scheduled-actions.md` §5). A plan whose
+     * AND WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS. A plan whose
      * `calls_out` has a `new` or `changed` action carries `approve`, the lines for them, and the install arms them only
      * when `approve` hands back exactly those lines. The same call, not a proposal, because only an owner in a browser
      * reaches here and the install is already one transaction: filing a proposal would half-install a pack whose rules
@@ -6183,7 +6176,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * Start a paused scheduled action again, now: a `pull`, `call` or `poll` (`loop/DIRECTION.md` §0b).
+     * Start a paused scheduled action again, now: a `pull`, `call` or `poll`.
      *
      * THE ONLY WAY ONE STARTS AGAIN. A 401 or a 403 pauses an action rather than retrying it, because retrying
      * a refused key against somebody's auth endpoint is how an account gets locked, and the owner is told when
@@ -6199,7 +6192,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * Start a script paused by three refused runs again, now (`loop/DIRECTION.md` §22).
+     * Start a script paused by three refused runs again, now.
      *
      * GUARDED EXACTLY AS `resumeAction` IS, for its reason: a script refused three times in a row fails the same
      * way on every run, so running it again is a decision a person makes, in a browser, after reading why.
@@ -6215,7 +6208,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /**
      * Every scheduled action: what it calls and how often, its state, its last run, its next run, and this month's
-     * counts from its own `pull` events (`loop/research-scheduled-actions.md` §4.6). READ+.
+     * counts from its own `pull` events. READ+.
      *
      * A KEY BY ITS LABEL. The list is built from the schedule, the vault's index and the run events, and nothing
      * sealed is read to build it, so a token that may read the record may read this.
@@ -6227,7 +6220,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * Every automation, or one with its last ten runs and each step's outcome (`loop/research-shell-automations.md` §5).
+     * Every automation, or one with its last ten runs and each step's outcome.
      * READ+, and what the canvas and `braindog:automation/<id>` both draw from.
      *
      * HELD TO WHAT THE CALLER MAY READ, ONE AUTOMATION AT A TIME. A rule is shown to whoever may read every list its body
@@ -6239,7 +6232,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * EVERY LIST IT TOUCHES, AND NOT THE LIST ITS ROW LIVES IN. This asked `readable` of that one list, so a rule about
      * Inbox rows whose step creates a Money row paying Omar 91000 was listed and opened in full for the member invited
      * to Inbox alone and for the member held to `append` on Money, while `governance` held the change to the same rule
-     * from both (SEC-4). It is `sees` over the kernel's walk now, the question Decide asks, so an arrival rule is placed
+     * from both. It is `sees` over the kernel's walk now, the question Decide asks, so an arrival rule is placed
      * by the list its door writes (`rowRegisterOf`), as Decide places it, where this read it as a rule with no row.
      */
     async automations(args: { rule?: string; before?: string; limit?: number } | undefined, ctx: CallContext) {
@@ -6249,8 +6242,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (extra) return { ok: false as const, refusal: extra };
       const shown = (id: string, body: Record<string, unknown>): boolean => sees(ctx, liveTouches(id, body));
       const named = args?.rule;
-      /* `before` AND `limit` PAGE ONE RULE'S RUNS, AND ONLY THAT (`loop/finish/contracts.md` §2.2, X10). The list of every
-         automation carries no runs to page, so either key without `rule` is a key this call does not take there. */
+      /* `before` AND `limit` PAGE ONE RULE'S RUNS, AND ONLY THAT. The list of every automation carries no runs to
+         page, so either key without `rule` is a key this call does not take there. */
       if (named === undefined) {
         for (const key of ['before', 'limit'] as const)
           if (args?.[key] !== undefined)
@@ -6288,10 +6281,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * touch Money is not told to somebody held to `append` there.
      *
      * A SCRIPT THAT TOUCHES NO LIST IS SHOWN WHERE A RULE WITH NO ROW IS, to a caller who reads every list, and it was
-     * shown to any reader (`loop/BACKLOG.md`, left by wave thirty-eight). `[].every` is true, so a clock script's title,
-     * the hosts it calls and the label of the key it opens reached the member held to `append` on Money and a member
-     * invited to one list, both of whom `automations` refuses the clock rule beside it. What a script about no list says
-     * is about the record as a whole, which is the rule `holds` keeps for a question about no list.
+     * shown to any reader. `[].every` is true, so a clock script's title, the hosts it calls and the label of the key
+     * it opens reached the member held to `append` on Money and a member invited to one list, both of whom
+     * `automations` refuses the clock rule beside it. What a script about no list says is about the record as a whole,
+     * which is the rule `holds` keeps for a question about no list.
      */
     async scripts(args: Record<string, never> | undefined, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
@@ -6309,10 +6302,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Run an automation now: the canvas's Run now, and the `manual` trigger's only door.
      *
-     * AN OWNER'S, IN A BROWSER, AS `installPack` IS. A run writes rows as the rule, notifies and, once Brief C lands,
-     * calls out, so pressing it is a decision a person makes. An agent that wants one run proposes the rule and waits for
-     * the owner, or writes the row a write trigger listens for. Which rules have a button is the kernel's to say: only
-     * one that declares `on: { manual: true }`.
+     * AN OWNER'S, IN A BROWSER, AS `installPack` IS. A run writes rows as the rule, notifies and calls out, so pressing
+     * it is a decision a person makes. An agent that wants one run proposes the rule and waits for the owner, or writes
+     * the row a write trigger listens for. Which rules have a button is the kernel's to say: only one that declares
+     * `on: { manual: true }`.
      */
     async automationRun(args: { rule: string }, ctx: CallContext) {
       const stop = admin(ctx, 'start an automation');
@@ -6680,9 +6673,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args.person === undefined) {
         const found = await kernel.lookInvitation(args.token);
         if (!found.ok) return found;
-        /* WHAT THE LINK OPENS, SAID BEFORE ANYBODY ACCEPTS (`loop/finish/platform.md` §4.0 M): the record's own name, what it
-           gives on the whole record, and each list by its name with what it gives there. A list removed since the link was
-           minted is left out, so no id reaches the page. */
+        /* WHAT THE LINK OPENS, SAID BEFORE ANYBODY ACCEPTS: the record's own name, what it gives on the whole record,
+           and each list by its name with what it gives there. A list removed since the link was minted is left out, so
+           no id reaches the page. */
         const { email, expires_at, level, registers } = found.value;
         return ok({
           email,
@@ -6724,7 +6717,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
-      /* ONE VERB BOTH WAYS, AND THE WAY IS SAID (`loop/finish/contracts.md` X11). A missing `suspended` meant stop, so a page
+      /* ONE VERB BOTH WAYS, AND THE WAY IS SAID. A missing `suspended` meant stop, so a page
          that meant to let somebody back in and dropped the field stopped them instead. */
       if (typeof args.suspended !== 'boolean') return no('REQUIRED_MISSING', 'Stop them, or let them back in?', { at: 'suspended' });
       return tail(kernel.suspendMember(actorOf(ctx), args.person, args.suspended));
@@ -6963,13 +6956,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          The rows still travel under redaction: labels, what each key opens, its kind, its rotation
          dates and its scopes. What is missing is the bytes.
 
-         A RECORD WITH NO VAULT HAS NO BYTES TO GUARD, SO THE FULL FILE IS NOT BARRED. This refused
-         every such record `WRONG_KEY` with "This record has no vault", and there is no key it could
-         have been given, so `braindog export`, which asks for the full file so a backup can put the
-         record back, could not take one at all (wave fifty-five's checker; `brainfile-novault.test.ts`
-         in the CLI). "No vault" is the replacing import's own two counts, no `vault_key` row and no
-         grant holding a `ciphertext`: a record with a sealed credential and no key row is not waved
-         through on the strength of the missing row.
+         A RECORD WITH NO VAULT HAS NO BYTES TO GUARD, SO THE FULL FILE IS NOT BARRED. This refused every such record
+         `WRONG_KEY` with "This record has no vault", and there is no key it could have been given, so
+         `braindog export`, which asks for the full file so a backup can put the record back, could not take one at all
+         (`brainfile-novault.test.ts` in the CLI). "No vault" is the replacing import's own two counts, no `vault_key`
+         row and no grant holding a `ciphertext`: a record with a sealed credential and no key row is not waved through
+         on the strength of the missing row.
 
          A VAULT WHOSE KEY HAS NO ID is one wrapped by a passphrase (`vault_key.kek_id` is null there),
          and it used to be told it had no vault. It is refused at `vault_key` rather than `kek_id`, so
@@ -7236,7 +7228,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * (`heldDigest`, which deletes it). Both store every arrival `untriaged` and match none of them:
      * `12 §3` applied to a verifier nobody can check, which is better than treating the URL as proof.
      *
-     * A SIGNED DOOR IS ANSWERED WITH ITS KEY OPENED, AND ONLY THROUGH `open` (DOR-3). The key is the live vault entry
+     * A SIGNED DOOR IS ANSWERED WITH ITS KEY OPENED, AND ONLY THROUGH `open`. The key is the live vault entry
      * the declaration's `key:` names, chosen as every action chooses one (`grantChosen`, the newest), and `open` is the
      * host's opener, which writes the `grant.read` that is the audit trail of every check. No opener, no key under that
      * label, or a key that does not open are all `none`: the arrival is stored `untriaged` and matches nothing, which
@@ -7282,8 +7274,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async ingestMint(args: { ingest: string }, ctx: CallContext): Promise<Result<{ ingest: string; token: string; rec: string | null; path: string | null }>> {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
-      /* THE FIX NAMES THE SERVER KEY AND NOTHING ELSE THAT IS CALLED A TOKEN. It said "Sign in, or send BRAINDOG_TOKEN"
-         until the checker read it against the line above: `credentialed: false` is a self-host started without that
+      /* THE FIX NAMES THE SERVER KEY AND NOTHING ELSE THAT IS CALLED A TOKEN. It said "Sign in, or send
+         BRAINDOG_TOKEN", which the line above contradicts: `credentialed: false` is a self-host started without that
          variable, so there is no value to send and nobody can sign in, and the agent token a client keeps under the
          same name is refused by `admin` before this is reached. `bearerFor` in `apps/selfhost/src/server.ts` maps the
          server key to the owner with `credentialed: true`, which is the one caller this check lets through. */
@@ -7319,7 +7311,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const token = webhookSecret();
       const digest = await sha256Hex(token);
       const key = ingestTokenKey(ingest);
-      /* AND THE MINT IS AN EVENT, NAMING THE DOOR AND WHO MINTED IT (defects S5). A token that decides which rows
+      /* AND THE MINT IS AN EVENT, NAMING THE DOOR AND WHO MINTED IT. A token that decides which rows
          come in at `exact` was made and replaced with nothing in the log, so the owner could not say who opened a
          door or when. `grant.add` for the first, `grant.rotate` for one that replaces a digest already held, both
          existing kinds; the event carries the door's id and never the token or its digest, and it is written in
@@ -7338,7 +7330,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       });
       /* AND THE ADDRESS, BECAUSE NOTHING ELSE ANSWERED IT. `whoami` and `boot` carry no record id, so the screen that
          showed this token could not build the URL it goes in, and on a live record the owner's press never yielded
-         one (`loop/research-shell-doors.md` §3c). `<rec>` is `kernel.identity().id` because that is what both hosts
+         one. `<rec>` is `kernel.identity().id` because that is what both hosts
          route by: the self-host compares the segment to it, and the Worker reaches the object `provision` created under
          the same id it wrote there. A record with no identity yet has no address, and says `null` rather than guess. */
       const rec = kernel.identity()?.id ?? null;
@@ -7350,7 +7342,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * Every live webhook door this record declares, for the screen that mints their tokens. ADMIN, routed as `/api/doors`.
      *
      * THE APP NAMED THE ONE DOOR IT COULD SHOW. `shortcut-door.ts` held `bank-from-out-sms` as a constant, so a door a
-     * person or an agent declared at run time (DIRECTION §22) had no screen at all. The record lists them instead.
+     * person or an agent declared at run time had no screen at all. The record lists them instead.
      *
      * `held` SAYS WHETHER A TOKEN IS GOOD FOR IT, AND NEVER WHAT THE TOKEN'S DIGEST IS. The digest is what the `/in/*`
      * door compares against, so answering it here would hand the verifier to a screen that has no use for it. `held`
@@ -7454,12 +7446,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * its kind, and for a new key its project. A key already there, named outright or found by its label within
      * reach, rotates its grant rather than becoming a second row saying the same thing.
      *
-     * AND A THIRD CALLER, WHICH ADDS AND NEVER REPLACES: an agent's login token at `/api/vault/deposit`
-     * (`loop/finish/agents.md` C1), admitted only when the host passes `agentDeposit`, which it sets on that one path
-     * and never from anything in a request. The token needs `write` on the keys list; the key goes to the project its
-     * run is in, or to no project when the run is in none, and it is signed by that run. A label already within that
-     * reach is refused, because replacing a value is rotation and rotation still needs a vault grant or the owner: a
-     * login token that leaks can add a key and can never swap one.
+     * AND A THIRD CALLER, WHICH ADDS AND NEVER REPLACES: an agent's login token at `/api/vault/deposit`, admitted only
+     * when the host passes `agentDeposit`, which it sets on that one path and never from anything in a request. The
+     * token needs `write` on the keys list; the key goes to the project its run is in, or to no project when the run is
+     * in none, and it is signed by that run. A label already within that reach is refused, because replacing a value is
+     * rotation and rotation still needs a vault grant or the owner: a login token that leaks can add a key and can
+     * never swap one.
      */
     async depositGrant(
       args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: unknown },
@@ -7495,7 +7487,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             at: args?.project !== undefined ? 'project' : 'credential',
           });
       }
-      /* WHICH DATA KEY THE VALUE IS SEALED UNDER (DOR-2). This picks it, never the caller's body read as anything but
+      /* WHICH DATA KEY THE VALUE IS SEALED UNDER. This picks it, never the caller's body read as anything but
          the one other word: an agent's login token deposits its own run's key, sealed under the record's, and never
          one for a scheduled connector, whatever it sends. */
       const under = args.sealed_under === 'connector' ? 'connector' : 'record';
@@ -7723,7 +7715,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * none, so it cannot be held to a register the way the log is: a caller who may not read the whole record reads none
      * of it. The refusal is `FORBIDDEN` for all of them, and the sentence says which of the three it was.
      *
-     * THE `inbox` REACH IS THE ONE WAY PAST `owner` (pick P2, `loop/DIRECTION.md` section 30). Measured before it: a
+     * THE `inbox` REACH IS THE ONE WAY PAST `owner`. Measured before it: a
      * token for the whole record, minted by the owner for an agent, was refused "This needs owner, and no token reaches
      * it" in every state, so arrivals an agent was meant to triage had no reader but the owner in a browser. It admits
      * a token and nothing else, whose person is an owner TODAY, since a token never outlives its holder's access, and the
@@ -7877,7 +7869,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const title = kernel.register(row.register)?.title;
           return [{ register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank: hit.rank }];
         }),
-        /* THE TOTAL IS NOT NARROWED THE SAME WAY (COL-9): `fts.searchMatched` counts every live row of a register
+        /* THE TOTAL IS NOT NARROWED THE SAME WAY: `fts.searchMatched` counts every live row of a register
            this caller may read, and a caller whose grant is further narrowed by a `where` sees a figure over the
            whole register beside a page that is already narrowed. The hits above never name a row outside the
            `where`; the count naming how many there might be is the known gap left here. */
@@ -7910,9 +7902,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
     ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted }),
-    /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/` (`loop/finish/contracts.md` §2.8): the owner's, in a
-       browser, and a runner's, for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin`
-       as every ADMIN method here is, and a runner's admit the one principal every guard above refuses. */
+    /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
+       for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
+       here is, and a runner's admit the one principal every guard above refuses. */
     ...jobMethods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock }),
     /* AND `previewChange`, WHICH IS UNDER `methods/` BUT SPREAD HERE, as `jobs.ts` is, because it is handed the functions
        above that hold a page to its reader as well as the guards: a change is drawn through `page`'s own reader and held

@@ -1,8 +1,8 @@
 /**
  * `script`: the ninth kind of declaration, checked where it is written and fired into one outbox row.
  *
- * `loop/research-shell-scripts.md` Brief 2, and DIRECTION section 22: a person's or an agent's code, run on a clock,
- * from a door or from a rule, writing through the record's own create and update path.
+ * A person's or an agent's code, run on a clock, from a door or from a rule, writing through the record's own create
+ * and update path.
  *
  * THE RECORD NEVER RUNS IT. A fire writes ONE `script.run` outbox row carrying the script's id, the version it fired
  * under and its input, and nothing else. A host leases the row, runs the source in a sandbox that holds nothing but
@@ -15,7 +15,7 @@
  * THE CEILINGS LIVE HERE, BELOW THE SANDBOX, SO INSTALL CAN REFUSE WHAT A RUN WOULD. `@braindog/script` is rank 12 and
  * the kernel rank 7 (`31-STACK` section 2), so the kernel may not import the sandbox's numbers, and this file used to
  * check only a header's shape: a script asking for more than a ceiling installed, was put in front of the owner to
- * approve, and was then refused `OUT_OF_BOUNDS` by `checkDecl` at every run (defects A10). So `SCRIPT_CEILINGS` and
+ * approve, and was then refused `OUT_OF_BOUNDS` by `checkDecl` at every run. So `SCRIPT_CEILINGS` and
  * `SCRIPT_SOURCE_BYTES` are the record's, and a header over one is refused before anybody is asked to approve it. The
  * sandbox keeps its own `CEILINGS` because it depends on no package, and `packages/mcp/test/script.test.ts` holds its
  * numbers, the grammar's and these to one another.

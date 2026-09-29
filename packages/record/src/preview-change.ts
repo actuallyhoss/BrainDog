@@ -20,8 +20,6 @@
  * page with (`Holding`), never a copy of them. Everything a change names outside its page blocks must be a list she
  * reads, asked before the lint so that the lint's sentence is never how she learns which lists this record keeps; and
  * a rule, a script or a door runs across the whole record, so only somebody who reads all of it may try one.
- *
- * `loop/finish/contracts.md` §2.4 is the shape; `loop/finish/pages.md` C2 the reasons.
  */
 
 import type { Refusal, Result } from '@braindog/ports';
@@ -44,7 +42,7 @@ import {
 import type { CallContext } from './index.ts';
 import { PREVIEW_BYTES_MOST, PREVIEW_CURRENCIES_MOST, PREVIEW_HORIZON_MOST, PREVIEW_ROWS_MOST, PREVIEW_WALK_ROWS_MOST, PREVIEW_WALKS_MOST } from './index.ts';
 
-/** The most declarations one preview installs in its rehearsal (`loop/finish/contracts.md` §2.4). */
+/** The most declarations one preview installs in its rehearsal. */
 export const PREVIEW_DECLARATIONS_MOST = 12;
 /** The most sample rows one list is given in a preview. */
 export const PREVIEW_SAMPLE_ROWS_A_LIST = 20;

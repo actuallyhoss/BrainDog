@@ -1,9 +1,9 @@
 /**
  * `ring` and `heat` over a register, not only over the rows an author wrote into the fence.
  *
- * Both kinds landed drawing authored rows only (M4 wave two, brief 2), and both already took a `source:`, because
- * every kind does. What a register answered them was the ordinary list read, and it was wrong for both, measured on
- * this record before the change:
+ * Both kinds landed drawing authored rows only, and both already took a `source:`, because every kind does. What a
+ * register answered them was the ordinary list read, and it was wrong for both, measured on this record before the
+ * change:
  *
  *   `heat`  sixty rows on sixty distinct days answered FIFTY rows, `matched: 60` and no refusal. A heat grid adds
  *           the rows on one day together, so the ten it never read were ten days drawn as gaps, with nothing on the
@@ -178,13 +178,13 @@ test('and a ring an author wrote out is still the rows of its own fence', async 
   sql.close();
 });
 
-/* ── which clause is the whole (DIRECTION §25) ───────────────────────────
-   THE CHECKER REFUSED THE FIRST CUT OF `ringOf` ON THIS MEASUREMENT: a list of 100 tasks, 4 on the work list with 2
-   of them done and 96 at home, and a ring saying `list is work, state is done` drew 2%, where the work list is half
-   done. The owner's call is that the whole is every row the block's scope admits (the page's project when it
-   inherits, else the list), the `where` is the part, and a block that wants another whole says so with `of:`. So the
-   2% stands for the block as written, and the half is one `of:` away. Before the fix `of:` was a key the record did
-   not read, and the ring drew 2 of 100 with a refusal beside it. */
+/* ── which clause is the whole ─────────────────────────────────────────── THE FIRST CUT OF `ringOf` WAS REFUSED ON
+   THIS MEASUREMENT: a list of 100 tasks, 4 on the work list with 2 of them done and 96 at home, and a ring saying
+   `list is work, state is done` drew 2%, where the work list is half done. The owner's call is that the whole is every
+   row the block's scope admits (the page's project when it inherits, else the list), the `where` is the part, and a
+   block that wants another whole says so with `of:`. So the 2% stands for the block as written, and the half is one
+   `of:` away. Before the fix `of:` was a key the record did not read, and the ring drew 2 of 100 with a refusal beside
+   it. */
 
 const LISTED: Declaration = {
   id: 'register.chores',
@@ -241,9 +241,8 @@ test('the part is always inside the whole: a where that repeats the of: counts t
 
 test('THE PART IS COUNTED INSIDE THE WHOLE even when the where alone would reach past it', async () => {
   /* A DONE HOME CHORE IS WHAT TELLS THE TWO APART. On the hundred above every home chore is open, so a part counted
-     from the `where` alone and a part counted inside the `of:` both answer 2, and the checker measured that dropping
-     the `of:` from the part left every test green. With one home chore done, the part read alone is 3 of 4, a work
-     list more done than it is. */
+     from the `where` alone and a part counted inside the `of:` both answer 2, and dropping the `of:` from the part left
+     every test green. With one home chore done, the part read alone is 3 of 4, a work list more done than it is. */
   const { k, sql } = await chores({ kind: 'ring', heading: 'Work done', source: 'register.chores', where: 'state is done', of: 'list is work' });
   assert.ok(k.create('chores', { what: 'Home done', list: 'home', state: 'done' }, { actor: 'p_1' }).ok);
   assert.deepEqual(cells(first(k)).slice(1), [2, 4], 'a done home chore was counted as part of the work list');

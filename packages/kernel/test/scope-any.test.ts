@@ -1,10 +1,10 @@
 /**
  * A parameter inside a sentence's `, or` group is not the figure's scope, and `fill` took it for one.
  *
- * THE SENTENCE LEARNED `, or` (M4 wave two brief 7) AND `scopeOf` STILL SPLIT IT ON THE COMMA. It keeps the clauses that
- * carry `{{it}}` as `within`, which is right for a conjunction and wrong for an alternative: under an "or" the parameter
- * widens the rows rather than cutting the register down, which is exactly why the tree form's `any` branch answers
- * nothing. Measured before the repair, over the five obligations below with Halden as the parameter:
+ * THE SENTENCE LEARNED `, or` AND `scopeOf` STILL SPLIT IT ON THE COMMA. It keeps the clauses that carry `{{it}}` as
+ * `within`, which is right for a conjunction and wrong for an alternative: under an "or" the parameter widens the rows
+ * rather than cutting the register down, which is exactly why the tree form's `any` branch answers nothing. Measured
+ * before the repair, over the five obligations below with Halden as the parameter:
  *
  *   party is {{it}}, or state is paid    rows 2, held 1     a reading that holds fewer rows than it matched
  *   state is paid, or party is {{it}}    FIELD_UNKNOWN      `within` was ` or party is Halden`, and `or party` is no field

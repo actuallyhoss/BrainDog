@@ -37,7 +37,7 @@ export type Scope = (typeof SCOPES)[number];
  * `test/token-reach.test.ts` pins this one.
  *
  * `inbox` IS THE MONEY INBOX: an owner's whole-record token that carries it reads `inbox`, which is otherwise the
- * owner's alone (DIRECTION section 30, P2). It opens that read and nothing beside it.
+ * owner's alone. It opens that read and nothing beside it.
  */
 export const TOKEN_REACHES = ['inbox'] as const;
 export type TokenReach = (typeof TOKEN_REACHES)[number];

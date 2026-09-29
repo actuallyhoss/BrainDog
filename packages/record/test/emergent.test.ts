@@ -1,5 +1,5 @@
 /**
- * The holding pen on `boot`, and the preferences that steer it (`loop/finish/pages.md` PGS-8, contracts §7.3 and §7.4).
+ * The holding pen on `boot`, and the preferences that steer it.
  *
  * WHAT IS HELD: a list with a row and no page reading it is offered one page, whole, which passes the lint accepting it
  * would meet, over every list the seed installs; its table never draws a secret; a dismissal is never answered again;
@@ -114,9 +114,9 @@ test('A LIST WITH ROWS AND NO PAGE IS OFFERED ONE WHOLE PAGE, its figure first, 
   for (const item of pen) assert.equal(api.kernel.lint([asDecl(item)]), null, `${item.id} would be refused on accepting`);
 
   /* ACCEPTED, IT IS A PAGE, and the pen stops offering it as a whole page because a page now reads the list. Parts
-     still puts a day on every row in `bought`, indexed, and the derived page drew no calendar of them, so PGS-17's
-     block item is offered beside `page:bins`: a second, later suggestion over the same list is not the whole page's
-     to refuse (`emergent-blocks.test.ts` holds that item's own shape). */
+     still puts a day on every row in `bought`, indexed, and the derived page drew no calendar of them, so a block item
+     is offered beside `page:bins`: a second, later suggestion over the same list is not the whole page's to refuse
+     (`emergent-blocks.test.ts` holds that item's own shape). */
   value(await api.kernel.install([asDecl(parts)]));
   const after = (await bootOf(api, owner)).pen;
   assert.deepEqual(

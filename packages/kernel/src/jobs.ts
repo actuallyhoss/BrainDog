@@ -1,8 +1,8 @@
 /**
  * `job`: the tenth kind of declaration, and the queue a machine the owner enrolled claims its runs from.
  *
- * `loop/finish/agents.md` C13, and `loop/DIRECTION.md` section 30, P3: a job is a run of Claude Code on the owner's own
- * machine, under the owner's own subscription, started from the record and watched in it (`33 §11`, `46 §4.7`).
+ * A job is a run of Claude Code on the owner's own machine, under the owner's own subscription, started from the record
+ * and watched in it (`33 §11`, `46 §4.7`).
  *
  * A KIND IS APPROVED ONCE, AND A RUN NAMES ONE. What a run may do (its prompt, the tools it may use, the folder it works
  * in, how many turns it takes and how it asks) is a `job.<id>` declaration, installed through the ordinary `change`
@@ -59,11 +59,11 @@ export const JOB_IDLE_MS = 1_500;
  */
 export const JOB_MCP_PATH = '/mcp';
 
-/** The most turns a kind may give one run (C13). */
+/** The most turns a kind may give one run. */
 export const JOB_TURNS_MOST = 40;
 /** The most arguments a kind may take. Each is one line a person types in, so a long form is a different design. */
 export const JOB_ARGS_MOST = 8;
-/** The most characters one argument may hold, whatever its kind declares (C13's `max: 64`). */
+/** The most characters one argument may hold, whatever its kind declares. */
 export const JOB_ARG_CHARS_MOST = 64;
 /** The most characters in an argument's label, the words beside the one line a person types it into. */
 export const JOB_ARG_LABEL_CHARS_MOST = 40;

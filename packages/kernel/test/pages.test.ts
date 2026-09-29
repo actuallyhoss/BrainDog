@@ -1,10 +1,9 @@
 /**
  * The three things a page did in the browser and not in the kernel.
  *
- * `apps/web` holds a second implementation of the page runner, and `loop/research-phase1-map.md`
- * marked it for deletion. It could not be deleted: three behaviours lived only there, so removing
- * the copy would have removed the behaviour. They are here now, which is what makes the copy
- * removable rather than load-bearing.
+ * `apps/web` holds a second implementation of the page runner, which was marked for deletion. It could not be deleted:
+ * three behaviours lived only there, so removing the copy would have removed the behaviour. They are here now, which is
+ * what makes the copy removable rather than load-bearing.
  *
  *   `when:`     `06 §1.1` publishes it. The kernel drew every block unconditionally, so the two
  *               implementations disagreed about which blocks are on a page.

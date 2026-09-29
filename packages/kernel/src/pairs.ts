@@ -1,10 +1,10 @@
 /**
  * THE TWO LEGS OF A TRANSFER, FOUND AND MARKED, AND UNMARKED WHEN THEY STOP BEING ONE.
  *
- * Money moved between two of one person's own accounts is written as two rows, one leaving and one arriving, and a ledger
- * that reads each as it stands counts the move twice: once as spend and once as income. An import writes every such move
- * that way (`loop/research-living-in-it.md` section 4.1), and every Ledger figure says `transfer is false`, so until both
- * legs were marked by hand the month's spend held money that was only moved.
+ * Money moved between two of one person's own accounts is written as two rows, one leaving and one arriving, and a
+ * ledger that reads each as it stands counts the move twice: once as spend and once as income. An import writes every
+ * such move that way, and every Ledger figure says `transfer is false`, so until both legs were marked by hand the
+ * month's spend held money that was only moved.
  *
  * `02 §5`'s register option: `pairs: { on, opposite, across, within, date?, mark, where? }`. Two rows that agree on every
  * `on` entry, face opposite ways, sit in different accounts, fall inside the window and both pass `where` are one
@@ -12,26 +12,26 @@
  * names the other row, so a person can see why a row stopped counting and undo it. Zero never matches, because two zero
  * rows are not a movement.
  *
- * A PAIR IS A FUNCTION OF THE LEDGER AS IT STANDS, NOT OF THE ORDER IT WAS WRITTEN IN. W57-1 made a pair once and kept it
- * whatever happened, and the audit of it (`loop/research-batch-fifty-eight-audit.md`) measured what that costs: a leg
- * corrected from GBP 400.00 to 900.00, a leg retyped from in to out, and a leg deleted each left the other marked, so
- * Spent read 0.00 against 900.00, 800.00 and 400.00. And a credit listed before its own debit took the rent two days
- * away, because it was the only candidate when the credit arrived. So two rows are paired when, and only while, each is
- * the other's one nearest candidate (`partnerOf`), and every write that could move that answer settles it again for the
- * rows around it (`settle`). A tie is not broken by id or by arrival: two legs equally near leave the row unpaired, which
- * counts the money rather than guessing which move hid it, UNLESS NO MATCHING OF THE TIED ROWS COULD HIDE THE WRONG
- * MONEY (`matchedOf`): alike legs are matched in day order, and a leg left over only when no other could be left over
- * at as few days' cost, and never while a row outside the set may yet be one of its legs.
+ * A PAIR IS A FUNCTION OF THE LEDGER AS IT STANDS, NOT OF THE ORDER IT WAS WRITTEN IN. The first form made a pair once
+ * and kept it whatever happened, and what that costs was measured: a leg corrected from GBP 400.00 to 900.00, a leg
+ * retyped from in to out, and a leg deleted each left the other marked, so Spent read 0.00 against 900.00, 800.00 and
+ * 400.00. And a credit listed before its own debit took the rent two days away, because it was the only candidate when
+ * the credit arrived. So two rows are paired when, and only while, each is the other's one nearest candidate
+ * (`partnerOf`), and every write that could move that answer settles it again for the rows around it (`settle`). A tie
+ * is not broken by id or by arrival: two legs equally near leave the row unpaired, which counts the money rather than
+ * guessing which move hid it, UNLESS NO MATCHING OF THE TIED ROWS COULD HIDE THE WRONG MONEY (`matchedOf`): alike legs
+ * are matched in day order, and a leg left over only when no other could be left over at as few days' cost, and never
+ * while a row outside the set may yet be one of its legs.
  *
- * A MARK A PERSON SET IS HIS (`41 §5.4` step 6b, `§13 #10`). The kernel never writes over it and never pairs the row, and
- * a person unmarking one leg of a pair unpairs the other, which is the undo the header of W57-1 promised and did not have.
- * HIS `true` IS KEPT OUT AS HIS `false` IS, and that has a cost audit sixty measured (X2): a transfer he typed and ticked
- * before the savings statement arrived leaves the statement's leg counted, GBP 4,000.00 read as received, until he ticks
- * that one too. Letting his `true` take a partner was tried (held61) and was refused, because a ticked card bill is the
- * same write and took a REFUND that was nobody's transfer (`pairs-undo.test.ts`, P3b), and the sample record's two typed
- * legs paired each other (`packages/seed/test/money-pairs.test.ts`). The spec says both are kept out; changing that is the
- * owner's call and not the kernel's. What a person did NOT say is not a pin: a whole row sent back with the mark as it
- * was is not his word on the mark (the write path in `index.ts` decides, audit sixty's X2b).
+ * A MARK A PERSON SET IS HIS (`41 §5.4` step 6b, `§13 #10`). The kernel never writes over it and never pairs the row,
+ * and a person unmarking one leg of a pair unpairs the other, which is the undo the first form promised and did not
+ * have. HIS `true` IS KEPT OUT AS HIS `false` IS, and that has a measured cost: a transfer he typed and ticked before
+ * the savings statement arrived leaves the statement's leg counted, GBP 4,000.00 read as received, until he ticks that
+ * one too. Letting his `true` take a partner was tried and was refused, because a ticked card bill is the same write
+ * and took a REFUND that was nobody's transfer (`pairs-undo.test.ts`), and the sample record's two typed legs paired
+ * each other (`packages/seed/test/money-pairs.test.ts`). The spec says both are kept out; changing that is the owner's
+ * call and not the kernel's. What a person did NOT say is not a pin: a whole row sent back with the mark as it was is
+ * not his word on the mark (the write path in `index.ts` decides).
  *
  * IN THE KERNEL'S WRITE PATH AND NOT IN A RULE, because a `where:` cannot say "a row of this register that mirrors me",
  * and because the import writes through `create` and so will the bank door after the cut-over: one build serves both.
@@ -71,11 +71,11 @@ const isCode = (v: unknown): v is string => typeof v === 'string' && CODE.test(v
 /**
  * Whether a field can say which currency a bare number is in: a `text`, or an `enum` whose every value is a currency.
  *
- * NOT A FIELD NAME, because the kernel is a shell and one ledger's `currency` is another's `ccy`. AND NOT ANY TEXT, ENUM
- * OR REF, which is what this was: audit sixty's X1 put `state` in `on`, an enum of pending and cleared that every counted
- * row holds alike, and -1000 in one currency paired with +1000 in another. An enum says its values at install, so it is
- * checked there. A text can hold anything, so it is taken at its word here and each row is held to it in `currencyOf`.
- * A `ref` holds a row id, and nothing here can read the row it names, so it is refused rather than trusted.
+ * NOT A FIELD NAME, because the kernel is a shell and one ledger's `currency` is another's `ccy`. AND NOT ANY TEXT,
+ * ENUM OR REF, which is what this was: `state` put in `on`, an enum of pending and cleared that every counted row holds
+ * alike, paired -1000 in one currency with +1000 in another. An enum says its values at install, so it is checked
+ * there. A text can hold anything, so it is taken at its word here and each row is held to it in `currencyOf`. A `ref`
+ * holds a row id, and nothing here can read the row it names, so it is refused rather than trusted.
  */
 const holdsCurrency = (f: FieldShape): boolean =>
   f.type === 'text' || (f.type === 'enum' && Array.isArray(f.values) && f.values.length > 0 && f.values.every(isCode));
@@ -219,11 +219,10 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
       'pairs.on',
     );
 
-  /* A BARE NUMBER CARRIES NO CURRENCY, so the declaration has to compare the field that does. A money is compared by the
-     currency inside it (`amountOf`); an `int` is not, and the audit's P7 installed `on: [abs(amount)]` over an `int` and
-     paired -1000 in one currency out of one bank with +1000 in another currency into a second, and audit sixty's X1 did
-     the same with `state` named beside it, so the field named has to be one that can hold a currency
-     (`holdsCurrency`). */
+  /* A BARE NUMBER CARRIES NO CURRENCY, so the declaration has to compare the field that does. A money is compared by
+     the currency inside it (`amountOf`); an `int` is not, and `on: [abs(amount)]` installed over an `int` paired -1000
+     in one currency out of one bank with +1000 in another currency into a second, and `state` named beside it did the
+     same, so the field named has to be one that can hold a currency (`holdsCurrency`). */
   const sized = field(entries.find((e) => e.abs)?.field ?? opposite.id)!;
   if (sized.type !== 'money' && !entries.some((e) => !e.abs && holdsCurrency(field(e.field)!)))
     return bad(
@@ -260,12 +259,12 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
   if (mark.type !== 'bool')
     return bad('DECLARATION_INVALID', `${id}'s pairs.mark is the bool set true on both legs, and ${mark.id} is a ${mark.type}.`, 'pairs.mark');
 
-  /* ── where ──
-     WHICH ROWS ARE MONEY THAT MOVED IS THE REGISTER'S TO SAY, and nothing the kernel can know. Money-core says it with a
-     `state` of pending, cleared or void and counts `state is cleared`; its `done:` holds `void` too, so `done:` is not the
-     answer, and a field name written here would be one ledger's words in the shell. P4 paired a cleared GBP 250.00
-     payment with a void credit and Spent read 0.00. THE TREE AND NOT THE SENTENCE, as `required_when:` takes it: the
-     match runs on every write with no clock and no ref lookup to hand, and a sentence needs both to be read. */
+  /* ── where ── WHICH ROWS ARE MONEY THAT MOVED IS THE REGISTER'S TO SAY, and nothing the kernel can know. Money-core
+     says it with a `state` of pending, cleared or void and counts `state is cleared`; its `done:` holds `void` too, so
+     `done:` is not the answer, and a field name written here would be one ledger's words in the shell. Measured: a
+     cleared GBP 250.00 payment paired with a void credit and Spent read 0.00. THE TREE AND NOT THE SENTENCE, as
+     `required_when:` takes it: the match runs on every write with no clock and no ref lookup to hand, and a sentence
+     needs both to be read. */
   if (said.where !== undefined) {
     if (said.where === null || typeof said.where !== 'object' || Array.isArray(said.where))
       return bad(
@@ -326,11 +325,11 @@ export type Leg = {
 /**
  * One register's `pairs:`, with what the matching needs to read the ledger.
  *
- * `state` AND `done` ARE THE REGISTER'S OWN, and every `Pairing` says them, `undefined` where the register has none: they
- * tell a row `where` refuses for good from one it refuses until the bank clears it (`waiting`). They were optional in
- * the first attempt at audit sixty-three's finding 2, the kernel built its `Pairing` without them, and every refused row
- * was taken for one that may clear: a client's cleared 20,000.00 that names its party held a split move back, and
- * Spent and Received each read 40,000.00 high. Required, a caller that leaves them out does not compile.
+ * `state` AND `done` ARE THE REGISTER'S OWN, and every `Pairing` says them, `undefined` where the register has none:
+ * they tell a row `where` refuses for good from one it refuses until the bank clears it (`waiting`). They were optional
+ * in the first attempt at a pending half, the kernel built its `Pairing` without them, and every refused row was taken
+ * for one that may clear: a client's cleared 20,000.00 that names its party held a split move back, and Spent and
+ * Received each read 40,000.00 high. Required, a caller that leaves them out does not compile.
  */
 export type Pairing = { sql: Sql; register: string; pairs: PairsDecl; fields: readonly FieldShape[]; state: string | undefined; done: readonly string[] | undefined };
 
@@ -353,10 +352,10 @@ export function loadLeg(p: Pairing, id: string): Leg | null {
  * holds `false` exactly as one that said `false`, and a form that sends every field it shows would otherwise pin every
  * row a person typed in and none of them would ever pair.
  *
- * NOT HERE: WHETHER AN UNCHANGED MARK WAS HIS WORD. held61 read it from the history, passing over a resent mark that
- * shared its batch with an edit of another field, and the checker found the case it cannot see: a row sent back with
- * nothing changed leaves one bare event and the mark's resend, the same two rows as his lone `{ moved: false }`. Only the
- * patch knows which it was, so `index.ts` writes the resend event only for a patch naming the mark alone.
+ * NOT HERE: WHETHER AN UNCHANGED MARK WAS HIS WORD. A first attempt read it from the history, passing over a resent
+ * mark that shared its batch with an edit of another field, and there is a case the history cannot see: a row sent back
+ * with nothing changed leaves one bare event and the mark's resend, the same two rows as his lone `{ moved: false }`.
+ * Only the patch knows which it was, so `index.ts` writes the resend event only for a patch naming the mark alone.
  */
 export function markPinned(p: Pairing, id: string): boolean {
   return pinnedBy(p, id) !== null;
@@ -430,7 +429,7 @@ function markShape(p: Pairing, field: string): FieldShape | undefined {
  * Every row whose old mark a person pinned, with what he said, when an install moves `pairs.mark` from `from` to `to`.
  * `p` is the list under the new declaration, whose `pairs.mark` is `to`.
  *
- * THE CHECKER OF `56b35c41` MEASURED WHAT A RENAME LOST. The pass that settles the list under the new declaration asks
+ * WHAT A RENAME LOST, MEASURED AT `56b35c41`. The pass that settles the list under the new declaration asks
  * `markPinned` of the new field only, and nobody had said anything there: the dinner he unticked on `transfer` paired
  * with Omar's repayment and read `moved: true`, Spent 0.00 against EGP 20,000.00, and a move he typed and ticked read
  * `moved: false`, so money that only moved read as spent (`pairs-followups.test.ts`, ONE). What he said was about the
@@ -443,9 +442,9 @@ function markShape(p: Pairing, field: string): FieldShape | undefined {
  * pass derives it again.
  *
  * A ROW WHERE SOMEBODY SPOKE ON THE NEW FIELD LATER THAN ON THE OLD ONE KEEPS THAT, since it is the nearer word, and
- * only then. held66's first cut kept any word on the new field, and its checker measured a mark renamed there and back:
- * dinner's "not a transfer" was carried to `moved`, he ticked it there, and the update back to `transfer` kept the older
- * false still standing in `transfer`, so his tick was lost and dinner read as spent, EGP 20,000.00
+ * only then. A first cut kept any word on the new field, and a mark renamed there and back measured the cost: dinner's
+ * "not a transfer" was carried to `moved`, he ticked it there, and the update back to `transfer` kept the older false
+ * still standing in `transfer`, so his tick was lost and dinner read as spent, EGP 20,000.00
  * (`pairs-followups.test.ts`, RENAMED THERE AND BACK). A word a create left, with no edit, is older than any edit.
  *
  * DELETED ROWS ARE CARRIED TOO, so a restore finds the pin it left with. ONLY A ROW THAT COULD HOLD A PIN IS ASKED: one
@@ -579,20 +578,20 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  * Whether a live row that is nobody's partner today may still be one leg of a move: `where` refuses it, and it may yet
  * clear into one `where` lets through.
  *
- * AUDIT SIXTY-THREE'S FINDING 2. A bank alert writes a credit pending before it clears, and a pending half left the set
- * around it two outs and two ins with a client's payment of the same size as the second in: day order matched the
- * client with the second out, 20,000.00 read as received 0.00, and once the half cleared all five unpaired. A row
- * like this one is not in the set, so the set cannot say which of its legs this row's partner is, and it is matched
- * leg by leg until it can be (`matchedOf`).
+ * A PENDING HALF. A bank alert writes a credit pending before it clears, and a pending half left the set around it two
+ * outs and two ins with a client's payment of the same size as the second in: day order matched the client with the
+ * second out, 20,000.00 read as received 0.00, and once the half cleared all five unpaired. A row like this one is not
+ * in the set, so the set cannot say which of its legs this row's partner is, and it is matched leg by leg until it can
+ * be (`matchedOf`).
  *
  * A ROW WHOSE MARK A PERSON PINNED IS NOT ONE, WHICHEVER WAY IT WAS PINNED. A pinned `false` says the row is not a
  * transfer, so no leg is waiting for it, and held back like a pending row, unticking a client's payment left the halves
  * beside it counted, Spent 40,000.00 high, measured. A pinned `true` waited once, on the reading that it says a move
- * landed and not which row is the other leg, and held66's checker measured what that cost: a person typed 20,000.00 out
- * of account A and ticked it, the bank then sent the real out of A and in to B the same day, and the bank's two legs
- * stayed apart for good, Spent and Received 20,000.00 each where they read 0. A pinned row is never a partner
- * (`pairable`), so a wait on it never ends. The owner's call (DIRECTION 25): only a row that clears on its own holds a
- * pair back (`pairs-followups.test.ts`, FOUR).
+ * landed and not which row is the other leg, and what that cost was measured: a person typed 20,000.00 out of account A
+ * and ticked it, the bank then sent the real out of A and in to B the same day, and the bank's two legs stayed apart
+ * for good, Spent and Received 20,000.00 each where they read 0. A pinned row is never a partner (`pairable`), so a
+ * wait on it never ends. The owner's call: only a row that clears on its own holds a pair back
+ * (`pairs-followups.test.ts`, FOUR).
  *
  * A ROW NO FINAL STATE WOULD LET THROUGH IS NOT ONE EITHER, and neither is a row already in one. The first attempt
  * took every row `where` refuses for one that may clear, and the kernel handed it no `done`, so under Money's clause a
@@ -603,13 +602,12 @@ function matchesWhere(p: Pairing, leg: Leg): boolean {
  * names its party does not.
  *
  * A REGISTER THAT DECLARES NO `done:` HAS SAID NO STATE IS FINAL, AND ONE WITH NO `state:` HAS NAMED NO LIFECYCLE, and
- * both used to have no row that waits. The checker of `56b35c41` measured what that left: audit sixty-three's F2 as it
- * was before the repair, the pending half's set matched in day order and the client hidden as its second in, Received
- * 0.00 against 20,000.00 (`pairs-followups.test.ts`, TWO). So without `done:` a row may move to any value its state
- * declares, and without `state:` any enum `where` reads is a field that may move so; a text, a number or a ref is what
- * the row says and stays, so a payment refused for the party it names still waits for nothing. The cost falls on the
- * counted side: a void half there is a row that may be put back, and holds a tied set back until the register says
- * void is final or the row goes.
+ * both used to have no row that waits. Measured at `56b35c41`, that left a pending half's set matched in day order and
+ * the client hidden as its second in, Received 0.00 against 20,000.00 (`pairs-followups.test.ts`, TWO). So without
+ * `done:` a row may move to any value its state declares, and without `state:` any enum `where` reads is a field that
+ * may move so; a text, a number or a ref is what the row says and stays, so a payment refused for the party it names
+ * still waits for nothing. The cost falls on the counted side: a void half there is a row that may be put back, and
+ * holds a tied set back until the register says void is final or the row goes.
  *
  * AN UNRELATED PENDING ROW OF THE SAME SIZE IN THE WINDOW HOLDS A SET BACK TOO, until it clears: measured, a pending
  * credit three days after a split move left all four halves counted, 40,000.00 each way. Nothing in the rows says
@@ -723,8 +721,8 @@ function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { l
  * THE WHOLE LIST, READ ONCE FOR A PASS OVER IT (`passOf`): every live row parsed and shaped, the rows grouped by size in
  * day order, and what `pairable` and `waiting` say of each row, asked the first time it is needed.
  *
- * AUDIT SIXTY-FIVE'S FINDING 3. The window was a query per row, each row it returned parsed and asked `markPinned`, and
- * on 200 rows of one amount packed into a week that was 622,665 questions to the event table for one pass. Each of
+ * ONE READ, NOT A QUERY PER ROW. The window was a query per row, each row it returned parsed and asked `markPinned`,
+ * and on 200 rows of one amount packed into a week that was 622,665 questions to the event table for one pass. Each of
  * those answers is a fact about one row, and the pass writes nothing any of them reads: it writes the mark and `_pair`,
  * and a row whose mark a person pinned keeps it (`index.ts`, `writeLeg`), so its pin stands. `passOf` refuses a
  * `Ledger` to a declaration whose own rule reads the mark, the one case where that would not hold.
@@ -799,13 +797,12 @@ function nearestIn(near: readonly { leg: Leg; gap: number }[]): Leg | null {
  * A leg's nearest candidate (`nearestIn`), or `null` when a row that may yet be one of its legs (`waiting`) stands at
  * least as near.
  *
- * THE CHECK FOR A LEG STILL TO COME GUARDED ONLY A TIED SET (`matchedOf`), and a leg nothing ties never reached it. The
- * checker of `56b35c41` measured it: 20,000.00 out of account A, its in to account B still pending, and a client's
- * 20,000.00 into B the next day. The client was the out's one candidate, so the two paired, Spent 0.00 and Received 0.00
- * against 20,000.00 each until the bank cleared the in (`pairs-followups.test.ts`, THREE, and audit sixty-five's
- * finding 1). NEARER OR AS NEAR, NOT ANYWHERE IN THE WINDOW: cleared, a waiting row farther off than the nearest
- * candidate would still be the farther, so the pair made now is the one that would be made then, and holding it back
- * would only count the move meanwhile.
+ * THE CHECK FOR A LEG STILL TO COME GUARDED ONLY A TIED SET (`matchedOf`), and a leg nothing ties never reached it.
+ * Measured at `56b35c41`: 20,000.00 out of account A, its in to account B still pending, and a client's 20,000.00 into
+ * B the next day. The client was the out's one candidate, so the two paired, Spent 0.00 and Received 0.00 against
+ * 20,000.00 each until the bank cleared the in (`pairs-followups.test.ts`, THREE). NEARER OR AS NEAR, NOT ANYWHERE IN
+ * THE WINDOW: cleared, a waiting row farther off than the nearest candidate would still be the farther, so the pair
+ * made now is the one that would be made then, and holding it back would only count the move meanwhile.
  */
 function heldIn(w: { near: readonly { leg: Leg; gap: number }[]; waitsAt: number }): Leg | null {
   const leg = nearestIn(w.near);
@@ -866,25 +863,24 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
  * A whole set's legs matched in day order, each to one of the other way or left over, or `null` when that is a guess
  * or not needed.
  *
- * AUDIT SIXTY-ONE'S FINDING 2. The tie rule refused M1, one 100,000.00 move sent as two halves of 50,000.00 on one day,
- * and M2, two top-ups of 5,000.00 each landing the next day, and both figures counted money that only moved: every
- * candidate was tied, though any way of matching those legs hides exactly the same money. The legs of a set agree on
- * every `on` entry and so on size and currency (`mirrors`), so when as many go one way as the other every leg is one
- * half of a move, and which half it is paired with changes no figure. Matched in day order, first out with first in,
- * the days are as near as any matching can make them in total, which is what the nearest rule asks one leg at a time.
+ * TWO TIES THAT HID NOTHING. The tie rule refused one 100,000.00 move sent as two halves of 50,000.00 on one day, and
+ * two top-ups of 5,000.00 each landing the next day, and both figures counted money that only moved: every candidate
+ * was tied, though any way of matching those legs hides exactly the same money. The legs of a set agree on every `on`
+ * entry and so on size and currency (`mirrors`), so when as many go one way as the other every leg is one half of a
+ * move, and which half it is paired with changes no figure. Matched in day order, first out with first in, the days are
+ * as near as any matching can make them in total, which is what the nearest rule asks one leg at a time.
  *
- * WHEN THE COUNTS DIFFER, THE LEGS LEFT OVER ARE THE ONES THAT COST THE FEWEST DAYS, AND ONLY WHEN NO OTHER CHOICE COSTS
- * AS FEW. Audit sixty-three's F1 put a client's 20,000.00 into account B two days after a move split in two halves of
- * that size, and refusing the set whole left both halves counted: Spent and Received each 40,000.00 high. Leaving the
- * client over costs no day and leaving either half over costs two, so which leg is spare is in the ledger. Three alike
- * outs against two ins on one day cost the same whichever out is spare, so that stays refused, as a tie of one does.
- * Every matching the accounts allow is counted, and the rest are matched in day order, so it stays one answer in every
- * order the rows arrived in (`sparesOf`).
+ * WHEN THE COUNTS DIFFER, THE LEGS LEFT OVER ARE THE ONES THAT COST THE FEWEST DAYS, AND ONLY WHEN NO OTHER CHOICE
+ * COSTS AS FEW. Measured: a client's 20,000.00 into account B two days after a move split in two halves of that size,
+ * and refusing the set whole left both halves counted: Spent and Received each 40,000.00 high. Leaving the client over
+ * costs no day and leaving either half over costs two, so which leg is spare is in the ledger. Three alike outs against
+ * two ins on one day cost the same whichever out is spare, so that stays refused, as a tie of one does. Every matching
+ * the accounts allow is counted, and the rest are matched in day order, so it stays one answer in every order the rows
+ * arrived in (`sparesOf`).
  *
  * NOT WHILE A ROW OUTSIDE THE SET IS `waiting` to be one of its legs. The set is then not the whole of the moves in it,
  * so a count that looks even is short of the partner a leg is waiting for, and the leg matched in its place is somebody
- * else's money (audit sixty-three's F2). Such a set is answered leg by leg until the row clears, as it was before sets
- * were read at all.
+ * else's money. Such a set is answered leg by leg until the row clears, as it was before sets were read at all.
  *
  * AND NOT USED WHERE NOTHING IS TIED: there each leg's nearest answers it, and a set matched in day order can differ
  * from that (an out on day 0 and 1, an in on day 1 and 5, pairs the day-1 legs by nearness and all four by order), which
@@ -894,10 +890,10 @@ function setOf(p: Pairing, leg: Leg, windows: Windows): { set: Map<string, Near>
  * LEGS ON ONE DAY GO IN `across` ORDER, AND ONLY THEN IN `seq` ORDER. `seq` is the order the bank listed them, the
  * arrival order the tie rule refused to break by, and ordering one day by it alone let that order decide whether a set
  * paired at all: an out of account A and an out of B against an in to C and an in to A, all one day, paired all four
- * when the in to C was listed first and none when the in to A was, since first with first then put A's legs together and
- * the matching was refused (`pairs-ties.test.ts`, ONE ANSWER IN EVERY ORDER). With the account first, `seq` only says
- * which of two legs alike in everything names which, and the rows paired and the figures are the same in every order
- * (M1).
+ * when the in to C was listed first and none when the in to A was, since first with first then put A's legs together
+ * and the matching was refused (`pairs-ties.test.ts`, ONE ANSWER IN EVERY ORDER). With the account first, `seq` only
+ * says which of two legs alike in everything names which, and the rows paired and the figures are the same in every
+ * order.
  */
 function matchedOf(p: Pairing, set: Map<string, Near>): Map<string, string> | null {
   const members = [...set.values()];
@@ -952,18 +948,19 @@ const DAY_MS = 86_400_000;
  * total, by index; `null` when no matching exists or when two matchings of that least cost leave different legs over.
  * Exported for its test, which holds it to every matching counted by hand.
  *
- * EVERY FEASIBLE MATCHING IS COUNTED, NOT ONLY THOSE TAKEN IN ORDER. The first attempt walked both sides first with first
- * and counted the choices of legs to skip, which is every matching of least cost only when any pair may be made. The
- * account rule (`can`) forbids some, and then a matching that crosses costs as few days as one in order and leaves a
- * different leg over: outs from x and y and ins into x, y and z on one day, where the one in-order matching left x's in
- * over and three matchings of no days exist, one per in. It paired four rows, and which account's in counted as income
- * was decided by how the account names sort (`pairs-pending.test.ts`, E).
+ * EVERY FEASIBLE MATCHING IS COUNTED, NOT ONLY THOSE TAKEN IN ORDER. The first attempt walked both sides first with
+ * first and counted the choices of legs to skip, which is every matching of least cost only when any pair may be made.
+ * The account rule (`can`) forbids some, and then a matching that crosses costs as few days as one in order and leaves
+ * a different leg over: outs from x and y and ins into x, y and z on one day, where the one in-order matching left x's
+ * in over and three matchings of no days exist, one per in. It paired four rows, and which account's in counted as
+ * income was decided by how the account names sort (`pairs-pending.test.ts`).
  *
- * WHICH LEGS PAIR WITH WHICH DOES NOT MOVE A FIGURE, WHICH ARE LEFT OVER DOES. Every leg of a set is the same size in the
- * same currency, so two matchings with one set of legs over hide the same money, and M1's two halves each way have two
- * matchings of no days and are not a guess. So the answer is refused only when the legs over differ. Any matching of
- * least cost leaving other legs over than `best` does must use one of the legs `best` matched, so it is enough to ask,
- * for each of those, what the least cost is with that leg taken out: equal to `best`'s, and another choice exists.
+ * WHICH LEGS PAIR WITH WHICH DOES NOT MOVE A FIGURE, WHICH ARE LEFT OVER DOES. Every leg of a set is the same size in
+ * the same currency, so two matchings with one set of legs over hide the same money, and a move's two halves each way
+ * have two matchings of no days and are not a guess. So the answer is refused only when the legs over differ. Any
+ * matching of least cost leaving other legs over than `best` does must use one of the legs `best` matched, so it is
+ * enough to ask, for each of those, what the least cost is with that leg taken out: equal to `best`'s, and another
+ * choice exists.
  *
  * BOUNDED BY THE SET. A whole set holds at most `SET_MOST` legs, so when the counts differ the shorter side holds at most
  * 15 and the longer at most 31, and this is at most 16 assignments, each about 15 x 15 x 31 steps (`leastOf`).
@@ -1079,8 +1076,8 @@ const SETTLE_MOST = 256;
    windows. Without a `Ledger` each window is a query that reads every row of the list (`candidatesOf`), and every row
    in it that mirrors the leg is asked `pairable` or `waiting` afresh, each a question to the event table, so a write
    whose window was busy read the list again for every window it asked: one create after 10,000 rows of one amount took
-   about 3 s (`loop/finish/defects.md`, L5). Below this a write asks its few windows by query, as it always has, since a
-   list read whole parses every row of it and a quiet write has no need of that. */
+   about 3 s. Below this a write asks its few windows by query, as it always has, since a list read whole parses every
+   row of it and a quiet write has no need of that. */
 const READ_WHOLE_AT = 16;
 
 /**
@@ -1143,22 +1140,22 @@ export function settle(p: Pairing, seeds: readonly string[], pass?: Pass): { leg
  * One pass over a whole list, one `settle` per seed: which rows it has answered, and, when they hold for the length of
  * the pass, the answers, the windows and the list read once (`Ledger`).
  *
- * AUDIT SIXTY-FIVE'S FINDING 3. Each `settle` read its own windows and answered its own rows, so a pass over a list
- * where most rows share a size read the same windows once per seed: 10,000 rows of three amounts in one year took 80 to
- * 146 s, one amount did not finish in 20 minutes, and a Durable Object request gets 30. Nothing the pass writes moves an
- * answer, since a row's partner is read from the fields `pairsReads` names other than the mark, and from whether a
- * person pinned the mark, and the pass writes only the mark and `_pair`, signed by the record. So one answer, one window
- * and one reading of each row serve the whole pass, and the ledger it leaves is the one each `settle` answering afresh
- * left (`pairs-settle-speed.test.ts`, `pairs-on-update.test.ts`).
+ * ONE PASS, ONE READ. Each `settle` read its own windows and answered its own rows, so a pass over a list where most
+ * rows share a size read the same windows once per seed: 10,000 rows of three amounts in one year took 80 to 146 s, one
+ * amount did not finish in 20 minutes, and a Durable Object request gets 30. Nothing the pass writes moves an answer,
+ * since a row's partner is read from the fields `pairsReads` names other than the mark, and from whether a person
+ * pinned the mark, and the pass writes only the mark and `_pair`, signed by the record. So one answer, one window and
+ * one reading of each row serve the whole pass, and the ledger it leaves is the one each `settle` answering afresh left
+ * (`pairs-settle-speed.test.ts`, `pairs-on-update.test.ts`).
  *
  * NOT WHERE THE DECLARATION READS ITS OWN MARK, in `on`, `opposite`, `across`, `date` or `where`: there each write of the
  * pass moves the answers after it, and every `settle` still answers afresh, as all of them did before.
  *
- * MEASURED on 10,000 rows in one year, a third of them the legs of moves, the audit's ledger (`pairs-settle-speed.test.ts`),
- * in the install's transaction on this machine with other work running on it: every amount one of 1, 3 or 50 round ones
- * took 2.8 s, 1.4 s and 1.4 s, where the pass took more than 20 minutes, 80 to 146 s, and 2.9 s before. 2,000 rows of one
- * amount in 73 days, as densely packed as the first, took 1,659.5 s before; 500 rows in 18 days 279.5 s before and 0.13 s
- * now. Sixteen ledgers of 200 to 2,000 rows with pending, void, named and ticked rows, installed over no `pairs:` and
+ * MEASURED on 10,000 rows in one year, a third of them the legs of moves (`pairs-settle-speed.test.ts`), in the
+ * install's transaction on this machine with other work running on it: every amount one of 1, 3 or 50 round ones took
+ * 2.8 s, 1.4 s and 1.4 s, where the pass took more than 20 minutes, 80 to 146 s, and 2.9 s before. 2,000 rows of one
+ * amount in 73 days, as densely packed as the first, took 1,659.5 s before; 500 rows in 18 days 279.5 s before and 0.13
+ * s now. Sixteen ledgers of 200 to 2,000 rows with pending, void, named and ticked rows, installed over no `pairs:` and
  * over a looser one, came out the same row for row and event for event before and after, and three more under a `where`
  * that reads the mark.
  */

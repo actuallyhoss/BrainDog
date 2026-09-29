@@ -1,17 +1,16 @@
 /**
- * The steps that wait on somebody else: a person asked through Decide, and Slash asked through the outbox
- * (`loop/research-shell-automations.md` §4.3, Brief C).
+ * The steps that wait on somebody else: a person asked through Decide, and Slash asked through the outbox.
  *
- * WHAT WAS MEASURED BEFORE THE RUNNER TOOK THEM. Both steps installed, and a run that reached either failed on the
- * spot with `NOT_IN_THIS_BUILD`: no suggestion was opened, no `infer.ask` row was queued, and the first test below read
- * `failed` where it expects `waiting`. The brief's red was that deciding the suggestion resolves it and the run never
- * moves; there was no suggestion to decide.
+ * WHAT WAS MEASURED BEFORE THE RUNNER TOOK THEM. Both steps installed, and a run that reached either failed on the spot
+ * with `NOT_IN_THIS_BUILD`: no suggestion was opened, no `infer.ask` row was queued, and the first test below read
+ * `failed` where it expects `waiting`. The expected failure was that deciding the suggestion resolves it and the run
+ * never moves; there was no suggestion to decide.
  *
- * ASKING SLASH IS THE HOST'S SWITCH, `answersSlash`, AND IT IS OFF UNLESS A HOST SAYS IT SERVES THE JOB. Off, the install
- * refuses the step with `NOT_IN_THIS_BUILD` and the runner fails a rule an earlier build installed with one, which is
- * what every host does today. The Slash half below opens its record with the switch on (`slashed`). These tests were
- * skipped until Brief A of `loop/research-infer-ask-next.md`: run against the build before it, each failed at install,
- * and the ack of a refusal ended the run on "Slash answered job ... with no text" and not on the refusal's own sentence.
+ * ASKING SLASH IS THE HOST'S SWITCH, `answersSlash`, AND IT IS OFF UNLESS A HOST SAYS IT SERVES THE JOB. Off, the
+ * install refuses the step with `NOT_IN_THIS_BUILD` and the runner fails a rule an earlier build installed with one,
+ * which is what every host does today. The Slash half below opens its record with the switch on (`slashed`). These
+ * tests were skipped until the host could answer Slash: run against the build before that, each failed at install, and
+ * the ack of a refusal ended the run on "Slash answered job ... with no text" and not on the refusal's own sentence.
  */
 
 import { test } from 'node:test';
@@ -222,8 +221,8 @@ test('THE SWITCH DECIDES WHETHER ask_slash INSTALLS: on, RATE installs; off, it 
   const refused = (await off.k.install([rule(RATE)])) as Result<unknown>;
   assert.equal(codeOf(refused), 'NOT_IN_THIS_BUILD');
   assert.equal(!refused.ok && 'refusal' in refused ? refused.refusal.at : null, 'steps[0].ask_slash');
-  /* AN ASK IN EITHER ARM OF A BRANCH IS AN ASK. `slashAskAt` walks both, and the checker measured that a walk of the
-     top list alone left this body installing on a host that answers nothing, all the rest of this file still green. */
+  /* AN ASK IN EITHER ARM OF A BRANCH IS AN ASK. `slashAskAt` walks both, and a walk of the top list alone was measured
+     leaving this body installing on a host that answers nothing, all the rest of this file still green. */
   const branched = (await off.k.install([
     rule({ rule: 'fork', on: { manual: true }, steps: [{ set_var: { name: 'k', to: 'a' } }, { if: 'k is a', then: [{ notify: { say: 'A.' } }], else: [{ ask_slash: { question: 'Which?', as: 'which' } }] }] }),
   ])) as Result<unknown>;
@@ -340,9 +339,9 @@ test('SLASH NOT ANSWERING WITHIN A DAY FAILS THE RUN at its wake', async () => {
 });
 
 test('A REFUSAL ACKED AS result.failed ENDS THE RUN ON ITS OWN SENTENCE, not on "no text"', async () => {
-  /* MEASUREMENT A OF `loop/research-infer-ask-next.md` §1.3, AS A TEST. The host's pass acks a refusal `done` with the
-     package's sentence under `result.failed`, and `ack` read `result.text` alone, so the month's sentence was thrown
-     away and the run said "Slash answered job ... with no text". */
+  /* A MEASUREMENT, AS A TEST. The host's pass acks a refusal `done` with the package's sentence under `result.failed`,
+     and `ack` read `result.text` alone, so the month's sentence was thrown away and the run said "Slash answered job
+     ... with no text". */
   const spent = "rule.pick asked Slash at step 1, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.";
   const { k, sql } = await slashed(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which' } }, { notify: { say: '{{vars.which}}' } }] }));
   value(k.automationRun('pick', 'p_1'));
@@ -359,7 +358,7 @@ test('A REFUSAL ACKED AS result.failed ENDS THE RUN ON ITS OWN SENTENCE, not on 
 test('A SECRET NAMED IN THE QUESTION TO SLASH IS REFUSED AT INSTALL, in every spelling that reaches its value', async () => {
   /* FOUR SPELLINGS REACH `pin`: the row's own `{{pin}}` and `{{text:pin}}` through `rules.ts`'s `fill`, and the run's
      `{{trigger.row.pin}}`, spaces allowed, through `flow.ts`'s `PATH`. `{{trigger.row}}` names no field and is written
-     as the JSON of the whole row, `pin` included, which the checker measured through `ask_person` on 23 September. */
+     as the JSON of the whole row, `pin` included, which was measured through `ask_person`. */
   const { k, sql } = await slashed();
   const asks = (question: string) =>
     rule({ rule: 'rate', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ ask_slash: { question, as: 'rate' } }] });
@@ -411,8 +410,8 @@ test('A RULE STORED WITH A SECRET IN ITS QUESTION SENDS THE QUESTION WITHOUT IT'
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: '{{pin}}' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.pin', 'hunter2') WHERE id = ?", made.id);
   /* AND A VALUE UNDER A FIELD THE LIST NO LONGER DECLARES, which has no live type to say whether it may leave, so it
-     does not. The checker measured that a `sendable` which kept undeclared fields left this file green, and sent
-     `hunter2` here twice: in the whole row's JSON and as `{{old}}`. */
+     does not. Measured: a `sendable` which kept undeclared fields left this file green, and sent `hunter2` here twice:
+     in the whole row's JSON and as `{{old}}`. */
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.old', 'hunter2') WHERE id = ?", made.id);
   await k.drain();
   const r = run(sql, 'rate')!;
@@ -423,11 +422,11 @@ test('A RULE STORED WITH A SECRET IN ITS QUESTION SENDS THE QUESTION WITHOUT IT'
   /* WITH THE SECOND LINE OFF THIS WAS `Rate for Rent, hunter2, hunter2, hunter2, {"what":"Rent","note":"hunter2",
      "pin":"hunter2"}, hunter2?`. Each hole is the dash a path to nothing is written as.
 
-     AND `note` IS ASKED AS THE WORDS IT HOLDS, `{{pin}}`, both in the row's JSON and by `{{trigger.row.note}}`. This read
-     `"note":"—"` and `—` while the question was filled twice, the run's fill and then the row's over what it had made:
-     the second read the braces the first wrote in and filled them from the cleaned row, which has no `pin`. That was
-     no leak here, and it is the fill that leaked through a question to a person, where the row is not cleaned the same
-     way (`flow-secret-verbs.test.ts`, SEC-3). The question is filled once now, for both. */
+     AND `note` IS ASKED AS THE WORDS IT HOLDS, `{{pin}}`, both in the row's JSON and by `{{trigger.row.note}}`. This
+     read `"note":"—"` and `—` while the question was filled twice, the run's fill and then the row's over what it had
+     made: the second read the braces the first wrote in and filled them from the cleaned row, which has no `pin`. That
+     was no leak here, and it is the fill that leaked through a question to a person, where the row is not cleaned the
+     same way (`flow-secret-verbs.test.ts`). The question is filled once now, for both. */
   assert.doesNotMatch(question, /hunter2/, question);
   assert.equal(question, 'Rate for Rent, —, —, —, {"what":"Rent","note":"{{pin}}"}, {{pin}}, —?');
   sql.close();

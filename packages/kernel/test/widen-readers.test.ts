@@ -1,11 +1,11 @@
 /**
  * A widened field is asked about by its readers, as a field taken away is.
  *
- * MEASURED BY THE CHECKER OF WAVE THIRTY-THREE. `contradicted` lets `enum` to `text` through without asking any reader
- * (`widen.ts`), and `stranded` only looked at fields taken away. So a rule with `each: [season]` over the enum survived
- * `season` widening to text, although the same rule declared fresh is refused, and at run time it crossed the whole free
- * text as one item, so its declared bound meant nothing. A page column whose `sign:` reads the enum was the same kind of
- * reader. A widening with no reader that needs the closed list still installs.
+ * NO READER WAS ASKED. `contradicted` lets `enum` to `text` through without asking any reader (`widen.ts`), and
+ * `stranded` only looked at fields taken away. So a rule with `each: [season]` over the enum survived `season` widening
+ * to text, although the same rule declared fresh is refused, and at run time it crossed the whole free text as one
+ * item, so its declared bound meant nothing. A page column whose `sign:` reads the enum was the same kind of reader. A
+ * widening with no reader that needs the closed list still installs.
  */
 
 import { test } from 'node:test';

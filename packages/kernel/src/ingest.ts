@@ -97,10 +97,10 @@ export type Extractor =
  * `invalid` IS STILL HONESTLY ABSENT. It is a field-shape check against `34 §3` and nothing here
  * runs one, so it stays out rather than becoming a word in a type that no code path can emit.
  *
- * `tail` IS A `lookup` THAT FOUND ITS ROW ONLY BY DIGITS PRINTED BEHIND STARS (`loop/DIRECTION.md` §25 A2). The row
- * is read, and it is read from a part of the account number, so the first arrival filed that way for one ingest,
- * account and tail waits for a person and the later ones file at `exact` once somebody has accepted one
- * (`confirmedTail`). A misfiled transfer is wrong money, and one confirmation per account costs little.
+ * `tail` IS A `lookup` THAT FOUND ITS ROW ONLY BY DIGITS PRINTED BEHIND STARS. The row is read, and it is read from a
+ * part of the account number, so the first arrival filed that way for one ingest, account and tail waits for a person
+ * and the later ones file at `exact` once somebody has accepted one (`confirmedTail`). A misfiled transfer is wrong
+ * money, and one confirmation per account costs little.
  */
 export type FieldOutcome = 'exact' | 'chosen' | 'defaulted' | 'missing' | 'ambiguous' | 'tail';
 
@@ -128,9 +128,9 @@ const NESTING = 3;
 /**
  * `07 §3`'s answers to an arrival the `dedupe:` says is already filed, with `review` after the three it lists.
  *
- * EXPORTED FOR THE INSTALL CHECK THAT DOES NOT EXIST YET. Nothing refuses a value outside this list at install: measured
- * on 23 September, `on_conflict: 'bogus'` installed clean and then behaved as `new`, because `arrive` asks only whether
- * the value is `skip`, `update` or `review`. The check belongs beside `dedupeFault` in `declare.ts`, and this is the list
+ * EXPORTED FOR THE INSTALL CHECK THAT DOES NOT EXIST YET. Nothing refuses a value outside this list at install:
+ * measured: `on_conflict: 'bogus'` installed clean and then behaved as `new`, because `arrive` asks only whether the
+ * value is `skip`, `update` or `review`. The check belongs beside `dedupeFault` in `declare.ts`, and this is the list
  * it would read, so the type and the check cannot name different sets.
  */
 export const ON_CONFLICTS = ['skip', 'update', 'new', 'review'] as const;
@@ -208,11 +208,11 @@ export type IngestDecl = {
    * What an arrival the `dedupe:` says the register already holds does: dropped with a reason, written over the row,
    * written beside it, or held for a person.
    *
-   * `review` IS FOR A KEY THAT CANNOT TELL A RESEND FROM A SECOND MOVEMENT. `loop/research-bank-real.md` found two card
-   * alerts in a hundred real texts with the same amount, merchant and day, whose available limits differ by exactly the
-   * charge, and `skip` filed the second as already said with no screen ever asking. Before this value a declaration
-   * carrying it installed clean and behaved as `new` (`test/ingest-review.test.ts`), because nothing checks the value at
-   * install and the write path asked only whether it was `update`.
+   * `review` IS FOR A KEY THAT CANNOT TELL A RESEND FROM A SECOND MOVEMENT. A hundred real bank texts held two card
+   * alerts with the same amount, merchant and day, whose available limits differ by exactly the charge, and `skip`
+   * filed the second as already said with no screen ever asking. Before this value a declaration carrying it installed
+   * clean and behaved as `new` (`test/ingest-review.test.ts`), because nothing checks the value at install and the
+   * write path asked only whether it was `update`.
    */
   on_conflict?: (typeof ON_CONFLICTS)[number];
   /**
@@ -373,10 +373,10 @@ export type IngestDeps = {
    */
   /*
    * THE THIRD ARGUMENT NAMES THE FORM, and `lookup` is the one that passes it. `lookup` has a rule `enum` must not
-   * have: digits printed behind stars are the tail of the one row whose longer value ends in them
-   * (`loop/research-bank-real.md`, *The three that did not read*, item 3, where one account printed two ways sent
-   * one family of his bank's messages to review whichever `last4` he typed). An argument rather than a second
-   * seam, so a record already handing down `matchLiterals` reaches the new rule without a line of new wiring.
+   * have: digits printed behind stars are the tail of the one row whose longer value ends in them (measured on real
+   * bank texts, where one account printed two ways sent one family of a bank's messages to review whichever `last4` was
+   * typed). An argument rather than a second seam, so a record already handing down `matchLiterals` reaches the new
+   * rule without a line of new wiring.
    */
   literals?: ((text: string, entries: readonly (readonly [string, Json])[], form?: 'enum' | 'lookup') => Json[] | 'ambiguous') | undefined;
   /**
@@ -1007,9 +1007,9 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        THE MIDDLE LEVEL HAD NO WAY TO BE REACHED and this comment said so: "there is no combinator
        here that chooses or defaults, so there is no honest third outcome to derive". There are three
        now, and `proposed` stopped being a level only a declared ceiling could produce. */
-    /* A ROW FOUND ONLY BY ITS PRINTED TAIL IS `proposed` UNTIL A PERSON HAS ACCEPTED ONE (`loop/DIRECTION.md` §25 A2):
-       once per ingest, account and tail, read from the rowsets this ingest opened and the decisions that accepted them
-       (`confirmedTail`). A lookup that matched the whole value never reaches `tails`, so it files as it always did. */
+    /* A ROW FOUND ONLY BY ITS PRINTED TAIL IS `proposed` UNTIL A PERSON HAS ACCEPTED ONE: once per ingest, account and
+       tail, read from the rowsets this ingest opened and the decisions that accepted them (`confirmedTail`). A lookup
+       that matched the whole value never reaches `tails`, so it files as it always did. */
     const pending = tails.filter((t) => !confirmedTail(deps.sql, matched.ingest, t));
     const confidence = worse(
       missed.length ? 'needs-review' : soft.length || pending.length ? 'proposed' : 'exact',

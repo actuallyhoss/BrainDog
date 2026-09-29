@@ -1,13 +1,12 @@
 /**
  * A FIGURE IS ASKED WHETHER ITS LIST HAS ITS FIELDS ON EVERY PATH, AND FROM BOTH SIDES OF THE EDGE.
  *
- * `ef1f268f` made an install refuse a figure over a field its list does not declare, and
- * `loop/research-batch-twenty-audit.md` measured two ways round it. §1: `stageInstall`, which every
- * pack install and every accepted pack proposal goes through, called `stageDeclarations` with no
- * record to check against, so a pack shipping `value: { sum: 'nosuch' }` planned ok, installed ok and
- * read `FIELD_UNKNOWN` on every page. §3: the check ran when the figure arrived and never when the list
- * changed under it, so the owner retiring `category` on Transactions through `setDeclaration` was taken
- * and left the seed's `txn-uncategorised` failing on every read.
+ * `ef1f268f` made an install refuse a figure over a field its list does not declare, and two ways round it were
+ * measured. First: `stageInstall`, which every pack install and every accepted pack proposal goes through, called
+ * `stageDeclarations` with no record to check against, so a pack shipping `value: { sum: 'nosuch' }` planned ok,
+ * installed ok and read `FIELD_UNKNOWN` on every page. Second: the check ran when the figure arrived and never when the
+ * list changed under it, so the owner retiring `category` on Transactions through `setDeclaration` was taken and left
+ * the seed's `txn-uncategorised` failing on every read.
  */
 
 import { test } from 'node:test';
@@ -58,12 +57,12 @@ async function record(...with_: Declaration[]): Promise<{ k: Kernel; sql: NodeSq
   return { k, sql };
 }
 
-/* ── §1: a pack's path ──────────────────────────────────────────────────── */
+/* ── a pack's path ──────────────────────────────────────────────────────── */
 
 test("A PACK'S FIGURE OVER A FIELD ITS LIST DOES NOT DECLARE IS REFUSED AT STAGE, as the same figure through install is", async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  /* The audit's pack: a third party's list with `what` and `amount`, and a figure summing `nosuch`. */
+  /* The measured pack: a third party's list with `what` and `amount`, and a figure summing `nosuch`. */
   const pack = [
     { ...ledger(FIELDS.slice(0, 2)), pack: 'third' },
     { ...metric({ value: { sum: 'nosuch' } }), pack: 'third' },
@@ -90,7 +89,7 @@ test('A PACK WHOSE FIGURE READS WHAT ITS LIST DECLARES STILL STAGES, and lands w
   sql.close();
 });
 
-/* ── §3: the list changes under a figure already installed ─────────────── */
+/* ── the list changes under a figure already installed ─────────────────── */
 
 test('A LIST CHANGE THAT RETIRES OR DROPS A FIELD AN INSTALLED FIGURE SUMS IS REFUSED, naming the figure', async () => {
   const { k, sql } = await record(metric());

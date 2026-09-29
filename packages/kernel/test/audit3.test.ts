@@ -1,11 +1,10 @@
 /**
- * The third backend audit, reproduced and held.
+ * Fourteen silent failures of the backend, reproduced and held.
  *
- * FOURTEEN FINDINGS, EVERY ONE A SILENCE. Not one of them raised an error, printed a warning or
- * failed a test: a figure computed over the whole register, a rule that wrote half of what it
- * declared, a question the gate answered without reading, a draft billed once per retry. Each test
- * below is named after the symptom rather than the function, because that is what the next person
- * will be looking for.
+ * FOURTEEN FAILURES, EVERY ONE A SILENCE. Not one of them raised an error, printed a warning or failed a test: a figure
+ * computed over the whole register, a rule that wrote half of what it declared, a question the gate answered without
+ * reading, a draft billed once per retry. Each test below is named after the symptom rather than the function, because
+ * that is what the next person will be looking for.
  */
 
 import { test } from 'node:test';
@@ -79,7 +78,7 @@ async function record(...decls: Declaration[]): Promise<{ k: Kernel; sql: NodeSq
   return { k, sql };
 }
 
-/* ── 1 · a figure over the whole register ────────────────────────────────── */
+/* ── a figure over the whole register ────────────────────────────────────── */
 
 test('AN `instant` SAYS `today` TOO, and a JSON predicate used to send SQL the word', async () => {
   /* `'2026-09-15T…' < 'today'` is a string comparison true of every instant there has ever been, so
@@ -119,7 +118,7 @@ test('AN `instant` SAYS `today` TOO, and a JSON predicate used to send SQL the w
   sql.close();
 });
 
-/* ── 6, 9, 14 · the lint that stopped linting ────────────────────────────── */
+/* ── the lint that stopped linting ───────────────────────────────────────── */
 
 test('A RULE WITH NO `when` IS STILL A DECLARATION, and used to skip every check there is', async () => {
   /* No `when` is a legal rule meaning "every row". It skipped the predicate check and, with it, the
@@ -207,7 +206,7 @@ test('and a bound over a list axis is unchecked rather than checked against zero
   sql.close();
 });
 
-/* ── 2, 7, 8 · what a rule did and did not do ────────────────────────────── */
+/* ── what a rule did and did not do ──────────────────────────────────────── */
 
 test('TWO `create` ACTIONS IN ONE RULE BOTH WRITE, and the second used to be skipped silently', async () => {
   /* The idempotency tuple did not carry the target register, so the second action's read found the
@@ -282,7 +281,7 @@ test('and the preview models an earlier `stop`, or it promises what will not hap
   sql.close();
 });
 
-/* ── 3, 11 · what a draft costs ──────────────────────────────────────────── */
+/* ── what a draft costs ──────────────────────────────────────────────────── */
 
 test('A REDELIVERY IS NOT AN ARRIVAL, and used to buy another draft every time', async () => {
   /* Every webhook sender retries and most mail servers do too. The redelivery branch returns the

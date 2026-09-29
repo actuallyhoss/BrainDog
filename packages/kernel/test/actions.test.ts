@@ -1,5 +1,5 @@
 /**
- * Scheduled actions: `call`, `poll`, and the runner that drains them with `pull` (`loop/DIRECTION.md` §0b).
+ * Scheduled actions: `call`, `poll`, and the runner that drains them with `pull`.
  *
  * THE OWNER'S RULES ARE THE SPINE OF THIS FILE. Fifteen minutes or the provider's floor, refused at
  * declaration. Jitter from the record, the pack and the action, never random. A 401 or a 403 is never
@@ -220,7 +220,7 @@ test('A 401 IS NEVER RETRIED: the action pauses, an event says so, the owner is 
   assert.equal(meters(sql, 'balance')[0]?.outcome, 'paused');
 
   /* THE EXISTING NOTIFICATION PATH: a note event, and the email it queues. A push is queued one per owner subscription
-     (W58, `push.test.ts`), and nobody on this record has subscribed a phone, so there is none. */
+     (`push.test.ts`), and nobody on this record has subscribed a phone, so there is none. */
   const note = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = 'ingest:balance'");
   assert.match(note?.note ?? '', /paused/);
   const told = sql.all<{ kind: string }>("SELECT kind FROM outbox WHERE kind IN ('notify.push', 'notify.email') ORDER BY kind").map((r) => r.kind);

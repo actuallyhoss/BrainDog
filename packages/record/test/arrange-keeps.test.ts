@@ -92,9 +92,9 @@ test('an update that changes a list the owner changed is said as refused, in the
   sql.close();
 });
 
-/* PLANNED ALONE, AN UPDATE THAT READS WHAT ITS MODULE'S UPDATE ADDS WAS SAID AS REFUSED. `propose` expands money-core to
-   portfolio's update first and files it; `arrangement` planned money-core by itself against a record without the new
-   list and said `REGISTER_UNRESOLVED`. Measured by the checker, and red against `planAll([p.id])`. */
+/* PLANNED ALONE, AN UPDATE THAT READS WHAT ITS MODULE'S UPDATE ADDS WAS SAID AS REFUSED. `propose` expands money-core
+   to portfolio's update first and files it; `arrangement` planned money-core by itself against a record without the new
+   list and said `REGISTER_UNRESOLVED`. Measured, and red against `planAll([p.id])`. */
 test('an update that reads a list its module update adds is offered, as propose files it', async () => {
   /* PORTFOLIO'S OWN NEXT, THE SAME WAY MONEY-CORE'S IS BUILT (`CURRENT`/`NEXT` above), and never the version it is
      already on. This test wrote a bare `'1.5.0'` while that was still portfolio's next minor over its installed

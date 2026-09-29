@@ -1,12 +1,12 @@
 /**
- * The key shapes the import audit found getting past the kernel's check, and the corpus they must not cost.
+ * The key shapes found getting past the kernel's check on an import, and the corpus they must not cost.
  *
- * `loop/research-audit-2026-09-25-import.md` S2 and S3 drove each of these into a real record and read it back: a
- * random token in an MCP endpoint's path, a Telegram bot URL, a GitHub token with a zero-width space in it, a hex key
- * after `api_key=`, and a password or a token in a `url`, `email` or `json` field, which had no check at all. Every
- * case in the first half was measured stored before the repair but two: the Twilio token and the webhook secret. Their
- * name runs into them with `_` and `=`, which the random-run test reads as one run, so it caught this seed's by chance
- * and passed the audit's. The named-hex shape is what catches them on every seed.
+ * Each of these was driven into a real record and read back: a random token in an MCP endpoint's path, a Telegram bot
+ * URL, a GitHub token with a zero-width space in it, a hex key after `api_key=`, and a password or a token in a `url`,
+ * `email` or `json` field, which had no check at all. Every case in the first half was measured stored before the
+ * repair but two: the Twilio token and the webhook secret. Their name runs into them with `_` and `=`, which the
+ * random-run test reads as one run, so it caught this seed's by chance and passed another's. The named-hex shape is
+ * what catches them on every seed.
  *
  * THE SECOND HALF IS WHY THE FIRST HALF IS NARROW. A check that refuses a Google Doc's link, an order number or a
  * sentence in Arabic with a direction mark in it is a check an owner learns to route round, and then it guards
@@ -42,13 +42,13 @@ const KEY = 'VALUE_MALFORMED: x holds what looks like a key, and a key never goe
 /* ── what got through ─────────────────────────────────────────────────────── */
 
 const MISSED: Record<string, string> = {
-  /* THE PATH EXEMPTION IS FOR A LINK TO A DOCUMENT, and an endpoint is not one. The audit's `urlPathRandom` and the
-     shape Zapier's MCP address really takes, a base64 secret between `/s/` and `/mcp`. */
+  /* THE PATH EXEMPTION IS FOR A LINK TO A DOCUMENT, and an endpoint is not one. A random path segment and the shape
+     Zapier's MCP address really takes, a base64 secret between `/s/` and `/mcp`. */
   'a token in an MCP endpoint path': j('https://mcp.example.com/api/mcp/s/', noise(48, 3), '/sse'),
   'a Zapier-style MCP address': j('https://mcp.zapier.com/api/mcp/s/', Buffer.from(`${noise(36, 4)}:${noise(36, 5)}`).toString('base64'), '/mcp'),
   'a token after /key/ on any host': j('https://example.com/integrations/key/', noise(40, 6), '/run'),
   /* THE HOST CAN SAY IT TOO, with no telling word in the path. Without this case the host half of the endpoint test
-     could be deleted and every test here stayed green (checker, 25 September). */
+     could be deleted and every test here stayed green (measured). */
   'a token under a hooks. host': j('https://hooks.example.net/incoming/', noise(48, 40), '/run'),
   'a Telegram bot URL': j('https://api.telegram.org/', 'bot', '123456789:', noise(35, 7), '/sendMessage'),
   'a Telegram bot token under a plain host': j('https://relay.example.net/', 'bot', '8123456789:', noise(35, 8, 'abcdefghijklmnopqrstuvwxyz0123456789_-'), '/getUpdates'),
@@ -73,7 +73,7 @@ const MISSED: Record<string, string> = {
 };
 
 /* EVERY MISS AT ONCE, so a red run names all of them rather than the first. */
-test('THE SHAPES THE AUDIT DROVE INTO A RECORD are refused in a text field', () => {
+test('THE SHAPES DRIVEN INTO A RECORD are refused in a text field', () => {
   const stored = Object.entries(MISSED)
     .filter(([, text]) => !looksLikeCredential(text) || refusedAs('text', `For the record: ${text}`) !== KEY)
     .map(([what]) => what);
@@ -81,7 +81,7 @@ test('THE SHAPES THE AUDIT DROVE INTO A RECORD are refused in a text field', () 
 });
 
 test('A URL, AN EMAIL AND A JSON FIELD GET THE CHECK A TEXT FIELD GETS', () => {
-  /* `secrets/urltype2.ts` in the audit: both were STORED. A url field is where an MCP address is most likely kept. */
+  /* Measured: both were STORED. A url field is where an MCP address is most likely kept. */
   const cases: [string, FieldDecl['type'], unknown][] = [
     ['a password in a url', 'url', j('https://admin', ':', 'S3cretPw', '@git.example.com/skills.git')],
     ['an MCP endpoint in a url', 'url', MISSED['a token in an MCP endpoint path']],
@@ -128,10 +128,10 @@ const LINKS = [
   `https://www.googleapis.com/drive/v3/files/${noise(44, 34)}?alt=media`,
   `https://contoso.sharepoint.com/:w:/g/personal/sam/${noise(46, 35, 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-')}?e=abc123`,
   `https://www.figma.com/design/${noise(22, 36)}/BrainDog-Home?node-id=1-2`,
-  `https://www.notion.so/sam/Quarterly-plan-${hex(32, 37)}`,
+  `https://www.notion.so/acme/Quarterly-plan-${hex(32, 37)}`,
   `https://www.loom.com/share/${hex(32, 38)}`,
-  'https://github.com/sam/braindog/commit/4464966a1b2c3d4e5f60718293a4b5c6d7e8f901',
-  'https://api.github.com/repos/sam/braindog/commits/4464966a1b2c3d4e5f60718293a4b5c6d7e8f901',
+  'https://github.com/acme/braindog/commit/4464966a1b2c3d4e5f60718293a4b5c6d7e8f901',
+  'https://api.github.com/repos/acme/braindog/commits/4464966a1b2c3d4e5f60718293a4b5c6d7e8f901',
   'https://api.stripe.com/v1/customers/cus_NffrFeUfNV2Hib',
   'https://dashboard.stripe.com/payments/pi_3NtXyZ2eZvKYlo2C1abcDEFG',
   'https://mcp.example.com/mcp',
@@ -165,9 +165,9 @@ test('AND THE CORPUS IT MUST NOT COST: sentences, amounts, ids, links, addresses
 
 /* EACH ONE IN THE SHAPE ITS SERVICE REALLY HANDS OUT, with made-up ids of the real length and alphabet. The Teams id is
    base64 of a GUID, as Teams writes it, and it was refused by the first version of the endpoint check, which measured a
-   73-long path segment rather than the 58-long run inside it (checker, 25 September). Zoom's `pwd=`, a Doc's
-   `resourcekey=` and a safe-links wrapper were refused at HEAD too, because a query was judged whole, and so was a real
-   YouTube playlist id tried by hand; this seed's passes there by chance. */
+   73-long path segment rather than the 58-long run inside it (measured). Zoom's `pwd=`, a Doc's `resourcekey=` and a
+   safe-links wrapper were refused at HEAD too, because a query was judged whole, and so was a real YouTube playlist id
+   tried by hand; this seed's passes there by chance. */
 const B64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
 const guid = (seed: number): string => [hex(8, seed), hex(4, seed + 1), hex(4, seed + 2), hex(4, seed + 3), hex(12, seed + 4)].join('-');
 const TEAMS = `https://teams.microsoft.com/l/meetup-join/19%3ameeting_${Buffer.from(guid(50)).toString('base64')}%40thread.v2/0?context=%7b%22Tid%22%3a%22${guid(51)}%22%2c%22Oid%22%3a%22${guid(52)}%22%7d`;
@@ -183,7 +183,7 @@ const REAL_LINKS: Record<string, string> = {
   'Google Doc shared with a resource key': `https://docs.google.com/document/d/${noise(44, 60, B64URL)}/edit?usp=sharing&resourcekey=0-${noise(22, 61, B64URL)}`,
   'Google Sheet on a tab': `https://docs.google.com/spreadsheets/d/${noise(44, 62, B64URL)}/edit#gid=1834720594`,
   'Google Slides': `https://docs.google.com/presentation/d/${noise(44, 63, B64URL)}/edit?slide=id.p1`,
-  'Notion page': `https://www.notion.so/sam/Launch-plan-${hex(32, 64)}?pvs=4`,
+  'Notion page': `https://www.notion.so/acme/Launch-plan-${hex(32, 64)}?pvs=4`,
   'Notion database view with a peek': `https://www.notion.so/${hex(32, 65)}?v=${hex(32, 66)}&p=${hex(32, 67)}&pm=s`,
   'Figma design on a node': `https://www.figma.com/design/${noise(22, 68)}/BrainDog-Home?node-id=1204-5521&t=${noise(16, 69)}-0`,
   'Figma prototype': `https://www.figma.com/proto/${noise(22, 70)}/BrainDog?page-id=0%3A1&node-id=12-34&starting-point-node-id=12%3A34&scaling=scale-down`,
@@ -193,10 +193,10 @@ const REAL_LINKS: Record<string, string> = {
   'Stripe payment': `https://dashboard.stripe.com/payments/pi_3${noise(23, 76)}`,
   'Stripe customer in test mode': `https://dashboard.stripe.com/test/customers/cus_${noise(14, 77)}`,
   'Stripe connected account invoice': `https://dashboard.stripe.com/acct_1${noise(15, 78)}/invoices/in_1${noise(23, 79)}`,
-  'GitHub pull request file': `https://github.com/sam/braindog/pull/412/files#diff-${hex(64, 80)}`,
-  'GitHub lines at a commit': `https://github.com/sam/braindog/blob/${hex(40, 81)}/packages/kernel/src/coerce.ts#L268-L319`,
-  'GitHub compare': `https://github.com/sam/braindog/compare/${hex(40, 82)}...${hex(40, 83)}`,
-  'GitHub release download': 'https://github.com/sam/braindog/releases/download/v1.4.0/braindog-win-x64.zip',
+  'GitHub pull request file': `https://github.com/acme/braindog/pull/412/files#diff-${hex(64, 80)}`,
+  'GitHub lines at a commit': `https://github.com/acme/braindog/blob/${hex(40, 81)}/packages/kernel/src/coerce.ts#L268-L319`,
+  'GitHub compare': `https://github.com/acme/braindog/compare/${hex(40, 82)}...${hex(40, 83)}`,
+  'GitHub release download': 'https://github.com/acme/braindog/releases/download/v1.4.0/braindog-win-x64.zip',
   'S3 public object': `https://braindog-public.s3.eu-west-1.amazonaws.com/exports/2026/09/${guid(84)}/Quarterly%20report.pdf`,
   'S3 path-style object': 'https://s3.us-east-1.amazonaws.com/braindog-public/press/logo-dark.svg',
   'S3 presigned-looking, with no credential and no signature': `https://braindog-public.s3.amazonaws.com/exports/${guid(85)}.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20260925T101500Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22report.csv%22`,
@@ -208,7 +208,7 @@ const SAS_SIG = encodeURIComponent(j(noise(21, 93), '+', noise(20, 98), '/', 'a=
 
 /* AND KEYS DRESSED AS LINKS, each in the shape its issuer really uses. */
 const KEYED_LINKS: Record<string, string> = {
-  'a raw GitHub file with its token': `https://raw.githubusercontent.com/sam/private/main/README.md?token=${noise(40, 90)}`,
+  'a raw GitHub file with its token': `https://raw.githubusercontent.com/acme/private/main/README.md?token=${noise(40, 90)}`,
   'an S3 presigned link with its credential and signature': j(
     'https://braindog-private.s3.amazonaws.com/a.csv?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=',
     'AKIA',

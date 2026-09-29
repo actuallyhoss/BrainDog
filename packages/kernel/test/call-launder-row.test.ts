@@ -1,6 +1,6 @@
 /**
- * A secret carried out to a call's endpoint by way of a field of the row: the other road out that wave fifty's checker
- * found beside the question to Slash (`slash-launder-row.test.ts`).
+ * A secret carried out to a call's endpoint by way of a field of the row: the other road out, found beside the question
+ * to Slash (`slash-launder-row.test.ts`).
  *
  * WHAT WAS MEASURED BEFORE THE REPAIR. `queueCall` left a field out of what a call sends by its live type alone, and
  * the lint followed a secret written into the row only as far as a question to Slash. So `set: { field: party, to:
@@ -10,16 +10,16 @@
  * branch. A rule that only writes the field and another that only runs the call installed clean, since neither body
  * says both, and that pair queued the secret too.
  *
- * SINCE AUDIT FIFTY-ONE §3 THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag` that writes the secret into a field
- * that may leave, and no longer the call that sends it (`launder-across-rules.test.ts`). So each refusal below names
- * the step that writes, the bodies that installed because their call did not send the field are refused too, and the
- * pair can no longer be installed.
+ * AND THE LINT REFUSES THE COPY ITSELF, at the `set` or `tag` that writes the secret into a field that may leave, and
+ * no longer the call that sends it (`launder-across-rules.test.ts`). So each refusal below names the step that writes,
+ * the bodies that installed because their call did not send the field are refused too, and the pair can no longer be
+ * installed.
  *
- * AND SINCE WAVE FIFTY-FIVE THE RUNNER REFUSES THE COPY TOO, for a rule stored past the lint. Before it, a stored rule
- * wrote `hunter2` into `party` and these tests pinned that the row kept it, to reach the call after it. That copy was
- * the leak, since every reader of the list sees `party`. So the stored rules are now held to writing nothing from the
- * secret, and `queueCall`'s second line is measured over a row that already holds a copy, put in by SQL as an earlier
- * build's write left it.
+ * AND THE RUNNER REFUSES THE COPY TOO, for a rule stored past the lint. Before it, a stored rule wrote `hunter2` into
+ * `party` and these tests pinned that the row kept it, to reach the call after it. That copy was the leak, since every
+ * reader of the list sees `party`. So the stored rules are now held to writing nothing from the secret, and
+ * `queueCall`'s second line is measured over a row that already holds a copy, put in by SQL as an earlier build's write
+ * left it.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE, as the Slash tests put their pin, because in use a secret field
  * holds a vault grant's id and a plaintext is the plainest way to see whether it left.
@@ -190,9 +190,9 @@ test('A STEP THAT WOULD WRITE A SECRET INTO A FIELD A CALL SENDS IS REFUSED AT I
 test('WHAT COPIES NO SECRET INSTALLS: a word nothing fills, and fields that may leave', async () => {
   const { k, sql } = await record();
   for (const [what, decl] of [
-    /* ON THE INLINE PATH NOTHING FILLS A TAG, so it writes the braces as typed. A `set` from `{{trigger.…}}` there, which
-       the pass leaves as typed too, is no longer a case of this test: the lint refuses it as a hole nothing fills
-       (`flow-lint.ts`'s `holeIn`, `loop/finish/defects.md` A8). */
+    /* ON THE INLINE PATH NOTHING FILLS A TAG, so it writes the braces as typed. A `set` from `{{trigger.…}}` there,
+       which the pass leaves as typed too, is no longer a case of this test: the lint refuses it as a hole nothing fills
+       (`flow-lint.ts`'s `holeIn`). */
     ['inline: tag {{token}}, which no fill reads', inline([{ tag: '{{token}}' }, { run: 'tags_hook' }])],
     /* THE `rowFill = false` BRANCH OF `hiddenIn`, ON THE RUN PATH. The run fills a tag from `{{vars.…}}` and
        `{{trigger.…}}` only, and the pass does not fill it, so `{{token}}` is tagged as typed. */
@@ -206,8 +206,8 @@ test('WHAT COPIES NO SECRET INSTALLS: a word nothing fills, and fields that may 
 });
 
 test('A TAG OF {{token}} BEFORE A QUESTION TO SLASH INSTALLS, since the run tags the braces as typed', async () => {
-  /* THE SAME BRANCH FOR THE QUESTION, which wave fifty added and no case reached: `tags` read by `{{tags}}` after a
-     `tag` step whose word only the pass's fill would have read. */
+  /* THE SAME BRANCH FOR THE QUESTION, which no case reached before: `tags` read by `{{tags}}` after a `tag` step whose
+     word only the pass's fill would have read. */
   const { k, sql } = await record();
   for (const steps of [
     [{ tag: '{{token}}' }, { ask_slash: { question: 'Rate for {{tags}}?', as: 'rate' } }],
@@ -328,9 +328,9 @@ test('TWO RULES STORED PAST THE LINT, one writing party from the secret and one 
 });
 
 test('AND A RETIRED SECRET, WHICH THE ROWS WRITTEN BEFORE IT STILL HOLD, is left out of what the pair sends too', async () => {
-  /* THE LIVE SCHEMA DROPS A RETIRED FIELD AND THE ROW KEEPS ITS VALUE, and `fill` reads the row. Measured by the checker
-     on 23 September: with `token` retired, the lint refused the single body (`hiddenOf` reads retired fields) and the
-     pair below queued `party: 'hunter2'`, because `queueCall` asked the live schema which fields were secret. */
+  /* THE LIVE SCHEMA DROPS A RETIRED FIELD AND THE ROW KEEPS ITS VALUE, and `fill` reads the row. Measured: with `token`
+     retired, the lint refused the single body (`hiddenOf` reads retired fields) and the pair below queued
+     `party: 'hunter2'`, because `queueCall` asked the live schema which fields were secret. */
   const { k, sql } = await pair();
   const made = value<Entry>(k.create('invoices', { what: 'Invoice 41', party: 'Fenwick', state: 'open' }, { actor: 'p_1' }));
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.token', 'hunter2', '$.party', 'hunter2') WHERE id = ?", made.id);

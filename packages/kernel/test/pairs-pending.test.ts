@@ -2,13 +2,13 @@
  * A set of alike legs is matched as a whole only when the whole of it is in the ledger, and a leg left over is not a
  * reason to match none of it.
  *
- * `loop/research-batch-sixty-three-audit.md` findings 2 and 6, driven with the audit's own cases (F1, F2 and B1) in the
- * kernel's own shape. Finding 2: EGP 20,000.00 out of CIB twice on the 10th, one half into HSBC cleared and the other
- * still pending, and a client paying EGP 20,000.00 into HSBC on the 12th. The pending half is nobody's partner, so the
- * set held two outs and two ins, and day order matched the client with the second out: Received read EGP 0.00 against
- * 20,000.00. When the bank cleared the half the set held three ins and two outs and nothing paired at all. Before
- * `57bf4ff7` every leg of it answered null (B1). Finding 6: the same halves all cleared, with the client beside them, and
- * the three-against-two set refused every pair, so Spent and Received each read EGP 40,000.00 high.
+ * Two cases, driven in the kernel's own shape. The first: EGP 20,000.00 out of CIB twice on the 10th, one half into
+ * HSBC cleared and the other still pending, and a client paying EGP 20,000.00 into HSBC on the 12th. The pending half
+ * is nobody's partner, so the set held two outs and two ins, and day order matched the client with the second out:
+ * Received read EGP 0.00 against 20,000.00. When the bank cleared the half the set held three ins and two outs and
+ * nothing paired at all. Before `57bf4ff7` every leg of it answered null. The second: the same halves all cleared, with
+ * the client beside them, and the three-against-two set refused every pair, so Spent and Received each read EGP
+ * 40,000.00 high.
  *
  * EVERY FIGURE HERE IS READ THE WAY THE LEDGER PAGE READS IT, as `pairs-ties.test.ts` reads it: `k.list` with Money's
  * `spent-30d` and `received-30d` sentences minus the date window.
@@ -75,7 +75,7 @@ async function ledger(decl: Declaration = LEDGER): Promise<Kernel> {
 
 type Line = { what: string; on: string; direction: 'in' | 'out'; account: string; state?: 'pending' | 'cleared' | 'void'; party?: string; moved?: boolean };
 
-/** Every line is EGP 20,000.00, the size of each half of the audit's move. */
+/** Every line is EGP 20,000.00, the size of each half of the move. */
 const write = (k: Kernel, lines: readonly Line[]): Record<string, string> =>
   Object.fromEntries(
     lines.map((l) => [
@@ -125,7 +125,7 @@ const HALVES: readonly Line[] = [
 ];
 const CLIENT: Line = { what: 'NILE DESIGN', on: DAY(2), direction: 'in', account: 'hsbc' };
 
-/** The halves paired across the two banks and the client left counted, as a correct ledger reads F1. */
+/** The halves paired across the two banks and the client left counted, as a correct ledger reads a split move. */
 function halvesPairedClientCounted(k: Kernel, ids: Record<string, string>, said: string): void {
   const got = partners(k, ids);
   assert.equal(got['NILE DESIGN'], null, `${said}: the client's payment was hidden as half of a move, ${JSON.stringify(got)}`);
@@ -139,7 +139,7 @@ function halvesPairedClientCounted(k: Kernel, ids: Record<string, string>, said:
   assert.equal(total(k, 'in'), 20_000, `${said}: Received is the client alone`);
 }
 
-test('F1: A SPLIT MOVE PAIRS WITH AN UNRELATED LEG OF THE SAME SIZE IN ITS WINDOW, and that leg stays counted, in every order', async () => {
+test('A SPLIT MOVE PAIRS WITH AN UNRELATED LEG OF THE SAME SIZE IN ITS WINDOW, and that leg stays counted, in every order', async () => {
   /* Measured before the repair: every row null, Spent 40,000 and Received 60,000, because two outs against three ins
      left one in over and the set was refused whole. Only one in can be the one left over at no cost to any day, the
      client two days off, so which rows pair is in the ledger and not a guess. */
@@ -158,11 +158,11 @@ test('F1: A SPLIT MOVE PAIRS WITH AN UNRELATED LEG OF THE SAME SIZE IN ITS WINDO
   }
 });
 
-test('F2: A HALF STILL PENDING KEEPS ITS SET FROM BEING MATCHED, so the client is not hidden in its place, and clearing it pairs the move', async () => {
+test('A HALF STILL PENDING KEEPS ITS SET FROM BEING MATCHED, so the client is not hidden in its place, and clearing it pairs the move', async () => {
   const k = await ledger();
   const ids = write(k, [HALVES[0]!, HALVES[1]!, HALVES[2]!, { ...HALVES[3]!, state: 'pending' }, CLIENT]);
   /* Measured before the repair: CIB OUT 2 named NILE DESIGN, so Received read 0.00 against 20,000.00. Answered leg by
-     leg, as the build before `57bf4ff7` answered it (B1), every row is tied or refused and all of it counts. */
+     leg, as the build before `57bf4ff7` answered it, every row is tied or refused and all of it counts. */
   const pending = partners(k, ids);
   for (const [what, to] of Object.entries(pending)) assert.equal(to, null, `${what} was paired while a half was pending, ${JSON.stringify(pending)}`);
   assert.equal(k.get(ids['NILE DESIGN']!)!.fields.moved, false);
@@ -174,7 +174,7 @@ test('F2: A HALF STILL PENDING KEEPS ITS SET FROM BEING MATCHED, so the client i
   halvesPairedClientCounted(k, ids, 'cleared');
 });
 
-test('F2 IN THE OTHER ORDER: the pending half arriving after the client unpicks the match that hid it', async () => {
+test('A HALF STILL PENDING, IN THE OTHER ORDER: the pending half arriving after the client unpicks the match that hid it', async () => {
   const k = await ledger();
   const ids = write(k, [HALVES[0]!, HALVES[1]!, HALVES[2]!, CLIENT]);
   /* Two outs and two ins, and nothing in the ledger yet says the second in is missing: day order pairs the client, and
@@ -233,11 +233,11 @@ test("A CLEARED PAYMENT THAT NAMES ITS PARTY DOES NOT HOLD A SPLIT MOVE BACK, un
   for (const [what, to] of Object.entries(partners(k, ids))) assert.equal(to, null, `${what} was paired while a half was pending`);
 });
 
-test('HIS `true` ON A LEG BESIDE A SPLIT MOVE DOES NOT HOLD THE SET BACK (DIRECTION 25): the bank legs pair, his leg counts as moved', async () => {
-  /* A third EGP 20,000.00 into HSBC the same day, which he typed and ticked. Until 25 September his ticked row held the
-     set back, since one of the outs might be its other leg; but a pinned row is never a partner, so the wait never
-     resolved and the move was counted twice for good. DIRECTION 25: only a row the pairing's `where` refuses (pending)
-     holds a pair back, because it clears on its own. */
+test('HIS `true` ON A LEG BESIDE A SPLIT MOVE DOES NOT HOLD THE SET BACK: the bank legs pair, his leg counts as moved', async () => {
+  /* A third EGP 20,000.00 into HSBC the same day, which he typed and ticked. His ticked row used to hold the set back,
+     since one of the outs might be its other leg; but a pinned row is never a partner, so the wait never resolved and
+     the move was counted twice for good. So only a row the pairing's `where` refuses (pending) holds a pair back,
+     because it clears on its own. */
   const k = await ledger();
   const ids = write(k, [...HALVES, { what: 'HSBC TYPED', on: DAY(0), direction: 'in', account: 'hsbc', moved: true }]);
   const got = partners(k, ids);
@@ -254,7 +254,7 @@ test('HIS `true` ON A LEG BESIDE A SPLIT MOVE DOES NOT HOLD THE SET BACK (DIRECT
   assert.equal(total(k, 'in'), 20_000, 'his unticked row alone');
 });
 
-const E: readonly Line[] = [
+const CROSSED: readonly Line[] = [
   { what: 'X OUT', on: DAY(0), direction: 'out', account: 'x' },
   { what: 'Y OUT', on: DAY(0), direction: 'out', account: 'y' },
   { what: 'X IN', on: DAY(0), direction: 'in', account: 'x' },
@@ -262,7 +262,7 @@ const E: readonly Line[] = [
   { what: 'Z IN', on: DAY(0), direction: 'in', account: 'z' },
 ];
 
-test('E: WHICH LEG IS LEFT OVER IS A GUESS WHEN A CROSSING MATCHING LEAVES ANOTHER AT THE SAME COST, in every order', async () => {
+test('WHICH LEG IS LEFT OVER IS A GUESS WHEN A CROSSING MATCHING LEAVES ANOTHER AT THE SAME COST, in every order', async () => {
   /* Outs from x and y, ins into x, y and z, one day, one size. An out may not take the in of its own account, so the
      feasible matchings are x to y with y to x (z over), x to y with y to z (x over) and x to z with y to x (y over),
      each costing no day. The first attempt counted only matchings taken first with first in account order, found the
@@ -275,7 +275,7 @@ test('E: WHICH LEG IS LEFT OVER IS A GUESS WHEN A CROSSING MATCHING LEAVES ANOTH
     const k = await ledger();
     const ids = write(
       k,
-      order.map((i) => E[i]!),
+      order.map((i) => CROSSED[i]!),
     );
     for (const [what, to] of Object.entries(partners(k, ids))) assert.equal(to, null, `${order.join(', ')}: ${what} was paired by a guess`);
     assert.equal(total(k, 'out'), 40_000);
@@ -288,7 +288,7 @@ test('A LEG LEFT OVER AT MORE COST THAN ANOTHER IS NO GUESS, whichever order the
      (X OUT to Y IN, Y OUT to Z IN), and leaving either other in over costs two, so X IN is over in the one matching of
      least cost and the rest pair. Counting every feasible matching must not make this a guess. */
   const k = await ledger();
-  const ids = write(k, [E[0]!, E[1]!, { ...E[2]!, on: DAY(2) }, E[3]!, E[4]!]);
+  const ids = write(k, [CROSSED[0]!, CROSSED[1]!, { ...CROSSED[2]!, on: DAY(2) }, CROSSED[3]!, CROSSED[4]!]);
   assert.deepEqual(partners(k, ids), { 'X OUT': 'Y IN', 'Y OUT': 'Z IN', 'X IN': null, 'Y IN': 'X OUT', 'Z IN': 'Y OUT' });
   assert.equal(total(k, 'out'), 0);
   assert.equal(total(k, 'in'), 20_000);

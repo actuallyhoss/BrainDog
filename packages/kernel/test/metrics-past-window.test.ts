@@ -5,7 +5,7 @@
  * question for half the fields. What makes a row dated after the as-of day wrong to count is whether
  * the field says when something HAPPENED (`on`, `done_on`, `settled`) or when something is DUE: a
  * payment on the 10th had not happened on the 5th, and a bill due on the 10th was already owed on the
- * 5th. The audit (`loop/research-batch-twenty-one-audit.md` §6) wrote three open bills due 2 days
+ * 5th. A probe wrote three open bills due 2 days
  * before and 3 and 12 days after the as-of day, 50,000, 100,000 and 200,000, and measured
  *
  *     state is open, due after -7d   live on the day: 350000 | as of that day, read 60 days later: 50000
@@ -71,7 +71,7 @@ const owed = (where: string): MetricDecl => ({
   compare: 'none',
 });
 
-/* The audit's three bills. */
+/* The probe's three bills. */
 const BILLS_DUE: ReadonlyArray<[number, number]> = [[-2, 50_000], [3, 100_000], [12, 200_000]];
 
 async function seeded(clockMs: number) {
@@ -97,7 +97,7 @@ const asOf = (deadline: boolean): EvalContext => ({
 
 for (const [where, live] of [['state is open, due after -7d', 350_000], ['state is open, due after -2d', 300_000]] as const) {
   test(`a deadline window that begins before the as-of day keeps its future: ${where}`, async () => {
-    /* The live figure is measured here, not copied from the audit: the record opened on the as-of day. */
+    /* The live figure is measured here, not copied from the probe: the record opened on the as-of day. */
     const then = await seeded(AS_OF);
     const measured = reading(then.k.metric(owed(where))).value;
     then.sql.close();

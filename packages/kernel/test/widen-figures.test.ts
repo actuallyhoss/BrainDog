@@ -1,13 +1,12 @@
 /**
  * A widening refuses to change what an installed figure counts.
  *
- * MEASURED IN `loop/research-batch-thirty-four-audit.md` §1. `enum` to `text` is a widening (`widen.ts`), and `stranded`
- * re-asked each reader of the opened field only whether it still compiles, which every one of these does. But `where`
- * maps an enum's words to its stored value by label, by spaces for underscores and without case, and over `text` it hands
- * the word back as written. Projects with `lane: enum [building, earning_money, parked]`, one row each, then `lane`
- * opened to text: `lane is earning money` went from 1 to 0, `lane is Building` from 1 to 0, `lane is not Parked` from 2
- * to 3, and a table filtered on the label `Earning` from 1 row to 0. Only the figure that wrote the stored value kept
- * its answer.
+ * MEASURED BEFORE THIS FILE. `enum` to `text` is a widening (`widen.ts`), and `stranded` re-asked each reader of the
+ * opened field only whether it still compiles, which every one of these does. But `where` maps an enum's words to its
+ * stored value by label, by spaces for underscores and without case, and over `text` it hands the word back as written.
+ * Projects with `lane: enum [building, earning_money, parked]`, one row each, then `lane` opened to text:
+ * `lane is earning money` went from 1 to 0, `lane is Building` from 1 to 0, `lane is not Parked` from 2 to 3, and a
+ * table filtered on the label `Earning` from 1 row to 0. Only the figure that wrote the stored value kept its answer.
  *
  * REFUSED, NOT REWRITTEN. The other way out was to rewrite each reader's literal to the stored value as part of the
  * change. That edits a declaration nobody in this change asked to edit, often one a pack owns and would put back on its
@@ -129,9 +128,9 @@ test("A PAGE FILTERED ON THE LABEL, A RULE'S when: AND AN AUTOMATION'S if: WRITT
   }
 });
 
-/* FOUND WRITING THE CASE ABOVE, and not in the audit: `page.earning` beside Projects in one batch was refused
-   "projects.lane has no value Earning", while the same page installed after Projects was taken. `unreadable` builds the
-   schema of a list arriving in the batch by hand and left the value labels out, which `schemaOf` carries. */
+/* FOUND WRITING THE CASE ABOVE: `page.earning` beside Projects in one batch was refused "projects.lane has no value
+   Earning", while the same page installed after Projects was taken. `unreadable` builds the schema of a list arriving
+   in the batch by hand and left the value labels out, which `schemaOf` carries. */
 test('A PAGE INSTALLED IN THE SAME BATCH AS ITS LIST MAY FILTER ON A VALUE LABEL, as one installed after it may', async () => {
   const after = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok((await after.install([projects(LANE)])).ok);
@@ -151,9 +150,9 @@ test('A FIGURE THAT WROTE THE STORED VALUE STILL INSTALLS THE WIDENING, and coun
   assert.equal(count(k, BY_VALUE), 1);
 });
 
-/* FOUND BY THE CHECKER OF THIS CHANGE: a pack update sends every declaration it holds, so the figure arrives in the
-   widening batch with the same bytes it already had. Passed over as "the batch's", `lane is earning money` went from 1
-   to 0 and the widening installed, the one path the refusal was chosen to hold against. */
+/* FOUND CHECKING THIS CHANGE: a pack update sends every declaration it holds, so the figure arrives in the widening
+   batch with the same bytes it already had. Passed over as "the batch's", `lane is earning money` went from 1 to 0 and
+   the widening installed, the one path the refusal was chosen to hold against. */
 test('A FIGURE RESENT UNCHANGED BESIDE THE WIDENING, as a pack update sends it, is still asked', async () => {
   const k = await record(metric(BY_WORDS));
   const out = await k.install([projects(LANE_TEXT), metric(BY_WORDS)]);
@@ -170,11 +169,11 @@ test('AND ONE WHOSE WORDS ARE CHANGED IN THE SAME BATCH BELONGS TO THE BATCH, an
   assert.equal(count(k, { ...BY_WORDS, where: 'lane is earning_money' } as MetricDecl), 1);
 });
 
-/* THREE READERS `loop/research-batch-thirty-six-audit.md` §1 FOUND THE REFUSAL NEVER ASKED, each measured changing its
-   answer with the widening installed. A pack version that also renames its figure sent it with different bytes, and a
-   reader with any change at all was passed over as "the batch's", though the batch's lint asks only whether it compiles.
-   A run-path rule may carry its steps as `then:`, and `sentencesOver` walked `steps` alone. And a rule started by an
-   arrival has no subject, though its run is handed the row the door wrote and its `if` is read against that list. */
+/* THREE READERS THE REFUSAL NEVER ASKED, each measured changing its answer with the widening installed. A pack version
+   that also renames its figure sent it with different bytes, and a reader with any change at all was passed over as
+   "the batch's", though the batch's lint asks only whether it compiles. A run-path rule may carry its steps as `then:`,
+   and `sentencesOver` walked `steps` alone. And a rule started by an arrival has no subject, though its run is handed
+   the row the door wrote and its `if` is read against that list. */
 test('A FIGURE RESENT BESIDE THE WIDENING WITH ONLY ITS NAME CHANGED IS STILL ASKED, since its words were kept', async () => {
   const k = await record(metric(BY_WORDS));
   const renamed = { ...BY_WORDS, name: 'Earning projects' } as MetricDecl;

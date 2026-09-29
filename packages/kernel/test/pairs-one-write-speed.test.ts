@@ -1,10 +1,10 @@
 /**
  * One write on a list where every row is one amount settles in its own time, not in the time of the whole list.
  *
- * `loop/finish/defects.md` L5 (DEF-12): one create after 10,000 rows of one amount took about 3 s. The install pass had
- * been taught to read the list once (`pairs.ts`, `passOf`), and a write's own `settle` still asked every window it read
- * by query, each query reading every row of the list and each row in the window that mirrors the leg asked afresh
- * whether it may pair. A write whose windows are busy now reads the list once too (`pairs.ts`, `READ_WHOLE_AT`).
+ * MEASURED: one create after 10,000 rows of one amount took about 3 s. The install pass had been taught to read the
+ * list once (`pairs.ts`, `passOf`), and a write's own `settle` still asked every window it read by query, each query
+ * reading every row of the list and each row in the window that mirrors the leg asked afresh whether it may pair. A
+ * write whose windows are busy now reads the list once too (`pairs.ts`, `READ_WHOLE_AT`).
  *
  * TIMED IN CPU, NOT ON THE WALL CLOCK: the claim is about the work one write does, and a runner busy with other files
  * would otherwise fail it for waiting.
@@ -57,8 +57,9 @@ const made = (r: unknown): Entry => {
 const dayOf = (d: number): string => new Date(Date.UTC(2025, 0, 1) + d * DAY_MS).toISOString().slice(0, 10);
 
 /**
- * The audit's ledger with one amount: a third of the rows the two legs of a move from CIB to HSBC a day or so apart, the
- * rest single card rows in any of four accounts, every one EGP 500.00. The same seed writes the same ledger every run.
+ * The measured ledger with one amount: a third of the rows the two legs of a move from CIB to HSBC a day or so apart,
+ * the rest single card rows in any of four accounts, every one EGP 500.00. The same seed writes the same ledger every
+ * run.
  */
 function fill(write: (fields: Record<string, unknown>) => void, rows: number, days: number): void {
   let seed = 3;

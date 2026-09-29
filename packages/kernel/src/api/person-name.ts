@@ -1,6 +1,6 @@
 /**
- * A person's own name and sign-in address, as this record mirrors them: `renamePerson` and `mirrorPerson`
- * (`loop/finish/contracts.md` §12.1, GAP-7; ROADMAP M3 "a name can be changed").
+ * A person's own name and sign-in address, as this record mirrors them: `renamePerson` and `mirrorPerson`, so a name
+ * can be changed.
  *
  * THE `person` TABLE IS A MIRROR OF THE DIRECTORY'S ROW (migration 0001), and until now only erasure wrote a name into
  * it (`erase.ts`), so a name typed once at an invitation stayed for ever. This file is the one writer of a changed name
@@ -35,7 +35,7 @@ const HIDDEN = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}\p{Cs}]/u;
 /**
  * A placeholder nobody filled in: a braced field (`{{first_name}}`, `{first}`, `${first}`), a bracketed one
  * (`[First] [Last]`), a mail merge's `*|FNAME|*` or `%FIRST_NAME%`. A form filled from a template stored these as a
- * person's name (`loop/finish/defects.md` H2), and every place the name was drawn said it for good.
+ * person's name, and every place the name was drawn said it for good.
  */
 const PLACEHOLDER = /\{[^{}]*\}|\[[^[\]]*\]|\*\|[^|]*\|\*|%[\p{L}_]+%/u;
 

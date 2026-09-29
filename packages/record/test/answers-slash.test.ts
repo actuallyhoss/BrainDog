@@ -1,6 +1,5 @@
 /**
- * The host's switch for an automation's question to Slash, as the record takes it (`RecordDeps.answersSlash`,
- * `loop/research-infer-ask-next.md` Brief A item 5).
+ * The host's switch for an automation's question to Slash, as the record takes it (`RecordDeps.answersSlash`).
  *
  * THE RECORD PASSES THE SWITCH THROUGH AND DECIDES NOTHING ITSELF. Whether a host answers an `infer.ask` job is the host's
  * to say, because only the host knows whether it has a model and runs the pass that leases the job. A record opened

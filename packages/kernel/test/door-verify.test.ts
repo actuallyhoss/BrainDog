@@ -1,12 +1,12 @@
 /**
  * A door stays a door while a pattern names it: the door is not re-installed without its token or its `match:`.
  *
- * `loop/research-batch-forty-two-audit.md` FINDING 4. `doorFault` refuses a `door:` naming anything but an installed
- * webhook with `verify: { kind: path }`, and it is asked when the PATTERN is installed. Measured by the audit on 23
- * September with this file's `HOOK` shape: `a` installed as a door and `b` naming it, then `a` re-installed without
- * `verify:` answered `ok`, and `a` retired answered `ok`, each leaving `b` installed under exactly the declaration
- * `doorFault` refuses. And a door with no `match:` filed an arrival meant for `b` itself, rows one and two `1 0`,
- * because `offered` puts the door's own pattern first and a pattern with no `match:` takes everything.
+ * WHY. `doorFault` refuses a `door:` naming anything but an installed webhook with `verify: { kind: path }`, and it is
+ * asked when the PATTERN is installed. Measured with this file's `HOOK` shape: `a` installed as a door and `b` naming
+ * it, then `a` re-installed without `verify:` answered `ok`, and `a` retired answered `ok`, each leaving `b` installed
+ * under exactly the declaration `doorFault` refuses. And a door with no `match:` filed an arrival meant for `b` itself,
+ * rows one and two `1 0`, because `offered` puts the door's own pattern first and a pattern with no `match:` takes
+ * everything.
  *
  * THE ORDER IS KEPT. The door's own pattern going first is deliberate (`ingest.ts`, "A PATTERN THAT NAMES THE DOOR IS NOT
  * A NEIGHBOUR"), so a door whose phrase is merely wider than a twin's still installs: whether one phrase covers another
@@ -98,8 +98,8 @@ test('(a) AND THE DOOR RE-INSTALLED WITHOUT ITS match: IS REFUSED WHILE A PATTER
 
 test('(b) A PACK STAGING THE DOOR WITHOUT verify: IS REFUSED AT STAGE TOO, in the same words install uses', async () => {
   /* `stageInstall` HANDS `stageDeclarations` NO `known`, so its `doorsKept` is skipped there and `lintBatch` is the one
-     that asks. Checked on 23 September by returning `null` in place of `lintBatch`'s `doorsKept`: every other case in
-     this file and the whole kernel suite stayed green, because `install` asks again when it stages. */
+     that asks. Checked by returning `null` in place of `lintBatch`'s `doorsKept`: every other case in this file and the
+     whole kernel suite stayed green, because `install` asks again when it stages. */
   const k = await doorAndTwin();
   const staged = (await k.stageInstall([without(HOOK('a', 'paid', 'one'), 'verify')])) as Refused;
   assert.equal(staged.ok, false, 'a pack staged the door out from under ingest.b');
@@ -111,15 +111,15 @@ test('A DOOR RE-INSTALLED WITH ITS TOKEN AND A NEW PHRASE STILL INSTALLS, howeve
   assert.equal(said(await k.install([HOOK('a', 'EGP', 'one')])), 'ok');
 });
 
-/* THE CHECKER'S SECOND SPELLING, measured on 23 September: a door declared with `match: { all: [] }` installed, a twin
-   naming it installed, and the twin's own text went to the door, rows one and two `1 0`, which is (a)'s hole with a
-   `match:` present. `evaluate` answers an empty group with `q !== 'any'`, so `none: []` is the same hole and so is any
-   nesting of the two that names no field.
+/* A SECOND SPELLING, measured: a door declared with `match: { all: [] }` installed, a twin naming it installed, and the
+   twin's own text went to the door, rows one and two `1 0`, which is (a)'s hole with a `match:` present. `evaluate`
+   answers an empty group with `q !== 'any'`, so `none: []` is the same hole and so is any nesting of the two that names
+   no field.
 
-   AND A FIELD BESIDE SUCH A GROUP DOES NOT MAKE IT DEPEND ON THE TEXT. The checker's third spelling, measured on 23
-   September: `{ any: [{ all: [] }, { field: body, contains: paid }] }` compiled clean, `evaluate` answered it true for an
-   empty arrival and for the text `You withdrew 5 EGP` alike, and the door and its twin installed together, because the
-   first version of `takesEvery` read any tree naming a field as the author's own phrase. */
+   AND A FIELD BESIDE SUCH A GROUP DOES NOT MAKE IT DEPEND ON THE TEXT. A third spelling, measured:
+   `{ any: [{ all: [] }, { field: body, contains: paid }] }` compiled clean, `evaluate` answered it true for an empty
+   arrival and for the text `You withdrew 5 EGP` alike, and the door and its twin installed together, because the first
+   version of `takesEvery` read any tree naming a field as the author's own phrase. */
 const TAKES_ALL: readonly unknown[] = [
   { all: [] },
   { none: [] },

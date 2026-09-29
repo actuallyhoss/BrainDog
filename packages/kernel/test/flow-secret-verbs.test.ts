@@ -1,16 +1,15 @@
 /**
- * A secret followed through every verb, not some: roadmap W53 "A secret is followed through every verb" (SEC-1 to 3),
- * the half wave fifty-three held back.
+ * A secret followed through every verb, not some.
  *
  * WHAT WAS MEASURED AT HEAD `afb3b1b2`, BEFORE THE REPAIR, over a list whose `pin` is secret:
  *
  *   - At install, the lint followed a secret into a `set`, a `tag` and a question to Slash and into nothing else.
  *     `note`, `notify`, `schedule`, `create` into another list's text field, `suggest`, `link` and a question to a
  *     person each installed holding `{{pin}}` or `{{trigger.row.pin}}`, on both paths, and a step crossing `each: [pin]`
- *     installed too. That is SEC-1, and the recorded finding named only the `create`; measuring found all of them.
+ *     installed too. The first report named only the `create`; measuring found all of them.
  *   - At run time, a rule stored past the lint wrote `hunter2` into the note event, a Payments row, the schedule and
- *     the question queue through every one of those verbs, and into the row itself through `set` and `tag`. Wave
- *     fifty-four refused the first set at run time and still wrote the last two, holding the field back from what
+ *     the question queue through every one of those verbs, and into the row itself through `set` and `tag`. An
+ *     earlier build refused the first set at run time and still wrote the last two, holding the field back from what
  *     leaves, because four test files stored such a copy to reach the lines after it. Those files now put the copy in
  *     by SQL, as a row an earlier build wrote, and `set` and `tag` are refused at run time with the rest.
  *   - An `untag` reading the secret installed, since it adds no word, and then failed its run whenever the secret held
@@ -19,14 +18,14 @@
  *   - Each text was filled twice. `rules.ts`'s `withEach` wrote a create's tuple in and `fill` then read the row's
  *     fields out of the result, so a `kinds` item `{{pin}}` crossed into `what: 'x {{each.0}}'` wrote `x hunter2`; and a
  *     run wrote its own paths into a step before the pass filled it from the row, so `{{trigger.row.note}}` over a
- *     `note` holding the words `{{pin}}` wrote `is hunter2`. That is SEC-3, and no lint can see it, since the braces
+ *     `note` holding the words `{{pin}}` wrote `is hunter2`. No lint can see it, since the braces
  *     are data.
  *
- * AND THE FIRST TEST IS THE ONE THE HELD ATTEMPT FAILED. Its run-time check compared each step filled from the row with
+ * AND THE FIRST TEST IS THE ONE A FIRST ATTEMPT FAILED. Its run-time check compared each step filled from the row with
  * the same step filled from `sendable`'s row, which also drops every field the live list does not declare, so a list
  * with no secret field at all had its rules refused at run time. A check that fires only when a value came from a field
- * declared secret or file, or from a variable set from one, has to leave that list alone, and has to leave alone a
- * text field that merely holds the same words as the secret.
+ * declared secret or file, or from a variable set from one, has to leave that list alone, and has to leave alone a text
+ * field that merely holds the same words as the secret.
  *
  * `hunter2` IS PUT IN BY SQL AFTER THE ROW IS MADE AND BEFORE THE DRAIN, as `slash-launder-row.test.ts` puts it: in
  * use a secret field holds a vault grant's id, and a plaintext is the plainest way to see where it went.
@@ -346,7 +345,7 @@ test('A RULE STORED PAST THE LINT COPIES THE SECRET THROUGH NO VERB AT RUN TIME:
       ]) {
         const { sql, went, run } = await stored({ on: on('obligations'), once_per: ['entry'], steps: [...before, copy(spelled)] }, { note: 'plain' });
         /* NOTHING NEW HOLDS IT, the run's own row included: a `set` or a `tag` of it wrote the entry, its write's event
-           and its search text before wave fifty-five. */
+           and its search text before the run-time refusal. */
         if (went.length) leaked.push(`${verb}#${n} ${spelled}: ${went.join(' | ')}`);
         if (f.atRun === 'refuses') {
           if (run?.state !== 'failed') leaked.push(`${verb}#${n} ${spelled}: the run is ${run?.state}, and a step that copies the secret fails it`);
@@ -398,11 +397,11 @@ test('A COPY INTO A FIELD THAT NEVER LEAVES EITHER IS NOT THE COPY CHECK AT RUN 
 });
 
 test('AN UNTAG THAT READS A SECRET INSTALLS AND RUNS, since it writes back only words the row already holds', async () => {
-  /* WAVE FIFTY-FOUR'S CHECKER FOUND INSTALL AND RUN DISAGREEING HERE. The lint lets an untag read the secret, as the
-     fixture above says why; the runner failed the run whenever `pin` held anything, because the check read every
-     string the run filled. The one thing an untag writes is the row's own `tags` less one word, so what it can tell a
-     reader is whether a tag equalled the secret, which an `if` on the field already tells, and nothing it writes is
-     new text. Install is the right one. Each case installs through the lint, not past it. */
+  /* INSTALL AND RUN DISAGREED HERE. The lint lets an untag read the secret, as the fixture above says why; the runner
+     failed the run whenever `pin` held anything, because the check read every string the run filled. The one thing an
+     untag writes is the row's own `tags` less one word, so what it can tell a reader is whether a tag equalled the
+     secret, which an `if` on the field already tells, and nothing it writes is new text. Install is the right one. Each
+     case installs through the lint, not past it. */
   const wrong: string[] = [];
   for (const { spelled, before } of [
     { spelled: '{{trigger.row.pin}}', before: [] as Step[] },
@@ -444,9 +443,9 @@ test('A CREATE THAT CROSSES A SECRET FIELD FAILS AT RUN TIME, since each value w
   sql.close();
 });
 
-test('SEC-3, rules.ts: A LIST ITEM THAT SPELLS {{pin}} IS CROSSED AS THOSE WORDS, on the inline path and as a run', async () => {
-  /* THE RECORDED FINDING, AS IT WAS MEASURED: `kinds` holds the words `{{pin}}`, and a create crossing it wrote
-     `x hunter2`. The lint cannot see this, since the braces are the row's data; both rules install clean. */
+test('rules.ts: A LIST ITEM THAT SPELLS {{pin}} IS CROSSED AS THOSE WORDS, on the inline path and as a run', async () => {
+  /* AS IT WAS MEASURED: `kinds` holds the words `{{pin}}`, and a create crossing it wrote `x hunter2`. The lint cannot
+     see this, since the braces are the row's data; both rules install clean. */
   for (const body of [
     { register: 'obligations', once_per: ['entry'], then: [{ create: { register: 'payments', bound: 4, each: ['kinds'], fields: { what: 'x {{each.0}}' } } }] },
     { on: { written: { register: 'obligations', op: ['update'] } }, once_per: ['entry'], steps: [{ create: { register: 'payments', bound: 4, each: ['kinds'], fields: { what: 'x {{each.0}}' } } }] },
@@ -467,7 +466,7 @@ test('SEC-3, rules.ts: A LIST ITEM THAT SPELLS {{pin}} IS CROSSED AS THOSE WORDS
   }
 });
 
-test('SEC-3, flow.ts: A TEXT FIELD THAT SPELLS {{pin}} IS COPIED AS THOSE WORDS, filled once and never again from the row', async () => {
+test('flow.ts: A TEXT FIELD THAT SPELLS {{pin}} IS COPIED AS THOSE WORDS, filled once and never again from the row', async () => {
   const wrong: string[] = [];
   const cases: { what: string; list: Step[]; found: (sql: NodeSql, made: Entry) => unknown }[] = [
     { what: 'set', list: [{ set: { field: 'memo', to: 'is {{trigger.row.note}}' } }], found: (sql, made) => sql.one<{ v: string }>("SELECT json_extract(fields, '$.memo') AS v FROM entry WHERE id = ?", made.id)?.v },
@@ -490,13 +489,13 @@ test('SEC-3, flow.ts: A TEXT FIELD THAT SPELLS {{pin}} IS COPIED AS THOSE WORDS,
 });
 
 test('WHERE A VARIABLE CAME FROM OUTLIVES A WAIT, is rebuilt for a column with no -sealed, and goes when an answer takes the name', async () => {
-  /* THREE LINES THE TESTS ABOVE LEFT UNTESTED, found by the checker on 23 September by taking each out and watching
-     this file, `slash-vars-hidden.test.ts`, `flow-waits.test.ts` and `slash-launder-row.test.ts` stay green: the
-     replay for a column a build before `-sealed` parked (`sealedAgain`), the filter in `answerStep` that takes an
-     answered name off `-sealed`, and the `present` that keeps an empty secret field from counting. With the replay
-     taken out, the run below finished and wrote `x k hunter2` into the note event after the wait. With the filter taken out, `p`
-     answered `yes` still read as the secret and the note step failed. With `present` taken out, a note reading a
-     `pin` that holds nothing failed its run. */
+  /* THREE LINES THE TESTS ABOVE LEFT UNTESTED, found by taking each out and watching this file,
+     `slash-vars-hidden.test.ts`, `flow-waits.test.ts` and `slash-launder-row.test.ts` stay green: the replay for a
+     column a build before `-sealed` parked (`sealedAgain`), the filter in `answerStep` that takes an answered name off
+     `-sealed`, and the `present` that keeps an empty secret field from counting. With the replay taken out, the run
+     below finished and wrote `x k hunter2` into the note event after the wait. With the filter taken out, `p` answered
+     `yes` still read as the secret and the note step failed. With `present` taken out, a note reading a `pin` that
+     holds nothing failed its run. */
   const decide = async (sql: NodeSql, k: Kernel): Promise<void> => {
     const asked = sql.one<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE status = 'open' AND opened_by = 'rule:copy'")!;
     const yes = (JSON.parse(asked.body) as { options: { id: string; label: string }[] }).options.find((o) => o.label === 'yes')!.id;

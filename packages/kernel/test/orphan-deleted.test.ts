@@ -1,11 +1,11 @@
 /**
  * A deleted row still holds its values, so a field it holds is not left out of the list either.
  *
- * MEASURED IN `loop/research-batch-thirty-two-audit.md` §7. The install's orphan check counted live rows only, so: a
- * change dropping `domain` while the row was live was `WOULD_ORPHAN`; the row was deleted; the same change installed;
- * the row was restored, and its JSON was `{"name":"Kiln","domain":"kiln.example"}` under a list with no `domain`. The
- * value was back, carried through every later edit, and no reader could see it: the exact state the check exists to
- * prevent, reached in three ordinary steps.
+ * MEASURED BEFORE THIS FILE. The install's orphan check counted live rows only, so: a change dropping `domain` while
+ * the row was live was `WOULD_ORPHAN`; the row was deleted; the same change installed; the row was restored, and its
+ * JSON was `{"name":"Kiln","domain":"kiln.example"}` under a list with no `domain`. The value was back, carried through
+ * every later edit, and no reader could see it: the exact state the check exists to prevent, reached in three ordinary
+ * steps.
  */
 
 import { test } from 'node:test';

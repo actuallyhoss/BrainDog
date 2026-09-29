@@ -1,12 +1,12 @@
 /**
  * An automation's clock that keeps the calendar: every month, or every few, on a day of the month at a time in the
- * record's zone (`loop/research-legacy-parity.md` B2).
+ * record's zone.
  *
- * MEASURED BEFORE THIS, on 25 September: `flow-lint.ts` refused `every: 1mo`, `1M`, `1month` and `1y` as "a clock is a
- * number and one of m, h, d or w", `day: last` on a weekly clock as "a day is mon to sun", and on a daily one as "day:
- * has nothing to choose". So a bill due on the last day of each month could only be carried as a task somebody copies
- * forward by hand (`packs/legacy-import/test/repeat-gap.test.ts`). A daily or four-weekly clock is no substitute: it
- * leaves the date within a month, and a date that drifts is the wrong day on a bill.
+ * MEASURED BEFORE THIS: `flow-lint.ts` refused `every: 1mo`, `1M`, `1month` and `1y` as "a clock is a number and one of
+ * m, h, d or w", `day: last` on a weekly clock as "a day is mon to sun", and on a daily one as "day: has nothing to
+ * choose". So a bill due on the last day of each month could only be carried as a task somebody copies forward by hand.
+ * A daily or four-weekly clock is no substitute: it leaves the date within a month, and a date that drifts is the wrong
+ * day on a bill.
  *
  * THE ORACLE IS THE CALENDAR, WRITTEN OUT BY HAND. Every expected instant below is a `Date.UTC` somebody can check
  * against a wall calendar and the zone's published change dates, never the output of the code under test. London
@@ -185,8 +185,8 @@ test('A RULE ON THE LAST DAY OF EACH MONTH IS ARMED FOR IT, RUNS ON IT, AND IS A
   }
 
   /* A DRAIN THAT COMES LATE TAKES EVERY TURN IT MISSED, each as its own run, and is armed for the next one ahead. It
-     took the first and folded the rest into it until the audit of 25 September (C2): here a host back on 2 July took
-     the turn of 30 April and none of 31 May or 30 June, and said nothing. Three turns after the loop's three. */
+     once took the first and folded the rest into it: here a host back on 2 July took the turn of 30 April and none of
+     31 May or 30 June, and said nothing. Three turns after the three above. */
   clock.set(Date.UTC(2027, 6, 2, 12));
   await k.drain();
   assert.equal(made(), 6);
@@ -197,7 +197,7 @@ test('A RULE ON THE LAST DAY OF EACH MONTH IS ARMED FOR IT, RUNS ON IT, AND IS A
   assert.equal(due(), '2027-07-31T08:00:00.000Z');
 });
 
-/* A CREATE ON ANY CLOCK INSTALLED AND THEN FAILED EVERY RUN, the weekly one included. Measured on 25 September with
+/* A CREATE ON ANY CLOCK INSTALLED AND THEN FAILED EVERY RUN, the weekly one included. Measured with
    `then: [{ create: { register: obligations, fields: { what: Rent }, bound: 1 } }]` on `every: 1w` and on `every: 1mo`:
    both armed, both ran on time, and both runs failed with "rule.<id>'s create step acts on a row, and this run has none
    to act on." (`flow.ts` `act`, where a step with no subject reached `runRules`, which fills a create from the row that

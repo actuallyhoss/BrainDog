@@ -1,7 +1,5 @@
 /**
- * A figure a run fills into a row is read only where it adds up the list the row is in (audit sixty-two, finding 4,
- * probe F1: `loop/research-batch-sixty-two-audit.md` §4; audit sixty-four, finding 1, as the owner decided it on 24
- * September: `loop/DIRECTION.md` section 25).
+ * A figure a run fills into a row is read only where it adds up the list the row is in, as the owner decided it.
  *
  * WHAT WAS MEASURED BEFORE THE FIRST REPAIR. Lists `salaries` and `inbox`, a figure `payroll` summing salaries, an
  * owner's rule on each new inbox row that sets `note` to `filed; payroll {{metric.payroll}}`, and a member invited to
@@ -14,10 +12,10 @@
  * member no longer decides it: a figure over another list is `--withheld--` for everyone, the owner alone included,
  * and the tests here that once proved the member rows were read now prove they are not.
  *
- * HOW THESE RULES REACH A RUN AT ALL. Install now refuses F1's rule (`figure-install-warning.test.ts`), so each rule
- * here goes in while `payroll` reads a series, and `payroll` is then pointed at Salaries. That install carries no rule,
- * so the lint never reads one, and it is the way a record comes to hold a rule whose figure is over another list:
- * measured here, it installs, and the run is the line that holds.
+ * HOW THESE RULES REACH A RUN AT ALL. Install now refuses the payroll rule below (`figure-install-warning.test.ts`), so
+ * each rule here goes in while `payroll` reads a series, and `payroll` is then pointed at Salaries. That install
+ * carries no rule, so the lint never reads one, and it is the way a record comes to hold a rule whose figure is over
+ * another list: measured here, it installs, and the run is the line that holds.
  */
 
 import { test } from 'node:test';
@@ -62,7 +60,7 @@ const rule = (rule: string, steps: unknown[], on: unknown = { written: { registe
   body: { rule, on, steps, ...extra } as never,
 });
 
-/** F1's own rule: every new inbox row is filed with the payroll written into its note. */
+/** The measured rule: every new inbox row is filed with the payroll written into its note. */
 const FILE = rule('file', [{ set: { field: 'note', to: 'filed; payroll {{metric.payroll}}' } }]);
 
 const why = (r: unknown): string => {
@@ -99,7 +97,7 @@ const noteOf = async (k: Kernel, register: string, what: string): Promise<unknow
 const runsOf = (sql: NodeSql, rule: string): { state: string; say: string | null }[] =>
   sql.all<{ state: string; say: string | null }>('SELECT state, say FROM automation_run WHERE rule = ? ORDER BY started_at, rowid', rule).map((r) => ({ ...r }));
 
-test('F1: A MEMBER INVITED TO INBOX ALONE READS --withheld-- WHERE THE PAYROLL WOULD BE, and the run still finishes', async () => {
+test('A MEMBER INVITED TO INBOX ALONE READS --withheld-- WHERE THE PAYROLL WOULD BE, and the run still finishes', async () => {
   const { k, sql } = await record(FILE);
   invite(k, { registers: { inbox: 'read' } });
   assert.equal(await noteOf(k, 'inbox', 'Invoice from the printer'), WITHHELD);
@@ -151,8 +149,8 @@ test('A FIGURE KEPT IN A VARIABLE FIRST is withheld too, since the variable is w
    about, and not only the run's own row's list, so the run needs a row of its own.
 
    ON SALARIES, THE LIST THE FIGURE ADDS UP, AND NOT ON INBOX. Written on Inbox, the run's own row was already a list
-   other than Salaries, so the note was withheld whether or not Diary was counted: the checker took `create` out of
-   `landsOf` in `flow.ts` and every test in this file still passed. On Salaries, Diary is the only other list. */
+   other than Salaries, so the note was withheld whether or not Diary was counted: with `create` taken out of `landsOf`
+   in `flow.ts`, every test in this file still passed. On Salaries, Diary is the only other list. */
 test('A ROW THE RUN CREATES IN ANOTHER LIST counts that list: a Salaries rule writing into Diary writes --withheld--', async () => {
   const { k, sql } = await record(
     rule('tally', [{ create: { register: 'diary', bound: 1, fields: { what: 'Payroll today', note: 'payroll {{metric.payroll}}' } } }], { written: { register: 'salaries', op: ['create'] } }, { once_per: ['entry'] }),

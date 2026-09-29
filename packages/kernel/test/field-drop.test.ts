@@ -1,11 +1,11 @@
 /**
  * A register change that leaves out a field the rows still hold a value for is refused, and retiring it is not.
  *
- * MEASURED IN `loop/research-shell-schema.md` blocker 2. Two agents each added a field to Projects from one reading,
- * and the owner accepted both: the second install carried a body without `domain` while row 1 held
- * `"domain":"https://kiln.example/"`. `contradicted` asked about retypes, narrowed lists, new required fields and
- * dangling refs, and `stranded` about readers, and a field that was simply absent passed both. The value stayed in the
- * row's JSON, was carried through every later edit, and was invisible to every reader that goes through the schema.
+ * MEASURED: two agents each added a field to Projects from one reading, and the owner accepted both: the second install
+ * carried a body without `domain` while row 1 held `"domain":"https://kiln.example/"`. `contradicted` asked about
+ * retypes, narrowed lists, new required fields and dangling refs, and `stranded` about readers, and a field that was
+ * simply absent passed both. The value stayed in the row's JSON, was carried through every later edit, and was
+ * invisible to every reader that goes through the schema.
  *
  * THE RECORD ALREADY HAS THE HONEST FORM OF REMOVAL, `retired: true`, which both checks understand, so the refusal
  * points at it rather than at a flag that forces the drop.
@@ -72,8 +72,8 @@ test('RETIRING THE SAME FIELD OVER THE SAME ROWS IS TAKEN, and the value stays i
 
 test('A FIELD ONLY A DELETED ROW HOLDS IS STILL REFUSED WHEN LEFT OUT, because a restore brings the value back', async () => {
   const { k, sql } = await record();
-  /* One row never had it, and the one that did is deleted. A restore within the thirty days would bring back a value the
-     schema no longer names (audit thirty-two section 7), so the deleted row counts and the change is refused. */
+  /* One row never had it, and the one that did is deleted. A restore within the thirty days would bring back a value
+     the schema no longer names, so the deleted row counts and the change is refused. */
   assert.ok(k.create('things', { name: 'Anvil' }, { actor: 'p_1' }).ok);
   const gone = k.create('things', { name: 'Kiln', domain: 'https://kiln.example/' }, { actor: 'p_1' });
   assert.ok(gone.ok);

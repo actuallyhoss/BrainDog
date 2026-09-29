@@ -1,6 +1,5 @@
 /**
- * The record's quiet hours, the kernel's half: `quietHours` and `setQuietHours` (`09 §5` rule 3,
- * `loop/finish/contracts.md` §12.1, decisions C74).
+ * The record's quiet hours, the kernel's half: `quietHours` and `setQuietHours` (`09 §5` rule 3).
  *
  * ONE COLUMN, `record.quiet` (migration 0020), AND NO SETTINGS LIST. NULL reads as 22:00 to 08:00, `'off'` holds nothing
  * back, and `{"from":"HH:MM","to":"HH:MM"}` is a window in the record's time zone. `quietOf` in `digest.ts` is the one

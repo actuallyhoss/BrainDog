@@ -1,12 +1,11 @@
 /**
  * A pair is a claim about two rows as they stand now, and it has to stop being made when they stop standing that way.
  *
- * `loop/research-batch-fifty-eight-audit.md` findings 1 to 4 and 7, driven here with the audit's own cases. W57-1 made a
- * pair once and then kept it whatever happened: a leg corrected to another amount, retyped the other way or deleted
- * left its partner marked, so Spent hid GBP 900.00, 800.00 and 400.00 in the three measured cases. A void or pending
- * row was a candidate, so a real payment paired with a line that never happened. A person who unmarked one leg left the
- * other hidden, and a `false` he set was overwritten by the next bank line that matched. And the first row to arrive
- * took a leg that a later, nearer row was the real partner of.
+ * The first form made a pair once and then kept it whatever happened: a leg corrected to another amount, retyped the
+ * other way or deleted left its partner marked, so Spent hid GBP 900.00, 800.00 and 400.00 in the three measured cases.
+ * A void or pending row was a candidate, so a real payment paired with a line that never happened. A person who
+ * unmarked one leg left the other hidden, and a `false` he set was overwritten by the next bank line that matched. And
+ * the first row to arrive took a leg that a later, nearer row was the real partner of.
  *
  * EVERY FIGURE HERE IS READ THE WAY THE LEDGER PAGE READS IT: `k.list` with Money's own `spent-30d` and `received-30d`
  * sentences minus the date window, over a register with money-core's shape (a positive amount, `direction` saying the
@@ -97,9 +96,9 @@ const unpaired = (k: Kernel, id: string, why: string): void => {
   assert.equal(row.fields.moved, false, `${why}: ${row.fields.what} is still marked`);
 };
 
-/* ─────────────── finding 1: a pair outlives an edit and a delete ─────────────── */
+/* ─────────────── a pair outlives an edit and a delete ─────────────── */
 
-test('P1: A LEG CORRECTED TO ANOTHER AMOUNT UNPAIRS BOTH, and Spent reads the 900.00 it was corrected to', async () => {
+test('A LEG CORRECTED TO ANOTHER AMOUNT UNPAIRS BOTH, and Spent reads the 900.00 it was corrected to', async () => {
   const { k, sql } = await record();
   const out = leg(k, 'TRANSFER TO RESERVE', DAY(0), 'out', 40_000, 'current');
   const back = leg(k, 'TRANSFER FROM CURRENT', DAY(1), 'in', 40_000, 'reserve');
@@ -130,7 +129,7 @@ test('P1: A LEG CORRECTED TO ANOTHER AMOUNT UNPAIRS BOTH, and Spent reads the 90
   sql.close();
 });
 
-test('P1b: THE IN LEG RETYPED AS OUT UNPAIRS BOTH, and Spent reads the two payments, 800.00', async () => {
+test('THE IN LEG RETYPED AS OUT UNPAIRS BOTH, and Spent reads the two payments, 800.00', async () => {
   const { k, sql } = await record();
   const out = leg(k, 'TRANSFER TO RESERVE', DAY(0), 'out', 40_000, 'current');
   const back = leg(k, 'TRANSFER FROM CURRENT', DAY(1), 'in', 40_000, 'reserve');
@@ -143,7 +142,7 @@ test('P1b: THE IN LEG RETYPED AS OUT UNPAIRS BOTH, and Spent reads the two payme
   sql.close();
 });
 
-test('P2: A DELETED LEG UNPAIRS ITS PARTNER, and the leg written again pairs with it as the first one did', async () => {
+test('A DELETED LEG UNPAIRS ITS PARTNER, and the leg written again pairs with it as the first one did', async () => {
   const { k, sql } = await record();
   const out = leg(k, 'TRANSFER TO RESERVE', DAY(0), 'out', 40_000, 'current');
   const back = leg(k, 'TRANSFER FROM CURRENT', DAY(1), 'in', 40_000, 'reserve');
@@ -152,7 +151,7 @@ test('P2: A DELETED LEG UNPAIRS ITS PARTNER, and the leg written again pairs wit
   assert.equal(spent(k), '400.00');
   unpaired(k, out.id, 'the survivor of a delete');
 
-  /* THE SECOND HALF OF P2. A re-import writes the in leg again; the survivor named the deleted row, so it was nobody's
+  /* THE SECOND HALF. A re-import writes the in leg again; the survivor named the deleted row, so it was nobody's
      candidate, the new leg landed unmarked, and Received counted 400.00 that was only moved. */
   const again = leg(k, 'TRANSFER FROM CURRENT', DAY(1), 'in', 40_000, 'reserve');
   assert.equal(now(k, again.id).fields._pair, out.id);
@@ -162,18 +161,18 @@ test('P2: A DELETED LEG UNPAIRS ITS PARTNER, and the leg written again pairs wit
   sql.close();
 });
 
-/* ─────────────── finding 2: a void or pending row is somebody's partner ─────────────── */
+/* ─────────────── a void or pending row is somebody's partner ─────────────── */
 
-test('P4: A VOID OR PENDING ROW IS NOBODY’S PARTNER when the declaration says which rows count, and a pending row that clears is', async () => {
+test('A VOID OR PENDING ROW IS NOBODY’S PARTNER when the declaration says which rows count, and a pending row that clears is', async () => {
   const { k, sql } = await record([LEDGER(CLEARED)]);
   const paid = leg(k, 'CARD PAYMENT', DAY(0), 'out', 25_000, 'current');
   const voided = leg(k, 'CREDIT, VOIDED', DAY(1), 'in', 25_000, 'savings', BANK, { state: 'void' });
-  unpaired(k, paid.id, 'P4, a cleared payment beside a void credit');
+  unpaired(k, paid.id, 'a cleared payment beside a void credit');
   assert.equal(voided.fields._pair, undefined);
   assert.equal(spent(k), '250.00');
 
   const pending = leg(k, 'CREDIT, PENDING', DAY(1), 'in', 25_000, 'reserve', BANK, { state: 'pending' });
-  unpaired(k, paid.id, 'P4b, a cleared payment beside a pending credit');
+  unpaired(k, paid.id, 'a cleared payment beside a pending credit');
   assert.equal(pending.fields._pair, undefined);
   assert.equal(spent(k), '250.00');
 
@@ -197,9 +196,9 @@ test('`where:` IS CHECKED AT INSTALL: a field it names is declared, and its word
   }
 });
 
-/* ─────────────── finding 3: a person can undo a pair ─────────────── */
+/* ─────────────── a person can undo a pair ─────────────── */
 
-test('P3: UNMARKING ONE LEG UNPAIRS THE OTHER, and the person’s false holds against the next matching line', async () => {
+test('UNMARKING ONE LEG UNPAIRS THE OTHER, and the person’s false holds against the next matching line', async () => {
   const { k, sql } = await record();
   const rent = leg(k, 'LOWRY STREET STUDIOS RENT', DAY(0), 'out', 100_000, 'current');
   const client = leg(k, 'HALDEN TYPE CO', DAY(1), 'in', 100_000, 'business', BANK);
@@ -219,7 +218,7 @@ test('P3: UNMARKING ONE LEG UNPAIRS THE OTHER, and the person’s false holds ag
   sql.close();
 });
 
-test('P3b: A FALSE A PERSON SETS BEFORE ANY PAIR IS NOT OVERWRITTEN BY THE NEXT BANK LINE, and a true he sets is not either', async () => {
+test('A FALSE A PERSON SETS BEFORE ANY PAIR IS NOT OVERWRITTEN BY THE NEXT BANK LINE, and a true he sets is not either', async () => {
   const { k, sql } = await record();
   const rent = leg(k, 'LOWRY STREET STUDIOS RENT', DAY(0), 'out', 100_000, 'current');
   made(k.update('ledger', rent.id, { moved: false }, PERSON));
@@ -255,9 +254,9 @@ test('P3b: A FALSE A PERSON SETS BEFORE ANY PAIR IS NOT OVERWRITTEN BY THE NEXT 
   sql.close();
 });
 
-/* ─────────────── finding 4: first come, not nearest ─────────────── */
+/* ─────────────── first come, not nearest ─────────────── */
 
-test('P5: THE NEAREST LEG WINS WHATEVER ORDER THE BANK LISTS THEM IN, and the rent a credit took first is given back', async () => {
+test('THE NEAREST LEG WINS WHATEVER ORDER THE BANK LISTS THEM IN, and the rent a credit took first is given back', async () => {
   const { k, sql } = await record();
   const rent = leg(k, 'LOWRY STREET STUDIOS RENT', DAY(0), 'out', 100_000, 'current', BANK);
   /* THE CREDIT IS LISTED BEFORE ITS DEBIT, as a bank export lists a same-day move, and the rent is the only candidate
@@ -308,9 +307,9 @@ test('A LEG MOVED OUT OF A TIE LETS THE TWO IT STOOD BETWEEN PAIR, though it was
   sql.close();
 });
 
-/* ─────────────── finding 7: a signed number across currencies ─────────────── */
+/* ─────────────── a signed number across currencies ─────────────── */
 
-test('P7: A SIGNED NUMBER WHOSE `on` NAMES NO CURRENCY IS REFUSED AT INSTALL, because a bare number carries none', async () => {
+test('A SIGNED NUMBER WHOSE `on` NAMES NO CURRENCY IS REFUSED AT INSTALL, because a bare number carries none', async () => {
   const postings = (on: string[], amount = 'int'): Declaration => ({
     id: 'register.postings',
     kind: 'register',

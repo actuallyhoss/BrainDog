@@ -1,5 +1,5 @@
 /**
- * Slash filing a `change` (`loop/research-shell-mcp.md` §4 Brief D, `loop/DIRECTION.md` §22).
+ * Slash filing a `change`.
  *
  * THE OWNER'S OWN EXAMPLE IS A GOLD RATE ON A SCHEDULE, and that is an `ingest`: a declaration, not a pack. Before this, a
  * model that drafted one had it dropped with "Slash files only pack, settings and arrange", so the record's Slash could

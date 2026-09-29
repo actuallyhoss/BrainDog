@@ -1,12 +1,11 @@
 /**
  * A FORWARD window read as of a past day, over rows that already existed on that day.
  *
- * `5ae403ff` ENDED EVERY AS-OF WINDOW WITH A START AND NO END AT THE AS-OF DAY, and that is right only
- * for a window that looks back. `on after -30d` is thirty days up to the day asked about, and a row
- * dated after it had not happened yet. `due after today` is the other way round: its whole content
- * is dated after the day, so an end at the day leaves `due > asOf and due < asOf + 1`, which holds
- * nothing. Measured in `loop/research-batch-nineteen-audit.md` §5 over two open bills due 3 and 12
- * days after the as-of day, both written before it:
+ * `5ae403ff` ENDED EVERY AS-OF WINDOW WITH A START AND NO END AT THE AS-OF DAY, and that is right only for a window
+ * that looks back. `on after -30d` is thirty days up to the day asked about, and a row dated after it had not happened
+ * yet. `due after today` is the other way round: its whole content is dated after the day, so an end at the day leaves
+ * `due > asOf and due < asOf + 1`, which holds nothing. Measured over two open bills due 3 and 12 days after the as-of
+ * day, both written before it:
  *
  *     state is open, due after today   live on the day: 300000 | as of that day, read 60 days later: 0
  *     state is open, due after -1d     live on the day: 300000 | as of that day, read 60 days later: 0
@@ -73,7 +72,7 @@ const owed = (where: string): MetricDecl => ({
   compare: 'none',
 });
 
-/* Two open bills due 3 and 12 days after the as-of day: 100,000 and 200,000, the audit's 300,000. */
+/* Two open bills due 3 and 12 days after the as-of day: 100,000 and 200,000, the measured 300,000. */
 const AHEAD: ReadonlyArray<[number, number]> = [[3, 100_000], [12, 200_000]];
 
 async function seeded(clockMs: number, rows: ReadonlyArray<[offset: number, amount: number]>) {
@@ -112,13 +111,12 @@ for (const where of ['state is open, due after today', 'state is open, due after
 /**
  * A window that begins before the as-of day, over a field the register declares a deadline.
  *
- * THIS TEST ONCE SAID SUCH A WINDOW ENDS AT THE AS-OF DAY, and over `due` that was the defect rather
- * than the rule. It asserted 1,000 for `due after -2d` because only the bill due on the day was
- * inside; but the two ahead were owed on that day as well, and a live read on it counted them. The
- * audit (`loop/research-batch-twenty-one-audit.md` §6) measured exactly this gap, and `isDeadline` in
- * `metrics.ts` closes it for a field whose register says `deadline: true`. The live figure is measured
- * here on a record opened on the as-of day, not copied, so the two numbers are one question asked
- * twice. `metrics-past-window.test.ts` holds the audit's own three bills.
+ * THIS TEST ONCE SAID SUCH A WINDOW ENDS AT THE AS-OF DAY, and over `due` that was the defect rather than the rule. It
+ * asserted 1,000 for `due after -2d` because only the bill due on the day was inside; but the two ahead were owed on
+ * that day as well, and a live read on it counted them. That is exactly the gap `isDeadline` in `metrics.ts` closes for
+ * a field whose register says `deadline: true`. The live figure is measured here on a record opened on the as-of day,
+ * not copied, so the two numbers are one question asked twice. `metrics-past-window.test.ts` holds the three bills of
+ * the original measure.
  */
 test('a deadline window that begins before the as-of day is what a live read gave on that day', async () => {
   const rows: ReadonlyArray<[number, number]> = [[0, 1_000], ...AHEAD];

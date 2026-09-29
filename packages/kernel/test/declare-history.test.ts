@@ -1,11 +1,10 @@
 /**
  * Every schema change leaves a `declare` event: who made it, the version it made, and the fields it added or took off.
  *
- * MEASURED IN `loop/research-shell-schema.md` blocker 5: a change that gave Projects a `domain` wrote no event at all,
- * and nothing in the tree emitted `declare`, though it is one of the five declaration kinds (`events.ts`). The
- * `declaration` table has no actor column, so "who added domain to Projects, and when" was answerable only by diffing
- * version bodies, and not at all for who. Through an accepted change the `decision` row named the decider and the
- * proposer was lost from the schema's own history.
+ * MEASURED: a change that gave Projects a `domain` wrote no event at all, and nothing in the tree emitted `declare`,
+ * though it is one of the five declaration kinds (`events.ts`). The `declaration` table has no actor column, so "who
+ * added domain to Projects, and when" was answerable only by diffing version bodies, and not at all for who. Through an
+ * accepted change the `decision` row named the decider and the proposer was lost from the schema's own history.
  */
 
 import { test } from 'node:test';

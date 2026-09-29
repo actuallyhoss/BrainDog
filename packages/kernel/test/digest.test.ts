@@ -266,7 +266,7 @@ test('A DIGEST WITH NOTHING IN IT IS NOT SENT', async () => {
 
 test('A PUSH CARRIES NO CONTENT, only which phone it rings', async () => {
   /* A lock screen is not a place a person chose to read their business on, and the outbox travels in every `.brain`
-     file. Since W58 a push is one job per owner subscription naming it by id, and the Worker sends it with no body. */
+     file. A push is one job per owner subscription naming it by id, and the Worker sends it with no body. */
   const { k, sql, clock } = await record(WEEKLY({ channels: ['push'] }));
   sql.exec(
     "INSERT INTO push_sub (id, person_id, endpoint, p256dh, auth, created_at) VALUES ('ps_1', 'p_1', 'https://fcm.googleapis.com/fcm/send/p1', 'k', 'a', ?)",
@@ -530,7 +530,7 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
      row, at most one interrupt per hour per record". */
   const { k, sql } = await record(WEEKLY(), false);
   value(await k.install([RULE_URGENT]));
-  /* THE OWNER'S PHONE, because a push is queued one per owner subscription (W58, `push.test.ts`). */
+  /* THE OWNER'S PHONE, because a push is queued one per owner subscription (`push.test.ts`). */
   sql.exec(
     "INSERT INTO push_sub (id, person_id, endpoint, p256dh, auth, created_at) VALUES ('ps_1', 'p_1', 'https://fcm.googleapis.com/fcm/send/p1', 'k', 'a', ?)",
     new Date(NOW).toISOString(),

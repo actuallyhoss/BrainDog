@@ -1,12 +1,12 @@
 /**
- * Additive is automatic (DIRECTION §22, the owner's answer of September 22nd).
+ * Additive is automatic, by the owner's rule.
  *
  * "An agent adding an optional field: automatic. A purely additive, optional field lands at once and is logged in
  * history ("Claude added domain to Projects"). Removing, retyping or narrowing a field still waits for his press in
  * Decide." Measured before this file: an agent's `{ add: { fields: [{ id: 'domain' }] } }` on Projects opened SG1 and
  * nothing else, so a row could not hold `domain` until the owner opened Decide and pressed accept, for a field that
- * takes nothing away from anybody. The narrow rule is `loop/research-shell-schema.md` "For the owner": additive,
- * optional, not unique, not indexed, and a history line that names the agent.
+ * takes nothing away from anybody. The narrow rule is: additive, optional, not unique, not indexed, and a history line
+ * that names the agent.
  */
 
 import { test } from 'node:test';
@@ -197,11 +197,11 @@ test("A PACK'S OWN LIST TAKES THE FIELD BY RULE, and the pack's next version sti
 });
 
 test("A MEMBER'S KEY ASKS: an addition from a key of anybody but the owner files and waits, whatever her level", async () => {
-  /* MEASURED BEFORE THE FIX (`loop/research-batch-thirty-three-audit.md` §3): a key of a person at `append` landed
-     `colour` on Projects with no press, while the same person proposing in her own name waited. `byRule` asked for a
-     token and for `propose` on the list, and never whose token it was. DIRECTION §22 answered for the owner's own
-     agents; `field-write.ts` holds the web to "a field on everybody's rows is the owner's call", and a member's key is
-     that member. So `append`, `write` and `decide` all file, and none of them lands. */
+  /* MEASURED BEFORE THE FIX: a key of a person at `append` landed `colour` on Projects with no press, while the same
+     person proposing in her own name waited. `byRule` asked for a token and for `propose` on the list, and never whose
+     token it was. The rule above answered for the owner's own agents; `field-write.ts` holds the web to "a field on
+     everybody's rows is the owner's call", and a member's key is that member. So `append`, `write` and `decide` all
+     file, and none of them lands. */
   for (const level of ['append', 'write', 'decide'] as const) {
     const { sql, add, live, declared } = await record();
     const member: CallContext = { ...agent, principal: { kind: 'token', id: 'tok_2', scope: 'propose', person: 'p_2', level } };
@@ -209,7 +209,7 @@ test("A MEMBER'S KEY ASKS: an addition from a key of anybody but the owner files
     idOf(out);
     assert.equal(out.value!.landed, undefined, `a ${level} key landed the field`);
     /* THE RECORD'S ONE QUESTION, READ BY ITSELF, because an `append` key is answered a receipt and not the question's
-       id: an appender reads nothing, not even what it filed (`20 §1`, COL-1). */
+       id: an appender reads nothing, not even what it filed (`20 §1`). */
     assert.equal(filed(sql), 'open', `a ${level} key answered its own question`);
     assert.deepEqual(live().fields.map((f) => f.id), ['name', 'lane']);
     assert.equal(declared().length, 0);
@@ -217,7 +217,7 @@ test("A MEMBER'S KEY ASKS: an addition from a key of anybody but the owner files
   }
 });
 
-test("AND THE OWNER'S OWN KEY STILL LANDS, which is the case DIRECTION §22 answered", async () => {
+test("AND THE OWNER'S OWN KEY STILL LANDS, which is the case the rule answered", async () => {
   const { sql, add, live } = await record();
   const out = await add({ fields: [{ id: 'colour', type: 'text' }] }, agent);
   assert.deepEqual(out.value!.landed, { declaration: 'register.things', version: 2 }, JSON.stringify(out));
@@ -255,10 +255,10 @@ test('AND A MEMBER INVITED AS OWNER OF PROJECTS ALONE is not the owner, and her 
 });
 
 test("A SCOPE FIELD WAITS, and every agent's context is what it was before the question", async () => {
-  /* MEASURED BEFORE THE FIX (`loop/research-batch-thirty-three-audit.md` §6): an agent added `project` with a `scope`
-     to Money, it landed by rule, and a second agent's `context` went from no registers to Money's three row titles.
-     `context` sends every readable list with a scope field into the brief, and `scopeFault` holds a key's writes to
-     its project by it, so a scope is where rows apply and not an optional field. */
+  /* MEASURED BEFORE THE FIX: an agent added `project` with a `scope` to Money, it landed by rule, and a second agent's
+     `context` went from no registers to Money's three row titles. `context` sends every readable list with a scope
+     field into the brief, and `scopeFault` holds a key's writes to its project by it, so a scope is where rows apply
+     and not an optional field. */
   const { sql, api, suggestion } = await record();
   const MONEY = {
     id: 'register.money',

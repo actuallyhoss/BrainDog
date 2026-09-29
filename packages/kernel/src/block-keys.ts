@@ -1,13 +1,13 @@
 /**
  * THE WORDS A PAGE DECLARATION MAY SAY, IN ONE PLACE, because two checks have to agree about them.
  *
- * `declare.ts` checks a page when it is installed and `pages.ts` checks each block when it is read, and until this
- * file each had its own idea: the read named a key nobody reads (`READS`), and the install named none at all. Measured
- * in `loop/research-dynamic-layouts.md` §3 through a pack installed on a fresh record: a block carrying `size: 2`
- * installed and was refused only when the page was opened, weeks after its author had gone; a page carrying `layout`
- * and `tabs` installed and was handed to the host in the answer, read by nothing and refused by nothing; and `lead: true`
- * on a `cards` block and `first: 3` on a `steps` block installed and read clean while no code for either kind looked at
- * them. So the install now refuses exactly what the read would, from this list, and the read refuses per kind too.
+ * `declare.ts` checks a page when it is installed and `pages.ts` checks each block when it is read, and until this file
+ * each had its own idea: the read named a key nobody reads (`READS`), and the install named none at all. Measured
+ * through a pack installed on a fresh record: a block carrying `size: 2` installed and was refused only when the page
+ * was opened, weeks after its author had gone; a page carrying `layout` and `tabs` installed and was handed to the host
+ * in the answer, read by nothing and refused by nothing; and `lead: true` on a `cards` block and `first: 3` on a
+ * `steps` block installed and read clean while no code for either kind looked at them. So the install now refuses
+ * exactly what the read would, from this list, and the read refuses per kind too.
  *
  * IT IMPORTS ONLY THE KIND REGISTRY, so `declare.ts` and `pages.ts` both import it and neither has to import the other,
  * whose own imports reach half the kernel. The registry (`kinds/index.ts`) is read here once, when this file loads, and
@@ -114,12 +114,12 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
  * written.
  *
  * `open` WAS ANSWERED AND MISSING TOO: a steps block's short view counts its open rows, and read back it was refused
- * "open: is not a key this record reads" (`loop/research-audit-2026-09-25-layouts.md` finding 7).
+ * "open: is not a key this record reads".
  *
- * EXPORTED BECAUSE THE RECORD BLANKS A HELD BLOCK BY IT. Every key here is something the read computed from rows, so
- * a block held from a reader keeps none of them beyond the empties, and the record's test holds its shell to this list:
- * the same audit found `open`, `done_now`, `next`, `nexts` and `types` answered here and left on a held block, where
- * `open: 2` counted the open steps of a list the reader may not open.
+ * EXPORTED BECAUSE THE RECORD BLANKS A HELD BLOCK BY IT. Every key here is something the read computed from rows, so a
+ * block held from a reader keeps none of them beyond the empties, and the record's test holds its shell to this list:
+ * `open`, `done_now`, `next`, `nexts` and `types` were measured answered here and left on a held block, where `open: 2`
+ * counted the open steps of a list the reader may not open.
  */
 export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',

@@ -1,7 +1,6 @@
 /**
- * A bundle an owner accepts lands against every member's version in the transaction that installs it
- * (`loop/research-batch-thirty-four-audit.md` finding 2, the hole `packages/kernel/test/govern-bundle-version.test.ts`
- * left open at the record).
+ * A bundle an owner accepts lands against every member's version in the transaction that installs it (the hole
+ * `packages/kernel/test/govern-bundle-version.test.ts` left open at the record).
  *
  * `decide` asks each member's version when it runs, and `land` then awaits `kernel.install`, which hashes before it
  * opens its transaction. The record passed only the named member's `expect`, so an install landing in that gap

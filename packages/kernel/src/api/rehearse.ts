@@ -4,8 +4,7 @@
  * WHAT IT IS FOR. A proposed change is drawn before anybody accepts it (`previewChange`), and an automation is tried
  * before anybody turns it on (`tryAutomation`). Both need the real write path, with every check, rule and event it
  * makes, because a preview that ran a second, simpler engine would show a result the real one does not reach. And
- * neither may leave a byte behind. So both run the real thing inside this, and this throws it all away
- * (`loop/finish/contracts.md` §2.1).
+ * neither may leave a byte behind. So both run the real thing inside this, and this throws it all away.
  *
  * ONE TRANSACTION, THROWN OUT OF. The kernel's transaction rolls back on a throw and on nothing else, so the function's
  * answer leaves the transaction as a throw of its own class, is caught outside it, and is handed back as the value it

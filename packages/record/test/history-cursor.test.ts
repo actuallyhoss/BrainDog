@@ -1,11 +1,11 @@
 /**
  * The log as a member invited to one list pages it: no event rowid out, none taken in.
  *
- * `loop/research-history-cursor.md` measured three ways the rowid counted the events she was not shown, and none of
- * them was only the `rowid` on her line. A limit-1 page answered her line's rowid as its cursor; a whole-number cursor
- * she chose was a probe, since stepping it from 3 to 10 changed the answer at 4 and at 8 and so said which rowids were
- * hers; and `markRead` answered the rowid it walked to. Every case here is written against a record built the way the
- * host builds a member (`kernel.access` into a `CallContext`), on a log where hidden writes sit between two of hers.
+ * Measured: three ways the rowid counted the events she was not shown, and none of them was only the `rowid` on her
+ * line. A limit-1 page answered her line's rowid as its cursor; a whole-number cursor she chose was a probe, since
+ * stepping it from 3 to 10 changed the answer at 4 and at 8 and so said which rowids were hers; and `markRead` answered
+ * the rowid it walked to. Every case here is written against a record built the way the host builds a member
+ * (`kernel.access` into a `CallContext`), on a log where hidden writes sit between two of hers.
  *
  * AND THE OWNER'S ANSWER DOES NOT MOVE. Whoever reads the whole record is told the rowid as before, because for them it
  * counts nothing they may not read, and `/audit`'s footer and `read.test.ts`'s arithmetic are true for them.

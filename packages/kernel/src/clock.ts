@@ -1,6 +1,6 @@
 /**
  * An automation's clock that keeps the calendar: every month, or every few, on a day of the month, at a time in the
- * record's zone (`loop/research-legacy-parity.md` B2).
+ * record's zone.
  *
  * `pull.ts`'s `intervalMs` IS A NUMBER OF MILLISECONDS, AND A MONTH IS NOT ONE. Until this file the lint refused `1mo`
  * outright, so a bill due on the last day of each month could only be kept as a task somebody copied forward by hand,
@@ -97,13 +97,12 @@ export function nextCalendar(cal: Calendar, fromMs: number, tz: string): number 
 /**
  * The instant a wall-clock time names in a zone.
  *
- * TWO GUESSES, ONE WITH THE OFFSET A DAY BEFORE AND ONE WITH THE OFFSET A DAY AFTER, since no zone changes twice in
- * two days. The earlier guess that reads back as the time asked for wins, so a time the zone says twice (01:30 on the
- * night New York leaves EDT) is its first. A time the zone skips (02:30 on the night it enters EDT) reads back as
- * neither, and the answer is the one read with the offset in force before the change, which the wall shows as the
- * same distance past the gap: 03:30.
- * `digest.ts`'s `nextOccurrence` READS A TIME THROUGH THIS TOO, by way of `nextCalendar`. It kept its own offset
- * arithmetic until 25 September and disagreed on both nights, measured in New York: 02:30 on 14 March 2027 came out
+ * TWO GUESSES, ONE WITH THE OFFSET A DAY BEFORE AND ONE WITH THE OFFSET A DAY AFTER, since no zone changes twice in two
+ * days. The earlier guess that reads back as the time asked for wins, so a time the zone says twice (01:30 on the night
+ * New York leaves EDT) is its first. A time the zone skips (02:30 on the night it enters EDT) reads back as neither,
+ * and the answer is the one read with the offset in force before the change, which the wall shows as the same distance
+ * past the gap: 03:30. `digest.ts`'s `nextOccurrence` READS A TIME THROUGH THIS TOO, by way of `nextCalendar`. It once
+ * kept its own offset arithmetic and disagreed on both nights, measured in New York: 02:30 on 14 March 2027 came out
  * 01:30 EST, and 01:30 on 7 November 2027 the second one. Now a digest and a monthly rule at the same skipped or
  * repeated time run together (`test/digest-dst.test.ts`).
  */

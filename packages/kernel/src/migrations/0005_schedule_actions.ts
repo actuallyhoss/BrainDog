@@ -1,9 +1,9 @@
 /**
  * The kernel schema, migration 5: `schedule` rebuilt with two more kinds, `call` and `poll`.
  *
- * `call` is an outbound POST a schedule fires, and `poll` fetches an endpoint and acts through a rule
- * when the answer changes (`loop/DIRECTION.md` §0b, `07 §1`, `09 §1`). Both are declared inside an
- * `ingest`, like `pull`, and both are armed and drained like it.
+ * `call` is an outbound POST a schedule fires, and `poll` fetches an endpoint and acts through a rule when the answer
+ * changes (`07 §1`, `09 §1`). Both are declared inside an `ingest`, like `pull`, and both are armed and drained like
+ * it.
  *
  * A REBUILD AND NOT AN ALTER, because SQLite cannot change a CHECK in place, and the list of kinds is
  * a CHECK so that the database refuses a thirteenth. Every row is copied across unchanged, and the

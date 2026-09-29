@@ -1,9 +1,9 @@
 /**
- * An enum's values are checked for key shapes, in every version of a declaration (`loop/research-audit-2026-09-25-import.md` S1).
+ * An enum's values are checked for key shapes, in every version of a declaration.
  *
- * A closed list grows at run time, and the import proposed a person's role and a service's kind from the old tool as new
- * values. The audit measured `register.people v2` holding a GitHub token as a role, resolved by rule on the owner's key.
- * A declaration is versioned history, so a value that lands there stays after any fix. The importer now leaves such a
+ * A closed list grows at run time, and an import proposed a person's role and a service's kind from its source as new
+ * values. Measured: `register.people v2` holding a GitHub token as a role, resolved by rule on the owner's key. A
+ * declaration is versioned history, so a value that lands there stays after any fix. An importer should leave such a
  * word out, and this is the kernel's half: no door can put one in a declaration at all.
  *
  * EVERY VALUE IS MADE UP, AND THE KEY IS NOT ONE.

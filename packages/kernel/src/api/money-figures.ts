@@ -1,11 +1,11 @@
 /**
  * `homeCurrency`: the record's own currency, for a caller outside the kernel that has to say it.
  *
- * WHY THE RECORD ASKS. `boot` answers `record.currency` (`loop/finish/contracts.md` §7.4), and the web prints every
- * amount on the home currency's terms: its symbol first, any other currency with its code after. The web derived it
- * from the rows it happened to hold (`apps/web/src/lib/record/api.ts` `homeCurrency`), which is a guess about a choice
- * the record already has. The currency is a setting a person chose, read by the same function every figure is added up
- * with (`declare.ts` `homeCurrency`), so the shell and the figures cannot name two different ones.
+ * WHY THE RECORD ASKS. `boot` answers `record.currency`, and the web prints every amount on the home currency's terms:
+ * its symbol first, any other currency with its code after. The web derived it from the rows it happened to hold
+ * (`apps/web/src/lib/record/api.ts` `homeCurrency`), which is a guess about a choice the record already has. The
+ * currency is a setting a person chose, read by the same function every figure is added up with (`declare.ts`
+ * `homeCurrency`), so the shell and the figures cannot name two different ones.
  *
  * `null` WHEN NOBODY HAS CHOSEN ONE, never a fallback. A record with no home currency writes each amount in its own.
  *

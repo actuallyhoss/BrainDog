@@ -1,11 +1,11 @@
 /**
  * The cursor a caller held to named lists pages the log with, in place of the event's rowid.
  *
- * THE ROWID COUNTED WHAT SHE WAS NOT SHOWN. `loop/research-history-cursor.md` measured a member invited to Obligations
- * reading her two lines as rowids 7 and 3, three events she was never shown between them, and removing `rowid` from
- * the line would not have closed it: the cursor out was the same number, a whole number in was a probe (stepping
- * `cursor` from 3 to 10 changed the answer at 4 and at 8, so her lines were 3 and 7 whatever the line carried), and
- * `markRead` answered the rowid it walked to. So what she is handed and what she may hand back are strings.
+ * THE ROWID COUNTED WHAT SHE WAS NOT SHOWN. A member invited to Obligations was measured reading her two lines as
+ * rowids 7 and 3, three events she was never shown between them, and removing `rowid` from the line would not have
+ * closed it: the cursor out was the same number, a whole number in was a probe (stepping `cursor` from 3 to 10 changed
+ * the answer at 4 and at 8, so her lines were 3 and 7 whatever the line carried), and `markRead` answered the rowid it
+ * walked to. So what she is handed and what she may hand back are strings.
  *
  * `e.<event id>` IS THE ORDINARY CASE, AND IT SAYS NOTHING THE LINE DID NOT. The id is already on every line she is
  * shown, so a cursor naming the last one is a pointer she could have written herself; the record resolves it through
@@ -75,10 +75,10 @@ export async function historyCursors(): Promise<HistoryCursors> {
     mint: (id) => `e.${id}`,
     async seal(rowid) {
       const iv = crypto.getRandomValues(new Uint8Array(NONCE));
-      /* SIXTEEN DIGITS, WHATEVER THE ROWID. AES-GCM keeps the plaintext's length, and `String(rowid)` made the cursor 41
-         characters for rowid 7, 45 for 1000 and 48 for 100000 (`loop/research-batch-nineteen-audit.md`, finding 6), so
-         the cursor she is handed past the walk cap told her the log's size to a power of ten. Sixteen is the width of
-         `Number.MAX_SAFE_INTEGER`, so no rowid this file will open is wider; every cursor is now 61 characters. */
+      /* SIXTEEN DIGITS, WHATEVER THE ROWID. AES-GCM keeps the plaintext's length, and `String(rowid)` made the cursor
+         41 characters for rowid 7, 45 for 1000 and 48 for 100000, so the cursor she is handed past the walk cap told
+         her the log's size to a power of ten. Sixteen is the width of `Number.MAX_SAFE_INTEGER`, so no rowid this file
+         will open is wider; every cursor is now 61 characters. */
       const plain = String(rowid).padStart(ROWID_WIDTH, '0');
       const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain)));
       const out = new Uint8Array(NONCE + sealed.length);

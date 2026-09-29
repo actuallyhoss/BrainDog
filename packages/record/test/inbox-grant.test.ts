@@ -1,10 +1,9 @@
 /**
- * An agent reads the money inbox when its owner grants it (brief B7 of `loop/research-legacy-parity.md`, pick P2 in
- * `loop/DIRECTION.md` section 30).
+ * An agent reads the money inbox when its owner grants it.
  *
- * WHAT WAS MEASURED BEFORE THIS. A token for the whole record, minted by the owner and carrying the `inbox` reach, asked
- * `inbox` and was refused `FORBIDDEN` with "This needs owner, and no token reaches it", in every state. The record being
- * moved in has agents triage the bank alerts no rule filed (`money_inbox`), so the move would have taken that away.
+ * WHAT WAS MEASURED BEFORE THIS. A token for the whole record, minted by the owner and carrying the `inbox` reach,
+ * asked `inbox` and was refused `FORBIDDEN` with "This needs owner, and no token reaches it", in every state. So a
+ * record whose agents triage the bank alerts no rule filed (`money_inbox`) could not have them do it.
  *
  * THE GRANT IS NARROW ON PURPOSE. It opens the read and nothing beside it: the token must be for the whole record, the
  * person behind it must still be an owner today, and it files and archives nothing. A token held to one list, a token

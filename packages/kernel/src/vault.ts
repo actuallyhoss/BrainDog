@@ -493,10 +493,10 @@ export function sealedGrant(
   args: { outbox: string; leasedUntil: string; grant: string },
   transaction: <T>(fn: () => T) => T,
 ): Result<LeasedSeal> {
-  /* TWO KINDS AND NO MORE. A `notify.webhook` names the key that signs its body (`09 §6`, `digest.ts`), and until
-     wave fifty-five this read `kind = 'pull.fetch'` alone, so the one door a deliverer could open that key through
-     answered "There is no connector job" and the post went unsigned. An email or a push names no key, and a lease on
-     one opens nothing, which is the same refusal it always was. */
+  /* TWO KINDS AND NO MORE. A `notify.webhook` names the key that signs its body (`09 §6`, `digest.ts`), and this once
+     read `kind = 'pull.fetch'` alone, so the one door a deliverer could open that key through answered "There is no
+     connector job" and the post went unsigned. An email or a push names no key, and a lease on one opens nothing, which
+     is the same refusal it always was. */
   const job = sql.one<{ kind: SendsAKey; state: string; leased_until: string | null; payload: string }>(
     `SELECT kind, state, leased_until, payload FROM outbox WHERE id = ? AND kind IN (${SENDS_A_KEY.map(() => '?').join(', ')})`,
     args.outbox,
@@ -552,13 +552,13 @@ export function sealedGrant(
      the key was revoked rather than that it never existed.
 
      THE ORDER IS `grantChosen`'s, NOT A CLAUSE OF ITS OWN. `deb5b703` wrote `ORDER BY created_at DESC, id DESC` here
-     twice, one commit before `grantChosen` said the order was written once (the audit of wave fifty-five, §7), and a
-     second copy is the one the next change to the chooser misses. Nor were the two one comparison: SQLite orders text
-     by its UTF-8 bytes and the chooser by UTF-16 code units, so over two ids that tie on `created_at` and differ past
-     U+FFFF the post signed with one key and a call naming the same label sent the other (`vault-webhook-grant.test.ts`).
-     No id the vault mints reaches that, since `bindGrant` holds every id to `g_` and a ULID. The filter stays in SQL,
-     as `liveNamed`'s does, and the revoked fallback asks the same chooser over the same rows read as if live, so the
-     date the refusal names is that of the grant the order would have chosen.
+     twice, one commit before `grantChosen` said the order was written once, and a second copy is the one the next
+     change to the chooser misses. Nor were the two one comparison: SQLite orders text by its UTF-8 bytes and the
+     chooser by UTF-16 code units, so over two ids that tie on `created_at` and differ past U+FFFF the post signed with
+     one key and a call naming the same label sent the other (`vault-webhook-grant.test.ts`). No id the vault mints
+     reaches that, since `bindGrant` holds every id to `g_` and a ULID. The filter stays in SQL, as `liveNamed`'s does,
+     and the revoked fallback asks the same chooser over the same rows read as if live, so the date the refusal names is
+     that of the grant the order would have chosen.
 
      A CONNECTOR'S JOB IS READ THE SAME WAY, because a label reaches here too. The fire writes the id it resolved, but a
      job queued before the fire resolved names, or one a runner re-sent as the connector declared it, carries the label

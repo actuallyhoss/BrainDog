@@ -1,15 +1,14 @@
 /**
- * A secret carried into a question to Slash by way of a variable: audit forty-six §1, which restates audit forty-five's
- * brief 2.
+ * A secret carried into a question to Slash by way of a variable.
  *
- * WHAT THE AUDIT MEASURED. The question's own braces were held to the rule `about:` is (`flow-lint.ts`'s `hiddenIn`,
- * and `sendable` in `ask()`), and a variable was not. `set_var: { name: p, to: '{{trigger.row.pin}}' }` then a question
+ * WHAT WAS MEASURED. The question's own braces were held to the rule `about:` is (`flow-lint.ts`'s `hiddenIn`, and
+ * `sendable` in `ask()`), and a variable was not. `set_var: { name: p, to: '{{trigger.row.pin}}' }` then a question
  * naming `{{vars.p}}` installed clean, and through a real self-host the model's request body held "What rate applies to
  * Rent, given hunter2?". `set_var` to `{{trigger.row}}` sent the row's JSON with `pin` in it. `set_var` fills `to` from
  * the whole row, and `sendable` cleaned the row the question was filled from and never a variable filled earlier.
  *
- * RED BEFORE THE REPAIR, MEASURED ON 23 SEPTEMBER against `flow.ts` and `flow-lint.ts` as they stood: every case below
- * failed. The install cases read `null` where they expect `DECLARATION_INVALID`, and the queued question read
+ * RED BEFORE THE REPAIR, MEASURED against `flow.ts` and `flow-lint.ts` as they stood: every case below failed. The
+ * install cases read `null` where they expect `DECLARATION_INVALID`, and the queued question read
  * `Rate for plain, hunter2, again hunter2, {"what":"Rent","note":"plain","pin":"hunter2"}, hunter2?`.
  *
  * AND EACH LINE OF THE REPAIR WAS TAKEN OUT AGAIN, ONE AT A TIME. The second fill at `set_var` left out: the stored case
@@ -126,9 +125,9 @@ test('A QUESTION TO SLASH NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED A
     const out = refusal((await k.install([rule(steps)])) as Result<unknown>);
     assert.equal(out, null, out?.fix);
   }
-  /* AND A SECRET ONE IN A QUESTION TO A PERSON IS REFUSED TOO. This installed until 23 September, "a question to a
-     person stays in the record"; it stays in the record's one queue, which everyone who decides reads, and at run time
-     it was asked as `Pay hunter2?` (`flow-secret-verbs.test.ts` measured each spelling). */
+  /* AND A SECRET ONE IN A QUESTION TO A PERSON IS REFUSED TOO. This once installed, "a question to a person stays in
+     the record"; it stays in the record's one queue, which everyone who decides reads, and at run time it was asked as
+     `Pay hunter2?` (`flow-secret-verbs.test.ts` measured each spelling). */
   const person = refusal((await k.install([rule([{ set_var: { name: 'p', to: '{{trigger.row.pin}}' } }, { ask_person: { question: 'Pay {{vars.p}}?', options: ['yes', 'no'], as: 'a' } }])])) as Result<unknown>);
   assert.equal(person?.code, 'DECLARATION_INVALID', person?.fix ?? 'installed');
   assert.match(person!.fix, /\{\{vars\.p\}\} into its question to a person at steps\[1\], and p holds pin: steps\[0\] put it there/);
@@ -136,11 +135,10 @@ test('A QUESTION TO SLASH NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED A
 });
 
 test('A QUESTION NO RUN CAN REACH HOLDING THE SECRET INSTALLS: the arm beside the one that set it, and after a plain set_var of the same name', async () => {
-  /* THE LINT REFUSED BOTH UNTIL 23 SEPTEMBER, measured against `flow-lint.ts` as wave forty-seven left it: each read
-     `DECLARATION_INVALID` naming the `set_var` that took `pin`. Neither can leave. A plan has no loops, so an `else` is
-     never taken after its own `then` (`flow.ts`'s `plan`), and the runner takes `p` out of what it keeps when a later
-     `set_var` fills it the same both ways (the test "WHAT WAS KEPT GOES" below measures that one reaching Slash as
-     `plain`). */
+  /* THE LINT ONCE REFUSED BOTH, measured against an earlier `flow-lint.ts`: each read `DECLARATION_INVALID` naming the
+     `set_var` that took `pin`. Neither can leave. A plan has no loops, so an `else` is never taken after its own `then`
+     (`flow.ts`'s `plan`), and the runner takes `p` out of what it keeps when a later `set_var` fills it the same both
+     ways (the test "WHAT WAS KEPT GOES" below measures that one reaching Slash as `plain`). */
   const { k, sql } = await slashed();
   const cases: [string, unknown[]][] = [
     [
@@ -218,9 +216,9 @@ test('A RULE STORED WITH SUCH A VARIABLE SENDS THE DASH A FIELD IS WRITTEN AS, a
 });
 
 test('WHAT WAS KEPT GOES WHEN THE VARIABLE IS SET AGAIN FROM A FIELD THAT MAY LEAVE, for Slash and for a person alike', async () => {
-  /* TWO LINES THE CASE ABOVE LEFT UNTESTED, found by the checker on 23 September by taking each out and watching the
-     suite stay green. With the `delete` at `set_var` taken out, `r` set from `pin` and then from `note` kept its dash
-     and Slash was asked `Given — and —?` about a variable holding `plain`.
+  /* TWO LINES THE CASE ABOVE LEFT UNTESTED, found by taking each out and watching the suite stay green. With the
+     `delete` at `set_var` taken out, `r` set from `pin` and then from `note` kept its dash and Slash was asked
+     `Given — and —?` about a variable holding `plain`.
 
      AND A QUESTION TO A PERSON NO LONGER READS THE SECRET. This test pinned `Pay hunter2?`, "a question to a person
      stays in the record", and that was the leak itself: it stays in the record's one queue, which everyone who decides
@@ -258,9 +256,9 @@ test('WHAT WAS KEPT GOES WHEN THE VARIABLE IS SET AGAIN FROM A FIELD THAT MAY LE
 test('A VARIABLE SET FROM ITSELF IS ASKED ABOUT AS IT HOLDS, not filled a second time from its own new value', async () => {
   /* FOUND WHILE WRITING THE REBUILD BELOW, which fills in the order a run took its steps. `set_var` wrote the new value
      into `vars` before its second fill, so `{{vars.p}}` in its own `to` read the value it was making, the two fills
-     differed, and what was kept for Slash was the text filled twice. Measured against `flow.ts` as wave forty-seven
-     left it: `Given plain more more?` about a variable holding `plain more`. Nothing secret went out, and the question
-     was still wrong. */
+     differed, and what was kept for Slash was the text filled twice. Measured against an earlier `flow.ts`:
+     `Given plain more more?` about a variable holding `plain more`. Nothing secret went out, and the question was still
+     wrong. */
   const { sql, clock } = await slashed(rule([{ set_var: { name: 'x', to: 'y' } }]));
   const steps = [
     { set_var: { name: 'p', to: '{{trigger.row.note}}' } },
@@ -301,9 +299,9 @@ async function parkedBefore(steps: unknown[]): Promise<{ k: Kernel; sql: NodeSql
 }
 
 test('A RUN PARKED BY A BUILD BEFORE THE KEEPING SENDS THE DASH WHEN IT WAKES, rebuilt from the steps it had taken', async () => {
-  /* THE CHECKER'S FINDING ON WAVE FORTY-SEVEN. A run that parked between the `set_var` and the question kept its `vars`
-     with no `-sendable` beside them, since the build that parked it wrote none, and the build that woke it read nothing
-     kept and filled the question from `vars`. Measured against `flow.ts` as that wave left it, the question went out as
+  /* A RUN PARKED ACROSS AN UPGRADE. A run that parked between the `set_var` and the question kept its `vars` with no
+     `-sendable` beside them, since the build that parked it wrote none, and the build that woke it read nothing kept
+     and filled the question from `vars`. Measured against that earlier `flow.ts`, the question went out as
      `Given hunter2, plain, r hunter2, —?`. `s` is set from `pin` after the wake, so the column has something kept by
      the time the question is reached: a rebuild done at the question, for a run with nothing kept, found `s` there and
      asked `Given hunter2, plain, r hunter2, —?` again, measured with the rebuild moved there. */
@@ -325,7 +323,7 @@ test('A RUN PARKED BY A BUILD BEFORE THE KEEPING SENDS THE DASH WHEN IT WAKES, r
 
 test('AND ONE PARKED ON A PERSON BY THAT BUILD, where the answer overwrote a variable set from the secret', async () => {
   /* THE ANSWER'S OWN STEP ROW IS READ IN THE REBUILD, so `a`, set from `pin` and then answered `yes`, is asked about as
-     `yes` and not as the dash. Measured against `flow.ts` as wave forty-seven left it: `Given hunter2 and yes?`. */
+     `yes` and not as the dash. Measured against an earlier `flow.ts`: `Given hunter2 and yes?`. */
   const { k, sql } = await parkedBefore([
     { set_var: { name: 'p', to: '{{trigger.row.pin}}' } },
     { set_var: { name: 'a', to: '{{trigger.row.pin}}' } },
@@ -345,11 +343,11 @@ test('AND ONE PARKED ON A PERSON BY THAT BUILD, where the answer overwrote a var
 });
 
 test('A RUN THIS BUILD PARKED IS NOT REBUILT, so a field edited during the wait does not replace what the variable holds', async () => {
-  /* THE CHECKER'S FINDING ON THE REBUILD ABOVE. `pack` wrote no `-sendable` for a run keeping nothing, so every run this
-     build parked with nothing kept read as one an earlier build parked, and was rebuilt from the row as it is now:
-     measured on 23 September, `p` set from `note` while it said `plain`, `note` edited to `changed` during the wait,
-     and Slash was asked `Given changed?` about a variable holding `plain`. No secret in the rule at all, and the
-     question was still about a value the run does not have. */
+  /* AND THE REBUILD ABOVE MISREAD A RUN KEEPING NOTHING. `pack` wrote no `-sendable` for a run keeping nothing, so
+     every run this build parked with nothing kept read as one an earlier build parked, and was rebuilt from the row as
+     it is now: measured, `p` set from `note` while it said `plain`, `note` edited to `changed` during the wait, and
+     Slash was asked `Given changed?` about a variable holding `plain`. No secret in the rule at all, and the question
+     was still about a value the run does not have. */
   const { k, sql, clock } = await slashed(rule([{ set_var: { name: 'p', to: '{{trigger.row.note}}' } }, { wait: '1h' }, { ask_slash: { question: 'Given {{vars.p}}?', as: 'a' } }]));
   const made = value<Entry>(k.create('obligations', { what: 'Rent', note: 'plain' }, { actor: 'p_1' }));
   await k.drain();

@@ -1,9 +1,9 @@
 /**
  * `script`, the ninth kind of declaration: installed, refused where it should be, and fired into one outbox row.
  *
- * `loop/research-shell-scripts.md` Brief 2. THE RECORD NEVER RUNS A SCRIPT. What a due `script` row produces is one
- * `script.run` outbox row naming the script, its version and its input, and nothing else: no entry, no event, no
- * second job. A host leases it and runs the source in a sandbox (Briefs 3 to 5); none of that is in this file.
+ * THE RECORD NEVER RUNS A SCRIPT. What a due `script` row produces is one `script.run` outbox row naming the script,
+ * its version and its input, and nothing else: no entry, no event, no second job. A host leases it and runs the source
+ * in a sandbox; none of that is in this file.
  */
 
 import { test } from 'node:test';
@@ -128,10 +128,10 @@ test('THE EGRESS IS PRINTED FROM THE SCRIPT BODY, with every origin and every ke
   assert.equal(egressOf(GOLD({ egress: [] }).body), null, 'a script that fetches nothing calls nothing out');
 });
 
-/* WHICH HOST EACH KEY GOES TO WAS NOT ON THE LINE. The host sends a key only where its vault entry opens (`keyRefused`,
-   `loop/research-batch-thirty-five-audit.md`), and the line the owner approves named the origins and the keys as two
-   lists, so a script with two origins and one key never said which of the two would get it. The vault holds the answer
-   by label; a caller that cannot read it says where the answer is instead. */
+/* WHICH HOST EACH KEY GOES TO WAS NOT ON THE LINE. The host sends a key only where its vault entry opens
+   (`keyRefused`), and the line the owner approves named the origins and the keys as two lists, so a script with two
+   origins and one key never said which of the two would get it. The vault holds the answer by label; a caller that
+   cannot read it says where the answer is instead. */
 test('THE LINE SAYS WHICH HOST EACH KEY GOES TO, from what its vault entry opens, and where to look when it cannot', () => {
   const two = GOLD({ egress: ['https://api.goldapi.io', 'https://metals.example.org'], keys: ['goldapi', 'metals'] }).body;
   const opens = (label: string) => (label === 'goldapi' ? 'api.goldapi.io' : null);
@@ -142,31 +142,31 @@ test('THE LINE SAYS WHICH HOST EACH KEY GOES TO, from what its vault entry opens
   assert.equal(egressOf(GOLD({ keys: [] }).body, undefined, opens)?.line, 'CALLS OUT api.goldapi.io · every 1h · no key');
 });
 
-/* THE LINE PRINTED THE VAULT'S WORDS AND THE HOST SENT THE KEY BY A PARSE OF THEM, and the two disagreed. The audit of
-   wave thirty-eight (`loop/research-batch-thirty-eight-audit.md` finding 4, `line.mts`) filed four proposals of this
-   script against one `goldapi` entry and ran the host's own `keyRefused` over each. L1 printed the URL the entry holds
-   and the key was sent; L2 printed "the GoldAPI account" and L3 printed a host the script never calls, as destinations
-   for a key every run refuses, so the owner approved a pairing that pauses the script after its third run; and L4
-   printed `https://api.goldapi.io@collector.test`, which reads as GoldAPI, while the key went to `collector.test` alone,
-   because everything before the `@` is user-info and not the host. Each case below is the line those four printed. */
+/* THE LINE PRINTED THE VAULT'S WORDS AND THE HOST SENT THE KEY BY A PARSE OF THEM, and the two disagreed. Measured:
+   four proposals of this script filed against one `goldapi` entry, with the host's own `keyRefused` run over each. The
+   first printed the URL the entry holds and the key was sent; the second printed "the GoldAPI account" and the third
+   printed a host the script never calls, as destinations for a key every run refuses, so the owner approved a pairing
+   that pauses the script after its third run; and the fourth printed `https://api.goldapi.io@collector.test`, which
+   reads as GoldAPI, while the key went to `collector.test` alone, because everything before the `@` is user-info and
+   not the host. Each case below is the line those four printed. */
 test('THE LINE NAMES THE HOST THE KEY IS SENT TO, parsed as the host parses it, and says when the key goes nowhere it calls', () => {
   const line = (opens: string, egress = ['https://api.goldapi.io']) => egressOf(GOLD({ egress }).body, undefined, (label) => (label === 'goldapi' ? opens : null))?.line;
 
-  assert.equal(line('https://api.goldapi.io/v1'), 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io', 'L1: a URL names its host');
+  assert.equal(line('https://api.goldapi.io/v1'), 'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to api.goldapi.io', 'a URL names its host');
   assert.equal(
     line('the GoldAPI account'),
     'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its vault entry opens "the GoldAPI account"), so every fetch with it is refused',
-    'L2: prose names no host',
+    'prose names no host',
   );
   assert.equal(
     line('metals.example.org'),
     'CALLS OUT api.goldapi.io · every 1h · key "goldapi" to no host it calls (its vault entry opens "metals.example.org"), so every fetch with it is refused',
-    'L3: a host the script does not call',
+    'a host the script does not call',
   );
   assert.equal(
     line('https://api.goldapi.io@collector.test', ['https://api.goldapi.io', 'https://collector.test']),
     'CALLS OUT api.goldapi.io and collector.test · every 1h · key "goldapi" to collector.test',
-    'L4: the host after the user-info, which is where the key went',
+    'the host after the user-info, which is where the key went',
   );
 });
 

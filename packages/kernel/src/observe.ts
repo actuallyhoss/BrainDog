@@ -52,13 +52,12 @@ const BATCH = 200;
 /**
  * Whether an observation is a scan of one of the record's own columns, which no declaration can index.
  *
- * A PRIMARY-KEY LOOKUP WAS COUNTED AS A SCAN. The record's `list` asks the declaration which fields carry an index,
- * and no declaration has a field called `id`, so every `where: { field: 'id', in: [...] }` was `query.scan` of
- * `<list>.id`. The MCP tools name a page's refs with exactly that read (`namesIn`, fe741dfa), and measured through
- * `handle` on the seed a hundred lists of tasks and a hundred of learnings counted `things.id` two hundred times in a
- * day, and the weekly look drafted "things.id was scanned 200 times in thirty days, and an index would pay for
- * itself" (`loop/research-batch-fifty-five-audit.md` §2). That is a model call on a proposal nobody can accept, and
- * three of them marked incorrect suspend the whole analyser.
+ * A PRIMARY-KEY LOOKUP WAS COUNTED AS A SCAN. The record's `list` asks the declaration which fields carry an index, and
+ * no declaration has a field called `id`, so every `where: { field: 'id', in: [...] }` was `query.scan` of `<list>.id`.
+ * The MCP tools name a page's refs with exactly that read (`namesIn`, fe741dfa), and measured through `handle` on the
+ * seed a hundred lists of tasks and a hundred of learnings counted `things.id` two hundred times in a day, and the
+ * weekly look drafted "things.id was scanned 200 times in thirty days, and an index would pay for itself". That is a
+ * model call on a proposal nobody can accept, and three of them marked incorrect suspend the whole analyser.
  *
  * ALL FIVE, NOT ONLY THE THREE WITH AN INDEX. `id` is the primary key, `seq` is `UNIQUE (register, seq)` and
  * `updated_at` leads `entry_live`, so those are not scans at all. `created_at` and `version` have no index of their

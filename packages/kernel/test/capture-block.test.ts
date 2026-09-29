@@ -102,10 +102,9 @@ test('A CAPTURE INTO A LIST THE RECORD DOES NOT HOLD, or under a filter it canno
 });
 
 test('A CAPTURE WHOSE where: NAMES A FIELD ITS LIST LACKS IS REFUSED AT INSTALL, as a table over that list is', async () => {
-  /* The install lint in `index.ts` read a block's `where:` only against a `register.` SOURCE, and a
-     capture binds its list through `register:` and has no source, so this installed clean and then
-     drew its refusal on every open, the failure that lint exists to prevent. Found by batch
-     twenty-six's checker. */
+  /* The install lint in `index.ts` read a block's `where:` only against a `register.` SOURCE, and a capture binds its
+     list through `register:` and has no source, so this installed clean and then drew its refusal on every open, the
+     failure that lint exists to prevent. */
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const out = await k.install([TASKS, pageOf({ kind: 'capture', register: 'tasks', where: 'colour is red' })]);
   assert.equal(out.ok, false, JSON.stringify(out));

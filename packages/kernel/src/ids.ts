@@ -25,12 +25,12 @@ export type Mint = () => string;
  *
  * INSIDE A MILLISECOND THE TAIL STEPS UP BY A RANDOM AMOUNT, from 1 to 2^32. Redrawing it gives two ids that sort by
  * luck, and the whole point of the format is that they sort by time; but adding one made the tail a counter, and a
- * member invited to one list read the exact number of hidden writes between two of her lines off their tails
- * (`loop/research-batch-nineteen-audit.md`, finding 2: 2, 4, 8 and 22 apart for 0, 1, 3 and 10 hidden diary writes).
- * A random step keeps the order and makes one gap answer many counts. What it cannot hide is that the gap grows with
- * the count: every step averages 2^31 and none passes 2^32, so a gap over 2^34 held at least four other ids and most
- * likely about seven. That is a bound and an estimate with a spread of its own, where the counter was the exact figure,
- * and `ids-tail.test.ts` holds the part that is closed: no difference names the count it came from.
+ * member invited to one list read the exact number of hidden writes between two of her lines off their tails (measured:
+ * 2, 4, 8 and 22 apart for 0, 1, 3 and 10 hidden diary writes). A random step keeps the order and makes one gap answer
+ * many counts. What it cannot hide is that the gap grows with the count: every step averages 2^31 and none passes 2^32,
+ * so a gap over 2^34 held at least four other ids and most likely about seven. That is a bound and an estimate with a
+ * spread of its own, where the counter was the exact figure, and `ids-tail.test.ts` holds the part that is closed: no
+ * difference names the count it came from.
  *
  * A FRESH TAIL HAS ITS TOP BIT CLEAR, so it starts in the lower half of the 80 bits and the steps have 2^79 of headroom:
  * 2^47 ids in one millisecond at the largest step before the tail could run past 80 bits and sort below the last id.

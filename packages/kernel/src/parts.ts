@@ -1,20 +1,19 @@
 /**
  * What a kernel extension is handed: the record's own functions, the ones `makeKernel` keeps in its closure.
  *
- * WHY A FILE OF ITS OWN. Every new kernel method used to be written inside `makeKernel`, in the one file every unit of a
- * workflow queues behind, because the functions a method needs (the transaction, the write path, the list cache) exist
- * only inside that closure. `makeKernel` now gathers them into one `KernelParts` object and hands it to
- * `api/index.ts`, and a new method is a file under `api/` that takes this and returns what it adds
- * (`loop/finish/architecture.md` ARC-6, `loop/finish/contracts.md` §2.1). Nothing here is new behaviour: each member is
- * the function the kernel's own methods already call.
+ * WHY A FILE OF ITS OWN. Every new kernel method used to be written inside `makeKernel`, in the one file every change
+ * queues behind, because the functions a method needs (the transaction, the write path, the list cache) exist only
+ * inside that closure. `makeKernel` now gathers them into one `KernelParts` object and hands it to `api/index.ts`, and a
+ * new method is a file under `api/` that takes this and returns what it adds. Nothing here is new behaviour: each member
+ * is the function the kernel's own methods already call.
  *
  * NO MEMBER NAMES `Kernel`. `Kernel` is `ReturnType<typeof makeKernel>`, and `makeKernel` returns what the extensions
  * return, so a part typed from `Kernel` would make the kernel's type depend on itself through every extension. Each
  * member is written out here instead, from the types the kernel's own files export, and `list`'s and `appendEvent`'s
  * argument shapes live here so that `index.ts` and this file hold one copy of each between them.
  *
- * A HELPER MISSING FROM HERE IS A REQUEST TO THE PHASE'S OWNER OF `index.ts` (`rules.md` §6), who adds one member to
- * this type and one line where `makeKernel` builds the object.
+ * A HELPER MISSING FROM HERE IS A CHANGE TO `index.ts`: one member added to this type and one line where `makeKernel`
+ * builds the object.
  */
 
 import type { Clock, Result, Sql } from '@braindog/ports';

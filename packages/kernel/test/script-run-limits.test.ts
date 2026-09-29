@@ -1,6 +1,5 @@
 /**
- * A script's run, held to what its declaration allows: audit thirty-four findings 5, 6 and 9
- * (`loop/research-batch-thirty-four-audit.md`), each first reproduced here as the audit's probe measured it.
+ * A script's run, held to what its declaration allows: three cases, each first reproduced here as it was measured.
  *
  * THE SANDBOX IS A STAND-IN FUNCTION, as in `script-run.test.ts`, and that is the point of all three: what a host hands
  * back is a request, and every case below is a request the record must answer correctly whatever ran the source. The
@@ -96,13 +95,13 @@ const creates = (n: number): ScriptWrite[] =>
 const lastSay = (sql: NodeSql) =>
   sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' AND target = 'declaration:script.gold-rate' ORDER BY rowid DESC LIMIT 1")?.note ?? '';
 
-/* ── finding 5: the count of writes ─────────────────────────────────────────── */
+/* ── the count of writes ────────────────────────────────────────────────────── */
 
 test('AN ANSWER WITH MORE WRITES THAN limits.writes WRITES NOTHING, and the sentence names both numbers', async () => {
   const r = await record(gold({ limits: { writes: 2 } }));
   const metered = finishScript(r.deps, prepared(r), { writes: creates(500), log: '', usage: USAGE });
   assert.equal(metered.outcome, 'refused');
-  assert.equal(golds(r.sql), 0, 'the audit measured 500 rows landing here');
+  assert.equal(golds(r.sql), 0, '500 rows were measured landing here');
   assert.match(lastSay(r.sql), /500 writes/);
   assert.match(lastSay(r.sql), /its limits\.writes is 2\./);
 });
@@ -133,7 +132,7 @@ test('A limits.writes DECLARED ABOVE THE CEILING IS REFUSED AT INSTALL, so it is
   sql.close();
 });
 
-/* ── finding 6: an update with no version ──────────────────────────────────── */
+/* ── an update with no version ─────────────────────────────────────────────── */
 
 /** One gold row, its spoken id, and its version as a script would have read it. */
 function oneRow(r: Rec): { spoken: string; id: string } {
@@ -168,7 +167,7 @@ test('AN UPDATE WITH A STALE VERSION IS STILL A CONFLICT, so leaving the version
   assert.equal(r.k.get(id)?.fields.value, 5);
 });
 
-/* ── finding 9: what "three refused runs in a row" counts ──────────────────── */
+/* ── what "three refused runs in a row" counts ─────────────────────────────── */
 
 const threw: ScriptAnswer = { refused: { code: null, why: 'TypeError: price_gram_24k is undefined' }, log: '', usage: USAGE };
 
@@ -181,7 +180,7 @@ test('A NEW VERSION STARTS THE COUNT AGAIN: two refusals under v1, and v2 refuse
   assert.equal(r.sql.one<{ version: number }>("SELECT version FROM declaration WHERE id = 'script.gold-rate' AND superseded_at IS NULL")?.version, 2);
 
   finishScript(r.deps, prepared(r, 2), threw);
-  assert.equal(state(r.sql), 'pending', "the audit measured the owner's fix paused on its first failure");
+  assert.equal(state(r.sql), 'pending', "the owner's fix was measured paused on its first failure");
   assert.equal(r.told.length, 0);
 
   finishScript(r.deps, prepared(r, 2), threw);
@@ -213,7 +212,7 @@ test('A HOST FAILURE, A HOLD OR A DROP BETWEEN REFUSALS IS NOT A RUN, so it neit
       finishScript(r.deps, prepared(r), threw);
       finishScript(r.deps, prepared(r), other as never);
     }
-    assert.equal(state(r.sql), 'paused', `three refusals with a ${name} after each pause the script; the audit measured six pausing nothing`);
+    assert.equal(state(r.sql), 'paused', `three refusals with a ${name} after each pause the script; six were measured pausing nothing`);
     assert.equal(r.told.length, 1, name);
   }
 });

@@ -1,6 +1,5 @@
 /**
- * The record's quiet hours, the record's half: `quietHours`, READ+, and `setQuietHours`, ADMIN (`09 §5` rule 3,
- * `loop/finish/contracts.md` §12.1, decisions C74).
+ * The record's quiet hours, the record's half: `quietHours`, READ+, and `setQuietHours`, ADMIN (`09 §5` rule 3).
  *
  * THE OWNER CHANGES THE WINDOW AND EVERY MEMBER READS IT. The window is the record's, not a person's: the digest is one
  * schedule row for the whole record, so whoever it holds back, it holds back for everybody, and a member who can see

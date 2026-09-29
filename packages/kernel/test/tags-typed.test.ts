@@ -1,12 +1,12 @@
 /**
  * The `tags` every list takes is typed like a declared `list<text>` for every check that guards a field's type.
  *
- * MEASURED IN `loop/research-batch-thirty-four-audit.md` §4. `withTags` gives every list a `tags` where a value is written
- * and where a predicate is read, and on purpose not in the body `register(id)` hands back. `contradicted` read that body,
- * so when a list that never declared `tags`, with a row holding `["late","example"]`, declared its own `tags` as `text`,
- * `int` or `bool`, there was no `was` to compare it with and it installed over the arrays. From then on every `tag` and
- * `untag` on that list was refused `VALUE_MALFORMED` and `tags has` was `MATCH_OP_UNSUPPORTED`: the N3 failure of
- * `loop/research-shell-seed-next.md`, the one `withTags` was written to end, back by one declaration.
+ * MEASURED, NOT SUPPOSED. `withTags` gives every list a `tags` where a value is written and where a predicate is read,
+ * and on purpose not in the body `register(id)` hands back. `contradicted` read that body, so when a list that never
+ * declared `tags`, with a row holding `["late","example"]`, declared its own `tags` as `text`, `int` or `bool`, there
+ * was no `was` to compare it with and it installed over the arrays. From then on every `tag` and `untag` on that list
+ * was refused `VALUE_MALFORMED` and `tags has` was `MATCH_OP_UNSUPPORTED`: the very failure `withTags` was written to
+ * end, back by one declaration.
  *
  * THE CHOICE A LIST MAKES IS STILL ITS OWN WHERE NO ROW HOLDS A TAG, as for any declared field: a type change over values
  * nobody wrote breaks nothing that is stored, and `withTags` keeps a declared `tags` of another shape on purpose.
@@ -70,10 +70,10 @@ test("WITH NO ROW HOLDING A TAG, a tags of another shape is still the list's own
   assert.equal(k.register('jobs')?.fields.find((f) => f.id === 'tags')?.type, 'text');
 });
 
-/* BUT NOT WHERE A RULE TAGS THE LIST. `loop/research-batch-thirty-six-audit.md` §5: Bills with a Water row, no tag on any
-   row, and `rule.late` tagging each Rent. `tags: int` installed by the decision above, and the next Rent write went in
-   without its tag, with no refusal and no event, one `write.refused` observation the only trace. The first write after
-   the change is where the rule would have started tagging, so a rule that tags is a reader the decision did not count. */
+/* BUT NOT WHERE A RULE TAGS THE LIST. Measured: Bills with a Water row, no tag on any row, and `rule.late` tagging each
+   Rent. `tags: int` installed by the decision above, and the next Rent write went in without its tag, with no refusal
+   and no event, one `write.refused` observation the only trace. The first write after the change is where the rule
+   would have started tagging, so a rule that tags is a reader the decision did not count. */
 const LATE: Declaration = {
   id: 'rule.late',
   kind: 'rule',

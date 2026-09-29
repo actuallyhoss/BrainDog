@@ -1,10 +1,9 @@
 /**
- * The held-pack refusal, asked through `@braindog/record` as the web, the CLI and the MCP ask it
- * (`loop/research-batch-forty-two-audit.md` finding 1, `loop/research-shell-next.md` M4).
+ * The held-pack refusal, asked through `@braindog/record` as the web, the CLI and the MCP ask it.
  *
  * `f507cff5` TAUGHT `plan` TO REFUSE AN UPDATE THAT STRANDS A HELD PACK, and proved it on an `Installed` its test built
- * by hand from the `pack` rows' manifests. The record builds its `Installed` from `kernel.packs()`, which answered an id
- * and a version and no `requires`, so `dependents` was always empty here. Measured by the audit through `planPack` and
+ * by hand from the `pack` rows' manifests. The record builds its `Installed` from `kernel.packs()`, which answered an
+ * id and a version and no `requires`, so `dependents` was always empty here. Measured through `planPack` and
  * `installPack` as the owner: money-core 2.0.0 over `bank-hsbc-eg` 1.0.0 on `^1.8.0` planned `dependents: []` and
  * answered INSTALLED, the stranded record the commit was written to prevent.
  */

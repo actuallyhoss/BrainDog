@@ -1,10 +1,10 @@
 /**
- * DEF-9's small truths (`loop/finish/defects.md`), one test each: a rule's `{{metric.x}}` is a figure and not a list,
- * a month-end repeat stays on the month's end, a digest names `push` only when a phone is subscribed, a Bearer or Basic
- * header is a key, `contains` over a secret is refused in the JSON form, the scan advice proposes no index for a list
- * at its ceiling, and `sealedOf` keeps its answer until the list's declaration changes.
+ * Seven small truths, one test each: a rule's `{{metric.x}}` is a figure and not a list, a month-end repeat stays on
+ * the month's end, a digest names `push` only when a phone is subscribed, a Bearer or Basic header is a key, `contains`
+ * over a secret is refused in the JSON form, the scan advice proposes no index for a list at its ceiling, and
+ * `sealedOf` keeps its answer until the list's declaration changes.
  *
- * HERE AND NOT BESIDE EACH FILE, because the seven are one unit's and each is a few lines. Every key-shaped value is
+ * HERE AND NOT BESIDE EACH FILE, because the seven were fixed together and each is a few lines. Every key-shaped value is
  * built at run time, as `test/key-shapes.test.ts` builds its own, so no line of this file is itself a key.
  */
 

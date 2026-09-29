@@ -1,10 +1,10 @@
 /**
  * The kernel schema, migration 18: `job`, the tenth kind of declaration, and a job's kind as the id of one.
  *
- * `loop/finish/agents.md` C13, and `loop/DIRECTION.md` section 30, P3. A job is a run of Claude Code on the owner's own
- * machine. What a run may do (its prompt, its tools, the folder it works in, its turns and how it asks) is a `job.<id>`
- * declaration, approved once in Decide as any change is, versioned and carried in a pack like every other kind
- * (`jobs.ts`). A row of `job` names one of those declarations and fills its arguments.
+ * A job is a run of Claude Code on the owner's own machine. What a run may do (its prompt, its tools, the folder it
+ * works in, its turns and how it asks) is a `job.<id>` declaration, approved once in Decide as any change is, versioned
+ * and carried in a pack like every other kind (`jobs.ts`). A row of `job` names one of those declarations and fills its
+ * arguments.
  *
  * TWO REBUILDS AND NOT TWO ALTERS, because SQLite cannot change a CHECK in place. `declaration.kind` takes `job` beside
  * the kinds it held after migration 12, and every row is copied across unchanged, with its `checksum` and its `pack_id`,

@@ -25,7 +25,7 @@ import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, mea
 import { instant } from './migrate.ts';
 import { SESSION_BODY } from './migrations/0002_session.ts';
 import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
-/* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against (DOR-5). */
+/* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
 import { timeOf } from './clock.ts';
 import { isZone } from './slot.ts';
@@ -76,10 +76,9 @@ import { INDEX_CEILING } from './observe.ts';
 const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/;
 
 /* `script` IS THE NINTH, and migration 12 rebuilds the CHECK that holds the database to this list. A person's or an
-   agent's code, run by a host in a sandbox and never by the record (`script.ts`, DIRECTION section 22).
+   agent's code, run by a host in a sandbox and never by the record (`script.ts`).
    `job` IS THE TENTH, and migration 18 rebuilds the same CHECK again: what one run of Claude Code on the owner's own
-   machine may do, approved once in Decide and claimed from the record's queue by a runner (`jobs.ts`,
-   `loop/finish/agents.md` C13). */
+   machine may do, approved once in Decide and claimed from the record's queue by a runner (`jobs.ts`). */
 export const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script', 'job'] as const;
 export type DeclKind = (typeof KINDS)[number];
 
@@ -469,10 +468,9 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
     }
 
   /* `money`, OR `money.<CUR>` FROM BEFORE A FIGURE COULD LEAVE ITS CURRENCY UNSAID. `02 §3` is why a money figure is
-     never a bare number, and it is still not one: the currency is the record's home currency, else the one its rows
-     are in, else one amount per currency (`metrics.ts` `evaluateMetric`). A pack cannot know which currency the record
-     it lands on keeps, so a currency in its format was the pack author's and nobody else's (`loop/finish/modules.md`
-     C1). */
+     never a bare number, and it is still not one: the currency is the record's home currency, else the one its rows are
+     in, else one amount per currency (`metrics.ts` `evaluateMetric`). A pack cannot know which currency the record it
+     lands on keeps, so a currency in its format was the pack author's and nobody else's. */
   const format = body.format;
   if (!isMoneyFormat(format) && !(FORMATS as readonly unknown[]).includes(format))
     return bad(
@@ -482,7 +480,7 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
       [...FORMATS, 'money', 'money.<CUR>'],
     );
 
-  /* WHERE A FIGURE STANDS AMONG THE HOME FIGURES, AND WHETHER A FORECAST MAY SELL IT (`modules.md` C7). A place is a
+  /* WHERE A FIGURE STANDS AMONG THE HOME FIGURES, AND WHETHER A FORECAST MAY SELL IT. A place is a
      whole number from 1 to 9 so two packs can interleave; `sellable` is `true` or absent, never `false`, so the one
      spelling means one thing. */
   if (body.home !== undefined && !(Number.isInteger(body.home) && (body.home as number) >= 1 && (body.home as number) <= HOME_PLACE_MOST))
@@ -490,7 +488,7 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
   if (body.sellable !== undefined && body.sellable !== true)
     return bad('DECLARATION_INVALID', `${id}'s sellable is true, or left out.`, 'sellable', ['true']);
 
-  /* CASH ROLLED FORWARD (`modules.md` C3) is read over a list of accounts, and its body names every field it reads. */
+  /* CASH ROLLED FORWARD is read over a list of accounts, and its body names every field it reads. */
   const walks = body.source === WALK_SOURCE;
   if (isRolled(body.value)) {
     if (walks || !String(body.source).startsWith('register.'))
@@ -501,7 +499,7 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id} is grouped by a field of its accounts, never cut into buckets of days.`, 'bucket');
   }
 
-  /* A FIGURE OVER THE WALK AHEAD (`modules.md` C4) reads the legs it names, and nothing a list-reading figure writes. */
+  /* A FIGURE OVER THE WALK AHEAD reads the legs it names, and nothing a list-reading figure writes. */
   if (!walks && (body.legs !== undefined || body.opening !== undefined))
     return bad('DECLARATION_INVALID', `${id} names ${body.legs !== undefined ? 'legs' : 'an opening'}, which only a figure over ${WALK_SOURCE} walks.`, body.legs !== undefined ? 'legs' : 'opening');
   if (walks) {
@@ -582,13 +580,12 @@ function valueFields(value: unknown): string[] {
 /**
  * A FIGURE OVER A FIELD ITS REGISTER DOES NOT DECLARE INSTALLED CLEAN, and was refused on every read.
  *
- * Measured by the checker of `loop/research-pack-update-edited.md`: `value: { sum: 'nosuch' }` went
- * in through an ordinary install, and `metrics.ts`'s `evaluateMetric` then answered `FIELD_UNKNOWN: ledger has
- * no field called nosuch` on every page the figure sat on. `index.ts`'s install check handed the
- * field to `unaggregatableIn`, which looks up the field's TYPE, found none, and read "no type" as "no
- * objection". `group_by: 'nosuch'` went in the same way. The predicate was never part of this: a
- * `where` naming an undeclared field is already refused at install by `unreadWhere`, which reads the
- * five record-owned fields too, so this does not look at `where`.
+ * Measured: `value: { sum: 'nosuch' }` went in through an ordinary install, and `metrics.ts`'s `evaluateMetric` then
+ * answered `FIELD_UNKNOWN: ledger has no field called nosuch` on every page the figure sat on. `index.ts`'s install
+ * check handed the field to `unaggregatableIn`, which looks up the field's TYPE, found none, and read "no type" as "no
+ * objection". `group_by: 'nosuch'` went in the same way. The predicate was never part of this: a `where` naming an
+ * undeclared field is already refused at install by `unreadWhere`, which reads the five record-owned fields too, so
+ * this does not look at `where`.
  *
  * THE SAME RULE THE READER KEEPS, NO WIDER. `evaluateMetric` admits `id` in a value and nothing else the
  * record owns, and admits no record-owned field as a grouping but the two instants the record stamps, created_at and
@@ -617,8 +614,7 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
  * The fields a known register declares and has not retired, or `null` when it is not known or declares no fields.
  *
  * NOT A RETIRED FIELD, which stays in the body and is dropped by `index.ts`'s `schemaOf`, so the reader answers
- * `FIELD_UNKNOWN` for it. Counting it here let `sum: 'old'` install and then fail on its first read, which the checker
- * of that change measured.
+ * `FIELD_UNKNOWN` for it. Counting it here let `sum: 'old'` install and then fail on its first read, as was measured.
  */
 function fieldsOf(installed: Known, register: string): string[] | null {
   const shape = installed.get(`register.${register}`);
@@ -684,15 +680,13 @@ function figureListsFault(id: string, body: { source?: unknown; value?: unknown;
  * comes back with rows filed under a kind the renderer cannot draw. A block that draws NOTHING and
  * says nothing is the exact silence `04 §1` calls the closure load-bearing for.
  *
- * A COPY THAT DRIFTS IS WORSE THAN NO COPY, AND A COUNT IN PROSE IS THE FIRST THING TO DRIFT. This
- * list said "the twenty" in two refusals and in this paragraph while holding twenty-eight, because
- * every kind added since was added to the array and not to the sentence. So neither says a number now,
- * and the test walks the array rather than a list typed out beside it. `cards`, `section`, `feed`, `diff`, `queue`,
- * `capture` and `inputs` were added to the renderer's table and then to this array by hand. A PACK'S OWN KIND,
- * `block.<id>`, WAS ADMITTED HERE BY PREFIX and is refused now: `05 §2` says
- * one arrives as a `block` declaration, this build refuses every such declaration `NOT_IN_THIS_BUILD`,
- * and a page naming one installed and read its rows with nothing anywhere to draw them
- * (`loop/research-dynamic-layouts.md` §3, finding 2).
+ * A COPY THAT DRIFTS IS WORSE THAN NO COPY, AND A COUNT IN PROSE IS THE FIRST THING TO DRIFT. This list said "the
+ * twenty" in two refusals and in this paragraph while holding twenty-eight, because every kind added since was added to
+ * the array and not to the sentence. So neither says a number now, and the test walks the array rather than a list
+ * typed out beside it. `cards`, `section`, `feed`, `diff`, `queue`, `capture` and `inputs` were added to the renderer's
+ * table and then to this array by hand. A PACK'S OWN KIND, `block.<id>`, WAS ADMITTED HERE BY PREFIX and is refused
+ * now: `05 §2` says one arrives as a `block` declaration, this build refuses every such declaration
+ * `NOT_IN_THIS_BUILD`, and a page naming one installed and read its rows with nothing anywhere to draw them.
  *
  * A NEW KIND IS NOT WRITTEN INTO THE ARRAY: it is a module in the kernel's kind registry (`kinds/index.ts`), and every
  * name that registry holds is admitted here as it loads. The array is the kinds `pages.ts` reads itself, and it stays
@@ -840,8 +834,8 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
 const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
 /* A SOURCE MUST BE HERE AND IN `pages.ts`'s `COMPUTED`, or a block reading it is refused at install while the reader
-   stands ready (`loop/finish/contracts.md` X52). `runs_on` is a project's keys, tools, skills and actions (agents C6);
-   `deadlines` is every row due soon and `figures.home` the figures that ask a place on Home (modules C6). */
+   stands ready. `runs_on` is a project's keys, tools, skills and actions; `deadlines` is every row due soon and
+   `figures.home` the figures that ask a place on Home. */
 const COMPUTED_SOURCES = [
   'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open',
   'runs_on', 'deadlines', 'figures.home',
@@ -996,12 +990,11 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
      coverage rule below is checked against whatever it says. Making it REQUIRED is the next pass, and
      it is one line here and four in those two files.
 
-     ONLY THE SHAPE IS CHECKED HERE. Whether each want is actually installed is answered after the
-     blocks below, not in this pass: a block naming a kind nobody installed is `KIND_UNKNOWN` (PLT-8's
-     "a page naming a kind nobody installed is refused at install, not drawn blank"), and that refusal
-     is about the block, so it is owed to whoever is reading the refusal before a page-wide dependency
-     that has nothing to do with which kind was typo'd. Checking availability this early made every
-     page with both faults report the wrong one. */
+     ONLY THE SHAPE IS CHECKED HERE. Whether each want is actually installed is answered after the blocks below, not in
+     this pass: a block naming a kind nobody installed is `KIND_UNKNOWN` (the rule "a page naming a kind nobody
+     installed is refused at install, not drawn blank"), and that refusal is about the block, so it is owed to whoever
+     is reading the refusal before a page-wide dependency that has nothing to do with which kind was typo'd. Checking
+     availability this early made every page with both faults report the wrong one. */
   const requires = body.requires;
   if (requires !== undefined) {
     if (!Array.isArray(requires) || requires.length === 0 || requires.length > REQUIRES_CEILING)
@@ -1107,8 +1100,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad(kindFault.code, `${id}.${at}: ${kindFault.fix}`, kindFault.at === undefined ? at : `${at}.${kindFault.at}`, kindFault.allowed);
 
     /* A SECTION'S HOST PANEL IS ABOUT THE PAGE'S ROW, so it is refused on a page with no `for:`; a path's short view is
-       a sentence and a label; and a roadmap over a list names the columns it places its rows by (`loop/finish/defects.md`
-       P8). The sentences are `kinds/words.ts`'s, which the read gives too. */
+       a sentence and a label; and a roadmap over a list names the columns it places its rows by. The sentences are
+       `kinds/words.ts`'s, which the read gives too. */
     const worded =
       panelFault((raw as { panel?: unknown }).panel, (body as { for?: unknown }).for !== undefined) ??
       shortFault((raw as { short?: unknown }).short) ??
@@ -1260,9 +1253,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id}.${at} is a capture and reads ${String(block.source)} as well. A capture writes into register: and reads nothing, so take the source off.`, at);
     if (kind === 'inputs' && block.source !== undefined)
       return bad('DECLARATION_INVALID', `${id}.${at} is inputs and reads ${String(block.source)} as well. Inputs edit one row of register:, so write register: ${String(block.source).replace(/^register\./u, '')} and take the source off.`, at);
-    /* AND THE ROW IS NAMED BY `row:`, WHICH `06 §1.1` SAYS AND THE READ DOES. `where:` installed here and nothing read it:
-       `loop/research-audit-2026-09-25-layouts.md` finding 6 installed `where: name is Two`, the block drew row One, and
-       typing into it wrote row One. Refused here, in the sentence the read refuses a hand-made block in. */
+    /* AND THE ROW IS NAMED BY `row:`, WHICH `06 §1.1` SAYS AND THE READ DOES. `where:` installed here and nothing read
+       it: a block installed with `where: name is Two` drew row One, and typing into it wrote row One. Refused here, in
+       the sentence the read refuses a hand-made block in. */
     if (kind === 'inputs' && block.where !== undefined)
       return bad('DECLARATION_INVALID', `${id}.${at} is inputs, which edit the one row that row: names and read no where:. Name the row with row:, such as row: ${typeof block.register === 'string' ? block.register : 'checks'}#2.`, at);
     if ((kind === 'capture' || kind === 'inputs') && block.register !== undefined) {
@@ -1779,11 +1772,10 @@ const ROUTE_TO_MOST = 64;
 const ROUTE_VALUE_MOST = 200;
 
 /**
- * MOD-20's `writes.set`: field ids mapped to a fixed value, checked the same as `dedupe:` and a route's
- * `by` (`IDENT`, the same identifier a field id anywhere else must be), because this key becomes a row's
- * field the same way an extracted one does. The value itself is left as the pack wrote it: a
- * `{{config:<key>}}` inside it is filled at install by `fillConfig`, well before this ever runs, and a
- * literal string needs no further shape here.
+ * `writes.set`: field ids mapped to a fixed value, checked the same as `dedupe:` and a route's `by` (`IDENT`, the same
+ * identifier a field id anywhere else must be), because this key becomes a row's field the same way an extracted one
+ * does. The value itself is left as the pack wrote it: a `{{config:<key>}}` inside it is filled at install by
+ * `fillConfig`, well before this ever runs, and a literal string needs no further shape here.
  */
 function setFault(set: unknown, id: string): Refusal | null {
   if (set === undefined) return null;
@@ -1805,23 +1797,23 @@ const SKIP_REASON_MOST = 120;
 /**
  * `25 §3.2`'s `verify:` on a webhook ingest, the half of it that is built: `{ kind: path }`, a random segment in the URL.
  *
- * NOTHING READ THIS KEY, SO EVERY SPELLING OF IT INSTALLED. Measured on 22 September against `validate` at `1c9bb0f0`:
+ * NOTHING READ THIS KEY, SO EVERY SPELLING OF IT INSTALLED. Measured against `validate` at `1c9bb0f0`:
  * `verify: { kind: path }` on an email ingest, `verify: { kind: hmac_sha256, header }` with no key behind it, a path
  * token written into the declaration itself, and the bare word `verify: path` were all answered `null`, and the record
- * answers `{ kind: 'none' }` for every webhook ingest whatever it carries.
- * A person who wrote one had every reason to believe the ingest was verified, and every arrival at it was stored
- * `untriaged`, which is correct behaviour with nothing to say why.
+ * answers `{ kind: 'none' }` for every webhook ingest whatever it carries. A person who wrote one had every reason to
+ * believe the ingest was verified, and every arrival at it was stored `untriaged`, which is correct behaviour with
+ * nothing to say why.
  *
  * ONLY A WEBHOOK, because it is the only channel whose door this record's host terminates with a URL a sender is given
  * (`packages/host/src/ingest.ts`). Mail is verified by the forwarder's own `Authentication-Results`, and `pull`, `call`
  * and `poll` are fetched by the record itself, so a `verify:` on any of them would be a promise nothing keeps.
  *
- * A SIGNATURE NAMES ITS KEY BY THE VAULT LABEL, AND BY NOTHING ELSE (DOR-3). `hmac_sha256` was refused by name until
- * a door could open a key: nothing bound a grant to an ingest, so a declaration naming one installed and verified
- * nothing, which is the fault above. `ingestVerify` in `packages/record/src/index.ts` now finds the key the label
- * names, the host opens it and checks the raw body (`packages/host/src/ingest.ts`), and `stripe` and `github` are the
- * same check in the shapes those two senders sign. A label that looks like a key is refused for the token's reason
- * below: a key pasted into `key:` would be a credential in every export, plan and diff at once.
+ * A SIGNATURE NAMES ITS KEY BY THE VAULT LABEL, AND BY NOTHING ELSE. `hmac_sha256` was refused by name until a door
+ * could open a key: nothing bound a grant to an ingest, so a declaration naming one installed and verified nothing,
+ * which is the fault above. `ingestVerify` in `packages/record/src/index.ts` now finds the key the label names, the
+ * host opens it and checks the raw body (`packages/host/src/ingest.ts`), and `stripe` and `github` are the same check
+ * in the shapes those two senders sign. A label that looks like a key is refused for the token's reason below: a key
+ * pasted into `key:` would be a credential in every export, plan and diff at once.
  *
  * `tolerance` IS STRIPE'S ALONE, because Stripe is the one sender here that signs the time along with the body. GitHub
  * signs the body and nothing else, and neither does a bare HMAC, so a tolerance on either would be a promise nothing
@@ -1832,18 +1824,18 @@ const SKIP_REASON_MOST = 120;
  * `arrangement`, so a token written here would be a credential in all of those at once. `{ kind: path }` says a token is
  * wanted; the token itself is minted outside the declaration and shown once.
  *
- * WHY THE SHORTCUT GETS WEBHOOK TWINS OF THE `bank-*` PATTERNS AND NOT A CHANNEL LIST ON EACH. `loop/research-switch-matrix.md`
- * brief 2 left the choice open. The list is the better grammar: one declaration per wording, read the same whichever way
- * it arrived. It is also a change to `07 §3`'s `channel:`, which is one word here, in `IngestDecl`, and in `arrive`'s
- * `i.channel === arrival.channel` (`ingest.ts`), and that makes it a `docs/07` row before it is code. A twin changes
- * nothing anybody reads: it is one more declaration of an existing shape, carrying this key.
+ * WHY THE SHORTCUT GETS WEBHOOK TWINS OF THE `bank-*` PATTERNS AND NOT A CHANNEL LIST ON EACH. Either would work. The
+ * list is the better grammar: one declaration per wording, read the same whichever way it arrived. It is also a change
+ * to `07 §3`'s `channel:`, which is one word here, in `IngestDecl`, and in `arrive`'s `i.channel === arrival.channel`
+ * (`ingest.ts`), and that makes it a `docs/07` row before it is code. A twin changes nothing anybody reads: it is one
+ * more declaration of an existing shape, carrying this key.
  *
- * THE URL'S INGEST ID CHOOSES THE PATTERN AS WELL AS THE VERIFIER, and this paragraph said the opposite until 23
- * September. It said neither host handed the id to `arrive`, so a verified arrival was offered every webhook pattern;
- * both hosts have handed it since 22 September (`arrivalDoor` in `apps/selfhost/src/server.ts`, the spread in the
- * Worker's `arrivals()`, held by `apps/worker/test/arrive-ingest-handoff.test.ts`), and `arrive` offers a named arrival
- * its own ingest's pattern and no other. So one twin's URL read one wording, and a phone posting six needed six URLs.
- * `door:` (`doorFault` below) is how several patterns share one: each names the twin whose URL it reads.
+ * THE URL'S INGEST ID CHOOSES THE PATTERN AS WELL AS THE VERIFIER. When neither host handed the id to `arrive`, a
+ * verified arrival was offered every webhook pattern; both hosts hand it now (`arrivalDoor` in
+ * `apps/selfhost/src/server.ts`, the spread in the Worker's `arrivals()`, held by
+ * `apps/worker/test/arrive-ingest-handoff.test.ts`), and `arrive` offers a named arrival its own ingest's pattern and
+ * no other. So one twin's URL read one wording, and a phone posting six needed six URLs. `door:` (`doorFault` below) is
+ * how several patterns share one: each names the twin whose URL it reads.
  */
 function verifyFault(id: string, channel: string, verify: unknown): Refusal | null {
   if (verify === undefined) return null;
@@ -1860,7 +1852,7 @@ function verifyFault(id: string, channel: string, verify: unknown): Refusal | nu
   return null;
 }
 
-/** The three signatures a webhook door checks over the raw body, beside the path token (DOR-3). */
+/** The three signatures a webhook door checks over the raw body, beside the path token. */
 const SIGNED_KINDS = ['hmac_sha256', 'stripe', 'github'] as const;
 
 /** Every `verify.kind` there is, for the refusal's `allowed` list. */
@@ -1913,10 +1905,10 @@ function signedFault(id: string, kind: string, verify: Record<string, unknown>):
 /**
  * `door:` on a webhook ingest: the id of another webhook ingest whose URL this pattern also reads (`IngestDecl.door`).
  *
- * NOTHING READS AN UNKNOWN KEY ON AN INGEST, SO A DOOR THAT COULD NEVER OPEN INSTALLED. Measured on 23 September with
- * this call taken out, over the five cases `test/ingest-door.test.ts` refuses: `door: 'ghost'`, a door that is an email
- * ingest, a door on a webhook with no `verify:`, `door: 7`, and an email pattern naming a real door all installed clean.
- * Each is a pattern offered nothing for ever, and from outside it looks exactly like a wording that has not arrived yet.
+ * NOTHING READS AN UNKNOWN KEY ON AN INGEST, SO A DOOR THAT COULD NEVER OPEN INSTALLED. Measured with this call taken
+ * out, over the five cases `test/ingest-door.test.ts` refuses: `door: 'ghost'`, a door that is an email ingest, a door
+ * on a webhook with no `verify:`, `door: 7`, and an email pattern naming a real door all installed clean. Each is a
+ * pattern offered nothing for ever, and from outside it looks exactly like a wording that has not arrived yet.
  *
  * A DOOR IS AN INSTALLED WEBHOOK THAT TAKES A PATH TOKEN, because that is the only ingest a URL can name with a verdict
  * attached. Without `verify: { kind: path }` the record answers `none` for it (`ingestVerify`), every arrival there is
@@ -1942,10 +1934,10 @@ function doorFault(id: string, channel: string, door: unknown, installed?: Known
   if (named.verify?.kind !== 'path')
     return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} takes no path token, so nothing arriving there is verified and no pattern is tried. Give ${door} verify: { kind: path }.`, 'door');
   /* A DOOR WITH NO `match:` TAKES EVERY ARRIVAL FIRST, so a pattern naming it is never offered one. `offered` in
-     `ingest.ts` puts the door's own pattern ahead of the patterns naming it on purpose, and measured by
-     `loop/research-batch-forty-two-audit.md` finding 4 (a), a text only `b` asks for was filed by the door, rows one and
-     two `1 0`, with the install silent. A wider phrase does the same to part of a twin's texts and is not refused:
-     whether one phrase covers another cannot be read from the two declarations, and it stays the author's. */
+     `ingest.ts` puts the door's own pattern ahead of the patterns naming it on purpose, and measured, a text only `b`
+     asks for was filed by the door, rows one and two `1 0`, with the install silent. A wider phrase does the same to
+     part of a twin's texts and is not refused: whether one phrase covers another cannot be read from the two
+     declarations, and it stays the author's. */
   if (takesEvery(named.match))
     return bad('DECLARATION_INVALID', `${id} names ${door} as its door, and ${door} ${matchless(named.match)}, so it takes every arrival there before ${id} is asked. Give ${door} a match: on a field, or give ${id} a door of its own.`, 'door');
   return null;
@@ -1956,21 +1948,21 @@ function doorFault(id: string, channel: string, door: unknown, installed?: Known
  * alone can answer.
  *
  * A `match:` THAT NAMES NO FIELD IS THE SAME ANSWER FOR EVERY ARRIVAL, whatever `ingest.ts` is handed. Checking only a
- * missing `match:` let the checker's second spelling
- * through: measured on 23 September through `arrive` and `drain`, a door declared `{ all: [] }` installed with a twin
- * naming it and filed the twin's own text, rows one and two `1 0`, and `{ none: [] }` did the same, because `evaluate`
- * answers an empty group with `q !== 'any'`. `{ any: [] }` and `match: null` were measured too, and filed that text
- * through the twin, `0 1`: they match nothing, so the door files nothing and they are harmless here.
+ * missing `match:` let a second spelling through: measured through `arrive` and `drain`, a door declared `{ all: [] }`
+ * installed with a twin naming it and filed the twin's own text, rows one and two `1 0`, and `{ none: [] }` did the
+ * same, because `evaluate` answers an empty group with `q !== 'any'`. `{ any: [] }` and `match: null` were measured
+ * too, and filed that text through the twin, `0 1`: they match nothing, so the door files nothing and they are harmless
+ * here.
  *
  * SO THE TREE IS FOLDED, AND NOT ONLY WHEN IT NAMES NO FIELD. The first version asked `evaluate` only of a tree with no
  * leaf in it, and `{ any: [{ all: [] }, { field: body, contains: paid }] }` compiled clean, answered true for an empty
- * arrival and for a text saying five of some currency were withdrawn alike, and installed with a twin naming it,
- * measured by this batch's checker on 23 September. A group whose answer its constant children already settle is
- * folded to that answer, the way `evaluate` reads an empty group (`all` and `none` true, `any` false), and a leaf is
- * unknown. Only a tree whose phrase decides is the wider-phrase case `doorFault` leaves to the author. Fuzzed against
- * `evaluate` over twenty thousand trees that compile clean, the fold settled 7683 of them and disagreed with
- * `evaluate` on none; the 51 it left open and `evaluate` answered true for every sample text were a phrase beside its
- * own `none`, which is logic over leaves and not a fold.
+ * arrival and for a text saying five of some currency were withdrawn alike, and installed with a twin naming it, as
+ * measured. A group whose answer its constant children already settle is folded to that answer, the way `evaluate`
+ * reads an empty group (`all` and `none` true, `any` false), and a leaf is unknown. Only a tree whose phrase decides is
+ * the wider-phrase case `doorFault` leaves to the author. Fuzzed against `evaluate` over twenty thousand trees that
+ * compile clean, the fold settled 7683 of them and disagreed with `evaluate` on none; the 51 it left open and
+ * `evaluate` answered true for every sample text were a phrase beside its own `none`, which is logic over leaves and
+ * not a fold.
  */
 function takesEvery(match: unknown): boolean {
   if (match === undefined) return true;
@@ -1994,21 +1986,21 @@ const matchless = (match: unknown): string => (match === undefined ? 'has no mat
 /**
  * The other side of `doorFault`: a webhook ingest that patterns name as their `door:` stays one they can read through.
  *
- * `doorFault` IS ASKED WHEN THE PATTERN IS INSTALLED, AND THE DOOR CAN CHANGE AFTERWARDS. Measured by
- * `loop/research-batch-forty-two-audit.md` finding 4 (b): the door re-installed without `verify:` answered `ok`, and
- * left its pattern installed under exactly the declaration `doorFault` refuses, a door whose arrivals are stored
- * unverified and never matched. So the door's new body is asked the same three questions the pattern asked of it,
- * against every pattern that will still name it once the batch lands: the batch counts, so a pattern dropping its
- * `door:` in the same call is not counted.
+ * `doorFault` IS ASKED WHEN THE PATTERN IS INSTALLED, AND THE DOOR CAN CHANGE AFTERWARDS. Measured: the door
+ * re-installed without `verify:` answered `ok`, and left its pattern installed under exactly the declaration
+ * `doorFault` refuses, a door whose arrivals are stored unverified and never matched. So the door's new body is asked
+ * the same three questions the pattern asked of it, against every pattern that will still name it once the batch lands:
+ * the batch counts, so a pattern dropping its `door:` in the same call is not counted.
  *
- * RETIRING THE DOOR IS REFUSED IN `retireDeclarations`, NOT HERE, for the audit's (c). Tried first on 23 September, the
- * refusal stopped money-core's own update: its plan handed `bank-ipn-in-sms`, which filed a row, to `bank-hsbc-eg` with
- * its `door: bank-from-out-sms`, and retired the door, which held no token and filed nothing. The plan now hands a door
- * with the pattern naming it (`packages/declare/test/door-follows-patterns.test.ts`), and with that in the tree the
- * guard changed nothing `bank-pack.test.ts` or `plan-handover-shown.test.ts` asserts, measured with every assertion made
- * to log and carry on. The one test it refused outright, `packages/record/test/ingest-verify-digest.test.ts`'s retire of
+ * RETIRING THE DOOR IS REFUSED IN `retireDeclarations`, NOT HERE. Tried first, the refusal stopped money-core's own
+ * update: its plan handed `bank-ipn-in-sms`, which filed a row, to `bank-hsbc-eg` with its `door: bank-from-out-sms`,
+ * and retired the door, which held no token and filed nothing. The plan now hands a door with the pattern naming it
+ * (`packages/declare/test/door-follows-patterns.test.ts`), and with that in the tree the guard changed nothing
+ * `bank-pack.test.ts` or `plan-handover-shown.test.ts` asserts, measured with every assertion made to log and carry on.
+ * The one test it refused outright, `packages/record/test/ingest-verify-digest.test.ts`'s retire of
  * `bank-from-out-sms`, which five of the bank's patterns read, now retires a webhook no pattern names, as its neighbour
- * already did for finding 4 (b). Without that plan change, this guard is the one that stopped the update.
+ * already did for a door re-installed without `verify:`. Without that plan change, this guard is the one that stopped
+ * the update.
  *
  * ASKED AFTER EVERY DECLARATION OF THE BATCH HAS PASSED `validate` (`doorsKept`), NOT INSIDE IT. Asked from
  * `ingestBody`, a batch shipping a door with no token and a pattern naming it was answered at the door's `verify` before
@@ -2102,9 +2094,9 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
   if (wrongKey) return wrongKey;
 
   /**
-   * `07 §3`'s `on_conflict:`, one of `ON_CONFLICTS`, and nothing read it here. Measured on 23 September: `bogus`
-   * installed clean and then behaved as `new`, because `arrive` asks only whether the value is `skip`, `update` or
-   * `review`, so a misspelt `skip` filed every resend as a second row and said nothing.
+   * `07 §3`'s `on_conflict:`, one of `ON_CONFLICTS`, and nothing read it here. Measured: `bogus` installed clean and
+   * then behaved as `new`, because `arrive` asks only whether the value is `skip`, `update` or `review`, so a misspelt
+   * `skip` filed every resend as a second row and said nothing.
    *
    * AND `review` IS NOT A PULL'S. It holds one arrival for a person, and a pulled page is up to five hundred rows that
    * `fetched.ts` applies one by one, asking only for `skip` and `update`: declared on a pull it wrote the near match as a
@@ -2132,10 +2124,10 @@ function ingestBody(decl: Declaration, installed?: Known): Refusal | null {
     if (wrongTarget) return wrongTarget;
   }
 
-  /* MOD-20: `writes.set` FILLS A FIXED VALUE ON EVERY ROW, keyed by field id the same way `dedupe:`
-     is, and checked the same way for the same reason — an unchecked field id becomes SQL two files
-     away (`existingRow`'s comment above `dedupeFault`), and a value that is not text could not be
-     left out when a setting is empty without a second rule to read. */
+  /* `writes.set` FILLS A FIXED VALUE ON EVERY ROW, keyed by field id the same way `dedupe:` is, and checked the same
+     way for the same reason — an unchecked field id becomes SQL two files away (`existingRow`'s comment above
+     `dedupeFault`), and a value that is not text could not be left out when a setting is empty without a second rule to
+     read. */
   if (writes !== undefined && writes !== null && typeof writes === 'object') {
     const wrongSet = setFault(writes.set, id);
     if (wrongSet) return wrongSet;
@@ -2362,7 +2354,7 @@ function stringLeaves(node: unknown, at: string, out: [string, string][] = []): 
 }
 
 /**
- * A `call` or a `poll`, checked where it is written (`loop/DIRECTION.md` §0b).
+ * A `call` or a `poll`, checked where it is written.
  *
  * THE ORIGIN IS LITERAL AND HTTPS, because the install diff prints it and a host built from data is a
  * host nobody approved: `25 §7` rule 4, and the fifth of Airbyte's connectors that interpolate their
@@ -2522,7 +2514,7 @@ const AUTH_SECRETS: readonly string[] = ['token', 'secret', 'password', 'value',
 
 /**
  * How a `call` or a `poll` sends its key: `auth: { kind: header, name: X-Api-Key }`, `{ kind: query, name: api_key }`,
- * `{ kind: basic }`, or absent for a bearer, which is what a bare `grant:` has always meant (DOR-5).
+ * `{ kind: basic }`, or absent for a bearer, which is what a bare `grant:` has always meant.
  *
  * THE KEY ITSELF IS STILL NAMED BY `grant:` AND BY NOTHING HERE. `auth:` says only where it goes, so the install diff
  * that names the key names it once, and a secret written into `auth:` is refused with the vault's sentence rather than
@@ -2569,7 +2561,7 @@ function authFault(id: string, auth: unknown, keyless: boolean): Refusal | null 
 }
 
 /**
- * `at:` and `tz:` on a scheduled action: the time of day each run belongs to, and the zone it is read in (DOR-5).
+ * `at:` and `tz:` on a scheduled action: the time of day each run belongs to, and the zone it is read in.
  *
  * A TIME OF DAY REPEATS ONLY ON WHOLE DAYS. `every: 6h` with `at: 07:00` names a time the next run cannot keep, so it is
  * refused rather than read as one of the two. A ZONE WITH NO TIME changes nothing about when a call or a poll runs,
@@ -2600,7 +2592,7 @@ const DAY_MS = 86_400_000;
 const SCHEDULE_KEYS: readonly string[] = ['every', 'at', 'tz', 'jitter'];
 
 /**
- * A connector's `fetch.schedule`, against the declaration's own `every` and `at` (DOR-5).
+ * A connector's `fetch.schedule`, against the declaration's own `every` and `at`.
  *
  * ONE INTERVAL, WRITTEN ONCE. The record fires a pull from `every`, and the connector counted its next slot from
  * `fetch.schedule.every`, so a declaration that said `every: 1h` and `schedule: { every: 15m }` was floor-checked on one
@@ -2873,14 +2865,12 @@ function extractorFault(form: unknown, at: string, depth: number): Refusal | nul
         `${at}.date's format ${typeof format === 'string' ? `${format} ` : ''}${fault}. Write it with one year, one month and one day token: YYYY or YY, MM or M, DD or D.`,
         `${at}.date.format`,
       );
-    /* THIS REFUSED EVERY FORMAT THE GRAMMAR ADMITS AND THIS BUILD DID NOT READ, and it was right
-       to while that was true: `NOT_IN_THIS_BUILD`, naming the four, saying *the repair is a
-       deploy, not an edit*. It was the one refusal in the tree whose fix was a deploy, and it
-       existed because `ingest.ts` held a second date grammar — four formats keyed by name —
-       beside `@braindog/extract`'s, which reads the token set. A record now reaches that reader
-       (`RecordOptions.dates`, September 20th 2026), so there is no build to be behind and no list
-       to name. What is left here is `DATE_FORMAT_INVALID` above, which is about the format's own
-       tokens and is the check `43 §6` actually specifies. */
+    /* THIS REFUSED EVERY FORMAT THE GRAMMAR ADMITS AND THIS BUILD DID NOT READ, and it was right to while that was
+       true: `NOT_IN_THIS_BUILD`, naming the four, saying *the repair is a deploy, not an edit*. It was the one refusal
+       in the tree whose fix was a deploy, and it existed because `ingest.ts` held a second date grammar — four formats
+       keyed by name — beside `@braindog/extract`'s, which reads the token set. A record now reaches that reader
+       (`RecordOptions.dates`), so there is no build to be behind and no list to name. What is left here is
+       `DATE_FORMAT_INVALID` above, which is about the format's own tokens and is the check `43 §6` actually specifies. */
   }
 
   /**
@@ -3374,8 +3364,8 @@ function createFault(
    * is refused nothing — it is the record's own record. A pack creating into a register NOBODY owns
    * is the harder case and is deliberately allowed here: `04 §5`'s sentence reads "only into its own
    * registers", which would refuse a pack writing into the user's own register, and that is a
-   * compatibility decision with a cost rather than a bug with a fix. It is in the backlog under its
-   * own line rather than settled quietly by whoever wrote this check.
+   * compatibility decision with a cost rather than a bug with a fix. It is left open on purpose rather
+   * than settled quietly by whoever wrote this check.
    */
   if (typeof spec.register === 'string' && ownPack != null && owners) {
     const theirs = owners.get(`register.${spec.register}`);
@@ -3470,21 +3460,20 @@ function createFault(
  *   `rates` · `meets`  on the one register holding the rates a money figure converts by, and the one
  *             `meet` writes, each part naming the field that plays it (`roles.ts`, `roleBody` below).
  *   `pairs`   `02 §5`'s transfer detection: the write path finds a row's other leg and marks both
- *             (`pairs.ts`). It sat on the unbuilt list below until W57-1, refused at install, so his
+ *             (`pairs.ts`). It once sat on the unbuilt list below, refused at install, so his
  *             ledger counted every move between two of his accounts as spend and as income.
  *   `delete`  `refuse_while_referenced`, the one value (`DELETE_RULES`, `referenced.ts`): the write path refuses to
- *             delete a row a live row still points at, naming the lists and how many rows. It sat on the unbuilt
- *             list below until OPS-12, so an account with transactions deleted and left them pointing at nothing.
+ *             delete a row a live row still points at, naming the lists and how many rows. It once sat on the unbuilt
+ *             list below, so an account with transactions deleted and left them pointing at nothing.
  *   `owner_only`  `true`, or left out: a colleague who adds across the whole record does not add here, and a grant
  *             naming the list still does (`guard` in `packages/record/src/index.ts`, `20 §1`). Keys and People are
  *             owner-only by their role, so neither declares it.
  *   `hand`    `{ person?, agent?, taken? }`: who holds a row, a person by a `ref` field and an agent by the `text` field
  *             it signs with, and the state a row moves to when an agent takes it (`HAND_PARTS`, `handFault` below).
- *             The app's "Hand to" reads it (GAP-11), and nothing in the kernel names the list that declares it.
+ *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
  *
- * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits
- * that the document does not publish. They landed with the roles brief (`loop/research-shell-next.md`
- * Brief R), whose files did not include the document or that test.
+ * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits that the document does
+ * not publish. They landed in a change that did not include the document or that test.
  *
  * `pack:` IS ON THIS LIST AND IS NOT READ FROM THE BODY, and that is deliberate rather than an
  * oversight: ownership is `declaration.pack_id`, written from the declaration's own `pack` and read
@@ -3521,8 +3510,8 @@ const REGISTER_UNBUILT = ['key', 'predicates', 'immutable_when'] as const;
 const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday'] as const;
 
 /**
- * The parts of a list's `hand:` (GAP-11): the `ref` field a person is handed a row by, the `text` field holding the name
- * an agent signs with, and the state a row moves to when an agent takes it.
+ * The parts of a list's `hand:`: the `ref` field a person is handed a row by, the `text` field holding the name an
+ * agent signs with, and the state a row moves to when an agent takes it.
  *
  * EITHER HOLDER MAY BE LEFT OUT, BUT NOT BOTH. Work's `owner` is a link that goes when the record has no People
  * (`LINKS` in `packages/seed/src/packs/first-party.ts`), and a list that hands only to agents is still handed.
@@ -3993,18 +3982,18 @@ function scopesBody(decl: Declaration, fields: readonly FieldLike[], scopes: unk
  * A register's `rates:` or `meets:`, which makes it the list the kernel reads that role from (`roles.ts`).
  *
  * CHECKED AT INSTALL, NOT AT THE FIRST CALL. Before the keys, a `people` list missing a field `meet` writes installed
- * clean and the refusal reached the first agent that met somebody, weeks later and to nobody who could fix it
- * (`loop/research-seed-roles.md` R2). So every part is named, each names a field of this list of a type that plays
- * it, `merged_into` points at this list, and `projects` at the list declaring `scopes:`, all before anything is
- * written. The type refusal is `at` the field, as `scopesBody`'s is, and says which part it was named for.
+ * clean and the refusal reached the first agent that met somebody, weeks later and to nobody who could fix it. So every
+ * part is named, each names a field of this list of a type that plays it, `merged_into` points at this list, and
+ * `projects` at the list declaring `scopes:`, all before anything is written. The type refusal is `at` the field, as
+ * `scopesBody`'s is, and says which part it was named for.
  *
  * ONE LIST HOLDS EACH ROLE, as one holds the projects: two rates lists give one pair two answers on one day, and two
  * people lists make one email two people. AND THE NAMED LIST COUNTS, while it is shaped like the role and declares no
  * key: otherwise a pack declaring `rates:` beside an older money pack's `fx` would move every figure onto the new list
- * and leave yesterday's rates unread, and the conversions that worked yesterday would say a pair was missing today.
- * By shape and not by name alone, because a list called `fx` of sound effects is not anybody's rates and must block
- * nothing (the checker's hazard in the roles survey, driven in `test/roles.test.ts`). The fix names the pack that owns
- * the named list when the record knows it, read from the record, so this file names no pack.
+ * and leave yesterday's rates unread, and the conversions that worked yesterday would say a pair was missing today. By
+ * shape and not by name alone, because a list called `fx` of sound effects is not anybody's rates and must block
+ * nothing (driven in `test/roles.test.ts`). The fix names the pack that owns the named list when the record knows it,
+ * read from the record, so this file names no pack.
  */
 function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[], installed?: Known, owners?: Owners): Refusal | null {
   const id = decl.id;
@@ -4024,9 +4013,9 @@ function roleBody(key: RoleKey, decl: Declaration, fields: readonly RoleField[],
     installed === undefined
       ? undefined
       : ([...installed].find(([other, body]) => other.startsWith('register.') && body.scopes !== undefined)?.[0]?.slice('register.'.length) ?? null);
-  /* ONE FIELD PLAYS ONE PART. Measured by the checker before this map: `meets: { met: handles, handles: handles }`
-     installed clean and the first meet with a handle wrote the line saying where over the handle, and `rates:` naming
-     `currency` for both codes installed clean and converted nothing, because every row's currency was its base. */
+  /* ONE FIELD PLAYS ONE PART. Measured before this map: `meets: { met: handles, handles: handles }` installed clean and
+     the first meet with a handle wrote the line saying where over the handle, and `rates:` naming `currency` for both
+     codes installed clean and converted nothing, because every row's currency was its base. */
   const taken = new Map<string, string>();
   for (const part of parts) {
     const name = (said as Record<string, unknown>)[part.part];
@@ -4081,12 +4070,12 @@ const UNREAD: Readonly<Record<RoleKey, string>> = { rates: 'rates no figure conv
  * `roleBody`'s question asked of the other list: a keyless `fx` or `people` shaped like the role, arriving where a list
  * already declares the key.
  *
- * WITHOUT THIS THE RULE HELD IN ONE INSTALL ORDER. `roleBody` runs only for a list declaring the key, so a list declaring
- * `rates:` and then a keyless `fx` of money-core's shape both installed (`research-batch-forty-seven-audit.md` finding 2,
- * driven in `test/roles-keyless-second.test.ts`). A rate written into `fx` was then read by nothing, and cash said the
- * dollar rate it needed was missing; and the declaring list's next update was refused by `roleBody`, telling its owner
- * to declare `rates:` on a list another pack owns. `meets:` then a People-shaped `people` did the same. Refused here,
- * the keyless list is the one told, which is the list that caused it. `legacyShaped` decides whether it would hold the
+ * WITHOUT THIS THE RULE HELD IN ONE INSTALL ORDER. `roleBody` runs only for a list declaring the key, so a list
+ * declaring `rates:` and then a keyless `fx` of money-core's shape both installed (driven in
+ * `test/roles-keyless-second.test.ts`). A rate written into `fx` was then read by nothing, and cash said the dollar
+ * rate it needed was missing; and the declaring list's next update was refused by `roleBody`, telling its owner to
+ * declare `rates:` on a list another pack owns. `meets:` then a People-shaped `people` did the same. Refused here, the
+ * keyless list is the one told, which is the list that caused it. `legacyShaped` decides whether it would hold the
  * role, so an `fx` of sound effects still installs beside the rates.
  */
 function keylessBeside(key: RoleKey, decl: Declaration, installed?: Known, owners?: Owners, held?: ReadonlySet<string>): Refusal | null {
@@ -4443,11 +4432,11 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
        the same in both places, rather than two that disagree until somebody finds the other door. */
     if (enumeral && (f.values as readonly unknown[]).some((v) => typeof v !== 'string'))
       return bad('DECLARATION_INVALID', `${id}.${f.id} lists a value that is not text, and an enum is compared as text.`, f.id);
-    /* AND NO VALUE IS SHAPED LIKE A KEY. A list grows at run time: an `add` of values lands by rule when the owner's key
-       files it (DIRECTION §22), and the import proposed a person's role and a service's kind straight from the old tool.
-       The audit measured `register.people v2` holding a GitHub token as a role, resolved by rule, and a declaration is
-       versioned history, so the value would stay after any fix (`loop/research-audit-2026-09-25-import.md` S1). Every
-       version is checked here, so no door can add one. No `found`, because the value may be the key. */
+    /* AND NO VALUE IS SHAPED LIKE A KEY. A list grows at run time: an `add` of values lands by rule when the owner's
+       key files it, and an import can propose a person's role and a service's kind straight from its source. Measured:
+       `register.people v2` holding a GitHub token as a role, resolved by rule, and a declaration is versioned history,
+       so the value would stay after any fix. Every version is checked here, so no door can add one. No `found`, because
+       the value may be the key. */
     if (enumeral && (f.values as readonly string[]).some((v) => looksLikeCredential(v)))
       return bad(
         'DECLARATION_INVALID',
@@ -4616,11 +4605,11 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
           `${id}.${f.id} repeats every ${typeof freq === 'string' ? freq : JSON.stringify(freq)}, and a frequency is daily, weekly, monthly or yearly.`,
           `${f.id}.repeat`,
         );
-      /* AND EVERY OTHER KEY IS ONE THE WALK READS, which was checked for `freq` alone. `{ freq: monthly, bymonthday:
-         [15, -1] }` installed and walked 09-15, 10-15, 11-15, never the last day; `{ freq: weekly, byday: [TU, TH] }`
-         walked Tuesdays only; `colour: blue` installed beside them (`loop/research-living-in-it.md` section 4.2,
-         `repeat-keys.test.ts`). A salary declared on two days that arms one is found out on the day it is missed, so the
-         key is refused, named, until `expandRepeat` reads it. */
+      /* AND EVERY OTHER KEY IS ONE THE WALK READS, which was checked for `freq` alone.
+         `{ freq: monthly, bymonthday: [15, -1] }` installed and walked 09-15, 10-15, 11-15, never the last day;
+         `{ freq: weekly, byday: [TU, TH] }` walked Tuesdays only; `colour: blue` installed beside them
+         (`repeat-keys.test.ts`). A salary declared on two days that arms one is found out on the day it is missed, so
+         the key is refused, named, until `expandRepeat` reads it. */
       const unread = Object.keys(repeat).find((k) => !(REPEAT_READ as readonly string[]).includes(k));
       if (unread !== undefined)
         return bad(
@@ -4966,10 +4955,10 @@ function knownTo(sql: Sql, batch: readonly Declaration[], planned?: PlannedRecor
   for (const decl of batch) known.set(decl.id, decl.body);
   /* A FIELD ANY VERSION OF A LIST TYPED SECRET OR FILE IS HANDED TO THE LINT AS ONE, AFTER THE BATCH IS LAID OVER, so a
      batch that drops the field and installs a rule naming it is read as the record it leaves. The lint seals what the
-     list's `fields` types so, and a retired field may then leave the list while its rows keep the value
-     (`loop/research-batch-fifty-five-audit.md` §4): the four rules of `retired-secret.test.ts` installed after the drop,
-     and after `pin` came back as text, each of which the lint refuses while `pin` is declared secret. `sealedEver` is
-     the reading `rules.ts`'s `sealedOf` makes at run time, so the two lines cannot come to seal two sets of fields.
+     list's `fields` types so, and a retired field may then leave the list while its rows keep the value. Measured: the
+     four rules of `retired-secret.test.ts` installed after the drop, and after `pin` came back as text, each of which
+     the lint refuses while `pin` is declared secret. `sealedEver` is the reading `rules.ts`'s `sealedOf` makes at run
+     time, so the two lines cannot come to seal two sets of fields.
 
      APPENDED AS RETIRED, AND AFTER THE FIELDS THE LIST DECLARES NOW. Every reader that asks whether a field can be
      written or aggregated passes over a retired one or takes the first entry under an id, so a list that declared `pin`
@@ -5224,8 +5213,8 @@ export function retireDeclarations(
   }
 
   /* THE DOOR GUARD: a webhook ingest a live pattern names as its `door:` goes with that pattern or not at all. Retired
-     alone it answered `ok` and left the pattern naming a door no text can arrive at, the declaration `doorFault` refuses
-     at install (`loop/research-batch-forty-two-audit.md` finding 4 (c), `test/retire-door.test.ts`). */
+     alone it answered `ok` and left the pattern naming a door no text can arrive at, the declaration `doorFault`
+     refuses at install (`test/retire-door.test.ts`). */
   const going = (id: string): boolean => ids.includes(id) || alsoGoing.includes(id);
   for (const door of ids.filter((id) => id.startsWith('ingest.'))) {
     const naming = rows
@@ -5396,8 +5385,8 @@ function namedRegisters(node: unknown, into = new Set<string>()): Set<string> {
 /**
  * A pack's declarations installed and to be installed stay as they were when it was turned off.
  *
- * Upgrading a disabled pack would compute its diff against declarations that are not active, so
- * `WOULD_ORPHAN` would stop meaning what it says (`loop/research-modular.md` §1.4). Enable first.
+ * Upgrading a disabled pack would compute its diff against declarations that are not active, so `WOULD_ORPHAN` would
+ * stop meaning what it says. Enable first.
  */
 export function disabledPackFault(sql: Sql, batch: readonly Declaration[]): Refusal | null {
   for (const pack of new Set(batch.map((d) => d.pack ?? d.body.pack).filter((p): p is string => typeof p === 'string')))
@@ -5605,7 +5594,7 @@ export async function enablePack(
 /* ── a pack's settings: `config:` ────────────────────────────────────────── */
 
 /**
- * The field types a setting may take (`loop/research-modular.md` §1.3).
+ * The field types a setting may take.
  *
  * A CLOSED SUBSET, AND THE THREE LEFT OUT ARE THE POINT. A `ref` would let a pack configure its way
  * into reading a list it did not declare, and a `secret` or a `file` would put a credential or a
@@ -5889,7 +5878,7 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
   const said = config[target.setting];
   const value = values[target.setting];
   /* A SETTING NOBODY HAS TYPED IS NO TARGET, not the placeholder the declaration carries beside it: a money ceiling
-     starts empty and the figure has no verdict until a person sets one (`loop/finish/modules.md` C1). */
+     starts empty and the figure has no verdict until a person sets one. */
   if (said !== undefined && (value === null || value === undefined)) {
     const { lte: _lte, gte: _gte, ...rest } = target;
     return { ...decl, target: rest };

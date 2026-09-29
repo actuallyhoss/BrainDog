@@ -14,17 +14,15 @@
  * at the top level — a safety net that was not there in the one case it was written for, a caller
  * doing `k.transaction(() => k.bindGrant(…))`.
  *
- * AND ON A DURABLE OBJECT THE SAVEPOINT IS THE HOST'S, NEVER A STATEMENT. `ctx.storage.sql.exec`
- * refuses `SAVEPOINT`, `RELEASE` and `BEGIN` outright, inside `transactionSync` or outside it and
- * even behind a leading comment, and the version of this file that issued them answered 500 on the
- * Cloud for `/api/keys/put` and `/api/invite` while every Node suite was green
- * (`loop/research-provision-day.md`, "Reason two"). What the Durable Object does allow, measured on
- * workerd 1.20260903.1 on 2026-09-22, is `storage.transactionSync` inside another one, and that
- * nested call is a real savepoint: an inner throw undid the inner row and the outer rows committed.
- * So on a host that refuses the statement the attempt runs inside `sql.transactionSync` and carries
- * a refusal out as a throw, and the host's own savepoint (or, at the top, the host's own
- * transaction) does the rollback. On `node:sqlite` nothing changes: the statement is accepted and
- * the path below it is the one the kernel's tests have always proved.
+ * AND ON A DURABLE OBJECT THE SAVEPOINT IS THE HOST'S, NEVER A STATEMENT. `ctx.storage.sql.exec` refuses `SAVEPOINT`,
+ * `RELEASE` and `BEGIN` outright, inside `transactionSync` or outside it and even behind a leading comment, and the
+ * version of this file that issued them answered 500 on the Cloud for `/api/keys/put` and `/api/invite` while every
+ * Node suite was green What the Durable Object does allow, measured on workerd 1.20260903.1, is
+ * `storage.transactionSync` inside another one, and that nested call is a real savepoint: an inner throw undid the
+ * inner row and the outer rows committed. So on a host that refuses the statement the attempt runs inside
+ * `sql.transactionSync` and carries a refusal out as a throw, and the host's own savepoint (or, at the top, the host's
+ * own transaction) does the rollback. On `node:sqlite` nothing changes: the statement is accepted and the path below it
+ * is the one the kernel's tests have always proved.
  *
  * Validation before the first write is still better; this is what makes the order stop mattering.
  */

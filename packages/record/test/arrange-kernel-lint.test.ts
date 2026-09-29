@@ -1,11 +1,10 @@
 /**
- * What `propose` files is what the kernel will stage, when the kernel is the one refusing
- * (`loop/research-batch-forty-seven-audit.md` finding 1; `declare`'s `stagedBatch`, and the kernel's `lint` over the
- * record `plannedState` leaves, are what this reads).
+ * What `propose` files is what the kernel will stage, when the kernel is the one refusing (`declare`'s `stagedBatch`,
+ * and the kernel's `lint` over the record `plannedState` leaves, are what this reads).
  *
- * THE ARRANGER ASKED `installFault`, WHICH READS THE DIFF, AND STOPPED THERE. Every refusal `declare` can read off a plan
- * was asked; none of the ones the kernel's `validate` makes at `host.stage` was, since `kernel.lint` ran only inside
- * `if (pages.length > 0)`. Measured by the audit's `planall-kernel.mts` on the wave forty-seven tree:
+ * THE ARRANGER ASKED `installFault`, WHICH READS THE DIFF, AND STOPPED THERE. Every refusal `declare` can read off a
+ * plan was asked; none of the ones the kernel's `validate` makes at `host.stage` was, since `kernel.lint` ran only
+ * inside `if (pages.length > 0)`. Measured on an earlier tree:
  *
  *     fxer (keyless fx) on, then {install: rater}      filed   accept DECLARATION_INVALID at rates:
  *     one arrangement, fxer and rater                  filed   accept DECLARATION_INVALID ... Already applied, and kept: fxer.
@@ -88,10 +87,10 @@ test('A PAGE THAT IS WRONG IS STILL NAMED AT body.pages', async () => {
   assert.match(out.refusal?.at ?? '', /^body\.pages/u, said(out));
 });
 
-/* A PAGE'S `where` AND A COLUMN'S `sign:` ARE READ BY THE KERNEL'S `unreadable`, NOT BY `validate`. With the pages asked
-   of `validate` alone, both of these were filed, and the accept installed `one` and answered "page.p.blocks[0] cannot be
-   read: nosuch is x: things has no field called nosuch. Already applied, and kept: one." `kernel.lint` over the packs and
-   the pages, as it was before, refused both at `body.pages`. Measured by the checker, against a list arriving in the same
+/* A PAGE'S `where` AND A COLUMN'S `sign:` ARE READ BY THE KERNEL'S `unreadable`, NOT BY `validate`. With the pages
+   asked of `validate` alone, both of these were filed, and the accept installed `one` and answered "page.p.blocks[0]
+   cannot be read: nosuch is x: things has no field called nosuch. Already applied, and kept: one." `kernel.lint` over
+   the packs and the pages, as it was before, refused both at `body.pages`. Measured against a list arriving in the same
    arrangement and against one already installed, with the same answers. */
 const ONE = {
   ...head('one', '1.0.0'),
@@ -176,10 +175,10 @@ test('A LIST AN EARLIER UPDATE IN THE ARRANGEMENT RETIRES IS NOT HELD AGAINST TH
 
 /* ─── WHAT `validate` ALONE LET THROUGH ───
 
-   WAVE FORTY-EIGHT'S `stagedFault` ASKED THE PLANNED RECORD `validate` AND NOTHING ELSE, and its checker named the rest of
-   what `stageInstall` asks: `unreadable`, `unserved`, `stranded`, `tagsNarrowed`, `taggingRefused`, `doorsKept` and a
-   disabled pack. Five arrangements were filed on the wave forty-eight tree that the accept refused, after installing
-   whatever came before the one it refused:
+   AN EARLIER `stagedFault` ASKED THE PLANNED RECORD `validate` AND NOTHING ELSE, and that left out the rest of what
+   `stageInstall` asks: `unreadable`, `unserved`, `stranded`, `tagsNarrowed`, `taggingRefused`, `doorsKept` and a
+   disabled pack. Five arrangements were filed on that tree that the accept refused, after installing whatever came
+   before the one it refused:
 
        jobsy 2.0.0 narrowing tags under a live rule.late       filed   accept FIELD_TYPE_CHANGED at register.jobs.fields.tags.type
        jobsy (tags: int), then later's rule.late tagging it     filed   accept FIELD_TYPE_CHANGED ... Already applied, and kept: jobsy.

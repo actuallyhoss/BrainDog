@@ -1,11 +1,10 @@
 /**
- * `previewPage` held to what `list`, `metric` and `page` already answer the same caller (audit sixty-six, findings 1, 2
- * and 9; probes `d1-preview-oracle` and `d2-preview-cost`).
+ * `previewPage` held to what `list`, `metric` and `page` already answer the same caller.
  *
- * THE BODY IS THE CALLER'S OWN, AND THAT IS WHAT IS NEW. `page` draws a body the owner installed, so its `where` and its
- * figures are words nobody reading the page chose. `previewPage` draws a body the caller writes, so every word in it is a
- * question she gets to ask, and each of the three findings is one kind of question the record already refuses to
- * answer somewhere else:
+ * THE BODY IS THE CALLER'S OWN, AND THAT IS WHAT IS NEW. `page` draws a body the owner installed, so its `where` and
+ * its figures are words nobody reading the page chose. `previewPage` draws a body the caller writes, so every word in
+ * it is a question she gets to ask, and each of the three cases below is one kind of question the record already
+ * refuses to answer somewhere else:
  *
  *   1. A `where` naming a row of a list she cannot read. `list` resolves her words with `reads` and answers 0 rows
  *      whether the title exists or not; the preview resolved them against the whole record and drew 1 row for
@@ -41,7 +40,7 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'own
 
 const reg = (id: string, name: string, title: string, fields: unknown[]) => ({ id: `register.${id}`, kind: 'register' as const, body: { id, name, title, fields } as never });
 
-/** D1's record with two more lists: Topics, which Wren reads and Notes points at, and Bills, a cash walk's leg. */
+/** The record with two more lists: Topics, which Wren reads and Notes points at, and Bills, a cash walk's leg. */
 const DECLS = [
   reg('clients', 'Clients', 'name', [{ id: 'name', type: 'text', required: true }]),
   reg('diary', 'Diary', 'body', [{ id: 'body', type: 'text', required: true }]),
@@ -108,7 +107,7 @@ async function record(bills = 0, text = '', currencies: readonly string[] = ['US
   return { sql, api, wren, preview };
 }
 
-/** A cash walk over Bills, every row monthly, as D2 wrote it. */
+/** A cash walk over Bills, every row monthly. */
 const walk = (horizon: number, where?: string, legs = 1) => ({
   kind: 'forecast',
   source: 'forecast.runway',
@@ -119,7 +118,7 @@ const walk = (horizon: number, where?: string, legs = 1) => ({
 
 test('A WHERE NAMING A ROW OF A LIST SHE CANNOT READ ANSWERS ALIKE WHETHER THE ROW EXISTS OR NOT, as `list` answers it', async () => {
   const { sql, api, wren, preview } = await record();
-  /* D1's three bodies. Before the repair: 1 row, then `REF_UNKNOWN` "there is no clients called Nobody Ltd.", twice. */
+  /* The three bodies. Before the repair: 1 row, then `REF_UNKNOWN` "there is no clients called Nobody Ltd.", twice. */
   const table = (where: string) => preview([{ kind: 'table', source: 'register.notes', where }]);
   const exists = await table('client is Acme Redundancy Plan');
   const made = await table('client is Nobody Ltd');
@@ -176,7 +175,7 @@ test('A FIGURE OVER A LIST SHE CANNOT READ AND A FIGURE NOBODY DECLARED ARE ONE 
   assert.equal(m1.refusal.code, 'METRIC_UNKNOWN');
   assert.equal(m1.refusal.fix.replace('diary-count', 'X'), m2.refusal.fix.replace('nosuch-count', 'X'));
 
-  /* D1's bodies. Before the repair: `FORBIDDEN` against nothing, and `FORBIDDEN` against `DECLARATION_INVALID`. */
+  /* The bodies. Before the repair: `FORBIDDEN` against nothing, and `FORBIDDEN` against `DECLARATION_INVALID`. */
   const pairs: [unknown, unknown][] = [
     [{ kind: 'stat', cells: [{ metric: 'diary-count' }] }, { kind: 'stat', cells: [{ metric: 'nosuch-count' }] }],
     [{ kind: 'series', source: 'metric.diary-count' }, { kind: 'series', source: 'metric.nosuch-count' }],
@@ -197,9 +196,10 @@ test('A FIGURE OVER A LIST SHE CANNOT READ AND A FIGURE NOBODY DECLARED ARE ONE 
     const b = await preview([unknown]);
     assert.deepEqual(JSON.parse(JSON.stringify(a).replaceAll('diary-count', 'X')), JSON.parse(JSON.stringify(b).replaceAll('nosuch-count', 'X')), `${JSON.stringify(known)} answered differently from ${JSON.stringify(unknown)}`);
   }
-  /* A FIGURE SHE READS, NAMED WITH A PARAMETER, IS A `where` SHE WROTE. Held unchecked, `notes-for:Acme Redundancy
-     Plan` drew 1 and `notes-for:Nobody Ltd` a reading refused `REF_UNKNOWN`, "there is no clients called Nobody Ltd.",
-     where `metric` answers 0 to both: finding 1's oracle through a stat cell. The `metric` answers are the control. */
+  /* A FIGURE SHE READS, NAMED WITH A PARAMETER, IS A `where` SHE WROTE. Held unchecked,
+     `notes-for:Acme Redundancy Plan` drew 1 and `notes-for:Nobody Ltd` a reading refused `REF_UNKNOWN`, "there is no
+     clients called Nobody Ltd.", where `metric` answers 0 to both: the first case's oracle through a stat cell. The
+     `metric` answers are the control. */
   for (const who of ['Acme Redundancy Plan', 'Nobody Ltd']) {
     const read = await api.metric({ metric: `notes-for:${who}` }, wren);
     assert.ok(read.ok && (read.value as { value?: unknown }).value === 0, JSON.stringify(read));
@@ -224,7 +224,7 @@ test('A FIGURE OVER A LIST SHE CANNOT READ AND A FIGURE NOBODY DECLARED ARE ONE 
 });
 
 test('WHAT ONE PREVIEW MAY DRAW IS BOUNDED, AND THE REFUSAL SAYS WHICH BOUND: cash walks, horizon, rows answered, bytes', async () => {
-  /* D2's list: 2,000 monthly bills, the most one leg may carry. */
+  /* The list: 2,000 monthly bills, the most one leg may carry. */
   const { sql, wren, preview } = await record(2000);
 
   /* THE HORIZON. `page` walks up to 3,650 days; a preview draws a walk no further than the ceiling, and says so on the
@@ -236,7 +236,7 @@ test('WHAT ONE PREVIEW MAY DRAW IS BOUNDED, AND THE REFUSAL SAYS WHICH BOUND: ca
   assert.match(far.blocks[0]!.refusals[0]!.fix, new RegExp(`${PREVIEW_HORIZON_MOST}`, 'u'));
   assert.match(far.blocks[0]!.refusals[0]!.fix, /3,650/u, 'the sentence does not say what `page` allows');
 
-  /* THE WALKS. D2's body: the block ceiling of walks. The first ones are drawn and the rest are held on the block. */
+  /* THE WALKS. The body: the block ceiling of walks. The first ones are drawn and the rest are held on the block. */
   const t = performance.now();
   const many = await preview(Array.from({ length: 24 }, () => walk(30)));
   const ms = performance.now() - t;
@@ -267,7 +267,7 @@ test('WHAT ONE PREVIEW MAY DRAW IS BOUNDED, AND THE REFUSAL SAYS WHICH BOUND: ca
 });
 
 test('A WALK IS BOUNDED BY WHAT IT READS, NOT ONLY BY HOW FAR IT LOOKS: legs and currencies, refused before the walk runs', async () => {
-  /* THE LEGS. Held unchecked, one walk of twenty legs over D2's 2,001 bills at 366 days ran 480,000 steps in 3.8 s and was
+  /* THE LEGS. Held unchecked, one walk of twenty legs over 2,001 bills at 366 days ran 480,000 steps in 3.8 s and was
      refused only afterwards, on the rows it answered: a block count and a horizon bound nothing a leg multiplies. */
   {
     const { sql, preview } = await record(2000);

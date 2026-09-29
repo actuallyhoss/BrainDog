@@ -1,5 +1,5 @@
 /**
- * Scheduled actions: the runner that drains `pull`, `call` and `poll` (`loop/DIRECTION.md` §0b).
+ * Scheduled actions: the runner that drains `pull`, `call` and `poll`.
  *
  * `call` is an outbound POST a schedule fires. `poll` fetches an endpoint on a schedule and acts through a
  * rule when the answer changes. `pull` is `25-CONNECTORS`'s fetch of something you already own. All three
@@ -49,8 +49,8 @@ export const ACTION_TIMEOUT_MS = 10_000;
 export const ACTION_MAX_BYTES = 2_000_000;
 
 /**
- * The ways a `call` or a `poll` sends its key (`loop/finish/contracts.md`, "call and poll `auth.kind`"): as a bearer, in
- * a header it names, in a query parameter it names, or as a basic user name and password.
+ * The ways a `call` or a `poll` sends its key: as a bearer, in a header it names, in a query parameter it names, or as
+ * a basic user name and password.
  *
  * FOUR OF CONNECT'S EIGHT, the four that are built from the key alone. The other four fetch a token first or sign the
  * whole request, which is a connector's run (`pull` with `fetch:`), not one request.
@@ -284,12 +284,12 @@ export type GrantChoosable = { id: string; label: string; revoked_at: string | n
  *
  * ONE ORDER, WRITTEN ONCE, BECAUSE FOUR COPIES OF IT HAD ALREADY LET A FIFTH GO WRONG. The vault admits two live grants
  * under one label, and at `afb3b1b2` the newest-first clause was spelled out in `keyNamed` and `opensNamed` here, in
- * `grantNamed` (`@braindog/host/script`) and in `slashOwnKeyFor` (`@braindog/host/slash`). The audit of wave forty-nine
- * found Slash's own path taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action
- * named `slash` sent the newest. The four that agreed agreed because each author copied the same words; measured on
- * 23 September, no state `test/grant-chooser.test.ts` or `packages/host/test/grant-named.test.ts` builds made two of them
- * disagree, so nothing about which key wins moved here. It lives in the kernel beside `opensNamed` for the reason
- * `hostOpened` below does: the host imports the rule rather than keeping a copy that can drift.
+ * `grantNamed` (`@braindog/host/script`) and in `slashOwnKeyFor` (`@braindog/host/slash`). Slash's own path was found
+ * taking `grants().find(...)`, which is `listGrants` order and so the OLDEST key, while every action named `slash` sent
+ * the newest. The four that agreed agreed because each author copied the same words; measured, no state
+ * `test/grant-chooser.test.ts` or `packages/host/test/grant-named.test.ts` builds made two of them disagree, so nothing
+ * about which key wins moved here. It lives in the kernel beside `opensNamed` for the reason `hostOpened` below does:
+ * the host imports the rule rather than keeping a copy that can drift.
  *
  * `fits` IS THE CALLER'S OWN RULE ABOUT WHAT IT CAN SEND, and the order is applied to what it keeps. Slash's key goes out
  * as a bearer, so it passes over a password or a note; an action and a script take the newest entry of any kind, as they
@@ -339,11 +339,11 @@ export function opensNamed(sql: Sql, name: string): string | null {
  * `api.gold.test`, and "the Bake test account" names nothing. Not a string at all names nothing either, so a lookup that
  * forgot to carry `opens` sends no key rather than every key.
  *
- * IT LIVES HERE, BESIDE `opensNamed`, AND NOT IN `@braindog/host`, because two readers of `opens` disagreed. The host sent
- * a key where this parse said and the approval line printed the words raw, so the audit of wave thirty-eight watched
- * `https://api.goldapi.io@collector.test` printed as the key's destination while the key went to `collector.test`, the
- * host after the user-info. The line (`scriptEgress`) asks this now, and so does `keyRefused` in `packages/host`, which
- * imports it from the index and holds no copy of its own.
+ * IT LIVES HERE, BESIDE `opensNamed`, AND NOT IN `@braindog/host`, because two readers of `opens` disagreed. The host
+ * sent a key where this parse said and the approval line printed the words raw, so
+ * `https://api.goldapi.io@collector.test` was printed as the key's destination while the key went to `collector.test`,
+ * the host after the user-info. The line (`scriptEgress`) asks this now, and so does `keyRefused` in `packages/host`,
+ * which imports it from the index and holds no copy of its own.
  */
 export function hostOpened(opens: unknown): string | null {
   if (typeof opens !== 'string') return null;
@@ -436,9 +436,8 @@ export function pause(
 /**
  * A `call` or `poll` row fires: queue one request, and say when the next one is due.
  *
- * A DECLARATION THAT IS GONE ENDS THE ROW. Retiring it, uninstalling its pack and turning its pack off all
- * retire the declaration, so the row goes `done` here and nothing re-arms it; turning the pack back on arms
- * it again (`research-modular.md` §1.2).
+ * A DECLARATION THAT IS GONE ENDS THE ROW. Retiring it, uninstalling its pack and turning its pack off all retire the
+ * declaration, so the row goes `done` here and nothing re-arms it; turning the pack back on arms it again.
  *
  * ONE REQUEST IN FLIGHT PER ACTION. A job still pending, leased or waiting on its retry is the run that
  * this fire would duplicate, so the fire queues nothing and only re-arms. That is what keeps a provider
@@ -814,7 +813,7 @@ export const ANSWER_KEPT_BYTES = 8_192;
 export type KeptAnswer = { status: number; body: string | null; cut: boolean };
 
 /**
- * A call's answer, as its run keeps it (`loop/DIRECTION.md` §0b: a call's "answer is recorded").
+ * A call's answer, as its run keeps it: a call's answer is recorded.
  *
  * THE KEY IS ALREADY OUT OF IT. The executor strikes every spelling of the key it sent from the body before the record
  * sees it (`sendAction`). WHAT STILL LOOKS LIKE A KEY IS WITHHELD WHOLE, because the event log is exported, shown to
@@ -848,13 +847,12 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
      off, or one the plan's limit held, sent nothing, so it counts nothing against the allowance. It is still an
      event, so it is never silent.
 
-     A FAILURE IS FREE, and rule 5 above is why: the account is metered for the work it got. A 429, a 502, a
-     timeout and a dropped connection gave it none, and the run is going to be tried again, so charging for it
-     bills somebody up to eight times for one provider's outage. `failed` is the ladder's outcome and only the
-     ladder's: a 401 pauses (`paused`), an origin the host would not call is `refused`, and both of those are
-     answers the record asked for and got. `failures` still counts, so a free run is never an invisible one; its
-     `bytes` and `ms` count nothing either, because the allowance limits both and a run that is not owed must not
-     spend them (`loop/finish/decisions.md` C34). */
+     A FAILURE IS FREE, and rule 5 above is why: the account is metered for the work it got. A 429, a 502, a timeout and
+     a dropped connection gave it none, and the run is going to be tried again, so charging for it bills somebody up to
+     eight times for one provider's outage. `failed` is the ladder's outcome and only the ladder's: a 401 pauses
+     (`paused`), an origin the host would not call is `refused`, and both of those are answers the record asked for and
+     got. `failures` still counts, so a free run is never an invisible one; its `bytes` and `ms` count nothing either,
+     because the allowance limits both and a run that is not owed must not spend them. */
   const free = usage.outcome === 'dropped' || usage.outcome === 'held' || usage.outcome === 'failed';
   const counted = {
     runs: free ? 0 : 1,
@@ -972,10 +970,10 @@ export function finishAction(deps: ActionDeps, ready: Ready, answer: ActionAnswe
     } catch {
       kept = {};
     }
-    /* A CALL ABOUT NO ROW KEEPS ITS ANSWER WHERE ITS DECLARATION SAYS: one its clock fired, or one a `call` step made in
-       a run that has no row (`loop/finish/contracts.md` §4.1). Such a call is a read of somebody's service, a rate or a
-       balance, and with `writes` and a `map` it lands as a pull's answer does. A call about a row is a post of that row,
-       and its answer lands nowhere but in the run that waits on it. */
+    /* A CALL ABOUT NO ROW KEEPS ITS ANSWER WHERE ITS DECLARATION SAYS: one its clock fired, or one a `call` step made
+       in a run that has no row. Such a call is a read of somebody's service, a rate or a balance, and with `writes` and
+       a `map` it lands as a pull's answer does. A call about a row is a post of that row, and its answer lands nowhere
+       but in the run that waits on it. */
     const changed = channel === 'poll' ? kept.seen !== hash : channel === 'pull' || (channel === 'call' && aboutNoRow(job.payload));
     let outcome: Usage['outcome'] = channel === 'poll' ? (changed ? 'changed' : 'unchanged') : 'ok';
     let say = channel === 'poll'
@@ -1353,7 +1351,7 @@ export function resumeAction(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, i
 type Totals = { runs: number; requests: number; bytes: number; failures: number };
 
 /**
- * One scheduled action, as the record's `actions` read answers it (`loop/research-scheduled-actions.md` §4.6).
+ * One scheduled action, as the record's `actions` read answers it.
  *
  * THE KEY IS ITS LABEL, from the vault's index. Nothing sealed is read to build this, and the run sentences are the
  * `pull` events' own notes, which carry a host, a status and a label and never a value.
@@ -1397,8 +1395,8 @@ export type ProjectRow = { id: string; spoken: string; title: string | null };
  *
  * WHY THE HOST IS HANDED THE ROW AND NOT THE WORDS: a declaration holds the project as a row id, which no page and no
  * person reads, and "Runs on" matched it against the project's NAME, so an action declared with `project: things#1` or
- * with the row's id showed on no project page at all (`loop/finish/shell.md` DOR-6). Resolved here, once, the page
- * matches the row it is drawn for and says the project's title where it names one.
+ * with the row's id showed on no project page at all. Resolved here, once, the page matches the row it is drawn for and
+ * says the project's title where it names one.
  */
 function projectRowOf(sql: Sql, ref: string): ProjectRow | null {
   const said = parseSpoken(ref);
@@ -1532,8 +1530,8 @@ export const RULE_CALLS_PER_DAY = 100;
 /**
  * One action's egress: where it calls, how often, which key by label, and which fields leave with it.
  *
- * WHAT THE OWNER READS BEFORE THE ONE PRESS (`loop/research-scheduled-actions.md` §5). The plan diff prints it as
- * `calls_out`, and a proposal that adds or changes an action carries it as the lines approving it would arm.
+ * WHAT THE OWNER READS BEFORE THE ONE PRESS. The plan diff prints it as `calls_out`, and a proposal that adds or
+ * changes an action carries it as the lines approving it would arm.
  */
 export type Egress = {
   /** The action's ingest id, or a script's or a digest's own id: the name the line is about. */
@@ -1603,10 +1601,10 @@ export function egressOf(body: unknown, nameOf?: (project: string) => string | n
   if (every === null && trigger === 'schedule') return null;
 
   const host = hostOf(addressOf(d as ActionDecl));
-  /* DOR-2: A PULL'S KEY IS THE ONE `fetch.auth` NAMES, when it names one, because that is the key the requests are
-     actually signed with (`keyNameOf`, `pull.ts`) — not always `grant`, which a paged pull's own approval line and
-     `install`'s `PLAN_STALE` check both read through this one function, so the fix lands for both at once. Every
-     other channel keeps reading its top-level `grant`, as it always did. */
+  /* A PULL'S KEY IS THE ONE `fetch.auth` NAMES, when it names one, because that is the key the requests are actually
+     signed with (`keyNameOf`, `pull.ts`), not always `grant`, which a paged pull's own approval line and `install`'s
+     `PLAN_STALE` check both read through this one function, so the fix lands for both at once. Every other channel
+     keeps reading its top-level `grant`, as it always did. */
   const key = (channel === 'pull' ? keyNameOf(d) : typeof d.grant === 'string' && d.grant !== '' ? d.grant : undefined) ?? null;
   const sends = trigger === 'schedule' || !Array.isArray(d.sends) ? [] : d.sends.filter((s): s is string => typeof s === 'string');
   const project = typeof d.project === 'string' && d.project !== '' ? d.project : null;
@@ -1652,9 +1650,9 @@ type ScriptHeader = { script: string; runs?: { every?: unknown; door?: unknown; 
  * `trigger` HAS NO WORD FOR A DOOR. It is the plan diff's closed union, owned by `@braindog/declare`, and a door-started
  * script is reported as rule-started there. The line says `when <door> receives an arrival`, which is the truth.
  *
- * EACH KEY IS SAID WITH THE HOST IT GOES TO, because the host sends a key only where its vault entry opens (`keyRefused`
- * in `@braindog/host`) and the line named the origins and the keys as two lists. A script with two origins and one key
- * was approved without anybody being told which origin gets the key, which is the pairing the audit of wave thirty-five
+ * EACH KEY IS SAID WITH THE HOST IT GOES TO, because the host sends a key only where its vault entry opens
+ * (`keyRefused` in `@braindog/host`) and the line named the origins and the keys as two lists. A script with two
+ * origins and one key was approved without anybody being told which origin gets the key, which is the pairing that was
  * found broken at run time. `opensOf` reads the vault by label, as the host resolves it; a caller that cannot reach the
  * vault, or a label it holds no live entry for, says "to the host its vault entry opens", which is where the answer is.
  */
@@ -1718,9 +1716,9 @@ type DigestHeader = {
  * A digest's egress, from its `webhook` channel, or `null` when everything it assembles stays with the owner.
  *
  * ONLY THE WEBHOOK, because it is the one channel a digest has that posts to an address the declaration chose. In-app,
- * email and push go to the record's own owners, and `mcp` sends nothing. Audit fifty-one (section 2) filed a digest
- * posting a table of Notes to `https://collector.example.com/in` and read `approve: null` on the stored proposal: the
- * owner was asked about a title, and when its clock came `digest.ts` posted the owner's row to that address.
+ * email and push go to the record's own owners, and `mcp` sends nothing. Measured: a digest filed posting a table of
+ * Notes to `https://collector.example.com/in` and read `approve: null` on the stored proposal: the owner was asked
+ * about a title, and when its clock came `digest.ts` posted the owner's row to that address.
  *
  * WHAT IT CARRIES IS SAID AS THE SECTIONS' SOURCES, in `sends`, so a digest that starts posting another list is a change
  * the owner is asked about again, as a call that sends another field is. `grant` is said when it is declared, as an
@@ -1863,19 +1861,19 @@ export function queueCall(
   }
 
   /* AND A FIELD HOLDING WHAT A SECRET OR A FILE FIELD OF THE SAME ROW HOLDS IS LEFT OUT THE SAME WAY, whatever its own
-     type. A rule's `set` writes a secret into a text field before the call is queued, and the type alone let it through:
-     measured on 23 September, `set: { field: party, to: '{{token}}' }` beside `run: paid_hook` queued `party:
-     'hunter2'`, inline and as a run, through `set_var`, another field, `tags` and a branch, and so did two rules that
-     each install clean, one writing `party` and one running the call, which no lint of one body can see. The lint now
-     refuses the single body at install (`flow-lint.ts`, `sentFrom`); this is the second line, and the only one for the
-     pair. It reads the row's values rather than the steps that wrote them, because the pass hands this function the
-     row and nothing of the rule, so a field holding the secret's words for another reason is left out too, which costs
-     a call a value and sends nothing that should stay.
+     type. A rule's `set` writes a secret into a text field before the call is queued, and the type alone let it
+     through: measured, `set: { field: party, to: '{{token}}' }` beside `run: paid_hook` queued `party: 'hunter2'`,
+     inline and as a run, through `set_var`, another field, `tags` and a branch, and so did two rules that each install
+     clean, one writing `party` and one running the call, which no lint of one body can see. The lint now refuses the
+     single body at install (`flow-lint.ts`, `sentFrom`); this is the second line, and the only one for the pair. It
+     reads the row's values rather than the steps that wrote them, because the pass hands this function the row and
+     nothing of the rule, so a field holding the secret's words for another reason is left out too, which costs a call a
+     value and sends nothing that should stay.
 
      RETIRED FIELDS COUNT, SO THE DECLARATION IS READ AND NOT ONLY `typeOf`. The live schema `typeOf` reads drops a
-     retired field, and the rows written before it was retired keep the value, which `fill` still reads: the checker
-     measured on 23 September, with `token` retired, the pair above queueing `party: 'hunter2'` while the lint refused
-     the single body, since `hiddenOf` there reads the declaration too. */
+     retired field, and the rows written before it was retired keep the value, which `fill` still reads: measured, with
+     `token` retired, the pair above queueing `party: 'hunter2'` while the lint refused the single body, since
+     `hiddenOf` there reads the declaration too. */
   const declared = deps.sql.one<{ body: string }>(
     "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
     `register.${entry.register}`,
@@ -1891,10 +1889,10 @@ export function queueCall(
   }
 
   /* A FILE FIELD HOLDS AN OBJECT, AND ITS NAME AND HASH ARE WHAT A COPY OF IT CARRIES. This collected strings only, so
-     a file held nothing back: audit fifty-two §3 (C3c) stored `set: { field: party, to: '{{trigger.row.doc.name}}' }`
-     beside a clean `run: paid_hook` and the call queued `party: 'contract-signed.pdf'`, and the same with `.sha256`
-     queued the hash. The mime and the size are not held, because `application/pdf` or `1200` in a sent field is what
-     a hundred ordinary rows say. */
+     a file held nothing back: measured, a stored `set: { field: party, to: '{{trigger.row.doc.name}}' }` beside a clean
+     `run: paid_hook` and the call queued `party: 'contract-signed.pdf'`, and the same with `.sha256` queued the hash.
+     The mime and the size are not held, because `application/pdf` or `1200` in a sent field is what a hundred ordinary
+     rows say. */
   const held: string[] = [];
   const hold = (v: unknown): void => {
     for (const one of Array.isArray(v) ? v : [v]) {
@@ -1910,14 +1908,14 @@ export function queueCall(
 
   /* AND EVERY VALUE THE FIELD HAS HELD, NOT ONLY TODAY'S. A copy made before the key changed was sent: with `party`
      copied from `token` on create and a clean rule posting on paid, a grant revoked and deposited again between the
-     two, and a token cleared from the row, each queued `party: '<the old grant id>'` (measured 23 September,
-     `secret-out.test.ts`, 2 of 2). A SECRET FIELD'S HISTORY IS THE VAULT'S IDS. `coerce.ts` takes a grant id and
-     nothing else and only the vault door writes the field, so whatever it ever held is a row of `grant`, and no row
-     of `grant` is deleted; the ledger cannot say which, because it writes `--redacted--` for a secret. Holding every
-     id the vault has issued is wider than this field's own, and a grant id in a field that leaves is the thing the
-     rule says never leaves, whichever key it names. What this cannot reach is a plaintext an earlier build left in the
-     field and then replaced: nothing kept it. A FILE FIELD'S HISTORY IS IN THE LEDGER, which keeps a file's value on
-     the `create` row and on every edit of it, so a file replaced after the copy is held back by the name it had. */
+     two, and a token cleared from the row, each queued `party: '<the old grant id>'` (measured in `secret-out.test.ts`,
+     2 of 2). A SECRET FIELD'S HISTORY IS THE VAULT'S IDS. `coerce.ts` takes a grant id and nothing else and only the
+     vault door writes the field, so whatever it ever held is a row of `grant`, and no row of `grant` is deleted; the
+     ledger cannot say which, because it writes `--redacted--` for a secret. Holding every id the vault has issued is
+     wider than this field's own, and a grant id in a field that leaves is the thing the rule says never leaves,
+     whichever key it names. What this cannot reach is a plaintext an earlier build left in the field and then replaced:
+     nothing kept it. A FILE FIELD'S HISTORY IS IN THE LEDGER, which keeps a file's value on the `create` row and on
+     every edit of it, so a file replaced after the copy is held back by the name it had. */
   for (const g of deps.sql.all<{ id: string }>('SELECT id FROM grant')) held.push(g.id);
   if (files.size > 0)
     for (const e of deps.sql.all<{ field: string | null; from_v: string | null; to_v: string | null }>(

@@ -464,8 +464,8 @@ test('THE THREE COMMENTS IN `metrics.ts` THAT NAMED WORK IN ANOTHER FILE SAY WHA
   assert.equal(mine.includes('Closing it belongs in `declare.ts`'), false, 'the field still defers a check declare.ts has made');
   assert.equal(mine.includes('a convention rather than an invariant'), false, 'the field still calls the refusal a convention');
 
-  /* `Reading.held`: the record counts held inside the scope a parameter filled, and the browser counts nothing since
-     ARC-1 (it prints the record's `held`), so what is held here is that `withParam` still writes the scope it cut. */
+  /* `Reading.held`: the record counts held inside the scope a parameter filled, and the browser counts nothing (it
+     prints the record's `held`), so what is held here is that `withParam` still writes the scope it cut. */
   const web = source('apps', 'web', 'src', 'lib', 'record', 'metrics.ts');
   assert.match(web, /within: scope\.join/u, 'withParam no longer writes the scope it cut');
   assert.equal(mine.includes('without setting any scope'), false, 'held still says the browser sets no scope');
@@ -1301,8 +1301,8 @@ test('A DECISION THAT PREDICTED NOTHING CANNOT BE WRONG, so the record checks th
 /* THE QUESTION A MISS FILES SAYS WHICH PREDICTION IT GRADES. Its body was the two options and `requires_reason` and
    nothing else, so the record found the prediction by the words of the question, and two predictions with the same
    claim and target, one over Money and one over Inbox, both answered: the Inbox miss was held from Inbox's readers
-   because its words matched the Money one too (`loop/research-decide-reach.md`, E1, measured `actual: undefined`). Only
-   `system` opens it, so the record can believe the id it carries. */
+   because its words matched the Money one too (measured `actual: undefined`). Only `system` opens it, so the record can
+   believe the id it carries. */
 test('A MISSED PREDICTION FILES ITS QUESTION NAMING THE PREDICTION, which only the system can open', async () => {
   const { k, sql, clock } = await record();
   predict(sql, '<=400000');

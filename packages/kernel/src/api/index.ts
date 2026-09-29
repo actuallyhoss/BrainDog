@@ -3,8 +3,8 @@
  *
  * ONE FILE PER UNIT, AND THIS FILE IS ONLY A LIST. A new kernel method is `api/<unit>.ts`, exporting
  * `extension(parts: KernelParts)` that returns the methods it adds; it is registered here with one import line and one
- * spread line, both inside the `EXTENSIONS` block, so two units adding methods in one workflow touch two lines of this
- * file and no line of `index.ts` (`loop/finish/contracts.md` §0 point 5 and §2.1).
+ * spread line, both inside the `EXTENSIONS` block, so two changes adding methods at once touch two lines of this file
+ * and no line of `index.ts`.
  *
  * `Kernel` STAYS `ReturnType<typeof makeKernel>`, and `makeKernel` returns `{ ...kernel, ...extensions(parts) }`, so a
  * method added here is typed on every caller with no line written anywhere else. A name the kernel already has is

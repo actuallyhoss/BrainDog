@@ -1,13 +1,13 @@
 /**
- * A rule's script step does not launder the rule's write (audit sixty-four, finding 2: `loop/research-batch-sixty-four-audit.md`
- * §2, probe L1 in `%TEMP%\braindog-loop\audit64\probe-loop.test.ts`).
+ * A rule's script step does not launder the rule's write.
  *
  * WHAT WAS MEASURED BEFORE THE REPAIR. `onWritten` skips a write made by a rule unless the trigger says `from_rules`,
  * and stops a chain past `CHAIN_CEILING`, but `byRule` is read off the actor (`index.ts`, `w.actor.startsWith('rule:')`)
  * and `finishScript` writes as `script:<id>@v<n>`. So the write a rule caused through a `script` step was a stranger's
- * write at depth 0. L1 on a real self-host: a rule with no `fields:` filter whose script stamps the row that fired it;
- * one update to `done` and twelve rounds of drain and poll took the row from version 3 to 14, twelve runs and a
- * thirteenth pending. The first test below is L1 at the kernel, and it failed the same way: every round one more run.
+ * write at depth 0. Measured on a real self-host: a rule with no `fields:` filter whose script stamps the row that fired
+ * it; one update to `done` and twelve rounds of drain and poll took the row from version 3 to 14, twelve runs and a
+ * thirteenth pending. The first test below is that case at the kernel, and it failed the same way: every round one more
+ * run.
  *
  * THE REPAIR, IN `flow.ts` AND `script-run.ts`. The job a `script` step queues is tied to the run that queued it by the
  * step's own row, so `finishScript` reads the chain from there (`chainOfJob`) and holds it while the script's writes go
@@ -66,7 +66,7 @@ const rule = (name: string, on: unknown, when: string | undefined, run = name): 
   body: { rule: name, on, ...(when === undefined ? {} : { when }), steps: [{ script: { id: run, as: 'job' } }] } as never,
 });
 
-/* L1's own rule: every update of a done item, no `fields:` filter, which an owner's first rule often will not have. */
+/* The measured rule: every update of a done item, no `fields:` filter, which an owner's first rule often will not have. */
 const STAMP = rule('stamp_done', { written: { register: 'items', op: ['update'] } }, 'state is done', 'stamp');
 
 const why = (r: unknown): string => {
@@ -99,7 +99,7 @@ const rows = (sql: NodeSql): Entry[] =>
     .map((r) => ({ ...r, fields: JSON.parse(r.fields) }) as unknown as Entry);
 
 const BODIES: Record<string, Body> = {
-  /* L1's STAMP: read the row it was started for and write its note. */
+  /* The STAMP: read the row it was started for and write its note. */
   stamp: (input, k) => {
     const row = k.get(input.id);
     return row ? [{ op: 'update', spoken: `items#${row.seq}`, patch: { note: `seen ${row.version}` }, version: row.version }] : [];
@@ -142,7 +142,7 @@ const runsOf = (sql: NodeSql, rule: string): { state: string; depth: number }[] 
 const jobsOf = (sql: NodeSql, name: string): number =>
   sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'script.run' AND json_extract(payload, '$.script') = ?", name)?.n ?? 0;
 
-test('L1: A RULE WHOSE SCRIPT WRITES THE ROW THAT STARTED IT RUNS ONCE, however many times the host comes round', async () => {
+test('A RULE WHOSE SCRIPT WRITES THE ROW THAT STARTED IT RUNS ONCE, however many times the host comes round', async () => {
   const { k, sql } = await record(script('stamp'), STAMP);
   const row = item(k, { what: 'Proof it' });
   const moved = k.update('items', row.id, { state: 'done' }, { actor: 'p_1' });

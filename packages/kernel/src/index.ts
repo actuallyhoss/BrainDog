@@ -265,11 +265,11 @@ export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
 /* FOR `declare`'s PLAN, which asks a widening's readers as `stranded` does and has to place an arrival's rule the same way. */
 export { rowRegisterOf } from './flow-lint.ts';
 /* FOR THE RECORD'S `holds`, which places a proposal by the same walk the filing check refuses it by, so the two stop being
-   copies that disagree (`loop/research-decide-reach.md`). */
+   copies that disagree. */
 export { ACROSS, ANY_LIST, touches, type Resolve as ReachResolve, type Touched } from './reach.ts';
 /* FOR THE RECORD'S `answersNot`, which has to know which steps a run waiting on a question can still take. A run keeps
    its place as an index into this flat plan (`automation_run.step`), so reading the declared tree instead counted steps
-   the run had already taken and arms it had already left (wave thirty-nine's checker, on f7c88f98). */
+   the run had already taken and arms it had already left. */
 export { plan as runPlan, type Op as RunOp } from './flow.ts';
 /* FOR THE RECORD'S `tryAutomation` AND THE AGENT'S `automation_try`, which hand this shape on as it is. */
 export type { Tried, TriedStep, TrySample } from './flow-try.ts';
@@ -590,7 +590,7 @@ export type RegisterDecl = {
   /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
   owner_only?: true;
   /** Who holds a row: a link to the person it is handed to, a text field naming the agent, and a state it moves
-   * to when an agent takes it (GAP-11, checked at install by `declare.ts`'s `handFault`). */
+   * to when an agent takes it (checked at install by `declare.ts`'s `handFault`). */
   hand?: { person?: string; agent?: string; taken?: string };
 };
 
@@ -674,10 +674,10 @@ export type WriteContext = {
   /**
    * Which registers the writer reads, so a ref she writes into one she cannot is not looked up. Absent is all.
    *
-   * `list`'s RULE, ON THE WAY IN. The write path resolved a spoken id against the whole record, so the member invited to
-   * Jobs alone filed a Job at `clients#1` and was answered `ok`, at `clients#2` "which was deleted", and at `clients#9`
-   * "there is no such row": three answers about a list whose `list` refuses her (`loop/research-batch-fifty-four-audit.md`
-   * §3). With this, a ref into a list she cannot read names no row, whether the row is live, deleted or never existed.
+   * `list`'s RULE, ON THE WAY IN. The write path resolved a spoken id against the whole record, so the member invited
+   * to Jobs alone filed a Job at `clients#1` and was answered `ok`, at `clients#2` "which was deleted", and at
+   * `clients#9` "there is no such row": three answers about a list whose `list` refuses her. With this, a ref into a
+   * list she cannot read names no row, whether the row is live, deleted or never existed.
    */
   reads?: ((register: string) => boolean) | undefined;
 };
@@ -689,9 +689,9 @@ const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', '
  *
  * THE RECORD'S OWN MARKER FIELD, AND IT DEPENDED ON A SEED. The `example` marker, `formed`, the `tag` and `untag` rule
  * actions and Slash's "not an example" count all read or write `tags` and name no field, and the field existed only
- * because `packages/seed` appends it to its own lists. `loop/research-shell-seed-next.md` N3 drove a list `jobs` declared
- * without it and a rule `then: [{ tag: late }, { note: 'late one' }]`: the rule installed and fired, its patch was
- * refused `FIELD_UNKNOWN`, the note in the same rule went with it, and the only trace was a `write.refused` counter.
+ * because `packages/seed` appends it to its own lists. Measured with a list `jobs` declared without it and a rule
+ * `then: [{ tag: late }, { note: 'late one' }]`: the rule installed and fired, its patch was refused `FIELD_UNKNOWN`,
+ * the note in the same rule went with it, and the only trace was a `write.refused` counter.
  *
  * ADDED WHERE A VALUE IS WRITTEN AND WHERE A PREDICATE IS READ, AND NOWHERE ELSE. `register(id)` and `registers()` still
  * hand back the body somebody declared, because an agent reading a list's fields to learn what it holds should not find
@@ -1166,8 +1166,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * The record a lint is asking about when it is not the table: set only inside `againstPlan`, and `null` otherwise.
    *
    * THE INSTALL CHECKS READ THE RECORD IN TWO PLACES, the table and the list cache, and the arranger needs them to read a
-   * record that is planned and not written. Wave forty-eight asked the planned record `validate` alone, through
-   * `declare`'s `stagedFault`, because nothing else would take one, and five arrangements the accept then refused were
+   * record that is planned and not written. Asking the planned record `validate` alone, through
+   * `declare`'s `stagedFault`, because nothing else would take one, let five arrangements the accept then refused be
    * filed (`test/lint-planned.test.ts`, `packages/record/test/arrange-kernel-lint.test.ts`). The checks read the record
    * through `heldRow` and `heldRows`, which answer from here when it is set, and the cache is swapped for the plan's.
    */
@@ -1485,7 +1485,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
             ...(f.labels ? { labels: f.labels } : {}),
             /* AND WHETHER A DAY IS A DEADLINE, which decides whether a window read as of a past day
                may count rows dated after it. `isDeadline` in `metrics.ts` reads it, and until this
-               line sent it no read through the record ever reached it: over the audit's bills due
+               line sent it no read through the record ever reached it: over bills due
                2 days before and 3 and 12 after the as-of day, `due after -7d` backfilled 50,000
                where the live read on that day was 350,000 (`test/metrics-asof-forward.test.ts`). */
             ...(f.deadline === true ? { deadline: true } : {}),
@@ -1575,7 +1575,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'ingest' && body.channel === 'pull' && typeof body.every === 'string')
         arm('pull', bare, { ingest: bare }, firstSlotMs(body, tz, clock.now()));
       /* A `call` OR A `poll` IS ARMED THE SAME WAY AND FROM THE SAME MOMENT, for the same reason: the first run
-         is the one that says the key and the address are right (`loop/DIRECTION.md` §0b). */
+         is the one that says the key and the address are right. */
       if (decl.kind === 'ingest' && (body.channel === 'call' || body.channel === 'poll') && typeof body.every === 'string')
         arm(body.channel as 'call' | 'poll', bare, { ingest: bare }, firstSlotMs(body, tz, clock.now()));
       /* A CALL ONLY A RULE RUNS HAS NO CLOCK, and it still gets its row: the row is what pausing, resuming and the list
@@ -1587,7 +1587,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       if (decl.kind === 'script') {
         const every = (body.runs as { every?: unknown } | undefined)?.every;
         arm('script', bare, { script: bare }, firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, typeof every === 'string' ? every : null, clock.now()));
-        /* SCR-2: A REINSTALL UNPAUSES A SCRIPT, and `arm` only moves a row that is `done` or `failed` (the comment
+        /* A REINSTALL UNPAUSES A SCRIPT, and `arm` only moves a row that is `done` or `failed` (the comment
            above), so a script paused for refusing too many times in a row stayed paused after the fix that was
            supposed to end that streak was installed. `pauseAfterRefusals` counts only the installed version's
            refusals, so a new version starts that streak again and the row is due at once. */
@@ -1602,11 +1602,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          fetch proves its key, and an automation's first run proves nothing a person asked for at the moment of
          install. It is a `rule` row keyed `flow.every:<id>`, which `0011_automation_run.ts` says the reason for. */
       /* AND A CLOCK EDITED WHILE ITS TURN IS PENDING IS ARMED AGAIN, from the new clock. `arm` moves only a row that is
-         done or failed, for the reason above, so a rule edited from day 1 to day 15 fired once more on the 1st (the
-         audit of 25 September, C3). The row keeps the clock it was armed from (`clock`, `late:` left out, since how late a
-         turn may be taken moves no turn), and a pending row whose clock differs is re-armed. A row armed before it kept
-         one is re-armed where its turn is not a turn of the clock as it now stands, which a clock with a time of day
-         can say and a bare length cannot; either way it learns its clock. */
+         done or failed, for the reason above, so a rule edited from day 1 to day 15 fired once more on the 1st. The row
+         keeps the clock it was armed from (`clock`, `late:` left out, since how late a turn may be taken moves no
+         turn), and a pending row whose clock differs is re-armed. A row armed before it kept one is re-armed where its
+         turn is not a turn of the clock as it now stands, which a clock with a time of day can say and a bare length
+         cannot; either way it learns its clock. */
       if (decl.kind === 'rule' && pathOf(body as FlowDecl) === 'run' && triggerOf(body as FlowDecl) === 'every') {
         const at = firstDue(body as FlowDecl, clock.now(), tz);
         const on = (body.on ?? {}) as Record<string, unknown>;
@@ -1933,7 +1933,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * counts for the list its door writes, whose row is the one its run is handed. What each one is asked is
    * `tagsRefusing`'s, so an enum holding the word is not refused and a templated tag is not judged.
    *
-   * ONLY WHAT THIS CHANGE STARTS REFUSING. Wave thirty-eight asked a change of shape and nothing else, which let a
+   * ONLY WHAT THIS CHANGE STARTS REFUSING. Asking a change of shape and nothing else let a
    * `list<enum>` drop the word a rule tags from its values, one shape to the same shape, and every later write that
    * tagged it was `ENUM_VALUE_UNKNOWN`. Asked against `was` as well, the narrowing is refused and a list that already
    * refused a rule's tag before this change is still not blamed for it. A `was` already retired is read the same way,
@@ -1982,11 +1982,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * that change did not make. A rule sent with any other bytes is new to the record and is asked everything.
    *
    * AND EVERY RULE WHOSE DOOR THE BATCH RE-POINTS, SENT OR NOT. An arrival rule's list is its door's `writes.register`,
-   * so a batch holding only the door moved the rule to another list and neither half asked: the audit of wave
-   * thirty-nine (finding 9) re-pointed `jobs_in` at a Bills whose `tags` was `list<enum>` of `[chase]` under
-   * `rule.arrived` tagging `fresh`, alone and beside the rule resent unchanged, and the next arrival's run failed at its
-   * `tag` step. The same-bytes skip is for the rule's own bytes, and here the door moved, so such a rule is asked as a
-   * new one, with `at` on the door, which is what the change sent. A door resent writing the list it wrote is no move.
+   * so a batch holding only the door moved the rule to another list and neither half asked: a change that re-pointed
+   * `jobs_in` at a Bills whose `tags` was `list<enum>` of `[chase]` under `rule.arrived` tagging `fresh` was taken,
+   * alone and beside the rule resent unchanged, and the next arrival's run failed at its `tag` step. The same-bytes
+   * skip is for the rule's own bytes, and here the door moved, so such a rule is asked as a new one, with `at` on the
+   * door, which is what the change sent. A door resent writing the list it wrote is no move.
    */
   function taggingRefused(batch: readonly Declaration[]): Refusal | null {
     const doorOf = doorsOf(batch);
@@ -2059,11 +2059,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /**
    * A list in the batch whose `tags` would start refusing what a rule tags it with, as the refusal, or `null`.
    *
-   * LIFTED OUT OF `contradicted` SO THAT `stageInstall` ASKS IT TOO. The pack path asked `taggingRefused` (a rule in the
-   * batch) and never this (a list in the batch), and `plan`'s own `FIELD_TYPE_CHANGED` asks only about rows written
-   * under the old type. The audit of wave thirty-nine (finding 5) staged a pack's Jobs with `tags` as `list<enum>` of
-   * `[chase]`, and as `int`, under an installed `rule.late`: each staged, applied, and left the next Rent untagged. A
-   * retired `tags` is asked here as well, since the field loop in `contradicted` passes over every retired field.
+   * LIFTED OUT OF `contradicted` SO THAT `stageInstall` ASKS IT TOO. The pack path asked `taggingRefused` (a rule in
+   * the batch) and never this (a list in the batch), and `plan`'s own `FIELD_TYPE_CHANGED` asks only about rows written
+   * under the old type. A pack's Jobs sent with `tags` as `list<enum>` of `[chase]`, and as `int`, under an installed
+   * `rule.late`, each staged, applied, and left the next Rent untagged. A retired `tags` is asked here as well, since
+   * the field loop in `contradicted` passes over every retired field.
    */
   function tagsNarrowed(batch: readonly Declaration[]): Refusal | null {
     for (const decl of batch) {
@@ -2086,8 +2086,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * A CHANGE REACHED `install` WITHOUT THE CHECKS A PACK MEETS. `packages/declare`'s `plan` refuses a type change and a new
    * required field over a populated register (`FIELD_TYPE_CHANGED`, `REQUIRED_ON_POPULATED`, `04 §5`) and a list nothing
    * holds (`REGISTER_UNRESOLVED`), and an accepted `change` and the in-app declare call `install` directly.
-   * `loop/research-batch-seventeen-audit.md` §6 accepted four such changes over two open Obligations rows, and each
-   * installed. Driven afterwards:
+   * Four such changes accepted over two open Obligations rows each installed. Driven afterwards:
    *
    *     state narrowed to [paid]      every edit to either row  ENUM_VALUE_UNKNOWN "state has no value open."
    *     what: text -> int             one row edited to 5, the other still "I2": one column, two types
@@ -2111,31 +2110,30 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const register = ownId(decl);
       const fields = (decl.body as { fields?: unknown }).fields;
       if (!Array.isArray(fields)) continue;
-      /* WITH THE `tags` EVERY LIST TAKES (`withTags`), as the `list<text>` its rows hold. Read from the declared body alone,
-         a list that never declared `tags` had no `was` for one arriving, so `loop/research-batch-thirty-four-audit.md` §4
-         declared `tags` as `text`, `int` and `bool` over a row holding `["late","example"]` and each installed; every
-         `tag` and `untag` on that list was `VALUE_MALFORMED` from then on. A list the record does not hold yet has no
-         rows to contradict, and nothing is added for it. */
+      /* WITH THE `tags` EVERY LIST TAKES (`withTags`), as the `list<text>` its rows hold. Read from the declared body
+         alone, a list that never declared `tags` had no `was` for one arriving, so `tags` declared as `text`, `int` and
+         `bool` over a row holding `["late","example"]` each installed; every `tag` and `untag` on that list was
+         `VALUE_MALFORMED` from then on. A list the record does not hold yet has no rows to contradict, and nothing is
+         added for it. */
       const before = new Map<string, Field>(
         (registers.has(register) ? withTags(registers.get(register)!.fields) : []).map((f) => [f.id, f as Field]),
       );
       const count = (where: string, ...params: (string | number)[]) =>
         Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}`, register, ...params)?.n ?? 0);
 
-      /* A FIELD LEFT OUT OVER VALUES THE ROWS STILL HOLD. `loop/research-shell-schema.md` blocker 2: two agents each
-         added a field from one reading, the owner accepted both, and the second body had no `domain` while a row held
-         one. Every check below walks the ARRIVING fields, so a field that was simply absent was never asked about: it
-         installed, the value stayed in the row's JSON through every later edit, and no reader could see it. Retiring is
-         the removal that keeps the value and says so, and it stays legal; a field already retired may then go, since
-         its values were put away on purpose.
+      /* A FIELD LEFT OUT OVER VALUES THE ROWS STILL HOLD. Two agents each added a field from one reading, the owner
+         accepted both, and the second body had no `domain` while a row held one. Every check below walks the ARRIVING
+         fields, so a field that was simply absent was never asked about: it installed, the value stayed in the row's
+         JSON through every later edit, and no reader could see it. Retiring is the removal that keeps the value and
+         says so, and it stays legal; a field already retired may then go, since its values were put away on purpose.
 
-         A DELETED ROW IS COUNTED TOO, alone of the checks here. `loop/research-batch-thirty-two-audit.md` §7 dropped
-         `domain` while a row was live (refused), deleted the row, dropped it again (installed), and restored the row:
-         its JSON held `"domain":"kiln.example"` under a list with no `domain`, the state this check exists to prevent.
-         The other checks ask what a reader meets on the next edit, which a deleted row never has; this one asks what
-         the rows hold, and a deleted row holds its values until the thirty-day purge, which is exactly as long as a
-         restore can bring them back. Refusing the restore instead would leave the person who deleted by mistake
-         unable to undo it over a schema change somebody else made, and retiring is one word in the declaration. */
+         A DELETED ROW IS COUNTED TOO, alone of the checks here. Measured: `domain` dropped while a row was live
+         (refused), the row deleted, `domain` dropped again (installed), and the row restored: its JSON held
+         `"domain":"kiln.example"` under a list with no `domain`, the state this check exists to prevent. The other
+         checks ask what a reader meets on the next edit, which a deleted row never has; this one asks what the rows
+         hold, and a deleted row holds its values until the thirty-day purge, which is exactly as long as a restore can
+         bring them back. Refusing the restore instead would leave the person who deleted by mistake unable to undo it
+         over a schema change somebody else made, and retiring is one word in the declaration. */
       const named = new Set((fields as Field[]).map((f) => f?.id).filter((id): id is string => typeof id === 'string'));
       for (const [id, was] of before) {
         if (named.has(id) || was.retired === true) continue;
@@ -2188,8 +2186,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         const was = before.get(f.id);
 
         /* A WIDENING IS NOT A RETYPE (`widen.ts`): `enum` to `text` over held values was refused here with "retire the
-           field and add a new one" (`loop/research-shell-seed-next.md` N2), though every stored value was already valid
-           text and the fix would have split one column into two. */
+           field and add a new one", though every stored value was already valid text and the fix would have split one
+           column into two. */
         if (was !== undefined && was.retired !== true && typeOf(was) !== typeOf(f) && !widens(was, f)) {
           const n = count(held);
           /* NOT "RETIRE IT" FOR `tags`, whose retiring the check above calls a choice that turns every later `tag` on
@@ -2222,11 +2220,12 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
                 register,
                 ...values,
               );
-          /* ONLY A VALUE THE LIST TAKES NOW AND WOULD STOP TAKING. Counted against the new list alone, a record the audit's
-             narrowing already reached (`state` at `[paid]` over two `open` rows) refused every later change to Obligations,
-             adding an unrelated text field included, with "would no longer take open", which it had not taken since. Those
-             rows are refused on every edit already, and this change does not make them so. A field that was not an enum
-             of the same shape before is held to every value, since nothing it declared took any of them. */
+          /* ONLY A VALUE THE LIST TAKES NOW AND WOULD STOP TAKING. Counted against the new list alone, a record the
+             narrowing above already reached (`state` at `[paid]` over two `open` rows) refused every later change to
+             Obligations, adding an unrelated text field included, with "would no longer take open", which it had not
+             taken since. Those rows are refused on every edit already, and this change does not make them so. A field
+             that was not an enum of the same shape before is held to every value, since nothing it declared took any of
+             them. */
           const took = was !== undefined && was.retired !== true && typeOf(was) === typeOf(f) && Array.isArray(was.values) ? new Set(was.values.map(String)) : null;
           const dropped = took === null ? out : out.filter((o) => took.has(String(o.v)));
           if (dropped.length > 0) {
@@ -2261,23 +2260,23 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         }
       }
     }
-    /* AND NOT OVER A LIST A RULE TAGS, THOUGH NO ROW HOLDS A TAG YET. The choice above is the list's own where nothing is
-       stored, and `loop/research-batch-thirty-six-audit.md` §5 found the reader it did not count: Bills with no tag on
-       any row and `rule.late` tagging each Rent took `tags: int`, and the next Rent went in without its tag, with no
-       refusal and no event, one `write.refused` observation the only trace. A rule's `tag` or `untag`, on either path
-       and in either arm, is a reader of the list's tags, so it is asked after the rows are. Only what the change starts
-       refusing is asked: a list that already refused a rule's tag before it is not this change's fault. */
+    /* AND NOT OVER A LIST A RULE TAGS, THOUGH NO ROW HOLDS A TAG YET. The choice above is the list's own where nothing
+       is stored, and it missed a reader: Bills with no tag on any row and `rule.late` tagging each Rent took `tags:
+       int`, and the next Rent went in without its tag, with no refusal and no event, one `write.refused` observation
+       the only trace. A rule's `tag` or `untag`, on either path and in either arm, is a reader of the list's tags, so
+       it is asked after the rows are. Only what the change starts refusing is asked: a list that already refused a
+       rule's tag before it is not this change's fault. */
     return tagsNarrowed(batch) ?? taggingRefused(batch);
   }
 
   /**
    * A list change that takes away a field a live figure, rule, page or ingest reads, as a refusal naming what reads it.
    *
-   * THE FIELD CHECK RAN WHEN THE READER ARRIVED AND NEVER WHEN THE LIST CHANGED UNDER IT. `loop/research-batch-twenty-audit.md`
-   * §3 retired `category` on Transactions through the owner's `setDeclaration` and it was taken, and the seed's
-   * `txn-uncategorised` then answered `FIELD_UNKNOWN` on every read; retiring or dropping a field a figure sums, groups by
-   * or filters on did the same on a bare kernel. So each live declaration that names the list is asked again, the same
-   * questions `unreadable` and `lintBatch` put to it at install, against the list as the change would leave it.
+   * THE FIELD CHECK RAN WHEN THE READER ARRIVED AND NEVER WHEN THE LIST CHANGED UNDER IT. `category` retired on
+   * Transactions through the owner's `setDeclaration` was taken, and the seed's `txn-uncategorised` then answered
+   * `FIELD_UNKNOWN` on every read; retiring or dropping a field a figure sums, groups by or filters on did the same on
+   * a bare kernel. So each live declaration that names the list is asked again, the same questions `unreadable` and
+   * `lintBatch` put to it at install, against the list as the change would leave it.
    *
    * ONLY WHAT THIS CHANGE BREAKS. A reader that already fails against the list as it stands is passed over: refusing
    * every later edit to a list because of a figure an earlier path let through would blame the wrong change, and the
@@ -2285,13 +2284,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * other type change over held rows is `contradicted`'s.
    *
    * A WIDENING IS ASKED ABOUT TOO. `contradicted` lets `enum` to `text` through without asking any reader (`widen.ts`),
-   * and the checker of wave thirty-three measured what that left: a rule with `each: [season]` survived `season` opening
-   * to text, though the same rule declared fresh is refused, and at run time it crossed the whole free text as one item.
-   * A page column whose `sign:` reads the enum is the same kind of reader. Every stored value still reads back; what a
-   * widening takes away is the closed list, and these are the readers that needed it.
+   * and that left, measured: a rule with `each: [season]` survived `season` opening to text, though the same rule
+   * declared fresh is refused, and at run time it crossed the whole free text as one item. A page column whose `sign:`
+   * reads the enum is the same kind of reader. Every stored value still reads back; what a widening takes away is the
+   * closed list, and these are the readers that needed it.
    *
-   * AND A READER THAT STILL COMPILES IS ASKED WHAT IT WOULD NOW MEAN. `loop/research-batch-thirty-four-audit.md` §1 opened
-   * `lane` to text under four figures that all compiled either way, and three changed their answer with nothing refused:
+   * AND A READER THAT STILL COMPILES IS ASKED WHAT IT WOULD NOW MEAN. `lane` opened to text under four figures that all
+   * compiled either way, and three changed their answer with nothing refused:
    * `lane is earning money` from 1 to 0, `lane is Building` from 1 to 0, `lane is not Parked` from 2 to 3. `where` reads an
    * enum's word by label, by spaces for underscores and without case, and a text's word exactly as written, so a word that
    * only the closed list turned into a stored value now asks for something no row holds. Each such sentence is parsed
@@ -2332,8 +2331,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     let readers: (Declaration & { rebatched: boolean })[] | null = null;
 
     /* THE LIST A RULE'S RUN READS ITS `if` AGAINST, an arrival's included: the door it waits at, as this batch leaves
-       it. `loop/research-batch-thirty-six-audit.md` §1 measured an automation on arrivals at a door writing Projects
-       answer "then" under the enum and "else" under text, installed, because `subjectOf` gives an arrival no list. */
+       it. An automation on arrivals at a door writing Projects that answered "then" under the enum and "else" under
+       text installed, because `subjectOf` gives an arrival no list. */
     const doorOf = doorsOf(batch);
     const listOf = (reader: Declaration): string | null => (reader.kind === 'rule' ? rowRegisterOf(reader.body as unknown as FlowDecl, doorOf) : null);
 
@@ -2396,10 +2395,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       readers ??= heldRows(['metric', 'rule', 'page', 'ingest'])
         .flatMap((row): (Declaration & { rebatched: boolean })[] => {
           /* A READER THE BATCH REWRITES IS ASKED IN THE WORDS THE BATCH SENDS. Passed over as "the batch's, and checked
-             with it", a figure resent with only its `name` changed kept `lane is earning money` and went from 1 to 0
-             (`loop/research-batch-thirty-six-audit.md` §1): what checked it was `lintBatch`, which asks only whether it
-             compiles, and a widening leaves that true. Read off the body as sent, one whose words the batch rewrote to
-             the stored value still installs, and one that kept them does not. */
+             with it", a figure resent with only its `name` changed kept `lane is earning money` and went from 1 to 0:
+             what checked it was `lintBatch`, which asks only whether it compiles, and a widening leaves that true. Read
+             off the body as sent, one whose words the batch rewrote to the stored value still installs, and one that
+             kept them does not. */
           if (arriving(row.id, row.body)) {
             const mine = sent.get(row.id)!;
             return [{ ...mine, rebatched: true }];
@@ -2502,10 +2501,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * One `declare` event for each declaration a change moved to a new version: who, from which version to which, and for a
    * register the field ids it added or took off.
    *
-   * NOTHING WROTE ONE. `declare` has been a declaration event kind since `events.ts` was drawn, and
-   * `loop/research-shell-schema.md` blocker 5 measured a change that gave Projects a `domain` leaving zero events: the
-   * `declaration` table has no actor, so "who added domain to Projects" had no answer at all, and "when" only by diffing
-   * version bodies. The feed needs the sentence "agent:claude added domain to Projects", and this is where it comes from.
+   * NOTHING WROTE ONE. `declare` has been a declaration event kind since `events.ts` was drawn, and a change that gave
+   * Projects a `domain` was measured leaving zero events: the `declaration` table has no actor, so "who added domain to
+   * Projects" had no answer at all, and "when" only by diffing version bodies. The feed needs the sentence
+   * "agent:claude added domain to Projects", and this is where it comes from.
    *
    * THE DIFF IS AGAINST THE VERSION THIS ONE SUPERSEDED, read after the write inside the same transaction, so it is the
    * body that was actually live and not whatever the caller last read. A retire and a drop are both "took off": either
@@ -2568,13 +2567,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /**
    * A run-path `if` the run could not read, whatever its answers held, as the refusal the run would have failed with.
    *
-   * THE LINT ASKED ONLY THAT AN `if` WAS A STRING OR A TREE, and this check read a rule's `when:` and not its steps. The
-   * checker of the record-reach wave installed `if: 'amount more than 1000'` over a Bills with a decimal `amount`, and
-   * every run failed at that step: "could not read its condition at step 1: amount more than 1000: more is not something
-   * a filter can say". The run reads the sentence against the row's schema with each answer typed by its value
-   * (`flow.ts`'s `test`), and the value is not known here, so each answer the rule gives is tried as text, as a decimal
-   * and as a bool, which are the three the run can type one as. Only a refusal all three meet, word for word, is the
-   * run's certain answer and refused; one that depends on the type is left to the run.
+   * THE LINT ASKED ONLY THAT AN `if` WAS A STRING OR A TREE, and this check read a rule's `when:` and not its steps. A
+   * rule with `if: 'amount more than 1000'` installed over a Bills with a decimal `amount`, and every run failed at
+   * that step: "could not read its condition at step 1: amount more than 1000: more is not something a filter can say".
+   * The run reads the sentence against the row's schema with each answer typed by its value (`flow.ts`'s `test`), and
+   * the value is not known here, so each answer the rule gives is tried as text, as a decimal and as a bool, which are
+   * the three the run can type one as. Only a refusal all three meet, word for word, is the run's certain answer and
+   * refused; one that depends on the type is left to the run.
    *
    * A CONDITION HOLDING `{{...}}` IS NOT READ, since the run fills it before reading it, and nor is a tree, which the run
    * evaluates without compiling. A rule whose row is on a list no lint can name (an arrival at no named door) is not
@@ -2889,9 +2888,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          * AN ENUM SORTS BY ITS POSITION IN `values`, THE ORDER IT WAS DECLARED IN, and it sorted A to Z. By the label
          * where it had one and by the stored word where it did not, so `tasks.priority`, declared `urgent, high, normal,
          * low`, answered High, Low, Normal, Urgent ascending, and `tasks.state`, which labels two of its seven values,
-         * put Later between Dropped and Open (`loop/research-living-in-it.md` section 5, measured at 07ba6dbd).
+         * put Later between Dropped and Open.
          *
-         * THIS IS HIS CALL 1 IN THAT SURVEY'S SECTION 8, TAKEN FOR HIM AS ITS DEFAULT, AND IT IS REVERSIBLE. A to Z matched
+         * THIS IS THE OWNER'S CALL, TAKEN AS THE DEFAULT, AND IT IS REVERSIBLE. A to Z matched
          * the words in the column; declared order matches the order the author wrote them in, which for a priority or a
          * lifecycle is the order a reader means. Going back is this one expression and `compareRows` in
          * `apps/web/src/lib/record/api.ts`; nothing stored changes either way, because the column keeps the id.
@@ -3359,7 +3358,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
        *
        * A ROW SENT BACK AS IT WAS READ WAS REFUSED FOR A VALUE IT HELD. A task read while its project was live answers
        * `thing: things#5`; the project is deleted, and the same fields back through `update` were refused `thing names
-       * things#5, and there is no such row` (audit fifty-two section 2), the same through a rowset at the owner's accept.
+       * things#5, and there is no such row`, the same through a rowset at the owner's accept.
        * The row id for the same target was taken, so the refusal was of the name and not of the ref.
        *
        * ONLY WHAT THE FIELD ALREADY HOLDS, and not every deleted row. A new ref to a deleted row by its name stays
@@ -3722,10 +3721,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       reproject(entry);
       rediary(entry);
 
-      /* THE GRACE WINDOW (decision C26): the creator's own edits in a row's first three minutes replace each other in
-         history instead of each leaving a line, so a typo fixed a moment after it was typed is not a permanent row on a
-         store that cannot forget. The fold rewrites the row's `create` line to the row as it now stands and writes no
-         `edit`, so however many times he fixes it in those minutes, the history says it was created as it ended up.
+      /* THE GRACE WINDOW: the creator's own edits in a row's first three minutes replace each other in history instead
+         of each leaving a line, so a typo fixed a moment after it was typed is not a permanent row on a store that
+         cannot forget. The fold rewrites the row's `create` line to the row as it now stands and writes no `edit`, so
+         however many times he fixes it in those minutes, the history says it was created as it ended up.
 
          NOTHING ANOTHER ACTOR READ IS EVER FOLDED, and each check below closes one way somebody else could have read it.
          The row's only line is its `create`, signed by this same actor: a second line means somebody or something has
@@ -3875,17 +3874,17 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       }
 
       /* A MARK A PERSON SENDS AS IT ALREADY WAS IS STILL HIS SAY, and the loop above writes no row for a value that did
-         not move, so nothing would remember it. The audit's P3b: the rent created unmarked, `transfer: false` set on it by
-         `p_1`, and the next bank line of the same size paired it and wrote `true` over his word. The row is written here,
-         signed by him, so `markPinned` finds it. NOT ON A PAIRED ROW, where the only value it can resend is the `true` the
-         pair set, and agreeing with a pair is not a reason to break it.
+         not move, so nothing would remember it. Measured: the rent created unmarked, `transfer: false` set on it by
+         `p_1`, and the next bank line of the same size paired it and wrote `true` over his word. The row is written
+         here, signed by him, so `markPinned` finds it. NOT ON A PAIRED ROW, where the only value it can resend is the
+         `true` the pair set, and agreeing with a pair is not a reason to break it.
 
-         AND ONLY WHEN THE PATCH NAMES THE MARK ALONE. An agent that reads a row and sends it back whole carries the mark
-         along as it was, and audit sixty's X2b measured that pin: the bank's out leg categorised and returned with
-         `moved: false`, the in leg arriving next, `{ pair: null, received: 4000 }`. Sent back with nothing changed at all
-         it pinned the same way, and the history cannot tell that write from his lone `{ moved: false }`, since both leave
-         one bare event and this one; only the patch can. A person who names the mark beside other fields and changes it is
-         still heard, by the loop above, which writes an `edit` for any value that moved. */
+         AND ONLY WHEN THE PATCH NAMES THE MARK ALONE. An agent that reads a row and sends it back whole carries the
+         mark along as it was, and that pinned it. Measured: the bank's out leg categorised and returned with
+         `moved: false`, the in leg arriving next, `{ pair: null, received: 4000 }`. Sent back with nothing changed at
+         all it pinned the same way, and the history cannot tell that write from his lone `{ moved: false }`, since both
+         leave one bare event and this one; only the patch can. A person who names the mark beside other fields and
+         changes it is still heard, by the loop above, which writes an `edit` for any value that moved. */
       if (decl.pairs && !deleting) {
         const mark = decl.pairs.mark;
         if (
@@ -3924,7 +3923,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * GAP-11: `hand.person` CHANGED TO A ROW THAT STANDS FOR A MEMBER TELLS THAT MEMBER, through the same path an
+   * `hand.person` CHANGED TO A ROW THAT STANDS FOR A MEMBER TELLS THAT MEMBER, through the same path an
    * automation's `ask_person to:` uses (`flow.ts`'s `ask`, `govern.ts`'s `propose`), as a notice rather than a
    * question: no run is waiting on the answer, so nothing reads which option was pressed.
    *
@@ -4183,9 +4182,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * The matching's view of one register's `pairs:`, WITH THE REGISTER'S `state` AND `done`, which `pairs.ts` needs to
-   * tell a row that may still clear from one that never will (`waiting`). The first attempt at audit sixty-three's
-   * finding 2 built its `Pairing` without them, and a client's cleared EGP 20,000.00 that names its party held a split
-   * move back under Money's clause: Spent and Received each EGP 40,000.00 high. Every `Pairing` here comes from this.
+   * tell a row that may still clear from one that never will (`waiting`). A `Pairing` built without them let a client's
+   * cleared EGP 20,000.00 that names its party hold a split move back under Money's clause: Spent and Received each EGP
+   * 40,000.00 high. Every `Pairing` here comes from this.
    */
   function pairingOf(register: string, decl: RegisterDecl, pairs: PairsDecl): Pairing {
     return { sql, register, pairs, fields: decl.fields, state: decl.state, done: decl.done };
@@ -4200,11 +4199,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * caused it. Each leg gets an `edit` on the mark when it moved and one on `_pair`, from the partner it had to the one
    * it has: the mark alone would say the row stopped counting and not which row it was matched to.
    *
-   * UNPAIRING IS THE SAME WRITE AS PAIRING, BACKWARDS. W57-1 only ever paired, and the audit measured what that left:
-   * GBP 400.00 paired and the out leg corrected to 900.00, Spent 0.00; the in leg retyped as out, Spent 0.00 against
-   * 800.00; the in leg deleted, Spent 0.00 against 400.00, and the leg re-imported landed unmarked because its partner
-   * still named the deleted row. An unpaired leg's mark goes back to false, and `_pair` leaves the row, so it is a
-   * candidate again exactly as a row never paired is.
+   * UNPAIRING IS THE SAME WRITE AS PAIRING, BACKWARDS. Pairing alone, never unpairing, left this, measured: GBP 400.00
+   * paired and the out leg corrected to 900.00, Spent 0.00; the in leg retyped as out, Spent 0.00 against 800.00; the
+   * in leg deleted, Spent 0.00 against 400.00, and the leg re-imported landed unmarked because its partner still named
+   * the deleted row. An unpaired leg's mark goes back to false, and `_pair` leaves the row, so it is a candidate again
+   * exactly as a row never paired is.
    *
    * SIGNED BY THE RECORD, NOT BY THE WRITER (`PAIRS_ACTOR`). The pairing ran in `p_1`'s batch and was signed `p_1`, so the
    * history said he had marked both legs, and a mark he really did set could not be told from one the kernel set for
@@ -4242,13 +4241,13 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /**
    * Step 6b over every row of each list whose `pairs:` an install has just changed: added, changed or taken away.
    *
-   * AUDIT SIXTY-THREE'S FINDING 4. The pairing ran in the write path and nowhere else, only for a write touching a field
+   * AN INSTALL PAIRED NOTHING. The pairing ran in the write path and nowhere else, only for a write touching a field
    * `pairsReads` names, and an install writes no ledger row. So a record updated from money-core 2.1.0, which had no
-   * `pairs:`, to 2.2.0 read Spent EGP 29,500.00 before and after, every mark false, and still after a note was written on
-   * one leg (U1); his import does not rewrite a row whose fields did not change, so a move already imported stayed
-   * counted until a neighbour arrived within four days. And the 2.1.0 that deployed at 00:22 UTC paired rent with a named
-   * client's payment, which 2.2.0 refuses, and both stayed marked after the update: Spent 0.00 and Received 0.00 against
-   * EGP 15,000.00 each (U2). `test/pairs-on-update.test.ts` holds both, through `install` and through a pack's path.
+   * `pairs:`, to 2.2.0 read Spent EGP 29,500.00 before and after, every mark false, and still after a note was written
+   * on one leg; his import does not rewrite a row whose fields did not change, so a move already imported stayed
+   * counted until a neighbour arrived within four days. And the 2.1.0 that deployed at 00:22 UTC paired rent with a
+   * named client's payment, which 2.2.0 refuses, and both stayed marked after the update: Spent 0.00 and Received 0.00
+   * against EGP 15,000.00 each. `test/pairs-on-update.test.ts` holds both, through `install` and through a pack's path.
    *
    * RUN WHERE THE NEW DECLARATION IS IN THE TABLE AND THE OLD ONE STILL IN `registers`: inside `install`'s transaction,
    * and inside the host's around a pack's staged write, before either reloads. That pair of readings is the only place
@@ -4266,15 +4265,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    * writes one stream into a record updated to the new `pairs:` and into one that had it from the start, and the two
    * agree row for row.
    *
-   * NOTHING IS CAPPED, because a cap is this finding again for the rows past it, so the cost is bounded by the ledger.
-   * The first attempt took 3.3 s, 7.6 s and 251 s on 10,000 rows of varied amounts, fifty round ones, and fifty packed
-   * into one year: each window of 250 rows was read whole and 159,018 windows were asked. The second asked each row's
-   * window once per `settle` and only the rows of its size, 1.8 s to 2.9 s on those three, and audit sixty-five's finding
-   * 3 then measured it where most rows share a size: 10,000 rows of three amounts in one year 80 to 146 s, one amount
-   * more than 20 minutes, against the 30 s a Durable Object request gets. Every `settle` walked the same rows again for
-   * one new seed and read their windows afresh. Now the pass reads the list once, and one answer, one window and one
-   * reading of each row serve every `settle` in it (`pairs.ts`, `passOf`): 2.8 s, 1.4 s and 1.4 s for one, three and
-   * fifty amounts in one year, measured with other work running, and the same ledger row for row and event for event.
+   * NOTHING IS CAPPED, because a cap is the same fault again for the rows past it, so the cost is bounded by the
+   * ledger. The first attempt took 3.3 s, 7.6 s and 251 s on 10,000 rows of varied amounts, fifty round ones, and fifty
+   * packed into one year: each window of 250 rows was read whole and 159,018 windows were asked. The second asked each
+   * row's window once per `settle` and only the rows of its size, 1.8 s to 2.9 s on those three, and where most rows
+   * share a size it took 80 to 146 s for 10,000 rows of three amounts in one year, and for one amount more than 20
+   * minutes, against the 30 s a Durable Object request gets. Every `settle` walked the same rows again for one new seed
+   * and read their windows afresh. Now the pass reads the list once, and one answer, one window and one reading of each
+   * row serve every `settle` in it (`pairs.ts`, `passOf`): 2.8 s, 1.4 s and 1.4 s for one, three and fifty amounts in
+   * one year, measured with other work running, and the same ledger row for row and event for event.
    */
   function settleRedeclared(): void {
     const is = listsOf(sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")).registers;
@@ -4485,18 +4484,18 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
    *
    * `staged` IS A BATCH BEING INSTALLED, whose registers are not in `registers` yet. A rule naming
    * `jobs#1` in a ref to Things installed when Jobs arrived in the same `install` and was refused
-   * `REF_REGISTER_MISMATCH` when it came after (`loop/research-batch-twenty-two-audit.md` §6),
-   * because the lookup below read `jobs#1` as a title while Jobs was only staged. The mismatch is a
-   * fact about the declarations, the spoken register against the field's `to`, so the staged
-   * registers count as registers for it, with no row in any of them yet.
+   * `REF_REGISTER_MISMATCH` when it came after, because the lookup below read `jobs#1` as a title
+   * while Jobs was only staged. The mismatch is a fact about the declarations, the spoken register
+   * against the field's `to`, so the staged registers count as registers for it, with no row in any
+   * of them yet.
    */
   const evalContext = (staged: readonly Declaration[] = []): EvalContext => ({
     nowMs: clock.now(),
     /* THE RECORD'S ZONE, SO A LIVE READ NAMES THE DAY THE NIGHT POINT WILL BE STORED UNDER. Without it
-       `metric`, `list` and every page block dated `today` by UTC while `snapshot` dated it locally:
-       in `Asia/Tokyo` at 00:05 on the 6th, `created_at is today` read 1100 live and 110 in the point
-       (`loop/research-batch-twenty-eight-audit.md` §4, `test/metrics-live-local-day.test.ts`). A
-       record with no identity yet has no zone and reads UTC, as it did. */
+       `metric`, `list` and every page block dated `today` by UTC while `snapshot` dated it locally: in
+       `Asia/Tokyo` at 00:05 on the 6th, `created_at is today` read 1100 live and 110 in the point
+       (`test/metrics-live-local-day.test.ts`). A record with no identity yet has no zone and reads UTC,
+       as it did. */
     tz: recordIdentity(sql)?.tz,
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     /* A ref is written by NAME in a sentence — `thing is Kiln` — because that is what a person says.
@@ -4571,8 +4570,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
   /** What the page layer reads through. It runs queries it did not write, so it takes callbacks. */
   /**
    * The lists a block reads beside its source, for `registersOf`: the steps under a card grid's `as: next` and `as: ring`,
-   * the projects a scope column or an inherited read is drawn from, and the list of projects a live run is named from
-   * (`loop/research-audit-2026-09-25-layouts.md` finding 1). Declarations only, so naming them reads no row.
+   * the projects a scope column or an inherited read is drawn from, and the list of projects a live run is named from.
+   * DECLARATIONS ONLY, so naming them reads no row.
    */
   const beside = (): ListsBeside => {
     const deps = pageDeps();
@@ -4613,7 +4612,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     titleOf: (register) => registers.get(register)?.title ?? null,
-    /* GAP-9: WITHOUT THIS LINE `readPage` NEVER LAYS ANOTHER PACK'S BLOCKS ON A PAGE, because `deps.adds` is
+    /* WITHOUT THIS LINE `readPage` NEVER LAYS ANOTHER PACK'S BLOCKS ON A PAGE, because `deps.adds` is
        optional and this is the one host that hands it: `additionsOf` reads every installed pack's manifest for
        what it adds to this page's declaration id. */
     adds: (page) => additionsOf(sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id'), page),
@@ -5745,7 +5744,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       return out.paused ? 'kept' : out.nextMs;
     },
 
-    /* A scheduled `call` or `poll` (`loop/DIRECTION.md` §0b): one request queued, and the next run armed. A
+    /* A scheduled `call` or `poll`: one request queued, and the next run armed. A
        declaration that is gone, or whose pack is off, ends the row, and a key that is gone pauses it. */
     call: (row) => fireAction(actionDeps(), row),
     poll: (row) => fireAction(actionDeps(), row),
@@ -6028,8 +6027,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      */
     /* `reads` AS `list` TAKES IT, and for the same reason: a ref in the figure's `where` was resolved against the whole
        record, so a figure filled with a hidden client's title counted that client's jobs for a member who could not
-       list them, and the record's door made up for it with a second `list` and a refusal of its own (SEC-10,
-       `test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
+       list them, and the record's door made up for it with a second `list` and a refusal of its own
+       (`test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
     metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean } = {}): Result<Reading> =>
       evaluateMetric(sql, liveTarget(sql, decl), o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads }),
 
@@ -6253,7 +6252,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
     /**
      * One pass of the scheduled actions: claim the due `pull`, `call` and `poll` rows, send each job through the
-     * host's executor, finish each, and re-arm (`loop/DIRECTION.md` §0b).
+     * host's executor, finish each, and re-arm.
      *
      * THE EXECUTOR IS AN ARGUMENT, so there is no network in the kernel. Every step is its own transaction and
      * the executor runs between them, outside all of them.
@@ -7253,7 +7252,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * The rebuild is here rather than in the import because it depends on the DECLARATIONS the file
      * just brought — a search index built before them would index nothing and look like it worked.
      *
-     * OR, WITH `replace`, THE FILE OVER THE RECORD IT WAS TAKEN FROM (`loop/research-restore.md` §4, W55-2).
+     * OR, WITH `replace`, THE FILE OVER THE RECORD IT WAS TAKEN FROM.
      *
      * A RECORD `createRecord` MADE IS NEVER EMPTY. It holds two schedule rows, its owner's person and member rows and the
      * `create` event before anybody writes, so a copy of a record could not be put back into that record at all: measured,
@@ -7324,9 +7323,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* AND THE FILE MUST BE THE WHOLE RECORD, BECAUSE EVERY TABLE IT DOES NOT FILL IS LEFT EMPTY. The header travels
          whatever else does, so a `sections: ['data']` export carries the `record` row the check above asks for, and
          replacing with one answered `ok` with the record's declarations and its owner's `member` row gone, and `list`
-         of a register it held answering REGISTER_UNKNOWN (measured by the checker, `test/file-doors.test.ts`). A section
-         counts as carried when any of its tables has a header in the file, and not only when all of them do, so a copy
-         from an older build, which lacks a table added since, can still put the record back. */
+         of a register it held answering REGISTER_UNKNOWN (measured, `test/file-doors.test.ts`). A section counts as
+         carried when any of its tables has a header in the file, and not only when all of them do, so a copy from an
+         older build, which lacks a table added since, can still put the record back. */
       const carried = new Set(all.filter((l) => l.startsWith('#table ')).map((l) => l.slice('#table '.length).split(' ')[0]));
       const leftOut = [...new Set(shapes.map((t) => t.section))].filter((s) => !shapes.some((t) => t.section === s && carried.has(t.name)));
       if (leftOut.length > 0)
@@ -7339,8 +7338,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       /* NOR THE SEALED BYTES. The export door redacts by default, which leaves `vault_key` out of the file and blanks
          every grant's `ciphertext` (`brainl.ts`, `SEALED`), so replacing with the file an export hands out unless told
          otherwise answered `ok` with the record key and the signing key gone, and every credential sealed under them
-         with them (measured by the checker). Refused while the record holds bytes of either kind and the file holds
-         none; a record with no vault loses nothing to a redacted file, and it is still taken. */
+         with them (measured). Refused while the record holds bytes of either kind and the file holds none; a record
+         with no vault loses nothing to a redacted file, and it is still taken. */
       const keys = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n ?? 0);
       const sealed = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM grant WHERE ciphertext IS NOT NULL')?.n ?? 0);
       const fileKeys = fileColumn(all, 'vault_key', 'purpose')?.length ?? 0;
@@ -7540,10 +7539,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
          `installDeclarations`; `lintBatch` asks that first.
 
          AND THE BATCH IS VALIDATED AGAINST THE RECORD, which `stageDeclarations(batch)` alone never did: with no
-         `known`, `metricFieldFault` returns before it looks, and `loop/research-batch-twenty-audit.md` §1 measured a
-         third party's pack whose figure summed `nosuch` plan ok, install ok and read `FIELD_UNKNOWN` on every page,
-         while the same figure through `install` was refused. Every `installPack` and every accepted pack proposal
-         comes through here, so a check that only `install` ran was a check a pack never met.
+         `known`, `metricFieldFault` returns before it looks, and a third party's pack whose figure summed `nosuch` was
+         measured to plan ok, install ok and read `FIELD_UNKNOWN` on every page, while the same figure through `install`
+         was refused. Every `installPack` and every accepted pack proposal comes through here, so a check that only
+         `install` ran was a check a pack never met.
 
          AND `stranded` FOR THE SAME REASON. Without it a pack update that opened `lane` to text staged here with its own
          figure resent beside it unchanged, and `lane is earning money` read 1 before and 0 after with nothing refused
@@ -7557,14 +7556,14 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
 
          AND ITS LIST HALF (`tagsNarrowed`), which counts rules and not rows, so it is not `plan`'s to ask. Asked by rule
          alone, a pack that narrowed Jobs' `tags` to `list<enum>` of `[chase]`, or to `int`, under an installed `rule.late`
-         staged, applied and left the next Rent untagged (`loop/research-batch-thirty-nine-audit.md` finding 5). */
+         staged, applied and left the next Rent untagged. */
       const cannot = stagingFault(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       const staged = await stageDeclarations(batch);
       if (!staged.ok) return staged;
       return ok(() => {
         const out = staged.value(sql, clock.now(), transaction);
-        /* AND THE LEDGER SETTLED UNDER A `pairs:` THE PACK CHANGED, which is where audit sixty-three's U1 and U2 arrived:
+        /* AND THE LEDGER SETTLED UNDER A `pairs:` THE PACK CHANGED, because a pack update is where a new `pairs:` arrives:
            money-core 2.2.0 installed over 2.1.0 paired nothing already there and kept a pair it refuses. Here and not in
            the caller, because only here is the cache still the old declaration; the host's transaction around this
            makes it one install with the declarations, and its own `transaction` here is then a no-op. */
@@ -7606,11 +7605,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /**
      * Retire declarations, and with `by` write one `declare` line for each that was live.
      *
-     * A RETIRE WROTE NO HISTORY. `loop/research-batch-thirty-two-audit.md` §8: `setDeclaration` wrote `Added name.` by
-     * `p_1`, `retireDeclaration` then retired Projects, and the `declare` lines were unchanged, so "who took Projects
-     * off" had no answer. The line names the version that was retired as both `from_v` and `to_v`, because a retire makes
-     * no new version: a `from_v` of null is what `declared` writes for a declaration's first version, and a reader of the
-     * feed would have read the retire as an arrival. Unsigned, it writes nothing, for `declared`'s reason: that is setup.
+     * A RETIRE WROTE NO HISTORY. Measured: `setDeclaration` wrote `Added name.` by `p_1`, `retireDeclaration` then
+     * retired Projects, and the `declare` lines were unchanged, so "who took Projects off" had no answer. The line
+     * names the version that was retired as both `from_v` and `to_v`, because a retire makes no new version: a `from_v`
+     * of null is what `declared` writes for a declaration's first version, and a reader of the feed would have read the
+     * retire as an arrival. Unsigned, it writes nothing, for `declared`'s reason: that is setup.
      *
      * THE LIVE VERSIONS ARE READ INSIDE THE SAME TRANSACTION AS THE RETIRE, so a line is written only for what this call
      * actually took off, and a refused retire rolls back with no line.
@@ -7624,8 +7623,8 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           return hit ? [{ id, version: hit.version }] : [];
         });
         const done = retireDeclarations(sql, ids, transaction);
-        /* A RETIRED AUTOMATION'S RUNS END WITH IT, in this transaction (audit thirty-three §4): a run of the retired
-           rule woke an hour later, wrote to its row and notified, because nothing after `startRun` asked. */
+        /* A RETIRED AUTOMATION'S RUNS END WITH IT, in this transaction: a run of the retired rule woke an hour later,
+           wrote to its row and notified, because nothing after `startRun` asked. */
         if (done.ok) for (const one of live) if (one.id.startsWith('rule.')) cancelRunsOf(flowDeps(), one.id.slice('rule.'.length));
         /* UNDER A SUGGESTION IT NAMES WHO PROPOSED IT, as `declared` does for an install. */
         const proposer = by?.suggestion === undefined ? undefined : sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', by.suggestion)?.by;
@@ -7655,11 +7654,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     disablePack(id: string, opts: { alsoDisable?: readonly string[]; actor?: string } = {}): Result<PackToggle> {
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      /* THE PACK'S AUTOMATIONS STOP WITH IT, IN THE SAME TRANSACTION (audit thirty-five §3). Left to the wake, a pack
-         turned off and on again inside the wait put the rule back live first, and the run then wrote `note: chased` and
-         notified "Chased Rent" for an owner who had switched it off. `attempt` and not `transaction`, because the
-         kernel's transaction is re-entrant: `declare.ts`'s own would become a no-op inside this one, and a refusal it
-         carried out would commit the retires made before it. */
+      /* THE PACK'S AUTOMATIONS STOP WITH IT, IN THE SAME TRANSACTION. Left to the wake, a pack turned off and on again
+         inside the wait put the rule back live first, and the run then wrote `note: chased` and notified "Chased Rent"
+         for an owner who had switched it off. `attempt` and not `transaction`, because the kernel's transaction is
+         re-entrant: `declare.ts`'s own would become a no-op inside this one, and a refusal it carried out would commit
+         the retires made before it. */
       const out = attempt(sql, transaction, () => {
         const done = disableDeclaredPack(sql, clock.now(), id, opts, transaction, mint);
         if (!done.ok || !done.value.changed) return done;
@@ -7735,7 +7734,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * THE RECORD KNEW AND NOTHING ASKED IT. `setDeclaration` writes the edit with `pack_id` null and stamps the pack's row
      * `superseded_at`, and that row still says whose it was. `declarations()` reads live rows only, so a plan saw an owner
      * who had moved one block on Money as somebody who had written a page called `money` from nothing, and refused every
-     * later money-core update as `PROVIDES_CONFLICT` (`loop/research-pack-update-edited.md`).
+     * later money-core update as `PROVIDES_CONFLICT`.
      *
      * THE PACK'S LAST ROW, NOT THE ROW JUST BEFORE. An owner who arranges a page twice has two rows with `pack_id` null
      * above the pack's, and "the latest earlier version" is then their own first edit. A retire between the two means the
@@ -7755,11 +7754,11 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     /**
      * The `pack` rows: what is installed, at which version, and what each asks of the others (`requires.packs`).
      *
-     * `requires` IS READ OFF THE MANIFEST THE ROW STORES, because a plan is built from this and nothing else. It answered
-     * an id and a version, so `plan` had no range to read for any held pack and `f507cff5`'s refusal never fired where a
-     * person installs one: audit forty-two's finding 1 put money-core 2.0.0 over `bank-hsbc-eg` 1.0.0 on `^1.8.0` through
-     * `planPack` and `installPack`, and it planned `dependents: []` and installed. A manifest that does not parse, or
-     * names no pack, gives `{}`: no range is claimed, and a plan says of that pack what it said before.
+     * `requires` IS READ OFF THE MANIFEST THE ROW STORES, because a plan is built from this and nothing else. It
+     * answered an id and a version, so `plan` had no range to read for any held pack and its range refusal never fired
+     * where a person installs one: money-core 2.0.0 put over `bank-hsbc-eg` 1.0.0 on `^1.8.0` through `planPack` and
+     * `installPack` planned `dependents: []` and installed. A manifest that does not parse, or names no pack, gives
+     * `{}`: no range is claimed, and a plan says of that pack what it said before.
      *
      * `laid` IS READ OFF THE SAME MANIFEST (`laidOf`): the fields the pack laid through `extends`, by list id, which is
      * how a plan lets a pack change a field it laid and no other. Absent for a pack that laid none, so a row reads as it
@@ -8128,7 +8127,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      *
      * ONLY A RULE THAT SAYS `on: { manual: true }`. A button on a clock rule would be a second clock nobody declared,
      * and one on a write rule would be a run with no row to be about. The run is armed for now and its steps are taken
-     * by the next drain, as every other trigger's are. Who may press it is the host's to decide (Brief D).
+     * by the next drain, as every other trigger's are. Who may press it is the host's to decide.
      */
     automationRun: (rule: string, actor: string): Result<{ run: string }> =>
       transaction(() => {
@@ -8158,9 +8157,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * Take an automation's steps over a sample, and say what each did, with nothing kept (`flow-try.ts`).
      *
      * INSIDE `rehearse` AND NOWHERE ELSE, so the sample row, the run, its steps and whatever they queued all roll back
-     * together (`loop/finish/contracts.md` §2.1). HERE AND NOT UNDER `api/`, because the runner's dependencies are this
-     * closure's `flowDeps` and `KernelParts` does not carry them; `parts` is read when this is called, after it is built.
-     * The body is linted by the caller first (`checkAutomation`); the runner meets a body it cannot read as a failed step.
+     * together. HERE AND NOT UNDER `api/`, because the runner's dependencies are this closure's `flowDeps` and
+     * `KernelParts` does not carry them; `parts` is read when this is called, after it is built. The body is linted by
+     * the caller first (`checkAutomation`); the runner meets a body it cannot read as a failed step.
      */
     tryAutomation: (body: FlowDecl, sample: TrySample, actor: string): Result<Tried> =>
       rehearsal(parts).rehearse(() => {

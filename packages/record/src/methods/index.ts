@@ -3,8 +3,8 @@
  *
  * ONE FILE PER UNIT, AND THIS FILE IS ONLY A LIST. A new record method is `methods/<unit>.ts`, exporting
  * `methods(deps: RecordDeps)` that returns the methods it adds; it is registered here with one import line and one
- * spread line, both inside the `METHODS` block, so two units adding methods in one workflow touch two lines of this file
- * and no line of `index.ts` (`loop/finish/contracts.md` §0 point 5).
+ * spread line, both inside the `METHODS` block, so two changes adding methods at once touch two lines of this file and
+ * no line of `index.ts`.
  *
  * THE SHAPE A METHOD IS WRITTEN IN IS THE SHAPE THE GATES READ. Each is a method of the object its file returns, at four
  * spaces, and its first statement is its group's guard: `admin(ctx` for ADMIN, `vault(ctx` for VAULT, `guard(` or

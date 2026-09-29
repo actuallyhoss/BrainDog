@@ -6,8 +6,8 @@
  * the liquid accounts, and an account's `balance` is a number somebody typed on the day they typed it: every payment
  * since then is a row in `transactions` that the figure never reads, so the tile stands still while the money moves.
  * Its "Owed to you, 30 days" is a sum over `obligations` alone, while the forecast block on the same page walks every
- * list its legs name, so two numbers about the same thirty days can disagree on one screen. `loop/finish/modules.md`
- * C3 and C4 are the two shapes that replace them, and both are read here so that every reader of a figure (a tile, a
+ * list its legs name, so two numbers about the same thirty days can disagree on one screen. A balance rolled forward
+ * and a walk are the two shapes that replace them, and both are read here so that every reader of a figure (a tile, a
  * page, `metric`, the night's `snapshot`) gets them through `evaluateMetric` and nothing else.
  *
  * ONE CURRENCY RULE FOR ALL THREE KINDS OF FIGURE. Each is added up in the record's home currency when one is set,

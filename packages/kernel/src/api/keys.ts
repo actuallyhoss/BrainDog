@@ -1,6 +1,6 @@
 /**
  * `rewrapKeys`: the record's half of rotating the root key, and `wrappedKeys`, what the host re-wraps.
- * `loop/finish/contracts.md` §2.1 and §2.6, `53 §5.6` step 5, `12 §6`.
+ * `53 §5.6` step 5, `12 §6`.
  *
  * THE RECORD NEVER HOLDS A KEY, SO THE RE-WRAP IS TWO HALVES. The host reads the record's wrapped keys, unwraps each
  * under the old root key and wraps it under the new one (`apps/worker/src/rewrap.ts`, `apps/selfhost/src/rewrap.ts`),

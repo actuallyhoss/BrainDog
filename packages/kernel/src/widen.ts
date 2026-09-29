@@ -1,9 +1,9 @@
 /**
  * Whether a field's new type stores every value its old type stored, unchanged: a widening, which is not a retype.
  *
- * MEASURED IN `loop/research-shell-seed-next.md` N2. `holdings.kind` going from a four-value `enum` to `text` was refused
- * `FIELD_TYPE_CHANGED` by the kernel and by `declare`, with the fix "Retire the field and add a new one". Every stored
- * value was already valid text, so the refusal protected nothing, and its fix would have split one column into two.
+ * MEASURED. `holdings.kind` going from a four-value `enum` to `text` was refused `FIELD_TYPE_CHANGED` by the kernel and
+ * by `declare`, with the fix "Retire the field and add a new one". Every stored value was already valid text, so the
+ * refusal protected nothing, and its fix would have split one column into two.
  *
  * TWO PAIRS AND NO MORE, each one checked against `coerce.ts` rather than assumed. An `enum` stores a bare string and its
  * membership is the write path's, so a `text` field reads every stored value as it is; a `list` of either stores an
@@ -13,8 +13,8 @@
  *   text to document   `document` rewrites CRLF to LF on the way in, so a stored text is not a value it would store
  *   enum to ref        a stored word is not a row id; something has to write the ids, which is a row migration
  *
- * ONE MODULE AND NOT A LINE IN `index.ts`, so `declare`'s plan (Brief 2B) imports the same answer rather than keeping a
- * second copy that drifts, which is how `FIRST_PARTY_LISTS` and `MODULE_LISTS` came to disagree (N4).
+ * ONE MODULE AND NOT A LINE IN `index.ts`, so `declare`'s plan imports the same answer rather than keeping a second
+ * copy that drifts, which is how `FIRST_PARTY_LISTS` and `MODULE_LISTS` came to disagree.
  */
 
 /** The parts of a field that say its type: `type`, and `of` for a list. */
@@ -39,9 +39,9 @@ export function widens(from: TypeShape, to: TypeShape): boolean {
  * every `if` among an automation's steps, and a page block's `where`. Only the ones read against `register`.
  *
  * A WIDENING KEEPS EVERY STORED VALUE AND CAN STILL CHANGE WHAT A SENTENCE MEANS, which is why a reader's sentences are
- * asked separately from whether it compiles. `loop/research-batch-thirty-four-audit.md` §1 opened `lane` from an enum to
- * text under four installed figures: every one still compiled, and three of them changed their answer, because `where`
- * reads an enum's word by label, by spaces for underscores and without case, and a text's word as it is written.
+ * asked separately from whether it compiles. Measured: `lane` opened from an enum to text under four installed figures:
+ * every one still compiled, and three of them changed their answer, because `where` reads an enum's word by label, by
+ * spaces for underscores and without case, and a text's word as it is written.
  *
  * A `where` HOLDING `{{...}}` IS LEFT OUT, for `unreadable`'s reason: it is a template's, and becomes a sentence only when a
  * row fills it. The tree form is left out too: it is compiled against stored values, so an enum refuses a label written
@@ -66,9 +66,9 @@ export function sentencesOver(kind: string, body: Record<string, unknown>, regis
           else walk(v, `${at}.${key}`);
         }
     };
-    /* `then` TOO, WHEN THERE ARE NO `steps`: on the run path `then` is a flat list of steps (`flow-lint.ts`), and a rule
-       written that way kept its `if` out of sight. `loop/research-batch-thirty-six-audit.md` §1 measured one answer
-       "then" under the enum and "else" under text, installed, while the same body with `steps:` was refused. */
+    /* `then` TOO, WHEN THERE ARE NO `steps`: on the run path `then` is a flat list of steps (`flow-lint.ts`), and a
+       rule written that way kept its `if` out of sight. Measured: one rule answered "then" under the enum and "else"
+       under text, installed, while the same body with `steps:` was refused. */
     if (body.steps !== undefined) walk(body.steps, 'steps');
     else walk(body.then, 'then');
   }

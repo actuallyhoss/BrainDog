@@ -1,11 +1,11 @@
 /**
- * The record says where a door is and which doors it has (`loop/research-shell-doors.md` §5, brief 1).
+ * The record says where a door is and which doors it has.
  *
  * MEASURED BEFORE THIS WAS WRITTEN: `ingestMint` answered `{ ingest, token }`, and no read in the record answered the
  * record id the address needs, so on a live record the owner's press never yielded a URL and the Shortcut screen showed
  * a bare token with `copy.shortcutNoAddress`. The screen could also mint one ingest, named in the app, because nothing
- * listed the doors a record declares. DIRECTION §22 has doors set up at run time by a person or an agent, so the app
- * has to learn them from the record rather than from its own source.
+ * listed the doors a record declares. Doors are set up at run time by a person or an agent, so the app has to learn
+ * them from the record rather than from its own source.
  *
  * `<rec>` IS `kernel.identity().id` ON BOTH HOSTS, read before this answered it: the self-host compares the URL's
  * segment to it (`apps/selfhost/src/server.ts` `arrivalDoor`), and the Worker reaches the object named by the segment,

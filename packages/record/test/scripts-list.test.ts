@@ -1,6 +1,6 @@
 /**
  * `scripts`, the READ+ list of installed scripts with their last run, their refused runs in a row and whether that
- * paused them (`loop/BACKLOG.md`: "`braindog scripts list` needs a READ+ record method").
+ * paused them, because `braindog scripts list` needs a READ+ record method.
  *
  * MEASURED BEFORE IT: no method in the host's route table read a script. `actions` filters to `pull`, `call` and `poll`,
  * so the only place a paused script's id could be found was the event that paused it, and the terminal refused
@@ -119,10 +119,10 @@ test('scripts IS HELD TO THE LISTS THE CALLER READS, answers a token, and takes 
   sql.close();
 });
 
-/* `loop/BACKLOG.md`, left by wave thirty-eight: "`scripts` shows a script with no reads or writes to any reader (not
-   'as automations is')". `automations` shows a rule with no row only to a caller who reads every list, and `scripts`
-   showed a script that names no list to everybody, the member held to `append` on Money included: its title, the hosts
-   it calls and the label of the key it opens, which are about the record as a whole and not about any list she reads. */
+/* A SCRIPT WITH NO READS OR WRITES WAS SHOWN TO ANY READER, NOT AS `automations` IS. `automations` shows a rule with no
+   row only to a caller who reads every list, and `scripts` showed a script that names no list to everybody, the member
+   held to `append` on Money included: its title, the hosts it calls and the label of the key it opens, which are about
+   the record as a whole and not about any list she reads. */
 test('A SCRIPT THAT TOUCHES NO LIST IS SHOWN WHERE A RULE WITH NO ROW IS: to a caller who reads every list', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });

@@ -374,9 +374,9 @@ export async function vaultGrant(deps: TokenDeps, bearer: string): Promise<Resul
  * An operation bearer, checked and spent. INTERNAL: the host calls it before it builds a context for the one ADMIN method
  * the reach names (`OPERATION_METHOD`), and the record's gate admits that context for that method and no other.
  *
- * NOTHING READ THESE BEARERS BEFORE. `devicePoll` minted one for reach `export` or `import` and gave it ten minutes, and
- * the only reader of `token_hash` was `vaultGrant`, which matches `reach = 'vault'` alone, so the CLI could be handed a
- * bearer that no door on either host would take (`loop/research-restore.md` §2.1, `test/operation-grant.test.ts`).
+ * NOTHING READ THESE BEARERS BEFORE. `devicePoll` minted one for reach `export` or `import` and gave it ten minutes,
+ * and the only reader of `token_hash` was `vaultGrant`, which matches `reach = 'vault'` alone, so the CLI could be
+ * handed a bearer that no door on either host would take (`test/operation-grant.test.ts`).
  *
  * SPENT ON FIRST USE, IN THE SAME TURN IT IS READ. The digest is awaited first, then the row is read and
  * marked `expired` with nothing awaited between, so a second request carrying the same bearer finds the row spent even
@@ -414,9 +414,9 @@ export async function operationGrant(deps: TokenDeps, bearer: string): Promise<R
   );
   const now = instant(deps.nowMs);
   if (!row || !OPERATIONS.includes(row.reach) || !row.approved_by || row.suspended_at || row.expires <= now) return wrong;
-  /* THE OPERATOR'S CUT-OFF IS A SECOND BEARER TO COVER (`loop/research-w61.md` §1 item 13): on either host a bearer the
-     token table refuses falls through to here at the operation doors (`OPERATION_METHOD`), so a grant approved before
-     the instant is refused in the same sentence, and it is refused without being spent, as nothing that fails here is. */
+  /* THE OPERATOR'S CUT-OFF IS A SECOND BEARER TO COVER: on either host a bearer the token table refuses falls through
+     to here at the operation doors (`OPERATION_METHOD`), so a grant approved before the instant is refused in the same
+     sentence, and it is refused without being spent, as nothing that fails here is. */
   if (endedByCutOff(deps.validFrom, row.approved_at)) return wrong;
 
   deps.sql.exec("UPDATE device_grant SET status = 'expired', expires = ?, last_used = ? WHERE id = ? AND status = 'active'", now, now, row.id);

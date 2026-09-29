@@ -1,5 +1,5 @@
 /**
- * `rehearse`, the first kernel extension (`api/rehearse.ts`, `loop/finish/contracts.md` §2.1).
+ * `rehearse`, the first kernel extension (`api/rehearse.ts`).
  *
  * TWO THINGS ARE PROVED HERE, AND THE FIRST IS THE MECHANISM. `rehearse` is written under `api/` and reaches the kernel
  * only through `extensions(parts)` and the spread in `makeKernel`, so `k.rehearse` being callable at all is the proof

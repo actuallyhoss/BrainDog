@@ -433,8 +433,8 @@ export function invite(
   /**
    * THE RULES ARE PART OF THE WHOLE, SO A LIST SENT WITHOUT ONE IS EVERY ROW AGAIN, and each change is said out loud:
    * `access.grant` when a list is narrowed or its rule changes, `access.revoke` when a rule is taken off, with
-   * `field: '<list>#where'` and the rule's JSON text either side (`loop/finish/platform.md` §4.0 W). A rule is a grant
-   * of rows, so its history is read where every other grant's is.
+   * `field: '<list>#where'` and the rule's JSON text either side. A rule is a grant of rows, so its history is read
+   * where every other grant's is.
    *
    * A LIST TAKEN AWAY ABOVE TOOK ITS RULE WITH ITS ROW, and that list's own `access.revoke` already says so.
    */
@@ -528,9 +528,9 @@ export function remove(deps: MemberDeps, by: string, person: string, why?: strin
  * THE LAST OWNER CANNOT BE SUSPENDED, for the reason they cannot be removed: a record with nobody
  * who can decide is a record nobody can un-suspend them from.
  *
- * IT ANSWERS WHERE THE PERSON NOW STANDS, `{ person, suspended_at }` (`loop/finish/contracts.md` §2.5,
- * `suspendMember`), so People can draw "stopped" from the answer instead of reading every member again,
- * and a retried call learns the instant the first one wrote rather than a bare yes.
+ * IT ANSWERS WHERE THE PERSON NOW STANDS, `{ person, suspended_at }` (`suspendMember`), so People can draw "stopped"
+ * from the answer instead of reading every member again, and a retried call learns the instant the first one wrote
+ * rather than a bare yes.
  */
 export function suspend(deps: MemberDeps, by: string, person: string, on: boolean, why?: string): Result<Suspended> {
   const row = deps.sql.one<{ id: string; suspended_at: string | null }>(

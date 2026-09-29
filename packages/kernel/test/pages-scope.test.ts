@@ -1,16 +1,15 @@
 /**
  * What a page tells somebody invited to one list, from the kernel's side of the check.
  *
- * `loop/research-scoped-audit.md` §1 and §2 drove a member holding `read` on Obligations alone
- * through `page` and measured two doors the kernel holds open. The record decides who may read
- * what, but it can only refuse the lists the kernel NAMES to it, and it can only filter a refusal
- * whose contents it can tell apart.
+ * A member holding `read` on Obligations alone was driven through `page` and measured two doors the kernel holds open.
+ * The record decides who may read what, but it can only refuse the lists the kernel NAMES to it, and it can only filter
+ * a refusal whose contents it can tell apart.
  *
- *   §2  `registersOf` never read `from[].register`, so a cash walk over Bills was a block about no
+ *   a.  `registersOf` never read `from[].register`, so a cash walk over Bills was a block about no
  *       list at all and came back to her with *Severance for Sam* on it. The runs, the open
  *       questions and the scheduled actions named nothing either, and each has a method of its
  *       own that refuses her.
- *   §1  `PAGE_UNKNOWN` listed every slug in `allowed`, and a page per row takes its slug from the
+ *   b.  `PAGE_UNKNOWN` listed every slug in `allowed`, and a page per row takes its slug from the
  *       row's title, so one wrong slug read the title of every diary entry.
  *
  * The pure half is asked of `registersOf` directly, because it is a function of the declaration.
@@ -34,8 +33,8 @@ const CASH: MetricDecl = { metric: 'cash', name: 'Cash now', source: 'register.a
 const metric = (id: string): MetricDecl | null => (id === 'cash' ? CASH : null);
 
 test('A CASH WALK READS THE LISTS ITS LEGS WALK, and it used to name only the list its opening figure reads', () => {
-  /* The audit's walk: opening from a figure, one leg over Bills. Before this, the answer was
-     `['accounts']`, and the record, asking only about Accounts, drew the bill. */
+  /* The measured walk: opening from a figure, one leg over Bills. Before this, the answer was `['accounts']`, and the
+     record, asking only about Accounts, drew the bill. */
   const walk: PageBlock = {
     kind: 'forecast',
     source: 'forecast.runway',

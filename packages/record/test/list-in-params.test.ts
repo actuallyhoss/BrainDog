@@ -20,7 +20,7 @@ import type { Param, Row, Sql } from '@braindog/ports';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
-/* ── OPS-5: a long `in` through the record ───────────────────────────── */
+/* ── a long `in` through the record ──────────────────────────────────── */
 
 const JOBS = {
   id: 'register.jobs',

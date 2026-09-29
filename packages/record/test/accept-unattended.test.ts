@@ -1,10 +1,10 @@
 /**
- * Accepting a `change` or a `pattern` that installs anything that runs while nobody is looking is held to the owner:
- * a rule, a script, a digest or an ingest (`loop/research-batch-fifty-one-audit.md` finding 1).
+ * Accepting a `change` or a `pattern` that installs anything that runs while nobody is looking is held to the owner: a
+ * rule, a script, a digest or an ingest.
  *
- * THE DOOR WAS HELD AT THE KIND ITS AUDIT NAMED. `432f267d` held an accept that installs a RULE to `admin`, and a
- * colleague at `decide` who is not the owner then filed and accepted, herself, each of the other three kinds. Measured
- * on `63f9535a` with the audit's probe (`probe-wave50-accept.test.ts`):
+ * THE DOOR WAS HELD AT ONE KIND ONLY. `432f267d` held an accept that installs a RULE to `admin`, and a colleague at
+ * `decide` who is not the owner then filed and accepted, herself, each of the other three kinds. Measured on
+ * `63f9535a`:
  *
  *     A change -> script every 1h, key goldapi                accept by colleague "ok"   armed [script gold-rate]
  *     B change -> digest prose: slash                         accept by colleague "ok"   armed [digest notes-weekly]
@@ -26,7 +26,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 23, 12);
 const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
-/** The audit's colleague: at `decide` on the whole record, and not the owner. */
+/** The colleague: at `decide` on the whole record, and not the owner. */
 const colleague: CallContext = { principal: { kind: 'person', id: 'p_c', level: 'decide' } };
 type Out = { ok: boolean; value?: { id?: string } & Record<string, unknown>; refusal?: { code: string; fix: string } };
 
@@ -146,8 +146,8 @@ for (const [name, kind, body, id] of [
     sql.close();
   });
 
-/* NOT WIDENED PAST WHAT RUNS UNATTENDED. A change to a list's fields is what `decide` was given for (audit forty-nine's
-   brief), and a register runs nothing on its own. */
+/* NOT WIDENED PAST WHAT RUNS UNATTENDED. A change to a list's fields is what `decide` was given for, and a register
+   runs nothing on its own. */
 test('A CHANGE TO A LIST’S FIELDS IS STILL THE COLLEAGUE’S TO ACCEPT', async () => {
   const { sql, file, accept, live } = await record();
   const out = await accept(await file('change', { declaration_id: 'register.notes', to: { declarations: [NOTES_WITH_DUE] } }), colleague);

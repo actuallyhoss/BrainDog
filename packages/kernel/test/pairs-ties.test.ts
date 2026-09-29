@@ -1,12 +1,12 @@
 /**
  * Two equal legs are a tie, and a tie the rows cannot be told apart in is not a guess.
  *
- * `loop/research-batch-sixty-one-audit.md` finding 2, driven with the audit's own cases. `nearestOf` leaves a row
- * unpaired when two candidates are equally near, so that which of two credits hid a payment never depends on the order
- * a bank printed them in. It also fired where every way of matching the legs hides the same money. M1: one EGP
- * 100,000.00 move sent as two halves of 50,000.00 because of a daily limit, four rows on one day, CIB to HSBC, and nothing
- * paired: Spent and Received each read 100,000.00. M2: EGP 5,000.00 CIB to HSBC twice, each landing the next day, and the
- * two middle legs each stood a day from two candidates, so nothing paired and Spent read 10,000.00.
+ * `nearestOf` leaves a row unpaired when two candidates are equally near, so that which of two credits hid a payment
+ * never depends on the order a bank printed them in. It also fired where every way of matching the legs hides the same
+ * money. One: an EGP 100,000.00 move sent as two halves of 50,000.00 because of a daily limit, four rows on one day,
+ * CIB to HSBC, and nothing paired: Spent and Received each read 100,000.00. Two: EGP 5,000.00 CIB to HSBC twice, each
+ * landing the next day, and the two middle legs each stood a day from two candidates, so nothing paired and Spent read
+ * 10,000.00.
  *
  * THE RULE THE REPAIR TAKES. The legs that mirror one another, followed from row to row, are one set. When a tie stands
  * in it and the set holds as many legs one way as the other, they are matched in day order, first out with first in,
@@ -87,14 +87,14 @@ const partners = (k: Kernel, ids: Record<string, string>): Record<string, string
 /** Writes the lines in the order given and answers each one's id by its `what`. */
 const write = (k: Kernel, lines: readonly Line[]): Record<string, string> => Object.fromEntries(lines.map((l) => [l.what, line(k, l).id]));
 
-const M1: readonly Line[] = [
+const SPLIT: readonly Line[] = [
   { what: 'CIB OUT 1', on: DAY(0), direction: 'out', pounds: 50_000, account: 'cib' },
   { what: 'CIB OUT 2', on: DAY(0), direction: 'out', pounds: 50_000, account: 'cib' },
   { what: 'HSBC IN 1', on: DAY(0), direction: 'in', pounds: 50_000, account: 'hsbc' },
   { what: 'HSBC IN 2', on: DAY(0), direction: 'in', pounds: 50_000, account: 'hsbc' },
 ];
 
-test('M1: ONE MOVE SENT AS TWO EQUAL HALVES ON ONE DAY PAIRS BOTH HALVES, in whichever order the two banks list them', async () => {
+test('ONE MOVE SENT AS TWO EQUAL HALVES ON ONE DAY PAIRS BOTH HALVES, in whichever order the two banks list them', async () => {
   for (const order of [
     [0, 1, 2, 3],
     [2, 3, 0, 1],
@@ -104,7 +104,7 @@ test('M1: ONE MOVE SENT AS TWO EQUAL HALVES ON ONE DAY PAIRS BOTH HALVES, in whi
     const k = await ledger();
     const ids = write(
       k,
-      order.map((i) => M1[i]!),
+      order.map((i) => SPLIT[i]!),
     );
     const got = partners(k, ids);
     /* Before the repair every value here was null and both figures read 100,000. */
@@ -118,7 +118,7 @@ test('M1: ONE MOVE SENT AS TWO EQUAL HALVES ON ONE DAY PAIRS BOTH HALVES, in whi
   }
 });
 
-test('M2: TWO EQUAL TOP-UPS A DAY APART PAIR IN DAY ORDER, each out with the in that followed it', async () => {
+test('TWO EQUAL TOP-UPS A DAY APART PAIR IN DAY ORDER, each out with the in that followed it', async () => {
   const k = await ledger();
   const ids = write(k, [
     { what: 'CIB OUT A', on: DAY(-10), direction: 'out', pounds: 5_000, account: 'cib' },
@@ -194,7 +194,7 @@ test('COUNTS THAT DIFFER ARE STILL A GUESS: three equal outs and two equal ins o
 
 test('A HALF DELETED PUTS THE SET BACK TO A GUESS, and the half that was paired with it is counted again with the rest', async () => {
   const k = await ledger();
-  const ids = write(k, M1);
+  const ids = write(k, SPLIT);
   assert.equal(total(k, 'out'), 0);
   made(k.update('ledger', ids['HSBC IN 2']!, { deleted_at: 'now' }, BANK));
   /* Two outs and one in: the in is equally near both, so all three count, and no row still names the deleted one. */

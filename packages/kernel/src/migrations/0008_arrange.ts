@@ -1,9 +1,9 @@
 /**
  * The kernel schema, migration 8: `suggestion` rebuilt with three more bodies, `pack`, `settings` and `arrange`.
  *
- * They are how an agent, or Slash, asks to change what a record is (`loop/research-spark.md` S12): install,
- * turn on or turn off a pack, change a pack's settings such as its voice, or several of those and pages as
- * one arrangement. Each is applied only when the owner accepts it (`govern.ts`).
+ * They are how an agent, or Slash, asks to change what a record is: install, turn on or turn off a pack, change a
+ * pack's settings such as its voice, or several of those and pages as one arrangement. Each is applied only when the
+ * owner accepts it (`govern.ts`).
  *
  * A REBUILD AND NOT AN ALTER, because SQLite cannot change a CHECK in place, and the list of bodies is a
  * CHECK so that the database refuses one nothing can apply. Every row is copied across unchanged. The format

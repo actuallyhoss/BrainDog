@@ -1,5 +1,5 @@
 /**
- * An agent's proposed page, drawn before anybody accepts it (M4 wave two brief 5, wave one's brief 9).
+ * An agent's proposed page, drawn before anybody accepts it.
  *
  * WHAT DECIDE SHOWED. A `change` carrying a page was drawn as lines: where it sits in the sidebar, the headings of its
  * blocks and the lists it reads. Nothing on the screen said what those blocks would hold, because the only method that

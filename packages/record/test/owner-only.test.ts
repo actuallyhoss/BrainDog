@@ -1,5 +1,5 @@
 /**
- * Access that is true for every level (`loop/finish/platform.md` COL-1, `20 §1`, DIRECTION §25 A3 D4).
+ * Access that is true for every level (`20 §1`).
  *
  * A COLLEAGUE WHO ADDS ACROSS THE WHOLE RECORD ADDED TO KEYS AND PEOPLE TOO. `append` held on the record reached every
  * list, the owner's two included, so a contractor asked to file expenses could file a key and a person. Keys, People and
@@ -135,7 +135,7 @@ test('A RECORD-WIDE APPENDER GIVEN READS ON ONE LIST OPENS THE APP, sees that li
   refusal(await api.list({ register: 'diary' }, fay));
   refusal(await api.create(add('credentials', 'Something'), fay));
 
-  /* WITHOUT A GRANT THAT READS, THE APP STAYS CLOSED to her, with the sentence the Home screen prints (D1). */
+  /* WITHOUT A GRANT THAT READS, THE APP STAYS CLOSED to her, with the sentence the Home screen prints. */
   value(await api.invite({ person: 'p_6', name: 'Gil', level: 'append' }, owner));
   assert.equal(refusal(await api.boot(as('p_6'))).code, 'LEVEL_REQUIRED');
   sql.close();

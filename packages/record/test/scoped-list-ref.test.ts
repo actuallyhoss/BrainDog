@@ -1,10 +1,10 @@
 /**
  * A member invited to Jobs alone, filtering Jobs by a ref into Clients, learns nothing about Clients.
  *
- * `loop/research-batch-twenty-two-audit.md` finding 1. `5fde092b` taught `list` to filter by a ref, and the kernel
- * answered `ok 0` for a client that exists and `REF_UNKNOWN` for one that does not, so a member who could not read
- * Clients confirmed the hidden title *Harrow Divorce Case* and counted the list by halving on `clients#N`. `723905b5`
- * gave `kernel.list` a `reads` option; this holds the record to passing it, because the kernel cannot know who asks.
+ * `5fde092b` taught `list` to filter by a ref, and the kernel answered `ok 0` for a client that exists and
+ * `REF_UNKNOWN` for one that does not, so a member who could not read Clients confirmed the hidden title *Harrow
+ * Divorce Case* and counted the list by halving on `clients#N`. `723905b5` gave `kernel.list` a `reads` option; this
+ * holds the record to passing it, because the kernel cannot know who asks.
  */
 
 import { test } from 'node:test';

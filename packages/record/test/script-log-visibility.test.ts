@@ -1,11 +1,11 @@
 /**
- * Who reads what a script said while it ran (`loop/research-batch-thirty-five-audit.md` finding 1).
+ * Who reads what a script said while it ran.
  *
  * `keepLog` puts a run's `ctx.log` on its `pull` event, and that line is about a declaration, so `lineOf` showed it to
- * everybody who reads the record as a whole. The audit's `runlog.mts` measured a member at `write`, held to `append` on
- * Money and refused `list money`, reading "Salary: Omar 91000" off the run line in `recentHistory` and in `whatsNew`,
- * while the row the same run wrote showed its money field as `--redacted--`. The script reads as the owner approved it,
- * so its log quotes whatever the lists it touched hold, and none of the record's own redaction reaches free text.
+ * everybody who reads the record as a whole. Measured: a member at `write`, held to `append` on Money and refused
+ * `list money`, reading "Salary: Omar 91000" off the run line in `recentHistory` and in `whatsNew`, while the row the
+ * same run wrote showed its money field as `--redacted--`. The script reads as the owner approved it, so its log quotes
+ * whatever the lists it touched hold, and none of the record's own redaction reaches free text.
  *
  * The run is made the real way: the schedule fires, the kernel's pass leases `script.run`, and a host's sandbox hands
  * back one write and one log line.
@@ -43,7 +43,7 @@ const TALLY = {
 };
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
-/** The audit's member: the whole record at `write`, and Money held to `append`, which files and does not read. */
+/** The measured member: the whole record at `write`, and Money held to `append`, which files and does not read. */
 const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' }, levels: { money: 'append' } };
 /** A colleague at `write` with no list held lower: she reads Money, and she did not approve the script. */
 const writer: CallContext = { principal: { kind: 'person', id: 'p_3', level: 'write' } };

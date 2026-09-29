@@ -1,14 +1,13 @@
 /**
- * A record whose search index is damaged opens, with its index rebuilt, and is not refused (audit sixty-four, finding 4).
+ * A record whose search index is damaged opens, with its index rebuilt, and is not refused.
  *
- * MEASURED BEFORE THE FIX, 24 September 2026, over the two damages the audit's B1 made to a real file: with
- * `entry_fts_config` dropped, the boot probe's `LIMIT 0` read threw `vtable constructor failed: entry_fts`, and with
- * the table's schema row removed it threw `no such table: entry_fts`. Neither is a missing module, so `applyMigrations`
- * rethrew both and `openRecord` threw: no method answered, not even `export`, and every row was intact. The build
- * before daef0898 opened both files, which is not the same as working: over the first damage it could read a row but
- * `export`, `search` and a write to a searchable list all threw the same driver sentence, and over the second only
- * `export` answered. So "open without search" was not enough for the owner to get their rows out, and the index is
- * rebuilt instead.
+ * MEASURED BEFORE THE FIX, over two damages made to a real file: with `entry_fts_config` dropped, the boot probe's
+ * `LIMIT 0` read threw `vtable constructor failed: entry_fts`, and with the table's schema row removed it threw
+ * `no such table: entry_fts`. Neither is a missing module, so `applyMigrations` rethrew both and `openRecord` threw: no
+ * method answered, not even `export`, and every row was intact. The build before daef0898 opened both files, which is
+ * not the same as working: over the first damage it could read a row but `export`, `search` and a write to a searchable
+ * list all threw the same driver sentence, and over the second only `export` answered. So "open without search" was not
+ * enough for the owner to get their rows out, and the index is rebuilt instead.
  *
  * NEITHER DAMAGE CAN HAPPEN ON A NORMAL PATH. A hand edit, a partial copy or a storage fault makes it, and the file
  * then has to be opened by a SQLite that still has FTS5, which is why these run over the kernel's own `openSqlite()`.
@@ -41,7 +40,7 @@ const OBLIGATIONS: Declaration = {
 };
 
 /**
- * B1's two damages, statement for statement, and the four audit sixty-five found past them (finding 5, probe B2).
+ * The two damages above, statement for statement, and four more found past them.
  *
  * THE FOUR OPENED WITHOUT A REBUILD, because the boot probe's `LIMIT 0` read compiles against the config table and
  * nothing else, and then a write to a searchable list threw: `database disk image is malformed` with `data` or
@@ -112,9 +111,9 @@ for (const [label, statements] of Object.entries(DAMAGES)) {
 }
 
 test('AN INDEX THAT LOST ITS OWN LINES TOO OPENS AND STILL FINDS EVERY ROW WRITTEN BEFORE', async () => {
-  /* THE INDEX IS PROJECTED FROM `entry`, NOT REFILLED FROM ITS OWN COPY. Before audit sixty-five's fix the rebuild read
+  /* THE INDEX IS PROJECTED FROM `entry`, NOT REFILLED FROM ITS OWN COPY. Before this fix the rebuild read
      `entry_fts_content`, so with that dropped beside the config it opened with an empty index and this search answered
-     nothing for a row that was there (measured, the audit's section 5 table). */
+     nothing for a row that was there (measured). */
   const { file, id, held, done } = await damaged(['DROP TABLE entry_fts_content', 'DROP TABLE entry_fts_config']);
   const sql = openSqlite(file);
   try {

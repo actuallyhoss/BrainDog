@@ -1,7 +1,7 @@
 /**
- * A BrainDog shared as a use case and installed on another (`loop/research-spark.md` S14): what the export carries and
- * leaves out, what a plan of the file says on a second record, that installing it is the ordinary `installPack`, and
- * that a newer version plans only what changed.
+ * A BrainDog shared as a use case and installed on another: what the export carries and leaves out, what a plan of the
+ * file says on a second record, that installing it is the ordinary `installPack`, and that a newer version plans only
+ * what changed.
  */
 
 import { test } from 'node:test';

@@ -2,17 +2,17 @@
  * `lint(batch, known, owners)`: every check `stageInstall` runs, asked of a record that is planned and not yet written.
  *
  * THE ARRANGER PLANS AN ARRANGEMENT PACK BY PACK, AND NOTHING IS WRITTEN UNTIL THE ACCEPT. So the second pack of one is
- * met at the accept by the record as the first leaves it, and the arranger could only ask the kernel about the record as
- * it stands. Wave forty-eight gave it `declare`'s `stagedFault`, which reads a planned record through `validate` alone,
- * and its checker named the rest: `doorsKept`, a disabled pack, `unreadable`, `unserved`, `stranded`, `tagsNarrowed`
- * and `taggingRefused` read the table and the live list cache. Measured on the wave forty-eight tree through the record
+ * met at the accept by the record as the first leaves it, and the arranger could only ask the kernel about the record
+ * as it stands. It was first given `declare`'s `stagedFault`, which reads a planned record through `validate` alone,
+ * and that left the rest: `doorsKept`, a disabled pack, `unreadable`, `unserved`, `stranded`, `tagsNarrowed` and
+ * `taggingRefused` read the table and the live list cache. Measured on that tree through the record
  * (`packages/record/test/arrange-kernel-lint.test.ts`), five arrangements the accept refuses were filed: a pack
  * narrowing Jobs' `tags` under a live `rule.late`, a pack's rule tagging a Jobs whose `tags` is `int` from the pack
  * before it, a pack's page filtering a list the pack before it declares on a field it lacks, a rule asking Slash on a
  * host that answers none, and a page over `rates` beside an update retiring a keyless `fx`.
  *
  * EACH CASE BELOW PUTS WHAT DECIDES IT IN `known` AND NOWHERE ELSE, so a lint that reads the table instead gives the
- * other answer. Against the wave forty-eight kernel, whose `lint` took the batch alone, every one of them failed.
+ * other answer. Against the kernel whose `lint` took the batch alone, every one of them failed.
  */
 
 import { test } from 'node:test';
@@ -143,10 +143,11 @@ test('THE LIVE LIST CACHE IS PUT BACK after a planned lint, so the next write re
 /* ─── WHICH LIST WAS THERE BEFORE ───
 
    `keylessBeside` tells a keyless list the record already holds to move its rows and go, and a list arriving to take
-   another id. Which is which is read from `held`, the ids before the batch, and for a planned lint that is the plan's and
-   not the table's. The checker measured both turns below on the first cut: with `fx` held alone and `rates` arriving in
-   the same batch, `fx` first, the fix read "register.fx has sat beside register.rates ... since before" of a `rates` the
-   record had never held; and with `heldIn` reading the table under a plan, every test in this package still passed. */
+   another id. Which is which is read from `held`, the ids before the batch, and for a planned lint that is the plan's
+   and not the table's. Both turns below were measured on the first cut: with `fx` held alone and `rates` arriving in
+   the same batch, `fx` first, the fix read "register.fx has sat beside register.rates ... since before" of a `rates`
+   the record had never held; and with `heldIn` reading the table under a plan, every test in this package still passed.
+   */
 const RATE_FIELDS = [
   { id: 'currency', type: 'text', required: true },
   { id: 'base', type: 'text', required: true },

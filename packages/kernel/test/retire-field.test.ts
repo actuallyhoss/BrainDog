@@ -1,15 +1,14 @@
 /**
  * Retiring a field from a live list, as a change that names the field and not the list, and that always waits for a press.
  *
- * THE APP COULD NOT REMOVE ANYTHING. `addTo` is additive by construction and tells whoever wants a field gone to "propose
- * the whole list", and nothing the app calls answers a list's installed body: `schema` sends the relabelled copy the
- * screens draw from, with no version. So `loop/research-m4-wave-three.md` brief 5 has the kernel resolve a second
- * field-level shape the way it resolves `add`, `to: { retire: { register, fields } }`, onto the list as it is when the
- * owner presses. Before this file, that body was refused `VALUE_MALFORMED` at `body.to` by `shapeFault`, because it is
- * not a declaration.
+ * THE APP COULD NOT REMOVE ANYTHING. `addTo` is additive by construction and tells whoever wants a field gone to
+ * "propose the whole list", and nothing the app calls answers a list's installed body: `schema` sends the relabelled
+ * copy the screens draw from, with no version. So the kernel resolves a second field-level shape the way it resolves
+ * `add`, `to: { retire: { register, fields } }`, onto the list as it is when the owner presses. Before this file, that
+ * body was refused `VALUE_MALFORMED` at `body.to` by `shapeFault`, because it is not a declaration.
  *
- * AND IT IS NEVER ANSWERED BY RULE. DIRECTION §22: an agent's purely additive field lands at once, and removing waits
- * for his press. A retire is not an `add`, so `additiveFault` holds it, and the record's `byRule` never sends it.
+ * AND IT IS NEVER ANSWERED BY RULE. An agent's purely additive field lands at once, and removing waits for his press. A
+ * retire is not an `add`, so `additiveFault` holds it, and the record's `byRule` never sends it.
  */
 
 import { test } from 'node:test';

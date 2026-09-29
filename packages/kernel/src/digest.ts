@@ -350,7 +350,7 @@ ${sent.text}` : sent.text;
         went.pop();
         continue;
       }
-      /* `because: 'digest.<id>'` IS OPS-14'S OWN MARK (`apps/worker/src/lapse.ts` `lapseDrops`), which drops a
+      /* `because: 'digest.<id>'` IS THE LAPSE'S OWN MARK (`apps/worker/src/lapse.ts` `lapseDrops`), which drops a
          lapsed record's digests by it before anything ships. Without it a digest email read the same as an
          urgent notice and still went out while the record was read-only. */
       deps.outbox('notify.email', { to, subject: sent.name, text, because: `digest.${sent.digest}` });
@@ -378,7 +378,7 @@ ${sent.text}` : sent.text;
 
          AND THE KEY THAT SIGNS IT IS NAMED BESIDE THE BODY, BY ITS LABEL. 09 §6 promises `webhook.grant` is "the vault
          label of the secret that signs the POST", `install` prints it on the CALLS OUT line and the accept refuses a
-         digest until the vault holds it, and this queued the url and the body alone: measured 23 September, the
+         digest until the vault holds it, and this queued the url and the body alone: measured, the
          `notify.webhook` for `grant: 'collector'` held two keys and no deliverer could have signed anything. The label
          is the reference a host resolves, as a call's `pull.fetch` names its key, and the key's value never enters
          the record, so it cannot enter the body; the body is what the endpoint reads. */
@@ -504,12 +504,11 @@ const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
  * instant, so this walks local dates and hands each one to it.
  *
  * ONE READING OF A SKIPPED OR REPEATED TIME, SHARED WITH THE CALENDAR CLOCK. This walk used to do
- * its own offset arithmetic, and measured on 25 September in New York it disagreed with
- * `nextCalendar` on both nights a year that matter: 02:30 on 14 March 2027, which the zone skips,
- * came out 01:30 EST where the clock says 03:30 EDT, and 01:30 on 7 November, which the zone says
- * twice, came out the second where the clock takes the first. So a daily digest and a monthly rule
- * both written `at: 02:30` ran an hour apart. London did the same on its own two nights
- * (`test/digest-dst.test.ts`).
+ * its own offset arithmetic, and measured in New York it disagreed with `nextCalendar` on both
+ * nights a year that matter: 02:30 on 14 March 2027, which the zone skips, came out 01:30 EST where
+ * the clock says 03:30 EDT, and 01:30 on 7 November, which the zone says twice, came out the second
+ * where the clock takes the first. So a daily digest and a monthly rule both written `at: 02:30`
+ * ran an hour apart. London did the same on its own two nights (`test/digest-dst.test.ts`).
  */
 export function nextOccurrence(schedule: { day?: string; at: string }, fromMs: number, tz: string): number | null {
   /* THE TIME IS CHECKED, not defaulted. `Number('8am')` is `NaN` and `NaN ?? 8` is `NaN`, so a
@@ -579,8 +578,8 @@ export function localParts(
 }
 
 /**
- * The record's quiet hours: a window in its own time zone, or `'off'` (`09 §5` rule 3, `loop/finish/contracts.md`
- * §12.1). `from` and `to` are `HH:MM`, and a window whose `from` is later than its `to` runs across midnight.
+ * The record's quiet hours: a window in its own time zone, or `'off'` (`09 §5` rule 3). `from` and `to` are `HH:MM`,
+ * and a window whose `from` is later than its `to` runs across midnight.
  */
 export type QuietWindow = { from: string; to: string } | 'off';
 

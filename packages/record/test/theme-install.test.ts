@@ -2,9 +2,8 @@
  * A pack's theme is checked where it comes in, and every door answers it the same way (`src/theme-check.ts`).
  *
  * WHAT WAS TRUE BEFORE IT: a pack whose theme set `faint` on the ground planned `ok` and installed `ok`, and so did a
- * seed `@braindog/theme` refuses, because nothing on the install path called the palette checks
- * (`loop/research-hardening.md` §2.4). The three fixtures whose codes those checks construct were skipped by name in
- * `refusals-install.test.ts` for that reason.
+ * seed `@braindog/theme` refuses, because nothing on the install path called the palette checks. The three fixtures
+ * whose codes those checks construct were skipped by name in `refusals-install.test.ts` for that reason.
  *
  * SO THE THREE FIXTURES ARE DRIVEN HERE THROUGH ALL THREE DOORS a person or an agent reaches a theme by: `planPack`,
  * `installPack` and `setDeclaration`. The refusal is compared whole across the three, because "the same palette in the
@@ -83,8 +82,8 @@ for (const name of THEMED) {
 }
 
 test('A SEED THE HOUSE PROFILE REFUSES IS REFUSED AT THE PLAN, AND THE SUGGESTED ACCENTS ARE NOT', async () => {
-  /* THE ONE REFUSED SEED IS PINNED, so this cannot pass by every seed being accepted: `loop/research-hardening.md`
-     §2.4 measured `recordTheme` refusing it with CONTRAST_FLOOR. */
+  /* THE ONE REFUSED SEED IS PINNED, so this cannot pass by every seed being accepted: `recordTheme` was measured
+     refusing it with CONTRAST_FLOOR. */
   const refusedSeed = '#1A1A6E';
   assert.equal(recordTheme(refusedSeed, { neutralHue: 110 }).ok, false, `${refusedSeed} is no longer refused by recordTheme`);
 

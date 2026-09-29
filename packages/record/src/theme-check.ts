@@ -4,8 +4,8 @@
  * THE KERNEL CHECKS A THEME'S SHAPE AND STOPS THERE, ON PURPOSE. `themeBody` in `kernel/src/declare.ts` answers what a
  * parser can (a colour outside the grammar, an alpha, a grey seed) and says the palette checks belong in the pass that
  * calls `build`. Nothing called it: a pack whose theme set `faint` on the ground planned and installed `ok` on both
- * hosts (`loop/research-hardening.md` §2.4). `@braindog/theme` is the one solver, and `31 §2`'s boundary table has
- * `record` orchestrate it beside `declare`, because neither of those two may import the other.
+ * hosts. `@braindog/theme` is the one solver, and `31 §2`'s boundary table has `record` orchestrate it beside
+ * `declare`, because neither of those two may import the other.
  *
  * EVERY DOOR A PACK COMES IN BY READS THROUGH `normaliseChecked`: `planPack`, `installPack`, `setDeclaration` (one
  * declaration set from the app, wrapped as a pack), the arranger's `packOf` and the use-case planner. A palette refused

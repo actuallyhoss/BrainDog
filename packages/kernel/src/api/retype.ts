@@ -1,6 +1,6 @@
 /**
  * A field retyped or narrowed over the rows a list already holds, the kernel's half: `retypePlan`, `retypeLanding` and
- * `retypeLand` (`21 §5`, `loop/finish/contracts.md` §12.1, GAP-8).
+ * `retypeLand` (`21 §5`).
  *
  * THE INSTALL REFUSES THIS, AND IT IS RIGHT TO. `contradicted` in `index.ts` answers `FIELD_TYPE_CHANGED` for a type
  * change over held values and `REQUIRED_ON_POPULATED` for a new required field over empty ones (`04 §5`), because a

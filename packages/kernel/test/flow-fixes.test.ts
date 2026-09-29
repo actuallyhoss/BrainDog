@@ -1,6 +1,5 @@
 /**
- * What the checks of the automations runner (`94ba1ad8`) and section 4 of `loop/research-batch-thirty-two-audit.md`
- * left open, one test per finding.
+ * What a review of the automations runner (`94ba1ad8`) left open, one test per gap.
  *
  * EACH TEST WAS RUN AGAINST THE CODE BEFORE ITS REPAIR AND FAILED ON THE LINE NAMED IN ITS COMMENT. Two of the five
  * repairs were refusals at first, a `metric` trigger and a run-path rule about time, until the hourly sweep started
@@ -243,9 +242,9 @@ test('THE INSTALLED AUTOMATIONS ARE PARSED ONCE PER VERSION, not on every write'
 /* ── (e) a call step and run: agree ────────────────────────────────────── */
 
 test('A CALL THAT SENDS A ROW NEEDS A ROW, from a call step and from run: alike, and a call that sends none does not', () => {
-  /* MEASURED BEFORE THE REPAIR, the audit's four lines: `run:` on a clock was refused and the same call as a step
-     installed on a clock, a button and an arrival. An arrival whose door writes obligations does bring an obligations
-     row, and the price GET sends nothing, so those two install. */
+  /* MEASURED BEFORE THE REPAIR, four lines: `run:` on a clock was refused and the same call as a step installed on a
+     clock, a button and an arrival. An arrival whose door writes obligations does bring an obligations row, and the
+     price GET sends nothing, so those two install. */
   const step = (rule_: string, on: unknown, ingest: string) => rule({ rule: rule_, on, steps: [{ call: { ingest, as: 'out' } }] });
   const run = (rule_: string, on: unknown, ingest: string) => rule({ rule: rule_, on, once_per: ['what'], steps: [{ run: ingest }] });
 

@@ -1,11 +1,11 @@
 /**
  * A digest at a time the zone skips or says twice, against the calendar clock at the same time.
  *
- * MEASURED ON 25 SEPTEMBER, BEFORE THE FIX, in New York: `nextOccurrence` asked for 02:30 on 14 March 2027, which the
- * zone skips, answered 06:30Z, which is 01:30 EST and an hour BEFORE the gap. `clock.ts`'s `nextCalendar` at the same
- * wall time answers 07:30Z, 03:30 EDT, the same distance past it. Asked for 01:30 on 7 November 2027, which the zone
- * says twice, the digest took the second (06:30Z, EST) and the clock the first (05:30Z, EDT). So a daily digest and a
- * monthly rule both written `at: 02:30` fired an hour apart on the one night a year anybody would look.
+ * MEASURED BEFORE THE FIX, in New York: `nextOccurrence` asked for 02:30 on 14 March 2027, which the zone skips,
+ * answered 06:30Z, which is 01:30 EST and an hour BEFORE the gap. `clock.ts`'s `nextCalendar` at the same wall time
+ * answers 07:30Z, 03:30 EDT, the same distance past it. Asked for 01:30 on 7 November 2027, which the zone says twice,
+ * the digest took the second (06:30Z, EST) and the clock the first (05:30Z, EDT). So a daily digest and a monthly rule
+ * both written `at: 02:30` fired an hour apart on the one night a year anybody would look.
  *
  * AND THE DAY WALK LOST A WHOLE DAY, found while measuring the above. The walk added 24 hours to the instant it was
  * asked from and read the local date there, and 24 hours from 23:30 EST on 13 March is 00:30 EDT on the 15th, because
@@ -31,7 +31,7 @@ const monthly = (day: number, at: string, from: number, tz: string): string | nu
   return iso(nextCalendar({ months: 1, month: 0, day, hh, mm }, from, tz));
 };
 
-/* ── the two nights the checker measured ─────────────────────────────── */
+/* ── the two nights measured ─────────────────────────────────────────── */
 
 test('A TIME NEW YORK SKIPS IS THE SAME DISTANCE PAST THE GAP, as the calendar clock reads it', () => {
   const from = Date.UTC(2027, 2, 13, 17); // Sat 13 Mar 12:00 EST

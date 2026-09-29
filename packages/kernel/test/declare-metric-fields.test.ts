@@ -1,12 +1,11 @@
 /**
  * A METRIC NAMES FIELDS, AND THE REGISTER IT READS HAS TO DECLARE THEM.
  *
- * The checker of `loop/research-pack-update-edited.md` installed `value: { sum: 'nosuch' }` in an
- * ordinary install and it went in. The evaluator in `metrics.ts` has always refused that figure as
- * `FIELD_UNKNOWN` when it is READ, so the mistake installed clean and then answered a refusal on every
- * page the figure sat on, which is the author told nothing at the one moment they could fix it.
- * `unaggregatableIn` at install looked the field's type up, found none, and took "no type" as "no
- * objection". These cases are the ones the reader refuses, asked one moment earlier.
+ * Measured: `value: { sum: 'nosuch' }` in an ordinary install went in. The evaluator in `metrics.ts` has always refused
+ * that figure as `FIELD_UNKNOWN` when it is READ, so the mistake installed clean and then answered a refusal on every
+ * page the figure sat on, which is the author told nothing at the one moment they could fix it. `unaggregatableIn` at
+ * install looked the field's type up, found none, and took "no type" as "no objection". These cases are the ones the
+ * reader refuses, asked one moment earlier.
  */
 
 import { test } from 'node:test';
@@ -74,10 +73,10 @@ test('A FIGURE OVER A FIELD THE REGISTER DOES NOT DECLARE IS REFUSED AT INSTALL,
   sql.close();
 });
 
-/* A RETIRED FIELD IS STILL IN THE REGISTER'S BODY, and it is not in the schema the reader is handed:
-   `index.ts`'s `schemaOf` drops it. Measured by the checker of this change: with the retired field
-   counted as declared, `sum: 'old'` and `group_by: 'old'` both installed and then answered
-   `FIELD_UNKNOWN: ledger has no field called old` on the first read, which is the defect above again. */
+/* A RETIRED FIELD IS STILL IN THE REGISTER'S BODY, and it is not in the schema the reader is handed: `index.ts`'s
+   `schemaOf` drops it. Measured: with the retired field counted as declared, `sum: 'old'` and `group_by: 'old'` both
+   installed and then answered `FIELD_UNKNOWN: ledger has no field called old` on the first read, which is the defect
+   above again. */
 test('A FIELD THE REGISTER HAS RETIRED IS REFUSED AT INSTALL, because the reader no longer sees it', async () => {
   const { k, sql } = await record();
   const body = LEDGER.body as { fields: object[] };

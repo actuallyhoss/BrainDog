@@ -1,11 +1,10 @@
 /**
  * A reading AS OF a past day, over a record that has rows dated after that day.
  *
- * THE CURRENT WINDOW HAD A START AND NO END, SO IT ENDED AT TODAY RATHER THAN AT THE AS-OF DAY.
- * `on after -30d` resolved against the as-of clock is "after the day thirty days before it", and
- * nothing said "and not after the day itself", so every row dated between the as-of day and now was
- * counted as if it had already happened. `endedAt` gave the window before an end in `245694a7`; the
- * window it was compared with had none. Measured in `loop/research-batch-seventeen-audit.md` §3 with
+ * THE CURRENT WINDOW HAD A START AND NO END, SO IT ENDED AT TODAY RATHER THAN AT THE AS-OF DAY. `on after -30d`
+ * resolved against the as-of clock is "after the day thirty days before it", and nothing said "and not after the day
+ * itself", so every row dated between the as-of day and now was counted as if it had already happened. `endedAt` gave
+ * the window before an end in `245694a7`; the window it was compared with had none. Measured with
  * `metrics-asof.test.ts`'s four rows and 7,000,000 dated ten and forty days after the as-of day:
  *
  *     {"value":14300000,"delta":94.33333333333333,"rows":4}
@@ -58,7 +57,7 @@ const SCHEMA: Schema = {
   },
 } as Schema;
 
-/* The seed's spelling since `aeef01c5`, which is the one the audit read. */
+/* The seed's spelling since `aeef01c5`, which is the one measured. */
 const SPENT: MetricDecl = {
   metric: 'spent-30d',
   name: 'Spent, 30 days',

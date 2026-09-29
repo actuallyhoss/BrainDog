@@ -1,6 +1,6 @@
 /**
  * Comments: a thread on a row, a question or a decision, one level of replies, and a resolution with its reason.
- * `docs/20-COLLABORATION.md` §5, `loop/finish/contracts.md` §2.5 and §10 (the `note` row).
+ * `docs/20-COLLABORATION.md` §5.
  *
  * NO TABLE, NO EVENT KIND AND NO REFUSAL CODE. A comment is a `note` event on the thing it is about, with `field` set to
  * `comment`, and a reply is one with `field` set to `reply:<id>`, the id of the comment it answers. A resolution is a
@@ -284,8 +284,8 @@ export function extension(parts: KernelParts) {
      * called to the caller, or `null` when she may not see it, and a comment on a thing she cannot see is neither
      * answered nor counted. At most `COMMENT_SEARCH_MOST` come back.
      *
-     * THE WINDOW AND NOT AN INDEX, because an index on a note's words would be a migration this finish does not assign
-     * (`loop/finish/contracts.md` §1.2). It runs only when the query has words.
+     * THE WINDOW AND NOT AN INDEX, because an index on a note's words would be a migration of its own. It runs only
+     * when the query has words.
      */
     commentsMatching(q: string, sees: (target: string) => string | null): CommentFound[] {
       const said = q.trim();

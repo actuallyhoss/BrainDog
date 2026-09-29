@@ -1,25 +1,24 @@
 /**
- * A figure read by a step: `{{metric.<id>}}` in a run's fill is the figure's value, read as a page reads it
- * (`loop/research-m3-dynamic.md` §3, B1).
+ * A figure read by a step: `{{metric.<id>}}` in a run's fill is the figure's value, read as a page reads it.
  *
  * A HEAD IN THE FILL AND NOT A NEW VERB. A `read_metric: { id, as }` step would put every figure into a variable before
  * it could be used, so a `notify` that says the total would cost a step, and the run's sixty-four names would fill with
  * copies of numbers the record already answers. Every text a run fills already goes through one pattern (`flow.ts`'s
  * `fill`, `rules.ts`'s `filling`), so a third head beside `vars` and `trigger` reaches the note, the question, the
- * create's fields, a `set_var` and an `if` at once. Measured before it, on 24 September: the survey's `read_metric`
- * step was refused "names no step", and `{{metric.total}}` in a `set_var` installed, ran `done` and wrote the braces
- * into the row, which is the one failure in that survey nobody was told about.
+ * create's fields, a `set_var` and an `if` at once. Measured before it: a `read_metric` step was refused "names no
+ * step", and `{{metric.total}}` in a `set_var` installed, ran `done` and wrote the braces into the row, and nobody was
+ * told.
  *
  * AN `if` CAN ASK WHETHER A VALUE IS PAST A FIGURE, AS WELL AS WHETHER IT EQUALS ONE. The figure is filled in as text
- * before the condition is read, and the condition is a list's filter sentence, which has said `more than`,
- * `at least`, `less than`, `at most` and `between` since `3187be5a`. Before that it had `is` and `is not` for a number
- * and no ordering, and `n is more than {{metric.total}}` failed the run with "more than 5 is not a value n can hold".
- * Measured again on 24 September after it, over a figure summing `n` and two rows written with `n` 2 and 10 (the
- * figure then 2 and 12): `more than`, `is more than`, `less than`, `at most`, `is at least` and `between 1 and` each
- * ran `done` and took the arm the numbers call for. The operator's own spellings are still not words: `n lt
- * {{metric.total}}` fails the run with "lt is not something a filter can say", and `n after {{metric.total}}` with
- * "after is about dates". A step asks about the figure as it stands when the step runs; the trigger's
- * `metric: { id, crosses }` is the other question, which fires once when the figure crosses a line.
+ * before the condition is read, and the condition is a list's filter sentence, which has said `more than`, `at least`,
+ * `less than`, `at most` and `between` since `3187be5a`. Before that it had `is` and `is not` for a number and no
+ * ordering, and `n is more than {{metric.total}}` failed the run with "more than 5 is not a value n can hold". Measured
+ * again after it, over a figure summing `n` and two rows written with `n` 2 and 10 (the figure then 2 and 12):
+ * `more than`, `is more than`, `less than`, `at most`, `is at least` and `between 1 and` each ran `done` and took the
+ * arm the numbers call for. The operator's own spellings are still not words: `n lt {{metric.total}}` fails the run
+ * with "lt is not something a filter can say", and `n after {{metric.total}}` with "after is about dates". A step asks
+ * about the figure as it stands when the step runs; the trigger's `metric: { id, crosses }` is the other question,
+ * which fires once when the figure crosses a line.
  *
  * THIS FILE HOLDS THE SPELLING AND THE LINT, AND IMPORTS NO VALUE. `flow-lint.ts` imports only light modules so that
  * `declare.ts`, which imports it, is not pulled into a cycle; the reading itself is `rules.ts`'s `figureText`, which
@@ -34,8 +33,8 @@ import type { Known } from './declare.ts';
  * `{{metric.total}}` and `{{ metric.cash-now }}`, as `flow.ts` and `rules.ts` fill them: the head is its own group so
  * that a pattern joined after `RUN_PATH` hands the same `(head, path)` pair to the run's `value`.
  *
- * A HYPHEN IS PART OF THE ID, which `RUN_PATH`'s path is not: money-core's figures are `cash-now` and `owed-to-you`, and
- * a pattern that stopped at the hyphen would leave the braces as typed for the three figures B10 reads first.
+ * A HYPHEN IS PART OF THE ID, which `RUN_PATH`'s path is not: money-core's figures are `cash-now` and `owed-to-you`,
+ * and a pattern that stopped at the hyphen would leave the braces as typed for the figures a money page reads first.
  */
 export const FIGURE = /\{\{\s*(metric)\.([A-Za-z0-9_-]+)\s*\}\}/g;
 
@@ -70,22 +69,21 @@ const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typ
  * which is what a field that is not there writes, and the dash in a row a month later tells nobody which rule wrote it.
  *
  * THE COLON IS REFUSED RATHER THAN READ. `{{metric:total}}` is the row's typed form (`{{money:amount}}`), so the pass
- * read it as a field called `total` and wrote the dash: the survey's checker measured `x —` on 24 September. Reading it
- * as the figure as well would make two spellings of one thing and would still stop at a hyphen, since the row's form is
- * `\w+`; the refusal names the spelling that works.
+ * read it as a field called `total` and wrote the dash: measured, `x —`. Reading it as the figure as well would make
+ * two spellings of one thing and would still stop at a hyphen, since the row's form is `\w+`; the refusal names the
+ * spelling that works.
  *
  * THE INLINE PATH READS NO FIGURE. It runs inside the write, before the write commits, and a figure over the list being
  * written would be read over a row that is half there. The pass leaves the braces as typed there, so they are refused.
  *
  * AND A FIGURE OVER ANOTHER LIST IN A RUN THAT WRITES INTO A ROW IS REFUSED, since the run would write it as `WITHHELD`
- * (audit sixty-four, finding 1, as the owner decided it on 24 September: `loop/DIRECTION.md` section 25). He asked to
- * be told when the rule goes in, so that he learns it from the lint and not from a placeholder in a row a week later.
- * A REFUSAL AND NOT A WARNING, because install has no channel for one: it answers `Result<Installed[]>`, whose value is
- * each declaration's `{ id, version, changed }`, and a warning carried beside it would have to be threaded through
- * `declare.ts`, `index.ts`, the record's install and the app that shows it. Nothing is lost by refusing: which lists
- * the run lands in is written in the rule, so the run would withhold the figure every time, a `notify` and an `if`
- * included (`landsOf` in `flow.ts` withholds every fill in the run), and a rule that always writes `--withheld--`
- * is one step the owner has to take out again.
+ * (the owner's decision). He asked to be told when the rule goes in, so that he learns it from the lint and not from a
+ * placeholder in a row a week later. A REFUSAL AND NOT A WARNING, because install has no channel for one: it answers
+ * `Result<Installed[]>`, whose value is each declaration's `{ id, version, changed }`, and a warning carried beside it
+ * would have to be threaded through `declare.ts`, `index.ts`, the record's install and the app that shows it. Nothing
+ * is lost by refusing: which lists the run lands in is written in the rule, so the run would withhold the figure every
+ * time, a `notify` and an `if` included (`landsOf` in `flow.ts` withholds every fill in the run), and a rule that
+ * always writes `--withheld--` is one step the owner has to take out again.
  *
  * WHAT THE LINT SEES AND THE RUN STILL CATCHES. The lint reads the rule's `written` list and its `create` steps. The
  * run also reads the row an arrival wrote, which is the ingest's list and not written in the rule, and a figure

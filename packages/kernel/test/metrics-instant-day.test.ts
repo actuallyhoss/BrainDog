@@ -1,14 +1,12 @@
 /**
  * A snapshot of a record's local yesterday, over an `instant` field rather than a `day`.
  *
- * `d254715a` ASKED THE QUESTION AT NOON UTC OF THE LOCAL DATE, which is exactly the record's day for a
- * `day` field, and left an `instant` one on the UTC day. The window's bounds are bare dates
- * (`at after -30d` resolves to `after 2026-08-05`, the as-of end to `before 2026-09-05`), and the
- * compiler compares a bare date with the first ten characters of the instant, which is its UTC date.
- * So in `America/New_York` the point stored under 4 September counted a row from ten at night on the
- * 4th (02:00 UTC on the 5th) as the 5th and dropped it, and counted a row from ten at night on 5 August
- * (02:00 UTC on the 6th) as the 6th and kept it. The audit (`loop/research-batch-twenty-audit.md` §5)
- * measured
+ * `d254715a` ASKED THE QUESTION AT NOON UTC OF THE LOCAL DATE, which is exactly the record's day for a `day` field, and
+ * left an `instant` one on the UTC day. The window's bounds are bare dates (`at after -30d` resolves to
+ * `after 2026-08-05`, the as-of end to `before 2026-09-05`), and the compiler compares a bare date with the first ten
+ * characters of the instant, which is its UTC date. So in `America/New_York` the point stored under 4 September counted
+ * a row from ten at night on the 4th (02:00 UTC on the 5th) as the 5th and dropped it, and counted a row from ten at
+ * night on 5 August (02:00 UTC on the 6th) as the 6th and kept it. Measured:
  *
  *     {"at":"2026-09-04","value":10101}
  *
@@ -68,8 +66,8 @@ const REPORTED: MetricDecl = {
   compare: 'none',
 };
 
-/* The audit's five rows, written in UTC. The New York times are EDT (UTC-4), and the local thirty days
-   to 4 September are 6 August to 4 September:
+/* The five measured rows, written in UTC. The New York times are EDT (UTC-4), and the local thirty days to 4 September
+   are 6 August to 4 September:
      1      09:00 on 4 Sep      inside
      10     22:00 on 4 Sep      inside, and the 5th by UTC
      100    22:00 on 5 Aug      outside, and the 6th by UTC

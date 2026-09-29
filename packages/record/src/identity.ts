@@ -111,7 +111,7 @@ const SESSIONS_READ = 100;
 type Rule = { most: number; window: number };
 /** A way in, or sending a link: ten in fifteen minutes (`49 §5.5`, amended below). */
 const SIGN_IN: Rule = { most: 10, window: WINDOW };
-/** Minting a passkey challenge: thirty a minute from one address, `chal:<ip>` (`loop/finish/ops.md` §4.0 C). */
+/** Minting a passkey challenge: thirty a minute from one address, `chal:<ip>`. */
 const CHALLENGES: Rule = { most: 30, window: MINUTE };
 
 /** Every value this file mints is 32 random bytes in base64url, which is 43 characters and nothing else. */
@@ -189,8 +189,8 @@ const ON_RECORD = `SELECT s.record FROM dir_slug s
 
 /**
  * Every way in a person had, gone: their passkeys, sessions, unspent links and challenges, the proofs still pending for
- * their address, and the count of mails sent to it. The sign-in half of closing an account (OPS-21), run inside the
- * Directory's transaction by `closeAccount` (`directory.ts`), which then takes their memberships and their row.
+ * their address, and the count of mails sent to it. The sign-in half of closing an account, run inside the Directory's
+ * transaction by `closeAccount` (`directory.ts`), which then takes their memberships and their row.
  *
  * HERE, BECAUSE THESE ARE SIGN-IN'S TABLES and this file is the one that knows every one of them and how the lockout
  * spells an address. The address keys are lower-cased as `mailKey` and `dir_pending` store them. A lockout keyed by
@@ -538,10 +538,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       /**
        * Who a cookie is, and with a slug, which record that request is for.
        *
-       * THE SLUG IS THE PATH'S (`/app/<slug>/api/…`, `loop/research-one-domain.md` §2.4), AND THIS IS THE CHECK THAT
-       * RUNS BEFORE THE WORKER ADDRESSES ANYTHING. It is `switch`'s own question, a live name on an open record this
-       * person is on, answered with the record and never written: the session row's record stays where the last
-       * switch put it, so bare `/app` still goes back there, and a read in one tab does not move another tab's.
+       * THE SLUG IS THE PATH'S (`/app/<slug>/api/…`), AND THIS IS THE CHECK THAT RUNS BEFORE THE WORKER ADDRESSES
+       * ANYTHING. It is `switch`'s own question, a live name on an open record this person is on, answered with the
+       * record and never written: the session row's record stays where the last switch put it, so bare `/app` still
+       * goes back there, and a read in one tab does not move another tab's.
        *
        * ONE 403 FOR EVERY NAME THAT IS NOT THEIRS, word for word the record's own "You are not on this record.". A
        * name nobody holds, a released one, a closed record and somebody else's are the same answer, so asking says
@@ -989,9 +989,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const stop = reserve(flow, mailKey(email), now);
         if (stop) return stop;
         /* THE INVITATION IS KEPT AS SENT, THE ONE VALUE HERE THAT IS NOT A MAC, because `invite.proved` hands it back
-           (`loop/finish/contracts.md` §2.6) for the host to accept. It opens nothing on its own once proving is the
-           rule: a new address still needs the proof, and a known one signs in first. The row is left out of every
-           Directory copy and goes when it is spent or a day is up. */
+           for the host to accept. It opens nothing on its own once proving is the rule: a new address still needs the
+           proof, and a known one signs in first. The row is left out of every Directory copy and goes when it is spent
+           or a day is up. */
         sql.transactionSync(() => {
           sql.exec('DELETE FROM dir_pending WHERE expires <= ?', now);
           sql.exec(
@@ -1069,10 +1069,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * `signup.known`, so the person who forgot they had one is let in from their mailbox and nobody watching the page
        * learns anything. Both mint one MAC and write one row, so neither answers faster.
        *
-       * A LOCKOUT ON EACH OF ITS KEYS (`loop/finish/ops.md` §4.0 C): `signup:<ip>` for the asking address, then
-       * `signup-email:<address>` for the address typed, which is struck for known and unknown alike so a lock says
-       * nothing about which it is; and `email:<address>`, the count of mails sent, is reserved only when a mail is about
-       * to go. A full mail count sends nothing and answers exactly as a sent one does.
+       * A LOCKOUT ON EACH OF ITS KEYS: `signup:<ip>` for the asking address, then `signup-email:<address>` for the
+       * address typed, which is struck for known and unknown alike so a lock says nothing about which it is; and
+       * `email:<address>`, the count of mails sent, is reserved only when a mail is about to go. A full mail count
+       * sends nothing and answers exactly as a sent one does.
        *
        * THE NAME IS CHECKED HERE AS WELL AS LIVE, because nothing about a name is secret: `signup.name` answers the same
        * question to anybody. It is checked again at checkout and once more when the record is made, where it is claimed.

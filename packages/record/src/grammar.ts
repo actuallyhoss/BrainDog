@@ -1,6 +1,5 @@
 /**
- * What a page, a list, a figure, a rule and an arrangement may contain, each as one compact read (`loop/research-spark.md`
- * S12, `loop/finish/pages.md` C3).
+ * What a page, a list, a figure, a rule and an arrangement may contain, each as one compact read.
  *
  * THE LINT WAS THE ONLY TEACHER. An agent learned a page's grammar one refusal at a time, and each try was a
  * turn. This is the same grammar said once: every key, its bounds, and one declaration that installs. It is a
@@ -10,10 +9,10 @@
  *
  * EVERY DESCRIPTION HANDS SLASH THE GRAMMARS OF WHAT IT MAY BUILD (`describedGrammar`). Its instructions named
  * `grammar/register`, `grammar/metric` and `grammar/rule` while the record served only the page grammar and put none of
- * them in what the model was sent, so a model learned a list's keys from the refusals Decide then showed the owner
- * (`loop/finish/defects.md` G1). The rule grammar here is what a rule may do INSIDE the record, because a description never builds one that
- * reaches out (`REACHES_OUT` in `slash.ts`); an agent reads `braindog:grammar/automations`, which is the MCP package's
- * own text, for every step.
+ * them in what the model was sent, so a model learned a list's keys from the refusals Decide then showed the owner. The
+ * rule grammar here is what a rule may do INSIDE the record, because a description never builds one that reaches out
+ * (`REACHES_OUT` in `slash.ts`); an agent reads `braindog:grammar/automations`, which is the MCP package's own text,
+ * for every step.
  */
 
 import type { Result } from '@braindog/ports';
@@ -27,12 +26,12 @@ import { REACHES_OUT } from './slash.ts';
 /**
  * The grammars `arrangement({ grammar })` answers, in the order a refusal names them.
  *
- * `rule` IS HERE BESIDE THE TWO `loop/finish/contracts.md` §6.4 NAMES, by `loop/finish/gaps.md`'s ruling on defects G1: Slash is never
- * told to read a grammar nothing serves, and SLS-1 drafts rules against this one. MCP serves `register` and `metric` as
- * resources and not `rule`, because its own `grammar/automations` already says a rule in full.
+ * `rule` IS HERE BESIDE `register` AND `metric`, because Slash is never told to read a grammar nothing serves, and
+ * Slash drafts rules against this one. MCP serves `register` and `metric` as resources and not `rule`, because its own
+ * `grammar/automations` already says a rule in full.
  *
- * `ingest` IS LAST, after `proposals`, by `contracts.md` §6.4 (DOR-4): a door and a scheduled action were learned from
- * the lint alone, one refusal at a time, and the web's new-action sheet builds the same declaration this says.
+ * `ingest` IS LAST, after `proposals`, because a door and a scheduled action were learned from the lint alone, one
+ * refusal at a time, and the web's new-action sheet builds the same declaration this says.
  */
 export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals', 'ingest'] as const;
 

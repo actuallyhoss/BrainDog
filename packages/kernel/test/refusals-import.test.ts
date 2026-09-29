@@ -35,12 +35,11 @@
  *
  * ─── A SEVENTH VERB `40 §6` DOES NOT LIST ───────────────────────────────────────────────────────
  *
- * `40 §6` names six verbs for seven codes, and `FILE_MALFORMED` has none. It is `not-brainl` here:
- * the first line replaced by the start of an HTML page, which is what a download saves when the
- * link it followed answered with an error page. `loop/research-via-runners.md` proposed `truncate`,
- * cutting the last line mid-row, and that was measured and does not reach this code. The last line
- * of a signed export is its `dog_sig` row, which no manifest hashes, so cutting it is answered
- * `SIGNATURE_INVALID` at `dog_sig` by `signatureOf`, before any reader parses a row.
+ * `40 §6` names six verbs for seven codes, and `FILE_MALFORMED` has none. It is `not-brainl` here: the first line
+ * replaced by the start of an HTML page, which is what a download saves when the link it followed answered with an
+ * error page. `truncate`, cutting the last line mid-row, was measured and does not reach this code. The last line of a
+ * signed export is its `dog_sig` row, which no manifest hashes, so cutting it is answered `SIGNATURE_INVALID` at
+ * `dog_sig` by `signatureOf`, before any reader parses a row.
  */
 
 import { test } from 'node:test';
@@ -206,11 +205,10 @@ for (const fixture of family) {
       assert.equal(answer.ok, false, `${where}'s file was imported after \`${verb}\``);
       assert.ok(refused(answer), `${where} answered with a conflict where a refusal was named`);
       assert.equal(answer.refusal.code, fixture.keys.get('code'), `${where}: ${answer.refusal.fix}`);
-      /* THE LEDGER ADDRESS WAS DROPPED AT THIS SURFACE WHEN THIS RUNNER WAS WRITTEN, and this line is
-         what found it. `applyMigrations` returns `at: migration[<n>]` and `migrate.test.ts` asserts it
-         there, but every kernel method answers a sticky refusal through `schemaRefusal`, which
-         rebuilt the envelope from `code` and `fix` alone. An import into a record whose ledger was
-         refused came back with no `at`, on 22 September 2026, for both ledger codes. */
+      /* THE LEDGER ADDRESS WAS DROPPED AT THIS SURFACE WHEN THIS RUNNER WAS WRITTEN, and this line is what found it.
+         `applyMigrations` returns `at: migration[<n>]` and `migrate.test.ts` asserts it there, but every kernel method
+         answers a sticky refusal through `schemaRefusal`, which rebuilt the envelope from `code` and `fix` alone. An
+         import into a record whose ledger was refused came back with no `at`, for both ledger codes. */
       assert.equal(answer.refusal.at, fixture.keys.get('at'), `${where} claims \`at: ${fixture.keys.get('at')}\``);
       assert.ok(/[.?!]$/.test(answer.refusal.fix.trim()), `${where} was refused with "${answer.refusal.fix}", which is not a sentence`);
 

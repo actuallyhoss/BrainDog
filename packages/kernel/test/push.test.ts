@@ -4,7 +4,6 @@
  * THREE PROMISES, EACH ONE A WAY A SUBSCRIPTION COULD OUTLIVE ITS PERSON OR REACH SOMEBODY ELSE. It is listed for the
  * person who made it and for nobody else; the erasure of that person takes it; and a `.brain` file carries none of
  * it, because an endpoint is an address that rings one person's phone and a backup is a file that gets copied.
- * Brief W58-2, `loop/research-living-in-it.md` section 7.
  *
  * THE ROWS ARE WRITTEN HERE BY HAND, IN THE SHAPE `packages/record/src/push.ts` WRITES THEM. The record's
  * `subscribePush` is the only writer, and it sits above the kernel; what is proved here is what the kernel does with
@@ -114,7 +113,7 @@ test('A 404 OR 410 FROM THE PUSH SERVICE TAKES THE ROW, and one it accepted is m
   sql.close();
 });
 
-/* ── the job, its lease and its answer (W58-2 and W58-3 joined) ──────────── */
+/* ── the job, its lease and its answer ───────────────────────────────────── */
 
 /* A LIST AND ONE URGENT RULE, which is the shortest path to `notify()` a test can take: a rule declaring `urgent` is one
    of the two things `09 §5` interrupts for, and `digest.ts` routes it through the same `outbox` dep a digest's `push`

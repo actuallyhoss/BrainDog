@@ -1,11 +1,10 @@
 /**
- * The kernel schema, migration 16: Spark is called Slash (`loop/DIRECTION.md` section 31), in the rows that hold the name.
+ * The kernel schema, migration 16: Spark is called Slash, in the rows that hold the name.
  *
- * `loop/research-slash-rename.md` section 2.1 found it in six columns and inside two kinds of declaration body, and in
- * no table, column, index or CHECK: no schema changes. Each value below is read by the new name after the rename, so a
- * record that kept the old one lost its assistant's switch and last day, the audit's "agent" label on its events, the
- * vault key its included model opens, and the resume of a run parked on an `ask_spark` step
- * (`test/slash-rename.test.ts`).
+ * The old name was found in six columns and inside two kinds of declaration body, and in no table, column, index or
+ * CHECK: no schema changes. Each value below is read by the new name after the rename, so a record that kept the old
+ * one lost its assistant's switch and last day, the audit log's "agent" label on its events, the vault key its included
+ * model opens, and the resume of a run parked on an `ask_spark` step (`test/slash-rename.test.ts`).
  *
  * THE OLD NAMES ARE WRITTEN OUT BECAUSE THEY ARE WHAT AN OLDER RECORD HOLDS, and this text is checksummed once applied,
  * so it is never edited to match a later rename either.
@@ -72,12 +71,12 @@ function renamed(body: Body, top = true): Body {
  * EVERY VERSION AND NOT ONLY THE ACTIVE ONE. A superseded rule comes back by a rollback, and one holding `ask_spark` would
  * then fail the lint it passed when it was written; the log's own copies in `event` are what history reads.
  *
- * RUN ON EVERY OPEN AND AFTER EVERY IMPORT, AND IDEMPOTENT, because it cannot share the migration's transaction: SHA-256
- * is asynchronous and a transaction here is synchronous. Keyed on the ledger instead, a process that died between
- * migration 16's commit and this write would have left those bodies unrenamed for good. What every open pays for it is
- * one read of `declaration` filtered by `LIKE`, measured on 25 September 2026 over the test port on a record holding 200
- * declarations, 100 of them rules of about 1 KB each, with nothing to rewrite: 1.6 milliseconds at the median and 2.3 at
- * the 90th percentile over 1,000 runs. A Durable Object opens its record once per instance, so that is paid once.
+ * RUN ON EVERY OPEN AND AFTER EVERY IMPORT, AND IDEMPOTENT, because it cannot share the migration's transaction:
+ * SHA-256 is asynchronous and a transaction here is synchronous. Keyed on the ledger instead, a process that died
+ * between migration 16's commit and this write would have left those bodies unrenamed for good. What every open pays
+ * for it is one read of `declaration` filtered by `LIKE`, measured over the test port on a record holding 200
+ * declarations, 100 of them rules of about 1 KB each, with nothing to rewrite: 1.6 milliseconds at the median and 2.3
+ * at the 90th percentile over 1,000 runs. A Durable Object opens its record once per instance, so that is paid once.
  *
  * Answers how many rows it rewrote.
  */

@@ -1,11 +1,11 @@
 /**
- * A `create` on a clock, bounded by the day of its turn (`rules.ts`'s `expand`; `loop/finish/defects.md` §5.2, AUT-1 A4).
+ * A `create` on a clock, bounded by the day of its turn (`rules.ts`'s `expand`).
  *
  * WITH NO ROW TO STAND ON, `bound:` IS THE MOST A RULE MAKES IN A DAY, as the grammar has always said. Counted by when
  * the rows were made, a drain back from three months off takes every missed monthly turn at one wall instant, so the
- * first turn's row spent the day and every later turn failed: the missed months' tasks (the audit of 25 September, C2)
- * were still not made. The day of a turn is the twenty-four hours before it, read from the `<rule>@<turn>` every row a
- * clocked create makes names as its parent.
+ * first turn's row spent the day and every later turn failed: the missed months' tasks were still not made. The day of
+ * a turn is the twenty-four hours before it, read from the `<rule>@<turn>` every row a clocked create makes names as
+ * its parent.
  */
 
 import { test } from 'node:test';

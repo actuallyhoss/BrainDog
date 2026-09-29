@@ -1,9 +1,8 @@
 /**
- * A phone asks to be told: `subscribePush` and `unsubscribePush`, each person's own. Brief W58-2.
+ * A phone asks to be told: `subscribePush` and `unsubscribePush`, each person's own.
  *
- * WRITTEN BY THE W58-2 AGENT AND RUN FROM ITS SCRATCHPAD, because this directory was outside its list; moved here with
- * relative imports when the two halves of push were joined. The kernel's half is `packages/kernel/test/push.test.ts`,
- * and the host's routing of these two is `packages/host/test/push-routes.test.ts`.
+ * The kernel's half is `packages/kernel/test/push.test.ts`, and the host's routing of these two is
+ * `packages/host/test/push-routes.test.ts`.
  */
 
 import { test } from 'node:test';

@@ -1,15 +1,15 @@
 /**
  * An install that changes what a list's `pairs:` says settles the rows already in it, in the same install.
  *
- * `loop/research-batch-sixty-three-audit.md` finding 4, driven here with the audit's own cases U1 and U2 over a list of
- * money-core's shape. The pairing ran in the write path and nowhere else, and only for a write touching a field
- * `pairsReads` names, while an install writes no ledger row. So a record on 2.1.0 without `pairs:` updated to 2.2.0
- * read Spent EGP 29,500.00 before the update and 29,500.00 after it, every mark false (U1), and a record on the 2.1.0
- * that deployed at 00:22 UTC, whose `where` was `state is cleared` alone, kept rent and a named client's payment paired
- * after 2.2.0 refused a named leg: Spent 0.00 and Received 0.00 against EGP 15,000.00 each (U2).
+ * Driven here with two measured cases over a list of money-core's shape. The pairing ran in the write path and nowhere
+ * else, and only for a write touching a field `pairsReads` names, while an install writes no ledger row. So a record on
+ * 2.1.0 without `pairs:` updated to 2.2.0 read Spent EGP 29,500.00 before the update and 29,500.00 after it, every mark
+ * false, and a record on the 2.1.0 that deployed at 00:22 UTC, whose `where` was `state is cleared` alone, kept rent
+ * and a named client's payment paired after 2.2.0 refused a named leg: Spent 0.00 and Received 0.00 against EGP
+ * 15,000.00 each.
  *
  * BOTH PATHS AN INSTALL TAKES ARE DRIVEN, `install` (a declaration set from the app) and `stageInstall` (every pack
- * install and update), because the audit's probes went through the pack path and a repair made on one would leave the
+ * install and update), because the first probes went through the pack path and a repair made on one would leave the
  * other as it was.
  */
 
@@ -91,7 +91,7 @@ const pairEvents = (sql: NodeSql) =>
   sql.all<{ actor: string; target: string; field: string }>("SELECT actor, target, field FROM event WHERE kind = 'edit' AND field IN ('_pair', 'transfer') ORDER BY rowid");
 
 for (const [path, update] of Object.entries(PATHS)) {
-  test(`U1 (${path}): A LIST GIVEN \`pairs:\` BY AN UPDATE PAIRS THE MOVES ALREADY IN IT, with events signed by the record`, async () => {
+  test(`A LIST GIVEN \`pairs:\` BY AN UPDATE PAIRS THE MOVES ALREADY IN IT, with events signed by the record (${path})`, async () => {
     const { k, sql } = await record();
     const legs = [
       leg(k, 'CREDIT CARD PAYMENT', '25', 'out', 9_500, 'cib'),
@@ -102,7 +102,7 @@ for (const [path, update] of Object.entries(PATHS)) {
     assert.deepEqual(marks(k, legs), [false, false, false, false]);
 
     await update(k, TIGHT);
-    /* MEASURED BEFORE THE REPAIR: `[false, false, false, false]`, and still after a note on one leg, as U1 read. */
+    /* MEASURED BEFORE THE REPAIR: `[false, false, false, false]`, and still after a note on one leg. */
     assert.deepEqual(marks(k, legs), [true, true, true, true], 'the update left the moves already in the ledger counted');
     assert.deepEqual(partners(k, legs), [legs[1], legs[0], legs[3], legs[2]]);
     const said = pairEvents(sql);
@@ -113,11 +113,11 @@ for (const [path, update] of Object.entries(PATHS)) {
     sql.close();
   });
 
-  test(`U2 (${path}): A PAIR THE NEW \`pairs:\` REFUSES DOES NOT OUTLIVE THE UPDATE`, async () => {
+  test(`A PAIR THE NEW \`pairs:\` REFUSES DOES NOT OUTLIVE THE UPDATE (${path})`, async () => {
     const { k, sql } = await record(LOOSE);
     const rent = leg(k, 'Rent, September', '03', 'out', 15_000, 'cib');
     const client = leg(k, 'Nile Design, invoice 12', '04', 'in', 15_000, 'hsbc', { party: 'Nile Design' });
-    assert.deepEqual(marks(k, [rent, client]), [true, true], 'the looser clause pairs rent with a named client, as the audit found');
+    assert.deepEqual(marks(k, [rent, client]), [true, true], 'the looser clause pairs rent with a named client');
 
     await update(k, TIGHT);
     /* MEASURED BEFORE THE REPAIR: `[true, true]`, Spent 0.00 and Received 0.00 against EGP 15,000.00 each. */

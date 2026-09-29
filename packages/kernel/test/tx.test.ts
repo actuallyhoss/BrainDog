@@ -10,9 +10,9 @@
  * suite, over `node:sqlite`, so that a kernel change which reaches for a raw savepoint again fails
  * here in a second rather than on the Cloud as a 500.
  *
- * WHY IT EXISTS AT ALL: `/api/keys/put` and `/api/invite` answered 500 on the Cloud with the Durable
- * Object's own sentence while 1001 kernel tests were green, because every one of them opened
- * `node:sqlite`, which permits `SAVEPOINT` (`loop/research-provision-day.md`, "Reason two").
+ * WHY IT EXISTS AT ALL: `/api/keys/put` and `/api/invite` answered 500 on the Cloud with the Durable Object's own
+ * sentence while 1001 kernel tests were green, because every one of them opened `node:sqlite`, which permits
+ * `SAVEPOINT`.
  */
 
 import { test } from 'node:test';
@@ -151,7 +151,7 @@ test(
   'A NESTED REFUSAL BEHIND AN ADAPTER THAT FLATTENS transactionSync',
   {
     todo:
-      'an adapter that answers a nested transactionSync with fn() throws away the savepoint the Durable Object would have made, so a nested refusal after a write keeps that write. apps/worker/src/index.ts storageSql stopped doing that on 22 September; this stays a todo because no kernel-side change can fix an adapter that flattens',
+      'an adapter that answers a nested transactionSync with fn() throws away the savepoint the Durable Object would have made, so a nested refusal after a write keeps that write. apps/worker/src/index.ts storageSql no longer does that; this stays a todo because no kernel-side change can fix an adapter that flattens',
   },
   async () => {
     const { k, sql } = await record(false);

@@ -1,17 +1,17 @@
 /**
  * A field retyped or narrowed over the rows its list holds, the record's half: `previewRetype`, READ+, and
- * `retypeField`, DATA (`21 §5`, `loop/finish/contracts.md` §12.1, GAP-8).
+ * `retypeField`, DATA (`21 §5`).
  *
  * THE PREVIEW WRITES NOTHING AND THE PRESS FILES ONE CHANGE. `previewRetype` answers what `retypePlan` reads over the
  * live rows: how many convert, each one that does not with the answers it may take, and a few converted values.
  * `retypeField` files the same ask as one `change` body, `{ retype: ... }` or `{ narrow: ... }`, and only once every
  * failing row has its answer, so the owner is never asked to accept a change that would leave a row behind.
  *
- * AN OWNER'S LANDS AT ONCE AND ANYBODY ELSE'S WAITS ON DECIDE (DIRECTION §22: "Removing, retyping or narrowing a field
- * still waits for his press in Decide"). The group and guard follow `propose`, the nearest governed write: DATA, and a
- * caller who may propose on the list may file one. When the caller is an owner in a browser the record answers the
- * question in the next call with the owner's own accept, as `field-write.ts` does for an addition, so the change is in
- * the queue's history either way and History reads one decision behind it.
+ * AN OWNER'S LANDS AT ONCE AND ANYBODY ELSE'S WAITS ON DECIDE: removing, retyping or narrowing a field still waits for
+ * his press in Decide. The group and guard follow `propose`, the nearest governed write: DATA, and a caller who may
+ * propose on the list may file one. When the caller is an owner in a browser the record answers the question in the
+ * next call with the owner's own accept, as `field-write.ts` does for an addition, so the change is in the queue's
+ * history either way and History reads one decision behind it.
  *
  * LANDING IS `landRetype`, EXPORTED, because an owner's press in Decide lands the same way: the kernel's `decide` hands
  * back `retype` in place of `install` (`govern.ts`), and the record's `decide` calls this with it. Landing stages the

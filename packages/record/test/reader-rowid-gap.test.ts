@@ -2,12 +2,11 @@
  * A colleague at `read` with no list held at a level of its own is handed no event rowid, because the gap between two of
  * her lines counts the owner's invitations.
  *
- * `loop/research-batch-twenty-one-audit.md` finding 4. `readsEveryList` let her keep the rowid on the argument that she
- * reads every list, and she does, but `lineOf` hides more than lists: every `grant`, `access.*`, `share.*`, `member`,
- * `person` and `vault_key` line goes to an owner only. The audit's probe read her two lines at rowids 3 and 7 with three
- * `access.grant` lines between them and none of them shown to her, so the gap was the number of people the owner had
- * invited in the meantime. The question that decides the rowid is the one the comment asked, and the only caller of
- * whom it is true without walking the log is an owner.
+ * WHY. `readsEveryList` let her keep the rowid on the argument that she reads every list, and she does, but `lineOf`
+ * hides more than lists: every `grant`, `access.*`, `share.*`, `member`, `person` and `vault_key` line goes to an owner
+ * only. A probe read her two lines at rowids 3 and 7 with three `access.grant` lines between them and none of them
+ * shown to her, so the gap was the number of people the owner had invited in the meantime. The question that decides
+ * the rowid is the one the comment asked, and the only caller of whom it is true without walking the log is an owner.
  */
 
 import { test } from 'node:test';
@@ -35,7 +34,7 @@ const value = <T>(r: unknown): T => {
   return x.value as T;
 };
 
-/** Her first line, then `invites` colleagues invited by the owner, then her second line: the audit's probe. */
+/** Her first line, then `invites` colleagues invited by the owner, then her second line: the probe. */
 async function between(invites: number) {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(Date.UTC(2026, 8, 21, 12)) });

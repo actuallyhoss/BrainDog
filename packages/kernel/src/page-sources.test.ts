@@ -1,6 +1,6 @@
 /**
- * The page sources a module's pages read across the lists (`pages.ts`, `loop/finish/modules.md` C6): `deadlines`,
- * `figures.home`, and `list` on the rows of `activity` and `governance.open`.
+ * The page sources a module's pages read across the lists (`pages.ts`): `deadlines`, `figures.home`, and `list` on the
+ * rows of `activity` and `governance.open`.
  *
  * THE DEPS ARE WIRED HERE FROM THE RECORD'S PUBLIC READS, with the two the kernel's own `pageDeps` gains beside them
  * (`lists` and `metrics`), so every row below comes from a real record's lists and every order from its read.

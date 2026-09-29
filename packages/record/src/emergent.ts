@@ -1,6 +1,6 @@
 /**
  * The holding pen: the pages a record would draw for a list if somebody asked, answered on `boot` and placed by nobody
- * (`29 §2`, `loop/finish/contracts.md` §7.4).
+ * (`29 §2`).
  *
  * PROPOSE, DO NOT PLACE. `29 §3`'s T1 fires when a list holds a row and no page reads it, and T6 puts a figure whose
  * `source` is that list at the top of what it proposes. What comes back is a whole page declaration a person can look at
@@ -16,12 +16,12 @@
  * A DISMISSAL IS TERMINAL ON EVERY DEVICE, because it is the person's `pen.dismissed` preference in the record and an
  * id in it is never answered again (`29 §4`: "A proposal that returns is worse than one that never appeared").
  *
- * `kind: 'block'` and `kind: 'column'` join `kind: 'page'` under the same `PenItem` (PGS-17). A block item is the block
- * a list's shape asks for on a page that draws the list without it: a calendar for a day, a gallery for pictures, a
- * path for a list of steps, a board for a state of three to seven values, and lines for a number recorded over time.
- * A column item is `29 §3`'s T5: a field filled on at least 80% of at least 20 rows, offered to the page's first table
- * over that list. Each changes a page somebody already has, so each is the page's whole declaration with one thing
- * added at the end, and nothing on it moved.
+ * `kind: 'block'` and `kind: 'column'` join `kind: 'page'` under the same `PenItem`. A block item is the block a list's
+ * shape asks for on a page that draws the list without it: a calendar for a day, a gallery for pictures, a path for a
+ * list of steps, a board for a state of three to seven values, and lines for a number recorded over time. A column item
+ * is `29 §3`'s T5: a field filled on at least 80% of at least 20 rows, offered to the page's first table over that
+ * list. Each changes a page somebody already has, so each is the page's whole declaration with one thing added at the
+ * end, and nothing on it moved.
  */
 
 import type { Declaration, Json, Kernel, RegisterDecl } from '@braindog/kernel';
@@ -221,7 +221,7 @@ export function penFor(deps: PenDeps): PenItem[] {
   return [...pages, ...shapesOffered(deps, PEN_MOST - pages.length)];
 }
 
-/* ── the block a list's shape asks for, and the column its people fill (PGS-17) ─────────────────────────────────── */
+/* ── the block a list's shape asks for, and the column its people fill ──────────────────────────────────────────── */
 
 /** The fewest rows at which one field's share of them is a proportion worth saying (`29 §3` T5). */
 export const PEN_COLUMN_ROWS_FEWEST = 20;

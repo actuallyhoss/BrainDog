@@ -80,8 +80,8 @@ export function shortFault(short: unknown): Refusal | null {
  *
  * A ROADMAP READS ITS CELLS BY PLACE: the title, the day it is due by and how long it takes (`render/src/roadmap.ts`),
  * so over a list it has to be told which field is which. Without `columns:` it installed, read its rows and drew
- * nothing at all, because there was no day to place any of them on (`loop/finish/defects.md` P8). The effort may be
- * left off, and a row with none is drawn as a dated stem, so two columns draw and one does not.
+ * nothing at all, because there was no day to place any of them on. The effort may be left off, and a row with none is
+ * drawn as a dated stem, so two columns draw and one does not.
  */
 export function roadmapFault(block: Raw): Refusal | null {
   if (block.source === undefined) return null;

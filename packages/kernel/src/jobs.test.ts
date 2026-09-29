@@ -1,5 +1,5 @@
 /**
- * The job queue (`jobs.ts`, `loop/finish/agents.md` C13), driven on its own against a record migrated to 18.
+ * The job queue (`jobs.ts`), driven on its own against a record migrated to 18.
  *
  * WHY ON ITS OWN. The kernel's `jobs` member (`api/jobs.ts`) and the record's job methods are wired by registry lines
  * other units write, so what is proven here is the queue those lines reach: a kind that installs and one that is

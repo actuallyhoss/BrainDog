@@ -1,12 +1,12 @@
 /**
- * `boot` says which row a page grew out of (M4 wave two brief 5, its rider).
+ * `boot` says which row a page grew out of.
  *
  * THE RAIL'S CAP READ A KEY NOBODY SENT. `apps/web/src/lib/record/boot-live.ts` caps a list's pages per heading with
  * `railRoom`, the kernel's own rule, and the cap is keyed on `about`: the list a template expanded over. The kernel's
  * page list carries it and `@braindog/client` types it on the answer, but `boot` copied each page key by key into its
- * shell and left `about` behind, so on a live record the cap was never asked. Measured on his own record at 27
- * projects, 23 services and 22 skills: 72 of 72 rail pages arrived with no `about`, and the rail drew 72 entries
- * where the sample, which has the key, draws 15.
+ * shell and left `about` behind, so on a live record the cap was never asked. Measured on a real record at 27 projects,
+ * 23 services and 22 skills: 72 of 72 rail pages arrived with no `about`, and the rail drew 72 entries where the
+ * sample, which has the key, draws 15.
  *
  * `about` SAYS NOTHING THE PAGE DID NOT. `boot` lists a page made for a row only to somebody who reads that row's list
  * (`seesPage`), and its title is that row's title already. The last test holds that line.

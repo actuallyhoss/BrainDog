@@ -1,15 +1,15 @@
 /**
  * A filter on one of the record's own columns is not a scan an index would fix.
  *
- * AUDIT FIFTY-FIVE, FINDING 2. The MCP tools name a page's refs by reading each list they point into where `id` is in
- * them, and the record's `list` counted every such read as `query.scan` of `<list>.id`, because it asks the
- * declaration which fields are indexed and no declaration has a field called `id`. Measured through `handle` on the
- * seed: ten lists of tasks and ten of learnings counted `things.id 20, learnings.id 10, tasks.id 10, people.id 10,
- * tracks.id 10`, and a hundred of each made the weekly look draft "things.id was scanned 200 times in thirty days,
- * and an index would pay for itself". `id` is the primary key, `seq` is `UNIQUE (register, seq)` and `updated_at` is
- * `entry_live`, while `created_at` and `version` are names `declare` refuses as a field, so the `index: true` the
- * draft asks for can be installed on none of the five. `packages/mcp/test/names-cache.test.ts` drives the audit's
- * shape end to end; this file holds the kernel's half of it.
+ * WHY. The MCP tools name a page's refs by reading each list they point into where `id` is in them, and the record's
+ * `list` counted every such read as `query.scan` of `<list>.id`, because it asks the declaration which fields are
+ * indexed and no declaration has a field called `id`. Measured through `handle` on the seed: ten lists of tasks and ten
+ * of learnings counted `things.id 20, learnings.id 10, tasks.id 10, people.id 10, tracks.id 10`, and a hundred of each
+ * made the weekly look draft "things.id was scanned 200 times in thirty days, and an index would pay for itself". `id`
+ * is the primary key, `seq` is `UNIQUE (register, seq)` and `updated_at` is `entry_live`, while `created_at` and
+ * `version` are names `declare` refuses as a field, so the `index: true` the draft asks for can be installed on none of
+ * the five. `packages/mcp/test/names-cache.test.ts` drives the same shape end to end; this file holds the kernel's half
+ * of it.
  */
 
 import { test } from 'node:test';

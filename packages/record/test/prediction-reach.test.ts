@@ -1,6 +1,6 @@
 /**
- * A prediction is held to the list its figure counts as well as to the declaration it names
- * (`loop/research-batch-forty-audit.md` finding 2), and so is the question its miss files.
+ * A prediction is held to the list its figure counts as well as to the declaration it names, and so is the question its
+ * miss files.
  *
  * WHAT WAS MEASURED. `holds` placed a prediction by `for_decl` alone: a list's declaration asked that list and anything
  * else asked whether the caller reads the whole record. The `measure`, whose `source` and `where` are what the baseline
@@ -72,7 +72,7 @@ async function record() {
   return { sql, api, clock, predict, predictions };
 }
 
-test('P1: A PREDICTION OVER MONEY FILED ON A CHANGE TO INBOX IS NOT HANDED TO A MEMBER WHO READS INBOX ALONE', async () => {
+test('A PREDICTION OVER MONEY FILED ON A CHANGE TO INBOX IS NOT HANDED TO A MEMBER WHO READS INBOX ALONE', async () => {
   const { sql, predict, predictions } = await record();
   await predict('Give the inbox a sender?', 'register.inbox', INBOX2, OVER_MONEY);
   assert.deepEqual(await predictions(owner), [OVER_MONEY.claim], 'the precondition: a prediction was written');
@@ -82,7 +82,7 @@ test('P1: A PREDICTION OVER MONEY FILED ON A CHANGE TO INBOX IS NOT HANDED TO A 
   sql.close();
 });
 
-test('P2: A PREDICTION OVER MONEY FILED ON A CHANGE TO A RULE IS NOT HANDED TO A MEMBER HELD TO append ON MONEY', async () => {
+test('A PREDICTION OVER MONEY FILED ON A CHANGE TO A RULE IS NOT HANDED TO A MEMBER HELD TO append ON MONEY', async () => {
   const { sql, api, predict, predictions } = await record();
   assert.equal((await api.list({ register: 'money' }, member)).ok, false, 'the member reads Money, so this is not the case');
   await predict('Tag the inbox?', 'rule.seen', SEEN, OVER_MONEY);
@@ -104,7 +104,7 @@ test('A PREDICTION ABOUT A RULE ON INBOX, COUNTING INBOX, GOES TO WHOEVER READS 
   sql.close();
 });
 
-test('E1: THE QUESTION A MISSED PREDICTION FILES GOES WHERE THE PREDICTION GOES', async () => {
+test('THE QUESTION A MISSED PREDICTION FILES GOES WHERE THE PREDICTION GOES', async () => {
   const { sql, api, clock, predict } = await record();
   await predict('Tag the inbox?', 'rule.seen', SEEN, OVER_MONEY);
   assert.ok(api.kernel.create('money', { what: 'Expenses: Omar', amount: 300, payee: 'Omar' }, { actor: 'p_owner' }).ok);
@@ -121,8 +121,8 @@ test('E1: THE QUESTION A MISSED PREDICTION FILES GOES WHERE THE PREDICTION GOES'
 /* TWO MISSES IN THE SAME WORDS ARE TWO QUESTIONS, ONE PER PREDICTION. The miss question named no prediction, so the
    record found the one it grades by its words, and a claim and target shared by a prediction over Money and one over
    Inbox matched both: the Inbox miss was held from the member invited to Inbox alone as if it were about Money.
-   Measured at `bccc7ea8` (`E1 twins ... actual: 0, expected: 1`). The kernel now puts the prediction's id on the body. */
-test('E1 TWINS: OF TWO MISSES IN THE SAME WORDS, THE ONE OVER INBOX REACHES INBOX AND THE ONE OVER MONEY DOES NOT', async () => {
+   Measured: `actual: 0, expected: 1`. The kernel now puts the prediction's id on the body. */
+test('OF TWO MISSES IN THE SAME WORDS, THE ONE OVER INBOX REACHES INBOX AND THE ONE OVER MONEY DOES NOT', async () => {
   const { sql, api, clock, predict } = await record();
   const twin = { ...OVER_INBOX, claim: OVER_MONEY.claim, target: OVER_MONEY.target };
   await predict('Tag the inbox?', 'rule.seen', SEEN, OVER_MONEY);

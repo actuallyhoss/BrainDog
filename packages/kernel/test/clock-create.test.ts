@@ -1,9 +1,9 @@
 /**
  * A `create` step on a run that has no row behind it: a clock, a button, an arrival that wrote nothing.
  *
- * MEASURED BEFORE THIS, on 25 September: such a create installed, armed, ran on time and failed every run with "rule.<id>'s
- * create step acts on a row, and this run has none to act on." `flow.ts`'s `act` sent every step with no subject away
- * from `runRules`, and `runRules` was the only thing that filled a create. `clock-monthly.test.ts` holds the clock half;
+ * MEASURED BEFORE THIS: such a create installed, armed, ran on time and failed every run with "rule.<id>'s create step
+ * acts on a row, and this run has none to act on." `flow.ts`'s `act` sent every step with no subject away from
+ * `runRules`, and `runRules` was the only thing that filled a create. `clock-monthly.test.ts` holds the clock half;
  * this file holds the button, and what a create with no row refuses rather than guesses.
  *
  * THE ROW A PRESS MAKES IS KEYED ON THE RUN. A create on a row is once per tuple per parent row (`expand`'s header), and a
@@ -118,10 +118,10 @@ test('THE SAME RUN TAKEN AGAIN FROM ITS CREATE MAKES NO SECOND ROW', async () =>
 });
 
 test('A CREATE WITH NO ROW REFUSES WHAT ONLY A ROW COULD FILL, at install and again at its run, and makes nothing', async () => {
-  /* BOTH INSTALLED UNTIL THE LINT READ THEM AGAINST THE TRIGGER (measured with `validateDeclaration` on 25 September).
-     Filled against no row, `each: [kinds]` crossed nothing and made nothing with no word said, and `{{what}}` would have
-     written the dash into the task a person reads. Install refuses both now, in the sentence the run fails with; the run
-     keeps its own refusal for a rule stored before the lint did, which is put in the declaration row by hand here. */
+  /* BOTH INSTALLED UNTIL THE LINT READ THEM AGAINST THE TRIGGER (measured with `validateDeclaration`). Filled against
+     no row, `each: [kinds]` crossed nothing and made nothing with no word said, and `{{what}}` would have written the
+     dash into the task a person reads. Install refuses both now, in the sentence the run fails with; the run keeps its
+     own refusal for a rule stored before the lint did, which is put in the declaration row by hand here. */
   const crossedBody = { rule: 'crossed', on: { manual: true }, steps: [{ create: { register: 'obligations', each: ['kinds'], fields: { what: 'Rent {{each.0}}' }, bound: 3 } }] };
   const copiedBody = { rule: 'copied', on: { manual: true }, steps: [{ create: { register: 'obligations', fields: { what: 'Rent {{what}}' }, bound: 1 } }] };
   const { k, sql } = await record(
@@ -148,9 +148,9 @@ test('A CREATE WITH NO ROW REFUSES WHAT ONLY A ROW COULD FILL, at install and ag
 /* ── the day of the turn ──────────────────────────────────────────────── */
 
 /* A TASK A MONTHLY RULE MADE HAD NO DUE DAY, because nothing a run fills said which day its turn was: `{{trigger.day}}`
-   was the dash, and a `day` field refuses the dash, so a rule that asked for it failed its run (measured on 25 September
-   before `context` in `flow.ts` gave it). Los Angeles is behind UTC, so each turn below is taken on an instant whose UTC
-   date is already the next day, and the day the rule writes has to be the record's own. */
+   was the dash, and a `day` field refuses the dash, so a rule that asked for it failed its run (measured before
+   `context` in `flow.ts` gave it). Los Angeles is behind UTC, so each turn below is taken on an instant whose UTC date
+   is already the next day, and the day the rule writes has to be the record's own. */
 const dueOf = (sql: NodeSql): { what: string; due: string | null }[] =>
   sql.all<{ what: string; due: string | null }>("SELECT json_extract(fields, '$.what') AS what, json_extract(fields, '$.due') AS due FROM entry WHERE register = 'obligations' AND deleted_at IS NULL ORDER BY rowid").map((r) => ({ ...r }));
 

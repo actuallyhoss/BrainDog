@@ -1,10 +1,10 @@
 /**
  * A figure written into a row stays in the row, so it has to be safe for whoever reads the row LATER, not only for who
- * reads it at the run (audit sixty-four, finding 1: `loop/research-batch-sixty-four-audit.md` §1, probe V1).
+ * reads it at the run.
  *
  * WHAT WAS MEASURED BEFORE THE REPAIR. `hiddenFigure` asked the `member` rows at the moment the run filled the figure.
- * V1: Salaries (Ada, GBP 5,200.00), Inbox, `metric.payroll` over Salaries, and a rule setting each new inbox note to
- * `filed; payroll {{metric.payroll}}`. The owner filed one Inbox row, invited Bea to Inbox alone, and filed another:
+ * The case: Salaries (Ada, GBP 5,200.00), Inbox, `metric.payroll` over Salaries, and a rule setting each new inbox note
+ * to `filed; payroll {{metric.payroll}}`. The owner filed one Inbox row, invited Bea to Inbox alone, and filed another:
  * `{"before":"filed; payroll GBP 5200.00","after":"filed; payroll <U+2014>"}`. Bea read the first. The first test below
  * failed on that note. Two more readers were never asked: a script whose `reads:` names Inbox and not Salaries, and
  * anybody invited next month.
@@ -17,7 +17,7 @@
  * AND THE PLACEHOLDER IS NOT AN EM DASH. The dash was the character this tree's prose rule forbids, written into a row
  * a stranger reads, and it read as a hole in the sentence rather than as a value held back on purpose.
  *
- * INSTALL NOW REFUSES V1'S RULE (`figure-install-warning.test.ts`), which is where the owner is told. So the rule goes
+ * INSTALL NOW REFUSES THAT RULE (`figure-install-warning.test.ts`), which is where the owner is told. So the rule goes
  * in here while `payroll` reads a series, which is over no list, and `payroll` is then pointed at Salaries: an install
  * with no rule in it, which the lint does not read, and the one way a record comes to hold this rule now.
  */
@@ -83,7 +83,7 @@ const noteOf = async (k: Kernel, register: string, what: string): Promise<{ id: 
   return { id: made.value.id, note: k.get(made.value.id)?.fields.note };
 };
 
-test('V1: A BOOKKEEPER INVITED TO INBOX AFTER A RUN READS NO PAYROLL IN THE NOTE WRITTEN BEFORE SHE CAME', async () => {
+test('A BOOKKEEPER INVITED TO INBOX AFTER A RUN READS NO PAYROLL IN THE NOTE WRITTEN BEFORE SHE CAME', async () => {
   const { k, sql } = await record(FILE);
   const before = await noteOf(k, 'inbox', 'Invoice from the printer');
   const invited = k.invite('p_1', { person: 'p_bea', email: 'bea@example.test', name: 'Bea', registers: { inbox: 'read' } });

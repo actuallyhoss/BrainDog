@@ -2,7 +2,7 @@
  * The install checks that read one declaration through `heldRow`, asked of a planned record: `doorsOf`, `taggingRefused`
  * and `stranded`'s `was`.
  *
- * WAVE FORTY-NINE'S CHECKER NAMED THE GAP. `heldRow` answers from the plan inside `againstPlan`, and
+ * THE GAP. `heldRow` answers from the plan inside `againstPlan`, and
  * `test/lint-planned.test.ts` covers the checks that read the plan through `heldRows` and the list cache, but no test
  * put the one row these three read in the plan alone. Pointed at the table, each would have passed every test in the
  * package.

@@ -1,11 +1,11 @@
 /**
  * Two ids minted in one millisecond say nothing about how many were minted between them.
  *
- * THE TAIL WAS A COUNTER. `loop/research-batch-nineteen-audit.md` (finding 2) measured a member invited to one list
- * reading two of her lines minted in one millisecond: the tails differed by 2, 4, 8 and 22 for 0, 1, 3 and 10 hidden
- * diary writes between them, because the minter added one to the tail inside a millisecond and every `create` mints
- * twice. `(diff - 2) / 2` was the exact count of what she was not shown. The fixed clock every test here runs on is the
- * worst case, and a rule cascade, an import or an accepted rowset reaches it under a real clock too.
+ * THE TAIL WAS A COUNTER. Measured: a member invited to one list reading two of her lines minted in one millisecond:
+ * the tails differed by 2, 4, 8 and 22 for 0, 1, 3 and 10 hidden diary writes between them, because the minter added
+ * one to the tail inside a millisecond and every `create` mints twice. `(diff - 2) / 2` was the exact count of what she
+ * was not shown. The fixed clock every test here runs on is the worst case, and a rule cascade, an import or an
+ * accepted rowset reaches it under a real clock too.
  *
  * AND THE ORDER STAYS. `list` pages on `(updated_at, id)` and K10 is the promise that two rows written in one
  * transaction sort the way they were written, so the step is random but never zero.

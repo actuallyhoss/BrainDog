@@ -479,10 +479,10 @@ test('and it says what this build is and what is serving it, which nothing asked
 });
 
 test('AND `boot` SAYS WHICH HOST IS SERVING IT, when the host said, and nothing when it did not', async () => {
-  /* BILLING INFERRED THE SELF-HOST FROM A 404 ON THE MAIL DOOR (`loop/research-held-landing.md` friction 5), because
-     `boot` named the record and the caller and nothing about the host, and the only host fact the app could read was
-     which routes answered. The field is copied from `Build`, so a host that was not asked has no key at all rather
-     than a value it never gave: `version` answers its six keys exactly, and this is not one of them. */
+  /* BILLING INFERRED THE SELF-HOST FROM A 404 ON THE MAIL DOOR, because `boot` named the record and the caller and
+     nothing about the host, and the only host fact the app could read was which routes answered. The field is copied
+     from `Build`, so a host that was not asked has no key at all rather than a value it never gave: `version` answers
+     its six keys exactly, and this is not one of them. */
   for (const host of ['self-host', 'cloud'] as const) {
     const sql = openSqlite();
     const api = await createRecordApi({ sql, clock: fixedClock(NOW), sign: SIGNER, build: { app: '', slash: false, host } });

@@ -1,22 +1,21 @@
 /**
- * What the checker of `56b35c41` left of audit sixty-three's findings 2, 4 and 6, all of it money read wrong.
+ * Four ways the pairing still read money wrong after `56b35c41`.
  *
  * ONE: AN UPDATE THAT RENAMES THE MARK LOST HIS WORD ON THE OLD ONE. A pack moving `pairs.mark` from `transfer` to
  * `moved` settled the ledger under `moved` and asked for a pin only there, so the leg he had unticked on `transfer` paired
  * again and read `moved: true`: his "not a transfer" gone, the dinner Omar paid him back for read as spent 0.00.
  *
- * TWO: A REGISTER THAT DECLARES NO `state:` OR NO `done:` HAD NO ROW THAT WAITS, so audit sixty-three's finding 2 stood
- * there as it did before the repair: a split move with one half pending, beside a client's payment of the same size, hid
- * the client as the second half, Received 0.00 against 20,000.00.
+ * TWO: A REGISTER THAT DECLARES NO `state:` OR NO `done:` HAD NO ROW THAT WAITS, so the pending-half case stood there
+ * as it did before the repair: a split move with one half pending, beside a client's payment of the same size, hid the
+ * client as the second half, Received 0.00 against 20,000.00.
  *
  * THREE: ONE OUT WHOSE IN IS STILL PENDING PAIRED WITH A CLIENT BESIDE IT. Nothing was tied, and the check that a leg
  * may still arrive guarded only a set of tied legs, so the out took the one cleared in of its size in the window: Spent
- * 0.00 and Received 0.00 against EGP 20,000.00 each until the bank cleared the real in. This is audit sixty-five's
- * finding 1.
+ * 0.00 and Received 0.00 against EGP 20,000.00 each until the bank cleared the real in.
  *
  * FOUR: THE FIRST REPAIR OF THREE LET A ROW HE TICKED HOLD THE BANK'S OWN LEGS BACK FOR GOOD, since a pinned row is
- * never a partner and so never stops waiting. Its checker measured Spent and Received 20,000.00 each where HEAD read 0,
- * and the owner decided (DIRECTION 25) that only a row that clears on its own holds a pair back.
+ * never a partner and so never stops waiting. Measured: Spent and Received 20,000.00 each where HEAD read 0, and the
+ * owner decided that only a row that clears on its own holds a pair back.
  *
  * EVERY FIGURE HERE IS READ THE WAY THE LEDGER PAGE READS IT, as `pairs-pending.test.ts` reads it: `k.list` with Money's
  * `spent-30d` and `received-30d` sentences minus the date window, over whichever field the register marks by.
@@ -147,7 +146,7 @@ const PATHS: Record<string, (k: Kernel, decl: Declaration) => Promise<void>> = {
 for (const [path, update] of Object.entries(PATHS)) {
   test(`ONE (${path}): HIS WORD ON THE OLD MARK IS HIS WORD ON THE NEW ONE when an update renames it, either way he said it`, async () => {
     const { k, sql } = await ledger(LEDGER({ life: 'done', where: UNNAMED, mark: 'transfer' }));
-    /* The checker's case: dinner on the card, and Omar paying him back into CIB the next day, which the bank pairs. */
+    /* The case: dinner on the card, and Omar paying him back into CIB the next day, which the bank pairs. */
     const ids = write(k, [
       { what: 'DINNER', on: DAY(0), direction: 'out', account: 'card' },
       { what: 'OMAR', on: DAY(1), direction: 'in', account: 'cib' },
@@ -198,9 +197,9 @@ test('ONE: A MARK NOBODY PINNED IS NOT CARRIED, so the rows the old mark paired 
 });
 
 test('ONE: RENAMED THERE AND BACK, HIS LATER WORD IS THE ONE CARRIED, not the older one still in the first field', async () => {
-  /* MEASURED BEFORE THE REPAIR, by the checker of this change: `transfer` to `moved` carried his "not a transfer", he
-     then ticked dinner on `moved`, and the update back to `transfer` kept the old false there because somebody had
-     already spoken on `transfer`. His tick was lost and dinner read as spent, EGP 20,000.00. */
+  /* MEASURED BEFORE THE REPAIR: `transfer` to `moved` carried his "not a transfer", he then ticked dinner on `moved`,
+     and the update back to `transfer` kept the old false there because somebody had already spoken on `transfer`. His
+     tick was lost and dinner read as spent, EGP 20,000.00. */
   const { k, sql } = await ledger(LEDGER({ life: 'done', mark: 'transfer' }));
   const ids = write(k, [
     { what: 'DINNER', on: DAY(0), direction: 'out', account: 'card' },
@@ -252,7 +251,7 @@ for (const life of ['state', 'none'] as const) {
     const { k, sql } = await ledger(LEDGER({ life }));
     const ids = write(k, [HALVES[0]!, HALVES[1]!, HALVES[2]!, { ...HALVES[3]!, state: 'pending' }, CLIENT]);
     /* MEASURED BEFORE THE REPAIR: CIB OUT 2 named NILE DESIGN, Received 0.00 against 20,000.00 for the one cleared half
-       and the client, which is audit sixty-three's F2 in a register that says nothing about which states are final. */
+       and the client, which is the pending-half case in a register that says nothing about which states are final. */
     const pending = partners(k, ids);
     for (const [what, to] of Object.entries(pending)) assert.equal(to, null, `${what} was paired while a half was pending, ${JSON.stringify(pending)}`);
     assert.equal(total(k, 'in'), 40_000, 'the cleared half and the client, both counted');
@@ -263,7 +262,7 @@ for (const life of ['state', 'none'] as const) {
 }
 
 test('TWO (no state:): A PAYMENT REFUSED FOR WHAT IT NAMES DOES NOT WAIT, since no value of a field of fixed values would let it through', async () => {
-  /* The first attempt at finding 2 held every refused row back, and a cleared client naming Nile Design kept the halves
+  /* The first attempt at TWO held every refused row back, and a cleared client naming Nile Design kept the halves
      counted for good, Spent and Received each EGP 40,000.00 high. With no `state:`, the fields that may move are the
      enums `where` reads; `party` is a text, and what a row names is what it says. */
   for (const state of ['cleared', 'pending'] as const) {
@@ -344,9 +343,9 @@ test('THREE: A PENDING LEG AS NEAR AS THE CLEARED CANDIDATE HOLDS THE PAIR BACK,
 
 test('THREE: PAST THE SET BOUND THE PENDING IN STILL HOLDS THE PAIR BACK, since a set that large is answered leg by leg', async () => {
   /* A SET OF MORE THAN `SET_MOST` ALIKE LEGS IS NOT ANSWERED AS A SET (`answerOf` falls to `nearestOf`), and every test
-     above stays under it. Measured by the checker of this change: `nearestOf` put back to `nearestIn` passed every other
-     test in this file, so the wait was guarded on one path only. Here thirty-three outs from other banks sit beside the
-     client, which makes the out's set too large, and the out still must not take the client while its own in is pending. */
+     above stays under it. Measured: `nearestOf` put back to `nearestIn` passed every other test in this file, so the
+     wait was guarded on one path only. Here thirty-three outs from other banks sit beside the client, which makes the
+     out's set too large, and the out still must not take the client while its own in is pending. */
   const { k, sql } = await ledger(LEDGER({ life: 'done' }));
   const crowd: Line[] = Array.from({ length: 33 }, (_, i) => ({ what: `OTHER OUT ${i}`, on: DAY(4), direction: 'out', account: `bank${i}` }));
   const ids = write(k, [OUT, IN_PENDING, ...crowd, BARE_CLIENT]);
@@ -363,10 +362,10 @@ test('THREE: PAST THE SET BOUND THE PENDING IN STILL HOLDS THE PAIR BACK, since 
 /* ─────────────── four: a row he ticked never holds the bank's legs back ─────────────── */
 
 test("FOUR: HIS TICKED 'TO SAVINGS' DOES NOT HOLD BACK THE BANK'S OWN TWO LEGS OF THE SAME MOVE, in either order they arrive", async () => {
-  /* THE CHECKER'S CASE AGAINST held66, AND THE OWNER'S CALL ON IT (DIRECTION 25). He types EGP 20,000.00 out of CIB and
-     ticks it moved; the bank then imports the real CIB out and the HSBC in, the same day. His row mirrors the HSBC in and
-     is nobody's partner, since a pinned mark never pairs, so a wait on it never ends. MEASURED ON held66 BEFORE THE
-     REPAIR: the bank's legs stayed apart for good, Spent 20,000 and Received 20,000 where HEAD read 0 and 0. */
+  /* THE CASE AGAINST THE FIRST REPAIR, AND THE OWNER'S CALL ON IT. He types EGP 20,000.00 out of CIB and ticks it
+     moved; the bank then imports the real CIB out and the HSBC in, the same day. His row mirrors the HSBC in and is
+     nobody's partner, since a pinned mark never pairs, so a wait on it never ends. MEASURED ON THE FIRST REPAIR: the
+     bank's legs stayed apart for good, Spent 20,000 and Received 20,000 where HEAD read 0 and 0. */
   for (const life of ['done', 'none'] as const) {
     for (const order of ['out first', 'in first'] as const) {
       const { k, sql } = await ledger(LEDGER({ life }));
@@ -390,8 +389,8 @@ test("FOUR: HIS TICKED 'TO SAVINGS' DOES NOT HOLD BACK THE BANK'S OWN TWO LEGS O
 
 test('FOUR: HIS TICKED LEG BESIDE A SPLIT MOVE DOES NOT HOLD THE SET BACK EITHER, so the halves pair and his row stays his', async () => {
   /* `pairs-pending.test.ts` held the opposite, that his `true` says a leg landed and not which row is the other, so the
-     set was answered leg by leg and every half counted, EGP 40,000.00 each way. The owner decided against that
-     (DIRECTION 25): his row can never be paired, so the halves would be counted for as long as it stands. */
+     set was answered leg by leg and every half counted, EGP 40,000.00 each way. The owner decided against that: his row
+     can never be paired, so the halves would be counted for as long as it stands. */
   const { k, sql } = await ledger(LEDGER({ life: 'done' }));
   const typed = made(
     k.create('ledger', { what: 'HSBC TYPED', on: DAY(0), direction: 'in', amount: { amount: 2_000_000, currency: 'EGP' }, account: 'hsbc', moved: true }, PERSON),

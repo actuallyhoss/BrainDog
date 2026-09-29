@@ -1,11 +1,11 @@
 /**
- * Somebody invited to one list, asking every door `loop/research-scoped-audit.md` found open onto another.
+ * Somebody invited to one list, asking every door once found open onto another.
  *
- * The audit built a member holding a read grant on Obligations and nothing else, and read a diary entry's full text, a
- * bill's amount, the owner's reason for letting somebody go and the figure a prediction was graded on, each through a
- * method that already refused her the list itself. Every test here builds that member the way the host builds one, from
- * `kernel.access`, and drives one door. Each was watched failing against the tree the audit read before it was closed.
- * The last test is the other half: the owner reads everything they read before.
+ * A member holding a read grant on Obligations and nothing else read a diary entry's full text, a bill's amount, the
+ * owner's reason for letting somebody go and the figure a prediction was graded on, each through a method that already
+ * refused her the list itself. Every test here builds that member the way the host builds one, from `kernel.access`,
+ * and drives one door. Each was watched failing against the tree before it was closed. The last test is the other half:
+ * the owner reads everything they read before.
  */
 
 import { test } from 'node:test';
@@ -100,7 +100,7 @@ type Refused = { ok: false; refusal: { code: string; fix: string; allowed?: stri
 type Block = { kind: string; source?: string; rows?: unknown[]; queue?: { id: string }[]; walk?: unknown; walks?: unknown; where?: unknown; refusals?: { code: string }[] };
 type PageOut = { title: string; blocks: Block[] };
 
-/** The record the audit built: Obligations, which she was invited to, and Diary and Bills, which she was not. */
+/** The record: Obligations, which she was invited to, and Diary and Bills, which she was not. */
 async function record() {
   const sql = openSqlite();
   const clock = fixedClock(NOW);

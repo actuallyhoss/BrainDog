@@ -1,5 +1,5 @@
 /**
- * Slash builds figures, and hears a description (`loop/research-dynamic-layouts.md` §6 brief D2, `loop/DIRECTION.md` §28).
+ * Slash builds figures, and hears a description.
  *
  * TWO DOORS WERE SHUT AT `6eda2f46`, AND THIS FILE IS WHAT WAS SEEN THROUGH EACH BEFORE IT OPENED.
  *
@@ -197,8 +197,8 @@ test('WHAT THE MODEL IS TOLD NAMES A METRIC AMONG WHAT A CHANGE BUILDS, and says
   assert.ok(change?.includes('one register, ingest, rule, metric, page or script'), change);
   const asked = said.find((l) => l.includes('`asked`'));
   assert.ok(asked, 'nothing in the instructions reads `asked`');
-  /* THE GRAMMARS ARE NAMED WHERE THEY ARE SENT, under `grammar` in the input, and by no address nothing serves
-     (`loop/finish/defects.md` G1). `slash-draft.test.ts` holds that a description's input carries all four. */
+  /* THE GRAMMARS ARE NAMED WHERE THEY ARE SENT, under `grammar` in the input, and by no address nothing serves.
+     `slash-draft.test.ts` holds that a description's input carries all four. */
   for (const word of ['change', 'grammar.register', 'grammar.metric', 'grammar.page', 'grammar.rule', '{"declarations":[...]}']) assert.ok(asked.includes(word), `${word} is not in: ${asked}`);
   assert.ok(!SLASH_INSTRUCTIONS.includes('grammar/'), 'the instructions name a grammar by an address the input does not carry');
   assert.ok(said.some((l) => l.includes('`repair`')), 'nothing in the instructions says how to read a repair');
@@ -245,8 +245,8 @@ test('A DESCRIPTION FILES ONLY WHAT THE MODEL DRAFTED FROM IT: a model that fail
 /**
  * THE CATALOGUE'S UPDATE AND A USE CASE'S GROWTH ARE THE OTHER TWO THINGS A PRESS FILES, and the case above cannot see
  * them: it hands the record neither a catalogue nor offers. With both guards in `slashFile` deleted, every case in this
- * file still passed (a load hook rewrote `described === undefined` out of each, on 25 September), so a description could
- * have filed "Update Bookshelf" and "Add Jobs" in the slots it was pressed for with nothing here going red.
+ * file still passed (a load hook rewrote `described === undefined` out of each), so a description could have filed
+ * "Update Bookshelf" and "Add Jobs" in the slots it was pressed for with nothing here going red.
  */
 test('A DESCRIPTION FILES NEITHER A CATALOGUE UPDATE NOR A USE CASE GROWING, which the same record pressed plainly files both of', async () => {
   const BOOKS = { register: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] };
@@ -380,7 +380,7 @@ test("THROUGH THE PACKAGE'S OWN LEDGER: at ask_cap 0 no description is asked, at
   }
 });
 
-/* ── what a description may read, file and spend (`loop/research-audit-2026-09-25-layouts.md` 8, 14 and 18) ── */
+/* ── what a description may read, file and spend ────────────────────────── */
 
 const PAYROLL = {
   id: 'register.payroll',
@@ -646,7 +646,7 @@ const pageDraft = (n: number) => ({
   body: { to: { id: `page.d${n}`, kind: 'page', body: { page: `d${n}`, title: `D${n}`, requires: ['register.tasks'], blocks: [{ kind: 'table', span: 12, source: 'register.tasks', empty: 'x' }] } } },
 });
 
-test('WITH DECIDE FULL, A DESCRIPTION IS NOT SENT: the audit measured 8 presses, 8 model calls and 8 ledger rows filing [1,1,1,0,0,0,0,0]', async () => {
+test('WITH DECIDE FULL, A DESCRIPTION IS NOT SENT: measured before, 8 presses, 8 model calls and 8 ledger rows filing [1,1,1,0,0,0,0,0]', async () => {
   let n = 0;
   const { heard, model } = listening(() => ({ drafts: [pageDraft(++n)] }));
   const meter = fakeMeter(10_000);
@@ -660,7 +660,7 @@ test('WITH DECIDE FULL, A DESCRIPTION IS NOT SENT: the audit measured 8 presses,
   sql.close();
 });
 
-test('THE SAME DESCRIPTION IS SENT ONCE WHILE WHAT IT FILED WAITS: the audit measured 20 presses, 20 calls and 20 ledger rows for one question', async () => {
+test('THE SAME DESCRIPTION IS SENT ONCE WHILE WHAT IT FILED WAITS: measured before, 20 presses, 20 calls and 20 ledger rows for one question', async () => {
   const { heard, model } = listening({ drafts: [pageDraft(1)] });
   const meter = fakeMeter(10_000);
   const { api, sql } = await record(model, 1, meter.meter);

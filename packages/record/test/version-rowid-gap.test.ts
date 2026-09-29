@@ -2,12 +2,12 @@
  * `version()` answers a caller who is not handed rowids a number that moves when a line they may read is written, and
  * that says nothing about how many lines they may not read were written in between.
  *
- * `loop/research-batch-twenty-four-audit.md` finding 2. `99caef53` took the rowid out of `recentHistory` and `whatsNew`
- * for everybody `holdsRowids` refuses, and `version()` went on answering `MAX(event.rowid)` behind `guard(ctx, 'read')`.
- * The audit's probe read Rae, a colleague at `read`, go from 4 to 9 across three invitations and two Diary rows, and Mo,
- * at `read` with Diary held to `append`, go from 9 to 14 across the same: the gap of 5 counted three invitations Rae is
- * shown none of, and the two Diary writes `lineOf` hides from Mo. The host lists `version` as the polling fallback's
- * own call, so a client that polls hands the count out without being asked for it.
+ * WHY. `99caef53` took the rowid out of `recentHistory` and `whatsNew` for everybody `holdsRowids` refuses, and
+ * `version()` went on answering `MAX(event.rowid)` behind `guard(ctx, 'read')`. A probe read Rae, a colleague at `read`,
+ * go from 4 to 9 across three invitations and two Diary rows, and Mo, at `read` with Diary held to `append`, go from 9 to
+ * 14 across the same: the gap of 5 counted three invitations Rae is shown none of, and the two Diary writes `lineOf`
+ * hides from Mo. The host lists `version` as the polling fallback's own call, so a client that polls hands the count
+ * out without being asked for it.
  */
 
 import { test } from 'node:test';

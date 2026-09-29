@@ -2,9 +2,9 @@
  * Somebody invited to one list, reading the parts of the record that are not rows: the decisions, the read mark, and a
  * page's activity block.
  *
- * Batch fourteen's audit drove each of these against a real record through a member holding a grant on ONE list and
- * found four ways through. Every test here builds that member the way the host does, from `kernel.access`, and asks
- * what they can learn about the list they were not invited to. The answer has to be nothing, including a timestamp.
+ * Each of these was driven against a real record through a member holding a grant on ONE list and found four ways
+ * through. Every test here builds that member the way the host does, from `kernel.access`, and asks what they can learn
+ * about the list they were not invited to. The answer has to be nothing, including a timestamp.
  */
 
 import { test } from 'node:test';
@@ -83,7 +83,7 @@ test('A DECISION ABOUT A LIST SOMEBODY CANNOT READ IS NOT THEIRS TO READ, its qu
   const hidden = await settle(api, 'diary', 'File the diary entry about the auditor?', 'The auditor must not know');
   const theirs = await settle(api, 'obligations', 'File invoice 41?', 'It is ours');
 
-  /* THE SUGGESTION WAS ALREADY HELD BACK, and its decision was not: the audit read the question and the reason of the
+  /* THE SUGGESTION WAS ALREADY HELD BACK, and its decision was not: the member read the question and the reason of the
      diary one straight off the list. */
   const decisions = value<{ id: string; question: string; reason: string }[]>(await api.governance({ register: 'decision' }, reader));
   /* She is handed `d.` handles, not numbers (`scoped-question-ids.test.ts`); the owner reads each back as its number. */
@@ -120,9 +120,9 @@ test('A READ MARK TELLS A SCOPED MEMBER NOTHING ABOUT AN EVENT THEY CANNOT SEE',
 
   /* NAMED OUTRIGHT, the hidden event's number came back with its exact time: one call per rowid read the whole log's
      clock, which is when the owner wrote in a list this member was never shown. */
-  /* AND SINCE `loop/research-history-cursor.md` THE NUMBER IS NOT TAKEN FROM THEM AT ALL. The walk down to a line they
-     may see stopped the time leaking, and still answered the rowid it landed on, so stepping `upTo` said which rowids
-     were theirs. The hidden event's number and its id are refused in the same words. */
+  /* AND THE NUMBER IS NOT TAKEN FROM THEM AT ALL. The walk down to a line they may see stopped the time leaking, and
+     still answered the rowid it landed on, so stepping `upTo` said which rowids were theirs. The hidden event's number
+     and its id are refused in the same words. */
   type Refused = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
   const byNumber = (await api.markRead({ upTo: secret.rowid! }, reader)) as Refused;
   const byId = (await api.markRead({ upTo: `e.${secret.id}` }, reader)) as Refused;
@@ -177,10 +177,10 @@ test("A TOKEN'S ACTIVITY FEED READS ITS PERSON'S MARK, not a mark nobody could e
 });
 
 test('A REFUSED BLOCK CARRIES NO NAME OF A LIST SHE CANNOT OPEN, and no figure somebody wrote into it', async () => {
-  /* `loop/research-batch-seventeen-audit.md` finding 4: `DRAWN` took back what a refused block computed and its `where`,
-     and handed back the rest of what the owner wrote. Measured at the time: a figures block kept
-     `cells: [{ metric: 'diary-count' }]`, and a cash walk kept `from: [{ register: 'bills' }]` and `opening: 1000000`,
-     so a member invited to Obligations read the names of two lists and a figure her own `list('bills')` refuses. */
+  /* MEASURED: `DRAWN` took back what a refused block computed and its `where`, and handed back the rest of what the
+     owner wrote. Measured at the time: a figures block kept `cells: [{ metric: 'diary-count' }]`, and a cash walk kept
+     `from: [{ register: 'bills' }]` and `opening: 1000000`, so a member invited to Obligations read the names of two
+     lists and a figure her own `list('bills')` refuses. */
   const { api, sql } = await record();
   const BILLS = {
     id: 'register.bills',

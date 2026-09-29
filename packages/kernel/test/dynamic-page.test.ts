@@ -1,12 +1,12 @@
 /**
  * The words a page needs to be laid out the way a person needs it, and the words nobody reads refused where they are
- * written (`loop/research-dynamic-layouts.md`, brief D1).
+ * written.
  *
  * THE SURVEY MEASURED THREE SILENT DOORS through a pack installed on a fresh record, and each is held shut here: a
  * block key nobody reads (`size: 2`) installed and was refused only when the page was opened; a page key nobody reads
  * (`layout`, `tabs`) installed and was handed to the host unread; `lead: true` on cards and `first: 3` on steps
- * installed and read clean while nothing looked at them; and a page naming `block.pad` reads its rows through the
- * same fall-through an unregistered kind always has, now that PLT-8 lets a pack's own kind read like any other.
+ * installed and read clean while nothing looked at them; and a page naming `block.pad` reads its rows through the same
+ * fall-through an unregistered kind always has, now that a pack's own kind reads like any other.
  *
  * AND THE NEW WORDS ARE ANSWERED, not only admitted: a card's next step, a path's done and next marks and its short
  * view, a question's option shown as what it is, the questions about one thing, and one row's fields to type into.
@@ -88,7 +88,7 @@ async function record() {
   return k;
 }
 
-/* ── the survey's lint lines, each a refusal naming the key or an acceptance with a shape check ── */
+/* ── the lint lines, each a refusal naming the key or an acceptance with a shape check ── */
 
 test('A PAGE NAMING A PACK KIND NOBODY INSTALLED IS REFUSED AT INSTALL, and one a pack declares is admitted', () => {
   const pad = { block: 'pad', title: 'Pad', primitive: 'grid', cells: 3, tone: true, minSpan: 4, purpose: 'figure' };
@@ -279,7 +279,7 @@ test('THE READ REFUSES A KEY ON A KIND THAT DOES NOT READ IT, as the install doe
     const odd = k.block({ kind: 'note', body: 'x', [key]: 1 } as never);
     assert.equal(odd.refusals[0]?.at, key);
   }
-  /* PLT-8: A PACK'S OWN KIND READS LIKE ANY OTHER once its declaration is installed (`declare.ts` `pageBody`), so a
+  /* A PACK'S OWN KIND READS LIKE ANY OTHER once its declaration is installed (`declare.ts` `pageBody`), so a
      `block.pad` naming a register draws its rows through the same fall-through a `table` does, with no refusal. */
   const pack = k.block({ kind: 'block.pad', source: 'register.areas' } as never);
   assert.deepEqual(pack.refusals, []);
@@ -334,8 +334,8 @@ test('INPUTS READ ONE ROW AND SAY EACH FIELD\'S TYPE, the first row of the list 
 });
 
 test("INPUTS SAY THE RECORD'S HOME CURRENCY BESIDE THE TYPES, so a bare figure in an empty money box is written in it and never in GBP", async () => {
-  /* `loop/research-audit-2026-09-25-layouts.md` finding 2: an EGP record stored a cost typed 1200 as GBP 1,200.00,
-     because the browser's guess at the home currency read rows a shipped build never holds. */
+  /* MEASURED: an EGP record stored a cost typed 1200 as GBP 1,200.00, because the browser's guess at the home currency
+     read rows a shipped build never holds. */
   const k = await record();
   const inputs = { kind: 'inputs', register: 'lines', columns: [{ field: 'low' }] } as never;
   assert.equal(k.block(inputs).home, null, 'a record with no home currency answered one');

@@ -2,10 +2,10 @@
  * The webhook token a Shortcut carries: minted by an owner, shown once, kept only as its SHA-256, and answered to the
  * `/in/*` door as that digest.
  *
- * `loop/research-switch-matrix.md` brief 2, second half. `verify: { kind: path }` reached the grammar at `ef182a6c`
- * and nothing answered it: measured at that HEAD, `ingestVerify` answered `{ kind: 'none' }` for a webhook ingest
- * declaring it, and there was no way to make a token at all, so every SMS his Shortcut posted would be stored
- * `untriaged` whatever URL it carried. Every token below is minted by the test and every name is invented.
+ * `verify: { kind: path }` reached the grammar at `ef182a6c` and nothing answered it: measured at that HEAD,
+ * `ingestVerify` answered `{ kind: 'none' }` for a webhook ingest declaring it, and there was no way to make a token at
+ * all, so every SMS his Shortcut posted would be stored `untriaged` whatever URL it carried. Every token below is
+ * minted by the test and every name is invented.
  */
 
 import assert from 'node:assert/strict';
@@ -23,8 +23,8 @@ const owner: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 
 /**
- * The seed, the card alerts' twins (money-core's until 3.0.0), and the bank's pack file, whose `bank-from-out-sms` is the door his Shortcut posts to.
- * The file and not the sample since 25 September, when the sample stopped carrying the bank's twelve
+ * The seed, the card alerts' twins (money-core's until 3.0.0), and the bank's pack file, whose `bank-from-out-sms` is
+ * the door his Shortcut posts to. The file and not the sample, since the sample stopped carrying the bank's twelve
  * (`seed/test/pack-files.ts`).
  */
 async function record() {
@@ -116,9 +116,9 @@ test('A TOKEN IS MINTED ONLY FOR A WEBHOOK INGEST THAT DECLARES verify: { kind: 
 });
 
 /**
- * THE CHECKER'S SECOND FINDING, measured before it was repaired: the digest outlived the declaration it was minted for.
- * `ingestMint` wrote a `dog_meta` row and nothing ever deleted it, so an ingest retired and then declared again under
- * the same id answered the old digest, and the token shown for the first declaration verified the second, which
+ * A RETIRED INGEST KEPT ITS DIGEST, measured before it was repaired: the digest outlived the declaration it was minted
+ * for. `ingestMint` wrote a `dog_meta` row and nothing ever deleted it, so an ingest retired and then declared again
+ * under the same id answered the old digest, and the token shown for the first declaration verified the second, which
  * nobody had minted anything for. Taking `verify:` out answered `none`, but put back it answered the old digest too.
  */
 const redeclare = async (api: Awaited<ReturnType<typeof record>>['api'], body: Record<string, unknown>, ingest = 'bank-from-out-sms') => {
@@ -128,12 +128,11 @@ const redeclare = async (api: Awaited<ReturnType<typeof record>>['api'], body: R
 
 test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the id answers none and the digest is gone', async () => {
   /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`, for the same reason as the test below. Six of
-     the bank's patterns read that one now that 1.4.0 added `bank-balance-sms` beside the other five, and since
-     `loop/research-batch-forty-two-audit.md` finding 4 (c) retiring it is refused while they do, so this case failed
-     on 23 September at `DECLARATION_INVALID at ingest.bank-card-used-sms` before it reached the digest. The guard
-     names the readers sorted (`declare.ts` `retireDeclarations`), and `bank-balance-sms` now sorts before
-     `bank-card-used-sms`, so the fix names `ingest.bank-balance-sms` since 1.4.0. The refusal is asserted first; the
-     digest is the same code on either id. */
+     the bank's patterns read that one now that 1.4.0 added `bank-balance-sms` beside the other five, and since retiring
+     it is refused while they do, this case failed at `DECLARATION_INVALID at ingest.bank-card-used-sms` before it
+     reached the digest. The guard names the readers sorted (`declare.ts` `retireDeclarations`), and `bank-balance-sms`
+     now sorts before `bank-card-used-sms`, so the fix names `ingest.bank-balance-sms` since 1.4.0. The refusal is
+     asserted first; the digest is the same code on either id. */
   const { sql, api } = await record();
   const door = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
   const kept = api.kernel.retire(['ingest.bank-from-out-sms']);
@@ -156,9 +155,9 @@ test('A TOKEN DOES NOT OUTLIVE ITS DECLARATION: retired and declared again, the 
 
 test('A DECLARATION THAT DROPS verify: TAKES THE DIGEST WITH IT, so putting verify: back does not bring the old token back', async () => {
   /* A WEBHOOK NO PATTERN NAMES AS ITS DOOR, and not `bank-from-out-sms`. Six of the bank's patterns read that one, and
-     since `loop/research-batch-forty-two-audit.md` finding 4 (b) dropping its `verify:` is refused while they do, so
-     this case failed on 23 September at `DECLARATION_INVALID at verify` before it reached the digest. The refusal is
-     asserted first, so the reason for the second webhook stays in the file; the digest is the same code on either id. */
+     since dropping its `verify:` is refused while they do, this case failed at `DECLARATION_INVALID at verify` before
+     it reached the digest. The refusal is asserted first, so the reason for the second webhook stays in the file; the
+     digest is the same code on either id. */
   const { sql, api } = await record();
   const door = HSBC_EG_SMS_INGESTS['bank-from-out-sms']!;
   const { verify: _verify, ...bare } = door;
@@ -186,10 +185,11 @@ test('A NEW VERSION THAT STILL DECLARES verify: KEEPS THE TOKEN, so a pack updat
 });
 
 test('THE REFUSAL FOR A CALLER WHO PRESENTED NOTHING SAYS WHAT WORKS, and not a token the next check refuses', async () => {
-  /* THE CHECKER'S FIRST FINDING. It said "Sign in, or send BRAINDOG_TOKEN", and both halves were wrong for the one
-     caller it is said to: `credentialed: false` is a self-host started without `BRAINDOG_TOKEN`, which has no token to
-     send and nobody to sign in, and the agent token a client's `BRAINDOG_TOKEN` usually holds is refused by `admin`
-     before this line is reached. What works is the server key, and only once the host is started with one. */
+  /* THE SENTENCE WAS WRONG FOR THE ONE WHO READ IT. It said "Sign in, or send BRAINDOG_TOKEN", and both halves were
+     wrong for the one caller it is said to: `credentialed: false` is a self-host started without `BRAINDOG_TOKEN`,
+     which has no token to send and nobody to sign in, and the agent token a client's `BRAINDOG_TOKEN` usually holds is
+     refused by `admin` before this line is reached. What works is the server key, and only once the host is started
+     with one. */
   const { sql, api } = await record();
   const out = await api.ingestMint({ ingest: 'bank-from-out-sms' }, { ...owner, credentialed: false });
   assert.equal(out.ok, false);

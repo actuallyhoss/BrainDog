@@ -1,8 +1,7 @@
 /**
- * A step reads a figure: `{{metric.<id>}}` in a run's fill is the figure's value, read as a page reads it
- * (`loop/research-m3-dynamic.md` §3, B1).
+ * A step reads a figure: `{{metric.<id>}}` in a run's fill is the figure's value, read as a page reads it.
  *
- * WHAT WAS MEASURED BEFORE THE REPAIR, AND EACH TEST BELOW FAILED ON IT. The survey's probe, a list `items` summed by a
+ * WHAT WAS MEASURED BEFORE THE REPAIR, AND EACH TEST BELOW FAILED ON IT. The case: a list `items` summed by a
  * figure `total`: `set_var: { name: tot, to: '{{metric.total}}' }` then `set: { field: note, to: 'total {{vars.tot}}' }`
  * installed, the run ended `done`, and the row's note read `total {{metric.total}}`. Nothing refused the rule and
  * nothing in the run said the braces were never filled, so the only place the failure showed was the row itself.
@@ -98,7 +97,7 @@ const noteOf = (sql: NodeSql, what: string): unknown =>
 const notes = (sql: NodeSql, actor: string): string[] =>
   sql.all<{ note: string }>("SELECT note FROM event WHERE kind = 'note' AND actor = ? ORDER BY rowid", actor).map((r) => r.note);
 
-/* ── the red the brief asked for ───────────────────────────────────────── */
+/* ── a step reads a figure ─────────────────────────────────────────────── */
 
 test('THE SURVEY PROBE: a set_var from {{metric.total}} then a set of note writes the figure, not the braces', async () => {
   const { k, sql } = await record(
@@ -124,9 +123,9 @@ test('A TEXT THE PASS FILLS READS THE FIGURE IN THE SAME PASS as the row and the
   assert.equal(noteOf(sql, 'Glaze'), 'Glaze of 15', 'the figure is read when the step is taken, over the rows as they are then');
 });
 
-/* ON A CLOCK, WHICH WRITES NO ROW. First written as a note on each new Items row, which a figure over Spent is not
-   written into since 24 September (`figure-install-warning.test.ts`): install refused it. What is measured is the
-   money's spelling and the hyphen, which a notify fills exactly as it fills a note. */
+/* ON A CLOCK, WHICH WRITES NO ROW. First written as a note on each new Items row, which a figure over Spent is no
+   longer written into (`figure-install-warning.test.ts`): install refused it. What is measured is the money's spelling
+   and the hyphen, which a notify fills exactly as it fills a note. */
 test('A MONEY FIGURE IS WRITTEN IN ITS CURRENCY AS A MONEY FIELD IS, and an id with a hyphen is read', async () => {
   const { k, sql, clock } = await record(rule({ rule: 'cash', on: { every: '15m' }, steps: [{ notify: { say: 'cash {{metric.cash-now}} and {{ metric.total }}' } }] }));
   assert.ok(k.create('spent', { what: 'Rent', amount: { amount: 123450, currency: 'GBP' } }, { actor: 'p_1' }).ok);
@@ -154,9 +153,9 @@ test('AN if AND A notify READ IT WITH NO EXTRA STEP, on a clock that has no row'
   assert.deepEqual(notes(sql, 'rule:watch'), ['Items add up to 7.']);
 });
 
-/* INTO A ROW OF KEYS, THE LIST THE FIGURE COUNTS. First written into each new Items row, which install refuses since 24
-   September (`figure-install-warning.test.ts`); a note on Keys is read only by whoever reads Keys, who reads the count
-   already, and what is measured is still that the secret list's aggregate is not taken for a copy of the secret. */
+/* INTO A ROW OF KEYS, THE LIST THE FIGURE COUNTS. First written into each new Items row, which install now refuses
+   (`figure-install-warning.test.ts`); a note on Keys is read only by whoever reads Keys, who reads the count already,
+   and what is measured is still that the secret list's aggregate is not taken for a copy of the secret. */
 test('A FIGURE OVER A LIST WITH A SECRET IS ITS AGGREGATE: the count goes into a note and the step is not refused as a copy', async () => {
   const { k, sql } = await record(
     rule({ rule: 'count', on: { written: { register: 'keys', op: ['create'] } }, steps: [{ set_var: { name: 'c', to: '{{metric.held}}' } }, { set: { field: 'note', to: '{{vars.c}} keys' } }] }),
@@ -205,9 +204,9 @@ test('THE LINT REFUSES A FIGURE NO INSTALLED METRIC IS, the colon spelling, and 
   assert.equal(figureFault('rule.a', { on: onItems, steps: [{ set: { field: 'note', to: '{{metric.nope}}' } }] }, 'run'), null, 'with nothing installed to read, only the spelling is checked');
 });
 
-/* WHAT THE THREE BELOW MEASURED BEFORE `flowFault` ASKED THE LINT, on 24 September: all three were `null` and the
-   record took each rule. `{{metric.nope}}` then wrote `x —` into the row, the colon wrote the dash as well, and the
-   inline rule wrote `x {{metric.total}}` as typed, since the inline pass fills no figure. */
+/* WHAT THE THREE BELOW MEASURED BEFORE `flowFault` ASKED THE LINT: all three were `null` and the record took each rule.
+   `{{metric.nope}}` then wrote `x —` into the row, the colon wrote the dash as well, and the inline rule wrote
+   `x {{metric.total}}` as typed, since the inline pass fills no figure. */
 
 test('INSTALL REFUSES A RULE NAMING {{metric.nope}} rather than writing the braces', async () => {
   const body = { rule: 'a', on: onItems, steps: [{ set: { field: 'note', to: 'x {{metric.nope}}' } }] };
@@ -231,8 +230,7 @@ test('INSTALL REFUSES THE COLON SPELLING on a run and ANY FIGURE on the inline p
   assert.equal(colon?.at, 'steps[0].notify.say');
 
   /* A SPACE AROUND THE DOT IS A SPELLING THE FILL DOES NOT READ. The lint took `{{ metric . total }}` as `total` and
-     let it install, and the run wrote `x {{ metric . total }}` into the row as typed: measured by the checker on 24
-     September. */
+     let it install, and the run wrote `x {{ metric . total }}` into the row as typed (measured). */
   const spaced = validateDeclaration(rule({ rule: 'a', on: onItems, steps: [{ set: { field: 'note', to: 'x {{ metric . total }}' } }] }), known);
   assert.equal(spaced?.code, 'DECLARATION_INVALID');
   assert.equal(spaced?.at, 'steps[0].set.to');

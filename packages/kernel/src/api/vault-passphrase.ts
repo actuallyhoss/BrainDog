@@ -1,6 +1,6 @@
 /**
- * The vault passphrase, the kernel's half: `changeVaultWrapping` and `unlockVault`, over `vault.ts`
- * (`loop/finish/platform.md` §4.0 V, `loop/finish/contracts.md` §2.5, `12 §6` "The optional second factor").
+ * The vault passphrase, the kernel's half: `changeVaultWrapping` and `unlockVault`, over `vault.ts` (`12 §6` "The
+ * optional second factor").
  *
  * THE KERNEL NEVER HOLDS THE PASSPHRASE OR A KEY. Each method is handed a host's step, a function that does the
  * crypto where the root key is (`packages/host/src/passphrase.ts`), and hands that step the record key's wrapping. What
