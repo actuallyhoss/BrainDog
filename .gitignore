@@ -50,3 +50,10 @@ apps/site/static/cli/braindog.mjs*
 # The handoff wrapper writes here and neither belongs in the history.
 loop/handoff.log
 loop/STOP
+
+# Working notes, briefs and reports kept on the machine that builds BrainDog, never in the repository.
+/loop/
+/REPORT.md
+/BUILD.md
+/CLAUDE.md
+/.claude/
