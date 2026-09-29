@@ -379,6 +379,7 @@ export const shell = {
   keymapSilenced: 'Character keys is off, so the keys marked below do nothing. Shortcuts that use Ctrl or Alt keep working.',
   keymapRowOff: 'Off',
   scopeDocument: 'Anywhere',
+  scopeWork: 'On Work',
   scopeGrid: 'In a list',
   scopeBoard: 'On a board',
   scopePage: 'On a page',
