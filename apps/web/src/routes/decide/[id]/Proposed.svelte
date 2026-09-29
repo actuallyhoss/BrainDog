@@ -154,7 +154,7 @@
 
   .appear-kind {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .appear-title {
@@ -173,7 +173,7 @@
 
   .appear-lines dt {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
 
@@ -219,6 +219,6 @@
   .appear-note {
     margin: var(--sp-2) 0 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 </style>

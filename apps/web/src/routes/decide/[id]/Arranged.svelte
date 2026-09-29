@@ -124,7 +124,7 @@
     margin: 0;
     color: var(--dim);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
   }
 
@@ -149,7 +149,7 @@
     margin-inline-start: var(--sp-2);
     color: var(--dim);
     font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* THE ONE PART THAT LEAVES THE RECORD: the warning glyph leads its heading, and the heading is in ink. */
@@ -183,7 +183,7 @@
   .arr-summary {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .arr-summary {

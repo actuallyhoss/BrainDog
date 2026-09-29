@@ -33,9 +33,13 @@
 {/if}
 
 <style>
+  /* THE HEADING AT THE META STEP IN THE SECOND INK, each call a line with its service in ink, and the estimate and the
+     note under them in the quiet ink (SYSTEM §3, §6). A caller that heads its tile with the same words hides this one
+     from sight and keeps it for a screen reader, so the list is never nameless. */
   .calls-h {
-    color: var(--dim);
-    font-weight: 600;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   .calls {
@@ -62,6 +66,7 @@
 
   .calls-name {
     color: var(--ink);
+    font-weight: 500;
   }
 
   .calls-line {
@@ -76,5 +81,6 @@
   .calls-estimate {
     margin: var(--sp-2) 0 0;
     color: var(--dim);
+    font-size: var(--t-sm);
   }
 </style>

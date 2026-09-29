@@ -17,6 +17,14 @@
   `/decide/<id>` KEEPS EVERYTHING IT HAD. It is where a decision is examined: the cost, the option
   bodies, the recommendation, the defer with its wake date, and a commit that takes a named decider
   and a written reason and cannot be edited afterwards.
+
+  THE LOOK (SYSTEM §5 to §7, `loop/design/SCREENS.md` "Decide"). The title row says how many wait and what the first
+  one suggests. The first question in the ranking is OPEN in a lead tile: what accepting does, the suggestion and why,
+  the share its reason claims drawn as squares, and its options with their keys. Beside it a tile draws how long each
+  question has waited, and under that the rest of the queue sits on the ground as rows. What accepting would change is
+  a tile of its own under the lead. What comes back, how the calls went and what was decided lately are lists on the
+  ground. The lead is the same card as every row, inside its own `ol.queue`, so the cursor, the ids and the answers are
+  one code path, and the rows start after it: no question is drawn twice.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -27,13 +35,15 @@
   import { queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { said } from '$lib/voice.svelte.ts';
-  import { DOM_CAP } from '$lib/record/api.ts';
+  import { DOM_CAP, whoDid } from '$lib/record/api.ts';
   import { targetLine } from '$lib/record/metrics.ts';
+  import { figuresIn, reasonIn } from '$lib/cite.ts';
   import Changes from './[id]/Changes.svelte';
   import Proposed from './[id]/Proposed.svelte';
   import Arranged from './[id]/Arranged.svelte';
   import Applied from './[id]/Applied.svelte';
-  import { updatesOf } from './[id]/changes.ts';
+  import { updatesOf, words as changeWords } from './[id]/changes.ts';
+  import { ageDays, AIM, DECIDED_FIRST, evidenceOf, sentenceOf, STALE_DAYS, waitedOf, waitedWords, waitingSaid, WORDS as LEAD } from './lead.ts';
   import { proposedOf } from './[id]/proposed.ts';
   import { appliedLines, arrangedOf, isArranging, partialOf, type Partial } from './[id]/arranged.ts';
   import { answerFor, optionsOf, reasonState, record, setReason, withdraw, type Answer } from '$lib/record/answer.ts';
@@ -53,10 +63,15 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Cited from '$lib/ui/Cited.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Chip from '$lib/ui/Chip.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
   import AskSheet from '$lib/ui/AskSheet.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import Bars from '$lib/viz/Bars.svelte';
+  import Waffle from '$lib/viz/Waffle.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
 
@@ -142,8 +157,10 @@
   /* EVERY DECISION ON THE RECORD, read or not yet, so the heading says how many there are and not how many were read. */
   const decidedTotal = $derived(from === 'live' && live?.older ? Math.max(live.older.total, DECIDED.length) : DECIDED.length);
   /* THE AIM IS THE FIGURE'S TARGET, no more than three open, said as every other target is said. It was read off the
-     sample's `metric('open-questions')`, whose note is this same line whenever the sample's queue holds anything. */
-  const aim = targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]);
+     sample's `metric('open-questions')`, whose note is this same line whenever the sample's queue holds anything. It was
+     a chip beside the count; it is said now in the sentence (over it, in red) and under the chart of how long each has
+     waited, where a reader asks how full the queue should be. */
+  const aim = targetLine({ format: 'int', target: { lte: AIM } } as Parameters<typeof targetLine>[0]);
 
   /**
    * DECIDED HERE, ON A LIVE RECORD, AND DRAWN WHERE IT WAS.
@@ -155,9 +172,6 @@
    */
   let settledHere = $state(new Map<string, string>());
   const waiting = $derived(open.filter((q) => !settledHere.has(q.id)));
-
-  /* THE AIM'S TONE IS THE RECORD'S OWN COUNT. */
-  const aimTone = $derived(waiting.length > 3 ? ('warn' as const) : ('good' as const));
 
   const rowsetOf = (q: Question) => live?.rowsets[q.id];
 
@@ -233,6 +247,68 @@
       .map(([key, items]) => ({ key, name: key || copy.decideGroupElse, items }));
   });
   const order = $derived(groups.flatMap((g) => g.items));
+
+  /**
+   * THE OPEN QUESTION: the first in the ranking, drawn whole in the lead tile, and only on the ranked queue. Grouped, the
+   * groups are the arrangement and none of them leads. It stays the lead once it is decided here, as a one-line receipt
+   * in the same place, so nothing under it moves.
+   */
+  const lead = $derived(grouping === 'none' ? order[0] : undefined);
+
+  /** Who asked, by name, for the meta line and the sentence; nothing for a question nobody is named on, or for you. */
+  const shell = $derived(route.data as unknown as Shell);
+  const names = $derived(new Map(Object.entries(shell.names ?? {})));
+  function askerOf(q: Question): string {
+    const by = aboutFor(q)?.by ?? '';
+    if (by === '') return '';
+    if (by === 'slash') return 'Slash';
+    const who = whoDid(by, me.person || null, names);
+    return who.you ? '' : who.name;
+  }
+
+  /* THE SENTENCE UNDER THE TITLE, about what still waits and what the first of it suggests (`lead.ts`). */
+  const firstWaiting = $derived(order.find((q) => !settledHere.has(q.id)));
+  const sentence = $derived(from === 'live' ? sentenceOf(waiting, firstWaiting, firstWaiting ? askerOf(firstWaiting) : '') : null);
+
+  /* HOW LONG EACH HAS WAITED, in the queue's order, the open one in ink and anything past two weeks in red. */
+  const waited = $derived(waitedOf(waiting, lead?.id, now));
+
+  /**
+   * THE SUGGESTION ON THE OPEN QUESTION, AND WHY: the suggested option's reason as it was filed, braces and all, so its
+   * rows are links (`Cited`), and the one share that reason claims, when it claims one, drawn as squares. No structured
+   * figure exists on a question, so a reason that names no "N of M" draws words and no chart.
+   */
+  const leadWhy = $derived.by(() => {
+    if (!lead || from !== 'live') return null;
+    const option = lead.options.find((o) => o.recommended);
+    if (!option) return null;
+    const body = aboutFor(lead)?.body;
+    const text = reasonIn(body, option.key) ?? option.body;
+    const figures = figuresIn(body);
+    return { option, text, figures, evidence: text.trim() === '' ? null : evidenceOf(text, figures, now) };
+  });
+
+  /**
+   * WHAT ACCEPTING THE OPEN QUESTION DOES, in a line each: the arrangement's lead, what a proposal puts in place, or the
+   * rows it changes; then what deciding late costs, as whoever asked wrote it. The whole of each is the tile under the
+   * lead; these are its headlines, above the options that approve it.
+   */
+  function doesOf(q: Question): { icon: IconName; text: string }[] {
+    const out: { icon: IconName; text: string }[] = [];
+    const story = stories.get(q.id);
+    const preview = previews.get(q.id);
+    const updates = changed.get(q.id) ?? [];
+    const set = rowsetOf(q);
+    if (story) out.push({ icon: 'settings', text: story.summary ? copy.arrangeLeadSummary(story.lead, story.summary) : story.lead });
+    else if (preview) for (const a of preview.appears.slice(0, 3)) out.push({ icon: 'doc', text: `${a.kind}: ${a.title}` });
+    else if (set && updates.length) out.push({ icon: 'rows', text: copy.decideRows(updates.length, listName(set.register)) });
+    if (q.cost) out.push({ icon: 'clock', text: symbolText(q.cost) });
+    return out;
+  }
+
+  /* DECIDED LATELY IS THE FIRST FEW, and "All decisions" draws the whole ledger in place, capped as every list is. */
+  let allDecided = $state(false);
+  const decidedShown = $derived(allDecided ? DECIDED.slice(0, DOM_CAP) : DECIDED.slice(0, DECIDED_FIRST));
 
   /** What a question takes without a choice: its suggested option, or accepting a change. */
   const approveKey = (q: Question): string | null =>
@@ -357,6 +433,13 @@
      `j` is a change a person can see and a pointer reader never meets a highlight they did not ask for. */
   let cursor = $state(-1);
 
+  /**
+   * WHAT THE KEYS ACT ON: the cursor's question, or the open one while the cursor is on nothing. The lead prints its
+   * keys, 1 2 3, so they have to answer it before anybody has pressed `j`; the first `j` still puts the cursor on it,
+   * which is the change a person can see.
+   */
+  const keyed = $derived(order[cursor] ?? (cursor < 0 ? lead : undefined));
+
   async function place(at: number) {
     if (order.length === 0) return;
     cursor = Math.max(0, Math.min(at, order.length - 1));
@@ -417,7 +500,7 @@
       return;
     }
 
-    const q = order[cursor];
+    const q = keyed;
     if (!q || settledHere.has(q.id)) return;
     if (e.key === 'Enter') {
       /* ENTER ON A CONTROL IS THAT CONTROL'S. */
@@ -527,18 +610,47 @@
 <svelte:head><title>{titleOf(said('decide'))}</title></svelte:head>
 <svelte:window {onkeydown} />
 
-<!-- NO COUNT IN THE HEAD: `Open questions` prints it one line lower, for the same list. -->
-<PageHead icon="decide" title={said('decide')}>
+<!-- THE COUNT IS WHAT STILL WAITS, and the sentence says it in words with the first question's suggestion. The group
+     control and Select are glass; asking yourself a question is the one ink pill, and only for somebody who may answer:
+     a question a reader could ask and never settle is a question left in everybody else's queue. -->
+<PageHead icon="decide" title={said('decide')} count={waiting.length} sentence={sentence?.text} needs={sentence?.needs || undefined}>
   {#snippet actions()}
-    <!-- ONE QUIET PRESS, and only for somebody who may answer: a question a reader could ask and never settle is a
-         question left in everybody else's queue. -->
-    {#if answerable}<Button weight="quiet" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
+    {#if from === 'live' && open.length > 0}
+      <div class="segmented" role="group" aria-label={copy.decideGroup}>
+        <button
+          type="button"
+          class="segment"
+          aria-pressed={grouping === 'none'}
+          data-on={grouping === 'none' ? '' : undefined}
+          onclick={() => groupBy('none')}>{copy.decideGroupNone}</button
+        >
+        <button
+          type="button"
+          class="segment"
+          aria-pressed={grouping === 'about'}
+          data-on={grouping === 'about' ? '' : undefined}
+          onclick={() => groupBy('about')}>{copy.decideGroupList}</button
+        >
+      </div>
+      <Button
+        weight="glass"
+        aria-pressed={selecting}
+        onclick={() => {
+          selecting = !selecting;
+          if (!selecting) picked = new Set();
+        }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
+      >
+    {/if}
+    {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
   {/snippet}
 </PageHead>
 
 <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
 
-{#snippet card(q: Question)}
+<!-- ONE CARD FOR THE OPEN QUESTION AND FOR EVERY ROW. `open` is the lead tile's: what accepting does, the suggestion
+     and why, and its evidence, above the options. A row carries its previews in place instead, because the calls an
+     arrangement makes are read before it is accepted, wherever it is accepted from. -->
+{#snippet card(q: Question, isLead: boolean)}
   {@const said = answers.get(q.id)}
   {@const updates = changed.get(q.id) ?? []}
   {@const preview = previews.get(q.id)}
@@ -547,11 +659,14 @@
   {@const decidedHere = settledHere.get(q.id)}
   {@const story = stories.get(q.id)}
   {@const part = partHere.get(q.id)}
+  {@const asker = askerOf(q)}
   <li
     class="q"
     id="q-{q.id}"
     tabindex="-1"
     aria-labelledby="q-{q.id}-title"
+    data-lead={isLead ? '' : undefined}
+    data-keys={keyed?.id === q.id ? '' : undefined}
     data-cursor={order[cursor]?.id === q.id ? '' : undefined}
     data-done={decidedHere !== undefined ? '' : undefined}
   >
@@ -565,19 +680,20 @@
       {#if did}<div class="q-applied"><Applied lines={did} /></div>{/if}
     {:else}
       <div class="q-top">
+        <IconWell name="decide" size="l" />
         <a class="q-open" href={at(`/decide/${q.id}`)}>
           <span class="q-body">
-            <!-- WHAT IT IS ABOUT LEADS, AND THE ID ENDS THE LINE. -->
+            <!-- WHAT IT IS ABOUT LEADS, AND WHO ASKED AND HOW LONG IT HAS WAITED FOLLOW. -->
             <span class="q-title" id="q-{q.id}-title">{q.title}</span>
-            {#if q.cost}<span class="q-cost">{symbolText(q.cost)}</span>{/if}
+            {#if q.cost && !isLead}<span class="q-cost">{symbolText(q.cost)}</span>{/if}
             <span class="q-head">
-              {#if set && updates.length}
+              {#if set && updates.length && !isLead}
                 <span class="q-entity">{copy.decideRows(updates.length, listName(set.register))}</span>
               {:else if about && grouping === 'none'}
                 <span class="q-entity">{about}</span>
               {/if}
-              {#if aboutFor(q)?.by === 'slash'}<span class="q-entity">{copy.fromSlash}</span>{/if}
-              <span class="q-age">opened {since(q.opened, now)}</span>
+              {#if aboutFor(q)?.by === 'slash'}<span class="q-entity">{copy.fromSlash}</span>{:else if asker}<span>{LEAD.askedBy(asker)}</span>{/if}
+              <span class="q-age" data-stale={ageDays(q.opened, now) > STALE_DAYS ? '' : undefined}>{waitingSaid(q.opened, now)}</span>
               <!-- What it would cost to get this one wrong, which is why it sits where it sits. The
                    word is `braindog-render`'s, the same one the `queue` block draws. -->
               {#if queueCost(q.band ?? '')}<span class="q-band" data-cost={q.band}>{queueCost(q.band ?? '')}</span>{/if}
@@ -597,7 +713,39 @@
         >{#if picked.has(q.id)}<Icon name="check" size="s" />{/if}</button>
       </div>
 
-      {#if story}
+      {#if isLead}
+        {@const does = doesOf(q)}
+        {#if does.length}
+          <ul class="q-does">
+            {#each does as line, i (i)}
+              <li><Icon name={line.icon} size="m" /><span>{line.text}</span></li>
+            {/each}
+          </ul>
+        {/if}
+        <!-- THE SUGGESTION, WHY, AND THE SHARE ITS REASON CLAIMS: shown, never pre-selected. The option below it is not
+             filled, moved first or focused, so it is found rather than chosen (19 §4, 20 §3). -->
+        {#if leadWhy}
+          <section class="q-rec" aria-labelledby="q-{q.id}-rec">
+            <h3 class="q-rec-h" id="q-{q.id}-rec">{LEAD.suggested(leadWhy.option.title)}</h3>
+            {#if leadWhy.evidence}
+              {@const ev = leadWhy.evidence}
+              <div class="q-ev">
+                <Waffle
+                  parts={[
+                    { label: '', value: ev.value, tone: 'ink' },
+                    { label: '', value: ev.max - ev.value, tone: 'g3' },
+                  ]}
+                  summary={ev.said}
+                />
+                <p class="q-ev-key num">{LEAD.ofMax(ev.value.toLocaleString('en-GB'), ev.max.toLocaleString('en-GB'))}</p>
+              </div>
+            {/if}
+            {#if leadWhy.text.trim() !== ''}
+              <p class="q-rec-why"><Cited text={leadWhy.text} figures={leadWhy.figures} {now} /></p>
+            {/if}
+          </section>
+        {/if}
+      {:else if story}
         <div class="q-changes"><Arranged arranged={story} compact /></div>
       {:else if preview}
         <section class="q-changes" aria-label={copy.proposalWillAppear}><Proposed proposed={preview} /></section>
@@ -605,7 +753,7 @@
         <div class="q-changes"><Changes {updates} compact /></div>
       {/if}
 
-      {#if part}<Applied partial={part} />{/if}
+      {#if part}<div class="q-part"><Applied partial={part} /></div>{/if}
 
       <!-- THE VERBS, BESIDE THE LINK AND NOT INSIDE IT: above it opens the question, below it answers it. -->
       <div class="q-act">
@@ -650,7 +798,8 @@
             </div>
           </div>
         {:else}
-          <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject.
+          <!-- Named by the question, because "Per seat" repeated down a queue is three words with no subject. Each option
+               carries the key that answers with it, drawn only where the keys act: the open question, or the cursor's.
 
                AND OFF FOR A READER WHO MAY NOT ANSWER, each one pointing at the standing sentence
                over the queue that says why. `aria-describedby` rather than a title, so the reason is
@@ -660,11 +809,13 @@
             {#each optionsOf(q) as o (o.key)}
               <Button
                 id="opt-{q.id}-{o.key}"
+                size={isLead ? 'm' : 'sm'}
+                kbd={o.n <= 9 ? String(o.n) : undefined}
                 disabled={!answerable}
                 aria-describedby={answerable ? undefined : 'cannot-decide'}
                 onclick={() => take(q, o.key)}
               >
-                {o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}
+                <span class="opt-name">{o.title}{#if o.recommended}<span class="rec">{copy.recommended}</span>{/if}</span>
               </Button>
             {/each}
           </div>
@@ -675,6 +826,42 @@
       </div>
     {/if}
   </li>
+{/snippet}
+
+<!-- THE REST OF THE QUEUE, ON THE GROUND. Ranked, it starts after the open question; grouped, every question is a row
+     under the heading of what it is about. The count is what still waits, the open one included. -->
+{#snippet waitingList()}
+  <Section title={LEAD.waiting} count={waiting.length}>
+    {#snippet aside()}
+      {#if waiting.length > 1}<span class="hint" aria-hidden="true"><Kbd keys="j" /><Kbd keys="k" /><span>{LEAD.switch}</span></span>{/if}
+    {/snippet}
+    {#if grouping === 'none'}
+      <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
+        <!-- THE ORDER IS SAID OUT LOUD, because a list whose order cannot be seen is a list a reader assumes is
+             arbitrary, and this one is not: it is dearest-to-get-wrong first. -->
+        <ol class="queue" start={2} aria-label={copy.rankedBy}>
+          {#each order.slice(1) as q (q.id)}{@render card(q, false)}{/each}
+        </ol>
+      </div>
+    {:else}
+      {#each groups as g (g.key)}
+        <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
+          <h3 class="group-head">{g.name}<span class="group-n num">{g.items.length}</span></h3>
+          <ol class="queue">
+            {#each g.items as q (q.id)}{@render card(q, false)}{/each}
+          </ol>
+        </div>
+      {/each}
+    {/if}
+
+    {#if waiting.length === 0}
+      <Empty kind="cleared" compact title={said('no_questions')}>
+        {#snippet actions()}
+          {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
+        {/snippet}
+      </Empty>
+    {/if}
+  </Section>
 {/snippet}
 
 <div class="page">
@@ -697,121 +884,115 @@
       {/snippet}
     </Empty>
   {:else}
-    <!-- THE COUNT IS WHAT STILL WAITS: a question decided here leaves it and keeps its line. -->
-    <Section title={copy.openQuestions} count={waiting.length}>
-      {#snippet aside()}
-        <div class="head-aside">
-          <div class="segmented" role="group" aria-label={copy.decideGroup}>
-            <button
-              type="button"
-              class="segment"
-              aria-pressed={grouping === 'none'}
-              data-on={grouping === 'none' ? '' : undefined}
-              onclick={() => groupBy('none')}>{copy.decideGroupNone}</button
-            >
-            <button
-              type="button"
-              class="segment"
-              aria-pressed={grouping === 'about'}
-              data-on={grouping === 'about' ? '' : undefined}
-              onclick={() => groupBy('about')}>{copy.decideGroupList}</button
-            >
-          </div>
-          <Chip label={copy.aimFor(aim)} tone={aimTone} />
-          <span class="select-toggle">
-            <Button
-              weight="bare"
-              aria-pressed={selecting}
-              onclick={() => {
-                selecting = !selecting;
-                if (!selecting) picked = new Set();
-              }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
-            >
-          </span>
-        </div>
-      {/snippet}
+    <!-- WHY THE ANSWERS ARE OFF, ABOVE THE QUESTIONS AND NOT AFTER A PRESS. It is the record's own
+         refusal, said before anybody has typed a word, and it ends by saying that reading is what
+         this colleague still holds. Every option button and the batch commit point at it. -->
+    {#if !answerable}
+      <p class="cannot" id="cannot-decide">{whyNot}</p>
+    {/if}
 
-      <!-- WHY THE ANSWERS ARE OFF, ABOVE THE QUESTIONS AND NOT AFTER A PRESS. It is the record's own
-           refusal, said before anybody has typed a word, and it ends by saying that reading is what
-           this colleague still holds. Every option button and the batch commit point at it. -->
-      {#if !answerable}
-        <p class="cannot" id="cannot-decide">{whyNot}</p>
-      {/if}
+    <div class="decide-grid">
+      <div class="col">
+        {#if lead}
+          <!-- THE OPEN QUESTION, whole, in the lead tile: its own `ol.queue`, so the cursor, the ids and the answers are
+               the rows' own. -->
+          <Tile lead aria-labelledby="q-{lead.id}-title">
+            <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
+              <ol class="queue queue-lead">{@render card(lead, true)}</ol>
+            </div>
+          </Tile>
 
-      {#each groups as g (g.key)}
-        <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
-          {#if grouping !== 'none'}<h3 class="group-head">{g.name}<span class="group-n">{g.items.length}</span></h3>{/if}
-          <!-- THE ORDER IS SAID OUT LOUD, because a list whose order cannot be seen is a list a reader
-               assumes is arbitrary, and this one is not: it is dearest-to-get-wrong first. Grouped, the
-               heading above already names the list and a second label would be the same list twice. -->
-          <ol class="queue" aria-label={grouping === 'none' ? copy.rankedBy : undefined}>
-            {#each g.items as q (q.id)}{@render card(q)}{/each}
-          </ol>
-        </div>
-      {/each}
-
-      {#if waiting.length === 0}
-        <Empty kind="cleared" compact title={said('no_questions')}>
-          {#snippet actions()}
-            {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
-          {/snippet}
-        </Empty>
-      {/if}
-
-      {#if picked.size > 0}
-        <!-- THE SELECTION'S BAR, stuck to the foot of the view and drawn after the list, so opening it
-             moves nothing above it. -->
-        <div class="batch" role="region" aria-label={copy.decideSelected(chosen.length)}>
-          <span class="batch-n">{copy.decideSelected(chosen.length)}</span>
-          {#if approvable.length > 0}
-            <input
-              class="batch-why"
-              type="text"
-              placeholder={copy.decideBatchReason}
-              aria-label={copy.decideBatchReason}
-              bind:value={batchReason}
-              onkeydown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void answerPicked();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  picked = new Set();
-                }
-              }}
-            />
-            <Button
-              weight="primary"
-              disabled={batching || !answerable || (from === 'live' && !batchReason.trim())}
-              aria-describedby={answerable ? undefined : 'cannot-decide'}
-              onclick={answerPicked}
-            >
-              {copy.decideAnswerSuggested(approvable.length)}
-            </Button>
-          {:else if !heldBack}
-            <span class="batch-note">{copy.decideNoneSuggested}</span>
+          <!-- WHAT ACCEPTING IT WOULD CHANGE, whole, under it: the rows it changes, what it puts in place, or the
+               arrangement with every call it makes. Gone once it is decided, since there is nothing left to approve. -->
+          {#if !settledHere.has(lead.id)}
+            {@const story = stories.get(lead.id)}
+            {@const preview = previews.get(lead.id)}
+            {@const updates = changed.get(lead.id) ?? []}
+            {@const set = rowsetOf(lead)}
+            {#if story}
+              <Tile icon="settings" title={LEAD.does}><Arranged arranged={story} /></Tile>
+            {:else if preview}
+              <Tile icon="doc" title={copy.proposalWillAppear}><Proposed proposed={preview} /></Tile>
+            {:else if updates.length}
+              <Tile icon="rows" title={changeWords.heading} count={updates.length}>
+                <Changes {updates} compact />
+                {#if set}<p class="reading">{copy.decideRows(updates.length, listName(set.register))}.</p>{/if}
+              </Tile>
+            {/if}
           {/if}
-          {#if heldBack}<span class="batch-note">{copy.arrangeNotInBatch}</span>{/if}
+        {:else}
+          {@render waitingList()}
+        {/if}
+      </div>
+
+      <div class="col">
+        <!-- HOW LONG EACH HAS WAITED: a chart only when there is more than one to compare, and its one reading line. -->
+        {#if waiting.length > 1}
+          <Tile icon="clock" title={LEAD.waited}>
+            <Bars items={waited.items} format={waitedWords} subject={LEAD.waited} />
+            <p class="reading">{waited.reading} {copy.aimFor(aim)}.</p>
+          </Tile>
+        {/if}
+        {#if lead && (order.length > 1 || waiting.length === 0)}
+          <div class="side-list">{@render waitingList()}</div>
+        {/if}
+      </div>
+    </div>
+
+    {#if picked.size > 0}
+      <!-- THE SELECTION'S BAR, glass chrome floating at the foot of the view, drawn after the queue so opening it moves
+           nothing above it. -->
+      <div class="batch" role="region" aria-label={copy.decideSelected(chosen.length)}>
+        <span class="batch-n">{copy.decideSelected(chosen.length)}</span>
+        {#if approvable.length > 0}
+          <input
+            class="batch-why"
+            type="text"
+            placeholder={copy.decideBatchReason}
+            aria-label={copy.decideBatchReason}
+            bind:value={batchReason}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void answerPicked();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                picked = new Set();
+              }
+            }}
+          />
           <Button
-            weight="bare"
-            onclick={() => {
-              picked = new Set();
-              selecting = false;
-            }}>{copy.clearSelection}</Button
+            weight="primary"
+            disabled={batching || !answerable || (from === 'live' && !batchReason.trim())}
+            aria-describedby={answerable ? undefined : 'cannot-decide'}
+            onclick={answerPicked}
           >
-        </div>
-      {/if}
-    </Section>
+            {copy.decideAnswerSuggested(approvable.length)}
+          </Button>
+        {:else if !heldBack}
+          <span class="batch-note">{copy.decideNoneSuggested}</span>
+        {/if}
+        {#if heldBack}<span class="batch-note">{copy.arrangeNotInBatch}</span>{/if}
+        <Button
+          weight="bare"
+          onclick={() => {
+            picked = new Set();
+            selecting = false;
+          }}>{copy.clearSelection}</Button
+        >
+      </div>
+    {/if}
   {/if}
 
   <!-- WHAT WAS PUT OFF, the soonest back first. The queue above leaves a deferred question out until its day comes, so
        without this list a question put off was a question nobody could find until it reappeared. -->
   {#if from === 'live' && views.later.length}
     <Section title={WORDS.later} count={views.later.length}>
-      <ul class="ledger">
+      <ul class="ledger ledger-lead">
         {#each views.later.slice(0, DOM_CAP) as q (q.id)}
           <li>
-            <a class="line" href={at(`/decide/${q.id}`)}>
+            <a class="line line-tall" href={at(`/decide/${q.id}`)}>
+              <span class="line-mark"><IconWell name="clock" size="l" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 {#if q.why}<span class="line-detail">{q.why}</span>{/if}
@@ -829,11 +1010,12 @@
        not by how sure it sounded. The word carries the outcome; the glyph beside it is never the only sign. -->
   {#if from === 'live' && views.calls.length}
     <Section title={WORDS.calls} count={views.calls.length}>
-      <ul class="ledger">
+      <ul class="ledger ledger-lead">
         {#each views.calls as c (c.id)}
           {@const when = dayWord(c.at, now)}
           <li>
             {#snippet body()}
+              <span class="line-mark"><IconWell name="observe" size="l" tone={c.went === 'met' ? 'earn' : undefined} /></span>
               <span class="line-main">
                 <span class="line-title">{c.claim}</span>
                 <span class="line-detail call-went" data-went={c.went}>
@@ -842,23 +1024,29 @@
               </span>
               {#if c.went !== 'due' && when}<span class="line-when">{WORDS.checked(when)}</span>{/if}
             {/snippet}
-            {#if c.about}<a class="line" href={at(`/decide/${c.about}`)}>{@render body()}</a>{:else}<div class="line">{@render body()}</div>{/if}
+            {#if c.about}<a class="line line-tall" href={at(`/decide/${c.about}`)}>{@render body()}</a>{:else}<div class="line line-tall">{@render body()}</div>{/if}
           </li>
         {/each}
       </ul>
     </Section>
   {/if}
 
+  <!-- DECIDED LATELY: the answer each one got and the reason it kept, the newest first. The first few, then the whole
+       ledger in place under "All decisions", capped and paged as it always was. -->
   {#if DECIDED.length}
-    <Section title={copy.searchDecided} count={decidedTotal}>
-      <ul class="ledger">
-        {#each DECIDED.slice(0, DOM_CAP) as q}
+    <Section title={LEAD.decided} count={decidedTotal}>
+      {#snippet aside()}
+        {#if !allDecided && decidedTotal > DECIDED_FIRST}
+          <Button weight="bare" size="sm" onclick={() => (allDecided = true)}>{LEAD.allDecided}<Icon name="arrow" size="s" /></Button>
+        {/if}
+      {/snippet}
+      <ul class="ledger ledger-lead">
+        {#each decidedShown as q}
           <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
           {@const choseTitle = q.options.find((o) => o.key === q.decided?.option)?.title}
           <li>
-            <!-- ON THE LIST'S EDGE, WITH NO TICK AND NO ID: every row here is decided, which the heading says once, and a
-                 tick on each pushed every title 32px in from the rows above it. -->
-            <a class="line" href={at(`/decide/${q.id}`)}>
+            <a class="line line-tall" href={at(`/decide/${q.id}`)}>
+              <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
               <span class="line-main">
                 <span class="line-title">{q.title}</span>
                 <span class="line-detail">{#if choseTitle}<span class="decided-choice">{choseTitle}</span> {/if}{q.decided?.reason}</span>
@@ -868,105 +1056,197 @@
           </li>
         {/each}
       </ul>
-      <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={decidedTotal} />
-      {#if from === 'live' && live?.older && live.older.cursor !== null}
-        <div class="older">
-          <Button weight="quiet" onclick={loadOlder} disabled={loadingOlder}>{copy.olderEntries}</Button>
-        </div>
+      {#if allDecided}
+        <!-- THE WHOLE LEDGER IS `DECIDED.slice(0, DOM_CAP)`, and the line under it says when it holds more. -->
+        <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={decidedTotal} />
+        {#if from === 'live' && live?.older && live.older.cursor !== null}
+          <div class="older">
+            <Button weight="quiet" onclick={loadOlder} disabled={loadingOlder}>{copy.olderEntries}</Button>
+          </div>
+        {/if}
+        {#if olderFix}<p class="older-fix" role="status">{olderFix}</p>{/if}
       {/if}
-      {#if olderFix}<p class="older-fix" role="status">{olderFix}</p>{/if}
     </Section>
   {/if}
 </div>
 
 <style>
   .page {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: var(--sp-7);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
-  }
-
-  .head-aside {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--sp-2) var(--sp-3);
   }
 
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has
      gone wrong, and this reader is doing exactly what they were invited to do. `--measure` because
      it is three sentences and a line that runs the width of the page is a line nobody reads. */
   .cannot {
-    margin: 0 0 var(--sp-4);
+    margin: 0;
     max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
 
+  /* ── the layout: the open question and what it changes, beside how long each has waited and the rest ─────── */
+
+  /* ONE COLUMN UNTIL THE CONTENT IS WIDE ENOUGH FOR TWO, measured on the content and not the window, so a docked panel
+     or a narrow window gets the single column rather than a squeezed second one. */
+  .decide-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
+  @container (inline-size >= 60rem) {
+    .decide-grid {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      column-gap: var(--sp-5);
+    }
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  /* A LIST UNDER A TILE stands a little further off than two tiles do, so it reads as the ground and not a third tile. */
+  .side-list:not(:first-child) {
+    margin-block-start: var(--sp-4);
+  }
+
+  /* THE ONE WRITTEN LINE UNDER A CHART OR A TABLE, saying what it means (SYSTEM §6). */
+  .reading {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* ── the hints and the groups ──────────────────────────────────────────── */
+
+  .hint {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .hint > span {
+    margin-inline-start: 2px;
+  }
+
   .group + .group {
     margin-block-start: var(--sp-5);
   }
 
+  /* A GROUP'S HEADING, a step under the section's: the row size at 600, its count in the quiet ink, and a hairline. */
   .group-head {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-1);
-    color: var(--ink2);
+    margin: 0 0 var(--sp-1);
+    padding-block: var(--sp-2);
+    border-block-end: 1px solid var(--line);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--t-row);
+    font-weight: 600;
   }
 
   .group-n {
     color: var(--dim);
-    font-variant-numeric: tabular-nums;
+    font-weight: 500;
   }
 
+  /* ── a question ─────────────────────────────────────────────────────────── */
+
+  /* THE ROWS REACH A STEP PAST THE TEXT COLUMN, as `rows.css` has them, so a title lines up with the heading above it
+     and its rounded wash still has somewhere to be. The lead's list is inside a tile and sits on its padding. */
   .queue {
     display: flex;
     flex-direction: column;
-    margin: 0;
+    margin: 0 calc(-1 * var(--sp-3));
     padding: 0;
     list-style: none;
   }
 
+  .queue-lead {
+    margin: 0;
+  }
+
   /**
-   * A QUESTION IS A SECTION OF THE LIST, NOT A CARD. Space and a soft divider separate one from the
-   * next. The link is the top of the item and the answers sit under it as siblings, because a button
-   * may not live inside a link.
+   * A QUESTION IS A ROW ON THE GROUND, NOT A CARD. The link is the top of the item and the answers sit under it as
+   * siblings, because a button may not live inside a link. Hover and the cursor are the rounded wash; a hairline runs
+   * between two rows and steps aside for a washed one, so the fill is one clean shape.
    */
   .q {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding-block: var(--sp-5);
-    border-block-end: 1px solid var(--line-soft);
+    padding: var(--sp-3);
+    border-radius: var(--r-md);
     scroll-margin-block: var(--sp-7);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .q:first-child {
-    padding-block-start: var(--sp-2);
+  .queue > .q + .q::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--sp-3);
+    block-size: 1px;
+    background: var(--line);
+    pointer-events: none;
+    transition: opacity var(--d-state) var(--ease-out);
   }
 
-  .q:last-child {
-    border-block-end: 0;
+  .q:not([data-lead])[data-cursor] {
+    background: var(--hover-wash);
   }
 
-  /* THE CURSOR IS THE FOCUS RING, drawn round the question with room to breathe, and only while it is
-     the keyboard's. A pointer reader never sees it. */
+  .q[data-cursor]::after,
+  .q[data-cursor] + .q::after {
+    opacity: 0;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .q:not([data-lead]):hover {
+      background: var(--hover-wash);
+    }
+
+    .q:not([data-lead]):hover::after,
+    .q:not([data-lead]):hover + .q::after {
+      opacity: 0;
+    }
+  }
+
+  /* THE CURSOR IS THE FOCUS RING while it is the keyboard's, drawn round the question. A pointer reader never sees it. */
   .q:focus-visible {
     outline: 2px solid var(--focus-in);
-    outline-offset: var(--sp-2);
-    border-radius: var(--r-sm);
+    outline-offset: 2px;
   }
 
-  /* A DECIDED QUESTION IS ONE LINE, and the rule under it stays so the list keeps its rhythm. */
+  .q[data-lead] {
+    gap: var(--sp-4);
+    padding: 0;
+  }
+
+  .q[data-lead]:focus-visible {
+    outline-offset: var(--sp-3);
+    border-radius: var(--r-md);
+  }
+
+  /* A DECIDED QUESTION IS ONE LINE, and the rule over it stays so the list keeps its rhythm. */
   .q[data-done] {
     padding-block: var(--sp-3);
   }
@@ -976,7 +1256,7 @@
     align-items: baseline;
     gap: var(--sp-1) var(--sp-2);
     color: var(--dim);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     text-decoration: none;
   }
 
@@ -1006,11 +1286,16 @@
     margin-inline: var(--sp-1) var(--sp-2);
   }
 
+  /* THE WELL, THE WORDS AND THE SELECTION CHECK, and everything under them starts on the words' edge. */
   .q-top {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
     align-items: start;
     gap: var(--sp-3);
+  }
+
+  .q:not([data-lead], [data-done]) > :not(.q-top) {
+    margin-inline-start: calc(var(--well-l) + var(--sp-3));
   }
 
   .q-open {
@@ -1022,79 +1307,165 @@
   .q-body {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    gap: 2px;
     min-inline-size: 0;
   }
 
   .q-title {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--t-row);
     font-weight: 500;
-    letter-spacing: -0.005em;
+    line-height: 20px;
   }
 
-  .q-open:hover .q-title {
-    text-decoration: underline;
-    text-decoration-color: var(--line);
-    text-underline-offset: 3px;
+  /* THE OPEN QUESTION'S NAME IS THE TILE'S HEADING, at the group step and wrapping, never cut. */
+  .q[data-lead] .q-title {
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
+    text-wrap: balance;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .q-open:hover .q-title {
+      text-decoration: underline;
+      text-decoration-color: var(--line);
+      text-underline-offset: 3px;
+    }
   }
 
   .q-cost {
     max-inline-size: var(--measure);
-    color: var(--dim);
+    color: var(--ink2);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
+  /* THE META LINE: what it is about, who asked, how long it has waited, and what getting it wrong costs. It wraps as
+     whole items, and the dot sits between items so a line never opens with one. */
   .q-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2);
+    column-gap: var(--sp-2);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
-  .q-entity {
-    color: var(--ink2);
-  }
-
-  /* THE BAND TAKES THE LINE'S OWN SEPARATOR RATHER THAN A PILL. Every other item on this line is a
-     word after a dot, and a capsule among them would be the loudest thing in a list of questions —
-     which is a ranking arguing for itself. The dearest band takes the darker ink and nothing else:
-     the word is what says it, and `data-cost` is matched instead of the English. */
-  .q-band[data-cost='undo'] {
-    color: var(--ink2);
-    font-weight: 500;
-  }
-
-  /* Between items, so a question about nothing does not open its line with a dot. */
   .q-head > span + span::before {
     content: '·';
     margin-inline-end: var(--sp-2);
     color: var(--dim);
   }
 
-  /* THE SELECTION BOX, at the trailing edge of the title, and only where it is wanted: under the
-     pointer, on the cursor, or once something is selected. It keeps its space when hidden, so showing
-     it moves nothing. A thumb selects nothing here; a phone answers one question at a time. */
+  .q-entity {
+    color: var(--ink2);
+  }
+
+  /* PAST TWO WEEKS THE AGE IS LATE, and its words carry the red at 500 so it is never a hairline of colour. */
+  .q-age[data-stale] {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  /* THE BAND TAKES THE LINE'S OWN SEPARATOR RATHER THAN A PILL: the dearest takes the darker ink and nothing else. */
+  .q-band[data-cost='undo'] {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  /* ── what accepting does, the suggestion, and its evidence (the open question only) ───────────────────── */
+
+  .q-does {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    margin-inline-start: calc(var(--well-l) + var(--sp-3));
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .q-does > li {
+    display: flex;
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
+  .q-does :global(.icon) {
+    flex: none;
+    margin-block-start: 2px;
+    color: var(--ink2);
+  }
+
+  .q-rec {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .q-rec-h {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .q-rec-why {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .q-ev {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-1);
+  }
+
+  .q-ev-key {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* ── the selection check ───────────────────────────────────────────────── */
+
+  /* A 20PX ROUND CHECK at the trailing edge of the title, and only where it is wanted: under the pointer, on the
+     cursor, or once something is selected. It keeps its space when hidden, so showing it moves nothing. */
   .pick {
     display: grid;
     place-items: center;
-    inline-size: 16px;
-    block-size: 16px;
+    box-sizing: border-box;
+    inline-size: 20px;
+    block-size: 20px;
     margin-block-start: 2px;
     padding: 0;
     background: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    border: 1.5px solid var(--dim);
+    border-radius: var(--r-pill);
     color: var(--on-ink);
     cursor: pointer;
     visibility: hidden;
+    transition:
+      background var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out);
   }
 
   .pick[data-on] {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--ink);
+    border-color: var(--ink);
   }
 
   .q:hover .pick,
@@ -1104,35 +1475,8 @@
     visibility: visible;
   }
 
-  /* ON A PHONE THE BOX IS A THUMB'S: drawn larger, reached through a 44px square round it, and shown only once
-     `Select` is pressed, because nothing hovers there to reveal it. */
-  .select-toggle {
-    display: none;
-  }
-
-  /* THE HEADING KEEPS ITS LINE when `Select` joins the aside on a phone; the aside wraps under itself instead. */
-  .page :global(.section-title) {
-    flex: none;
-    white-space: nowrap;
-  }
-
-  /* ON A PHONE THE HEAD HOLDS THE COUNT AND `Select`, and the aim, a desk's nicety, gives way to them. */
-  @media (width < 640px) {
-    .head-aside :global(.chip) {
-      display: none;
-    }
-
-    .batch .batch-note {
-      flex-basis: 100%;
-    }
-  }
-
-  @media (width < 900px), (pointer: coarse) {
-    .select-toggle {
-      display: inline-flex;
-    }
-  }
-
+  /* ON A PHONE THE CHECK IS A THUMB'S: larger, reached through a 44px square round it, and shown only once `Select` is
+     pressed, because nothing hovers there to reveal it. */
   @media (pointer: coarse) {
     .pick {
       position: relative;
@@ -1173,6 +1517,8 @@
     max-inline-size: var(--measure);
   }
 
+  /* ── the answers ───────────────────────────────────────────────────────── */
+
   .q-act {
     display: flex;
     flex-direction: column;
@@ -1186,16 +1532,52 @@
     gap: var(--sp-2);
   }
 
-  @media (pointer: fine) {
-    .q-options :global(.btn.btn) {
-      min-block-size: var(--ctl-h-sm);
+  /* THE OPEN QUESTION'S OPTIONS SHARE THE TILE'S WIDTH, each a pill with its name at the start and its key at the end. */
+  .q[data-lead] .q-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
+
+  .q[data-lead] .q-options :global(.btn) {
+    justify-content: space-between;
+    white-space: normal;
+    text-align: start;
+  }
+
+  .opt-name {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  /* THE SUGGESTION IS A WORD, IN THE QUIET INK, read with the option's name. */
+  .rec {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
+  }
+
+  /* A KEY IS PRINTED ONLY WHERE THE KEYS ACT: on the open question until the cursor moves, then on the cursor's row. */
+  .q:not([data-keys]) .q-options :global(.btn-kbd) {
+    display: none;
+  }
+
+  /* A ROW'S SMALL PILLS ARE A THUMB'S HEIGHT UNDER ONE, where `--ctl-h` is 44. */
+  @media (pointer: coarse) {
+    .q-options :global(.btn[data-size='sm']) {
+      min-block-size: var(--ctl-h);
+      font-size: var(--t-md);
     }
   }
 
   /* ON A PHONE EACH OPTION IS A FULL-WIDTH ROW, so a thumb meets one answer at a time and a long label wraps inside its
      own button rather than pushing the next one onto half a line. */
   @media (width < 640px) {
-    .q-options {
+    .q-options,
+    .q[data-lead] .q-options {
+      display: flex;
       flex-direction: column;
       align-items: stretch;
     }
@@ -1203,14 +1585,9 @@
     .q-options :global(.btn) {
       inline-size: 100%;
       justify-content: flex-start;
+      white-space: normal;
       text-align: start;
     }
-  }
-
-  /* THE SUGGESTION IS A WORD, IN THE QUIET INK, read with the option's name. */
-  .rec {
-    color: var(--dim);
-    font-weight: 400;
   }
 
   .said {
@@ -1222,7 +1599,7 @@
 
   .said-what {
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
   }
 
   .why {
@@ -1233,35 +1610,39 @@
   }
 
   .why-label {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
-  .why-field,
-  .batch-why {
+  /* A FIELD IS 40 ON `--s1` IN A TILE AND ON THE TILE'S OWN WHITE ON THE GROUND, radius 12, and no border: the fill is
+     its edge (SYSTEM §6). */
+  .why-field {
     inline-size: 100%;
-    min-block-size: var(--ctl-h);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    min-block-size: 40px;
+    padding: 10px var(--sp-3);
+    background: var(--bg);
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--t-ui);
-  }
-
-  /* THE REASON STAYS ABOVE THE KEYBOARD, with room under it for Send: a focused field scrolls clear of the sticky bar
-     above and of `--kb` below, which is the keyboard's height once it is up and nothing before. */
-  .why-field {
+    line-height: var(--lh-body);
     resize: vertical;
+    /* THE REASON STAYS ABOVE THE KEYBOARD, with room under it for Send: a focused field scrolls clear of the sticky bar
+       above and of `--kb` below, which is the keyboard's height once it is up and nothing before. */
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
     scroll-margin-block-end: calc(var(--kb) + var(--ctl-h) + var(--sp-6));
   }
 
+  .q[data-lead] .why-field {
+    background: var(--s1);
+  }
+
   .why-note {
+    margin: 0;
     max-inline-size: var(--measure);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .send {
@@ -1277,7 +1658,7 @@
     align-items: center;
     gap: var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .keys :global(.kbd-run + .kbd-run),
@@ -1285,29 +1666,16 @@
     margin-inline-start: var(--sp-3);
   }
 
-  @media (width < 900px), (pointer: coarse) {
-    .keys {
-      display: none;
-    }
-  }
-
   .why-fix {
+    margin: 0;
     max-inline-size: var(--measure);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
   }
 
-  /* THE PRESS FOR OLDER DECISIONS, under the ledger it adds to. */
-  .older {
-    display: flex;
-    margin-block: var(--sp-3);
-  }
+  /* ── the selection's bar: glass chrome at the foot of the view ─────────────────────────────── */
 
-  .older-fix {
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  /* At the trailing edge, as wide as it needs, so a toast at the leading edge and the bar do not meet. */
+  /* AT THE TRAILING EDGE, as wide as it needs, so a toast at the leading edge and the bar do not meet. Level two: the
+     strong glass, its hairline pair and the floating shadow; its field is the wash on glass the rail's ask field is. */
   .batch {
     position: sticky;
     inset-block-end: var(--sp-4);
@@ -1319,17 +1687,17 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
-    margin-block-start: var(--sp-4);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--s2);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    box-shadow: var(--e2);
+    padding: 6px 6px 6px var(--sp-4);
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-lg);
+    box-shadow: var(--glass-edge), var(--e2);
   }
 
   .batch-n {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1338,6 +1706,14 @@
     flex: 0 1 18rem;
     inline-size: 18rem;
     min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: var(--hover-wash);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-ui);
   }
 
   /* A question the cursor lands on clears the bar, which stands over the foot of the view. */
@@ -1348,35 +1724,47 @@
   .batch-note {
     flex: 1;
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
   }
 
-  /* The row shape is `$lib/ui/rows.css`; the decided list uses three of its four columns.
+  /* ── the lists under the queue ─────────────────────────────────────────── */
 
-     A DESKTOP TRACK LIST IS A DESKTOP RULE, AND HAS TO SAY SO: `rows.css` turns a row into a two-line
-     card below 640px, and this override is more specific than that rule, so without the width query
-     it won at every size and left a zero-width track holding a nowrap note. */
-  @media (width >= 640px) {
-    .ledger :global(.line) {
-      grid-template-columns: minmax(0, 1fr) auto;
-      min-block-size: 44px;
-    }
+  /* THE PRESS FOR OLDER DECISIONS, under the ledger it adds to. */
+  .older {
+    display: flex;
+    margin-block: var(--sp-3);
   }
 
-  /* ON A PHONE THE DAY GOES UNDER THE WORDS, and the words start on the list's edge like every row above them. */
+  .older-fix {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* A WELL, THE WORDS, AND WHEN, on every width. `rows.css` gives a lead column; on a phone the when goes under the
+     words and the well stands beside both, so every title starts on one edge. */
+  .ledger :global(.line) {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    gap: var(--sp-1) var(--sp-3);
+  }
+
   @media (width < 640px) {
     .ledger :global(.line) {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-1);
+      grid-template-columns: var(--well-l) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .ledger :global(.line-mark) {
+      grid-column: 1;
+      grid-row: 1 / span 2;
     }
 
     .ledger :global(.line-main) {
-      grid-column: 1;
+      grid-column: 2;
       grid-row: 1;
     }
 
     .ledger :global(.line-when) {
-      grid-column: 1;
+      grid-column: 2;
       grid-row: 2;
       justify-content: flex-start;
     }
@@ -1392,22 +1780,48 @@
 
   .decided-choice {
     margin-inline-end: var(--sp-1);
-    color: var(--ink2);
+    color: var(--ink);
     font-weight: 500;
+  }
+
+  /* THE COMPACT BAR IS GLASS ALREADY, and glass never holds glass: the segmented track drops its own there. */
+  :global(.head[data-under]) .segmented {
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* NO KEY IS PRINTED WHERE THERE IS NO KEYBOARD, and the group control, a desk's nicety, gives way on a phone. */
+  @media (width < 900px), (pointer: coarse) {
+    .keys,
+    .hint,
+    .q-options :global(.btn-kbd) {
+      display: none;
+    }
   }
 
   @media (width < 900px) {
     .page {
+      gap: var(--sp-6);
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    .head-aside .segmented {
+    .segmented {
       display: none;
+    }
+
+    /* A PHONE'S ROW IS 60 (SYSTEM §9), and the bar sits above the tab bar. */
+    .q:not([data-lead]) {
+      min-block-size: 60px;
     }
 
     .batch {
       inset-block-end: calc(var(--tabbar) + var(--sp-3));
     }
 
+    .batch .batch-note {
+      flex-basis: 100%;
+    }
   }
 </style>

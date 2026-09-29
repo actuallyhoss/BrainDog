@@ -88,7 +88,7 @@
 
   .did-list dt {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
 
@@ -101,7 +101,7 @@
   .did-note {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   @media (width < 640px) {

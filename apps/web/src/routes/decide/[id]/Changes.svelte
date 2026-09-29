@@ -118,7 +118,7 @@
   .change-id {
     color: var(--dim);
     font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .change-field {
@@ -142,7 +142,7 @@
   .change-label {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .plain {

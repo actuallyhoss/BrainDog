@@ -66,8 +66,10 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Thread from '$lib/ui/Thread.svelte';
+  import { gateSentence, WORDS as LEAD } from '../lead.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
@@ -434,6 +436,14 @@
         : null),
   );
 
+  /* THE SENTENCE UNDER THE TITLE, while the question is still open: how many options, which is suggested, and how long
+     it has been open (`../lead.ts`). A settled or closed question says what happened in its own block instead. */
+  const gateSaid = $derived(question && !settled && !(from === 'live' && live?.closed) ? gateSentence(question, now) : undefined);
+
+  /* WHAT THE COST TILE IS CALLED: the cost of deciding late when whoever asked wrote one, else the cost of getting it
+     wrong, which the record worked out; so a tile is never headed by a cost it does not hold. */
+  const costTitle = $derived(question?.cost || !queueCost(question?.band ?? '') ? copy.costOfDelay : copy.costOfWrong);
+
   /**
    * DRAWN ONCE THE READ HAS ANSWERED LIVE. The read is bracketed by `opened()` and `closed()`, so a call
    * still out takes `data-screen` away whatever this says.
@@ -505,126 +515,137 @@
     </Empty>
   </div>
 {:else}
-  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={question.title} />
+  <!-- THE QUESTION IS THE TITLE, and the sentence under it says how many ways there are to answer, which one is
+       suggested, and how long it has been open. -->
+  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={question.title} sentence={gateSaid} />
 
   <div class="page">
     <!-- THE BLOCK EXISTED AND ONLY THE RECORD COULD REACH IT. It was gated on `question.decided`,
          so a question decided a moment ago on this screen went on showing the options, the reason
          field and a live commit button, which is the one state where the product has to say plainly
          that it is finished. -->
-    <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news; what it would do follows, unchanged. -->
+    <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news; what it would do follows, each part in a
+         tile of its own: what accepting does, what it puts in place, the rows it adds or changes, and what it calls. -->
     {#if part && !settled}<Applied partial={part} />{/if}
     {#if story && !settled}
-      <section class="changed" aria-label={story.lead}>
-        <Arranged arranged={story} />
-      </section>
+      <Tile icon="settings" title={LEAD.does}>
+        <section class="changed" aria-label={story.lead}>
+          <Arranged arranged={story} />
+        </section>
+      </Tile>
     {/if}
 
     {#if preview && !settled}
-      <section class="changed">
-        <div class="options-head">
-          <h2 class="options-title">{copy.proposalWillAppear}</h2>
-        </div>
-        <Proposed proposed={preview} />
-        <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the preview
-             cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
-        {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
-          <details class="source-fold">
-            <summary>{copy.proposalSource(a.title)}</summary>
-            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <pre class="source" tabindex="0">{a.source}</pre>
-          </details>
-        {/each}
-      </section>
+      <Tile icon="doc" title={copy.proposalWillAppear}>
+        <section class="changed">
+          <Proposed proposed={preview} />
+          <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the preview
+               cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
+          {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
+            <details class="source-fold">
+              <summary>{copy.proposalSource(a.title)}</summary>
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+              <pre class="source" tabindex="0">{a.source}</pre>
+            </details>
+          {/each}
+        </section>
+      </Tile>
     {/if}
 
     {#if pickable.length && !settled && !live?.closed}
-      <section class="changed">
-        <div class="options-head">
-          <h2 class="options-title">{pickWords.heading}</h2>
-        </div>
-        <p class="pick-hint">{pickWords.hint}</p>
-        <ul class="picks">
-          {#each pickable as row (row.n)}
-            <li>
-              <label class="pick">
-                <input
-                  type="checkbox"
-                  checked={!unticked.includes(row.n)}
-                  aria-label={pickWords.keep(row.title)}
-                  onchange={(e) => (unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n])}
-                />
-                <span class="pick-title">{row.title}</span>
-                {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
-              </label>
-            </li>
-          {/each}
-        </ul>
-        {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
-      </section>
+      <Tile icon="rows" title={pickWords.heading} count={pickable.length}>
+        <section class="changed">
+          <p class="pick-hint">{pickWords.hint}</p>
+          <ul class="picks">
+            {#each pickable as row (row.n)}
+              <li>
+                <label class="pick">
+                  <input
+                    type="checkbox"
+                    checked={!unticked.includes(row.n)}
+                    aria-label={pickWords.keep(row.title)}
+                    onchange={(e) => (unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n])}
+                  />
+                  <span class="pick-title">{row.title}</span>
+                  {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
+                </label>
+              </li>
+            {/each}
+          </ul>
+          {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
+        </section>
+      </Tile>
     {/if}
 
     {#if updates.length}
-      <section class="changed">
-        <div class="options-head">
-          <h2 class="options-title">{changeWords.heading}</h2>
-        </div>
+      <Tile icon="rows" title={changeWords.heading} count={updates.length}>
         <Changes {updates} />
-      </section>
+      </Tile>
     {/if}
 
     <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
          sent, as the record worked them out when the proposal was filed. Accept and Decline below are the one
          approval (`research-scheduled-actions.md` §5), so the lines go once the question is settled. -->
     {#if from === 'live' && live && live.calls.length > 0 && !settled && !live.closed}
-      <section class="changed">
+      <Tile icon="globe" title={installWords.heading}>
         <dl class="calls-out">
           <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
         </dl>
-      </section>
+      </Tile>
     {/if}
 
     {#if settled}
-      <div class="settled">
-        <p class="settled-head">
-          <Icon name="check" size="m" />
-          {copy.decidedBy}
-          {whoDid(settled.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))).name}, {since(settled.at, now)}
-        </p>
-        <p class="settled-choice">{settled.title}</p>
-        <p class="settled-reason">“{settled.reason}”</p>
-        <p class="settled-note">{copy.immutable}</p>
-        {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
-        {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
-        <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision: the sample's
-             unsaved one, with its chip and its way back, went with the sample. -->
-        <p class="settled-where">{onwardWords.where} {onwardWords.left(waiting)}</p>
-        <div class="settled-next">{@render onward()}</div>
-      </div>
+      <!-- THE RECEIPT, A TILE WITH ITS GREEN CHECK: who, when, which option, and the reason as it was written. -->
+      <Tile>
+        <div class="settled">
+          <p class="settled-head">
+            <IconWell name="check" size="l" tone="earn" />
+            <span>
+              {copy.decidedBy}
+              {whoDid(settled.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))).name}, {since(settled.at, now)}
+            </span>
+          </p>
+          <p class="settled-choice">{settled.title}</p>
+          <p class="settled-reason">“{settled.reason}”</p>
+          <p class="settled-note">{copy.immutable}</p>
+          {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
+          {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
+          <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision: the sample's
+               unsaved one, with its chip and its way back, went with the sample. -->
+          <p class="settled-where">{onwardWords.where} {onwardWords.left(waiting)}</p>
+          <div class="settled-next">{@render onward()}</div>
+        </div>
+      </Tile>
     {:else if from === 'live' && live?.closed}
       <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again. -->
       <p class="cost-age">{governed.closed(question.id)} {onwardWords.left(waiting)}</p>
       {@render onward()}
     {:else}
-      <section class="cost">
+      <!-- WHY IT WAS ASKED AND WHAT IT COSTS, side by side when both are there: the reasoning whoever asked wrote,
+           then the cost of deciding late, the cost of getting it wrong the record worked out, and its age. -->
+      <div class="about" data-pair={question.context ? '' : undefined}>
         {#if question.context}
-          <h2 class="cost-label">{copy.whyAsked}</h2>
-          <p class="cost-body context">{symbolText(question.context)}</p>
+          <Tile icon="ask" title={copy.whyAsked}>
+            <p class="cost-body context">{symbolText(question.context)}</p>
+          </Tile>
         {/if}
-        {#if question.cost}
-          <h2 class="cost-label">{copy.costOfDelay}</h2>
-          <p class="cost-body">{symbolText(question.cost)}</p>
-        {/if}
-        <!-- AND THE OTHER COST, WHICH NOBODY TYPED. The one above is why deciding late is expensive,
-             written by whoever asked; this is what the record worked out getting it wrong would cost,
-             from what accepting the proposal would do, and it is what puts the question where it is
-             in the queue. Absent on a question whose body this build cannot read. -->
-        {#if queueCost(question.band ?? '')}
-          <h2 class="cost-label">{copy.costOfWrong}</h2>
-          <p class="cost-body" data-cost={question.band}>{queueCost(question.band ?? '')}</p>
-        {/if}
-        <p class="cost-age">Opened {since(question.opened, now)}. Nobody has decided it.</p>
-      </section>
+        <Tile icon="clock" title={costTitle}>
+          <section class="cost">
+            {#if question.cost}
+              <p class="cost-body">{symbolText(question.cost)}</p>
+            {/if}
+            <!-- AND THE OTHER COST, WHICH NOBODY TYPED. The one above is why deciding late is expensive,
+                 written by whoever asked; this is what the record worked out getting it wrong would cost,
+                 from what accepting the proposal would do, and it is what puts the question where it is
+                 in the queue. Absent on a question whose body this build cannot read. -->
+            {#if queueCost(question.band ?? '')}
+              {#if question.cost}<h3 class="cost-label">{copy.costOfWrong}</h3>{/if}
+              <p class="cost-body" data-cost={question.band}>{queueCost(question.band ?? '')}</p>
+            {/if}
+            <p class="cost-age">Opened {since(question.opened, now)}. Nobody has decided it.</p>
+          </section>
+        </Tile>
+      </div>
 
       <!-- WHY THE ANSWERS ARE OFF, ABOVE THE OPTIONS AND NOT AFTER A PRESS AND A PARAGRAPH. It is
            the record's own refusal, said before anybody has chosen anything, and it ends by saying
@@ -636,139 +657,142 @@
         <p class="cannot" id="cannot-decide">{whyNot}</p>
       {/if}
 
-      <section class="options">
-        <div class="options-head">
-          <h2 class="options-title">{copy.theOptions}</h2>
-        </div>
-
-        <div class="cards" data-cells={question.options.length}>
-          {#each question.options as option, i}
-            <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list, since a filed question
-                 keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
-                 `questionOf` made of it. -->
-            {@const because = reasonIn(about?.body, option.key) ?? option.body}
-            {@const shows = visuals.get(option.key)}
-            <article class="card" data-on={highlighted === option.key ? '' : undefined}>
-              <!-- WHAT THE OPTION IS LEADS IT, inside its own box and nowhere else: a swatch writes its colour into
-                   `--swatch` on its chip alone, hidden from a screen reader because the option's name says what it is. -->
-              {#if shows && 'swatch' in shows}
-                <span class="card-visual" data-shows="swatch" aria-hidden="true">
-                  {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
-                </span>
-              {:else if shows}
-                <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
-              {/if}
-              <header class="card-head">
-                <span class="card-n num">{i + 1}</span>
-                <h3 class="card-title">{option.title}</h3>
-                <!-- Shown, never pre-selected. -->
-                {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
-              </header>
-              <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name: a rule's own options
-                   carry no `because`, and a blank paragraph reads as a reason that failed to load. -->
-              {#if because.trim() !== ''}
-                <p class="card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></p>
-              {/if}
-              <!-- OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the options
-                   that says why. `aria-describedby` rather than a title, so the reason is read out
-                   with the control and not only seen beside it, which is the shape `/decide` and
-                   `/settings/people` both use. The card around it is untouched: the number, the
-                   title, the recommendation and the body are what this reader came for.
-                   THE BUTTON SAYS THE OPTION'S OWN NAME ("Per seat", not "Choose Per seat"), and the
-                   Suggested one is drawn as the primary until another is highlighted: shown, and
-                   still not chosen, because pressing it only opens the reason. ONLY THE FIRST SUGGESTED ONE: a body
-                   from an agent may mark two, and a screen has one primary. -->
-              <Button
-                weight={highlighted === option.key || (highlighted === null && option.recommended === true && question.options.find((o) => o.recommended)?.key === option.key)
-                  ? 'primary'
-                  : 'quiet'}
-                disabled={!answerable}
-                aria-describedby={answerable ? undefined : 'cannot-decide'}
-                onclick={() => choose(option.key)}
-              >
-                {option.title}
-              </Button>
-            </article>
-          {/each}
-        </div>
-      </section>
+      <Tile icon="decide" title={copy.theOptions} count={question.options.length}>
+        <section class="options">
+          <div class="cards" data-cells={question.options.length}>
+            {#each question.options as option, i}
+              <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list, since a filed question
+                   keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
+                   `questionOf` made of it. -->
+              {@const because = reasonIn(about?.body, option.key) ?? option.body}
+              {@const shows = visuals.get(option.key)}
+              <article class="card" data-on={highlighted === option.key ? '' : undefined}>
+                <!-- WHAT THE OPTION IS LEADS IT, inside its own well and nowhere else: a swatch writes its colour into
+                     `--swatch` on its chip alone, hidden from a screen reader because the option's name says what it is. -->
+                {#if shows && 'swatch' in shows}
+                  <span class="card-visual" data-shows="swatch" aria-hidden="true">
+                    {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                  </span>
+                {:else if shows}
+                  <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+                {/if}
+                <header class="card-head">
+                  <!-- THE KEY THAT HIGHLIGHTS IT, as a cap: `1` to `9` mark an option here, and never choose it. -->
+                  <kbd class="card-n num">{i + 1}</kbd>
+                  <h3 class="card-title">{option.title}</h3>
+                  <!-- Shown, never pre-selected. -->
+                  {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
+                </header>
+                <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name: a rule's own options
+                     carry no `because`, and a blank paragraph reads as a reason that failed to load. -->
+                {#if because.trim() !== ''}
+                  <p class="card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></p>
+                {/if}
+                <!-- OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the options
+                     that says why. `aria-describedby` rather than a title, so the reason is read out
+                     with the control and not only seen beside it, which is the shape `/decide` and
+                     `/settings/people` both use. The card around it is untouched: the number, the
+                     title, the recommendation and the body are what this reader came for.
+                     THE BUTTON SAYS THE OPTION'S OWN NAME ("Per seat", not "Choose Per seat"), and the
+                     Suggested one is drawn as the primary until another is highlighted: shown, and
+                     still not chosen, because pressing it only opens the reason. ONLY THE FIRST SUGGESTED ONE: a body
+                     from an agent may mark two, and a screen has one primary. -->
+                <Button
+                  weight={highlighted === option.key || (highlighted === null && option.recommended === true && question.options.find((o) => o.recommended)?.key === option.key)
+                    ? 'primary'
+                    : 'quiet'}
+                  disabled={!answerable}
+                  aria-describedby={answerable ? undefined : 'cannot-decide'}
+                  onclick={() => choose(option.key)}
+                >
+                  {option.title}
+                </Button>
+              </article>
+            {/each}
+          </div>
+        </section>
+      </Tile>
 
       {#if deferring}
-        <section class="commit">
-          <h2 class="commit-title">
-            {copy.deferTitle}
-            <span class="commit-required">{copy.required}</span>
-          </h2>
-          <!-- A FIELD WITH ITS LABEL ABOVE IT. "What has to happen first" was grey words beside the Defer button and
-               a placeholder inside this box, so it read as loose text on the queue and vanished once anybody typed. -->
-          <label class="commit-label" for="defer-why">{copy.deferHint}</label>
-          <textarea
-            id="defer-why"
-            bind:this={field}
-            bind:value={reason}
-            class="commit-field"
-            rows="2"
-            spellcheck="true"
-          ></textarea>
-          <label class="commit-wake">
-            {copy.wakeOn}
-            <input class="commit-date" type="date" bind:value={wake} />
-          </label>
-          <div class="commit-actions">
-            <Button weight="primary" disabled={!reason.trim() || !wake || sending} onclick={deferIt}>
-              {copy.deferAction}
-            </Button>
-            <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
-          </div>
-          {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
-        </section>
+        <Tile>
+          <section class="commit">
+            <h2 class="commit-title">
+              {copy.deferTitle}
+              <span class="commit-required">{copy.required}</span>
+            </h2>
+            <!-- A FIELD WITH ITS LABEL ABOVE IT. "What has to happen first" was grey words beside the Defer button and
+                 a placeholder inside this box, so it read as loose text on the queue and vanished once anybody typed. -->
+            <label class="commit-label" for="defer-why">{copy.deferHint}</label>
+            <textarea
+              id="defer-why"
+              bind:this={field}
+              bind:value={reason}
+              class="commit-field"
+              rows="2"
+              spellcheck="true"
+            ></textarea>
+            <label class="commit-wake">
+              {copy.wakeOn}
+              <input class="commit-date" type="date" bind:value={wake} />
+            </label>
+            <div class="commit-actions">
+              <Button weight="primary" disabled={!reason.trim() || !wake || sending} onclick={deferIt}>
+                {copy.deferAction}
+              </Button>
+              <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
+            </div>
+            {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
+          </section>
+        </Tile>
       {:else if committing}
-        <section class="commit">
-          <h2 class="commit-title">
-            {copy.yourReason}
-            <span class="commit-required">required</span>
-          </h2>
-          <p class="commit-choice">
-            You are choosing <strong>{question.options.find((o) => o.key === committing)?.title}</strong>.
-          </p>
-          <textarea
-            bind:this={field}
-            bind:value={reason}
-            class="commit-field"
-            rows="3"
-            placeholder={copy.reasonHint}
-            spellcheck="true"
-          ></textarea>
-          <!-- Nudged once, never blocked: a person who means it should be able to keep it (20 §3). -->
-          {#if short}<p class="commit-nudge">{copy.reasonNudge}</p>{/if}
-          <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED. The only cue was the small word "required"
-               above the box, and 23 §8's rule is that a control which refuses without a reason is
-               the thing this product does not ship. It is announced too: `aria-describedby` points
-               at the sentence, so somebody who cannot see the greying is told the same fact. -->
-          {#if !reason.trim()}<p class="commit-why" id="commit-why">{copy.reasonRequired}</p>{/if}
-          <div class="commit-actions">
-            <Button
-              weight="primary"
-              disabled={!reason.trim() || sending || noneTicked}
-              aria-describedby={reason.trim() ? undefined : 'commit-why'}
-              onclick={commit}
-            >
-              {copy.commit}
-            </Button>
-            <Button weight="bare" onclick={() => (committing = null)}>Cancel</Button>
-            <!-- ONE WARNING AT A TIME. `commit-why` above already says "kept for ever and cannot be
-                 edited"; this said the same thing in different words six lines below it, so an empty
-                 reason produced the same caution twice and neither read as the reason the button was
-                 off. It belongs where it is the only thing left to say: the button is live, and the
-                 next press is the irreversible one. -->
-            {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
-          </div>
-          {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
-          {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
-          <!-- THE LINE THAT SAID "Nothing you do here is saved yet." UNDER A STILL-LIVE BUTTON is
-               gone: this panel is replaced by the settled block the moment the press lands, and the
-               chip on that block carries the same fact where it is the whole of the news. -->
-        </section>
+        <Tile>
+          <section class="commit">
+            <h2 class="commit-title">
+              {copy.yourReason}
+              <span class="commit-required">required</span>
+            </h2>
+            <p class="commit-choice">
+              You are choosing <strong>{question.options.find((o) => o.key === committing)?.title}</strong>.
+            </p>
+            <textarea
+              bind:this={field}
+              bind:value={reason}
+              class="commit-field"
+              rows="3"
+              placeholder={copy.reasonHint}
+              spellcheck="true"
+            ></textarea>
+            <!-- Nudged once, never blocked: a person who means it should be able to keep it (20 §3). -->
+            {#if short}<p class="commit-nudge">{copy.reasonNudge}</p>{/if}
+            <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED. The only cue was the small word "required"
+                 above the box, and 23 §8's rule is that a control which refuses without a reason is
+                 the thing this product does not ship. It is announced too: `aria-describedby` points
+                 at the sentence, so somebody who cannot see the greying is told the same fact. -->
+            {#if !reason.trim()}<p class="commit-why" id="commit-why">{copy.reasonRequired}</p>{/if}
+            <div class="commit-actions">
+              <Button
+                weight="primary"
+                disabled={!reason.trim() || sending || noneTicked}
+                aria-describedby={reason.trim() ? undefined : 'commit-why'}
+                onclick={commit}
+              >
+                {copy.commit}
+              </Button>
+              <Button weight="bare" onclick={() => (committing = null)}>Cancel</Button>
+              <!-- ONE WARNING AT A TIME. `commit-why` above already says "kept for ever and cannot be
+                   edited"; this said the same thing in different words six lines below it, so an empty
+                   reason produced the same caution twice and neither read as the reason the button was
+                   off. It belongs where it is the only thing left to say: the button is live, and the
+                   next press is the irreversible one. -->
+              {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
+            </div>
+            {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
+            {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
+            <!-- THE LINE THAT SAID "Nothing you do here is saved yet." UNDER A STILL-LIVE BUTTON is
+                 gone: this panel is replaced by the settled block the moment the press lands, and the
+                 chip on that block carries the same fact where it is the whole of the news. -->
+          </section>
+        </Tile>
       {:else}
         <div class="third">
           <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped.
@@ -783,76 +807,86 @@
          decision as before. On the question and not on each option: the record keeps a thread on a question or a
          decision, and an option is part of the question. A Reads colleague may comment here too. -->
     {#if from === 'live'}
-      <Thread
-        on="suggestion:{question.id}"
-        me={String(page.data.me?.person ?? '') || null}
-        people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
-      />
+      <div class="thread">
+        <Thread
+          on="suggestion:{question.id}"
+          me={String(page.data.me?.person ?? '') || null}
+          people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
+        />
+      </div>
     {/if}
   </div>
 {/if}
 
 <style>
+  /* THE GATE IS ONE COLUMN OF TILES ON THE GROUND, 12 apart, capped where a card of options still reads as one row. */
   .page {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--sp-3);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
 
+  /* WHY IT WAS ASKED AND WHAT IT COSTS: one column, and two side by side once there is room for both. */
+  .about {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
+  @container (inline-size >= 48rem) {
+    .about[data-pair] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   .cost {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
     max-inline-size: var(--measure);
   }
 
   .cost-label {
-    color: var(--dim);
+    margin: var(--sp-2) 0 0;
+    color: var(--ink2);
     font-family: var(--font-ui);
     font-size: var(--t-sm);
     font-weight: 500;
   }
 
   .cost-body {
-    margin-block-start: var(--sp-1);
+    margin: 0;
     color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  /* THE REASONING KEEPS ITS LINES, and the cost heading after it has room above it. */
+  /* THE REASONING KEEPS ITS LINES. */
   .context {
     white-space: pre-line;
-    margin-block-end: var(--sp-3);
+    max-inline-size: var(--measure);
   }
 
   .cost-age {
-    margin-block-start: var(--sp-2);
+    margin: var(--sp-2) 0 0;
     color: var(--dim);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
   }
 
   /* THE STANDING SENTENCE OVER THE OPTIONS, at the weight of a hint rather than an alarm, and the
      same rule `/decide` draws it by: nothing has gone wrong, and this reader is doing exactly what
      they were invited to do. `--measure` because it is three sentences and a line that runs the
-     width of the page is a line nobody reads. The page itself is a flex column with `--sp-5`
-     between its children, so this needs no margin of its own. */
+     width of the page is a line nobody reads. */
   .cannot {
+    margin: var(--sp-2) 0;
     max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
-  }
-
-  .options-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-3);
-    margin-block-end: var(--sp-3);
-  }
-
-  .options-title {
-    color: var(--ink2);
-    font-family: var(--font-ui);
-    font-size: var(--t-ui);
-    font-weight: 500;
   }
 
   .picks {
@@ -903,14 +937,13 @@
     }
   }
 
-  /* The canvas's written body (`automations/[id]`), so a script reads the same wherever it is shown. */
+  /* The canvas's written body (`automations/[id]`), so a script reads the same wherever it is shown: tile-2, no edge. */
   .source {
     margin: var(--sp-2) 0 0;
     padding: var(--sp-3);
     overflow: auto;
     max-block-size: 60vh;
     background: var(--s1);
-    border: 1px solid var(--line);
     border-radius: var(--r-md);
     color: var(--ink2);
     font-family: var(--font-id);
@@ -919,6 +952,7 @@
     overflow-wrap: anywhere;
   }
 
+  /* THE HEADING IS THE TILE'S, so the list's own `dt` is said to a screen reader and not drawn twice. */
   .calls-out {
     display: grid;
     gap: var(--sp-2);
@@ -928,20 +962,26 @@
     line-height: 1.6;
   }
 
+  .calls-out :global(.calls-h) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
-  /* Told how many things it contains. `auto-fit` with three items in a 962px column generated SEVEN
-     tracks, four of them empty — a 550px slab of border colour, with every selector correct (05 §4). */
-  /* The options sit on the page's own ground, side by side, with space between them. The chosen one
-     takes the raised surface; its button is the page's one primary. The negative inset keeps the text
-     of the first option on the heading's edge while the chosen one still has room for its surface.
-     EACH TRACK IS CAPPED, AND THE ROW SITS ON THE HEADING'S EDGE. Stretched to the page's width, two options at 1440
-     stood 580px apart with nothing between them, so the second read as unrelated to the first. */
+  /* THE OPTIONS ARE WELLS OF TILE-2 SIDE BY SIDE IN THEIR TILE, told how many there are: `auto-fit` with three
+     items in a wide column once generated seven tracks, four of them empty (05 §4). The highlighted one takes an ink
+     ring, a shape and not a shade; its button is the page's one primary. */
   .cards {
     display: grid;
-    grid-template-columns: repeat(var(--cells, 3), minmax(0, 22rem));
-    justify-content: start;
+    grid-template-columns: repeat(var(--cells, 3), minmax(0, 1fr));
     gap: var(--sp-2);
-    margin-inline: calc(-1 * var(--sp-4));
+  }
+
+  .cards[data-cells='1'] {
+    --cells: 1;
   }
 
   .cards[data-cells='2'] {
@@ -952,17 +992,31 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    min-inline-size: 0;
     padding: var(--sp-4);
+    background: var(--s1);
     border-radius: var(--r-md);
-    transition: background var(--d-state) var(--ease-out);
+    transition: box-shadow var(--d-state) var(--ease-out);
   }
 
   .card[data-on] {
-    background: var(--s1);
+    box-shadow: inset 0 0 0 2px var(--ink);
   }
 
   .card > :global(.btn) {
     align-self: start;
+    margin-block-start: auto;
+  }
+
+  /* A QUIET PILL ON A TILE-2 WELL IS THE TILE'S WHITE, or it would be the well's own grey and no pill at all. */
+  .cards .card > :global(.btn[data-weight='quiet']) {
+    background: var(--bg);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .cards .card > :global(.btn[data-weight='quiet']:hover:not(:disabled)) {
+      background: var(--s2);
+    }
   }
 
   /* THE OPTION'S VISUAL, THE TILE'S SHAPE AT THE CARD'S SIZE: swatches share the card's width in one band, a figure
@@ -987,7 +1041,7 @@
   .card-figure {
     padding: var(--sp-3);
     flex: 1;
-    background: var(--s2);
+    background: var(--bg);
     color: var(--ink);
     font-size: var(--t-xl);
     font-weight: 500;
@@ -1000,60 +1054,64 @@
     gap: var(--sp-2);
   }
 
-  /* The option's number, in the body face with nothing round it. A boxed digit in the id face
-     read as a key to press, and the card is already the box. */
+  /* THE KEY CAP (SYSTEM §6): Geist Mono 12 on the tile's white inside a tile-2 well, 18 square at its smallest. */
   .card-n {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    box-sizing: border-box;
+    min-inline-size: 18px;
+    block-size: 18px;
+    padding: 0 var(--sp-1);
+    background: var(--bg);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1;
   }
 
   .card[data-on] .card-n {
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--on-ink);
   }
 
   .card-title {
+    margin: 0;
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 500;
-    letter-spacing: -0.005em;
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
   }
 
   /* The suggestion as a word in the quiet ink, not a green chip. */
   .card-rec {
-    margin-inline-start: var(--sp-1);
+    margin-inline-start: auto;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .card-body {
-    flex: 1;
-    color: var(--dim);
-    font-size: var(--t-ui);
-    line-height: 1.55;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  /* A FORM ON THE PAGE'S OWN GROUND, NOT A FILLED BOX AROUND A GROUP. The field is the only edge it needs, and the
-     box made the reason read as a second card beside the options rather than the next thing to write. */
+  /* ── the reason and the defer, one tile each ───────────────────────────── */
+
   .commit {
+    display: flex;
+    flex-direction: column;
     max-inline-size: var(--measure);
-  }
-
-  :global(:root[data-scheme='light']) .settled {
-    border-color: var(--line);
-  }
-
-  @media (prefers-color-scheme: light) {
-    :global(:root:not([data-scheme='dark'])) .settled {
-      border-color: var(--line);
-    }
   }
 
   .commit-label {
     display: block;
     margin-block-end: var(--sp-2);
-    color: var(--ink);
+    color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
   }
@@ -1062,148 +1120,149 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    color: var(--dim);
+    margin-block-start: var(--sp-3);
+    color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
   }
 
+  /* A FIELD IS 40 ON TILE-2, radius 12, no border: the fill is its edge (SYSTEM §6). */
   .commit-date {
-    min-block-size: var(--ctl-h);
+    min-block-size: 40px;
     padding: 0 var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-ui);
   }
 
-  /* A HEADING IS AS TALL AS ITS DESCENDERS, AND HAS ROOM UNDER IT. Measured 18.297px against a
-     `line-height` of 18.3, with the textarea starting flush at that boundary, so the tails of "Why"
-     and "yet" were painted over. An earlier version of this comment blamed `display: flex` for
-     collapsing the box; that is wrong — the `display: block` sibling `.options-title` measures the
-     same 18.297px, because the height comes from the line box either way. What fixed it is the two
-     declarations below: a line-height with room for a descender, and space between the heading and
-     the field. The commit-reason panel uses the same `h2` and escaped only because a sub-line
-     happens to sit between it and its field. */
+  /* A HEADING IS AS TALL AS ITS DESCENDERS, AND HAS ROOM UNDER IT: a line-height with room for a descender, and space
+     between the heading and the field, or the tails of "Why" and "yet" are painted over by the field under them. */
   .commit-title {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-2);
+    margin: 0 0 var(--sp-2);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
-    font-weight: 500;
+    font-size: var(--t-row);
+    font-weight: 600;
     line-height: 1.4;
   }
 
   .commit-required {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 400;
   }
 
   .commit-choice {
-    margin-block: var(--sp-1) var(--sp-3);
-    color: var(--dim);
+    margin: var(--sp-1) 0 var(--sp-3);
+    color: var(--ink2);
     font-size: var(--t-ui);
   }
 
   .commit-field {
     inline-size: 100%;
-    padding: var(--sp-3);
-    background: var(--bg);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    min-block-size: 40px;
+    padding: 10px var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink);
     font-family: var(--font-ui);
+    font-size: var(--t-ui);
+    line-height: var(--lh-body);
     resize: vertical;
+    scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
 
   .commit-why {
-    margin-block: var(--sp-2) 0;
+    margin: var(--sp-2) 0 0;
     color: var(--ink2);
     font-size: var(--t-sm);
   }
 
   .commit-fix {
-    margin-block-start: var(--sp-2);
+    margin: var(--sp-2) 0 0;
     font-size: var(--t-ui);
   }
 
   .commit-nudge {
-    margin-block-start: var(--sp-2);
+    margin: var(--sp-2) 0 0;
     color: var(--warn);
     font-size: var(--t-ui);
   }
 
   .commit-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
-    margin-block-start: var(--sp-3);
+    margin-block-start: var(--sp-4);
   }
 
   .commit-note {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .third {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    margin-block-start: var(--sp-2);
   }
 
+  /* ── the receipt ───────────────────────────────────────────────────────── */
+
   .settled {
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
     max-inline-size: var(--measure);
   }
 
   .settled-head {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
   }
 
-  .settled-head :global(.icon) {
-    color: var(--earn);
-  }
-
   .settled-choice {
-    margin-block: var(--sp-2) var(--sp-1);
+    margin: var(--sp-3) 0 var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
   }
 
   .settled-reason {
+    margin: 0;
     color: var(--ink2);
   }
 
   .settled-note {
-    margin-block-start: var(--sp-3);
+    margin: var(--sp-3) 0 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .settled-applied {
     margin-block-start: var(--sp-4);
   }
 
-  /* The chip and the way back, on one line, under the receipt they belong to. */
+  /* The way on, under the receipt it belongs to. */
   .settled-next {
     margin-block-start: var(--sp-4);
   }
 
   .settled-where {
-    margin-block-start: var(--sp-3);
+    margin: var(--sp-3) 0 0;
     color: var(--dim);
     font-size: var(--t-sm);
   }
@@ -1216,28 +1275,23 @@
     gap: var(--sp-3);
   }
 
+  .thread {
+    margin-block-start: var(--sp-5);
+  }
+
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    /* The gate is a first-class phone surface, not a degraded one: options as stacked cards, and the
+    /* The gate is a first-class phone surface, not a degraded one: options as stacked wells, and the
        reason field above the fold. Decisions get made from a phone (19 §3). */
     .cards {
       grid-template-columns: minmax(0, 1fr);
-      margin-inline: 0;
     }
 
-    .card {
-      padding-inline: 0;
-      border-block-start: 1px solid var(--line-soft);
-      border-radius: 0;
-    }
-
-    .card[data-on] {
-      padding-inline: var(--sp-3);
-      border-block-start-color: transparent;
-      border-radius: var(--r-md);
+    .card-n {
+      display: none;
     }
   }
 </style>
