@@ -159,6 +159,8 @@ export const agents = {
       readsTitle: 'Read',
       reads: ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'],
       writesTitle: 'Write',
+      /* The line under the split of the tools, said from the lead: the writes carry a name, the reads change nothing. */
+      reading: 'Every write lands in the record as an event under the agent’s name. A read changes nothing.',
       writes: ['propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
       /* `TEMPLATES` in the same file; `test/content.test.ts` holds this list and its count to it. */
       resourcesTitle: 'Seven addresses a client fills in itself',
@@ -181,6 +183,12 @@ export const agents = {
     outside: {
       title: 'Let other systems send in what they know.',
       lead: 'A service, a script or a CI job can reach your record without anybody signed in. Each way in does one thing, and is limited to it.',
+      /* The line under the three ways drawn by reach, in the order this list holds them. */
+      order:
+        'Ordered by how much each can do: a door takes what it is sent and reads nothing, a report key adds rows to one ' +
+        'list, and a key reads and writes as its scope allows.',
+      /* What the reach chart counts for each way, one step a segment: takes in, adds rows, reads and writes. */
+      reach: ['Takes in', 'Adds rows', 'Reads and writes'],
       ways: [
         {
           /* `packages/host/src/ingest.ts`: the Cloud's `/in/webhook/<rec_id>/<ingest-id>/<token>`, answered 202. */

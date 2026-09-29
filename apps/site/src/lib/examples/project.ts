@@ -66,6 +66,9 @@ Launch ads | GBP 0.00 | GBP 200.00 | GBP 400.00
         { at: 4, cols: 6 },
         { at: 5, cols: 6 },
       ],
+      reads: {
+        5: 'GBP 414.00 spent so far, and nothing has gone over its range.',
+      },
     },
     {
       id: 'decide',

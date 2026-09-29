@@ -1,18 +1,18 @@
 <!--
-  The drawn app's phone, below 900px: the product's phone layout round one page of an example record.
+  The drawn app's page area: below 900px the new app's phone round one page of an example record, and at 900px and
+  wider the title row and the page beside the rail.
 
-  THE PRODUCT'S SHAPE, AS `apps/web/src/lib/ui/TabBar.svelte` DRAWS IT: a head with the page's large
-  title, the page, and a bar at the foot with Home, Decide, Inbox and More, Decide carrying its count.
-  More opens the record's other pages as a list, where the product opens its navigation sheet, because
-  the declared pages are never a fifth tab.
+  THE PHONE IS SYSTEM §9's: the ground and its light, a large title with the ask field as a 44px glass circle at the
+  top right, the page's sentence under the title, the tiles full width, and a glass tab bar floating one inset from
+  the bottom with Home, Decide, Inbox and More, Decide carrying its count. More opens the record's other pages as a
+  list, where the product opens its navigation sheet, because the declared pages are never a fifth tab.
 
-  NOTHING SCROLLS INSIDE THE PHONE. A page shows its first screen and fades at its foot, and a tab or a
-  case changes it. A scroll inside a scroll is a trap for a thumb on a page that is itself scrolling,
-  and the first screen is the one a person meets in the product.
+  NOTHING SCROLLS INSIDE THE PHONE. A page shows its first screen and fades at its foot, and a tab or a case changes
+  it. A scroll inside a scroll is a trap for a thumb on a page that is itself scrolling.
 
-  AT 900PX AND WIDER THE FRAME STEPS ASIDE. The phone's box is `display: contents`, so its head and its
-  page become the window's page area (the `head` and `body` areas `Window.svelte` lays out), the bar
-  goes, and the page scrolls inside the window instead, as a page scrolls inside the product's shell.
+  AT 900PX AND WIDER THE FRAME STEPS ASIDE. The phone's box is `display: contents`, so its head and its page become the
+  window's page area (the `head` and `body` areas `Window.svelte` lays out): the title row with the toolbar at its
+  right and the sentence under it, and the page, which scrolls inside the window as a page scrolls in the product.
 -->
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
@@ -24,14 +24,18 @@
 
   let {
     title,
+    sentence = '',
     pages,
     current,
     open = 0,
     pick,
     heading = $bindable(null),
+    tools,
     children,
   }: {
     title: string;
+    /** The page's opening sentence, said under the title (SYSTEM §5). */
+    sentence?: string;
     pages: readonly Entry[];
     current: string;
     /** How many questions wait on Decide. */
@@ -39,6 +43,8 @@
     pick: (id: string) => void;
     /** The page's title, which the window focuses after a press inside the page takes the pressed control away. */
     heading?: HTMLElement | null | undefined;
+    /** The toolbar at the title row's end. */
+    tools?: Snippet;
     children: Snippet;
   } = $props();
 
@@ -65,17 +71,25 @@
 
 <div class="phone">
   <header class="head">
-    <h2 class="title" tabindex="-1" bind:this={heading}>{more ? w.morePages : title}</h2>
+    <div class="title-row">
+      <h2 class="title" tabindex="-1" bind:this={heading}>{more ? w.morePages : title}</h2>
+      <span class="find" aria-hidden="true"><Icon name="search" size="l" /></span>
+      {#if tools && !more}<div class="tools">{@render tools()}</div>{/if}
+    </div>
+    {#if sentence && !more}<p class="sentence">{sentence}</p>{/if}
   </header>
 
-  <div class="body" role="region" aria-label={more ? w.morePages : title} tabindex="0">
+  <!-- A REGION WITH A NAME, which a keyboard can reach and scroll at a desk, where the page scrolls inside the window. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <section class="body" aria-label={more ? w.morePages : title} tabindex="0">
     {#if more}
       <ul class="rest">
         {#each rest as p (p.id)}
           <li>
             <button type="button" class="row" aria-current={p.id === current ? 'page' : undefined} onclick={() => void fromList(p.id)}>
-              <span class="row-glyph">{#if isIconName(p.glyph)}<Icon name={p.glyph} size="m" />{/if}</span>
-              <span>{p.title}</span>
+              <span class="row-well">{#if isIconName(p.glyph)}<Icon name={p.glyph} size="m" />{/if}</span>
+              <span class="row-name">{p.title}</span>
+              <Icon name="chevron-right" size="m" />
             </button>
           </li>
         {/each}
@@ -83,7 +97,7 @@
     {:else}
       {@render children()}
     {/if}
-  </div>
+  </section>
 
   <div class="bar" role="group" aria-label={w.bar}>
     {#each tabs as p (p.id)}
@@ -103,67 +117,101 @@
 </div>
 
 <style>
+  /* ── The phone ───────────────────────────────────────────────────────── */
+
   .phone {
+    position: relative;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
     inline-size: 100%;
     max-inline-size: 400px;
-    block-size: 600px;
+    block-size: 640px;
     margin-inline: auto;
     overflow: clip;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-lg);
-    background: var(--bg);
-    box-shadow: var(--e2);
+    border-radius: 36px;
+    background-color: var(--sunk);
+    background-image: var(--ground-light);
+    box-shadow: var(--e3);
   }
 
-  /* The phone's large title, `--t-xl` at 600, as the design brief sets the phone's head. */
+  /* The large title, 30/36, with the ask field as a glass circle at its end (SYSTEM §9). */
   .head {
+    display: grid;
+    gap: var(--sp-2);
     padding: var(--sp-5) var(--sp-4) var(--sp-3);
   }
 
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
   .title {
+    flex: 1;
+    min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-xl);
+    font-size: var(--t-title);
     font-weight: 600;
-    line-height: var(--lh-tight);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .find {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--tap);
+    block-size: var(--tap);
+    border-radius: var(--r-pill);
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
+    color: var(--ink);
+  }
+
+  .tools {
+    display: none;
+  }
+
+  /* THE SENTENCE: what the page's figures say, in one line under the title. */
+  .sentence {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-md);
+    line-height: 1.5;
+    text-wrap: pretty;
   }
 
   .body {
     position: relative;
     min-block-size: 0;
     overflow: clip;
-    padding: 0 var(--sp-4);
-  }
-
-  /* THE FADE AT THE FOOT says the page goes on past its first screen, where a hard edge says it ends. */
-  .body::after {
-    content: '';
-    position: absolute;
-    inset-inline: 0;
-    inset-block-end: 0;
-    block-size: var(--sp-8);
-    background: linear-gradient(transparent, var(--bg));
-    pointer-events: none;
+    padding: 0 var(--sp-3) calc(var(--tab-h) + var(--sp-6));
+    /* THE FADE AT THE FOOT says the page goes on past its first screen, where a hard edge says it ends. The mask
+       reads only alpha, so the colour in it is any opaque token and never shows. */
+    mask-image: linear-gradient(to bottom, var(--ink) calc(100% - var(--sp-9)), transparent calc(100% - var(--sp-5)));
   }
 
   .rest {
     display: grid;
+    gap: 2px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
+  /* The other pages as rows on the ground: a well, the name and a chevron, 60 tall under a thumb. */
   .row {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: var(--row-h-2);
-    padding: 0;
+    min-block-size: 60px;
+    padding: 0 var(--sp-2);
     border: 0;
-    border-block-end: 1px solid var(--line-soft);
+    border-radius: var(--r-md);
     background: none;
     color: var(--ink);
     font: inherit;
@@ -172,19 +220,36 @@
     cursor: pointer;
   }
 
-  .row-glyph {
-    display: grid;
-    place-items: center;
-    color: var(--dim);
+  .row[aria-current='page'] {
+    background: var(--hover-wash);
   }
 
-  /* The bar as `TabBar.svelte` draws it: even columns on the sunk ground, and the current tab in ink
-     with an ink bar above it, so where you are is a shape as well as a shade. */
+  .row-well {
+    display: grid;
+    place-items: center;
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+    border-radius: var(--r-well);
+    background: var(--bg);
+    color: var(--ink2);
+  }
+
+  .row-name {
+    flex: 1;
+  }
+
+  /* THE TAB BAR: glass, floating one inset from the bottom and the sides, each place a 44px target with its label. */
   .bar {
+    position: absolute;
+    inset-inline: var(--inset);
+    inset-block-end: var(--inset);
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-block-start: 1px solid var(--line);
-    background: var(--sunk);
+    padding: 4px;
+    border-radius: var(--r-lg);
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
   }
 
   .tab {
@@ -192,37 +257,41 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    min-block-size: var(--tab-h);
+    gap: 2px;
+    min-block-size: 52px;
     padding: var(--sp-1);
     border: 0;
+    border-radius: 18px;
     background: none;
-    color: var(--dim);
+    color: var(--ink2);
     font: inherit;
     font-size: var(--t-xs);
+    font-weight: 500;
     cursor: pointer;
   }
 
   .tab[aria-current='page'] {
+    background: var(--bg);
     color: var(--ink);
-    box-shadow: inset 0 2px 0 0 var(--ink);
+    font-weight: 600;
   }
 
   .badge-slot {
     position: relative;
   }
 
+  /* THE SQUARE COUNT, in ink on the site, where red is the mark's alone. */
   .badge {
     position: absolute;
-    inset-block-start: -5px;
-    inset-inline-start: 11px;
+    inset-block-start: -6px;
+    inset-inline-start: 13px;
     min-inline-size: 16px;
     padding: 0 4px;
-    border-radius: var(--r-pill);
-    background: var(--sunk);
-    color: var(--warn);
+    border-radius: var(--r-sm);
+    background: var(--ink);
+    color: var(--on-ink);
     font-size: var(--t-xs);
-    font-weight: 500;
+    font-weight: 600;
     line-height: 16px;
     text-align: center;
   }
@@ -236,28 +305,39 @@
     white-space: nowrap;
   }
 
+  /* ── 900px and wider: the title row and the page beside the rail ────────── */
+
   @media (width >= 900px) {
     .phone {
       display: contents;
     }
 
+    /* THE TITLE ROW (SYSTEM §5): the title at 28, the toolbar at the right, and the sentence under it. */
     .head {
       grid-area: head;
-      padding: var(--sp-4) var(--sp-5) 0;
+      gap: 2px;
+      padding: var(--sp-4) 28px var(--sp-3) 20px;
     }
 
-    .title {
-      font-size: var(--t-lg);
+    .title-row {
+      min-block-size: var(--tap);
+    }
+
+    .find {
+      display: none;
+    }
+
+    .tools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .body {
       grid-area: body;
       overflow: auto;
-      padding: var(--sp-3) var(--sp-5) var(--sp-5);
-    }
-
-    .body::after {
-      content: none;
+      padding: var(--sp-1) 28px 20px 20px;
+      mask-image: none;
     }
 
     .bar {

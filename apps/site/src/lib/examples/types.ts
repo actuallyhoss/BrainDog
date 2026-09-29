@@ -22,6 +22,11 @@ export type ExamplePage = {
   src: string;
   layout?: readonly Span[];
   links?: Readonly<Record<number, readonly (string | null)[]>>;
+  /**
+   * THE LINE UNDER A CHART, by segment index: one written sentence saying what the chart means, specific and read off
+   * the rows it draws (SYSTEM §6). The drawn app sets it under the chart's tile; a list or a set of figures needs none.
+   */
+  reads?: Readonly<Record<number, string>>;
 };
 
 export type Example = {

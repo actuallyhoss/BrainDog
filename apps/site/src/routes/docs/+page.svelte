@@ -1,12 +1,15 @@
 <!--
-  /docs: every section of the docs as a card, with its pages, and a search over all of them.
+  /docs: the opening tile with the search, then every section of the docs as a tile with its pages.
 
-  A SECTION WITH NO PAGE YET IS STILL A CARD, saying so, because the seven sections are the shape of
-  the docs (site.md C7) and each fills as its unit writes it. Its title links nowhere until it has a
-  page to open, so no card sends a reader to an address with nothing at it.
+  THE LOOK IS SYSTEM §10's: tiles on the ground, each section's tile headed by its glyph in a well, its name and how
+  many pages it holds, then its sentence and its pages as a quiet list.
 
-  `/llms.txt` IS LINKED FROM HERE, so the prerender crawler reaches it from a page as well as from the
-  sitemap, and so a person who wants to hand the docs to an agent finds where they are.
+  A SECTION WITH NO PAGE YET IS STILL A TILE, saying so, because the sections are the shape of the docs (site.md C7)
+  and each fills as its unit writes it. Its title links nowhere until it has a page to open, so no tile sends a reader
+  to an address with nothing at it.
+
+  `/llms.txt` IS LINKED FROM HERE, so the prerender crawler reaches it from a page as well as from the sitemap, and so a
+  person who wants to hand the docs to an agent finds where they are.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
@@ -28,36 +31,48 @@
   <meta property="og:description" content={w.meta.description} />
 </svelte:head>
 
-<section class="docs-head" data-ground="sunk">
-  <div class="in head-in">
-    <h1 class="docs-title">{w.title}</h1>
-    <p class="lede">{w.lede}</p>
-    <a class="for-agents" href="/llms.txt" data-sveltekit-reload>{w.forAgents}</a>
-    <div class="head-search">
-      <Search index={data.index} id="docs-search" />
+<section class="band" aria-labelledby="docs-title">
+  <div class="in">
+    <div class="tiles">
+      <div class="tile lead head">
+        <div class="head-words">
+          <span class="well l"><Icon name="book" /></span>
+          <h1 class="h2" id="docs-title">{w.title}</h1>
+          <p class="lede">{w.lede}</p>
+          <a class="onward" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow" size="m" /></a>
+        </div>
+        <div class="head-search">
+          <Search index={data.index} id="docs-search" />
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="docs-cards" aria-label={w.title}>
+<section class="band" aria-label={w.title}>
   <div class="in">
-    <ul class="hair cards">
+    <ul class="tiles cards">
       {#each data.sections as section (section.id)}
         {@const first = section.pages[0]?.path ?? null}
-        <li class="card">
-          <span class="card-glyph"><Icon name={section.glyph} /></span>
-          <h2 class="card-title">
-            {#if first}<a class="card-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
-          </h2>
+        <li class="tile card span-4">
+          <div class="tile-head">
+            <span class="well"><Icon name={section.glyph} /></span>
+            <h2 class="tile-title">
+              {#if first}<a class="card-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
+            </h2>
+            {#if section.pages.length > 0}<span class="tile-count num">{section.pages.length}</span>{/if}
+          </div>
           <p class="card-blurb">{section.blurb}</p>
           {#if section.pages.length > 0}
             <ul class="card-pages">
               {#each section.pages as page (page.path)}
-                <li><a class="card-page" href={page.path}>{page.title}</a></li>
+                <li>
+                  <a class="card-page" href={page.path}><span>{page.title}</span><Icon name="chevron-right" size="m" /></a>
+                </li>
               {/each}
             </ul>
           {:else}
-            <p class="card-empty">{w.empty}</p>
+            <p class="card-empty meta">{w.empty}</p>
           {/if}
         </li>
       {/each}
@@ -66,64 +81,30 @@
 </section>
 
 <style>
-  .docs-head {
-    padding-block: var(--sp-8);
-    border-block-end: 1px solid var(--line);
-  }
-
-  .head-in {
+  .head {
     display: grid;
-    gap: var(--sp-4);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+  }
+
+  .head-words {
+    display: grid;
     justify-items: start;
-  }
-
-  .docs-title {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-site-h2);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-  }
-
-  .for-agents {
-    color: var(--ink);
-    font-size: var(--t-site-small);
+    gap: var(--sp-3);
   }
 
   .head-search {
-    inline-size: min(100%, 560px);
-  }
-
-  .docs-cards {
-    padding-block: var(--sp-8);
+    min-inline-size: 0;
   }
 
   .cards {
-    grid-template-columns: minmax(0, 1fr);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .card {
-    display: grid;
-    align-content: start;
     gap: var(--sp-3);
-    padding: var(--sp-5);
-  }
-
-  .card-glyph {
-    display: inline-flex;
-    color: var(--ink2);
-  }
-
-  .card-title {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-site-h3);
-    font-weight: 600;
-    line-height: 1.2;
   }
 
   .card-link {
@@ -133,21 +114,21 @@
 
   .card-link:hover {
     text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
-  .card-blurb,
-  .card-empty {
+  .card-blurb {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: 1.55;
+    font-size: var(--t-site-small);
+    line-height: 20px;
   }
 
   .card-empty {
-    color: var(--dim);
-    font-size: var(--t-site-small);
+    margin: 0;
   }
 
+  /* THE PAGES SIT IN THE TILE AS A LIST, with a hairline between rows and the row's wash under the pointer. */
   .card-pages {
     display: grid;
     margin: 0;
@@ -155,13 +136,32 @@
     list-style: none;
   }
 
-  /* A 44px row under a thumb and a lighter one under a mouse, like every list of links on the site. */
+  .card-pages li + li {
+    border-block-start: 1px solid var(--line);
+  }
+
   .card-page {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
     min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-2);
+    margin-inline: calc(-1 * var(--sp-2));
+    border-radius: var(--r-md);
     color: var(--ink);
     font-size: var(--t-site-small);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .card-page :global(svg) {
+    color: var(--dim);
+  }
+
+  .card-page:hover {
+    background: var(--hover-wash);
   }
 
   @media (pointer: coarse) {
@@ -170,15 +170,17 @@
     }
   }
 
-  @media (width >= 640px) {
-    .cards {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+  @media (width >= 900px) {
+    .head {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      align-items: end;
+      gap: var(--sp-7);
     }
   }
 
-  @media (width >= 900px) {
-    .cards {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+  @media (width < 640px) {
+    .card-page {
+      min-block-size: var(--tap);
     }
   }
 </style>

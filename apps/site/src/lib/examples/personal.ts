@@ -61,6 +61,10 @@ ${runs.join('\n')}
         { at: 3, cols: 6 },
       ],
       links: { 1: ['bills', 'bills', null] },
+      reads: {
+        2: 'Eating out is GBP 16.00 over its budget. Groceries and Transport are inside theirs.',
+        3: 'Three runs most weeks since July. One Wednesday was missed in August, and none yet this week.',
+      },
     },
     {
       id: 'decide',

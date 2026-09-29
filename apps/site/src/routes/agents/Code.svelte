@@ -71,8 +71,8 @@
   .code-label {
     flex: 1;
     min-inline-size: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink2);
+    font-size: var(--t-site-small);
     overflow-wrap: anywhere;
   }
 
@@ -80,13 +80,15 @@
     flex: none;
   }
 
+  /* THE TILE'S SECOND FILL, as a key cap and a field are (SYSTEM §2), in ink and the mono face: a panel inside a tile,
+     never a tile of its own and never a dark slab dropped into a light one. */
   .code-text {
     margin: 0;
     padding: 12px 14px;
     overflow-x: auto;
-    background: var(--ink);
-    border-radius: 10px;
-    color: var(--bg);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--ink);
     font-family: var(--font-id);
     font-size: var(--t-sm);
     line-height: 1.6;

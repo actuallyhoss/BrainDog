@@ -59,6 +59,9 @@ Closed last week | 17 | the most since August
         { at: 3, cols: 4 },
       ],
       links: { 3: [null, 'release', null] },
+      reads: {
+        2: 'Seventeen closed last week, the most in the eight full weeks shown. This week has just begun.',
+      },
     },
     {
       id: 'decide',

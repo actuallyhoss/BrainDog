@@ -1,11 +1,15 @@
 <!--
   One glyph from `icons.ts`, inline, in `currentColor` and nothing else. Always decorative here:
   every glyph on this site sits beside the words that say what it means.
+
+  THE SET'S OWN STROKE, 1.75, with round caps and joins (SYSTEM §6, Glyphs), and 2.75 for the two glyphs
+  drawn as dots. The shapes are the set's markup, written in by `{@html}` because a glyph is circles,
+  rects and paths and not one path; every string is a constant in `icons.ts`, never a reader's text.
 -->
 <script lang="ts">
-  import { PATHS, type IconName } from './icons.ts';
+  import { DOTTED, GLYPHS, type IconName } from './icons.ts';
 
-  let { name, size = 'm' }: { name: IconName; size?: 's' | 'm' | 'l' } = $props();
+  let { name, size = 'm' }: { name: IconName; size?: 's' | 'm' | 'l' | 'xl' } = $props();
 </script>
 
 <svg
@@ -14,12 +18,12 @@
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"
-  stroke-width="1.7"
+  stroke-width={DOTTED.has(name) ? 2.75 : 1.75}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"
 >
-  <path d={PATHS[name]} />
+  {@html GLYPHS[name]}
 </svg>
 
 <style>
@@ -41,5 +45,18 @@
   .icon[data-size='l'] {
     inline-size: var(--icon-l);
     block-size: var(--icon-l);
+  }
+
+  .icon[data-size='xl'] {
+    inline-size: var(--icon-xl);
+    block-size: var(--icon-xl);
+  }
+
+  /* IN AN ICON WELL THE GLYPH IS 18, whatever size was asked for (SYSTEM §6): the well sets the size, so every
+     heading row on the site draws the same glyph in the same box. Written here because a component's own rule
+     outranks the site sheet's layer. */
+  :global(.well) > .icon[data-size] {
+    inline-size: 18px;
+    block-size: 18px;
   }
 </style>

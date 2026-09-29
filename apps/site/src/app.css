@@ -1,23 +1,53 @@
 /**
  * The site's own half of the stylesheet. Everything else is `@braindog/skin`.
  *
- * Two rules, and both are the site being a DOCUMENT where the app is an application: the page
- * scrolls (the app is one inner scroll container), and the ground is the work surface rather than
- * the desk the chrome sits on, because there is no chrome here to sit on it.
+ * THE LOOK IS `loop/design/SYSTEM.md` §10: the app's system with fewer screens. The page is the ground (`--sunk`)
+ * with its one soft light from the top (`--ground-light`); the header is a glass bar floating 12 in; every band is
+ * Bento tiles on that ground, and the tiles carry drawings of the product at work; the footer is one tile. Content is
+ * opaque and chrome is glass, and glass never holds content. Red is the mark's and nothing else's here.
  *
- * And the things every page here draws the same way: the button, and the hues a state may take.
- * They are here rather than in each page because three copies of a button had already drifted into
- * three buttons once.
+ * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column, the band, the tile
+ * grid and its spans, the tile and its heading row, the icon well, the heading sizes, the reading text, the buttons
+ * and the key cap. Three copies of a button once drifted into three buttons, which is why they live in one place.
  */
 
 @layer components {
+  :root {
+    /* The one width every page's content, the bar and the footer share, so their edges line up. */
+    --site-max: 1240px;
+    /* The page's gutter: the window inset (12) on a phone, and twice it on a desk, as the Bento site boards lay out. */
+    --site-gutter: var(--inset);
+
+    /**
+     * THE SITE'S TYPE, beside the app's steps (SYSTEM §10): the hero's heading is 56/60 at a desk, every other heading
+     * is `--t-lead` (34/40), and text for reading is 17/28. The hero steps down in a straight line to 40 at 390, so a
+     * phone's first screen still holds the slogan and the action under it.
+     */
+    --t-site-hero: clamp(40px, 34.06px + 1.524vw, 56px);
+    --lh-site-hero: 1.072;
+    --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
+    --lh-site-body: 1.647;
+    --t-site-small: 14px;
+    /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
+    --t-app-xs: var(--t-xs);
+    --t-app-sm: var(--t-sm);
+  }
+
+  @media (width >= 640px) {
+    :root {
+      --site-gutter: calc(2 * var(--inset));
+    }
+  }
+
+  /* THE GROUND AND ITS LIGHT, painted once on the document, so every band and every tile sits on the same field. */
   html {
-    background: var(--bg);
+    background-color: var(--sunk);
+    background-image: var(--ground-light);
+    background-repeat: no-repeat;
     scroll-behavior: smooth;
   }
 
-  /* Somebody who has asked their system to stop animating things did not mean "except when I click
-     an anchor". */
+  /* Somebody who has asked their system to stop animating things did not mean "except when I click an anchor". */
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
@@ -25,254 +55,37 @@
   }
 
   body {
-    background: var(--bg);
+    background: transparent;
     font-size: var(--t-site-body);
+    font-variant-numeric: tabular-nums;
     /**
-     * NOTHING ON THE SITE IS SET UNDER 14PX (`loop/finish/site.md` C10), and this is where that holds.
-     *
-     * The app's two smallest steps are 12 and 13, sized for a dense record read at a desk, and the
-     * site's pages borrowed them for every label, date, price note and footer link: some fifty rules
-     * across the routes, each of them a line under the floor on a phone. Raising the two tokens here
-     * lifts every one of them at once, and a rule written tomorrow with `--t-sm` lands on 14 too.
-     * It is set on `body` and not `:root` so `:root` still holds the app's values for the rule below.
+     * NOTHING ON THE SITE IS SET UNDER 14PX (`loop/finish/site.md` C10), and this is where that holds. The app's two
+     * smallest steps are 12 and 13, sized for a dense record read at a desk; raising them here lifts every label on a
+     * page at once. It is set on `body` and not `:root` so `:root` still holds the app's values for the rule below.
      */
     --t-xs: var(--t-site-small);
     --t-sm: var(--t-site-small);
+    /**
+     * RED IS THE MARK'S ALONE ON THE SITE (SYSTEM §10). The drawings are the product's own renderer, which paints a
+     * late bill or a budget run over in `--danger`; here that state takes the amber the product uses for a soft
+     * warning, which is still a hue that means "look", and the words beside it still say what is wrong. The mark
+     * paints in `--brand` and keeps its red.
+     */
+    --danger: var(--warn);
+    --danger-fill: var(--warn-fill);
   }
 
   /**
-   * THE DRAWINGS OF THE APP KEEP THE APP'S SCALE. A drawing is a picture of the record at its own
-   * size, with its labels at the sizes the app sets them, and a 13px label grown to 14 inside a
-   * drawn window pushes its rows out of the frame they were drawn to fit. Each root here is one
-   * drawing: the window, the phone, the decision, the Slash palette, the flow, and every figure
-   * that says it is a picture with `role="img"`.
+   * THE DRAWINGS OF THE APP KEEP THE APP'S SCALE. A drawing is a picture of the record at its own size, with its labels
+   * at the sizes the app sets them, and a 13px label grown to 14 inside a drawn window pushes its rows out of the frame
+   * they were drawn to fit. Each root here is one drawing, and every figure that says it is a picture with `role="img"`.
    */
   :where(.app, .phone, .decide, .palette, .flow-figure, [role='img']) {
     --t-xs: var(--t-app-xs);
     --t-sm: var(--t-app-sm);
   }
 
-  /* The one width every page's content and the bar share, so their edges line up. */
-  :root {
-    --site-max: 1200px;
-
-    /**
-     * THE TYPE SCALE, one size per role, from 390 to 1440 (`loop/finish/site.md` C10). Each grows in a
-     * straight line between the two widths, so the gap between a sub-heading and a section heading is
-     * filled at every width in between. The slope is (large - small) / 1050px, anchored at 390px.
-     */
-    --t-site-display: clamp(40px, 28.11px + 3.048vw, 72px);
-    --t-site-h2: clamp(30px, 24.8px + 1.333vw, 44px);
-    --t-site-h3: clamp(20px, 18.51px + 0.381vw, 24px);
-    --t-site-lead: clamp(18px, 17.26px + 0.19vw, 20px);
-    --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
-    --t-site-small: 14px;
-    /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
-    --t-app-xs: var(--t-xs);
-    --t-app-sm: var(--t-sm);
-
-    /**
-     * THE GROUNDS, AND THE PAGE HAD ONE.
-     *
-     * `loop/research-site-reference.md` measured it: scanning down the centre of the dark capture,
-     * the background is `--bg` from y=0 to y=3693 and from y=4013 to the footer, and the only
-     * other surface on 4,368px of page is a 320px closing band at **1.04:1** against what it sits
-     * on. FirstLook flips its ground six times in ten sections and the flip is a **15.88:1** jump
-     * (`firstlook.ai` inline stylesheet, sections measured in that file's §2). PostHog carries
-     * three surface levels per scheme, selected by a `data-scheme` attribute on a container
-     * (`src/styles/global.css:178-439`). Both of them tell a reader where one idea stops. We told
-     * them nothing for four thousand pixels.
-     *
-     * A BAND SETS A GROUND BY RENAMING THE SEMANTIC TOKENS, not by painting a colour. That is the
-     * whole trick and it is worth stating, because the obvious alternative is a per-band class on
-     * every element inside it. A custom property's own `var()`s are substituted where the property
-     * is DECLARED, so `--flip-bg: var(--ink)` computed here on `:root` freezes to the page's ink
-     * colour; a band that then says `--bg: var(--flip-bg)` hands that value to everything under
-     * it. `.btn-primary` below is `background: var(--ink); color: var(--bg)`, so inside a flipped
-     * band it comes out dark-on-light without one line of band-specific button CSS. Every
-     * component on the page inherits its band's ground for free, and there is one place to get it
-     * wrong instead of forty.
-     *
-     * THE FLIP IS THE BODY-TEXT PAIR, REVERSED, which is why it needs no contrast check of its
-     * own: `--ink` on `--bg` is certified by `packages/theme` at 17.61:1 in dark and 15.41:1 in
-     * light, and swapping which one is the ground does not change the ratio. In the dark scheme a
-     * flipped band is a near-white field; in the light scheme it is near-black. That is the same
-     * move FirstLook makes with `--ink` against `--paper`, done in a way that survives a reader
-     * who has their system set either way.
-     *
-     * THE FOUR MIXES ARE HERE AND NOT AT A CALL SITE, for the reason `tokens.css` gives at length
-     * over `--hover-wash`: a percentage chosen where it is used is a colour chosen where it is
-     * used with one extra step in front of it, and it drifts. These four are the secondary text,
-     * the quiet text, the hairline and the raised surface of a flipped band, and every band that
-     * flips uses these and no others.
-     *
-     * THE PERCENTAGES WERE SOLVED, NOT PICKED, against the shipped palette in both schemes. The
-     * flipped ground is the page's `--ink`, so the ratios are computed against that:
-     *
-     *   --flip-ink2  76%   8.42:1 on the dark scheme's flipped ground, 11.0:1 on the light's
-     *   --flip-dim   65%   5.69:1 dark, 7.19:1 light
-     *
-     * The dark scheme is the binding one both times, because its flipped ground is near-white and
-     * a mix towards near-black climbs more slowly there. 58% was tried first for the quiet role
-     * and landed at 4.39:1, under the 4.5 body floor, which is why the number is 65 and not a
-     * rounder one. The hairline and the raised surface carry no text and only have to be seen.
-     */
-    --flip-bg: var(--ink);
-    --flip-ink: var(--bg);
-    --flip-ink2: color-mix(in srgb, var(--bg) 76%, var(--ink));
-    --flip-dim: color-mix(in srgb, var(--bg) 65%, var(--ink));
-    --flip-line: color-mix(in srgb, var(--bg) 22%, var(--ink));
-    --flip-s1: color-mix(in srgb, var(--bg) 9%, var(--ink));
-    /* `--flip-sunk` AND `--flip-edge` ARE DECLARED HERE FOR THE REASON THE WHOLE BLOCK IS: the mix
-       has to resolve against the PAGE's two colours. Written inside the flip rule instead, where
-       `--bg` is already the flipped one, `mix(--bg 18%, --ink)` comes out on the far side of the
-       ground and paints a near-white panel on a near-black band, which is what it did.
-       AND SUNK SITS JUST ABOVE THE GROUND HERE RATHER THAN BELOW IT. In the app `sunk` is the
-       canvas a panel sits ON, one step darker than the panel. A flipped band's ground is already
-       the scheme's ink, so there is no step further back to take: 4 per cent is half of what `s1`
-       takes, which keeps the order the app has, ground then sunk then s1, with the two smallest
-       steps nearest the ground. */
-    --flip-sunk: color-mix(in srgb, var(--bg) 4%, var(--ink));
-    --flip-edge: color-mix(in srgb, var(--bg) 30%, var(--ink));
-  }
-
-  /**
-   * THE DARK SCHEME'S FLIP IS `--s1` AND THE PAGE'S OWN INKS, never the reversed pair. Reversed, a
-   * flipped band in the dark scheme is a near-white field, the brightest thing on the screen by far.
-   * Here it is one step up from the ground, which still marks where one idea stops. The inks keep
-   * their certified pairs on `--s1`, and the focus ring keeps the ink, as it does on the light flip.
-   */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --flip-bg: var(--s1);
-      --flip-ink: var(--ink);
-      --flip-ink2: var(--ink2);
-      --flip-dim: var(--dim);
-      --flip-line: var(--line);
-      --flip-s1: var(--s2);
-      --flip-sunk: var(--bg);
-      --flip-edge: var(--edge);
-    }
-  }
-
-  /**
-   * A BAND'S GROUND, in three values, and one of them is "the page".
-   *
-   * `page` is written rather than assumed so a section that changes its mind is one attribute
-   * value, and so the list of grounds this site has is readable in one place.
-   *
-   * `flip` is the ink field in the light scheme only. In the dark scheme it is `--s1`, a raised panel,
-   * because the ink reversed there is a near-white slab across the screen (see the dark block below).
-   */
-  [data-ground] {
-    background: var(--bg);
-    color: var(--ink);
-  }
-
-  [data-ground='sunk'] {
-    --bg: var(--sunk);
-  }
-
-  [data-ground='flip'] {
-    --bg: var(--flip-bg);
-    --ink: var(--flip-ink);
-    --ink2: var(--flip-ink2);
-    --dim: var(--flip-dim);
-    --line: var(--flip-line);
-    --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
-    --s1: var(--flip-s1);
-    --s2: var(--flip-s1);
-    /**
-     * `--sunk` AND `--edge` FLIP TOO, AND A BAND FOUND THAT OUT THE HARD WAY.
-     *
-     * `--sunk` is the application's canvas, one decisive step BELOW `--bg`, and the parts widget
-     * draws its panel in it on purpose so the panel reads as a piece of the app rather than as a
-     * box on a page. It was not in this list, so on a flipped band it stayed the scheme's own dark
-     * canvas: a black panel sitting in the middle of a near-white field, which is the single
-     * loudest thing on the page and none of it was meant.
-     *
-     * Both are solved with the rest of the flipped set on `:root`, where the mix resolves against
-     * the page's own two colours. That keeps every surface on this band made out of the two
-     * colours the band is made of, rather than out of a third one nobody chose.
-     */
-    --sunk: var(--flip-sunk);
-    --edge: var(--flip-edge);
-    /* Re-declared HERE so its `var(--ink)` resolves against this band's ink and not the page's.
-       Declared on `:root` it would be a near-white wash on a near-white field in the dark scheme,
-       which is not wrong so much as absent, and absent is the harder bug to see. */
-    --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
-    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
-    /**
-     * THE FOCUS RING GOES WITH THE GROUND, and this is the line that stops a band from breaking
-     * `a11y.css`.
-     *
-     * `a11y.css` draws `:focus-visible` as `2px solid var(--accent-text)`, and `--accent-text` is
-     * solved against the five DECLARED surfaces of the scheme. A flipped band is not one of them:
-     * it is the OTHER scheme's ground, so in dark mode the ring would be the light-pink
-     * `--accent-text` on a near-white field at about 1.9:1, and in light mode the dark-magenta one
-     * on near-black at about 2.5:1. Both are under the 3:1 a focus indicator needs, on the one
-     * band a keyboard reader has sixteen tab stops to walk.
-     *
-     * It becomes the flipped ink, which is the certified body pair and is 15:1 or better in both
-     * schemes. The ring loses its brand hue on this band and that is the trade being made
-     * knowingly: `a11y.css`'s own note calls the ring it replaced "visible and anonymous", and
-     * anonymous on one band costs less than invisible on one band. `base.css` paints prose links
-     * in the same token, so this keeps those readable here too.
-     */
-    --accent-text: var(--flip-ink);
-  }
-
-  /**
-   * THE READING COLUMN, and the number was already right.
-   *
-   * 1200 less two 32px gutters is 1136 of a 1440 viewport, 78.9%, within a point of FirstLook's
-   * 79.2% and PostHog's 79.1% window. What was wrong was never the column: it was that ours sat on
-   * the same grey as the margin beside it, so nothing was full-bleed and nothing had an edge. The
-   * bands are the full width of the screen now and this is what sits inside them.
-   */
-  .in {
-    max-inline-size: var(--site-max);
-    margin-inline: auto;
-    padding-inline: var(--sp-6);
-  }
-
-  /* Sentence case in the text face, like every other label on the site (C10). The opener's mono word
-     and its rule went with the redesign: no page drew them, and a mono label is not code. */
-  .band-tag {
-    color: var(--dim);
-    font-family: var(--font-ui);
-    font-size: var(--t-site-small);
-  }
-
-  /**
-   * THE HAIRLINE GRID, taken from the two references that agree on it.
-   *
-   * PostHog's `OSTable` is `inline-grid ... divide-x divide-y divide-border rounded-md`
-   * (`src/components/OSTable/index.tsx`) and FirstLook's `.pillars` and `.systems` are grids with
-   * `gap: 1px` over a border-coloured ground under `overflow: hidden` at a 12px radius. Both end
-   * up in the same place: the divider between cells IS the gap, so a grid of sixteen cells carries
-   * one border instead of sixteen, every line is exactly 1px whatever the browser's rounding does,
-   * and there is one radius on the outside rather than a rule about which corner is which.
-   *
-   * `research-site-reference.md` counts 64 to 145 hairlines per page on PostHog and 68 on Linear,
-   * against ours: one vertical rule for the whole document. This is how the count goes up without
-   * a border declaration per element.
-   */
-  .hair {
-    display: grid;
-    gap: 1px;
-    overflow: hidden;
-    background: var(--line);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-  }
-
-  .hair > * {
-    background: var(--bg);
-  }
-
-  /* HEADINGS IN THE TEXT FACE, as the app now sets them. Poppins stays on the wordmark only: a
-     geometric display face over every heading is one of the first things that reads as a theme. */
+  /* HEADINGS IN GEIST, as every word is (SYSTEM §3). The skin's base still names the display face for the app. */
   h1,
   h2,
   h3,
@@ -280,16 +93,272 @@
     font-family: var(--font-ui);
   }
 
+  /* ── The column and the band ─────────────────────────────────────────────── */
+
+  .in {
+    max-inline-size: calc(var(--site-max) + 2 * var(--site-gutter));
+    margin-inline: auto;
+    padding-inline: var(--site-gutter);
+  }
+
+  /* A BAND IS ONE IDEA: a row of tiles on the ground. Bands sit one inset apart, as the tiles inside them do, so a
+     page reads as one board; the first band leaves room under the floating bar. */
+  .band {
+    display: block;
+  }
+
+  .band + .band {
+    margin-block-start: var(--inset);
+  }
+
+  main > :first-child {
+    margin-block-start: var(--sp-6);
+  }
+
+  main > :last-child {
+    margin-block-end: var(--inset);
+  }
+
+  /* ── The tile grid ───────────────────────────────────────────────────────── */
+
+  /* TWELVE COLUMNS, ONE INSET APART. A tile says how many it takes; below 900 every tile takes the row. */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--inset);
+    align-items: stretch;
+  }
+
+  .tiles > * {
+    grid-column: span 12;
+    min-inline-size: 0;
+  }
+
+  @media (width >= 900px) {
+    .tiles > .span-3 {
+      grid-column: span 3;
+    }
+
+    .tiles > .span-4 {
+      grid-column: span 4;
+    }
+
+    .tiles > .span-5 {
+      grid-column: span 5;
+    }
+
+    .tiles > .span-6 {
+      grid-column: span 6;
+    }
+
+    .tiles > .span-7 {
+      grid-column: span 7;
+    }
+
+    .tiles > .span-8 {
+      grid-column: span 8;
+    }
+
+    .tiles > .span-9 {
+      grid-column: span 9;
+    }
+  }
+
+  /* Between a phone and a desk, the small tiles pair up rather than each taking a whole row. */
+  @media (640px <= width < 900px) {
+    .tiles > .span-3,
+    .tiles > .span-4 {
+      grid-column: span 6;
+    }
+  }
+
+  /* ── The tile ────────────────────────────────────────────────────────────── */
+
   /**
-   * THE BUTTON, and exactly one of them per view is filled.
+   * CONTENT IS AN OPAQUE TILE (SYSTEM §4, §6): the tile fill, radius 22, level one, and no border. It never holds a
+   * tile and never sits on glass. A tile that leads a band, with a heading and words to read, takes the lead padding.
+   */
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    padding: 20px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+    color: var(--ink);
+  }
+
+  .tile.lead {
+    gap: var(--sp-5);
+    padding: clamp(24px, 1.2vw + 19px, 32px);
+  }
+
+  /* THE HEADING ROW: an icon well, the title, a count, and a link or a meta line at the end. */
+  .tile-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-block-size: var(--well);
+    margin: 0;
+  }
+
+  .tile-title {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .tile-count {
+    color: var(--dim);
+    font-size: var(--t-row);
+    font-weight: 600;
+  }
+
+  .tile-meta {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-site-small);
+    text-align: end;
+  }
+
+  .tile-head .onward {
+    margin-inline-start: auto;
+  }
+
+  /* THE ICON WELL: 28 (or 32) square, radius 9, the 18px glyph in the second ink. `ink` is the chosen form. */
+  .well {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--well);
+    block-size: var(--well);
+    background: var(--s1);
+    border-radius: var(--r-well);
+    color: var(--ink2);
+  }
+
+  .well.l {
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+  }
+
+  .well.ink {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  /* THE FIGURE A TILE HOLDS, and the one written line under its chart that says what the chart means. */
+  .figure {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-figure);
+    font-weight: 600;
+    line-height: 1.133;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .reading {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-site-small);
+    line-height: 20px;
+    text-wrap: pretty;
+  }
+
+  .meta {
+    color: var(--dim);
+    font-size: var(--t-site-small);
+  }
+
+  /* ── Headings and reading text ───────────────────────────────────────────── */
+
+  /* The hero's heading: 56/60 at a desk, one colour, one plain sentence. */
+  .display {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-site-hero);
+    font-weight: 600;
+    line-height: var(--lh-site-hero);
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  /* Every other heading on the site: `--t-lead`, 34/40, one plain sentence in one colour (DIRECTION §33). */
+  .h2 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-lead);
+    font-weight: 600;
+    line-height: 1.176;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  /* A heading inside a band that is not the band's own: a tile's title set larger, for a tile that is read. */
+  .h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  /* Text for reading: 17/28 in the second ink. */
+  .lede {
+    margin: 0;
+    max-inline-size: 60ch;
+    color: var(--ink2);
+    font-size: var(--t-site-body);
+    line-height: var(--lh-site-body);
+    text-wrap: pretty;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A link that leads on: ink words and an arrow that leans towards where it goes. */
+  .onward {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: var(--tap);
+    color: var(--ink);
+    font-size: var(--t-site-small);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .onward:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .onward svg {
+      transition: transform var(--d-state) var(--ease-out);
+    }
+
+    .onward:hover svg {
+      transform: translateX(3px);
+    }
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+  /**
+   * THE BUTTON IS A PILL, and exactly one per view is filled. The filled one is ink with the on-ink word (SYSTEM §6);
+   * the quiet one is the tile's second fill; the glass one sits on the ground or on chrome. No hue is spent on an
+   * action, and red is never a fill.
    *
-   * A filled button is the answer to "what do I do here", and a view with two of them has two
-   * answers. The filled one is ink on the ground, the way the app draws its primary: no hue is
-   * spent on an action. A small radius and not a pill, for the same reason.
-   *
-   * THE PRESS IS A SCALE AND AN OPACITY, for the reason `tokens.css` gives beside those two values:
-   * under `prefers-reduced-motion` a11y collapses every duration to 1ms, so a press written as a
-   * transform alone is not damped for those readers, it is absent. Opacity is a state and lands.
+   * THE PRESS IS A SCALE AND AN OPACITY: under `prefers-reduced-motion` a11y collapses every duration, so a press
+   * written as a transform alone is not damped for those readers, it is absent. Opacity is a state and lands.
    */
   .btn {
     display: inline-flex;
@@ -297,26 +366,26 @@
     justify-content: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    padding-inline: 14px;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    padding-inline: 16px;
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-pill);
     color: var(--ink);
-    font-size: var(--t-base);
+    font: inherit;
+    font-size: var(--t-site-small);
     font-weight: 500;
     line-height: 1.2;
     text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
     transition:
       transform var(--d-release) var(--ease-out),
       opacity var(--d-release) var(--ease-out),
-      background var(--d-state) var(--ease-out),
-      border-color var(--d-state) var(--ease-out);
+      background var(--d-state) var(--ease-out);
   }
 
   .btn:hover {
     background: var(--s2);
-    border-color: var(--edge);
   }
 
   .btn:active {
@@ -328,42 +397,99 @@
 
   .btn-primary {
     background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
+    color: var(--on-ink);
   }
 
   .btn-primary:hover {
     background: var(--primary-hover);
-    border-color: var(--primary-hover);
+  }
+
+  .btn-glass {
+    background: var(--glass);
+    box-shadow: var(--glass-edge);
+    backdrop-filter: var(--glass-blur);
   }
 
   .btn-lg {
-    min-block-size: 40px;
-    padding-inline: var(--sp-4);
+    min-block-size: var(--tap);
+    padding-inline: 20px;
   }
 
   .btn-sm {
     min-block-size: var(--ctl-h-sm);
-    padding-inline: 10px;
-    font-size: var(--t-sm);
+    padding-inline: 12px;
   }
 
-  /* `13 §7`: 44 on both axes under a thumb, and every button on the site is wider than it is tall. */
+  /* 44 on both axes under a thumb, and every button on the site is wider than it is tall. */
   @media (pointer: coarse) {
     .btn {
       min-block-size: var(--tap);
     }
   }
 
+  /* The arrow in a primary button leans towards where it goes, a little, under the pointer. */
+  @media (prefers-reduced-motion: no-preference) {
+    .btn-primary svg {
+      transition: transform var(--d-state) var(--ease-out);
+    }
+
+    .btn-primary:hover svg {
+      transform: translateX(2px);
+    }
+  }
+
+  /* THE KEY CAP: an 18px cap in the tile's second fill, radius 6, in the mono face. A glyph and not a sentence, so it
+     keeps the app's 12 where the site's words are 14. */
+  .kbd {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: 18px;
+    block-size: 18px;
+    padding-inline: 4px;
+    background: var(--s1);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-app-xs);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* A pill of words in the tile's second fill: a category, a door, what a pack adds. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 30px;
+    padding-inline: 12px;
+    background: var(--s1);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-site-small);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* Glass for chrome drawn on the site: the frosted fill, its blur and its hairline pair, at level two. */
+  .glass {
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
+  }
+
+  /* Read by a screen reader and not drawn. */
+  .sr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /**
-   * THE HUES A CHANGELOG KIND MAY TAKE. They mark a state (fixed, added, changed), which is what
-   * colour on this site is for.
-   *
-   * THREE, AND NOT FOUR. `changelog/+page.svelte` is the only thing on the site that sets
-   * `data-hue`, and it maps its three kinds onto `earn`, `info` and `warn`. An `accent` rule sat
-   * here painting nothing, and a `--hue-wash` that mixed `--hue` down to 14% was never read by any
-   * rule; both are gone. `icons.ts` narrows its `Hue` type to the same three, so a call site that
-   * asks for a hue this file cannot paint will not typecheck.
+   * THE HUES A CHANGELOG KIND MAY TAKE. They mark a state (fixed, added, changed), which is what colour on this site is
+   * for. `icons.ts` narrows its `Hue` type to the same three.
    */
   [data-hue='info'] {
     --hue: var(--info);
@@ -377,175 +503,13 @@
     --hue: var(--warn);
   }
 
-  /* The arrow in a primary button leans towards where it goes, a little, under the pointer. */
-  @media (prefers-reduced-motion: no-preference) {
-    .btn-primary svg {
-      transition: transform var(--d-state) var(--ease-out);
-    }
-
-    .btn-primary:hover svg {
-      transform: translateX(2px);
-    }
-  }
-}
-
-/* ── The sections every page is made of (`loop/DIRECTION.md` §33) ──────────────────
-   One heading shape, one lead, one frame for a drawing, so the home page, /slash, /pricing and
-   /agents read as one site. A section heading is one plain sentence in one colour, smaller than the
-   hero's, so the drawings under it do the talking. The accent stays in the hero and on the Slash key. */
-@layer components {
-  .sec {
-    padding-block: clamp(72px, 9vw, 136px);
-  }
-
-  .sec + .sec {
-    border-block-start: 1px solid var(--line);
-  }
-
-  .sec-head {
-    display: grid;
-    gap: var(--sp-5);
-    max-inline-size: 760px;
-  }
-
-  .sec-head.center {
-    margin-inline: auto;
-    text-align: center;
-    justify-items: center;
-  }
-
-  .h2 {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-site-h2);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    text-wrap: balance;
-  }
-
-  /* The hero's heading, the largest role of the scale. A page may still size its own. */
-  .display {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-site-display);
-    font-weight: 600;
-    line-height: 1.04;
-    letter-spacing: -0.035em;
-    text-wrap: balance;
-  }
-
-  .hl {
-    color: var(--accent-text);
-  }
-
-  .lede {
-    margin: 0;
-    max-inline-size: 58ch;
-    color: var(--ink2);
-    font-size: var(--t-site-lead);
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-
-  .onward {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-block-size: var(--tap);
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .onward:hover {
-    color: var(--accent-text);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .onward svg {
-      transition: transform var(--d-state) var(--ease-out);
-    }
-
-    .onward:hover svg {
-      transform: translateX(3px);
-    }
-  }
-
-  /* THE FRAME A DRAWING SITS IN: the app window's edge and shadow, without its bar. */
-  .frame {
-    overflow: hidden;
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    box-shadow: var(--e2);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .frame {
-      background: var(--s1);
-      box-shadow:
-        var(--e2),
-        inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent);
-    }
-  }
-
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-block-size: 30px;
-    padding-inline: 12px;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .num {
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* One sentence in `.lede` size above a list of short points, each a bold head and one line. */
-  .points {
-    display: grid;
-    gap: var(--sp-5);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .points li {
-    display: grid;
-    gap: 4px;
-    padding-inline-start: var(--sp-4);
-    border-inline-start: 2px solid var(--line);
-  }
-
-  .points b {
-    color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 600;
-  }
-
-  .points span {
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 1.55;
-  }
-
+  /* A band rises into place as it scrolls in, where the browser can tie it to the scroll, and never under reduced motion. */
   @media (prefers-reduced-motion: no-preference) {
     @supports (animation-timeline: view()) {
       .reveal {
         animation: reveal-rise auto both;
         animation-timeline: view();
-        animation-range: entry 4% cover 20%;
+        animation-range: entry 4% cover 18%;
       }
     }
   }
@@ -553,18 +517,12 @@
   @keyframes reveal-rise {
     from {
       opacity: 0;
-      transform: translateY(24px);
+      transform: translateY(16px);
     }
 
     to {
       opacity: 1;
       transform: none;
-    }
-  }
-
-  @media (width < 640px) {
-    .in {
-      padding-inline: var(--sp-4);
     }
   }
 }

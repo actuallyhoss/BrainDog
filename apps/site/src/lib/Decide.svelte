@@ -38,11 +38,19 @@
   region: announcing a four-step animation of text it has already read would be noise.
 
   NO DEFAULT STRINGS. Every word is a prop, because all of this site's copy lives in `copy.ts` where
-  the content test scans it. The only characters the component makes are the avatar initials, and
-  they are cut from the names written beside them and hidden from assistive technology.
+  the content test scans it. The only characters the component makes are the faces' initials, cut from
+  the names written beside them, drawn by the stylesheet from a data attribute and hidden from
+  assistive technology, so they are never words in the markup.
+
+  TWO TILES, AS THE NEW APP DRAWS THEM (SYSTEM §6, 29 September): the question on the left, with an icon
+  well on its heading, the agent that asks, the proposal and the verb; and the history on the right, the
+  landing row arriving in the arrive wash. The figure is not a tile: it lays its two tiles in its own
+  grid, so no tile holds another. Its glyphs are drawn inline from `icons.ts`'s set, because the
+  server-render test compiles this file alone.
 -->
 <script lang="ts">
-  type Row = { who: string; what: string; when: string };
+  /** `rule` marks a row a rule wrote, drawn with no face: faces are for agents and people. */
+  type Row = { who: string; what: string; when: string; rule?: boolean };
 
   let {
     scene,
@@ -62,6 +70,10 @@
       accepted: string;
       /** Oldest first, and the last one lands when the proposal is accepted. */
       history: readonly Row[];
+      /** The two tiles' headings, and the history's order. Absent, the tiles draw no words of their own. */
+      heads?: { ask: string; history: string; order?: string };
+      /** The one line under the history. */
+      undo?: string;
     };
   } = $props();
 
@@ -141,80 +153,113 @@
   });
 </script>
 
+
 <figure class="decide" data-phase={phase} bind:this={root} aria-labelledby="{uid}-label">
   <figcaption class="label" id="{uid}-label">{scene.label}</figcaption>
 
   <div class="stage">
-    <div class="flow">
-      <p class="actor agent">
-        <span class="face" aria-hidden="true">{initial(scene.agent)}</span>
-        <span class="name">{scene.agent}</span>
-        <!-- THE TYPING DOTS ARE THE ONLY THING THAT SAYS "DRAFTING", and they need no word: the
-             card arriving under them is what the dots were promising. -->
-        <span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>
-      </p>
-
-      <div class="card">
-        <p class="title">{scene.proposal.title}</p>
-        <p class="change">
-          <span class="plus" aria-hidden="true"></span>
-          <span class="change-text">{scene.proposal.change}</span>
-        </p>
-        <div class="foot">
-          <p class="actor person">
-            <span class="face" aria-hidden="true">{initial(scene.person)}</span>
-            <span class="name">{scene.person}</span>
-          </p>
-          <!-- THE VERB AND THE STAMP SHARE ONE CELL, so the card is one size before and after the
-               press and nothing under it moves. The verb is DRAWN, not a `<button>`: a control on a
-               marketing page that does nothing when pressed is a broken control, whatever it
-               looks like. -->
-          <span class="decision">
-            <span class="verb">{scene.verb}</span>
-            <span class="stamp">
-              <svg class="tick" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3.5 8.5l3 3 6-7" />
-              </svg>
-              <span>{scene.accepted}</span>
-            </span>
-            <svg class="pointer" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3 2l10 6.2-4.4 1.1L6.4 14z" />
-            </svg>
+    <div class="tile ask">
+      {#if scene.heads}
+        <p class="head">
+          <span class="well" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 20.5v-6.25L6.25 8.5" /><path d="M12 14.25l5.75-5.75" /><path d="M6.25 13V8.5h4.5" /><path d="M17.75 13V8.5h-4.5" /></svg>
           </span>
+          <span class="head-title">{scene.heads.ask}</span>
+        </p>
+      {/if}
+
+      <div class="flow">
+        <p class="actor agent">
+          <span class="face" data-initial={initial(scene.agent)} aria-hidden="true"></span>
+          <span class="name">{scene.agent}</span>
+          <!-- THE TYPING DOTS ARE THE ONLY THING THAT SAYS "DRAFTING", and they need no word: the
+               proposal arriving under them is what the dots were promising. -->
+          <span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>
+        </p>
+
+        <div class="card">
+          <p class="title">{scene.proposal.title}</p>
+          <p class="change">
+            <span class="plus" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 5.25v13.5M5.25 12h13.5" /></svg>
+            </span>
+            <span class="change-text">{scene.proposal.change}</span>
+          </p>
+          <div class="foot">
+            <p class="actor person">
+              <span class="face" data-initial={initial(scene.person)} aria-hidden="true"></span>
+              <span class="name">{scene.person}</span>
+            </p>
+            <!-- THE VERB AND THE STAMP SHARE ONE CELL, so the tile is one size before and after the press
+                 and nothing under it moves. The verb is DRAWN, not a `<button>`: a control on a marketing
+                 page that does nothing when pressed is a broken control, whatever it looks like. -->
+            <span class="decision">
+              <span class="verb">{scene.verb}</span>
+              <span class="stamp">
+                <svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.25 4.25L19 7" /></svg>
+                <span>{scene.accepted}</span>
+              </span>
+              <svg class="pointer" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 2l10 6.2-4.4 1.1L6.4 14z" />
+              </svg>
+            </span>
+          </div>
         </div>
       </div>
     </div>
 
-    <ol class="history">
-      {#each older as row, i (i)}
-        <li class="row">
-          <span class="who">{row.who}</span>
-          <span class="what">{row.what}</span>
-          <span class="when">{row.when}</span>
-        </li>
-      {/each}
-      {#if landing}
-        <li class="row landing">
-          <span class="who">{landing.who}</span>
-          <span class="what">{landing.what}</span>
-          <span class="when">{landing.when}</span>
-        </li>
+    <div class="tile past">
+      {#if scene.heads}
+        <p class="head">
+          <span class="well" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 12.5h3.75l2.5-6 4.5 11 2.5-5h4.75" /></svg>
+          </span>
+          <span class="head-title">{scene.heads.history}</span>
+          {#if scene.heads.order}<span class="head-meta">{scene.heads.order}</span>{/if}
+        </p>
       {/if}
-    </ol>
+
+      <!-- NEWEST FIRST, as the app's history reads: the landing row at the top, then the older ones. -->
+      <ol class="history">
+        {#if landing}
+          <li class="row landing">
+            <span class="face" data-initial={initial(landing.who)} aria-hidden="true"></span>
+            <span class="said">
+              <span class="what">{landing.what}</span>
+              <span class="meta"><span class="who">{landing.who}</span><span class="dot" aria-hidden="true"></span><span class="when">{landing.when}</span></span>
+            </span>
+          </li>
+        {/if}
+        {#each [...older].reverse() as row, i (i)}
+          <li class="row">
+            {#if row.rule}
+              <span class="rule" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M13 3.25 5.25 13.5H12l-1 7.25 7.75-10.25H12z" /></svg>
+              </span>
+            {:else}
+              <span class="face" data-initial={initial(row.who)} aria-hidden="true"></span>
+            {/if}
+            <span class="said">
+              <span class="what">{row.what}</span>
+              <span class="meta"><span class="who">{row.who}</span><span class="dot" aria-hidden="true"></span><span class="when">{row.when}</span></span>
+            </span>
+          </li>
+        {/each}
+      </ol>
+
+      {#if scene.undo}<p class="reading">{scene.undo}</p>{/if}
+    </div>
   </div>
 </figure>
 
 <style>
-  /* SEMANTIC TOKENS ONLY, so the scene takes whichever ground its band sets. `app.css` flips a band
-     by renaming `--bg`, `--ink`, `--s1` and the rest, and a component that named a colour of its own
-     would be the one thing on a flipped band still drawn for the page. The two hues it uses,
-     `--info` for the agent and `--earn` for the acceptance, are only ever strokes and rings, never
-     text, because neither is solved as a text colour against a flipped ground. */
+  /* SEMANTIC TOKENS ONLY. Two tiles on the site's ground, each drawn as the app draws a tile. */
   .decide {
     --face: 28px;
 
     margin: 0;
     inline-size: 100%;
+    block-size: 100%;
   }
 
   /* Named for a screen reader only: the scene says it better than a caption over it. */
@@ -227,53 +272,108 @@
     white-space: nowrap;
   }
 
-  /* TWO COLUMNS AT A DESK, the proposal on the left and the history it writes to on the right, so
-     the eye goes the way the change does. They stack on a phone, below. */
+  /* TWO TILES AT A DESK, the question on the left and the history it writes to on the right, so the eye goes the
+     way the change does, one inset apart. They stack below 900. */
   .stage {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    align-items: start;
-    gap: var(--sp-5);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--inset);
+    block-size: 100%;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    padding: 20px;
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    box-shadow: var(--e1);
+  }
+
+  /* THE HEADING ROW: an icon well, the title, and a meta line at the end (SYSTEM §6). */
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .well,
+  .rule {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--well);
+    block-size: var(--well);
+    border-radius: var(--r-well);
+    background: var(--s1);
+    color: var(--ink2);
+  }
+
+  .well svg,
+  .rule svg,
+  .plus svg {
+    inline-size: 18px;
+    block-size: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .head-title {
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+  }
+
+  .head-meta {
+    margin-inline-start: auto;
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .flow {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
   }
 
   .actor {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 10px;
     margin: 0;
     min-inline-size: 0;
   }
 
+  /* A FACE: a circle in the second ink with the initial in the on-ink colour, drawn from its data attribute. */
   .face {
     display: grid;
     flex: none;
     place-items: center;
     inline-size: var(--face);
     block-size: var(--face);
-    background: var(--s1);
-    border: 2px solid var(--hue, var(--line));
     border-radius: var(--r-pill);
-    color: var(--ink);
+    background: var(--ink2);
+    color: var(--on-ink);
     font-size: var(--t-xs);
     font-weight: 600;
   }
 
-  .agent {
-    --hue: var(--info);
+  .face::before {
+    content: attr(data-initial);
   }
 
-  .person {
-    --hue: var(--earn);
+  .person .face {
+    background: var(--ink);
   }
 
   .name {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink);
+    font-size: var(--t-base);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -287,43 +387,48 @@
   .typing i {
     inline-size: 5px;
     block-size: 5px;
-    background: var(--dim);
+    background: var(--live);
     border-radius: var(--r-pill);
   }
 
+  /* THE PROPOSAL sits in the tile, not in a box of its own: the question at the group step, the change in a
+     second-fill well with its plus, and the person and the verb at its foot. */
   .card {
     display: grid;
-    gap: var(--sp-2);
-    padding: var(--sp-4);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    gap: var(--sp-3);
   }
 
   .title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--t-group);
     font-weight: 600;
-    line-height: var(--lh-tight);
+    line-height: 24px;
+    text-wrap: balance;
   }
 
-  /* THE CHANGE IS DRAWN THE WAY A DIFF DRAWS AN ADDED LINE, a bar and the words, because that is
-     what it is: something the agent wants to add to the record and has not been allowed to yet. */
   .change {
     display: flex;
-    gap: var(--sp-2);
+    align-items: flex-start;
+    gap: 10px;
     margin: 0;
+    padding: 10px 12px 10px 10px;
+    border-radius: var(--r-md);
+    background: var(--s1);
     color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .plus {
+    display: grid;
     flex: none;
-    inline-size: 3px;
-    background: var(--info);
-    border-radius: var(--r-pill);
+    place-items: center;
+    inline-size: 22px;
+    block-size: 22px;
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--ink);
   }
 
   .foot {
@@ -331,9 +436,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    margin-block-start: var(--sp-2);
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line-soft);
+    margin-block-start: var(--sp-1);
   }
 
   .decision {
@@ -348,29 +451,29 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    min-block-size: var(--ctl-h-sm);
-    padding-inline: var(--sp-3);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-4);
     border-radius: var(--r-pill);
     font-size: var(--t-sm);
     font-weight: 600;
     white-space: nowrap;
   }
 
-  /* DRAWN IN INK, as the product's primary actions are (`loop/DIRECTION.md` §19: primary actions in
-     ink, the accent spent rarely). `.btn-primary` in `app.css` is the same pair. */
+  /* DRAWN IN INK, as the product's primary actions are. */
   .verb {
     background: var(--ink);
-    color: var(--bg);
+    color: var(--on-ink);
     visibility: hidden;
   }
 
   .stamp {
+    background: var(--s1);
     color: var(--ink);
   }
 
   .tick {
-    inline-size: var(--icon-s);
-    block-size: var(--icon-s);
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
     fill: none;
     stroke: var(--earn);
     stroke-width: 2;
@@ -391,68 +494,74 @@
     pointer-events: none;
   }
 
+  /* ── The history ──────────────────────────────────────────────────── */
+
   .history {
     display: grid;
+    gap: 2px;
     margin: 0;
-    padding: var(--sp-1);
+    padding: 0;
     list-style: none;
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
   }
 
   .row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: 44px;
-    padding-inline: var(--sp-3);
-    border-block-end: 1px solid var(--line-soft);
-    border-radius: var(--r-sm);
+    min-block-size: 56px;
+    padding: var(--sp-2) 10px;
+    border-radius: var(--r-md);
   }
 
-  .row:last-child {
-    border-block-end-color: transparent;
+  .said {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .what {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .who {
     color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 600;
-    white-space: nowrap;
+    font-weight: 500;
   }
 
-  .what {
-    overflow: hidden;
-    color: var(--ink);
-    font-size: var(--t-sm);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .dot {
+    inline-size: 3px;
+    block-size: 3px;
+    border-radius: var(--r-pill);
+    background: currentColor;
   }
 
-  .when {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    white-space: nowrap;
-  }
-
-  /* THE LANDING ROW, washed, and its quiet cell stepped up to `--ink2`, because `--dim` runs out of
-     contrast three surfaces down. `--flip-dim` is solved against the flipped band's ground, 5.73:1
-     in the dark scheme; this row is on `--s1`, 4.74:1, and the 6 per cent wash under it takes `--dim`
-     to 4.19:1, under the 4.5 body floor. The `a11y` gate found exactly that on the old home-page
-     ledger's newest row, in dark at 1440 and at 390; light lands at 4.94:1 and clears. `--ink2`
-     there measures 6.18:1. Raising `--flip-dim` instead needs 68 per cent against `--flip-ink2`'s 76,
-     and two roles eight points apart read as one colour, so the call site that stacks the surfaces
-     pays for it. This row sits on the same two surfaces. */
+  /* THE LANDING ROW ARRIVES in the arrive wash, the one fill that says "just now" (SYSTEM §2). Its quiet words step
+     up to the second ink, which keeps its contrast on the wash. */
   .landing {
-    background: var(--hover-wash);
-    box-shadow: inset 3px 0 0 var(--info);
+    background: var(--arrived-wash);
   }
 
-  .landing .when {
+  .landing .meta {
     color: var(--ink2);
+  }
+
+  .reading {
+    margin: auto 0 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   /* ── The frames. Opacity and transform only, so the box is one size in every frame ─────────── */
@@ -495,7 +604,7 @@
   [data-phase='proposed'] .landing,
   [data-phase='pressed'] .landing {
     opacity: 0;
-    transform: translateY(var(--sp-2));
+    transform: translateY(calc(-1 * var(--sp-2)));
   }
 
   /* ── Only when motion is welcome ──────────────────────────────────── */
@@ -504,8 +613,8 @@
     .card,
     .landing {
       transition:
-        opacity var(--d-enter) var(--ease-spring),
-        transform var(--d-enter) var(--ease-spring);
+        opacity var(--d-enter) var(--ease-out),
+        transform var(--d-enter) var(--ease-out);
     }
 
     .pointer {
@@ -530,8 +639,8 @@
       animation-delay: 300ms;
     }
 
-    /* THE DOTS ONLY MOVE WHILE THEY ARE SHOWN. An infinite animation on an invisible element is
-       still a compositor frame every tick, for the whole life of the page. */
+    /* THE DOTS ONLY MOVE WHILE THEY ARE SHOWN. An infinite animation on an invisible element is still a
+       compositor frame every tick, for the whole life of the page. */
     [data-phase='proposed'] .typing i,
     [data-phase='pressed'] .typing i,
     [data-phase='done'] .typing i {
@@ -550,38 +659,11 @@
     }
   }
 
-  /* ── The phone: the proposal over the history ─────────────────────── */
+  /* ── Narrower: the question over the history ──────────────────────── */
 
-  /* RANGE SYNTAX, TO MATCH THE PAGE. `+page.svelte` breaks its grid at `width < 640px`, which
-     excludes exactly 640; `max-width: 640px` includes it. The old home-page ledger used the second
-     and, at a viewport of exactly 640, dropped to its phone rows while the page kept its desk grid.
-     The page owns the number, so this file follows it. */
-  @media (width < 640px) {
+  @media (width < 900px) {
     .stage {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-4);
-    }
-
-    .row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        'who when'
-        'what what';
-      gap: var(--sp-1) var(--sp-2);
-      padding-block: var(--sp-2);
-    }
-
-    .who {
-      grid-area: who;
-    }
-
-    .what {
-      grid-area: what;
-      white-space: normal;
-    }
-
-    .when {
-      grid-area: when;
     }
   }
 </style>

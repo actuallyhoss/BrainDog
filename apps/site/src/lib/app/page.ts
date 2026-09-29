@@ -77,3 +77,32 @@ export function answerOf(block: Block, question: string, option: string): { ques
   }
   return { question: asked, label };
 }
+
+/** Whether a segment is the page's opening sentence, a `note lead`, which the drawn app says in its title row. */
+export const isLead = (segment: Segment): boolean => segment.type === 'block' && segment.kind === 'note' && segment.form === 'lead';
+
+/**
+ * THE PAGE'S OPENING SENTENCE, as plain words: the first `note lead` in its source, or `''` when it has none. The new
+ * app says it under the page's title (SYSTEM §5, the sentence), so the drawn app reads it off the same text the page
+ * is drawn from rather than keeping a second copy.
+ */
+export function leadOf(src: string): string {
+  for (const s of parse(src, { page: true })) {
+    if (s.type === 'block' && isLead(s)) return s.rows.map((r) => r.cells.join(' ')).join(' ').trim();
+  }
+  return '';
+}
+
+/**
+ * WHO IS WORKING ON THE RECORD NOW, read off its Agents page: the rows of the `cards | Working now` fence, each an
+ * agent's name and when it last wrote. The drawn rail's Working now section is these rows, so it says what the page does.
+ */
+export function workingIn(src: string): { who: string; doing: string; when: string }[] {
+  for (const s of parse(src, { page: true })) {
+    if (s.type !== 'block' || s.kind !== 'cards' || (s.heading ?? '').trim() !== 'Working now') continue;
+    return s.rows
+      .map((r) => ({ who: (r.cells[0] ?? '').trim(), doing: (r.cells[1] ?? '').trim(), when: (r.cells[2] ?? '').trim() }))
+      .filter((r) => r.who !== '' && r.who !== 'who');
+  }
+  return [];
+}

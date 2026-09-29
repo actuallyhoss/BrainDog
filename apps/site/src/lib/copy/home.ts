@@ -6,8 +6,8 @@
  */
 export const home = {
   hero: {
-    /* THE SLOGAN, IN TWO HALVES, so the last two words take `--accent-text`. The words are the
-       owner's and unchanged. */
+    /* THE SLOGAN, in two halves for the history of the thing, drawn as one sentence in one colour since 29 September:
+       red is the mark's alone (SYSTEM §10). The words are the owner's and unchanged, with no full stop. */
     title: 'Give your business',
     titleAccent: 'a memory',
     sub: 'Everything you keep track of, in one place arranged around you. You and your AI agents keep it up to date, and every change says who made it.',
@@ -36,11 +36,15 @@ export const home = {
     /* `acceptIt` in `apps/web/src/lib/copy.ts`: the word the app's own button says. */
     verb: 'Accept',
     accepted: 'Accepted by you',
+    /* THE TWO TILES' HEADINGS, as the app names the screen and the list, and the line under the history, which is
+       what `yours` below says of every change. */
+    heads: { ask: 'Decide', history: 'History', order: 'Newest first' },
+    undo: 'Any change can be undone, and the name stays on it.',
     history: [
       /* The times are `sample.ts`'s: `seq 4160` at `stamp(-31)`, and `stamp` counts hours. */
       { who: 'Codex', what: 'Opened a question about the Kiln licensing model', when: '1d ago' },
       /* `seq 4188` in `sample.ts`, written by `rule.reply`, which the app names `Reply` through `names.ts`'s `actor`. */
-      { who: 'Reply', what: 'Added a note to an invoice that is late', when: '9h ago' },
+      { who: 'Reply', what: 'Added a note to an invoice that is late', when: '9h ago', rule: true },
       /* `seq 4192` and `4191` in `sample.ts`. It says `just now` because it lands as the reader presses
          Accept, and `decide-copy.test.ts` reads that word from `since` in `packages/render/src/format.ts`. */
       { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: 'just now' },
@@ -161,6 +165,8 @@ Review | Invite links | Lena
           { at: 2, cols: 6 },
           { at: 3, cols: 6 },
         ],
+        /* THE LINE UNDER THE CHART, read off its rows: July's GBP 701.00 is the highest, and September is partial. */
+        reads: { 1: 'July was the most, GBP 701.00. September is not over yet.' },
       },
       /* The first-party packs are `FIRST_PARTY` in `packages/seed/src/packs/first-party.ts`. */
       packsLine: 'Or start from a pack: Money, Work, Studies, People, Stripe, Mercury, Holdings and more.',
@@ -176,6 +182,8 @@ Review | Invite links | Lena
         'BrainDog is open source, so you can read exactly how all of this works.',
       ],
       source: 'See the code on GitHub',
+      /* A glyph for each paragraph of `body`, in order: its own database, every change named, open source. */
+      glyphs: ['server', 'undo', 'code'],
     },
 
     plans: {
@@ -186,6 +194,9 @@ Review | Invite links | Lena
         { head: 'Colleagues are free', said: 'On both plans, with any level of access.' },
       ],
       more: 'Full pricing',
+      /* The two meters each plan is drawn with, and who the faces are: the Team example's four (`lib/examples/team.ts`). */
+      meters: { credits: 'Slash credits a month', runs: 'automation runs a month' },
+      faces: ['Omar', 'Lena', 'Maya', 'Jun'],
     },
   },
 

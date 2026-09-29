@@ -9,8 +9,8 @@
   in `apps/site/legal/`. Until `LAUNCH.legal` says they are in force, this page says so in one sentence
   and links none of them; after it, it lists the three, each at `/legal/<name>`.
 
-  The page is bands on the site's two grounds with a hairline at each seam, the skeleton every other
-  route has, with the prose at a 68ch reading measure inside them (`Parts.svelte`).
+  The page is one band of tiles, the licence in the opening tile beside the terms, with the prose at a 68ch
+  reading measure inside them (`Parts.svelte`).
 -->
 <script lang="ts">
   import { site } from '$lib/copy.ts';
@@ -21,11 +21,13 @@
   const l = trust.legal;
 
   const parts: Part[] = [
-    { id: 'licence-title', title: l.licence.title, body: l.licence.body, links: l.licence.links },
+    { id: 'licence-title', title: l.licence.title, glyph: 'code', span: 7, body: l.licence.body, links: l.licence.links },
     LAUNCH.legal
       ? {
           id: 'terms-title',
           title: l.terms.title,
+          glyph: 'file',
+          span: 5,
           body: [l.terms.live],
           links: [
             { label: l.texts.terms.title, href: '/legal/terms' },
@@ -33,7 +35,7 @@
             { label: l.texts.processing.title, href: '/legal/processing' },
           ],
         }
-      : { id: 'terms-title', title: l.terms.title, body: [l.terms.body] },
+      : { id: 'terms-title', title: l.terms.title, glyph: 'file', span: 5, body: [l.terms.body] },
   ];
 </script>
 

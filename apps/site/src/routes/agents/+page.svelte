@@ -1,48 +1,47 @@
 <!--
   For agents and services.
 
-  REBUILT ON 26 SEPTEMBER with the rest of the site (`loop/DIRECTION.md` §33): a two-tone heading, a
-  way to connect first, and no eyebrow tags. The drawing of a client reaching the record is kept.
+  REBUILT ON 29 SEPTEMBER IN THE SITE'S NEW LOOK (`loop/design/SYSTEM.md` §10, the board `Light-Agents.dc.html`):
+  every band is Bento tiles on the ground, and the tiles carry the product at work rather than prose about it.
 
-  THE PAGE THE HOME PAGE'S TECHNICAL MATERIAL MOVED TO. `loop/DIRECTION.md` §19 is the owner's own
-  instruction: the counted figures and the tool grid come off the home page, and what is worth
-  keeping goes on a page a curious reader reaches on purpose. For one hour on 21 September there was
-  no such page and the material sat in `copy.ts` comments, drawn nowhere.
+    lead       the answer, the one action, and agents at work leaving what they found for the next one's briefing.
+    connect    the address, then the terminal, beside the lead: the way in is on the first screen.
+    value      what an agent gives and what it gets back, as two lists with icon wells; a key and the skill beside.
+    tools      the sixteen tools split into reads and writes, drawn as the record between two lanes, and the addresses.
+    outside    the three ways in from outside, charted by how much each can do, then one tile each with its limits.
+    cannot     what only a person can do.
 
-  IT COUNTS THINGS, AND THAT IS THE POINT OF IT. The rule that a figure must not be counted at a
-  stranger is a rule about a stranger: somebody who arrived at a headline and is being shown a
-  number they did not ask for. A reader who opens a page called For agents has asked. Every figure
-  here is read off a declaration and the file it came from is in the comment beside its copy.
+  IT COUNTS THINGS, AND THAT IS THE POINT OF IT. The rule that a figure must not be counted at a stranger is a rule about
+  a stranger. A reader who opens a page called For agents has asked. Every figure here is read off a declaration, and
+  the file it came from is in the comment beside its copy (`lib/copy/agents.ts`).
 
-  NO SCREENSHOTS, AND TWO DRAWINGS. The other pages carry the product's own screens because a screen
-  is the argument there, and a screenshot of a terminal here would be a decoration standing where
-  the reader wants a specification. What this page had instead was two lists of identifiers under
-  two uppercase headings, which is the counted-stat texture §19 named: names with nothing saying how
-  they relate. `loop/research-site-now.md` change 5 asked for the relation to be drawn, so the tools
-  band is a diagram of a client reaching the record, the writes arriving as named events on one side
-  and the reads leaving on the other, built from the same strings and nothing new. The value band
-  draws agents at work and the briefing the next one starts with, from its own lists' words.
-
-  ONE BAND TURNS OVER, THE ONE CARRYING THE DRAWING OF THE TOOLS, and the others sit on `page`.
-  They were `page, sunk, page, sunk`, and `--sunk` against `--bg` is 1.07:1, which the eye adapts to
-  rather than reads, so the alternation was bands that looked like one. The seams between the rest
-  are the hairline alone, and each band opens differently: the value as two lists beside a drawing,
-  the ways in as cards, the tools as the drawing, the ways in from outside as one row per way, and
-  the refusals as a ruled list.
-
-  WHAT AN AGENT GIVES AND GETS COMES FIRST (SIT-10, from `loop/DIRECTION.md` §0), then how to
-  connect: the address, the terminal, a key as the fallback, and the Agent Skill. The ways in from
-  outside (doors, report keys and keys, each with its curl line) are SCR-5's section, folded in here
-  by contracts X30.
+  THE CHARTS ARE DRAWN FROM THE COPY'S OWN LISTS: the split is the lengths of `reads` and `writes`, which
+  `test/content.test.ts` holds to `packages/mcp`, and the reach chart is the order the ways are listed in.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
+  import type { IconName } from '$lib/icons.ts';
   import { SIGNUP, SKILL, SOURCE, site } from '$lib/copy.ts';
   import Code from './Code.svelte';
 
   const a = site.agents;
   const v = a.value;
+  const m = a.mcp;
+
+  /* One glyph per line of the two lists, in their order: people, keys, servers, handoff, learned, the work; then the
+     briefing, the project's context, skills, keys on a grant and the agent's own page. */
+  const GIVES: readonly IconName[] = ['person', 'key', 'server', 'file', 'book', 'work'];
+  const GETS: readonly IconName[] = ['message', 'projects', 'zap', 'lock', 'agent'];
+  const BRIEF: readonly IconName[] = ['work', 'decide', 'people', 'key', 'book'];
+  const WAYS: readonly IconName[] = ['inbox', 'upload', 'key'];
+  const CANNOT: readonly IconName[] = ['decide', 'people', 'lock'];
+
+  /* THE SPLIT, one cell a tool: the reads in grey and the writes in ink, the one series that carries a name. */
+  const total = m.reads.length + m.writes.length;
+  const CELL = 20;
+  const GAP = 4;
+  const splitWidth = total * CELL + (total - 1) * GAP;
 </script>
 
 <svelte:head>
@@ -54,744 +53,428 @@
   <meta property="og:description" content={site.meta.agents.description} />
 </svelte:head>
 
-<section class="band head" data-ground="page" aria-labelledby="agents-h1">
-  <div class="in head-in">
-    <h1 class="display" id="agents-h1">{a.title}</h1>
-    <p class="lead">{a.lead}</p>
+<!-- ── The answer and the way in ──────────────────────────────────────────────── -->
+<section class="band" aria-labelledby="agents-h1">
+  <div class="in">
+    <div class="tiles">
+      <div class="tile lead span-7">
+        <h1 class="h2" id="agents-h1">{a.title}</h1>
+        <p class="lede">{a.lead}</p>
+        <p class="actions">
+          <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{site.nav.start}<Icon name="arrow" size="m" /></a>
+        </p>
+
+        <!-- THE SCENE: agents at work leave what they found, and the next one starts with a briefing. One labelled
+             picture, because it repeats the lists' words further down. -->
+        <figure class="scene" role="img" aria-label={v.drawn.label}>
+          <ul class="crew">
+            {#each v.drawn.crew as one (one.name)}
+              <li class="worker">
+                <span class="face">{one.face}</span>
+                <span class="worker-text">
+                  <span class="who">{one.name}</span>
+                  <span class="did">{one.did}</span>
+                </span>
+              </li>
+            {/each}
+          </ul>
+          <svg class="into" viewBox="0 0 48 120" preserveAspectRatio="none" aria-hidden="true">
+            <path class="into-line" d="M2 20 C 26 20, 22 60, 46 60 M2 60 H 46 M2 100 C 26 100, 22 60, 46 60" />
+          </svg>
+          <div class="brief">
+            <p class="brief-head"><span class="brief-title">{v.drawn.briefing.title}</span> <span class="brief-for">{v.drawn.briefing.for}</span></p>
+            <dl class="brief-rows">
+              {#each v.drawn.briefing.rows as row, i (row.what)}
+                <div class="brief-row">
+                  <dt><Icon name={BRIEF[i] ?? 'check'} size="s" />{row.what}</dt>
+                  <dd>{row.said}</dd>
+                </div>
+              {/each}
+            </dl>
+          </div>
+        </figure>
+        <p class="reading">{v.drawn.label}</p>
+      </div>
+
+      <!-- THE ORDER THE APP TEACHES: the address, which signs in through the app; then the terminal. -->
+      <section class="tile lead span-5" aria-labelledby="connect-title">
+        <header class="tile-head">
+          <span class="well"><Icon name="plug" /></span>
+          <h2 class="tile-title" id="connect-title">{a.connect.title}</h2>
+        </header>
+        {#each a.connect.ways as w, i (w.head)}
+          <div class="way" class:rule={i > 0}>
+            <h3 class="h3">{w.head}</h3>
+            <p class="said">{w.said}</p>
+            {#each w.lines as line (line.code)}
+              <Code label={line.label} code={line.code} />
+            {/each}
+          </div>
+        {/each}
+      </section>
+    </div>
   </div>
 </section>
 
-<!-- ── The value ───────────────────────────────────────────────────────────────
-     TWO PLAIN LISTS AND ONE DRAWING, never a grid of cards (`loop/DIRECTION.md` §33). The lists say
-     it and the drawing shows it: agents with faces leaving what they found, and the briefing the next
-     one starts with. The drawing repeats the lists' words in a picture, so it is one labelled image
-     and its parts are not read out twice. -->
-<section class="band" data-ground="page" aria-labelledby="value-title">
+<!-- ── What an agent gives, and what it gets back ─────────────────────────────── -->
+<section class="band" aria-labelledby="value-title">
   <div class="in">
-    <div class="sec-head">
-      <h2 class="h2 h2-s" id="value-title">{v.title}</h2>
-      <p class="lead">{v.lead}</p>
-    </div>
-
-    <div class="value">
-      <div class="trade">
-        <div>
-          <h3 class="list-head">{v.givesTitle}</h3>
-          <ul class="plain">
-            {#each v.gives as one (one.what)}
-              <li><strong>{one.what}</strong>, {one.said}</li>
-            {/each}
-          </ul>
-        </div>
-        <div>
-          <h3 class="list-head">{v.getsTitle}</h3>
-          <ul class="plain">
-            {#each v.gets as one (one.what)}
-              <li><strong>{one.what}</strong>, {one.said}</li>
-            {/each}
-          </ul>
+    <div class="tiles">
+      <div class="tile lead span-7">
+        <h2 class="h2" id="value-title">{v.title}</h2>
+        <p class="lede">{v.lead}</p>
+        <div class="trade">
+          <div>
+            <h3 class="list-head">{v.givesTitle}</h3>
+            <ul class="plain">
+              {#each v.gives as one, i (one.what)}
+                <li><span class="well"><Icon name={GIVES[i] ?? 'check'} /></span><span><strong>{one.what}</strong>, {one.said}</span></li>
+              {/each}
+            </ul>
+          </div>
+          <div>
+            <h3 class="list-head">{v.getsTitle}</h3>
+            <ul class="plain">
+              {#each v.gets as one, i (one.what)}
+                <li><span class="well"><Icon name={GETS[i] ?? 'check'} /></span><span><strong>{one.what}</strong>, {one.said}</span></li>
+              {/each}
+            </ul>
+          </div>
         </div>
       </div>
 
-      <figure class="scene" role="img" aria-label={v.drawn.label}>
-        <ul class="crew">
-          {#each v.drawn.crew as one (one.name)}
-            <li class="worker">
-              <span class="face">{one.face}</span>
-              <span class="worker-text">
-                <span class="who">{one.name}</span>
-                <span class="did">{one.did}</span>
-              </span>
-            </li>
+      <div class="stack span-5">
+        <section class="tile lead" aria-labelledby="key-title">
+          <header class="tile-head">
+            <span class="well"><Icon name="key" /></span>
+            <h2 class="tile-title" id="key-title">{a.connect.key.title}</h2>
+          </header>
+          <p class="said">{a.connect.key.said}</p>
+          {#each a.connect.key.clients as client (client.name)}
+            <Code label={client.name} code={client.code} />
           {/each}
-        </ul>
-        <span class="into" aria-hidden="true"></span>
-        <div class="brief">
-          <p class="brief-head">
-            <span class="brief-title">{v.drawn.briefing.title}</span>
-            <span class="brief-for">{v.drawn.briefing.for}</span>
-          </p>
-          <dl class="brief-rows">
-            {#each v.drawn.briefing.rows as row (row.what)}
-              <div class="brief-row">
-                <dt>{row.what}</dt>
-                <dd>{row.said}</dd>
+        </section>
+
+        <section class="tile lead" aria-labelledby="skill-title">
+          <header class="tile-head">
+            <span class="well"><Icon name="book" /></span>
+            <h2 class="tile-title" id="skill-title">{a.connect.skill.title}</h2>
+          </header>
+          <p class="said">{a.connect.skill.said}</p>
+          <p class="meta">{a.connect.skill.where}</p>
+          <p><a class="btn" href={SKILL}>{a.connect.skill.open}<Icon name="arrow" size="m" /></a></p>
+        </section>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── The tools ───────────────────────────────────────────────────────────────
+     THE DRAWING IS ONE `<figure>` AND THE LISTS INSIDE IT ARE STILL LISTS: the writes arriving on one side of the
+     record, the reads leaving on the other, and the addresses a client fills in under it. -->
+<section class="band" aria-labelledby="mcp-title">
+  <div class="in">
+    <div class="tiles">
+      <div class="tile lead span-12">
+        <div class="tools-head">
+          <div class="tools-say">
+            <h2 class="h2" id="mcp-title">{m.title}</h2>
+            <p class="lede">{m.lead}</p>
+          </div>
+
+          <div class="split">
+            <svg class="split-bar" viewBox="0 0 {splitWidth} {CELL}" role="img" aria-label="{m.readsTitle} {m.reads.length}, {m.writesTitle} {m.writes.length}">
+              {#each { length: total } as _, i (i)}
+                <rect class={i < m.reads.length ? 'cell-read' : 'cell-write'} x={i * (CELL + GAP)} y="0" width={CELL} height={CELL} rx="3" />
+              {/each}
+            </svg>
+            <p class="split-labels">
+              <span style="flex-grow: {m.reads.length}"><b class="num">{m.reads.length}</b> {m.readsTitle}</span>
+              <span style="flex-grow: {m.writes.length}"><b class="num">{m.writes.length}</b> {m.writesTitle}</span>
+            </p>
+            <p class="reading">{m.reading}</p>
+          </div>
+        </div>
+
+        <figure class="reach" aria-labelledby="mcp-title">
+          <div class="lane">
+            <h3 class="lane-head"><span class="dot write" aria-hidden="true"></span>{m.writesTitle}</h3>
+            <ul class="tools">
+              {#each m.writes as name (name)}<li><code class="tool">{name}</code></li>{/each}
+            </ul>
+          </div>
+
+          <span class="flow" aria-hidden="true"><Icon name="arrow-right" size="l" /></span>
+
+          <!-- THE RECORD IS THE MARK AND NO WORD: the lanes' headings already say what goes in and what comes out. -->
+          <div class="core" aria-hidden="true"><Mark height={40} /></div>
+
+          <span class="flow" aria-hidden="true"><Icon name="arrow-right" size="l" /></span>
+
+          <div class="lane">
+            <h3 class="lane-head"><span class="dot read" aria-hidden="true"></span>{m.readsTitle}</h3>
+            <ul class="tools">
+              {#each m.reads as name (name)}<li><code class="tool">{name}</code></li>{/each}
+            </ul>
+          </div>
+        </figure>
+
+        <div class="addresses">
+          <h3 class="tile-head"><span class="well"><Icon name="link" /></span><span class="tile-title">{m.resourcesTitle}</span></h3>
+          <dl class="addr">
+            {#each m.resources as one (one.uri)}
+              <div class="addr-cell">
+                <dt><code>{one.uri}</code></dt>
+                <dd>{one.said}</dd>
               </div>
             {/each}
           </dl>
         </div>
-      </figure>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ── Connect ─────────────────────────────────────────────────────────────────
-     THE ORDER THE APP TEACHES: the address, which signs in through the app; then the terminal, the
-     install line and `braindog setup` after it (contracts X55); then a key, for a client that cannot
-     open a browser. The Agent Skill closes the band because both of the first two put it in place. -->
-<section class="band" data-ground="page" aria-labelledby="connect-title">
+<!-- ── From outside ────────────────────────────────────────────────────────────
+     THE THREE WAYS IN, charted by how much each can do, then one tile each: what it is, its one curl line and its
+     limits, each limit leading and the sentence under it the reason. -->
+<section class="band" aria-labelledby="outside-title">
   <div class="in">
-    <h2 class="h2" id="connect-title">{a.connect.title}</h2>
-    <ul class="ways">
-      {#each a.connect.ways as w, i (w.head)}
-        <li class="way">
-          <span class="way-icon" aria-hidden="true"><Icon name={i === 0 ? 'link' : 'terminal'} /></span>
-          <h3>{w.head}</h3>
-          <p>{w.said}</p>
-          {#each w.lines as line (line.code)}
-            <Code label={line.label} code={line.code} />
-          {/each}
-        </li>
+    <div class="tiles">
+      <div class="tile lead span-12 outside-head">
+        <div>
+          <h2 class="h2" id="outside-title">{a.outside.title}</h2>
+          <p class="lede">{a.outside.lead}</p>
+        </div>
+        <div class="reach-chart">
+          <ol class="ladder" role="img" aria-label={a.outside.order}>
+            {#each a.outside.ways as way, i (way.head)}
+              <li class="rung">
+                <span class="rung-name">{way.head}</span>
+                <span class="segs">
+                  {#each a.outside.reach as step, s (step)}
+                    <span class="seg" class:on={s <= i} title={step}></span>
+                  {/each}
+                </span>
+                <span class="rung-step">{a.outside.reach[i]}</span>
+              </li>
+            {/each}
+          </ol>
+          <p class="reading">{a.outside.order}</p>
+        </div>
+      </div>
+
+      {#each a.outside.ways as way, i (way.head)}
+        <section class="tile span-4 way-tile" aria-labelledby="way-{i}">
+          <header class="tile-head">
+            <span class="well"><Icon name={WAYS[i] ?? 'plug'} /></span>
+            <h3 class="tile-title" id="way-{i}">{way.head}</h3>
+          </header>
+          <p class="said">{way.said}</p>
+          <Code label={way.head} code={way.code} />
+          <dl class="limits">
+            {#each way.limits as limit (limit.what)}
+              <div class="limit">
+                <dt><Icon name="check" size="m" />{limit.what}</dt>
+                <dd>{limit.said}</dd>
+              </div>
+            {/each}
+          </dl>
+        </section>
       {/each}
-    </ul>
-
-    <div class="fallback">
-      <div class="fallback-text">
-        <h3>{a.connect.key.title}</h3>
-        <p>{a.connect.key.said}</p>
-      </div>
-      <div class="clients">
-        {#each a.connect.key.clients as client (client.name)}
-          <Code label={client.name} code={client.code} />
-        {/each}
-      </div>
-    </div>
-
-    <div class="skill">
-      <span class="way-icon" aria-hidden="true"><Icon name="layers" /></span>
-      <div class="skill-text">
-        <h3>{a.connect.skill.title}</h3>
-        <p>{a.connect.skill.said}</p>
-        <p>{a.connect.skill.where}</p>
-      </div>
-      <a class="btn" href={SKILL}>{a.connect.skill.open}<Icon name="arrow" size="s" /></a>
     </div>
   </div>
 </section>
 
-<!-- ── Over MCP ────────────────────────────────────────────────────────────────
-     THE DRAWING IS ONE `<figure>` AND THE LISTS INSIDE IT ARE STILL LISTS. A reader who is not
-     looking at it meets the same three headed lists it replaced, in the order they are drawn; the
-     wires, the bus and the arrowheads are borders on elements that are otherwise empty, so none of
-     them is read out and none of them is a colour spelled in this file. -->
-<section class="band" data-ground="flip" aria-labelledby="mcp-title">
+<!-- ── What only a person can do ───────────────────────────────────────────── -->
+<section class="band" aria-labelledby="cannot-title">
   <div class="in">
-    <div class="sec-head">
-      <h2 class="h2" id="mcp-title">{a.mcp.title}</h2>
-      <p class="lead">{a.mcp.lead}</p>
-    </div>
-
-    <figure class="reach" aria-labelledby="mcp-title">
-      <div class="lane lane-write">
-        <h3 class="lane-head">{a.mcp.writesTitle}<Icon name="arrow" size="s" /></h3>
-        <ol class="events">
-          {#each a.mcp.writes as name (name)}
-            <li class="event">
-              <span class="ev"><span class="ev-dot" aria-hidden="true"></span><span class="mono">{name}</span></span>
-              <span class="wire" aria-hidden="true"></span>
-            </li>
-          {/each}
-        </ol>
-      </div>
-
-      <span class="link" aria-hidden="true"></span>
-
-      <!-- THE RECORD IS THE MARK AND NO WORD. It carried the ledger's heading, `History, only ever
-           added`, for the length of one typecheck: `site.ledger` left `copy.ts` in the same hour for
-           the home page's `decide` scene, and a drawing that borrows another band's words breaks
-           when that band is rewritten. A word of its own would be a new key, and new keys are the
-           copy deck's to add. Decorative, because the lanes' headings already say what goes in and
-           what comes out. -->
-      <div class="core">
-        <Mark height={44} />
-      </div>
-
-      <span class="link" aria-hidden="true"></span>
-
-      <div class="lane lane-read">
-        <h3 class="lane-head">{a.mcp.readsTitle}<Icon name="arrow" size="s" /></h3>
-        <ul class="taps">
-          {#each a.mcp.reads as name (name)}
-            <li class="tap"><span class="wire" aria-hidden="true"></span><span class="mono">{name}</span></li>
-          {/each}
-        </ul>
-      </div>
-
-      <!-- THE ADDRESSES HANG OFF THE RECORD, NOT OFF EITHER LANE. They are read directly, without a
-           tool call, so the stem runs down from the record itself to the strip that holds them. -->
-      <span class="stem" aria-hidden="true"></span>
-
-      <div class="addresses">
-        <h3 class="lane-head">{a.mcp.resourcesTitle}</h3>
-        <dl class="addr hair">
-          {#each a.mcp.resources as one (one.uri)}
-            <div class="addr-cell">
-              <dt class="mono">{one.uri}</dt>
+    <div class="tiles">
+      <div class="tile lead span-12 cannot">
+        <div class="cannot-say">
+          <h2 class="h2" id="cannot-title">{a.cannot.title}</h2>
+          <p class="lede">{a.cannot.lead}</p>
+          <p class="actions">
+            <a class="btn btn-lg" href={SIGNUP} rel="external">{site.nav.start}<Icon name="arrow" size="m" /></a>
+            {#if SOURCE}<a class="onward" href={SOURCE} rel="external"><Icon name="code" size="m" />{site.nav.source}</a>{/if}
+          </p>
+        </div>
+        <dl class="rows">
+          {#each a.cannot.rows as one, i (one.what)}
+            <div class="row">
+              <span class="well l"><Icon name={CANNOT[i] ?? 'lock'} /></span>
+              <dt>{one.what}</dt>
               <dd>{one.said}</dd>
             </div>
           {/each}
         </dl>
       </div>
-    </figure>
-  </div>
-</section>
-
-<!-- ── From outside ────────────────────────────────────────────────────────────
-     ONE ROW PER WAY IN: what it is and its curl line on the left, its limits as a hairline grid on
-     the right. Short limits of one or two words each are what a hairline grid is for: each cell
-     leads with the limit and the sentence under it is the reason. The report key's row is the band
-     this replaced, kept word for word. -->
-<section class="band" data-ground="page" aria-labelledby="outside-title">
-  <div class="in">
-    <div class="sec-head">
-      <h2 class="h2 h2-s" id="outside-title">{a.outside.title}</h2>
-      <p class="lead">{a.outside.lead}</p>
-    </div>
-    {#each a.outside.ways as way (way.head)}
-      <div class="split push">
-        <div class="push-text">
-          <h3>{way.head}</h3>
-          <p>{way.said}</p>
-          <Code label={way.head} code={way.code} />
-        </div>
-        <dl class="limits hair">
-          {#each way.limits as limit (limit.what)}
-            <div class="limit">
-              <dt>{limit.what}</dt>
-              <dd>{limit.said}</dd>
-            </div>
-          {/each}
-        </dl>
-      </div>
-    {/each}
-  </div>
-</section>
-
-<!-- ── Refused ────────────────────────────────────────────────────────────────
-     THE MARK STANDS IN A RAIL OF ITS OWN, the third opener on this page and the one the previous
-     two cannot be: the tag alone in a narrow left column, and the heading, the
-     lead and the refusals sharing one left edge beside it. -->
-<section class="band" data-ground="page" aria-labelledby="cannot-title">
-  <div class="in side">
-    <div>
-      <h2 class="h2 h2-s" id="cannot-title">{a.cannot.title}</h2>
-      <p class="lead">{a.cannot.lead}</p>
-      <dl class="rows">
-        {#each a.cannot.rows as one (one.what)}
-          <div class="row">
-            <dt>{one.what}</dt>
-            <dd>{one.said}</dd>
-          </div>
-        {/each}
-      </dl>
-      <p class="source">
-        <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{site.nav.start}<Icon name="arrow" size="s" /></a>
-        {#if SOURCE}<a class="quiet" href={SOURCE}>{site.nav.source}</a>{/if}
-      </p>
     </div>
   </div>
 </section>
 
 <style>
-  .band {
-    padding-block: var(--sp-8);
-  }
-
-  /* The seam the other pages draw, for the reason the pricing page records: `--sunk` against `--bg`
-     is 1.07:1, which the eye adapts to rather than reads as an edge. */
-  .band + .band {
-    border-block-start: 1px solid var(--line);
-  }
-
-  .head {
-    padding-block: var(--sp-7) var(--sp-8);
-  }
-
-  /* THE HEADLINE HAD NO SIZE AND THE NAMES HAD NO FACE. `.display` and `.mono` were written on
-     this page's markup and defined nowhere the page could see: `+page.svelte` scopes its own
-     `.display`, `app.css` has no `.mono`, so the `h1` fell back to the browser's 2em and the
-     sixteen identifiers were set in the proportional face. Both are declared here, at the pricing
-     page's values. */
-  .display {
+  p {
     margin: 0;
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: clamp(2.25rem, 4vw, 3.5rem);
-    font-weight: 600;
-    line-height: var(--lh-3xl);
-    letter-spacing: var(--tr-tight);
-    text-wrap: balance;
   }
 
-  .mono {
-    font-family: var(--font-id);
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3) var(--sp-4);
   }
 
-  .lead {
-    max-inline-size: 62ch;
-    margin-block-start: var(--sp-4);
+  .said {
     color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
+    font-size: var(--t-site-body);
+    line-height: var(--lh-site-body);
     text-wrap: pretty;
   }
 
-  /* ── The drawing ─────────────────────────────────────────────────────── */
+  /* ── The scene ───────────────────────────────────────────────────────── */
 
-  /* FIVE COLUMNS: what arrives, a link, the record, a link, what leaves. The links are their own
-     tracks rather than margins on the record so the wire between a lane's bus and the record is an
-     element with a length, which is what lets it be drawn at all without an SVG and a coordinate
-     system that would have to be kept in step with the text. The addresses span all five under a
-     stem from the record. */
-  .reach {
+  .scene {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--sp-7) auto var(--sp-7) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.15fr);
     align-items: center;
-    margin: var(--sp-7) 0 0;
+    margin: var(--sp-2) 0 0;
+    padding: var(--sp-4);
+    background: var(--s1);
+    border-radius: var(--r-md);
   }
 
-  .lane-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-4);
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  /* THE BUS. Every wire in a lane ends on one vertical stroke on the side facing the record, and
-     the link carries that stroke into it: six arrivals become one input, and ten reads fan out
-     from one output. `--edge` and not `--line`, because on the flipped ground `--line` is a 22 per
-     cent mix meant for a seam, and a wire is the thing being looked at. */
-  .events,
-  .taps {
-    display: flex;
-    flex-direction: column;
+  .crew {
+    display: grid;
     gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .events {
-    border-inline-end: 1px solid var(--edge);
-  }
-
-  .taps {
-    border-inline-start: 1px solid var(--edge);
-  }
-
-  .event,
-  .tap {
+  .worker {
     display: flex;
     align-items: center;
-  }
-
-  .wire {
-    position: relative;
-    flex: 1;
-    min-inline-size: var(--sp-6);
-    block-size: 1px;
-    background: var(--edge);
-  }
-
-  /* THE ARROWHEAD, two borders of a small square turned 45 degrees, at the end of the wire that
-     points the way the event is going: into the bus on the left, out to the name on the right. */
-  .wire::after {
-    content: '';
-    position: absolute;
-    inset-inline-end: 0;
-    inset-block-start: -3px;
-    inline-size: 7px;
-    block-size: 7px;
-    border-block-start: 1px solid var(--edge);
-    border-inline-end: 1px solid var(--edge);
-    transform: rotate(45deg);
-    transform-origin: 60% 40%;
-  }
-
-  .tap .wire {
-    flex: 0 0 var(--sp-7);
-    margin-inline-end: var(--sp-3);
-  }
-
-  .tap .mono {
-    color: var(--ink);
-    font-size: var(--t-sm);
-  }
-
-  /* A NAMED EVENT IS A SMALL RAISED CARD, the one thing in the drawing with a surface, because an
-     arrival is a thing and a read is a passage. The dot is the history's own bullet. */
-  .ev {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-1) var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
     border-radius: var(--r-md);
-    color: var(--ink);
-    font-size: var(--t-sm);
   }
 
-  .ev-dot {
+  /* An agent's face is a circle (SYSTEM §2), in the second ink with its initials. */
+  .face {
+    display: grid;
     flex: none;
-    inline-size: var(--dot);
-    block-size: var(--dot);
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
     background: var(--ink2);
     border-radius: var(--r-pill);
-  }
-
-  .event .wire {
-    margin-inline-start: var(--sp-3);
-  }
-
-  /* The heading starts where the names do, past the wire and its gap. */
-  .lane-read .lane-head {
-    padding-inline-start: calc(var(--sp-7) + var(--sp-3));
-  }
-
-  /* The link rides at the height of the lists and not of the lane, which carries a heading. */
-  .link {
-    align-self: center;
-    block-size: 1px;
-    margin-block-start: calc(var(--t-xs) + var(--sp-4));
-    background: var(--edge);
-  }
-
-  /* THE RECORD STANDS THE HEIGHT OF THE TALLER LANE. Centred in the row it was a box floating
-     between the ten reads, and the stem under it hung from nothing: the first screenshot at 1440
-     showed about 80px of empty ground between the box's bottom edge and the top of the stem. Stretched,
-     its bottom edge is the row's, and the stem leaves from it. */
-  .core {
-    align-self: stretch;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-2);
-    margin-block-start: calc(var(--t-xs) + var(--sp-4));
-    padding: var(--sp-6) var(--sp-7);
-    background: var(--sunk);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-lg);
-    text-align: center;
-  }
-
-  .stem {
-    grid-column: 3;
-    justify-self: center;
-    inline-size: 1px;
-    block-size: var(--sp-7);
-    background: var(--edge);
-  }
-
-  .addresses {
-    grid-column: 1 / -1;
-  }
-
-  .addr {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0;
-  }
-
-  /* SEVEN ADDRESSES IN FOUR COLUMNS: the last one takes two, so no cell of the hairline grid is left
-     showing its ground. At two columns it takes the whole row, and at one it is simply the last. */
-  .addr-cell:last-child {
-    grid-column: span 2;
-  }
-
-  .addr-cell {
-    padding: var(--sp-4);
-  }
-
-  .addr-cell dt {
-    color: var(--ink);
+    color: var(--on-ink);
     font-size: var(--t-xs);
-    overflow-wrap: anywhere;
-  }
-
-  .addr-cell dd {
-    margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
-  }
-
-  /* ── Reported ────────────────────────────────────────────────────────── */
-
-  .split {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: var(--sp-8);
-    align-items: start;
-  }
-
-  .limits {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 0;
-  }
-
-  .limit {
-    padding: var(--sp-5);
-  }
-
-  .limit dt {
-    color: var(--ink);
-    font-size: var(--t-md);
     font-weight: 600;
   }
 
-  .limit dd {
-    margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
-  }
-
-  /* ── Refused ────────────────────────────────────────────────────────── */
-
-  .side {
+  .worker-text {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .side > div {
-    max-inline-size: 880px;
-  }
-
-  .rows {
-    margin: var(--sp-5) 0 0;
-    border-block-start: 1px solid var(--line);
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 20ch) minmax(0, 1fr);
-    gap: var(--sp-5);
-    padding-block: var(--sp-4);
-    border-block-end: 1px solid var(--line);
-  }
-
-  .row dt {
-    font-weight: 600;
-  }
-
-  .row dd {
-    margin: 0;
-    color: var(--ink2);
-  }
-
-  .source {
-    margin-block-start: var(--sp-6);
-  }
-
-  /* ── The arrivals move, once, as they scroll in ─────────────────────────
-     The home page's scroll timeline and its two guards, for its reasons: `prefers-reduced-motion`
-     is the reader's answer, `@supports` is the browser's, and where either says no the drawing is
-     simply finished. Each card has a timeline of its own, so the six arrive one after another
-     without a delay being written anywhere. */
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      .event {
-        animation: arrive auto both;
-        animation-timeline: view();
-        animation-range: entry 10% cover 30%;
-      }
-    }
-  }
-
-  @keyframes arrive {
-    from {
-      opacity: 0;
-      transform: translateX(calc(-1 * var(--sp-6)));
-    }
-  }
-
-  @media (width < 1024px) {
-    .addr {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  /* BELOW 900 THE DRAWING STANDS UP. Five columns in a tablet's width leaves each lane about 200px,
-     so the lanes stack over the record, the links turn vertical, and the wires and buses go,
-     because a horizontal wire that ends on a stroke nobody can see the far end of is a line
-     rather than a connection. What is left is the order of the drawing, top to bottom. */
-  @media (width < 900px) {
-    .split {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-6);
-    }
-
-    .reach {
-      grid-template-columns: minmax(0, 1fr);
-      justify-items: center;
-    }
-
-    .lane,
-    .addresses {
-      justify-self: stretch;
-    }
-
-    .lane-head,
-    .lane-read .lane-head {
-      justify-content: center;
-      padding-inline-start: 0;
-    }
-
-    .events,
-    .taps {
-      flex-direction: row;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: var(--sp-2) var(--sp-4);
-      border: 0;
-    }
-
-    .wire {
-      display: none;
-    }
-
-    .link,
-    .stem {
-      grid-column: auto;
-      inline-size: 1px;
-      block-size: var(--sp-6);
-      margin-block: var(--sp-3);
-    }
-
-    .core {
-      align-self: auto;
-      margin-block-start: 0;
-    }
-  }
-
-  @media (width < 760px) {
-    .side {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-3);
-    }
-
-    .row {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-2);
-    }
-  }
-
-  @media (width < 640px) {
-    .addr,
-    .limits {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .addr-cell:last-child {
-      grid-column: auto;
-    }
-  }
-  /* ── 26 September: the head, the ways in, and the smaller section heading ── */
-
-  .head {
-    padding-block: clamp(56px, 7vw, 104px);
-  }
-
-  .head-in {
-    display: grid;
-    gap: var(--sp-5);
-  }
-
-  .head-in .display {
-    max-inline-size: 18ch;
-    font-size: clamp(2.375rem, 4.7vw, 4.25rem);
-  }
-
-  .head-in .lead {
-    max-inline-size: 60ch;
-    margin: 0;
-  }
-
-  .h2-s {
-    font-size: clamp(1.75rem, 1.1rem + 2vw, 2.5rem);
-  }
-
-  .ways {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-4);
-    margin: var(--sp-6) 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .way {
-    display: grid;
-    align-content: start;
-    gap: var(--sp-3);
-    padding: var(--sp-6);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: 20px;
-  }
-
-  .way-icon {
-    display: grid;
-    place-items: center;
-    inline-size: 40px;
-    block-size: 40px;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    color: var(--ink);
-  }
-
-  .way h3 {
-    margin: var(--sp-2) 0 0;
-    font-size: var(--t-lg);
-    font-weight: 600;
-  }
-
-  .way p {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 1.6;
-  }
-
-  /* A GRID ITEM'S MINIMUM IS ITS CONTENT, so without this a curl line would widen the card and then the
-     page; with it the line scrolls inside its own panel (`Code.svelte`). */
-  .way,
-  .clients,
-  .push-text {
     min-inline-size: 0;
   }
 
-  /* ── The value ───────────────────────────────────────────────────────── */
-
-  /* THE LISTS, THEN THE DRAWING. At 1440 the two lists sit side by side on the left and the drawing on
-     the right; below 900 everything stacks in reading order. */
-  .value {
-    display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    gap: var(--sp-7);
-    align-items: center;
-    margin-block-start: var(--sp-7);
+  .who {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
   }
+
+  .did {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .into {
+    display: block;
+    inline-size: 48px;
+    block-size: 120px;
+  }
+
+  .into-line {
+    fill: none;
+    stroke: var(--edge);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .brief {
+    display: grid;
+    gap: var(--sp-2);
+    padding: 12px 14px;
+    background: var(--bg);
+    border-radius: var(--r-md);
+  }
+
+  .brief-head {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .brief-title {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .brief-rows {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .brief-row {
+    display: grid;
+    grid-template-columns: 7.5em minmax(0, 1fr);
+    gap: var(--sp-2);
+    align-items: baseline;
+  }
+
+  .brief-row dt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .brief-row dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  /* ── Connect ─────────────────────────────────────────────────────────── */
+
+  .way {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .way.rule {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  /* ── Value ───────────────────────────────────────────────────────────── */
 
   .trade {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-6);
-    align-items: start;
+    gap: var(--sp-5);
   }
 
   .list-head {
     margin: 0 0 var(--sp-3);
-    font-size: var(--t-md);
+    color: var(--ink);
+    font-size: var(--t-site-small);
     font-weight: 600;
   }
 
@@ -804,9 +487,12 @@
   }
 
   .plain li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
     color: var(--ink2);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
+    font-size: var(--t-site-small);
+    line-height: 20px;
   }
 
   .plain strong {
@@ -814,243 +500,374 @@
     font-weight: 600;
   }
 
-  /* THE SCENE: the agents at work above, the record's briefing below, and one stroke between them
-     for what passes from the first to the second. The faces are `Decide.svelte`'s, with the agent's
-     hue, so an agent looks the same on every page that draws one. */
-  .scene {
-    display: grid;
-    justify-items: stretch;
-    margin: 0;
-    padding: var(--sp-6);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: 20px;
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--inset);
   }
 
-  .crew {
+  /* ── The tools ───────────────────────────────────────────────────────── */
+
+  .tools-head {
     display: grid;
-    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--sp-6);
+    align-items: end;
+  }
+
+  .tools-say {
+    display: grid;
+    gap: var(--sp-4);
+  }
+
+  .split {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .split-bar {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+  }
+
+  .cell-read {
+    fill: var(--edge);
+  }
+
+  .cell-write {
+    fill: var(--ink);
+  }
+
+  .split-labels {
+    display: flex;
+    gap: 4px;
+    color: var(--ink2);
+    font-size: var(--t-site-small);
+  }
+
+  .split-labels span {
+    flex-basis: 0;
+  }
+
+  .split-labels b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .reach {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-4);
+    margin: 0;
+    padding: var(--sp-5);
+    background: var(--s1);
+    border-radius: var(--r-md);
+  }
+
+  .lane-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    color: var(--ink);
+    font-size: var(--t-site-small);
+    font-weight: 600;
+  }
+
+  .dot {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-pill);
+  }
+
+  .dot.write {
+    background: var(--ink);
+  }
+
+  .dot.read {
+    background: var(--edge);
+  }
+
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .worker {
-    display: flex;
+  .tool {
+    display: inline-flex;
     align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-3);
+    min-block-size: 28px;
+    padding-inline: 10px;
     background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
   }
 
-  .face {
+  .flow {
+    color: var(--dim);
+  }
+
+  .core {
     display: grid;
-    flex: none;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    background: var(--s1);
-    border: 2px solid var(--info);
-    border-radius: var(--r-pill);
-    color: var(--ink);
-    font-size: var(--t-xs);
-    font-weight: 600;
-  }
-
-  .worker-text {
-    display: grid;
-    min-inline-size: 0;
-  }
-
-  .who {
-    color: var(--ink);
-    font-size: var(--t-sm);
-    font-weight: 600;
-  }
-
-  .did {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .into {
-    justify-self: center;
-    inline-size: 1px;
-    block-size: var(--sp-6);
-    background: var(--edge);
-  }
-
-  .brief {
-    padding: var(--sp-4) var(--sp-5);
+    inline-size: 88px;
+    block-size: 88px;
     background: var(--bg);
-    border: 1px solid var(--edge);
     border-radius: var(--r-lg);
+    box-shadow: var(--e1);
   }
 
-  .brief-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-3);
-  }
-
-  .brief-title {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .brief-for {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .brief-rows {
+  .addresses {
     display: grid;
-    gap: var(--sp-2);
-    margin: 0;
-  }
-
-  .brief-row {
-    display: grid;
-    grid-template-columns: minmax(0, 14ch) minmax(0, 1fr);
     gap: var(--sp-3);
-    font-size: var(--t-sm);
   }
 
-  .brief-row dt {
-    color: var(--dim);
+  .addresses .tile-head {
+    font: inherit;
   }
 
-  .brief-row dd {
+  /* SEVEN ADDRESSES IN FOUR COLUMNS: the last one takes two, so no cell is left empty at the end. */
+  .addr {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-2);
     margin: 0;
+  }
+
+  .addr-cell {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    padding: 12px 14px;
+    background: var(--s1);
+    border-radius: var(--r-md);
+  }
+
+  .addr-cell:last-child {
+    grid-column: span 2;
+  }
+
+  .addr-cell dt code {
     color: var(--ink);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
-  /* ── The key, and the skill ──────────────────────────────────────────── */
-
-  .fallback {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: var(--sp-6);
-    align-items: start;
-    margin-block-start: var(--sp-7);
-  }
-
-  .fallback h3,
-  .skill h3,
-  .push-text h3 {
+  .addr-cell dd {
     margin: 0;
-    font-size: var(--t-lg);
-    font-weight: 600;
-  }
-
-  .fallback p,
-  .skill p,
-  .push-text p {
-    margin: var(--sp-3) 0 0;
     color: var(--ink2);
-    line-height: 1.6;
-    text-wrap: pretty;
-  }
-
-  .clients {
-    display: grid;
-    gap: var(--sp-4);
-  }
-
-  .skill {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--sp-5);
-    align-items: start;
-    margin-block-start: var(--sp-7);
-    padding-block-start: var(--sp-6);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .skill-text {
-    max-inline-size: 62ch;
+    font-size: var(--t-site-small);
+    line-height: 20px;
   }
 
   /* ── From outside ────────────────────────────────────────────────────── */
 
-  .push {
-    margin-block-start: var(--sp-7);
+  .outside-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+    gap: var(--sp-6);
   }
 
-  .push + .push {
-    padding-block-start: var(--sp-7);
-    border-block-start: 1px solid var(--line);
+  .outside-head > div:first-child {
+    display: grid;
+    gap: var(--sp-4);
   }
 
-  .push-text {
+  .reach-chart {
     display: grid;
     gap: var(--sp-3);
   }
 
-  .push-text p {
+  .ladder {
+    display: grid;
+    gap: var(--sp-2);
     margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  .source {
-    display: flex;
-    flex-wrap: wrap;
+  .rung {
+    display: grid;
+    grid-template-columns: 7em minmax(0, 1fr) 9em;
     align-items: center;
+    gap: var(--sp-3);
+    font-size: var(--t-sm);
+  }
+
+  .rung-name {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .rung-step {
+    color: var(--dim);
+  }
+
+  .segs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .seg {
+    block-size: 10px;
+    background: var(--s1);
+    border-radius: 3px;
+  }
+
+  .seg.on {
+    background: var(--ink2);
+  }
+
+  .rung:last-child .seg.on {
+    background: var(--ink);
+  }
+
+  .way-tile {
     gap: var(--sp-4);
   }
 
-  .quiet {
+  .limits {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .limit dt {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--t-site-small);
+    font-weight: 600;
+  }
+
+  .limit dd {
+    margin: 2px 0 0;
+    padding-inline-start: calc(var(--icon-m) + var(--sp-2));
     color: var(--ink2);
+    font-size: var(--t-site-small);
+    line-height: 20px;
   }
 
-  @media (width < 760px) {
-    .ways {
-      grid-template-columns: minmax(0, 1fr);
+  /* ── What only a person can do ───────────────────────────────────────── */
+
+  .cannot {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--sp-6);
+    align-items: start;
+  }
+
+  .cannot-say {
+    display: grid;
+    gap: var(--sp-4);
+  }
+
+  .rows {
+    display: grid;
+    margin: 0;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'well what'
+      'well said';
+    column-gap: var(--sp-3);
+    padding-block: var(--sp-4);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .row:last-child {
+    border-block-end: 0;
+  }
+
+  .row .well {
+    grid-area: well;
+  }
+
+  .row dt {
+    grid-area: what;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+  }
+
+  .row dd {
+    grid-area: said;
+    margin: 2px 0 0;
+    color: var(--ink2);
+    font-size: var(--t-site-small);
+    line-height: 20px;
+  }
+
+  /* ── Narrower than a desk ─────────────────────────────────────────────── */
+
+  @media (width < 1100px) {
+    .addr {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .way {
-      padding: var(--sp-5);
+    .addr-cell:last-child {
+      grid-column: auto;
     }
   }
 
-  /* BELOW 900 THE VALUE, THE KEY AND THE SKILL STACK, in the order they are read: the lists before
-     the drawing, what a key is before the snippets, and the skill's button under its sentences. */
   @media (width < 900px) {
-    .value,
-    .fallback {
+    .tools-head,
+    .outside-head,
+    .cannot {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-6);
+      gap: var(--sp-5);
     }
 
-    .skill {
-      grid-template-columns: auto minmax(0, 1fr);
+    /* THE RECORD BETWEEN ITS LANES, STACKED: the writes, the record, the reads, and the arrows turn down. */
+    .reach {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: start;
     }
 
-    .skill .btn {
-      grid-column: 2;
-      justify-self: start;
+    .flow {
+      transform: rotate(90deg);
     }
   }
 
   @media (width < 640px) {
-    .trade {
+    .trade,
+    .addr {
       grid-template-columns: minmax(0, 1fr);
     }
 
+    /* The briefing goes under the crew, and the joining lines with it. */
     .scene {
-      padding: var(--sp-4);
-    }
-
-    .skill {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--sp-4);
+      gap: var(--sp-3);
     }
 
-    .skill .btn {
-      grid-column: auto;
+    .into {
+      display: none;
+    }
+
+    .rung {
+      grid-template-columns: 6em minmax(0, 1fr);
+    }
+
+    .rung-step {
+      display: none;
     }
   }
 </style>

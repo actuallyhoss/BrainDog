@@ -20,14 +20,15 @@
 
   const parts: Part[] = [
     address === ''
-      ? { id: 'mail-title', title: s.mail.title, body: [s.mail.pending] }
-      : { id: 'mail-title', title: s.mail.title, body: [s.mail.body], links: [{ label: address, href: `mailto:${address}` }] },
+      ? { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.pending] }
+      : { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.body], action: { label: address, href: `mailto:${address}` } },
     ...(repo === null
       ? []
       : [
           {
             id: 'github-title',
             title: s.github.title,
+            glyph: 'code' as const,
             body: [s.github.body],
             links: [
               { label: s.github.issues, href: `${repo}/issues` },
@@ -35,7 +36,7 @@
             ],
           },
         ]),
-    { id: 'report-title', title: s.report.title, lines: s.report.items },
+    { id: 'report-title', title: s.report.title, glyph: 'file', span: 7, lines: s.report.items },
   ];
 </script>
 

@@ -48,6 +48,10 @@ Paying customers | 12 | 15
         { at: 3, cols: 4 },
       ],
       links: { 1: [null, 'invoices', null] },
+      reads: {
+        2: 'Money in rose every month since April, while costs held near GBP 3,000.00.',
+        3: 'Three more paying customers reach the goal of 15 for this quarter.',
+      },
     },
     {
       id: 'decide',

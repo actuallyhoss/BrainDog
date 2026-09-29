@@ -85,26 +85,93 @@ export const trust = {
     lede: 'How your record is kept, one fact to a line.',
     kept: {
       title: 'How a record is kept',
+      /* One tile each on /security: a short name, the glyph its well draws, and the fact as it has always been worded. */
       facts: [
         // docs/12-SECURITY.md §2; apps/worker/src/index.ts (`RECORD`, one Durable Object per record).
-        'Every hosted record is its own database. No table holds two customers, so no query can reach from one record into another.',
+        {
+          title: 'Its own database',
+          glyph: 'server',
+          text: 'Every hosted record is its own database. No table holds two customers, so no query can reach from one record into another.',
+        },
         // docs/16-DECISIONS.md ADR-062; apps/worker/src/vault.ts and keys.ts (the host seals, the record stores).
-        'The keys to services you connect are sealed before they are stored, and the record never holds one in the clear.',
+        {
+          title: 'Sealed keys',
+          glyph: 'key',
+          text: 'The keys to services you connect are sealed before they are stored, and the record never holds one in the clear.',
+        },
         // apps/worker/src/seal.ts and nightly.ts (age to one recipient whose identity is kept outside Cloudflare).
-        'Every night a copy of each hosted record is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
+        {
+          title: 'Sealed nightly copies',
+          glyph: 'lock',
+          text: 'Every night a copy of each hosted record is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
+        },
         // docs/12-SECURITY.md §3 (passkey primary, email link fallback, no password anywhere).
-        'You sign in with a passkey first, and an emailed link is the fallback. There is no password to steal.',
+        {
+          title: 'A passkey, and no password',
+          glyph: 'shield',
+          text: 'You sign in with a passkey first, and an emailed link is the fallback. There is no password to steal.',
+        },
         // docs/16-DECISIONS.md ADR-060 (scopes read, propose, write; no admin scope; VAULT and erasure stay a browser session).
-        "An agent's token can read, propose or write, and nothing more. No token can open your keys, erase data, restore a copy or delete the record: those need you, signed in, in a browser.",
+        {
+          title: "What an agent's token can do",
+          glyph: 'agent',
+          text: "An agent's token can read, propose or write, and nothing more. No token can open your keys, erase data, restore a copy or delete the record: those need you, signed in, in a browser.",
+        },
         // apps/web/src/routes/settings/[area]/areas/Export.svelte; docs/12-SECURITY.md §8 (the export).
-        'You can export the whole record at any time, from Settings, as a file you keep.',
+        {
+          title: 'Export at any time',
+          glyph: 'download',
+          text: 'You can export the whole record at any time, from Settings, as a file you keep.',
+        },
       ],
+    },
+    /* THE DRAWINGS BESIDE THE FACTS. Each says only what its fact says, and each is a picture with its words as its name. */
+    drawn: {
+      records: 'Four records side by side, each its own database, with nothing running between them',
+      recordName: (n: number) => `Record ${n}`,
+      sealed: ['A key you connect', 'Sealed first', 'Stored, never in the clear'],
+      sealedLabel: 'A key you connect is sealed first, then stored, and never kept in the clear',
+      sealedNote: 'Agents and scripts use your keys without ever seeing them.',
+      /* The pricing table's own figure: `Nightly, last 30 kept` (`copy/pricing.ts`). */
+      nights: 'Thirty nights of sealed copies, the newest last',
+      nightsFrom: '30 nights ago',
+      nightsTo: 'Last night',
+      nightsRead: 'The last 30 copies are kept, and each one is sealed.',
+      signin: ['Sign in with a passkey', 'Or email me a link', 'No password, anywhere'],
+      signinLabel: 'Signing in: a passkey first, an emailed link as the fallback, and no password field',
+      /* The token's reach, row by row, as ADR-060 draws it: the first three a token may do, the rest only a person. */
+      reach: {
+        head: ['What it can do', "An agent's token", 'You, signed in, in a browser'],
+        rows: [
+          ['Read', true],
+          ['Propose', true],
+          ['Write', true],
+          ['Open your keys', false],
+          ['Erase data', false],
+          ['Restore a copy', false],
+          ['Delete the record', false],
+        ] as [string, boolean][],
+        can: 'Can',
+        cannot: 'Cannot',
+      },
+      exportName: 'Everything, in one file',
+      exportNote: 'Its lists, pages, rules and rows',
+      exportVerb: 'Export the record',
     },
     report: {
       title: 'Report a vulnerability',
       body: 'Write to the support address with the steps that show the weakness. Test only against a record that is yours.',
       /* The empty-address twin, as on /support. */
       pending: 'The address for reporting a weakness is published here before sign-up opens.',
+      /* THE REPOSITORY'S OWN PROMISE, `SECURITY.md` at the root, its table of what happens after a report, word for word
+         in its figures. It is drawn only beside the address, because it is a promise about mail somebody reads. */
+      after: 'What happens after you write',
+      steps: [
+        { what: 'A person reads it', when: 'within 3 working days' },
+        { what: 'A first assessment', when: 'within 10 working days' },
+        { what: 'A fix, or a dated plan', when: 'within 90 days' },
+        { what: 'An advisory, with credit', when: 'at the fix, or at 90 days' },
+      ],
     },
   },
 } as const;

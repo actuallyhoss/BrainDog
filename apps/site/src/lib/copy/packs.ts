@@ -37,6 +37,9 @@ export const packs = {
       themes: 'Themes',
     },
     shown: (n: number) => many(n, 'pack', 'packs'),
+    /* The chart beside the search: how many packs each kind holds, from the filters' own counts. */
+    kinds: 'By kind',
+    kindsRead: (kind: string, n: number) => `${kind} is the largest kind, with ${many(n, 'pack', 'packs')}. A pack can be more than one kind.`,
     noMatch: 'No pack matches that. Try a shorter word, or show all.',
     showAll: 'Show all packs',
     none: 'No pack is listed yet.',

@@ -1,17 +1,19 @@
 <!--
-  One docs page: the section nav, the page drawn by the product's renderer, and the list of its parts.
+  One docs page: the section nav, the page drawn by the product's renderer in tiles, and the list of its parts.
 
-  THE FRAME IS SITE.MD SIT-3's: at 1440 a 240px nav, a 720px page and a 200px list of the page's `##`
-  headings; from 900px the nav and the page; below 900px the nav is a closed disclosure at the top and
-  the list of parts is not drawn, because on a phone the page itself is the list. A code block scrolls
-  inside itself (the skin's `.media`) and nothing else on the page moves sideways.
+  THE LOOK IS SYSTEM §10's, after the Bento board `Light-Docs`: at a desk the nav is a tile at the start, the page is a
+  column of tiles (its opening, then one tile for each `##` part), and "On this page" is a tile at the end; the two
+  side tiles stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
+  disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list. A code
+  block scrolls inside its well and nothing else on the page moves sideways.
 
-  THE PAGE IS ALSO TEXT FOR AN AGENT: "Open as text" is the `.md` address beside it, the head names
-  that address as the page's alternate, and "Copy as text" puts the same text on the clipboard.
-  "Edit on GitHub" appears once `LAUNCH.repo` says the repository is public, and not before, because
-  until then the address answers 404 to everyone but the owner.
+  THE PAGE IS ALSO TEXT FOR AN AGENT: "Open as text" is the `.md` address beside it, the head names that address as
+  the page's alternate, and "Copy as text" puts the same text on the clipboard. "Edit on GitHub" appears once
+  `LAUNCH.repo` says the repository is public, and not before, because until then the address answers 404 to everyone
+  but the owner.
 -->
 <script lang="ts">
+  import Icon from '$lib/Icon.svelte';
   import Body from '$lib/docs/Body.svelte';
   import CopyText from '$lib/docs/CopyText.svelte';
   import Nav from '$lib/docs/Nav.svelte';
@@ -46,67 +48,81 @@
   <meta property="og:description" content={description} />
 </svelte:head>
 
-<div class="docs-frame">
-  <div class="docs-nav">
-    <Nav sections={data.sections} current={doc.path} index={data.index} />
-  </div>
-
-  <article class="doc" aria-labelledby="doc-title">
-    <p class="doc-section">{section.label}</p>
-    <h1 class="doc-title" id="doc-title">{doc.title}</h1>
-
-    <div class="doc-tools">
-      <CopyText text={doc.src} />
-      <a class="btn btn-sm" href={`${doc.path}.md`} data-sveltekit-reload>{w.raw}</a>
-      {#if edit}<a class="btn btn-sm" href={edit}>{w.edit}</a>{/if}
+<div class="in">
+  <div class="docs-frame">
+    <div class="docs-nav">
+      <Nav sections={data.sections} current={doc.path} index={data.index} />
     </div>
 
-    <Body src={doc.src} />
+    <article class="doc" aria-labelledby="doc-title">
+      <Body src={doc.src}>
+        {#snippet head()}
+          <p class="doc-where meta">
+            <a class="doc-crumb" href="/docs">{w.nav.home}</a>
+            <Icon name="chevron-right" size="s" />
+            <span>{section.label}</span>
+          </p>
+          <h1 class="h2 doc-title" id="doc-title">{doc.title}</h1>
+          <div class="doc-tools">
+            <CopyText text={doc.src} />
+            <a class="btn btn-sm" href={`${doc.path}.md`} data-sveltekit-reload>{w.raw}</a>
+            {#if edit}<a class="btn btn-sm" href={edit}>{w.edit}</a>{/if}
+          </div>
+        {/snippet}
+      </Body>
 
-    {#if data.prev || data.next}
-      <nav class="pager" aria-label={w.pager}>
-        {#if data.prev}
-          <a class="pager-link" rel="prev" href={data.prev.path}>
-            <span class="pager-dir">{w.prev}</span>
-            <span class="pager-title">{data.prev.title}</span>
-          </a>
-        {/if}
-        {#if data.next}
-          <a class="pager-link pager-next" rel="next" href={data.next.path}>
-            <span class="pager-dir">{w.next}</span>
-            <span class="pager-title">{data.next.title}</span>
-          </a>
-        {/if}
-      </nav>
+      {#if data.prev || data.next}
+        <nav class="pager" aria-label={w.pager}>
+          {#if data.prev}
+            <a class="pager-link" rel="prev" href={data.prev.path}>
+              <span class="well"><Icon name="arrow-left" /></span>
+              <span class="pager-words">
+                <span class="pager-dir">{w.prev}</span>
+                <span class="pager-title">{data.prev.title}</span>
+              </span>
+            </a>
+          {/if}
+          {#if data.next}
+            <a class="pager-link pager-next" rel="next" href={data.next.path}>
+              <span class="pager-words">
+                <span class="pager-dir">{w.next}</span>
+                <span class="pager-title">{data.next.title}</span>
+              </span>
+              <span class="well"><Icon name="arrow-right" /></span>
+            </a>
+          {/if}
+        </nav>
+      {/if}
+    </article>
+
+    {#if doc.headings.length > 0}
+      <aside class="contents tile" aria-labelledby="doc-contents">
+        <div class="tile-head">
+          <span class="well"><Icon name="rows" /></span>
+          <h2 class="tile-title" id="doc-contents">{w.contents}</h2>
+        </div>
+        <ol class="contents-list">
+          {#each doc.headings as heading (heading.id)}
+            <li><a class="contents-link" href={`#${heading.id}`}>{plainOf(heading.text)}</a></li>
+          {/each}
+        </ol>
+      </aside>
     {/if}
-  </article>
-
-  {#if doc.headings.length > 0}
-    <aside class="contents" aria-labelledby="doc-contents">
-      <h2 class="contents-title" id="doc-contents">{w.contents}</h2>
-      <ol class="contents-list">
-        {#each doc.headings as heading (heading.id)}
-          <li><a class="contents-link" href={`#${heading.id}`}>{plainOf(heading.text)}</a></li>
-        {/each}
-      </ol>
-    </aside>
-  {/if}
+  </div>
 </div>
 
 <style>
-  /* ONE COLUMN ON A PHONE, with the site's 16px gutters. The frame is wider than the site's 1200px
-     column because SIT-3's three widths and their gaps need 1224px, and it is centred like the column. */
+  /* ONE COLUMN ON A PHONE, the nav's disclosure over the page. The frame is the site's column. */
   .docs-frame {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-    max-inline-size: calc(240px + 720px + 200px + 2 * var(--sp-6) + 2 * var(--sp-6));
-    margin-inline: auto;
-    padding-block: var(--sp-5) var(--sp-8);
-    padding-inline: var(--sp-4);
+    gap: var(--inset);
+    align-items: start;
   }
 
   .doc {
+    display: grid;
+    gap: var(--inset);
     min-inline-size: 0;
   }
 
@@ -114,20 +130,26 @@
     display: none;
   }
 
-  .doc-section {
-    margin-block: 0 var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-site-small);
+  .doc-where {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .doc-crumb {
+    color: var(--ink2);
+    text-decoration: none;
+  }
+
+  .doc-crumb:hover {
+    color: var(--ink);
+    text-decoration: underline;
   }
 
   .doc-title {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-site-h2);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    text-wrap: balance;
+    margin-block-start: calc(-1 * var(--sp-2));
   }
 
   .doc-tools {
@@ -135,31 +157,38 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    margin-block: var(--sp-4) var(--sp-7);
   }
 
+  /* THE PAGES BEFORE AND AFTER, as two tiles on the ground: a well with its arrow, the direction and the title. */
   .pager {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-3);
-    margin-block-start: var(--sp-8);
-    padding-block-start: var(--sp-5);
-    border-block-start: 1px solid var(--line);
+    gap: var(--inset);
   }
 
   .pager-link {
-    display: grid;
-    gap: 2px;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
     min-block-size: var(--tap);
-    padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    padding: var(--sp-4) 20px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
     color: var(--ink);
     text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .pager-link:hover {
-    background: var(--s1);
+  .pager-link:hover .pager-title {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .pager-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   .pager-dir {
@@ -168,83 +197,72 @@
   }
 
   .pager-title {
-    font-weight: 600;
-  }
-
-  .contents-title {
-    margin-block: 0 var(--sp-2);
-    color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-row);
     font-weight: 600;
   }
 
   .contents-list {
     display: grid;
-    gap: var(--sp-1);
+    gap: 2px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .contents-link {
-    display: block;
-    padding-block: 2px;
+    display: flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding: 6px var(--sp-2);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font-size: var(--t-site-small);
-    line-height: 1.4;
+    line-height: 20px;
     text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .contents-link:hover {
+    background: var(--hover-wash);
     color: var(--ink);
-    text-decoration: underline;
   }
 
   /* A tablet held wide draws the list too, and a thumb needs the site's 44px row there. */
   @media (pointer: coarse) {
     .contents-link {
-      display: flex;
-      align-items: center;
       min-block-size: var(--tap);
     }
   }
 
   @media (width >= 640px) {
-    .docs-frame {
-      padding-inline: var(--sp-6);
-    }
-
     .pager {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .pager-next {
       grid-column: 2;
+      justify-content: flex-end;
       text-align: end;
     }
   }
 
   @media (width >= 900px) {
     .docs-frame {
-      grid-template-columns: 240px minmax(0, 720px);
-      justify-content: center;
-      gap: var(--sp-6);
-      padding-block-start: var(--sp-7);
+      grid-template-columns: 248px minmax(0, 1fr);
     }
   }
 
-  /* THE LIST OF PARTS ONLY WHERE THERE IS ROOM FOR IT beside a page still wide enough to read, and it
-     stays in view as the page scrolls, under the site's sticky bar. */
+  /* THE LIST OF PARTS ONLY WHERE THERE IS ROOM FOR IT beside a page still wide enough to read, and it stays in view
+     as the page scrolls, under the floating bar. */
   @media (width >= 1180px) {
     .docs-frame {
-      grid-template-columns: 240px minmax(0, 720px) 200px;
+      grid-template-columns: 248px minmax(0, 1fr) 236px;
     }
 
     .contents {
       position: sticky;
-      inset-block-start: calc(var(--sp-8) + var(--sp-4));
-      display: block;
-      align-self: start;
+      inset-block-start: calc(56px + 2 * var(--inset));
+      display: flex;
     }
   }
 </style>

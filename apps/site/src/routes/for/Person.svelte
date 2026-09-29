@@ -1,29 +1,30 @@
 <!--
-  One page written for one kind of person, `/for/<who>`: what they would say, their example record drawn
-  large enough to use, three things it does for them, the price and the one action.
+  One page written for one kind of person, `/for/<who>`: what they would say, their example record drawn large
+  enough to use, three things it does for them, the price and the one action.
 
-  THE RECORD IS THE HOME PAGE'S EXAMPLE, NOT A NEW ONE. The pages drawn here are `lib/examples/<id>.ts`,
-  the same dialect text the window across the home page's hero draws, through the same `Page.svelte`,
-  so a reader who pressed "More for founders" there meets the record they were looking at, larger. Each
-  row's drawing is one segment of one of those pages (`copy/for.ts` names which), cut from the page's
-  text by its span in the parse, so no figure on this page is written twice.
+  THE LOOK IS SYSTEM §10's, after the Bento board `Light-Founders`: every band is tiles on the ground. The first tile
+  holds the person's own question, the sentence under it and the action, and beside it the example record's answer:
+  its Home's figures and the sentence its Home opens with. Then the record itself in one wide tile, then one tile per
+  thing it does for them, each carrying its drawing, and the close.
 
-  LARGER THAN THE WINDOW, AND NOTHING SCROLLS INSIDE IT. The home page's window holds its size while its
-  pages change, because the hero under it must not move. Here the drawn record is the page, so a page
-  takes the height it needs. At 900px and wider the product's rail (`lib/app/Rail.svelte`) picks the
-  page; below it a row of the same pages wraps above it, because a rail is a desk's shape and a phone
-  has no room beside the page.
+  THE RECORD IS THE HOME PAGE'S EXAMPLE, NOT A NEW ONE. The pages drawn here are `lib/examples/<id>.ts`, the same
+  dialect text the window across the home page's hero draws, through the same `Page.svelte`, so a reader who pressed
+  "More for founders" there meets the record they were looking at, larger. Each drawing is one segment of one of
+  those pages (`copy/for.ts` names which), cut from the page's text by its span in the parse, so no figure on this
+  page is written twice.
 
-  WITH SCRIPTING OFF THE RECORD SHOWS ITS HOME, drawn. The rail and the row of pages do nothing without a
-  script, so the `<noscript>` rule below takes them away rather than leave controls that cannot act.
+  NOTHING SCROLLS INSIDE THE RECORD. The home page's window holds its size while its pages change; here the drawn
+  record is the page, so a page takes the height it needs. A row of the record's pages sits over it at every width.
+
+  WITH SCRIPTING OFF THE RECORD SHOWS ITS HOME, drawn. The row of pages does nothing without a script, so the
+  `<noscript>` rule below takes it away rather than leave controls that cannot act.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
   import { parse } from 'braindog-render';
   import Icon from '$lib/Icon.svelte';
-  import { isIconName } from '$lib/icons.ts';
+  import { isIconName, type IconName } from '$lib/icons.ts';
   import Page from '$lib/app/Page.svelte';
-  import Rail from '$lib/app/Rail.svelte';
   import { questionsIn } from '$lib/app/page.ts';
   import { SIGNUP } from '$lib/copy.ts';
   import { cases } from '$lib/copy/cases.ts';
@@ -53,8 +54,8 @@
   const waiting = $derived(asked.filter((q) => !answered.includes(q)).length);
 
   /**
-   * OPEN A PAGE. From the rail or the row, focus stays on the control pressed, which is still there; from
-   * a figure inside the page, that control is about to be replaced, so focus goes to the new page's title.
+   * OPEN A PAGE. From the row of pages, focus stays on the control pressed, which is still there; from a figure
+   * inside the page, that control is about to be replaced, so focus goes to the new page's title.
    */
   async function open(to: string, from: 'nav' | 'page') {
     shown = to;
@@ -64,15 +65,54 @@
     }
   }
 
+  const segmentsOf = (pageId: string) => parse(example?.pages.find((p) => p.id === pageId)?.src ?? '', { page: true });
+
   /**
-   * ONE SEGMENT OF ONE OF THE EXAMPLE'S PAGES, as its author wrote it: the text between the segment's
-   * `start` and `end` in the parse, which `Page.svelte` then draws as a page of one.
+   * ONE SEGMENT OF ONE OF THE EXAMPLE'S PAGES, as its author wrote it: the text between the segment's `start` and
+   * `end` in the parse, which `Page.svelte` then draws as a page of one.
    */
   function fence(pageId: string, at: number): string {
     const src = example?.pages.find((p) => p.id === pageId)?.src ?? '';
     const seg = parse(src, { page: true })[at];
     return seg ? src.slice(seg.start, seg.end) : '';
   }
+
+  /* THE HOME'S ANSWER, for the opening tile: the figures its Home leads with, and the sentence it opens with. */
+  const home = $derived(segmentsOf(example?.pages[0]?.id ?? 'home'));
+  const figuresAt = $derived(home.findIndex((s) => s.type === 'block' && s.kind === 'stat'));
+  const opening = $derived.by(() => {
+    const lead = home.find((s) => s.type === 'block' && s.kind === 'note' && s.form === 'lead');
+    return lead?.type === 'block' ? lead.rows.map((r) => r.cells.join(' ')).join(' ').trim() : '';
+  });
+
+  /* THE GLYPH ON A TILE'S HEADING says what its drawing is, from the set's own idea for it (ICONS.md). */
+  const KIND_GLYPH: Record<string, IconName> = {
+    series: 'bars',
+    progress: 'gauge',
+    ring: 'target',
+    heat: 'activity',
+    timeline: 'calendar',
+    steps: 'zap',
+    todo: 'work',
+    checklist: 'work',
+    cards: 'agent',
+    agents: 'agent',
+    queue: 'decide',
+    comparison: 'receipt',
+    board: 'projects',
+    stat: 'bars',
+  };
+
+  function glyphFor(pageId: string, at: number): IconName {
+    const seg = segmentsOf(pageId)[at];
+    const byKind = seg?.type === 'block' ? KIND_GLYPH[seg.kind] : undefined;
+    if (byKind) return byKind;
+    const g = example?.pages.find((p) => p.id === pageId)?.glyph ?? '';
+    return isIconName(g) ? g : 'file';
+  }
+
+  /* Three rows beside the close: wide, narrow, wide, and the close takes the narrow place beside the last. */
+  const SPANS = ['span-7', 'span-5', 'span-7'] as const;
 </script>
 
 <svelte:head>
@@ -85,46 +125,60 @@
   <!-- Three classes a rule, over the two a scoped `.x.svelte-HASH` carries, so these win whatever order the head is in. -->
   <noscript>
     <style>
-      .for .drawn .side { display: none; }
-      .for .drawn .chips { display: none; }
-      .for .drawn.drawn { grid-template-columns: minmax(0, 1fr); }
+      .for .drawn .pages { display: none; }
     </style>
   </noscript>
 </svelte:head>
 
 <div class="for">
-  <section class="hero" aria-labelledby="for-title">
+  <!-- ── The person's question, and the record's answer ─────────────────── -->
+  <section class="band" aria-labelledby="for-title">
     <div class="in">
-      <p class="band-tag tag">
-        {#if example && isIconName(example.glyph)}<Icon name={example.glyph} size="s" />{/if}
-        <span>{person.tag}</span>
-      </p>
-      <h1 class="display said" id="for-title">{person.said}</h1>
-      <div class="hero-row">
-        <p class="lede">{person.sub}</p>
-        <div class="actions">
-          <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{f.start}<Icon name="arrow" size="s" /></a>
-          <a class="quiet" href="/pricing">{f.pricing}</a>
+      <div class="tiles">
+        <div class="tile lead opening">
+          <div class="words">
+            <p class="tag">
+              <span class="well">{#if example && isIconName(example.glyph)}<Icon name={example.glyph} />{/if}</span>
+              <span>{person.tag}</span>
+            </p>
+            <h1 class="h2 said" id="for-title">{person.said}</h1>
+            <p class="lede">{person.sub}</p>
+            <div class="actions">
+              <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{f.start}<Icon name="arrow" size="m" /></a>
+              <a class="btn btn-lg" href="/pricing">{f.pricing}</a>
+            </div>
+          </div>
+
+          {#if example && (figuresAt >= 0 || opening !== '')}
+            <div class="answer" role="group" aria-label={w.window}>
+              <p class="answer-head meta">{example.label}</p>
+              {#if figuresAt >= 0}
+                <Page src={fence(example.pages[0]?.id ?? 'home', figuresAt)} layout={[{ at: 0, cols: 12 }]} now={DRAWN_ON} />
+              {/if}
+              {#if opening !== ''}<p class="reading">{opening}</p>{/if}
+            </div>
+          {/if}
         </div>
       </div>
     </div>
+  </section>
 
-    {#if example && page}
-      <div class="in stage">
-        <div class="drawn frame" role="group" aria-label={w.window}>
-          <div class="side">
-            <Rail name={example.label} glyph={example.glyph} pages={example.pages} current={page.id} open={waiting} pick={(to) => void open(to, 'nav')} />
-          </div>
-          <div class="body">
-            <div class="chips" role="group" aria-label={f.pages}>
+  <!-- ── The record, drawn large ──────────────────────────────────────────── -->
+  {#if example && page}
+    <section class="band" aria-labelledby="page-title">
+      <div class="in">
+        <div class="tiles">
+          <div class="tile drawn" role="group" aria-label={w.window}>
+            <div class="pages" role="group" aria-label={f.pages}>
               {#each example.pages as p (p.id)}
                 <button type="button" class="pick" aria-current={p.id === page.id ? 'page' : undefined} onclick={() => void open(p.id, 'nav')}>
-                  {#if isIconName(p.glyph)}<Icon name={p.glyph} size="s" />{/if}
+                  {#if isIconName(p.glyph)}<span class="pick-well"><Icon name={p.glyph} size="m" /></span>{/if}
                   <span>{p.title}</span>
+                  {#if p.id === 'decide' && waiting > 0}<span class="count num" aria-hidden="true">{waiting}</span><span class="sr">{w.toDecide(waiting)}</span>{/if}
                 </button>
               {/each}
             </div>
-            <h2 class="page-title" tabindex="-1" bind:this={heading}>{page.title}</h2>
+            <h2 class="page-title" id="page-title" tabindex="-1" bind:this={heading}>{page.title}</h2>
             <Page
               src={page.src}
               layout={page.layout ?? []}
@@ -137,275 +191,249 @@
               go={(to) => void open(to, 'page')}
               onanswer={(question) => (answered = [...answered, question])}
             />
+            <p class="caption meta">{w.caption}</p>
           </div>
         </div>
-        <p class="caption">{w.caption}</p>
       </div>
-    {/if}
-  </section>
+    </section>
+  {/if}
 
-  <section class="sec" aria-labelledby="rows-title">
+  <!-- ── What it does for you, one tile a thing, and the close beside the last ── -->
+  <section class="band" aria-labelledby="rows-title">
     <div class="in">
-      <h2 class="h2" id="rows-title">{f.rowsTitle}</h2>
-      <ul class="rows">
-        {#each person.rows as row (row.head)}
-          <li class="row reveal">
-            <div class="words">
-              <h3 class="row-head">{row.head}</h3>
-              <p class="row-said">{row.said}</p>
-            </div>
-            <div class="drawing frame">
+      <h2 class="sr" id="rows-title">{f.rowsTitle}</h2>
+      <div class="tiles">
+        {#each person.rows as row, i (row.head)}
+          <article class="tile lead does reveal {SPANS[i] ?? 'span-6'}">
+            <header class="tile-head">
+              <span class="well"><Icon name={glyphFor(row.draw.page, row.draw.at)} /></span>
+              <h3 class="h3">{row.head}</h3>
+            </header>
+            <p class="lede">{row.said}</p>
+            <div class="drawing">
               <Page src={fence(row.draw.page, row.draw.at)} layout={[{ at: 0, cols: 12 }]} now={DRAWN_ON} canvas />
             </div>
-          </li>
+          </article>
         {/each}
-      </ul>
-    </div>
-  </section>
 
-  <section class="sec" aria-labelledby="close-title">
-    <div class="in">
-      <h2 class="h2" id="close-title">{f.start}</h2>
-      <div class="close-row">
-        <p class="lede">{f.price(cloud.price, cloud.unit)}</p>
-        <div class="actions">
-          <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{f.start}<Icon name="arrow" size="s" /></a>
-          <a class="quiet" href="/pricing">{f.pricing}</a>
+        <div class="tile lead close span-5 reveal">
+          <h2 class="h2" id="close-title">{f.start}</h2>
+          <p class="lede">{f.price(cloud.price, cloud.unit)}</p>
+          <div class="actions">
+            <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{f.start}<Icon name="arrow" size="m" /></a>
+            <a class="btn btn-lg" href="/pricing">{f.pricing}</a>
+          </div>
+
+          <nav class="others" aria-labelledby="others-title">
+            <h3 class="others-title meta" id="others-title">{f.others}</h3>
+            <ul>
+              {#each others as c (c.id)}
+                <li><a class="onward" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow" size="m" /></a></li>
+              {/each}
+            </ul>
+          </nav>
         </div>
       </div>
-
-      <nav class="others" aria-labelledby="others-title">
-        <h3 class="others-title" id="others-title">{f.others}</h3>
-        <ul>
-          {#each others as c (c.id)}
-            <li><a class="onward" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow" size="s" /></a></li>
-          {/each}
-        </ul>
-      </nav>
     </div>
   </section>
 </div>
 
 <style>
-  .hero {
-    padding-block: var(--sp-7) clamp(72px, 9vw, 136px);
-    background: var(--sunk);
+  /* ── The opening tile: the question on one side, the record's answer on the other ── */
+
+  .opening {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
+  }
+
+  .words {
+    display: grid;
+    align-content: start;
+    justify-items: start;
+    gap: var(--sp-4);
   }
 
   .tag {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-4);
+    gap: 10px;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-site-small);
+    font-weight: 500;
   }
 
   .said {
-    max-inline-size: 18ch;
-  }
-
-  .hero-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--sp-6) var(--sp-8);
-    align-items: end;
-    margin-block-start: var(--sp-6);
+    max-inline-size: 22ch;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-4);
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
   }
 
-  .quiet {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--tap);
-    color: var(--ink2);
-    font-size: var(--t-base);
+  /* THE ANSWER sits on the tile's second fill: the Home's figures drawn by the renderer, and its opening sentence. */
+  .answer {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: 20px;
+    background: var(--s1);
+    border-radius: var(--r-md);
+  }
+
+  .answer-head {
+    margin: 0;
+  }
+
+  .answer :global(.block) {
+    margin: 0;
   }
 
   /* ── The record, drawn large ─────────────────────────────────────────── */
 
-  .stage {
-    display: grid;
-    gap: var(--sp-4);
-    margin-block-start: var(--sp-8);
-  }
-
   .drawn {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* The rail is a desk's shape, so below 900px the row of pages stands in for it. */
-  .side {
-    display: none;
-  }
-
-  .body {
-    display: grid;
-    align-content: start;
     gap: var(--sp-4);
-    min-inline-size: 0;
-    padding: clamp(var(--sp-4), 3vw, var(--sp-7));
-    background: var(--bg);
   }
 
-  /* THE PAGES WRAP rather than scroll sideways, so every one is in view and none hides past an edge. */
-  .chips {
+  /* THE RECORD'S PAGES, as the rail names them: an icon well and the name, the chosen one in the ink well. They wrap
+     rather than scroll sideways, so every one is in view and none hides past an edge. */
+  .pages {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
+    padding: 4px;
+    background: var(--s1);
+    border-radius: var(--r-md);
   }
 
   .pick {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-block-size: var(--tap);
-    padding-inline: var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-pill);
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding-inline: 5px 12px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--t-site-small);
     font-weight: 500;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .pick:hover {
+    background: var(--hover-wash);
+    color: var(--ink);
   }
 
   .pick[aria-current='page'] {
     background: var(--bg);
-    border-color: var(--ink2);
+    box-shadow: var(--e1);
     color: var(--ink);
+    font-weight: 600;
+  }
+
+  .pick-well {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 26px;
+    block-size: 26px;
+    border-radius: var(--r-well);
+    background: var(--hover-wash);
+  }
+
+  .pick[aria-current='page'] .pick-well {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .count {
+    color: var(--dim);
+    font-size: var(--t-site-small);
+    font-weight: 400;
   }
 
   .page-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-lg);
+    font-size: var(--t-title);
     font-weight: 600;
-  }
-
-  .page-title:focus-visible {
-    outline: 2px solid var(--focus-out, currentColor);
-    outline-offset: 2px;
+    line-height: 1.214;
+    letter-spacing: -0.02em;
   }
 
   .caption {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    text-align: center;
   }
 
-  /* ── What it does for you: the words on one side, the drawing on the other ── */
+  /* ── What it does for you ────────────────────────────────────────────── */
 
-  .rows {
-    display: grid;
-    gap: clamp(var(--sp-7), 6vw, var(--sp-8));
-    margin: var(--sp-7) 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-    align-items: center;
-  }
-
-  .words {
-    display: grid;
-    gap: var(--sp-3);
-    max-inline-size: 44ch;
-  }
-
-  .row-head {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-lg);
-    font-weight: 600;
-    text-wrap: balance;
-  }
-
-  .row-said {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
+  .does {
+    gap: var(--sp-4);
   }
 
   .drawing {
     min-inline-size: 0;
-    padding: clamp(var(--sp-4), 3vw, var(--sp-6));
-    background: var(--bg);
+    margin-block-start: auto;
   }
 
-  /* ── The price, the action, and the other four pages ─────────────────── */
+  .drawing :global(.block) {
+    margin-block-end: 0;
+  }
 
-  .close-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--sp-6);
-    margin-block-start: var(--sp-5);
+  .close {
+    justify-content: flex-start;
   }
 
   .others {
-    margin-block-start: var(--sp-8);
-    padding-block-start: var(--sp-5);
+    display: grid;
+    gap: var(--sp-1);
+    margin-block-start: auto;
+    padding-block-start: var(--sp-4);
     border-block-start: 1px solid var(--line);
   }
 
   .others-title {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
     font-weight: 500;
   }
 
   .others ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--sp-6);
-    margin: var(--sp-2) 0 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--sp-4);
+    margin: 0;
     padding: 0;
     list-style: none;
   }
 
   @media (width >= 900px) {
-    .drawn {
-      grid-template-columns: 232px minmax(0, 1fr);
-    }
-
-    .side {
-      display: grid;
-    }
-
-    .chips {
-      display: none;
-    }
-
-    .row {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      gap: var(--sp-8);
-    }
-
-    /* The drawings alternate sides, so three rows read as three and not as one long column. */
-    .row:nth-child(even) .words {
-      order: 2;
+    .opening {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      align-items: start;
+      gap: var(--sp-7);
     }
   }
 
-  @media (width < 900px) {
-    .hero-row {
+  @media (width < 640px) {
+    .pick {
+      min-block-size: var(--tap);
+    }
+
+    .others ul {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .actions .btn {
+      flex: 1 1 auto;
     }
   }
 </style>

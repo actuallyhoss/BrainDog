@@ -40,7 +40,7 @@
 
   .flow-name {
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--t-row);
     font-weight: 600;
     text-align: center;
   }
@@ -53,12 +53,12 @@
     list-style: none;
   }
 
+  /* A STEP IN THE TILE'S SECOND FILL, radius 12: a card inside a tile is a well, never a tile (SYSTEM §4). */
   .step {
     display: grid;
     gap: var(--sp-1);
     padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     background: var(--s1);
   }
 
@@ -78,9 +78,14 @@
     border-inline-start: 1px solid var(--line);
   }
 
-  /* What starts it sits apart, as the product's trigger card does: the one card that is not a step. */
+  /* What starts it sits apart, as the product's trigger card does: the one card that is not a step, in ink. */
   .step[data-part='trigger'] {
-    background: var(--s2);
+    background: var(--ink);
+  }
+
+  .step[data-part='trigger'] .part,
+  .step[data-part='trigger'] .said {
+    color: var(--on-ink);
   }
 
   .part {

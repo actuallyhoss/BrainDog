@@ -1,10 +1,15 @@
 <!--
   Slash, drawn: the palette a record opens on `/`, with the three things it does as tabs.
 
-  DRAWN IN HTML AND CSS, like the app across the hero, so every word is text and nothing is a picture
-  of text. The prerendered page shows the first mode whole; with scripting the tabs switch it, and the
-  palette moves to the next mode on its own every few seconds until somebody presses a tab, unless
-  the reader has asked for reduced motion.
+  DRAWN IN HTML AND CSS, like the app in the hero, so every word is text and nothing is a picture of text. The
+  prerendered page shows the first mode whole; with scripting the tabs switch it, and the palette moves to the next
+  mode on its own every few seconds until somebody presses a tab, unless the reader has asked for reduced motion.
+
+  THE NEW APP'S PALETTE ON A TILE (SYSTEM §6, 29 September): the ask field with its search glyph and its return key
+  cap, the three modes as a segmented control with the chosen one in ink, then the answer: an icon well and the
+  answer's sentence, the rows it read with a bar each where they are sums of money (the largest in ink and the rest
+  grey, as every chart here), and where it came from. It draws its own surface, a tile at level two, because a palette
+  floats; the host places it and never wraps it in a second tile.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -32,6 +37,15 @@
   let root: HTMLElement | undefined = $state();
   const mode = $derived(demo.modes[at]!);
 
+  /* THE SUMS A MODE'S ROWS HOLD, when every row holds one: the chart is drawn from the answer's own figures. */
+  const amount = (cell: string): number | null => {
+    const m = /([\d,]+\.\d{2})/.exec(cell);
+    return m ? Number.parseFloat((m[1] ?? '').replaceAll(',', '')) : null;
+  };
+  const sums = $derived(mode.rows.map((r) => amount(r[1] ?? '')));
+  const charted = $derived(sums.every((v) => v !== null && v > 0));
+  const most = $derived(Math.max(...sums.map((v) => v ?? 0)));
+
   const pick = (i: number) => {
     at = i;
     held = true;
@@ -54,12 +68,15 @@
 
 <div class="palette" data-size={size} role="group" aria-label={demo.label} bind:this={root}>
   <div class="ask">
-    <span class="key" aria-hidden="true">/</span>
-    {#key at}
-      <p class="prompt" data-mode={mode.id}>
-        {#if mode.id === 'notice'}<span class="noticed">Slash noticed</span> · {mode.prompt}{:else}{mode.prompt}{/if}
-      </p>
-    {/key}
+    <p class="field">
+      <Icon name="search" size="m" />
+      {#key at}
+        <span class="prompt" data-mode={mode.id}>
+          {#if mode.id === 'notice'}<span class="noticed">Slash noticed</span> · {mode.prompt}{:else}{mode.prompt}{/if}
+        </span>
+      {/key}
+      <span class="cap" aria-hidden="true">↵</span>
+    </p>
     <div class="modes" role="tablist" aria-label={demo.label}>
       {#each demo.modes as m, i (m.id)}
         <button type="button" role="tab" aria-selected={i === at} class:on={i === at} onclick={() => pick(i)}>{m.label}</button>
@@ -69,18 +86,26 @@
 
   {#key at}
     <div class="answer" role="tabpanel" aria-label={mode.label}>
-      <p class="lead"><span class="face" aria-hidden="true">/</span>{mode.lead}</p>
+      <p class="lead">
+        <span class="well" aria-hidden="true"><Icon name={mode.id === 'draft' ? 'file' : mode.id === 'notice' ? 'bell' : 'slash'} size="m" /></span>
+        <span>{mode.lead}</span>
+      </p>
       <ul class="rows">
-        {#each mode.rows as row (row[0])}
-          <li class="row" data-mode={mode.id}>
+        {#each mode.rows as row, i (row[0])}
+          <li class="row" data-mode={mode.id} data-charted={charted ? '' : undefined}>
             <span class="what">{row[0]}</span>
+            {#if charted}
+              <span class="track" aria-hidden="true"
+                ><span class="bar" data-most={sums[i] === most ? '' : undefined} style="--share: {((sums[i] ?? 0) / most) * 100}%"></span></span
+              >
+            {/if}
             <span class="val num">{row[1]}</span>
             {#if row[2]}<span class="when">{row[2]}</span>{/if}
           </li>
         {/each}
       </ul>
       <div class="foot">
-        <span class="source"><Icon name={mode.id === 'draft' ? 'decide' : 'check'} size="s" />{mode.source}</span>
+        <span class="source"><Icon name={mode.id === 'draft' ? 'decide' : 'check'} size="m" />{mode.source}</span>
         {#if mode.id === 'draft'}
           <span class="do">
             <span class="btnlike">{demo.reject}</span>
@@ -93,84 +118,84 @@
 </div>
 
 <style>
+  /* A PALETTE FLOATS, so its tile sits at level two, on the tile fill, radius 22 (SYSTEM §4, §6). */
   .palette {
-    overflow: hidden;
-    background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    box-shadow: var(--e3);
+    display: grid;
+    align-content: start;
+    gap: var(--sp-4);
+    padding: 20px;
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    box-shadow: var(--e2);
     font-size: var(--t-base);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .palette {
-      background: var(--s1);
-      box-shadow:
-        var(--e3),
-        inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent);
-    }
   }
 
   .ask {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
-    border-block-end: 1px solid var(--line);
   }
 
-  .key {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    background: var(--accent);
-    border-radius: 8px;
-    color: var(--accent-ink);
-    font-family: var(--font-display);
-    font-size: var(--t-md);
-    font-weight: 600;
-    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+  /* THE ASK FIELD: 44 tall in the second fill, radius 12, the search glyph, the words and the return key cap. */
+  .field {
+    display: flex;
+    flex: 1 1 260px;
+    align-items: center;
+    gap: 10px;
+    min-inline-size: 0;
+    min-block-size: var(--tap);
+    margin: 0;
+    padding-inline: 12px 8px;
+    border-radius: var(--r-md);
+    background: var(--s1);
+    color: var(--ink2);
   }
 
   .prompt {
     flex: 1;
     min-inline-size: 0;
-    margin: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 500;
+    font-size: var(--t-base);
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .prompt[data-mode='notice'] {
-    color: var(--ink2);
-  }
-
   .noticed {
-    color: var(--accent-text);
+    color: var(--live);
     font-weight: 600;
   }
 
-  .modes {
-    display: flex;
+  .cap {
+    display: inline-grid;
     flex: none;
+    place-items: center;
+    min-inline-size: 22px;
+    block-size: 22px;
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+  }
+
+  /* THE MODES, a segmented control in the second fill with the chosen one in ink. */
+  .modes {
+    display: inline-flex;
     gap: 2px;
     padding: 3px;
-    background: var(--sunk);
-    border-radius: 9px;
+    border-radius: var(--r-pill);
+    background: var(--s1);
   }
 
   .modes button {
-    min-block-size: 28px;
-    padding-inline: 10px;
-    background: none;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: 14px;
     border: 0;
-    border-radius: 7px;
-    color: var(--dim);
+    border-radius: var(--r-pill);
+    background: none;
+    color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
     font-weight: 500;
@@ -178,62 +203,56 @@
   }
 
   .modes button.on {
-    background: var(--s3);
-    color: var(--ink);
-    box-shadow: var(--e1);
+    background: var(--ink);
+    color: var(--on-ink);
   }
 
   .answer {
-    padding: var(--sp-5) var(--sp-5) var(--sp-4);
+    display: grid;
+    gap: var(--sp-3);
   }
 
   .lead {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
-    margin: 0 0 var(--sp-4);
+    gap: 10px;
+    margin: 0;
     color: var(--ink);
     font-size: var(--t-md);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    line-height: 22px;
   }
 
-  .face {
+  .well {
     display: grid;
     flex: none;
     place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
-    border: 1.5px solid var(--accent);
-    border-radius: 50%;
-    color: var(--accent-text);
-    font-family: var(--font-display);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    inline-size: var(--well);
+    block-size: var(--well);
+    border-radius: var(--r-well);
+    background: var(--s1);
+    color: var(--ink2);
   }
 
   .rows {
+    display: grid;
     margin: 0;
     padding: 0;
     list-style: none;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
   }
 
+  /* A ROW: what, its share of the answer as a bar where the rows are sums, the sum, and when. */
   .row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: var(--sp-4);
-    align-items: baseline;
-    padding: 10px var(--sp-4);
-  }
-
-  .row[data-mode='draft'] {
-    grid-template-columns: 7.5rem minmax(0, 1fr);
-  }
-
-  .row + .row {
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 40px;
     border-block-start: 1px solid var(--line);
+  }
+
+  .row[data-charted] {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
   }
 
   .what {
@@ -243,25 +262,47 @@
     text-overflow: ellipsis;
   }
 
-  .row[data-mode='draft'] .what {
-    color: var(--dim);
-    font-size: var(--t-sm);
+  .track {
+    display: block;
+    block-size: 8px;
+    border-radius: 3px;
+    background: var(--s1);
+  }
+
+  .bar {
+    display: block;
+    inline-size: var(--share);
+    min-inline-size: 3px;
+    block-size: 100%;
+    border-radius: 3px;
+    background: var(--dim);
+  }
+
+  .bar[data-most] {
+    background: var(--ink);
   }
 
   .val {
     color: var(--ink);
+    font-weight: 500;
+    text-align: end;
+  }
+
+  .when {
+    min-inline-size: 72px;
+    color: var(--dim);
+    font-size: var(--t-sm);
     text-align: end;
   }
 
   .row[data-mode='draft'] .val {
+    color: var(--ink2);
+    font-weight: 400;
     text-align: start;
   }
 
-  .when {
-    min-inline-size: 5.5rem;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    text-align: end;
+  .row[data-mode='draft'] {
+    grid-template-columns: 96px minmax(0, 1fr);
   }
 
   .foot {
@@ -270,7 +311,6 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    margin-block-start: var(--sp-4);
   }
 
   .source {
@@ -282,17 +322,18 @@
   }
 
   .do {
-    display: flex;
+    display: inline-flex;
     gap: var(--sp-2);
   }
 
+  /* Drawn, not pressed: a picture of the two verbs, as the app draws them. */
   .btnlike {
     display: inline-flex;
     align-items: center;
-    min-block-size: 30px;
-    padding-inline: 12px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: 14px;
+    border-radius: var(--r-pill);
+    background: var(--s1);
     color: var(--ink);
     font-size: var(--t-sm);
     font-weight: 500;
@@ -300,90 +341,69 @@
 
   .btnlike.primary {
     background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
+    color: var(--on-ink);
   }
 
-  .palette[data-size='l'] .answer {
-    padding: var(--sp-6) var(--sp-6) var(--sp-5);
+  .palette[data-size='l'] {
+    padding: 24px;
   }
 
   .palette[data-size='l'] .lead {
-    font-size: var(--t-lg);
+    font-size: var(--t-group);
+    line-height: 24px;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .prompt,
     .answer {
-      animation: in 360ms var(--ease-out) both;
-    }
-
-    .row {
-      animation: in 420ms var(--ease-out) both;
-    }
-
-    .row:nth-child(2) {
-      animation-delay: 60ms;
-    }
-
-    .row:nth-child(3) {
-      animation-delay: 120ms;
-    }
-
-    .row:nth-child(4) {
-      animation-delay: 180ms;
+      animation: palette-in var(--d-enter) var(--ease-out) both;
     }
   }
 
-  @keyframes in {
+  @keyframes palette-in {
     from {
       opacity: 0;
-      transform: translateY(6px);
-    }
-
-    to {
-      opacity: 1;
-      transform: none;
+      transform: translateY(4px);
     }
   }
 
   @media (width < 640px) {
-    .ask {
-      flex-wrap: wrap;
-      padding: var(--sp-3);
+    .palette {
+      padding: 16px;
     }
 
-    .prompt {
-      flex-basis: calc(100% - 40px);
-      white-space: normal;
+    .row[data-charted] {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'what val'
+        'track when';
+      row-gap: 6px;
+      padding-block: var(--sp-2);
+    }
+
+    .row[data-charted] .what {
+      grid-area: what;
+    }
+
+    .row[data-charted] .track {
+      grid-area: track;
+    }
+
+    .row[data-charted] .val {
+      grid-area: val;
+    }
+
+    .row[data-charted] .when {
+      grid-area: when;
     }
 
     .modes {
-      flex: 1;
+      inline-size: 100%;
     }
 
     .modes button {
       flex: 1;
-    }
-
-    .answer {
-      padding: var(--sp-4);
-    }
-
-    .row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 2px var(--sp-3);
-      padding: 10px var(--sp-3);
-    }
-
-    .when {
-      grid-column: 1;
-      min-inline-size: 0;
-      text-align: start;
-    }
-
-    .row[data-mode='draft'] {
-      grid-template-columns: minmax(0, 1fr);
+      min-block-size: var(--tap);
     }
   }
 </style>

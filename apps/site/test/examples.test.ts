@@ -89,3 +89,20 @@ test('the page ids of each example are unique, and its first page is its Home', 
     assert.equal(ids[0], 'home', `the first page of the ${e.id} example is "${ids[0]}", and types.ts says the first page of every example is its Home`);
   }
 });
+
+/**
+ * EVERY READING LINE NAMES A SEGMENT THE PAGE HAS, and a block rather than prose. The drawn app sets `reads[at]` under
+ * the tile of segment `at` (SYSTEM §6, a chart's one written line), so a fence added above it would move the sentence
+ * onto the wrong chart without anything else failing.
+ */
+test('every reading line sits under a block the page has', () => {
+  const wrong: string[] = [];
+  for (const { page, at } of PAGES) {
+    const segments = parse(page.src, { page: true });
+    for (const key of Object.keys(page.reads ?? {})) {
+      const seg = segments[Number(key)];
+      if (!seg || seg.type !== 'block') wrong.push(`${at}: a reading at ${key}, which is not a block of the page`);
+    }
+  }
+  assert.deepEqual(wrong, [], wrong.join('\n'));
+});

@@ -6,19 +6,22 @@
   styles `@braindog/skin` ships. So a figure on the home page is the figure a record draws, and a row
   written wrong degrades to its fence here exactly as it would there.
 
+  `tiles` DRAWS THE PAGE AS THE NEW APP DOES (SYSTEM §6): each block an opaque tile with an icon well on its
+  heading, and under a chart the one written line that says what it means (`reads`, by segment). The page's
+  opening sentence (`note lead`) is left out, because the title row above the page says it; `leadOf` finds it.
+
   TWELVE COLUMNS AT 900PX AND WIDER, ONE BELOW. `layout` places a segment by its index; one it does not
   place takes its kind's `minSpan` (`page.ts`).
 
   `interactive` HANDS THE DRAWERS THEIR CALLBACKS, and nothing is sent anywhere. A board card moves and a
-  task ticks inside the drawer that drew it, which keeps its own marks until the rows are drawn again,
-  so this page has nothing to add to either. A question answered on a queue leaves it, and a status line
-  says what was chosen, because the queue's drawer keeps no state of its own.
+  task ticks inside the drawer that drew it, so this page has nothing to add to either. A question answered
+  on a queue leaves it, and a status line says what was chosen, because the queue's drawer keeps no state.
 
-  `source` ADDS THE PAGE AND SOURCE SWITCH, and Source is `src` as it is written. `go` receives the links
-  that stay inside the drawn app: a figure `links` names answers `#go:<page>` through `cellHref`, and a
-  press on it calls `go` instead of moving the reader's page. The switch and the links arrive with the
-  script, because neither does anything without one, and a prerendered page with no script shows each
-  page as drawn.
+  `source` ADDS THE PAGE AND SOURCE SWITCH, and Source is `src` as it is written. A host that draws the switch
+  itself (the drawn app puts it in its title row) passes `view` instead, and this page draws no switch. `go`
+  receives the links that stay inside the drawn app: a figure `links` names answers `#go:<page>` through
+  `cellHref`, and a press on it calls `go` instead of moving the reader's page. The switch and the links arrive
+  with the script, because neither does anything without one.
 -->
 <script module lang="ts">
   export type { Span } from '../examples/types.ts';
@@ -28,11 +31,13 @@
   import '@braindog/skin/blocks.css';
   import '@braindog/skin/blocks-charts.css';
   import { tick } from 'svelte';
-  import { parse, type Block as Drawn, type RenderOptions, type Row } from 'braindog-render';
+  import { parse, type Block as Drawn, type RenderOptions, type Row, type Segment } from 'braindog-render';
   import { Block, Degraded, Markdown } from 'braindog-render/svelte';
+  import Icon from '../Icon.svelte';
+  import type { IconName } from '../icons.ts';
   import Flow from './Flow.svelte';
   import { cases } from '../copy/cases.ts';
-  import { GO, answerOf, goTarget, spanOf, withoutAnswered } from './page.ts';
+  import { GO, answerOf, goTarget, isLead, spanOf, withoutAnswered } from './page.ts';
   import type { Span } from '../examples/types.ts';
 
   let {
@@ -40,10 +45,13 @@
     layout = [],
     interactive = false,
     source = false,
+    view,
     go,
     links,
     now,
     canvas = false,
+    tiles = false,
+    reads,
     settled = [],
     onanswer,
   }: {
@@ -51,6 +59,8 @@
     layout?: readonly Span[];
     interactive?: boolean;
     source?: boolean;
+    /** The host's own switch: `source` shows the text, `page` the page, and this page draws no switch of its own. */
+    view?: 'page' | 'source' | undefined;
     go?: (page: string) => void;
     /** `links[segment][cell]`: the page a figure opens, or `null`. */
     links?: Readonly<Record<number, readonly (string | null)[]>> | undefined;
@@ -58,6 +68,10 @@
     now?: number | undefined;
     /** Draw each plain `steps` fence as an automation's canvas (`Flow.svelte`) rather than as a list. */
     canvas?: boolean;
+    /** Each block a tile with an icon well, and the page's opening sentence left to the host's title row. */
+    tiles?: boolean;
+    /** The line under a chart, by segment index, which says what the chart means. */
+    reads?: Readonly<Record<number, string>> | undefined;
     /**
      * Questions already answered elsewhere, by id, which this page leaves out as it leaves out its own.
      * The host keeps them, so an answer outlives this component when it is drawn again.
@@ -86,7 +100,8 @@
 
   /* Source is shown for the page it was asked on, so opening another page shows that page drawn. */
   let showingFor = $state<string | null>(null);
-  const showing = $derived(source && showingFor === src);
+  const own = $derived(view === undefined);
+  const showing = $derived(own ? source && showingFor === src : view === 'source');
 
   let root: HTMLElement | null = $state(null);
 
@@ -104,6 +119,31 @@
         : {}),
     };
   };
+
+  /**
+   * THE GLYPH ON A TILE'S HEADING, by what the block draws: a chart of figures, a trend, a goal, a run of days,
+   * a list of money, a board, a question, arrivals, an automation, agents at work. From the one icon set.
+   */
+  const GLYPH: Record<string, IconName> = {
+    stat: 'bars',
+    series: 'trend-up',
+    progress: 'target',
+    ring: 'pie',
+    heat: 'calendar',
+    comparison: 'receipt',
+    board: 'projects',
+    queue: 'decide',
+    timeline: 'inbox',
+    steps: 'zap',
+    cards: 'agent',
+    agents: 'people',
+    note: 'file',
+  };
+  const glyphOf = (seg: Segment): IconName => (seg.type === 'block' ? (GLYPH[seg.kind] ?? 'file') : 'file');
+  /* An automation drawn as its canvas names itself in its own caption, so its tile draws no heading row of its own. */
+  const drawnAsFlow = (seg: Segment): boolean => canvas && seg.type === 'block' && seg.kind === 'steps' && seg.form === undefined;
+  const headed = (seg: Segment): boolean =>
+    seg.type === 'block' && (seg.heading ?? '').trim() !== '' && seg.kind !== 'code' && !drawnAsFlow(seg);
 
   /* A board's move and a task's tick stay in the drawer that drew them (see the note above). */
   const keep = () => {};
@@ -142,13 +182,15 @@
     el.addEventListener('click', follow);
     return () => el.removeEventListener('click', follow);
   });
+
+  const saying = $derived(said?.on === src ? said.text : '');
 </script>
 
-<div class="page" bind:this={root} tabindex="-1">
-  {#if source || interactive}
-    <div class="page-bar">
-      {#if interactive}<p class="said" role="status">{said?.on === src ? said.text : ''}</p>{/if}
-      {#if source && live}
+<div class="page" data-tiles={tiles ? '' : undefined} bind:this={root} tabindex="-1">
+  {#if (source && own) || interactive}
+    <div class="page-bar" data-empty={!(source && own && live) && saying === '' ? '' : undefined}>
+      {#if interactive}<p class="said" role="status">{saying}</p>{/if}
+      {#if source && own && live}
         <div class="switch" role="group" aria-label={w.view}>
           <button type="button" class="seg tap" aria-pressed={!showing} onclick={() => (showingFor = null)}>{w.page}</button>
           <button type="button" class="seg tap" aria-pressed={showing} onclick={() => (showingFor = src)}>{w.source}</button>
@@ -162,24 +204,35 @@
   {:else}
     <div class="grid">
       {#each segments as seg, at (at)}
-        {@const span = spanOf(seg, at, layout)}
-        <div class="page-cell" style="--span:{span.cols}" data-tall={span.tall ? '' : undefined}>
-          {#if seg.type === 'markdown'}
-            <Markdown segment={seg} opts={optsFor(at)} />
-          {:else if seg.type === 'degraded'}
-            <Degraded segment={seg} />
-          {:else if canvas && seg.kind === 'steps' && seg.form === undefined}
-            <Flow block={seg} />
-          {:else}
-            <Block
-              block={withoutAnswered(seg, gone)}
-              opts={optsFor(at)}
-              onmove={interactive ? keep : undefined}
-              ontick={interactive ? keep : undefined}
-              onact={interactive ? (row, option) => void act(seg, row, option) : undefined}
-            />
-          {/if}
-        </div>
+        {#if !(tiles && isLead(seg))}
+          {@const span = spanOf(seg, at, layout)}
+          {@const reading = reads?.[at]}
+          <div
+            class="page-cell"
+            class:tile-cell={tiles}
+            style="--span:{span.cols}"
+            data-tall={span.tall ? '' : undefined}
+            data-headed={tiles && headed(seg) ? '' : undefined}
+          >
+            {#if tiles && headed(seg)}<span class="cell-well" aria-hidden="true"><Icon name={glyphOf(seg)} size="m" /></span>{/if}
+            {#if seg.type === 'markdown'}
+              <Markdown segment={seg} opts={optsFor(at)} />
+            {:else if seg.type === 'degraded'}
+              <Degraded segment={seg} />
+            {:else if canvas && seg.kind === 'steps' && seg.form === undefined}
+              <Flow block={seg} />
+            {:else}
+              <Block
+                block={withoutAnswered(seg, gone)}
+                opts={optsFor(at)}
+                onmove={interactive ? keep : undefined}
+                ontick={interactive ? keep : undefined}
+                onact={interactive ? (row, option) => void act(seg, row, option) : undefined}
+              />
+            {/if}
+            {#if tiles && reading}<p class="cell-reading">{reading}</p>{/if}
+          </div>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -192,6 +245,10 @@
     min-inline-size: 0;
   }
 
+  .page[data-tiles] {
+    gap: var(--sp-3);
+  }
+
   /* The answer on the start side and the switch on the end, one row, so neither moves the page under it. */
   .page-bar {
     display: flex;
@@ -200,27 +257,31 @@
     min-block-size: var(--ctl-h);
   }
 
-  .switch {
-    margin-inline-start: auto;
+  /* AN EMPTY STATUS LINE TAKES NO ROOM. It stays in the tree, so it is announced the moment it fills. */
+  .page-bar[data-empty] {
+    min-block-size: 0;
+    margin-block-end: calc(-1 * var(--sp-3));
   }
 
-  /* A two-way segmented switch, the product's shape for a pair: the chosen half raised on the well. */
+  /* A two-way segmented switch on glass, the toolbar's shape (SYSTEM §5): the chosen half a tile-white pill. */
   .switch {
     display: inline-flex;
     gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    background: var(--sunk);
+    margin-inline-start: auto;
+    padding: 3px;
+    border-radius: var(--r-pill);
+    background: var(--glass);
+    box-shadow: var(--glass-edge);
+    backdrop-filter: var(--glass-blur);
   }
 
   .seg {
     min-block-size: var(--ctl-h-sm);
-    padding-inline: var(--sp-3);
+    padding-inline: 14px;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-pill);
     background: none;
-    color: var(--dim);
+    color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
     font-weight: 500;
@@ -242,13 +303,13 @@
   }
 
   /* THE SOURCE WRAPS INSIDE ITS COLUMN rather than scrolling sideways, as a degraded fence does, so a
-     long row never pushes a phone page wider than the phone. */
+     long row never pushes a phone page wider than the phone. It is content, so it sits in a tile. */
   .source {
     margin: 0;
-    padding: var(--sp-4);
-    border: 1px solid var(--line);
+    padding: 20px;
     border-radius: var(--r-lg);
-    background: var(--sunk);
+    background: var(--bg);
+    box-shadow: var(--e1);
     color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-xs);
@@ -264,9 +325,64 @@
     align-items: start;
   }
 
+  .page[data-tiles] .grid {
+    gap: var(--inset);
+    align-items: stretch;
+  }
+
   /* NOT `.cell`, which is the renderer's name for a stat tile and would put two things under one name. */
   .page-cell {
     min-inline-size: 0;
+  }
+
+  /* ── A block as a tile (SYSTEM §6) ─────────────────────────────────────── */
+
+  .tile-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: 20px;
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    box-shadow: var(--e1);
+  }
+
+  /* The renderer's own spacing under a block belongs to a page of blocks; in a tile the tile's padding is it. */
+  .tile-cell :global(.block) {
+    margin: 0;
+  }
+
+  /* THE HEADING ROW: the well drawn here, and the renderer's own caption beside it as the tile's title, so the
+     figure keeps the name its caption gives it. */
+  .cell-well {
+    position: absolute;
+    inset-block-start: 20px;
+    inset-inline-start: 20px;
+    display: grid;
+    place-items: center;
+    inline-size: var(--well);
+    block-size: var(--well);
+    border-radius: var(--r-well);
+    background: var(--s1);
+    color: var(--ink2);
+  }
+
+  .tile-cell[data-headed] :global(.block-head) {
+    align-items: center;
+    min-block-size: var(--well);
+    margin-block-end: var(--sp-3);
+    padding-inline-start: calc(var(--well) + 10px);
+    font-size: var(--t-row);
+    font-weight: 600;
+  }
+
+  .cell-reading {
+    margin: auto 0 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+    text-wrap: pretty;
   }
 
   @media (width >= 900px) {

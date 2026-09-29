@@ -34,6 +34,18 @@ export const changelog = {
     filters: 'Show only',
     tally: (n: number, kind: string) => `${n} ${kind}`,
 
+    /* THE CHART ON THE PAGE: every entry by the day it shipped, stacked by kind, and the one line that says what it
+       shows. Every figure in it is counted from `entries.ts` when the page is built. */
+    byDay: 'Entries by day',
+    span: (from: string, to: string) => `${from} to ${to}`,
+    chartLabel: (from: string, to: string, busiest: string, most: number) =>
+      `Entries each day from ${from} to ${to}, stacked as shipped, fixed and changed. The busiest day is ${busiest}, with ${most}.`,
+    reading: (busiest: string, most: number, shipped: number, fixed: number, quiet: number) =>
+      `The busiest day was ${busiest}, with ${most} ${most === 1 ? 'entry' : 'entries'}` +
+      (quiet > 0 ? `, and ${quiet} ${quiet === 1 ? 'day has' : 'days have'} none.` : '.') +
+      ` Shipped ${shipped > fixed ? 'outnumbers' : 'trails'} fixed, ${shipped} to ${fixed}.`,
+    dayEntries: (n: number) => entries(n),
+
     latest: 'Latest',
     /** A day heading inside its month: "25 September". */
     day: (day: number, month: number) => `${day} ${monthName(month)}`,

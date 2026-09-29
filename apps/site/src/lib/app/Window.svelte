@@ -1,34 +1,34 @@
 <!--
-  The drawn app, which lies across the bottom edge of the hero: an example record for each of five kinds
-  of person, drawn by the product's own renderer.
+  The drawn app in the hero: an example record for each of five kinds of person, drawn as the new app draws a record
+  (SYSTEM §5) by the product's own renderer.
 
-  WHAT IT IS. On 22 September the owner asked for the screenshots to go and for the records in this
-  window to open different pages, and on 26 September kept it as it is while the bands under it were
-  rebuilt (`loop/DIRECTION.md` §33). Every page in it is dialect text in `lib/examples/`, drawn by
-  `Page.svelte` through `braindog-render/svelte`, so what a reader sees is what a record with those
-  rows draws, and the Source switch on every page shows the text it was drawn from.
+  WHAT IT IS. On 22 September the owner asked for the screenshots to go and for the records in this window to open
+  different pages, and on 26 September kept it while the bands under it were rebuilt (`loop/DIRECTION.md` §33). On 29
+  September the app's look changed (§34), and the drawing changed with it: the ground and its light, the floating glass
+  rail with its icon wells and Working now, the title row with its sentence and its toolbar, and the page's blocks as
+  tiles with their charts. Every page is dialect text in `lib/examples/`, drawn by `Page.svelte` through
+  `braindog-render/svelte`, so what a reader sees is what a record with those rows draws, and the Source switch in the
+  toolbar shows the text it was drawn from.
 
-  900PX AND WIDER IT IS A WINDOW: the cases as tabs in its bar, the product's rail (`Rail.svelte`), and
-  the page area. BELOW 900PX IT IS A PHONE (`Phone.svelte`): the cases as chips above it, and the
-  product's phone layout round the page. One tree serves both, laid out twice by the stylesheet, so a
-  case chosen on one is the case chosen on the other.
+  900PX AND WIDER IT IS A WINDOW: the cases as a glass segmented control over it, the rail (`Rail.svelte`), and the
+  page area. BELOW 900PX IT IS A PHONE (`Phone.svelte`): the cases as glass chips above it, and the phone round the
+  page. One tree serves both, laid out twice by the stylesheet, so a case chosen on one is the case chosen on the other.
 
-  NO LAYOUT JUMP. Every case's panel sits in the one grid cell, the window's body is one height, and a
-  page longer than it scrolls inside the window (or, on the phone, fades at its foot). Choosing a case, a
-  page or a figure changes what is inside the box and never the box.
+  NO LAYOUT JUMP. Every case's panel sits in the one grid cell, the window's body is one height, and a page longer
+  than it scrolls inside the window (or, on the phone, fades at its foot). Choosing a case, a page or a figure changes
+  what is inside the box and never the box.
 
-  IT IS A REAL TAB CONTROL for the cases: `role="tablist"`, arrow keys, Home and End, a roving
-  `tabindex`, one panel per case wired to its own tab. The ids are `uc-<case>` and `uc-<case>-rail`,
-  which `test/content.test.ts` and `test/window-static.test.ts` look each case up by. A press inside a
-  page that takes the pressed control away (a figure that opens another page) moves focus to the new
-  page's title, so a keyboard is never left on something that has gone.
+  IT IS A REAL TAB CONTROL for the cases: `role="tablist"`, arrow keys, Home and End, a roving `tabindex`, one panel
+  per case wired to its own tab. The ids are `uc-<case>` and `uc-<case>-rail`, which `test/content.test.ts` and
+  `test/window-static.test.ts` look each case up by. A press inside a page that takes the pressed control away (a
+  figure that opens another page) moves focus to the new page's title, so a keyboard is never left on something gone.
 
-  WITH SCRIPTING OFF IT IS FIVE HOMES, ONE AFTER ANOTHER. The `<noscript>` rule below lays every panel
-  out in turn, hides the tabs, which do nothing without a script, and shows each panel's case name,
-  which is in the markup already and `hidden` there, so a reader with scripting on never meets it.
+  WITH SCRIPTING OFF IT IS FIVE HOMES, ONE AFTER ANOTHER. The `<noscript>` rule below lays every panel out in turn,
+  hides the tabs, which do nothing without a script, and shows each panel's case name, which is in the markup already
+  and `hidden` there, so a reader with scripting on never meets it.
 
-  THE HOMES DRAW IN ONCE, on load, within 1.2s, and nothing moves under reduced motion. The first press
-  anywhere ends it, so a page opened later arrives drawn.
+  THE HOMES DRAW IN ONCE, on load, within 1.2s, and nothing moves under reduced motion. The first press anywhere ends
+  it, so a page opened later arrives drawn.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -40,7 +40,7 @@
   import Page from './Page.svelte';
   import Phone from './Phone.svelte';
   import Rail from './Rail.svelte';
-  import { questionsIn } from './page.ts';
+  import { leadOf, questionsIn, workingIn } from './page.ts';
 
   const w = cases.drawn;
 
@@ -49,13 +49,24 @@
   let shown = $state<Record<string, string>>({});
   /** The questions answered in each case, by case id, so Decide's count follows an answer. */
   let answered = $state<Record<string, string[]>>({});
+  /** The one page showing its source, as `<case>/<page>`, so opening another page shows that page drawn. */
+  let sourceOf = $state<string | null>(null);
   let first = $state(true);
 
+  /* TRUE ONCE THE SCRIPT HAS RUN: the toolbar's switch does nothing without one, so it is drawn only then. */
+  let live = $state(false);
+  $effect(() => {
+    live = true;
+  });
+
   let tabs: (HTMLButtonElement | null)[] = $state([]);
-  let headings: (HTMLElement | null)[] = $state([]);
+  /* One per case from the start: a bound prop with a fallback refuses `undefined`, so no slot may start empty. */
+  let headings: (HTMLElement | null)[] = $state(EXAMPLES.map(() => null));
 
   /* What each case's Decide asks, read once from its page, so the rail and the bar can count it. */
   const ASKED: readonly (readonly string[])[] = EXAMPLES.map((c) => questionsIn(c.pages.find((p) => p.id === 'decide')?.src ?? ''));
+  /* Who is at work on each case's record, read once from its Agents page, for the rail's Working now. */
+  const WORKING = EXAMPLES.map((c) => workingIn(c.pages.find((p) => p.id === 'agents')?.src ?? ''));
 
   const pageOf = (c: Example): ExamplePage | undefined => c.pages.find((p) => p.id === shown[c.id]) ?? c.pages[0];
 
@@ -85,9 +96,8 @@
   }
 
   /**
-   * OPEN A PAGE OF A CASE. From the rail or the bar, focus stays on the entry pressed, which is still
-   * there; from inside the page, the control pressed is about to be replaced, so focus goes to the new
-   * page's title.
+   * OPEN A PAGE OF A CASE. From the rail or the bar, focus stays on the entry pressed, which is still there; from
+   * inside the page, the control pressed is about to be replaced, so focus goes to the new page's title.
    */
   async function open(i: number, id: string, from: 'nav' | 'page') {
     const c = EXAMPLES[i];
@@ -108,10 +118,10 @@
   /**
    * WHICH ENDS OF THE CHIP ROW STILL HAVE CASES BEHIND THEM, as `before`, `after`, both or neither.
    *
-   * At 390 the row is narrower than its five chips, so some start out of view, and a row that simply
-   * ends at the edge says there is nothing more. The fade and the arrow follow this. It starts as
-   * `after`, which is what every phone width measures, so the served page draws the cue before any
-   * script has run; a window, where the five fit, measures neither and its stylesheet never reads it.
+   * At 390 the row is narrower than its five chips, so some start out of view, and a row that simply ends at the edge
+   * says there is nothing more. The fade and the arrow follow this. It starts as `after`, which is what every phone
+   * width measures, so the served page draws the cue before any script has run; a window, where the five fit,
+   * measures neither and its stylesheet never reads it.
    */
   let strip: HTMLDivElement | null = $state(null);
   let more = $state('after');
@@ -120,7 +130,7 @@
     if (!strip) return;
     const x = Math.abs(strip.scrollLeft);
     const end = strip.scrollWidth - strip.clientWidth;
-    more = [x > 1 ? 'before' : '', x < end - 1 ? 'after' : ''].filter(Boolean).join(' ');
+    more = [x > 4 ? 'before' : '', x < end - 4 ? 'after' : ''].filter(Boolean).join(' ');
   }
 
   /* A ResizeObserver calls back once as soon as it observes, so this is also the first measure. */
@@ -133,10 +143,10 @@
 </script>
 
 <!--
-  THE SCRIPTING-OFF LAYOUT. A `<noscript>` in the head is ignored by any browser running scripts, and
-  Svelte draws it empty on the client, so none of this reaches a reader who has the tabs. Every selector
-  carries three classes or more, because the component's own `.panel.svelte-HASH` carries two and a tie
-  would be decided by the order SvelteKit puts stylesheets in the head, not by this file.
+  THE SCRIPTING-OFF LAYOUT. A `<noscript>` in the head is ignored by any browser running scripts, and Svelte draws it
+  empty on the client, so none of this reaches a reader who has the tabs. Every selector carries three classes or more,
+  because the component's own `.panel.svelte-HASH` carries two and a tie would be decided by the order SvelteKit puts
+  stylesheets in the head, not by this file.
 -->
 <svelte:head>
   <noscript>
@@ -154,7 +164,6 @@
 <div class="app">
   <div class="window" role="group" aria-label={w.window}>
     <div class="bar">
-      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
       <div class="tabs" role="tablist" aria-label={w.tabs} data-more={more} bind:this={strip} onscroll={measure}>
         {#each EXAMPLES as c, i (c.id)}
           <button
@@ -177,42 +186,64 @@
       <span class="more" aria-hidden="true"><Icon name="arrow" size="s" /></span>
     </div>
 
-    <div class="stack" data-first={first ? '' : undefined}>
-      {#each EXAMPLES as c, i (c.id)}
-        {@const page = pageOf(c)}
-        {@const asking = waiting(i, c)}
-        {@const to = w.moreFor[c.id]}
-        <div class="panel" class:on={i === chosen} role="tabpanel" id="uc-{c.id}-rail" aria-labelledby="uc-{c.id}">
-          <p class="case" hidden>{c.label}</p>
-          <div class="side">
-            <Rail name={c.label} glyph={c.glyph} pages={c.pages} current={page?.id ?? ''} open={asking} pick={(id) => void open(i, id, 'nav')} />
-          </div>
-          {#if page}
-            <Phone
-              title={page.title}
-              pages={c.pages}
-              current={page.id}
-              open={asking}
-              pick={(id) => void open(i, id, 'nav')}
-              bind:heading={headings[i]}
-            >
-              <Page
-                src={page.src}
-                layout={page.layout ?? []}
-                links={page.links}
-                interactive
-                source
-                now={DRAWN_ON}
-                canvas={page.id === 'automations'}
-                settled={answered[c.id] ?? []}
-                go={(id) => void open(i, id, 'page')}
-                onanswer={(question) => answer(c, question)}
+    <div class="screen">
+      <div class="stack" data-first={first ? '' : undefined}>
+        {#each EXAMPLES as c, i (c.id)}
+          {@const page = pageOf(c)}
+          {@const asking = waiting(i, c)}
+          {@const to = w.moreFor[c.id]}
+          {@const key = `${c.id}/${page?.id ?? ''}`}
+          <div class="panel" class:on={i === chosen} role="tabpanel" id="uc-{c.id}-rail" aria-labelledby="uc-{c.id}">
+            <p class="case" hidden>{c.label}</p>
+            <div class="side">
+              <Rail
+                name={c.label}
+                pages={c.pages}
+                current={page?.id ?? ''}
+                open={asking}
+                working={WORKING[i] ?? []}
+                pick={(id) => void open(i, id, 'nav')}
               />
-            </Phone>
-          {/if}
-          <a class="more-for" href={to.href}>{to.label}<Icon name="arrow" size="s" /></a>
-        </div>
-      {/each}
+            </div>
+            {#if page}
+              {#snippet tools()}
+                {#if live}
+                  <div class="switch" role="group" aria-label={w.view}>
+                    <button type="button" class="seg tap" aria-pressed={sourceOf !== key} onclick={() => (sourceOf = null)}>{w.page}</button>
+                    <button type="button" class="seg tap" aria-pressed={sourceOf === key} onclick={() => (sourceOf = key)}>{w.source}</button>
+                  </div>
+                {/if}
+              {/snippet}
+              <Phone
+                title={page.title}
+                sentence={leadOf(page.src)}
+                pages={c.pages}
+                current={page.id}
+                open={asking}
+                pick={(id) => void open(i, id, 'nav')}
+                {tools}
+                bind:heading={headings[i]}
+              >
+                <Page
+                  src={page.src}
+                  layout={page.layout ?? []}
+                  links={page.links}
+                  reads={page.reads}
+                  interactive
+                  tiles
+                  view={sourceOf === key ? 'source' : 'page'}
+                  now={DRAWN_ON}
+                  canvas={page.id === 'automations'}
+                  settled={answered[c.id] ?? []}
+                  go={(id) => void open(i, id, 'page')}
+                  onanswer={(question) => answer(c, question)}
+                />
+              </Phone>
+            {/if}
+            <a class="more-for" href={to.href}>{to.label}<Icon name="arrow" size="s" /></a>
+          </div>
+        {/each}
+      </div>
     </div>
   </div>
 
@@ -220,12 +251,14 @@
 </div>
 
 <style>
+  /* ONE COLUMN THAT MAY SHRINK, so the chip row scrolls inside the phone's width rather than widening the page. */
   .app {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-4);
   }
 
-  /* ── Below 900px: the chips, and a phone under them ─────────────────── */
+  /* ── Below 900px: the glass chips, and a phone under them ───────────────── */
 
   .window {
     position: relative;
@@ -238,22 +271,19 @@
     margin-block-end: var(--sp-4);
   }
 
-  .dots {
-    display: none;
-  }
-
-  /* THE ROW FADES AT WHICHEVER END STILL HAS CASES BEHIND IT, and `more` in the script says which. The
-     mask reads only alpha, so the colour in it is any opaque token and never shows. */
+  /* THE ROW FADES AT WHICHEVER END STILL HAS CASES BEHIND IT, and `more` in the script says which. The mask reads
+     only alpha, so the colour in it is any opaque token and never shows. */
   .tabs {
     --fade-start: 0px;
     --fade-end: 0px;
     display: flex;
     gap: var(--sp-2);
     min-inline-size: 0;
-    padding-block: var(--sp-1);
+    padding: var(--sp-2) 2px;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
     scroll-snap-type: x mandatory;
+    scroll-padding-inline: 2px;
     scrollbar-width: none;
     mask-image: linear-gradient(
       to right,
@@ -272,17 +302,19 @@
     --fade-end: var(--sp-7);
   }
 
-  /* A case as a chip, and the chosen one in ink: a shape as well as a shade, with no accent. */
+  /* A CASE AS A GLASS CHIP, and the chosen one in ink: a shape as well as a shade, with no hue. */
   .tab {
     display: inline-flex;
     flex: none;
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
-    padding-inline: var(--sp-3);
-    border: 1px solid var(--line);
+    padding-inline: 14px;
+    border: 0;
     border-radius: var(--r-pill);
-    background: var(--bg);
+    background: var(--glass);
+    box-shadow: var(--glass-edge);
+    backdrop-filter: var(--glass-blur);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-sm);
@@ -293,13 +325,11 @@
   }
 
   .tab[aria-selected='true'] {
-    border-color: var(--ink);
     background: var(--ink);
-    color: var(--bg);
+    color: var(--on-ink);
   }
 
-  /* THE ARROW, and only a narrow phone's: the one query below that shows it is where the five chips
-     no longer fit in their row. */
+  /* THE ARROW, and only a narrow phone's: the one query below that shows it is where the five chips no longer fit. */
   .more {
     display: none;
   }
@@ -308,7 +338,16 @@
     display: grid;
   }
 
+  /* `.panel` IS ALSO THE SKIN'S NAME FOR A NOTE'S CALLOUT, a filled box with padding, and the tests find the case
+     panels by it. So the case panel says outright that it has no box of its own. */
   .panel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font-size: inherit;
     grid-area: 1 / 1;
     display: flex;
     flex-direction: column;
@@ -323,8 +362,8 @@
     visibility: visible;
   }
 
-  /* THE CASE'S NAME OVER ITS PANEL, drawn only by the scripting-off rule. NO `display` IN HERE: the
-     element is `hidden`, and any author `display` would beat the UA's `[hidden]`. */
+  /* THE CASE'S NAME OVER ITS PANEL, drawn only by the scripting-off rule. NO `display` IN HERE: the element is
+     `hidden`, and any author `display` would beat the UA's `[hidden]`. */
   .case {
     grid-area: case;
     margin: 0;
@@ -338,7 +377,37 @@
     display: none;
   }
 
-  /* A quiet link to the page written for this kind of person: ink, underlined at 40%, never the accent. */
+  /* The toolbar's Page and Source switch: glass, the chosen half a tile-white pill (SYSTEM §5). */
+  .switch {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--r-pill);
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
+  }
+
+  .seg {
+    min-block-size: 30px;
+    padding-inline: 14px;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: none;
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .seg[aria-pressed='true'] {
+    background: var(--bg);
+    color: var(--ink);
+    box-shadow: var(--e1);
+  }
+
+  /* A quiet link to the page written for this kind of person: ink, underlined at 40%, never a hue. */
   .more-for {
     display: inline-flex;
     align-self: center;
@@ -365,8 +434,8 @@
       padding-inline-end: var(--sp-7);
     }
 
-    /* THE ARROW SAYS WHICH WAY THE REST ARE, and goes when the end is reached. It sits in the outer half
-       of the fade, which is fully clear, and it is drawn and not pressed: a tap lands on the chip under it. */
+    /* THE ARROW SAYS WHICH WAY THE REST ARE, and goes when the end is reached. It sits in the outer half of the fade,
+       which is fully clear, and it is drawn and not pressed: a tap lands on the chip under it. */
     .tabs[data-more~='after'] + .more {
       position: absolute;
       inset-block: 0;
@@ -382,68 +451,57 @@
   /* ── 900px and wider: the window ───────────────────────────────────── */
 
   @media (width >= 900px) {
-    /* THE WINDOW IS THE ONE RAISED THING ON THE SITE: the product sitting on the page, across the seam
-       between the hero and the band under it, and a thing that sits on something is the one place a
-       shadow says something true. `--e3` is the top of the theme's own ladder, solved per scheme. */
-    .window {
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: var(--r-lg);
-      background: var(--bg);
-      box-shadow: var(--e3);
-    }
-
+    /* THE CASES AS ONE GLASS SEGMENTED CONTROL, centred over the window. */
     .bar {
-      gap: var(--sp-4);
-      margin-block-end: 0;
-      padding: var(--sp-2) var(--sp-3);
-      border-block-end: 1px solid var(--line);
-    }
-
-    .dots {
-      display: inline-flex;
-      flex: none;
-      gap: 6px;
-    }
-
-    .dots i {
-      inline-size: 10px;
-      block-size: 10px;
-      border-radius: var(--r-pill);
-      background: var(--line);
+      justify-content: center;
     }
 
     .tabs {
-      gap: var(--sp-1);
-      padding-block: 0;
+      gap: 2px;
+      padding: 4px;
       overflow-x: visible;
+      border-radius: var(--r-pill);
+      background: var(--glass);
+      box-shadow: var(--glass-edge), var(--e2);
+      backdrop-filter: var(--glass-blur);
       mask-image: none;
     }
 
     .tab {
       min-block-size: var(--ctl-h);
-      border-color: transparent;
-      border-radius: var(--r-md);
       background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
     }
 
     .tab[aria-selected='true'] {
-      border-color: var(--line);
-      background: var(--s1);
+      background: var(--bg);
       color: var(--ink);
       box-shadow: var(--e1);
       font-weight: 600;
     }
 
-    /* ONE HEIGHT FOR EVERY CASE AND EVERY PAGE, so the window is 1,136 by about 520 at 1440 whatever is
-       chosen. The rail on the left, the page's head and body on the right, the link at the rail's foot. */
+    /* THE SCREEN: the app's own ground and its light, floating over the site's at the top of the ladder, and held by
+       the glass hairline pair, since the two grounds are one colour. */
+    .screen {
+      overflow: hidden;
+      border-radius: var(--r-lg);
+      background-color: var(--sunk);
+      background-image: var(--ground-light);
+      box-shadow: var(--glass-edge), var(--e3);
+    }
+
+    /* ONE HEIGHT FOR EVERY CASE AND EVERY PAGE, so the window is one size whatever is chosen. The rail floats one
+       inset in on three sides; the title row, the sentence and the page sit beside it; the link sits under the rail. */
+    /* The row is the stack's height and no more, so a long page scrolls inside the window instead of stretching it. */
     .stack {
-      block-size: 472px;
+      grid-template-rows: minmax(0, 1fr);
+      block-size: 580px;
     }
 
     .panel {
       display: grid;
-      grid-template-columns: 208px minmax(0, 1fr);
+      grid-template-columns: 216px minmax(0, 1fr);
       grid-template-rows: auto auto minmax(0, 1fr) auto;
       grid-template-areas:
         'case case'
@@ -451,6 +509,7 @@
         'side body'
         'foot body';
       gap: 0;
+      padding: var(--inset) 0 var(--inset) var(--inset);
     }
 
     .side {
@@ -467,10 +526,8 @@
     .more-for {
       grid-area: foot;
       align-self: stretch;
-      padding: var(--sp-2) var(--sp-4);
-      border-inline-end: 1px solid var(--line);
-      background: var(--sunk);
-      font-size: var(--t-xs);
+      justify-content: center;
+      padding-block-start: var(--sp-2);
     }
   }
 
@@ -481,7 +538,7 @@
     }
   }
 
-  /* THE HOMES DRAW IN ONCE: each block rises into place, the last of them done inside 1.2s. */
+  /* THE HOMES DRAW IN ONCE: each tile rises into place, the last of them done inside 1.2s. */
   @media (prefers-reduced-motion: no-preference) {
     .stack[data-first] .panel :global(.page-cell) {
       animation: draw-in 560ms var(--ease-out) both;

@@ -46,6 +46,9 @@ Revision cards | 45 | 120 | cards made
         { at: 3, cols: 6 },
       ],
       links: { 1: [null, null, 'assignments'] },
+      reads: {
+        3: 'The essay is 600 words from done. Revision cards are furthest behind, at 45 of 120.',
+      },
     },
     {
       id: 'decide',

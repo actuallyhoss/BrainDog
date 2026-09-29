@@ -120,6 +120,24 @@ export const pricing = {
         ', and they never expire',
       more: 'See pricing',
     },
+    /**
+     * THE DRAWINGS ON /slash. Every figure in them is the palette demo's above, or the home page's inbox scene, so
+     * nothing drawn here says a thing the page does not already say in words.
+     */
+    drawn: {
+      askReading: (what: string, pct: number) => `${what} is ${pct}% of what is owed in the next two weeks.`,
+      draftReading: 'Adds one page. Nothing else changes until you accept it.',
+      noticeSpare: (amount: string) => `It covers the rent with ${amount} to spare.`,
+      accept: 'You accept',
+      into: (list: string) => `Into ${list}`,
+      learnReading: 'No credits, for the learning or the filing.',
+      learnLabel: (list: string) =>
+        `Three card alerts arrive, you accept how to file them once, and every one after goes into ${list}`,
+      creditsLabel: 'Slash credits a month on each plan, and what a pack adds',
+      creditsReading: (times: string) => `Cloud Plus includes ${times} times the credits of Cloud, and a pack tops up either.`,
+      /* The four rules' glyphs, in the order `rules` says them. */
+      ruleGlyphs: ['decide', 'key', 'coins', 'clock'],
+    },
     closeTitle: 'Try it on your own record.',
     closeBody: 'Slash is included on every plan from day one.',
   },
@@ -151,6 +169,20 @@ export const pricing = {
         points: ['Five times the Cloud allowance', 'Everything in Cloud', 'Switch plans any time'],
       },
     },
+    /* THE LEAD TILE'S DRAWING: the same price for one person as for four, the Team example's colleagues beside you. */
+    perRecord: {
+      alone: 'Just you',
+      team: 'You and three colleagues',
+      you: 'You',
+      faces: ['Omar', 'Lena', 'Maya'],
+      note: 'On Cloud. Colleagues are free on both plans, with any level of access.',
+    },
+    /* What each plan card sums up of its allowance, under the price. */
+    summary: (credits: string, runs: string) => `${credits} Slash credits and ${runs} automation runs a month`,
+    /* The line under the paired bars, from the figures themselves: how many times Cloud each meter is, and the price gap. */
+    compareReading: (times: string, more: string) => `Cloud Plus is ${times} times Cloud on every meter, for ${more} more a month.`,
+    bothTitle: 'Included on both plans',
+    backupsLabel: (n: number) => `The last ${n} nightly copies, the newest at the right`,
     usageTitle: 'Compare plans',
     // The month is `nextMonth` in `directory.ts`, UTC; people, pages and lists are no meter in `Allowance`.
     usageLead: 'Allowances reset on the first of each month. People, pages, lists and history are never counted.',
@@ -182,7 +214,17 @@ export const pricing = {
     // `PACKS` in `plans.ts`, the owner's call of 26 September (`loop/DIRECTION.md` §33), written for launch day.
     packsLead: 'Used after your monthly credits run out. They never expire.',
     packsPer: (credits: number) => `${credits.toLocaleString('en-US')} credits`,
+    perCredit: (price: string) => `${price} a credit`,
+    packsFree: 'Slash’s own daily read never spends your credits.',
     extraUsageTitle: 'Extra usage',
+    /* THE CAP, DRAWN: a month's usage stops at the plan with extra usage off, and at the cap with it on. */
+    cap: {
+      plan: 'Your plan',
+      extra: 'Extra usage',
+      cap: 'Your cap',
+      label: 'A month of usage: your plan, then extra usage up to the cap you set, and nothing past the cap',
+      reading: 'Off, the month stops at your plan. On, it stops at your cap and never past it.',
+    },
     // With it off, `mayRun` in `directory.ts` holds the action until the first of next month; the prices are `EXTRA` in `plans.ts` (§33).
     extraLead:
       'Off by default. Turn it on and set a monthly cap, and you are never charged past it. With it off, ' +
