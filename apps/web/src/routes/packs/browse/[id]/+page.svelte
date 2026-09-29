@@ -16,6 +16,11 @@
   ONE PRIMARY BUTTON: Install, Update, Turn on, or Installed. Install and Update read the record's plan and open the plan
   sheet (`$lib/market/PlanSheet.svelte`, PLT-4's); what installs is what the sheet showed (`./offer.ts`). Somebody the
   record will not let install is refused there, and a Kennel entry is then asked for on Decide instead.
+
+  THE LOOK (SYSTEM §6, and the site's catalogue board): tiles, 12 apart. The lead tile holds what it does, who made it,
+  the trust line and the one button; beside it, what it adds as the board draws a plan (a glyph, the kind, its count and
+  what each is called, then the hosts it calls); under them its pages drawn large; then its hosts, its versions and its
+  details. A trust state is its intent and its glyph, and a key revoked or a signature lost is the danger line.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -33,10 +38,14 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { choose, packDocument, type PackState } from '$lib/record/packs.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
+  import { TONES, type Tone } from 'braindog-render';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import { glyphOf } from '$lib/market/ListingCard.svelte';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, namesOf } from '$lib/market/adds.ts';
@@ -46,7 +55,7 @@
   import { words } from '$lib/market/words.ts';
   import { drew } from '../../../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../../../settings/billing.ts';
-  import { moduleTitle } from '../../sharing.ts';
+  import { listWords, moduleTitle, oneOf } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
   import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
@@ -89,10 +98,76 @@
   let trust = $state.raw<Trust | null>(null);
   const said = $derived(trust && listing ? trustWords(trust, listing.author) : null);
   const untrusted = $derived(trust?.kind === 'revoked' || trust?.kind === 'stripped');
+  /**
+   * The intent a trust state is drawn in. A key its author revoked, or a version that lost the signature earlier ones
+   * had, is never offered, so it is `bad`, the one that needs him; a key that changed is `warn`; a key this browser
+   * knows is `good`; a first sight, a rotation and an unsigned version are `info`.
+   */
+  const trustTone = $derived.by((): Tone | null => {
+    if (!trust) return null;
+    if (trust.kind === 'revoked' || trust.kind === 'stripped') return 'bad';
+    if (trust.kind === 'changed') return 'warn';
+    return trust.kind === 'known' ? 'good' : 'info';
+  });
   let preview = $state.raw<PreviewRead>({ state: 'none' });
 
   const adds = $derived(file ? addsOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : null);
   const names = $derived(file ? namesOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : new Map<string, string>());
+
+  /**
+   * WHAT IT ADDS, AS THE BOARD'S PLAN ROWS: each kind it brings with its count and what each is called, from the file
+   * (`adds`), else from the reach the catalogue computed; then the hosts it calls, said as none when it calls none.
+   */
+  type PlanRow = { key: string; glyph: IconName; label: string; n: number; names: string };
+  /** At most this many named on a row, and how many more said after them, so Money's 38 figures are one line. */
+  const NAMED_MOST = 6;
+  const planRows = $derived.by((): PlanRow[] => {
+    const rows: PlanRow[] = [];
+    /* THE COUNT IS EVERY ONE; THE NAMES ARE EACH NAME ONCE, so two rules said the same way are not said twice. */
+    const push = (key: string, glyph: IconName, label: string, named: readonly string[], sep = ', ') => {
+      if (named.length === 0) return;
+      const once = [...new Set(named)];
+      const shown = once.slice(0, NAMED_MOST).join(sep);
+      rows.push({ key, glyph, label, n: named.length, names: once.length > NAMED_MOST ? `${shown} ${words.andMore(once.length - NAMED_MOST)}` : shown });
+    };
+    const read = adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length > 0 ? adds : null;
+    if (read) {
+      push('lists', 'rows', words.addsLists, read.lists.map((l) => l.name));
+      push('pages', 'doc', words.addsPages, read.pages.map(pageTitle));
+      push('figures', 'activity', words.addsFigures, read.figures.map((f) => f.name));
+      push('rules', 'skill', words.addsRules, read.rules, '; ');
+    } else if (reach) {
+      push('lists', 'rows', words.addsLists, reach.lists);
+      push('pages', 'doc', words.addsPages, reach.pages);
+      push('rules', 'skill', words.addsRules, reach.rules, '; ');
+    }
+    if (reach) {
+      const hosts = [...new Set(reach.calls_out.map((c) => c.host ?? '').filter((h) => h !== ''))];
+      rows.push({ key: 'hosts', glyph: 'globe', label: words.calledHosts, n: hosts.length, names: hosts.length > 0 ? hosts.join(', ') : words.callsNothing });
+    }
+    return rows;
+  });
+  /** The declarations of the file the page describes: a pack's own, or a use case file's `pack`. */
+  const declared = $derived.by((): Record<string, unknown>[] => {
+    const doc = file ? (file.doc ?? (file.text ? safeParse(file.text) : null)) : null;
+    const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+    const at = [doc, isMap(doc) ? doc.pack : null, isMap(doc) && isMap(doc.usecase) ? doc.usecase.pack : null].find((d) => isMap(d) && Array.isArray(d.declarations));
+    return isMap(at) ? (at.declarations as unknown[]).filter(isMap) : [];
+  });
+
+  /**
+   * A PAGE FOR EACH ROW IS TITLED BY THE ROW, `{{name}}`, which names nothing until a row is chosen, so it is said by its
+   * list: "A page for each project", as the plan sheet says it (`sharing.ts`).
+   */
+  function pageTitle(p: { id: string; title: string }): string {
+    if (!/\{\{(?!config:)/u.test(p.title)) return p.title;
+    const d = declared.find((x) => x.page === p.id);
+    const each = d && typeof d.for === 'object' && d.for !== null ? (d.for as { register?: unknown }).register : undefined;
+    return typeof each === 'string' ? copy.sharePageEach(oneOf(names.get(each) ?? listWords(each))) : p.title;
+  }
+
+  /** How many things it adds, for the tile's count; `null` until the file or its reach is read. */
+  const addsTotal = $derived(planRows.length === 0 ? null : planRows.filter((r) => r.key !== 'hosts').reduce((n, r) => n + r.n, 0));
 
   function safeParse(text: string): unknown {
     try {
@@ -296,26 +371,132 @@
   {:else}
     {#if recordRefused}<Empty kind="error" title={recordRefused} />{/if}
 
-    <!-- IT LEADS WITH WHAT IT DOES AND ITS ONE BUTTON (design.md DSN-17); who made it and whether that is vouched for
-         follow on one line, and its version, licence and signature are the Details section's. -->
-    <section class="lead" aria-label={copy.useCaseFor}>
-      <p class="summary">{listing.summary}</p>
-      {#if said}<p class="trust" data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>{#if said.loud}<Icon name="alert" size="s" />{/if}{said.text}</p>{/if}
-      <div class="act wide-only">{@render act()}</div>
-      <p class="meta">
-        <span>{words.kinds[listing.kind]}</span>
-        <span class="with-icon"><Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}</span>
-        {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
-      </p>
-      {#if refused}
-        <p class="said" role="status" title={refused.code ? copy.refusalCode(refused.code) : undefined}>{refused.fix}</p>
-        <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install" (GAP-3): the editor side, staging and the failing
-             roles selected, is built; this is the one press that reaches it from here. -->
-        {#if refused.code && FIXABLE.has(refused.code) && hasTheme(file?.doc)}
-          <Button onclick={() => { stageFix(file?.doc); void goto(at('/settings/appearance')); }}>{copy.lookFixAndInstall}</Button>
-        {/if}
+    <div class="tiles">
+      <!-- THE LEAD TILE: what it does, whether it is vouched for, and its one button (design.md DSN-17). Who made it heads
+           the tile; its version, licence and signature are the Details tile's. -->
+      <div class="lead-cell">
+        <Tile lead icon={glyphOf(listing)} title={copy.useCaseFor} meta={words.kinds[listing.kind]} aria-label={copy.useCaseFor}>
+          <p class="summary">{listing.summary}</p>
+          <p class="byline with-icon">
+            <Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}
+            {#if listing.count !== null}<span class="num quiet-part">{words.installs(listing.count)}</span>{/if}
+          </p>
+          {#if said && trustTone}
+            <!-- A TONE IS ITS INTENT AND ITS GLYPH, never colour alone: a key its author revoked, or a version that lost its
+                 signature, is the danger line, and a key that changed the warning one. -->
+            <p class="trust" data-intent={trustTone} data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>
+              <span class="glyph" role="img" aria-label={TONES[trustTone].label}>{TONES[trustTone].glyph}</span><span>{said.text}</span>
+            </p>
+          {/if}
+          <div class="act wide-only">{@render act()}</div>
+          {#if refused}
+            <p class="said refused" data-intent="bad" role="status" title={refused.code ? copy.refusalCode(refused.code) : undefined}>
+              <span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span><span>{refused.fix}</span>
+            </p>
+            <!-- A THEME PACK REFUSED AT INSTALL OFFERS "Fix and install" (GAP-3): the editor side, staging and the failing
+                 roles selected, is built; this is the one press that reaches it from here. -->
+            {#if refused.code && FIXABLE.has(refused.code) && hasTheme(file?.doc)}
+              <div>
+                <Button onclick={() => { stageFix(file?.doc); void goto(at('/settings/appearance')); }}>{copy.lookFixAndInstall}</Button>
+              </div>
+            {/if}
+          {/if}
+        </Tile>
+      </div>
+
+      <!-- WHAT IT ADDS, BEFORE ANYTHING CHANGES (the site's board): each kind beside its glyph and its count, and what each
+           is called; then every host it calls, or that it calls none. Read from the file, never written for the page. -->
+      <div class="adds-cell">
+        <Tile icon="plus" title={words.adds} count={addsTotal ?? undefined}>
+          {#if planRows.length > 0}
+            <ul class="plan">
+              {#each planRows as r (r.key)}
+                <li class="plan-row">
+                  <Icon name={r.glyph} size="m" />
+                  <span class="plan-label">{r.label}</span>
+                  <span class="plan-n num">{r.n}</span>
+                  <span class="plan-names">{r.names}</span>
+                </li>
+              {/each}
+            </ul>
+          {:else if file || reach}
+            <p class="quiet">{words.addsNothing}</p>
+          {:else}
+            <p class="quiet" role="status">{words.planning}</p>
+          {/if}
+        </Tile>
+      </div>
+
+      <!-- ITS PAGES, DRAWN: the use case's rail and Home, or an add-on's pages through the real renderer, each on a well of
+           the ground's colour inside the tile. A listing with no drawing has no tile for one: what it adds already names
+           its pages. A drawing that could not be read says so. -->
+      {#if u || preview.state === 'ready' || preview.state === 'refused'}
+        <div class="wide-cell">
+          <Tile icon="projects" title={words.pages}>
+            {#if u}
+              <Preview preview={previewOf(u)} large />
+            {:else if preview.state === 'ready' && preview.preview.pages.length > 0}
+              <PreviewPage preview={preview.preview} large />
+            {:else}
+              <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
+            {/if}
+          </Tile>
+        </div>
       {/if}
-    </section>
+
+      {#if reach && reach.calls_out.length > 0}
+        <div class="third-cell calls-cell">
+          <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
+            <ul class="log">
+              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{call.line}</li>{/each}
+            </ul>
+          </Tile>
+        </div>
+      {/if}
+
+      <div class="third-cell">
+        <Tile icon="history" title={words.versions} count={listing.versions.length}>
+          <ol class="log versions">
+            {#each listing.versions as v (v.version)}
+              <li class="log-row" data-yanked={v.yanked ? '' : undefined}>
+                <span class="v num">{v.version}</span>
+                <span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span>
+                {#if v.notes}<span class="notes">{v.notes}</span>{/if}
+                {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
+                {#if listing.source === 'kennel'}<span class="quiet">{signedWords(v.signature)}</span>{/if}
+              </li>
+            {/each}
+          </ol>
+        </Tile>
+      </div>
+
+      <div class="third-cell">
+        <Tile icon="info" title={words.details}>
+          <dl class="facts">
+            {#if latest}<dt>{words.version}</dt><dd class="num">{latest.version}</dd>{/if}
+            <dt>{words.licence}</dt>
+            <dd>{listing.license}</dd>
+            {#if listing.source === 'kennel'}
+              <dt>{words.signature}</dt>
+              <dd class="with-icon"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</dd>
+            {/if}
+            <dt>{words.addsModules}</dt>
+            <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
+            <!-- A MODULE ADDED HERE WRITES NO EXAMPLE ROWS (`packDocument`), so it says none rather than its seed's. -->
+            {#if listing.kind === 'module'}
+              <dt>{words.addsExamples}</dt>
+              <dd>{words.examples(0)}</dd>
+            {:else if adds}
+              <dt>{words.addsExamples}</dt>
+              <dd>{words.examples(adds.examples)}</dd>
+            {:else if reach}
+              <dt>{words.addsExamples}</dt>
+              <dd>{words.examples(reach.examples)}</dd>
+            {/if}
+          </dl>
+        </Tile>
+      </div>
+    </div>
 
     {#if planned}
       <PlanSheet
@@ -328,111 +509,6 @@
       />
     {/if}
 
-    <!-- SECTIONS, NOT PANELS: a heading and what it heads, on the page's own ground, so the drawing is the one surface. -->
-    <section class="panel drawing" aria-labelledby="d-pages">
-      <h2 class="panel-h" id="d-pages">{words.pages}</h2>
-      {#if u}
-        <Preview preview={previewOf(u)} large />
-      {:else if preview.state === 'ready' && preview.preview.pages.length > 0}
-        <PreviewPage preview={preview.preview} large />
-      {:else}
-        <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
-      {/if}
-    </section>
-
-    <div class="grid">
-      <section class="panel" aria-labelledby="d-adds">
-        <h2 class="panel-h" id="d-adds">{words.adds}</h2>
-        {#if adds && adds.lists.length + adds.pages.length + adds.figures.length + adds.rules.length > 0}
-          <dl class="facts">
-            {#if adds.lists.length > 0}
-              <dt>{words.addsLists}</dt>
-              <dd>
-                <ul class="names">
-                  {#each adds.lists as l (l.id)}<li><Icon name="rows" size="s" /><span class="name">{l.name}</span>{#if l.fields.length > 0}<span class="small">{l.fields.join(', ')}</span>{/if}</li>{/each}
-                </ul>
-              </dd>
-            {/if}
-            {#if adds.pages.length > 0}
-              <dt>{words.addsPages}</dt>
-              <dd>
-                <ul class="names">
-                  {#each adds.pages as p (p.id)}<li><Icon name="doc" size="s" />{p.title}</li>{/each}
-                </ul>
-              </dd>
-            {/if}
-            {#if adds.figures.length > 0}
-              <dt>{words.addsFigures}</dt>
-              <dd>
-                <ul class="names">
-                  {#each adds.figures as f (f.id)}<li><span class="name">{f.name}</span>{#if f.target || f.window}<span class="small">{[f.target, f.window].filter(Boolean).join(', ')}</span>{/if}</li>{/each}
-                </ul>
-              </dd>
-            {/if}
-            {#if adds.rules.length > 0}
-              <dt>{words.addsRules}</dt>
-              <dd>
-                <ul class="names">
-                  {#each adds.rules as r, i (i)}<li>{r}</li>{/each}
-                </ul>
-              </dd>
-            {/if}
-            <dt>{words.addsExamples}</dt>
-            <dd>{words.examples(adds.examples)}</dd>
-          </dl>
-        {:else if reach && reach.lists.length + reach.pages.length > 0}
-          <dl class="facts">
-            {#if reach.lists.length > 0}<dt>{words.addsLists}</dt><dd>{reach.lists.join(', ')}</dd>{/if}
-            {#if reach.pages.length > 0}<dt>{words.addsPages}</dt><dd>{reach.pages.join(', ')}</dd>{/if}
-            <dt>{words.addsExamples}</dt><dd>{words.examples(reach.examples)}</dd>
-          </dl>
-        {:else}
-          <p class="quiet">{words.addsNothing}</p>
-        {/if}
-      </section>
-
-      <section class="panel" aria-labelledby="d-calls">
-        <h2 class="panel-h" id="d-calls">{words.calls}</h2>
-        {#if reach && reach.calls_out.length > 0}
-          <ul class="names">
-            {#each reach.calls_out as call, i (i)}<li class="loud"><Icon name="globe" size="s" />{call.line}</li>{/each}
-          </ul>
-        {:else if reach}
-          <p class="quiet with-icon"><Icon name="check" size="s" />{words.callsNothing}</p>
-        {/if}
-      </section>
-
-      <section class="panel" aria-labelledby="d-versions">
-        <h2 class="panel-h" id="d-versions">{words.versions}</h2>
-        <ol class="versions">
-          {#each listing.versions as v (v.version)}
-            <li data-yanked={v.yanked ? '' : undefined}>
-              <span class="v num">{v.version}</span>
-              <span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span>
-              {#if v.notes}<span class="notes">{v.notes}</span>{/if}
-              {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
-              {#if listing.source === 'kennel'}<span class="quiet small">{signedWords(v.signature)}</span>{/if}
-            </li>
-          {/each}
-        </ol>
-      </section>
-
-      <section class="panel" aria-labelledby="d-details">
-        <h2 class="panel-h" id="d-details">{words.details}</h2>
-        <dl class="facts">
-          {#if latest}<dt>{words.version}</dt><dd class="num">{latest.version}</dd>{/if}
-          <dt>{words.licence}</dt>
-          <dd>{listing.license}</dd>
-          {#if listing.source === 'kennel'}
-            <dt>{words.signature}</dt>
-            <dd class="with-icon"><Icon name={latest?.signature ? 'key' : 'info'} size="s" />{signedWords(latest?.signature)}</dd>
-          {/if}
-          <dt>{words.addsModules}</dt>
-          <dd>{(reach ?? latest?.reach)?.modules.map(moduleTitle).join(', ') || words.requiresNothing}</dd>
-        </dl>
-      </section>
-    </div>
-
     <div class="act narrow-only">{@render act()}</div>
   {/if}
 </div>
@@ -441,25 +517,70 @@
   .page {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
     min-inline-size: 0;
   }
 
-  .page > :global(*) {
-    max-inline-size: 100%;
+  /**
+   * THE TILES, 12 APART (SYSTEM §4): the lead beside what it adds, its pages across the width under them, then its hosts,
+   * versions and details in thirds. One column on a phone, in the order they are read.
+   */
+  .tiles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    min-inline-size: 0;
   }
 
-  .lead {
+  .tiles > * {
     display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    inline-size: 100%;
-    max-inline-size: 70ch;
+    min-inline-size: 0;
   }
 
+  .tiles > * > :global(.tile) {
+    flex: 1;
+  }
+
+  @media (width >= 900px) {
+    .tiles {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .lead-cell {
+      grid-column: span 7;
+    }
+
+    .adds-cell {
+      grid-column: span 5;
+    }
+
+    .wide-cell {
+      grid-column: 1 / -1;
+    }
+
+    /* The last row shares the width between however many tiles it holds: three, or two when nothing calls out. */
+    .third-cell {
+      grid-column: span 6;
+    }
+
+    .tiles:has(.calls-cell) .third-cell {
+      grid-column: span 4;
+    }
+  }
+
+  /* WHAT IT DOES, FIRST AND LARGEST: the lead sentence at 16/24 in ink. */
+  .summary {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-md);
+    line-height: 24px;
+    text-wrap: pretty;
+  }
+
+  .byline,
+  .trust,
   .quiet,
   .said {
     display: flex;
@@ -467,20 +588,22 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
-  /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: var(--sp-4);
-    row-gap: var(--sp-1);
-    margin: 0;
+  .byline {
+    color: var(--ink2);
+  }
+
+  .quiet-part {
+    margin-inline-start: var(--sp-2);
     color: var(--dim);
-    font-size: var(--t-sm);
+  }
+
+  .quiet,
+  .said {
+    color: var(--dim);
   }
 
   .with-icon {
@@ -489,60 +612,121 @@
     gap: var(--sp-2);
   }
 
-  /* WHAT IT DOES, FIRST AND LARGEST: the page's lead sentence at the section-title size. */
-  .summary {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
-  }
-
+  /* THE TRUST LINE: its dot in the intent's fill and its words in ink; a loud one at 500, and a key revoked or a
+     signature lost in the danger ink as well, since it is the one thing on the page that needs him first. */
   .trust {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
   }
 
   .trust[data-loud] {
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 500;
+  }
+
+  .trust[data-intent='bad'],
+  .refused {
+    color: var(--danger);
+    font-weight: 500;
   }
 
   .act {
-    margin-block: var(--sp-2);
+    display: flex;
+    margin-block-start: var(--sp-2);
   }
 
-  .drawing {
-    inline-size: 100%;
-    margin-block-start: var(--sp-4);
-  }
-
-  /* TWO COLUMNS OF SECTIONS FROM 640PX, one on a phone, with the section gap between them and no edge around any. */
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sp-6) var(--sp-7);
-    inline-size: 100%;
-    margin-block-start: var(--sp-4);
-  }
-
-  .panel {
+  /* THE PLAN'S ROWS, AS THE BOARD DRAWS THEM: a glyph, the kind, its count at the row size and 600, and what each is
+     called, a hairline between two. */
+  .plan {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
-    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  /* A SECTION TITLE, as `Section.svelte` draws one: the body face at the section size, 600, in ink. */
-  .panel-h {
-    font-family: var(--font-ui);
+  .plan-row {
+    display: grid;
+    grid-template-columns: var(--icon-m) 7rem 2.5rem minmax(0, 1fr);
+    column-gap: var(--sp-3);
+    align-items: start;
+    padding-block: var(--sp-2);
+    color: var(--ink2);
+  }
+
+  .plan-row + .plan-row {
+    border-block-start: 1px solid var(--line);
+  }
+
+  /* THE GLYPH SITS ON THE FIRST LINE, level with the kind and its count, however many lines the names take. */
+  .plan-row > :global(.icon) {
+    margin-block-start: 4px;
+    color: var(--ink2);
+  }
+
+  .plan-label {
+    font-size: var(--t-sm);
+    line-height: 24px;
+  }
+
+  .plan-n {
+    color: var(--ink);
     font-size: var(--t-md);
     font-weight: 600;
+    line-height: 24px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .plan-names {
+    min-inline-size: 0;
+    padding-block-start: 3px;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .log {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .log-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-block: var(--sp-2);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .log-row + .log-row {
+    border-block-start: 1px solid var(--line);
+  }
+
+  .loud {
     color: var(--ink);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  .versions .log-row[data-yanked] .v {
+    color: var(--dim);
+    text-decoration: line-through;
+  }
+
+  /* A VERSION IS A FIGURE, in tabular figures of the body face and never the identifier face (design-brief §11.4). */
+  .v {
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  .notes {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .facts {
@@ -550,86 +734,39 @@
     grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
     gap: var(--sp-2) var(--sp-4);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink);
     font-size: var(--t-sm);
-    line-height: 1.5;
+    line-height: 18px;
   }
 
   .facts dt {
     color: var(--dim);
-    font-weight: 500;
   }
 
   .facts dd {
     margin: 0;
     min-inline-size: 0;
-  }
-
-  .names,
-  .versions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .names li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .name {
-    color: var(--ink);
-  }
-
-  .small {
-    inline-size: 100%;
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  .loud {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .versions li {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-  }
-
-  .versions li[data-yanked] .v {
-    text-decoration: line-through;
-    color: var(--dim);
-  }
-
-  /* A VERSION IS A FIGURE, in tabular figures of the body face and never the identifier face (design-brief §11.4). */
-  .v {
-    color: var(--ink);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .notes {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .narrow-only {
     display: none;
   }
 
+  @media (width < 900px) {
+    .page {
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
+    }
+  }
+
   @media (width < 640px) {
-    .grid {
-      grid-template-columns: minmax(0, 1fr);
+    /* ON A PHONE THE PLAN'S NAMES GO UNDER THE KIND, so each keeps the width to be read. */
+    .plan-row {
+      grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
+    }
+
+    .plan-names {
+      grid-column: 2 / -1;
     }
 
     .facts {
@@ -645,17 +782,15 @@
       display: none;
     }
 
-    /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the tab bar and the home indicator (`--tabbar`), for as long
-       as the page scrolls: it is last in the page so a sticky bottom holds it there, and settles under the last section.
-       Its bar is the button and a step of space each side, no taller than `--sticky`. */
+    /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the floating tab bar and the home indicator (`--tabbar`),
+       for as long as the page scrolls: it is last in the page so a sticky bottom holds it there, and settles under the
+       last tile. No bar round it: the ink pill is the thing that floats. */
     .narrow-only {
       position: sticky;
       inset-block-end: var(--tabbar, env(safe-area-inset-bottom));
       display: flex;
       inline-size: 100%;
-      padding-block: var(--sp-1);
-      background: var(--bg);
-      border-block-start: 1px solid var(--line-soft);
+      padding-block: var(--sp-2);
     }
 
     .narrow-only > :global(*) {

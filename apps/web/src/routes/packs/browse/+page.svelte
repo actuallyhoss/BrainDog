@@ -12,6 +12,11 @@
 
   A HOST WITH NO KENNEL, OR A RECORD THAT DOES NOT ANSWER, still draws every built-in listing: neither is what browse is
   about, and a signed-out visitor from the site's Install link is shown what there is before being asked to sign in.
+
+  THE LOOK (SYSTEM §5, §6, and the site's catalogue board): the search field and the order are glass in the title row's
+  toolbar, and the sentence under the title says how many there are and how many this record holds already. The
+  categories are a glass segmented control on the ground under it: a row of up to nine chips does not fit a toolbar
+  beside a title, and a toolbar that wraps under itself reads as two toolbars. Then the grid of tiles, 12 apart.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
@@ -27,6 +32,7 @@
   import { choose, type PackState } from '$lib/record/packs.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import ListingCard from '$lib/market/ListingCard.svelte';
   import { chipsOf, categoryName, inCategory } from '$lib/market/categories.ts';
   import { readCounts } from '$lib/market/counts.ts';
@@ -55,6 +61,9 @@
   const shown = $derived(order === 'for-you' && query.trim() !== '' ? inCategory(searched, picked) : ordered(inCategory(searched, picked), order));
   const ORDERS: readonly Order[] = ['for-you', 'installed', 'newest'];
 
+  /* HOW MANY THIS RECORD HOLDS ALREADY, in or turned off or behind an update, once it has answered. */
+  const held = $derived(states ? listings.filter((l) => actionOf(l, states!).kind !== 'install').length : null);
+
   onMount(() => {
     void readHostCatalogue(fetch).then((got) => {
       if (got.ok) kennel = got.index;
@@ -73,29 +82,32 @@
 
 <svelte:head><title>{titleOf(copy.browseTitle)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.browseTitle} />
-
-<div class="page">
-  <div class="field field-lg search">
-    <input class="field-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
-  </div>
-
-  <div class="controls">
-    <div class="chips" role="group" aria-label={words.categoriesLabel}>
-      <button type="button" class="chip" aria-pressed={picked === null} data-on={picked === null ? '' : undefined} onclick={() => (category = null)}>
-        {words.all}<span class="n">{searched.length}</span>
-      </button>
-      {#each chips as c (c.category)}
-        <button type="button" class="chip" aria-pressed={picked === c.category} data-on={picked === c.category ? '' : undefined} onclick={() => (category = picked === c.category ? null : c.category)}>
-          {c.name}<span class="n">{c.count}</span>
-        </button>
-      {/each}
+<PageHead icon="packs" title={copy.browseTitle} sentence={words.sentence(listings.length, held)}>
+  {#snippet actions()}
+    <div class="find">
+      <Icon name="search" size="m" />
+      <input class="find-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
     </div>
     <div class="segmented order" role="group" aria-label={words.orderLabel}>
       {#each ORDERS as o (o)}
         <button type="button" class="segment" aria-pressed={order === o} data-on={order === o ? '' : undefined} onclick={() => (order = o)}>{words.orders[o]}</button>
       {/each}
     </div>
+  {/snippet}
+</PageHead>
+
+<div class="page">
+  <!-- THE CATEGORIES, EACH WITH ITS COUNT: one glass segmented control on the ground, which wraps rather than hiding a
+       chip past its edge. -->
+  <div class="segmented chips" role="group" aria-label={words.categoriesLabel}>
+    <button type="button" class="segment chip" aria-pressed={picked === null} data-on={picked === null ? '' : undefined} onclick={() => (category = null)}>
+      {words.all}<span class="n">{searched.length}</span>
+    </button>
+    {#each chips as c (c.category)}
+      <button type="button" class="segment chip" aria-pressed={picked === c.category} data-on={picked === c.category ? '' : undefined} onclick={() => (category = picked === c.category ? null : c.category)}>
+        {c.name}<span class="n">{c.count}</span>
+      </button>
+    {/each}
   </div>
 
   {#if kennelRefused}<Empty kind="error" title={kennelRefused} />{/if}
@@ -105,7 +117,7 @@
   {#if shown.length === 0}
     <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />
   {:else}
-    <ul class="grid">
+    <ul class="catalogue">
       {#each shown as l (l.key)}
         {@const u = l.kind === 'usecase' && l.source === 'bundled' ? useCase(l.id) : undefined}
         {@const action = states ? actionOf(l, states) : null}
@@ -131,105 +143,137 @@
     min-inline-size: 0;
   }
 
-  .search {
-    inline-size: 100%;
-    max-inline-size: 40rem;
-  }
-
-  .controls {
+  /**
+   * THE SEARCH FIELD IN THE TOOLBAR: a field (the `--r-md` corner, the search glyph, 36 tall and 44 under a thumb) in
+   * the toolbar's glass rather than the field's `--s1`, because it sits on the ground with the other toolbar controls
+   * (SYSTEM §5). Its focus is the field's ring, on the wrapper.
+   */
+  .find {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  /* THE CHIPS SCROLL SIDEWAYS IN THEIR OWN ROW, so the page never does at 390px. */
-  .chips {
-    display: flex;
-    flex: 1 1 20rem;
     gap: var(--sp-2);
-    min-inline-size: 0;
-    overflow-x: auto;
-    padding-block: var(--sp-1);
-    scrollbar-width: none;
-    /* THE CLIPPED EDGE FADES, as `.table-region` does, so a row of chips that runs on says so. A mask reads only alpha,
-       so the opaque stop is any token. */
-    mask-image: linear-gradient(to right, var(--ink) calc(100% - var(--sp-6)), transparent);
+    box-sizing: border-box;
+    inline-size: 18rem;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-md);
+    box-shadow: var(--glass-edge);
+    color: var(--dim);
   }
 
-  /* A CHOICE CHIP: a pill with an `--edge` border, and ink when chosen (design-brief §4); the ring is the shared one. */
+  .find:focus-within {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+  }
+
+  .find-input {
+    flex: 1;
+    align-self: stretch;
+    min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+    padding: 0;
+    background: none;
+    border: 0;
+    appearance: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+  }
+
+  .find-input:focus-visible {
+    /* focus-ok: `.find:focus-within` above draws the ring on the wrapper, as a field's does. */
+    outline: none;
+  }
+
+  .find-input::placeholder {
+    color: var(--dim);
+  }
+
+  .find-input::-webkit-search-cancel-button {
+    appearance: none;
+    display: none;
+  }
+
+  /* IN THE COMPACT BAR THE TOOLBAR DROPS ITS OWN GLASS, as the bar's buttons do: the bar is glass, and glass never holds
+     glass. Only where the bar is drawn, from 900px up. */
+  @media (width >= 900px) {
+    :global(.head[data-under]) .find,
+    :global(.head[data-under]) .order {
+      background: var(--hover-wash);
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  .chips {
+    align-self: start;
+  }
+
   .chip {
     display: inline-flex;
-    flex: none;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-pill);
-    background: none;
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
     white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .chip[data-on] {
-    border-color: var(--on);
-    background: var(--on);
-    color: var(--on-ink);
   }
 
   .n {
-    color: inherit;
-    font-size: var(--t-xs);
+    color: var(--dim);
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
 
   .count {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
-  /* ONE COLUMN OF CARDS ON A PHONE, TWO FROM 640PX AND THREE FROM 900PX (design.md DSN-17), set by the breakpoints
-     rather than by a card's least width, so the count is the same at 390 and at 1440 whatever the rail takes. */
-  .grid {
+  /* ONE COLUMN OF TILES ON A PHONE, TWO FROM 640PX AND THREE FROM 900PX, 12 apart (SYSTEM §4), set by the breakpoints
+     rather than by a tile's least width, so the count is the same at 390 and at 1440 whatever the rail takes. */
+  .catalogue {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-6) var(--sp-5);
+    gap: 12px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   @media (pointer: coarse) {
-    .chip {
+    .find,
+    .find-input {
       min-block-size: var(--tap);
+    }
+
+    .find-input {
+      font-size: var(--t-md);
     }
   }
 
-  @media (width < 640px) {
-    .search {
-      max-inline-size: none;
+  /* ON A PHONE THE FIELD TAKES THE TOOLBAR'S WHOLE LINE and the order the next, each as wide as the screen allows. */
+  @media (width < 900px) {
+    .page {
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    .order {
-      inline-size: 100%;
+    .find {
+      flex: 1 1 100%;
+      inline-size: auto;
     }
   }
 
   @media (width >= 640px) {
-    .grid {
+    .catalogue {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (width >= 900px) {
-    .grid {
+    .catalogue {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }

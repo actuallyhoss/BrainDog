@@ -12,8 +12,15 @@
   import { copy } from '$lib/copy.ts';
   import { VOICE_LINES } from '$lib/voice.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import { words } from '$lib/market/words.ts';
 
   let { preview, large = false }: { preview: Preview; large?: boolean } = $props();
+
+  /* SMALL, THE HOME IS ITS FIRST FEW HEADINGS AND HOW MANY MORE, so a card is a thumbnail and not a column of lines,
+     and a grid of them keeps its rows near one height. Large, it is every heading. */
+  const MOST = 4;
+  const headings = $derived(large ? preview.home : preview.home.slice(0, MOST));
+  const rest = $derived(preview.home.length - headings.length);
 </script>
 
 <div class="preview" data-large={large ? '' : undefined} aria-hidden="true">
@@ -32,9 +39,10 @@
   <div class="mini-home">
     <span class="mini-h">{copy.browseHome}</span>
     <span class="mini-title">{preview.spine.home ?? copy.home}</span>
-    {#each preview.home as heading, i (i)}
+    {#each headings as heading, i (i)}
       <span class="mini-block">{'voice' in heading ? (heading.text ?? VOICE_LINES[heading.voice]) : heading.text}</span>
     {/each}
+    {#if rest > 0}<span class="mini-block mini-more">{words.moreLines(rest)}</span>{/if}
     {#if preview.home.length === 0}<span class="mini-empty">{copy.browseHouseHome}</span>{/if}
     {#if preview.lists.length > 0}
       <span class="mini-h lists-h">{copy.browseLists}</span>
@@ -48,7 +56,8 @@
   .preview {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .mini-rail,
@@ -89,19 +98,21 @@
   .mini-block {
     overflow: hidden;
     padding-block: var(--sp-1);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--line);
     color: var(--ink2);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .mini-empty,
-  .mini-lists {
+  .mini-lists,
+  .mini-more {
     color: var(--dim);
   }
 
-  /* LARGE, IT IS A SURFACE OF ITS OWN (nothing holds it), with the rail beside the Home from 640px and above it on a
-     phone, where two columns would halve each. */
+  /* LARGE, IT IS DRAWN ON ITS OWN GROUND: a `--sunk` well inside the tile that holds it, the way the app's ground sits
+     under its rail and its Home, with the rail beside the Home from 640px and above it on a phone, where two columns
+     would halve each. */
   .preview[data-large] {
     gap: var(--sp-5);
     padding: var(--sp-4);

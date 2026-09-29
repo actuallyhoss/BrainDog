@@ -9,13 +9,19 @@
 
   A `Sheet`: a drawer from 640px up, and below it a bottom sheet with its sections as rows and the buttons pinned in its
   footer. `extra` is a question the install asks beside the plan, a use case's voice, drawn above the buttons.
+
+  THE LOOK (SYSTEM §6): the sheet is a tile's surface, so nothing in it is a box. Each thing the plan does is a group
+  with an icon well, its title and its count, and its rows under it with hairlines between them, the way a list sits on
+  the ground. What stops it leads, with the danger well and its title in the danger ink: it is the one thing on the
+  sheet that needs him before anything else can happen.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { estimateOf } from '../record/actions.ts';
   import Sheet from '../ui/Sheet.svelte';
   import Button from '../ui/Button.svelte';
-  import Icon from '../ui/Icon.svelte';
+  import IconWell from '../ui/IconWell.svelte';
+  import type { IconName } from '../ui/icons.ts';
   import { sheetOf, words } from './plan.ts';
 
   let {
@@ -45,6 +51,25 @@
   const several = $derived((sheet?.parts.length ?? 0) > 1);
 
   let open = $state(true);
+
+  /** The glyph each thing a plan does is drawn with, so the sheet reads by its pictures before its words. */
+  const GLYPHS: Readonly<Record<string, IconName>> = {
+    adds: 'plus',
+    changes: 'edit',
+    retires: 'archive',
+    moves: 'arrow',
+    kept: 'check',
+    stays: 'lock',
+    extends: 'rows',
+    'page-adds': 'doc',
+    settings: 'settings',
+    examples: 'rows',
+    spawns: 'skill',
+    interrupts: 'bell',
+    worth: 'info',
+    'turns-on': 'play',
+  };
+  const glyphOf = (key: string): IconName => GLYPHS[key] ?? 'info';
 </script>
 
 {#if sheet}
@@ -53,8 +78,8 @@
       {#if sheet.summary}<p class="plan-summary">{sheet.summary}</p>{/if}
 
       {#if sheet.stops.length > 0}
-        <section class="plan-stops" role="alert" aria-labelledby="plan-stops-h">
-          <h3 class="plan-h" id="plan-stops-h"><Icon name="alert" size="s" />{words.stops}</h3>
+        <section class="plan-group plan-stops" role="alert" aria-labelledby="plan-stops-h">
+          <h3 class="plan-h" id="plan-stops-h"><IconWell name="alert" tone="danger" /><span class="plan-title">{words.stops}</span></h3>
           <ul class="plan-rows">
             {#each sheet.stops as stop, i (i)}<li class="plan-row"><span class="plan-text">{stop}</span></li>{/each}
           </ul>
@@ -70,8 +95,8 @@
             </h3>
           {/if}
           {#each part.sections as s (s.key)}
-            <div class="plan-section">
-              <h4 class="plan-h">{s.title}</h4>
+            <div class="plan-group">
+              <h4 class="plan-h"><IconWell name={glyphOf(s.key)} /><span class="plan-title">{s.title}</span><span class="plan-count num">{s.rows.length}</span></h4>
               <ul class="plan-rows">
                 {#each s.rows as r, i (i)}
                   <li class="plan-row">
@@ -86,8 +111,8 @@
       {/each}
 
       {#if calls.length > 0}
-        <section class="plan-part" aria-labelledby="plan-calls-h">
-          <h3 class="plan-h" id="plan-calls-h">{words.calls}</h3>
+        <section class="plan-group" aria-labelledby="plan-calls-h">
+          <h3 class="plan-h" id="plan-calls-h"><IconWell name="globe" /><span class="plan-title">{words.calls}</span><span class="plan-count num">{calls.length}</span></h3>
           <ul class="plan-rows">
             {#each calls as c, i (i)}
               <li class="plan-row">
@@ -118,9 +143,9 @@
   .plan {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    font-size: var(--t-sm);
-    line-height: 1.5;
+    gap: var(--sp-5);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .plan-summary {
@@ -128,23 +153,16 @@
     color: var(--ink2);
   }
 
-  /* WHAT STOPS IT IS READ FIRST, and it is the one red thing on the sheet: red means refused (design.md D-1). */
-  .plan-stops {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    padding: var(--sp-3);
-    border: 1px solid var(--danger);
-    border-radius: var(--r-md);
-    color: var(--danger);
-  }
-
+  /* ONE PACK'S PART OF A PLAN THAT HAS SEVERAL: its name over its groups, a hairline above every part after the first. */
   .plan-part {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line-soft);
+    gap: var(--sp-5);
+  }
+
+  .plan-part + .plan-part {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
   }
 
   .plan-part-h {
@@ -153,20 +171,22 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: 0;
-    font-family: var(--font-ui);
-    font-size: var(--t-ui);
-    font-weight: 600;
     color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
   }
 
   .plan-move {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
 
-  .plan-section {
+  /* A GROUP: its heading row (a well, the title at the row size and 600, the count in the quiet ink), then its rows. */
+  .plan-group {
     display: flex;
     flex-direction: column;
     gap: var(--sp-1);
@@ -175,31 +195,51 @@
   .plan-h {
     display: flex;
     align-items: center;
-    gap: var(--sp-1);
-    margin: 0;
+    gap: var(--sp-3);
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--t-row);
     font-weight: 600;
-    color: var(--dim);
+    line-height: 20px;
   }
 
-  .plan-stops .plan-h {
+  .plan-title {
+    min-inline-size: 0;
+  }
+
+  .plan-count {
+    color: var(--dim);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* WHAT STOPS IT: the danger well and the danger ink on its title. The rows stay ink, so a long refusal is read at full
+     contrast rather than as a block of red. */
+  .plan-stops .plan-title {
     color: var(--danger);
   }
 
+  /* THE ROWS UNDER A HEADING, set in from its edge by the well and its gap, a hairline between two. */
   .plan-rows {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
     margin: 0;
     padding: 0;
+    padding-inline-start: calc(var(--well) + var(--sp-3));
     list-style: none;
   }
 
   .plan-row {
     display: flex;
     flex-direction: column;
+    gap: 2px;
     min-inline-size: 0;
+    padding-block: var(--sp-2);
+  }
+
+  .plan-row + .plan-row {
+    border-block-start: 1px solid var(--line);
   }
 
   .plan-text {
@@ -207,32 +247,44 @@
     overflow-wrap: anywhere;
   }
 
-  .plan-stops .plan-text {
-    color: var(--danger);
-  }
-
   .plan-detail {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
     overflow-wrap: anywhere;
   }
 
   .plan-change {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   .plan-note {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .plan-group .plan-note {
+    padding-inline-start: calc(var(--well) + var(--sp-3));
   }
 
   .plan-extra {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  /* ON A PHONE THE ROWS TAKE THE WHOLE WIDTH: the well stays at the heading, and the words under it keep the room. */
+  @media (width < 640px) {
+    .plan-rows,
+    .plan-group .plan-note {
+      padding-inline-start: 0;
+    }
   }
 </style>

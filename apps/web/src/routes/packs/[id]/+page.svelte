@@ -9,6 +9,10 @@
   default. Nothing installed changes: the record fills `{{config:}}` when the add-on is next installed
   or updated, and that is the one sentence this screen says. An add-on that declares no settings
   draws no settings section.
+
+  THE LOOK (SYSTEM §5, §6): what the add-on does is the title row's sentence and its switch is in the toolbar. The form
+  is a group on the ground, each setting's label above its 40px field (a switch sits beside its label, as a switch
+  does). Exchange rates are a tile of their own, and what the add-on added is a list of rows with their icon wells.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -25,6 +29,9 @@
   import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import { TONES } from 'braindog-render';
+  import Tile from '$lib/ui/Tile.svelte';
   import { HOME_CURRENCY_SETTING } from '@braindog/kernel';
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
@@ -304,7 +311,7 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon="packs" kicker={copy.packs} back="/packs" title={name}>
+  <PageHead icon="packs" kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
     {#snippet actions()}
       {#if installed}
         <button
@@ -321,10 +328,9 @@
   </PageHead>
 
   <div class="page">
-    <!-- WHAT IT DOES, THEN WHICH VERSION AND WHETHER IT IS ON: the head's switch says the state to a screen reader, and
-         this line says it in words, so off is never colour alone. -->
+    <!-- WHICH VERSION AND WHETHER IT IS ON, under the sentence that says what it does: the head's switch says the state
+         to a screen reader, and this line says it in words, so off is never colour alone. -->
     <div class="lead">
-      {#if pack}<p class="blurb">{pack.blurb}</p>{/if}
       <p class="about">
         {#if settings.version}<span class="num">{market.versionOf(settings.version)}</span>{/if}
         {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
@@ -345,7 +351,7 @@
             <!-- THE ONE USE CASE ON SPEAKS whatever `speaks` holds, which is written down only once two are on. -->
             {@const only = key === SPEAKS && alone}
             {#if d}
-              <div class="setting">
+              <div class="setting" data-kind={decl.type === 'bool' ? 'switch' : undefined}>
                 {#if decl.type === 'bool' || segmented || isList(decl)}
                   <span class="setting-label" id="set-{key}-label">{label}</span>
                 {:else}
@@ -502,7 +508,7 @@
 
                 {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
                 {#if decl.note}<p class="setting-note">{decl.note}</p>{/if}
-                {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad">{why}</p>{/if}
+                {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
               </div>
             {/if}
           {/each}
@@ -514,7 +520,7 @@
             {/if}
           </div>
           <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-          <p class="setting-said" role="status" data-intent={fix && !besideField ? 'bad' : undefined}>{fix && !besideField ? fix : ''}</p>
+          <p class="setting-said" role="status" data-intent={fix && !besideField ? 'bad' : undefined}>{#if fix && !besideField}<span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{fix}{/if}</p>
         </form>
       </Section>
       {#if HOME_CURRENCY_SETTING in settings.config}
@@ -522,12 +528,14 @@
              This page drew a form written for one pack, which it imported by name; now it links to the same sheet
              every scheduled action is made on, filled in for a rate. It stays offered once one is set up, because each
              currency is an action of its own and a second currency is the same press again. -->
-        <Section title={copy.ratesHeading}>
+        <!-- A TILE, AND NO CHART IN IT: the rates are fetched by an action, and until one runs there is no rate here to
+             draw. It is a control tile, which SYSTEM §6 allows to hold no figure. -->
+        <Tile icon="money" title={copy.ratesHeading}>
           <p class="rates-why">{copy.ratesWhy}</p>
           <div class="settings-actions">
             <Button weight="quiet" href={at('/automations?new=action&preset=rates')}>{copy.ratesSetUp}</Button>
           </div>
-        </Section>
+        </Tile>
       {/if}
     {:else}
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
@@ -544,24 +552,23 @@
     {/if}
     {#if pack && (pack.registers.length || pack.pages.length)}
       <Section title={copy.installDiff} count={pack.registers.length + pack.pages.length}>
-        <ul class="ledger ledger-glyph">
+        <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it (SYSTEM §6, Rows). -->
+        <ul class="ledger">
           {#each pack.registers as r (r)}
             <li>
-              <a class="line" href={at(`/r/${r}`)}>
-                <span class="seq"><Icon name="rows" size="s" /></span>
-                <span class="line-main"><span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? r}</span></span>
-                <span class="line-amount"></span>
-                <span class="line-when"></span>
+              <a class="line added" href={at(`/r/${r}`)}>
+                <span class="line-mark"><IconWell name="rows" size="l" /></span>
+                <span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? r}</span>
+                <span class="added-go"><Icon name="chevron" size="s" /></span>
               </a>
             </li>
           {/each}
           {#each pack.pages as p (p)}
             <li>
-              <a class="line" href={at(`/p/${p}`)}>
-                <span class="seq"><Icon name="doc" size="s" /></span>
-                <span class="line-main"><span class="line-title">{PAGES[p]?.title ?? p}</span></span>
-                <span class="line-amount"></span>
-                <span class="line-when"></span>
+              <a class="line added" href={at(`/p/${p}`)}>
+                <span class="line-mark"><IconWell name="doc" size="l" /></span>
+                <span class="line-title">{PAGES[p]?.title ?? p}</span>
+                <span class="added-go"><Icon name="chevron" size="s" /></span>
               </a>
             </li>
           {/each}
@@ -575,9 +582,9 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 820px;
+    gap: var(--sp-6);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    max-inline-size: calc(var(--measure) + 2 * var(--gutter));
   }
 
   .lead {
@@ -586,11 +593,8 @@
     gap: var(--sp-1);
   }
 
-  .blurb {
-    max-inline-size: 62ch;
-    color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.6;
+  .lead:not(:has(:not(:empty))) {
+    display: none;
   }
 
   /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
@@ -601,6 +605,7 @@
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .about:empty,
@@ -617,35 +622,56 @@
   .settings {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-5);
   }
 
   .when {
+    margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .rates-why {
     max-inline-size: 62ch;
-    margin-block: 0 var(--sp-3);
-    margin-inline: 0;
+    margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
+    line-height: 20px;
     text-wrap: pretty;
   }
 
-  /* The label in a column of its own, so a form of seven reads down one edge. */
+  /* ONE SETTING: its label above its control (SYSTEM §6, Fields), its note and any refusal under it. */
   .setting {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-inline-size: 0;
+  }
+
+  /* A SWITCH SITS BESIDE ITS LABEL, the way a switch reads everywhere else, with its note under both. */
+  .setting[data-kind='switch'] {
     display: grid;
-    grid-template-columns: minmax(12ch, 18ch) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-1) var(--sp-4);
+    column-gap: var(--sp-4);
+  }
+
+  .setting[data-kind='switch'] > :not(.setting-label, .setting-control) {
+    grid-column: 1 / -1;
   }
 
   .setting-label {
     color: var(--ink2);
-    font-size: var(--t-ui);
+    font-size: var(--t-sm);
     font-weight: 500;
+    line-height: 18px;
+  }
+
+  .setting[data-kind='switch'] .setting-label {
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .setting-control {
@@ -653,6 +679,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
   .setting-field {
@@ -662,11 +689,6 @@
 
   .setting-number {
     flex: 0 1 12ch;
-  }
-
-  /* A LIST'S LINES STACK, each box beside its Remove, and the label sits level with the first line. */
-  .setting:has(.setting-lines) {
-    align-items: start;
   }
 
   .setting-lines {
@@ -689,31 +711,42 @@
     font-size: var(--t-sm);
   }
 
+  /* A SELECT OR A DATE IS A FIELD: the `--s1` well, no border, the `--r-md` corner, 40 tall and 44 under a thumb. The
+     house chevron is `controls.css`'s. */
   .setting-select {
-    min-block-size: var(--ctl-h);
+    min-block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
+    background-color: var(--s1);
+    border: 0;
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
   }
 
   .setting-note,
   .setting-why {
-    grid-column: 2;
     margin: 0;
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .setting-note {
     color: var(--dim);
   }
 
+  /* A REFUSAL BESIDE ITS FIELD: its dot in the danger fill and its words in ink (a tone is its glyph, never colour). */
+  .setting-why,
+  .setting-said {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink);
+  }
+
   .setting-said {
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
   }
 
   .setting-said:empty {
@@ -727,23 +760,30 @@
     gap: var(--sp-3);
   }
 
-  /* A SWITCH, AND ITS TARGET IS THE CONTROL'S HEIGHT ON BOTH AXES: 44px on a coarse pointer. */
-  /* The switch is the shared one in `controls.css`. */
+  /* A ROW OF WHAT IT ADDED: its well, its name, and the chevron that says it opens (SYSTEM §6, Rows). */
+  .added {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    column-gap: var(--sp-3);
+  }
 
-  @media (width < 640px) {
-    .setting {
-      grid-template-columns: minmax(0, 1fr);
-    }
+  .added-go {
+    display: inline-grid;
+    color: var(--dim);
+  }
 
-    .setting-note,
-    .setting-why {
-      grid-column: 1;
+  .added-go:dir(rtl) {
+    scale: -1 1;
+  }
+
+  @media (pointer: coarse) {
+    .setting-select {
+      min-block-size: var(--tap);
     }
   }
 
   @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+    .added {
+      min-block-size: 60px;
     }
   }
 </style>

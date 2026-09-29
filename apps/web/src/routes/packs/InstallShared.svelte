@@ -186,10 +186,12 @@
   }
 </script>
 
+<!-- ONE COLUMN, THREE WAYS IN, each a label above its field and a quiet pill to read it (SYSTEM §6, Fields). The one
+     primary is the plan sheet's Approve, so nothing here is ink. -->
 <div class="from">
   <p class="from-blurb">{words.fromBlurb}</p>
   <div class="from-row">
-    <Button weight="quiet" disabled={busy || !client} onclick={() => picker?.click()}><Icon name="download" size="s" />{copy.chooseFile}</Button>
+    <Button disabled={busy || !client} onclick={() => picker?.click()}><Icon name="download" size="s" />{copy.chooseFile}</Button>
     <input bind:this={picker} class="from-pick" type="file" accept=".json,application/json" tabindex="-1" aria-hidden="true" onchange={(e) => fromFile(e.currentTarget.files?.[0])} />
   </div>
   <form
@@ -200,9 +202,11 @@
     }}
   >
     <label class="field-label" for="from-address">{words.address}</label>
-    <div class="field from-field"><input id="from-address" class="field-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" aria-describedby="from-address-hint" bind:value={address} /></div>
+    <div class="from-line">
+      <div class="field from-field"><input id="from-address" class="field-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" aria-describedby="from-address-hint" bind:value={address} /></div>
+      <Button type="submit" disabled={busy || !client || address.trim() === ''}>{busy ? words.reading : words.read}</Button>
+    </div>
     <p class="from-hint" id="from-address-hint">{words.addressHint}</p>
-    <Button weight="bare" type="submit" disabled={busy || !client || address.trim() === ''}>{busy ? words.reading : words.read}</Button>
   </form>
   <form
     class="from-paste"
@@ -212,8 +216,8 @@
     }}
   >
     <label class="field-label" for="from-paste">{words.paste}</label>
-    <textarea id="from-paste" class="field-input from-text" rows="6" spellcheck="false" bind:value={pasted}></textarea>
-    <Button weight="bare" type="submit" disabled={busy || !client || pasted.trim() === ''}>{words.readPasted}</Button>
+    <textarea id="from-paste" class="from-text" rows="6" spellcheck="false" bind:value={pasted}></textarea>
+    <Button type="submit" disabled={busy || !client || pasted.trim() === ''}>{words.readPasted}</Button>
   </form>
   {#if said}<p class="from-said" role="status" title={said.code ? copy.refusalCode(said.code) : undefined}>{said.fix}</p>{/if}
   {#if filed !== null}<p class="from-said" role="status">{words.asked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{words.openDecide}</a>{/if}</p>{/if}
@@ -247,15 +251,15 @@
   .from {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    max-inline-size: 62ch;
+    gap: var(--sp-5);
+    max-inline-size: var(--measure);
   }
 
   .from-blurb {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.6;
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .from-row {
@@ -278,23 +282,48 @@
     min-inline-size: 0;
   }
 
-  .from-field {
+  .from-address .field-label,
+  .from-paste .field-label {
+    margin: 0;
+  }
+
+  /* THE ADDRESS AND ITS PILL ON ONE LINE, the field taking what the pill leaves; on a phone the pill wraps under it. */
+  .from-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
     inline-size: 100%;
   }
 
-  /* THE PASTE BOX IS FULL WIDTH at every size, and a file is long, so it grows with what is pasted up to a screen. */
+  .from-field {
+    flex: 1 1 16rem;
+    min-inline-size: 0;
+  }
+
+  /**
+   * THE PASTE BOX IS A FIELD, the same `--s1` well with no border and the `--r-md` corner, full width at every size and
+   * growing with what is pasted. Its focus is the field's: the 2px ink ring offset 2.
+   */
   .from-text {
+    box-sizing: border-box;
     inline-size: 100%;
     min-block-size: 8lh;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
     font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    line-height: 18px;
     resize: vertical;
   }
 
   .from-hint {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .from-said {
@@ -317,14 +346,17 @@
 
   .from-legend {
     margin-block-end: var(--sp-1);
-    font-weight: 600;
+    color: var(--ink);
     font-size: var(--t-sm);
+    font-weight: 600;
   }
 
   .from-pick-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-2);
+    min-block-size: var(--tap);
+    color: var(--ink);
     font-size: var(--t-sm);
   }
 </style>

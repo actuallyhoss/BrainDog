@@ -69,7 +69,7 @@ export const words = {
   requiresNothing: 'Nothing else',
   licence: 'Licence',
   pages: 'Its pages',
-  noPreview: 'No drawing of its pages yet. Its lists and pages are named below.',
+  noPreview: 'No drawing of its pages yet. What it adds names each one.',
   previewRefused: 'This drawing could not be read.',
   yanked: (reason: string): string => `Taken back: ${reason}`,
   install: (title: string): string => `Install ${title}`,
@@ -92,4 +92,20 @@ export const words = {
   /* AN INSTALLED ADD-ON ON /packs AND ITS OWN PAGE (design.md §4, the add-ons row): one row, its switch, one "…". */
   more: (name: string): string => `More for ${name}`,
   versionOf: (version: string): string => `Version ${version}`,
+  /* A CARD'S COUNTS, the board's "1 list · 1 page · 1 rule", each beside its glyph. */
+  countLists: (n: number): string => (n === 1 ? '1 list' : `${n} lists`),
+  countPages: (n: number): string => (n === 1 ? '1 page' : `${n} pages`),
+  countRules: (n: number): string => (n === 1 ? '1 rule' : `${n} rules`),
+  countHosts: (n: number): string => (n === 1 ? 'Calls 1 host' : `Calls ${n} hosts`),
+  /* THE BROWSE TITLE ROW'S SENTENCE (SYSTEM §5): how many there are, and how many this record holds already. */
+  sentence: (n: number, held: number | null): string =>
+    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from; ${held} ${held === 1 ? 'is' : 'are'} already in your record.`,
+  /* THE DETAIL PAGE'S PLAN: the row that names every host it calls, and the tail of a row that names more than fit. */
+  calledHosts: 'Hosts it calls',
+  andMore: (n: number): string => `and ${n} more`,
+  /* A SMALL DRAWING'S LAST LINE, when a Home has more headings than a card draws. */
+  moreLines: (n: number): string => `${n} more`,
+  /* WHAT A USE CASE BRINGS BESIDE ITS OWN LISTS: the modules it turns on, by name. */
+  brings: (names: readonly string[]): string =>
+    `With ${names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`}`,
 } as const;

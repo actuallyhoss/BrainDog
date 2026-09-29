@@ -9,6 +9,8 @@
  * where the record says what it will and will not take, and this is only the summary above it.
  */
 
+import { ruleName } from '@braindog/seed/usecases/names';
+
 import { words } from './words.ts';
 
 type Body = Record<string, unknown>;
@@ -23,6 +25,16 @@ export type Adds = {
 
 const isMap = (v: unknown): v is Body => typeof v === 'object' && v !== null && !Array.isArray(v);
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/**
+ * A LIST IS A DECLARATION THAT NAMES A `register` AND IS NOTHING ELSE. A rule, a script or a pattern names the list it
+ * acts on with `register` too, and read as a list it was counted twice over: Money's page said sixteen lists, five of
+ * them its rules under their lists' ids, and said none of its rules (the reading `@braindog/seed/packs/modules` makes).
+ */
+const isList = (d: Body): boolean => typeof d.register === 'string' && typeof d.rule !== 'string' && typeof d.script !== 'string' && typeof d.ingest !== 'string';
+
+/** A list with no name of its own, by its id in words: `bank_lines` is "Bank lines". */
+const idWords = (id: string): string => (id.charAt(0).toUpperCase() + id.slice(1)).replaceAll('_', ' ');
 
 /** The document's declarations wherever it keeps them: a pack's own, or a use case file's `pack`. */
 function declarationsOf(doc: unknown): { declarations: Body[]; seeds: number } {
@@ -52,18 +64,24 @@ function windowOf(w: unknown): string | null {
 export function namesOf(doc: unknown): Map<string, string> {
   const names = new Map<string, string>();
   for (const d of declarationsOf(doc).declarations) {
-    if (typeof d.register === 'string') {
-      const name = str(d.name) || d.register;
-      names.set(d.register, name).set(`register.${d.register}`, name);
+    if (isList(d)) {
+      const id = str(d.register);
+      const name = str(d.name) || idWords(id);
+      names.set(id, name).set(`register.${id}`, name);
     } else if (typeof d.page === 'string') names.set(d.page, str(d.title) || d.page).set(`page.${d.page}`, str(d.title) || d.page);
     else if (typeof d.metric === 'string') names.set(d.metric, str(d.name) || d.metric).set(`metric.${d.metric}`, str(d.name) || d.metric);
   }
   return names;
 }
 
-/** A rule as a sentence: its own name when it has one, else what starts it. */
+/**
+ * A rule as a sentence: its own name when it has one, else the name this build gives a first-party rule ("Chase late
+ * payments", as the plan sheet says it), else what starts it.
+ */
 function ruleOf(d: Body, names: ReadonlyMap<string, string>): string {
   if (str(d.name) !== '') return str(d.name);
+  const known = ruleName(str(d.rule));
+  if (known) return known;
   const on = isMap(d.on) ? d.on : {};
   const written = isMap(on.written) ? on.written : null;
   if (written) return words.ruleWritten(names.get(str(written.register)) ?? str(written.register));
@@ -77,12 +95,13 @@ export function addsOf(doc: unknown): Adds {
   const names = namesOf(doc);
   const out: Adds = { lists: [], pages: [], figures: [], rules: [], examples: seeds };
   for (const d of declarations) {
-    if (typeof d.register === 'string') {
+    if (typeof d.rule === 'string') out.rules.push(ruleOf(d, names));
+    else if (isList(d)) {
+      const id = str(d.register);
       const fields = Array.isArray(d.fields) ? d.fields.filter(isMap).map((f) => str(f.label) || str(f.id)).filter((f) => f !== '') : [];
-      out.lists.push({ id: d.register, name: names.get(d.register) ?? d.register, fields });
+      out.lists.push({ id, name: names.get(id) ?? idWords(id), fields });
     } else if (typeof d.page === 'string') out.pages.push({ id: d.page, title: names.get(d.page) ?? d.page });
     else if (typeof d.metric === 'string') out.figures.push({ id: d.metric, name: names.get(d.metric) ?? d.metric, target: targetOf(d.target), window: windowOf(d.window) });
-    else if (typeof d.rule === 'string') out.rules.push(ruleOf(d, names));
   }
   return out;
 }

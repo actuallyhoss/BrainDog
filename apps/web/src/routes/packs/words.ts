@@ -6,10 +6,37 @@
  * PLAIN NODE LOADS THIS FILE, because `sharing.ts` reads it and a test reads `sharing.ts`.
  */
 
+/** "a", "a and b", "a, b and c". */
+const joined = (parts: readonly string[]): string =>
+  parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+
+const counted = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+
 export const words = {
   tabsLabel: 'Add-ons',
   tabs: { installed: 'Installed', updates: 'Updates', from: 'Install from…' },
   browse: 'Browse add-ons',
+  /* THE TITLE ROW'S SENTENCE (SYSTEM §5). An update is never urgent, so no phrase in it is red. `updates` is `null`
+     while the newer versions are still being looked for, and the sentence then says only what is installed. */
+  sentence: (installed: number, updates: number | null): string => {
+    const head = counted(installed, 'add-on installed', 'add-ons installed');
+    if (installed === 0) return '';
+    if (updates === null) return `${head}.`;
+    if (updates === 0) return installed === 1 ? `${head}, and it is up to date.` : `${head}, and every one is up to date.`;
+    return `${head}, and ${updates.toLocaleString('en-GB')} ${updates === 1 ? 'has an update' : 'have an update'}.`;
+  },
+  /* WHAT THE INSTALLED ADD-ONS HOLD, the tile over the list: its parts on the chart, then the one line reading it. */
+  holdsTitle: 'What your add-ons hold',
+  holdsLists: (n: number) => counted(n, 'list', 'lists'),
+  holdsPages: (n: number) => counted(n, 'page', 'pages'),
+  holdsRules: (n: number) => counted(n, 'rule', 'rules'),
+  holds: (parts: readonly string[], alone: boolean, largest: string | null): string =>
+    alone
+      ? `It keeps ${joined(parts)}.`
+      : `Between them they keep ${joined(parts)}${largest ? `; ${largest} is the largest` : ''}.`,
+  /* THE LIST'S OWN HEADING, and the updates' when that tab is open. */
+  installedTitle: 'Installed',
+  updatesTitle: 'Updates',
   /* UPDATES. */
   updatesNone: 'Everything is up to date',
   updatesNoneBody: 'A newer version of anything installed here shows up in this list, with its plan.',

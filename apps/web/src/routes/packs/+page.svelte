@@ -12,6 +12,13 @@
 
   BROWSING IS `/packs/browse`. This screen used to list what could still be installed under what was, with a guess at
   what each would add; the plan now comes from the record, so it is read where the listing is.
+
+  THE LOOK (SYSTEM §5, §6): the three tabs are a glass segmented control in the title row's toolbar, beside Browse, and
+  the sentence under the title says how many are installed and how many have an update, in ink (an update is never
+  urgent). Installed leads with one tile, what the add-ons hold between them as a stacked bar of lists, pages and rules
+  with its reading line; then the add-ons themselves as 56px rows on the ground, each with its icon well, its switch,
+  and its "…" on hover. The counts are read from each add-on's own document (`$lib/market/adds.ts`), the reader the
+  plan sheet's summary uses, and a list is counted from what the record says the add-on holds.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -19,6 +26,7 @@
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import type { CatalogueEntry, CatalogueIndex, CatalogueUpdate, Trust } from '@braindog/declare/catalogue';
+  import { useCase } from '@braindog/seed/usecases';
   import { builtInFile } from '@braindog/seed/usecases/share';
   import { moduleName, ruleName } from '@braindog/seed/usecases/names';
   /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists, read off each one's own manifest and document. It
@@ -32,8 +40,9 @@
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import { METRICS } from '$lib/record/declared.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import { blocked, choose, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
+  import { blocked, choose, packDocument, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
+  import { addsOf } from '$lib/market/adds.ts';
   import { actionOf, listingsOf, type ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { words as market } from '$lib/market/words.ts';
@@ -41,8 +50,12 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import Menu from '$lib/ui/Menu.svelte';
+  import Section from '$lib/ui/Section.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Stacked from '$lib/viz/Stacked.svelte';
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
@@ -141,9 +154,11 @@
     addsOpen = true;
   }
 
-  /** The second line of a row: off said as off, else what the add-on is for, else the lists it keeps. */
+  /** The second line of a row: off said as off, else what the add-on or its use case is for, else the lists it keeps. */
   const lineOf = (state: PackState): string =>
-    state.disabled_at !== null ? copy.packTurnedOff : (byId.get(state.id)?.blurb ?? state.registers.map(listName).join(', '));
+    state.disabled_at !== null
+      ? copy.packTurnedOff
+      : (byId.get(state.id)?.blurb ?? (state.id.startsWith('usecase-') ? useCase(state.id.slice('usecase-'.length))?.summary : undefined) ?? state.registers.map(listName).join(', '));
 
   /**
    * One press of a switch, or of the button a refusal offered.
@@ -412,6 +427,63 @@
     }
   }
 
+  /* ── what they hold ────────────────────────────────────────────────────── */
+
+  /**
+   * What each installed add-on holds: its lists as the record counts them (`registers`), and its pages and rules read
+   * from its own document by `addsOf`, the reader the plan sheet's summary uses. A module's document is the seed's,
+   * loaded here after the list is drawn; a built-in use case's is its own file; an add-on from the Kennel is read off the
+   * catalogue's reach for the version installed. One with no document to read counts its lists and nothing else, so the
+   * tile never says a page or a rule it cannot see.
+   */
+  type Holds = { id: string; lists: number; pages: number; rules: number };
+  let holds = $state.raw<Holds[] | null>(null);
+
+  $effect(() => {
+    const held = states;
+    const index = kennel;
+    if (!held || !looked) return;
+    void holdsOf(held, index).then((found) => {
+      if (states === held) holds = found;
+    });
+  });
+
+  const documentOf = async (id: string): Promise<unknown> =>
+    byId.has(id) ? packDocument(id) : id.startsWith('usecase-') ? builtInFile(id.slice('usecase-'.length)) : null;
+
+  async function holdsOf(held: readonly PackState[], index: CatalogueIndex | null): Promise<Holds[]> {
+    return Promise.all(
+      held.map(async (s): Promise<Holds> => {
+        const doc = await documentOf(s.id).catch(() => null);
+        if (doc) {
+          const a = addsOf(doc);
+          return { id: s.id, lists: s.registers.length, pages: a.pages.length, rules: a.rules.length };
+        }
+        const entry = index?.entries.find((e) => e.kind === 'pack' && e.id === s.id);
+        const reach = (entry?.versions.find((v) => v.version === s.version) ?? entry?.versions[0])?.reach;
+        return { id: s.id, lists: s.registers.length, pages: reach?.pages.length ?? 0, rules: reach?.rules.length ?? 0 };
+      }),
+    );
+  }
+
+  /** The tile's chart and its one line, or `null` when there is nothing to draw. */
+  const holding = $derived.by(() => {
+    if (!holds || holds.length === 0) return null;
+    const sum = (k: 'lists' | 'pages' | 'rules') => holds!.reduce((n, h) => n + h[k], 0);
+    const all = [
+      { label: words.holdsLists(sum('lists')), value: sum('lists') },
+      { label: words.holdsPages(sum('pages')), value: sum('pages') },
+      { label: words.holdsRules(sum('rules')), value: sum('rules') },
+    ].filter((p) => p.value > 0);
+    if (all.length === 0) return null;
+    /* THE LARGEST IS NAMED ONLY WHEN IT IS ONE: a tie names nobody. */
+    const size = (h: Holds) => h.lists + h.pages + h.rules;
+    const top = [...holds].sort((a, b) => size(b) - size(a));
+    const first = top[0];
+    const largest = first && holds.length > 1 && size(first) > size(top[1] ?? { id: '', lists: 0, pages: 0, rules: 0 }) ? nameOf(first.id) : null;
+    return { parts: all, line: words.holds(all.map((p) => p.label), holds.length === 1, largest) };
+  });
+
   /* ── reading ───────────────────────────────────────────────────────────── */
 
   /**
@@ -444,34 +516,33 @@
 
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.packs}>
-  {#snippet actions()}<Button weight="quiet" href="/packs/browse">{words.browse}</Button>{/snippet}
+<PageHead icon="packs" title={copy.packs} count={live ? installed.length : undefined} sentence={live ? words.sentence(installed.length, updates ? updates.length : null) : undefined}>
+  {#snippet actions()}
+    <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, glass on the ground (SYSTEM §5), and a tab list still: the arrows
+         move between them and the panel they control is the content under the title. -->
+    <div class="tabs segmented" role="tablist" aria-label={words.tabsLabel} tabindex="-1" onkeydown={tabKey}>
+      {#each TABS as t (t)}
+        <button
+          type="button"
+          role="tab"
+          class="segment tab"
+          id="packs-tab-{t}"
+          aria-selected={tab === t}
+          aria-controls="packs-panel"
+          tabindex={tab === t ? 0 : -1}
+          data-on={tab === t ? '' : undefined}
+          onclick={() => (tab = t)}
+        >
+          {words.tabs[t]}{#if t === 'updates' && updates && updates.length > 0}<span class="tab-count num">{updates.length}</span>{/if}
+        </button>
+      {/each}
+    </div>
+    <Button weight="glass" href="/packs/browse"><Icon name="search" size="s" />{words.browse}</Button>
+  {/snippet}
 </PageHead>
 
 <div class="page">
-  <!-- WHAT A PACK IS, SAID ONCE, WHERE THE WORD IS FIRST MET. An empty record hears it from the empty state instead,
-       so the first screen never says the same sentence twice. -->
-  {#if !(tab === 'installed' && states && installed.length === 0)}<p class="blurb">{copy.packBlurb}</p>{/if}
-
-  <div class="tabs segmented" role="tablist" aria-label={words.tabsLabel} tabindex="-1" onkeydown={tabKey}>
-    {#each TABS as t (t)}
-      <button
-        type="button"
-        role="tab"
-        class="segment tab"
-        id="packs-tab-{t}"
-        aria-selected={tab === t}
-        aria-controls="packs-panel"
-        tabindex={tab === t ? 0 : -1}
-        data-on={tab === t ? '' : undefined}
-        onclick={() => (tab = t)}
-      >
-        {words.tabs[t]}{#if t === 'updates' && updates && updates.length > 0}<span class="tab-count">{updates.length}</span>{/if}
-      </button>
-    {/each}
-  </div>
-
-  <div class="panel" id="packs-panel" role="tabpanel" aria-labelledby="packs-tab-{tab}">
+  <div class="tabpanel" id="packs-panel" role="tabpanel" aria-labelledby="packs-tab-{tab}">
     {#if refused}
       <Empty kind="error" title={refused.fix}>
         {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
@@ -494,57 +565,77 @@
       {#snippet actions()}<Button href="/packs/browse">{words.browse}</Button>{/snippet}
     </Empty>
   {/if}
-  <!-- ONE ROW PER ADD-ON (design.md §4): its name and one line, its switch, and one "…" holding Settings, What this adds
-       and Uninstall, destructive last. One column on a phone, two at 900px and up, a hairline under each row. -->
-  <ul class="installed">
-    {#each installed as state (state.id)}
-      {@const pack = byId.get(state.id)}
-      {@const off = state.disabled_at !== null}
-      {@const block = blocks[state.id]}
-      {@const name = nameOf(state.id)}
-      <!-- OFF IS SAID, NEVER ABSENT. Its rows are still in the record, and this row is the only way back to them. -->
-      <li class="addon" data-off={off ? '' : undefined}>
-        <a class="addon-main" href={at(`/packs/${state.id}`)}>
-          <span class="addon-name">{name}</span>
-          <span class="addon-line">{lineOf(state)}</span>
-        </a>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          aria-checked={!off}
-          aria-label={copy.packSwitch(name)}
-          disabled={busy !== null}
-          onclick={() => turn(state.id, off)}
-        ><span class="switch-track"></span></button>
-        <Menu label={market.more(name)} align="end">
-          {#snippet trigger()}<span class="more"><Icon name="more" size="s" /><span class="vh">{market.more(name)}</span></span>{/snippet}
-          <a class="mi" role="menuitem" href={at(`/packs/${state.id}`)}>{packWords.settings}</a>
-          <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}>{copy.installDiff}</button>
-          {#if pack}
-            <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}>{copy.uninstall}</button>
-          {/if}
-        </Menu>
-        <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
-        {#if block}
-          <p class="addon-said" role="status">
-            {#if block.kind === 'required'}
-              <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
-              <Button weight="quiet" tone="bad" disabled={busy !== null} onclick={() => turn(block.id, false, block.also)}>{copy.packOffTogether(block.also.length)}</Button>
-            {:else if block.kind === 'scopes'}
-              <span>{copy.packScopesInUse(block.registers.map(listName))}</span>
-            {:else if block.kind === 'off'}
-              <span>{copy.packIsOff(nameOf(block.pack))}</span>
-              <Button weight="quiet" disabled={busy !== null} onclick={() => turn(block.pack, true)}>{copy.packTurnOn(nameOf(block.pack))}</Button>
-            {:else}
-              <span>{block.fix}</span>
-            {/if}
-          </p>
-        {/if}
-      </li>
-    {/each}
-  </ul>
-  {#if live}<p class="aside"><a class="tap" href={at('/packs/share')}>{copy.shareSetup}</a></p>{/if}
+
+  <!-- WHAT THEY HOLD BETWEEN THEM: one tile, its chart and the line reading it. Drawn once every add-on's document has
+       been read, and not at all when there is nothing to count. -->
+  {#if holding}
+    <Tile icon="packs" title={words.holdsTitle}>
+      <Stacked parts={holding.parts} subject={words.holdsTitle} summary={holding.line} />
+      <p class="reading">{holding.line}</p>
+    </Tile>
+  {/if}
+
+  {#if installed.length > 0}
+    <!-- ONE ROW PER ADD-ON (SYSTEM §6, Rows): its well, its name and one line, its switch, and one "…" holding Settings,
+         What this adds and Uninstall, destructive last. On the ground, no box, a hairline between rows. -->
+    <Section title={words.installedTitle} count={installed.length}>
+      {#snippet aside()}<Button weight="bare" size="sm" href="/packs/share">{copy.shareSetup}</Button>{/snippet}
+      <ul class="ledger addons">
+        {#each installed as state (state.id)}
+          {@const pack = byId.get(state.id)}
+          {@const off = state.disabled_at !== null}
+          {@const block = blocks[state.id]}
+          {@const name = nameOf(state.id)}
+          <!-- OFF IS SAID, NEVER ABSENT. Its rows are still in the record, and this row is the only way back to them. A row
+               a refusal is waiting on keeps its verbs showing (`data-needs`). -->
+          <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined}>
+            <div class="line addon">
+              <span class="line-mark"><IconWell name="packs" size="l" /></span>
+              <a class="addon-main" href={at(`/packs/${state.id}`)}>
+                <span class="line-title addon-name">{name}</span>
+                <span class="line-detail addon-line">{lineOf(state)}</span>
+              </a>
+              <button
+                type="button"
+                class="switch"
+                role="switch"
+                aria-checked={!off}
+                aria-label={copy.packSwitch(name)}
+                disabled={busy !== null}
+                onclick={() => turn(state.id, off)}
+              ><span class="switch-track"></span></button>
+              <span class="line-verbs">
+                <Menu label={market.more(name)} align="end">
+                  {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{market.more(name)}</span></span>{/snippet}
+                  <a class="mi" role="menuitem" href={at(`/packs/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
+                  <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}><Icon name="eye" size="s" />{copy.installDiff}</button>
+                  {#if pack}
+                    <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, pack.name)}><Icon name="trash" size="s" />{copy.uninstall}</button>
+                  {/if}
+                </Menu>
+              </span>
+              <!-- WHAT STOPPED THE SWITCH, AND THE ONE THING TO PRESS NEXT. The cascade is that press, never the first. -->
+              {#if block}
+                <p class="addon-said" role="status">
+                  {#if block.kind === 'required'}
+                    <span>{copy.packNeededBy(block.also.map(nameOf))}</span>
+                    <Button size="sm" tone="bad" disabled={busy !== null} onclick={() => turn(block.id, false, block.also)}>{copy.packOffTogether(block.also.length)}</Button>
+                  {:else if block.kind === 'scopes'}
+                    <span>{copy.packScopesInUse(block.registers.map(listName))}</span>
+                  {:else if block.kind === 'off'}
+                    <span>{copy.packIsOff(nameOf(block.pack))}</span>
+                    <Button size="sm" disabled={busy !== null} onclick={() => turn(block.pack, true)}>{copy.packTurnOn(nameOf(block.pack))}</Button>
+                  {:else}
+                    <span>{block.fix}</span>
+                  {/if}
+                </p>
+              {/if}
+            </div>
+          </li>
+        {/each}
+      </ul>
+    </Section>
+  {/if}
 
   <!-- WHAT ONE ADD-ON BRINGS, each list and page a row that opens it. Settings says the same on the add-on's own page. -->
   <Sheet bind:open={addsOpen} title={copy.installDiff} subtitle={addsState ? nameOf(addsState.id) : undefined} onclose={() => (addsFor = null)}>
@@ -553,9 +644,13 @@
       {#if addsState.registers.length + pages.length === 0}
         <p class="aside">{market.addsNothing}</p>
       {:else}
-        <ul class="adds">
-          {#each addsState.registers as r (r)}<li><a class="adds-row" href={at(`/r/${r}`)}><Icon name="rows" size="s" />{listName(r)}</a></li>{/each}
-          {#each pages as p (p)}<li><a class="adds-row" href={at(`/p/${p}`)}><Icon name="doc" size="s" />{PAGES[p]?.title ?? p}</a></li>{/each}
+        <ul class="ledger adds">
+          {#each addsState.registers as r (r)}
+            <li><a class="line adds-row" href={at(`/r/${r}`)}><span class="line-mark"><IconWell name="rows" size="l" /></span><span class="line-title">{listName(r)}</span></a></li>
+          {/each}
+          {#each pages as p (p)}
+            <li><a class="line adds-row" href={at(`/p/${p}`)}><span class="line-mark"><IconWell name="doc" size="l" /></span><span class="line-title">{PAGES[p]?.title ?? p}</span></a></li>
+          {/each}
         </ul>
       {/if}
     {/if}
@@ -568,27 +663,33 @@
   {:else if updates.length === 0}
     <Empty kind="cleared" title={words.updatesNone} body={words.updatesNoneBody} />
   {:else}
-    <div class="all">
-      <Button weight="primary" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
-    </div>
-    <!-- THE SAME ROW AS AN INSTALLED ADD-ON: its name, the versions it moves between, and its one press. -->
-    <ul class="installed">
-      {#each updates as u (u.key)}
-        {@const s = said[u.key]}
-        <li class="addon update">
-          <span class="addon-main">
-            <span class="addon-name">{u.title}</span>
-            <span class="addon-line" title={words.fromTo(u.from, u.to)}>{words.updateAvailable}</span>
-          </span>
-          <Button disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
-          {#if s && 'filed' in s}
-            <p class="addon-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
-          {:else if s}
-            <p class="addon-said" role="status" title={s.code ? copy.refusalCode(s.code) : undefined}>{s.fix}</p>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    <!-- THE SAME ROW AS AN INSTALLED ADD-ON: its well, its name, the versions it moves between in its tooltip, and its one
+         press, which reads the plan. "Update all" is the screen's one primary, at the group's heading. -->
+    <Section title={words.updatesTitle} count={updates.length}>
+      {#snippet aside()}
+        <Button weight="primary" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
+      {/snippet}
+      <ul class="ledger addons">
+        {#each updates as u (u.key)}
+          {@const s = said[u.key]}
+          <li class="addon-row">
+            <div class="line addon update">
+              <span class="line-mark"><IconWell name="refresh" size="l" /></span>
+              <span class="addon-main">
+                <span class="line-title addon-name">{u.title}</span>
+                <span class="line-detail addon-line" title={words.fromTo(u.from, u.to)}>{words.updateAvailable}</span>
+              </span>
+              <Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
+              {#if s && 'filed' in s}
+                <p class="addon-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
+              {:else if s}
+                <p class="addon-said" role="status" title={s.code ? copy.refusalCode(s.code) : undefined}>{s.fix}</p>
+              {/if}
+            </div>
+          </li>
+        {/each}
+      </ul>
+    </Section>
   {/if}
   {#each unverified as fix, i (i)}<p class="aside">{fix}</p>{/each}
 {/snippet}
@@ -607,100 +708,88 @@
     max-inline-size: var(--page-max);
   }
 
-  /* One sentence saying what the things on this screen are, in the person's words. */
-  .blurb {
-    max-inline-size: 62ch;
-    color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.6;
+  /* NOT `.panel`, which `blocks.css` draws as a page block's box: the tab's content sits straight on the ground. */
+  .tabpanel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-6);
+    min-inline-size: 0;
   }
 
-  .tabs {
-    align-self: start;
+  /* THE TABS IN THE TOOLBAR. The count on Updates is a plain number in the quiet ink (SYSTEM §6, Badges): an update
+     does not need him, so it is never the red square. */
+  .tab {
+    white-space: nowrap;
   }
 
   .tab-count {
     margin-inline-start: var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
   }
 
-  .panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-4);
-    min-inline-size: 0;
+  /* IN THE COMPACT BAR THE TABS DROP THEIR OWN GLASS, as the bar's buttons do: the bar is glass, and glass never holds
+     glass. Only where the bar is drawn, from 900px up. */
+  @media (width >= 900px) {
+    :global(.head[data-under]) .tabs {
+      background: transparent;
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 
-  /* ROWS, NOT A WALL OF CARDS (design.md §4, the add-ons row): an add-on is one 56px row, its name over one line of what
-     it is, then its switch and its "…", with a hairline under each row and nothing around the list. From 900px the rows
-     flow into two columns, so a record with a dozen add-ons reads as a list and not a scroll. */
-  .installed {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    column-gap: var(--sp-6);
-    max-inline-size: var(--page-max);
+  /* THE TILE'S ONE LINE: what the chart means, in the body size under it. */
+  .reading {
     margin: 0;
-    padding: 0;
-    list-style: none;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
+  /**
+   * AN ADD-ON'S ROW: the 32px well, the name over its line, the switch, and the "…" at the trailing edge, 56 tall on the
+   * ground (SYSTEM §6, Rows). Its own grid rather than the list's id column, because a row here is a thing with a switch
+   * and not a line of a register; the wash, the hairline and the verbs' show-on-hover are the shared `rows.css` ones.
+   */
   .addon {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    column-gap: var(--sp-2);
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    column-gap: var(--sp-3);
+    row-gap: 0;
     min-block-size: var(--row-h-2);
-    border-block-end: 1px solid var(--line-soft);
   }
 
   .update {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
   }
 
   /* THE NAME AND ITS LINE ARE ONE TARGET, the add-on's own page, so a thumb anywhere on the words opens it. */
   .addon-main {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    gap: 2px;
     min-inline-size: 0;
-    padding-block: var(--sp-2);
+    padding-block: var(--sp-1);
     color: inherit;
     text-decoration: none;
   }
 
-  .addon-name,
-  .addon-line {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .addon-name {
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
-  }
-
-  .addon-line {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
   /* OFF, AND STILL HERE. The name steps down to secondary ink and the line says "Turned off"; nothing is faded below
-     the contrast a person needs to read it, and the switch keeps full strength because it is the way back. */
-  .addon[data-off] .addon-name {
+     the contrast a person needs to read it, and the switch keeps full strength because it is the way back. Never red. */
+  .addon-row[data-off] .addon-name {
     color: var(--ink2);
   }
 
   .more {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-grid;
+    place-items: center;
     inline-size: var(--ctl-h);
-    min-block-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    border-radius: var(--r-pill);
     color: var(--ink2);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   .vh {
@@ -712,18 +801,12 @@
     white-space: nowrap;
   }
 
+  /* A MENU ROW: the menu draws its rhythm (32 tall, an icon and the word); the row keeps its own ink. */
   .mi {
-    display: flex;
-    align-items: center;
-    inline-size: 100%;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
     text-align: start;
     text-decoration: none;
     cursor: pointer;
@@ -735,46 +818,25 @@
     color: var(--ink);
   }
 
-  /* RED ONLY UNDER THE POINTER OR THE FOCUS: at rest Uninstall is one more item, last in the menu. */
-  .mi[data-tone='bad']:hover,
-  .mi[data-tone='bad']:focus-visible {
-    color: var(--danger);
-  }
+  /* A DESTRUCTIVE VERB IS ITS WORDS IN INK (SYSTEM §6): Uninstall is one more item, last in the menu, and never red. */
 
+  /* WHAT STOPPED THE SWITCH sits under the name, across the rest of the row. */
   .addon-said {
     display: flex;
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    padding-block-end: var(--sp-3);
+    padding-block: 0 var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-sm);
   }
 
-  /* WHAT ONE ADD-ON BRINGS, as rows in the sheet: a glyph and a name, each opening what it names. */
-  .adds {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
+  /* WHAT ONE ADD-ON BRINGS, as rows in the sheet: a well and a name, each opening what it names. */
   .adds-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--tap);
-    border-block-end: 1px solid var(--line-soft);
-    color: var(--ink);
-    font-size: var(--t-base);
-    text-decoration: none;
-  }
-
-  .all {
-    display: flex;
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
+    column-gap: var(--sp-3);
   }
 
   .aside {
@@ -783,40 +845,52 @@
     font-size: var(--t-sm);
   }
 
+  /* A ROW THAT IS NOT ITSELF A LINK STILL TAKES THE WASH UNDER THE POINTER, and its hairlines step aside for it, as the
+     shared rows' do. */
   @media (hover: hover) and (pointer: fine) {
+    .addon:hover {
+      background: var(--hover-wash);
+    }
+
+    .addons > li:has(> .addon:hover) > .addon::after,
+    .addons > li:has(> .addon:hover) + li > .addon::after {
+      opacity: 0;
+    }
+
     .addon-main:hover .addon-name {
       text-decoration: underline;
       text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
       text-underline-offset: 3px;
     }
-  }
 
-  /* AT 390PX the tabs are one full-width segmented control, each tab a third of it; the rows are one column already. */
-  @media (width < 640px) {
-    .tabs {
-      align-self: stretch;
-    }
-
-    .tab {
-      flex: 1 1 0;
-      min-inline-size: 0;
+    .more:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
     }
   }
 
-  /* On a phone a row's name is read at the phone's body size, as every card's first line is. */
+  /* ON A PHONE the tabs take the toolbar's whole line, each a third of it, and a row's name is read at the phone's body
+     size, as every row's first line is (SYSTEM §9). */
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
+    .tabs {
+      flex: 1 1 100%;
+    }
+
+    /* EACH TAB AS WIDE AS ITS WORD, the room left shared between them, so "Install from…" is never cut. */
+    .tab {
+      flex: 1 1 auto;
+    }
+
+    .addon {
+      min-block-size: 60px;
+    }
+
     .addon-name {
       font-size: var(--t-md);
-    }
-  }
-
-  @media (width >= 900px) {
-    .installed {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>

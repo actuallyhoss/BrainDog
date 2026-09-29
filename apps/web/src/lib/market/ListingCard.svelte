@@ -1,23 +1,65 @@
 <!--
-  One listing as a card on browse (`listing.ts`): a small drawing, then the title, two lines of what it does, what it
-  calls out to when it calls anywhere, who published it and whether that is vouched for, how many records hold it, and
-  the one cue that says what its page will offer.
+  One listing as a tile on browse (`listing.ts`): its category's glyph and its title, a small drawing when there is one,
+  two lines of what it does, what it adds counted beside each glyph, what it calls out to when it calls anywhere, and at
+  its foot the one cue that says what its page will offer beside who made it. Who made it is not on the heading, where
+  the heading's one line would cut the title short to make room for it.
+
+  A TILE, AS EVERYTHING THAT HOLDS A FIGURE IS (SYSTEM §6), and the catalogue the site's board draws: a white tile with
+  its icon on the heading, and "1 list, 1 page, 1 rule" under what it is for. The drawing sits in a well of the ground's
+  colour inside it, so a Home in miniature or a page at half size is a picture of the product and never a tile in a
+  tile.
 
   THE DRAWING IS THE BEST ONE THERE IS. A built-in use case's rail and Home are the caller's (`drawing`, today's
   `Preview.svelte`, which reads the use case's own declarations); an add-on whose version has a trusted preview draws its
-  first page through the real renderer (`PreviewPage.svelte`); anything else names the lists and pages it adds, which is
-  all that can be said without a picture nobody vouched for.
+  first page through the real renderer (`PreviewPage.svelte`); anything else has no drawing, and its counts say what it
+  adds.
+
+  THE CUE IS THE CARD'S ONE LINK, stretched over the whole tile, so a thumb can press anywhere and a screen reader hears
+  the press and the listing's name together. It names what the detail page's button will say and never installs: the
+  plan is read on that page first.
 
   WHAT A CARD SAYS ABOUT TRUST IS THE INDEX'S CLAIM. The detail page verifies the signature before anything can be
   pressed; a card only reads what the catalogue computed when the version was listed. Nothing on a card is the author's
   own words about itself but the title and summary.
 -->
+<script lang="ts" module>
+  import type { Category } from '@braindog/declare/catalogue';
+  import type { IconName } from '../ui/icons.ts';
+  import type { Listing } from './listing.ts';
+
+  /** The glyph each category is drawn with on a tile's heading. */
+  const CATEGORY_GLYPHS: Readonly<Record<Category, IconName>> = {
+    'made-by-braindog': 'packs',
+    'ways-of-working': 'projects',
+    modules: 'rows',
+    templates: 'doc',
+    connectors: 'plug',
+    doors: 'inbox',
+    automations: 'clock',
+    blocks: 'grid',
+    themes: 'sun',
+  };
+
+  /**
+   * A listing's glyph: a use case is a whole way of working, a module brings lists, and an add-on is drawn by the first
+   * category it is in that is not one of the two that lead browse.
+   */
+  export function glyphOf(l: { kind: Listing['kind']; categories: readonly Category[] }): IconName {
+    if (l.kind === 'usecase') return CATEGORY_GLYPHS['ways-of-working'];
+    if (l.kind === 'module') return CATEGORY_GLYPHS.modules;
+    const own = l.categories.find((c) => c !== 'made-by-braindog' && c !== 'ways-of-working');
+    return own ? CATEGORY_GLYPHS[own] : 'packs';
+  }
+</script>
+
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { at } from '$lib/at.ts';
   import Icon from '$lib/ui/Icon.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import PreviewPage from './PreviewPage.svelte';
-  import { hostsOf, latestOf, listingHref, verifiedOf, type Action, type Listing } from './listing.ts';
+  import { hostsOf, latestOf, listingHref, verifiedOf, type Action } from './listing.ts';
   import { readVersionPreview, type PreviewRead } from './preview.ts';
   import { words } from './words.ts';
 
@@ -28,6 +70,36 @@
   const hosts = $derived(hostsOf(listing));
   const verified = $derived(verifiedOf(listing));
   const href = $derived(at(listingHref(listing)));
+
+  /* WHAT IT ADDS, COUNTED: each kind it brings beside its glyph, and nothing for a kind it brings none of. A module's
+     rules are its page's to say, read from its document there, so a card never claims a count it did not read. */
+  const counts = $derived(
+    reach
+      ? [
+          { glyph: 'rows' as const, said: words.countLists(reach.lists.length), n: reach.lists.length },
+          { glyph: 'doc' as const, said: words.countPages(reach.pages.length), n: reach.pages.length },
+          { glyph: 'skill' as const, said: words.countRules(reach.rules.length), n: reach.rules.length },
+        ].filter((c) => c.n > 0)
+      : [],
+  );
+
+  /* WHAT A USE CASE TURNS ON BESIDE ITS OWN, by the names the modules go by: a use case that keeps its lists in them
+     brings nothing of its own, and "Nothing of its own" alone would read as nothing at all. */
+  const brings = $derived(
+    listing.kind === 'usecase' && reach && reach.modules.length > 0
+      ? words.brings(reach.modules.map((id) => firstPartyModules().find((m) => m.id === id)?.name ?? id))
+      : null,
+  );
+
+  const cue = $derived(
+    action?.kind === 'installed'
+      ? words.installed
+      : action?.kind === 'update'
+        ? words.update(action.to)
+        : action?.kind === 'turn-on'
+          ? words.turnOn(listing.title)
+          : words.installCue,
+  );
 
   /* A PREVIEW IS ASKED FOR ONLY WHERE THE INDEX SAYS ONE EXISTS, so a card with none costs no request. */
   let read = $state.raw<PreviewRead>({ state: 'none' });
@@ -40,111 +112,67 @@
       if (listing === l) read = got;
     });
   });
+
+  const drawn = $derived(Boolean(drawing) || (read.state === 'ready' && read.preview.pages.length > 0));
 </script>
 
-<!-- ONE SURFACE PER CARD (design.md §4, the catalogue row): the drawing is the card's only filled shape, and the words sit
-     under it on the page's own ground, so no box ever holds another box. What it does leads; what it calls out to follows
-     when it calls anywhere; the version, licence and signature are the detail page's. -->
 <li class="card">
-  <div class="drawing">
-    {#if drawing}
-      {@render drawing()}
-    {:else if read.state === 'ready' && read.preview.pages.length > 0}
-      <PreviewPage preview={read.preview} />
-    {:else if reach && reach.lists.length + reach.pages.length > 0}
-      <ul class="names" aria-label={words.adds}>
-        {#each reach.lists.slice(0, 4) as name (`l:${name}`)}<li><Icon name="rows" size="s" />{name}</li>{/each}
-        {#each reach.pages.slice(0, 4) as name (`p:${name}`)}<li><Icon name="doc" size="s" />{name}</li>{/each}
-      </ul>
-    {:else}
-      <p class="quiet">{words.addsNothing}</p>
+  <Tile icon={glyphOf(listing)} title={listing.title}>
+    {#if drawn}
+      <div class="drawing">
+        {#if drawing}
+          {@render drawing()}
+        {:else if read.state === 'ready'}
+          <PreviewPage preview={read.preview} />
+        {/if}
+      </div>
     {/if}
-  </div>
 
-  <div class="text">
-    <h2 class="title"><a class="link" {href}>{listing.title}</a></h2>
     <p class="summary">{listing.summary}</p>
-    <!-- A BUILT-IN'S CALLS ARE SAID ON ITS DETAIL PAGE, read from its file there; the index computed a catalogue entry's
-         when it was listed, so only that one is said on the card, and only when it calls somewhere. -->
-    {#if listing.source === 'kennel' && hosts.length > 0}
-      <p class="calls"><Icon name="globe" size="s" />{words.callsOut(hosts)}</p>
-    {/if}
-    <p class="meta">
-      <span>{words.kinds[listing.kind]}</span>
-      <span>{words.by(listing.publisher?.name ?? listing.author)}{#if verified}{' · '}{verified === 'reviewed' ? words.reviewed : words.verified}{/if}</span>
-      {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
-    </p>
-    <!-- THE ONE CUE: what the detail page's button will say. The card is the link, so this is words on it, not a second
-         control; "Installed" and an update say what the record holds. -->
-    <span class="cue" data-held={action?.kind === 'installed' ? '' : undefined}>
-      {#if action?.kind === 'installed'}<Icon name="check" size="s" />{words.installed}{:else if action?.kind === 'update'}{words.update(action.to)}{:else if action?.kind === 'turn-on'}{words.turnOn(listing.title)}{:else}{words.installCue}{/if}
-    </span>
-  </div>
+
+    <!-- WHAT IT ADDS, THEN WHAT IT CALLS OUT TO when it calls anywhere. A built-in's calls are said on its detail page,
+         read from its file there; the index computed a catalogue entry's when it was listed, so only that one is said. -->
+    <ul class="adds" aria-label={words.adds}>
+      {#each counts as c (c.glyph)}<li><Icon name={c.glyph} size="s" />{c.said}</li>{:else}{#if !brings}<li>{words.addsNothing}</li>{/if}{/each}
+      {#if brings}<li><Icon name="packs" size="s" />{brings}</li>{/if}
+      {#if listing.source === 'kennel' && hosts.length > 0}<li class="calls" title={words.callsOut(hosts)}><Icon name="globe" size="s" />{words.countHosts(hosts.length)}</li>{/if}
+    </ul>
+
+    <div class="foot">
+      <p class="meta">
+        <span>{words.by(listing.publisher?.name ?? listing.author)}</span>
+        <span>{words.kinds[listing.kind]}</span>
+        {#if verified && verified !== 'braindog'}<span class="with-icon"><Icon name="check" size="s" />{verified === 'reviewed' ? words.reviewed : words.verified}</span>{/if}
+        {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
+      </p>
+      <!-- THE ONE CUE, AT THE FOOT'S END: what the detail page's button will say, as a quiet pill. "Installed" is words
+           and no pill: it is what the record holds, not a press. -->
+      <a class="cue" {href} data-held={action?.kind === 'installed' ? '' : undefined}>
+        {#if action?.kind === 'installed'}<Icon name="check" size="s" />{/if}{cue}<span class="vh">, {listing.title}</span>
+      </a>
+    </div>
+  </Tile>
 </li>
 
 <style>
+  /* THE CARD IS THE LINK'S BOX: the cue's hit area is stretched over it, and the focus ring is drawn round it. */
   .card {
     position: relative;
     display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
     min-inline-size: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-lg);
   }
 
-  /* THE DRAWING IS THE CARD'S ONE SURFACE: a well in `--sunk`, rounded, with no edge, so what is drawn inside it (a Home
-     in miniature, a page at half size, or the names of what it adds) never sits in a second box. */
+  .card > :global(.tile) {
+    flex: 1;
+  }
+
+  /* THE DRAWING'S WELL: the ground's colour inside the tile, radius `--r-md`, no edge. */
   .drawing {
     min-inline-size: 0;
     padding: var(--sp-3);
     border-radius: var(--r-md);
     background: var(--sunk);
-  }
-
-  .text {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-  }
-
-  .title {
-    font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 600;
-    line-height: var(--lh-tight);
-  }
-
-  /* THE WHOLE CARD IS THE LINK'S TARGET, by stretching the title's link over it, so the title is the one thing a screen
-     reader hears and a thumb can press anywhere. */
-  .link {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .link::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-  }
-
-  .link:focus-visible {
-    /* focus-ok: the card carries the ring instead (`.card:has(.link:focus-visible)` below), because the link is
-       stretched over the whole card and a ring round the title alone would mark a smaller target than the press. */
-    outline: none;
-  }
-
-  .card:has(.link:focus-visible) {
-    outline: 2px solid var(--focus-in);
-    outline-offset: 2px;
-  }
-
-  .quiet {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   /* WHAT IT DOES, IN TWO LINES, because one cut most summaries off before their verb. */
@@ -153,74 +181,131 @@
     overflow: hidden;
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
+    font-size: var(--t-base);
+    line-height: 20px;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
   }
 
-  .calls {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-sm);
-    overflow-wrap: anywhere;
-  }
-
-  /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
-  .meta {
+  /* THE COUNTS, EACH BESIDE ITS GLYPH, wrapping as whole items with no separator glyph to lead a wrapped line. */
+  .adds {
     display: flex;
     flex-wrap: wrap;
-    column-gap: var(--sp-3);
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
-
-  .names {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
+    gap: var(--sp-1) var(--sp-4);
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  .names li {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
     color: var(--ink2);
     font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
   }
 
-  /* A PILL THAT READS AS THE PRESS THE DETAIL PAGE OFFERS, in the secondary button's shape; the card is its target. */
-  .cue {
+  .adds li {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
+  }
+
+  .adds :global(.icon) {
+    color: var(--dim);
+  }
+
+  /* CALLING OUT IS WORTH SEEING BEFORE THE PAGE IS OPENED, so it is ink where the counts are the second ink. */
+  .calls {
+    color: var(--ink);
+  }
+
+  /* THE FOOT SITS AT THE BOTTOM OF THE TILE, so a row of tiles lines its cues up whatever each one says above. */
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-start: auto;
+  }
+
+  /* A QUIET PILL (SYSTEM §6): the `--s1` pill inside a tile, ink words. Its hit box is the whole card. */
+  .cue {
+    display: inline-flex;
+    flex: none;
+    margin-inline-start: auto;
+    align-items: center;
     gap: var(--sp-1);
-    margin-block-start: var(--sp-2);
-    padding-block: var(--sp-1);
-    padding-inline: var(--sp-3);
-    border: 1px solid var(--edge);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-4);
+    background: var(--s1);
     border-radius: var(--r-pill);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .cue::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-lg);
+  }
+
+  .cue:focus-visible {
+    /* focus-ok: the card carries the ring instead (`.card:has(.cue:focus-visible)` below), because the link is stretched
+       over the whole card and a ring round the pill alone would mark a smaller target than the press. */
+    outline: none;
+  }
+
+  .card:has(.cue:focus-visible) {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
   }
 
   .cue[data-held] {
-    border-color: transparent;
     padding-inline: 0;
+    background: none;
     color: var(--dim);
+  }
+
+  .meta {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-wrap: wrap;
+    column-gap: var(--sp-3);
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+  }
+
+  .with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+
+  .vh {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .card:hover .cue:not([data-held]) {
-      background: var(--hover-wash);
+      background: var(--s2);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .cue {
+      min-block-size: var(--tap);
+      font-size: var(--t-md);
     }
   }
 </style>

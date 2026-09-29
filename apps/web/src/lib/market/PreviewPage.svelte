@@ -5,6 +5,9 @@
   `PageView` with `mode: 'preview'`, which hands no block a write, arranges nothing and has no source view. So what a
   person sees here is what the installed page draws, from the same renderer (contracts §11 X50).
 
+  THE PAGE'S TABS ARE THE `--s1` SEGMENTED PILL, because the preview sits inside a tile and glass never sits on content
+  (`controls.css`).
+
   SMALL ON A CARD, LARGE ON THE DETAIL PAGE. A card draws the first page at half size, clipped, and hidden from a screen
   reader, because the card's own words already say what it adds and a link a card cannot follow is a trap. The detail
   page draws every page full size with a tab for each when there are several, and a wide block scrolls inside its own
@@ -71,13 +74,16 @@
     white-space: nowrap;
   }
 
+  /* THE PAGE DRAWN ON ITS OWN GROUND: a well in `--sunk`, radius `--r-md`, with no edge, so the installed page's blocks
+     sit on it as they would on the app's ground. It is a picture of the product inside the tile that holds it, not a
+     second box (SYSTEM §4, §10). */
   .frame {
+    box-sizing: border-box;
     inline-size: 100%;
     overflow-x: auto;
-    padding: var(--sp-3);
-    border: 1px solid var(--line-soft);
+    padding: var(--sp-4);
     border-radius: var(--r-md);
-    background: var(--bg);
+    background: var(--sunk);
   }
 
   /* NO EDGE AND NO FILL OF ITS OWN: a card's drawing well is the one surface (`ListingCard.svelte`), and a second box

@@ -11,6 +11,8 @@
  */
 
 export const words = {
+  /* THE FORM'S FIRST GROUP: what the file is called, its version, and what and who it is for. */
+  about: 'The file',
   changesSince: (since: string): string => `What changed since ${since}`,
   sinceShared: (version: string): string => `${version}, as last shared`,
   sinceBuiltIn: (title: string): string => `${title} as BrainDog ships it`,

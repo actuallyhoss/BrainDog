@@ -19,6 +19,10 @@
 
   ONE COLUMN AT `--measure`, at every width (design.md §4, the share row): a form read top to bottom, never two ragged
   columns.
+
+  THE LOOK (SYSTEM §5, §6): what goes in the file is the title row's sentence, and the way back to the add-ons is the
+  head's. The form is groups on the ground, each field's label above it; what changes and what an installer sees are two
+  tiles, the second drawing the use case on a well of the ground's colour. Download is the one primary.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -42,6 +46,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import Preview from '../browse/Preview.svelte';
   import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
@@ -276,10 +281,9 @@
 
 <svelte:head><title>{titleOf(copy.shareSetup)}</title></svelte:head>
 
-<PageHead icon="packs" title={copy.shareSetup} />
+<PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={copy.shareWhat} />
 
 <div class="page">
-  <p class="blurb">{copy.shareWhat}</p>
   {#if refused}
     <Empty kind="error" title={refused} />
   {:else}
@@ -292,33 +296,37 @@
         void download();
       }}
     >
-      <div class="pair">
-        <label class="field-label" for="share-title">{copy.shareTitle}</label>
-        <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
-      </div>
-      <div class="pair">
-        <label class="field-label" for="share-version">{copy.shareVersion}</label>
-        <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
-        {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
-      </div>
-      <fieldset class="pair steps">
-        <legend class="field-label">{copy.shareStep}</legend>
-        <label class="row-pick"><input type="radio" name="share-step" value="patch" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepPatch}</span></label>
-        <label class="row-pick"><input type="radio" name="share-step" value="minor" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepMinor}</span></label>
-      </fieldset>
-      <div class="pair">
-        <label class="field-label" for="share-summary">{copy.shareSummary}</label>
-        <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
-      </div>
-      <div class="pair">
-        <label class="field-label" for="share-audience">{copy.shareAudience}</label>
-        <div class="field">
-          <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+      <Section title={words.about}>
+        <div class="fields">
+          <div class="pair">
+            <label class="field-label" for="share-title">{copy.shareTitle}</label>
+            <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
+          </div>
+          <div class="pair">
+            <label class="field-label" for="share-version">{copy.shareVersion}</label>
+            <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
+            {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
+          </div>
+          <fieldset class="pair steps">
+            <legend class="field-label">{copy.shareStep}</legend>
+            <label class="row-pick"><input type="radio" name="share-step" value="patch" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepPatch}</span></label>
+            <label class="row-pick"><input type="radio" name="share-step" value="minor" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepMinor}</span></label>
+          </fieldset>
+          <div class="pair">
+            <label class="field-label" for="share-summary">{copy.shareSummary}</label>
+            <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
+          </div>
+          <div class="pair">
+            <label class="field-label" for="share-audience">{copy.shareAudience}</label>
+            <div class="field">
+              <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+            </div>
+            <datalist id="share-audience-suggestions">
+              {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
+            </datalist>
+          </div>
         </div>
-        <datalist id="share-audience-suggestions">
-          {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
-        </datalist>
-      </div>
+      </Section>
 
       {#if live && own && own.registers.length > 0}
         <Section title={copy.shareExamples}>
@@ -366,7 +374,7 @@
       </Section>
 
       {#if draft}
-        <Section title={draft.state === 'ready' && draft.since !== null ? words.changesSince(draft.since) : words.changesFirst}>
+        <Tile icon="refresh" title={draft.state === 'ready' && draft.since !== null ? words.changesSince(draft.since) : words.changesFirst} count={draft.state === 'ready' && lines.length > 0 ? lines.length : undefined}>
           {#if draft.state === 'reading'}
             <p class="note" role="status">{words.drafting}</p>
           {:else if draft.state === 'refused'}
@@ -381,11 +389,11 @@
               <p class="note">{words.noChanges}</p>
             {/if}
           {/if}
-        </Section>
+        </Tile>
         {#if installerView}
-          <Section title={words.installer}>
+          <Tile icon="eye" title={words.installer}>
             <Preview preview={installerView} large />
-          </Section>
+          </Tile>
         {/if}
       {/if}
 
@@ -398,7 +406,6 @@
         <Button disabled={publishing || !live} aria-busy={publishing ? 'true' : undefined} onclick={() => void publish()}>
           {publishing ? publishWords.publishing : publishWords.publish}
         </Button>
-        <Button weight="bare" href="/packs">{copy.packs}</Button>
       </div>
     </form>
   {/if}
@@ -408,42 +415,50 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     max-inline-size: calc(var(--measure) + 2 * var(--gutter));
-  }
-
-  .blurb {
-    color: var(--ink2);
-    font-size: var(--t-ui);
-    line-height: 1.6;
   }
 
   .note {
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
-  /* ONE COLUMN, EVERY FIELD THE SAME WIDTH: the measure the page is capped at. */
+  /* ONE COLUMN, EVERY FIELD THE SAME WIDTH: the measure the page is capped at. Groups sit 28 apart, so each reads as
+     its own heading and what it heads. */
   .share-form {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: var(--sp-6);
     min-inline-size: 0;
   }
 
+  .fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    padding-block-start: var(--sp-2);
+  }
+
+  /* A FIELD'S LABEL ABOVE IT (SYSTEM §6, Fields), 6 apart. */
   .pair {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    gap: 6px;
     min-inline-size: 0;
+  }
+
+  .pair .field-label {
+    margin: 0;
   }
 
   .steps {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-1) var(--sp-4);
+    gap: 0 var(--sp-4);
     margin: 0;
     padding: 0;
     border: 0;
@@ -451,31 +466,35 @@
 
   .steps legend {
     inline-size: 100%;
+    padding: 0;
   }
 
   .rows {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
     margin: var(--sp-3) 0 0;
     padding: 0;
     border: 0;
   }
 
   .rows-h {
+    padding: 0;
     margin-block-end: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink);
+    font-size: var(--t-row);
     font-weight: 600;
+    line-height: 20px;
   }
 
+  /* A PICK IS A ROW: the box, then its words, 44 tall so the whole row is the target. */
   .row-pick {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
   .pick-text {
@@ -487,28 +506,40 @@
   .pick-detail {
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
+  /* WHAT CHANGES, ONE LINE EACH, a hairline between two. */
   .changes {
-    display: grid;
-    gap: var(--sp-1);
+    display: flex;
+    flex-direction: column;
     margin: 0;
-    padding-inline-start: var(--sp-5);
+    padding: 0;
+    list-style: none;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .changes li {
+    padding-block: var(--sp-2);
+  }
+
+  .changes li + li {
+    border-block-start: 1px solid var(--line);
   }
 
   .wrong {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
   }
 
   /* The answer is one sentence, and its link is ink and underlined: red is never a link here. */
   .sent {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     overflow-wrap: anywhere;
   }
 
@@ -521,5 +552,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
+  }
+
+  @media (width < 900px) {
+    .page {
+      padding: var(--sp-4) var(--gutter) var(--sp-8);
+    }
   }
 </style>
