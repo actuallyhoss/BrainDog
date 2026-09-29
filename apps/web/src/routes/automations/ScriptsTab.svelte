@@ -1,6 +1,9 @@
 <!--
   The hub's Scripts tab: each script, what starts it, and where it stands, one row each opening that script.
 
+  NO TILES HERE (SCREENS, Automations): the scripts screen holds the charts of its runs, and a second copy one tab
+  away would drift from the first. The list sits on the ground under its heading, each row with the code glyph.
+
   THE SCRIPTS SCREEN KEEPS THE DETAIL. What a script may read, write and fetch, its versions, its owner-only log and
   Resume are on `/scripts` (SCR-2), so this tab says where each one stands and points there, rather than drawing a
   second copy of cards that would drift from the first.
@@ -9,6 +12,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Section from '$lib/ui/Section.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { readScripts, startsBy, stateOf, words, type Script } from '$lib/record/scripts.ts';
   import HubRows from './HubRows.svelte';
@@ -52,6 +56,7 @@
         said: said.line,
         dot: said.tone === 'bad' ? 'bad' : said.tone === 'warn' ? 'warn' : null,
         path: `/scripts/${encodeURIComponent(s.script)}`,
+        icon: 'code',
       };
     }),
   );
@@ -63,7 +68,9 @@
   <!-- NO BUTTON OF ITS OWN: the heading's "New script" is above it, and two read as two different things to press. -->
   <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} agentPrompt={w.scriptsPrompt} />
 {:else if from === 'ready'}
-  <HubRows rows={shown} />
+  <Section title={w.scripts} count={shown.length}>
+    <HubRows rows={shown} />
+  </Section>
   <p class="more">{w.scriptsMore} <a href={at('/scripts')}>{w.scriptsOpen}</a></p>
 {/if}
 
@@ -77,5 +84,7 @@
 
   .more a {
     color: var(--ink);
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
   }
 </style>

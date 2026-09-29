@@ -10,6 +10,10 @@
   last fifteen minutes, because whoever holds a token can write into the record. The page's own `anOwner` is handed in,
   so there is one predicate for who owns the record; the record decides again on each call.
 
+  A LIST ON THE GROUND (SYSTEM §6): each door a row with the plug in its 32px well, its name, the list it writes to and
+  whether an address is in use, then its one press. No tile over it, because the doors read carries no count to draw:
+  a number with no chart under it is the one thing a tile may not hold (SCREENS, Automations).
+
   A TOKEN LIVES IN `said` AND NOWHERE ELSE. The section is drawn only inside the `ingest` arm, so leaving the area takes
   the component and every token with it, and nothing writes one to a store, a query string or a toast. The rules are
   `webhook-doors.ts`, which the tests hold.
@@ -27,6 +31,8 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import NewAction from '$lib/ui/NewAction.svelte';
   import { actionWords } from '$lib/record/action-draft.ts';
 
@@ -126,7 +132,7 @@
   {:else if listed === null}
     <p class="hint" role="status">{copy.doorsReading}</p>
   {:else if listed.kind !== 'doors'}
-    <p class="code-said" role="status" data-intent={toneOf(listed)}>{lineOf(listed)}</p>
+    <p class="code-said" role="status" data-tone={toneOf(listed)}>{#if toneOf(listed)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(listed)}</p>
     {#if listed.kind === 'signin'}
       <div class="row-actions">
         <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
@@ -140,61 +146,64 @@
       {#each doors as door (door.id)}
         {@const mine = said[door.id]}
         <li class="door">
-          <p class="door-name">{door.name}</p>
-          {#if door.register}
-            <p class="hint">{copy.doorsWrites(door.register)}</p>
-          {/if}
-          {#if !door.mintable}
-            <p class="hint">{copy.doorsOtherCheck}</p>
-          {:else}
-            <p class="hint">{door.held ? copy.doorsHeld : copy.doorsNotHeld}</p>
-            {#if mine?.kind === 'minted'}
-              {@const minted = mine}
-              <!-- SHOWN ONCE, from `said` alone. THE SENTENCE IS PASSED to `clipboard.put` as `said`, so the toast is
-                   that one line: passed only as the label it read "Copied Address copied." (defects A12), and with
-                   neither it would quote the text, which is a live credential. -->
-              <div class="code-form">
-                <p class="code-label">{copy.doorsOnce}</p>
-                {#if minted.url}
-                  <p class="mono wrap">{minted.url}</p>
-                  <div class="row-actions">
-                    <Button weight="primary" onclick={() => void clipboard.put(minted.url ?? '', copy.doorsUrlCopied, copy.doorsUrlCopied)}>{copy.doorsCopyUrl}</Button>
-                  </div>
-                  <p class="hint">{copy.doorsPost}</p>
-                {:else}
-                  <!-- NO PATH IN THE ANSWER, SO NO ADDRESS. The token is still the only copy there will be, so it is
-                       shown rather than thrown away, with the sentence that says why the address is missing. -->
-                  <p class="mono wrap">{minted.token}</p>
-                  <div class="row-actions">
-                    <Button weight="primary" onclick={() => void clipboard.put(minted.token, copy.doorsTokenCopied, copy.doorsTokenCopied)}>{copy.doorsCopyToken}</Button>
-                  </div>
-                  <p class="hint">{copy.doorsNoAddress}</p>
-                {/if}
-              </div>
+          <IconWell name="plug" size="l" />
+          <div class="door-main">
+            <p class="door-name">{door.name}</p>
+            {#if door.register}
+              <p class="hint">{copy.doorsWrites(door.register)}</p>
             {/if}
-            {#if asking === door.id}
-              <!-- THE CONFIRM IS IN PLACE OF THE BUTTON, as `ClearExamples` asks: the press that replaces sits where
-                   the first press was, and keeping the old one is the quieter of the two. -->
-              <p class="code-said" data-intent="bad">{copy.doorsReplaceAsk}</p>
-              <div class="row-actions">
-                <Button weight="primary" tone="bad" disabled={busy !== null} onclick={() => void mint(door.id)}>{copy.doorsReplace}</Button>
-                <Button weight="bare" disabled={busy !== null} onclick={() => (asking = null)}>{copy.doorsKeep}</Button>
-              </div>
+            {#if !door.mintable}
+              <p class="hint">{copy.doorsOtherCheck}</p>
             {:else}
-              <div class="row-actions">
-                <Button weight={door.held ? 'quiet' : 'primary'} disabled={busy !== null} onclick={() => press(door)}>
-                  {busy === door.id ? copy.doorsMinting : door.held ? copy.doorsRemint : copy.doorsMint}
-                </Button>
-              </div>
+              <p class="hint">{door.held ? copy.doorsHeld : copy.doorsNotHeld}</p>
+              {#if mine?.kind === 'minted'}
+                {@const minted = mine}
+                <!-- SHOWN ONCE, from `said` alone. THE SENTENCE IS PASSED to `clipboard.put` as `said`, so the toast is
+                     that one line: passed only as the label it read "Copied Address copied." (defects A12), and with
+                     neither it would quote the text, which is a live credential. -->
+                <div class="code-form">
+                  <p class="code-label">{copy.doorsOnce}</p>
+                  {#if minted.url}
+                    <p class="mono wrap">{minted.url}</p>
+                    <div class="row-actions">
+                      <Button weight="primary" onclick={() => void clipboard.put(minted.url ?? '', copy.doorsUrlCopied, copy.doorsUrlCopied)}>{copy.doorsCopyUrl}</Button>
+                    </div>
+                    <p class="hint">{copy.doorsPost}</p>
+                  {:else}
+                    <!-- NO PATH IN THE ANSWER, SO NO ADDRESS. The token is still the only copy there will be, so it is
+                         shown rather than thrown away, with the sentence that says why the address is missing. -->
+                    <p class="mono wrap">{minted.token}</p>
+                    <div class="row-actions">
+                      <Button weight="primary" onclick={() => void clipboard.put(minted.token, copy.doorsTokenCopied, copy.doorsTokenCopied)}>{copy.doorsCopyToken}</Button>
+                    </div>
+                    <p class="hint">{copy.doorsNoAddress}</p>
+                  {/if}
+                </div>
+              {/if}
+              {#if asking === door.id}
+                <!-- THE CONFIRM IS IN PLACE OF THE BUTTON, as `ClearExamples` asks: the press that replaces sits where
+                     the first press was, and keeping the old one is the quieter of the two. -->
+                <p class="code-said">{copy.doorsReplaceAsk}</p>
+                <div class="row-actions">
+                  <Button weight="primary" tone="bad" disabled={busy !== null} onclick={() => void mint(door.id)}>{copy.doorsReplace}</Button>
+                  <Button weight="bare" disabled={busy !== null} onclick={() => (asking = null)}>{copy.doorsKeep}</Button>
+                </div>
+              {:else}
+                <div class="row-actions">
+                  <Button weight={door.held ? 'quiet' : 'primary'} disabled={busy !== null} onclick={() => press(door)}>
+                    {busy === door.id ? copy.doorsMinting : door.held ? copy.doorsRemint : copy.doorsMint}
+                  </Button>
+                </div>
+              {/if}
+              <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+              <p class="code-said" role="status" data-tone={toneOf(mine)}>{#if toneOf(mine)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(mine)}</p>
+              {#if mine?.kind === 'signin'}
+                <div class="row-actions">
+                  <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+                </div>
+              {/if}
             {/if}
-            <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-            <p class="code-said" role="status" data-intent={toneOf(mine)}>{lineOf(mine)}</p>
-            {#if mine?.kind === 'signin'}
-              <div class="row-actions">
-                <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-              </div>
-            {/if}
-          {/if}
+          </div>
         </li>
       {/each}
     </ul>
@@ -220,23 +229,48 @@
   .doors {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
     margin: 0 0 var(--sp-3);
     padding: 0;
     list-style: none;
   }
 
+  /* A DOOR IS A ROW ON THE GROUND: the plug in its well beside everything the door says and offers, and a hairline
+     between two doors, as between any two rows (SYSTEM §6). */
   .door {
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-3);
+    padding-block: var(--sp-3);
   }
 
+  .door + .door {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .door-main {
+    min-inline-size: 0;
+  }
+
+  .door-main > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* THE NAME AS A ROW TITLE, 15 at 500, level with the middle of its well. */
   .door-name {
-    margin: 0 0 var(--sp-1);
+    margin: 0 0 2px;
+    padding-block-start: 6px;
     color: var(--ink);
-    font-weight: 600;
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
   }
 
+  .door .hint {
+    margin-block-end: var(--sp-1);
+  }
+
+  /* THE ADDRESS SHOWN ONCE, as the mail section above it in Settings draws its own, so the two read as one screen. */
   .code-form {
     display: flex;
     flex-direction: column;
@@ -244,32 +278,56 @@
     margin-block-start: var(--sp-3);
   }
 
+  .code-form .hint {
+    margin: 0;
+  }
+
   .code-label {
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   /* A TOKEN IS ONE 43-CHARACTER WORD and the address is longer, so without this the body scrolls sideways at 320px. */
   .wrap {
+    margin: 0;
     overflow-wrap: anywhere;
   }
 
+  /* AN ADDRESS IS SET IN GEIST MONO (SYSTEM §3). */
   .mono {
-    font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    font-family: var(--font-id);
     font-size: var(--t-sm);
     letter-spacing: 0;
   }
 
+  /* WHAT THE RECORD SAID, in the second ink; a refusal after a red glyph and in ink, so the words carry it. */
   .code-said {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
     margin: 0;
-    color: var(--tone, var(--ink2));
+    color: var(--ink2);
     font-size: var(--t-sm);
+  }
+
+  .code-said[data-tone='bad'] {
+    color: var(--ink);
+  }
+
+  .glyph {
+    display: inline-flex;
+    flex: none;
+    margin-block-start: 1px;
+    color: var(--danger);
   }
 
   .row-actions {
     flex-wrap: wrap;
     display: flex;
     gap: var(--sp-2);
-    margin-block-start: var(--sp-3);
+    margin-block: var(--sp-3) var(--sp-2);
   }
+
 </style>

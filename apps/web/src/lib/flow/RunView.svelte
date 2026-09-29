@@ -160,18 +160,21 @@
     row-gap: var(--sp-1);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-row);
+    font-weight: 500;
   }
 
   .rv-meta {
     color: var(--dim);
     font-size: var(--t-sm);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
   }
 
   .rv-say {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--t-base);
     overflow-wrap: anywhere;
   }
 
@@ -184,32 +187,35 @@
     list-style: none;
   }
 
-  /* A BRANCH'S ARMS SIT UNDER IT, indented by a rule, as the canvas draws them. */
+  /* A BRANCH'S ARMS SIT UNDER IT, indented by a line, as the canvas draws them. */
   .rv-list .rv-list {
     margin-block-start: var(--sp-1);
     padding-inline-start: var(--sp-3);
     border-inline-start: 1px solid var(--line);
   }
 
+  /* A STEP OF THE RUN, INSIDE THE SHEET: the sheet is a tile's surface and a tile never holds a tile, so a step is the
+     surface's inner fill at the field's corner (SYSTEM §4), with no border. */
   .rv-card {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
     background: var(--s1);
-    border: 1px solid var(--line);
     border-radius: var(--r-md);
   }
 
+  /* NOT REACHED IS HOLLOW: no fill, and a hairline ring where the fill would be. */
   .rv-card[data-state='unreached'] {
     background: transparent;
-    border-style: dashed;
+    box-shadow: inset 0 0 0 1px var(--line);
   }
 
   .rv-said {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
+    font-weight: 500;
     overflow-wrap: anywhere;
   }
 
@@ -250,15 +256,16 @@
   .rv-arm {
     margin: var(--sp-1) 0 0;
     color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    font-size: var(--t-sm);
+    font-weight: 500;
   }
 
-  /* A STATE'S DOT IN ITS INTENT, BESIDE ITS WORD (`loop/finish/design-brief.md` §10): working is `--info`, parked on a
-     person `--warn`, failed `--danger`, done and stopped `--dim`, and a step never reached a hollow mark. */
+  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6), each in its meaning: going now `--live`, done green, parked on a
+     person amber, failed red, stopped the quiet ink, and a step never reached a hollow ring. */
   .rv-dot {
     display: inline-block;
     flex: none;
+    box-sizing: border-box;
     inline-size: var(--dot);
     block-size: var(--dot);
     border-radius: var(--r-pill);
@@ -267,21 +274,25 @@
 
   .rv-dot[data-state='pending'],
   .rv-dot[data-state='running'] {
-    background: var(--info);
+    background: var(--live);
+  }
+
+  .rv-dot[data-state='done'] {
+    background: var(--earn);
   }
 
   .rv-dot[data-state='waiting'] {
-    background: var(--warn-fill);
+    background: var(--warn);
   }
 
   .rv-dot[data-state='failed'] {
-    background: var(--danger-fill);
+    background: var(--danger);
   }
 
   .rv-dot[data-state='skipped'],
   .rv-dot[data-state='unreached'] {
     background: transparent;
-    border: 1px solid var(--edge);
+    border: 1.5px solid var(--dim);
   }
 
   .rv-actions {

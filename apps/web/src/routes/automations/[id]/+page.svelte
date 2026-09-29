@@ -26,6 +26,14 @@
   canvas of the version it ran under, with Run it again. Versions lists what was installed, what changed from the one
   before in the steps' own words, and puts an older one back on the canvas to be saved. As written is the declaration
   itself, one click away and never the only way to see it (21 §3.1's text lens).
+
+  THE LOOK (SYSTEM §6, SCREENS Automations). The trigger and every step are tiles on the ground, joined by `--rule`
+  lines, each with its icon in a well; the card being edited has an ink well and the docked panel beside it
+  (`Inspector.svelte`), so the flow stays in view while it is filled in. Try it is a tile under the flow, and Try and
+  Save ride in a glass bar at the foot. Runs opens on a tile of how the last runs went, a bar of their endings and a
+  sparkline of how long each took, with the one line that says what they mean, and the runs sit on the ground under
+  it; Versions are rows on the ground, and As written is the declaration in a tile. The sentence under the title is the
+  last run and the next, and a failed last run is its red phrase.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -35,7 +43,7 @@
   import { since } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
   import { actor } from '$lib/record/names.ts';
-  import { openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
+  import { installWords, openActions, type ActionRow, type CallOut } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
@@ -43,6 +51,9 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import { Sparkline, Stacked } from '$lib/viz/index.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -59,7 +70,9 @@
     diffLines,
     durationOf,
     editWords,
+    lasted,
     openAutomations,
+    planPlaces,
     sampleOf,
     sayLines,
     stepAnswer,
@@ -73,6 +86,7 @@
     type TryRun,
     type Version,
   } from '$lib/flow/source.ts';
+  import { canvasWords, lastRunReading, pageSentence, runDurations, runMark, runParts, triggerIcon } from '../hub.ts';
 
   const flow = new FlowDraft({ slash: () => page.data.slash === true });
 
@@ -239,6 +253,11 @@
   const kind = $derived(triggerKind(flow.draft.trigger));
   const register = $derived('written' in flow.draft.trigger ? flow.draft.trigger.written.register : null);
   const saveWord = $derived(busy ? words.saving : !owner ? words.save : row ? editWords.saveChanges : editWords.saveOn);
+  /* THE SENTENCE UNDER THE TITLE: the last run and the next, the failed clause red. None for a draft never saved. */
+  const said = $derived(pageSentence(row, now));
+  /* THE PLAN THE RUNNER NUMBERS STEPS BY, so "failed at step 3" counts the steps as the canvas draws them. */
+  const places = $derived(row?.body ? planPlaces(row.body) : null);
+  const durations = $derived(runDurations(runs));
 
   /* THE RECORD IS ASKED ABOUT THE BODY ONCE THE BUILDER HAS NOTHING TO SAY ABOUT IT, after the canvas rests. Asked
      sooner, it would say the same fault twice in two sets of words. */
@@ -562,189 +581,227 @@
     </Empty>
   </div>
 {:else if from === 'ready'}
-  <!-- RENAME OPENS THE TRIGGER'S SHEET, WHOSE FIRST FIELD IS THE NAME, and `Sheet.svelte` puts the caret in the first
-       field it holds. Offered once it is saved: a new draft's sheet opens on its trigger anyway, and "Rename" over a
-       draft with no name yet named nothing. The lifecycle sits in one "…" menu beside it, destructive last. -->
-  <PageHead icon="refresh" kicker={words.heading} back="/automations" {title}>
-    {#snippet actions()}
-      {#if row}
-        <Button onclick={() => flow.select('trigger')}>{editWords.rename}</Button>
-        <Menu label={editWords.more(title)} align="end" bind:open={menuOpen}>
-          {#snippet trigger()}<span class="more-trigger tap"><Icon name="more" size="s" /><span class="vh">{editWords.more(title)}</span></span>{/snippet}
-          {#if owner}
-            <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}>{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
-          {/if}
-          <button type="button" class="mi" role="menuitem" onclick={duplicate}>{editWords.duplicate}</button>
-          {#if owner}
-            <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => ((menuOpen = false), (removeSheet = true))}>{editWords.remove}</button>
-          {/if}
-        </Menu>
-      {/if}
-    {/snippet}
-  </PageHead>
-  <div class="page">
-
-    <div class="segmented tabs" role="group" aria-label={title}>
-      <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
-      {#if row}
-        <button type="button" class="segment" aria-pressed={tab === 'runs'} data-on={tab === 'runs' ? '' : undefined} onclick={() => (tab = 'runs')}>{words.runs}</button>
-        <button type="button" class="segment" aria-pressed={tab === 'versions'} data-on={tab === 'versions' ? '' : undefined} onclick={() => ((tab = 'versions'), void loadVersions())}>{editWords.versions}</button>
-      {/if}
-      <button type="button" class="segment" aria-pressed={tab === 'written'} data-on={tab === 'written' ? '' : undefined} onclick={() => (tab = 'written')}>{words.written}</button>
-    </div>
-
-    {#if row && !row.enabled}<p class="said">{words.off}</p>{/if}
-
-    {#if tab === 'steps'}
-      <div class="canvas">
-        <!-- A FAULT ABOUT THE WHOLE AUTOMATION IS READ WITH THE TRIGGER, the card it sits under, so a screen reader that
-             lands on the trigger hears what is wrong before it presses anything (`aria-describedby`). -->
-        <button
-          type="button"
-          class="trigger tap"
-          data-selected={flow.selected === 'trigger' ? '' : undefined}
-          aria-describedby={faultIds.length > 0 ? faultIds.join(' ') : undefined}
-          onclick={() => flow.select('trigger')}
-        >
-          <span class="trigger-kicker">{words.trigger}</span>
-          <span class="trigger-said">{sayStart(flow.draft)}</span>
-          <span class="trigger-path">{flow.path === 'inline' ? words.inline : words.asRun}</span>
-        </button>
-        {#each general as f, i (f.say)}<p class="fault" id={`flow-fault-${i}`}>{f.say}</p>{/each}
-        {#if served && served.key === null}<p class="fault" id="flow-fault-served">{served.say}</p>{/if}
-        <FlowList {flow} list={ROOT} nodes={flow.draft.steps} faults={shown} />
+  <!-- THE WHOLE SCREEN NARROWS BESIDE THE DOCKED INSPECTOR, title row and all: the panel sets `--dock-w` while it is
+       open, and this pads by what it takes past the page's own gutter, so nothing sits under the panel. -->
+  <div class="screen">
+    <!-- RENAME OPENS THE TRIGGER'S PANEL, WHOSE FIRST FIELD IS THE NAME, and the inspector puts the caret in the first
+         field it holds. Offered once it is saved: a new draft's panel opens on its trigger anyway, and "Rename" over a
+         draft with no name yet named nothing. The lifecycle sits in one "…" menu beside it, destructive last. -->
+    <PageHead icon="refresh" kicker={words.heading} back="/automations" {title} sentence={said?.text} needs={said?.needs || undefined}>
+      {#snippet actions()}
+        {#if row}
+          <Button onclick={() => flow.select('trigger')}>{editWords.rename}</Button>
+          <Menu label={editWords.more(title)} align="end" bind:open={menuOpen}>
+            {#snippet trigger()}<span class="more-trigger"><Icon name="more" size="m" /><span class="vh">{editWords.more(title)}</span></span>{/snippet}
+            {#if owner}
+              <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}>{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
+            {/if}
+            <button type="button" class="mi" role="menuitem" onclick={duplicate}>{editWords.duplicate}</button>
+            {#if owner}
+              <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => ((menuOpen = false), (removeSheet = true))}>{editWords.remove}</button>
+            {/if}
+          </Menu>
+        {/if}
+      {/snippet}
+    </PageHead>
+    <div class="page">
+      <div class="segmented tabs" role="group" aria-label={title}>
+        <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
+        {#if row}
+          <button type="button" class="segment" aria-pressed={tab === 'runs'} data-on={tab === 'runs' ? '' : undefined} onclick={() => (tab = 'runs')}>{words.runs}</button>
+          <button type="button" class="segment" aria-pressed={tab === 'versions'} data-on={tab === 'versions' ? '' : undefined} onclick={() => ((tab = 'versions'), void loadVersions())}>{editWords.versions}</button>
+        {/if}
+        <button type="button" class="segment" aria-pressed={tab === 'written'} data-on={tab === 'written' ? '' : undefined} onclick={() => (tab = 'written')}>{words.written}</button>
       </div>
 
-      {#if flow.draft.steps.length > 0}
-        <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} />
-      {/if}
+      {#if tab === 'steps'}
+        <div class="column">
+          <div class="canvas">
+            <!-- A FAULT ABOUT THE WHOLE AUTOMATION IS READ WITH THE TRIGGER, the card it sits under, so a screen reader
+                 that lands on the trigger hears what is wrong before it presses anything (`aria-describedby`). -->
+            <button
+              type="button"
+              class="trigger tap"
+              data-selected={flow.selected === 'trigger' ? '' : undefined}
+              aria-describedby={faultIds.length > 0 ? faultIds.join(' ') : undefined}
+              onclick={() => flow.select('trigger')}
+            >
+              <IconWell name={triggerIcon(kind)} size="l" tone={flow.selected === 'trigger' ? 'ink' : general.length > 0 || (served !== null && served.key === null) ? 'danger' : undefined} />
+              <span class="trigger-main">
+                <span class="trigger-kicker">{words.trigger}</span>
+                <span class="trigger-said">{sayStart(flow.draft)}</span>
+                <span class="trigger-path">{flow.path === 'inline' ? words.inline : words.asRun}</span>
+              </span>
+            </button>
+            {#each general as f, i (f.say)}<p class="fault" id={`flow-fault-${i}`}><span class="fault-glyph" aria-hidden="true"><Icon name="alert" /></span>{f.say}</p>{/each}
+            {#if served && served.key === null}<p class="fault" id="flow-fault-served"><span class="fault-glyph" aria-hidden="true"><Icon name="alert" /></span>{served.say}</p>{/if}
+            <FlowList {flow} list={ROOT} nodes={flow.draft.steps} faults={shown} />
+          </div>
 
-      {#if calls.length > 0}
-        <dl class="calls"><CallsOut {calls} hosted={hostedHere(page.data as unknown as Shell)} /></dl>
-      {/if}
-
-      <div class="foot">
-        <!-- SENT SAYS SO ONLY UNTIL THE NEXT EDIT. Kept after one, the footer read "Sent to Decide" over a draft that was
-             not, and hid the fault line that said why the button had gone grey. -->
-        {#if filed && !flow.dirty}
-          <p class="said" role="status">
-            {words.filed}
-            {#if filed.id}<a class="tap" href={at(`/decide/${filed.id}`)}>{words.openDecide}</a>{/if}
-          </p>
-        {/if}
-        {#if refusal}
-          <p class="said" data-intent="warn" role="status">{refusal}</p>
-        {:else if untouched}
-          <p class="said">{editWords.start}</p>
-        {:else if faults.length > 0}
-          <p class="said" id="flow-held">{words.faults}: {faults.length === 1 ? faults[0]!.say : copy.flowFaultsOnCards(faults.length)}</p>
-        {:else if served}
-          <p class="said" id="flow-held">{words.faults}: {served.say}</p>
-        {:else if !flow.dirty && !filed}
-          <p class="said">{words.nothingChanged}</p>
-        {/if}
-        <!-- A NEW AUTOMATION THAT STARTS ON A PRESS SAYS WHERE THE PRESS WILL BE. Its trigger reads "When you press Run
-             now" and there was no Run now anywhere, because a run needs something saved to run. -->
-        {#if manual && !row}
-          <p class="said">{copy.flowRunAfterSave}</p>
-        {/if}
-        <div class="foot-actions">
-          <Button disabled={!flow.canUndo} onclick={undo}>{copy.undo}</Button>
-          <Button disabled={!flow.canRedo} onclick={redo}>{copy.redo}</Button>
-          {#if manual && row && row.enabled && !flow.dirty}
-            <Button onclick={() => void runNow()}><Icon name="play" size="s" />{words.runNow}</Button>
+          {#if flow.draft.steps.length > 0}
+            <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} />
           {/if}
-        </div>
-      </div>
 
-      <!-- TRY AND SAVE, AND NOTHING ELSE, IN THE STICKY BAR, so on a phone it is one row of two 44px buttons, no taller than
-           `--sticky`, sitting above the tab bar (`loop/finish/design-brief.md` §6 and §11.12). -->
-      <div class="bar">
-        <Button disabled={trying || flow.draft.steps.length === 0} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
-        <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
-        <Button weight="primary" disabled={busy || blocked || !flow.dirty} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
-      </div>
-    {:else if tab === 'runs' && row}
-      {#if runs.length === 0}
-        <Empty kind="no-data-yet" compact title={words.noRuns} />
-      {:else}
-        <ol class="runs">
-          {#each runs as r (r.id)}
-            {@const took = durationOf(r)}
-            <!-- STATE FIRST, WITH ITS DOT, THEN WHEN, HOW LONG AND WHAT STARTED IT, and no id: a run is opened by the whole
-                 row, and its detail is the canvas it ran on (`RunView.svelte`). -->
-            <li class="run">
-              <button type="button" class="run-open" aria-label={`${editWords.openRun}: ${cap(words.runState[r.state] ?? r.state)}, ${since(r.started, now)}`} onclick={() => openRun(r)}>
-                <span class="run-head">
-                  <span class="dot" data-state={r.state} aria-hidden="true"></span>
-                  <span>{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span>
-                </span>
-                <span class="run-meta">
-                  {#if took !== null}<span>{editWords.took(took)}</span>{/if}
-                  {#if r.trigger !== null && editWords.startedBy[r.trigger]}<span>{editWords.startedBy[r.trigger]}</span>{/if}
-                </span>
-                {#if r.say}<span class="run-say">{r.say}</span>{/if}
-              </button>
-              {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}
-                <Button weight="bare" onclick={() => void stop(r.id)}>{words.cancel}</Button>
-              {/if}
-            </li>
-          {/each}
-        </ol>
-        {#if older !== null}
-          <div><Button disabled={paging} onclick={() => void moreRuns()}>{editWords.olderRuns}</Button></div>
-        {/if}
-      {/if}
-    {:else if tab === 'versions' && row}
-      {#if versions === null}
-        <p class="said" role="status">{editWords.versions}</p>
-      {:else if versionsFix !== ''}
-        <p class="said" data-intent="warn" role="status">{versionsFix}</p>
-      {:else if versions.length === 0}
-        <Empty kind="no-data-yet" compact title={editWords.noVersions} />
-      {:else}
-        <ol class="versions">
-          {#each versions as v, i (v.version)}
-            {@const changes = diffOf === v.version ? changesOf(i) : null}
-            <li class="version">
-              <p class="version-head">
-                <span class="version-name">{editWords.versionOf(v.version)}</span>
-                {#if v.live}<span class="version-tag">{editWords.live}</span>{/if}
-                {#if !v.enabled}<span class="version-tag">{editWords.off}</span>{/if}
-                <span class="version-meta">{since(v.at, now)}{v.by ? `, ${editWords.by(actor(v.by, me, names).name)}` : ''}</span>
+          {#if calls.length > 0}
+            <!-- THE CALLS SAY THEIR OWN HEADING AS THE LIST'S TERM (`CallsOut.svelte`), which the tile's heading already
+                 says, so the term is kept for a screen reader and not drawn twice. -->
+            <Tile icon="globe" title={installWords.heading}>
+              <dl class="calls"><CallsOut {calls} hosted={hostedHere(page.data as unknown as Shell)} /></dl>
+            </Tile>
+          {/if}
+
+          <div class="foot">
+            <!-- SENT SAYS SO ONLY UNTIL THE NEXT EDIT. Kept after one, the footer read "Sent to Decide" over a draft that
+                 was not, and hid the fault line that said why the button had gone grey. -->
+            {#if filed && !flow.dirty}
+              <p class="said" role="status">
+                {words.filed}
+                {#if filed.id}<a class="tap" href={at(`/decide/${filed.id}`)}>{words.openDecide}</a>{/if}
               </p>
-              <div class="version-actions">
-                <Button weight="quiet" onclick={() => (diffOf = diffOf === v.version ? null : v.version)}>{diffOf === v.version ? editWords.hideChanges : editWords.showChanges}</Button>
-                {#if !v.live}<Button weight="quiet" onclick={() => putBack(v)}>{editWords.putBack}</Button>{/if}
-              </div>
-              {#if changes !== null}
-                {#if changes.length === 0}
-                  <p class="said">{i === versions.length - 1 ? editWords.firstVersion : editWords.noChanges}</p>
-                {:else}
-                  <ul class="diff">
-                    {#each changes as d, j (j)}
-                      <!-- A WORD AND A MARK, NOT A COLOUR ALONE (`loop/finish/design-brief.md` §10): the mark is read out as
-                           added or removed, and the line keeps its indent under a branch. -->
-                      <li class="diff-line" data-op={d.op}>
-                        <span class="diff-mark" role="img" aria-label={d.op === 'added' ? 'Added' : 'Removed'}>{d.op === 'added' ? '+' : '−'}</span>
-                        <span class="diff-said">{d.line}</span>
-                      </li>
-                    {/each}
-                  </ul>
-                {/if}
+            {/if}
+            {#if refusal}
+              <p class="said" data-tone="warn" role="status"><span class="said-glyph" aria-hidden="true"><Icon name="alert" /></span>{refusal}</p>
+            {:else if untouched}
+              <p class="said">{editWords.start}</p>
+            {:else if faults.length > 0}
+              <p class="said" data-tone="bad" id="flow-held">{words.faults}: {faults.length === 1 ? faults[0]!.say : copy.flowFaultsOnCards(faults.length)}</p>
+            {:else if served}
+              <p class="said" data-tone="bad" id="flow-held">{words.faults}: {served.say}</p>
+            {:else if !flow.dirty && !filed}
+              <p class="said">{words.nothingChanged}</p>
+            {/if}
+            <!-- A NEW AUTOMATION THAT STARTS ON A PRESS SAYS WHERE THE PRESS WILL BE. Its trigger reads "When you press
+                 Run now" and there was no Run now anywhere, because a run needs something saved to run. -->
+            {#if manual && !row}
+              <p class="said">{copy.flowRunAfterSave}</p>
+            {/if}
+            <div class="foot-actions">
+              <Button disabled={!flow.canUndo} kbd={canvasWords.undoKey} onclick={undo}>{copy.undo}</Button>
+              <Button disabled={!flow.canRedo} kbd={canvasWords.redoKey} onclick={redo}>{copy.redo}</Button>
+              {#if manual && row && row.enabled && !flow.dirty}
+                <Button onclick={() => void runNow()}><Icon name="play" size="s" />{words.runNow}</Button>
               {/if}
-            </li>
-          {/each}
-        </ol>
-      {/if}
-    {:else}
-      <!-- A SCROLLING BOX A KEYBOARD CAN REACH, for `Sheet.svelte`'s reason: a long body scrolls sideways and down, and
-           a box with no focusable node in it cannot be scrolled without a pointer. -->
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <pre class="written" tabindex="0">{JSON.stringify(flow.body, null, 2)}</pre>
-    {/if}
+            </div>
+          </div>
 
-    <p class="vh" role="status" aria-live="polite">{flow.said}</p>
+          <!-- TRY AND SAVE, AND NOTHING ELSE, IN THE STICKY GLASS BAR, so on a phone it is one row of two 44px buttons, no
+               taller than `--sticky`, floating above the tab bar (`loop/finish/design-brief.md` §6 and §11.12). -->
+          <div class="bar">
+            <Button disabled={trying || flow.draft.steps.length === 0} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
+            <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
+            <Button weight="primary" disabled={busy || blocked || !flow.dirty} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
+          </div>
+        </div>
+      {:else if tab === 'runs' && row}
+        {#if runs.length === 0}
+          <Empty kind="no-data-yet" compact title={words.noRuns} />
+        {:else}
+          <div class="column">
+            <Tile icon="refresh" title={canvasWords.lastRuns} meta={canvasWords.lastRunsMeta(runs.length)}>
+              {#snippet actions()}
+                {#if durations.length > 1}
+                  <span class="trend"><Sparkline values={durations} subject={canvasWords.tookSubject} format={(n) => lasted(n * 1000)} /></span>
+                {/if}
+              {/snippet}
+              <Stacked parts={runParts(runs)} subject={canvasWords.runsSubject} />
+              <p class="reading">{lastRunReading(runs, places, now)}</p>
+            </Tile>
+
+            <ol class="runs ledger ledger-lead">
+              {#each runs as r (r.id)}
+                {@const took = durationOf(r)}
+                {@const mark = runMark(r.state)}
+                <!-- THE STATE AS ITS WELL AND ITS WORD, THEN WHEN, HOW LONG AND WHAT STARTED IT, and no id: a run is opened
+                     by the whole row, and its detail is the canvas it ran on (`RunView.svelte`). Stop sits beside the row,
+                     outside it, so the two presses never nest. -->
+                <li class="run">
+                  <button type="button" class="run-open line line-tall" aria-label={`${editWords.openRun}: ${cap(words.runState[r.state] ?? r.state)}, ${since(r.started, now)}`} onclick={() => openRun(r)}>
+                    <IconWell name={mark.icon} size="l" tone={mark.tone} />
+                    <span class="line-main">
+                      <span class="line-title">{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span>
+                      <span class="line-detail run-meta">
+                        {#if took !== null}<span>{editWords.took(took)}</span>{/if}
+                        {#if r.trigger !== null && editWords.startedBy[r.trigger]}<span>{editWords.startedBy[r.trigger]}</span>{/if}
+                      </span>
+                      {#if r.say}<span class="run-say">{r.say}</span>{/if}
+                    </span>
+                  </button>
+                  {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}
+                    <Button weight="bare" size="sm" onclick={() => void stop(r.id)}>{words.cancel}</Button>
+                  {/if}
+                </li>
+              {/each}
+            </ol>
+            {#if older !== null}
+              <div><Button disabled={paging} onclick={() => void moreRuns()}>{editWords.olderRuns}</Button></div>
+            {/if}
+          </div>
+        {/if}
+      {:else if tab === 'versions' && row}
+        {#if versions === null}
+          <p class="said" role="status">{editWords.versions}</p>
+        {:else if versionsFix !== ''}
+          <p class="said" data-tone="warn" role="status"><span class="said-glyph" aria-hidden="true"><Icon name="alert" /></span>{versionsFix}</p>
+        {:else if versions.length === 0}
+          <Empty kind="no-data-yet" compact title={editWords.noVersions} />
+        {:else}
+          <ol class="versions ledger ledger-lead column">
+            {#each versions as v, i (v.version)}
+              {@const changes = diffOf === v.version ? changesOf(i) : null}
+              <li class="version">
+                <!-- THE LIVE VERSION'S WELL IS INK, the system's mark for the chosen one, beside the word that says it. -->
+                <div class="line line-tall version-line">
+                  <IconWell name="history" size="l" tone={v.live ? 'ink' : undefined} />
+                  <span class="line-main">
+                    <span class="line-title version-head">
+                      <span class="version-name">{editWords.versionOf(v.version)}</span>
+                      {#if v.live}<span class="version-tag">{editWords.live}</span>{/if}
+                      {#if !v.enabled}<span class="version-tag">{editWords.off}</span>{/if}
+                    </span>
+                    <span class="line-detail version-meta">{since(v.at, now)}{v.by ? `, ${editWords.by(actor(v.by, me, names).name)}` : ''}</span>
+                  </span>
+                  <span class="version-actions">
+                    <Button size="sm" onclick={() => (diffOf = diffOf === v.version ? null : v.version)}>{diffOf === v.version ? editWords.hideChanges : editWords.showChanges}</Button>
+                    {#if !v.live}<Button size="sm" onclick={() => putBack(v)}>{editWords.putBack}</Button>{/if}
+                  </span>
+                </div>
+                {#if changes !== null}
+                  <div class="version-changes">
+                    {#if changes.length === 0}
+                      <p class="said">{i === versions.length - 1 ? editWords.firstVersion : editWords.noChanges}</p>
+                    {:else}
+                      <Tile icon="history" title={canvasWords.changed} count={changes.length}>
+                        <ul class="diff">
+                          {#each changes as d, j (j)}
+                            <!-- A WORD AND A MARK, NOT A COLOUR ALONE (`loop/finish/design-brief.md` §10): the mark is read out
+                                 as added or removed, and the line keeps its indent under a branch. -->
+                            <li class="diff-line" data-op={d.op}>
+                              <span class="diff-mark" role="img" aria-label={d.op === 'added' ? 'Added' : 'Removed'}>{d.op === 'added' ? '+' : '−'}</span>
+                              <span class="diff-said">{d.line}</span>
+                            </li>
+                          {/each}
+                        </ul>
+                      </Tile>
+                    {/if}
+                  </div>
+                {/if}
+              </li>
+            {/each}
+          </ol>
+        {/if}
+      {:else}
+        <div class="column">
+          <Tile icon="code" title={words.written}>
+            <!-- A SCROLLING BOX A KEYBOARD CAN REACH, for `Sheet.svelte`'s reason: a long body scrolls sideways and down,
+                 and a box with no focusable node in it cannot be scrolled without a pointer. -->
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <pre class="written" tabindex="0">{JSON.stringify(flow.body, null, 2)}</pre>
+          </Tile>
+        </div>
+      {/if}
+
+      <p class="vh" role="status" aria-live="polite">{flow.said}</p>
+    </div>
   </div>
 
   <Inspector {flow} />
@@ -768,12 +825,20 @@
 {/if}
 
 <style>
+  /* THE SCREEN GIVES UP WHAT THE DOCKED INSPECTOR TAKES, past the gutter the title row and the page already pad by. */
+  .screen {
+    min-inline-size: 0;
+    padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));
+    transition: padding-inline-end var(--d-enter) var(--ease-out);
+  }
+
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 960px;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+    max-inline-size: var(--page-max);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
   /* FOUR TABS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS on a 320px screen, where their words do not fit one row. */
@@ -783,75 +848,121 @@
     max-inline-size: 100%;
   }
 
-  .canvas {
+  /* ONE COLUMN OF 720 for the flow and everything that goes with it: the try tile, the calls, the footer and the bar
+     are the cards' width, so at 1440 Save never sits out on its own to the right of what it saves
+     (`loop/finish/design.md` 2.7). */
+  .column {
     display: flex;
     flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
     max-inline-size: 720px;
   }
 
+  .canvas {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* THE TRIGGER IS THE FIRST NODE: a tile on the ground with what starts it in a 32px well, 12 in from a 22 corner, so
+     the well's 9 and the tile's 22 are one curve. Its state is its well's, as a step's is (`FlowCard.svelte`). */
   .trigger {
     display: grid;
-    gap: 2px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-3);
     padding: var(--sp-3);
-    background: var(--s2);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-md);
+    background: var(--bg);
+    border: 0;
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
     color: inherit;
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition: box-shadow var(--d-state) var(--ease-out);
   }
 
   .trigger[data-selected] {
-    border-color: var(--ink2);
+    box-shadow: var(--e2);
+  }
+
+  .trigger-main {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
   }
 
   .trigger-kicker {
     color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 18px;
   }
 
   .trigger-said {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-row);
     font-weight: 600;
+    line-height: 20px;
+    overflow-wrap: anywhere;
   }
 
   .trigger-path {
     color: var(--dim);
     font-size: var(--t-sm);
+    line-height: 18px;
   }
 
+  /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph (SCREENS, Automations), on the
+     ground, lined up with the trigger's words. */
   .fault {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
-    padding: var(--sp-1) var(--sp-2);
-    background: var(--warn-wash);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
+    padding-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
+    color: var(--danger);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
+  .fault-glyph,
+  .said-glyph {
+    display: inline-flex;
+    flex: none;
+    margin-block-start: 1px;
+    color: var(--danger);
+  }
+
+  /* THE CALLS' OWN TERM IS THE TILE'S HEADING ALREADY, so it is kept for a screen reader and not drawn twice. */
   .calls {
     display: grid;
     gap: var(--sp-1);
     margin: 0;
-    max-inline-size: 720px;
     font-size: var(--t-sm);
   }
 
-  /* THE FOOTER AND THE BAR ARE THE CARDS' WIDTH, 720PX, as the try panel and the calls are. At the page's own 960 their
-     rules ran 180px past the column they close, so at 1440 Save sat out on its own to the right of everything it saves
-     (`loop/finish/design.md` 2.7). */
+  .calls :global(.calls-h) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .calls :global(.calls) {
+    margin: 0;
+  }
+
   .foot {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
-    max-inline-size: 720px;
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .said {
@@ -862,42 +973,64 @@
     overflow-wrap: anywhere;
   }
 
-  .said[data-intent='warn'] {
+  .said a {
     color: var(--ink);
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+  }
+
+  /* THE RECORD'S NO, IN INK AFTER A RED GLYPH; WHAT HOLDS THE SAVE BACK, IN RED WORDS (SCREENS, Automations). */
+  .said[data-tone='warn'] {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    color: var(--ink);
+  }
+
+  .said[data-tone='bad'] {
+    color: var(--danger);
+    font-weight: 500;
   }
 
   .foot-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-3);
+    gap: 6px;
     margin-inline-start: auto;
   }
 
-  /* TRY AND SAVE STAY IN REACH AT EVERY WIDTH. A flow of twenty cards puts them two screens down, and they are the two
-     things the page is for.
-
-     ON A PHONE IT STICKS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
-     scrollport runs to the bottom of the window, and `TabBar` is fixed over the last `--tabbar` of it, so this sticks
-     `--tabbar` up. It was once the sentence and every button, 94px tall, and on an iPhone the tab bar hid it; it is now
-     the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most anything sticky may be on a phone
-     (`loop/finish/design-brief.md` §6). The sentence, Undo and Run now sit in the flow above it. At 900 and up there is
-     no tab bar and it sticks to the bottom edge. */
+  /**
+   * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a glass bar at the foot of the column (SYSTEM §5: chrome is glass). A
+   * flow of twenty cards puts them two screens down, and they are the two things the page is for.
+   *
+   * ON A PHONE IT FLOATS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
+   * scrollport runs to the bottom of the window, and `TabBar` floats `--inset` over its last `--tabbar`, so this sticks
+   * a step above that. It is the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most anything sticky
+   * may be on a phone (`loop/finish/design-brief.md` §6). The sentence, Undo and Run now sit in the flow above it. At
+   * 900 and up there is no tab bar and it floats `--inset` over the bottom edge, at the column's end.
+   */
   .bar {
     position: sticky;
-    inset-block-end: var(--tabbar);
+    inset-block-end: var(--inset);
     z-index: var(--z-raise);
     display: flex;
     justify-content: flex-end;
-    gap: var(--sp-3);
-    max-inline-size: 720px;
-    padding: var(--sp-1) 0;
-    background: var(--bg);
-    border-block-start: 1px solid var(--line-soft);
+    gap: 6px;
+    align-self: flex-end;
+    padding: var(--sp-1);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-pill);
+    box-shadow: var(--glass-edge), var(--e2);
   }
 
-  @media (width >= 900px) {
+  @media (width < 900px) {
     .bar {
-      inset-block-end: 0;
+      inset-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-2));
+      align-self: stretch;
+      max-block-size: var(--sticky);
+      border-radius: var(--r-lg);
     }
   }
 
@@ -914,27 +1047,66 @@
     }
   }
 
+  /* FORCED COLOURS DROP THE GLASS AND THE TILES' SHADOWS, so each keeps an edge to be told from the ground by. */
+  @media (forced-colors: active) {
+    .bar,
+    .trigger {
+      outline: 1px solid CanvasText;
+    }
+
+    .trigger[data-selected] {
+      outline-width: 3px;
+    }
+  }
+
+  /* THE HEAD'S "…": a 36px circle, as every icon control in a toolbar is (SYSTEM §5). */
   .more-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
     inline-size: var(--ctl-h);
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
+    border-radius: var(--r-pill);
+    background: var(--glass);
+    box-shadow: var(--glass-edge);
+    color: var(--ink);
+    transition: background var(--d-state) var(--ease-out);
   }
 
+  @media (hover: hover) and (pointer: fine) {
+    .more-trigger:hover {
+      background: var(--glass-strong);
+    }
+  }
+
+  /* GLASS NEVER HOLDS GLASS: in the compact bar the circle drops its own, and keeps it on a phone, whose head is never
+     the glass bar (`PageHead.svelte`). */
+  :global(.head[data-under]) .more-trigger {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  @media (width < 900px) {
+    :global(.head[data-under]) .more-trigger {
+      background: var(--glass);
+      box-shadow: var(--glass-edge);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .more-trigger {
+      inline-size: var(--tap);
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* THE MENU'S ROWS: `Menu.svelte` gives them their height and rhythm; the colours are the caller's. A destructive verb
+     is its words in ink (SYSTEM §6), last in the menu and never red. */
   .mi {
-    display: flex;
-    align-items: center;
-    inline-size: 100%;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
     text-align: start;
     cursor: pointer;
   }
@@ -945,59 +1117,97 @@
     color: var(--ink);
   }
 
-  /* RED ONLY UNDER THE POINTER OR THE FOCUS, as `FlowCard`'s Remove: at rest it is one more item, last in the menu. */
-  .mi[data-tone='bad']:hover,
-  .mi[data-tone='bad']:focus-visible {
-    color: var(--danger);
+  /* ── the Runs tab ─────────────────────────────────────────────────────── */
+
+  /* THE SPARKLINE IN THE TILE'S TOP RIGHT, 120 by 32 with no axes (SYSTEM §7). */
+  .trend {
+    display: block;
+    inline-size: 120px;
   }
 
-  .versions {
-    display: flex;
-    flex-direction: column;
+  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6), at body size in ink. */
+  .reading {
     margin: 0;
-    padding: 0;
-    list-style: none;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
   }
 
-  .version {
+  .run {
     display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    padding: var(--sp-3) 0;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
-  .version + .version {
-    border-block-start: 1px solid var(--line-soft);
+  /* THE ROW IS THE BUTTON THAT OPENS THE RUN: `rows.css`'s tall row, its wash and its hairline, with its well beside
+     both lines at every width (the shared card layout under 640 would put the words under the well). */
+  .run-open {
+    flex: 1 1 auto;
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
+    min-inline-size: 0;
+    background: none;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .run-open .line-main {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .run-meta span + span::before {
+    content: ' · ';
+  }
+
+  .run-say {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  /* ── the Versions tab ─────────────────────────────────────────────────── */
+
+  /* THE WELL, THE WORDS AND THE VERBS ON ONE LINE, the verbs always drawn, since a version is opened to act on it. */
+  .version-line {
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+  }
+
+  .version-line .line-main {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .version-head {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    column-gap: var(--sp-3);
-    margin: 0;
-  }
-
-  .version-name {
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
+    column-gap: var(--sp-2);
   }
 
   .version-tag {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .version-meta {
     color: var(--dim);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   .version-actions {
+    grid-column: 3;
+    grid-row: 1;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-3);
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  /* WHAT A VERSION CHANGED, UNDER ITS ROW AND LINED UP WITH ITS WORDS, in a tile of its own. */
+  .version-changes {
+    padding: var(--sp-1) var(--sp-3) var(--sp-3) calc(var(--sp-3) + var(--well-l) + var(--sp-3));
+  }
+
+  .version-changes .said {
+    display: block;
   }
 
   .diff {
@@ -1005,10 +1215,8 @@
     flex-direction: column;
     gap: 2px;
     margin: 0;
-    padding: var(--sp-2) var(--sp-3);
+    padding: 0;
     list-style: none;
-    background: var(--sunk);
-    border-radius: var(--r-md);
     font-size: var(--t-sm);
   }
 
@@ -1030,6 +1238,7 @@
 
   .diff-mark {
     color: var(--dim);
+    font-family: var(--font-id);
     text-align: center;
   }
 
@@ -1038,114 +1247,36 @@
     overflow-wrap: anywhere;
   }
 
-  .runs {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
+  /* ON A PHONE THE VERSION'S VERBS GO UNDER ITS WORDS, and its changes use the row's whole width. */
+  @media (width < 640px) {
+    .version-line {
+      grid-template-columns: var(--well-l) minmax(0, 1fr);
+    }
 
-  /* A HAIRLINE BETWEEN RUNS AND NONE ROUND THE LIST (DESIGN-SYSTEM 4.4). The row is the button that opens the run, and
-     Stop sits beside it, outside it, so the two presses never nest. */
-  .run {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-1) 0;
-  }
+    .version-actions {
+      grid-column: 2;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
 
-  .run-open {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
-    min-inline-size: 0;
-    min-block-size: var(--tap);
-    padding: var(--sp-2);
-    background: none;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: inherit;
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .run-open:hover {
-      background: var(--hover-wash);
+    .version-changes {
+      padding-inline-start: var(--sp-3);
     }
   }
 
-  .run-meta {
-    display: flex;
-    flex-wrap: wrap;
-    column-gap: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
+  /* ── As written ───────────────────────────────────────────────────────── */
 
-  .run + .run {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  /* THE ONE COLOURED THING ON A RUN'S LINE, BESIDE THE WORD IT COLOURS (DESIGN-SYSTEM 1.2). Working now is `--info`, a
-     failed run `danger`, one parked on a person `warn`; done is `--dim`, as `loop/finish/design-brief.md` §10 gives a
-     normal state no colour, and one that was stopped is a mark with no intent at all. */
-  .dot {
-    display: inline-block;
-    flex: none;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    border-radius: var(--r-pill);
-    background: var(--edge);
-  }
-
-  .dot[data-state='pending'],
-  .dot[data-state='running'] {
-    background: var(--info);
-  }
-
-  .dot[data-state='done'] {
-    background: var(--dim);
-  }
-
-  .dot[data-state='waiting'] {
-    background: var(--warn-fill);
-  }
-
-  .dot[data-state='failed'] {
-    background: var(--danger-fill);
-  }
-
-  .run-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-ui);
-  }
-
-  .run-say {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    overflow-wrap: anywhere;
-  }
-
+  /* THE DECLARATION IN GEIST MONO, in the tile's inner well at the field's corner. */
   .written {
     margin: 0;
     padding: var(--sp-3);
     overflow: auto;
     background: var(--s1);
-    border: 1px solid var(--line);
     border-radius: var(--r-md);
     color: var(--ink2);
     font-family: var(--font-id);
     font-size: var(--t-sm);
+    line-height: 18px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

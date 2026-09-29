@@ -12,8 +12,10 @@
   are 44px under a thumb: touch has no hover to reveal a control that only shows on hover, so these are always drawn.
 
   THE PILL SAYS WHEN A DRAG WILL LAND ON IT, `landing`. The row it sits in is the empty list's drop target, and with the
-  "Nothing yet" box gone the pill is the only thing there to light up, so it takes the accent edge the landing line
-  between two cards is drawn in.
+  "Nothing yet" box gone the pill is the only thing there to light up, so it takes the ink ring the landing line between
+  two cards is drawn in.
+
+  BOTH ARE SMALL NODES ON THE WIRE: the tile's white at its first depth, on the `--rule` connector (SYSTEM §4, §6).
 
   ASK SLASH IS OFFERED WHERE A MODEL IS, read from the layout's `slash` here rather than passed down through `FlowList`,
   because every menu on the canvas asks the same question of the same tab and none of the lists between has a use for it.
@@ -125,35 +127,52 @@
     justify-content: center;
   }
 
+  /* THE PLUS ON THE WIRE, AND THE PILL IN AN EMPTY ARM: small nodes of the canvas, so the tile's white and its first
+     depth, on the `--rule` line they sit on. The words are the second ink, and ink under the pointer. */
   .add {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--sp-2);
+    box-sizing: border-box;
     min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    border: 1px dashed var(--line);
+    padding: 0 var(--sp-3) 0 var(--sp-2);
+    background: var(--bg);
+    border: 0;
     border-radius: var(--r-pill);
-    background: var(--s1);
-    color: var(--dim);
+    box-shadow: var(--e1);
+    color: var(--ink2);
     font-size: var(--t-sm);
+    font-weight: 500;
+    transition:
+      color var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out);
   }
 
   .step-menu[data-compact] .add {
     inline-size: var(--ctl-h-sm);
     padding: 0;
-    border-style: solid;
   }
 
-  .add:hover {
-    border-color: var(--edge);
+  @media (hover: hover) and (pointer: fine) {
+    .add:hover {
+      box-shadow: var(--e2);
+      color: var(--ink);
+    }
+  }
+
+  /* THE PILL SAYS A DRAG WILL LAND ON IT with the landing line's own ink, drawn round it rather than as a border. */
+  .step-menu[data-landing] .add {
+    box-shadow:
+      0 0 0 2px var(--ink),
+      var(--e1);
     color: var(--ink);
   }
 
-  .step-menu[data-landing] .add {
-    border-style: solid;
-    border-color: var(--ink2);
-    color: var(--ink2);
+  /* THE FOCUS RING FOLLOWS THE ROUND SHAPE, since the button round it is the thing focused. */
+  .step-menu :global(.menu-trigger),
+  .open {
+    border-radius: var(--r-pill);
   }
 
   /* 44 UNDER A THUMB, as every target in this app is (`13 §7`), and the circle stays a circle. */
@@ -177,12 +196,11 @@
     white-space: nowrap;
   }
 
-  /* A HEADING IN SENTENCE CASE AT 500, NOT AN EYEBROW. The 600 and 0.02em it had were the letterspaced eyebrow that
-     DESIGN-SYSTEM 2.2 bans, and `loop/research-canvas-ux.md` 1.8 found it here, over the arms and over the trigger. */
+  /* A GROUP'S HEADING IN THE MENU: sentence case at 500 in the meta size, never a letterspaced eyebrow (SYSTEM §3). */
   .group {
-    margin: var(--sp-2) var(--sp-3) var(--sp-1);
+    margin: var(--sp-2) var(--sp-2) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
   }
 
@@ -190,26 +208,14 @@
     margin-block-start: var(--sp-1);
   }
 
+  /* THE MENU'S ROWS: `Menu.svelte` gives them their height and rhythm; the colours are the caller's. */
   .mi {
-    display: flex;
-    align-items: center;
-    inline-size: 100%;
-    min-block-size: 34px;
-    padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
     text-align: start;
     cursor: pointer;
-  }
-
-  @media (pointer: coarse) {
-    .mi {
-      min-block-size: var(--tap);
-    }
   }
 
   .mi:hover,
@@ -237,7 +243,8 @@
     list-style: none;
   }
 
-  /* A ROW OF THE SHEET: the step's name, and under it what the step does, the whole row the target at 44 or more. */
+  /* A ROW OF THE SHEET: the step's name, and under it what the step does, the whole row the target at 44 or more, and
+     the sheet's inner fill under the one pressed or focused. */
   .pick {
     display: flex;
     flex-direction: column;
@@ -248,15 +255,17 @@
     padding: var(--sp-2) var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .pick:focus-visible {
-    background: var(--hover-wash);
+  .pick:focus-visible,
+  .pick:active {
+    background: var(--s1);
   }
 
   .pick-label {

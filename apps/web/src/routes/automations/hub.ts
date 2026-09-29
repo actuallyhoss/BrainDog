@@ -10,16 +10,22 @@
  * The new-action sheet opens from the address too (`contracts.md` X57), so a declared page links to a sheet already
  * filled in and the hub is the only reader of `?new=`.
  *
- * PURE, so it loads in plain Node: the clock is an argument and every import is a type but `since` and `humanize`.
+ * PURE, so it loads in plain Node: the clock is an argument and every import is a type but `since`, `humanize`,
+ * `lasted` and the flow's own words. The chart inputs are here too (SCREENS, Automations): what the tiles above each
+ * list draw, worked out from the reads the tabs already make, and never a number the record did not send.
  */
 
 import { since } from 'braindog-render';
 
+import { VERB_LABELS, words as flowWords } from '../../lib/flow/flow.ts';
+import { lasted } from '../../lib/flow/source.ts';
 import { humanize } from '../../lib/record/names.ts';
 
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
-import type { ActionRow } from '../../lib/record/actions.ts';
+import type { ActionRow, Channel } from '../../lib/record/actions.ts';
 import type { Script } from '../../lib/record/scripts.ts';
+import type { IconName } from '../../lib/ui/icons.ts';
+import type { WeekDay } from '../../lib/viz/weekstrip.ts';
 
 export type Tab = 'automations' | 'scheduled' | 'scripts' | 'doors' | 'runs';
 
@@ -104,7 +110,345 @@ export const hubWords = {
     waiting: (when: string) => `Started ${when}, waiting on a step.`,
     pending: (when: string) => `Queued ${when}.`,
   } as Record<string, (when: string) => string>,
+
+  /* ── the groups the lists sit in on the ground ── */
+  on: 'On',
+  off: 'Off',
+  paused: 'Paused',
+  onClock: 'On a clock',
+  scripts: 'Scripts',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  /* THE RIGHT-HAND COLUMN OF AN AUTOMATION'S ROW, when it has a next turn. */
+  nextAt: (when: string) => `Next ${when}`,
+
+  /* ── the tiles above the lists, each a chart and the one line saying what it means (SYSTEM §6) ── */
+  runsMonth: 'Runs this month',
+  runsMonthSubject: 'Runs this month, by automation',
+  runsMonthMeta: (n: number) => `${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
+  endedTitle: 'How runs ended',
+  endedSubject: 'Runs this month that finished',
+  endedOf: (n: number) => `of ${n.toLocaleString('en')}`,
+  failedNote: (n: number) => `${n.toLocaleString('en')} failed`,
+  nextUp: 'Next up',
+  nextUpMeta: (days: number) => `Next ${days} days`,
+  nextUpSubject: 'Scheduled actions due, by day',
+  recentRuns: 'Recent runs',
+  /* THE SOURCE IS EACH THING'S NEWEST RUNS, NOT EVERY RUN (`runs/+page.svelte`'s `DEEP` and `EACH`), so the tile says so. */
+  latestRuns: 'Latest runs',
+  heatSubject: (days: number) => `Runs a day, last ${days} days`,
 } as const;
+
+/* ── the leading mark of a row ──────────────────────────────────────────── */
+
+/**
+ * The icon in an automation's well, by what starts it (SCREENS, Automations): a clock, a bell for an arrival, a press,
+ * a tick for a decision, a document for a change to a list, and an eye for a figure that is watched.
+ */
+const TRIGGER_ICONS: Record<string, IconName> = {
+  every: 'clock',
+  arrival: 'bell',
+  manual: 'play',
+  decided: 'check',
+  written: 'doc',
+  metric: 'observe',
+};
+
+export const triggerIcon = (kind: string): IconName => (Object.hasOwn(TRIGGER_ICONS, kind) ? TRIGGER_ICONS[kind]! : 'refresh');
+
+/** A scheduled action's well, by the way it reaches out: fetching, calling, or watching. */
+const CHANNEL_ICONS: Record<Channel, IconName> = { pull: 'download', call: 'globe', poll: 'observe' };
+
+export const channelIcon = (channel: Channel): IconName => CHANNEL_ICONS[channel] ?? 'clock';
+
+/** A run's well on the Runs tab, by the kind of thing that ran. */
+const KIND_ICONS: Record<RunKind, IconName> = { automation: 'refresh', scheduled: 'clock', script: 'code' };
+
+export const kindIcon = (kind: RunKind): IconName => KIND_ICONS[kind];
+
+/* ── words ──────────────────────────────────────────────────────────────── */
+
+const SMALL = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+/** A count as a sentence starts with it: "Three", and figures from eleven up. */
+export function spell(n: number, start = false): string {
+  const said = Number.isInteger(n) && n >= 0 && n < SMALL.length ? SMALL[n]! : n.toLocaleString('en');
+  return start ? said.charAt(0).toUpperCase() + said.slice(1) : said;
+}
+
+/** "once", "twice", "14 times". */
+export const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n.toLocaleString('en')} times`);
+
+/** "A", "A and B", "A, B and C". */
+function andList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+/* ── the hub's sentence (SYSTEM §5) ─────────────────────────────────────── */
+
+/** The sentence under the title, and the phrase inside it that needs him (drawn red), or `''` when nothing does. */
+export type Sentence = { text: string; needs: string };
+
+/**
+ * What the automations on this record come to, in one line: how many run by themselves, and then what is wrong.
+ *
+ * WHAT IS FAILING NOW OUTRANKS WHAT FAILED THIS MONTH. An automation whose last run failed is named, because it is the
+ * one to open; failing ones are only counted past two names. Otherwise the month's failed runs are counted, and a month
+ * with none says so without red. A record whose host sends no month says nothing about it rather than "none failed".
+ */
+export function hubSentence(rows: readonly AutomationRow[]): Sentence | null {
+  if (rows.length === 0) return null;
+  const on = rows.filter((r) => r.enabled);
+  const first =
+    on.length === 0
+      ? rows.length === 1
+        ? 'The one automation here is turned off'
+        : 'Every automation here is turned off'
+      : `${spell(on.length, true)} ${on.length === 1 ? 'automation runs by itself' : 'automations run by themselves'}`;
+  const failing = on.filter((r) => r.last?.state === 'failed').map((r) => r.name);
+  const monthly = rows.filter((r) => r.month !== null);
+  const failed = monthly.reduce((n, r) => n + (r.month?.failures ?? 0), 0);
+
+  let needs = '';
+  if (failing.length === 1) needs = `${failing[0]} is failing`;
+  else if (failing.length === 2) needs = `${andList(failing)} are failing`;
+  else if (failing.length > 2) needs = `${spell(failing.length)} are failing`;
+  else if (failed > 0) needs = `${spell(failed)} ${failed === 1 ? 'run' : 'runs'} failed this month`;
+
+  if (needs) return { text: `${first}, and ${needs}.`, needs };
+  if (monthly.length > 0 && on.length > 0) return { text: `${first}, and none failed this month.`, needs: '' };
+  return { text: `${first}.`, needs: '' };
+}
+
+/* ── an automation's row ────────────────────────────────────────────────── */
+
+/**
+ * An automation's second line: off, or how its last run went. Its next turn is the row's right-hand column
+ * (`nextOf`), so it is not said twice the way `rowLine` says it for a list that has no column to put it in.
+ */
+export function lastLine(row: AutomationRow, now: number): string {
+  if (!row.enabled) return flowWords.off;
+  if (!row.last) return flowWords.neverRun;
+  const last = flowWords.lastRun(since(row.last.at, now), flowWords.runState[row.last.state] ?? row.last.state);
+  return row.last.state === 'failed' && row.last.say ? `${last} ${row.last.say}` : last;
+}
+
+/** "Next in 2h", for a turned-on automation that has one. */
+export const nextOf = (row: AutomationRow, now: number): string | undefined =>
+  row.enabled && row.next ? hubWords.nextAt(since(row.next, now)) : undefined;
+
+/* ── the Automations tab's tiles ────────────────────────────────────────── */
+
+export type Bar = { label: string; value: number; tone?: string | undefined; note?: string | undefined };
+
+/** The automations that ran this month, most runs first: the ones in the month's record, and only with a run. */
+function ranThisMonth(rows: readonly AutomationRow[]): (AutomationRow & { month: { runs: number; failures: number } })[] {
+  return rows
+    .filter((r): r is AutomationRow & { month: { runs: number; failures: number } } => r.month !== null && r.month.runs > 0)
+    .sort((a, b) => b.month.runs - a.month.runs || a.name.localeCompare(b.name));
+}
+
+/**
+ * "Runs this month" (SCREENS, Automations): a bar per automation, the busiest six. One is highlighted in ink, the
+ * busiest, and any with a failure is red with the count at its end, because a failure is the part that needs him.
+ */
+export function monthBars(rows: readonly AutomationRow[], top = 6): Bar[] {
+  return ranThisMonth(rows)
+    .slice(0, top)
+    .map((r, i) => ({
+      label: r.name,
+      value: r.month.runs,
+      tone: r.month.failures > 0 ? 'danger' : i === 0 ? 'ink' : undefined,
+      note: r.month.failures > 0 ? hubWords.failedNote(r.month.failures) : undefined,
+    }));
+}
+
+/** The month's runs across every automation, and how many of them failed; `null` when none ran. */
+export function endedSplit(rows: readonly AutomationRow[]): { runs: number; failed: number; ok: number } | null {
+  const ran = ranThisMonth(rows);
+  const runs = ran.reduce((n, r) => n + r.month.runs, 0);
+  if (runs === 0) return null;
+  const failed = Math.min(runs, ran.reduce((n, r) => n + r.month.failures, 0));
+  return { runs, failed, ok: runs - failed };
+}
+
+/** The line under "Runs this month": the busiest, and the one that failed most. */
+export function monthReading(rows: readonly AutomationRow[]): string {
+  const ran = ranThisMonth(rows);
+  const top = ran[0];
+  if (!top) return '';
+  const worst = [...ran].filter((r) => r.month.failures > 0).sort((a, b) => b.month.failures - a.month.failures || b.month.runs - a.month.runs)[0];
+  const lead = `${top.name} ran ${times(top.month.runs)}, the most this month`;
+  if (!worst) return `${lead}, and nothing failed.`;
+  if (worst === top) return `${lead}, and ${spell(worst.month.failures)} of those failed.`;
+  return `${lead}; ${worst.name} failed ${spell(worst.month.failures)} of ${worst.month.runs.toLocaleString('en')}.`;
+}
+
+/** The line under "How runs ended": the share that finished, and where the failures are. */
+export function endedReading(rows: readonly AutomationRow[]): string {
+  const split = endedSplit(rows);
+  if (!split) return '';
+  if (split.failed === 0) return `Every one of the ${split.runs.toLocaleString('en')} runs this month finished.`;
+  /* NEVER 100% WITH A FAILURE IN IT. A share is rounded down while anything failed, so one failure in three hundred reads
+     as 99% and not as the whole. */
+  const share = Math.floor((split.ok / split.runs) * 100);
+  const where = ranThisMonth(rows)
+    .filter((r) => r.month.failures > 0)
+    .sort((a, b) => b.month.failures - a.month.failures)
+    .map((r) => r.name);
+  const on = where.length <= 2 ? andList(where) : `${spell(where.length)} automations`;
+  return `${share}% finished; the failures are on ${on}.`;
+}
+
+/* ── days ───────────────────────────────────────────────────────────────── */
+
+const DAY_MS = 86_400_000;
+
+/** A moment's calendar day in this browser's time, `YYYY-MM-DD`. */
+export function dayKey(at: number | string): string {
+  const d = new Date(typeof at === 'string' ? Date.parse(at) : at);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The `n` calendar days from the one `now` is in, forward (`n > 0`) or back to it (`n < 0`), as keys. */
+function daysFrom(now: number, n: number): string[] {
+  const d = new Date(now);
+  const out: string[] = [];
+  for (let i = 0; i < Math.abs(n); i += 1) {
+    const at = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (n > 0 ? i : i - Math.abs(n) + 1), 12);
+    out.push(dayKey(at.getTime()));
+  }
+  return out;
+}
+
+/* SPELLED HERE AND NOT BY `Intl`, whose English writes September "Sept" in one engine and "Sep" in the next; the week
+   strip spells its days the same way (`lib/viz/weekstrip.ts`). */
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+const CLOCK = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+/** A day's heading on the ground: Today, Yesterday, or "Mon 28 Sep". */
+export function dayTitle(key: string, now: number): string {
+  if (key === dayKey(now)) return hubWords.today;
+  const [yesterday] = daysFrom(now - DAY_MS, 1);
+  if (key === yesterday) return hubWords.yesterday;
+  const [y, m, d] = key.split('-').map(Number);
+  const day = new Date(y!, m! - 1, d!, 12);
+  return `${WEEKDAY[day.getDay()]} ${day.getDate()} ${MONTH[day.getMonth()]}`;
+}
+
+/** The time of day a run started, "08:05", the feed's right-hand column. */
+export const clockOf = (at: string): string => {
+  const t = Date.parse(at);
+  return Number.isFinite(t) ? CLOCK.format(new Date(t)) : '';
+};
+
+/* ── the Runs tab ───────────────────────────────────────────────────────── */
+
+/** Runs grouped by the day they started, newest day first, each day's runs in the order they came. */
+export function runDays(lines: readonly RunLine[], now: number): { key: string; title: string; lines: RunLine[] }[] {
+  const out: { key: string; title: string; lines: RunLine[] }[] = [];
+  for (const l of lines) {
+    const key = Number.isFinite(Date.parse(l.at)) ? dayKey(l.at) : '';
+    const last = out.at(-1);
+    if (last && last.key === key) last.lines.push(l);
+    else out.push({ key, title: key === '' ? hubWords.recentRuns : dayTitle(key, now), lines: [l] });
+  }
+  return out;
+}
+
+export type Heat = { rows: string[]; cols: string[]; values: number[][]; days: string[] };
+
+/**
+ * "Recent runs" (SCREENS, Automations): runs a day over the last `days`, for the six things that ran most in them.
+ * Columns are the days, oldest first, labelled by their date. `null` when nothing ran in the window.
+ */
+export function runHeat(lines: readonly RunLine[], now: number, days = 14): Heat | null {
+  const keys = daysFrom(now, -days);
+  const at = new Map(keys.map((k, i) => [k, i]));
+  const by = new Map<string, { name: string; counts: number[]; total: number }>();
+  for (const l of lines) {
+    if (!Number.isFinite(Date.parse(l.at))) continue;
+    const c = at.get(dayKey(l.at));
+    if (c === undefined) continue;
+    const id = `${l.kind}:${l.name}`;
+    const one = by.get(id) ?? { name: l.name, counts: keys.map(() => 0), total: 0 };
+    one.counts[c]! += 1;
+    one.total += 1;
+    by.set(id, one);
+  }
+  if (by.size === 0) return null;
+  const top = [...by.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)).slice(0, 6);
+  return { rows: top.map((t) => t.name), cols: keys.map((k) => String(Number(k.slice(8)))), values: top.map((t) => t.counts), days: keys };
+}
+
+/** The line under "Recent runs": what ran most in the window, and what failed in it. */
+export function heatReading(lines: readonly RunLine[], heat: Heat): string {
+  const top = heat.rows[0];
+  const most = heat.values[0]?.reduce((a, b) => a + b, 0) ?? 0;
+  if (top === undefined) return '';
+  const inWindow = new Set(heat.days);
+  const bad = lines.filter((l) => l.bad && Number.isFinite(Date.parse(l.at)) && inWindow.has(dayKey(l.at)));
+  const lead = `${top} ran most, ${times(most)} in the last ${heat.days.length} days`;
+  if (bad.length === 0) return `${lead}, and none of these runs failed.`;
+  const names = [...new Set(bad.map((l) => l.name))];
+  return `${lead}; ${spell(bad.length)} failed, on ${names.length <= 2 ? andList(names) : `${spell(names.length)} things`}.`;
+}
+
+/* ── the Scheduled tab ──────────────────────────────────────────────────── */
+
+const UNIT_MS: Record<string, number> = { m: 60_000, h: 3_600_000, d: DAY_MS, w: 7 * DAY_MS };
+
+/** How far apart an action's turns are, from its `every` ("15m", "1d"), or `null` when it is not one of those. */
+export function intervalOf(every: string): number | null {
+  const m = /^(\d+)\s*(m|h|d|w)$/u.exec(every.trim());
+  if (!m) return null;
+  const ms = Number(m[1]) * UNIT_MS[m[2]!]!;
+  return ms > 0 ? ms : null;
+}
+
+/**
+ * "Next up" (SCREENS, Automations): the next `days` days, a dot on each day a scheduled action is due.
+ *
+ * FROM ITS NEXT TURN, ON ITS OWN CLOCK. The read carries each action's next run and how often it runs, so its turns
+ * after that are that clock's, one dot a day however many times it runs in it. A paused action has no turns, and one
+ * whose `every` is not a span has only its next.
+ */
+export function nextWeek(actions: readonly ActionRow[], now: number, days = 14): { days: WeekDay[]; today: string; due: ActionRow[] } {
+  const keys = daysFrom(now, days);
+  const at = new Map(keys.map((k, i) => [k, i]));
+  const out: WeekDay[] = keys.map((date) => ({ date, items: [] }));
+  const end = new Date(now);
+  const until = new Date(end.getFullYear(), end.getMonth(), end.getDate() + days).getTime();
+  const due: ActionRow[] = [];
+  for (const a of actions) {
+    if (a.state === 'paused' || !a.next) continue;
+    const first = Date.parse(a.next);
+    if (!Number.isFinite(first)) continue;
+    const step = intervalOf(a.every);
+    const seen = new Set<number>();
+    for (let t = first, n = 0; t < until && n < 2000; t = step === null ? Infinity : t + step, n += 1) {
+      const i = at.get(dayKey(t));
+      if (i === undefined || seen.has(i)) continue;
+      seen.add(i);
+      out[i]!.items = [...out[i]!.items, { colour: 'var(--ink2)', label: humanize(a.ingest) }];
+    }
+    if (seen.size > 0) due.push(a);
+  }
+  due.sort((a, b) => Date.parse(a.next!) - Date.parse(b.next!));
+  return { days: out, today: keys[0]!, due };
+}
+
+/** The line under "Next up": how many are due in the window, and which is next and when. */
+export function nextReading(due: readonly ActionRow[], now: number, days = 14): string {
+  const first = due[0];
+  if (!first || !first.next) return '';
+  const name = humanize(first.ingest);
+  const when = since(first.next, now);
+  if (due.length === 1) return `${name} is next, ${when}, and the only one due in the next ${days} days.`;
+  return `${spell(due.length, true)} scheduled actions run in the next ${days} days; ${name} is next, ${when}.`;
+}
 
 /**
  * One row on any tab: a name and what it is on the first line, where it stands on the second.
@@ -123,6 +467,12 @@ export type HubRow = {
   path: string | null;
   /** A link under the row that does what its sentence asks, like adding a missing key. */
   fix?: { path: string; label: string } | undefined;
+  /** The glyph in the row's 32px well (SYSTEM §6): what starts it, how it reaches out, or what kind of thing ran. */
+  icon?: IconName | undefined;
+  /** The right-hand column: an automation's next turn, or the time a run started. */
+  aside?: string | undefined;
+  /** Whether the aside is a time in a feed, which is set in Geist Mono (SYSTEM §3). */
+  clock?: boolean | undefined;
 };
 
 export type RunKind = 'automation' | 'scheduled' | 'script';
@@ -187,4 +537,130 @@ export function runLines(
     }
   }
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+}
+
+/* ── one automation's page ──────────────────────────────────────────────── */
+
+export const canvasWords = {
+  lastRuns: 'How the last runs went',
+  lastRunsMeta: (n: number) => `Last ${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
+  runsSubject: 'The last runs, by how they ended',
+  tookSubject: 'How long each finished run took, oldest first',
+  written: 'As written',
+  tryTile: 'Try it',
+  tryParts: 'What each step would do',
+  matchParts: 'Rows it would act on now',
+  matching: 'Match',
+  notMatching: 'Do not match',
+  calls: 'What it reaches',
+  changed: 'What changed',
+  /* THE KEYS THE FOOTER'S UNDO AND REDO ARE ALSO PRESSED WITH, in `Kbd`'s spelling, printed on the buttons. */
+  undoKey: '⌘Z',
+  redoKey: '⌘⇧Z',
+  ranState: {
+    done: 'Done',
+    failed: 'Failed',
+    waiting: 'Waiting',
+    running: 'Running',
+    pending: 'Waiting to start',
+    cancelled: 'Stopped',
+  } as Record<string, string>,
+} as const;
+
+/**
+ * The icon and the tone of a run's well, by how it stands. A finished run is the ordinary case and takes no colour, so
+ * a list of twenty is quiet; a failed one is red, one going now is `live`, and one parked on a step amber.
+ */
+export function runMark(state: string): { icon: IconName; tone?: 'danger' | 'live' | 'warn' | undefined } {
+  switch (state) {
+    case 'done':
+      return { icon: 'check' };
+    case 'failed':
+      return { icon: 'alert', tone: 'danger' };
+    case 'running':
+    case 'pending':
+      return { icon: 'play', tone: 'live' };
+    case 'waiting':
+      return { icon: 'clock', tone: 'warn' };
+    default:
+      return { icon: 'stop' };
+  }
+}
+
+/**
+ * "How the last runs went": the runs on the page by how they ended, in the order a person reads a result (done,
+ * failed, still going, stopped), each in its meaning's colour, and only the endings they had.
+ */
+export function runParts(runs: readonly RunRow[]): { label: string; value: number; tone: string }[] {
+  const count = (states: readonly string[]) => runs.filter((r) => states.includes(r.state)).length;
+  return [
+    { label: canvasWords.ranState.done!, value: count(['done']), tone: 'earn' },
+    { label: canvasWords.ranState.failed!, value: count(['failed']), tone: 'danger' },
+    { label: canvasWords.ranState.running!, value: count(['running', 'pending']), tone: 'live' },
+    { label: canvasWords.ranState.waiting!, value: count(['waiting']), tone: 'warn' },
+    { label: canvasWords.ranState.cancelled!, value: count(['cancelled']), tone: 'g3' },
+  ].filter((p) => p.value > 0);
+}
+
+/** How long each finished run took, in seconds, oldest first: the sparkline beside the parts. */
+export function runDurations(runs: readonly RunRow[]): number[] {
+  const out: number[] = [];
+  for (const r of runs) {
+    if (r.finished === null) continue;
+    const ms = Date.parse(r.finished) - Date.parse(r.started);
+    if (Number.isFinite(ms) && ms >= 0) out.push(ms / 1000);
+  }
+  return out.reverse();
+}
+
+/**
+ * The step a failed run stopped at, counted as a person reads the canvas: its place among the steps, a branch's arm
+ * after the branch, and the runner's jump between the arms not counted (`planPlaces`).
+ */
+export function failedAt(run: RunRow, places: readonly string[] | null): { n: number; label: string } | null {
+  const bad = run.steps.find((s) => s.state === 'failed');
+  if (!bad) return null;
+  const n = places ? places.slice(0, bad.n + 1).filter((p) => p !== '').length : bad.n + 1;
+  const label = Object.hasOwn(VERB_LABELS, bad.kind) ? VERB_LABELS[bad.kind as keyof typeof VERB_LABELS] : bad.kind;
+  return { n: Math.max(1, n), label };
+}
+
+/**
+ * The line under "How the last runs went" (SCREENS, Automations), built from the newest run: "The last run failed 2h
+ * ago, at step 3: Call a service." Then, when the newest did not fail and an older one did, how many of these failed.
+ */
+export function lastRunReading(runs: readonly RunRow[], places: readonly string[] | null, now: number): string {
+  const last = runs[0];
+  if (!last) return '';
+  const when = since(last.started, now);
+  let lead: string;
+  if (last.state === 'failed') {
+    const at = failedAt(last, places);
+    lead = at ? `The last run failed ${when}, at step ${at.n}: ${at.label}.` : `The last run failed ${when}.`;
+  } else if (last.state === 'done') {
+    const took = last.finished === null ? null : Date.parse(last.finished) - Date.parse(last.started);
+    lead = took !== null && Number.isFinite(took) && took >= 0 ? `The last run finished ${when}, in ${lasted(took)}.` : `The last run finished ${when}.`;
+  } else if (last.state === 'running') lead = `A run is going now; it started ${when}.`;
+  else if (last.state === 'pending') lead = `A run is waiting to start; it was asked for ${when}.`;
+  else if (last.state === 'waiting') lead = `The last run is waiting on a step; it started ${when}.`;
+  else lead = `The last run was stopped; it started ${when}.`;
+  const failed = runs.filter((r) => r.state === 'failed').length;
+  if (last.state === 'failed' || failed === 0 || runs.length < 2) return lead;
+  return `${lead} ${spell(failed, true)} of the last ${runs.length.toLocaleString('en')} failed.`;
+}
+
+/**
+ * The page's sentence under its title: its last run and its next, and the failed clause as the phrase that needs him.
+ * `null` for a draft that was never saved, which has nothing to report.
+ */
+export function pageSentence(row: AutomationRow | null, now: number): Sentence | null {
+  if (!row) return null;
+  if (!row.enabled) return { text: flowWords.off, needs: '' };
+  const next = row.next ? flowWords.nextRun(since(row.next, now)) : '';
+  if (!row.last) return { text: [flowWords.neverRun, next].filter(Boolean).join(' '), needs: '' };
+  const state = flowWords.runState[row.last.state] ?? row.last.state;
+  const last = flowWords.lastRun(since(row.last.at, now), state);
+  const why = row.last.state === 'failed' && row.last.say ? ` ${row.last.say}` : '';
+  const text = [last + why, next].filter(Boolean).join(' ');
+  return { text, needs: row.last.state === 'failed' ? last : '' };
 }

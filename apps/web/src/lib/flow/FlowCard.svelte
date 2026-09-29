@@ -1,6 +1,15 @@
 <!--
   One step's card: a handle, what the step does in one line, and a menu of the moves.
 
+  A NODE IS A TILE (SYSTEM §6): the white surface at radius `--r-lg` and the first level of depth, sitting straight on
+  the ground with the `--rule` connectors between it and the next. Its verb is the icon in a 28px well, the sentence is
+  a row title, and the card's state is said by the well, which is the system's own language for it: the chosen card's
+  well is ink (the rail's chosen place is drawn the same way), and a card with something wrong has a red well over the
+  sentences that say what. No border round a card, ever; the chosen one also lifts to the chrome's depth.
+
+  THE RADIUS IS THE TILE'S AND THE PADDING IS 8, so the handle's 36px circle and the card's corner are one curve: 18 of
+  radius and 8 of inset is the 22 of the corner, give or take a pixel.
+
   DRAGGED BY POINTER EVENTS, NOT BY HTML DRAG AND DROP, and that is the touch requirement rather than a taste. The page
   builder's `draggable` works under a mouse and does nothing under a finger: no browser fires `dragstart` from a touch
   on a phone. A pointer captured on the handle is one code path for a mouse, a pen and a thumb, and `touch-action:
@@ -21,6 +30,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -191,7 +201,7 @@
   </button>
 
   <button type="button" class="say tap" aria-describedby={shown.length > 0 ? `faults-${node.key}` : undefined} onclick={() => flow.select(node.key)}>
-    {#if verb && GLYPH[verb]}<span class="glyph"><Icon name={GLYPH[verb]!} size="s" /></span>{/if}
+    <IconWell name={(verb && GLYPH[verb]) || 'refresh'} size="m" tone={flow.selected === node.key ? 'ink' : shown.length > 0 ? 'danger' : undefined} />
     <span class="said">{#each parts as p, i (i)}{#if p.ref}<span class="ref">{p.text}</span>{:else}{p.text}{/if}{/each}</span>
   </button>
 
@@ -211,7 +221,7 @@
 
   {#if shown.length > 0}
     <ul class="faults" id={`faults-${node.key}`}>
-      {#each shown as f (f)}<li><span class="warn"><Icon name="alert" size="m" /></span>{f}</li>{/each}
+      {#each shown as f (f)}<li><span class="warn" aria-hidden="true"><Icon name="alert" size="m" /></span>{f}</li>{/each}
     </ul>
   {/if}
 
@@ -227,30 +237,35 @@
 </div>
 
 <style>
+  /* THE NODE: a tile's surface, radius and depth, 8 of padding, and no border in any state. */
   .card {
+    /* WHERE THE SENTENCE STARTS, so the faults and the try's answer under it line up with its words and not the handle:
+       the handle, the card's gap, the say button's own padding, the well, and the gap after the well. */
+    --lead: calc(var(--ctl-h) + var(--sp-1) + var(--sp-2) + var(--well) + var(--sp-2));
+
     position: relative;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--sp-1);
-    padding: var(--sp-1);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    transition: border-color var(--d-state) var(--ease-out);
+    padding: var(--sp-2);
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+    color: var(--ink);
+    transition:
+      box-shadow var(--d-state) var(--ease-out),
+      opacity var(--d-state) var(--ease-out);
   }
 
-  .card:hover {
-    border-color: var(--edge);
-  }
-
+  /* THE CHOSEN CARD LIFTS to the chrome's depth, beside its ink well: the one the panel is about. */
   .card[data-selected] {
-    border-color: var(--ink2);
+    box-shadow: var(--e2);
   }
 
-  /* A FAULT IS A WORD UNDER THE CARD, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and
+  /* A FAULT IS A WORD UNDER THE CARD AND A RED WELL, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and
      `loop/DESIGN-SYSTEM.md` 1.2 and 4.8 draw an intent as a word, a dot or a 16px glyph and an error as ink with a
-     glyph, never as a wash; so the card stays neutral and each sentence under it leads with the warn glyph. */
+     glyph, never as a wash; so the card stays white and each sentence under it leads with the glyph. */
 
   /* The one held: half there, so the column does not close up and move every other card under the pointer. */
   .card[data-dragging] {
@@ -259,12 +274,12 @@
 
   /* THE LANDING LINE, the rule `PageBody.svelte` draws for a block, copied because it is scoped there: a 3px ink bar
      on the edge the held card will arrive at, over the gap rather than inside the card, so nothing reflows under the
-     pointer. Every card is full width, so it is always a line across the top or the bottom. */
+     pointer. Every card is full width, so it is always a line across the top or the bottom, inset from the corners. */
   .card[data-drop]::after {
     content: '';
     position: absolute;
     z-index: var(--z-raise);
-    inset-inline: calc(var(--sp-1) * -1);
+    inset-inline: var(--sp-3);
     block-size: 3px;
     background: var(--ink);
     border-radius: var(--r-pill);
@@ -287,15 +302,19 @@
     min-block-size: var(--ctl-h);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     color: var(--dim);
     font: inherit;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
+  /* THE HANDLE AND THE MENU ARE CIRCLES, the handle's in the card's corner curve. */
   .handle,
   .more-trigger {
     justify-content: center;
     inline-size: var(--ctl-h);
+    border-radius: var(--r-pill);
   }
 
   /* THE HANDLE ALONE TAKES THE GESTURE. `none` on the whole card would stop a thumb scrolling the column wherever it
@@ -309,60 +328,61 @@
     cursor: grabbing;
   }
 
+  /* THE SENTENCE, AS A ROW TITLE (SYSTEM §3): 15 at 500, after its verb's well. It wraps; a step is read whole. */
   .say {
     gap: var(--sp-2);
     min-inline-size: 0;
-    padding: 0 var(--sp-2);
+    padding: var(--sp-1) var(--sp-2);
+    border-radius: var(--r-md);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 20px;
     text-align: start;
     cursor: pointer;
-  }
-
-  .glyph {
-    display: grid;
-    place-items: center;
-    flex: none;
-    inline-size: 26px;
-    block-size: 26px;
-    background: var(--s2);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
   }
 
   .said {
     overflow-wrap: anywhere;
   }
 
-  /* THE INSPECTOR'S CHIP, IN THE UI FACE. `rate` and `what` are names a person picked, not identifiers to copy, so
-     not `--font-id` (`loop/DESIGN-SYSTEM.md` 2.1). */
+  /* A VALUE THE STEP READS IS A CHIP IN THE SENTENCE, in the UI face and the meta size: `rate` and `what` are names a
+     person picked, not identifiers to copy, so not `--font-id` (`loop/DESIGN-SYSTEM.md` 2.1). The tile's inner fill,
+     a pill, and no border. */
   .ref {
     display: inline-block;
     margin-inline: 2px;
     padding: 0 var(--sp-2);
-    background: var(--s2);
-    border: 1px solid var(--line);
+    background: var(--s1);
     border-radius: var(--r-pill);
     color: var(--ink2);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
-    line-height: calc(var(--ctl-h-sm) - 2px);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 22px;
     vertical-align: baseline;
   }
 
-  .handle:hover,
-  .say:hover,
-  .more-trigger:hover {
-    background: var(--hover-wash);
+  /* HOVER ONLY WHERE THERE IS ONE: the tile's inner fill under what is pointed at. */
+  @media (hover: hover) and (pointer: fine) {
+    .handle:hover,
+    .say:hover,
+    .more-trigger:hover {
+      background: var(--s1);
+      color: var(--ink);
+    }
   }
 
+  /* WHAT IS WRONG, UNDER THE SENTENCE AND LINED UP WITH IT: red words at 500 after the glyph, because a fault is what
+     stands between him and the save (SCREENS, Automations: "faults say danger text with the glyph"). */
   .faults {
     grid-column: 1 / -1;
     margin: 0;
-    padding: 0 var(--sp-2) var(--sp-1) calc(var(--ctl-h) + var(--sp-2));
+    padding: 0 var(--sp-2) var(--sp-1) var(--lead);
     list-style: none;
-    color: var(--ink2);
+    color: var(--danger);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
   .faults li {
@@ -374,10 +394,10 @@
   .warn {
     display: inline-flex;
     padding-block-start: 1px;
-    color: var(--warn);
+    color: var(--danger);
   }
 
-  /* UNDER THE SENTENCE, LINED UP WITH IT, as the faults are: the handle's column is left clear. */
+  /* UNDER THE SENTENCE, LINED UP WITH IT, as the faults are: the handle's and the well's columns are left clear. */
   .paint {
     grid-column: 1 / -1;
     display: flex;
@@ -385,37 +405,38 @@
     align-items: baseline;
     gap: 0 var(--sp-2);
     margin: 0;
-    padding: 0 var(--sp-2) var(--sp-1) calc(var(--ctl-h) + var(--sp-2));
+    padding: 0 var(--sp-2) var(--sp-1) var(--lead);
     color: var(--ink2);
     font-size: var(--t-sm);
   }
 
-  /* A STATE'S DOT IN ITS INTENT (`loop/finish/design-brief.md` §10): running and reaching outside is `--info`, parked on
-     something is `--warn`, a failure `--danger`, done `--dim`, and a step never reached a hollow mark. */
+  /* A STATE IS A 6PX DOT AND ITS WORD (SYSTEM §6), each in its meaning: done is green, what it would do out in the world
+     the second ink, parked on something amber, a failure red, and a step never reached a hollow ring. */
   .paint-dot {
     display: inline-block;
     flex: none;
+    box-sizing: border-box;
     inline-size: var(--dot);
     block-size: var(--dot);
     border-radius: var(--r-pill);
-    background: var(--dim);
+    background: var(--earn);
   }
 
   .paint-dot[data-state='would'] {
-    background: var(--info);
+    background: var(--ink2);
   }
 
   .paint-dot[data-state='waiting'] {
-    background: var(--warn-fill);
+    background: var(--warn);
   }
 
   .paint-dot[data-state='failed'] {
-    background: var(--danger-fill);
+    background: var(--danger);
   }
 
   .paint-dot[data-state='skipped'] {
     background: transparent;
-    border: 1px solid var(--edge);
+    border: 1.5px solid var(--dim);
   }
 
   .paint-word {
@@ -437,18 +458,12 @@
     white-space: nowrap;
   }
 
+  /* THE MENU'S ROWS: `Menu.svelte` gives them their height and rhythm; the colours are the caller's. */
   .mi {
-    display: flex;
-    align-items: center;
-    inline-size: 100%;
-    min-block-size: 34px;
-    padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
     text-align: start;
     cursor: pointer;
   }
@@ -459,22 +474,26 @@
     color: var(--ink);
   }
 
-  /* RED ONLY UNDER THE POINTER OR THE FOCUS. Remove was `--danger` at rest, and `loop/DESIGN-SYSTEM.md` 4.3 gives a
-     destructive ghost its danger label on hover or focus alone; at rest it is one more item in the menu. */
-  .mi[data-tone='bad']:hover,
-  .mi[data-tone='bad']:focus-visible {
-    color: var(--danger);
-  }
-
   @media (pointer: coarse) {
-    .mi {
-      min-block-size: var(--tap);
+    .card {
+      --lead: calc(var(--tap) + var(--sp-1) + var(--sp-2) + var(--well) + var(--sp-2));
     }
 
     .handle,
     .more-trigger {
       inline-size: var(--tap);
       min-block-size: var(--tap);
+    }
+  }
+
+  /* FORCED COLOURS DROP THE FILL AND THE SHADOW, so a card keeps an edge, and the chosen one a heavier one. */
+  @media (forced-colors: active) {
+    .card {
+      outline: 1px solid CanvasText;
+    }
+
+    .card[data-selected] {
+      outline-width: 3px;
     }
   }
 

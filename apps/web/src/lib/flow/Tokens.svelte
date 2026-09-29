@@ -168,7 +168,7 @@
   .tok-box {
     flex: 1;
     min-inline-size: 0;
-    min-block-size: calc(var(--ctl-h) - 2px);
+    min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
     color: var(--ink);
     font-size: var(--t-ui);
@@ -183,7 +183,7 @@
   }
 
   .tok-box:focus-visible {
-    /* focus-ok: `.field:focus-within` in controls.css draws the ink edge and ring on the wrapper. */
+    /* focus-ok: `.field:focus-within` in controls.css draws the ink ring on the wrapper. */
     outline: none;
   }
 
@@ -192,18 +192,22 @@
     color: var(--dim);
   }
 
-  /* A PILL IN THE RUNNING TEXT: the chip's face, the UI font, and never split across two lines. */
+  /* A PILL IN THE RUNNING TEXT: the tile's own white on the field's `--s1` well, lifted by a hairline shadow the way the
+     chosen segment is, in the UI face at the meta size, and never split across two lines. */
   .tok-box :global(.tok-pill) {
     display: inline-block;
     margin: 0 1px;
     padding: 0 var(--sp-2);
-    background: var(--s2);
-    border: 1px solid var(--line);
+    background: var(--bg);
     border-radius: var(--r-pill);
-    color: var(--ink2);
+    box-shadow:
+      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
+      0 0 0 0.5px var(--line);
+    color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
-    line-height: 1.6;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 1.5;
     white-space: nowrap;
     user-select: all;
   }
@@ -217,33 +221,39 @@
   .tok-head {
     margin: var(--sp-1) 0 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
   }
 
   .tok-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-1);
+    gap: 6px;
   }
 
+  /* A CHIP TO PUT IN IS A QUIET PILL (SYSTEM §6, Buttons): the tile's inner fill, no border, the second ink, and a step
+     darker under the pointer. */
   .tok-chip {
     display: inline-flex;
     align-items: center;
     min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-2);
-    background: var(--s2);
-    border: 1px solid var(--line);
+    padding: 0 var(--sp-3);
+    background: var(--s1);
+    border: 0;
     border-radius: var(--r-pill);
     color: var(--ink2);
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-weight: 500;
     cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .tok-chip:hover {
-      border-color: var(--edge);
+      background: var(--s2);
       color: var(--ink);
     }
   }
@@ -254,6 +264,7 @@
     }
 
     .tok-box {
+      min-block-size: var(--tap);
       font-size: var(--t-md);
     }
   }

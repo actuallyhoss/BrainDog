@@ -14,9 +14,16 @@
   the record's sentence, in ink with a glyph and never a wash (DESIGN-SYSTEM 4.8).
 
   THE PICK IS THE PAGE'S, bound here, because the sticky bar's Try reads it as well as this panel.
+
+  A TILE UNDER THE CANVAS (SYSTEM §6): the play glyph in its well and "If it ran now" as its heading, the pick as the
+  tile's own segmented control, and once it has been tried, the answer drawn before it is said. A run's steps are one
+  stacked bar by how each went, in the colours the cards are painted in; a dry run's rows are the share of the list it
+  would act on now. The sentence under either is the chart's one written line.
 -->
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import { Stacked } from '$lib/viz/index.ts';
   import { editWords, picksFor, type Answer, type Pick, type Pickable, type Tried, type TryRun, type TryState } from './source.ts';
 
   let {
@@ -50,6 +57,9 @@
       n === 0 ? 'No row matches it now.' : `${n === 1 ? 'One row matches' : `${n.toLocaleString('en')} rows match`} it now${of === null ? '' : `, of ${of.toLocaleString('en')}`}.`,
     more: (n: number) => `And ${n.toLocaleString('en')} more.`,
     nothing: 'Nothing, on this row.',
+    match: 'Match',
+    rest: 'Do not',
+    of: 'Rows of the list it would act on now',
   };
 
   const FROM: Record<Pick['from'], string> = { latest: editWords.fromLatest, row: editWords.fromRow, json: editWords.fromJson };
@@ -75,13 +85,20 @@
   };
   const failedStep = (t: TryRun) => t.steps.find((s) => s.state === 'failed');
 
+  /* THE STEPS OF A TRY BY HOW EACH WENT, in the colours a card is painted in (`FlowCard.svelte`): done green, what it
+     would do out in the world a grey, waiting amber, failed red, not reached the palest grey. */
+  const TONE: Record<TryState, string> = { done: 'earn', would: 'g2', waiting: 'warn', failed: 'danger', skipped: 'g4' };
+  const partsOf = (t: TryRun) =>
+    (['done', 'would', 'waiting', 'failed', 'skipped'] as TryState[])
+      .map((st) => ({ label: editWords.tryState[st], value: t.steps.filter((x) => x.state === st).length, tone: TONE[st] }))
+      .filter((p) => p.value > 0);
+
   const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice(1));
   /** A line's indent, two spaces a level as `automations.ts` `stepLines` writes it, and the line without it. */
   const depthOf = (line: string): number => Math.floor((line.length - line.trimStart().length) / 2);
 </script>
 
-<section class="tried" aria-labelledby="tried-heading">
-  <h2 class="tried-heading" id="tried-heading">{editWords.triedHeading}</h2>
+<Tile icon="play" title={editWords.triedHeading}>
 
   {#if choices.length > 0}
     <div class="tried-pick">
@@ -130,6 +147,7 @@
       {@const t = run.value}
       {@const bad = failedStep(t)}
       {#if editWords.startedBy[t.trigger]}<p class="tried-trigger">{editWords.startedBy[t.trigger]}</p>{/if}
+      {#if t.steps.length > 0}<Stacked parts={partsOf(t)} subject={editWords.triedHeading} />{/if}
       <p class="tried-count">{tally(t)}</p>
       {#if bad}<p class="tried-refused"><span class="tried-glyph"><Icon name="alert" /></span><span>{bad.say}</span></p>{/if}
       <p class="tried-note">{editWords.triedWrote}</p>
@@ -138,6 +156,15 @@
     <p class="tried-refused"><span class="tried-glyph"><Icon name="alert" /></span><span>{inline.refusal.fix}</span></p>
   {:else if inline && inline.ok && inline.value.matches !== null}
     {@const t = inline.value}
+    {#if t.rows !== null && t.rows > 0}
+      <Stacked
+        parts={[
+          { label: said.match, value: Math.min(t.matches ?? 0, t.rows), tone: 'ink' },
+          { label: said.rest, value: Math.max(0, t.rows - (t.matches ?? 0)), tone: 'g4' },
+        ]}
+        subject={said.of}
+      />
+    {/if}
     <p class="tried-count num">{said.matches(t.matches ?? 0, t.rows)}</p>
     {#if t.sample.length > 0}
       <ul class="tried-rows">
@@ -163,30 +190,17 @@
     </ol>
     <p class="tried-note">{editWords.triedWrote}</p>
   {/if}
-</section>
+</Tile>
 
 <style>
-  .tried {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    max-inline-size: 720px;
-  }
-
-  .tried-heading {
-    margin: 0 0 var(--sp-1);
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 600;
-  }
-
   .tried-pick {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
   }
 
-  /* THE THREE WAYS WRAP RATHER THAN RUN OFF A 320px SCREEN: their words are wider together than a phone's column. */
+  /* THE THREE WAYS WRAP RATHER THAN RUN OFF A 320px SCREEN: their words are wider together than a phone's column. In a
+     tile the track is the tile's inner fill (`controls.css`). */
   .tried-segments {
     flex-wrap: wrap;
     align-self: flex-start;
@@ -196,64 +210,88 @@
   .tried-choices {
     display: flex;
     flex-direction: column;
+    gap: 2px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
+  /* A ROW TO TRY IT ON: one line in the second ink, the tile's inner fill under the chosen one and the one pointed at,
+     rounded as a row's wash is (SYSTEM §6, Rows). */
   .tried-choice {
     display: flex;
     align-items: center;
     inline-size: 100%;
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-2);
+    padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--t-base);
     text-align: start;
     overflow-wrap: anywhere;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .tried-choice[data-on] {
-    background: var(--selected);
+    background: var(--s1);
     color: var(--ink);
+    font-weight: 500;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .tried-choice:hover {
-      background: var(--hover-wash);
+      background: var(--s1);
     }
   }
 
   .tried-paste {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-1);
+    gap: 6px;
   }
 
   .tried-label {
     color: var(--ink2);
     font-size: var(--t-sm);
+    font-weight: 500;
   }
 
-  /* 16px IN EVERY INPUT (`loop/finish/design-brief.md` §6), so a phone does not zoom the page on focus. */
+  /* A FIELD FOR WHAT IS PASTED: the `--s1` well, no border, the field's corner, in Geist Mono because it is JSON, and
+     16px in every input (`loop/finish/design-brief.md` §6), so a phone does not zoom the page on focus. */
   .tried-json {
+    box-sizing: border-box;
     inline-size: 100%;
     min-block-size: 6lh;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
     font-family: var(--font-id);
     font-size: var(--t-md);
     resize: vertical;
   }
 
+  .tried-json:focus-visible {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+  }
+
+  /* THE CHART'S ONE WRITTEN LINE (SYSTEM §6): body size in ink. */
   .tried-count,
   .tried-trigger {
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .tried-trigger {
+    color: var(--ink2);
   }
 
   .tried-refused {
@@ -265,12 +303,13 @@
     font-size: var(--t-base);
   }
 
-  /* THE GLYPH CARRIES THE INTENT AND THE SENTENCE STAYS INK (DESIGN-SYSTEM 1.2 and 4.8). */
+  /* THE GLYPH CARRIES THE INTENT AND THE SENTENCE STAYS INK (DESIGN-SYSTEM 1.2 and 4.8): red, since what it says is
+     what stopped the run. */
   .tried-glyph {
     display: inline-flex;
     flex: none;
     margin-block-start: 2px;
-    color: var(--warn);
+    color: var(--danger);
   }
 
   .tried-rows,
@@ -287,13 +326,12 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0 var(--sp-2);
-    padding: var(--sp-1) 0;
-    border-block-end: 1px solid var(--line-soft);
+    padding: var(--sp-2) 0;
     font-size: var(--t-sm);
   }
 
-  .tried-rows li:last-child {
-    border-block-end: 0;
+  .tried-rows li + li {
+    border-block-start: 1px solid var(--line);
   }
 
   .tried-would {
@@ -305,7 +343,8 @@
 
   .tried-id {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
   }
 
   .tried-steps {
@@ -322,6 +361,6 @@
   .tried-note {
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 </style>

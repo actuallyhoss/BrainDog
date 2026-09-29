@@ -23,8 +23,13 @@
   could otherwise never be filled by one. It used to be a 28px circle over a dashed "Nothing yet" box, two things to
   read where one pill says both what is missing and what to press (1.10).
 
-  SIDE BY SIDE ABOVE 640px, STACKED UNDER IT. Two arms of a nested branch at phone width are two columns of about 150px,
-  and a sentence does not survive that; stacked, each arm keeps the column's width and says which arm it is. The fork
+  THE CONNECTORS ARE `--rule` LINES (SYSTEM §2, the line that reads on the ground): the cards are tiles on the ground,
+  and the wires between them are drawn in the ground's own hairline, never a box or a colour.
+
+  SIDE BY SIDE WHERE THERE IS ROOM, STACKED WHERE THERE IS NOT, and the room is the column's, not the window's. The
+  step a branch sits in is a size container, so a branch inside a branch, or a canvas narrowed by the docked panel,
+  stacks its arms once they would be under 280px each, whatever the window is. Two arms of about 150px are two columns
+  a sentence does not survive; stacked, each arm keeps the column's width and says which arm it is. The fork
   cannot span two centres that sit one above the other, so there it is a single spine down the left, hanging from the
   branch card, with a short line into the top of each arm and the join running back to the centre under the last one.
 -->
@@ -83,13 +88,23 @@
     list-style: none;
   }
 
+  /* EACH STEP IS A SIZE CONTAINER, so a branch decides its arms by the width of the column it sits in, and the lines
+     inside those arms read the same width when they draw the stacked form: the fork, the spine and an arm's last gap
+     all answer one container, the branch's own step. */
   .step {
     display: flex;
     flex-direction: column;
+    container-type: inline-size;
   }
 
-  /* THE CONNECTOR: a hairline down the middle of the gap, with the plus sitting on it. The plus sits at the top of the
-     gap, so that a gap grown to meet a join keeps its plus where every other plus is and draws the rest as line. */
+  /* A CONTAINER IS ALSO A STACKING CONTEXT, so a card's open menu would be painted under the next step. The step that
+     holds an open menu, and every step round it, rises over its siblings while the menu is open. */
+  .step:has(:global([aria-expanded='true'])) {
+    z-index: var(--z-raise);
+  }
+
+  /* THE CONNECTOR: a `--rule` line down the middle of the gap, with the plus sitting on it. The plus sits at the top of
+     the gap, so that a gap grown to meet a join keeps its plus where every other plus is and draws the rest as line. */
   .gap {
     position: relative;
     display: flex;
@@ -103,7 +118,7 @@
     position: absolute;
     inset-block: 0;
     inset-inline-start: 50%;
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--rule);
   }
 
   .gap > :global(*) {
@@ -122,8 +137,8 @@
   /* THE FORK. `.arms` is as wide as the branch card above it, so its 50% is the card's centre, and with two equal
      columns and a gap G each arm's centre is 25% - G/4 in from its own side. The stem is `::after`, from the card down
      to the fork; the fork and the join are one box, `::before`, drawn by its top and bottom borders only. The extra
-     1px at the end is the width of the far arm's own hairline, which starts at its centre and is drawn to the right
-     of it, so without it the fork stops one pixel short of that arm. */
+     1px at the end is the width of the far arm's own line, which starts at its centre and is drawn to the right of it,
+     so without it the fork stops one pixel short of that arm. */
   .arms {
     position: relative;
     display: grid;
@@ -137,7 +152,7 @@
     position: absolute;
     inset-block: var(--sp-3) 0;
     inset-inline: calc(25% - var(--sp-3) / 4) calc(25% - var(--sp-3) / 4 - 1px);
-    border-block: 1px solid var(--line);
+    border-block: 1px solid var(--rule);
   }
 
   .arms::after {
@@ -146,7 +161,7 @@
     inset-block-start: 0;
     block-size: var(--sp-3);
     inset-inline-start: 50%;
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--rule);
   }
 
   .arm {
@@ -156,9 +171,8 @@
     min-inline-size: 0;
   }
 
-  /* A LABEL ON THE LINE, as n8n writes true and false on its two outputs: a short run of hairline from the fork, the
-     word, and then the arm's first gap carries the line on. Sentence case at 500 with no tracking; the 0.02em it had
-     was the letterspaced eyebrow DESIGN-SYSTEM 2.2 bans. */
+  /* A LABEL ON THE LINE, as n8n writes true and false on its two outputs: a short run of line from the fork, the word,
+     and then the arm's first gap carries the line on. Sentence case at 500 in the meta size, no tracking. */
   .arm-head,
   .either {
     display: flex;
@@ -166,8 +180,9 @@
     align-items: center;
     margin: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
+    line-height: 18px;
     text-align: center;
   }
 
@@ -175,10 +190,10 @@
   .either::before {
     content: '';
     block-size: var(--sp-2);
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--rule);
   }
 
-  @media (width < 640px) {
+  @container (width < 560px) {
     .arms {
       grid-template-columns: minmax(0, 1fr);
       row-gap: var(--sp-3);
@@ -187,13 +202,13 @@
     }
 
     /* ONE SPINE DOWN THE LEFT, 12px in from the card's edge, and the join from it back to the centre under the last
-       arm. The box ends on the column's centre plus the width of the centre hairline, the same 1px as above. */
+       arm. The box ends on the column's centre plus the width of the centre line, the same 1px as above. */
     .arms::before {
       inset-block: 0;
       inset-inline: var(--sp-3) calc(50% - 1px);
       border-block: 0;
-      border-inline-start: 1px solid var(--line);
-      border-block-end: 1px solid var(--line);
+      border-inline-start: 1px solid var(--rule);
+      border-block-end: 1px solid var(--rule);
     }
 
     /* The spine hangs from the card itself, so there is no stem from its centre. */
@@ -207,10 +222,10 @@
       position: absolute;
       inset-block-start: 0;
       inset-inline: 0 calc(50% - 1px);
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--rule);
     }
 
-    /* STACKED, AN ARM ENDS ON ITS LAST PLUS. Its centre is not the column's centre any more, so a hairline carried on
+    /* STACKED, AN ARM ENDS ON ITS LAST PLUS. Its centre is not the column's centre any more, so a line carried on
        below the plus would stop in the air beside the join instead of on it. */
     .flow-list[data-arm] > .gap:last-child::before {
       inset-block-end: 50%;

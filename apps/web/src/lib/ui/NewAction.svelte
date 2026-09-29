@@ -247,7 +247,7 @@
           <legend class="label">{w.map}</legend>
           <span class="help">{w.mapHelp}</span>
           {#each draft.map as line, i (i)}
-            <div class="line">
+            <div class="map-line">
               <select class="pick" aria-label={w.map} bind:value={line.field}>
                 {#each fields as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
                 {#if line.field !== '' && !fields.some((f) => f.id === line.field)}
@@ -393,16 +393,18 @@
     gap: var(--sp-3);
   }
 
-  .line {
+  /* ONE LINE OF THE MAP, A HAIRLINE ABOVE IT. Its own class and not `.line`, which is the shared row's (`rows.css`) and
+     drew a list row's height, padding and press on every line of this form. */
+  .map-line {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
     padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--line);
   }
 
-  .line > * {
+  .map-line > * {
     flex: 1 1 10rem;
     min-inline-size: 0;
   }
@@ -413,10 +415,14 @@
     line-height: var(--lh-body);
   }
 
+  /* THE ADDRESS SHOWN ONCE, in the sheet's inner well at the field's corner, so the one thing to copy is one shape. */
   .once {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    padding: var(--sp-3);
+    background: var(--s1);
+    border-radius: var(--r-md);
   }
 
   /* THE ADDRESS IS ONE LONG WORD, so without this the sheet scrolls sideways at 390. */

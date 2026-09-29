@@ -1,38 +1,47 @@
 <!--
   The hub's rows (`loop/finish/shell.md` EDT-3): one list shape for automations, scheduled actions, scripts and runs.
 
-  TWO LINES EACH, AS THE AUTOMATIONS LIST ALWAYS WAS: the name and what it is, then where it stands. One shape for all
-  four because they sit one tab apart, and a failed script and a failed automation should not be two different reads.
-  DESIGN-SYSTEM 4.4: a subject and a line of detail, `--line-soft` between rows and nothing round the list.
+  ROWS ON THE GROUND (SYSTEM §6, "Lists are neither"): `rows.css`'s ledger, a 56px row with a 32px icon well for what
+  the thing is, its name, and under it what it is and where it stands; the right-hand column is its next turn or the
+  time a run started. Nothing round the list, a hairline between its rows, and the rounded wash under the one pointed
+  at. The caller puts it under a `Section` heading, grouped by kind or by day.
 
-  A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone
-  (DESIGN-SYSTEM 1.2).
+  ONE SHAPE FOR ALL FOUR because they sit one tab apart, and a failed script and a failed automation should not be two
+  different reads.
+
+  THE SECOND LINE IS NEVER CUT. It is the verdict ("Paused. The key is not in the vault.") and an ellipsis took exactly
+  the part that said what to do, so it wraps; the name gives way instead.
+
+  A DOT FOR WHAT NEEDS A LOOK, AND ONLY THAT, leading the sentence that says it, so the dot never stands alone (SYSTEM
+  §6, "a status is a 6px dot and its word"). Red for a failure, amber for a pause, and a hollow ring for off.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import type { HubRow } from './hub.ts';
 
-  let { rows }: { rows: readonly HubRow[] } = $props();
+  let { rows, dim = false }: { rows: readonly HubRow[]; /** Draw the group quieter: the turned-off ones. */ dim?: boolean } = $props();
 </script>
 
 {#snippet body(r: HubRow)}
-  <span class="head">
-    <span class="name">{r.name}</span>
-    {#if r.what}
-      <span class="sep" aria-hidden="true">·</span>
-      <span class="what">{r.what}</span>
-    {/if}
+  <IconWell name={r.icon ?? 'refresh'} size="l" />
+  <span class="line-main">
+    <span class="line-title name">{r.name}</span>
+    <span class="line-detail meta">
+      {#if r.what}<span class="what">{r.what}</span>{/if}
+      <span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>
+    </span>
   </span>
-  <span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>
+  {#if r.aside}<span class="line-when aside" data-clock={r.clock ? '' : undefined}>{r.aside}</span>{/if}
 {/snippet}
 
-<ul class="rows">
+<ul class="ledger ledger-lead hub-rows" data-dim={dim ? '' : undefined}>
   {#each rows as r (r.key)}
     <li>
       {#if r.path}
-        <a class="row tap" href={at(r.path)}>{@render body(r)}</a>
+        <a class="row tap line line-tall" href={at(r.path)}>{@render body(r)}</a>
       {:else}
-        <div class="row">{@render body(r)}</div>
+        <div class="row line line-tall">{@render body(r)}</div>
       {/if}
       {#if r.fix}
         <a class="fix tap" href={at(r.fix.path)}>{r.fix.label}</a>
@@ -42,102 +51,99 @@
 </ul>
 
 <style>
-  .rows {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  li + li {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  /* THE HOVER WASH BLEEDS 8PX PAST THE GUTTER AND THE TEXT DOES NOT (DESIGN-SYSTEM 3.1), so the names sit on the
-     heading's edge. */
+  /* THE LINK IS THE WHOLE ROW, and its words keep the ink they had rather than a link's. THE WELL, THE WORDS AND THE
+     RIGHT-HAND COLUMN ON ONE LINE AT EVERY WIDTH: the shared card layout under 640 puts the words under the lead, and a
+     hub row keeps its well beside both of its lines, as a search hit does. */
   .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-    margin-inline: calc(-1 * var(--sp-2));
-    padding: var(--sp-3) var(--sp-2);
-    border-radius: var(--r-sm);
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
     color: inherit;
     text-decoration: none;
   }
 
-  a.row:hover {
-    background: var(--hover-wash);
+  .row .line-main {
+    grid-column: 2;
+    grid-row: 1;
   }
 
-  /* THE FIRST LINE GIVES WAY, what-it-is first and down to a few words, so on a phone the name keeps its room. */
-  .head {
-    display: flex;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    align-items: baseline;
+  .row .aside {
+    grid-column: 3;
+    grid-row: 1;
   }
 
-  .name,
-  .what {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .name {
-    flex: 0 1 auto;
-    color: var(--ink);
-    font-size: var(--t-ui);
-    font-weight: 500;
-  }
-
-  .what {
-    flex: 0 1 auto;
-    min-inline-size: 6ch;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .sep {
-    flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .said {
-    color: var(--dim);
-    font-size: var(--t-sm);
+  /* THE SECOND LINE WRAPS AND IS NEVER CLAMPED: what it is, then the verdict, with a dot before the verdict alone. The
+     ledger's detail is one clipped line; here it is a sentence that has to be read to its end. */
+  .meta {
+    display: block;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
     overflow-wrap: anywhere;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+
+  .what::after {
+    content: ' · ';
   }
 
   .said[data-dot]::before {
     content: '';
     display: inline-block;
+    box-sizing: border-box;
     inline-size: var(--dot);
     block-size: var(--dot);
-    margin-inline-end: var(--sp-1);
+    margin-inline-end: 6px;
     border-radius: var(--r-pill);
-    background: var(--faint);
-    vertical-align: middle;
+    vertical-align: 0.1em;
   }
 
   .said[data-dot='bad']::before {
-    background: var(--danger-fill);
+    background: var(--danger);
   }
 
-  /* THE THEME HAS NO WARNING HUE, and a paused thing is not a failure, so it takes the ink: darker than off, not red. */
   .said[data-dot='warn']::before {
-    background: var(--ink);
+    background: var(--warn);
   }
 
+  /* OFF IS NOT A STATE THAT NEEDS ANYTHING, so it is a ring and not a fill, in the quiet ink. */
+  .said[data-dot='off']::before {
+    border: 1.5px solid var(--dim);
+  }
+
+  /* A TIME IN A FEED IS SET IN GEIST MONO (SYSTEM §3); a next turn is words and keeps the UI face. */
+  .aside[data-clock] {
+    font-family: var(--font-id);
+  }
+
+  /* THE TURNED-OFF GROUP, QUIETER AND NOT RED: the name steps down to the second ink. */
+  .hub-rows[data-dim] .name {
+    color: var(--ink2);
+  }
+
+  /* THE LINK THAT DOES WHAT THE SENTENCE ASKS, under the row and lined up with its words, not its well. */
   .fix {
     display: inline-flex;
     align-items: center;
-    min-block-size: 44px;
-    margin-block-start: calc(-1 * var(--sp-2));
+    min-block-size: var(--ctl-h-sm);
+    margin: 0 0 var(--sp-2) calc(var(--sp-3) + var(--well-l) + var(--sp-3));
     color: var(--ink);
     font-size: var(--t-sm);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .fix:hover {
+      text-decoration-color: currentColor;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .fix {
+      min-block-size: var(--tap);
+      margin-block-end: 0;
+    }
   }
 </style>

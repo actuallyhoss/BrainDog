@@ -10,6 +10,10 @@
   worth listing, so only when all three refuse is the screen a refusal; otherwise one line above the list says it may
   be short, rather than a quiet list reading as a quiet record.
 
+  A TILE, THEN THE RUNS ON THE GROUND BY DAY (SCREENS, Automations). "Recent runs" is a heat grid of runs a day over the
+  last fourteen, one row for each of the six things that ran most, with the line under it saying what ran most and
+  what failed; its meta says "Latest runs", because each thing's newest runs are what is read, not every run there was.
+
   NO PAGING. Each thing's newest runs are what it keeps to hand, and the line under the heading says so; a row opens
   the thing that ran, where all of its runs are.
 -->
@@ -19,6 +23,9 @@
   import { titleOf } from '$lib/title.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import { HeatGrid } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { words } from '$lib/flow/flow.ts';
   import { openAutomations, type AutomationRow, type RunRow } from '$lib/flow/source.ts';
@@ -26,7 +33,7 @@
   import { readScripts, type Script } from '$lib/record/scripts.ts';
   import HubTabs from '../HubTabs.svelte';
   import HubRows from '../HubRows.svelte';
-  import { hubWords as w, runLines, type HubRow, type RunLine } from '../hub.ts';
+  import { clockOf, heatReading, hubWords as w, kindIcon, runDays, runHeat, runLines, type HubRow, type RunLine } from '../hub.ts';
 
   /* HOW MANY AUTOMATIONS HAVE THEIR OWN RUNS READ, newest last run first. Past these a rule is its last run alone, so a
      record with a hundred rules costs a bounded number of reads. */
@@ -86,23 +93,47 @@
     if (from === 'ready' && lines.length > 0) drew('ready');
   });
 
-  const shown = $derived(
-    lines.map((l): HubRow => ({ key: l.key, name: l.name, what: w.kind[l.kind], said: l.said, dot: l.bad ? 'bad' : null, path: l.path })),
-  );
+  const now = Date.now();
+
+  const rowOf = (l: RunLine): HubRow => ({
+    key: l.key,
+    name: l.name,
+    what: w.kind[l.kind],
+    said: l.said,
+    dot: l.bad ? 'bad' : null,
+    path: l.path,
+    icon: kindIcon(l.kind),
+    aside: clockOf(l.at),
+    clock: true,
+  });
+
+  const days = $derived(runDays(lines, now));
+  const heat = $derived(runHeat(lines, now));
 </script>
 
 <svelte:head><title>{titleOf(w.tab.runs)}</title></svelte:head>
 
-<PageHead icon="refresh" title={words.heading} count={from === 'ready' ? lines.length : undefined} />
+<PageHead icon="refresh" title={words.heading} count={from === 'ready' ? lines.length : undefined}>
+  {#snippet actions()}<HubTabs here="runs" />{/snippet}
+</PageHead>
 <div class="page">
-  <HubTabs here="runs" />
   {#if from === 'refused'}
     <Empty kind="error" heading title={fix} />
   {:else if from === 'ready' && lines.length === 0}
     <Empty kind="no-data-yet" title={w.runsNone} body={w.runsWhy} agentPrompt={w.runsPrompt} />
   {:else if from === 'ready'}
+    {#if heat}
+      <Tile icon="history" title={w.recentRuns} meta={w.latestRuns}>
+        <HeatGrid rows={heat.rows} cols={heat.cols} values={heat.values} subject={w.heatSubject(heat.days.length)} />
+        <p class="reading">{heatReading(lines, heat)}</p>
+      </Tile>
+    {/if}
     <p class="note">{short ? w.runsSomeMissing : w.runsReach}</p>
-    <HubRows rows={shown} />
+    {#each days as day (day.key)}
+      <Section title={day.title} count={day.lines.length}>
+        <HubRows rows={day.lines.map(rowOf)} />
+      </Section>
+    {/each}
   {/if}
 </div>
 
@@ -110,13 +141,23 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 820px;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+    max-inline-size: var(--page-max);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  .note {
+  /* THE ONE LINE UNDER THE CHART that says what it means (SYSTEM §6), at body size in ink. */
+  .reading {
     margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* WHAT THE LIST REACHES, said once over it in the quiet ink, and a step closer to the list than to the tile. */
+  .note {
+    margin: 0 0 calc(var(--sp-2) - var(--sp-5));
     max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-sm);

@@ -1,7 +1,7 @@
 <!--
   Automations: `/automations`, one place for everything that runs by itself (`loop/finish/shell.md` EDT-3).
 
-  FIVE TABS UNDER ONE HEADING: Automations, Scheduled (calls, polls and pulls), Scripts, Doors, and Runs. They were four
+  FIVE TABS IN ONE CONTROL: Automations, Scheduled (calls, polls and pulls), Scripts, Doors, and Runs. They were four
   corners of the product (this list, a project's "Runs on", `/scripts`, and Settings, Ingest) and nowhere listed a run
   of each, so "what does this record do on its own" had no single answer. Each tab draws its kind in the words that
   kind's own screen uses, through one row shape (`HubRows.svelte`), and each row opens that kind's own screen. Runs is
@@ -30,7 +30,7 @@
   import AutomationsTab from './AutomationsTab.svelte';
   import ScheduledTab from './ScheduledTab.svelte';
   import ScriptsTab from './ScriptsTab.svelte';
-  import { hubWords as w, newOf, tabOf, withoutNew } from './hub.ts';
+  import { hubWords as w, newOf, tabOf, withoutNew, type Sentence } from './hub.ts';
 
   const tab = $derived(tabOf(page.url.searchParams));
   const ask = $derived(newOf(page.url.searchParams));
@@ -38,6 +38,8 @@
   /* THE HEADING COUNTS AUTOMATIONS ONLY ON ITS OWN TAB, as it did when this was the list; a count of five kinds at
      once would be a sum nobody asked for. */
   let count = $state<number | undefined>(undefined);
+  /* AND THE SENTENCE UNDER IT, from the same read: how many run by themselves, and which one is failing. */
+  let said = $state<Sentence | null>(null);
 
   /* BUMPED WHEN THE SHEET CLOSES, so the tab under it reads again and a door or an action just made is listed. */
   let drawn = $state(0);
@@ -60,9 +62,18 @@
 
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
-<PageHead icon="refresh" title={words.heading} count={tab === 'automations' ? count : undefined}>
+<!-- THE TABS ARE THE TOOLBAR'S GLASS SEGMENTED CONTROL, beside the one primary action, which is the tab's own: "New
+     automation", "New scheduled action", "New script", and none on Doors, whose section carries "New door" for an owner
+     (SCREENS, Automations). -->
+<PageHead
+  icon="refresh"
+  title={words.heading}
+  count={tab === 'automations' ? count : undefined}
+  sentence={tab === 'automations' ? said?.text : undefined}
+  needs={tab === 'automations' && said?.needs ? said.needs : undefined}
+>
   {#snippet actions()}
-    <!-- ONE PRIMARY ACTION, THE TAB'S OWN. Doors has none here because its section carries "New door" for an owner. -->
+    <HubTabs here={tab} />
     {#if tab === 'automations'}
       <Button weight="primary" href="/automations/new">{words.newOne}</Button>
     {:else if tab === 'scheduled'}
@@ -73,10 +84,9 @@
   {/snippet}
 </PageHead>
 <div class="page">
-  <HubTabs here={tab} />
   {#key drawn}
     {#if tab === 'automations'}
-      <AutomationsTab oncount={(n) => (count = n)} />
+      <AutomationsTab oncount={(n) => (count = n)} onsentence={(s) => (said = s)} />
     {:else if tab === 'scheduled'}
       <ScheduledTab />
     {:else if tab === 'scripts'}
@@ -90,11 +100,13 @@
 <NewAction open={ask !== null} kind={ask?.kind ?? 'action'} preset={ask?.preset ?? null} onclose={shut} />
 
 <style>
+  /* THE LISTS SIT ON THE GROUND UNDER THEIR TILES, 20 apart, as wide as the page allows (SYSTEM §4, §5). */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: 820px;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+    max-inline-size: var(--page-max);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 </style>

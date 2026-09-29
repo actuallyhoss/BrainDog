@@ -4,6 +4,14 @@
   AN AUTOMATION IS A RULE THAT GREW A TRIGGER AND STEPS rather than a kind of its own, so a rule installed before this
   screen existed is an automation whose trigger is a change, and it opens on the same canvas.
 
+  TWO TILES, THEN THE LIST ON THE GROUND (SCREENS, Automations). "Runs this month" is a bar per automation and "How
+  runs ended" a ring of the month's runs that finished, each with the one line that says what it means. Both are drawn
+  from the month the list read already carries (`AutomationRow.month`), and neither is drawn when there is no month to
+  draw from: a tile without a chart is a number nobody can check (SYSTEM §11).
+
+  THE LIST IS GROUPED ON AND OFF, the turned-off ones quieter and never red. Each row leads with its trigger's icon,
+  says how its last run went, and puts its next turn in the right-hand column.
+
   A RECORD WITHOUT THE READ STILL OFFERS NEW. Listing needs the `automations` method; drawing one and sending it needs
   only `propose`, which every record has. So a record that cannot list says so, and the heading keeps its button.
 -->
@@ -11,13 +19,28 @@
   import { apiBase } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import { Bars, Ring } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { words } from '$lib/flow/flow.ts';
-  import { openAutomations, rowLine, rowTrigger, type AutomationRow } from '$lib/flow/source.ts';
+  import { openAutomations, rowTrigger, type AutomationRow } from '$lib/flow/source.ts';
   import HubRows from './HubRows.svelte';
-  import type { HubRow } from './hub.ts';
+  import {
+    endedReading,
+    endedSplit,
+    hubSentence,
+    hubWords as w,
+    lastLine,
+    monthBars,
+    monthReading,
+    nextOf,
+    triggerIcon,
+    type HubRow,
+    type Sentence,
+  } from './hub.ts';
 
-  let { oncount }: { oncount: (n: number) => void } = $props();
+  let { oncount, onsentence }: { oncount: (n: number) => void; onsentence?: ((s: Sentence | null) => void) | undefined } = $props();
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<AutomationRow[]>([]);
@@ -31,6 +54,7 @@
       rows = out.first.value;
       from = 'ready';
       oncount(rows.length);
+      onsentence?.(hubSentence(rows));
     } else if (out.absent) from = 'absent';
     else {
       fix = out.first.refusal.fix;
@@ -52,19 +76,23 @@
      person reads and replaces, not a feature the code ships. */
   const agentPrompt = 'read my record, then propose an automation that fetches the US dollar in euros from api.example.com every hour and tells me when it is over 0.95';
 
-  /* OFF FIRST: a turned-off automation's last run is history, and its line says "Turned off." */
-  const shown = $derived(
-    rows.map(
-      (r): HubRow => ({
-        key: r.id,
-        name: r.name,
-        what: rowTrigger(r),
-        said: rowLine(r, now),
-        dot: !r.enabled ? 'off' : r.last?.state === 'failed' ? 'bad' : null,
-        path: `/automations/${encodeURIComponent(r.id)}`,
-      }),
-    ),
-  );
+  const rowOf = (r: AutomationRow): HubRow => ({
+    key: r.id,
+    name: r.name,
+    what: rowTrigger(r),
+    said: lastLine(r, now),
+    dot: !r.enabled ? 'off' : r.last?.state === 'failed' ? 'bad' : null,
+    path: `/automations/${encodeURIComponent(r.id)}`,
+    icon: triggerIcon(r.trigger),
+    aside: nextOf(r, now),
+  });
+
+  const on = $derived(rows.filter((r) => r.enabled).map(rowOf));
+  const off = $derived(rows.filter((r) => !r.enabled).map(rowOf));
+
+  /* THE TILES, ONLY FROM A MONTH THE RECORD SENT. */
+  const bars = $derived(monthBars(rows));
+  const split = $derived(endedSplit(rows));
 </script>
 
 {#if from === 'refused'}
@@ -76,5 +104,59 @@
        two different things to press (`loop/finish/design.md` 2.7). -->
   <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt} />
 {:else if from === 'ready'}
-  <HubRows rows={shown} />
+  {#if split && bars.length > 0}
+    <div class="tiles">
+      <Tile icon="refresh" title={w.runsMonth} meta={w.runsMonthMeta(split.runs)}>
+        <Bars items={bars} subject={w.runsMonthSubject} />
+        <p class="reading">{monthReading(rows)}</p>
+      </Tile>
+      <Tile icon="check" title={w.endedTitle}>
+        <div class="ring">
+          <Ring value={split.ok} max={split.runs} tone="earn" size={112} label={w.endedOf(split.runs)} subject={w.endedSubject} />
+        </div>
+        <p class="reading">{endedReading(rows)}</p>
+      </Tile>
+    </div>
+  {/if}
+
+  {#if on.length > 0}
+    <Section title={w.on} count={on.length}>
+      <HubRows rows={on} />
+    </Section>
+  {/if}
+  {#if off.length > 0}
+    <Section title={w.off} count={off.length}>
+      <HubRows rows={off} dim />
+    </Section>
+  {/if}
 {/if}
+
+<style>
+  /* TWO TILES SIDE BY SIDE WHERE THEY FIT, 12 apart (SYSTEM §4), and one over the other on a phone. The bars take the
+     wider share, since their labels are names. */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: var(--inset);
+  }
+
+  @media (width >= 900px) {
+    .tiles {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+  }
+
+  .ring {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* THE ONE LINE UNDER EACH CHART that says what it means (SYSTEM §6), at body size in ink, at the tile's foot. */
+  .reading {
+    margin: 0;
+    margin-block-start: auto;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+</style>
