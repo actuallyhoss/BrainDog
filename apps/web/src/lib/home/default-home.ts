@@ -187,6 +187,16 @@ export function leadOf(c: HomeCounts): string | null {
 }
 
 /**
+ * THE LEAD LINE AS THE TITLE ROW'S SENTENCE (SYSTEM §5): the same words as `leadOf`, and the half that needs the
+ * reader named, so the head draws it red. Nothing needs him when only agents are counted, so that line has no red.
+ */
+export function leadSaid(c: HomeCounts): { text: string; needs: string } | null {
+  const text = leadOf(c);
+  if (text === null) return null;
+  return { text, needs: c.needing > 0 ? words.needing(c.needing).replace(/\.$/u, '') : '' };
+}
+
+/**
  * WHETHER HOME HAS NOTHING TO SAY BUT WHAT CHANGED: no figure pinned, no question waiting, nothing due and no agent
  * working. Such a record reads one calm sentence where the lead would be, and the feed under it. A page of the record's
  * own with any other kind of block is never quiet, because its author put that block there to be read.

@@ -29,6 +29,7 @@
 
   const TITLE: Record<Scope, string> = {
     document: copy.scopeDocument,
+    today: copy.scopeToday,
     work: copy.scopeWork,
     grid: copy.scopeGrid,
     board: copy.scopeBoard,
@@ -43,6 +44,7 @@
   /* One glyph per scope, so the groups read as places rather than as paragraphs. */
   const GLYPH = {
     document: 'home',
+    today: 'today',
     work: 'task',
     grid: 'rows',
     board: 'board',

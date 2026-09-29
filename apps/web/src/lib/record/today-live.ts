@@ -19,8 +19,69 @@ import { money } from 'braindog-render';
 import type { Fetch } from './boot-live.ts';
 import { moneyInText } from './money.ts';
 
-/** A task that needs you: past its day, due today, or marked urgent. */
-export type TaskRow = { seq: number; what: string; due: string | null; project: string | null; why: 'late' | 'today' | 'urgent'; agent: string | null };
+/**
+ * A task that needs you: past its day, handed back to be checked, due today, or marked urgent.
+ *
+ * THE LAST FOUR KEYS ARE ADDED, NEVER REQUIRED: the version a Done is written at, the state it is put back to, its
+ * tier and its project's hue, so the row can say them and the screen can tick it where it is.
+ */
+export type TaskRow = {
+  seq: number;
+  what: string;
+  due: string | null;
+  project: string | null;
+  why: 'late' | 'today' | 'urgent' | 'review';
+  agent: string | null;
+  version?: number | undefined;
+  state?: string | null | undefined;
+  priority?: string | null | undefined;
+  hue?: number | null | undefined;
+};
+
+/** A task dated in the next two weeks, for the week strip and the days under it. */
+export type DayRow = {
+  seq: number;
+  what: string;
+  day: string;
+  project: string | null;
+  hue: number | null;
+  agent: string | null;
+  state: string | null;
+  priority: string | null;
+  version?: number | undefined;
+};
+
+/**
+ * One run an agent had open today, as a span on the day: from when it opened to when it was last heard from, and
+ * whether it is working now (open, and heard from inside the last 45 minutes, the record's own `STALE_MS`).
+ */
+export type SessionRow = {
+  seq: number | null;
+  agent: string;
+  doing: string;
+  state: string;
+  host: string | null;
+  /** When the run opened, epoch ms, which may be before midnight. */
+  opened: number;
+  /** Where its span on the day starts and ends: from midnight at the earliest, to now while it works. */
+  from: number;
+  to: number;
+  working: boolean;
+};
+
+/**
+ * Cash ahead, as the record's own walk draws it on the Money page: the balance at the end of each of the next weeks,
+ * the lowest it goes inside them and on which day, and the day it first goes under, when it does. Minor units.
+ */
+export type Forecast = {
+  currency: string;
+  /** Today's balance, then the lowest each of the next weeks reaches, oldest first. */
+  values: number[];
+  weeks: number;
+  low: { value: number; day: string | null };
+  /** The first day the walk goes under zero inside the weeks drawn, or `null`. */
+  crossed: string | null;
+};
 
 /** A run an agent has open now: who, what it says it is doing, where, and when it was last heard from. */
 export type RunRow = { seq: number | null; agent: string; doing: string; project: string | null; seen: string | null };
@@ -28,8 +89,11 @@ export type RunRow = { seq: number | null; agent: string; doing: string; project
 /** One kind of change since the reader's mark: how many, called what, and the activity filtered to it. */
 export type SinceRow = { key: string; label: string; count: number; href: string };
 
-/** One figure of cash: a book's name, or `null` for the whole; the amount as a screen writes it. */
-export type CashLine = { label: string | null; amount: string };
+/**
+ * One figure of cash: a book's name, or `null` for the whole; the amount as a screen writes it, and (added) the
+ * figure itself in minor units with its currency, which a chart is drawn from.
+ */
+export type CashLine = { label: string | null; amount: string; value?: number | undefined; currency?: string | undefined };
 
 /** A bill or an invoice coming up, with its amount signed by which way the money goes. */
 export type DueRow = { seq: number; what: string; amount: string | null; out: boolean; due: string | null; late: boolean };
@@ -43,16 +107,28 @@ export type Today = {
   /** How many questions are open in all. */
   open: number;
   runs: RunRow[];
-  since: { rows: SinceRow[]; total: number; capped: boolean };
+  /**
+   * What changed since the mark, and (added) how much of it agents and the reader did, and the time of the oldest
+   * change held, `null` when the answer was capped and so does not reach back to the mark.
+   */
+  since: { rows: SinceRow[]; total: number; capped: boolean; byAgents?: number; byYou?: number; from?: string | null };
   /** What the read mark is moved to when the reader leaves: the newest line this screen held. */
   upTo: Cursor | null;
-  /** `null` when the record holds no money. */
-  money: { cash: CashLine[]; books: CashLine[]; due: DueRow[] } | null;
+  /** `null` when the record holds no money. `forecast` is added, and `null` where the record draws no walk. */
+  money: { cash: CashLine[]; books: CashLine[]; due: DueRow[]; forecast?: Forecast | null } | null;
+  /** Added: tasks dated in the next fourteen days after today; `null` when the record holds no tasks list. */
+  coming?: DayRow[] | null;
+  /** Added: the runs heard from since the reader's midnight; `null` when the runs could not be read. */
+  sessions?: SessionRow[] | null;
+  /** Added: the machine every working run is on, when they are all on one. */
+  host?: string | null;
+  /** Added: the reader's midnight, epoch ms, which the day's spans are drawn from. */
+  dayStart?: number;
 };
 
 export type TodayRead = { ok: true; value: Today } | { ok: false; refusal: { code: string; fix: string } };
 
-type Row = { id: string; seq: number | null; fields: Record<string, unknown> };
+type Row = { id: string; seq: number | null; fields: Record<string, unknown>; version?: number; created_at?: string; updated_at?: string };
 type Client = ReturnType<typeof createClient>;
 
 /** How many open questions Today answers in place; the rest are a link to Decide. */
@@ -85,29 +161,118 @@ export function amountSaid(v: unknown): string | null {
  * `due` AND `urgent` ARE TWO READS, because a task is here for either reason and the record answers one predicate a
  * read. A task in both is drawn once, under the day, which is the more pressing of the two facts.
  */
-export function tasksOf(due: readonly Row[], urgent: readonly Row[], today: string, projects: ReadonlyMap<string, string>): TaskRow[] {
+export function tasksOf(
+  due: readonly Row[],
+  urgent: readonly Row[],
+  today: string,
+  projects: ReadonlyMap<string, string>,
+  review: readonly Row[] = [],
+  hues: ReadonlyMap<string, number> = new Map(),
+): TaskRow[] {
   const seen = new Set<number>();
   const out: TaskRow[] = [];
   const add = (r: Row, why: TaskRow['why']) => {
     if (r.seq === null || seen.has(r.seq)) return;
     seen.add(r.seq);
     const by = text(r.fields.by).slice(0, 10) || null;
+    const thing = text(r.fields.thing);
     out.push({
       seq: r.seq,
       what: text(r.fields.what) || `#${r.seq}`,
       due: by,
-      project: projects.get(text(r.fields.thing)) ?? null,
+      project: projects.get(thing) ?? null,
       why,
       agent: text(r.fields.agent) || null,
+      version: typeof r.version === 'number' ? r.version : undefined,
+      state: text(r.fields.state) || null,
+      priority: text(r.fields.priority) || null,
+      hue: hues.get(thing) ?? null,
     });
   };
   for (const r of due) {
     const by = text(r.fields.by).slice(0, 10);
     if (by !== '') add(r, by < today ? 'late' : 'today');
   }
+  /* HANDED BACK TO BE CHECKED: an agent finished its part and a person looks before it is done. After the late ones,
+     because a check is a few minutes of his and it unblocks the agent. */
+  for (const r of review) add(r, 'review');
   for (const r of urgent) add(r, 'urgent');
-  const rank = { late: 0, today: 1, urgent: 2 } as const;
+  const rank = { late: 0, review: 1, today: 2, urgent: 3 } as const;
   return out.sort((a, b) => rank[a.why] - rank[b.why] || (a.due ?? '').localeCompare(b.due ?? ''));
+}
+
+/**
+ * The tasks dated after today and inside the next `days`, each once and not one already in what needs you, soonest
+ * first. What the week strip and the days under it draw.
+ */
+export function comingOf(
+  rows: readonly Row[],
+  today: string,
+  last: string,
+  projects: ReadonlyMap<string, string>,
+  hues: ReadonlyMap<string, number> = new Map(),
+  shown: ReadonlySet<number> = new Set(),
+): DayRow[] {
+  const seen = new Set<number>(shown);
+  const out: DayRow[] = [];
+  for (const r of rows) {
+    const day = text(r.fields.by).slice(0, 10);
+    if (r.seq === null || seen.has(r.seq) || day === '' || day <= today || day > last) continue;
+    seen.add(r.seq);
+    const thing = text(r.fields.thing);
+    out.push({
+      seq: r.seq,
+      what: text(r.fields.what) || `#${r.seq}`,
+      day,
+      project: projects.get(thing) ?? null,
+      hue: hues.get(thing) ?? null,
+      agent: text(r.fields.agent) || null,
+      state: text(r.fields.state) || null,
+      priority: text(r.fields.priority) || null,
+      version: typeof r.version === 'number' ? r.version : undefined,
+    });
+  }
+  return out.sort((a, b) => a.day.localeCompare(b.day) || a.seq - b.seq);
+}
+
+/* ── the runs of the day ────────────────────────────────────────────────── */
+
+/** The record's own `STALE_MS`: a run not heard from in 45 minutes has gone quiet. */
+export const QUIET_AFTER = 45 * 60_000;
+
+/**
+ * The runs heard from since `dayStart`, as spans: from when each opened (or midnight, for one opened before it) to
+ * when it was last heard from, or to now while it works. A run with no time it can be placed at is left out.
+ */
+export function sessionsOf(rows: readonly Row[], dayStart: number, now: number): SessionRow[] {
+  const out: SessionRow[] = [];
+  for (const r of rows) {
+    const seen = Date.parse(text(r.fields.last_seen) || text(r.updated_at));
+    const opened = Date.parse(text(r.created_at));
+    if (!Number.isFinite(seen) || seen < dayStart) continue;
+    const state = text(r.fields.state) || 'active';
+    const working = state === 'active' && now - seen < QUIET_AFTER;
+    const began = Number.isFinite(opened) ? Math.min(opened, seen) : seen;
+    out.push({
+      seq: r.seq,
+      agent: text(r.fields.agent) || 'other',
+      doing: text(r.fields.doing),
+      state,
+      host: text(r.fields.host) || null,
+      opened: began,
+      from: Math.max(dayStart, began),
+      to: working ? now : seen,
+      working,
+    });
+  }
+  return out.sort((a, b) => a.from - b.from);
+}
+
+/** The machine every working run is on, when there are runs and they are all on one; otherwise `null`. */
+export function hostOf(hosts: readonly (string | null | undefined)[]): string | null {
+  const said = hosts.map((h) => (typeof h === 'string' ? h.trim() : ''));
+  if (said.length === 0 || said.some((h) => h === '')) return null;
+  return new Set(said).size === 1 ? said[0]! : null;
 }
 
 /* ── since you were last here ───────────────────────────────────────────── */
@@ -166,14 +331,105 @@ export function sinceOf(events: readonly Pick<EventLine, 'kind' | 'register'>[],
   return [...rows.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+/**
+ * WHETHER A LINE WAS AN AGENT'S: signed by its run (`S42`), by its token's name (`agent:claude`), or by the bare name of
+ * an agent the product knows. The same shapes `actor()` in `names.ts` reads as an agent.
+ */
+export const byAgent = (actor: string): boolean => /^S\d+$/u.test(actor) || /^agent:/u.test(actor) || /^(claude|codex|cursor)$/u.test(actor);
+
+/**
+ * Who made the changes since the mark: how many were agents' and how many the reader's own, over the same lines
+ * `sinceOf` counts (an agent's heartbeat is not a change), and the time of the oldest of them.
+ */
+export function sinceWho(
+  events: readonly Pick<EventLine, 'kind' | 'register' | 'actor' | 'ts'>[],
+  me: string | null,
+): { byAgents: number; byYou: number; from: string | null } {
+  let byAgents = 0;
+  let byYou = 0;
+  let from: string | null = null;
+  for (const e of events) {
+    if (e.register !== null && QUIET.has(e.register)) continue;
+    if (byAgent(e.actor)) byAgents += 1;
+    else if (me !== null && me !== '' && e.actor === me) byYou += 1;
+    if (typeof e.ts === 'string' && e.ts !== '' && (from === null || e.ts < from)) from = e.ts;
+  }
+  return { byAgents, byYou, from };
+}
+
 /* ── money ──────────────────────────────────────────────────────────────── */
+
+type Walk = { from?: unknown; currency?: unknown; steps?: unknown; crossed?: unknown; horizon?: unknown };
+type Step = { day: string; balance: number };
+
+const stepsOf = (w: Walk): Step[] =>
+  (Array.isArray(w.steps) ? w.steps : []).flatMap((s: unknown) => {
+    const { day, balance } = (s ?? {}) as { day?: unknown; balance?: unknown };
+    return typeof day === 'string' && typeof balance === 'number' ? [{ day: day.slice(0, 10), balance }] : [];
+  });
+
+/**
+ * Cash ahead, today and then the lowest each of `weeks` weeks reaches, read off the record's own walk (a Money page block over
+ * `forecast.runway`). A walk a currency is chosen by `currency` when the money is held in several. `null` when the
+ * page holds no walk this can read.
+ */
+export function forecastOf(blocks: readonly unknown[], today: string, weeks = 13, currency: string | null = null): Forecast | null {
+  const walks: Walk[] = [];
+  for (const b of blocks) {
+    if (typeof b !== 'object' || b === null) continue;
+    const block = b as { source?: unknown; walk?: unknown; walks?: unknown; refusals?: unknown };
+    if (block.source !== 'forecast.runway') continue;
+    if (block.walk && typeof block.walk === 'object') walks.push(block.walk as Walk);
+    if (Array.isArray(block.walks)) for (const w of block.walks) if (w && typeof w === 'object') walks.push(w as Walk);
+  }
+  /* THE LONGEST WALK OF THE CURRENCY ASKED FOR: the page draws a year and a month over the same legs, and the year
+     reaches past the weeks drawn here. */
+  const fit = walks
+    .filter((w) => typeof w.from === 'number' && typeof w.currency === 'string' && (currency === null || w.currency === currency))
+    .sort((a, b) => (typeof b.horizon === 'number' ? b.horizon : 0) - (typeof a.horizon === 'number' ? a.horizon : 0))[0];
+  if (!fit) return null;
+  const opening = fit.from as number;
+  const steps = stepsOf(fit).sort((a, b) => a.day.localeCompare(b.day));
+  const last = dayPlus(today, weeks * 7);
+  /* THE LOWEST EACH WEEK REACHES, and not its balance on one day of it: a dip between two Mondays is the part of the
+     picture that matters, and sampling a day a week drew straight over it. */
+  const values = [opening];
+  let carried = opening;
+  let i = 0;
+  while (i < steps.length && steps[i]!.day <= today) carried = steps[i++]!.balance;
+  values[0] = carried;
+  for (let k = 1; k <= weeks; k++) {
+    const end = dayPlus(today, k * 7);
+    let lowest = carried;
+    while (i < steps.length && steps[i]!.day <= end) {
+      carried = steps[i++]!.balance;
+      lowest = Math.min(lowest, carried);
+    }
+    values.push(lowest);
+  }
+  let low: Forecast['low'] = { value: opening, day: null };
+  let crossed: string | null = null;
+  for (const s of steps) {
+    if (s.day > last) break;
+    if (s.balance < low.value) low = { value: s.balance, day: s.day };
+    if (crossed === null && s.balance < 0) crossed = s.day;
+  }
+  return { currency: fit.currency as string, values, weeks, low, crossed };
+}
+
+/** `YYYY-MM-DD` plus `n` days, on the calendar and never on a clock. */
+function dayPlus(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  const at = new Date(Date.UTC(y, m - 1, d + n));
+  return `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}-${String(at.getUTCDate()).padStart(2, '0')}`;
+}
 
 type Reading = { value: number | null; unit: string | null; held?: number; rows?: number; parts?: { currency: string; amount: number }[]; groups?: { key: string; value: number | null; parts?: { currency: string; amount: number }[] }[] };
 
 /** One figure, or one line a currency when it is held in several that were not added up. */
 export function cashOf(r: Pick<Reading, 'value' | 'unit' | 'parts'>, label: string | null): CashLine[] {
-  if (r.parts && r.parts.length > 0) return r.parts.map((p) => ({ label, amount: moneyInText(money(p.amount, p.currency)) }));
-  if (typeof r.value === 'number' && r.unit) return [{ label, amount: moneyInText(money(Math.round(r.value), r.unit)) }];
+  if (r.parts && r.parts.length > 0) return r.parts.map((p) => ({ label, amount: moneyInText(money(p.amount, p.currency)), value: p.amount, currency: p.currency }));
+  if (typeof r.value === 'number' && r.unit) return [{ label, amount: moneyInText(money(Math.round(r.value), r.unit)), value: Math.round(r.value), currency: r.unit }];
   return [];
 }
 
@@ -225,15 +481,70 @@ async function drawn(client: Client): Promise<{ questions: QueueQuestion[]; runs
   return { questions, runs };
 }
 
-async function tasksFor(client: Client, held: ReadonlySet<string>, today: string): Promise<TaskRow[] | null> {
+/** The projects by id: their names, and the hue each was given, which is the colour a project is drawn in. */
+async function thingsOf(client: Client): Promise<{ names: Map<string, string>; hues: Map<string, number> }> {
+  const got = await rows(client, 'things', null, null, 500);
+  const hues = new Map<string, number>();
+  for (const r of got) if (typeof r.fields.hue === 'number' && Number.isFinite(r.fields.hue)) hues.set(r.id, r.fields.hue);
+  return { names: new Map(got.map((r) => [r.id, text(r.fields.name)])), hues };
+}
+
+/** How far ahead the week strip and the days under it look. */
+export const AHEAD_DAYS = 14;
+
+async function tasksFor(client: Client, held: ReadonlySet<string>, today: string): Promise<{ tasks: TaskRow[]; coming: DayRow[] } | null> {
   if (!held.has('tasks')) return null;
   const live = 'state is not done or dropped';
-  const [due, urgent, projects] = await Promise.all([
+  /* FOUR READS, ONE PREDICATE EACH, because the record answers one a read: what is late or due today, what was handed
+     back to be checked, what is urgent, and what falls due in the next two weeks. A read refused is left out. */
+  const [due, urgent, review, ahead, things] = await Promise.all([
     rows(client, 'tasks', `${live}, by before +1d`, { field: 'by', dir: 'asc' }, 25),
     rows(client, 'tasks', `${live}, priority is urgent`, null, 15),
-    held.has('things') ? names(client, 'things', 'name') : Promise.resolve(new Map<string, string>()),
+    rows(client, 'tasks', 'state is review', null, 10).catch(() => []),
+    rows(client, 'tasks', `${live}, by after today, by before +${AHEAD_DAYS + 1}d`, { field: 'by', dir: 'asc' }, 60).catch(() => []),
+    held.has('things') ? thingsOf(client).catch(() => ({ names: new Map<string, string>(), hues: new Map<string, number>() })) : Promise.resolve({ names: new Map<string, string>(), hues: new Map<string, number>() }),
   ]);
-  return tasksOf(due, urgent, today, projects);
+  const tasks = tasksOf(due, urgent, today, things.names, review, things.hues);
+  const shown = new Set(tasks.map((t) => t.seq));
+  return { tasks, coming: comingOf(ahead, today, dayPlus(today, AHEAD_DAYS), things.names, things.hues, shown) };
+}
+
+async function sessionsFor(client: Client, held: ReadonlySet<string>, dayStart: number, now: number): Promise<SessionRow[] | null> {
+  if (!held.has('session')) return null;
+  const out = await client.list({ register: 'session', limit: 40, order: [{ field: 'last_seen', dir: 'desc' }] });
+  if (!out.ok) return null;
+  return sessionsOf((out.value.rows as unknown[]).filter(isRow), dayStart, now);
+}
+
+/** How long a walk read is kept before Today asks the Money page again. */
+const WALK_KEPT_MS = 5 * 60_000;
+const walked = new Map<string, { at: number; blocks: readonly unknown[] }>();
+
+/**
+ * The Money page's blocks, where its cash walk is, read only where the record holds that page.
+ *
+ * KEPT FOR FIVE MINUTES A RECORD, because Today reads again on every version the record moves to, and an agent at work
+ * moves it every few seconds: the whole Money page walked a year ahead on each of those is load for a picture of the
+ * next thirteen weeks, which a few minutes do not change.
+ */
+async function walkFor(client: Client, key: string, b: Boot): Promise<readonly unknown[]> {
+  if (!(b.pages ?? []).some((p) => p.slug === 'money')) return [];
+  const kept = walked.get(key);
+  if (kept && Date.now() - kept.at < WALK_KEPT_MS) return kept.blocks;
+  const out = await client.page('money');
+  if (!out.ok) return [];
+  const answered = (out.value as { blocks?: unknown }).blocks;
+  /* ONLY THE WALKS ARE KEPT: the rest of the page is not Today's to hold. */
+  const blocks = (Array.isArray(answered) ? answered : []).filter((x: unknown) => typeof x === 'object' && x !== null && (x as { source?: unknown }).source === 'forecast.runway');
+  walked.set(key, { at: Date.now(), blocks });
+  return blocks;
+}
+
+/** The reader's midnight before `now`, on their own clock. */
+export function midnightOf(now: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }
 
 async function moneyFor(client: Client, held: ReadonlySet<string>, books: number, today: string): Promise<Today['money']> {
@@ -273,24 +584,39 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
   const held = new Set(b.registers.map((r) => r.id));
   const lists = new Map(b.registers.map((r) => [r.id, r.name]));
   const books = b.registers.find((r) => r.id === 'books')?.count ?? 0;
-  const [queue, tasks, cash] = await Promise.all([
+  const today = dayOf(now);
+  const dayStart = midnightOf(now);
+  const [queue, work, cash, sessions, walks] = await Promise.all([
     drawn(client).catch(() => ({ questions: [], runs: [] })),
-    tasksFor(client, held, dayOf(now)).catch(() => null),
-    moneyFor(client, held, books, dayOf(now)).catch(() => null),
+    tasksFor(client, held, today).catch(() => null),
+    moneyFor(client, held, books, today).catch(() => null),
+    sessionsFor(client, held, dayStart, now).catch(() => null),
+    held.has('accounts') ? walkFor(client, base, b).catch(() => []) : Promise.resolve([]),
   ]);
+  /* THE WALK OF THE CURRENCY THE CASH FIGURE IS IN, so the line under the figure is about that figure. */
+  const forecast = cash && cash.cash.length > 0 ? forecastOf(walks, today, 13, cash.cash[0]?.currency ?? null) : null;
   const events = b.whatsNew?.events ?? [];
   const since = sinceOf(events, lists);
+  const capped = b.whatsNew?.sinceCapped ?? false;
+  const who = sinceWho(events, b.me?.person ?? null);
+  /* THE MACHINE THE RUNS ARE ON: the live runs `boot` sent say it, and failing those, the day's runs that still work. */
+  const live = b.sessions ?? [];
+  const host = live.length > 0 ? hostOf(live.filter((r) => !r.stale).map((r) => (typeof r.fields.host === 'string' ? r.fields.host : null))) : hostOf((sessions ?? []).filter((s) => s.working).map((s) => s.host));
   return {
     ok: true,
     value: {
       now,
-      tasks,
+      tasks: work ? work.tasks : null,
       questions: queue.questions,
       open: b.counts?.decide ?? (b.waiting ?? []).length,
       runs: queue.runs,
-      since: { rows: since, total: since.reduce((n, r) => n + r.count, 0), capped: b.whatsNew?.sinceCapped ?? false },
+      since: { rows: since, total: since.reduce((n, r) => n + r.count, 0), capped, byAgents: who.byAgents, byYou: who.byYou, from: capped ? null : who.from },
       upTo: b.whatsNew?.upTo ?? null,
-      money: cash,
+      money: cash ? { ...cash, forecast } : cash,
+      coming: work ? work.coming : null,
+      sessions,
+      host,
+      dayStart,
     },
   };
 }

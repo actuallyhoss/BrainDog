@@ -1,23 +1,35 @@
 <!--
-  Today: the screen every record opens on. Top to bottom, the ask bar, then what needs you, who is working now, what
-  changed since you were last here, and money at a glance.
+  Today: the screen every record opens on, and the one the owner reads first each morning (SYSTEM §5, board `Main`).
 
-  A SITUATION, NOT A BOARD. What needs you is unfiltered: work past its day or due today, work marked urgent, and at
-  most three open questions answered where they are shown. A section a record does not hold is absent, and one with
-  nothing in it is one plain line.
+  Under the title, one sentence says what the morning holds, with the one phrase that needs him in red. Then the next
+  two weeks as a strip of days. On the left, on the ground: what needs you, with its verbs and their keys, and the days
+  coming up under it. On the right, three tiles: the agents at work and their day as swimlanes, what changed since you
+  were last here, and cash with the walk ahead.
+
+  A SITUATION, NOT A BOARD. What needs you is unfiltered: open questions answered where they are shown, work past its
+  day, work handed back to be checked, work due today and work marked urgent, and money late or due today. A section a
+  record does not hold is absent, and a picture with no data under it is not drawn: every figure, dot and span here is
+  the record's own answer (`lib/record/today-live.ts`), and every sentence is worked out from it (`today-tiles.ts`).
 
   THE READ MARK IS MOVED ON THE WAY OUT, NEVER ON ARRIVAL. Moving it on load would mark everything read the moment the
-  screen drew, so "since you were last here" would never show the news it exists for. It is stamped on `pagehide` and
-  when the screen goes, up to the newest line this screen actually held.
+  screen drew, so "since you were here" would never show the news it exists for. It is stamped on `pagehide` and when
+  the screen goes, up to the newest line this screen actually held.
 
   IT LISTENS. `read` asks again when the record's version moves (`lib/data/live.svelte.ts`), so an agent's write or a
   question answered in another tab appears without a reload and without blanking what is drawn.
 
+  THE KEYS ARE THE WORK SCREEN'S, on the rows of this one: j and k walk the rows, x ticks the task under the cursor,
+  Enter opens it, 1 to 9 answer the question under it, and n opens the line a task is typed into. None of them is `/`,
+  `?` or `g`, which are the shell's, and a `g` pressed first leaves the key after it to the shell.
+
   The page the record used to open on is kept at `/?overview`, under More (`routes/+page.svelte`).
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
-  import { relative, since } from 'braindog-render';
+  import { tick, untrack } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { money as moneyText, since } from 'braindog-render';
+  import { moneyInText } from '$lib/record/money.ts';
+  import type { QueueQuestion } from '@braindog/kernel';
   import { apiBase, at } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
@@ -26,49 +38,94 @@
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
+  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import AgentFace from '$lib/ui/AgentFace.svelte';
+  import Kbd from '$lib/ui/Kbd.svelte';
+  import { hueFor } from '$lib/ui/face.ts';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import { Sparkline, Stacked, Swimlanes, WeekStrip } from '$lib/viz/index.ts';
+  import { rampAt } from '$lib/viz/shared.ts';
   import Question from './Question.svelte';
-  import type { TodayRead } from '$lib/record/today-live.ts';
+  import type { DayRow, DueRow, TaskRow, TodayRead } from '$lib/record/today-live.ts';
   import { drew } from '../ui/screen.svelte.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { may } from '$lib/record/may.ts';
   import type { Entry } from '$lib/record/schema.ts';
-  import Kbd from '$lib/ui/Kbd.svelte';
-  import { dayOf } from '$lib/work/board.ts';
+  import type { RowWriter } from '$lib/record/rows-write.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { dayOf, daySaid, dueSaid } from '$lib/work/board.ts';
   import { captureOf, contextOf, freshFields, isQuestion } from '$lib/work/capture.ts';
+  import {
+    cashReading,
+    cashSummary,
+    datedOf,
+    dayGroups,
+    elapsedSaid,
+    lanesOf,
+    lanesReading,
+    lateSaid,
+    sentenceOf,
+    shareReading,
+    sinceIcon,
+    sinceReading,
+    sinceWhen,
+    weekDays,
+    weekReading,
+    whoSaid,
+  } from './today-tiles.ts';
 
   let { data }: { data: Shell } = $props();
 
   /* THE PLAIN WORDS THIS SCREEN SAYS, kept beside it. */
   const words = {
-    ask: 'Ask or add anything',
-    askHint: 'Press Enter to search your record, add a row or ask a question.',
     needs: 'Needs you',
     needsNone: 'Nothing needs you right now.',
-    late: 'late',
     today: 'due today',
     urgent: 'urgent',
+    review: 'waits on your review',
     moreQuestions: (n: number) => `${n} more ${n === 1 ? 'question' : 'questions'} to decide`,
-    working: 'Working now',
+    showMore: (n: number) => `${n} more that need you`,
+    showFewer: 'Show fewer',
+    agentsTile: 'Agents working',
+    allOn: (host: string) => `all on ${host}`,
     workingNone: 'No agent is working right now.',
-    since: 'Since you were last here',
+    doingNothing: 'has not said what it is doing',
+    working: (n: number) => (n === 1 ? 'One is working now.' : `${n} are working now.`),
+    since: 'Since you were here',
     sinceNone: 'Nothing new since you were last here.',
-    sinceTotal: (n: number, capped: boolean) => `${n.toLocaleString('en')}${capped ? '+' : ''} ${n === 1 ? 'change' : 'changes'}`,
-    allActivity: 'All activity',
+    sinceSubject: 'What changed since you were last here',
+    activity: 'Activity',
     money: 'Money',
-    cash: 'Cash now',
+    cash: 'Cash',
+    cashNow: 'Cash now',
     cashNone: 'No account counts as cash yet.',
-    dueNext: 'Due',
-    dueNone: 'Nothing is due.',
-    owed: 'in',
-    owing: 'out',
+    week: 'The next two weeks',
+    coming: 'Coming up',
+    openWork: 'Open Work',
+    moreOn: (n: number) => `${n} more on Work`,
     agent: (name: string) => name.charAt(0).toUpperCase() + name.slice(1),
-    addTask: 'Add as a task',
+    onIt: (name: string) => `${name.charAt(0).toUpperCase() + name.slice(1)} is on it`,
+    handedBack: (name: string) => `${name.charAt(0).toUpperCase() + name.slice(1)} handed it back`,
+    waiting: 'waiting on someone',
+    toPay: 'to pay',
+    toCome: 'coming in',
+    addTask: 'Add a task',
+    addTip: 'Add a task (n)',
+    addIt: 'Add',
     askIt: 'Ask',
+    capture: 'Add a task: “Call the bank tomorrow !urgent #Project”',
     added: (t: string) => `Added “${t}” to your tasks.`,
+    done: 'Done',
+    doneLabel: (t: string) => `Mark “${t}” done`,
+    marked: (t: string) => `Marked “${t}” done.`,
+    reviewIt: 'Review',
+    keys: { move: 'move', done: 'done', open: 'open', answer: 'answer' },
+    priority: { urgent: 'urgent', high: 'high', low: 'low' } as Record<string, string>,
   } as const;
-
-  /* The day as the reader's wall says it, over the title. */
-  const day = $derived(new Date(data.now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
 
   /* ONE READ FOR THE SCREEN, keyed on the record, asked again when its version moves. A refused shell asks nothing. */
   const today = read<Extract<TodayRead, { ok: true }>['value']>(
@@ -76,21 +133,37 @@
     () => import('$lib/record/today-live.ts').then((m) => m.readToday(apiBase())),
   );
   const t = $derived(today.value);
+  const day = $derived(t ? dayOf(t.now) : dayOf(data.now));
 
-  /* THE ASK BAR HANDS WHAT WAS TYPED TO THE PALETTE, which searches, adds a row and asks, so there is one place that
-     answers a sentence rather than two that answer it differently.
-
-     AND A LINE THAT IS NOT A QUESTION IS OFFERED AS A TASK, which Enter adds, on a record that holds tasks and for
-     somebody who may add one. It is added the way the Work screen adds one (`lib/work/Work.svelte`): the same light
-     syntax, "tomorrow", "!urgent", "#project", and a six-second Undo. A question still goes to the palette on Enter. */
-  let asked = $state('');
-  const typed = $derived(asked.trim());
   const takesTasks = $derived(data.lists.some((l) => l.id === 'tasks') && may(data, 'append', 'tasks'));
-  const offerTask = $derived(takesTasks && typed !== '');
-  const enterAdds = $derived(offerTask && !isQuestion(typed));
+  const mayWrite = $derived(data.lists.some((l) => l.id === 'tasks') && may(data, 'write', 'tasks'));
+
+  /* ── the capture line ──────────────────────────────────────────────────────── */
+
+  /* THE PLUS OPENS ONE LINE AT THE TOP OF WHAT NEEDS YOU, and a line that is not a question is added as a task the way
+     the Work screen adds one (`lib/work/Work.svelte`): the same light syntax, "tomorrow", "!urgent", "#project", and a
+     six-second Undo. A question goes to the palette, which answers a sentence; the rail's ask field is the ask bar. */
+  let capturing = $state(false);
+  let asked = $state('');
+  let captureBox = $state<HTMLInputElement | null>(null);
+  const typed = $derived(asked.trim());
+  const enterAdds = $derived(takesTasks && typed !== '' && !isQuestion(typed));
+
+  async function openCapture() {
+    capturing = true;
+    warm();
+    await tick();
+    captureBox?.focus();
+  }
+
+  function closeCapture() {
+    capturing = false;
+    asked = '';
+  }
 
   function ask(e: SubmitEvent) {
     e.preventDefault();
+    if (typed === '') return;
     if (enterAdds) void addTask();
     else askIt();
   }
@@ -98,10 +171,11 @@
   function askIt() {
     const said = asked.trim();
     asked = '';
+    capturing = false;
     openPaletteWith(said);
   }
 
-  /* WHAT A TASK IS READ AGAINST, asked for as the bar is first used, so Enter does not wait on it. */
+  /* WHAT A TASK IS READ AGAINST, asked for as the line opens, so Enter does not wait on it. */
   function warm() {
     if (takesTasks) void import('$lib/record/work-live.ts').then((m) => m.captureContext(apiBase())).catch(() => {});
   }
@@ -123,7 +197,7 @@
     const writer = rows.rowWriter(base);
     void run<Entry>({
       apply: () => undefined,
-      /* A REFUSED LINE COMES BACK INTO THE BAR, so it is corrected rather than typed again. */
+      /* A REFUSED LINE COMES BACK INTO THE BOX, so it is corrected rather than typed again. */
       revert: () => {
         if (asked.trim() === '') asked = said;
       },
@@ -131,6 +205,50 @@
       settle: () => void today.reread(),
       said: words.added(c.text),
       undo: (row) => () => void writer.archive(live.TASKS, row.seq, row.version).then(() => today.reread()),
+    });
+  }
+
+  /* ── ticking a task where it is ────────────────────────────────────────────── */
+
+  /* THE SAME WRITE THE WORK SCREEN MAKES: the state to done at the version read, drawn gone at once, and put back to the
+     state it held for six seconds. A refusal brings the row back and the toast says the record's sentence. */
+  let writer: RowWriter | null = null;
+  async function writes(): Promise<RowWriter> {
+    const m = await import('$lib/record/rows-write.ts');
+    return (writer ??= m.rowWriter(apiBase()));
+  }
+
+  let gone = $state<ReadonlySet<number>>(new Set());
+  const hide = (seq: number) => (gone = new Set(gone).add(seq));
+  const show = (seq: number) => {
+    const next = new Set(gone);
+    next.delete(seq);
+    gone = next;
+  };
+
+  type Tickable = { seq: number; what: string; state?: string | null | undefined; version?: number | undefined };
+
+  function finish(task: Tickable) {
+    if (!mayWrite || gone.has(task.seq)) return;
+    const back = task.state && task.state !== 'done' ? task.state : 'open';
+    void run<Entry>({
+      apply: () => hide(task.seq),
+      revert: () => show(task.seq),
+      send: async () => {
+        const out = await (await writes()).update('tasks', task.seq, { state: 'done' }, task.version);
+        return out.ok ? { ok: true as const, value: out.entry } : { ok: false as const, fix: out.fix };
+      },
+      settle: () => void today.reread(),
+      said: words.marked(task.what),
+      undo: (entry) => ({
+        apply: () => show(task.seq),
+        revert: () => hide(task.seq),
+        send: async () => {
+          const out = await (await writes()).update('tasks', task.seq, { state: back }, entry.version);
+          return out.ok ? { ok: true as const, value: out.entry } : { ok: false as const, fix: out.fix };
+        },
+        settle: () => void today.reread(),
+      }),
     });
   }
 
@@ -161,429 +279,1130 @@
     if (today.state === 'ready') drew('ready');
   });
 
-  const needing = $derived(t ? (t.tasks?.length ?? 0) + t.questions.length : 0);
+  /* ── what needs you ────────────────────────────────────────────────────────── */
+
+  /** A project's hue: the record's own, else the one its name is always drawn in (`face.ts`). */
+  const hueOf = (project: string | null, hue: number | null | undefined): number | null => (typeof hue === 'number' ? hue : project ? hueFor(project) : null);
+
+  type Need =
+    | { kind: 'question'; key: string; href: string; q: QueueQuestion }
+    | { kind: 'task'; key: string; href: string; task: TaskRow }
+    | { kind: 'bill'; key: string; href: string; bill: DueRow };
+
+  const tasks = $derived((t?.tasks ?? []).filter((x) => !gone.has(x.seq)));
+  const bills = $derived(t?.money?.due ?? []);
+  const taskNeed = (task: TaskRow): Need => ({ kind: 'task', key: `t${task.seq}`, href: `/r/tasks/${task.seq}`, task });
+  const billNeed = (bill: DueRow): Need => ({ kind: 'bill', key: `b${bill.seq}`, href: `/r/obligations/${bill.seq}`, bill });
+
+  /* THE ORDER THE BOARD READS IN: the questions answered in place, then what is late, what was handed back, what is due
+     today and what is urgent. Money late or due today sits with the work of the same day. */
+  const needs = $derived.by((): Need[] => {
+    if (!t) return [];
+    const late = tasks.filter((x) => x.why === 'late');
+    return [
+      ...t.questions.map((q): Need => ({ kind: 'question', key: `q${q.id}`, href: `/decide/${encodeURIComponent(q.id)}`, q })),
+      ...late.map(taskNeed),
+      ...bills.filter((b) => b.late).map(billNeed),
+      ...tasks.filter((x) => x.why === 'review').map(taskNeed),
+      ...tasks.filter((x) => x.why === 'today').map(taskNeed),
+      ...bills.filter((b) => !b.late && b.due === day).map(billNeed),
+      ...tasks.filter((x) => x.why === 'urgent').map(taskNeed),
+    ];
+  });
   const moreQuestions = $derived(t ? Math.max(0, t.open - t.questions.length) : 0);
+  const needing = $derived(needs.length + moreQuestions);
+
+  /* A LONG MORNING IS FOLDED, never cut: the first eight, and the rest one press away. */
+  const FIRST = 8;
+  let unfolded = $state(false);
+  const shownNeeds = $derived(unfolded ? needs : needs.slice(0, FIRST));
+
+  const lateDays = $derived(
+    [...tasks.filter((x) => x.why === 'late' && x.due).map((x) => x.due!), ...bills.filter((b) => b.late && b.due).map((b) => b.due!)].sort(),
+  );
+  const said = $derived(t ? sentenceOf(needing, lateDays, t.runs.length, day) : null);
+
+  /* ── the next two weeks ────────────────────────────────────────────────────── */
+
+  const coming = $derived((t?.coming ?? []).filter((x) => !gone.has(x.seq)));
+  const dated = $derived(
+    t
+      ? datedOf(
+          tasks.map((x) => ({ ...x, hue: hueOf(x.project, x.hue) })),
+          coming.map((x) => ({ ...x, hue: hueOf(x.project, x.hue) })),
+          bills,
+          day,
+        )
+      : [],
+  );
+  const strip = $derived(weekDays(dated, day));
+  const stripSaid = $derived(weekReading(dated, day));
+
+  type Later = { day: string; key: string; href: string } & ({ kind: 'task'; task: DayRow } | { kind: 'bill'; bill: DueRow });
+  const later = $derived.by((): Later[] => [
+    ...coming.map((task): Later => ({ kind: 'task', day: task.day, key: `c${task.seq}`, href: `/r/tasks/${task.seq}`, task })),
+    ...bills.filter((b) => b.due !== null && b.due > day).map((bill): Later => ({ kind: 'bill', day: bill.due!, key: `b${bill.seq}`, href: `/r/obligations/${bill.seq}`, bill })),
+  ]);
+  const groups = $derived(dayGroups(later, day));
+  const PER_GROUP = 6;
+
+  /* ── the agents ────────────────────────────────────────────────────────────── */
+
+  const sessions = $derived(t?.sessions ?? []);
+  const lanes = $derived(lanesOf(sessions, words.agent));
+  const bySeq = $derived(new Map(sessions.flatMap((s) => (s.seq === null ? [] : [[s.seq, s] as const]))));
+  const agentsSaid = $derived(t ? (sessions.length > 0 ? lanesReading(sessions, t.now, words.agent) : t.runs.length > 0 ? words.working(t.runs.length) : '') : '');
+  const quiet = (seen: string | null, now: number): boolean => {
+    const at = seen ? Date.parse(seen) : Number.NaN;
+    return Number.isFinite(at) && now - at > 45 * 60_000;
+  };
+
+  /* ── since you were here ───────────────────────────────────────────────────── */
+
+  const listIcons = $derived(new Map(data.index.registers.map((r) => [r.id, r.icon as string])));
+  const sinceTop = $derived((t?.since.rows ?? []).slice(0, 5));
+  const sinceParts = $derived.by(() => {
+    const rows = t?.since.rows ?? [];
+    const rest = rows.slice(5).reduce((n, r) => n + r.count, 0);
+    return [...sinceTop.map((r) => ({ label: '', value: r.count })), ...(rest > 0 ? [{ label: '', value: rest }] : [])];
+  });
+  const sinceMeta = $derived(t ? [sinceWhen(t.since.from, t.now) ?? '', whoSaid(t.since.byAgents ?? 0, t.since.byYou ?? 0)].filter(Boolean).join(' · ') : '');
+  const sinceSummary = $derived(`${words.sinceSubject}: ${(t?.since.rows ?? []).map((r) => `${r.label} ${r.count}`).join(', ')}`);
+
+  /* ── cash ──────────────────────────────────────────────────────────────────── */
+
+  const money = $derived(t?.money ?? null);
+  const lead = $derived(money?.cash[0] ?? null);
+  const forecast = $derived(money?.forecast ?? null);
+  const cashSaid = $derived(forecast ? cashReading(forecast) : null);
+  const currencyName = (code: string | undefined): string => {
+    if (!code) return words.cashNow;
+    try {
+      return new Intl.DisplayNames(['en-GB'], { type: 'currency' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  };
+  /* THE SMALLER FIGURES UNDER THE LEAD: cash held in another currency, then each book's, three at most. */
+  const minor = $derived(money ? [...money.cash.slice(1).map((c) => ({ amount: c.amount, label: currencyName(c.currency) })), ...money.books.map((b) => ({ amount: b.amount, label: b.label ?? words.cashNow }))].slice(0, 3) : []);
+  /* WITH NO WALK TO DRAW, THE BOOKS ARE THE PICTURE: each book's share of the cash, where they share one currency. */
+  const bookParts = $derived.by(() => {
+    const books = money?.books ?? [];
+    const currencies = new Set(books.map((b) => b.currency));
+    if (books.length < 2 || currencies.size !== 1 || books.some((b) => typeof b.value !== 'number')) return [];
+    return books.map((b) => ({ label: b.label ?? words.cashNow, value: Math.max(0, b.value ?? 0) }));
+  });
+  const bookSaid = (n: number): string => {
+    const cur = money?.books[0]?.currency;
+    return cur ? moneyInText(moneyText(Math.round(n), cur)) : n.toLocaleString('en-GB');
+  };
+  const cashTile = $derived(lead !== null && (forecast !== null || bookParts.length > 0));
+
+  /* ── the keyboard ──────────────────────────────────────────────────────────── */
+
+  type Keyed = { key: string; href: string; tick: Tickable | null; question: boolean };
+  const keyed = $derived.by((): Keyed[] => [
+    ...shownNeeds.map((n): Keyed => ({ key: n.key, href: n.href, tick: n.kind === 'task' ? n.task : null, question: n.kind === 'question' })),
+    ...groups.flatMap((g) => g.items.slice(0, PER_GROUP)).map((l): Keyed => ({ key: l.key, href: l.href, tick: l.kind === 'task' ? l.task : null, question: false })),
+  ]);
+  let cursor = $state<string | null>(null);
+  const under = $derived(keyed.find((k) => k.key === cursor) ?? null);
+  const answers: Record<string, { choose(i: number): boolean } | undefined> = $state({});
+
+  function focusRow(key: string) {
+    const row = document.querySelector<HTMLElement>(`[data-row="${CSS.escape(key)}"]`);
+    row?.querySelector<HTMLElement>('.line-title, .q-text')?.focus();
+  }
+
+  function move(by: number) {
+    if (keyed.length === 0) return;
+    const i = keyed.findIndex((k) => k.key === cursor);
+    const next = i < 0 ? (by > 0 ? 0 : keyed.length - 1) : Math.min(keyed.length - 1, Math.max(0, i + by));
+    cursor = keyed[next]!.key;
+    focusRow(cursor);
+  }
+
+  /* A `g` PRESSED FIRST IS THE SHELL'S, and so is the key after it: `g 1` goes to the first place in the rail. */
+  let goAt = 0;
+
+  function keys(e: KeyboardEvent) {
+    if (e.metaKey || e.ctrlKey || e.altKey || covered()) return;
+    if (typing()) {
+      if (e.key === 'Escape' && capturing && document.activeElement === captureBox) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeCapture();
+      }
+      return;
+    }
+    if (silenced(e)) return;
+    if (e.key === 'g') {
+      goAt = Date.now();
+      return;
+    }
+    if (Date.now() - goAt < 1000) {
+      goAt = 0;
+      return;
+    }
+    const on = document.activeElement;
+    const control = on instanceof HTMLElement && on.closest('button, a[href], select, summary') !== null;
+    switch (e.key) {
+      case 'j':
+        move(1);
+        break;
+      case 'k':
+        move(-1);
+        break;
+      case 'x': {
+        const it = under?.tick;
+        if (!it || !mayWrite) return;
+        const i = keyed.findIndex((k) => k.key === cursor);
+        finish(it);
+        const next = keyed[i + 1] ?? keyed[i - 1];
+        cursor = next?.key ?? null;
+        if (next) void tick().then(() => focusRow(next.key));
+        break;
+      }
+      case 'Enter':
+        if (control || !under) return;
+        void goto(at(under.href));
+        break;
+      case 'n':
+        if (!takesTasks) return;
+        void openCapture();
+        break;
+      case 'Escape':
+        if (cursor === null) return;
+        cursor = null;
+        break;
+      default: {
+        const n = Number(e.key);
+        if (!under?.question || !Number.isInteger(n) || n < 1 || n > 9) return;
+        if (!answers[under.key]?.choose(n - 1)) return;
+      }
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  $effect(() => {
+    const on = (e: KeyboardEvent) => keys(e);
+    document.addEventListener('keydown', on);
+    return () => document.removeEventListener('keydown', on);
+  });
+
+  /* ── what a row says ───────────────────────────────────────────────────────── */
+
+  function taskMeta(x: { agent: string | null; state?: string | null | undefined; priority?: string | null | undefined }): string[] {
+    const parts: string[] = [];
+    const tier = x.priority ? words.priority[x.priority] : undefined;
+    if (tier) parts.push(tier);
+    if (x.agent) parts.push(x.state === 'review' ? words.handedBack(x.agent) : words.onIt(x.agent));
+    else if (x.state === 'blocked') parts.push(words.waiting);
+    return parts;
+  }
+
+  /* THE CHECK SAYS WHO HOLDS IT: dashed amber while it waits on somebody, the live arc while an agent is on it. */
+  const checkState = (x: { agent: string | null; state?: string | null | undefined }): string | undefined =>
+    x.state === 'blocked' ? 'waiting' : x.agent && x.state !== 'review' ? 'held' : undefined;
+
+  const signed = (bill: DueRow): string => (bill.amount ? `${bill.out ? '−' : '+'}${bill.amount}` : '');
 </script>
 
 <svelte:head><title>{titleOf(copy.today)}</title></svelte:head>
 
-<PageHead title={copy.today} kicker={day} />
+<PageHead title={copy.today} count={t ? needing : undefined} sentence={said?.text} needs={said?.needs || undefined}>
+  {#snippet actions()}
+    {#if takesTasks && !data.refused}
+      <button
+        type="button"
+        class="add tap"
+        aria-label={words.addTask}
+        title={words.addTip}
+        aria-expanded={capturing}
+        aria-controls={capturing ? 'today-capture' : undefined}
+        onclick={() => (capturing ? closeCapture() : void openCapture())}
+      >
+        <Icon name="plus" size="l" />
+      </button>
+    {/if}
+  {/snippet}
+</PageHead>
 
 <div class="page">
-  <form class="ask" onsubmit={ask} role="search">
-    <label class="sr-only" for="today-ask">{words.ask}</label>
-    <input
-      id="today-ask"
-      class="ask-input"
-      type="text"
-      autocomplete="off"
-      enterkeyhint="go"
-      placeholder={words.ask}
-      title={words.askHint}
-      bind:value={asked}
-      onfocus={warm}
-    />
-    {#if offerTask}
-      <!-- THE TWO THINGS A LINE CAN BE, the one Enter does first and marked with the key. -->
-      <div class="offer">
-        {#if enterAdds}
-          <button type="submit" class="offer-btn">{words.addTask}<Kbd keys="↵" /></button>
-          <button type="button" class="offer-btn" onclick={askIt}>{words.askIt}</button>
-        {:else}
-          <button type="submit" class="offer-btn">{words.askIt}<Kbd keys="↵" /></button>
-          <button type="button" class="offer-btn" onclick={() => void addTask()}>{words.addTask}</button>
-        {/if}
-      </div>
-    {/if}
-  </form>
-
   {#if data.refused}
     <p class="none">{data.refused.fix}</p>
   {:else if today.state !== 'ready' && today.state !== 'empty'}
     <ReadState state={today.state} refusal={today.refusal} onretry={() => void today.reread()} />
   {:else if t}
-    <div class="grid">
-      <div class="col">
-        <!-- ══ NEEDS YOU ══ -->
-        <section class="block" aria-labelledby="h-needs">
-          <h2 class="head" id="h-needs">{words.needs}{#if needing}<span class="n num">{needing}</span>{/if}</h2>
+    <div class="today">
+      <!-- ══ THE NEXT TWO WEEKS ══ -->
+      <div class="t-week">
+        <Tile aria-label={words.week}>
+          <WeekStrip days={strip} today={day} subject={words.week} />
+          <p class="reading">{stripSaid}</p>
+        </Tile>
+      </div>
+
+      <!-- ══ NEEDS YOU ══ -->
+      <div class="t-needs ground">
+        <Section title={words.needs} count={needing}>
+          {#snippet aside()}
+            {#if keyed.length > 0}
+              <span class="hints" aria-hidden="true">
+                <Kbd keys="j" /><Kbd keys="k" /><span class="hint">{words.keys.move}</span>
+                {#if mayWrite}<Kbd keys="x" /><span class="hint">{words.keys.done}</span>{/if}
+                <Kbd keys="↵" /><span class="hint">{words.keys.open}</span>
+                {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
+              </span>
+            {/if}
+            {#if data.lists.some((l) => l.id === 'tasks')}
+              <a class="aside-link tap" href={at('/?work')}>{words.openWork}<Icon name="arrow" size="s" /></a>
+            {/if}
+          {/snippet}
+
+          {#if capturing}
+            <form class="capture" id="today-capture" onsubmit={ask}>
+              <label class="sr-only" for="today-ask">{words.addTask}</label>
+              <input
+                id="today-ask"
+                class="capture-input"
+                type="text"
+                autocomplete="off"
+                enterkeyhint="done"
+                placeholder={words.capture}
+                bind:value={asked}
+                bind:this={captureBox}
+              />
+              <button type="submit" class="capture-btn" disabled={typed === ''}>{enterAdds || typed === '' ? words.addIt : words.askIt}<span class="cap-key" aria-hidden="true"><Kbd keys="↵" /></span></button>
+              {#if typed !== '' && takesTasks}
+                {#if enterAdds}
+                  <button type="button" class="capture-btn quiet" onclick={askIt}>{words.askIt}</button>
+                {:else}
+                  <button type="button" class="capture-btn quiet" onclick={() => void addTask()}>{words.addIt}</button>
+                {/if}
+              {/if}
+            </form>
+          {/if}
+
           {#if needing === 0}
             <p class="none">{words.needsNone}</p>
           {:else}
-            <ul class="rows">
-              {#each t.tasks ?? [] as task (task.seq)}
+            <ul class="ledger ledger-lead rows">
+              {#each shownNeeds as n (n.key)}
+                <li data-row={n.key} data-cursor={cursor === n.key ? '' : undefined} data-needs onfocusin={() => (cursor = n.key)}>
+                  {#if n.kind === 'question'}
+                    <Question bind:this={answers[n.key]} question={n.q} now={t.now} onanswered={answered} />
+                  {:else if n.kind === 'task'}
+                    {@render taskRow(n.task, n.href, true)}
+                  {:else}
+                    {@render billRow(n.bill, n.href, true)}
+                  {/if}
+                </li>
+              {/each}
+              {#if needs.length > FIRST}
                 <li>
-                  <a class="row" href={at(`/r/tasks/${task.seq}`)}>
-                    <span class="when" data-why={task.why}>
-                      {task.why === 'late' && task.due ? relative(task.due, t.now) : task.why === 'today' ? words.today : words.urgent}
-                    </span>
-                    <span class="what">{task.what}</span>
-                    <span class="where">{[task.project, task.agent ? words.agent(task.agent) : null].filter(Boolean).join(' · ')}</span>
+                  <button type="button" class="line line-short more-row" aria-expanded={unfolded} onclick={() => (unfolded = !unfolded)}>
+                    <span class="line-mark more-mark" data-open={unfolded ? '' : undefined}><Icon name="chevron" size="m" /></span>
+                    <span class="line-main"><span class="line-title">{unfolded ? words.showFewer : words.showMore(needs.length - FIRST)}</span></span>
+                  </button>
+                </li>
+              {/if}
+              {#if moreQuestions > 0}
+                <li>
+                  <a class="line line-short more-row" href={at('/decide')}>
+                    <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
+                    <span class="line-main"><span class="line-title">{words.moreQuestions(moreQuestions)}</span></span>
                   </a>
                 </li>
-              {/each}
-              {#each t.questions as q (q.id)}
-                <li class="ask-row">
-                  <span class="when" data-why="decide">{copy.decide.toLowerCase()}</span>
-                  <Question question={q} now={t.now} onanswered={answered} />
-                </li>
-              {/each}
-            </ul>
-            {#if moreQuestions > 0}
-              <p class="more"><a href={at('/decide')}>{words.moreQuestions(moreQuestions)}</a></p>
-            {/if}
-          {/if}
-        </section>
-
-        <!-- ══ WHO IS WORKING ══ -->
-        <section class="block" aria-labelledby="h-working">
-          <h2 class="head" id="h-working">{words.working}{#if t.runs.length}<span class="n num">{t.runs.length}</span>{/if}</h2>
-          {#if t.runs.length === 0}
-            <p class="none">{words.workingNone}</p>
-          {:else}
-            <ul class="rows">
-              {#each t.runs as run, i (run.seq ?? i)}
-                <li>
-                  <svelte:element this={run.seq === null ? 'div' : 'a'} class="row" href={run.seq === null ? undefined : at(`/r/session/${run.seq}`)}>
-                    <span class="when">{words.agent(run.agent)}</span>
-                    <span class="what">{run.doing || '…'}</span>
-                    <span class="where">{[run.project, run.seen ? since(run.seen, t.now) : null].filter(Boolean).join(' · ')}</span>
-                  </svelte:element>
-                </li>
-              {/each}
+              {/if}
             </ul>
           {/if}
-        </section>
+        </Section>
       </div>
 
-      <div class="col side">
-        <!-- ══ SINCE YOU WERE LAST HERE ══ -->
-        <section class="block" aria-labelledby="h-since">
-          <h2 class="head" id="h-since">
-            {words.since}{#if t.since.total}<span class="n num">{words.sinceTotal(t.since.total, t.since.capped)}</span>{/if}
-          </h2>
-          {#if t.since.rows.length === 0}
-            <p class="none">{words.sinceNone}</p>
-          {:else}
-            <ul class="rows">
-              {#each t.since.rows as row (row.key)}
-                <li>
-                  <a class="row count" href={at(row.href)}>
-                    <span class="num big">{row.count}</span>
-                    <span class="what">{row.label}</span>
-                  </a>
-                </li>
-              {/each}
-            </ul>
-          {/if}
-          <p class="more"><a href={at('/audit')}>{words.allActivity}</a></p>
-        </section>
-
-        <!-- ══ MONEY ══ Only on a record that holds money. -->
-        {#if t.money}
-          <section class="block" aria-labelledby="h-money">
-            <h2 class="head" id="h-money"><a href={at('/p/money')}>{words.money}</a></h2>
-            {#if t.money.cash.length === 0}
-              <p class="none">{words.cashNone}</p>
-            {:else}
-              <dl class="cash">
-                {#each t.money.cash as line, i (i)}
-                  <div class="cash-line lead">
-                    <dt>{words.cash}</dt>
-                    <dd class="num">{line.amount}</dd>
-                  </div>
+      <!-- ══ THE DAYS COMING UP ══ -->
+      {#if groups.length > 0}
+        <div class="t-coming ground">
+          {#each groups as g (g.key)}
+            <Section title={g.title} count={g.items.length}>
+              {#snippet aside()}<span class="span-said">{g.span}</span>{/snippet}
+              <ul class="ledger ledger-lead rows">
+                {#each g.items.slice(0, PER_GROUP) as l (l.key)}
+                  <li data-row={l.key} data-cursor={cursor === l.key ? '' : undefined} onfocusin={() => (cursor = l.key)}>
+                    {#if l.kind === 'task'}
+                      {@render taskRow(l.task, l.href, false)}
+                    {:else}
+                      {@render billRow(l.bill, l.href, false)}
+                    {/if}
+                  </li>
                 {/each}
-                {#each t.money.books as line, i (i)}
-                  <div class="cash-line">
-                    <dt>{line.label}</dt>
-                    <dd class="num">{line.amount}</dd>
-                  </div>
-                {/each}
-              </dl>
-            {/if}
-            <h3 class="sub">{words.dueNext}</h3>
-            {#if t.money.due.length === 0}
-              <p class="none">{words.dueNone}</p>
-            {:else}
-              <ul class="rows">
-                {#each t.money.due as bill (bill.seq)}
+                {#if g.items.length > PER_GROUP}
                   <li>
-                    <a class="row bill" href={at(`/r/obligations/${bill.seq}`)}>
-                      <span class="when" data-why={bill.late ? 'late' : undefined}>{bill.due ? relative(bill.due, t.now) : ''}</span>
-                      <span class="what">{bill.what}</span>
-                      <span class="amount num" data-out={bill.out ? '' : undefined}>
-                        {bill.amount ?? ''}<span class="dir">{bill.out ? words.owing : words.owed}</span>
-                      </span>
+                    <a class="line line-short more-row" href={at('/?work')}>
+                      <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
+                      <span class="line-main"><span class="line-title">{words.moreOn(g.items.length - PER_GROUP)}</span></span>
                     </a>
+                  </li>
+                {/if}
+              </ul>
+            </Section>
+          {/each}
+        </div>
+      {/if}
+
+      <!-- ══ THE TILES ══ -->
+      <div class="t-side">
+        {#if t.runs.length > 0 || sessions.length > 0}
+          <Tile icon="session" title={words.agentsTile} count={t.runs.length} meta={t.host ? words.allOn(t.host) : undefined}>
+            {#if t.runs.length > 0}
+              <ul class="runs">
+                {#each t.runs as r, i (r.seq ?? i)}
+                  {@const s = r.seq === null ? undefined : bySeq.get(r.seq)}
+                  <li class="run">
+                    <AgentFace agent={r.agent} run={r.seq === null ? '' : `S${r.seq}`} live={quiet(r.seen, t.now) ? 'quiet' : 'working'} size="s" />
+                    <span class="run-main">
+                      <span class="run-name">{words.agent(r.agent)}</span>
+                      {#if r.project}<span class="run-where">{r.project}</span>{/if}
+                      <span class="run-doing" dir="auto">{r.doing || words.doingNothing}</span>
+                    </span>
+                    <span class="run-time num">{s ? elapsedSaid(t.now - s.opened) : r.seen ? since(r.seen, t.now) : ''}</span>
                   </li>
                 {/each}
               </ul>
             {/if}
-          </section>
+            {#if lanes.length > 0 && t.dayStart !== undefined}
+              <div class="lanes">
+                <Swimlanes {lanes} start={t.dayStart} end={Math.max(t.now + 3_600_000, t.dayStart + 6 * 3_600_000)} now={t.now} subject="Agent runs" />
+              </div>
+            {/if}
+            {#if agentsSaid}<p class="reading">{agentsSaid}</p>{/if}
+          </Tile>
+        {:else}
+          <p class="none side-none">{words.workingNone}</p>
+        {/if}
+
+        <Tile icon="activity" title={words.since} href="/audit" hrefLabel={words.activity}>
+          {#if t.since.total > 0}
+            <div class="figure-row">
+              <span class="figure num">{t.since.total.toLocaleString('en-GB')}{t.since.capped ? '+' : ''}</span>
+              {#if sinceMeta}<span class="figure-meta">{sinceMeta}</span>{/if}
+            </div>
+            <Stacked parts={sinceParts} height={10} summary={sinceSummary} />
+            <ul class="legend">
+              {#each sinceTop as row, i (row.key)}
+                <li>
+                  <a class="legend-row" href={at(row.href)}>
+                    <span class="swatch" data-tone={rampAt(i)}></span>
+                    <Icon name={sinceIcon(row, (l) => listIcons.get(l)) as IconName} size="m" />
+                    <span class="legend-n num">{row.count}</span>
+                    <span class="legend-label">{row.label}</span>
+                  </a>
+                </li>
+              {/each}
+            </ul>
+            <p class="reading">{sinceReading(t.since.rows, t.since.total, t.since.byAgents ?? 0, t.since.byYou ?? 0)}</p>
+          {:else}
+            <p class="reading quiet">{words.sinceNone}</p>
+          {/if}
+        </Tile>
+
+        {#if money && lead && cashTile}
+          <Tile icon="money" title={words.cash} href="/p/money" hrefLabel={words.money}>
+            <div class="figure-row cash-row">
+              <span class="figure num">{lead.amount}</span>
+              {#if forecast}
+                <span class="spark"><Sparkline values={forecast.values} mark="low" tone={forecast.crossed ? 'danger' : 'ink'} summary={cashSummary(forecast)} /></span>
+              {/if}
+            </div>
+            <p class="figure-sub">{money.cash.length > 1 ? currencyName(lead.currency) : words.cashNow}</p>
+            {#if minor.length > 0}
+              <div class="minor">
+                {#each minor as m, i (i)}
+                  <div class="minor-one"><span class="minor-fig num">{m.amount}</span><span class="minor-label">{m.label}</span></div>
+                {/each}
+              </div>
+            {/if}
+            {#if forecast && cashSaid}
+              <p class="reading">
+                {#if cashSaid.needs && cashSaid.text.includes(cashSaid.needs)}
+                  {cashSaid.text.slice(0, cashSaid.text.indexOf(cashSaid.needs))}<span class="needs-said">{cashSaid.needs}</span>{cashSaid.text.slice(cashSaid.text.indexOf(cashSaid.needs) + cashSaid.needs.length)}
+                {:else}
+                  {cashSaid.text}
+                {/if}
+              </p>
+            {:else if bookParts.length > 0}
+              {@const share = shareReading(bookParts)}
+              <Stacked parts={bookParts} subject={words.cashNow} format={bookSaid} />
+              {#if share}<p class="reading">{share}</p>{/if}
+            {/if}
+          </Tile>
+        {:else if money}
+          <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile (SYSTEM §11). -->
+          <div class="ground">
+            <Section title={words.cash}>
+              {#snippet aside()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
+              {#if money.cash.length === 0}
+                <p class="none">{words.cashNone}</p>
+              {:else}
+                <ul class="ledger ledger-lead rows">
+                  {#each [...money.cash.map((c) => ({ label: currencyName(c.currency), amount: c.amount })), ...money.books.map((b) => ({ label: b.label ?? words.cashNow, amount: b.amount }))] as c, i (i)}
+                    <li>
+                      <div class="line">
+                        <span class="line-mark"><IconWell name="money" size="l" /></span>
+                        <span class="line-main"><span class="line-title">{c.label}</span></span>
+                        <span class="line-amount num">{c.amount}</span>
+                        <span></span>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </Section>
+          </div>
         {/if}
       </div>
     </div>
   {/if}
 </div>
 
+{#snippet taskRow(task: Tickable & { agent: string | null; project: string | null; hue?: number | null | undefined; priority?: string | null | undefined; why?: TaskRow['why']; due?: string | null; day?: string }, href: string, need: boolean)}
+  {@const hue = hueOf(task.project, task.hue)}
+  <div class="line line-tall">
+    <span class="line-mark">
+      {#if mayWrite}
+        <button type="button" class="line-check tap" role="checkbox" aria-checked="false" aria-label={words.doneLabel(task.what)} data-state={checkState(task)} onclick={() => finish(task)}>
+          <Icon name="check" size="s" />
+        </button>
+      {:else}
+        <span class="line-check" data-state={checkState(task)} aria-hidden="true"></span>
+      {/if}
+    </span>
+    <span class="line-main">
+      <a class="line-title" href={at(href)} dir="auto">{task.what}</a>
+      <span class="line-detail">
+        {#if task.project}<span class="proj" style:--hue={hue} aria-hidden="true"></span><span dir="auto">{task.project}</span>{#if taskMeta(task).length}{' · '}{/if}{/if}{taskMeta(task).join(' · ')}
+      </span>
+    </span>
+    {#if need && task.why === 'late' && task.due}
+      <span class="line-when line-late" data-why="late">{lateSaid(task.due, day)}</span>
+    {:else if need && task.why === 'review'}
+      <span class="line-when line-late" data-why="review">{words.review}</span>
+    {:else if need && task.why === 'urgent'}
+      <span class="line-when line-late" data-why="urgent">{words.urgent}</span>
+    {:else if need && task.why === 'today'}
+      <span class="line-when when-today" data-why="today">{words.today}</span>
+    {:else if task.day}
+      <span class="line-when">{dueSaid(task.day, day)}</span>
+    {:else}
+      <span></span>
+    {/if}
+    <span class="line-verbs">
+      {#if task.why === 'review'}
+        <Button weight="quiet" size="sm" {href} kbd="↵">{words.reviewIt}</Button>
+      {/if}
+      {#if mayWrite}
+        <Button weight="quiet" size="sm" kbd="x" onclick={() => finish(task)}>{words.done}</Button>
+      {/if}
+    </span>
+  </div>
+{/snippet}
+
+{#snippet billRow(bill: DueRow, href: string, need: boolean)}
+  <div class="line line-tall">
+    <span class="line-mark"><IconWell name={bill.out ? 'obligation' : 'money'} size="l" /></span>
+    <span class="line-main">
+      <a class="line-title" href={at(href)} dir="auto">{bill.what}</a>
+      <span class="line-detail">{words.money} · {bill.out ? words.toPay : words.toCome}{#if !need && bill.due}{' · '}{daySaid(bill.due)}{/if}</span>
+    </span>
+    {#if need && bill.late && bill.due}
+      <span class="line-when line-late" data-why="late">{lateSaid(bill.due, day)}</span>
+    {:else if need}
+      <span class="line-when when-today" data-why="today">{words.today}</span>
+    {:else}
+      <span></span>
+    {/if}
+    <span class="line-amount num" data-in={bill.out ? undefined : ''}>{signed(bill)}</span>
+  </div>
+{/snippet}
+
 <style>
   .page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-5);
     max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
     min-inline-size: 0;
   }
 
-  /* THE ASK BAR: one field the width of the page, a hairline box, no ornament. */
-  .ask {
+  /* ── the grid (SYSTEM §5, board `Main`) ──────────────────────────────────────
+     The strip across the top; the list on the ground at the left and three tiles at the right, 12 apart. Every track
+     may shrink to nothing, so no tile or row can push the page wider than the window. */
+  .today {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 404px);
+    grid-template-areas:
+      'week week'
+      'needs side'
+      'coming side';
+    grid-template-rows: auto auto 1fr;
+    gap: var(--sp-5) var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  .t-week {
+    grid-area: week;
+    min-inline-size: 0;
+  }
+
+  .t-needs {
+    grid-area: needs;
+    min-inline-size: 0;
+  }
+
+  .t-coming {
+    grid-area: coming;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    gap: var(--sp-5);
+    min-inline-size: 0;
   }
 
-  .offer {
+  .t-side {
+    grid-area: side;
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
+    flex-direction: column;
+    gap: var(--inset);
+    align-self: start;
+    min-inline-size: 0;
   }
 
-  .offer-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h-sm);
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
-    cursor: pointer;
-  }
-
-  .offer-btn:first-child {
-    border-color: var(--ink2);
-    color: var(--ink);
-  }
-
-  .offer-btn:hover,
-  .offer-btn:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  @media (pointer: coarse) {
-    .offer-btn {
-      min-block-size: var(--tap);
+  /* BETWEEN A LAPTOP AND A PHONE THE TILES SIT UNDER WHAT NEEDS YOU, side by side where they fit. */
+  @media (width < 1180px) {
+    .today {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'week'
+        'needs'
+        'side'
+        'coming';
+      grid-template-rows: none;
     }
 
-    .offer-btn :global(kbd) {
+    .t-side {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+      align-items: start;
+    }
+  }
+
+  /* ON A PHONE (SYSTEM §9) the order is what needs you, the agents, what changed and cash, and then the days. */
+  @media (width < 900px) {
+    .page {
+      padding: var(--sp-2) var(--gutter) var(--sp-8);
+    }
+
+    .today {
+      grid-template-areas:
+        'needs'
+        'side'
+        'week'
+        'coming';
+      gap: var(--sp-4);
+    }
+
+    .t-side {
+      display: flex;
+      gap: var(--inset);
+    }
+
+    .lanes {
       display: none;
     }
   }
 
-  .ask-input {
+  /* ── the toolbar's one primary: the ink circle with a plus ─────────────────── */
+  .add {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: var(--ink);
+    border: 0;
+    border-radius: var(--r-pill);
+    color: var(--on-ink);
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .add:hover {
+      background: var(--primary-hover);
+    }
+  }
+
+  .add[aria-expanded='true'] :global(.icon) {
+    rotate: 45deg;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .add :global(.icon) {
+      transition: rotate var(--d-state) var(--ease-out);
+    }
+  }
+
+  /* ── on the ground ─────────────────────────────────────────────────────────── */
+
+  /* A WELL ON THE GROUND IS THE TILE'S WHITE, so it reads as a mark and not as a hole in the ground. */
+  .ground :global(.well:not([data-tone])) {
+    background: var(--bg);
+  }
+
+  .rows {
+    margin-block-start: calc(-1 * var(--sp-1));
+  }
+
+  /* A row that is not itself a link takes the wash under the pointer too, as one that is does (`rows.css`). */
+  @media (hover: hover) and (pointer: fine) {
+    .rows > li > div.line:hover,
+    .rows > li > :global(.q:hover) {
+      background: var(--hover-wash);
+    }
+  }
+
+  .rows > li[data-cursor] > :global(.q) {
+    background: var(--hover-wash);
+  }
+
+  /* THE COLUMN FOR THE AMOUNT and the verbs: a bill's figure where a task's pills are. */
+  .line-amount[data-in] {
+    color: var(--earn);
+    font-weight: 600;
+  }
+
+  .when-today {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  /* THE PROJECT'S SQUARE before its name, in the project's own hue, as its face is drawn everywhere. */
+  .proj {
+    display: inline-block;
+    inline-size: 12px;
+    block-size: 12px;
+    margin-inline-end: 6px;
+    border-radius: 3px;
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    vertical-align: -1px;
+  }
+
+  .more-row {
+    inline-size: 100%;
+    background: none;
+    border: 0;
+    color: var(--ink2);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .more-row .line-title {
+    font-weight: 500;
+  }
+
+  .more-mark {
+    color: var(--dim);
+  }
+
+  .more-mark[data-open] :global(.icon) {
+    rotate: 90deg;
+  }
+
+  .none {
+    margin: 0;
+    padding-block: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
+  .side-none {
+    padding-inline: var(--sp-1);
+  }
+
+  /* THE KEYS, ONE QUIET LINE IN THE HEADING'S ASIDE: shown only where there is a keyboard to press them with. */
+  .hints {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+  }
+
+  .hint {
+    margin-inline: 2px var(--sp-2);
+  }
+
+  @media (pointer: coarse), (width < 900px) {
+    .hints {
+      display: none;
+    }
+  }
+
+  .aside-link,
+  .span-said {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .span-said {
+    color: var(--dim);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .aside-link:hover {
+      color: var(--ink);
+    }
+  }
+
+  /* ── the capture line, at the top of what needs you ────────────────────────── */
+  .capture {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-block-end: var(--sp-2);
+  }
+
+  .capture-input {
     flex: 1;
     min-inline-size: 0;
-    min-block-size: var(--ctl-h);
+    block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
+    background: var(--bg);
+    border: 0;
+    border-radius: var(--r-md);
+    box-shadow: var(--e1);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-base);
   }
 
-  .ask-input::placeholder {
+  .capture-input::placeholder {
     color: var(--dim);
   }
 
-  .ask-input:focus-visible {
-    border-color: var(--ink2);
+  .capture-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2) 0 var(--sp-4);
+    background: var(--ink);
+    border: 0;
+    border-radius: var(--r-pill);
+    color: var(--on-ink);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+    cursor: pointer;
   }
 
-  /* TWO COLUMNS WHERE THERE IS ROOM: what needs you and who is working on the left, what changed and money on the right. */
-  .grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-6);
+  .capture-btn :global(.kbd) {
+    background: color-mix(in srgb, var(--on-ink) 18%, transparent);
+    color: var(--on-ink);
   }
 
-  @media (width >= 1100px) {
-    .grid {
-      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  .capture-btn.quiet {
+    padding-inline: var(--sp-4);
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  .capture-btn:disabled {
+    background: var(--s2);
+    color: var(--dim);
+    cursor: not-allowed;
+  }
+
+  .cap-key {
+    display: inline-flex;
+  }
+
+  @media (pointer: coarse) {
+    .capture-input {
+      block-size: var(--tap);
+      font-size: var(--t-md);
+    }
+
+    .capture-btn {
+      min-block-size: var(--tap);
+      padding-inline: var(--sp-4);
+    }
+
+    .cap-key {
+      display: none;
     }
   }
 
-  .col {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-6);
-    min-inline-size: 0;
-  }
+  /* ── inside the tiles ──────────────────────────────────────────────────────── */
 
-  .block {
-    min-inline-size: 0;
-  }
-
-  .head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-2);
+  /* THE ONE WRITTEN LINE under every chart, saying what it means (SYSTEM §6). */
+  .reading {
+    margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
-    font-weight: 600;
+    line-height: 20px;
+    text-wrap: pretty;
   }
 
-  .head a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .head a:hover {
-    text-decoration: underline;
-  }
-
-  .n {
-    color: var(--dim);
-    font-weight: 400;
-  }
-
-  .sub {
-    margin: var(--sp-4) 0 var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .none {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .more {
-    margin: var(--sp-2) 0 0;
-    font-size: var(--t-sm);
-  }
-
-  .more a {
+  .reading.quiet {
     color: var(--ink2);
   }
 
-  /* A LIST IS LINES ON THE PAGE WITH A HAIRLINE BETWEEN THEM AND NOTHING AROUND THEM, dense: one line each where it fits. */
-  .rows {
+  .needs-said {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  .figure-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .cash-row {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* A LONG FIGURE WRAPS RATHER THAN PUSHING THE TILE PAST A PHONE'S EDGE. */
+  .figure {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-size: var(--t-figure);
+    font-weight: 600;
+    line-height: calc(34 / 30);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .figure-meta {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .spark {
+    flex: 0 1 120px;
+    min-inline-size: 64px;
+  }
+
+  .figure-sub {
+    margin: calc(-1 * var(--sp-3)) 0 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .minor {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-6);
+  }
+
+  .minor-one {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .minor-fig {
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .minor-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* THE AGENTS: a line a run, its face with the live ring, who and where and what, and how long it has been at it. */
+  .runs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .rows > li + li {
-    border-block-start: 1px solid var(--line-soft);
+  .run {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: 32px;
+    min-inline-size: 0;
   }
 
-  .row {
-    display: grid;
-    grid-template-columns: 11ch minmax(0, 1fr) auto;
-    gap: var(--sp-3);
+  .run-main {
+    display: flex;
+    flex: 1;
     align-items: baseline;
-    padding: var(--sp-2) 0;
+    gap: 6px;
+    min-inline-size: 0;
+    overflow: hidden;
+    font-size: var(--t-base);
+    white-space: nowrap;
+  }
+
+  .run-name {
+    flex: none;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-weight: 600;
+  }
+
+  .run-where {
+    flex: none;
+    color: var(--ink);
+  }
+
+  .run-doing {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink2);
+    text-overflow: ellipsis;
+  }
+
+  .run-time {
+    flex: none;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+  }
+
+  .lanes {
+    min-inline-size: 0;
+  }
+
+  /* WHAT CHANGED: a swatch a kind, its glyph, its count and its words, two to a line, each a door to the activity. */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: 28px;
+    min-inline-size: 0;
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-base);
     text-decoration: none;
   }
 
-  a.row:hover .what {
-    text-decoration: underline;
+  @media (hover: hover) and (pointer: fine) {
+    .legend-row:hover .legend-label {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
-  .ask-row {
-    display: grid;
-    grid-template-columns: 11ch minmax(0, 1fr);
-    gap: var(--sp-3);
-    align-items: baseline;
-    padding: var(--sp-2) 0;
+  .legend-n {
+    color: var(--ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
-  .when {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    white-space: nowrap;
-  }
-
-  .when[data-why='late'],
-  .when[data-why='urgent'] {
-    color: var(--warn);
-  }
-
-  .what {
+  .legend-label {
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .where {
-    max-inline-size: 24ch;
-    overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* THE SWATCH IS THE STACKED BAR'S OWN STEP: ink, then the ramp's greys, mixed as the chart mixes them (`viz.css`). */
+  .swatch {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 2px;
+    background: var(--ink);
   }
 
-  .row.count {
-    grid-template-columns: 5ch minmax(0, 1fr);
+  .swatch[data-tone='g1'] {
+    background: color-mix(in srgb, var(--ink) 76%, var(--bg));
   }
 
-  .big {
-    color: var(--ink);
-    font-weight: 600;
-    text-align: end;
+  .swatch[data-tone='g2'] {
+    background: color-mix(in srgb, var(--ink) 48%, var(--bg));
   }
 
-  .row.bill {
-    grid-template-columns: 11ch minmax(0, 1fr) auto;
+  .swatch[data-tone='g3'] {
+    background: color-mix(in srgb, var(--ink) 24%, var(--bg));
   }
 
-  .amount {
-    white-space: nowrap;
+  .swatch[data-tone='g4'] {
+    background: color-mix(in srgb, var(--ink) 13%, var(--bg));
   }
 
-  .dir {
-    margin-inline-start: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
-  }
+  @media (width < 640px) {
+    .legend {
+      grid-template-columns: minmax(0, 1fr);
+    }
 
-  .cash {
-    margin: 0;
-  }
+    /* A PHONE'S ROW (SYSTEM §9): the mark, the words across, and the time and the verbs on a line under them. */
+    .rows :global(.line.line-tall) {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+      grid-template-rows: auto auto;
+      align-items: start;
+      gap: var(--sp-1) var(--sp-3);
+    }
 
-  .cash-line {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding: var(--sp-1) 0;
-    font-size: var(--t-ui);
-  }
+    .rows :global(.line.line-tall > .line-mark) {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
 
-  .cash-line dt {
-    color: var(--ink2);
-  }
+    .rows :global(.line.line-tall > .line-main) {
+      grid-column: 2 / -1;
+      grid-row: 1;
+    }
 
-  .cash-line dd {
-    margin: 0;
-    color: var(--ink);
-  }
+    .rows :global(.line.line-tall > .line-when) {
+      grid-column: 2;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
 
-  .cash-line.lead dd {
-    font-size: var(--t-lg);
-    font-weight: 600;
+    .rows :global(.line.line-tall > .line-verbs),
+    .rows :global(.line.line-tall > .line-amount) {
+      grid-column: 3;
+      grid-row: 2;
+    }
   }
 
   .sr-only {
@@ -595,29 +1414,14 @@
     white-space: nowrap;
   }
 
-  /* ON A PHONE A ROW IS TWO LINES: the day over the words, and where under them. */
-  @media (width < 640px) {
-    .row,
-    .row.bill {
-      grid-template-columns: minmax(0, 1fr) auto;
+  @media (forced-colors: active) {
+    .add {
+      border: 1px solid ButtonText;
     }
 
-    .row .when {
-      grid-column: 1 / -1;
-    }
-
-    .ask-row {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .page {
-      padding: var(--sp-3) var(--gutter) var(--sp-8);
-    }
-  }
-
-  @media (pointer: coarse) {
-    .ask-input {
-      min-block-size: var(--tap);
+    .proj,
+    .swatch {
+      forced-color-adjust: none;
     }
   }
 </style>

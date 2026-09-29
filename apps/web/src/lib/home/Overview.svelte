@@ -29,11 +29,12 @@
   import { landing } from '$lib/record/landing.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Count from '$lib/ui/Count.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import PageView from '$lib/page/PageView.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
-  import { countsOf, defaultHome, homeBlocks, leadOf, quiet, type HomeVoice } from '$lib/home/default-home.ts';
+  import { countsOf, defaultHome, homeBlocks, leadSaid, quiet, type HomeVoice } from '$lib/home/default-home.ts';
   import { words } from '$lib/home/words.ts';
   import { untrack } from 'svelte';
   import { typing } from '$lib/a11y/keys.svelte.ts';
@@ -145,8 +146,9 @@
 
   const live = $derived(got?.from === 'live' ? got : null);
   const blocks = $derived(live ? homeBlocks(live.page.blocks, live.now, voice) : []);
-  /* THE LEAD LINE IS BUILT FROM THE PAGE'S OWN COUNTS, so it can never disagree with the blocks under it. */
-  const lead = $derived(live ? leadOf(countsOf(live.page.blocks)) : null);
+  /* THE LEAD LINE IS BUILT FROM THE PAGE'S OWN COUNTS, so it can never disagree with the blocks under it. It is the
+     title row's sentence (SYSTEM §5), with what needs the reader in red. */
+  const lead = $derived(live ? leadSaid(countsOf(live.page.blocks)) : null);
   /* NOTHING PINNED, WAITING, DUE OR WORKING: one calm sentence, and only what changed under it. A host that cannot draw
      the house page at all is calm too, rather than blank. */
   const calm = $derived((live !== null && quiet(live.page.blocks)) || (settled && got === null));
@@ -197,15 +199,15 @@
 
 <!-- `display: contents`, so the sticky head still sticks to the panel. -->
 <div class="home-head">
-  <PageHead {title} kicker={today}>
+  <PageHead {title} kicker={today} sentence={!calm && lead ? lead.text : undefined} needs={lead?.needs || undefined}>
     {#snippet actions()}
       <!-- NOTHING AT ALL WHEN THERE IS NOTHING TO DECIDE: a count of nothing, as a link to a page
-           whose empty state is the same answer, is noise. `/decide` stays in the rail and on `g d`. -->
+           whose empty state is the same answer, is noise. `/decide` stays in the rail and on `g d`.
+           A glass pill in the toolbar, its count the one red square, because each one waits on the reader. -->
       {#if data.open > 0}
-        <a class="to-decide tap" href={at('/decide')}>
-          <span class="to-decide-n num">{data.open}</span>
-          <span>{copy.toDecide}</span>
-        </a>
+        <Button weight="glass" href="/decide">
+          <span>{copy.decide}</span><Count n={data.open} label={`${data.open} ${copy.toDecide}`} />
+        </Button>
       {/if}
     {/snippet}
   </PageHead>
@@ -255,8 +257,6 @@
     {:else if calm}
       <!-- ONE CALM SENTENCE AND ONE LINE ON WHAT FILLS THIS PAGE, never what a business is made of. -->
       <Empty kind="cleared" title={nothing} body={said('fills_with')} />
-    {:else if lead}
-      <p class="lead">{lead}</p>
     {/if}
 
     {#if drawn !== null || !settled}
@@ -274,57 +274,21 @@
     display: contents;
   }
 
-  /* A ghost link, not a figure: the words at the small size, the count in `warn`. */
-  .to-decide {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    min-block-size: var(--ctl-h-sm);
-    padding-inline: var(--sp-2);
-    /* The padding hangs past both edges, so the words end where the column's times end on a laptop
-       and start on the gutter on a phone, where the link wraps under the date. */
-    margin-inline: calc(-1 * var(--sp-2));
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .to-decide:hover {
-    background: var(--s2);
-    color: var(--ink);
-  }
-
-  .to-decide-n {
-    color: var(--warn);
-    font-weight: 500;
-  }
-
   /* ── the page ─────────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN, the page's own: its blocks carry their spans and its rail, and Home adds no column of its own beside it. */
+  /* ONE COLUMN, the page's own: its blocks carry their spans and its rail, and Home adds no column of its own beside it.
+     The same inset as Today's, under the title row and its sentence. */
   .page {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
     max-inline-size: var(--page-max);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
     min-inline-size: 0;
   }
 
   .body {
     min-inline-size: 0;
-  }
-
-  /* THE LEAD IS A SENTENCE, NOT A HEADING: the page title already names the page, and this says what is in it. */
-  .lead {
-    max-inline-size: var(--measure);
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-lg);
-    line-height: var(--lh-tight);
-    text-wrap: pretty;
   }
 
   /* A QUESTION WRAPS TO TWO LINES AND NO MORE on Home, so five of them fit above the fold; its own card on Decide says
@@ -349,7 +313,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+      padding: var(--sp-2) var(--gutter) var(--sp-8);
     }
   }
 

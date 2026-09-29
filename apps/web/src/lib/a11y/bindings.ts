@@ -15,7 +15,7 @@
  * `keys.svelte.ts` RE-EXPORTS EVERYTHING HERE, so no screen changed and no import moved.
  */
 
-export type Scope = 'document' | 'work' | 'grid' | 'board' | 'page' | 'decide' | 'gate' | 'inbox' | 'palette' | 'nav';
+export type Scope = 'document' | 'today' | 'work' | 'grid' | 'board' | 'page' | 'decide' | 'gate' | 'inbox' | 'palette' | 'nav';
 
 
 export type Binding = {
@@ -90,6 +90,14 @@ export const BINDINGS: Binding[] = [
   { id: 'close', scope: 'document', key: 'Esc', label: 'Close the topmost layer, one per press', bare: false },
   { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, not Slash', bare: true },
   { id: 'menu', scope: 'document', key: '⇧F10', label: 'The row or block menu', bare: false },
+
+  /* TODAY (`lib/home/Today.svelte`): the Needs you list worked from the keyboard. They stand down while a box has the
+     caret, while anything is open over the page, and after `g`. */
+  { id: 'today-move', scope: 'today', key: 'j  k', label: 'The next or the previous thing that needs you', bare: true },
+  { id: 'today-tick', scope: 'today', key: 'x', label: 'Mark it done, with an undo', bare: true },
+  { id: 'today-open', scope: 'today', key: '↵', label: 'Open it', bare: false },
+  { id: 'today-answer', scope: 'today', key: '1–9', label: 'Answer the question with that option', bare: true },
+  { id: 'today-new', scope: 'today', key: 'n', label: 'Type a new task', bare: true },
 
   /* THE WORK SCREEN (`lib/work/Work.svelte`), the owner's old tool's keys: the screen he did 85% of his writing on was
      worked with them, and a board of seventy rows with no keys is worked one row at a time. They act on the task the
@@ -185,4 +193,4 @@ export const BINDINGS: Binding[] = [
   { id: 'nav-menu', scope: 'nav', key: '⇧F10', label: 'Move up, Move down, Move to top, Hide', bare: false },
 ];
 
-export const SCOPE_ORDER: Scope[] = ['document', 'work', 'grid', 'board', 'page', 'decide', 'gate', 'inbox', 'palette', 'nav'];
+export const SCOPE_ORDER: Scope[] = ['document', 'today', 'work', 'grid', 'board', 'page', 'decide', 'gate', 'inbox', 'palette', 'nav'];
