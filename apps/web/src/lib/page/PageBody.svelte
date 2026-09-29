@@ -87,8 +87,11 @@
   /**
    * THE ORDER A READER MEETS THE BLOCKS IN, which is the main column and then the rail: the order the page draws them
    * in, the order a phone stacks them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
+   *
+   * ONLY THE BLOCKS THAT ARE DRAWN. A block whose `when:` said no has no element, so a cursor on it is a cursor nobody
+   * can see, and `j` on a page that opens with three of them pressed three times before anything moved.
    */
-  const reading = $derived(layout ? [...split.main, ...split.rail] : pairs);
+  const reading = $derived((layout ? [...split.main, ...split.rail] : pairs).filter((x) => x.block.drawn));
 
   /**
    * The runs an area draws in. A boxed section and the blocks after it share one surface while reading; while arranging
