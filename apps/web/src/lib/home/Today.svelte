@@ -712,7 +712,7 @@
             <div class="figure-row cash-row">
               <span class="figure num">{lead.amount}</span>
               {#if forecast}
-                <span class="spark"><Sparkline values={forecast.values} mark="low" tone={forecast.crossed ? 'danger' : 'ink'} summary={cashSummary(forecast)} /></span>
+                <span class="trend"><Sparkline values={forecast.values} mark="low" tone={forecast.crossed ? 'danger' : 'ink'} summary={cashSummary(forecast)} /></span>
               {/if}
             </div>
             <p class="figure-sub">{money.cash.length > 1 ? currencyName(lead.currency) : words.cashNow}</p>
@@ -1206,7 +1206,7 @@
     white-space: nowrap;
   }
 
-  .spark {
+  .trend {
     flex: 0 1 120px;
     min-inline-size: 64px;
   }

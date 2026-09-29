@@ -32,6 +32,6 @@ export { default as Waffle } from './Waffle.svelte';
 export { default as WeekStrip } from './WeekStrip.svelte';
 
 export type { NamedTone, Tone } from './shared.ts';
-export type { SparkMark } from './sparkline.ts';
+export type { TrendMark } from './sparkline.ts';
 export type { Lane, LaneMark, Span } from './swimlanes.ts';
 export type { WeekDay, WeekItem } from './weekstrip.ts';

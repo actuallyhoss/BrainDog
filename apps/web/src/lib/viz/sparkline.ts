@@ -12,9 +12,9 @@
 
 import { figure, r2, sentence, textWidth } from './shared.ts';
 
-export type SparkMark = 'last' | 'low' | 'high';
+export type TrendMark = 'last' | 'low' | 'high';
 
-export interface SparkPoint {
+export interface TrendPoint {
   /** The value's index in the list it came from. */
   i: number;
   v: number;
@@ -22,33 +22,33 @@ export interface SparkPoint {
   y: number;
 }
 
-export interface SparkLabel {
+export interface TrendLabel {
   x: number;
   y: number;
   anchor: 'start' | 'end';
 }
 
-export interface SparkGeometry {
-  points: SparkPoint[];
+export interface TrendGeometry {
+  points: TrendPoint[];
   /** `points` for the solid `<polyline>`. */
   line: string;
   /** `points` for the dashed projection, or '' when nothing is projected. */
   projection: string;
   /** `points` for the area under the solid line, down to the foot of the plot. */
   area: string;
-  last: SparkPoint | null;
-  low: SparkPoint | null;
-  high: SparkPoint | null;
+  last: TrendPoint | null;
+  low: TrendPoint | null;
+  high: TrendPoint | null;
   /** The y of the dashed threshold rule, or null. */
   threshold: number | null;
   /** Where the marked point's label goes, when one was asked for. */
-  label: SparkLabel | null;
+  label: TrendLabel | null;
 }
 
-export interface SparkOptions {
+export interface TrendOptions {
   width: number;
   height: number;
-  mark?: SparkMark | undefined;
+  mark?: TrendMark | undefined;
   /** A value to draw as a dashed rule (a target, a floor). */
   threshold?: number | undefined;
   /** The index from which the values are a projection, drawn dashed. */
@@ -61,10 +61,10 @@ export interface SparkOptions {
 export const LABEL_ROOM = 16;
 const PAD = 4;
 
-const joined = (ps: readonly SparkPoint[]): string => ps.map((p) => `${r2(p.x)},${r2(p.y)}`).join(' ');
+const joined = (ps: readonly TrendPoint[]): string => ps.map((p) => `${r2(p.x)},${r2(p.y)}`).join(' ');
 
 /** Which point the mark names. The first low and the first high, so a flat run is marked where it began. */
-export function marked(points: readonly SparkPoint[], mark: SparkMark): SparkPoint | null {
+export function marked(points: readonly TrendPoint[], mark: TrendMark): TrendPoint | null {
   if (points.length === 0) return null;
   if (mark === 'last') return points[points.length - 1] ?? null;
   let best = points[0]!;
@@ -76,7 +76,7 @@ export function marked(points: readonly SparkPoint[], mark: SparkMark): SparkPoi
  * Does the label go below its point? The low's label goes under it and the high's over it. The last
  * point's goes on the side the line did not come from: under it when the line came down to it.
  */
-export function labelBelow(values: readonly number[], mark: SparkMark): boolean {
+export function labelBelow(values: readonly number[], mark: TrendMark): boolean {
   if (mark === 'low') return true;
   if (mark === 'high') return false;
   const finite = values.filter(Number.isFinite);
@@ -85,7 +85,7 @@ export function labelBelow(values: readonly number[], mark: SparkMark): boolean 
   return last !== undefined && before !== undefined && before > last;
 }
 
-export function sparkline(values: readonly number[], o: SparkOptions): SparkGeometry {
+export function sparkline(values: readonly number[], o: TrendOptions): TrendGeometry {
   const mark = o.mark ?? 'last';
   const below = o.markLabel ? labelBelow(values, mark) : false;
   const top = PAD + (o.markLabel && !below ? LABEL_ROOM : 0);
@@ -101,7 +101,7 @@ export function sparkline(values: readonly number[], o: SparkOptions): SparkGeom
   const x = (i: number): number => (n <= 1 ? o.width - PAD : PAD + (i * (o.width - 2 * PAD)) / (n - 1));
   const y = (v: number): number => (hi === lo ? (top + bottom) / 2 : top + ((hi - v) / (hi - lo)) * (bottom - top));
 
-  const points: SparkPoint[] = finite.map(({ v, i }) => ({ i, v, x: x(i), y: y(v) }));
+  const points: TrendPoint[] = finite.map(({ v, i }) => ({ i, v, x: x(i), y: y(v) }));
   const p = o.projectFrom;
   const cut = p === undefined || !Number.isFinite(p) ? points.length : points.findIndex((pt) => pt.i >= p);
   const solid = cut < 0 ? points : points.slice(0, Math.max(cut + 1, 1));
@@ -115,7 +115,7 @@ export function sparkline(values: readonly number[], o: SparkOptions): SparkGeom
       : '';
 
   const at = marked(points, mark);
-  let label: SparkLabel | null = null;
+  let label: TrendLabel | null = null;
   if (at && o.markLabel) {
     const right = at.x > o.width * 0.5;
     const w = textWidth(o.markLabel);
@@ -145,7 +145,7 @@ export function sparkline(values: readonly number[], o: SparkOptions): SparkGeom
 export function describeSparkline(
   values: readonly number[],
   subject: string | undefined,
-  mark: SparkMark = 'last',
+  mark: TrendMark = 'last',
   format: (n: number) => string = figure,
 ): string {
   const finite = values.filter(Number.isFinite);

@@ -16,7 +16,7 @@
 <script lang="ts">
   import './viz.css';
   import { paint, type Tone } from './shared.ts';
-  import { describeSparkline, sparkline, type SparkMark } from './sparkline.ts';
+  import { describeSparkline, sparkline, type TrendMark } from './sparkline.ts';
 
   let {
     values,
@@ -38,7 +38,7 @@
     height?: number | undefined;
     /** `ink` by default; `earn` for money in, `danger` for a fall that needs him, `live` for a run. A project's colour works too. */
     tone?: 'ink' | 'earn' | 'danger' | 'live' | Tone | undefined;
-    mark?: SparkMark | undefined;
+    mark?: TrendMark | undefined;
     /** What the line measures, which leads the sentence it reads as: "acme.example takings a day, 9 weeks". */
     subject?: string | undefined;
     /** The whole sentence, when the one built from the values will not do. */
@@ -61,7 +61,7 @@
   const said = $derived(summary ?? describeSparkline(values, subject, mark, format));
 </script>
 
-<div class="viz viz-spark" bind:clientWidth={measured} style:max-inline-size="{width}px">
+<div class="viz viz-trend" bind:clientWidth={measured} style:max-inline-size="{width}px">
   <svg viewBox="0 0 {W} {height}" role="img" aria-label={said}>
     {#if g.threshold !== null}
       <line class="viz-rule" x1="0" x2={W} y1={g.threshold} y2={g.threshold} />
