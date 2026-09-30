@@ -209,8 +209,8 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   };
 }
 
-/** The paths a gate's server hands to the record: the record's and sign-in's. Everything else is the build's. */
-export const forwards = (pathname) => /^\/+(?:api|auth)(?:\/|$)/.test(pathname);
+/** The paths a gate's server hands to the record: the record's, sign-in's and the account's. Everything else is the build's. */
+export const forwards = (pathname) => /^\/+(?:api|auth|account)(?:\/|$)/.test(pathname);
 
 /**
  * The server key of a record this module started, for the one gate that has to sign in as a person rather than
@@ -241,6 +241,14 @@ const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
  * It is on by default because every other browser gate measures a screen rather than a door.
  */
 export async function forward(req, res, base, { bearer = true } = {}) {
+  /* THE CLOUD'S OWN BILLING DOOR, which the self-host behind the `cloud` variant has none of: the Cloud answers
+     `GET /account/billing` for every signed-in person, so the variant answers it too, with nothing owed and no
+     checkout open, and Billing draws the screen it draws for a record paid up. */
+  if (VARIANT_OF.get(base) === 'cloud' && req.method === 'GET' && /^\/+account\/billing\/?$/u.test(new URL(req.url ?? '/', base).pathname)) {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ ok: true, value: { records: [], open: false } }));
+    return;
+  }
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   const headers = {};
