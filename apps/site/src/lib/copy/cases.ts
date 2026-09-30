@@ -12,6 +12,8 @@ export const cases = {
     /* What a screen reader calls the window, its row of tabs, its rail and the phone's bar. */
     window: 'A drawing of the app',
     tabs: 'Who the record is for',
+    /* The words before the tabs: the tabs finish the sentence. */
+    for: 'A record for',
     rail: 'Pages',
     bar: 'Record',
     /* THE PAGE AND SOURCE SWITCH. Source is the page's dialect text as it is written, which is the
@@ -34,9 +36,7 @@ export const cases = {
     chose: (label: string) => `You chose ${label}`,
     /* THE LINE UNDER THE WINDOW. A drawing of an app looks like a picture of one, so it says both
        that it can be pressed and what it is: an example, drawn by the renderer a record uses. */
-    caption:
-      'An example record, drawn by BrainDog’s own renderer. Pick who it is for, open a page, or answer a question. ' +
-      'Every page shows its source.',
+    caption: 'Example records, drawn by BrainDog’s own renderer. Open a page or answer a question.',
     /* THE PAGE WRITTEN FOR EACH KIND OF PERSON, by the example's id (`lib/examples/types.ts`). The
        addresses are the site's own prerendered pages under `/for/`. */
     moreFor: {

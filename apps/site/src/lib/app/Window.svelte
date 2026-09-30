@@ -163,6 +163,8 @@
 
 <div class="app">
   <div class="window" role="group" aria-label={w.window}>
+    <div class="top">
+    <p class="for" aria-hidden="true">{w.for}</p>
     <div class="bar">
       <div class="tabs" role="tablist" aria-label={w.tabs} data-more={more} bind:this={strip} onscroll={measure}>
         {#each EXAMPLES as c, i (c.id)}
@@ -184,6 +186,7 @@
         {/each}
       </div>
       <span class="more" aria-hidden="true"><Icon name="arrow" size="s" /></span>
+    </div>
     </div>
 
     <div class="screen">
@@ -253,9 +256,18 @@
 <style>
   /* ONE COLUMN THAT MAY SHRINK, so the chip row scrolls inside the phone's width rather than widening the page. */
   .app {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-4);
+  }
+
+  /* THE WORDS THE TABS FINISH: "A record for", then Personal, Student and the rest. */
+  .for {
+    margin: 0 0 var(--sp-1);
+    color: var(--ink2);
+    font-size: var(--t-site-small);
+    font-weight: 500;
   }
 
   /* ── Below 900px: the glass chips, and a phone under them ───────────────── */
@@ -451,9 +463,33 @@
   /* ── 900px and wider: the window ───────────────────────────────────── */
 
   @media (width >= 900px) {
-    /* THE CASES AS ONE GLASS SEGMENTED CONTROL, centred over the window. */
+    /* THE WORDS, THEN THE CASES AS ONE GLASS SEGMENTED CONTROL, at the window's left edge; the caption answers them at its
+       right, on the same line. */
+    .top {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      margin-block-end: var(--sp-4);
+      padding-inline-end: 340px;
+    }
+
+    .for {
+      margin: 0;
+    }
+
     .bar {
-      justify-content: center;
+      margin-block-end: 0;
+    }
+
+    .caption {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+      display: flex;
+      align-items: center;
+      max-inline-size: 320px;
+      min-block-size: calc(var(--ctl-h) + 8px);
+      text-align: end;
     }
 
     .tabs {

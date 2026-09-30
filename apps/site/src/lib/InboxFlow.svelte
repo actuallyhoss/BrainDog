@@ -82,7 +82,7 @@
 <style>
   .flow-figure {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 24px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr) 20px minmax(0, 1.3fr);
     align-items: start;
     gap: var(--sp-3);
   }
