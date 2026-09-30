@@ -1,9 +1,8 @@
 <!--
-  A group on the ground: the heading at `--t-group`, its count in the quiet ink, the actions at the right,
-  and one hairline under the heading. The rows follow with no box round them.
+  A group as a tile: a white surface on the board, the heading at `--t-group` with its count in the quiet ink and the
+  actions at the right, and the rows inside it.
 
-  THE HAIRLINE IS THE GROUP'S EDGE NOW, because there is no container any more to draw one. Lists sit straight on the
-  ground, and a heading with nothing under it reads as a line of text rather than the start of a group.
+  INSIDE A TILE OR A SHEET IT IS ONLY THE HEADING AND ITS ROWS, because a tile never holds a tile.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -16,7 +15,7 @@
   }: { title: string; count?: number; children: Snippet; aside?: Snippet } = $props();
 </script>
 
-<section class="section">
+<section class="section" data-surface="tile">
   <div class="section-head">
     <h2 class="section-title">
       {title}
@@ -38,14 +37,32 @@
 </section>
 
 <style>
+  .section {
+    min-inline-size: 0;
+    padding: var(--sp-4) 12px 12px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+  }
+
+  :global(:is(.tile, .sheet)) .section {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .section-head {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     min-block-size: var(--ctl-h);
-    margin-block-end: var(--sp-2);
-    padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--rule);
+    margin-block-end: var(--sp-1);
+    padding-inline: var(--sp-2);
+  }
+
+  :global(:is(.tile, .sheet)) .section-head {
+    padding-inline: 0;
   }
 
   /* `--t-group`, 17 on 24 at 600: a group heading ranks under the page title and over every row title (15 at 500), so

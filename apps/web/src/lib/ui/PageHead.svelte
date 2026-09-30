@@ -189,7 +189,7 @@
     <p class="kicker">{kicker}</p>
   {/if}
 {/if}
-<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined}>
+<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined} data-said={sentence ? '' : undefined}>
   <div class="head-main">
     <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from
          whoever typed it, the glyph beside it is ours. An Arabic title in an English paragraph
@@ -292,6 +292,8 @@
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-sheet);
+    box-sizing: border-box;
+    max-inline-size: var(--page-max);
     padding: var(--inset) var(--gutter) var(--sp-2);
   }
 
@@ -309,9 +311,8 @@
     inset-inline: calc(var(--gutter) - 14px);
     z-index: -1;
     border-radius: var(--r-lg);
-    background: var(--glass);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
+    background: var(--bg);
+    box-shadow: var(--e2);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--d-move) var(--ease-out);
@@ -402,15 +403,15 @@
     min-inline-size: 0;
   }
 
-  /* A QUIET CONTROL IN THE TOOLBAR IS GLASS: the glass fill, its hairline pair and its blur, on the ground. */
+  /* A QUIET CONTROL IN THE TOOLBAR IS A WHITE PILL ON THE BOARD. */
   .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])) {
-    background: var(--glass);
+    background: var(--bg);
     border-color: transparent;
-    box-shadow: var(--glass-edge);
-    backdrop-filter: var(--glass-blur);
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
-  /* AND IN THE COMPACT BAR IT DROPS ITS OWN GLASS, a segmented track as well: the bar is glass already, and glass never holds glass. */
+  /* AND IN THE COMPACT BAR IT DROPS ITS FILL, a segmented track as well: the bar is white already. */
   .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
   .head[data-under] .head-actions :global(.segmented) {
     background: transparent;
@@ -420,7 +421,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass']):hover:not(:disabled)) {
-      background: var(--glass-strong);
+      background: var(--hover-wash);
     }
 
     .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass']):hover:not(:disabled)) {
@@ -441,6 +442,39 @@
   .sentence :global([data-needs]) {
     color: var(--danger);
     font-weight: 500;
+  }
+
+  /**
+   * ON A WIDE SCREEN THE SENTENCE IS THE HEADLINE. The page's name steps down to a label over it, with its count, and
+   * the sentence is set at 40/600 in ink: the screen opens on what is true today rather than on a word the nav already
+   * says. Scrolled, the compact bar keeps the name, as before.
+   */
+  @media (width >= 900px) {
+    .head[data-said]:not([data-under]) .title {
+      color: var(--ink2);
+      font-size: var(--t-md);
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .head[data-said]:not([data-under]) .count {
+      font-size: var(--t-md);
+    }
+
+    .head[data-said] + .sentence {
+      max-inline-size: calc(24em + var(--gutter) * 2);
+      margin-block: var(--sp-1) var(--sp-5);
+      color: var(--ink);
+      font-size: var(--t-3xl);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      text-wrap: pretty;
+    }
+
+    .head[data-said] + .sentence :global([data-needs]) {
+      font-weight: 600;
+    }
   }
 
   @media (width < 900px) {

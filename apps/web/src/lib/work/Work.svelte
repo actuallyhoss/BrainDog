@@ -1292,7 +1292,7 @@
 
       <!-- ══ THE BANDS, on the ground ══ One keyed list, headings and rows together, so a row keeps its element as it
            changes band. -->
-      <div class="board" data-all={pick === ALL ? '' : undefined}>
+      <div class="board" data-surface="tile" data-all={pick === ALL ? '' : undefined}>
         {#each items as item (item.key)}
           {#if item.kind === 'head'}
             {@const folded = folds(item.band)}
@@ -1686,7 +1686,7 @@
 
   /* ── the toolbar: glass, 36 high, 6 apart ── */
 
-  /* A SEGMENTED CONTROL: a glass pill holding three, the chosen one a tile-white pill. */
+  /* A SEGMENTED CONTROL: a white pill holding three, the chosen one ink. */
   .seg {
     display: flex;
     align-items: center;
@@ -1694,10 +1694,8 @@
     box-sizing: border-box;
     block-size: var(--ctl-h);
     padding: 3px;
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
+    background: var(--bg);
     border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
   }
 
   .seg-btn {
@@ -1720,9 +1718,13 @@
   }
 
   .seg-btn[aria-pressed='true'] {
-    background: var(--bg);
-    box-shadow: var(--e1);
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .seg-btn[aria-pressed='true'] .seg-n {
+    color: inherit;
+    opacity: 0.7;
   }
 
   .seg-n {
@@ -1730,7 +1732,7 @@
     font-weight: 400;
   }
 
-  /* A 36PX GLASS CIRCLE, with its tooltip and its name. */
+  /* A 36PX WHITE CIRCLE, with its tooltip and its name. */
   .circle {
     display: grid;
     place-items: center;
@@ -1738,21 +1740,19 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
+    background: var(--bg);
     border: 0;
     border-radius: var(--r-pill);
-    box-shadow: var(--glass-edge);
     color: var(--ink);
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
   .keys-btn[aria-expanded='true'] {
-    background: var(--glass-strong);
+    background: var(--hover-wash);
   }
 
-  /* IN THE COMPACT BAR THE CONTROLS DROP THEIR OWN GLASS: the bar is glass already, and glass never holds glass. */
+  /* IN THE COMPACT BAR THE CONTROLS DROP THEIR FILL: the bar is white already. */
   :global(.head[data-under]) .seg,
   :global(.head[data-under]) .circle {
     background: transparent;
@@ -1762,7 +1762,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .circle:hover {
-      background: var(--glass-strong);
+      background: var(--hover-wash);
     }
 
     .seg-btn:hover:not([aria-pressed='true']) {
@@ -2034,11 +2034,20 @@
 
   /* ── the bands ── */
 
+  /* THE BANDS IN ONE TILE, white on the board. */
   .board {
     display: flex;
     flex-direction: column;
     margin-block-start: var(--sp-2);
     min-inline-size: 0;
+    padding: var(--sp-4) 12px 12px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e1);
+  }
+
+  .board .head-row {
+    padding-inline: var(--sp-2);
   }
 
   /* A GROUP ON THE GROUND: the title at `--t-group`, its count quiet, a note or the keys at the right, and one hairline
@@ -2050,7 +2059,6 @@
     min-block-size: 32px;
     margin-block: var(--sp-4) var(--sp-1);
     padding-block-end: var(--sp-1);
-    border-block-end: 1px solid var(--line);
   }
 
   .head-row[data-first] {

@@ -13,9 +13,8 @@
  */
 
 @layer components {
-  /* The window is THE GROUND: `--sunk`, with one soft light from the top of the
-     window painted on it, `--ground-light`, the only gradient in the product. The rail floats on it
-     as glass and the work sits straight on it; nothing is lifted into a panel any more.
+  /* The window is THE BOARD: flat `--sunk`, no light and no gradient. The top bar sits straight on
+     it and the work is white tiles laid on it.
 
      And the shell's `.body` is the ONE scroll container. Without this the document scrolls too and
      the window shows two scrollbars: the work's, and an outer one for a page that has nowhere to go.
@@ -28,12 +27,9 @@
     background: var(--sunk);
   }
 
-  /* THE LIGHT IS A LAYER OF ITS OWN, so a ground without it is still the ground: were the image
-     written into the `background` shorthand above, a light that failed to resolve would take the
-     colour down with it. */
-  body {
-    background-image: var(--ground-light);
-    background-repeat: no-repeat;
+  /* THE BOARD IS WIDE: the tiles run to 1440 before they stop, and the top bar and every head stop with them. */
+  :root {
+    --page-max: 1440px;
   }
 
   /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the
