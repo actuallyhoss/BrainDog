@@ -119,8 +119,11 @@
 
 <style>
   /* A PALETTE FLOATS, so its tile sits at level two, on the tile fill, radius 22 (the design system). */
+  /* ONE COLUMN THAT MAY BE NARROWER THAN ITS CONTENT, or the modes' pill sets the palette's width and a 320px phone
+     scrolls the whole page sideways to reach the last one. */
   .palette {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: var(--sp-4);
     padding: 20px;
@@ -183,6 +186,9 @@
   /* THE MODES, a segmented control in the second fill with the chosen one in ink. */
   .modes {
     display: inline-flex;
+    max-inline-size: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
     gap: 2px;
     padding: 3px;
     border-radius: var(--r-pill);
@@ -190,6 +196,7 @@
   }
 
   .modes button {
+    flex: none;
     min-block-size: var(--ctl-h-sm);
     padding-inline: 14px;
     border: 0;
