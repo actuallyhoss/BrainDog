@@ -1,0 +1,330 @@
+/*
+ * `cards`: one card a row (`Cards.svelte`). The scope chip a card shares with a table's `as: scope` column stays in
+ * `blocks.css`, because the register's own lists draw it too.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── cards: one card per row ─────────────────────────────────────────────
+     `auto-fill` over 17rem, so a lane of one card keeps a card's width rather than stretching across
+     the page, and `min()` so a container narrower than one card is one column, not a sideways
+     scroll. No breakpoint: the grid answers its container, which is 05 §6's rule for width.
+     `cards-grid` and not `cards`, because the register's phone list and `/decide` already own that
+     name, and a rule here is global. */
+
+  /* THE FIRST ROW'S HAIRLINE IS CUT: the grid is drawn two pixels up and clipped by them (one pixel would be exactly
+     the hairline, and pixel snapping left half of it showing), so the tile's heading is the only thing over the first
+     cards, whichever of them the tracks put in the first row. */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
+    align-items: start;
+    gap: 0 var(--sp-5);
+    margin: -2px 0 0;
+    padding: 0;
+    list-style: none;
+    clip-path: inset(2px 0 0);
+  }
+
+  /* A CARD IS A SECTION OF ITS TILE, and nothing inside it is boxed: the head, the figure and the facts with air
+     between them, and a hairline over each, so a run of cards reads as a list set in columns rather than a wall of
+     rounded panels inside a panel. `start` above, so a short card is its own height. */
+  .cards-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: var(--sp-4) 0;
+    border-block-start: 1px solid var(--line);
+  }
+
+  .cards-item:has(.cards-title a):hover .cards-title {
+    text-decoration: underline;
+    text-decoration-color: var(--edge);
+    text-underline-offset: 3px;
+  }
+
+  /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. */
+  .cards-item[data-quiet] {
+    opacity: 0.6;
+  }
+
+  .cards-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .cards-mark,
+  .cards-face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* A MARK IS SQUARE AND A FACE IS ROUND, so a project and a person are told apart by shape, which
+     holds in every theme and for every reader where a hue would not. */
+  .cards-mark {
+    background: var(--s1);
+    border-radius: var(--r-well);
+  }
+
+  .cards-face {
+    background: var(--hold-wash);
+    border-radius: var(--r-pill);
+  }
+
+  .cards-who .cards-face {
+    inline-size: 22px;
+    block-size: 22px;
+  }
+
+  /* THE UI FACE, NAMED. An `h3` takes the display face from the skin, and that face is for 20px and
+     up; a card's name is body size, so it takes the face every other name in a list takes. */
+  .cards-title {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    overflow-wrap: anywhere;
+  }
+
+  .cards-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* The whole card is the target, drawn from the link rather than by wrapping the card in one,
+     because a link may not hold another and a fact can be a link. On `::before`, because a touch target
+     is measured as the element and its `::before`. */
+  .cards-title a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .cards-when {
+    flex: none;
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  .cards-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+  }
+
+  .cards-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .cards-figure .cards-value {
+    color: var(--ink);
+    font-size: var(--t-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The code in front of a card's figure is half the figure and never under the smallest step, as a stat's is. */
+  .cards-figure .amount-code {
+    font-size: max(var(--t-xs), 0.5em);
+  }
+
+  .cards-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The line takes what the figure leaves, down to a width at which it is still a shape, and no wider than a
+     sparkline is. Its line and dot are the stat's (`.trend-line` in `stat.css`), drawn again here so this sheet
+     stands on its own. */
+  .cards-trend {
+    flex: 1 1 6rem;
+    min-inline-size: 5rem;
+    max-inline-size: 120px;
+    block-size: 32px;
+    overflow: visible;
+  }
+
+  .cards-trend-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cards-trend-end {
+    stroke: var(--tone, var(--ink));
+    stroke-width: 6px;
+    stroke-linecap: round;
+  }
+
+  /* THE RING SITS BESIDE ITS NUMBER, which is printed, so the arc is a picture of a figure the
+     reader already has and never the only place it is said. */
+  .cards-ring {
+    display: grid;
+    grid-template-areas:
+      'mark value'
+      'mark label';
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--sp-2);
+  }
+
+  .cards-ring-mark {
+    grid-area: mark;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  .cards-ring .cards-value {
+    grid-area: value;
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards-ring .cards-label {
+    grid-area: label;
+  }
+
+  .cards-ring-track {
+    fill: none;
+    stroke: var(--s1);
+    stroke-width: 4;
+  }
+
+  .cards-ring-fill {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .cards-facts {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+  }
+
+  /* A LABEL AND ITS VALUE READ AS A PAIR. They sat at opposite edges of a
+     340px card, so "Kind" and "Method" were 300px apart and a two-line "Next" was right-aligned prose.
+     The labels share a column the width of the longest one, and the value starts beside it. */
+  .cards-facts {
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: var(--sp-3);
+  }
+
+  .cards-fact {
+    display: contents;
+    font-size: var(--t-sm);
+  }
+
+  .cards-fact dt {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .cards-fact dd {
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .cards-who {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .cards-empty {
+    margin: 0;
+    color: var(--dim);
+  }
+
+  /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it.
+     Both are sentences somebody wrote, so they wrap at the card's edge rather than trimming, and the
+     reply sits a step quieter than the name it answers. */
+  .cards-reply,
+  .cards-next {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .cards-next {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* `cards lead`: THE FIRST CARD IS TWO TRACKS WIDE WHERE THE GRID HAS TWO, and one where it has one.
+     The renderer only marks the card (05 §4, told and never inferred), so the host has to know how
+     many tracks there are, and the grid cannot say. `span 2` in a grid of one track makes an
+     implicit second track: measured in a 560px block, the tracks came out 470px and 66px and the
+     cards after the lead fell into them by turns, one 470px wide and the next 66. So the block is
+     its own container and the span waits for a width that holds two 17rem tracks and the gap:
+     34rem plus 24px, which is at most 36rem at any root of 12px or more. Between the two widths
+     the lead is one card wide for a few pixels, which is the safe side to be wrong on. */
+  .block[data-kind='cards'][data-form='lead'] {
+    container-type: inline-size;
+  }
+
+  @container (inline-size >= 36rem) {
+    .cards-item[data-lead] {
+      grid-column: span 2;
+    }
+  }
+
+  .cards-item[data-lead] .cards-title {
+    font-size: var(--t-lg);
+  }
+
+  /* A CARD'S `hue` IS ITS MARK'S COLOUR AND NOTHING ELSE (05 §5's one identity accent): the renderer writes
+     `--hue` on the card only for a whole number from 0 to 359, and the mark is drawn in the identity formula every
+     other mark in the app uses (`IdentityMark.svelte`). Never the card's edge, its ground or its ring, so a hue never
+     reads as a tone. Asked of the card's own attribute and not of the inherited property, because `--hue` inherits: a
+     page drawn for a project may carry that project's hue above the block, and every card without one of its own would
+     wear it. */
+  .cards-item[style*='--hue'] > .cards-head > .cards-mark {
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  }
+
+  /* A CARD'S `picture` LEADS IT at 16:9, cut to fit, on the well a missing picture would leave, so a card whose file
+     has not loaded yet is the same height as it will be. The title under it names the card. */
+  .cards-picture {
+    display: block;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--r-md);
+    background: var(--s1);
+  }
+}

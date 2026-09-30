@@ -22,6 +22,9 @@
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import { apiBase } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
+  /* THE KINDS ONLY A DECLARED PAGE DRAWS, with the screen that draws them rather than in the sheet every screen waits
+     on (`blocks-kinds.css`). Before the charts, in the order the rules had when they were one sheet. */
+  import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
   /* EVERY REGISTERED KIND'S STYLESHEET, with the screen that draws its blocks (`kinds/styles.ts`). */
   import './kinds/styles.ts';

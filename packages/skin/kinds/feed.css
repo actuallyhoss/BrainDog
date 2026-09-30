@@ -1,0 +1,151 @@
+/*
+ * `feed` and `agents`: what happened, grouped by who did it (`Feed.svelte`, `Agents.svelte`).
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── feed: what happened, grouped by who did it ──────────────────────────
+     "Since you last looked": a list without a box, the count leading every row, and
+     full ink only on what is new. The block is its own container, so a narrow slot moves the time
+     under the words without a breakpoint. */
+
+  .feed {
+    display: grid;
+    gap: var(--sp-4);
+    container-type: inline-size;
+  }
+
+  .feed-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .feed-tally,
+  .feed-new {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .feed-tally {
+    color: var(--dim);
+    font-weight: 500;
+  }
+
+  .feed-new {
+    color: var(--ink);
+  }
+
+  .feed-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .feed-row {
+    display: grid;
+    grid-template-columns: 3ch auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    min-block-size: var(--row-h);
+    padding-block: var(--sp-2);
+    border-block-end: 1px solid var(--line);
+    font-size: var(--t-ui);
+  }
+
+  .feed-row:last-child {
+    border-block-end: 0;
+  }
+
+  /* THE COUNT IS WHAT IS READ FIRST, so it leads, in tabular figures down one edge. */
+  .feed-count {
+    color: var(--dim);
+    font-weight: 500;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A face is round and a rule's mark is square, so the two are told apart by shape. */
+  .feed-face {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--s2);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .feed-group[data-by='rule'] .feed-face {
+    background: var(--s3);
+    border-radius: var(--r-sm);
+  }
+
+  /* Nobody named is a gap in the column, not an empty circle. */
+  .feed-face:empty {
+    visibility: hidden;
+  }
+
+  .feed-what {
+    min-inline-size: 0;
+    color: var(--ink2);
+    overflow-wrap: anywhere;
+  }
+
+  .feed-who {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  .feed-what > .glyph {
+    margin-inline-start: var(--sp-1);
+  }
+
+  /* NEW IS BRIGHTER, and the head's "N new" and the line below say it in words as well. */
+  .feed-row[data-new] .feed-count {
+    color: var(--ink);
+  }
+
+  .feed-row[data-new] .feed-who {
+    color: var(--ink);
+  }
+
+  .feed-when {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+  }
+
+  /* The row above already draws the rule, so the words sit under it rather than between two. */
+  .feed-seen {
+    padding-block: var(--sp-3) var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .feed-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  @container (inline-size < 30rem) {
+    .feed-row {
+      grid-template-columns: 3ch auto minmax(0, 1fr);
+    }
+
+    .feed-when {
+      grid-column: 3;
+    }
+  }
+}

@@ -16,6 +16,7 @@
 -->
 <script lang="ts">
   import '@braindog/skin/blocks.css';
+  import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
   import type { Snippet } from 'svelte';
   import { inline } from 'braindog-render';

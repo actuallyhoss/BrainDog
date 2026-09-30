@@ -1,0 +1,58 @@
+/*
+ * A block the renderer could not draw (`Degraded.svelte`), and one that needs a client this host is not.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── the visible fence ──────────────────────────────────────────────────
+     A QUIET NOTE, NOT AN ALARM (05 §3). Nothing on it failed, so it has no border, no red
+     and no warning glyph: the reason first, as the parser's plain sentence, then what was written,
+     small, in the identifier face, in `--dim` on the sunk ground. The source WRAPS inside its column
+     rather than scrolling like a `.media` code block, so a long line never pushes a phone page
+     sideways. `Degraded.svelte` and `toHTML` write the same two classes. */
+  .degraded-fix {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .degraded-source {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font-family: var(--font-id);
+    font-size: var(--t-xs);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .degraded-action {
+    margin-inline-start: auto;
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    cursor: pointer;
+  }
+
+  .needs-client {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+}

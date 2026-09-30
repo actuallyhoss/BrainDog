@@ -1,0 +1,197 @@
+/*
+ * `board`: the grid primitive's lanes and cards (`p/Grid.svelte`), and the move where the host can make one.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* The outer lanes start and end on the tile's own edges, so a lane's name lines up with the tile's heading. */
+  .board-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .board-col:first-child {
+    padding-inline-start: 0;
+  }
+
+  .board-col:last-child {
+    padding-inline-end: 0;
+  }
+
+  /* A hairline between lanes. Four stacks of cards with nothing between them is four stacks, not four columns: the eye
+     has to infer the boundary from where the cards happen to end, which is exactly what fails when one is empty. */
+  .board-col + .board-col {
+    border-inline-start: 1px solid var(--line);
+  }
+
+  .board-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block-end: var(--sp-1);
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .board-count {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 400;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Scoped to the lane: `.card` is a common name, and a page's own card must not inherit a board's.
+     A board card is the tile's second surface with no border; the lane's hairline is the structure. */
+  .board-col .card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--s1);
+    border-radius: var(--r-md);
+  }
+
+  .board-col .card-title {
+    color: var(--ink);
+    font-size: var(--t-sm);
+  }
+
+  /* ── board: the move ────────────────────────────────────────────────────
+     A card is draggable only where the host passed `onmove`, so every rule below describes a board
+     that can actually be changed. A board that cannot draws none of these attributes at all. */
+
+  .board-col .card[draggable='true'] {
+    cursor: grab;
+    /* The pointer picks up the CARD, not the words in it: a native drag that begins as a text
+       selection drags the sentence and leaves the card sitting where it was. */
+    user-select: none;
+  }
+
+  .board-col .card[data-carrying] {
+    cursor: grabbing;
+    opacity: 0.45;
+  }
+
+  /* THE COLUMN THAT WOULD TAKE IT, and only while a drop there would do something: the card's own
+     column stays dark, which is how "this changes nothing" gets said without a message. An inset
+     ring rather than a border, so no column changes width and the four stacks do not shift under
+     the card being carried. */
+  /**
+   * THE TINT IS THE HOVER WASH PAINTED OVER THE COLUMN, as a background-image layer over whatever
+   * ground the column has, so the drop target reads against the columns beside it without a second
+   * strength of any tint, and never in the brand's red, which a block does not wear.
+   */
+  .board-col[data-drop] {
+    background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
+    box-shadow: inset 0 0 0 1px var(--edge);
+  }
+
+  /* NOT SAVED, IN WORDS: the register's receipt chip, in the one place a card has room for it.
+     Untoned on purpose, because a word carries its own meaning and needs no hue to do it. */
+  .board-col .card-mark {
+    align-self: start;
+    margin-block-start: var(--sp-1);
+    padding: 1px 6px;
+    background: var(--hold-wash);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  .board-col .card-detail {
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* THE TOUCH PATH, A CARD'S LANES AS A NATIVE SELECT (`p/Grid.svelte`), drawn quiet because a pointer that can drag
+     rarely needs it: the card's last line, in the small step and the second ink, on a hairline edge. No rule sized it,
+     so it was the browser's own select at whatever height the platform chose; under a thumb it is 44 by 44, since a
+     select draws no `::before` for `.tap` to grow. */
+  .board-move {
+    align-self: start;
+    max-inline-size: 100%;
+    min-block-size: var(--ctl-h-sm);
+    margin-block-start: var(--sp-1);
+    padding-inline: var(--sp-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-xs);
+  }
+
+  @media (pointer: coarse) {
+    .board-move {
+      min-block-size: var(--tap);
+      min-inline-size: var(--tap);
+    }
+  }
+
+  /**
+   * A BOARD IN A NARROW SLOT IS A GROUPED LIST: each lane's heading with its count, then its cards as
+   * rows with a hairline between them, and no box round any of them.
+   *
+   * Stacked on a phone, the lanes kept everything that made them columns (the design review found three screens of
+   * boxed cards): a raised card inside a padded lane, and the lane's leading rule, which on a stacked lane is a stray
+   * line down the left of nothing. The block answers its own width, named so a query from inside a lane asks the board.
+   */
+  .block[data-kind='board'] {
+    container: board / inline-size;
+  }
+
+  /* A LANE KEEPS ROOM FOR A TITLE, and a board with more lanes than its slot holds scrolls inside itself. Six lanes in
+     1000px were 165px each at 1440, and every title wrapped to three lines (design §2.11, Board). The page never
+     scrolls sideways; the block does, as a wide table's region does, and below 30rem the lanes stack anyway. */
+  .block[data-kind='board'] .grid {
+    grid-template-columns: repeat(var(--cells), minmax(13rem, 1fr));
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  @container board (inline-size < 30rem) {
+    .block[data-kind='board'] .grid {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--sp-5);
+    }
+
+    .block[data-kind='board'] .board-col {
+      gap: 0;
+      padding: 0;
+    }
+
+    .block[data-kind='board'] .board-col + .board-col {
+      border-inline-start: 0;
+    }
+
+    .block[data-kind='board'] .board-head {
+      padding-block-end: var(--sp-2);
+    }
+
+    .block[data-kind='board'] .board-col .card {
+      gap: var(--sp-1);
+      padding: var(--sp-2) 0;
+      background: none;
+      border-block-end: 1px solid var(--line);
+      border-radius: 0;
+    }
+
+    .block[data-kind='board'] .board-col .card:last-child {
+      border-block-end: 0;
+    }
+
+    .block[data-kind='board'] .board-col .card-title {
+      font-size: var(--t-base);
+    }
+  }
+}

@@ -1,0 +1,97 @@
+/*
+ * `diff`: before and after (`Diff.svelte`). A screen that draws `Diff` outside a declared page imports this sheet
+ * itself.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── diff: before and after ──────────────────────────────────────────────
+     Track changes rather than a patch: a skill is prose, so its lines are in the UI face and wrap
+     inside the box, and a phone never scrolls one sideways. What was taken out keeps its words,
+     dimmed and struck, with a minus beside it; what was put in sits on the held wash in ink with a
+     plus. Each mark's name is its word, and red stays for danger. */
+
+  .diff {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .diff-sum {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .diff-lines {
+    padding-block: var(--sp-2);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  .diff-line {
+    display: grid;
+    grid-template-columns: 1.5em minmax(0, 1fr);
+    padding-inline: var(--sp-2) var(--sp-3);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+    text-decoration: none;
+  }
+
+  .diff-mark {
+    color: var(--dim);
+    text-align: center;
+  }
+
+  /* Pre-wrap keeps a line's own indentation, an empty line keeps its height, and a line of prose
+     wraps at a reading measure while its wash still spans the box. */
+  .diff-text {
+    max-inline-size: var(--measure);
+    min-block-size: 1lh;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .diff-line[data-op='add'] {
+    background: var(--hold-wash);
+    color: var(--ink);
+  }
+
+  .diff-line[data-op='add'] .diff-mark {
+    color: var(--ink);
+  }
+
+  .diff-line[data-op='del'] .diff-text {
+    color: var(--dim);
+    text-decoration: line-through;
+  }
+
+  .diff-toggle {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    padding-inline: calc(var(--sp-2) + 1.5em) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .diff-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .diff-toggle:hover {
+    background: var(--hover-wash);
+    color: var(--ink2);
+  }
+
+  @media (pointer: coarse) {
+    .diff-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+}

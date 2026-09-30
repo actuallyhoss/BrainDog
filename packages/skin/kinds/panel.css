@@ -1,0 +1,94 @@
+/*
+ * `note` and `quote`: the panel primitive (`p/Panel.svelte` and its `toHTML` twin), an inline callout on the tile.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── panel: note, quote ─────────────────────────────────────────────────── */
+
+  /* AN INLINE CALLOUT: the second surface and nothing else. No stripe down the
+     leading edge, no tinted ground and no border; the intent is the mark at top left. The transparent
+     edge is for forced colours, which draw it. */
+  .panel {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
+  /* A NOTE THAT IS ITS WHOLE TILE IS THE TILE'S WORDS, not a well inside the tile (no tile in a tile). */
+  .block-slot > .block-panel > .panel {
+    padding: 0;
+    background: none;
+  }
+
+  .block-slot > .block-panel > .panel[data-marked] {
+    padding-inline-start: calc(var(--icon-m) + var(--sp-2));
+  }
+
+  .block-slot > .block-panel > .panel > .panel-glyph {
+    inset-inline-start: 0;
+    inset-block-start: 0;
+  }
+
+  .panel p + p {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* A CALLOUT'S GUTTER. The mark sits beside the first line rather than above it, because a note is
+     one sentence and a glyph on a line of its own turns it into two. The paragraphs keep their own
+     block flow — a grid here would break `measure`'s reading width. */
+  .panel[data-marked] {
+    position: relative;
+    padding-inline-start: calc(var(--sp-4) + var(--icon-m) + var(--sp-2));
+  }
+
+  .panel-glyph {
+    position: absolute;
+    inset-inline-start: var(--sp-4);
+    inset-block-start: var(--sp-3);
+    inline-size: var(--icon-m);
+    color: var(--tone, var(--ink2));
+    font-variant-emoji: text;
+    line-height: inherit;
+    text-align: center;
+  }
+
+  /* A quote is prose, so it keeps the reading measure a note's panel has, rather than running the
+     width of a 1440 page. */
+  blockquote.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
+    font-size: var(--t-md);
+    color: var(--ink);
+  }
+
+  .quote-by {
+    font-size: var(--t-sm);
+    font-style: normal;
+    color: var(--dim);
+  }
+
+  /* `note lead` IS THE PAGE'S SENTENCE, said from its figures: the line under the title, 16/24 in the
+     second ink, on the ground and not in a tile (`PageBody`). A tone keeps its mark in the gutter. */
+  .block[data-kind='note'][data-form='lead'] .panel {
+    max-inline-size: var(--measure);
+    padding-block: 0;
+    padding-inline-end: 0;
+    background: none;
+    color: var(--ink2);
+    font-size: var(--t-md);
+    line-height: 1.5;
+  }
+
+  .block[data-kind='note'][data-form='lead'] .panel:not([data-marked]) {
+    padding-inline-start: 0;
+  }
+}

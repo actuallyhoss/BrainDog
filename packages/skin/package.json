@@ -13,6 +13,8 @@
     "./mark.ts": "./mark.ts",
     "./alpha.css": "./alpha.css",
     "./blocks.css": "./blocks.css",
+    "./blocks-kinds.css": "./blocks-kinds.css",
+    "./kinds/*.css": "./kinds/*.css",
     "./blocks-charts.css": "./blocks-charts.css"
   },
   "files": [
@@ -22,6 +24,8 @@
     "house.css",
     "alpha.css",
     "blocks.css",
+    "blocks-kinds.css",
+    "kinds",
     "blocks-charts.css",
     "mark.ts"
   ],

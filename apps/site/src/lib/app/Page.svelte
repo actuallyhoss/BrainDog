@@ -29,6 +29,7 @@
 
 <script lang="ts">
   import '@braindog/skin/blocks.css';
+  import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
   import { tick } from 'svelte';
   import { parse, type Block as Drawn, type RenderOptions, type Row, type Segment } from 'braindog-render';

@@ -36,6 +36,8 @@
   last run and the next, and a failed last run is its red phrase.
 -->
 <script lang="ts">
+  /* A VERSION'S CHANGES ARE THE DIFF KIND'S LINES (`kinds/diff.css`), with this screen's own rules over them. */
+  import '@braindog/skin/kinds/diff.css';
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';

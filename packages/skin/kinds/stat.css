@@ -1,0 +1,290 @@
+/*
+ * `stat`: the grid primitive's figures (`p/Grid.svelte`), and the small trend line the renderer draws beside a stat
+ * or a sparkline. The primitive's own `.grid` stays in `blocks.css`.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* NO BOX AND NO RULES BETWEEN THE FIGURES: the tile is the box, and space separates the stats. A
+     board's lanes keep their hairline (`board.css`), because a lane is a column and not a figure. */
+  .grid:has(> .cell) {
+    gap: var(--sp-5);
+  }
+
+  /**
+   * A STAT: the label in the meta ink, the figure, and the reading line under it.
+   *
+   * `fit-content(100%)` puts the glyph immediately after the label rather than at the far edge of the cell, because a
+   * tone belongs to the thing it qualifies, and lets a label longer than its cell wrap rather than push the grid past
+   * its box: a `max-content` track cut `HOW LONG THE MONEY LASTS` to `HOW LONG THE MONEY LA` in a 178px cell. Rows pack
+   * to the top, so a figure sits on the same line as its neighbours whatever the note under it wraps to.
+   */
+  .cell {
+    display: grid;
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'note note';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    align-content: start;
+    align-items: center;
+    row-gap: var(--sp-1);
+    column-gap: var(--sp-2);
+  }
+
+  /* A FIGURE THAT IS A DOOR SAYS SO WITHOUT SHOUTING: the rounded wash every openable thing gets, borrowed from the
+     gap and the tile's padding round it, and the focus ring the sheet already defines. The colour does not change,
+     because the figure's tone is what its colour is FOR. */
+  a.cell {
+    margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-3));
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md);
+    color: inherit;
+    text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  a.cell:hover {
+    background: var(--hover-wash);
+  }
+
+  a.cell:active {
+    background: var(--s1);
+  }
+
+  /* A LINKED FIGURE IS A TARGET, so under a thumb it is 44 tall (pages §2.5, stat lead). */
+  @media (pointer: coarse) {
+    a.cell {
+      min-block-size: var(--tap);
+    }
+  }
+
+  .cell-label {
+    grid-area: label;
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
+  }
+
+  .cell .glyph {
+    grid-area: glyph;
+    justify-self: start;
+  }
+
+  /* THE FIGURE AT THE TILE'S FIGURE STEP, tabular on a PROPORTIONAL face: a monospace face gives the thousands
+     separator a full cell, so EGP 2,869 renders as EGP 2 , 869 at display size (13 §3.2). */
+  .cell-figure {
+    grid-area: figure;
+    color: var(--ink);
+    font-size: var(--t-figure);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* HALF THE FIGURE, AND NEVER UNDER THE SMALLEST STEP. A code with no symbol in front of it (EGP) is the whole of what
+     says the currency, and half of a figure the fit has already stepped down came to 8 to 10px at 390. A card's figure
+     takes the same rule in `cards.css`. */
+  .cell-figure .amount-code {
+    font-size: max(var(--t-xs), 0.5em);
+  }
+
+  /* THE READING LINE: what the figure means, under it. */
+  .cell-note {
+    grid-area: note;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* A FIGURE IS ALWAYS INK, even when it is wrong. The dot beside the label says so and the note
+     under the figure says why; a red number is the loudest thing on a page and says the least. */
+  .cell[data-intent] .cell-figure {
+    color: var(--ink);
+  }
+
+  /* A STAT'S TREND IS ITS SPARKLINE, TOP RIGHT, 120 by 32 with no axes, on the label's line and never
+     wider than half its cell. Every cell of a strip with a trend in it takes the sparkline's height on that line, so
+     the figures of one strip stay on one line whichever of them has one. */
+  .cell:has(> .cell-trend) {
+    grid-template-areas:
+      'label glyph trend'
+      'figure figure figure'
+      'note note note';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+  }
+
+  .grid:has(> .cell > .cell-trend) > .cell {
+    grid-template-rows: minmax(32px, auto);
+  }
+
+  .cell-trend {
+    grid-area: trend;
+    inline-size: min(120px, 50cqi);
+    block-size: 32px;
+    overflow: visible;
+  }
+
+  /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`, and a card's in `cards.css`):
+     2px of ink with round joins and a 3px dot on the last point, the dot in the figure's tone when it has one. */
+  .trend-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .trend-end {
+    stroke: var(--tone, var(--ink));
+    stroke-width: 6px;
+    stroke-linecap: round;
+  }
+
+  /* `stat lead`: the first figure is the screen's one lead figure (`t-lead`), and the others stay the size
+     they are, so the lead reads as the answer and the rest as its detail. IT STEPS DOWN INSIDE ITS OWN CELL rather than
+     running into the next one: a balance in the millions, in pounds with its code, is wider than a quarter of the page
+     at the lead size. */
+  .block[data-form='lead'] .cell:first-child {
+    container-type: inline-size;
+  }
+
+  .block[data-form='lead'] .cell:first-child .cell-figure {
+    font-size: clamp(var(--t-figure), 10cqi, var(--t-lead));
+    letter-spacing: -0.025em;
+  }
+
+  /* A LONG LEAD ALSO TAKES THE FIT EVERY LONG FIGURE TAKES (no stat figure is ever cut): the smaller of the
+     two, and never past either. No floor, unlike the fit below: only a figure too long for its cell steps down. */
+  .block[data-form='lead'] .cell:first-child .cell-figure[data-fit] {
+    font-size: min(clamp(var(--t-figure), 10cqi, var(--t-lead)), calc(100cqi / (var(--chars) * 0.64)));
+  }
+
+  /* A FIGURE LONGER THAN ITS CELL STEPS DOWN INSIDE IT, rather than running into the next one: a balance in two or three
+     currencies on a Home column of four. The renderer marks such a figure and says the length of its longest amount
+     (`figureChars`), which never breaks inside itself; a figure any cell holds carries no mark and keeps its size. */
+  .block[data-kind='stat'] .cell {
+    container-type: inline-size;
+  }
+
+  .cell-figure[data-fit] {
+    /* The renderer says the length on the figure itself; this is only what a figure marked without one would use. */
+    --chars: 16;
+    /* NEVER BELOW A READABLE SIZE: the floor is the body's reading size, and a figure that still does not fit wraps
+       between its amounts (` · `) instead of shrinking further. The row itself goes to fewer across before that. */
+    font-size: max(var(--t-md), min(var(--t-figure), calc(100cqi / (var(--chars) * 0.64))));
+  }
+
+  /* FIGURES WRAP TO MORE ROWS BEFORE THEY SHRINK. The block is its own container, NAMED, because every cell inside it is
+     a container too (for the figure's own fit, above), and an unnamed query from a label or a figure would ask its cell
+     rather than the block. */
+  .block[data-kind='stat'] {
+    container: stat / inline-size;
+  }
+
+  /**
+   * THE STEPS ARE THE FIGURES' OWN ARITHMETIC, IN px AND NOT rem. The widest ten-character money figure in the record
+   * draws about 160px at `--t-figure` 600, and a figure is px wide at any root size, so a rem threshold would be the
+   * only thing that moved when a reader sets her text smaller (at Chrome's "Small", a 12px root, 38rem was 456px and
+   * put four cut figures back across one row). `record/figure-fit.test.ts` draws every stat a declared page has at both
+   * sides of each step, in the face the run draws, and holds each figure to two per cent of room.
+   *
+   * Five figures or more go three across below 960px of block, four or more two by two below 736px, and three go two
+   * and one below 560px. Under 480px the stat is rows (below).
+   */
+  @container stat (inline-size < 960px) {
+    .grid:has(> .cell:nth-child(5)) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @container stat (inline-size < 736px) {
+    .grid:has(> .cell:nth-child(4)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container stat (inline-size < 560px) {
+    .grid:has(> .cell:nth-child(3)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /**
+   * UNDER 480px OF BLOCK, A STAT IS ROWS: THE LABEL ON THE LEFT AND THE FIGURE ON THE RIGHT.
+   *
+   * Tiles side by side in a phone's width either cut a figure or step it down until it no longer reads as the answer.
+   * In a row the figure's track never goes narrower than the figure's longest unbreakable run: the label keeps its one
+   * line while there is room and wraps when there is not, and a figure in several currencies breaks between its amounts
+   * rather than running past the edge. So no figure is cut at any width.
+   *
+   * THE LEAD'S FIRST FIGURE KEEPS ITS OWN LINE. It is the screen's one lead figure, so it stays label over figure and
+   * the figures after it are the rows under it.
+   */
+  @container stat (inline-size < 480px) {
+    .block[data-kind='stat'] .grid:has(> .cell) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    /* The label's track may shrink and wrap the label, and the figure's never goes under the figure's own minimum. The
+       row's hairline is the one every list in the product draws between its rows. */
+    .block[data-kind='stat'] .cell {
+      grid-template-areas:
+        'label glyph figure'
+        'note note note';
+      grid-template-columns: minmax(0, auto) auto minmax(auto, 1fr);
+      align-items: baseline;
+      padding-block: var(--sp-3);
+      border-block-end: 1px solid var(--line);
+    }
+
+    .block[data-kind='stat'] .cell:has(> .cell-trend) {
+      grid-template-areas:
+        'label glyph figure'
+        'trend trend trend'
+        'note note note';
+    }
+
+    .block[data-kind='stat'] .grid:has(> .cell > .cell-trend) > .cell {
+      grid-template-rows: none;
+    }
+
+    .block[data-kind='stat'] .cell:last-child {
+      border-block-end: 0;
+    }
+
+    .block[data-kind='stat'] .cell .glyph {
+      align-self: center;
+    }
+
+    .block[data-kind='stat'] .cell-figure {
+      justify-self: end;
+      font-size: var(--t-lg);
+      text-align: end;
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child {
+      grid-template-areas:
+        'label glyph'
+        'figure figure'
+        'note note';
+      grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child:has(> .cell-trend) {
+      grid-template-areas:
+        'label glyph trend'
+        'figure figure figure'
+        'note note note';
+      grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+    }
+
+    .block[data-kind='stat'][data-form='lead'] .cell:first-child .cell-figure {
+      justify-self: start;
+      text-align: start;
+    }
+  }
+}

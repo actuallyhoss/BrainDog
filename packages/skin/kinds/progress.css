@@ -1,0 +1,94 @@
+/*
+ * `progress range` (`Progress.svelte`): a budget as bands against what was spent, on the row and track
+ * `blocks-charts.css` draws for every `progress`.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── progress range: a budget as bands against what was spent ────────────
+     On `progress`'s own row and track (`blocks-charts.css`), so the label, the figure and the track
+     keep the places a goal gives them; the range in words takes the place a goal's share has. Each
+     rule names the form, so it outranks the goal's rule it changes in whichever order the two sheets
+     load. The track is one scale for the block, the band runs from the low estimate to the high and
+     the mark is what was spent, so an overspend is found by its place, past the band's end, and the
+     intent's colour only repeats it. */
+
+  /* AN EMPTY BAND BY DEFAULT, which each drawn track replaces in its own `style`. Declared here as
+     well because `css-rules` reads only the first custom property of a `style` attribute: the track
+     writes `--from:…;--to:…`, and `--to` was reported as a token nothing declares (measured). */
+  .progress[data-form='range'] {
+    --from: 0;
+    --to: 0;
+  }
+
+  .progress[data-form='range'] .progress-range {
+    grid-area: share;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .progress[data-form='range'] .progress-track {
+    block-size: 8px;
+    margin-block: var(--sp-1);
+    overflow: visible;
+  }
+
+  .progress-band {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: calc(var(--from) * 100%) calc((1 - var(--to)) * 100%);
+    border-radius: var(--r-pill);
+    background: var(--edge);
+  }
+
+  /* The mark stands 4px proud of the track on each side, so it reads over the band as well as
+     past it, and it is 2px wide and centred on its figure. */
+  .progress-at {
+    position: absolute;
+    inset-block: -4px;
+    inset-inline-start: calc(var(--at) * 100% - 1px);
+    inline-size: 2px;
+    border-radius: 1px;
+    background: var(--tone, var(--ink));
+  }
+
+  /* THE TOTAL IS A LINE UNDER THE ROWS, added up by the drawer from them, so it has no track: a
+     band for the sum would be drawn on a scale the rows set and read as one more line of the budget. */
+  .progress[data-form='range'] > .progress-row[data-total] {
+    margin-block-start: var(--sp-1);
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .progress[data-form='range'] > .progress-row[data-total] > .progress-label {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* IN A NARROW SLOT THE LABEL TAKES A LINE OF ITS OWN, and what was spent and the range share the line under it. At
+     390 the spent figure and the nowrap "GBP 1,000.00 to GBP 1,500.00" were two `auto` tracks beside the label, which
+     left the label about 50px and "Total" none (pages §2.5, progress range). The figure keeps its width and the range
+     wraps before it would push anything out. The block answers its own width, as the charts do. */
+  .block[data-kind='progress'] {
+    container-type: inline-size;
+  }
+
+  @container (inline-size < 30rem) {
+    .progress[data-form='range'] > .progress-row {
+      grid-template-areas:
+        'label label'
+        'figure share'
+        'track track'
+        'left note';
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .progress[data-form='range'] .progress-range {
+      text-align: end;
+      white-space: normal;
+    }
+  }
+}

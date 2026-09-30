@@ -1,0 +1,91 @@
+/*
+ * `inputs`: a few fields of one row to type into (`Inputs.svelte`), laid on a spec's own tracks (`.row` in
+ * `blocks.css`).
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── inputs: a few fields of one row to type into ──────────────────────────
+     Where the host cannot write, `inputs` is a spec and `.rows` in `blocks.css` draws it. Where it can, each
+     field is a label holding its control, laid on the spec's own tracks, so the same block reads the
+     same whether or not it can be typed into and a label lines up with a spec's label above it. The
+     box is `capture`'s: the raised surface, the hairline, the control height. It hangs a step into the tile's padding
+     as `.rows` does. */
+  .inputs {
+    display: grid;
+    margin-inline: calc(-1 * var(--sp-3));
+  }
+
+  .inputs-field {
+    display: grid;
+    grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: center;
+    padding: var(--sp-2) var(--sp-3);
+    border-block-end: 1px solid var(--line);
+    cursor: text;
+  }
+
+  .inputs-field:last-child {
+    border-block-end: 0;
+  }
+
+  .inputs-field:has(> .inputs-check) {
+    cursor: pointer;
+  }
+
+  .inputs-label {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .inputs-box {
+    min-inline-size: 0;
+    min-block-size: calc(var(--ctl-h) + var(--sp-1));
+    padding-inline: var(--sp-3);
+    background: var(--s1);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+    font-variant-numeric: tabular-nums;
+    transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  .inputs-box:hover {
+    border-color: var(--line);
+  }
+
+  /* A CHECKBOX IS ITS OWN SIZE AT THE START OF ITS TRACK. It is drawn by `controls.css`, an ink fill
+     when ticked like every checked control, and no longer asks the browser for a fill in the brand's
+     red. */
+  .inputs-check {
+    justify-self: start;
+    inline-size: 18px;
+    block-size: 18px;
+    margin: 0;
+  }
+
+  .inputs-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  @media (pointer: coarse) {
+    .inputs-box {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* On a phone the label leads and the control takes the line under it, as a spec's row does. */
+  @media (width < 640px) {
+    .inputs-field {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-1);
+    }
+  }
+}

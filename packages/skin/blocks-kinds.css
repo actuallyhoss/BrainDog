@@ -1,0 +1,26 @@
+/**
+ * Every kind sheet in `kinds/`, in one import, for a screen that draws declared pages.
+ *
+ * `blocks.css` is the sheet every screen waits on, so a rule only a declared page's kind needs is not in it: it is in
+ * `kinds/<kind>.css`, and this gathers them for the screens that draw a whole page of blocks (the app's `PageView`, the
+ * site's pages and docs). A screen that draws one kind outside a declared page imports that kind's own sheet instead.
+ *
+ * THE ORDER IS THE ORDER THE RULES HAD IN `blocks.css`, before `blocks-charts.css`, so what one kind's rule overrides of
+ * another's is unchanged. Each sheet opens its own `@layer components` block, as `blocks.css` does.
+ */
+
+@import './kinds/panel.css';
+@import './kinds/stat.css';
+@import './kinds/board.css';
+@import './kinds/cards.css';
+@import './kinds/section.css';
+@import './kinds/feed.css';
+@import './kinds/queue.css';
+@import './kinds/capture.css';
+@import './kinds/diff.css';
+@import './kinds/inputs.css';
+@import './kinds/proportional.css';
+@import './kinds/media.css';
+@import './kinds/degraded.css';
+@import './kinds/progress.css';
+@import './kinds/path.css';

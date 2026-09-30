@@ -1,0 +1,31 @@
+/*
+ * `code` and `tree`: the media primitive (`p/Media.svelte`).
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── media: code, tree ──────────────────────────────────────────────────── */
+
+  .media {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--ink2);
+    font-family: var(--font-id);
+    font-size: var(--t-sm);
+    line-height: 1.6;
+    overflow-x: auto;
+    tab-size: 2;
+  }
+
+  .media[data-lang]::before {
+    content: attr(data-lang);
+    display: block;
+    margin-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+}

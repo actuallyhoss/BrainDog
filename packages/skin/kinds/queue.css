@@ -1,0 +1,353 @@
+/*
+ * `queue`: what is waiting on you (`Queue.svelte`, and the app's answerable `QueueAnswer.svelte`, which draws the same
+ * card).
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── queue: what is waiting on you ───────────────────────────────────────
+     One card a question, because a question is read whole: who asked, what they are asking, why, and
+     the ways to answer it. The options are a list rather than a row of buttons, so a long reason sits
+     under the words it belongs to and the recommendation is read beside its own option and no other. */
+
+  /* THE BLOCK IS ITS OWN CONTAINER, so a queue answers the width of the slot it was placed in rather
+     than the width of the window. A queue at `span: 6` on a wide screen is as narrow as the same
+     queue on a phone, and it is the block that has to fit. */
+  .queue {
+    display: grid;
+    container-type: inline-size;
+  }
+
+  /* A QUESTION IS A SECTION OF ITS TILE, with a hairline between one and the next, and not a card inside the tile. */
+  .queue-card {
+    display: grid;
+    gap: var(--sp-2);
+    padding-block: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .queue-card:first-child {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  .queue-by {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: baseline;
+    margin: 0;
+    font-size: var(--t-xs);
+    color: var(--dim);
+  }
+
+  .queue-who {
+    color: var(--ink2);
+    font-weight: 500;
+  }
+
+  /* THE BAND SITS AT THE END OF THE BY-LINE, pushed there rather than placed there, because it is
+     the one thing on that line that is about the card's PLACE in the list rather than about the
+     card. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that shouts is a
+     ranking that decides.
+
+     THE WORD CARRIES IT AND THE COLOUR DOES NOT. Four bands on four colours would be a legend a
+     reader has to learn and an a11y failure the moment one of them is the only difference, so the
+     dearest band takes weight and the darker ink, and the other three are identical. `data-cost` is
+     matched rather than the English, so a translated label still weights the right card. */
+  .queue-cost {
+    margin-inline-start: auto;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s1);
+    color: var(--ink2);
+    white-space: nowrap;
+  }
+
+  .queue-cost[data-cost='undo'] {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .queue-question {
+    margin: 0;
+    font-size: var(--t-lg);
+    line-height: var(--lh-tight);
+    color: var(--ink);
+  }
+
+  .queue-why {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--ink2);
+  }
+
+  /* THREE COLUMNS SHARED BY EVERY OPTION: the way to answer, the recommendation, the reason. The tracks are declared
+     once here and each option borrows them with `subgrid`, so the buttons line up down one edge, the reasons start at
+     one x, and the recommendation sits against the option it names. A reason under its option cost three lines an
+     option, and `/p/agents` opened on the queue and nothing else. */
+  .queue-options {
+    display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .queue-option {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    gap: var(--sp-1) var(--sp-3);
+    align-items: baseline;
+  }
+
+  /* EACH PART NAMES ITS OWN COLUMN, because an option with no recommendation would otherwise slide
+     its reason into the recommendation's track and the reasons would go ragged down the card. */
+  .queue-act,
+  .queue-label {
+    grid-column: 1;
+  }
+
+  /* AN ANSWER IS A PILL, the shape `QueueAnswer.svelte` already
+     gave the answerable queue, so the read-only renderer's options and the ones on Home are one drawing. A long option
+     wraps inside its pill rather than pushing the card sideways at 390. */
+  .queue-act {
+    justify-self: start;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-4);
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
+    background: var(--s1);
+    color: var(--ink);
+    font: inherit;
+    text-align: start;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .queue-act:hover {
+    background: var(--hold-wash);
+  }
+
+  /* THE SUGGESTED OPTION IS THE PRIMARY, drawn as every primary button is (`Button.svelte`'s `primary`: an ink fill with
+     the ground's letters), and the "Suggested" word stays beside it so the suggestion is said and not only shaded. It
+     is still not pressed for anybody: the fill says which one, and the press is the reader's. NOT WHILE IT IS THE ONE
+     BEING ANSWERED (`data-on`): `QueueAnswer.svelte` draws that on the selected ground, and ground-coloured letters on
+     it would vanish. */
+  .queue-option[data-recommended] > .queue-act:not([data-on]) {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
+  }
+
+  .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+
+  .queue-label {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* THE WORD BESIDE THE PRIMARY. What an agent suggests is worth saying and is not worth pre-pressing, so the option's
+     pill is filled (above) and this quiet label names why, rather than the option reading as already chosen. */
+  .queue-rec {
+    grid-column: 2;
+    justify-self: start;
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s1);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  .queue-because {
+    grid-column: 3;
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .queue-more,
+  .queue-empty {
+    max-inline-size: var(--measure);
+    margin: 0;
+    color: var(--dim);
+  }
+
+  /* AND UNDER IT AGAIN WHEN THE BLOCK IS NARROW, because three tracks in a phone's width leaves the
+     reason about a hundred pixels and a reason nobody can read is worse than a reason below its
+     option. The width is the BLOCK's and not the window's: a queue at `span: 6` on a wide screen is
+     as narrow as the same queue on a phone, and it is the block that has to fit. */
+  @container (inline-size < 34rem) {
+    .queue-options {
+      grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .queue-because {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* AND A COUNT THAT LEADS SOMEWHERE LOOKS LIKE IT DOES. It is an `<a>` only when the evaluator said
+     where the rest are; dimmed like the sentence beside it, underlined so it reads as the door it is. */
+  a.queue-more {
+    display: inline-block;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  a.queue-more:hover,
+  a.queue-more:focus-visible {
+    color: var(--ink);
+  }
+
+  /* AN OPTION'S VISUAL IS ITS OWN BOX, on the first track above the option's words, because the three
+     tracks are shared by every option (above) and a box beside the label would push the buttons out
+     of their one edge. Above the words it reads as a sample laid over its name. */
+  .queue-option > .queue-visual {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .queue-visual {
+    display: flex;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  /* THE ONE COLOUR ON THE PAGE THAT NO THEME CHOSE (05 §5, "a colour from data is drawn only inside
+     its option's box"). `--swatch` is set on this chip and nowhere else, so nothing around it can
+     inherit it, and this is the only rule that reads it. The hairline is the theme's, so a swatch
+     the colour of the surface under it is still a chip rather than a hole. And forced colours leave
+     it alone, because in that mode every background is repainted and the lining a person is asked
+     to choose would be drawn as no colour at all. */
+  .queue-swatch {
+    flex: none;
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--swatch);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    forced-color-adjust: none;
+  }
+
+  .queue-figure {
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--s2);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .queue-file {
+    display: block;
+    inline-size: 4rem;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    background: var(--s2);
+  }
+
+  /* `queue tiles`: A TILE A QUESTION, SIDE BY SIDE WHERE THEY FIT, each led by what its recommended
+     option is. The tracks answer the queue's own width, as the cards grid does, and the count of what
+     is left spans them all rather than sitting in a tile's place. */
+  .queue:has(> .queue-tile) {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+    align-items: start;
+    gap: var(--sp-3);
+  }
+
+  /* Side by side, a question is a well of the tile's second surface rather than a section under a hairline. */
+  .queue-card.queue-tile {
+    padding: var(--sp-4);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
+  }
+
+  .queue:has(> .queue-tile) > .queue-more {
+    grid-column: 1 / -1;
+  }
+
+  /* THE LEADING VISUAL FILLS THE TILE'S WIDTH: the swatches share it, the figure is the tile's
+     largest type, the file is a picture at the tile's width. It is the same box an option draws,
+     only larger, so the colour is still inside its option's box. */
+  .queue-tile > .queue-visual {
+    margin-block: calc(var(--sp-4) * -1) var(--sp-1);
+    margin-inline: calc(var(--sp-4) * -1);
+    overflow: hidden;
+    border-start-start-radius: var(--r-md);
+    border-start-end-radius: var(--r-md);
+  }
+
+  .queue-tile > .queue-visual > .queue-swatch {
+    flex: 1;
+    inline-size: auto;
+    block-size: 4.5rem;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .queue-tile > .queue-visual > .queue-figure {
+    padding: var(--sp-4);
+    flex: 1;
+    border-radius: 0;
+    font-size: var(--t-xl);
+    font-weight: 500;
+  }
+
+  .queue-tile > .queue-visual > .queue-file {
+    flex: 1;
+    inline-size: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 0;
+  }
+
+  .queue-suggested {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  /* THE WAYS TO ANSWER ARE FOLDED AND SAY SO IN WORDS, a pill like a section's fold, because the tile
+     has to be read before it is answered and the recommendation must not stand in for the choice. */
+  .queue-ways > .queue-options {
+    margin-block-start: var(--sp-2);
+  }
+
+  .queue-ways-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-sm);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .queue-ways-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .queue-ways-toggle:hover {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .queue-ways-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+}

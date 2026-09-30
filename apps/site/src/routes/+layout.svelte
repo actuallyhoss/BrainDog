@@ -19,6 +19,7 @@
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
   import '@braindog/skin/blocks.css';
+  import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
   import '../app.css';
 

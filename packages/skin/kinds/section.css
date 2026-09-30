@@ -1,0 +1,151 @@
+/*
+ * `section`: a heading for the blocks after it (`Section.svelte`), and the fold that hides them.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── section: a heading for the blocks after it ──────────────────────────
+     ON THE GROUND IT IS A GROUP'S HEADING: the title at `--t-group`, its count in the meta ink, the fold at
+     the end of the line, and a hairline under it, with the tiles after it. IN A BOXED SECTION IT IS THAT TILE'S HEADING
+     ROW, the glyph in its well and the name at `--t-row`, because the box is one tile. */
+
+  .sec {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    padding-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .box .sec {
+    padding-block-end: 0;
+    border-block-end: 0;
+  }
+
+  .sec-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--t-group);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  .box .sec-title {
+    font-size: var(--t-row);
+    line-height: 20px;
+  }
+
+  .sec-count {
+    margin-inline-start: calc(var(--sp-2) - var(--sp-3));
+    color: var(--dim);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE WELL DRAWS ONLY WHAT THE HOST DREW INTO IT (`RenderOptions.icon`). The renderer ships no glyph art, so a
+     section whose name the host has no drawing for keeps an empty slot, and an empty slot takes no room rather than
+     holding a blank square. With a drawing it is the tile heading's well: 18 in the second ink on the second surface. */
+  .sec-glyph {
+    display: none;
+  }
+
+  .sec-glyph:has(> svg) {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--well);
+    block-size: var(--well);
+    background: var(--s1);
+    border-radius: var(--r-well);
+    color: var(--ink2);
+  }
+
+  .sec-glyph > svg {
+    inline-size: 18px;
+    block-size: 18px;
+  }
+
+  .sec-fold {
+    margin-inline-start: auto;
+  }
+
+  .sec-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-3);
+    background: var(--hover-wash);
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .sec-toggle::-webkit-details-marker {
+    display: none;
+  }
+
+  .sec-toggle:hover {
+    background: var(--hold-wash);
+    color: var(--ink);
+  }
+
+  .box .sec-toggle {
+    background: var(--s1);
+  }
+
+  /* One word at a time: the control says what pressing it does, and the other word leaves the
+     accessibility tree along with the screen. */
+  .sec-fold[open] .sec-show,
+  .sec-fold:not([open]) .sec-hide {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .sec-toggle {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* A SECTION ON A DECLARED PAGE IS ITS OWN HEADING. The page draws a bar naming every block, and a
+     section's name is the section, which it already draws, so the bar goes and the words are said
+     once. The page's styles are not in a layer, so only an important declaration here outranks
+     them. The region keeps its name: a reference to a hidden heading still reads its text. */
+  .block-slot:has(> .block[data-kind='section']) > .block-bar {
+    display: none !important;
+  }
+
+  /* A FOLDED SECTION FOLDS THE BLOCKS AFTER IT, up to the next section. CSS cannot ask which section
+     is nearest, so this asks two questions it can: is there a folded section before this block with
+     no open section after it, or a folded, open, folded run with no open section after that. It is
+     exact until a page folds three sections with open ones between them. Nothing folds while the
+     page is being arranged, because a block nobody can see is a block nobody can move. */
+  .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:not([data-arranging], :has(> .block[data-kind='section'])):not(
+      .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ *
+    ),
+  .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+    ~ .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+    ~ .block-slot:not([data-arranging], :has(> .block[data-kind='section'])):not(
+      .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ .block-slot:has(> .block[data-kind='section'] .sec-fold:not([open]))
+        ~ .block-slot:has(> .block[data-kind='section']):not(:has(.sec-fold:not([open])))
+        ~ *
+    ) {
+    display: none;
+  }
+}

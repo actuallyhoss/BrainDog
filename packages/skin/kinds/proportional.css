@@ -1,0 +1,143 @@
+/*
+ * `bar` and `gauge`: the proportional primitive (`p/Proportional.svelte`). The chart kinds that draw on it are in
+ * `blocks-charts.css`.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── proportional: bar, gauge ───────────────────────────────────────────── */
+
+  /* Every chart kind is this primitive and starts on the heading's edge. A bar's ROWS HANG THEIR PADDING INTO THE
+     TILE'S, as every list of rows does (`.rows`), so the label starts on that edge and the hole's dashed box and the
+     hover wash have room round it. */
+  .prop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+
+  .prop-row {
+    display: grid;
+    grid-template-columns: minmax(9ch, 20ch) minmax(0, 1fr) auto auto auto;
+    gap: var(--sp-3);
+    align-items: center;
+    margin-inline: calc(-1 * var(--sp-3));
+    padding: var(--sp-1) var(--sp-3);
+    min-block-size: var(--row-h);
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+  }
+
+  .prop-track {
+    position: relative;
+    block-size: 6px;
+    border-radius: calc(var(--r-sm) / 2);
+    background: var(--s1);
+    overflow: hidden;
+  }
+
+  /* AN UNTONED BAR IS INK, NOT THE ACCENT. A `bar` block is a magnitude comparison — eight rows of
+     "who you owe, largest first" — and painting all eight in the brand colour spends the one loud
+     thing on the screen on the fact that a list is a list. The bar earns a colour only when the row
+     it belongs to carries an intent; otherwise it is a dark neutral and the LENGTH does the work,
+     which is the only channel a bar chart actually has. */
+  .prop-track::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: calc(var(--magnitude) * 100%);
+    border-radius: inherit;
+    background: var(--tone-fill, var(--ink));
+  }
+
+  .prop-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* AND A PART'S NAME IS A TARGET, so on a thumb it is one. Measured at 61x17 on `/p/work` below
+     640: "No project", the row a `bar` block draws for what belongs to no part, which opens exactly
+     those rows. A name that opens a list is not a link inside a sentence, so neither WCAG 2.5.8 nor
+     `13 §7` exempts it. `.tap`'s trick grows the hit box without moving the word, and the row grows
+     with it so the box stays inside its own row rather than taking the press meant for the row
+     above. The same rule a split legend's name takes in `blocks-charts.css`. */
+  @media (pointer: coarse) {
+    .prop-row {
+      min-block-size: var(--tap);
+    }
+
+    .prop-label a {
+      position: relative;
+    }
+
+    .prop-label a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2)) 0;
+    }
+  }
+
+  .prop-value {
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .prop-note {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* The hole is the only row that is a button: it opens the register filtered to exactly those
+     rows, because an unknown is a task somebody has to close (05 §7.5). */
+  .prop-row[data-hole] {
+    cursor: pointer;
+    border: 1px dashed var(--edge);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .prop-row[data-hole]:hover {
+    background: var(--hover-wash);
+  }
+
+  /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only
+     row of a chart that is a control. Below 640 the two-line rule further down already carries it
+     past the floor; above it, a coarse pointer is a tablet and nothing has ever measured one,
+     because `layout.mjs` runs its target rule below 640 only. `05 §6`: density follows the
+     pointer, never the width. `button.` because the same class is a plain `div` wherever the host
+     cannot act on the hole. */
+  @media (pointer: coarse) {
+    button.prop-row {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /**
+   * FIVE TRACKS DO NOT FIT ON A PHONE, AND THE ONE THAT GAVE WAY WAS THE CHART: `minmax(0, 1fr)` is the only track that
+   * can yield and it is the bar, measured at exactly 0px in every `bar` and `gauge` row at 390. So the row becomes two
+   * lines, as `.row` does: the label leads, and the bar, the value, the note and the glyph share the line under it.
+   * FOUR TRACKS AND NOT THREE, because the glyph is a fifth child only on a toned row; given three it took a line alone.
+   */
+  @media (width < 640px) {
+    .prop-row {
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      gap: var(--sp-1) var(--sp-2);
+    }
+
+    .prop-label {
+      grid-column: 1 / -1;
+    }
+
+    .prop-track {
+      grid-column: 1;
+    }
+  }
+}

@@ -359,12 +359,15 @@
     min-inline-size: 0;
   }
 
+  /* THE STREAM IS A SIZE CONTAINER, so what is drawn in it answers the column and not the page. It used to be one
+     through the feed block's rule in the shared sheet, which names the same class and now loads only with declared pages. */
   .feed {
     grid-area: feed;
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+    container-type: inline-size;
   }
 
   @container (width >= 860px) {

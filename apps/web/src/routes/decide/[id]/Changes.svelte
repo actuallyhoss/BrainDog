@@ -16,6 +16,8 @@
   "A project".
 -->
 <script lang="ts">
+  /* `Diff` is drawn here outside a declared page, so its kind's sheet comes with it (`kinds/diff.css`). */
+  import '@braindog/skin/kinds/diff.css';
   import { diffPlan, ref } from 'braindog-render';
   import { Diff } from 'braindog-render/svelte';
   import { apiBase } from '$lib/at.ts';

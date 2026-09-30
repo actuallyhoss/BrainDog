@@ -22,6 +22,9 @@
   record, so they are one sentence here.
 -->
 <script lang="ts">
+  /* A TABLE'S VALUE CELLS HERE ARE `.cell`, the stat's own name, and draw with its rule (`kinds/stat.css`), which
+     arrives with declared pages and so is asked for by name. */
+  import '@braindog/skin/kinds/stat.css';
   import { page as route } from '$app/state';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';

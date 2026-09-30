@@ -24,6 +24,8 @@
   44px column, so every pencil on the page shares an edge. The hero figure is `--t-figure`, and never wraps.
 -->
 <script lang="ts">
+  /* A FACT IS DRAWN ON THE BAR PRIMITIVE'S `.prop` ROW (`kinds/proportional.css`): its label, its value and their type. */
+  import '@braindog/skin/kinds/proportional.css';
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';

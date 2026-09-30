@@ -30,6 +30,8 @@
   and this file only draws the line.
 -->
 <script lang="ts">
+  /* THE CAPTURE BLOCK'S LINE IS THIS LINE (`kinds/capture.css`), so the register draws it from the same sheet. */
+  import '@braindog/skin/kinds/capture.css';
   import { copy } from '$lib/copy.ts';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import Button from '$lib/ui/Button.svelte';

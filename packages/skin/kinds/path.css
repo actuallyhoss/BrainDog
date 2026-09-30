@@ -1,0 +1,27 @@
+/*
+ * `path` (`Path.svelte`): the view switch over its stones. The stones are list items and keep `.list`'s rules in
+ * `blocks.css`.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
+ * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* A PATH'S VIEW SWITCH: "<label> · Everything" as a segmented control, `packages/render/svelte/Path.svelte`'s
+     own markup. The stones under it already reach 44px through `.tap`; this is the switch above them. */
+  .path-switch {
+    display: flex;
+    gap: var(--sp-1);
+    margin-block-end: var(--sp-2);
+  }
+
+  .path-view {
+    min-block-size: var(--ctl-h-sm);
+  }
+
+  @media (pointer: coarse) {
+    .path-view {
+      min-block-size: var(--tap);
+    }
+  }
+}
