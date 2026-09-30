@@ -132,6 +132,38 @@
     vertical-align: baseline;
   }
 
+  /* ON A PHONE A ROW WRAPS: the longest chord ("g then h d i s v p ,") made the shared key column wider than the screen
+     had left for the words, and the table stood past the page. Below 640 each row is its chord and then its words,
+     which move under the chord when they do not fit beside it. */
+  @media (width < 640px) {
+    .keys,
+    .scope,
+    .scope-title {
+      display: block;
+    }
+
+    .keys tr {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      column-gap: var(--sp-3);
+    }
+
+    .scope-title {
+      flex: 1 1 100%;
+    }
+
+    .key {
+      inline-size: auto;
+      padding-inline-end: 0;
+    }
+
+    .does {
+      flex: 1 1 12rem;
+      min-inline-size: 0;
+    }
+  }
+
   /* THE MARK IS NOT COLOUR ALONE. A silenced row is dimmed AND carries the word, because
      `19 §4` is an accessibility control and the one reader most likely to have turned it on is the
      one least served by a change in opacity. */

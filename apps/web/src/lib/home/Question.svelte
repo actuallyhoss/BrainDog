@@ -128,7 +128,7 @@
     <span class="line-mark"><IconWell name="decide" size="l" /></span>
     <div class="q-main">
       <div class="q-top">
-        <a class="q-text" href={at(`/decide/${encodeURIComponent(question.id)}`)} dir="auto">{saidOf(question.question)}</a>
+        <a class="q-text tap" href={at(`/decide/${encodeURIComponent(question.id)}`)} dir="auto">{saidOf(question.question)}</a>
         {#if waited}<span class="q-age">{waited}</span>{/if}
       </div>
       <p class="q-by">{meta}</p>

@@ -680,7 +680,7 @@
           <div class="line line-tall">
             <span class="line-mark"><IconWell name="key" size="l" /></span>
             <span class="line-main">
-              {#if href}<a class="line-title key-name" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
+              {#if href}<a class="line-title key-name tap" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
               <span class="line-detail key-meta">
                 <ScopeChip scope={k.scope} />
                 {#if k.opens}<span class="key-opens">{k.opens}</span>{/if}

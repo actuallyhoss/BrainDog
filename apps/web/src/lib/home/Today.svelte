@@ -532,7 +532,9 @@
 
 <div class="page">
   {#if data.refused}
-    <p class="none">{data.refused.fix}</p>
+    <!-- A REFUSAL AS EVERY SCREEN DRAWS ONE, which is also what settles the screen: a bare sentence said nothing to the
+         readiness count, so an address naming no record never finished drawing. -->
+    <ReadState state="refused" refusal={data.refused.fix} />
   {:else if today.state !== 'ready' && today.state !== 'empty'}
     <ReadState state={today.state} refusal={today.refusal} onretry={() => void today.reread()} />
   {:else if t}
@@ -780,7 +782,7 @@
       {/if}
     </span>
     <span class="line-main">
-      <a class="line-title" href={at(href)} dir="auto">{task.what}</a>
+      <a class="line-title tap" href={at(href)} dir="auto">{task.what}</a>
       <span class="line-detail">
         {#if task.project}<span class="proj" style:--hue={hue} aria-hidden="true"></span><span dir="auto">{task.project}</span>{#if taskMeta(task).length}{' · '}{/if}{/if}{taskMeta(task).join(' · ')}
       </span>
@@ -813,7 +815,7 @@
   <div class="line line-tall">
     <span class="line-mark"><IconWell name={bill.out ? 'obligation' : 'money'} size="l" /></span>
     <span class="line-main">
-      <a class="line-title" href={at(href)} dir="auto">{bill.what}</a>
+      <a class="line-title tap" href={at(href)} dir="auto">{bill.what}</a>
       <span class="line-detail">{words.money} · {bill.out ? words.toPay : words.toCome}{#if !need && bill.due}{' · '}{daySaid(bill.due)}{/if}</span>
     </span>
     {#if need && bill.late && bill.due}
@@ -910,8 +912,11 @@
       gap: var(--sp-4);
     }
 
+    /* STRETCHED, NOT `start`: the column is the tile's width. At `start` a tile took its own widest line, and one
+       with a long heading stood past the phone's edge. */
     .t-side {
       display: flex;
+      align-items: stretch;
       gap: var(--inset);
     }
 
@@ -1321,6 +1326,13 @@
     color: var(--ink2);
     font-size: var(--t-base);
     text-decoration: none;
+  }
+
+  /* A ROW THAT OPENS ITS LIST IS A 44 TARGET UNDER A THUMB (13 §7); 28 is the legend's density under a mouse. */
+  @media (pointer: coarse) {
+    .legend-row {
+      min-block-size: var(--tap);
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {

@@ -52,6 +52,14 @@
   .viz [data-tone='warn'] { --c: var(--warn); }
   .viz [data-tone='live'] { --c: var(--live); }
 
+  /* A MARK IS DRAWN WHERE IT BELONGS AND NEVER SLID THERE. Each chart draws once at a guessed width and again at the
+     width it measured, and the reduced-motion rule (`a11y.css`) gives every element a 1ms duration over the default
+     `all`, so every `cx`, `x` and `width` became a transition from the guess, and until its frame ran the week's dots
+     stood 160px past the tile. No mark here has a designed transition, so none of them transitions. */
+  .viz svg * {
+    transition-property: none;
+  }
+
   /* ── marks ─────────────────────────────────────────────────────────────── */
 
   .viz-fill {

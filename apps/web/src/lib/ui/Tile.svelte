@@ -93,10 +93,13 @@
     padding: var(--sp-5);
   }
 
+  /* THE ROW WRAPS WHEN IT CANNOT HOLD ITS ASIDE: on a phone a meta line such as "all on <host>" goes under the title
+     rather than past the tile's edge, and on a wide tile nothing moves. */
   .tile-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2) var(--sp-3);
     min-inline-size: 0;
     min-block-size: var(--well);
   }
@@ -129,13 +132,18 @@
 
   .tile-aside {
     display: flex;
-    flex: none;
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    max-inline-size: 100%;
     align-items: center;
     gap: var(--sp-2);
     margin-inline-start: auto;
   }
 
   .tile-meta {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--dim);
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;

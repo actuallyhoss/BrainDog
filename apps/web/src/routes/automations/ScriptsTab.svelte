@@ -87,4 +87,14 @@
     text-decoration-color: var(--rule);
     text-underline-offset: 3px;
   }
+
+  /* UNDER A THUMB THE LINK IS A 44 TARGET (13 §7). It is the one way from this tab to the whole scripts screen, not a
+     word in passing, so it stands as a line of its own at the tap height rather than a 17px run of text. */
+  @media (pointer: coarse) {
+    .more a {
+      display: flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
 </style>

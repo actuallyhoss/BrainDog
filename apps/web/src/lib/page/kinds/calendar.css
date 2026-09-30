@@ -4,10 +4,10 @@
  * THE RENDERER DRAWS EVERY MONTH AND THE AGENDA, ALWAYS, and this sheet decides which the reader sees, by the width the
  * block has. Wide, each month is a grid of weeks whose days name their first rows and
  * count the rest, and the agenda is not shown, because it says again what the grid already holds. Narrow, a grid of
- * seven columns cannot hold a title, so each month is a strip of its days with a dot on a busy one, and the agenda
+ * seven columns cannot hold a title, so each month is rows of its days with a dot on a busy one, and the agenda
  * under it carries the words.
  *
- * THE BLOCK IS ITS OWN CONTAINER, so a calendar in a narrow column at 1440 turns into the strip exactly as it does on a
+ * THE BLOCK IS ITS OWN CONTAINER, so a calendar in a narrow column at 1440 turns into those rows exactly as it does on a
  * phone. 40rem is the phone breakpoint's 640px at the default root; it is a container query and not a new `@media` width, so no route
  * gains a width to fit (05 §6).
  *
@@ -19,8 +19,12 @@
     container-type: inline-size;
   }
 
+  /* ONE TRACK AS WIDE AS THE BLOCK. An implicit track is `auto`, which grows to the widest thing's min-content: when the
+     narrow month was one unwrapped row of days the track took its 1400px, and the month and the agenda both stood past
+     the page. */
   .calendar {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-5);
     min-inline-size: 0;
   }
@@ -167,7 +171,27 @@
     overflow-wrap: anywhere;
   }
 
-  /* ── narrow: a strip of days, then the agenda ───────────────────────────── */
+  /* AN AGENDA ROW'S TITLE OPENS ITS ROW, SO UNDER A THUMB IT IS A 44 TARGET (13 §7), by the trick a split's legend
+     uses in `blocks-charts.css`: the row is as tall as the target, and an invisible box round the words takes the press
+     without moving them. */
+  @media (pointer: coarse) {
+    .calendar-day .calendar-item {
+      min-block-size: var(--tap);
+      align-items: center;
+    }
+
+    .calendar-day .calendar-title a {
+      position: relative;
+    }
+
+    .calendar-day .calendar-title a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
+  /* ── narrow: rows of days, then the agenda ───────────────────────────── */
 
   @container (inline-size < 40rem) {
     .calendar {
@@ -178,9 +202,10 @@
       display: block;
     }
 
-    /* THE TABLE BECOMES ONE ROW OF DAYS. The weeks are unwrapped with `contents`, so every day of the month sits in
-       one strip that scrolls sideways inside the block, snaps a day at a time, and fades at its far edge to say there
-       is more; the page itself never scrolls sideways. The days outside the month are not drawn in a strip. */
+    /* THE TABLE BECOMES ROWS OF DAYS. The weeks are unwrapped with `contents` and the days wrap at the block's edge, as
+       many to a line as fit, so the whole month is on screen and the page never scrolls sideways. It was one strip that
+       scrolled inside the block, and a region that scrolls with nothing in it to focus is one a keyboard cannot move.
+       The days outside the month are not drawn here. */
     .calendar-month {
       display: block;
     }
@@ -196,16 +221,8 @@
 
     .calendar-month tbody {
       display: flex;
+      flex-wrap: wrap;
       gap: var(--sp-1);
-      overflow-x: auto;
-      overscroll-behavior-inline: contain;
-      scroll-snap-type: inline mandatory;
-      scrollbar-width: none;
-      mask-image: linear-gradient(to left, transparent, var(--ink) var(--sp-5));
-    }
-
-    .calendar-month tbody:dir(rtl) {
-      mask-image: linear-gradient(to right, transparent, var(--ink) var(--sp-5));
     }
 
     .calendar-month tr {
@@ -222,7 +239,6 @@
       block-size: auto;
       padding: var(--sp-1) 0;
       border: 0;
-      scroll-snap-align: start;
     }
 
     .calendar-cell[data-outside] {
@@ -239,8 +255,8 @@
     }
 
     /* A BUSY DAY'S DOT, drawn from the count the renderer wrote. It is `--ink2` and not a tone: a dot says "something is
-       on", and what it is, with its tone, is in the agenda under the strip. Its absence on a free day is what the
-       strip is for, so an empty cell keeps the dot's height and the numbers stay on one line. */
+       on", and what it is, with its tone, is in the agenda under the days. Its absence on a free day is what the
+       rows are for, so an empty cell keeps the dot's height and the numbers stay on one line. */
     .calendar-cell::after {
       content: '';
       inline-size: var(--dot);
