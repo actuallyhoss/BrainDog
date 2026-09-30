@@ -7,13 +7,12 @@
 export const home = {
   hero: {
     /* THE SLOGAN, in two halves for the history of the thing, drawn as one sentence in one colour since 29 September:
-       red is the mark's alone (the design system). The words are the owner's and unchanged, with no full stop. */
+       red is the accent and never a heading's colour. The words are the owner's and unchanged, with no full stop. */
     title: 'Give your business',
     titleAccent: 'a memory',
-    sub: 'Everything you keep track of, in one place arranged around you. You and your AI agents keep it up to date, and every change says who made it.',
+    sub: 'Everything you keep track of, in one place. You and your AI agents keep it up to date, and every change says who made it.',
     primary: 'Start your record',
-    secondary: 'See what it costs',
-    note: 'From $12 a month per record. Colleagues are free.',
+    secondary: 'See pricing',
   },
 
   /**
@@ -56,21 +55,26 @@ export const home = {
    * drawn working, with a heading that says what the reader gets and one sentence under it.
    */
   home: {
+    /* THE DECISION'S BAND: the heading and one sentence beside the scene above. */
+    decide: {
+      title: 'An agent proposes. You decide.',
+      lead: 'When an agent wants to change something, you get a question first. Accept it and the change lands with its name on it.',
+    },
+
     slash: {
       title: 'Press / and ask.',
-      lead:
-        'Slash is built into every record. Ask what you owe this month and it shows the bills. Ask for a ' +
-        'page and it builds one. Nothing it writes goes in until you say yes.',
+      lead: 'Ask what you owe this month and it shows the bills. Ask for a page and it builds one. Nothing it writes goes in until you say yes.',
       more: 'More about Slash',
     },
 
     agents: {
       title: 'Bring your own agents.',
-      lead:
-        'Claude, Codex, Cursor and anything else that speaks MCP can read and write your record with a ' +
-        'key you give it. When an agent wants to change something, you get a question first, and its ' +
-        'name stays on the change.',
+      lead: 'Claude, Codex, Cursor or anything else that speaks MCP reads and writes your record with a key you give it.',
+      /* The connect sheet's own words, as the app's sheet says them. */
+      sheet: 'Connect an agent',
       connect: 'MCP address',
+      copy: 'Copy the address',
+      keys: 'Agents use your API keys without ever seeing them.',
       more: 'How agents connect',
     },
 
@@ -83,9 +87,9 @@ export const home = {
     inbox: {
       title: 'Forward it once. It files itself after that.',
       lead:
-        'Send in bank texts and receipts by email, point a webhook at your record, or connect Stripe and ' +
-        'Mercury. After three of the same kind, Slash suggests how to file them. Say yes and the rest go ' +
-        'in on their own, without using credits.',
+        'Send bank texts and receipts by email, point a webhook at your record, or connect Stripe and Mercury. ' +
+        'After three of a kind, Slash suggests how to file them. Say yes and the rest file themselves, with no credits spent.',
+      doors: ['Email', 'Webhook', 'Stripe', 'Mercury'],
       steps: ['Arrives', 'Learned once', 'Filed'],
       arrivals: [
         { from: 'Card alert', text: 'You paid GBP 32.00 to PUREGYM on 3 Oct.' },
@@ -111,75 +115,12 @@ export const home = {
       ],
     },
 
-    /**
-     * THE BLOCKS, DRAWN AS A PAGE BY THE PRODUCT'S OWN RENDERER. `page.src` is dialect text (docs/05 §2),
-     * drawn by `lib/app/Page.svelte` through `braindog-render`, so the band shows what a record's page
-     * with these rows draws rather than a picture of one.
-     *
-     * EVERY FIGURE AGREES WITH THE PERSONAL AND TEAM EXAMPLES in the window above (`lib/examples/`),
-     * dated `DRAWN_ON`, Monday 28 September 2026. The Personal Home leaves GBP 1,312.40 after the
-     * week's GBP 878.99 of bills, so its accounts hold GBP 2,191.39; less the GBP 1,148.99 of bills
-     * due inside thirty days and plus the GBP 2,450.00 pay day, that is GBP 3,492.40. The Lisbon goal,
-     * the three bills due this week and their days are the Personal example's, September is the month
-     * in progress, and the tickets are the Team example's board.
-     */
-    pages: {
-      title: 'Make the pages you actually check.',
-      /* The block kinds are `KINDS` in `packages/render/src/kinds.ts`; moving and asking for them are
-         docs/06 and docs/29. */
-      lead:
-        'Put figures, charts, boards, calendars and tables on a page, all reading from your lists. ' +
-        'Drag them around yourself, or tell Slash what you want to see.',
-      page: {
-        src: `~~~stat
-Cash in 30 days | GBP 3,492.40 | after bills and pay day
-Trip to Lisbon | GBP 420.00 | of GBP 900.00 put by
-~~~
-
-~~~series | Spending by month
-Month | in: Spent | state
-May | GBP 612.00
-June | GBP 540.00
-July | GBP 701.00
-August | GBP 588.00
-September | GBP 455.00 | partial
-~~~
-
-~~~comparison | Due this week
-What | Amount | Due
-Streaming subscription | GBP 10.99 | 30 Sep
-Phone contract | GBP 18.00 | 1 Oct
-Rent | GBP 850.00 | 4 Oct
-~~~
-
-~~~board | Tickets
-To do | Search filters | Omar
-To do | Export to CSV | Lena
-Doing | Onboarding emails | Maya
-Review | Invite links | Lena
-~~~`,
-        /* Figures beside the chart, then the table beside the board, on the page's twelve columns. */
-        layout: [
-          { at: 0, cols: 4 },
-          { at: 1, cols: 8 },
-          { at: 2, cols: 6 },
-          { at: 3, cols: 6 },
-        ],
-        /* THE LINE UNDER THE CHART, read off its rows: July's GBP 701.00 is the highest, and September is partial. */
-        reads: { 1: 'July was the most, GBP 701.00. September is not over yet.' },
-      },
-      /* The first-party packs are `FIRST_PARTY` in `packages/seed/src/packs/first-party.ts`. */
-      packsLine: 'Or start from a pack: Money, Work, Studies, People, Stripe, Mercury, Holdings and more.',
-    },
-
     yours: {
       title: 'Your data stays yours.',
       body: [
-        'Each record gets its own database. Export the whole thing as one file whenever you want, and ' +
-          'if you leave, you take it with you.',
-        'Every change is saved with who made it, whether that was you, a colleague, an agent or a rule, ' +
-          'and any change can be undone. Agents and scripts use your API keys without ever seeing them.',
-        'BrainDog is open source, so you can read exactly how all of this works.',
+        'Each record is its own database. Export all of it as one file whenever you like.',
+        'Every change is saved with who made it, and any change can be undone.',
+        'The code is open, so you can read exactly how all of this works.',
       ],
       source: 'See the code on GitHub',
       /* A glyph for each paragraph of `body`, in order: its own database, every change named, open source. */
@@ -188,21 +129,18 @@ Review | Invite links | Lena
 
     plans: {
       title: 'Priced per record, not per person.',
-      lead: 'Invite your whole team for free. Every plan includes Slash credits, and you can top up any time.',
-      side: [
-        { head: 'Need more Slash?', said: 'Top up with a credit pack. 100 credits are $5, and they never expire.' },
-        { head: 'Colleagues are free', said: 'On both plans, with any level of access.' },
-      ],
-      more: 'Full pricing',
-      /* The two meters each plan is drawn with, and who the faces are: the Team example's four (`lib/examples/team.ts`). */
+      /* The two meters each plan is drawn with. */
       meters: { credits: 'Slash credits a month', runs: 'automation runs a month' },
+      /* THE TEAM EXAMPLE'S FOUR (`lib/examples/team.ts`), drawn as the faces on the free seats. */
       faces: ['Omar', 'Lena', 'Maya', 'Jun'],
+      free: { head: 'Colleagues are free', said: 'On both plans, with any level of access.' },
+      more: 'Full pricing',
     },
   },
 
   closing: {
     title: 'Start your record.',
-    body: 'Tell it who you are and what it is for. Slash sets up the first lists and pages, and you change whatever you like after that.',
+    body: 'Tell it who you are and what it is for, and Slash sets up the first lists and pages.',
     primary: 'Start your record',
     secondary: 'See the pricing',
   },
