@@ -118,14 +118,14 @@ export type Start = {
 
 const fromDevice = (): Start => {
   const held = pref.read();
-  return { order: held.nav ?? [], hidden: readList(HIDDEN), shape: held.navShape, suggest: held.suggestPages, dismissed: readList(DISMISSED) };
+  return { order: held.nav ?? [], hidden: readList(HIDDEN), shape: held.shape, suggest: held.suggestPages, dismissed: readList(DISMISSED) };
 };
 
 export class NavPrefs {
   order = $state<string[]>([]);
   hidden = $state<string[]>([]);
-  /** Where the navigation lives. The rail unless somebody said otherwise: `19 §3` keeps it the default in bold. */
-  shape = $state<NavShape>('rail');
+  /** Where the navigation lives. The top bar unless somebody said otherwise. */
+  shape = $state<NavShape>('bar');
   /**
    * Whether the holding pen proposes anything, `29 §4`'s one global switch. On unless somebody said otherwise, which is
    * the record's own reading of `pen.suggest` absent.
@@ -141,7 +141,7 @@ export class NavPrefs {
   constructor(start: Start = fromDevice()) {
     this.order = start.order ?? [];
     this.hidden = start.hidden ?? [];
-    this.shape = start.shape ?? 'rail';
+    this.shape = start.shape ?? 'bar';
     this.suggest = start.suggest ?? true;
     this.dismissed = start.dismissed ?? [];
   }
@@ -169,10 +169,10 @@ export class NavPrefs {
 
     const held = pref.read();
     const shape = prefs['nav.shape'];
-    this.shape = isShape(shape) ? shape : (held.navShape ?? 'rail');
+    this.shape = isShape(shape) ? shape : (held.shape ?? 'bar');
     const suggest = prefs['pen.suggest'];
     this.suggest = typeof suggest === 'boolean' ? suggest : (held.suggestPages ?? true);
-    pref.write({ navShape: this.shape, suggestPages: this.suggest });
+    pref.write({ shape: this.shape, suggestPages: this.suggest });
 
     const kept = strings(prefs['pen.dismissed']);
     const legacy = takeLegacy().filter((id) => !kept.includes(id));
@@ -216,10 +216,10 @@ export class NavPrefs {
   setShape(next: NavShape): Promise<Saved> {
     const before = this.shape;
     this.shape = next;
-    pref.write({ navShape: next });
+    pref.write({ shape: next });
     return this.#commit('nav.shape', next, () => {
       this.shape = before;
-      pref.write({ navShape: before });
+      pref.write({ shape: before });
     });
   }
 

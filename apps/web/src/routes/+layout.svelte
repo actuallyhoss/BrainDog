@@ -189,6 +189,8 @@
   const tabs = $derived(tabsOf(flat.main));
   /* WHAT THE TOP BAR SAYS IS UNDER MORE: the sections and pages that are not rows, and the lists. */
   const behind = $derived(flat.more.length + flat.pages.length + moreLists.length);
+  /* THE PERSON READING, by the name the record told them, for the top bar's face. */
+  const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim());
 
   /* WHERE THE READER IS, for the sheet's rows: the Overview is a place of its own, so Today is not marked on it too. */
   const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
@@ -506,7 +508,14 @@
     {:else}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          <TopBar entries={flat.main} {behind} onmore={() => (moreOpen = true)} />
+          <TopBar
+            entries={flat.main}
+            {behind}
+            record={data.index.name || personName}
+            person={personName}
+            onmore={() => (moreOpen = true)}
+            onfind={() => (palette.open = true)}
+          />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -562,7 +571,7 @@
     surface that reaches anything in the record. Below 900px the rule under it hides it, because the
     tab bar is the navigation there whatever the shape says.
   -->
-  {#if shape !== 'rail'}
+  {#if shape === 'menu'}
     <button type="button" class="launcher tap" onclick={() => (palette.open = true)} aria-label={copy.paletteLabel}>
       <Icon name="search" size="l" />
     </button>
@@ -836,9 +845,16 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  /* The strip floats 12 in from the window, as the rail does. */
+  /* The strip sits on the board, lined up with the work under it. */
   .bar-slot {
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: var(--page-max);
     min-inline-size: 0;
+    padding: var(--sp-4) 28px var(--sp-2);
+  }
+
+  .shell[data-shape='menu'] .bar-slot {
     padding: var(--inset) var(--inset) 0;
   }
 

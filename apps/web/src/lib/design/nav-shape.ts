@@ -27,7 +27,7 @@ export type NavShapeSignals = {
   sections: number;
   /** Whether this person has reordered the nav by hand (`Pref.nav` is non-empty). */
   handArranged: boolean;
-  /** The shape set today, or `undefined` for the rail default, which is `Pref.navShape`'s own reading. */
+  /** The shape set today, or `undefined` for the top bar default, which is `Pref.navShape`'s own reading. */
   current: NavShape | undefined;
   /**
    * The viewport width in CSS pixels, when it is known. Below 900px `19 §3` keeps the tab bar
@@ -58,7 +58,7 @@ const TOP_BAR_SLOTS = 4;
  */
 export function recommendNavShape(signals: NavShapeSignals): NavShapeRecommendation | null {
   const { entries, sections, handArranged, current, viewportWidth } = signals;
-  const effective: NavShape = current ?? 'rail';
+  const effective: NavShape = current ?? 'bar';
 
   if (viewportWidth !== undefined && viewportWidth < 900) return null;
 

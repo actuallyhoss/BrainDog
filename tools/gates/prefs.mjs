@@ -42,9 +42,9 @@
  * the sample, and the check was red on this file's case for it until the
  * case went too.
  *
- * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `navShape`,
+ * `Pref` holds fourteen: `scheme`, `text`, `density`, `theme`, `contrast`, `sidebar`, `shape`,
  * `chars`, `suggestPages`, `seen`, `columns`, `nav`, `defined`, `railShut`. Nine are covered
- * here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `navShape`, `suggestPages`, `nav` and
+ * here: `text`, `density`, `scheme`, `contrast`, `sidebar`, `shape`, `suggestPages`, `nav` and
  * `railShut`, which is everything a page LOAD can settle. `suggestPages` joined the type after this
  * file had spent a paragraph excusing itself from covering a field the type did not have; it is
  * covered now, on the load, because turning it off empties a list. `railShut` arrived later still
@@ -194,7 +194,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       route: '/',
       /* `undefined` is open, which is what a first visit should be. So the two values are "unset"
          and `false` rather than `true` and `false`. */
-      values: [{}, { sidebar: false }],
+      values: [{ shape: 'rail' }, { shape: 'rail', sidebar: false }],
       /* THE RENDERED WIDTH, not the link count. Folding hides the rail with CSS, so its anchors are
          still in the DOM and still queryable. A probe that counts them reports "no change" about a
          control that works, which is the same lie in the other direction. */
@@ -202,7 +202,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     },
     {
       /**
-       * `navShape`: which of the three shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
+       * `shape`: which of the three shapes `19 §3` offers is drawn, and it is drawn by the SHELL.
        *
        * THE ONE PREFERENCE WHERE A LAZY PROBE WOULD GO GREEN ON A BROKEN BUILD, and it would do it
        * the opposite way round from `sidebar` two cases up. `sidebar` leaves its anchors in the DOM,
@@ -215,15 +215,14 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
        * `0 1 0` the top bar, `0 0 1` the menu button, and a build that ignored the preference comes
        * back `1 0 0` three times, which is exactly what this gate is for.
        */
-      name: 'navShape',
+      name: 'shape',
       what: 'which navigation the shell draws (19 §3)',
       route: '/',
       /* 1440 BY 900, WHICH IS THIS GATE'S VIEWPORT AND IS WHY THIS CASE CAN BE MEASURED AT ALL. The
          tab bar stays below 900px whatever the shape says, so the same three values there are one
          answer three times, correctly. */
-      /* `undefined` IS THE RAIL, which `19 §3` keeps as the default in bold, so the first value is
-         "unset" rather than `'rail'`. */
-      values: [{}, { navShape: 'bar' }, { navShape: 'menu' }],
+      /* `undefined` IS THE TOP BAR, the default, so the first value is "unset" rather than `'bar'`. */
+      values: [{}, { shape: 'rail' }, { shape: 'menu' }],
       probe: () =>
         [
           document.querySelectorAll('nav.rail').length,
@@ -264,7 +263,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
          "at the end of its section, never inserted mid-list", and the menu is up / down / to top /
          hide. Three pages from three different sections would reorder three buckets of one, which
          changes nothing and would fail this gate for being a bad test rather than a bad build. */
-      values: [{}, { nav: ['/p/portage', '/p/kiln', '/p/marlow-co'] }],
+      values: [{ shape: 'rail' }, { shape: 'rail', nav: ['/p/portage', '/p/kiln', '/p/marlow-co'] }],
       probe: () => [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => a.getAttribute('href')).join(' '),
     },
     {
@@ -290,7 +289,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
          AND BECAUSE IT HOLDS MORE THAN ONE PAGE. This folded `Money`, which declares one page, and the
          rail now draws a section of one as a plain row with no fold to press, so the cookie carried
          the name and the page had nothing to shut. `Projects` is three things on the shipped seed. */
-      values: [{}, { railShut: ['Projects'] }],
+      values: [{ shape: 'rail' }, { shape: 'rail', railShut: ['Projects'] }],
       probe: () =>
         [...document.querySelectorAll('nav.rail .fold[aria-expanded="false"]')]
           .map((b) => (b.textContent ?? '').replace(/\s+/g, ' ').trim())
@@ -314,7 +313,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       record: true,
       what: "which navigation the shell draws when the record keeps the shape, over the cookie's copy (contracts §7.3)",
       route: '/',
-      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'bar' } }, { navShape: 'bar', '@record': { 'nav.shape': 'menu' } }],
+      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'rail' } }, { shape: 'rail', '@record': { 'nav.shape': 'menu' } }],
       probe: () =>
         [
           document.querySelectorAll('nav.rail').length,

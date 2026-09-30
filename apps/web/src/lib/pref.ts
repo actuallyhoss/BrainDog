@@ -76,8 +76,11 @@ export type Pref = {
    * record's, not the cookie's."* The record holds it as `nav.shape` (`setPref`, answered on `boot`'s `me.prefs`), and
    * `nav-prefs.svelte.ts` writes this copy from the record's word so the shell draws the right shape before `boot`
    * answers. It is never read as the truth once the record has spoken.
+   *
+   * IT WAS `navShape` UNTIL THE TOP BAR BECAME THE DEFAULT. Every boot wrote the rail into that key whether or not
+   * anybody chose it, so the old copy is left behind rather than read as a choice.
    */
-  navShape?: 'rail' | 'bar' | 'menu' | undefined;
+  shape?: 'rail' | 'bar' | 'menu' | undefined;
   /** Whether bare letters act inside a focused grid. */
   chars?: boolean | undefined;
   /**
@@ -186,7 +189,7 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   theme: (v) => typeof v === 'string',
   contrast: (v) => typeof v === 'boolean',
   sidebar: (v) => typeof v === 'boolean',
-  navShape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
+  shape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
   chars: (v) => typeof v === 'boolean',
   suggestPages: (v) => typeof v === 'boolean',
   seen: (v) => typeof v === 'string',

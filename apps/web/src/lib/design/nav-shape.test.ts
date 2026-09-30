@@ -22,7 +22,7 @@ test('nothing placed yet recommends the menu, and says why', () => {
 });
 
 test('THE FREELANCER, four entries, fits the top bar with nothing behind More', () => {
-  const rec = recommendNavShape({ ...base, entries: 4, sections: 1 });
+  const rec = recommendNavShape({ ...base, entries: 4, sections: 1, current: 'rail' });
   assert.equal(rec?.shape, 'bar');
   assert.match(rec!.reason, /4 nav entries/);
 });
