@@ -297,7 +297,10 @@
      same place as setting one. At every width the query builder follows, over the same address. -->
 {#if sheeted || fields.length}
   <Sheet bind:open={filterOpen} title={copy.filter}>
-    {#if rowsAsCards() && enums.length}
+    <!-- THE VALUES ARE DRAWN WHILE THE SHEET IS OPEN AND NOT BEFORE. A closed sheet held two dozen hidden
+         `.filter-value` buttons ahead of the Display sheet's in the document, so the first one anything found on the page
+         was one nobody could see. -->
+    {#if filterOpen && rowsAsCards() && enums.length}
     <div class="filter-groups">
       {#each enums as f}
         <fieldset class="filter-group">

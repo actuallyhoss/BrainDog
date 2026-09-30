@@ -24,17 +24,21 @@
 
   let links = $state<ShareRow[] | null>(null);
   let refused = $state<string | null>(null);
+  /* A HOST WITH NO SUCH READ has no links to list, which is not a refusal: `ROUTE_UNKNOWN` is a host older than the read,
+     as People reads it for `members`, and the section is left out rather than printing the client's sentence. */
+  let unrouted = $state(false);
   /** The link whose Close is out, so a second press on it closes it once. */
   let closing = $state<string | null>(null);
 
   async function load() {
     const at = opened();
     const out = await readLinks(apiBase());
-    closed(out.ok, at);
+    unrouted = !out.ok && out.code === 'ROUTE_UNKNOWN';
+    closed(out.ok || unrouted, at);
     if (out.ok) {
       links = out.value;
       refused = null;
-    } else refused = out.fix;
+    } else if (!unrouted) refused = out.fix;
   }
 
   $effect(() => {
@@ -72,6 +76,7 @@
   }
 </script>
 
+{#if !unrouted}
 <Section title={words.linksTitle} count={openCount}>
   <p class="links-lead">{words.linksLead}</p>
   {#if refused !== null}
@@ -102,6 +107,7 @@
     </ul>
   {/if}
 </Section>
+{/if}
 
 <style>
   .links-lead {

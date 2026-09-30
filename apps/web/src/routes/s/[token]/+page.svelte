@@ -57,7 +57,9 @@
     if ((route.params.token ?? '') !== asked) return closed(true, at);
     now = Date.now();
     got = out;
-    closed(out.from === 'live', at);
+    /* A LINK THAT DOES NOT OPEN IS AN ANSWER, not a failure: the record was asked and said no, and the screen draws that
+       as its designed empty state. Only a record nobody reached refuses the screen. */
+    closed(out.from !== 'unreached', at);
   }
 
   $effect(() => {

@@ -141,8 +141,10 @@
   async function ask(): Promise<void> {
     step = 'loading';
     const out = await checkName('');
+    /* A HOST THAT REFUSES THE QUESTION ANSWERED IT: one with no sign-up door (a self-host has none) has not opened
+       sign-up, which is the closed page and its way to sign in. Only a host nobody reached is "did not answer". */
     if (!out.ok) {
-      step = 'unreachable';
+      step = out.kind === 'refused' ? 'closed' : 'unreachable';
       return;
     }
     if (!out.value.open) {

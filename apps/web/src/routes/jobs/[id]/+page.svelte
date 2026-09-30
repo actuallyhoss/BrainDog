@@ -25,6 +25,7 @@
   A REFUSED SHELL IS NOT A RUN TO SHOW, and the record's sentence is the page, as it is on Home (`data.refused`).
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { TONES, since } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
@@ -91,7 +92,9 @@
     let timer: ReturnType<typeof setTimeout> | undefined;
     let seq = 0;
     let first = true;
-    const mark = opened();
+    /* UNTRACKED, because `opened()` reads the pending count it raises: tracked, every answer that lowered it ran this
+       effect again, and an id naming no run asked the record over and over until Svelte gave up on the loop. */
+    const mark = untrack(opened);
     events = [];
     answered = null;
     lost = false;

@@ -22,16 +22,31 @@
   let props: AreaProps = $props();
   const owner = $derived(ownsRecord(props.shell.me));
 
+  /* This area's own words. */
+  const words = { notHereYet: 'Not on this record yet' } as const;
+
   let client: ReturnType<typeof createClient> | null = null;
   const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
 
   /* THE RECORD'S WINDOW, READ FROM THE RECORD. It was a constant sentence here while the kernel held a constant; now the
      kernel holds a column, and every member reads it, so what this says is what the digest does. */
-  const held = read(() => `quiet:${apiBase()}`, () => clientOf().quietHours());
-  type Quiet = NonNullable<typeof held.value>;
+  type Quiet = Extract<Awaited<ReturnType<ReturnType<typeof createClient>['quietHours']>>, { ok: true }>['value'];
+  /* A RECORD THAT KEEPS NO QUIET HOURS HERE IS AN ANSWER, NOT A FAILURE: `NOT_IN_THIS_BUILD` says so in the record's own
+     sentence, which is drawn as a row the way Backups draws a host that keeps no copies, and the screen is not refused
+     for a setting this record does not have. */
+  const held = read<Quiet | { unserved: string }>(
+    () => `quiet:${apiBase()}`,
+    async () => {
+      const out = await clientOf().quietHours();
+      if (!out.ok && 'refusal' in out && out.refusal.code === 'NOT_IN_THIS_BUILD') return { ok: true as const, value: { unserved: out.refusal.fix } };
+      return out;
+    },
+  );
   /* THE LAST ANSWER A WRITE GAVE, over the read, so the sentence moves the moment the record says it moved. */
   let answered = $state<Quiet | null>(null);
-  const quiet = $derived(answered ?? held.value);
+  const kept = $derived(held.value !== null && 'unserved' in held.value ? null : held.value);
+  const unserved = $derived(held.value !== null && 'unserved' in held.value ? held.value.unserved : null);
+  const quiet = $derived(answered ?? kept);
   const hours = $derived(quiet?.window ?? null);
   const on = $derived(hours !== null && hours !== 'off');
   const from = $derived(hours !== null && hours !== 'off' ? hours.from : '');
@@ -87,6 +102,8 @@
 <Section title={copy.quietHours}>
   {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
     <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+  {:else if unserved !== null && answered === null}
+    <div role="status"><StateRow icon="moon" title={words.notHereYet} line={unserved} /></div>
   {:else if quiet !== null}
     {#if owner}
       <div class="quiet">

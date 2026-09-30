@@ -1175,7 +1175,9 @@
 
   <div class="page" bind:this={root}>
     {#if data.refused}
-      <p class="none">{data.refused.fix}</p>
+      <!-- A REFUSAL AS EVERY SCREEN DRAWS ONE, which is also what settles the screen: a bare sentence said nothing to the
+           readiness count, so an address naming no record never finished drawing. -->
+      <ReadState state="refused" refusal={data.refused.fix} />
     {:else if !answer}
       <ReadState state={work.state === 'ready' ? 'waiting' : work.state} refusal={work.refusal} onretry={() => void work.reread()} />
     {:else if shape}

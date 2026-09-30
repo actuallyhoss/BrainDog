@@ -178,6 +178,9 @@
     say: 'Say where it stands',
     said: (ago: string, who: string) => `said ${ago} by ${who}`,
     unsaid: 'Nobody has said where this stands yet.',
+    /* The two fields' names where the record does not declare them, so neither is ever a field with no name. */
+    body: 'Update',
+    health: 'Health',
   };
   let posting = $state(false);
   let writer: RowWriter | null = null;
@@ -291,13 +294,13 @@
            things: a renamed field renames them. -->
       <Tile icon="edit" title={trackWords.say} lead>
         <form class="composer" bind:this={form} onsubmit={post}>
-          <label class="field-label" for="update-body">{bodyField ? labelOf(bodyField) : ''}</label>
+          <label class="field-label" for="update-body">{bodyField ? labelOf(bodyField) : trackWords.body}</label>
           <textarea id="update-body" class="c-area" rows="3" dir="auto" bind:value={draft} {onkeydown}></textarea>
           <!-- THE HEALTH AS PILLS, NOT THE BROWSER'S MENU: the choices are few and
                declared, so every one is on screen and the chosen one is `[data-on]`, as every segmented control is. -->
           <div class="c-line">
             <div class="c-health">
-              <p class="field-label" id="update-health">{healthField ? labelOf(healthField) : ''}</p>
+              <p class="field-label" id="update-health">{healthField ? labelOf(healthField) : trackWords.health}</p>
               <div class="segmented" role="group" aria-labelledby="update-health">
                 {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
                   <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
