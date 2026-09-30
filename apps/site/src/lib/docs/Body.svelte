@@ -92,6 +92,15 @@
     line-height: var(--lh-site-body);
   }
 
+  /* A THUMB'S TARGET WITHOUT MOVING A LINE: 13px above and below takes a 19px link past 44, and the negative margin
+     gives it back, so the words sit where they did and the press lands on a 44px box. */
+  @media (pointer: coarse) {
+    .doc-text :global(a) {
+      padding-block: 13px;
+      margin-block: -13px;
+    }
+  }
+
   /* A part's heading at the group step; a heading a reader jumps to lands below the floating bar, not under it. */
   .doc-h {
     margin: 0;

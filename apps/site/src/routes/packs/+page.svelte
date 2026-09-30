@@ -369,7 +369,7 @@
   }
 
   /* THE TITLE'S LINK COVERS THE CARD, so a press anywhere on it opens the pack. */
-  .card-link::after {
+  .card-link::before {
     content: '';
     position: absolute;
     inset: 0;

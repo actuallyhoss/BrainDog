@@ -113,6 +113,17 @@
     text-decoration: none;
   }
 
+  /* A THUMB'S TARGET WITHOUT MOVING A LINE: 13px above and below takes a 19px link past 44, and the negative margin
+     gives it back, so the words sit where they did and the press lands on a 44px box. */
+  @media (pointer: coarse) {
+    .card-link {
+      display: inline-block;
+      min-inline-size: var(--tap);
+      padding-block: 13px;
+      margin-block: -13px;
+    }
+  }
+
   .card-link:hover {
     text-decoration: underline;
     text-underline-offset: 3px;

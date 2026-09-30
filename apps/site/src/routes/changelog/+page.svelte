@@ -511,6 +511,21 @@
     transition: opacity var(--d-state) var(--ease-out);
   }
 
+  /* THE LINK GLYPH IS 12PX AND THE PRESS IS NOT: a 44px square round it, drawn by nothing. */
+  .permalink {
+    position: relative;
+  }
+
+  .permalink::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: var(--tap);
+    block-size: var(--tap);
+    translate: -50% -50%;
+  }
+
   .entry:hover .permalink,
   .permalink:focus-visible {
     opacity: 1;
@@ -554,7 +569,7 @@
   }
 
   .month-sum {
-    min-block-size: var(--well);
+    min-block-size: max(var(--well), var(--tap));
   }
 
   .sum-side {
