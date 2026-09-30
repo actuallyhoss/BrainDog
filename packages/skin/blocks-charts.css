@@ -169,10 +169,15 @@
     list-style: none;
   }
 
+  /* AN ITEM NEVER OUTGROWS THE LEGEND: a long name with its figure and share wraps inside its own row on a phone rather
+     than standing past the block. */
   .split-item {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-2);
+    min-inline-size: 0;
+    max-inline-size: 100%;
     font-size: var(--t-sm);
   }
 
@@ -187,7 +192,9 @@
 
 
   .split-label {
+    min-inline-size: 0;
     color: var(--ink2);
+    overflow-wrap: anywhere;
   }
 
   /* A PART THAT OPENS ITS ROWS IS STILL A LEGEND, not a sentence's link: "Not said yet" on Projects drew in the accent,
@@ -1675,7 +1682,8 @@
     rx: 3px;
   }
 
-  .roadmap-bar[data-intent] {
+  /* A TONED MARK IS A GROUP carrying the intent, so its window and its line take the tone from it. */
+  .roadmap-mark > .roadmap-bar {
     fill: var(--tone-fill);
     stroke: var(--tone);
   }
@@ -1686,8 +1694,16 @@
     stroke-width: 1.5px;
   }
 
-  .roadmap-stem[data-intent] {
+  .roadmap-mark > .roadmap-stem {
     stroke: var(--tone);
+  }
+
+  /* AND ITS GLYPH, a dot on the due day in the tone, as every intent on a row is drawn (`.glyph` in `blocks.css`). */
+  .roadmap-due {
+    fill: none;
+    stroke: var(--tone);
+    stroke-width: var(--dot);
+    stroke-linecap: round;
   }
 
   /* NOW IS THE ONE LIVE LINE ON A CHART. */

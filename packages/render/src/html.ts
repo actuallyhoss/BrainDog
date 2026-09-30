@@ -44,7 +44,7 @@ import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRange
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
-import { ROADMAP_DUE, ROADMAP_FROM, ROADMAP_NONE, ROADMAP_PAINT, ROADMAP_WHAT, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
+import { ROADMAP_DUE, ROADMAP_FROM, ROADMAP_NONE, ROADMAP_PAINT, ROADMAP_WHAT, roadmapDue, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatOutside, heatPlan, heatSkipped, heatTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
@@ -1231,8 +1231,13 @@ function roadmap(b: Block, o: RenderOptions): string {
     Object.entries(p)
       .map(([k, v]) => ` ${k}="${v}"`)
       .join('');
-  const line = (cls: string, x: string, tone: string, painted: string): string =>
-    `<path class="${cls}"${tone} d="M${x} 0V100"${painted} vector-effect="non-scaling-stroke"></path>`;
+  const line = (cls: string, x: string, painted: string): string =>
+    `<path class="${cls}" d="M${x} 0V100"${painted} vector-effect="non-scaling-stroke"></path>`;
+  /* A TONED MARK IS A GROUP: the intent on the group, and the drawing and its named dot inside it (`roadmapDue`). */
+  const toned = (tone: string | undefined, drawn: string, due: string): string => {
+    if (!tone || !Object.hasOwn(TONES, tone)) return drawn;
+    return `<g class="roadmap-mark"${toneAttrs(tone)}>${drawn}<path class="roadmap-due" role="img" aria-label="${TONES[tone as keyof typeof TONES].label}" d="${due}"${paint(ROADMAP_PAINT.due)} vector-effect="non-scaling-stroke"></path></g>`;
+  };
   const chart = `<svg class="roadmap-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(roadmapSentence(plan))}">${plan.bands
     .map(
       (m) =>
@@ -1241,10 +1246,11 @@ function roadmap(b: Block, o: RenderOptions): string {
     .join('')}${plan.bars
     .map((bar) => {
       const lane = roadmapLane(bar.track, plan.tracks);
-      return `<rect class="roadmap-bar"${toneAttrs(bar.tone)}${paint(ROADMAP_PAINT.bar)} x="${bar.x}" y="${lane.y}" width="${bar.width}" height="${lane.height}" vector-effect="non-scaling-stroke"></rect>`;
+      const drawn = `<rect class="roadmap-bar"${paint(ROADMAP_PAINT.bar)} x="${bar.x}" y="${lane.y}" width="${bar.width}" height="${lane.height}" vector-effect="non-scaling-stroke"></rect>`;
+      return toned(bar.tone, drawn, roadmapDue(bar.x, bar.width, lane));
     })
-    .join('')}${plan.stems.map((s) => line('roadmap-stem', s.x, toneAttrs(s.tone), paint(ROADMAP_PAINT.stem))).join('')}${
-    plan.today === null ? '' : line('roadmap-today', plan.today, '', paint(ROADMAP_PAINT.today))
+    .join('')}${plan.stems.map((s) => toned(s.tone, line('roadmap-stem', s.x, paint(ROADMAP_PAINT.stem)), roadmapDue(s.x, null, null))).join('')}${
+    plan.today === null ? '' : line('roadmap-today', plan.today, paint(ROADMAP_PAINT.today))
   }</svg>`;
   /* `--at` IS A SHARE OF THE WIDTH, as `blocks-charts.css` reads it for every chart's ticks (`calc(var(--at) * 100%)`),
      and the plan answers in the box's thousand units, so a label is put where its mark is only after dividing. */

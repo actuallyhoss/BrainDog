@@ -27,6 +27,7 @@
     ROADMAP_NONE,
     ROADMAP_PAINT,
     ROADMAP_WHAT,
+    roadmapDue,
     roadmapLane,
     roadmapLines,
     roadmapPlan,
@@ -146,34 +147,53 @@
         {/each}
         {#each plan.bars as bar}
           {@const lane = roadmapLane(bar.track, plan.tracks)}
-          {#if onreschedule}
-            {@const at = barAt(bar)}
-            <rect
-              class="roadmap-bar"
-              data-intent={bar.tone}
-              data-grip=""
-              data-dragging={drag?.row === bar.row ? '' : undefined}
-              {...ROADMAP_PAINT.bar}
-              x={at.x}
-              y={lane.y}
-              width={at.width}
-              height={lane.height}
-              vector-effect="non-scaling-stroke"
-              cursor={cursorOf(bar.row)}
-              style={GRIP}
-              onpointerdown={(e) => grab(e, bar.row, false)}
-              onpointermove={(e) => slide(e, bar.row, false)}
-              onpointerup={letGo}
-              onpointercancel={() => (drag = null)}
-              onpointerleave={() => (hover = null)}
-            ></rect>
+          {@const g = glyph(bar.tone)}
+          {@const drawn = onreschedule ? barAt(bar) : bar}
+          {#snippet span()}
+            {#if onreschedule}
+              <rect
+                class="roadmap-bar"
+                data-grip=""
+                data-dragging={drag?.row === bar.row ? '' : undefined}
+                {...ROADMAP_PAINT.bar}
+                x={drawn.x}
+                y={lane.y}
+                width={drawn.width}
+                height={lane.height}
+                vector-effect="non-scaling-stroke"
+                cursor={cursorOf(bar.row)}
+                style={GRIP}
+                onpointerdown={(e) => grab(e, bar.row, false)}
+                onpointermove={(e) => slide(e, bar.row, false)}
+                onpointerup={letGo}
+                onpointercancel={() => (drag = null)}
+                onpointerleave={() => (hover = null)}
+              ></rect>
+            {:else}
+              <rect class="roadmap-bar" {...ROADMAP_PAINT.bar} x={bar.x} y={lane.y} width={bar.width} height={lane.height} vector-effect="non-scaling-stroke"></rect>
+            {/if}
+          {/snippet}
+          <!-- A TONED MARK IS A GROUP: the intent on the group, and the window and its named dot inside it (`roadmapDue`). -->
+          {#if g}
+            <g class="roadmap-mark" data-intent={bar.tone}>
+              {@render span()}
+              <path class="roadmap-due" role="img" aria-label={g.label} d={roadmapDue(drawn.x, drawn.width, lane)} {...ROADMAP_PAINT.due} vector-effect="non-scaling-stroke"></path>
+            </g>
           {:else}
-            <rect class="roadmap-bar" data-intent={bar.tone} {...ROADMAP_PAINT.bar} x={bar.x} y={lane.y} width={bar.width} height={lane.height} vector-effect="non-scaling-stroke"></rect>
+            {@render span()}
           {/if}
         {/each}
         {#each plan.stems as s}
           {@const x = stemAt(s)}
-          <path class="roadmap-stem" data-intent={s.tone} {...ROADMAP_PAINT.stem} d="M{x} 0V100" vector-effect="non-scaling-stroke"></path>
+          {@const g = glyph(s.tone)}
+          {#if g}
+            <g class="roadmap-mark" data-intent={s.tone}>
+              <path class="roadmap-stem" {...ROADMAP_PAINT.stem} d="M{x} 0V100" vector-effect="non-scaling-stroke"></path>
+              <path class="roadmap-due" role="img" aria-label={g.label} d={roadmapDue(x, null, null)} {...ROADMAP_PAINT.due} vector-effect="non-scaling-stroke"></path>
+            </g>
+          {:else}
+            <path class="roadmap-stem" {...ROADMAP_PAINT.stem} d="M{x} 0V100" vector-effect="non-scaling-stroke"></path>
+          {/if}
           {#if onreschedule}
             <!-- A STEM IS A HAIRLINE, which no finger lands on and few pointers do, so it is taken by a stroke twelve
                  pixels wide over the same line, painted nothing and hit on its stroke alone. No role, because it is

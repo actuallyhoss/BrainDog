@@ -409,6 +409,20 @@ export function roadmapLane(track: number, tracks: number): { y: string; height:
 }
 
 /**
+ * Where a toned mark says its tone: one dot on its due day, which is where a window ends and where a date's line
+ * stands, halfway down a window's lane and at the top of a date's line.
+ *
+ * THE MARK'S COLOUR IS NEVER ITS ONLY WORD (13 §5.1). A window or a line drawn in the danger fill is a picture of a
+ * tone, so the tone's glyph is drawn with it, named as every glyph is. A zero-length path with a round cap and a
+ * stroke that does not scale is a round dot in a box that stretches, where a circle would come out an ellipse.
+ */
+export function roadmapDue(x: string, width: string | null, lane: { y: string; height: string } | null): string {
+  const end = Number(x) + (width === null ? 0 : Number(width));
+  const y = lane === null ? 0 : Number(lane.y) + Number(lane.height) / 2;
+  return `M${at(end)} ${at(y)}h0`;
+}
+
+/**
  * How each mark is painted when the page has no rule for it: `currentColor` at a low opacity, or `none`.
  *
  * NO STYLESHEET DREW THIS KIND AT FIRST, and an SVG shape nobody paints is filled black: the box came out one
@@ -426,6 +440,7 @@ export const ROADMAP_PAINT = {
   bar: { fill: 'currentColor', 'fill-opacity': '0.25' },
   stem: { fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.6' },
   today: { fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+  due: { fill: 'none', stroke: 'currentColor', 'stroke-width': '6', 'stroke-linecap': 'round' },
 } as const satisfies Record<string, Readonly<Record<string, string>>>;
 
 /** One placed row as the table under the drawing says it: its first day, or `—` on a date, and its due day. */
