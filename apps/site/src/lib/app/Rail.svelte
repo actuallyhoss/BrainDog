@@ -8,8 +8,8 @@
   off the record's own Agents page, and at the foot whatever the host puts there.
 
   GLASS, AND IT HOLDS ONLY CHROME. The chosen place has an ink well with the glyph in the on-ink colour and its row in
-  the tile fill. Decide's count is the square badge, drawn in ink here rather than red: on the site, red is the mark's
-  and nothing else's (the design system), and the app draws it red.
+  the tile fill. Decide's count is the square badge in the house red, as the app draws it: a question waiting on you
+  is what the accent is for.
 
   EACH PLACE IS A BUTTON THAT OPENS ITS PAGE in the drawn app's page area, and the place on show carries
   `aria-current`. Focus stays on the row pressed, which is still there. The ask field and the agents' rows are drawn,
@@ -266,8 +266,8 @@
     block-size: 20px;
     padding-inline: 5px;
     border-radius: var(--r-sm);
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
     font-size: var(--t-sm);
     font-weight: 600;
   }

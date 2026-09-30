@@ -85,6 +85,7 @@ const SET = {
   key: '<circle cx="8" cy="15.5" r="4.25"/><path d="M11.1 12.6 19.5 4.25M16.25 7.5l2.5 2.5M14 9.75l1.75 1.75"/>',
   lock: '<rect x="4.75" y="10.25" width="14.5" height="10" rx="3"/><path d="M8 10.25V7.5a4 4 0 0 1 8 0v2.75"/>',
   shield: '<path d="M12 3.25 19.25 6v5.5c0 4.4-3 7.9-7.25 9.25C7.75 19.4 4.75 15.9 4.75 11.5V6z"/><path d="M9 12l2.25 2.25L15.25 10"/>',
+  copy: '<rect x="8.75" y="8.75" width="11.5" height="11.5" rx="2.5"/><path d="M15.25 8.75V6.25a2.5 2.5 0 0 0-2.5-2.5h-6.5a2.5 2.5 0 0 0-2.5 2.5v6.5a2.5 2.5 0 0 0 2.5 2.5h2.5"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66L11.5 6.84"/><path d="M14 10a4 4 0 0 0-5.66 0l-2.83 2.83a4 4 0 0 0 5.66 5.66l1.33-1.33"/>',
   box: '<path d="M12 3.25 20.25 7.5v9L12 20.75 3.75 16.5v-9z"/><path d="M3.75 7.5 12 11.75l8.25-4.25M12 11.75v9"/>',
   code: '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14"/>',
@@ -137,6 +138,6 @@ export const isIconName = (name: string): name is IconName => Object.hasOwn(GLYP
 /**
  * The three hues a mark may take, each a TEXT role so it reads against the surface it sits on in
  * both schemes. `--brand` is not one of them: it paints the logo and nothing else. `--danger` is
- * not one either, because on the site red is the mark's alone (the design system).
+ * not one either, because on the site red is the accent, kept for what waits on you.
  */
 export type Hue = 'info' | 'earn' | 'warn';

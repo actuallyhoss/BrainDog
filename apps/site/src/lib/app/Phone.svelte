@@ -280,7 +280,7 @@
     position: relative;
   }
 
-  /* THE SQUARE COUNT, in ink on the site, where red is the mark's alone. */
+  /* THE SQUARE COUNT, in the house red, as the rail's is: a question waiting on you is what the accent is for. */
   .badge {
     position: absolute;
     inset-block-start: -6px;
@@ -288,8 +288,8 @@
     min-inline-size: 16px;
     padding: 0 4px;
     border-radius: var(--r-sm);
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--accent);
+    color: var(--accent-ink);
     font-size: var(--t-xs);
     font-weight: 600;
     line-height: 16px;

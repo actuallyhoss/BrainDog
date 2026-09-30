@@ -1,10 +1,11 @@
 /**
  * The site's own half of the stylesheet. Everything else is `@braindog/skin`.
  *
- * THE LOOK IS THE DESIGN SYSTEM'S SITE: the app's system with fewer screens. The page is the ground (`--sunk`)
- * with its one soft light from the top (`--ground-light`); the header is a glass bar floating 12 in; every band is
- * Bento tiles on that ground, and the tiles carry drawings of the product at work; the footer is one tile. Content is
- * opaque and chrome is glass, and glass never holds content. Red is the mark's and nothing else's here.
+ * THE LOOK IS "WINDOW FOR EVERYONE" (30 September): the product itself at full size, in glass, on a ground with two
+ * soft lights, a rose one from the mark's side and a cool one opposite. The header is a glass bar floating 12 in; a
+ * band is words on the ground beside one glass frame holding the product at work; the footer is one tile. Content is
+ * opaque and chrome is glass. The house red is the accent: the mark, a count waiting on you, a chosen agent and a
+ * figure that needs looking at. It is never the colour of a paragraph or of the one filled button, which stays ink.
  *
  * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column, the band, the tile
  * grid and its spans, the tile and its heading row, the icon well, the heading sizes, the reading text, the buttons
@@ -42,7 +43,10 @@
   /* THE GROUND AND ITS LIGHT, painted once on the document, so every band and every tile sits on the same field. */
   html {
     background-color: var(--sunk);
-    background-image: var(--ground-light);
+    background-image:
+      radial-gradient(720px 560px at 4% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 72%),
+      radial-gradient(760px 620px at 100% 14%, color-mix(in srgb, var(--info-fill) 11%, transparent), transparent 72%),
+      var(--ground-light);
     background-repeat: no-repeat;
     scroll-behavior: smooth;
   }
@@ -66,13 +70,12 @@
     --t-xs: var(--t-site-small);
     --t-sm: var(--t-site-small);
     /**
-     * RED IS THE MARK'S ALONE ON THE SITE (the design system). The drawings are the product's own renderer, which paints a
-     * late bill or a budget run over in `--danger`; here that state takes the amber the product uses for a soft
-     * warning, which is still a hue that means "look", and the words beside it still say what is wrong. The mark
-     * paints in `--brand` and keeps its red.
+     * A STATE THAT NEEDS LOOKING AT TAKES THE ACCENT. The drawings are the product's own renderer, which paints a late
+     * bill or a budget run over in `--danger`; on the site that is the house red the accent already is, so the page
+     * carries one red and not two, and the words beside it still say what is wrong.
      */
-    --danger: var(--warn);
-    --danger-fill: var(--warn-fill);
+    --danger: var(--accent-text);
+    --danger-fill: var(--accent);
   }
 
   /**
@@ -85,7 +88,8 @@
     --t-sm: var(--t-app-sm);
   }
 
-  /* HEADINGS IN GEIST, as every word is (the design system). The skin's base still names the display face for the app. */
+  /* A HEADING OF A BAND IS SET IN THE DISPLAY FACE, the wordmark's own, and every other word is Geist. The display face
+     is loaded at one weight and never set under 20px (`bundle`'s budget line), so only `.display` and `.h2` name it. */
   h1,
   h2,
   h3,
@@ -280,7 +284,7 @@
   .display {
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-ui);
+    font-family: var(--font-display);
     font-size: var(--t-site-hero);
     font-weight: 600;
     line-height: var(--lh-site-hero);
@@ -292,7 +296,7 @@
   .h2 {
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-ui);
+    font-family: var(--font-display);
     font-size: var(--t-lead);
     font-weight: 600;
     line-height: 1.176;
@@ -475,6 +479,54 @@
     background: var(--glass);
     box-shadow: var(--glass-edge), var(--e2);
     backdrop-filter: var(--glass-blur);
+  }
+
+  /* ── The band of E: words on the ground beside the product in one glass frame ── */
+
+  /* TWO COLUMNS AT A DESK, the words 400 wide and the frame the rest; `.flip` puts the frame first. Below 900 the words
+     come first and the frame under them, whichever side it took. */
+  .feature {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-6) var(--sp-8);
+  }
+
+  @media (width >= 900px) {
+    .feature {
+      grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+    }
+
+    .feature.flip {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+    }
+
+    .feature.flip > .words {
+      order: 2;
+    }
+  }
+
+  .words {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  /* THE FRAME: the glass the product sits in, one inset of it round the product's own opaque tiles. */
+  .frame {
+    min-inline-size: 0;
+    padding: var(--inset);
+    border-radius: calc(var(--r-lg) + var(--inset));
+    background: var(--glass);
+    box-shadow: var(--glass-edge), var(--e2);
+    backdrop-filter: var(--glass-blur);
+  }
+
+  /* A band of E sits further from the next than a row of tiles does: each is one idea with room round it. */
+  .band.spaced + .band.spaced {
+    margin-block-start: clamp(72px, 6vw + 24px, 128px);
   }
 
   /* Read by a screen reader and not drawn. */
