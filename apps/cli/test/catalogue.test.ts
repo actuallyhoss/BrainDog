@@ -375,7 +375,7 @@ test('pack install <id> with no --from resolves the id in the catalogue the host
   assert.equal(await pack(['install', 'project-brief', '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0, 'a dry run asked');
   assert.match(h.out.join('\n'), /Unsigned: nothing says who published it/u);
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.0 from a catalogue\?.* Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 1\.2\.1 from a catalogue\?.* Nothing was sent\.$/u);
 
   assert.equal(await pack(['install', 'project-brief'], h.io), 0, h.said.join('\n'));
   const asked = h.seen.filter((s) => s.method === 'propose');
