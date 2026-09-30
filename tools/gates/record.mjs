@@ -209,8 +209,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   };
 }
 
-/** The paths a gate's server hands to the record: the record's, sign-in's and the account's. Everything else is the build's. */
-export const forwards = (pathname) => /^\/+(?:api|auth|account)(?:\/|$)/.test(pathname);
+/** The paths a gate's server hands to the record: the record's, sign-in's, and the Cloud's billing door, which `forward`
+    answers itself for the cloud variant. Everything else is the build's. */
+export const forwards = (pathname) => /^\/+(?:api|auth|account\/billing)(?:\/|$)/.test(pathname);
 
 /**
  * The server key of a record this module started, for the one gate that has to sign in as a person rather than
