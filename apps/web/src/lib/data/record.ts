@@ -118,7 +118,7 @@ function said<T>(r: { ok: true; value: T } | { ok: false; refusal: Refusal } | {
  */
 function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
   const declared = new Map<string, RegisterDecl>();
-  const maps = new Map<string, RefMap>();
+  const maps = new Map<string, Promise<Said<RefMap>>>();
   const asked = new Map<string, Promise<void>>();
   /* ONE `schema` PER LIST FOR THE LIFE OF THIS SOURCE, whichever of the screen and the ref walk asks first. */
   const answers = new Map<string, ReturnType<typeof client.schema>>();
@@ -128,10 +128,21 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     return out;
   };
 
-  /** One register's rows by ULID, walked to the end of its cursor. Kept once whole. */
-  async function refMap(register: string): Promise<Said<RefMap>> {
-    const kept = maps.get(register);
-    if (kept) return { ok: true, value: kept };
+  /** One register's rows by ULID, walked to the end of its cursor. Kept once whole.
+      THE WALK ITSELF IS KEPT, NOT ONLY ITS ANSWER: every cell of a list asks for the same map while the first walk is
+      still out, and each used to start its own. A refusal is dropped so the next ask tries again. */
+  function refMap(register: string): Promise<Said<RefMap>> {
+    let kept = maps.get(register);
+    if (!kept) {
+      maps.set(register, (kept = walk(register)));
+      void kept.then((out) => {
+        if (!out.ok) maps.delete(register);
+      });
+    }
+    return kept;
+  }
+
+  async function walk(register: string): Promise<Said<RefMap>> {
     /* A LIST THIS BUILD DOES NOT SHIP IS DECLARED FIRST, or `refMapOf` finds no title to name its rows by and every ref
        into it is drawn as `club_books#2`. */
     await learn(schemaOf, register, asked);
@@ -145,9 +156,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
       rows.push(...(out.value.rows as RecordRow[]));
       cursor = out.value.cursor;
     } while (cursor !== null);
-    const map = refMapOf(register, rows);
-    maps.set(register, map);
-    return { ok: true, value: map };
+    return { ok: true, value: refMapOf(register, rows) };
   }
 
   async function refsFor(register: string): Promise<Said<Map<string, RefMap>>> {
