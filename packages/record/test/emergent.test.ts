@@ -166,7 +166,7 @@ test('A DISMISSAL IS NEVER ANSWERED AGAIN, pen.suggest off offers nothing, and a
 test('SETPREF TAKES THE FIVE KEYS IN THEIR SHAPES, refuses a wrong one by key, and lets the oldest dismissal go first', async () => {
   const { api, sql } = await small();
   assert.equal(code(await api.setPref({ key: 'nav.shape', value: 'bar' }, owner)), 'ok');
-  assert.equal(code(await api.setPref({ key: 'nav.shape', value: 'side' }, owner)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.shape', value: 'left' }, owner)), 'VALUE_MALFORMED');
   assert.equal(code(await api.setPref({ key: 'nav.shape', value: ['rail'] }, owner)), 'VALUE_MALFORMED');
   assert.equal(code(await api.setPref({ key: 'pen.suggest', value: 'yes' }, owner)), 'VALUE_MALFORMED');
   assert.equal(code(await api.setPref({ key: 'pen.dismissed', value: 'page:parts' }, owner)), 'VALUE_MALFORMED');

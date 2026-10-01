@@ -313,7 +313,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       record: true,
       what: "which navigation the shell draws when the record keeps the shape, over the cookie's copy (contracts §7.3)",
       route: '/',
-      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'rail' } }, { shape: 'rail', '@record': { 'nav.shape': 'menu' } }],
+      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'side' } }, { shape: 'rail', '@record': { 'nav.shape': 'menu' } }],
       probe: () =>
         [
           document.querySelectorAll('nav.rail').length,

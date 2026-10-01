@@ -748,14 +748,14 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed'] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
- * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail, a
- * bar across the top or one menu; `pen.dismissed` is the ids of what the pen offered and the person turned down
+ * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
+ * bar across the top or one menu, and `rail` is the side rail as builds before the top bar led wrote it, unasked; `pen.dismissed` is the ids of what the pen offered and the person turned down
  * (`PenItem.id`, and the navigation shape's `shape:<shape>:<reason>`), newest last. `pen.suggest` absent is on.
  */
 export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
-  'nav.shape'?: 'rail' | 'bar' | 'menu';
+  'nav.shape'?: 'side' | 'rail' | 'bar' | 'menu';
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
 };
@@ -5581,9 +5581,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return no('VALUE_MALFORMED', `${key} is a list of at most 500 addresses, each starting with /, or null to take it away.`, { at: 'value' });
         kept = [...new Set(value)];
       } else if (value !== null && key === 'nav.shape') {
-        if (value !== 'rail' && value !== 'bar' && value !== 'menu')
-          return no('VALUE_MALFORMED', 'nav.shape is rail, bar or menu, or null to take it away.', { at: 'value', allowed: ['rail', 'bar', 'menu'] });
-        kept = value as 'rail' | 'bar' | 'menu';
+        if (value !== 'side' && value !== 'rail' && value !== 'bar' && value !== 'menu')
+          return no('VALUE_MALFORMED', 'nav.shape is side, bar or menu, or null to take it away.', { at: 'value', allowed: ['side', 'bar', 'menu'] });
+        kept = value as 'side' | 'rail' | 'bar' | 'menu';
       } else if (value !== null && key === 'pen.suggest') {
         if (typeof value !== 'boolean') return no('VALUE_MALFORMED', 'pen.suggest is true or false, or null to take it away.', { at: 'value' });
         kept = value;

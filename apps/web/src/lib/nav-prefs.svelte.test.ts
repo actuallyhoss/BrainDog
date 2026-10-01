@@ -104,3 +104,13 @@ test('TWO QUICK MOVES ARRIVE IN THE ORDER THEY WERE MADE', async () => {
   assert.deepEqual(sent, [['/p/a', '/p/b'], ['/p/b', '/p/a']]);
   assert.deepEqual(prefs.order, ['/p/b', '/p/a']);
 });
+
+test("THE RECORD'S `rail` IS NOBODY'S CHOICE, and a rail chosen now is kept as `side`", () => {
+  const old = new NavPrefs({ order: [], hidden: [] });
+  old.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+  assert.equal(old.shape, 'bar');
+
+  const chosen = new NavPrefs({ order: [], hidden: [] });
+  chosen.adopt({ 'nav.shape': 'side' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+  assert.equal(chosen.shape, 'rail');
+});

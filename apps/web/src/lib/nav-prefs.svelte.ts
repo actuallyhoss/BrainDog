@@ -37,7 +37,7 @@ export type NavShape = 'rail' | 'bar' | 'menu';
 export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
-  'nav.shape'?: NavShape;
+  'nav.shape'?: NavShape | 'side';
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
 };
@@ -46,7 +46,12 @@ export type Prefs = {
 export type Saved = { from: 'kept' } | { from: 'device' } | { from: 'refused'; fix: string };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-const isShape = (v: unknown): v is NavShape => v === 'rail' || v === 'bar' || v === 'menu';
+/**
+ * THE RECORD'S WORD FOR THE SIDE RAIL IS `side`, AND ITS `rail` IS NOBODY'S CHOICE. Builds before the top bar led copied
+ * the device's shape to the record on first load, so a record holds `rail` whether or not anybody picked it. A rail
+ * chosen now is kept as `side`, and a `rail` read back is read as no choice at all.
+ */
+const shapeKept = (v: unknown): NavShape | undefined => (v === 'side' ? 'rail' : v === 'bar' || v === 'menu' ? v : undefined);
 
 function readList(key: string): string[] {
   try {
@@ -168,8 +173,7 @@ export class NavPrefs {
     keepList(HIDDEN, this.hidden);
 
     const held = pref.read();
-    const shape = prefs['nav.shape'];
-    this.shape = isShape(shape) ? shape : (held.shape ?? 'bar');
+    this.shape = shapeKept(prefs['nav.shape']) ?? held.shape ?? 'bar';
     const suggest = prefs['pen.suggest'];
     this.suggest = typeof suggest === 'boolean' ? suggest : (held.suggestPages ?? true);
     pref.write({ shape: this.shape, suggestPages: this.suggest });
@@ -217,7 +221,7 @@ export class NavPrefs {
     const before = this.shape;
     this.shape = next;
     pref.write({ shape: next });
-    return this.#commit('nav.shape', next, () => {
+    return this.#commit('nav.shape', next === 'rail' ? 'side' : next, () => {
       this.shape = before;
       pref.write({ shape: before });
     });
