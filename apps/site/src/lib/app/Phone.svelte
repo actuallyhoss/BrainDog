@@ -312,11 +312,28 @@
       display: contents;
     }
 
-    /* THE TITLE ROW (the design system): the title at 28, the toolbar at the right, and the sentence under it. */
+    /* THE TITLE ROW: the page's name as a label with the toolbar at the right, and the sentence under it as the
+       headline, as the app draws a page on a wide screen. */
     .head {
       grid-area: head;
       gap: 2px;
-      padding: var(--sp-4) 28px var(--sp-3) 20px;
+      padding: var(--sp-3) var(--sp-5) var(--sp-3);
+    }
+
+    .head:has(.sentence) .title {
+      color: var(--ink2);
+      font-size: var(--t-base);
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .sentence {
+      max-inline-size: 30em;
+      color: var(--ink);
+      font-size: var(--t-title);
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
     }
 
     .title-row {
@@ -336,7 +353,7 @@
     .body {
       grid-area: body;
       overflow: auto;
-      padding: var(--sp-1) 28px 20px 20px;
+      padding: var(--sp-1) var(--sp-5) 20px;
       mask-image: none;
     }
 

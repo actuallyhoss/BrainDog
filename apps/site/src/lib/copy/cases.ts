@@ -26,7 +26,6 @@ export const cases = {
     morePages: 'More pages',
     /* THE RAIL'S ASK FIELD AND ITS AGENTS, in the new app's words (the design system). Both are drawn, not pressed. */
     ask: 'Ask, add or find',
-    working: 'Working now',
     toDecide: (n: number) => `${n} to decide`,
     /* THE ANSWERS ON DECIDE, as `apps/web`'s Decide screen says them. Nothing is sent anywhere: the
        answer changes this drawing and nothing else. `chose` is for a question whose options are

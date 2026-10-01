@@ -4,13 +4,13 @@
 
   WHAT IT IS. On 22 September the owner asked for the screenshots to go and for the records in this window to open
   different pages, and on 26 September kept it while the bands under it were rebuilt. On 29 September the app's look
-  changed, and the drawing changed with it: the ground and its light, the floating glass
-  rail with its icon wells and Working now, the title row with its sentence and its toolbar, and the page's blocks as
-  tiles with their charts. Every page is dialect text in `lib/examples/`, drawn by `Page.svelte` through
+  changed, and the drawing changed with it, and again when the app took its top bar: the flat board, the bar across the
+  top with the record's name, its places and search, the page's sentence as the headline, and the page's blocks as
+  white tiles with their charts. Every page is dialect text in `lib/examples/`, drawn by `Page.svelte` through
   `braindog-render/svelte`, so what a reader sees is what a record with those rows draws, and the Source switch in the
   toolbar shows the text it was drawn from.
 
-  900PX AND WIDER IT IS A WINDOW: the cases as a glass segmented control over it, the rail (`Rail.svelte`), and the
+  900PX AND WIDER IT IS A WINDOW: the cases as a glass segmented control over it, the top bar (`Rail.svelte`), and the
   page area. BELOW 900PX IT IS A PHONE (`Phone.svelte`): the cases as glass chips above it, and the phone round the
   page. One tree serves both, laid out twice by the stylesheet, so a case chosen on one is the case chosen on the other.
 
@@ -40,7 +40,7 @@
   import Page from './Page.svelte';
   import Phone from './Phone.svelte';
   import Rail from './Rail.svelte';
-  import { leadOf, questionsIn, workingIn } from './page.ts';
+  import { leadOf, questionsIn } from './page.ts';
 
   const w = cases.drawn;
 
@@ -65,8 +65,6 @@
 
   /* What each case's Decide asks, read once from its page, so the rail and the bar can count it. */
   const ASKED: readonly (readonly string[])[] = EXAMPLES.map((c) => questionsIn(c.pages.find((p) => p.id === 'decide')?.src ?? ''));
-  /* Who is at work on each case's record, read once from its Agents page, for the rail's Working now. */
-  const WORKING = EXAMPLES.map((c) => workingIn(c.pages.find((p) => p.id === 'agents')?.src ?? ''));
 
   const pageOf = (c: Example): ExamplePage | undefined => c.pages.find((p) => p.id === shown[c.id]) ?? c.pages[0];
 
@@ -204,7 +202,6 @@
                 pages={c.pages}
                 current={page?.id ?? ''}
                 open={asking}
-                working={WORKING[i] ?? []}
                 pick={(id) => void open(i, id, 'nav')}
               />
             </div>
@@ -389,15 +386,13 @@
     display: none;
   }
 
-  /* The toolbar's Page and Source switch: glass, the chosen half a tile-white pill (the design system). */
+  /* The toolbar's Page and Source switch: a white pill, the chosen half ink, as the app draws its own. */
   .switch {
     display: inline-flex;
     gap: 2px;
     padding: 3px;
     border-radius: var(--r-pill);
-    background: var(--glass);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
+    background: var(--bg);
   }
 
   .seg {
@@ -414,9 +409,8 @@
   }
 
   .seg[aria-pressed='true'] {
-    background: var(--bg);
-    color: var(--ink);
-    box-shadow: var(--e1);
+    background: var(--ink);
+    color: var(--on-ink);
   }
 
   /* A quiet link to the page written for this kind of person: ink, underlined at 40%, never a hue. */
@@ -517,18 +511,17 @@
       font-weight: 600;
     }
 
-    /* THE SCREEN: the app's own ground and its light, floating over the site's at the top of the ladder, and held by
+    /* THE SCREEN: the app's own flat board, floating over the site's ground at the top of the ladder, and held by
        the glass hairline pair, since the two grounds are one colour. */
     .screen {
       overflow: hidden;
       border-radius: var(--r-lg);
       background-color: var(--sunk);
-      background-image: var(--ground-light);
       box-shadow: var(--glass-edge), var(--e3);
     }
 
-    /* ONE HEIGHT FOR EVERY CASE AND EVERY PAGE, so the window is one size whatever is chosen. The rail floats one
-       inset in on three sides; the title row, the sentence and the page sit beside it; the link sits under the rail. */
+    /* ONE HEIGHT FOR EVERY CASE AND EVERY PAGE, so the window is one size whatever is chosen. The bar runs across the
+       top with the link at its end; the title row, the sentence and the page sit under it. */
     /* The row is the stack's height and no more, so a long page scrolls inside the window instead of stretching it. */
     .stack {
       grid-template-rows: minmax(0, 1fr);
@@ -537,33 +530,29 @@
 
     .panel {
       display: grid;
-      grid-template-columns: 216px minmax(0, 1fr);
-      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
       grid-template-areas:
         'case case'
-        'side head'
-        'side body'
-        'foot body';
+        'side foot'
+        'head head'
+        'body body';
       gap: 0;
-      padding: var(--inset) 0 var(--inset) var(--inset);
+      padding: 0;
     }
 
     .side {
       grid-area: side;
-      display: flex;
-      flex-direction: column;
-      min-block-size: 0;
-    }
-
-    .side > :global(.rail) {
-      flex: 1;
+      display: block;
+      min-inline-size: 0;
+      padding: var(--sp-4) var(--sp-3) 0 var(--sp-5);
     }
 
     .more-for {
       grid-area: foot;
-      align-self: stretch;
-      justify-content: center;
-      padding-block-start: var(--sp-2);
+      align-self: center;
+      padding: var(--sp-4) var(--sp-5) 0 0;
+      white-space: nowrap;
     }
   }
 

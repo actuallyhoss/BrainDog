@@ -1,23 +1,18 @@
 <!--
-  The drawn app's rail, 900px and wider: the new app's floating rail card (the design system), cut down to what an example
-  record shows.
+  The drawn app's navigation, 900px and wider: the app's top bar, cut down to what an example record shows.
 
-  THE SAME ORDER AS THE PRODUCT'S. The record switcher at the top (the mark, the record's name and its chevron), the
-  ask field, then the places: the spine (Home, Decide and Inbox, with Decide's count) and the record's own pages in
-  the order they were declared, each an 18px glyph in a 26px well. Then Working now, one row per agent at work, read
-  off the record's own Agents page, and at the foot whatever the host puts there.
+  THE SAME ORDER AS THE PRODUCT'S. The record's name with its chevron beside the mark, then the places: the spine
+  (Home, Decide and Inbox, with Decide's count) and the record's own pages in the order they were declared, each a
+  glyph and a name, and the search field at the end.
 
-  GLASS, AND IT HOLDS ONLY CHROME. The chosen place has an ink well with the glyph in the on-ink colour and its row in
-  the tile fill. Decide's count is the square badge in the house red, as the app draws it: a question waiting on you
-  is what the accent is for.
+  FLAT ON THE BOARD, AND IT HOLDS ONLY CHROME. The chosen place is an ink pill. Decide's count is the badge in the house
+  red, as the app draws it: a question waiting on you is what the accent is for.
 
   EACH PLACE IS A BUTTON THAT OPENS ITS PAGE in the drawn app's page area, and the place on show carries
-  `aria-current`. Focus stays on the row pressed, which is still there. The ask field and the agents' rows are drawn,
-  not pressed: an example record has nothing behind them, and a control that opens nothing is a broken one.
+  `aria-current`. Focus stays on the place pressed, which is still there. The search field is drawn, not pressed: an
+  example record has nothing behind it, and a control that opens nothing is a broken one.
 -->
 <script lang="ts">
-  import AgentMark from '../AgentMark.svelte';
-  import { markedOf } from '../agent-marks.ts';
   import type { Snippet } from 'svelte';
   import Icon from '../Icon.svelte';
   import Mark from '../Mark.svelte';
@@ -25,14 +20,12 @@
   import { cases } from '../copy/cases.ts';
 
   type Entry = { id: string; title: string; glyph: string };
-  type Agent = { who: string; when: string };
 
   let {
     name,
     pages,
     current,
     open = 0,
-    working = [],
     pick,
     foot,
   }: {
@@ -42,8 +35,6 @@
     current: string;
     /** How many questions wait on Decide. */
     open?: number;
-    /** The agents at work on the record, from its Agents page. */
-    working?: readonly Agent[];
     pick: (id: string) => void;
     /** What sits at the rail's foot. */
     foot?: Snippet;
@@ -54,16 +45,12 @@
   const spine = $derived(pages.filter((p) => SPINE.has(p.id)));
   const rest = $derived(pages.filter((p) => !SPINE.has(p.id)));
   const w = cases.drawn;
-
-  /* THE LIVE RING'S ARC. An agent that wrote this minute draws three quarters of its ring, and one that wrote a few
-     minutes ago draws the whole ring faint: working, with no step reported. The circle is r 10, so 62.83 round. */
-  const ARC = 62.83;
 </script>
 
 {#snippet row(p: Entry)}
   <li>
     <button type="button" class="item tap" aria-current={p.id === current ? 'page' : undefined} onclick={() => pick(p.id)}>
-      <span class="well">{#if isIconName(p.glyph)}<Icon name={p.glyph} size="m" />{/if}</span>
+      {#if isIconName(p.glyph)}<Icon name={p.glyph} size="s" />{/if}
       <span class="item-name">{p.title}</span>
       {#if p.id === 'decide' && open > 0}<span class="badge num" aria-hidden="true">{open}</span><span class="hide">{w.toDecide(open)}</span>{/if}
     </button>
@@ -74,13 +61,7 @@
   <p class="record">
     <Mark height={18} />
     <span class="record-name">{name}</span>
-    <span class="chev" aria-hidden="true"><Icon name="chevron-down" size="m" /></span>
-  </p>
-
-  <p class="ask" aria-hidden="true">
-    <Icon name="search" size="m" />
-    <span class="ask-words">{w.ask}</span>
-    <span class="cap">/</span>
+    <span class="chev" aria-hidden="true"><Icon name="chevron-down" size="s" /></span>
   </p>
 
   <ul class="places">
@@ -88,296 +69,145 @@
     {#each rest as p (p.id)}{@render row(p)}{/each}
   </ul>
 
-  {#if working.length > 0}
-    <p class="section">{w.working}</p>
-    <ul class="agents">
-      {#each working as a, i (a.who)}
-        {@const marked = markedOf(a.who)}
-        <li class="agent">
-          <span class="face" data-marked={marked ? '' : undefined} aria-hidden="true"><svg viewBox="0 0 24 24">
-            <circle class="ring-track" cx="12" cy="12" r="10" />
-            <circle
-              class="ring"
-              data-live={i === 0 ? '' : undefined}
-              cx="12"
-              cy="12"
-              r="10"
-              stroke-dasharray={i === 0 ? `${ARC * 0.75} ${ARC}` : `${ARC} ${ARC}`}
-              transform="rotate(-90 12 12)"
-            />
-            <circle class="disc" cx="12" cy="12" r="8" />
-</svg>{#if marked}<span class="mark"><AgentMark agent={marked} /></span>{:else}<span class="initial">{a.who.slice(0, 1)}</span>{/if}</span>
-          <span class="agent-name">{a.who}</span>
-          <span class="agent-when">{a.when}</span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+  <p class="ask" aria-hidden="true">
+    <Icon name="search" size="s" />
+    <span class="ask-words">{w.ask}</span>
+    <span class="cap">/</span>
+  </p>
 
   {#if foot}<div class="foot">{@render foot()}</div>{/if}
 </div>
 
 <style>
-  /* THE RAIL CARD: glass, radius 22, padding 10, floating one inset from the window's edge (the design system). */
+  /* THE BAR: one line on the board, no panel round it. */
   .rail {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-block-size: 0;
-    padding: 10px;
-    border-radius: var(--r-lg);
-    background: var(--glass);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    min-block-size: 40px;
   }
 
   /* The record switcher: the mark at 18, the record's name at 15/600, and its chevron. */
   .record {
     display: flex;
+    flex: none;
     align-items: center;
-    gap: 10px;
-    min-block-size: 40px;
+    gap: var(--sp-2);
     margin: 0;
-    padding-inline: 8px;
     color: var(--ink);
     font-size: var(--t-row);
     font-weight: 600;
-  }
-
-  .record-name {
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
     white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   .chev {
-    color: var(--ink2);
-  }
-
-  /* THE ASK FIELD, drawn: a 36px field in the wash, the search glyph, the words and the `/` key cap. */
-  .ask {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    margin: 6px 0 10px;
-    padding-inline: 10px 6px;
-    border-radius: var(--r-md);
-    background: var(--hover-wash);
+    display: grid;
     color: var(--dim);
-    font-size: var(--t-base);
   }
 
-  .ask-words {
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .cap {
-    display: inline-grid;
-    place-items: center;
-    min-inline-size: 18px;
-    block-size: 18px;
-    padding-inline: 4px;
-    border-radius: var(--r-sm);
-    background: var(--s1);
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
-    font-weight: 500;
-  }
-
-  .places,
-  .agents {
+  /* THE PLACES CLIP RATHER THAN WRAP: the bar is one line whatever the record holds. */
+  .places {
     display: flex;
-    flex-direction: column;
+    flex: 1 1 auto;
+    align-items: center;
     gap: 2px;
+    min-inline-size: 0;
     margin: 0;
     padding: 0;
+    overflow: hidden;
     list-style: none;
   }
 
-  /* A PLACE, as the new rail draws one: a 26px well with the glyph, the name at 14/500, and a count at the end. */
+  .places li {
+    flex: none;
+  }
+
+  /* A PLACE: glyph and name, and where you are is the ink pill. */
   .item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    inline-size: 100%;
-    min-block-size: var(--rail-item-h);
-    padding: 0 10px 0 5px;
+    gap: 6px;
+    min-block-size: 34px;
+    padding: 0 12px;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pill);
     background: none;
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--t-sm);
     font-weight: 500;
-    text-align: start;
+    white-space: nowrap;
     cursor: pointer;
   }
 
-  .well {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 26px;
-    block-size: 26px;
-    border-radius: var(--r-well);
-    background: var(--hover-wash);
-    color: var(--ink2);
-  }
-
   .item[aria-current='page'] {
-    background: var(--bg);
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .item[aria-current='page'] .well {
     background: var(--ink);
     color: var(--on-ink);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .item:hover:not([aria-current='page']) {
-      background: var(--hover-wash);
+    .item:not([aria-current='page']):hover {
+      background: var(--bg);
       color: var(--ink);
     }
   }
 
-  .item-name {
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  /* THE SQUARE COUNT: Decide's, the one filled badge, in ink on the site. */
+  /* Decide's count: the one filled badge, in the house red. */
   .badge {
     display: inline-grid;
     place-items: center;
-    min-inline-size: 20px;
-    block-size: 20px;
-    padding-inline: 5px;
-    border-radius: var(--r-sm);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-size: var(--t-sm);
-    font-weight: 600;
-  }
-
-  /* ── Working now ─────────────────────────────────────────────────────── */
-
-  .section {
-    margin: 16px 0 2px;
-    padding-inline: 10px;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .agent {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: 32px;
-    padding: 0 10px 0 4px;
-    color: var(--ink);
-  }
-
-  /* THE FACE: a circle with the agent's initial, inside a 2px ring in the live colour whose arc is its progress. */
-  .face {
-    position: relative;
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 26px;
-    block-size: 26px;
-  }
-
-  .face svg {
-    position: absolute;
-    inset: 0;
-    inline-size: 100%;
-    block-size: 100%;
-  }
-
-  .ring-track {
-    fill: none;
-    stroke: var(--line);
-    stroke-width: 2;
-  }
-
-  .ring {
-    fill: none;
-    stroke: var(--live);
-    stroke-width: 2;
-    stroke-linecap: round;
-    opacity: 0.4;
-  }
-
-  .ring[data-live] {
-    opacity: 1;
-  }
-
-  .disc {
-    fill: var(--ink2);
-  }
-
-  /* A MAKER'S MARK ON A PLAIN DISC (the owner's "use real ones"): an ink disc would swallow Codex's black knot. */
-  .face[data-marked] .disc {
-    fill: var(--bg);
-    stroke: var(--line);
-    stroke-width: 1;
-  }
-
-  .mark {
-    position: relative;
-    display: grid;
-    place-items: center;
-    inline-size: 70%;
-    block-size: 70%;
-    color: var(--ink);
-  }
-
-  .initial {
-    position: relative;
+    box-sizing: border-box;
+    min-inline-size: 18px;
+    block-size: 18px;
+    padding: 0 5px;
+    border-radius: var(--r-pill);
+    background: var(--danger);
     color: var(--on-ink);
     font-size: var(--t-xs);
     font-weight: 600;
     line-height: 1;
   }
 
-  .agent-name {
-    flex: 1;
+  /* SEARCH, drawn as the white field the app has at the end of its bar. */
+  .ask {
+    display: flex;
+    flex: 0 1 220px;
+    align-items: center;
+    gap: var(--sp-2);
     min-inline-size: 0;
-    overflow: hidden;
-    font-size: var(--t-base);
-    font-weight: 500;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .agent-when {
-    flex: none;
+    min-block-size: 34px;
+    margin: 0;
+    padding: 0 6px 0 12px;
+    border-radius: var(--r-pill);
+    background: var(--bg);
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
-  .foot {
-    display: flex;
-    flex-direction: column;
-    margin-block-start: auto;
-    padding-block-start: var(--sp-3);
+  .ask-words {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* Read by a screen reader and not drawn: the count said as words, where the figure alone says nothing. */
+  .cap {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: 20px;
+    block-size: 20px;
+    border-radius: var(--r-sm);
+    background: var(--sunk);
+    color: var(--ink2);
+    font-size: var(--t-xs);
+  }
+
+  .foot {
+    flex: none;
+  }
+
   .hide {
     position: absolute;
     inline-size: 1px;

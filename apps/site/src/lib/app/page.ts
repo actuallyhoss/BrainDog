@@ -92,17 +92,3 @@ export function leadOf(src: string): string {
   }
   return '';
 }
-
-/**
- * WHO IS WORKING ON THE RECORD NOW, read off its Agents page: the rows of the `cards | Working now` fence, each an
- * agent's name and when it last wrote. The drawn rail's Working now section is these rows, so it says what the page does.
- */
-export function workingIn(src: string): { who: string; doing: string; when: string }[] {
-  for (const s of parse(src, { page: true })) {
-    if (s.type !== 'block' || s.kind !== 'cards' || (s.heading ?? '').trim() !== 'Working now') continue;
-    return s.rows
-      .map((r) => ({ who: (r.cells[0] ?? '').trim(), doing: (r.cells[1] ?? '').trim(), when: (r.cells[2] ?? '').trim() }))
-      .filter((r) => r.who !== '' && r.who !== 'who');
-  }
-  return [];
-}
