@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Terms of Service
 
-Last updated: 2026-09-29
+Last updated: 2026-10-01
 
 ## The short version
 
@@ -16,7 +16,7 @@ Last updated: 2026-09-29
 
 ## Who we are
 
-These terms are an agreement between you and **Quartz Apps LLC**, a Wyoming limited liability company whose post goes to c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States ("we" or "us"). We run BrainDog at brain.dog.
+These terms are an agreement between you and **Quartz Apps LLC** ("we" or "us"). We run BrainDog at brain.dog.
 
 By making an account or using BrainDog, you agree to these terms. The [Privacy policy](/legal/privacy) says how we handle your information. If you use BrainDog for a business, the [Data processing addendum](/legal/processing) is part of these terms too. If you don't agree, please don't use BrainDog.
 
@@ -72,7 +72,7 @@ Slash is the assistant built into every record. It answers questions from your r
 
 You own what you put in your record. You're responsible for it, and for having the right to put it there.
 
-**The licence you give us.** To run BrainDog, we need your permission to handle your content. So you give Quartz Apps LLC a worldwide, non-exclusive, royalty-free licence to host, store, copy, process and show your content, only to run BrainDog for you and the people you share it with. That includes sending it to the services that run BrainDog for us, which the [Privacy policy](/legal/privacy) lists.
+**The licence you give us.** To run BrainDog, we need your permission to handle your content. So you give us a worldwide, non-exclusive, royalty-free licence to host, store, copy, process and show your content, only to run BrainDog for you and the people you share it with. That includes sending it to the services that run BrainDog for us, which the [Privacy policy](/legal/privacy) lists.
 
 We don't sell your content, we don't use it for advertising, and we don't use it to train AI models.
 
@@ -98,7 +98,7 @@ Don't:
 - attack, overload or probe BrainDog, or try to reach a record that isn't yours;
 - get around our limits, or share one record's plan among unrelated people or businesses to avoid paying;
 - use BrainDog to send spam or to store or spread malware;
-- pretend to be BrainDog, Quartz or our staff.
+- pretend to be BrainDog or our staff.
 
 If you find a security problem, please tell us at support@brain.dog before telling anyone else. The security page on brain.dog says what to include. Test only against a record that is yours.
 
@@ -157,7 +157,7 @@ An owner can export the whole record, at any time, from Settings, as one file yo
 
 The BrainDog software is open source. [owner: true only once the repository is public (LAUNCH.repo)] Its licences (Apache License 2.0, and MIT for the renderer) give you rights to the code, and these terms don't take them away. These terms cover the hosted service at brain.dog.
 
-The BrainDog name, logo and look belong to Quartz Apps LLC. Don't use them in a way that suggests we made or endorse something we didn't.
+The BrainDog name, logo and look belong to us. Don't use them in a way that suggests we made or endorse something we didn't.
 
 ## Keeping BrainDog running
 
@@ -212,4 +212,3 @@ If you use BrainDog for a business, you'll cover our reasonable costs if someone
 ## Contact
 
 - Help, billing, privacy, security problems, abuse and complaints: support@brain.dog
-- Post: Quartz Apps LLC, c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States

@@ -309,8 +309,8 @@ function actionOf(kind: MailKind, record: string): string {
 const HOME = 'https://brain.dog';
 const MARK_SRC = `${HOME}/email/mark.png`;
 
-/** Who sends BrainDog's mail, and where post reaches them: the last line of every footer. */
-export const POSTAL = 'Quartz Apps LLC, c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801';
+/** Who sends BrainDog's mail: the last line of every footer. */
+export const SENDER = 'BrainDog is run by Quartz Apps LLC.';
 
 /**
  * THE SYSTEM'S OWN FACE, because a mail cannot load one. Geist first for the reader who has it installed, then each
@@ -421,7 +421,7 @@ function page(p: Page): string {
     ...(p.support
       ? [`<p style="margin:0 0 8px">Write to <a href="mailto:${h(p.support)}" style="color:${L.dim};text-decoration:underline">${h(p.support)}</a> with any question.</p>`]
       : []),
-    `<p style="margin:0">${h(POSTAL)}</p>`,
+    `<p style="margin:0">${h(SENDER)}</p>`,
   ].join('');
   return (
     '<!doctype html>' +
@@ -467,9 +467,9 @@ function page(p: Page): string {
   );
 }
 
-/** The footer's lines as plain text, under a letter's own: why it was sent, where to write, and where post goes. */
+/** The footer's lines as plain text, under a letter's own: why it was sent, where to write, and who sends it. */
 const textFooter = (why: string, support: string): string =>
-  [`This mail is from BrainDog, sent ${why}.`, ...(support ? [`Write to ${support} with any question.`] : []), POSTAL].join('\n');
+  [`This mail is from BrainDog, sent ${why}.`, ...(support ? [`Write to ${support} with any question.`] : []), SENDER].join('\n');
 
 /**
  * A kind's letter, with every value in it made safe: a line of text, and escaped in the HTML.

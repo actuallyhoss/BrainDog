@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { existsSync } from 'node:fs';
 
-import { isMailKind, letterOf, OPS_QUIET_MS, opsAlert, POSTAL, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
+import { isMailKind, letterOf, OPS_QUIET_MS, opsAlert, SENDER, recordLetter, sendMail, type MailKind } from '../src/mail.ts';
 
 const KINDS: MailKind[] = [
   'signin',
@@ -116,8 +116,8 @@ test('EVERY LETTER WEARS THE ONE PAGE: the mark from brain.dog, a card of at mos
     assert.match(html, /<div style="display:none;[^"]*">[^<&]+&#847;/u, kind);
     assert.match(html, /@media \(prefers-color-scheme:dark\)\{/u, kind);
     assert.match(html, /<meta name="color-scheme" content="light dark">/u, kind);
-    assert.ok(html.includes(POSTAL), kind);
-    assert.ok(text.endsWith(POSTAL), kind);
+    assert.ok(html.includes(SENDER), kind);
+    assert.ok(text.endsWith(SENDER), kind);
     /* Email-client safe: no stylesheet to fetch, no web font, no script, and every image absolute. */
     assert.doesNotMatch(html, /<link\b|@import|@font-face|<script/u, kind);
     for (const [, src] of html.matchAll(/<img src="([^"]*)"/gu)) assert.match(src!, /^https:\/\//u, kind);
@@ -178,7 +178,7 @@ test("A RECORD'S OWN MAIL IS DRAWN IN THE SAME PAGE: a digest's sections, figure
   assert.match(letter.html, /mailto:support@brain\.dog/u);
   assert.doesNotMatch(letter.text, /```|^#/mu);
   assert.ok(letter.text.startsWith('Monday\n\nCash\n----\n\nCash: £10,540.00\n\nOverdue\n-------\n\nWho  |  Amount\nPell & Vine  |  £400.00\nA | B <b>  |  £12.00\n\n'), letter.text);
-  assert.ok(letter.text.endsWith(`Write to support@brain.dog with any question.\n${POSTAL}`));
+  assert.ok(letter.text.endsWith(`Write to support@brain.dog with any question.\n${SENDER}`));
   assert.ok(!`${letter.subject}${letter.text}${letter.html}`.includes(EM_DASH));
 });
 

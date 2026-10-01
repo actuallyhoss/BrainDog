@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Privacy Policy
 
-Last updated: 2026-09-29
+Last updated: 2026-10-01
 
 ## The short version
 
@@ -16,7 +16,7 @@ Last updated: 2026-09-29
 
 ## Who we are
 
-BrainDog, at brain.dog, is run by Quartz Apps LLC, a Wyoming limited liability company whose post goes to c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States.
+BrainDog, at brain.dog, is run by Quartz Apps LLC.
 
 We have two roles, and this policy covers both:
 
@@ -227,4 +227,3 @@ When we change this policy, we change the date at the top. If a change matters, 
 ## Contact
 
 - Privacy, and anything else: support@brain.dog
-- Post: Quartz Apps LLC, c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States

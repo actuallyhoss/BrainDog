@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Data Processing Addendum
 
-Last updated: 2026-09-29
+Last updated: 2026-10-01
 
 ## The short version
 
@@ -14,7 +14,7 @@ Last updated: 2026-09-29
 
 ## Who this is between
 
-This addendum is between Quartz Apps LLC, a Wyoming limited liability company whose post goes to c/o Cloud Peak Law, 1309 Coffeen Ave STE 1200, Sheridan, WY 82801, United States ("we" or "us"), and the business that uses BrainDog ("you").
+This addendum is between Quartz Apps LLC ("we" or "us") and the business that uses BrainDog ("you").
 
 It is part of the [Terms of Service](/legal/terms), and it applies whenever you use BrainDog for a business and we process personal data for you. By accepting the Terms for a business, you accept this addendum too. If you'd like a copy signed by both of us, write to support@brain.dog. [owner: confirm you will countersign on request]
 

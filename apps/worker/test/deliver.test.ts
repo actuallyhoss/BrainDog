@@ -49,7 +49,7 @@ test('AN EMAIL IS SENT WITH WHAT THE ROW SAYS, from the sender this deployment n
   assert.equal(mail.subject, 'Monday');
   // The record's words first, then the footer that says what the mail is and who sent it.
   assert.ok(mail.text!.startsWith('2 overdue\n\nThis mail is from BrainDog, sent '), mail.text);
-  assert.match(mail.text!, /Quartz Apps LLC, c\/o Cloud Peak Law/u);
+  assert.match(mail.text!, /BrainDog is run by Quartz Apps LLC\.$/u);
   assert.match(mail.html!, /<h1[^>]*>Monday<\/h1>/u);
   assert.match(mail.html!, />2 overdue<\/p>/u);
 

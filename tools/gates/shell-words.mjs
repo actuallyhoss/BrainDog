@@ -215,7 +215,7 @@ const OUT = {
   'apps/worker/src/mail.ts': {
     why: 'the footer of every mail names who sends it, as the legal pages do (1 hit).',
     words: {
-      quartz: '`POSTAL`, "Quartz Apps LLC, c/o Cloud Peak Law, ...": the company that runs BrainDog, printed under every letter as the sender a mail law asks for, never a branch on a use case.',
+      quartz: '`SENDER`, "BrainDog is run by Quartz Apps LLC.": the company that runs BrainDog, printed under every letter as its sender, never a branch on a use case.',
     },
   },
   'packages/seed/src/changelog.ts': {
