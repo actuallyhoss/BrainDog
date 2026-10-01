@@ -30,6 +30,8 @@
   /* THE BOARD IS WIDE: the tiles run to 1440 before they stop, and the top bar and every head stop with them. */
   :root {
     --page-max: 1440px;
+  /* How tall a page's head row is where it rides over the top of the lead tile (`PageHead`'s `over`). */
+  --head-over: 56px;
   }
 
   /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the

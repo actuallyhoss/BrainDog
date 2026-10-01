@@ -39,6 +39,7 @@
     arrangement = null,
     ids = '',
     level = 2,
+    headed = false,
   }: {
     /** `page` is `/p/<slug>`, with its keys; `home` and `preview` are drawn inside another screen, which owns the keys. */
     mode: 'page' | 'home' | 'preview';
@@ -55,6 +56,8 @@
     ids?: string;
     /** The level each block's name is drawn at. */
     level?: 2 | 3;
+    /** The page's head rides over the top of the lead tile on a wide screen (`PageHead`'s `over`), so the tile leaves it room. */
+    headed?: boolean;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -384,7 +387,7 @@
 <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only in the mode where they
      are reorderable; announcing "list, 5 items" to somebody reading a page is describing the furniture. ON A PAGE WITH A
      RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
-<div class="page" data-mode={mode} role={arranging && !layout ? 'list' : undefined}>
+<div class="page" data-mode={mode} data-headed={headed ? '' : undefined} role={arranging && !layout ? 'list' : undefined}>
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
@@ -562,6 +565,11 @@
       padding: var(--sp-5) var(--sp-5) var(--sp-5);
       background: var(--bg);
       border-radius: var(--r-lg);
+    }
+
+    /* THE HEAD'S ROW IS THE TOP OF THIS TILE, when the page says so: the name and the tools over the headline. */
+    .page[data-mode='page'][data-headed] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+      padding-block-start: calc(var(--head-over) + var(--sp-2));
     }
 
     .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(p) {

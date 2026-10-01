@@ -64,6 +64,7 @@
     hue,
     define,
     led = false,
+    over = false,
   }: {
     title: string;
     /** The glyph the register or page declares, drawn beside the title only when `hue` is given. */
@@ -111,6 +112,11 @@
      * phone's bar, title and sentence are unchanged.
      */
     led?: boolean | undefined;
+    /**
+     * The page opens on a tile that holds its sentence (`PageView`): from 900px up the name and the tools ride over the
+     * top of that tile as its label row, and the kicker and the definition step aside. The `h1` stays the page's heading.
+     */
+    over?: boolean | undefined;
   } = $props();
 
   /* THE COMPACT BAR ARRIVES ONCE SOMETHING HAS SCROLLED UNDER THE HEAD. A zero-height mark where the head starts leaves
@@ -190,15 +196,15 @@
 {#if kicker}
   <!-- Over the title and scrolling with the page: the row that stays is the title's. -->
   {#if back}
-    <a class="kicker kicker-link tap" href={at(back)} data-led={led ? '' : undefined}>{kicker}</a>
+    <a class="kicker kicker-link tap" href={at(back)} data-led={led ? '' : undefined} data-over={over ? '' : undefined}>{kicker}</a>
   {:else}
-    <p class="kicker" data-led={led ? '' : undefined}>{kicker}</p>
+    <p class="kicker" data-led={led ? '' : undefined} data-over={over ? '' : undefined}>{kicker}</p>
   {/if}
 {/if}
 <!-- THE HEAD AND ITS SENTENCE ARE ONE WHITE TILE ON A WIDE SCREEN, when the page says a sentence. Under 900px, and on a
      page with no sentence, the wrapper has no box of its own. -->
 <div class="lead-wrap" data-said={sentence ? '' : undefined} data-led={led ? '' : undefined}>
-<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined} data-said={sentence ? '' : undefined} data-led={led ? '' : undefined}>
+<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined} data-said={sentence ? '' : undefined} data-led={led ? '' : undefined} data-over={over ? '' : undefined}>
   <div class="head-main">
     <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from
          whoever typed it, the glyph beside it is ours. An Arabic title in an English paragraph
@@ -245,7 +251,7 @@
   first time the word appears; it does not give it the top of the screen for as long as the page is open. Out here it
   is read where it is met and scrolls away with the list, and it still shows once and never again.
 -->
-{#if define}<p class="head-define" data-led={led ? '' : undefined}><Define noun={define} /></p>{/if}
+{#if define}<p class="head-define" data-led={led ? '' : undefined} data-over={over ? '' : undefined}><Define noun={define} /></p>{/if}
 
 <style>
   /* Same size as the figure, dimmed: it modifies the number rather than being part of it. */
@@ -504,6 +510,43 @@
 
     .lead-wrap[data-said][data-led] {
       display: none;
+    }
+
+    /* OVER THE LEAD TILE: the row is the tile's first `--head-over`, pulled up over it by as much as it is tall, so the
+       page's name and tools read as the tile's label row and the headline under them is the page's. It scrolls with
+       the tile; the top bar is what stays. */
+    .kicker[data-over],
+    .head-define[data-over] {
+      display: none;
+    }
+
+    .head[data-over] {
+      position: relative;
+      display: flex;
+      align-items: center;
+      block-size: var(--head-over);
+      margin-block: var(--sp-3) calc(-1 * (var(--head-over) + var(--sp-3)));
+      padding: 0 calc(var(--gutter) + var(--sp-5));
+    }
+
+    .head[data-over]::before {
+      display: none;
+    }
+
+    .head[data-over] .head-main {
+      flex: 1;
+    }
+
+    .head[data-over] .title {
+      color: var(--ink2);
+      font-size: var(--t-md);
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .head[data-over] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
+    .head[data-over] .head-actions :global(.segmented) {
+      background: var(--s1);
     }
 
     .head[data-said] .title {

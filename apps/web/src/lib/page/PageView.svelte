@@ -46,6 +46,7 @@
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
+  import { layoutOf } from './layout.ts';
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
   import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
@@ -112,6 +113,18 @@
   /** Blocks added in this session. They live beside the declared ones and index past them. */
   let extra = $state<PageBlock[]>([]);
 
+  /**
+   * WHETHER THE PAGE OPENS ON ITS SENTENCE, read as a tile that holds the page's name and tools as well. On a wide screen
+   * the head then rides inside that tile, over its top, and the sentence under it is the headline. Not while arranging,
+   * where every block is a list item with a bar of its own, and not on a page with a rail, whose first block is the
+   * main column's and not the page's.
+   */
+  const led = $derived.by(() => {
+    if (!live || arranging || showSource || layoutOf(live.page.page) !== null) return false;
+    const first = live.page.blocks[0];
+    return first !== undefined && first.drawn && first.kind === 'note' && first.lead === true;
+  });
+
   /** Declared, then added. One list, so ordering and spans do not care which is which. */
   const all = $derived<LiveBlock[]>(live ? [...live.page.blocks, ...extra.map((b) => added(b, live.page.blocks))] : []);
 
@@ -176,6 +189,7 @@
     kicker={live.page.page.nav?.section}
     title={live.page.page.title}
     define="page"
+    over={led}
   >
     {#snippet actions()}
       {#if !arranging}
@@ -199,7 +213,7 @@
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
     <SourceView {slug} title={live.page.page.title} />
   {:else}
-    <PageBody mode="page" page={live.page.page} blocks={all} now={live.now} {writes} {arrangement} />
+    <PageBody mode="page" page={live.page.page} blocks={all} now={live.now} {writes} {arrangement} headed={led} />
   {/if}
 {:else if mode === 'home'}
   <!-- HOME'S BODY: the use case's page with its layout, spans and boxes, under Home's own head. Writes stay on, so a
