@@ -114,3 +114,21 @@ test("THE RECORD'S `rail` IS NOBODY'S CHOICE, and a rail chosen now is kept as `
   chosen.adopt({ 'nav.shape': 'side' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
   assert.equal(chosen.shape, 'rail');
 });
+
+test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE'S COPY OF IT", () => {
+  const g = globalThis as { document?: unknown };
+  const railCookie = () => ({ cookie: `bd_pref=${encodeURIComponent(JSON.stringify({ shape: 'rail' }))}` });
+  g.document = railCookie();
+  try {
+    const prefs = new NavPrefs({ order: [], hidden: [] });
+    prefs.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+    assert.equal(prefs.shape, 'bar');
+
+    g.document = railCookie();
+    const unset = new NavPrefs({ order: [], hidden: [] });
+    unset.adopt({}, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+    assert.equal(unset.shape, 'rail', 'a device with a rail and a record with no shape keeps the rail');
+  } finally {
+    delete g.document;
+  }
+});

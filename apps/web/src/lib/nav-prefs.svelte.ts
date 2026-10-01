@@ -173,7 +173,8 @@ export class NavPrefs {
     keepList(HIDDEN, this.hidden);
 
     const held = pref.read();
-    this.shape = shapeKept(prefs['nav.shape']) ?? held.shape ?? 'bar';
+    /* A LEGACY `rail` GOES STRAIGHT TO THE DEFAULT, past the cookie: the cookie's copy was written from that same `rail`. */
+    this.shape = shapeKept(prefs['nav.shape']) ?? (prefs['nav.shape'] === 'rail' ? 'bar' : (held.shape ?? 'bar'));
     const suggest = prefs['pen.suggest'];
     this.suggest = typeof suggest === 'boolean' ? suggest : (held.suggestPages ?? true);
     pref.write({ shape: this.shape, suggestPages: this.suggest });
