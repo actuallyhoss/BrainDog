@@ -25,6 +25,8 @@ import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoo
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import type { AccountCall, SignupCall } from '@braindog/ports';
+/* GOOGLE: its two routes are answered in `signIn()` before `serveAuth`, as sign-up's are. */
+import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
 /* CLOSING AN ACCOUNT: the door is the host package's, and `account()` hands it this Worker's halves. */
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
@@ -307,6 +309,13 @@ type Env = {
    */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
+  /**
+   * The Google OAuth client sign-in with Google runs as (`google.ts`), both put with `wrangler secret put`. The id is
+   * not a secret, and is one here so that it is set beside the half that is. Either unset, and both routes are 404
+   * and `/auth/methods` offers no Google.
+   */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   /**
    * The Analytics Engine dataset one point per request goes to (`telemetry.ts`, `51 §5.18`). Drafted and commented in
    * `wrangler.jsonc` until the owner decides, and unbound is no point written; with it bound, a point also needs `SESSION_SECRET`.
@@ -3369,6 +3378,20 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
      is made by its operator. */
   const signupPath = url.pathname.replace(/\/+$/, '');
   if (Object.hasOwn(SIGNUP_ROUTES, signupPath)) return signUp(request, env, ctx, signupPath as keyof typeof SIGNUP_ROUTES);
+  /* GOOGLE IS ANSWERED HERE FOR THE SAME REASON, and only where sign-in is on and a client is set. Without one the
+     rows fall through to `serveAuth`, which answers each as a way in this host does not offer. */
+  const origin = `https://${env.PUBLIC_HOST ?? ''}`;
+  const mode = cookieMode(origin);
+  const google = googleOn(env) && (env.SESSION_SECRET ?? '').length >= 32 && mode !== null;
+  if (google && Object.hasOwn(GOOGLE_ROUTES, signupPath))
+    return serveGoogle(request, signupPath as keyof typeof GOOGLE_ROUTES, {
+      origin,
+      mode,
+      clientId: (env.GOOGLE_CLIENT_ID ?? '').trim(),
+      clientSecret: (env.GOOGLE_CLIENT_SECRET ?? '').trim(),
+      ip: request.headers.get('cf-connecting-ip') ?? '',
+      ask: (call) => directory.auth(call) as unknown as Promise<AuthResult>,
+    });
   /* THE ZONE IS READ FROM A COPY OF THE BODY, because `operated()` in `packages/host/src/auth.ts` hands `provision`
      the slug, the email and the name and drops every other field, so a `tz` in the body never arrived here and every
      record was made in `UTC`. The copy is read only inside the
@@ -3378,7 +3401,8 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
   const copy = request.method === 'POST' && url.pathname.replace(/\/+$/, '') === '/auth/provision' ? request.clone() : null;
   return serveAuth(request, {
     on: 'worker',
-    origin: `https://${env.PUBLIC_HOST ?? ''}`,
+    origin,
+    google,
     auth: ((call: AuthCall) => directory.auth(call)) as unknown as Auth,
     ip: request.headers.get('cf-connecting-ip') ?? '',
     /* MAIL ONLY WHEN BOTH ARE SET, so a host that cannot send says so by offering no `mail` at all. THE ANSWER NEVER

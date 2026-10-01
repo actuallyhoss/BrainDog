@@ -564,6 +564,16 @@ export const account = {
     others
       ? 'This browser cannot use a passkey here. Use one of the other ways in below, or open this page in a browser that supports passkeys.'
       : 'This browser cannot use a passkey here. Open this page in a browser that supports passkeys.',
+  withGoogle: 'Continue with Google',
+  /* WHAT CAME BACK FROM GOOGLE WITHOUT A SESSION, one sentence each. `unknown` can say so plainly, because Google has
+     just shown the address belongs to whoever is reading it. */
+  googleSaid: {
+    cancelled: 'Google sign-in was cancelled. Nothing changed.',
+    unknown: 'Nobody here signs in with that Google address. Use another way in, or start a record of your own.',
+    unverified: 'Google could not vouch for that address. Use another way in.',
+    locked: 'Too many tries. Wait a few minutes, then try again.',
+    failed: 'Google sign-in did not finish. Try it again.',
+  },
   emailLink: 'Email me a sign-in link',
   emailLabel: 'Email',
   emailLike: 'you@example.com',

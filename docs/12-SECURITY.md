@@ -99,6 +99,11 @@ a revoke button. A credential you cannot see being used is a credential you cann
 - **Sign-up** (`/auth/signup/start`, `verify`, `name`) is Cloud only, closed while `BILLING` is unset, locked out like
   every other door, and checks Turnstile with `TURNSTILE_SECRET` when it is set. A known address gets a sign-in link
   and the same `200 {}`, so the door tells nobody who has an account.
+- **Sign in with Google** (`/auth/google/start`, `callback`) is Cloud only and off until both `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET` are set. Google proves the address and nothing else: the Directory mints a sign-in link for
+  it and the Worker spends it at once, so an address nobody has, a suspended person and the lockouts are all treated
+  as the mailed link treats them. Only a verified `@gmail.com` address, or one on a domain Google hosts (`hd`), is
+  taken. The state, the PKCE verifier and the nonce live in a ten-minute `__Host-` cookie, never in a row.
 - **The token cut-off** is `TOKENS_VALID_FROM` (`BRAINDOG_TOKENS_VALID_FROM` on a self-host): every token, device grant
   and operation grant created before the instant is refused, and the owner's list shows them "ended by the operator".
 - **Closing an account** is the person's own act (`POST /account/close`, the address typed, a sign-in within 15

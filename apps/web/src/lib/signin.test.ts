@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Failure, Methods, Said } from './auth.ts';
-import { onwardOf, stateOf, type How, type Seen, type Shelf, type Step } from './signin.ts';
+import { googleStart, googleWhy, onwardOf, stateOf, type How, type Seen, type Shelf, type Step } from './signin.ts';
 
 const WHO = { person: 'p_01', email: 'ada@example.com', record: 'studio', provedAt: 1 };
 const NOW = 1_757_000_000_000;
@@ -283,4 +283,26 @@ test('A NEXT THAT RESOLVES INSIDE THE APP IS FOLLOWED AS IT RESOLVES, not as it 
   /* What the tab keeps is the resolved address, so the two halves cannot disagree about it later. */
   assert.deepEqual([...s.held.values()], ['/app/shop/r/tasks?f=a#top']);
   assert.equal(onwardOf('', '#magic=t', s), '/app/shop/r/tasks?f=a#top');
+});
+
+/* ── Google ──────────────────────────────────────────────────────────────── */
+
+test('GOOGLE IS A WAY ONLY WHERE THE HOST SAYS SO, and never the lead', () => {
+  const without = stateOf(seen({ methods: host() }));
+  assert.equal(without.name === 'signed-out' && without.ways?.google, undefined);
+  const s = stateOf(seen({ methods: host({ google: true }) }));
+  assert.equal(s.name === 'signed-out' && s.ways?.google, true);
+  assert.notEqual(s.name === 'signed-out' && s.ways?.lead, 'google');
+});
+
+test('THE WAY BACK FROM GOOGLE SAYS WHY IN FIVE WORDS, and anything else says nothing', () => {
+  assert.equal(googleWhy('?google=unknown'), 'unknown');
+  assert.equal(googleWhy('?next=%2Fapp%2Fwork&google=cancelled'), 'cancelled');
+  assert.equal(googleWhy('?google=%3Cscript%3E'), null);
+  assert.equal(googleWhy(''), null);
+});
+
+test('THE GOOGLE BUTTON GOES TO THE HOST, carrying where to land only when that is not the front', () => {
+  assert.equal(googleStart('/app/', 'https://brain.dog'), 'https://brain.dog/auth/google/start');
+  assert.equal(googleStart('/app/work', 'https://brain.dog'), 'https://brain.dog/auth/google/start?next=%2Fapp%2Fwork');
 });

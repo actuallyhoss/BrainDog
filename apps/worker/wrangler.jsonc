@@ -730,5 +730,10 @@
      `packages/host/src/stripe-sign.ts`); the third is the secret half of `TURNSTILE_SITE_KEY`. Each is put with
      `wrangler secret put <NAME> --env <environment>`, a different value per environment. Unset, billing answers
      `NOT_IN_THIS_BUILD` naming the missing one and sign-up runs on its lockouts alone; a key whose mode is not
-     `BILLING`'s refuses every billing door, naming both. None is under `secrets.required`, for the reason `KEK` is not. */
+     `BILLING`'s refuses every billing door, naming both. None is under `secrets.required`, for the reason `KEK` is not.
+
+     `GOOGLE_CLIENT_ID` AND `GOOGLE_CLIENT_SECRET` ARE SIGN-IN WITH GOOGLE'S TWO (`src/google.ts`): the id and the
+     secret of one OAuth web client whose redirect is `https://<PUBLIC_HOST>/auth/google/callback`, each put with
+     `wrangler secret put <NAME> --env <environment>`. Either unset, and the sign-in page offers no Google and both
+     routes are 404. Not under `secrets.required`, for the reason `KEK` is not. */
 }

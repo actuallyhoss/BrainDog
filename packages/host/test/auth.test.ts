@@ -60,6 +60,8 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'POST /auth/signup/start worker',
       'POST /auth/signup/verify worker',
       'GET /auth/signup/name worker',
+      'GET /auth/google/start worker',
+      'GET /auth/google/callback worker',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
       'POST /auth/suspend worker',
@@ -89,7 +91,7 @@ test('every flow has one route, named by the rule, and only reads are GETs', () 
     assert.equal(rows[0]?.needs, 'nothing', 'a device has no credential yet');
   }
   assert.equal(new Set(AUTH_ROUTES.map((r) => r.path)).size, AUTH_ROUTES.length, 'two routes share a path');
-  assert.deepEqual(AUTH_ROUTES.filter((r) => r.method === 'GET').map((r) => r.flow), ['methods', 'session', 'passkeys', 'sessions', 'signup.name']);
+  assert.deepEqual(AUTH_ROUTES.filter((r) => r.method === 'GET').map((r) => r.flow), ['methods', 'session', 'passkeys', 'sessions', 'signup.name', 'google.start', 'google.callback']);
   /* AN INVITATION'S PROOF HAS NO ROUTE OF ITS OWN: routed alone, it would mail a proof to any address typed. */
   for (const flow of ['invite.prove', 'invite.proved'] as const) assert.equal(AUTH_ROUTES.filter((r) => r.flow === flow).length, 0, `${flow} is routed`);
   for (const r of AUTH_ROUTES.filter((x) => x.needs === 'operator')) assert.equal(r.on, 'worker', `${r.path} is an operator route off the Worker`);

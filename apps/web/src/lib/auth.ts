@@ -30,6 +30,8 @@ export type Methods = {
   me: Who | null;
   /** No passkey exists yet, so the screen leads with the way that needs none. */
   firstRun?: boolean | undefined;
+  /** The host signs people in with Google. Absent is no, so a host older than the button draws none. */
+  google?: true | undefined;
 };
 
 /** A passkey as Settings lists it. */
@@ -184,6 +186,7 @@ function methodsOf(v: unknown): Methods | null {
     me: whoOf(v.me),
     ...(v.why === 'not-configured' || v.why === 'insecure' ? { why: v.why } : {}),
     ...(typeof v.firstRun === 'boolean' ? { firstRun: v.firstRun } : {}),
+    ...(v.google === true ? { google: true as const } : {}),
   };
 }
 

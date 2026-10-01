@@ -53,6 +53,7 @@ const BARE_ORIGIN = new Map([
   ['routes/settings/[area]/settings-state.svelte.ts', 'the login line, the mail door, the invite link and the move to another record are built on the bare host'],
   ['lib/ui/ShareMenu.svelte', 'a read-only page link is copied whole, so the host is written into it'],
   ['lib/data/offline.ts', 'the service worker scope is an absolute URL, never a record address `at()` builds'],
+  ['routes/signin/+page.svelte', 'the Google button goes to `/auth/google/start`, which is the host\'s and not under the app'],
 ]);
 
 test('NO ADDRESS IN THE APP IS RENDERED WITHOUT `at()`, and no record call goes to the bare origin', () => {

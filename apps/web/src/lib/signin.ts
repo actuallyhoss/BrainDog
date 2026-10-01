@@ -42,6 +42,8 @@ export type Ways = {
   lead: 'passkey' | 'magic' | 'key' | null;
   /** The server key's block starts open: on first run, or when it is the only way in. */
   keyOpen: boolean;
+  /** The host signs people in with Google. Never the lead: it is a link away from this screen, not a press on it. */
+  google?: true;
 };
 
 export type State =
@@ -80,7 +82,7 @@ function waysOf(it: Methods, webauthn: boolean): Ways | null {
   /* No passkey exists yet on first run, so a passkey button could not sign anybody in. */
   const passkey = it.passkey && webauthn && !first;
   const lead = passkey ? 'passkey' : it.key && first ? 'key' : it.magic ? 'magic' : it.key ? 'key' : null;
-  return { passkey, magic: it.magic, key: it.key, lead, keyOpen: it.key && (first || lead === 'key') };
+  return { passkey, magic: it.magic, key: it.key, lead, keyOpen: it.key && (first || lead === 'key'), ...(it.google ? { google: true as const } : {}) };
 }
 
 function signedIn(who: Who, it: Methods, s: Seen): State {
@@ -149,6 +151,28 @@ export function stateOf(s: Seen): State {
   if (step.at === 'sent') return { name: 'link-sent', ways, email: step.email };
   if (!ways) return { name: 'not-configured' };
   return { name: 'signed-out', ways, note: step.at === 'out' ? 'out' : ways.lead === null ? 'unsupported' : null };
+}
+
+/** Why a sign-in through Google came back here, as the host's redirect says it in `?google=`. */
+export type GoogleWhy = 'cancelled' | 'unknown' | 'unverified' | 'locked' | 'failed';
+
+const GOOGLE_WHYS: readonly string[] = ['cancelled', 'unknown', 'unverified', 'locked', 'failed'];
+
+/** What `?google=` says, or `null` for an address that says nothing this screen knows. */
+export function googleWhy(search: string): GoogleWhy | null {
+  const said = new URLSearchParams(search).get('google') ?? '';
+  return GOOGLE_WHYS.includes(said) ? (said as GoogleWhy) : null;
+}
+
+/**
+ * Where the Google button goes: the host's start, carrying where to land when that is not the app's front.
+ *
+ * WITH THE ORIGIN, because `/auth/*` is the host's and not under the app, and an address that starts with `/` is one
+ * `Button` puts under `/app` (`at()` in `at.ts`).
+ */
+export function googleStart(goTo: string, origin: string): string {
+  const start = `${origin}/auth/google/start`;
+  return goTo === `${BASE}/` ? start : `${start}?${new URLSearchParams({ next: goTo })}`;
 }
 
 /** `sessionStorage`, as far as `onwardOf` touches it. */

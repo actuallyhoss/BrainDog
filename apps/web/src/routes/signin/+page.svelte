@@ -36,7 +36,7 @@
   import { at, BASE } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
-  import { onwardOf, stateOf, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
+  import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
   import { actable, firstDoor, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -71,6 +71,9 @@
    */
   let keyOpen = $state(false);
   let emailField = $state<HTMLInputElement | undefined>(undefined);
+  /** Why a sign-in through Google came back here without a session, until the next press. */
+  let fromGoogle = $state<GoogleWhy | null>(null);
+  let origin = $state('');
 
   const view = $derived(stateOf({ methods: asked, entered, link, step, secure: here.secure, webauthn: here.webauthn, now }));
   const asking = $derived(step.at === 'asking' ? step.how : null);
@@ -164,6 +167,14 @@
        WHERE HE GOES AFTERWARDS IS READ FIRST, because it needs to know whether a link came, and `takeLink` is about
        to clear the fragment that says so. */
     goTo = onwardOf(location.search, location.hash, tabShelf());
+    origin = location.origin;
+    /* WHAT GOOGLE'S WAY BACK SAID LEAVES THE ADDRESS TOO, so a reload does not say it again. */
+    fromGoogle = googleWhy(location.search);
+    if (fromGoogle) {
+      const kept = new URLSearchParams(location.search);
+      kept.delete('google');
+      history.replaceState(history.state, '', `${location.pathname}${kept.size > 0 ? `?${kept}` : ''}${location.hash}`);
+    }
     link = takeLink(location.hash, clearHash);
     void load();
     window.addEventListener('hashchange', arrived);
@@ -205,6 +216,7 @@
   /** One press: the step says it is out, and what came back decides the next one. */
   async function run<T>(how: How, work: () => Promise<Said<T>>, then: (value: T) => void) {
     if (step.at === 'asking') return;
+    fromGoogle = null;
     step = { at: 'asking', how };
     const at = opened();
     const out = await work();
@@ -405,6 +417,7 @@
       {/if}
 
       {#if note}<p class="status" role="status">{note}</p>{/if}
+      {#if fromGoogle && doors}<p class="status" role="status">{copy.googleSaid[fromGoogle]}</p>{/if}
 
       <!-- ONE BLOCK FOR EVERY STATE THAT OFFERS A WAY IN, so moving between signed out, asking and
            rejected never remounts it: an open server-key block stays open, and a typed email stays. -->
@@ -424,6 +437,18 @@
               </Button>
               <p class="why" id="in-passkey-why">{words.passkeyLine}</p>
             </div>
+          {/if}
+
+          <!-- A LINK AND NOT A PRESS: the host sends the browser to Google and back, and the page is loaded again signed
+               in. The mark is drawn in the ink, as every glyph here is. -->
+          {#if doors.google}
+            <Button href={googleStart(goTo, origin)} data-sveltekit-reload>
+              <svg class="g" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                />
+              </svg>{copy.withGoogle}
+            </Button>
           {/if}
 
           {#if doors.magic}
@@ -554,6 +579,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+  }
+
+  .g {
+    flex: none;
+    inline-size: 16px;
+    block-size: 16px;
+    fill: currentColor;
   }
 
   /* EVERY WAY IN IS THE WIDTH OF THE COLUMN and as tall as a field beside it: 40 under a mouse, 44 under a thumb

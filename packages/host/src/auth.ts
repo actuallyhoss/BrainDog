@@ -399,6 +399,17 @@ export type SignupFlow = 'signup.start' | 'signup.verify' | 'signup.name';
 
 const SIGNUP: ReadonlySet<string> = new Set<SignupFlow>(['signup.start', 'signup.verify', 'signup.name']);
 
+/**
+ * The two halves of signing in with Google, which are routes and never Directory flows.
+ *
+ * THE WORKER ANSWERS BOTH ITSELF (`apps/worker/src/google.ts`): Google proves the address, and the Directory is asked
+ * for a sign-in link and has it spent, through the two `magic` flows it already has. A self-host has no Google
+ * client, so `serveAuth` answers each row as a way in this host does not offer.
+ */
+export type GoogleFlow = 'google.start' | 'google.callback';
+
+const GOOGLE: ReadonlySet<string> = new Set<GoogleFlow>(['google.start', 'google.callback']);
+
 /** One sign-in route: where it is, who serves it, and what it needs. */
 export type AuthRoute = {
   path: string;
@@ -407,7 +418,7 @@ export type AuthRoute = {
    * The `AuthCall` it becomes. `provision` is the one that is not a flow: it makes a record, then mints a claim.
    * The two device flows reach a record and never the Directory, and `device.ts` answers them.
    */
-  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow | SignupFlow;
+  flow: AuthFlow | 'provision' | DeviceFlow | InviteFlow | SignupFlow | GoogleFlow;
   /** The server key is the self-host's; provisioning and sign-up are the Worker's; everything else is both. */
   on: 'both' | 'selfhost' | 'worker';
   /** Nothing, the session cookie, or the operator's key. A route that needs a session still answers without one: 401. */
@@ -445,6 +456,8 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/signup/start', method: 'POST', flow: 'signup.start', on: 'worker', needs: 'nothing', what: 'Ask for a record of your own: a link is mailed to prove the address. `{ email, slug, name?, tz? }`.' },
   { path: '/auth/signup/verify', method: 'POST', flow: 'signup.verify', on: 'worker', needs: 'nothing', what: 'Spend the mailed link, once: the person is made and signed in. `{ token }`.' },
   { path: '/auth/signup/name', method: 'GET', flow: 'signup.name', on: 'worker', needs: 'nothing', what: 'Whether a name for a new record is free, `?slug=`, and why not when it is not.' },
+  { path: '/auth/google/start', method: 'GET', flow: 'google.start', on: 'worker', needs: 'nothing', what: 'Send the browser to Google to say which address it is signed in as. `?next=` is where to land afterwards.' },
+  { path: '/auth/google/callback', method: 'GET', flow: 'google.callback', on: 'worker', needs: 'nothing', what: 'Back from Google: an address somebody here has is signed in, and any other is sent to the sign-in page told why.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
   { path: '/auth/suspend', method: 'POST', flow: 'suspend', on: 'worker', needs: 'operator', what: 'Stop somebody signing in, `{ email }`, ending every session they hold, or let them in again, `{ email, suspended: false }`.' },
@@ -473,6 +486,8 @@ export type MethodsBody = {
   why?: Why;
   me: Who | null;
   firstRun?: boolean;
+  /** This host has a Google client and can spend a sign-in link, so the screen offers the button. Absent is no. */
+  google?: true;
 };
 
 /** The cookie's two names. `__Host-` pins it to this host, `/` and `Secure`, so no subdomain can plant one. */
@@ -713,6 +728,8 @@ export type AuthDoor = {
   device?: DeviceDoor | undefined;
   /** The record and Directory halves of an invitation link. Absent where nobody can accept one, and the route is 404. */
   invite?: InviteDoor | undefined;
+  /** This host signs people in with Google, which `/auth/methods` says so the screen draws the button. */
+  google?: boolean | undefined;
 };
 
 type Header = readonly [string, string];
@@ -931,7 +948,7 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
 
   /* A SIGN-UP ROW IS DECLARED AND NOT YET SERVED: the Directory has no such flow to hand it to. The unit that adds
      the three flows to `AuthCall` removes this line, and `callOf`'s `never` then asks it for their three cases. */
-  if (SIGNUP.has(route.flow)) return off();
+  if (SIGNUP.has(route.flow) || GOOGLE.has(route.flow)) return off();
 
   const call = callOf(route.flow as AuthFlow, body, sid, door.ip);
   if (!call) return off();
@@ -970,7 +987,8 @@ async function methods(door: AuthDoor, mode: CookieMode | null, sid: string | un
 
   const m = out.body as Methods;
   if (!m.configured) return reply(200, { ok: true, value: { ...nothing, why: 'not-configured' } satisfies MethodsBody }, clear);
-  const body: MethodsBody = { passkey: m.passkey, magic: m.magic, key: m.key, open: false, me: m.me, firstRun: m.firstRun };
+  /* GOOGLE NEEDS THE LINK FLOWS, because a sign-in through it is a link minted and spent on the spot. */
+  const body: MethodsBody = { passkey: m.passkey, magic: m.magic, key: m.key, open: false, me: m.me, firstRun: m.firstRun, ...(door.google === true && m.magic ? { google: true as const } : {}) };
   return answered({ ...out, body }, mode);
 }
 
