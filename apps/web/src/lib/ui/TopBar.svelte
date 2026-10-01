@@ -40,7 +40,7 @@
     onfind?: (() => void) | undefined;
   } = $props();
 
-  const words = { unnamed: 'My BrainDog', you: 'You' } as const;
+  const words = { unnamed: 'My BrainDog', you: 'You', find: 'Ask, add, or jump to anything' } as const;
 
   /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
   const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
@@ -54,7 +54,7 @@
   <div class="bar-places">
     {#each entries as item (item.key)}
       <a class="bar-item tap" href={at(item.href)} aria-current={isHere(item, path) ? 'page' : undefined}>
-        <Icon name={item.icon as IconName} size="s" /><span class="bar-name">{item.label}</span>
+        <Icon name={item.icon as IconName} size="m" /><span class="bar-name">{item.label}</span>
         {#if item.count}<span class="tally num" data-waiting={item.key === 'decide' ? '' : undefined} aria-label={`${item.count} ${copy.openQuestions}`}
             >{item.count}</span
           >{/if}
@@ -62,17 +62,17 @@
     {/each}
     <button
       type="button"
-      class="bar-item tap"
-      aria-label={behind ? copy.navBehindMore(behind) : undefined}
+      class="bar-item bar-more tap"
+      aria-label={behind ? copy.navBehindMore(behind) : copy.more}
+      title={behind ? copy.navBehindMore(behind) : copy.more}
       onclick={() => onmore?.()}
     >
-      <span class="bar-name">{copy.more}</span>
-      {#if behind}<span class="tally num">{behind}</span>{/if}
+      <Icon name="more" size="m" />
     </button>
   </div>
 
   <button type="button" class="bar-find tap" onclick={() => onfind?.()}>
-    <Icon name="search" size="s" /><span class="bar-find-words">{copy.searchRecord}</span><kbd>/</kbd>
+    <Icon name="search" size="m" /><span class="bar-find-words">{words.find}</span><kbd>/</kbd>
   </button>
   <a class="bar-face tap" href={at('/settings')} aria-label={copy.settings} title={person || words.you}>{(person || words.you).slice(0, 1)}</a>
 </nav>
@@ -84,7 +84,7 @@
     align-items: center;
     gap: var(--sp-4);
     min-inline-size: 0;
-    min-block-size: 48px;
+    min-block-size: 44px;
   }
 
   .bar-record {
@@ -128,13 +128,13 @@
   .bar-item {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--sp-2);
     flex: none;
-    min-block-size: 38px;
+    min-block-size: 40px;
     padding: 0 14px;
     border: 0;
     background: none;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-md);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-base);
@@ -155,6 +155,10 @@
   .bar-item[aria-current='page'] {
     background: var(--ink);
     color: var(--on-ink);
+  }
+
+  .bar-more {
+    padding: 0 10px;
   }
 
   .bar-name {
@@ -196,13 +200,13 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    flex: 0 1 300px;
-    min-inline-size: 150px;
+    flex: 0 1 400px;
+    min-inline-size: 180px;
     min-block-size: 40px;
     padding: 0 8px 0 14px;
-    border: 0;
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
     background: var(--bg);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-md);
     color: var(--dim);
     font: inherit;
     font-size: var(--t-base);
@@ -234,8 +238,8 @@
     display: grid;
     place-items: center;
     flex: none;
-    inline-size: 38px;
-    block-size: 38px;
+    inline-size: 36px;
+    block-size: 36px;
     background: var(--ink);
     border-radius: var(--r-pill);
     color: var(--on-ink);

@@ -51,6 +51,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import LeadHead from '$lib/ui/LeadHead.svelte';
   import Panel from '$lib/ui/Panel.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
@@ -109,6 +110,7 @@
     noProject: 'No project',
     project: 'Project',
     projects: 'Filter by project',
+    projectsTile: 'Projects',
     more: (n: number) => `${n} more`,
     fewer: 'Fewer',
     search: 'Search tasks',
@@ -1143,34 +1145,14 @@
 <!-- THE WHOLE SCREEN NARROWS BESIDE THE DOCKED PANEL, title row and all: the panel sets `--dock-w` while it is open, and
      this pads by what it takes past the page's own gutter, so the toolbar never sits under the panel. -->
 <div class="work">
-  <PageHead title={words.title} count={answer ? openCount : undefined} sentence={sentence?.text} needs={sentence?.needs || undefined}>
-    {#snippet actions()}
-      {#if answer && shape}
-        <div class="seg" role="group" aria-label={words.whose}>
-          {#each WHOSE as w (w)}
-            <button type="button" class="seg-btn tap" aria-pressed={whose === w} onclick={() => (whose = w)}>
-              {words.whoseSaid[w]}<span class="seg-n num">{whoseN[w]}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-      <button
-        type="button"
-        class="keys-btn circle tap"
-        aria-expanded={legend}
-        aria-controls="work-keys"
-        aria-label={words.keys}
-        title="{words.keys} (?)"
-        onclick={() => (legend = !legend)}
-      >
-        <Icon name="keyboard" size="m" />
-      </button>
-      {#if answer && shape && mayAdd}
-        <button type="button" class="circle tap" aria-label={words.capture} title="{words.capture} (n)" onclick={() => captureBox?.focus()}>
-          <Icon name="plus" size="m" />
-        </button>
-      {/if}
-    {/snippet}
+  <PageHead
+    title={words.title}
+    count={answer ? openCount : undefined}
+    sentence={sentence?.text}
+    needs={sentence?.needs || undefined}
+    led={Boolean(answer && shape && sentence)}
+  >
+    {#snippet actions()}{@render headTools()}{/snippet}
   </PageHead>
 
   <div class="page" bind:this={root}>
@@ -1181,6 +1163,14 @@
     {:else if !answer}
       <ReadState state={work.state === 'ready' ? 'waiting' : work.state} refusal={work.refusal} onretry={() => void work.reread()} />
     {:else if shape}
+      <div class="cols">
+      <!-- ══ THE LEAD TILE: the sentence, the capture line and the bands ══ -->
+      <div class="lead-tile tile">
+      {#if sentence}
+        <LeadHead meta={daySaid(today)} sentence={sentence.text} needs={sentence.needs || undefined}>
+          {#snippet aside()}{@render headTools()}{/snippet}
+        </LeadHead>
+      {/if}
       <!-- ══ THE CAPTURE LINE, and how the typed words read ══ -->
       {#if mayAdd}
         <form class="capture" onsubmit={add}>
@@ -1262,32 +1252,6 @@
           <span><Kbd keys="↵" /> open</span>
           <span><Kbd keys="Esc" /> cancel</span>
         </p>
-      {/if}
-
-      <!-- ══ THE TIER CHART: one square a task, yours against the agents' ══ -->
-      {#if tiers}
-        <Tile icon="chart-column" title={words.tier.title} count={tiers.total}>
-          <div class="tier">
-            <div class="tier-chart">
-              {#each [{ name: tiers.people ? words.tier.people : words.tier.yours, side: tiers.yours }, { name: words.tier.agents, side: tiers.agents }] as w (w.name)}
-                <div class="tier-side">
-                  <p class="tier-name"><span class="tier-who">{w.name}</span> <span class="num">{w.side.n}</span></p>
-                  {#if w.side.n > 0}
-                    <div class="tier-waffle" style:inline-size="{w.side.columns * 13 - 3}px">
-                      <Waffle parts={w.side.parts} columns={w.side.columns} summary={w.side.said} />
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-              <ul class="viz tier-key">
-                {#each tiers.key as k (k.label)}
-                  <li><span class="key-dot" data-tone={k.tone}></span><span class="num">{k.n}</span> {k.label}</li>
-                {/each}
-              </ul>
-            </div>
-            <p class="tier-read">{tiers.reading}</p>
-          </div>
-        </Tile>
       {/if}
 
       <!-- ══ THE BANDS, on the ground ══ One keyed list, headings and rows together, so a row keeps its element as it
@@ -1456,9 +1420,82 @@
           <p class="none">{rows.length === 0 ? words.nothing : words.nothingHere}</p>
         {/if}
       </div>
+      </div>
+
+      <!-- ══ BESIDE IT: the projects, and the tiers ══ -->
+      <div class="side">
+        {#if shape.project && choices.length > 1}
+          <Tile class="side-projects" icon="projects" title={words.projectsTile}>
+            <ul class="plist">
+              {#each choices as c (c.key)}
+                <li>
+                  <button type="button" class="pl tap" aria-pressed={pick === c.key} onclick={() => (pick = c.key)}>
+                    {#if c.key !== ALL && c.key !== NONE}<Face name={c.label} of="project" size="s" />{/if}
+                    <span class="pl-name">{c.label}</span><span class="pl-n num">{c.count}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </Tile>
+        {/if}
+      <!-- ══ THE TIER CHART: one square a task, yours against the agents' ══ -->
+      {#if tiers}
+        <Tile icon="chart-column" title={words.tier.title} count={tiers.total}>
+          <div class="tier">
+            <div class="tier-chart">
+              {#each [{ name: tiers.people ? words.tier.people : words.tier.yours, side: tiers.yours }, { name: words.tier.agents, side: tiers.agents }] as w (w.name)}
+                <div class="tier-side">
+                  <p class="tier-name"><span class="tier-who">{w.name}</span> <span class="num">{w.side.n}</span></p>
+                  {#if w.side.n > 0}
+                    <div class="tier-waffle" style:inline-size="{w.side.columns * 13 - 3}px">
+                      <Waffle parts={w.side.parts} columns={w.side.columns} summary={w.side.said} />
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+              <ul class="viz tier-key">
+                {#each tiers.key as k (k.label)}
+                  <li><span class="key-dot" data-tone={k.tone}></span><span class="num">{k.n}</span> {k.label}</li>
+                {/each}
+              </ul>
+            </div>
+            <p class="tier-read">{tiers.reading}</p>
+          </div>
+        </Tile>
+      {/if}
+      </div>
+      </div>
     {/if}
   </div>
 </div>
+
+{#snippet headTools()}
+  {#if answer && shape}
+    <div class="seg" role="group" aria-label={words.whose}>
+      {#each WHOSE as w (w)}
+        <button type="button" class="seg-btn tap" aria-pressed={whose === w} onclick={() => (whose = w)}>
+          {words.whoseSaid[w]}<span class="seg-n num">{whoseN[w]}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+  <button
+    type="button"
+    class="keys-btn circle tap"
+    aria-expanded={legend}
+    aria-controls="work-keys"
+    aria-label={words.keys}
+    title="{words.keys} (?)"
+    onclick={() => (legend = !legend)}
+  >
+    <Icon name="keyboard" size="m" />
+  </button>
+  {#if answer && shape && mayAdd}
+    <button type="button" class="circle tap" aria-label={words.capture} title="{words.capture} (n)" onclick={() => captureBox?.focus()}>
+      <Icon name="plus" size="m" />
+    </button>
+  {/if}
+{/snippet}
 
 {#snippet strip()}
   <span class="strip" aria-hidden="true">
@@ -2034,16 +2071,116 @@
 
   /* ── the bands ── */
 
-  /* THE BANDS IN ONE TILE, white on the board. */
+  /* THE LEAD TILE AND WHAT SITS BESIDE IT: two parts to one, 12 apart, and one column under 1180px. */
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  .lead-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: var(--sp-4) 12px 12px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+  }
+
+  .lead-tile > .capture,
+  .lead-tile > .tools,
+  .lead-tile > .legend,
+  .lead-tile > .none {
+    margin-inline: var(--sp-2);
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  /* THE PROJECTS, two to a line: the one chosen is ink. */
+  .plist {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pl {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .pl:hover {
+    background: var(--hover-wash);
+  }
+
+  .pl[aria-pressed='true'] {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .pl-name {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pl-n {
+    color: var(--dim);
+    font-weight: 400;
+  }
+
+  .pl[aria-pressed='true'] .pl-n {
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  @media (width >= 1180px) {
+    .chips {
+      display: none;
+    }
+  }
+
+  @media (width < 1180px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .side :global(.side-projects) {
+      display: none;
+    }
+  }
+
+  /* THE BANDS, inside the lead tile. */
   .board {
     display: flex;
     flex-direction: column;
     margin-block-start: var(--sp-2);
     min-inline-size: 0;
-    padding: var(--sp-4) 12px 12px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
   }
 
   .board .head-row {

@@ -63,6 +63,7 @@
     icon,
     hue,
     define,
+    led = false,
   }: {
     title: string;
     /** The glyph the register or page declares, drawn beside the title only when `hue` is given. */
@@ -105,6 +106,11 @@
     define?: Noun | undefined;
     /** The toolbar: glass controls 36 high and 6 apart, and at most one ink primary. */
     actions?: Snippet | undefined;
+    /**
+     * A lead tile draws this head on a wide screen (`LeadHead.svelte`), so from 900px up this one is not drawn. The
+     * phone's bar, title and sentence are unchanged.
+     */
+    led?: boolean | undefined;
   } = $props();
 
   /* THE COMPACT BAR ARRIVES ONCE SOMETHING HAS SCROLLED UNDER THE HEAD. A zero-height mark where the head starts leaves
@@ -184,12 +190,15 @@
 {#if kicker}
   <!-- Over the title and scrolling with the page: the row that stays is the title's. -->
   {#if back}
-    <a class="kicker kicker-link tap" href={at(back)}>{kicker}</a>
+    <a class="kicker kicker-link tap" href={at(back)} data-led={led ? '' : undefined}>{kicker}</a>
   {:else}
-    <p class="kicker">{kicker}</p>
+    <p class="kicker" data-led={led ? '' : undefined}>{kicker}</p>
   {/if}
 {/if}
-<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined} data-said={sentence ? '' : undefined}>
+<!-- THE HEAD AND ITS SENTENCE ARE ONE WHITE TILE ON A WIDE SCREEN, when the page says a sentence. Under 900px, and on a
+     page with no sentence, the wrapper has no box of its own. -->
+<div class="lead-wrap" data-said={sentence ? '' : undefined} data-led={led ? '' : undefined}>
+<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined} data-said={sentence ? '' : undefined} data-led={led ? '' : undefined}>
   <div class="head-main">
     <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from
          whoever typed it, the glyph beside it is ours. An Arabic title in an English paragraph
@@ -226,16 +235,17 @@
   </div>
 </header>
 {#if sentence}
-  <p class="sentence">
+  <p class="sentence" data-led={led ? '' : undefined}>
     {#if said}{said.before}{#if said.needs}<span class="needs" data-needs>{said.needs}</span>{/if}{said.after}{:else if typeof sentence !== 'string'}{@render sentence()}{/if}
   </p>
 {/if}
+</div>
 <!--
   THE DEFINITION IS READ ONCE, SO IT DOES NOT RIDE IN THE STICKY HEAD. `19 §6` gives the definition its place, the
   first time the word appears; it does not give it the top of the screen for as long as the page is open. Out here it
   is read where it is met and scrolls away with the list, and it still shows once and never again.
 -->
-{#if define}<p class="head-define"><Define noun={define} /></p>{/if}
+{#if define}<p class="head-define" data-led={led ? '' : undefined}><Define noun={define} /></p>{/if}
 
 <style>
   /* Same size as the figure, dimmed: it modifies the number rather than being part of it. */
@@ -295,6 +305,11 @@
     box-sizing: border-box;
     max-inline-size: var(--page-max);
     padding: var(--inset) var(--gutter) var(--sp-2);
+  }
+
+  /* NO BOX OF ITS OWN, except on a wide screen with a sentence (below): the head sticks to the scroller, not to this. */
+  .lead-wrap {
+    display: contents;
   }
 
   /* A kicker already stands between the row and the top of the work. */
@@ -450,20 +465,63 @@
    * says. Scrolled, the compact bar keeps the name, as before.
    */
   @media (width >= 900px) {
-    .head[data-said]:not([data-under]) .title {
+    /* A LEAD TILE DRAWS THE HEAD HERE, so this one steps aside. `display: none` takes its `h1` out of the outline too,
+       and the tile's own is the page's heading. */
+    [data-led] {
+      display: none;
+    }
+
+    /* THE LEAD TILE: white, 12 in from the gutter, holding the page's name, its toolbar and the sentence. The head does
+       not stick inside it; the top bar is always in view and the tile scrolls with the page. */
+    .lead-wrap[data-said] {
+      display: block;
+      box-sizing: border-box;
+      max-inline-size: calc(var(--page-max) - var(--gutter) * 2);
+      margin: var(--sp-2) var(--gutter) 0;
+      padding: var(--sp-3) var(--sp-5) var(--sp-5);
+      background: var(--bg);
+      border-radius: var(--r-lg);
+    }
+
+    .lead-wrap[data-said] .head {
+      position: static;
+      padding: 0;
+    }
+
+    .lead-wrap[data-said] .head::before {
+      display: none;
+    }
+
+    .lead-wrap[data-said] .sentence {
+      padding: 0;
+    }
+
+    /* ON THE WHITE TILE a quiet control takes the tile's inner fill, since white on white is no control at all. */
+    .lead-wrap[data-said] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
+    .lead-wrap[data-said] .head-actions :global(.segmented) {
+      background: var(--s1);
+    }
+
+    .lead-wrap[data-said][data-led] {
+      display: none;
+    }
+
+    .head[data-said] .title {
+      overflow: visible;
+      white-space: normal;
       color: var(--ink2);
       font-size: var(--t-md);
       font-weight: 500;
       letter-spacing: 0;
     }
 
-    .head[data-said]:not([data-under]) .count {
+    .head[data-said] .count {
       font-size: var(--t-md);
     }
 
     .head[data-said] + .sentence {
-      max-inline-size: calc(24em + var(--gutter) * 2);
-      margin-block: var(--sp-1) var(--sp-5);
+      max-inline-size: 24em;
+      margin-block: var(--sp-1) 0;
       color: var(--ink);
       font-size: var(--t-3xl);
       font-weight: 600;

@@ -58,6 +58,7 @@
   import type { RowWriter } from '$lib/record/rows-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { dayOf, daySaid, dueSaid } from '$lib/work/board.ts';
+  import LeadHead from '$lib/ui/LeadHead.svelte';
   import { TASKS } from '$lib/work/list.ts';
   import { captureOf, contextOf, freshFields, isQuestion } from '$lib/work/capture.ts';
   import {
@@ -512,7 +513,7 @@
 
 <svelte:head><title>{titleOf(copy.today)}</title></svelte:head>
 
-<PageHead title={copy.today} count={t ? needing : undefined} sentence={said?.text} needs={said?.needs || undefined}>
+<PageHead title={copy.today} count={t ? needing : undefined} sentence={said?.text} needs={said?.needs || undefined} led={Boolean(t && said)}>
   {#snippet actions()}
     {#if takesTasks && !data.refused}
       <button
@@ -547,18 +548,37 @@
         </Tile>
       </div>
 
-      <!-- ══ NEEDS YOU ══ -->
-      <div class="t-needs ground">
+      <!-- ══ THE LEAD TILE: the day, the sentence, and what needs you ══ -->
+      <div class="t-needs tile">
+        {#if said}
+          <LeadHead meta={daySaid(day)} sentence={said.text} needs={said.needs || undefined}>
+            {#snippet aside()}
+              {#if keyed.length > 0}
+                <span class="hints" aria-hidden="true">
+                  <Kbd keys="j" /><Kbd keys="k" /><span class="hint">{words.keys.move}</span>
+                  {#if mayWrite}<Kbd keys="x" /><span class="hint">{words.keys.done}</span>{/if}
+                  <Kbd keys="↵" /><span class="hint">{words.keys.open}</span>
+                  {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
+                </span>
+              {/if}
+              {#if takesTasks}
+                <button
+                  type="button"
+                  class="add tap"
+                  aria-label={words.addTask}
+                  title={words.addTip}
+                  aria-expanded={capturing}
+                  aria-controls={capturing ? 'today-capture' : undefined}
+                  onclick={() => (capturing ? closeCapture() : void openCapture())}
+                >
+                  <Icon name="plus" size="l" />
+                </button>
+              {/if}
+            {/snippet}
+          </LeadHead>
+        {/if}
         <Section title={words.needs} count={needing}>
           {#snippet aside()}
-            {#if keyed.length > 0}
-              <span class="hints" aria-hidden="true">
-                <Kbd keys="j" /><Kbd keys="k" /><span class="hint">{words.keys.move}</span>
-                {#if mayWrite}<Kbd keys="x" /><span class="hint">{words.keys.done}</span>{/if}
-                <Kbd keys="↵" /><span class="hint">{words.keys.open}</span>
-                {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
-              </span>
-            {/if}
             {#if data.lists.some((l) => l.id === TASKS)}
               <a class="aside-link tap" href={at('/?work')}>{words.openWork}<Icon name="arrow" size="s" /></a>
             {/if}
@@ -626,7 +646,7 @@
 
       <!-- ══ THE DAYS COMING UP ══ -->
       {#if groups.length > 0}
-        <div class="t-coming ground">
+        <div class="t-coming">
           {#each groups as g (g.key)}
             <Section title={g.title} count={g.items.length}>
               {#snippet aside()}<span class="span-said">{g.span}</span>{/snippet}
@@ -657,7 +677,7 @@
       <!-- ══ THE TILES ══ -->
       <div class="t-side">
         {#if t.runs.length > 0 || sessions.length > 0}
-          <Tile icon="session" title={words.agentsTile} count={t.runs.length} meta={t.host ? words.allOn(t.host) : undefined}>
+          <Tile class="t-agents" icon="session" title={words.agentsTile} count={t.runs.length} meta={t.host ? words.allOn(t.host) : undefined}>
             {#if t.runs.length > 0}
               <ul class="runs">
                 {#each t.runs as r, i (r.seq ?? i)}
@@ -682,10 +702,10 @@
             {#if agentsSaid}<p class="reading">{agentsSaid}</p>{/if}
           </Tile>
         {:else}
-          <p class="none side-none">{words.workingNone}</p>
+          <p class="none side-none t-agents">{words.workingNone}</p>
         {/if}
 
-        <Tile icon="activity" title={words.since} href="/audit" hrefLabel={words.activity}>
+        <Tile class="t-since" icon="activity" title={words.since} href="/audit" hrefLabel={words.activity}>
           {#if t.since.total > 0}
             <div class="figure-row">
               <span class="figure num">{t.since.total.toLocaleString('en-GB')}{t.since.capped ? '+' : ''}</span>
@@ -711,7 +731,7 @@
         </Tile>
 
         {#if money && lead && cashTile}
-          <Tile icon="money" title={words.cash} href="/p/money" hrefLabel={words.money}>
+          <Tile class="t-cash" icon="money" title={words.cash} href="/p/money" hrefLabel={words.money}>
             <div class="figure-row cash-row">
               <span class="figure num">{lead.amount}</span>
               {#if forecast}
@@ -742,7 +762,7 @@
           </Tile>
         {:else if money}
           <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile. -->
-          <div class="ground">
+          <div class="t-cash">
             <Section title={words.cash}>
               {#snippet aside()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
               {#if money.cash.length === 0}
@@ -841,40 +861,60 @@
      may shrink to nothing, so no tile or row can push the page wider than the window. */
   .today {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 404px);
-    grid-template-areas:
-      'week week'
-      'needs side'
-      'coming side';
-    grid-template-rows: auto auto 1fr;
-    gap: var(--sp-5) var(--sp-5);
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: var(--inset);
+    min-inline-size: 0;
+  }
+
+  /* THE LEAD TILE: white, the day and the sentence at its head, and what needs you under them. It runs the height of
+     the two tiles beside it. */
+  .t-needs {
+    grid-column: 1 / span 7;
+    grid-row: 1 / span 2;
+    min-inline-size: 0;
+    padding: var(--sp-4) 12px 12px;
+    background: var(--bg);
+    border-radius: var(--r-lg);
+  }
+
+  .t-needs :global(.section-head) {
+    padding-inline: var(--sp-2);
+  }
+
+  .t-side {
+    display: contents;
+  }
+
+  .today :global(.t-agents) {
+    grid-column: 8 / -1;
+    grid-row: 1;
+  }
+
+  .today :global(.t-since) {
+    grid-column: 8 / -1;
+    grid-row: 2;
+  }
+
+  /* THE ROW UNDER THEM: cash, and the days coming up with what falls on them. */
+  .today :global(.t-cash) {
+    grid-column: 1 / span 5;
+    grid-row: 3 / span 2;
     min-inline-size: 0;
   }
 
   .t-week {
-    grid-area: week;
-    min-inline-size: 0;
-  }
-
-  .t-needs {
-    grid-area: needs;
+    grid-column: 6 / -1;
+    grid-row: 3;
     min-inline-size: 0;
   }
 
   .t-coming {
-    grid-area: coming;
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-5);
-    min-inline-size: 0;
-  }
-
-  .t-side {
-    grid-area: side;
+    grid-column: 6 / -1;
+    grid-row: 4;
     display: flex;
     flex-direction: column;
     gap: var(--inset);
-    align-self: start;
     min-inline-size: 0;
   }
 
@@ -882,17 +922,22 @@
   @media (width < 1180px) {
     .today {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-areas:
-        'week'
-        'needs'
-        'side'
-        'coming';
-      grid-template-rows: none;
+    }
+
+    .t-needs,
+    .t-week,
+    .t-coming,
+    .today :global(.t-agents),
+    .today :global(.t-since),
+    .today :global(.t-cash) {
+      grid-column: auto;
+      grid-row: auto;
     }
 
     .t-side {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+      gap: var(--inset);
       align-items: start;
     }
   }
@@ -904,12 +949,23 @@
     }
 
     .today {
-      grid-template-areas:
-        'needs'
-        'side'
-        'week'
-        'coming';
       gap: var(--sp-4);
+    }
+
+    .t-needs {
+      order: 1;
+    }
+
+    .t-side {
+      order: 2;
+    }
+
+    .t-week {
+      order: 3;
+    }
+
+    .t-coming {
+      order: 4;
     }
 
     /* STRETCHED, NOT `start`: the column is the tile's width. At `start` a tile took its own widest line, and one
@@ -957,12 +1013,6 @@
     }
   }
 
-  /* ── on the ground ─────────────────────────────────────────────────────────── */
-
-  /* A WELL ON THE GROUND IS THE TILE'S WHITE, so it reads as a mark and not as a hole in the ground. */
-  .ground :global(.well:not([data-tone])) {
-    background: var(--bg);
-  }
 
   .rows {
     margin-block-start: calc(-1 * var(--sp-1));

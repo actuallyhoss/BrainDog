@@ -5,8 +5,8 @@
   the row size and 600, an optional count in the quiet ink, and at the far end either a link word with its arrow or a
   line of meta. `actions` sits there too, for a tile whose heading carries a control of its own.
 
-  NO TILE INSIDE A TILE, NO GLASS UNDER ONE, NO BORDER ROUND IT. The tile is told from the ground by its fill and its
-  level-one shadow in light, and by its fill alone in dark (the `--e1` token is empty there).
+  NO TILE INSIDE A TILE, NO GLASS UNDER ONE, NO BORDER ROUND IT, NO SHADOW. The tile is told from the board by its
+  fill alone, in light and in dark.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -85,7 +85,6 @@
     padding: 20px;
     background: var(--bg);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
     color: var(--ink);
   }
 

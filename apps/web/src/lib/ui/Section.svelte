@@ -42,7 +42,6 @@
     padding: var(--sp-4) 12px 12px;
     background: var(--bg);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
   }
 
   :global(:is(.tile, .sheet)) .section {
