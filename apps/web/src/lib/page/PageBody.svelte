@@ -506,7 +506,6 @@
     padding: var(--tile-pad);
     background: var(--bg);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
     /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
@@ -522,7 +521,6 @@
     padding: var(--tile-pad);
     background: var(--bg);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
   }
 
   .area[data-area='rail'] .box {
@@ -553,6 +551,29 @@
      heading still reads its text. */
   .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) > :global(.block-bar) {
     display: none;
+  }
+
+  /**
+   * ON A WIDE SCREEN THE PAGE'S SENTENCE IS A HEADLINE IN A WHITE TILE OF ITS OWN, 40/600, so the screen opens on what
+   * is true and the figures behind it follow.
+   */
+  @media (width >= 900px) {
+    .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+      padding: var(--sp-5) var(--sp-5) var(--sp-5);
+      background: var(--bg);
+      border-radius: var(--r-lg);
+    }
+
+    .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(p) {
+      max-inline-size: 22em;
+      margin: 0;
+      color: var(--ink);
+      font-size: var(--t-3xl);
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
   }
 
   /* A group heading keeps air above it and none below, so it reads as the head of the tiles after it. */
