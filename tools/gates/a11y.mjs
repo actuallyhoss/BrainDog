@@ -775,6 +775,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
      * finding was sixteen rows on `/r/obligations`. Over chrome alone every one of them has zero elements
      * to look at and reports zero violations.
      */
+    if (ready.retried()) console.log(`  ${ready.retried()} screen(s) settled only after one reload`);
     const blind = ready.nothingDrawn();
     if (blind) console.error(`\n  ${blind}`);
 

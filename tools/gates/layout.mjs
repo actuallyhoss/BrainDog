@@ -671,6 +671,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * gate exists to measure a table, a card list and a row, so a run that measured none of them is a
      * run that asserted nothing about the thing it is for.
      */
+    if (ready.retried()) console.log(`  ${ready.retried()} screen(s) settled only after one reload`);
     const blind = ready.nothingDrawn();
     if (blind) console.error(`  ${blind}`);
 

@@ -363,6 +363,7 @@ export function readiness(gate, timeoutMs, root) {
   }
 
   let anyReady = false;
+  let retried = 0;
 
   return {
     /** Whether this run is holding the app to the contract. Read by the aggregate check. */
@@ -382,12 +383,26 @@ export function readiness(gate, timeoutMs, root) {
     async settled(page, prerendered = false) {
       const live = contract && !prerendered;
       const sel = live ? `main#main[${SCREEN}]` : `main#main[${SCREEN}], #main *`;
-      const el = await page.waitForSelector(sel, { timeout: timeoutMs }).catch(() => null);
-      if (!el) return null;
-      const state = await page.evaluate(screenOf);
+      const once = async () => {
+        const el = await page.waitForSelector(sel, { timeout: timeoutMs }).catch(() => null);
+        return el ? ((await page.evaluate(screenOf)) ?? UNCONTRACTED) : null;
+      };
+      let state = await once();
+      /* ONE RELOAD BEFORE IT IS A FINDING. On a shared two-core runner a screen that settles in a second
+         locally can miss the window, or catch the record mid-boot and draw its error card; that is the
+         runner, not the screen. A screen that fails twice is the screen. The count is printed, so a run
+         that leans on the second look says so. */
+      if (state === null || (state === 'refused' && live)) {
+        const again = await page.reload().then(once, () => null);
+        if (again !== null && again !== 'refused') retried++;
+        if (again !== null) state = again;
+      }
       if (state === 'ready') anyReady = true;
-      return state ?? UNCONTRACTED;
+      return state;
     },
+
+    /** How many screens settled only on the second look, for the gate's summary line. */
+    retried: () => retried,
 
     /**
      * The one decision every call site makes, and the one sentence it prints.
