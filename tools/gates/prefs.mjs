@@ -351,6 +351,39 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       ],
       probe: () => [...document.querySelectorAll('#main [data-pen]')].map((row) => row.getAttribute('data-pen')).join('\n'),
     },
+    {
+      /**
+       * `home.page`: the page this person opens on, chosen in Settings > Pages. The shell sends a tab that opened on the
+       * bare front door there (`+layout.svelte`), so the address the tab lands on and the screen's heading are the
+       * measurement: unset, `/` stays Today; set, the same load ends on the chosen list.
+       *
+       * WAITED FOR, AND NOT READ ONCE. The move is an effect after the first draw, so the probe gives the address a moment
+       * to change before it reads it; on the unset load it reads `/` after that moment, which is the answer.
+       */
+      name: 'home.page',
+      record: true,
+      what: 'the page a tab opened on the front door lands on (Settings > Pages)',
+      route: '/',
+      values: [{ '@record': {} }, { '@record': { 'home.page': '/r/obligations' } }],
+      probe: async () => {
+        for (let n = 0; n < 30 && !location.pathname.includes('/r/'); n++) await new Promise((r) => setTimeout(r, 100));
+        return [location.pathname, document.querySelector('#main h1')?.textContent?.trim() ?? 'no heading'].join(' ');
+      },
+    },
+    {
+      /**
+       * `nav.labels`: a page renamed in Settings > Navigation, drawn under its new name in the rail (`navPrefs.relabel`).
+       * The rail's words are the measurement, in the rail's order, so a build that kept the label and drew the page's own
+       * title comes back with the same words twice and goes red.
+       */
+      name: 'nav.labels',
+      record: true,
+      what: 'the names the rail draws its pages under (Settings > Navigation)',
+      route: '/',
+      values: [{ shape: 'rail', '@record': {} }, { shape: 'rail', '@record': { 'nav.labels': { '/p/kiln': 'The kiln room' } } }],
+      probe: () =>
+        [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => (a.textContent ?? '').replace(/\s+/g, ' ').trim()).join(' | '),
+    },
   ];
 
   /**

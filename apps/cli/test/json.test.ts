@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -152,7 +152,8 @@ test('a success WITH A REPLY TYPE OF ITS OWN carries it rather than the lines', 
   const doc = document(out) as { ok: boolean; value: { page: string; file: string } };
   assert.equal(doc.ok, true);
   assert.equal(doc.value.page, 'invoicing');
-  assert.equal(doc.value.file, join(h.dir, 'invoicing.dog'));
+  /* ON macOS THE TEMP FOLDER IS A LINK (/var is /private/var), and the child answers the folder it resolved. */
+  assert.equal(realpathSync(doc.value.file), realpathSync(join(h.dir, 'invoicing.dog')));
 });
 
 test('a local error IS THE error VARIANT WITH A SENTENCE AND NO INVENTED CODE (§13 D11)', async (t) => {

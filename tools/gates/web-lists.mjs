@@ -152,6 +152,10 @@ const HELD = {
     ids: ['agents', 'steps'],
     why: 'block kinds called `agents` and `steps`, which are not the lists.',
   },
+  'apps/web/src/lib/page/home.ts': {
+    ids: ['agents', 'steps'],
+    why: 'block kinds called `agents` and `steps` (which a home keeps when empty, and which fold), which are not the lists.',
+  },
   'apps/web/src/lib/page/BlockSlot.svelte': {
     ids: ['steps'],
     why: 'the block kind called `steps`, which is not the list.',

@@ -190,9 +190,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     };
 
     /**
-     * THE CURSOR ON THE FIRST ROW OF TODAY THAT `test` ACCEPTS. Today's list mixes questions, tasks and bills, and `x`
-     * ticks only a task and a number answers only a question, so each is pressed on a row it can act on. `test` is
-     * run in the page on the row the cursor is on.
+     * THE CURSOR ON THE FIRST ROW OF TODAY THAT `test` ACCEPTS. Today is a declared page drawn as a home (`lib/page`,
+     * PageBody in mode=home), whose `j` walks every row of every block: questions, tasks and what falls due. `x` ticks
+     * only a task and a number answers only a question, so each is pressed on a row it can act on. The row the keys
+     * hold is marked `data-row-cursor`, and `test` is run in the page on it.
      */
     const onTodayRow = (test) => async (page) => {
       for (let i = 0; i < 20; i++) {
@@ -201,8 +202,8 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
         if (await page.evaluate(test)) return;
       }
     };
-    const onQuestion = onTodayRow(() => document.querySelector('li[data-row][data-cursor] .q') !== null);
-    const onTask = onTodayRow(() => document.querySelector('li[data-row][data-cursor] [role="checkbox"]') !== null);
+    const onQuestion = onTodayRow(() => document.querySelector('[data-row-cursor] .queue-act') !== null);
+    const onTask = onTodayRow(() => document.querySelector('[data-row-cursor] [role="checkbox"]') !== null);
 
     /**
      * THE WRITES A TICK OR AN ANSWER SENDS, HELD. One record serves every recipe in this run, in the registry's order,
@@ -277,8 +278,9 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       'goto-nav': { route: '/inbox', press: ['g', '1'] },
       help: { route: '/', press: ['?'] },
 
-      /* TODAY, the screen `/` opens on (`lib/home/Today.svelte`). The cursor starts on nothing, so `j` alone is the move;
-         `k` is pressed from the second row, since on the first it has nowhere to go. */
+      /* TODAY, the declared page `/` opens on, drawn by PageView in home mode (`lib/page/PageBody.svelte` `homeKey`). The
+         cursor starts on nothing, so `j` alone is the move; `k` is pressed from the second row, since on the first it
+         has nowhere to go. */
       'today-move': {
         runs: [
           { route: '/', press: ['j'] },
@@ -287,7 +289,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       },
       'today-tick': { route: '/', setup: held(onTask), press: ['x'] },
       'today-answer': { route: '/', setup: held(onQuestion), press: ['1'] },
-      /* `n` opens the line a task is typed into, and the caret is in it. */
+      /* `n` puts the caret in the page's capture line (`.capture-input`), where a task is typed. */
       'today-new': { route: '/', press: ['n'] },
 
       /* THE WORK SCREEN, at `/?work` (`lib/work/Work.svelte`). Its keys act on the task under the cursor, so every one
