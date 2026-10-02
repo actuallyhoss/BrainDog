@@ -37,6 +37,7 @@
  */
 
 import {
+  SLASH_HEADLINE_INSTRUCTIONS,
   SLASH_INSTRUCTIONS,
   SLASH_KEY_GONE,
   SLASH_PLAN_INSTRUCTIONS,
@@ -87,7 +88,7 @@ export type SlashEnv = {
  * IT STOPS A RUNAWAY AND NOTHING ELSE, AND ONLY ON THE ENGINE'S CALLS NOW. The package caps its own prompts at 12,000 tokens
  * in and 2,048 out, 256.7 neurons at the most, so no package call comes near it; the package's monthly `ask_cap` is what
  * bounds those. It was once the whole bound on the record's own `draft` too, whose reading has no cap of its own, and that
- * let a press on a large record spend more than the one ask the ceiling counted it as. The record's two asks are held to `worstAsk` instead (`includedModel`).
+ * let a press on a large record spend more than the one ask the ceiling counted it as. The record's asks are held to `worstAsk` instead (`includedModel`).
  */
 export const INCLUDED_NEURONS_PER_CALL = 2_500;
 
@@ -140,6 +141,8 @@ const RECORD_TOKENS = 2_048;
    here: no test spends a neuron, so the first alpha answer after the switch is the measurement. */
 const DRAFTS: JsonSchema = { type: 'object', properties: { drafts: { type: 'array', items: { type: 'object' } } }, required: ['drafts'] };
 const PLAN: JsonSchema = { type: 'object', properties: { plan: { type: 'object' } }, required: ['plan'] };
+/* The page headlines: one line a page, keyed by the page's id. Each line is checked by the record (`headlineFault`). */
+const LINES: JsonSchema = { type: 'object', properties: { lines: { type: 'object' } }, required: ['lines'] };
 
 /** Nothing reached the binding, which the package reads by this mark and not by the class, as it reads `SlashKeyClosedError`'s. */
 class NotSent extends Error {
@@ -218,8 +221,9 @@ export function includedInference(env: SlashEnv, most: () => number | Promise<nu
 }
 
 /**
- * The record's own Slash over the included model: `endpointModel`'s two asks, the same instructions and the same input,
- * read by the same `answerOf`. Every failure is a throw, which the record reads as "the rules speak".
+ * The record's own Slash over the included model: `endpointModel`'s draft, first plan and page headlines, the same
+ * instructions and the same input, read by the same `answerOf`. Every failure is a throw, which the record reads as "the
+ * rules speak".
  *
  * EACH ASK IS HELD TO THE ONE CALL THE OPERATOR'S CEILING COUNTS IT AS, `worstAsk`, AND NOT TO `INCLUDED_NEURONS_PER_CALL`.
  * The record's meter writes one `slash_call` row a press, and `operatorCeiling` turns the month's neurons into asks at 232 each,
@@ -250,6 +254,7 @@ export function includedModel(env: SlashEnv): SlashModel | undefined {
     name: 'included',
     draft: (input) => ask(SLASH_INSTRUCTIONS, input, DRAFTS),
     form: (input) => ask(SLASH_PLAN_INSTRUCTIONS, input, PLAN),
+    headline: (input) => ask(SLASH_HEADLINE_INSTRUCTIONS, input, LINES),
   };
 }
 
@@ -341,6 +346,13 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       const model = chosen();
       if (model.skill === undefined) throw new NotSent('The model Slash answers with here drafts no skill.');
       return model.skill(input);
+    },
+    /* THE PAGE HEADLINES, the daily look's other background ask, through the same choice: a model that writes none is
+       never sent, and each page keeps its rules line. */
+    headline: async (input) => {
+      const model = chosen();
+      if (model.headline === undefined) throw new NotSent('The model Slash answers with here writes no headlines.');
+      return model.headline(input);
     },
   };
 }

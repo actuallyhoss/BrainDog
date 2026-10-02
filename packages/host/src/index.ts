@@ -34,7 +34,7 @@ export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, t
    that holds the record's press and first plan in Slash's ledger and exported it from `slash-ask.ts` alone, which no
    app imports, so both hosts built the record without it and every press stayed unmetered.
    `apps/worker/test/slash-press-metered.test.ts` is the press on the Worker that shows it wired. */
-export { slashRecordMeter, type SlashLedgerDeps } from './slash-ask.ts';
+export { slashRecordMeter, type SlashLedgerDeps, type SlashRecordMeter } from './slash-ask.ts';
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason
@@ -224,8 +224,10 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'digestToday', group: 'READ+', writes: false, what: 'What the digest would say if it went now. It sends nothing.',
     takes: { digest: 'text' } },
   { name: 'pages', group: 'READ+', writes: false, what: 'Every page this record can draw, templates expanded.' },
-  { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup.',
-    takes: { slug: 'text' } },
+  /* `filter` IS THE READER'S OWN CHOICE over the page's declared filters, a field to the value chosen, so it is JSON: on a
+     GET it is `?filter={"project":"bake"}`. What it may name is the record's question (`kernel.page`), not this table's. */
+  { name: 'page', group: 'READ+', writes: false, what: 'One page, with every block run: rows and figures, never markup. A filter narrows it to what you chose.',
+    takes: { slug: 'text', filter: 'json' } },
   { name: 'metric', group: 'READ+', writes: false, what: 'One figure, with its target and how it compares.',
     takes: { metric: 'text' } },
   /* EVERY FIGURE, AND NOT ONLY A DRAWN ONE. `metric` reads an id already known and `page`

@@ -17,7 +17,8 @@
  * `{ model, dims, vectors }`, one vector for each text the hourly sweep queued, which the kernel writes to `entry_vec`.
  *
  * METERED ON THE BACKGROUND ALLOWANCE, NEVER ON HIS ASKS. The daily look, an automation's question, a digest's prose and a
- * pattern's draft share `BACKGROUND_ASKS_MONTH` (60) a month; his 80 are his own (`packages/slash/src/types.ts`). The pass
+ * pattern's draft share `BACKGROUND_ASKS_MONTH` (60) a month, less the page headlines' own share (`HEADLINE_ASKS_MONTH`); his
+ * 80 are his own (`packages/slash/src/types.ts`). The pass
  * asks the meter BEFORE it leases and leases no more jobs than the month has left, so a spent month leaves the jobs
  * `pending`, where they never walk the retry ladder to dead, and the next month serves them.
  *
@@ -41,6 +42,22 @@ export const MODEL_JOBS_PER_PASS = 5;
  * package never imports that one (the header's rule). A host that has the package's number hands it to `backgroundMeter`.
  */
 export const BACKGROUND_JOBS_MONTH = 60;
+
+/**
+ * The part of a month's background allowance kept for the daily look's page headlines, and the most they may spend: one
+ * batched ask a night for thirty nights. The headline ask writes its row with `HEADLINE_ASK` as its question, which is how
+ * both meters below tell it from a skill draft, a digest's prose, a pattern or an embedding.
+ *
+ * TWO SHARES, SO NEITHER KIND CAN EAT THE OTHER'S MONTH. Counted as one pool, a busy inbox's patterns and a week of
+ * digests spent the 60 by the twentieth and every page fell back to its rules line for the rest of the month; and a
+ * record whose figures move every day, with the look asked for on a request as well as at night, could spend the 60 on
+ * headlines and leave the digests to go out as figures. So headlines may spend this much and no more, and everything else
+ * may spend the rest of the allowance and never this. A 31st night whose figures moved keeps the rules line.
+ */
+export const HEADLINE_ASKS_MONTH = 30;
+
+/** The question a headline ask's ledger row is written with, and what the meters count it by. */
+export const HEADLINE_ASK = "Slash's page headlines";
 
 /** How many arrivals of one shape a finding's pattern is drafted from, newest first and handed over oldest first. */
 const SHAPE_SAMPLES_MOST = 5;
@@ -128,25 +145,43 @@ const warn = (line: string): void => console.error(line);
  * counted here too, which errs on the side a cap should. An `embed` row is one embedding job, a hundred rows in one call.
  * `-` is a model never reached, which costs nothing and is not counted.
  *
+ * `share` SAYS WHICH OF THE TWO SHARES IS METERED (`HEADLINE_ASKS_MONTH`). `work`, the default and what the model-jobs pass
+ * and a skill draft are held to, counts every background row but the headlines and holds `cap` less the headlines' share;
+ * `headline` counts the headline rows alone and holds their share. The two caps add up to `cap`.
+ *
  * NO LEDGER YET IS NOTHING SPENT. The engine creates the table on its first call, so a host that has not built it has
  * spent nothing this month; any other failure to count is read as spent, so a count nobody can read never lets a call through.
  */
-export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MONTH): ModelJobMeter {
+export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MONTH, share: 'work' | 'headline' = 'work'): ModelJobMeter {
+  /* IN PROPORTION, so a smaller cap keeps both shares: a flat thirty under a cap of ten would leave the work none. */
+  const headlines = Math.round((cap * HEADLINE_ASKS_MONTH) / BACKGROUND_JOBS_MONTH);
+  const held = share === 'headline' ? headlines : cap - headlines;
   return {
-    cap,
+    cap: held,
     spent(since) {
-      try {
-        return (
-          sql.one<{ n: number }>(
-            "SELECT COUNT(*) AS n FROM slash_call WHERE kind IN ('pattern', 'prose', 'embed') AND filed IS NULL AND model <> '-' AND ts >= ?",
-            since,
-          )?.n ?? 0
-        );
-      } catch (e) {
-        return /no such table/iu.test(said(e)) ? 0 : cap;
-      }
+      const spent = backgroundSpent(sql, since);
+      if (spent === null) return held;
+      return share === 'headline' ? spent.headlines : spent.all - spent.headlines;
     },
   };
+}
+
+/**
+ * Every background ask this month and the headlines among them, as the status door shows the whole allowance spent, or
+ * `null` when the ledger could not be read. No ledger yet is nothing spent (`backgroundMeter`).
+ */
+export function backgroundSpent(sql: Pick<Sql, 'one'>, since: string): { all: number; headlines: number } | null {
+  try {
+    const row = sql.one<{ n: number; h: number | null }>(
+      `SELECT COUNT(*) AS n, SUM(CASE WHEN kind = 'pattern' AND question = ? THEN 1 ELSE 0 END) AS h FROM slash_call
+       WHERE kind IN ('pattern', 'prose', 'embed') AND filed IS NULL AND model <> '-' AND ts >= ?`,
+      HEADLINE_ASK,
+      since,
+    );
+    return { all: row?.n ?? 0, headlines: row?.h ?? 0 };
+  } catch (e) {
+    return /no such table/iu.test(said(e)) ? { all: 0, headlines: 0 } : null;
+  }
 }
 
 /** The months a meter has already said it is spent in, so the line is said once a month and not on every alarm. */
@@ -305,7 +340,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     /* THE JOBS WAIT, AND THE LINE SAYS WHY, once a month: leasing nothing leaves them `pending`, off the retry ladder. */
     if (told.get(meter) !== month) {
       told.set(meter, month);
-      log(`Slash's background allowance of ${meter.cap} model jobs is spent until ${monthOf(now, 1).slice(0, 10)}, so the record's pattern drafts, digest prose and embeddings wait until then.`);
+      log(`Slash's ${meter.cap} background model jobs this month, apart from the page headlines, are spent until ${monthOf(now, 1).slice(0, 10)}, so the record's pattern drafts, digest prose and embeddings wait until then.`);
     }
     return false;
   }

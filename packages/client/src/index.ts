@@ -1021,7 +1021,9 @@ export function createClient(options: ClientOptions) {
        written against `call('governance', { … })` gets no help with the argument name and no error
        when the route is renamed, which is the whole reason the table is typed at all. */
     pages: () => call<unknown[]>('pages'),
-    page: (slug: string) => call<unknown>('page', { slug }),
+    /** One page, narrowed by the reader's own filter choices (a field to the value chosen). An empty filter is no filter. */
+    page: (slug: string, filter?: Readonly<Record<string, string>>) =>
+      call<unknown>('page', filter && Object.keys(filter).length ? { slug, filter } : { slug }),
     metric: (metric: string) => call<unknown>('metric', { metric }),
     /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */
     figures: () => call<FigureEntry[]>('figures'),

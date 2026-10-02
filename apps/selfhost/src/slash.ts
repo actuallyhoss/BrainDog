@@ -117,6 +117,12 @@ export function slashModelFor(
       if (model.skill === undefined) throw Object.assign(new Error('The model Slash answers with here drafts no skill.'), { sent: false });
       return model.skill(input);
     },
+    /* AND THE PAGE HEADLINES THE SAME WAY: a model that writes none is never sent, and each page keeps its rules line. */
+    headline: async (input) => {
+      const model = chosen();
+      if (model.headline === undefined) throw Object.assign(new Error('The model Slash answers with here writes no headlines.'), { sent: false });
+      return model.headline(input);
+    },
   };
 }
 

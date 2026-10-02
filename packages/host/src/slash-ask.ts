@@ -75,10 +75,10 @@
 
 import { ulids } from '@braindog/kernel';
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import type { SlashMeter } from '@braindog/record';
+import type { SlashBackground, SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
-import { backgroundMeter, BACKGROUND_JOBS_MONTH } from './model-jobs.ts';
+import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
 
@@ -630,7 +630,17 @@ const monthResets = (ms: number): string => {
   return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
 };
 
-export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
+/** The record's `SlashMeter` with its background ask always there, which this host's ledger counts. */
+export type SlashRecordMeter = SlashMeter & { background: NonNullable<SlashMeter['background']> };
+
+/** The question a background ask's ledger row is written with, by what it is for. `HEADLINE_ASK` is what the meters count. */
+const BACKGROUND_ASK: Record<SlashBackground, string> = {
+  skill: "Slash's skill draft",
+  look: "Slash's daily look",
+  headline: HEADLINE_ASK,
+};
+
+export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
   const mint = ulids(() => deps.clock.now());
   return {
     async hold(kind) {
@@ -699,19 +709,30 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
       };
     },
     /**
-     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's skill draft. Counted the way
+     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's own draft, a skill draft, or the page headlines. Counted the way
      * `backgroundMeter` counts it, over a `pattern` row with no `filed`, which `asksUsed` (the engine's own count of kind
-     * `read`) never sees, so a skill draft never spends one of his asks.
+     * `read`) never sees, so neither ever spends one of his asks.
+     *
+     * EACH FROM ITS OWN SHARE (`HEADLINE_ASKS_MONTH`): a headline ask is written with `HEADLINE_ASK` as its question and
+     * held to the headlines' share, and the look and a skill draft to the rest, which the model-jobs pass spends too. So a
+     * month of drafts and digests cannot leave the pages without their line, nor the headlines the digests without prose.
+     * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
      */
-    async background() {
+    async background(ask: SlashBackground = 'skill') {
       const engine = await deps.engine();
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
       const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;
-      const spent = backgroundMeter(deps.sql).spent(monthStart(deps.clock.now()));
-      if (spent >= BACKGROUND_JOBS_MONTH)
+      const meter = backgroundMeter(deps.sql, BACKGROUND_JOBS_MONTH, ask === 'headline' ? 'headline' : 'work');
+      if (meter.spent(monthStart(deps.clock.now())) >= meter.cap)
         return {
           ok: false,
-          refusal: { code: 'SLASH_BUDGET_SPENT', fix: `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.` },
+          refusal: {
+            code: 'SLASH_BUDGET_SPENT',
+            fix:
+              ask === 'headline'
+                ? `This month's Slash headlines are spent until ${monthResets(deps.clock.now())}, so each page keeps its own line until then.`
+                : `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.`,
+          },
         };
       const tier = typeof status?.tier === 'string' ? status.tier : 'a';
       const model = typeof status?.model === 'string' && status.model !== '' ? status.model : deps.model;
@@ -725,7 +746,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashMeter {
         at(),
         tier,
         model,
-        "Slash's skill draft",
+        BACKGROUND_ASK[ask] ?? BACKGROUND_ASK.skill,
       );
       let done = false;
       return {
