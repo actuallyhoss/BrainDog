@@ -4877,6 +4877,15 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         limit,
       );
       type Line = FeedLine & { ts: string; actor: string; note: string | null; row: Entry | null };
+      /* A QUESTION IS NAMED BY WHAT IT ASKS, AS A ROW IS BY ITS TITLE. A feed drew "suggested SG10", the question's
+         number, where the line could say what was asked; a decision is the question it answered. Asked once a line,
+         and only of a line about a question, so a feed of row edits costs nothing more. */
+      const governedThing = (target: string | null): string | null => {
+        const sg = target?.startsWith('suggestion:') ? target.slice('suggestion:'.length) : null;
+        const d = target?.startsWith('decision:') ? target.slice('decision:'.length) : null;
+        const said = sg !== null ? questionOf(sql, sg) : d !== null ? (sql.one<{ q: string }>('SELECT question AS q FROM decision WHERE id = ?', d)?.q ?? null) : null;
+        return said === null || said.trim() === '' || said === '--erased--' ? null : said.trim();
+      };
       /* A RECORD SETTING ITSELF UP IS ONE ROW OF A FEED BLOCK TOO, as it is one line of `whatsNew` (`feed.ts`). */
       const setup = setupCollapser<Line>((line) => {
         const tags = line.row?.fields.tags;
@@ -4911,7 +4920,10 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
           if (e.kind === SETUP_KIND) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: null, rows: typeof e.to === 'number' ? e.to : 0 };
           const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
           const row = e.row;
-          if (!row) return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note };
+          if (!row) {
+            const thing = id === null ? governedThing(e.target) : null;
+            return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note, ...(thing ? { thing } : {}) };
+          }
           const title = registers.get(row.register)?.title;
           const named = title ? row.fields[title] : undefined;
           return {

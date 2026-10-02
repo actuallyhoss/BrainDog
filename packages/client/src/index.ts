@@ -78,7 +78,17 @@ export type Boot = {
    * `currency` is the home currency a person chose, `null` when nobody has: every amount is written on its terms. ABSENT
    * FROM A HOST OLDER THAN THE FIELD, which a reader tells from `null` (nobody chose) by the key not being there.
    */
-  record?: { slug: string; name: string; locale: string; currency?: string | null } | null;
+  record?: {
+    slug: string;
+    name: string;
+    locale: string;
+    currency?: string | null;
+    /**
+     * The currencies the money the caller reads is in, sorted, at most two. A host that sends it already folded the one
+     * currency into `currency`, so `null` beside it is none or two. Absent from an older host.
+     */
+    money?: string[];
+  } | null;
   /** Who is asking: the person behind the call, their name, and what they hold on the record. */
   me?: {
     kind: 'person' | 'token' | 'system';

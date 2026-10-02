@@ -9,6 +9,10 @@
  *
  * `null` WHEN NOBODY HAS CHOSEN ONE, never a fallback. A record with no home currency writes each amount in its own.
  *
+ * `moneyCurrencies`: the currencies the record's money is written in, for `boot` to name the one a record that chose
+ * none is drawn in. Nobody chose, but a record whose every amount is sterling has nothing left to choose between, and the
+ * web asked it one list and two rows a money field at a time before the first screen (`boot-live.ts` `readImplied`).
+ *
  * `figureLists`: every list one figure reads, for the record's `metric` and `figures` to hold a figure back by.
  *
  * WHY THE RECORD ASKS THIS TOO. Both methods asked `readable` of a figure's `source` alone, and a figure's source is no
@@ -17,6 +21,8 @@
  * invited to Accounts would be answered the sum of the Transactions she cannot open. The walk over the declaration is
  * `money-figures.ts` `figureLists`, the one `pages.ts` holds a block back by, so a figure and a page cannot disagree.
  */
+
+import { jsonPath } from '@braindog/where';
 
 import { homeCurrency } from '../declare.ts';
 import type { MetricDecl } from '../metrics.ts';
@@ -33,6 +39,30 @@ export function extension(parts: KernelParts) {
     /** The home currency a pack's `home_currency` setting names, read now, or `null` when none is set. */
     homeCurrency(): string | null {
       return homeCurrency(parts.sql);
+    },
+    /**
+     * The currencies the money on the lists `reads` admits is in, sorted, stopping at the second: a record in two is
+     * answered two and no more, because one currency is the only answer anybody draws with. Every list when `reads` is
+     * absent; a list the caller may not open adds nothing, so its money says nothing about it.
+     */
+    moneyCurrencies(reads: (register: string) => boolean = () => true): string[] {
+      const found = new Set<string>();
+      for (const d of parts.declarations()) {
+        if (d.kind !== 'register' || !d.id.startsWith('register.')) continue;
+        const list = parts.register(d.id.slice('register.'.length));
+        if (!list || !reads(list.id)) continue;
+        for (const f of list.fields) {
+          if (f.type !== 'money') continue;
+          const at = `json_extract(fields, '${jsonPath(f.id)}.currency')`;
+          const held = parts.sql.all<{ c: unknown }>(
+            `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL LIMIT 2`,
+            list.id,
+          );
+          for (const r of held) if (typeof r.c === 'string' && /^[A-Z]{3}$/u.test(r.c)) found.add(r.c);
+          if (found.size > 1) return [...found].sort();
+        }
+      }
+      return [...found].sort();
     },
     /**
      * Every list `decl` reads, the figure a walk opens from included. A caller asks `readable` of each and answers

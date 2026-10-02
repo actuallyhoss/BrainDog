@@ -209,7 +209,7 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
   const bo: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'read' } };
   const boot = value<Boot>(await api.boot(bo));
   /* NO HOME CURRENCY IS CHOSEN ON THIS RECORD, and the shell is told so rather than handed a guess. */
-  assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: null });
+  assert.deepEqual(boot.record, { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: null, money: [] });
   const { levels, ...me } = boot.me;
   assert.deepEqual(me, { kind: 'person', person: 'p_2', name: 'Bo', level: 'read', prefs: {} });
   /* AND THE LEVEL ON EACH LIST SHE HOLDS, her record-wide `read` on both (`me.levels`). */
@@ -219,6 +219,32 @@ test('BOOT CARRIES THE SHELL: the record, who is asking, the rail, the counts an
   assert.equal(boot.counts.inbox, null, 'a reader was told how much waits in the inbox');
   assert.equal(value<Boot>(await api.boot(owner)).counts.inbox, 0);
   assert.deepEqual(boot.whatsNew, value<WhatsNew>(await api.whatsNew(undefined, bo)), 'boot and whatsNew disagree');
+  sql.close();
+});
+
+test('WHERE NOBODY CHOSE A CURRENCY, BOOT NAMES THE ONE ALL THE MONEY IS IN, never one of two and never from a list the caller cannot open', async () => {
+  const { api, sql } = await record();
+  const BILLS = {
+    id: 'register.bills',
+    kind: 'register' as const,
+    body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money' }] } as never,
+  };
+  assert.ok((await api.kernel.install([BILLS])).ok);
+  const said = async (ctx: CallContext) => value<Boot>(await api.boot(ctx)).record?.currency;
+  assert.equal(await said(owner), null, 'a record with no money names no currency');
+  value(await api.create({ register: 'bills', fields: { what: 'Kiln rent', amount: { amount: 120_000, currency: 'GBP' } } }, owner));
+  value(await api.create({ register: 'bills', fields: { what: 'Clay', amount: { amount: 4_500, currency: 'GBP' } } }, owner));
+  assert.equal(await said(owner), 'GBP');
+  value(await api.invite({ person: 'p_3', registers: { diary: 'read' } }, owner));
+  const held = api.kernel.access('p_3')!;
+  const diarist: CallContext = { principal: { kind: 'person', id: 'p_3', level: held.level }, registers: held.registers ?? '*', levels: held.levels };
+  assert.equal(await said(diarist), null, 'the money on a list she cannot open named its currency');
+  /* NOR A LIST HER GRANT NARROWS: the currency is read over every row, and some of them are held back from her. */
+  const narrowed: CallContext = { ...owner, wheres: { bills: { field: 'what', op: 'eq', value: 'Clay' } } as never };
+  assert.equal(await said(narrowed), null, 'the money on rows held back from her named its currency');
+  value(await api.create({ register: 'bills', fields: { what: 'Glaze', amount: { amount: 3_000, currency: 'USD' } } }, owner));
+  assert.equal(await said(owner), null, 'two currencies were chosen between');
+  assert.deepEqual(value<Boot>(await api.boot(owner)).record?.money, ['GBP', 'USD']);
   sql.close();
 });
 

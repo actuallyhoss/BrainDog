@@ -41,7 +41,7 @@ const GENERAL = [
  * of a `cards` block, the opening sentence of a `note` and a `queue`'s first question drawn whole, with what accepting
  * it does; `first` cuts a `feed`'s or an `agents` block's groups and
  * a `steps` block's open rows; `range` draws a `progress` block's rows as bands; `box` puts the blocks after a `section`
- * on one surface; `tiles` draws a `queue` as tiles; `register` is the list a `capture` adds to and an `inputs` block
+ * on one surface; `tiles` draws a `queue` as tiles; `people` draws a `heat` as a line a person, columns `day | who`; `register` is the list a `capture` adds to and an `inputs` block
  * edits; `row` is a `diff`'s row and an `inputs` block's.
  *
  * LEFT GENERAL ON PURPOSE: `opening`, `from` and `horizon` are read by whatever kind sits over `forecast.runway`, and a
@@ -67,6 +67,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   box: ['section'],
   panel: ['section'],
   tiles: ['queue'],
+  people: ['heat'],
   short: ['steps'],
   register: ['capture', 'inputs'],
   series: ['series'],

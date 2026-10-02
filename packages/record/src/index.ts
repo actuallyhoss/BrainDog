@@ -810,11 +810,15 @@ export type Boot = {
   /**
    * The record's own name, which the shell draws above everything else. `null` before it is provisioned.
    *
-   * `currency` IS THE HOME CURRENCY A PERSON CHOSE, `null` when nobody has, and every amount on a screen is written on
-   * its terms. It is the kernel's `homeCurrency`, the one every figure is added up in,
-   * so the shell never names a currency the figures do not.
+   * `currency` IS THE HOME CURRENCY A PERSON CHOSE, and every amount on a screen is written on its terms. It is the
+   * kernel's `homeCurrency`, the one every figure is added up in, so the shell never names a currency the figures do
+   * not. WHERE NOBODY CHOSE ONE it is the one currency every amount the caller reads is in, which is what each figure
+   * then comes back in too (`drawnIn`), and `null` when the money is in none or in two.
+   *
+   * `money` IS WHAT THAT WAS READ FROM, the currencies the money the caller reads is in, sorted and at most two, so a
+   * host that sent it has already asked what the web otherwise asks before the first screen (`boot-live.ts`).
    */
-  record: { slug: string; name: string; locale: string; currency: string | null } | null;
+  record: { slug: string; name: string; locale: string; currency: string | null; money: string[] } | null;
   /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
   me: {
     kind: 'person' | 'token' | 'system';
@@ -4148,6 +4152,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return out;
   };
 
+  /**
+   * The currency the shell draws money in: the home currency a person chose, else the one currency every amount this
+   * caller reads is in, else `null`.
+   *
+   * THE SECOND HALF WAS THE WEB'S, ASKED BEFORE THE FIRST SCREEN: one schema read a list with rows and two one-row
+   * reads a money field (`boot-live.ts` `readImplied`), on every load of a record nobody set a currency on. It is one
+   * query a money field here. Two currencies are never chosen between, and a list this caller may not open says nothing.
+   * NOR DOES ONE THEIR GRANT NARROWS (`whereFor`): the query reads every row of a list, so a member who sees only some
+   * of its rows would be told the currency of rows held back from them.
+   */
+  const drawnIn = (ctx: CallContext): { currency: string | null; money: string[] } => {
+    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined);
+    return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
+  };
+
   const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
@@ -4161,7 +4180,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        which lists a page already reads and which slugs are taken. */
     const every = kernel.pages();
     return {
-      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, currency: kernel.homeCurrency() } : null,
+      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawnIn(ctx) } : null,
       me: {
         /* A RUNNER NEVER BOOTS, since `scoped` refuses it before this is read, so `Boot.me.kind` keeps its three and a
            principal that is neither a person nor a token reads as the record's own, with no level. */

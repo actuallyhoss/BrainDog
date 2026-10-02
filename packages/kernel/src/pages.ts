@@ -203,7 +203,10 @@ export type PageBlock = {
    * row up to `limit`, and says which are in the short view in `short_now`.
    */
   short?: { where: string; label: string };
-  /** Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. */
+  /**
+   * Whether the condition was satisfied. Absent on a block with no `when:`, which always draws. A boxed section is also
+   * `false` when every block it holds is (`emptyBoxesShut`).
+   */
   drawn?: boolean;
 };
 
@@ -935,6 +938,19 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
      will see costs no query. Each column keeps its own: a section in the rail neither ends nor starts a fold in the
      main column. */
   const hiding = new Set<string>();
+  const blocks = laid.map(({ block: b, added }) => {
+    const area = b !== null && typeof b === 'object' && b.area === 'rail' ? 'rail' : 'main';
+    if (b !== null && typeof b === 'object' && b.kind === 'section') hiding.delete(area);
+    else if (hiding.has(area) && b !== null && typeof b === 'object') {
+      const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false };
+      return added === undefined ? folded : { ...folded, added };
+    }
+    const read = readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b);
+    if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
+    const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
+    const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
+    return added === undefined ? drawn : { ...drawn, added };
+  });
   return ok({
     ...found.decl,
     page: found.slug,
@@ -946,20 +962,32 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
     /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
        (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
-    blocks: laid.map(({ block: b, added }) => {
-      const area = b !== null && typeof b === 'object' && b.area === 'rail' ? 'rail' : 'main';
-      if (b !== null && typeof b === 'object' && b.kind === 'section') hiding.delete(area);
-      else if (hiding.has(area) && b !== null && typeof b === 'object') {
-        const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false };
-        return added === undefined ? folded : { ...folded, added };
-      }
-      const read = readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b);
-      if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
-      const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
-      const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
-      return added === undefined ? drawn : { ...drawn, added };
-    }),
+    blocks: emptyBoxesShut(blocks),
     ...(filters ? { filters: filters.answer } : {}),
+  });
+}
+
+/**
+ * The page's blocks with each boxed section that holds nothing drawn said `drawn: false`.
+ *
+ * A BOX WHOSE EVERY BLOCK IS HIDDEN IS AN EMPTY TITLED BOX, so it is not drawn either. Measured: Money's 'Heads up' is
+ * gated on there being accounts, and its three lines each on something stale or late, so a record with accounts and
+ * nothing wrong drew the bell heading over an empty surface, on the most common healthy day. A section holds the blocks
+ * after it in its own column up to the next section there, as a `when:` hides them. One that holds no block, or carries
+ * a host panel under its heading, is not empty and stays as it is; a section with no box draws only its heading, which
+ * is its own `when:`'s to hide.
+ */
+function emptyBoxesShut(blocks: readonly BlockResult[]): BlockResult[] {
+  const areaOf = (b: BlockResult): 'main' | 'rail' => (b.area === 'rail' ? 'rail' : 'main');
+  return blocks.map((b, i) => {
+    if (b.kind !== 'section' || b.box !== true || b.drawn === false || typeof b.panel === 'string') return b;
+    const held: BlockResult[] = [];
+    for (const next of blocks.slice(i + 1)) {
+      if (areaOf(next) !== areaOf(b)) continue;
+      if (next.kind === 'section') break;
+      held.push(next);
+    }
+    return held.length > 0 && held.every((x) => x.drawn === false) ? { ...b, drawn: false } : b;
   });
 }
 

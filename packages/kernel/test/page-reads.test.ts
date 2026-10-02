@@ -399,6 +399,45 @@ test('A SECTION WHOSE WHEN SAYS NO HIDES THE BLOCKS IT HOLDS, up to the next sec
   sql.close();
 });
 
+test('A BOX WHOSE EVERY BLOCK IS HIDDEN IS NOT DRAWN, and one holding anything drawn, or nothing at all, stays', async () => {
+  const { k, sql } = await record();
+  const waiting = { metric: 'questions-open', gt: 0 };
+  const page: Declaration = {
+    id: 'page.desk',
+    kind: 'page',
+    body: {
+      page: 'desk',
+      title: 'Desk',
+      requires: REQUIRES,
+      layout: { rail: 4 },
+      blocks: [
+        { kind: 'section', heading: 'Heads up', box: true },
+        { kind: 'note', body: 'Something waits.', when: waiting },
+        { kind: 'note', area: 'rail', body: 'Always here.' },
+        { kind: 'note', body: 'Something else waits.', when: waiting },
+        { kind: 'section', heading: 'Open', box: true },
+        { kind: 'note', body: 'Maybe.', when: waiting },
+        table('tasks', 'what'),
+        { kind: 'section', heading: 'Bare', box: true },
+        { kind: 'section', heading: 'Unboxed' },
+        { kind: 'note', body: 'Hidden too.', when: waiting },
+      ],
+    } as never,
+  };
+  value(await k.install([page]));
+  const quiet = value<{ blocks: BlockResult[] }>(k.page('desk')).blocks;
+  assert.deepEqual(
+    quiet.map((b) => b.drawn),
+    [false, false, undefined, false, undefined, false, undefined, undefined, undefined, false],
+    'a block in the rail is not held by a box in the main column, and a heading with no box is its own when to hide',
+  );
+
+  value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'slash'));
+  const asked = value<{ blocks: BlockResult[] }>(k.page('desk')).blocks;
+  assert.ok(asked.every((b) => b.drawn !== false));
+  sql.close();
+});
+
 /* ── a host with no tally, and a reader held from a list ─────────────────── */
 
 test('A HOST WITH NO TALLY COUNTS FROM ITS ROWS, and a list the reader may not read is neither counted nor narrowed', () => {
