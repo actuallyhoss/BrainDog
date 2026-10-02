@@ -9,6 +9,7 @@ import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type Column, type T
 import { lanes } from './board.ts';
 import { ringDash, ringOf, trendOf, type AgentMark } from './cards.ts';
 import { diffPlan, diffRows, lineDiff } from './diff.ts';
+import { feedCased, feedCasedNodes } from './feed.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
 import { leadingCode, symbolFigure, symbolText, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING, valueWord } from './format.ts';
 
@@ -1250,9 +1251,25 @@ test('an empty feed says one of two things: nothing new, or no mark yet', () => 
 });
 
 test('with no mark, nothing is new, and the rows are still drawn', () => {
-  const html = toHTML(onPage('```feed\nagent | Claude | 3 | saves | 1h ago\nseen |\n```'));
+  const html = toHTML(onPage('```feed\nagent | Claude | 3 | saves | 1h ago\nrule | Late fees | 1 | sent | 2h ago\nseen |\n```'));
   assert.doesNotMatch(html, /data-new|feed-new|feed-seen/u);
   assert.match(html, /Agents<span class="feed-tally num" data-calm="">3<\/span>/u);
+});
+
+test('A FEED OF ONE GROUP DRAWS NO HEAD, and a name the bank shouted is written as a person writes it', () => {
+  const html = toHTML(onPage('```feed\nrule | Categorise what cleared | 1 | changed KILN STOREFRONT PAYOUT at HSBC UK | 4w ago\nrule | Catch a repeat | 1 | suggested SG10 | 4w ago\n```'));
+  assert.doesNotMatch(html, /feed-head|>Rules</u, '"Rules" alone over every line named nothing');
+  assert.match(html, /changed Kiln Storefront Payout at HSBC UK/u, 'an acronym stays one');
+  assert.match(html, /suggested SG10/u, 'a ref with a figure in it is never cased');
+  assert.equal(feedCased('changed TALLYARD'), 'changed Tallyard');
+  assert.equal(feedCased('NORTHERN RAIL'), 'Northern Rail');
+  assert.equal(feedCased('paid VAT to HMRC'), 'paid VAT to HMRC');
+  assert.equal(feedCased('BÄCKEREI MÜLLER'), 'Bäckerei Müller', 'a capital outside ASCII is a letter of the word, not its edge');
+  assert.equal(feedCased('CAFÉ ROUGE LTD'), 'Café Rouge LTD');
+  assert.deepEqual(feedCasedNodes([{ type: 'link', href: '/r/x', body: [{ type: 'text', text: 'FENWICK CLOUD' }] }, { type: 'code', text: 'TALLYARD' }]), [
+    { type: 'link', href: '/r/x', body: [{ type: 'text', text: 'Fenwick Cloud' }] },
+    { type: 'code', text: 'TALLYARD' },
+  ]);
 });
 
 test('A LINE DIFF PAIRS WHAT IT CAN, and a changed line reads as the old one, then the new one', () => {

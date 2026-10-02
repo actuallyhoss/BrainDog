@@ -223,19 +223,20 @@
       </svg>
       <!-- The words over the box, placed by `--at`: text inside a `preserveAspectRatio="none"` box is stretched with
            it. Hidden, because the table below says every row and the drawing's name says the whole. A dragged mark's
-           name goes with it, so the word under the pointer is the row being moved. -->
+           name goes with it, so the word under the pointer is the row being moved. NO GLYPH AFTER A NAME: the mark's
+           dot on its due day is its tone, and a second dot after the name read as two marks for one bar. -->
       <ol class="roadmap-names" aria-hidden="true">
         {#each plan.bars as bar}
           {@const at = onreschedule ? roadmapLabelAt(bar, barAt(bar)) : bar.label.x}
-          <li class="roadmap-name" data-side={bar.label.side} data-intent={bar.tone} style="--at:{roadmapShare(at)};--room:{roadmapShare(bar.label.room)};--track:{bar.lane}">{bar.title}{@render mark(bar.tone)}</li>
+          <li class="roadmap-name" data-side={bar.label.side} data-intent={bar.tone} style="--at:{roadmapShare(at)};--room:{roadmapShare(bar.label.room)};--track:{bar.lane}">{bar.title}</li>
         {/each}
         {#each plan.stems as s}
-          <li class="roadmap-name" data-stem="" data-intent={s.tone} style="--at:{roadmapShare(s.label.x)};--line:{s.label.line}">{s.title}{@render mark(s.tone)}</li>
+          <li class="roadmap-name" data-stem="" data-intent={s.tone} style="--at:{roadmapShare(s.label.x)};--line:{s.label.line}">{s.title}</li>
         {/each}
       </ol>
     </div>
     <ol class="roadmap-months" aria-hidden="true">
-      {#each plan.bands as m}
+      {#each plan.bands.filter((m) => m.label) as m}
         <li class="roadmap-month" data-odd={m.odd ? '' : undefined} style="--at:{roadmapShare(m.x)}">{m.label}</li>
       {/each}
     </ol>

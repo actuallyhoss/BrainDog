@@ -82,23 +82,29 @@
      says on track, at risk or off track without shouting it. The theme solves its fills for a chip that must be found,
      and drawn as they are the four were the loudest things on Projects, the off-track red a twin of the brand's own red
      beside the logo. Mixed in OKLab, so the hue holds and only the colour's strength drops; the lightness barely moves,
-     so the fill still stands off the tile as the theme checked it would. `bad` keeps the most of its own, because a
-     thing off track is the one a person may need to act on. */
+     so the fill still stands off the tile as the theme checked it would. `bad` keeps the most chroma of the four,
+     because a thing off track is the one a person may need to act on.
+
+     OFF TRACK IS A MUTED BRICK, NEVER THE BRAND'S RED. At 70% of the danger fill it was still a red at two thirds of
+     the brand's own strength and at its hue (OKLCH h 26 against the logo's 27), so a project off track read as the
+     product's mark. Three tenths of the warn fill turn it toward brick (h 34) before the edge grey takes half of what
+     is left: about 0.09 of chroma against the logo's 0.22, in both schemes. The red itself is kept for what needs the
+     person now: an error, the count on Decide, the words in a headline. */
   [data-intent='good'] {
     --tone: var(--earn);
-    --tone-fill: color-mix(in oklab, var(--earn-fill) 60%, var(--edge));
+    --tone-fill: color-mix(in oklab, var(--earn-fill) 45%, var(--edge));
   }
   [data-intent='warn'] {
     --tone: var(--warn);
-    --tone-fill: color-mix(in oklab, var(--warn-fill) 60%, var(--edge));
+    --tone-fill: color-mix(in oklab, var(--warn-fill) 50%, var(--edge));
   }
   [data-intent='bad'] {
     --tone: var(--danger);
-    --tone-fill: color-mix(in oklab, var(--danger-fill) 70%, var(--edge));
+    --tone-fill: color-mix(in oklab, color-mix(in oklab, var(--danger-fill) 70%, var(--warn-fill)) 50%, var(--edge));
   }
   [data-intent='info'] {
     --tone: var(--info);
-    --tone-fill: color-mix(in oklab, var(--info-fill) 60%, var(--edge));
+    --tone-fill: color-mix(in oklab, var(--info-fill) 45%, var(--edge));
   }
 
   /* ASKED FOR MORE CONTRAST, A STATE GETS ITS THEME FILL WHOLE: the high-contrast palette solved it to be found. */
@@ -147,9 +153,10 @@
     --ramp-1: color-mix(in srgb, var(--ink) 72%, var(--bg));
     --ramp-2: color-mix(in srgb, var(--ink) 45%, var(--bg));
     --ramp-3: color-mix(in srgb, var(--ink) 22%, var(--bg));
-    /* MONEY IN, AND WORK DONE, AS A BAR: the good state's calm fill (the intent map above), for the bars that are not a
-       state of their own but the one series in colour. */
-    --in-fill: color-mix(in oklab, var(--earn-fill) 60%, var(--edge));
+    /* MONEY IN AS A BAR, beside money out: the good state's calm fill (the intent map above), for the bars that are not
+       a state of their own but the one series in colour. A count drawn alone (work done by week) is not money in, and
+       takes the ink ramp (`.series` in `blocks-charts.css`). */
+    --in-fill: color-mix(in oklab, var(--earn-fill) 45%, var(--edge));
     margin: 0 0 var(--sp-5);
   }
 
@@ -163,11 +170,14 @@
     max-inline-size: var(--measure);
   }
 
-  /* A TILE IS AS TALL AS WHAT IT HOLDS, and not as tall as the tile beside it. Stretched to its row, a tile of one task
-     beside a tile of six was a white panel mostly blank, the emptiest thing on Kiln drawn the size of the fullest. The
-     page grid is the app's; this is the one thing the skin says about the tiles in it. */
+  /* THE TILES OF ONE ROW END TOGETHER, and what is in each starts at its top. Held to its own height, every row of the
+     page ended in a ragged edge, a tile of three figures stopping short of the chart beside it, and the page read as a
+     skyline rather than as rows. The row is as tall as its tallest tile, and the tile under it is a flow of blocks, so
+     the shorter one keeps its words at the top and only its ground runs on. A tile far emptier than its neighbour is a
+     layout to change (fold it, stack it, give it the rail), not a height to let drift. The page grid is the app's; this
+     is the one thing the skin says about the tiles in it. */
   .block-slot {
-    align-self: start;
+    align-self: stretch;
   }
 
   /* A HEADING IS A NAME, in ink and in sentence case, at a tile heading's step. */

@@ -27,7 +27,7 @@ import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
-import { FEED_EARLIER, feedBurst, feedNew, feedPlan } from './feed.ts';
+import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
 import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
@@ -49,7 +49,7 @@ import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FOREC
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_NONE, ROADMAP_PAINT, roadmapDue, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
-import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatOutside, heatPlan, heatSkipped, heatTitle } from './heat.ts';
+import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
@@ -167,6 +167,8 @@ const glyphSvg = (d: string, attrs = ''): string =>
 /**
  * A glyph slot's drawing, or nothing: the host's art for a name the set holds, else the slot stays
  * empty, as it was before any host could answer, and the stylesheet draws what it always drew there.
+ * One pass and no waiting: a set glyph the host has not got yet stays the named, empty slot here, and
+ * the Svelte `Section` fills it once `opts.iconSet` settles. The server render of that drawer is this tree.
  */
 const slotArt = (name: string, o: RenderOptions): string => {
   const d = glyphPath(name, o);
@@ -944,10 +946,12 @@ function feed(b: Block, o: RenderOptions): string {
             feedBurst(said(r.cells[2])) ? drawn(r.cells[2]) : ''
           }</span>${lead}<span class="feed-what"><span class="feed-who">${
             who ? drawn(who) : MISSING
-          }</span> ${drawn(r.cells[3])}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
+          }</span> ${renderInline(feedCasedNodes(inline(r.cells[3] ?? '', o)), o)}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
         })
         .join('');
-      return `<div class="feed-group" data-by="${g.by}"><h3 class="feed-head">${escape(g.label)}${head}</h3><ul class="feed-rows">${rows}</ul></div>`;
+      /* ONE GROUP DRAWS NO HEAD (`feedPlan`'s `lone`). */
+      const named = plan.lone ? '' : `<h3 class="feed-head">${escape(g.label)}${head}</h3>`;
+      return `<div class="feed-group" data-by="${g.by}">${named}<ul class="feed-rows">${rows}</ul></div>`;
     })
     .join('');
   return `<div class="feed">${body}</div>`;
@@ -1258,7 +1262,7 @@ function forecast(b: Block, o: RenderOptions): string {
   const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis
     .map((a) => `<li class="forecast-axis-tick"${a.zero ? ' data-zero=""' : ''} style="--at:${a.at}">${escape(a.label)}</li>`)
     .join('')}</ol>`;
-  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg>${axis}${
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-walk', plan.walk, painted(FORECAST_PAINT.walk))}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num" style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true">${escape(plan.now.label)}</span>${axis}${
     plan.cross ? `<span class="forecast-pin" style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
   }</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks.map((t) => `<li class="forecast-tick" style="--at:${t.at}">${escape(t.label)}</li>`).join('')}</ol>`;
@@ -1330,12 +1334,15 @@ function roadmap(b: Block, o: RenderOptions): string {
   const names = `<ol class="roadmap-names" aria-hidden="true">${plan.bars
     .map(
       (bar) =>
-        `<li class="roadmap-name" data-side="${bar.label.side}"${toneAttrs(bar.tone)} style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}${toneGlyph(bar.tone)}</li>`,
+        `<li class="roadmap-name" data-side="${bar.label.side}"${toneAttrs(bar.tone)} style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}</li>`,
     )
     .join('')}${plan.stems
-    .map((s) => `<li class="roadmap-name" data-stem=""${toneAttrs(s.tone)} style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}${toneGlyph(s.tone)}</li>`)
+    .map((s) => `<li class="roadmap-name" data-stem=""${toneAttrs(s.tone)} style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}</li>`)
     .join('')}</ol>`;
+  /* ONE DOT A MARK: the names carry no glyph, because the dot on the due day is the tone and is named. A month band
+     too narrow for its name at the start edge is not named. */
   const months = `<ol class="roadmap-months" aria-hidden="true">${plan.bands
+    .filter((m) => m.label)
     .map((m) => `<li class="roadmap-month"${m.odd ? ' data-odd=""' : ''} style="--at:${roadmapShare(m.x)}">${escape(m.label)}</li>`)
     .join('')}</ol>`;
   /* A LANE LIST, NOT A TABLE: a name with its span of days under it and a short bar where it lies in the span. It is
@@ -1413,6 +1420,7 @@ function ring(b: Block, o: RenderOptions): string {
  */
 function heat(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
+  if (b.form === 'people') return heatPeople(b, said, o);
   const plan = heatPlan(
     b.rows.map((r) => ({ day: said(r, 0), value: said(r, 1) })),
     roadmapToday(o.now),
@@ -1441,6 +1449,33 @@ function heat(b: Block, o: RenderOptions): string {
     .map((l) => `<tr><th scope="row">${escape(l.day)}</th><td class="num">${escape(l.count)}</td></tr>`)
     .join('')}</tbody></table></details>`;
   return `<div class="heat" style="--weeks:${plan.weeks}"><div class="heat-grid" role="img" aria-label="${escape(plan.name)}">${cells}</div>${table}${skipped}${outside}</div>`;
+}
+
+/**
+ * `heat people`: a line a person across the twelve weeks, a dot in each week they were in touch (`heatPeoplePlan`).
+ * Each person's dots are named in words, so there is no fold of numbers under it.
+ */
+function heatPeople(b: Block, said: (r: Row, i: number) => string, o: RenderOptions): string {
+  const plan = heatPeoplePlan(
+    b.rows.map((r) => ({ day: said(r, 0), who: said(r, 1) })),
+    roadmapToday(o.now),
+  );
+  const skipped = plan.skipped.length ? `<p class="heat-skipped">${escape(heatMissed(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
+  if (plan.empty) return `<div class="heat" data-form="people"><p class="heat-empty">${escape(HEAT_NONE)}</p>${skipped}</div>`;
+  const people = plan.people
+    .map(
+      (p) =>
+        `<li class="heat-person"><span class="heat-who">${escape(p.who)}</span><span class="heat-weeks" role="img" aria-label="${escape(heatPersonSaid(p, plan.weeks))}">${p.weeks
+          .map(
+            (on, w) =>
+              `<span class="heat-week"${on ? ' data-on=""' : ''}${w === plan.weeks - 1 ? ' data-now=""' : ''}${on ? ` title="${escape(heatWeekTitle(plan.starts[w]!))}"` : ''}></span>`,
+          )
+          .join('')}</span></li>`,
+    )
+    .join('');
+  const ticks = plan.ticks.map((t) => `<li class="heat-tick" style="--week:${t.week}">${escape(t.label)}</li>`).join('');
+  const more = plan.more ? `<p class="heat-more">${escape(heatPeopleMore(plan.more))}</p>` : '';
+  return `<div class="heat" data-form="people" style="--weeks:${plan.weeks}"><ol class="heat-people" aria-label="${escape(plan.name)}">${people}</ol><ol class="heat-ticks" aria-hidden="true">${ticks}</ol>${more}${skipped}</div>`;
 }
 
 /**

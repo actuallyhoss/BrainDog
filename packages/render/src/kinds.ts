@@ -245,7 +245,9 @@ const TABLE = {
      track, and a drawer that does not know the kind yet falls back to the grid's label and figure, which reads as the
      day and its count. The value may be left off, and a row with none is one of something, as a register's row on a
      day is. No tone: the wash is the reading, and a tone on one day would be a fifth colour in a scale of four. */
-  heat: { primitive: 'grid', cells: 2, optional: 1, tone: false, minSpan: 4, purpose: 'figure' },
+  /* The `people` form is `day | who`: a line a person across the same twelve weeks, a dot in each week they were in
+     touch (`heatPeoplePlan`), because the grid of days said when anybody was in touch and never who. */
+  heat: { primitive: 'grid', cells: 2, optional: 1, forms: ['people'], tone: false, minSpan: 4, purpose: 'figure' },
   /* `title | by | effort`: a task as a bar ending on its due day, as long as its effort in days, and a task
      with no effort as a dated stem (`src/roadmap.ts`). On `list`, because the README has called a roadmap
      a list with dates since the primitive table was written, and because a drawer that does not know the

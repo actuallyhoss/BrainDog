@@ -33,6 +33,21 @@
     border-block-start: 0;
   }
 
+  /* A HOST THAT WRAPS EACH QUESTION IN A BOX OF ITS OWN (Decide's answerable cards, one `<div>` each) makes every card
+     the first child of its box, and the rule above then took the hairline off all of them: eight questions down Also
+     waiting ran together as one wall of type. The question in any box after the first box of questions gets its
+     hairline and its air back. An answered line between two boxes counts as a box, so the rhythm holds round it. */
+  :has(> .queue-card) ~ * > .queue-card:first-child {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  /* And the cursor's band takes the hairlines it would cross, as it does between bare cards (above). */
+  :has(> .queue-card) ~ * > .queue-card:first-child[data-focused],
+  :has(> .queue-card[data-focused]) + * > .queue-card:first-child {
+    border-block-start-color: transparent;
+  }
+
   /* THE HOST'S ROW CURSOR IS THE BAND A LIST'S CURSOR ROW WEARS (`blocks.css`), so j and k land on a question the way
      they land on a task. The card has no inline padding and the first one none above it, so the band reaches a step
      past its edges as a spread shadow rather than padding that would move the words when the cursor arrives, and the
@@ -232,7 +247,9 @@
   }
 
   /* THE WORD BESIDE THE PRIMARY. What an agent suggests is worth saying and is not worth pre-pressing, so the option's
-     pill is filled (above) and this quiet label names why, rather than the option reading as already chosen. */
+     pill is filled (above) and this quiet label names why, rather than the option reading as already chosen. It is
+     drawn as it is here only beside an option that cannot be pressed (`.queue-label`); beside a pill it is the pill's
+     own mark (below). */
   .queue-rec {
     justify-self: start;
     padding-inline: var(--sp-2);
@@ -240,6 +257,41 @@
     background: var(--s1);
     color: var(--ink2);
     font-size: var(--t-xs);
+  }
+
+  /* "SUGGESTED" IS A SMALL MARK INSIDE ITS PILL, and adds no line. Under its button it was a line of its own between
+     every suggested answer and the next, which gave each question with a suggestion a stutter the others did not
+     have. Inside the pill, after the option's words, in the pill's own letters a step quieter: the word where the
+     host draws it in the button, and a dot where it draws it after the button, whose word is then kept for a screen
+     reader alone. Not while the option is the one being answered: its pill is the selected ground then, and says so. */
+  .queue-act > .queue-rec {
+    margin-inline-start: var(--sp-2);
+    padding: 0;
+    background: none;
+    color: inherit;
+    opacity: 0.72;
+    font-weight: 400;
+  }
+
+  .queue-option[data-recommended] > .queue-act:not([data-on], :has(> .queue-rec))::after {
+    content: '';
+    display: inline-block;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    margin-inline-start: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: currentColor;
+    opacity: 0.72;
+    vertical-align: middle;
+  }
+
+  .queue-option[data-recommended] > .queue-act ~ .queue-rec {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .queue-because {
@@ -260,10 +312,29 @@
     font-size: var(--t-xl);
   }
 
+  /* ON A PHONE A QUESTION IS A STEP UNDER THE PAGE'S HEADLINE, not level with it: at 20 and 24 the questions under
+     the headline line read as headlines themselves, and Decide opened on a wall of them. The first question keeps its
+     one step over the rest. Home said this for its own questions only; it holds wherever a queue is drawn. */
+  @media (width < 900px) {
+    .queue-question {
+      font-size: var(--t-group);
+      font-weight: 600;
+    }
+
+    .queue-lead > .queue-question {
+      font-size: var(--t-lg);
+    }
+  }
+
   /* The line above its ways already says which one is recommended, so the option's own pill would say it a second time
-     on the one card read whole. The option keeps `data-recommended`, and with it the ink fill where it can be pressed. */
+     on the one card read whole, as a word or as the stand-in dot. The option keeps `data-recommended`, and with it the
+     ink fill where it can be pressed. */
   .queue-lead .queue-rec {
     display: none;
+  }
+
+  .queue-lead .queue-option[data-recommended] > .queue-act:not([data-on])::after {
+    content: none;
   }
 
   .queue-does {

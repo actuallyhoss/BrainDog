@@ -14,6 +14,8 @@
  * empty `when` there is the reader who has not looked yet.
  */
 
+import type { Inline } from './inline.ts';
+
 /** The kinds of actor, in the order their groups are drawn. Closed, because each is a group. */
 export const FEED_BY = ['agent', 'rule', 'you'] as const;
 
@@ -88,7 +90,7 @@ export type FeedGroup<R> = {
  * than thrown, because `Block` is a public type a host can build by hand. Rows keep their order, and
  * the new ones are above the mark, so in every group the new rows come first.
  */
-export function feedPlan<R extends { cells: readonly string[] }>(rows: readonly R[]): { groups: FeedGroup<R>[]; empty: string } {
+export function feedPlan<R extends { cells: readonly string[] }>(rows: readonly R[]): { groups: FeedGroup<R>[]; empty: string; lone: boolean } {
   const at = rows.findIndex((r) => (r.cells[0] ?? '').trim() === FEED_SEEN);
   const marked = at >= 0 && (rows[at]?.cells[1] ?? '').trim() !== '';
   const groups = FEED_BY.map((by): FeedGroup<R> => {
@@ -97,5 +99,43 @@ export function feedPlan<R extends { cells: readonly string[] }>(rows: readonly 
     const fresh = sum(mine.filter((m) => m.fresh));
     return { by, label: FEED_GROUPS[by], rows: mine, fresh, total: sum(mine), earlier: fresh > 0 ? mine.findIndex((m) => !m.fresh) : -1 };
   }).filter((g) => g.rows.length > 0);
-  return { groups, empty: at >= 0 && !marked ? FEED_NO_MARK : FEED_NOTHING_NEW };
+  /* ONE GROUP NEEDS NO HEAD. "Rules" alone over every line of "Since you were away" named a group with nothing beside
+     it to tell it from (the home review), so a feed of one kind of actor is its lines alone. */
+  return { groups, empty: at >= 0 && !marked ? FEED_NO_MARK : FEED_NOTHING_NEW, lone: groups.length === 1 };
+}
+
+/**
+ * A word a bank shouts, capitals only, in any alphabet; and one long enough that a run holding it is a name and not an
+ * acronym. NOT `\b[A-Z]`, whose edges are ASCII: `BÄCKEREI` was split at the `Ä` and came out `BÄCkerei`.
+ */
+const SHOUTED = /(?<![\p{L}\p{N}])\p{Lu}{2,}(?: \p{Lu}{2,})*(?![\p{L}\p{N}])/gu;
+const NAME_LONG = 5;
+const NAME_CASED = 4;
+
+/**
+ * A payee's name as a person writes it, where the bank sent it in capitals: `changed TALLYARD` is `changed Tallyard`,
+ * and `KILN STOREFRONT PAYOUT` is `Kiln Storefront Payout`.
+ *
+ * ONLY A RUN THAT HOLDS A LONG WORD, AND ONLY ITS WORDS OF FOUR LETTERS OR MORE, so an acronym stays one: `HSBC`, `VAT`
+ * and `UK` are how their owners write them, and `SG10`, which has a figure in it, is never touched. Shouting was the
+ * bank's, not the person's (the home review: eight lines of `changed TALLYARD`).
+ */
+export function feedCased(text: string): string {
+  return text.replace(SHOUTED, (run) =>
+    run.split(' ').some((w) => w.length >= NAME_LONG)
+      ? run
+          .split(' ')
+          .map((w) => (w.length >= NAME_CASED ? w[0] + w.slice(1).toLowerCase() : w))
+          .join(' ')
+      : run,
+  );
+}
+
+/** `feedCased` over the words of a cell, inside its links and emphasis too, and never inside code. */
+export function feedCasedNodes(nodes: readonly Inline[]): Inline[] {
+  return nodes.map((n) => {
+    if (n.type === 'text') return { ...n, text: feedCased(n.text) };
+    if (n.type === 'strong' || n.type === 'em' || n.type === 'link') return { ...n, body: feedCasedNodes(n.body) };
+    return n;
+  });
 }

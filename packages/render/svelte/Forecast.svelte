@@ -1,6 +1,7 @@
 <!--
-  `forecast`: the cash walk as a line over a soft wash, the remembered balance solid and the walk dashed, a value axis
-  of round steps that holds zero, the day it goes under, and every movement in a fold. `src/forecast.ts` decides the
+  `forecast`: the cash walk as a line over a soft wash split at zero, solid as far as the record knows it and dashed
+  beyond, today's dot with its balance, a value axis of round steps that holds zero, the day it goes under tied to the
+  line by a thin rule, and every movement in a fold (inside Adjust where there is one). `src/forecast.ts` decides the
   paths and the words; `forecast` in `src/html.ts` is this file's twin.
 
   THE KNOBS AND THE SCRUB EXIST ONLY WHERE THE HOST ASKS FOR THEM (`opts.scenario`). They live in
@@ -125,6 +126,9 @@
   const knobbed = $derived(Boolean(opts.scenario) && (model?.knobs.length ?? 0) > 0);
   /* WHETHER ANYTHING IS DRAWN UNDER THE CHART TO MOVE: a knob, or another currency to show it in. */
   const controls = $derived(knobbed || shows.length > 0);
+  /* EVERY MOVEMENT SITS INSIDE ADJUST WHERE ADJUST IS DRAWN, and stood alone under the chart as an orphan line of grey
+     (the money review). Without Adjust it stays under the chart, as `toHTML` draws it, so a reader can still open it. */
+  const inside = $derived(Boolean(opts.scenario) && controls);
   const choices = $derived(drawn ? horizonChoices(drawn) : []);
   /* THE CONTROLS OF A GROUP OFFER WHAT EVERY WALK MAY COUNT, and spending in each walk's currency. */
   const members = $derived(group ? (Object.entries(group.members) as [string, Member][]).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) : []);
@@ -285,13 +289,19 @@
     <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={p.sentence}>
       {#if p.grid}<path class="forecast-grid" {...FORECAST_PAINT.grid} d={p.grid} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.area}<path class="forecast-area" {...FORECAST_PAINT.area} d={p.area} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.below}<path class="forecast-area" data-below="" {...FORECAST_PAINT.area} d={p.below} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-zero" d="M0 {p.zero}H1000" vector-effect="non-scaling-stroke"></path>
+      {#if p.cross}<path class="forecast-cross-rule" {...FORECAST_PAINT.rule} d={p.cross.rule} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.base}<path class="forecast-base" d={p.base} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.past}<path class="forecast-past" d={p.past} vector-effect="non-scaling-stroke"></path>{/if}
-      <path class="forecast-future" d={p.future} vector-effect="non-scaling-stroke"></path>
+      {#if p.walk}<path class="forecast-walk" {...FORECAST_PAINT.walk} d={p.walk} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.future}<path class="forecast-future" d={p.future} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-low" d={p.low} vector-effect="non-scaling-stroke"></path>
+      <path class="forecast-now" {...FORECAST_PAINT.now} d={p.now.d} vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
     </svg>
+    <!-- TODAY'S BALANCE BESIDE TODAY'S DOT, where the line starts, hidden like the axis: the chart's name says it. -->
+    <span class="forecast-now-label num" style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true">{p.now.label}</span>
     <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk. -->
     <ol class="forecast-axis" aria-hidden="true">
       {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} style="--at:{a.at}">{a.label}</li>{/each}
@@ -310,6 +320,39 @@
   <ol class="forecast-ticks" aria-hidden="true">
     {#each p.ticks as t}<li class="forecast-tick" style="--at:{t.at}">{t.label}</li>{/each}
   </ol>
+{/snippet}
+
+<!-- EVERY MOVEMENT, the walk's numbers in a fold: under the chart, or inside Adjust where there is one. -->
+{#snippet numbers(m: ForecastModel, s: Scenario)}
+  <details class="forecast-numbers">
+    <summary class="forecast-toggle">{FORECAST_NUMBERS}</summary>
+    <table class="forecast-table">
+      <thead>
+        <tr>
+          <th scope="col">{FORECAST_WHEN}</th>
+          <th scope="col">{FORECAST_WHAT}</th>
+          <th scope="col">{FORECAST_MOVE}</th>
+          <th scope="col">{FORECAST_BALANCE}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">{day(m.today)}</th>
+          <td>{m.label}</td>
+          <td class="num"></td>
+          <td class="num">{m.template}</td>
+        </tr>
+        {#each s.steps as step}
+          <tr>
+            <th scope="row">{day(step.day)}</th>
+            <td>{step.label}</td>
+            <td class="num">{figureLike(m.template, step.delta)}</td>
+            <td class="num">{figureLike(m.template, step.balance)}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </details>
 {/snippet}
 
 <!-- THE HANDLE AT THE TOP OF A SHEET, which a thumb pulls down to close it. It holds nothing a person presses. -->
@@ -442,41 +485,17 @@
     {/if}
     <!-- THE KNOBS COME AFTER THE CHART, and only once asked for, so the answer is read before the questions a reader may ask of it. -->
     {#if controls}
-      <div class="forecast-knobs" data-inline="" id="{uid}-knobs" hidden={!knobsOpen}>{@render knobsOf(drawn, shown)}</div>
+      <div class="forecast-knobs" data-inline="" id="{uid}-knobs" hidden={!knobsOpen}>
+        {@render knobsOf(drawn, shown)}
+        {#if inside}{@render numbers(drawn, shown)}{/if}
+      </div>
     {/if}
     <!-- WHAT THE KNOBS CHANGED, under every walk they move: the one with the controls, and each other walk of its group. -->
     {#if (knobbed || group) && moved && base}
       <p class="forecast-against" role="status">{against(base, shown, moved)}</p>
     {/if}
-    <details class="forecast-numbers">
-      <summary class="forecast-toggle">{FORECAST_NUMBERS}</summary>
-      <table class="forecast-table">
-        <thead>
-          <tr>
-            <th scope="col">{FORECAST_WHEN}</th>
-            <th scope="col">{FORECAST_WHAT}</th>
-            <th scope="col">{FORECAST_MOVE}</th>
-            <th scope="col">{FORECAST_BALANCE}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">{day(drawn.today)}</th>
-            <td>{drawn.label}</td>
-            <td class="num"></td>
-            <td class="num">{drawn.template}</td>
-          </tr>
-          {#each shown.steps as s}
-            <tr>
-              <th scope="row">{day(s.day)}</th>
-              <td>{s.label}</td>
-              <td class="num">{figureLike(drawn.template, s.delta)}</td>
-              <td class="num">{figureLike(drawn.template, s.balance)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </details>
+    <!-- EVERY MOVEMENT IS A QUESTION ASKED OF THE ANSWER, so where there is an Adjust it is the last thing inside it. -->
+    {#if !inside}{@render numbers(drawn, shown)}{/if}
     {#if opts.scenario}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <dialog

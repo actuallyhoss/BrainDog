@@ -270,6 +270,29 @@ test('a forecast offers its knobs only where the host asks, closed behind one Ad
   assert.doesNotMatch(plain, /type="range"|data-adjust/u);
 });
 
+test('EVERY MOVEMENT IS INSIDE ADJUST WHERE ADJUST IS DRAWN, and under the chart where it is not, as toHTML draws it', () => {
+  const block = page(SHAPES['a forecast with a past, stems, knobs and a crossing']!);
+  const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
+  const knobs = tree(render(Knobbed, { props: { block, opts: { scenario: true } } }).body);
+  /* WHAT THE KNOBS' DIV HOLDS, to its own closing tag and not the first `</div>` inside it. */
+  const from = knobs.indexOf('<div class="forecast-knobs"');
+  assert.ok(from > -1, 'the knobs are drawn');
+  let depth = 0;
+  let to = from;
+  for (const m of knobs.slice(from).matchAll(/<(\/?)div\b/gu)) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) {
+      to = from + m.index;
+      break;
+    }
+  }
+  assert.equal(knobs.match(/Every movement/gu)?.length, 1, 'drawn once');
+  assert.match(knobs.slice(from, to), /<details class="forecast-numbers">/u, 'and inside the fold Adjust opens');
+  const plain = tree(render(Block, { props: { block } }).body);
+  assert.match(plain, /<details class="forecast-numbers">/u);
+  assert.doesNotMatch(plain, /forecast-knobs/u, 'with no Adjust it stays under the chart');
+});
+
 test('a capture draws its field only where the host can write, prompted by its heading, and no Add until there is text', () => {
   const block = page(SHAPES['a capture with nowhere to write and a door to its list']!);
   const Writable = Block as unknown as Component<{ block: BlockSegment; oncapture: (register: string, text: string, inherited: Record<string, string>) => void }>;

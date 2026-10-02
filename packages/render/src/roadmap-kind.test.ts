@@ -217,6 +217,14 @@ test('the rows are also a lane list a screen reader reads, each with its span of
   assert.match(html, /Regate window<span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>/u);
 });
 
+test('ONE DOT A BAR: a toned window carries its named dot on its due day, and its name over the chart carries none', () => {
+  const html = toHTML(parse(FENCE), { now: NOW });
+  const names = /<ol class="roadmap-names"[\s\S]*?<\/ol>/u.exec(html)?.[0] ?? '';
+  assert.match(names, />Regate window<\/li>/u);
+  assert.doesNotMatch(names, /class="glyph"/u, 'a second dot after the name read as two marks for one bar');
+  assert.equal([...html.matchAll(/class="roadmap-due" role="img" aria-label="watch this"/gu)].length, 1);
+});
+
 test('THE TABLE KEEPS THE ORDER THE ROWS CAME IN, a date written first read first', () => {
   /* The plan hands back bars and then stems, so a table built in that order put every window ahead of every date.
      Removing the sort left the test above green, because its fence writes its date after its windows (measured). */

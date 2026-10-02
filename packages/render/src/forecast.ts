@@ -1,10 +1,15 @@
 /**
  * What `forecast` decides, as functions both drawers call.
  *
- * A forecast is a cash walk drawn as a line: the balance the record remembered, solid, up to today,
- * and the walk from today's balance, dashed, to the horizon, over a soft wash down to the zero rule. The value axis is
- * a few round steps that always hold zero, said short (`£50k`, `£0`, `−£50k`), and the first day the balance goes under
- * is marked and said in words.
+ * A forecast is a cash walk drawn as a line: the balance the record remembered up to today and the walk from today's
+ * balance, one solid line as far as the record knows the movements, dashed only beyond it, over a soft wash down to the
+ * zero rule, split there so what is under zero can be tinted on its own. The value axis is a few round steps that always
+ * hold zero, said short (`£50k`, `£0`, `−£50k`); today is a dot with its balance beside it; and the first day the
+ * balance goes under is marked, said in words, and tied to the line by a thin rule.
+ *
+ * DASHED ONLY BEYOND WHAT IS KNOWN. The whole walk was dashed from today, so a year of entered bills and invoices read
+ * as a guess from its first day (the money review: "make it a real chart"). The movements are the record's own, so
+ * the line is solid to the last of them, or to the day a `known` row names, and only what lies past it is dashed.
  *
  * NO STEMS. Every movement worth a twentieth of the range stood on the zero rule as a stem, which on a year's walk was
  * a few grey ticks nobody could read against a balance line (the money review called them stray), and their deltas
@@ -100,6 +105,11 @@ export type ForecastModel = {
    * or `null` when the host sent none or wrote it in another money. The spend slider reaches twice it.
    */
   spent: number | null;
+  /**
+   * The last day the walk is drawn from what the record knows, from a `known | 2026-12-31 |  |` row, or `null` when the
+   * host sent none and the walk's last dated movement is it. The line is solid to it and dashed beyond.
+   */
+  known: string | null;
 };
 
 /** Growth a year, in percent, of money going out and of money coming in. */
@@ -200,7 +210,14 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     shows: showsOf(rows),
     home: homeOf(rows.find((r) => r[0]?.trim() === 'home')),
     spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
+    known: knownOf(rows.find((r) => r[0]?.trim() === 'known'), today),
   };
+}
+
+/** A `known | 2026-12-31 |  |` row's day, or `null` when there is none, it is not a day, or it is before today. */
+function knownOf(row: readonly string[] | undefined, today: string): string | null {
+  const d = row?.[1]?.trim() ?? '';
+  return ISO.test(d) && d >= today ? d : null;
 }
 
 /** A `home | GBP |  |` row's currency, or `null` when there is none or it is not a code. */
@@ -661,15 +678,27 @@ export type ForecastPlan = {
   said: string;
   warn: boolean;
   past: string;
+  /** The walk from today as far as the record knows it, solid, and `''` when nothing ahead of today is known. */
+  walk: string;
+  /** The walk beyond what is known, dashed, from where `walk` ends, and `''` when the record knows it to the horizon. */
   future: string;
-  /** The soft wash between the balance and the zero rule, remembered and walked alike, as one closed path. */
+  /**
+   * The soft wash between the balance and the zero rule, remembered and walked alike, split at zero: `area` is the part
+   * above it and `below` the part under it, each one closed path or `''` when the walk never goes that side.
+   */
   area: string;
+  below: string;
+  /** Today's dot, where its balance is said (shares across and down), and the balance as a headline says it. */
+  now: { d: string; at: string; y: string; label: string };
   base: string;
   zero: string;
   /** The rules at the axis's other round steps, faint, and `''` when zero is the only one. */
   grid: string;
-  /** The crossing's dot and where its label sits, as a fraction across. */
-  cross: { d: string; at: string; day: string } | null;
+  /**
+   * The crossing's dot, where its label sits as a fraction across, and the thin rule from the label at the chart's top
+   * edge down to the dot, so the flag says which point of the line it names.
+   */
+  cross: { d: string; rule: string; at: string; day: string } | null;
   low: string;
   ticks: { at: string; label: string }[];
   /** The start and the end of the time axis, for the scrub. */
@@ -739,13 +768,32 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
 
   const line = (days: Scenario['days']) =>
     days.filter((p) => p.day <= end).map((p, i) => `${i ? 'L' : 'M'}${x(p.day)} ${y(p.balance)}`).join(' ');
+  /* A LINE OF ONE POINT DRAWS NOTHING, and is said as nothing. */
+  const drawn = (days: Scenario['days']) => (days.filter((p) => p.day <= end).length > 1 ? line(days) : '');
 
-  /* THE WASH RUNS UNDER BOTH LINES AS ONE SHAPE, down to the zero rule at its two ends, so a walk that goes under
-     washes the part below zero as well; a day the record did not remember is bridged, as the eye bridges it. */
+  /* THE KNOWN PART AND THE GUESSED PART SHARE THE DAY BETWEEN THEM, so the solid line and the dashed one meet. */
+  const lastStep = shown.steps.reduce((most, s) => (s.day > most ? s.day : most), model.today);
+  const known = (model.known ?? lastStep) < end ? (model.known ?? lastStep) : end;
+
+  /* THE WASH RUNS UNDER BOTH LINES, down to the zero rule at its two ends, and is cut at zero into the part above and
+     the part under, each one shape, so the part a person has to act on can be tinted alone. Where the walk crosses
+     between two days the cut is put on the crossing itself, or the wash above would poke past the line there. A day the
+     record did not remember is bridged, as the eye bridges it. */
   const points = [...model.past.map((p) => ({ day: p.day, v: p.value })), ...shown.days.filter((p) => p.day <= end).map((p) => ({ day: p.day, v: p.balance }))];
-  const area = points.length > 1
-    ? `M${x(points[0]!.day)} ${y(0)} ${points.map((p) => `L${x(p.day)} ${y(p.v)}`).join(' ')} L${x(points.at(-1)!.day)} ${y(0)}Z`
-    : '';
+  const cut: { d: number; v: number }[] = [];
+  for (const p of points) {
+    const d = daysBetween(start, p.day);
+    const prev = cut.at(-1);
+    if (prev && Math.sign(prev.v) * Math.sign(p.v) < 0) cut.push({ d: prev.d + (prev.v / (prev.v - p.v)) * (d - prev.d), v: 0 });
+    cut.push({ d, v: p.v });
+  }
+  const xd = (d: number) => at((d / span) * 1000);
+  const wash = (side: (v: number) => number, any: boolean) =>
+    cut.length > 1 && any
+      ? `M${xd(cut[0]!.d)} ${y(0)} ${cut.map((p) => `L${xd(p.d)} ${y(side(p.v))}`).join(' ')} L${xd(cut.at(-1)!.d)} ${y(0)}Z`
+      : '';
+  const area = wash((v) => Math.max(0, v), cut.some((p) => p.v > 0));
+  const below = wash((v) => Math.min(0, v), cut.some((p) => p.v < 0));
 
   const starts: { d: number; day: string }[] = [];
   for (let d = 0; d <= span; d++) {
@@ -780,12 +828,22 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     said,
     warn: c !== null,
     past,
-    future: line(shown.days),
+    walk: drawn(shown.days.filter((p) => p.day <= known)),
+    future: drawn(shown.days.filter((p) => p.day >= known)),
     area,
+    below,
+    now: {
+      d: `M${x(model.today)} ${y(model.opening)}h0`,
+      at: at(daysBetween(start, model.today) / span),
+      y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
+      label: headlineFigure(figure(model.opening)),
+    },
     base: base ? line(base.days) : '',
     zero: y(0),
     grid: levels.filter((v) => v !== 0).map((v) => `M0 ${y(v)}H1000`).join(' '),
-    cross: c ? { d: `M${x(c.day)} ${y(c.balance)}h0`, at: at(daysBetween(start, c.day) / span), day: shortDay(c.day) } : null,
+    cross: c
+      ? { d: `M${x(c.day)} ${y(c.balance)}h0`, rule: `M${x(c.day)} 0V${y(c.balance)}`, at: at(daysBetween(start, c.day) / span), day: shortDay(c.day) }
+      : null,
     low: `M${x(shown.lowest.day)} ${y(shown.lowest.balance)}h0`,
     ticks,
     start,
@@ -828,6 +886,9 @@ export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastP
 export const FORECAST_PAINT = {
   area: { fill: 'currentColor', 'fill-opacity': '0.06', stroke: 'none' },
   grid: { fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.08' },
+  walk: { fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' },
+  now: { fill: 'none', stroke: 'currentColor', 'stroke-width': '7', 'stroke-linecap': 'round' },
+  rule: { fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.35', 'stroke-width': '1' },
 } as const satisfies Record<string, Readonly<Record<string, string>>>;
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */

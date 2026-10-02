@@ -7,16 +7,27 @@
 -->
 <script lang="ts">
   import { FOLD_HIDE, FOLD_SHOW, counted, inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { glyphPath } from '../src/inline.ts';
+  import { glyphPath, glyphWaits } from '../src/inline.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
   const glyph = $derived(block.rows[0]?.cells[0] ?? '');
+  /* A NAME ONLY THE SET HOLDS IS ASKED AGAIN ONCE THE SET LANDS, the way a tile heading's `IconWell` waits on it:
+     `circle-check` has no drawing in the host's hand until the set's chunk arrives (`opts.iconSet`), and a slot
+     that asked once would stay empty for good. A host that still has no drawing then keeps the slot empty. */
+  let landed = $state(0);
+  $effect(() => {
+    if (glyph && glyphWaits(glyph, opts)) void opts.iconSet?.().then(() => landed++, () => {});
+  });
+
   /* The slot's drawing, only where the host answers `opts.icon` for a name the set holds; otherwise the
      slot stays empty, as `section` in src/html.ts leaves it. The heading's words say what the section
      is, so the glyph beside them stays hidden from a screen reader either way. */
-  const d = $derived(glyph ? glyphPath(glyph, opts) : null);
+  const d = $derived.by(() => {
+    void landed;
+    return glyph ? glyphPath(glyph, opts) : null;
+  });
   const count = $derived(block.rows[0]?.cells[1] ?? '');
   const fold = $derived(block.rows[0]?.cells[2] === 'fold');
 </script>

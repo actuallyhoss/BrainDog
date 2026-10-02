@@ -106,6 +106,8 @@ export {
   FEED_NOTHING_NEW,
   FEED_SEEN,
   feedBurst,
+  feedCased,
+  feedCasedNodes,
   feedFault,
   feedNew,
   feedPlan,

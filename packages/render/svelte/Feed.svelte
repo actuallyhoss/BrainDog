@@ -6,10 +6,12 @@
   The count leads each row, because the number is the part that decides whether a row is worth reading, and only
   where it is a burst of more than one (`feedBurst`): a `1` in front of every line said nothing. An agent wears its
   maker's mark where the host draws one, and a rule wears no letter. A new row is told apart by words as well as by
-  the accent: the group's head says how many are new, and a line says where the read ones begin.
+  the accent: the group's head says how many are new, and a line says where the read ones begin. A feed of one group
+  draws no head, and a name the bank sent in capitals is written as a person writes it (`feedCased`).
 -->
 <script lang="ts">
   import { FEED_EARLIER, MISSING, TONES, agentMarkFill, feedBurst, feedNew, feedPlan, initialOf, inline, text, type AgentMark, type Block, type RenderOptions } from '../src/index.ts';
+  import { feedCasedNodes } from '../src/feed.ts';
   import { RUN_OPEN, runFaceOf, type RunFace } from '../src/cards.ts';
   import { hrefFor } from '../src/html.ts';
   import { rowAt, rowKey } from '../src/cursor.ts';
@@ -88,7 +90,7 @@
   <div class="feed" onfocusin={onrowfocus ? focused : undefined}>
     {#each plan.groups as g}
       <div class="feed-group" data-by={g.by}>
-        <h3 class="feed-head">{g.label}{#if g.fresh > 0}<span class="feed-new num">{feedNew(g.fresh)}</span>{:else}<span class="feed-tally num" data-calm="">{g.total}</span>{/if}</h3>
+        {#if !plan.lone}<h3 class="feed-head">{g.label}{#if g.fresh > 0}<span class="feed-new num">{feedNew(g.fresh)}</span>{:else}<span class="feed-tally num" data-calm="">{g.total}</span>{/if}</h3>{/if}
         <ul class="feed-rows">
           {#each g.rows as { row, fresh }, i}
             {@const who = row.cells[1] ?? ''}
@@ -103,7 +105,7 @@
               {#if run}{@render runFace(run)}{:else if mark}{@render agentFace(mark, 'feed-face')}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
               <span class="feed-what"
                 ><span class="feed-who">{#if who}<Text nodes={nodes(who)} {opts} />{:else}{MISSING}{/if}</span> <Text
-                  nodes={nodes(row.cells[3])}
+                  nodes={feedCasedNodes(nodes(row.cells[3]))}
                   {opts}
                 />{#if row.tone}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
               >

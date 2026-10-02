@@ -101,6 +101,9 @@ A `heat` row is `day | value`, the value one when left off and rows on one day a
 by weekday ending on the week of `RenderOptions.now`, the cells written week by week, Monday first, with no
 position of their own: the host flows them into seven rows and `--weeks` columns, and on a phone hides the first
 four weeks. A day nobody wrote is a gap and never a zero, and a day still to come carries `data-future` and no wash.
+` ```heat people ` reads `day | who` instead: one `heat-person` line a person, the latest in touch first and at most eight (the rest counted in `heat-more`), across the
+same twelve weeks, a `heat-week` dot each week (`data-on` where they were in touch), each line's dots named in words,
+and the months along them as `heat-tick`s placed by `--week`. All twelve weeks hold on a phone.
 
 A `calendar` row is `title | day`, and a tone. Every month from the first row's to the last row's is drawn as a
 table of weeks, Monday first, each day naming its first three rows and counting the rest (`+2`), then an agenda of

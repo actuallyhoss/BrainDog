@@ -19,7 +19,7 @@ import { compile, compileModule } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import type { Component } from 'svelte';
 
-import { glyphName, glyphPath, inline, magnitudeOfCell, text } from './inline.ts';
+import { glyphName, glyphPath, glyphWaits, inline, magnitudeOfCell, text } from './inline.ts';
 import { toHTML } from './html.ts';
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { ALIASES } from './glyphs/aliases.ts';
@@ -176,6 +176,15 @@ test('A SECTION AND A CHIP DRAW THEIR NAMED GLYPH IN THE SLOT, and the slot is a
   assert.ok(toHTML(chips).includes('<span class="pill-glyph" data-glyph="rocket" aria-hidden="true"></span>'));
 });
 
+test('A SLOT WAITS ON THE HOST\'S SET only for a glyph it has no drawing for yet, and only when the host says one is coming', () => {
+  const coming = { icon: (_name: string): string | null => null, iconSet: () => Promise.resolve() };
+  assert.equal(glyphWaits('circle-check', coming), true, 'a set glyph not yet in hand waits');
+  assert.equal(glyphWaits('layout-list', { ...coming, icon: () => DRAWING }), false, 'a glyph in hand is drawn at once');
+  assert.equal(glyphWaits('constructor', coming), false, 'a name that is no glyph never waits');
+  assert.equal(glyphWaits('circle-check', nothing), false, 'a host with nothing coming is not waited on');
+  assert.equal(glyphWaits('circle-check', {}), false);
+});
+
 const SHAPES: Record<string, BlockSegment> = {
   'a note with a glyph in its heading and its body': onPage('```note | {{icon:flag}} Heads up\n{{icon:rocket}} shipped, {{icon:rocket}}twice and {{icon:constructor}} not\n```'),
   'a card with a glyph in its title': onPage('```cards\ntitle: Doing | fact: Project\n{{icon:rocket}} shipped | Kiln\n```'),
@@ -186,7 +195,12 @@ const SHAPES: Record<string, BlockSegment> = {
 };
 
 for (const [name, block] of Object.entries(SHAPES)) {
-  for (const [host, opts] of [['with the host\'s art', everything], ['with no art', nothing], ['with no host', {}]] as const) {
+  for (const [host, opts] of [
+    ['with the host\'s art', everything],
+    ['with no art', nothing],
+    ['with its art still arriving', { ...nothing, iconSet: () => new Promise<never>(() => {}) }],
+    ['with no host', {}],
+  ] as const) {
     test(`the two renderers draw one tree: ${name}, ${host}`, () => {
       const svelte = tree(render(Block, { props: { block, opts } }).body);
       const html = tree(toHTML([block], opts));

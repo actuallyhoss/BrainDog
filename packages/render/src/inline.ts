@@ -48,6 +48,16 @@ export type InlineOptions = {
    * can answer from `braindog-render/glyphs`.
    */
   icon?: (name: string) => string | null;
+  /**
+   * The host's drawings that arrive after the page: settles once `icon` can answer every name the set holds.
+   *
+   * THE SET IS A CHUNK OF ITS OWN (`glyphs/index.ts`), so a host answering `icon` from what it has in hand
+   * answers `null` for `circle-check` until the chunk lands, and a drawer that asked once keeps its slot
+   * empty for good. A live drawer whose `icon` answered `null` for a glyph name waits on this once and asks
+   * again, as the app's `Icon` does (`glyphWaits`). `toHTML` is one pass and never waits: its slot stays
+   * the named, empty span a host without the set has always had.
+   */
+  iconSet?: () => Promise<unknown>;
 };
 
 /**
@@ -74,6 +84,14 @@ export function glyphPath(name: string, opts: InlineOptions): string | null {
   const d = known === null ? null : (opts.icon?.(known) ?? null);
   return d ? d : null;
 }
+
+/**
+ * Whether a slot that drew nothing for `name` should wait on the host's set and ask again: the name is a
+ * glyph, the host has no drawing for it yet, and the host says its drawings are still arriving. A name
+ * that is no glyph never waits, so `constructor` reaches neither `icon` nor `iconSet`.
+ */
+export const glyphWaits = (name: string, opts: InlineOptions): boolean =>
+  opts.iconSet !== undefined && glyphName(name) !== null && glyphPath(name, opts) === null;
 
 /* WHAT FOLLOWS AN INLINE GLYPH IS HELD TO IT, so a line never ends on a glyph and starts again with the
    word it belongs to. A space after it becomes a no-break space; anything else that touches it gets

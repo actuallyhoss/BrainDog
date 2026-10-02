@@ -124,13 +124,18 @@
         {@render visual(o.shows)}
         {#if onact}
           <!-- The number key that answers sits inside the pill, so it takes no track of the three every option shares. -->
+          <!-- THE RECOMMENDATION IS A MARK INSIDE ITS PILL, after the words, so it adds no line under the button;
+               `kinds/queue.css` drops the stand-in dot once the word is inside. The space keeps "Paid Recommended"
+               two words in the button's name, since an inline span adds none. -->
           <button type="button" class="queue-act" onclick={() => onact?.(item.row, o.key)}
-            >{#if keyed && n < CHOICE_KEYS}<kbd class="queue-key" aria-hidden="true">{n + 1}</kbd>{/if}{o.label}</button
+            >{#if keyed && n < CHOICE_KEYS}<kbd class="queue-key" aria-hidden="true">{n + 1}</kbd>{/if}{o.label}{#if o.recommended}{' '}<span
+                class="queue-rec">{QUEUE_RECOMMENDED}</span
+              >{/if}</button
           >
         {:else}
           <span class="queue-label">{o.label}</span>
+          {#if o.recommended}<span class="queue-rec">{QUEUE_RECOMMENDED}</span>{/if}
         {/if}
-        {#if o.recommended}<span class="queue-rec">{QUEUE_RECOMMENDED}</span>{/if}
         {#if o.because}<span class="queue-because" data-calm=""><Text nodes={nodes(o.because)} {opts} /></span>{/if}
       </li>
     {/each}

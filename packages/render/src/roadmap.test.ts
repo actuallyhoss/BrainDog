@@ -57,7 +57,7 @@ test('the number of tracks is the most windows in hand on any one day', () => {
 
 /* ── the span and its months ──────────────────────────────────────────────── */
 
-test('the span is whole months, and a bar runs from the start of its first day to the end of its last', () => {
+test('the span never starts before the first of the earliest month, and a bar runs from the start of its first day to the end of its last', () => {
   const plan = roadmapPlan([win('2026-09-01', '2026-09-10')], TODAY);
   assert.deepEqual([plan.from, plan.to], ['2026-09-01', '2026-10-01']);
   assert.deepEqual([plan.bars[0]!.x, plan.bars[0]!.width], ['0', '333.33']);
@@ -65,14 +65,30 @@ test('the span is whole months, and a bar runs from the start of its first day t
 
 test('month bands cover the span, alternate, and name the year on the first band and every January', () => {
   const plan = roadmapPlan([win('2026-11-15', '2027-02-10')], TODAY);
-  assert.deepEqual([plan.from, plan.to], ['2026-11-01', '2027-03-01']);
+  /* 106 days from the first bar to 1 Mar, so the span starts three days ahead of it, 3% of them. */
+  assert.deepEqual([plan.from, plan.to], ['2026-11-12', '2027-03-01']);
   assert.deepEqual(plan.bands.map((b) => b.label), ['Nov 2026', 'Dec', 'Jan 2027', 'Feb']);
   assert.deepEqual(plan.bands.map((b) => b.odd), [false, true, false, true]);
   assert.equal(plan.bands[0]!.x, '0');
   const ends = plan.bands.map((b) => Number(b.x) + Number(b.width));
   assert.ok(Math.abs(ends.at(-1)! - 1000) < 0.02, 'the last band ends at the edge');
-  // 120 days in the span: November's 30 are a quarter of it.
-  assert.equal(plan.bands[0]!.width, '250');
+  // 109 days in the span: November's last 19 are that share of it.
+  assert.equal(plan.bands[0]!.width, String(Math.round((19 / 109) * 1000 * 100) / 100));
+});
+
+test('THE SPAN STARTS JUST BEFORE THE FIRST THING, not at an empty month, and a sliver of a month at the edge is not named', () => {
+  /* Kiln's plan: the first bar ends on 30 Aug and the rest run on from September, so August was drawn empty. */
+  const plan = roadmapPlan([win('2026-08-29', '2026-08-30'), win('2026-09-05', '2026-09-21'), win('2026-10-01', '2026-11-20')], '2026-09-02');
+  assert.equal(plan.from, '2026-08-26', 'three days ahead, 3% of the 94 from the first bar to 1 Dec');
+  assert.deepEqual(plan.bands.map((b) => b.label), ['', 'Sep 2026', 'Oct', 'Nov'], 'six days of August are too narrow to name, and the year goes on');
+  const wide = roadmapPlan([win('2026-08-29', '2026-08-30'), win('2026-09-05', '2026-09-21')], '2026-09-02');
+  assert.deepEqual(wide.bands.map((b) => b.label), ['Aug 2026', 'Sep'], 'in a span of five weeks the same five days hold their name');
+  assert.ok(Number(plan.bars[0]!.x) > 0, 'the first bar does not stand on the edge');
+  assert.ok(plan.today !== null, 'and today is still on the chart');
+  /* TODAY INSIDE THE FIRST MONTH, ahead of the first thing, keeps its line: the span starts ahead of today instead. */
+  const early = roadmapPlan([win('2026-09-20', '2026-09-25')], '2026-09-10');
+  assert.equal(early.from, '2026-09-08');
+  assert.ok(early.today !== null);
 });
 
 test('the today line sits in the middle of today, and is absent when today is not in the span', () => {

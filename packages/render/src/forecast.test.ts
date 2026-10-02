@@ -322,3 +322,51 @@ test('toHTML draws the wash, the axis down one side and no stems', () => {
   assert.match(html, /<li class="forecast-axis-tick" data-zero="" style="--at:0\.6667">£0<\/li>/u);
   assert.doesNotMatch(html, /forecast-stem|forecast-top|forecast-bottom/u);
 });
+
+test('THE LINE IS SOLID AS FAR AS THE RECORD KNOWS THE MOVEMENTS, and dashed only beyond, or beyond a `known` day', () => {
+  const m = model();
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  /* The last movement inside the sixty days is 20 Oct, so the walk is solid to it and dashed from it to 16 Nov. */
+  const xOf = (d: string) => /^M([\d.]+) /u.exec(d)?.[1];
+  assert.equal(xOf(plan.walk), xOf(plan.now.d), 'the solid walk starts at today');
+  assert.equal(`M${plan.walk.split(' L').at(-1)}`, plan.future.split(' L')[0], 'and the dashed one starts where it ends');
+  assert.match(plan.future, / L1000 /u, 'the dashed walk runs to the horizon');
+  const told = forecastModel([...ROWS, ['known', '2026-11-30', '', '']])!;
+  assert.equal(told.known, '2026-11-30');
+  const all = forecastPlan(told, scenario(told, baseKnobs(told)), null);
+  assert.equal(all.future, '', 'known past the horizon, nothing is dashed');
+  const none = forecastModel([['opening', '2026-09-17', 'Cash now', '£1,000.00'], ['horizon', '30', '', '']])!;
+  const flat = forecastPlan(none, scenario(none, baseKnobs(none)), null);
+  assert.equal(flat.walk, '', 'with no movement ahead, nothing ahead of today is known');
+  assert.ok(flat.future.length > 0);
+  assert.equal(forecastModel([...ROWS, ['known', '2026-09-01', '', '']])!.known, null, 'a known day before today is no day');
+});
+
+test('THE WASH IS CUT AT ZERO into the part above and the part under, and the cut sits on the crossing itself', () => {
+  const m = model();
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.ok(plan.area.endsWith('Z') && plan.below.endsWith('Z'));
+  /* £300 on 19 Oct to −£900 on 20 Oct crosses a quarter of the way through the day: 35.25 of 63 days in. */
+  assert.ok(plan.area.includes(`L559.52 ${plan.zero}`), plan.area);
+  assert.ok(plan.below.includes(`L559.52 ${plan.zero}`), plan.below);
+  const ys = (d: string) => [...d.matchAll(/[ML][\d.]+ ([\d.]+)/gu)].map((x) => Number(x[1]));
+  assert.ok(ys(plan.area).every((v) => v <= Number(plan.zero)), 'above never reaches under zero');
+  assert.ok(ys(plan.below).every((v) => v >= Number(plan.zero)), 'under never reaches above it');
+  const up = forecastModel([['opening', '2026-09-17', 'Cash now', '£1,000.00'], ['horizon', '30', '', '']])!;
+  assert.equal(forecastPlan(up, scenario(up, baseKnobs(up)), null).below, '', 'a walk that never goes under has nothing to tint');
+});
+
+test('TODAY IS A DOT WITH ITS BALANCE, and the crossing flag is tied to the line by a rule', () => {
+  const m = model();
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.equal(plan.now.label, '£1,000');
+  assert.equal(plan.now.at, String(Math.round((3 / 63) * 100) / 100));
+  assert.match(plan.now.d, /h0$/u);
+  const dot = /^M([\d.]+) ([\d.]+)h0$/u.exec(plan.cross!.d)!;
+  assert.equal(plan.cross!.rule, `M${dot[1]} 0V${dot[2]}`, 'from the chart top, where the flag sits, down to the dot');
+  const html = toHTML(parse(['```forecast', ...ROWS.map((r) => r.join(' | ')), '```'].join('\n'), { page: true }));
+  assert.match(html, /<path class="forecast-area" data-below="" fill="currentColor"/u);
+  assert.match(html, /<path class="forecast-walk" fill="none" stroke="currentColor" stroke-width="2"/u);
+  assert.match(html, /<path class="forecast-cross-rule" /u);
+  assert.match(html, /<span class="forecast-now-label num" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true">£1,000<\/span>/u);
+});

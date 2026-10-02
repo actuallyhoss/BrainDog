@@ -520,6 +520,17 @@
     fill: var(--ramp-2);
   }
 
+  /* A SERIES WITH NOTHING GOING OUT IS A COUNT, NOT MONEY IN: work done by week, notes a month. Green there said
+     "earned" of a bar that only counts, and was the loudest colour on the tile, so it is drawn in the ink ramp, its
+     key with it. The green stays for money in beside money out, where in and out are the two things being told apart. */
+  .series:not(:has(.series-key[data-dir='out'])) .series-bar[data-dir='in'][data-step='0'] {
+    fill: var(--ramp-1);
+  }
+
+  .series:not(:has(.series-key[data-dir='out'])) .series-key[data-dir='in'][data-step='0'] .series-swatch {
+    background: var(--ramp-1);
+  }
+
   /* THE CURRENT BUCKET SO FAR: its fill is faint because the bucket is not over, so a solid edge in `--dim` is what
      keeps its height readable against the page, as the dashed edge does for the two states below. */
   .series-bar[data-state='partial'] {
@@ -1212,6 +1223,13 @@
     stroke: none;
   }
 
+  /* THE PART OF THE WASH UNDER ZERO IS A QUIET DANGER TINT, the one place the walk is a thing the person must act on.
+     The renderer draws it as its own path (`data-below`), so the wash above the line stays the neutral one. */
+  .forecast-area[data-below] {
+    fill: var(--danger);
+    fill-opacity: 0.08;
+  }
+
   .forecast-grid {
     fill: none;
     stroke: var(--line);
@@ -1225,7 +1243,11 @@
     overflow: visible;
   }
 
+  /* ONE SOLID LINE AS FAR AS THE RECORD KNOWS: the remembered balance (`forecast-past`) and the walk over entered
+     movements (`forecast-walk`) are one stroke, and only what lies past the last known day (`forecast-future`) is
+     dashed. Without a rule for the walk it took the renderer's currentColor fallback. */
   .forecast-past,
+  .forecast-walk,
   .forecast-future,
   .forecast-base {
     fill: none;
@@ -1258,6 +1280,44 @@
 
   .forecast-cross {
     stroke: var(--warn);
+  }
+
+  /* THE CROSSING IS TIED TO ITS FLAG BY ONE HAIRLINE in the warn tone at half strength, from the chart's top edge down
+     to the point where the balance goes under: enough to say which day the words above mean, quieter than the line. */
+  .forecast-cross-rule {
+    fill: none;
+    stroke: var(--warn);
+    stroke-opacity: 0.5;
+    stroke-width: 1px;
+  }
+
+  /* TODAY IS A DOT ON THE LINE with its balance beside it, said without a hover. The dot is
+     the ink at the low point's size; the words sit just after it and above it, placed by `--at` across and `--y` down
+     (both fractions of the plot, from `src/forecast.ts`), so they never sit on the line they name. */
+  .forecast-now {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 7px;
+    stroke-linecap: round;
+  }
+
+  /* `--y` is the renderer's, inline; the 0 here only stands when a host leaves it out, and puts the words at the top. */
+  .forecast-now-label {
+    --y: 0;
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    inset-block-start: calc(var(--y) * 100%);
+    translate: var(--sp-2) calc(-100% - var(--sp-1));
+    color: var(--ink);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .forecast-now-label:dir(rtl) {
+    translate: calc(-1 * var(--sp-2)) calc(-100% - var(--sp-1));
   }
 
   .forecast-pin {
@@ -1337,7 +1397,10 @@
     min-inline-size: 0;
   }
 
-  .forecast-knob[role='group']:has(.forecast-counts) {
+  /* What counts, and Every movement where Adjust holds it, each take the whole row: a list of switches and a table are
+     both wider than one knob's column. */
+  .forecast-knob[role='group']:has(.forecast-counts),
+  .forecast-knobs > .forecast-numbers {
     grid-column: 1 / -1;
   }
 
@@ -1723,9 +1786,9 @@
 
   /* ── roadmap: dated work on one time axis ─────────────────────────────────
      NO RULE DREW THIS KIND, so a shipped pack's roadmap put its names under the chart in a heap and the
-     marks took the weak paints `src/roadmap.ts` gives a page with no stylesheet. A window is a wash of the one series
-     inside a line of it, so the name drawn over it stays readable; a date is a stem in `--dim`, a tone in its intent;
-     today is a dashed ink line. The names sit in HTML over the box, placed by `--at` across and by their track or
+     marks took the weak paints `src/roadmap.ts` gives a page with no stylesheet. A window is a thin bar with no edge, light
+     enough that the name drawn over it stays readable; a date is a stem in `--dim`, a tone in its intent's fill;
+     today is a hairline of ink. The names sit in HTML over the box, placed by `--at` across and by their track or
      label line down, and each stops at the end edge rather than running past it. On a phone the chart gives way to
      the lane list under it: each row's name, its dates, and a thin track with its window on it. It is the renderer's own kind and not a registered one
      (`lib/page/kinds/`), which is why its rules sit here with the other charts and not in a `kinds/` sheet. */
@@ -1758,28 +1821,31 @@
     overflow: visible;
   }
 
-  .roadmap-band {
+  /* NO MONTH IS WASHED. The month names under the chart already say where one ends; a band under every other month
+     was a second grid the eye read before the work, and in the dark scheme the loudest surface on the tile. */
+  .roadmap-band,
+  .roadmap-band[data-odd] {
     fill: none;
   }
 
-  .roadmap-band[data-odd] {
-    fill: var(--hover-wash);
-    fill-opacity: 1;
-  }
-
-  /* A WINDOW IS AN AREA OF THE INK AT 8% INSIDE A LINE OF IT, so the name drawn over it stays readable. */
+  /* A WINDOW IS A THIN BAR WITH NO EDGE: a little over half its lane's height, centred in it, so the lane's air reads
+     as the gap between two pieces of work. An untoned one is the ramp's lightest grey and a toned one its intent at
+     three fifths into the tile, both light enough that a name drawn over the bar stays in plain ink. The renderer
+     sizes the rect to its lane; the scale is drawn about its own middle, so the due dot (`roadmapDue`) stays on it. */
   .roadmap-bar {
-    fill: color-mix(in srgb, var(--ink) 8%, transparent);
+    fill: var(--ramp-3);
     fill-opacity: 1;
-    stroke: var(--ink);
-    stroke-width: 1.5px;
+    stroke: none;
     rx: 3px;
+    transform-box: fill-box;
+    transform-origin: center;
+    scale: 1 0.6;
   }
 
   /* A TONED MARK IS A GROUP carrying the intent, so its window and its line take the tone from it. */
   .roadmap-mark > .roadmap-bar {
-    fill: var(--tone-fill);
-    stroke: var(--tone);
+    fill: color-mix(in oklab, var(--tone-fill) 60%, var(--bg));
+    stroke: none;
   }
 
   .roadmap-stem {
@@ -1789,21 +1855,23 @@
   }
 
   .roadmap-mark > .roadmap-stem {
-    stroke: var(--tone);
+    stroke: var(--tone-fill);
   }
 
-  /* AND ITS GLYPH, a dot on the due day in the tone, as every intent on a row is drawn (`.glyph` in `blocks.css`). */
+  /* AND ITS GLYPH, a dot on the due day in the tone's fill, as every intent on a row is drawn (`.glyph` in
+     `blocks.css`). It is the window's one dot: the name beside it does not draw a second (below). */
   .roadmap-due {
     fill: none;
-    stroke: var(--tone);
+    stroke: var(--tone-fill);
     stroke-width: var(--dot);
     stroke-linecap: round;
   }
 
-  /* NOW IS THE ONE LIVE LINE ON A CHART. */
+  /* TODAY IS ONE HAIRLINE OF INK. In the live violet it was the only second hue on the tile and the first thing seen;
+     a fixed line of the ink says where now is and lets the work be read. */
   .roadmap-today {
-    stroke: var(--live);
-    stroke-width: 1.5px;
+    stroke: var(--ink);
+    stroke-width: 1px;
   }
 
   .roadmap-names,
@@ -1857,6 +1925,12 @@
   .roadmap-name[data-stem] {
     inset-block-start: calc(var(--line) * var(--roadmap-line));
     color: var(--ink2);
+  }
+
+  /* ONE DOT A MARK. The chart draws the tone on the due day; the same glyph after the name over it was a second dot
+     a few pixels on. The names are hidden from a screen reader, which reads the tone from the list under the chart. */
+  .roadmap-name > .glyph {
+    display: none;
   }
 
   .roadmap-months {
@@ -1944,7 +2018,7 @@
     }
 
     .roadmap-item[data-intent] .roadmap-item-bar {
-      background: var(--tone);
+      background: var(--tone-fill);
     }
   }
 
@@ -2101,14 +2175,84 @@
 
   .heat-empty,
   .heat-skipped,
-  .heat-outside {
+  .heat-outside,
+  .heat-more {
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
   }
 
+  /* `heat people`: A LINE A PERSON, a dot a week. The name holds a column of its own and the twelve weeks share the
+     rest, so every person's dots sit square under the month names below them. A week they were in touch is a dot of
+     ink and a week they were not is a hairline grey one, the same size, so the line reads as a rhythm and not as gaps.
+     `--weeks` is the plan's, on `.heat`; a month name's `--week` counts from 0, after the name's column. The columns
+     are `minmax(0, 1fr)` in both lists, so a month name wider than its week runs over the next one and never widens
+     its own column out of line with the dots; it is centred on its week's dot. `--heat-who` is the name's column, and
+     the month names' first column is that and the gap after it, so their weeks start where the dots' do. */
+  .heat[data-form='people'] {
+    --heat-who: 12rem;
+  }
+
+  .heat-people {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .heat-person {
+    display: grid;
+    grid-template-columns: minmax(0, var(--heat-who)) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .heat-who {
+    overflow: hidden;
+    color: var(--ink);
+    font-size: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .heat-weeks {
+    display: grid;
+    grid-template-columns: repeat(var(--weeks), minmax(0, 1fr));
+    justify-items: center;
+  }
+
+  .heat-week {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: var(--line);
+  }
+
+  .heat-week[data-on] {
+    background: var(--ink);
+  }
+
+  .heat-ticks {
+    display: grid;
+    grid-template-columns: minmax(0, calc(var(--heat-who) + var(--sp-3))) repeat(var(--weeks), minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  .heat-tick {
+    grid-row: 1;
+    grid-column: calc(var(--week) + 2);
+    justify-self: center;
+    white-space: nowrap;
+  }
+
   /* EIGHT WEEKS ON A PHONE, the last eight of the twelve: the first four columns are the first twenty-eight cells,
-     because the cells come week by week. The plan does not change, so a day keeps the wash the twelve weeks gave it. */
+     because the cells come week by week. The plan does not change, so a day keeps the wash the twelve weeks gave it.
+     THE DAY GRID ONLY: a person's line is one dot a week, so all twelve still fit, and its name column narrows instead. */
   @container (inline-size < 30rem) {
     .heat-grid {
       --weeks: 8;
@@ -2116,6 +2260,10 @@
 
     .heat-day:nth-child(-n + 28) {
       display: none;
+    }
+
+    .heat[data-form='people'] {
+      --heat-who: 7rem;
     }
   }
 

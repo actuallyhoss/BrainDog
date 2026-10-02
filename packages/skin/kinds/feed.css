@@ -53,8 +53,10 @@
     grid-template-columns: 3ch auto minmax(0, 1fr) auto;
     align-items: baseline;
     gap: var(--sp-1) var(--sp-3);
-    min-block-size: var(--row-h);
-    padding-block: var(--sp-2);
+    /* A STEP UNDER A LIST'S LINE, because an event is read, not pressed, and a feed of them is one plain line each. It
+       follows the density setting with every other line. */
+    min-block-size: calc(var(--row-h) - var(--sp-2));
+    padding-block: var(--sp-1);
     border-block-end: 1px solid var(--line);
     font-size: var(--t-ui);
   }
@@ -155,15 +157,19 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  /* ONE PLAIN LINE PER EVENT: the name and what they did in the same weight, cut at the end edge rather than wrapped,
+     so a long payee never makes one event three lines tall beside its neighbours. */
   .feed-what {
     min-inline-size: 0;
+    overflow: hidden;
     color: var(--ink2);
-    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .feed-who {
     color: var(--ink2);
-    font-weight: 500;
+    font-weight: 400;
   }
 
   .feed-what > .glyph {

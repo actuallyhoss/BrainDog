@@ -358,4 +358,8 @@ test('A TILE\'S WAYS TO ANSWER ARE BUTTONS WHERE THE HOST CAN ACT, and still not
   const html = render(BlockView, { props: { block: drawn(QUEUE), onact: () => {} } }).body;
   assert.equal(html.match(/<button type="button" class="queue-act"/gu)?.length, 3);
   assert.doesNotMatch(html, /aria-pressed|<details[^>]* open/u);
+  /* The recommendation is the pill's own mark, after its words, and never a line of its own after the button. */
+  const bare = html.replace(/<!--[^]*?-->/gu, '');
+  assert.match(bare, /<button type="button" class="queue-act">Navy <span class="queue-rec">Recommended<\/span><\/button>/u);
+  assert.equal(html.match(/class="queue-rec"/gu)?.length, 1);
 });

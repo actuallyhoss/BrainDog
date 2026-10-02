@@ -134,8 +134,8 @@ test('a date moves whole, and its stem is drawn at the middle of the day it will
   const plan = roadmapPlan([roadmapRow('Launch', '2026-09-30', '')], '2026-09-22');
   const stem = plan.stems[0]!;
   assert.deepEqual(dragWindow({ start: '', end: stem.day }, 'move', -3), { start: '', end: addDays(stem.day, -3) });
-  /* Thirty days in September: the 27th's middle is 26.5 days in, 883.33 of the thousand. */
-  assert.deepEqual(dragDrawn({ start: '', end: stem.day }, 'move', -3, plan), { x: '883.33', width: '0' });
+  /* The span starts two days ahead of today, the 20th, and runs to 1 Oct: the 27th's middle is 7.5 of its 11 days in. */
+  assert.deepEqual(dragDrawn({ start: '', end: stem.day }, 'move', -3, plan), { x: '681.82', width: '0' });
 });
 
 test('a bar under the pointer is drawn where the plan would put that window, in the same units', async () => {
