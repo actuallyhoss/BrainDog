@@ -168,8 +168,13 @@ export const FOUNDER = {
 
      1.12.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.9.0'S TEMPLATE: it always opens on a line, the work handed back
      when there is any and otherwise the project's next step, and Where it stands no longer says that step again. No
-     block added or taken away. 1.11.0 is live, so the change is a version and not a reset. */
-  version: '1.12.0',
+     block added or taken away. 1.11.0 is live, so the change is a version and not a reset.
+
+     1.13.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.10.0'S TEMPLATE: where it stands and what is handed back sit in
+     the rail beside the chart, which takes the main column, What is open goes since the plan draws the same tasks, and
+     what is handed back is drawn only while it lists a task. A block taken away and none added; no list, field or
+     figure of this use case moves, so a minor step. 1.12.0 is live. */
+  version: '1.13.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -570,10 +575,7 @@ export const FOUNDER_EXAMPLES = [
 /**
  * WHAT THE MODULES SAY TO A FOUNDER, by module and then by the module's own words (`MODULE_NAMES` in `install.ts`). A
  * founder is not given the plain words the other use cases get: money owed to one of their organisations is an invoice,
- * and saying so is the business's voice and not somebody else's. So Money's late note names the invoices it counts.
+ * and saying so is the business's voice and not somebody else's. Money's late line already names the invoices it
+ * counts, and since money-core 3.5.0 it carries no heading for this to call Late invoices, so there is nothing to rename.
  */
-export const FOUNDER_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'money-core': {
-    'Late coming in': 'Late invoices',
-  },
-};
+export const FOUNDER_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {};

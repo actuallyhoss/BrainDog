@@ -321,13 +321,25 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   away, so the step is a minor one: a record holding 1.8.0 is offered it. The project page moves with it, though no
  *   pack holds it (`crossPack`): it always opens on a line, the work handed back when there is any and otherwise the
  *   project's next step, which Where it stands no longer says a second time.
+ * - portfolio 1.10.0, money-core 3.5.0 and work 1.12.0: every row of tiles ends at one height (the visual review of
+ *   October 2nd). The Overview's Right now goes into its line ("3 projects in play, 2 at risk or off track") and the two
+ *   splits take half the row each. Money's three one-line notes, an old balance, money late coming in and money late
+ *   going out, are three lines of one boxed Heads up under Accounts. Work draws Today the whole width and Late and This
+ *   week side by side under it. Each folded heading wears a glyph the app draws there. Work gains `project-held-up`,
+ *   what on a project is handed back or blocked, and blocks move, no list or field is taken away, so each step is a minor
+ *   one. The project page moves with them, though no pack holds it (`crossPack`): where it stands and what is handed
+ *   back sit in the rail beside the chart, What is open goes since the plan draws the same tasks, and what is handed back
+ *   is drawn only while it lists a task.
+ * - people 2.5.0: In touch, 12 weeks is a line a person (`people: true`, columns `day | who`), the latest drawn and the
+ *   rest counted, in place of a grid of days that said when anybody was in touch and never who. A key on a block that is
+ *   already there, no list, field or figure added or taken away, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.9.0',
-  people: '2.4.0',
-  'money-core': '3.4.0',
+  portfolio: '1.10.0',
+  people: '2.5.0',
+  'money-core': '3.5.0',
   estate: '2.1.0',
-  work: '1.11.0',
+  work: '1.12.0',
 };
 
 type Body = Record<string, unknown>;

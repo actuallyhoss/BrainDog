@@ -682,7 +682,6 @@ export const PERSONAL_NAMES: Readonly<Record<string, Readonly<Record<string, str
     'Money in': 'Pay',
     'Money out': 'Spent',
     'Being chased': 'Still waiting for',
-    'Late going out': 'Bills gone late',
     'Most days money in may be late': 'Most days pay may be late',
   },
 };

@@ -51,5 +51,21 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   'recurring-ended': 'End a schedule on its last day',
 };
 
+/**
+ * WHAT A FIRST-PARTY RULE'S WRITE SAYS AFTER THE ROW'S NAME, by the rule's id, for the rules that change a row rather
+ * than note on it or ask. "Since you were away" drew `Categorise what cleared changed TALLYARD` down the page; the line
+ * is the row and what was done to it, `Tallyard categorised`. A rule left out keeps the verb and the row.
+ */
+export const RULE_DONE: Readonly<Record<string, string>> = {
+  'txn-categorise': 'categorised',
+  'recurring-ended': 'ended',
+};
+
+/** The words after a row's name for what a rule did to it, or `null` for a rule this build does not word. */
+export const ruleDone = (id: string): string | null => {
+  const bare = id.replace(/^rule[.:]/u, '');
+  return Object.hasOwn(RULE_DONE, bare) ? RULE_DONE[bare]! : null;
+};
+
 /** A rule by its name, from its id with or without `rule.` in front, or `null` for one this build does not ship. */
 export const ruleName = (id: string): string | null => RULE_NAMES[id.replace(/^rule[.:]/u, '')] ?? null;

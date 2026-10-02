@@ -258,14 +258,19 @@ test('THE LINE COMES FIRST AND A CALL IS DRAWN ONLY WHILE ONE IS ASKED, since 2.
   const first = calm.blocks.find((b) => b.drawn !== false)!;
   assert.deepEqual([first.kind, (first as Decl).lead], ['note', true]);
   const queues = (page: Page) => page.blocks.filter((b) => b.kind === 'queue').map((b) => [b.heading, b.drawn !== false]);
-  assert.deepEqual(queues(calm), [['Your call', false], ['Calls waiting on you', false]]);
+  assert.deepEqual(queues(calm), [['Calls waiting on you', false]]);
 
   said(api.kernel.propose({ question: 'Which card stock for the box?', body_kind: 'options', body: { about: 'The box', options: [{ id: 'kraft', label: 'Brown kraft', because: 'Costs least' }, { id: 'white', label: 'Bright white', because: 'Prints sharpest' }] } } as never, 'slash'));
-  assert.deepEqual(queues(await pageOf(api, 'desk')), [['Your call', true], ['Calls waiting on you', true]]);
+  const asked = await pageOf(api, 'desk');
+  assert.deepEqual(queues(asked), [['Calls waiting on you', true]]);
+  /* AND STRAIGHT UNDER THE LINE, SINCE 2.2.0: a call is what needs the person, and it was asked twice on one desk, once
+     in a third of the box and once under the calendar. */
+  const drawn = asked.blocks.filter((b) => b.drawn !== false);
+  assert.deepEqual([drawn[0]!.kind, drawn[1]!.heading], ['note', 'Calls waiting on you']);
   sql.close();
 });
 
-test('THE THREE POINTED COLUMNS: the next open step, the one call waiting, and the last three done', async () => {
+test('WHERE IT STANDS: the next open step over the last three done, one box of whole rows, and each call asked once', async () => {
   const { api, sql } = await desked();
   await launch(api);
   said(api.kernel.propose({ question: 'Which card stock for the box?', body_kind: 'options', body: { about: 'The box', options: [
@@ -273,14 +278,17 @@ test('THE THREE POINTED COLUMNS: the next open step, the one call waiting, and t
     { id: 'white', label: 'Bright white', because: 'Shows the print sharpest', shows: { swatch: ['#f7f5ef'] } },
   ] } } as never, 'slash'));
   const page = await pageOf(api, 'desk');
-  const [move, call, done] = ['Next move', 'Your call', 'Already done'].map((h) => page.blocks.find((b) => b.heading === h)!);
+  const [move, done] = ['Next move', 'Already done'].map((h) => page.blocks.find((b) => b.heading === h)!);
+  /* ONE ABOVE THE OTHER, SINCE 2.2.0: three thirds side by side ended at three heights, a step against a call's options
+     against three rows, and two thirds and a hole the day nothing was asked. */
+  assert.deepEqual([(move as Decl).span, (done as Decl).span], [12, 12]);
   /* THE SHORT VIEW OF THE PATH IS ONE OPEN STEP, taken in rank order across every part, and the count is of them all. */
   assert.equal(move!.kind, 'steps');
   assert.equal(move!.rows.length, 1);
   assert.equal(move!.rows[0]!.fields.what, 'Test the burn time');
   assert.equal(move!.next, 0);
-  assert.equal(call!.kind, 'queue');
-  assert.deepEqual(call!.queue?.map((q) => q.question), ['Which card stock for the box?']);
+  const calls = page.blocks.filter((b) => b.kind === 'queue');
+  assert.deepEqual(calls.map((q) => q.queue?.map((x) => x.question)), [['Which card stock for the box?']]);
   assert.deepEqual(done!.rows.map((r) => r.fields.what).sort(), ['Ask for a box quote', 'Pick the wax', 'Take the photographs']);
   /* AND THE TILES FURTHER DOWN SHOW EACH OPTION AS WHAT IT IS. */
   const tiles = page.blocks.find((b) => b.kind === 'queue' && (b as Decl).tiles === true)!;
@@ -377,14 +385,17 @@ test('A PART\'S PAGE ANSWERS EVERY BLOCK: its path, its calls, its pad and its h
      drawer's alone and asks the record nothing: the sample is essential, and writing the card is only a should. */
   assert.deepEqual((page.blocks.find((b) => b.kind === 'steps') as Decl).short, { where: 'priority is essential', label: 'Essentials' });
   assert.deepEqual(path.short_now, [true, false]);
+  /* THE PART'S OWN CARD HEADS THE RAIL, SINCE 2.2.0: a third of the main column beside nothing, over the path. */
   const ring = page.blocks.find((b) => b.kind === 'cards')!;
   assert.deepEqual(ring.rings, [33]);
+  assert.equal(ring.area, 'rail');
+  assert.equal(page.blocks.find((b) => b.area === 'rail'), ring, 'the part\'s card is not the first thing in the rail');
   const calls = page.blocks.find((b) => b.kind === 'queue')!;
   assert.deepEqual(calls.queue?.map((q) => q.question), ['Which card stock for the box?']);
   assert.deepEqual(page.blocks.find((b) => b.heading === 'Who helps')!.rows.map((r) => r.fields.name), ['The box printer']);
   assert.deepEqual(page.blocks.find((b) => b.heading === 'Learned on the way' && b.kind === 'table')!.rows.map((r) => r.fields.lesson), ['Samples take a week']);
   /* THE PAD IN THE RAIL IS THIS PART'S, and a thought typed there is preset to be about it (the next test). */
-  const pad = page.blocks.filter((b) => b.area === 'rail' && b.kind === 'cards');
+  const pad = page.blocks.filter((b) => b.area === 'rail' && b.kind === 'cards' && (b as Decl).source === 'register.notes');
   assert.deepEqual(pad.map((b) => b.rows.map((r) => r.fields.text)), [['A ribbon on the box, or not?']]);
   assert.deepEqual(page.blocks.find((b) => b.kind === 'capture')!.fills, { about: box.id });
   sql.close();
@@ -404,7 +415,7 @@ test('A CAPTURE PRESETS WHICH PART A NOTE IS ABOUT, so the pad on the page of a 
   /* WHAT THE HOST WRITES WITH THOSE FILLS IS WHAT THE PAD BESIDE IT DRAWS. */
   make(api, 'notes', { text: 'Kraft looks warmer.', ...capture.fills });
   const slug = api.kernel.pages().find((p) => p.title === 'The box')!.slug;
-  const pad = (await pageOf(api, slug)).blocks.find((b) => b.area === 'rail' && b.kind === 'cards')!;
+  const pad = (await pageOf(api, slug)).blocks.find((b) => b.area === 'rail' && b.kind === 'cards' && (b as Decl).source === 'register.notes')!;
   assert.deepEqual(pad.rows.map((r) => r.fields.text), ['Kraft looks warmer.']);
   sql.close();
 });

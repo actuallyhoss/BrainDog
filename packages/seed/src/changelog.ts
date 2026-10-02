@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.10.0',
+      notes:
+        'Projects opens on how many are in play and how many are at risk, with where they are and how they are going side by side under it. A project page keeps where it stands and what is handed back in a column beside its chart, and lists its open work once, on the plan.',
+    },
+    {
       version: '1.9.0',
       notes:
         'The page is called Projects, as the top bar calls it. Right now sits beside where the projects are and how they are going, and statuses read Earning, Building, Parked and Finished. A project page opens on one line: the work handed back for you to check, or else its next step.',
@@ -38,6 +43,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '2.5.0', notes: 'In touch, 12 weeks names each person beside the weeks they were in touch, the latest first.' },
     {
       version: '2.4.0',
       notes:
@@ -54,6 +60,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.5.0',
+      notes: 'An old balance, money late coming in and money late going out are one Heads up under your accounts, each line there only while it is true.',
+    },
     {
       version: '3.4.0',
       notes:
@@ -89,6 +99,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.12.0',
+      notes: 'Today runs the whole width, with what is late and what is due this week side by side under it.',
+    },
     {
       version: '1.11.0',
       notes: 'Work shows what is still to do, folds what is further off and what was done, and has a strip of your projects to look at one at a time.',

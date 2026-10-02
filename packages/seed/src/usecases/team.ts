@@ -72,8 +72,11 @@ export const TEAM = {
      every heading wears a glyph, each list is drawn only while it holds a ticket, and Home folds how the cycle is
      going under what needs the team. A project's page takes portfolio 1.8.0's template. 2.9.0 is on `origin/master`.
      2.11.0: a project's page takes portfolio 1.9.0's template, which always opens on a line, the tickets handed back
-     when there are any and otherwise the project's next step, said once. 2.10.0 is live. */
-  version: '2.11.0',
+     when there are any and otherwise the project's next step, said once. 2.10.0 is live.
+     2.12.0: a project's page takes portfolio 1.10.0's template: where it stands and the tickets handed back sit in the
+     rail beside the chart, What is open goes since the plan draws the same tickets, and what is handed back is drawn
+     only while it lists one. 2.11.0 is live. */
+  version: '2.12.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

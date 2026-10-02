@@ -1,9 +1,9 @@
 {
   "pack": "launch-desk",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "title": "Launch desk",
   "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part in its own colour and picture with its next step, the steps on a calendar by the day they are due, the calls waiting on you, a pad beside it, and a price check.",
-  "changes": "The desk opens on its one line, how many essential steps are done, before anything else, and the calls waiting on you are drawn only while one is asked, so a desk with nothing to decide shows no empty box saying so.",
+  "changes": "Tiles sit in even rows: on the desk the next move and what is already done stack in one box, the calls waiting on you come straight under the line and are shown once, and a part's own card sits at the top of the column beside its path.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -558,13 +558,25 @@
           "body": "All {{essentials}} essential step(s) are done."
         },
         {
+          "kind": "queue",
+          "span": 12,
+          "heading": "Calls waiting on you",
+          "source": "governance.open",
+          "tiles": true,
+          "empty": "No call is waiting on you.",
+          "when": {
+            "metric": "questions-open",
+            "gt": 0
+          }
+        },
+        {
           "kind": "section",
           "heading": "Where it stands",
           "box": true
         },
         {
           "kind": "steps",
-          "span": 4,
+          "span": 12,
           "heading": "Next move",
           "source": "register.steps",
           "first": 1,
@@ -589,20 +601,8 @@
           "empty": "No step is open."
         },
         {
-          "kind": "queue",
-          "span": 4,
-          "heading": "Your call",
-          "source": "governance.open",
-          "limit": 1,
-          "empty": "No call is waiting on you.",
-          "when": {
-            "metric": "questions-open",
-            "gt": 0
-          }
-        },
-        {
           "kind": "table",
-          "span": 4,
+          "span": 12,
           "heading": "Already done",
           "source": "register.steps",
           "where": "done is true",
@@ -691,18 +691,6 @@
           "empty": "No open step is due this month or the next two. Give a step a day it is due, and it is put on the calendar."
         },
         {
-          "kind": "queue",
-          "span": 12,
-          "heading": "Calls waiting on you",
-          "source": "governance.open",
-          "tiles": true,
-          "empty": "No call is waiting on you.",
-          "when": {
-            "metric": "questions-open",
-            "gt": 0
-          }
-        },
-        {
           "kind": "section",
           "heading": "The pad",
           "source": "register.notes",
@@ -769,31 +757,6 @@
           "body": "{{what}}"
         },
         {
-          "kind": "cards",
-          "span": 4,
-          "source": "register.parts",
-          "where": "name is {{name}}",
-          "columns": [
-            {
-              "field": "name",
-              "as": "title"
-            },
-            {
-              "field": "progress",
-              "as": "ring"
-            },
-            {
-              "field": "hue",
-              "as": "hue"
-            },
-            {
-              "field": "picture",
-              "as": "picture"
-            }
-          ],
-          "empty": "This part is not on the list."
-        },
-        {
           "kind": "steps",
           "span": 12,
           "heading": "The path",
@@ -843,6 +806,31 @@
             }
           ],
           "empty": "Nothing learned here yet."
+        },
+        {
+          "kind": "cards",
+          "source": "register.parts",
+          "where": "name is {{name}}",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "progress",
+              "as": "ring"
+            },
+            {
+              "field": "hue",
+              "as": "hue"
+            },
+            {
+              "field": "picture",
+              "as": "picture"
+            }
+          ],
+          "empty": "This part is not on the list.",
+          "area": "rail"
         },
         {
           "kind": "queue",

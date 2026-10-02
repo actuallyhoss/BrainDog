@@ -202,14 +202,19 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
       },
       {
         /* WHEN YOU WERE LAST IN TOUCH, one mark on each person's last day, over twelve weeks. A person counts once, on
-           their latest day, so a busy week is many people and not one person written to often. */
+           their latest day, so a busy week is many people and not one person written to often.
+
+           A LINE A PERSON, SINCE People 2.5.0 (`people: true`, columns `day | who`): the grid of days said when anybody
+           was in touch and never who, so the chart now names each one beside their week. The latest are drawn and the
+           rest counted under them. */
         kind: 'heat',
         heading: 'In touch, 12 weeks',
         icon: 'handshake',
         span: 12,
+        people: true,
         source: 'register.people',
         where: 'in_touch after -84d',
-        columns: [{ field: 'in_touch' }],
+        columns: [{ field: 'in_touch' }, { field: 'name' }],
         when: { metric: 'people-in-touch-12w', gt: 0 },
         empty: 'Nobody was in touch in the last twelve weeks.',
       },

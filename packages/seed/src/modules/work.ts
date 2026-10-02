@@ -703,6 +703,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * CALMER, SINCE work 1.11.0 (DIRECTION §35): the line, the capture line and the five bands of what is still to do,
    * then two folds, Not this week and Done lately. Open is said once, in the line, so the figures tile went; how fast work
    * moves is a line over eight weeks under Done lately. A strip of projects narrows every band (`filters:`).
+   *
+   * EVEN ROWS, SINCE work 1.12.0 (the visual review of October 2nd): Today the whole width, then Late and This week side
+   * by side, half each, and Done lately wears a glyph a folded heading draws.
    */
   work: {
     page: 'work',
@@ -739,22 +742,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         register: 'tasks',
       },
       {
-        /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
-           every `todo` row. Late, Today and This week are yours, cut at today and at a week, ordered by tier and then
-           by day. */
-        kind: 'todo',
-        heading: 'Late',
-        icon: 'alert',
-        span: 12,
-        source: 'register.tasks',
-        where: `${YOURS}, by before today`,
-        columns: [{ field: 'what' }, { field: 'by' }],
-        order: TIER_THEN_DUE,
-        limit: 12,
-        when: { metric: 'tasks-late-yours', gt: 0 },
-        empty: 'Nothing of yours is late.',
-      },
-      {
         kind: 'todo',
         heading: 'Today',
         icon: 'calendar',
@@ -768,10 +755,29 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing due today.',
       },
       {
+        /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
+           every `todo` row. Late, Today and This week are yours, cut at today and at a week, ordered by tier and then
+           by day.
+
+           LATE AND THIS WEEK SIDE BY SIDE, HALF EACH, UNDER TODAY, SINCE work 1.12.0: two short lists the whole width
+           each were two strips of white with a task at the left of each. Today keeps the whole width above them. */
+        kind: 'todo',
+        heading: 'Late',
+        icon: 'alert',
+        span: 6,
+        source: 'register.tasks',
+        where: `${YOURS}, by before today`,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        order: TIER_THEN_DUE,
+        limit: 12,
+        when: { metric: 'tasks-late-yours', gt: 0 },
+        empty: 'Nothing of yours is late.',
+      },
+      {
         kind: 'todo',
         heading: 'This week',
         icon: 'calendar-days',
-        span: 12,
+        span: 6,
         source: 'register.tasks',
         where: `${YOURS}, by after today, by before +8d`,
         columns: [{ field: 'what' }, { field: 'by' }],
@@ -869,7 +875,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
            fold the page is what is still to do. */
         kind: 'section',
         heading: 'Done lately',
-        icon: 'circle-check',
+        /* `check`, SINCE work 1.12.0: a folded heading draws only the glyphs the app ships with, and `circle-check` drew
+           nothing there. */
+        icon: 'check',
         span: 12,
         fold: true,
         when: { metric: 'tasks-done-7d', gt: 0 },

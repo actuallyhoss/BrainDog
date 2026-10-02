@@ -13,7 +13,7 @@ import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
 import { NOW, PAGES, THINGS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
-import { PORTFOLIO_REGISTERS } from '../src/modules/portfolio.ts';
+import { PORTFOLIO_REGISTERS, PROJECT_METRICS } from '../src/modules/portfolio.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -64,6 +64,13 @@ const block = (p: PageResult, heading: string) => {
 };
 
 const names = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => String(r.fields.name));
+
+/** One of the Overview's figures, read as the record reads it. */
+const figure = (k: Kernel, id: string): number | null => {
+  const out = k.metric(PROJECT_METRICS[id] as never);
+  assert.ok(out.ok, `${id}: ${sayOf(out)}`);
+  return out.value.value;
+};
 const TODAY = new Date(NOW).toISOString().slice(0, 10);
 const inPlay = (t: (typeof THINGS)[number]) => t.lane === 'building' || t.lane === 'earning';
 
@@ -72,11 +79,17 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   for (const slug of ['portfolio', 'kiln', 'marlow-co', 'portage']) for (const b of opened(k, slug).blocks) assert.deepEqual(b.refusals, [], `${slug} ${b.heading}`);
 
   const overview = opened(k, 'portfolio');
-  const figures = Object.fromEntries((block(overview, 'Right now').readings ?? []).map((r) => [r.metric, r.reading?.value]));
-  assert.deepEqual(figures, {
+  /* IN PLAY IS THE LINE'S, SINCE portfolio 1.10.0, beside what needs you, and what aims within thirty days is a figure
+     the fold's Coming up is drawn under. */
+  const line = overview.blocks.find((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false) as { values?: Record<string, unknown> };
+  assert.deepEqual(line.values, {
     'projects-live': THINGS.filter(inPlay).length,
-    'projects-aim-30d': THINGS.filter((t) => inPlay(t) && typeof t.aim === 'string' && t.aim >= TODAY && t.aim <= new Date(NOW + 30 * 86_400_000).toISOString().slice(0, 10)).length,
+    'projects-need-you': THINGS.filter((t) => inPlay(t) && (t.health === 'at_risk' || t.health === 'off_track')).length,
   });
+  assert.equal(
+    figure(k, 'projects-aim-30d'),
+    THINGS.filter((t) => inPlay(t) && typeof t.aim === 'string' && t.aim >= TODAY && t.aim <= new Date(NOW + 30 * 86_400_000).toISOString().slice(0, 10)).length,
+  );
   /* NEED YOU IS THE LINE'S, SINCE portfolio 1.8.0, said once, and the table under it names them. */
   assert.equal(
     block(overview, 'Needs you').rows.length,
@@ -167,8 +180,7 @@ test('A PROJECT PAST THE DAY IT AIMED FOR IS ASKED ABOUT ON DECIDE, once, and no
   assert.equal(asked.length, 1, 'asked once per project and day');
   assert.equal(k.question(String(asked[0]!.id)), 'Kiln was aiming for 1 day ago. Move the day, or park it?');
   assert.equal(k.get(`things#${seq}`)!.fields.lane, 'earning', 'the rule wrote nothing');
-  const figures = Object.fromEntries((block(opened(k, 'portfolio'), 'Right now').readings ?? []).map((r) => [r.metric, r.reading?.value]));
-  assert.equal(figures['projects-aim-30d'], 1, 'a missed day is no longer ahead');
+  assert.equal(figure(k, 'projects-aim-30d'), 1, 'a missed day is no longer ahead');
 });
 
 test('PROJECTS INSTALLS ALONE: a record with only projects, its Overview opens and a project written by hand is on it', async () => {
@@ -217,7 +229,7 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
   assert.equal(leads.length, 2, 'the Overview declares its two opening sentences');
   assert.deepEqual(leads.map((b) => b.drawn !== false), [true, false], 'one sentence and not both, or neither');
-  assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-need-you\}\} project\(s\) in play are at risk or off track\.$/u);
+  assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-live\}\} project\(s\) in play, \{\{projects-need-you\}\} at risk or off track\.$/u);
 
   /* EVERY PROJECT IS A PART OF WHERE THEY ARE, parked and finished among them. */
   const lanes = block(overview, 'Where they are').readings?.[0]?.reading?.groups ?? [];
@@ -237,19 +249,22 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   assert.ok(THINGS.every((t) => typeof t.about === 'string' && t.about !== ''), 'a sample project says nothing about what it is');
 });
 
-test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a capital, and Right now is a third of a row', async () => {
-  /* SINCE portfolio 1.9.0: the title read Overview under a top bar saying Projects, Where they are printed "earning" and
-     "building" as they are stored, and Right now held two numbers across the whole width. */
+test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a capital, and its first row is two even halves', async () => {
+  /* SINCE portfolio 1.9.0 the title is Projects and the statuses read Building and Earning. SINCE portfolio 1.10.0 Right
+     now is gone into the line: a third of the row beside two splits a third its height ended the row at three heights. */
   const page = PAGES.portfolio!;
   assert.equal(page.title, (page.nav as { section?: string } | undefined)?.section);
   const lane = PORTFOLIO_REGISTERS.things!.fields.find((f) => f.id === 'lane') as unknown as { values: readonly string[]; labels?: Record<string, string> };
   assert.deepEqual(lane.values.map((v) => lane.labels?.[v]), ['Building', 'Earning', 'Parked', 'Finished']);
-  const row = (page.blocks as { heading?: string; span?: number; when?: unknown }[]).filter((b) => ['Right now', 'Where they are', 'How they are going'].includes(String(b.heading)));
-  assert.deepEqual(row.map((b) => b.span), [4, 4, 4], 'the three do not make one row');
+  const blocks = page.blocks as { kind: string; heading?: string; span?: number; when?: unknown; lead?: boolean }[];
+  assert.ok(!blocks.some((b) => b.heading === 'Right now'), 'Right now is drawn beside the line that says its figure');
+  const row = blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading)));
+  assert.deepEqual(row.map((b) => b.span), [6, 6], 'the two do not make one row');
   assert.ok(row.every((b) => JSON.stringify(b.when) === JSON.stringify({ metric: 'projects-live', gt: 0 })), 'part of the row draws when the rest does not');
+  assert.deepEqual(blocks.findIndex((b) => b.heading === 'Where they are'), blocks.findIndex((b) => !b.lead), 'the row is not the first under the line');
 
   const k = await seeded();
-  assert.equal(block(opened(k, 'portfolio'), 'Right now').drawn !== false, true);
+  assert.equal(block(opened(k, 'portfolio'), 'Where they are').drawn !== false, true);
 });
 
 test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be checked, and says the step once', async () => {
@@ -270,6 +285,28 @@ test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be ch
   assert.ok(made.ok, sayOf(made));
   const back = opened(k, 'kiln').blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false);
   assert.deepEqual(back.map((b) => (b as { body?: string }).body), ['Work on Kiln has been handed back, and it waits for you to check it.']);
+});
+
+test('A PROJECT PAGE KEEPS WHERE IT STANDS AND WHAT IS HANDED BACK IN ONE COLUMN BESIDE ITS CHART, and lists its open work once', async () => {
+  /* SINCE portfolio 1.10.0: Where it stands was five twelfths beside a chart twice its height, Handed back seven beside
+     What is open, and What is open listed the tasks the plan under it draws again. */
+  const k = await seeded();
+  const page = opened(k, 'kiln');
+  const of = (heading: string) => block(page, heading) as ReturnType<typeof block> & { area?: string; span?: number };
+  assert.deepEqual(['At a glance', 'Where it stands', 'Handed back or blocked'].map((h) => of(h).area), ['rail', 'rail', 'rail']);
+  assert.deepEqual([of('Done, by week').area, of('Done, by week').span], [undefined, 12]);
+  assert.ok(!page.blocks.some((b) => b.heading === 'What is open'), 'the open tasks are listed twice');
+  /* KILN HAS A BLOCKED TASK, so what is handed back is drawn; a project with none draws no tile saying so. */
+  assert.notEqual(of('Handed back or blocked').drawn, false);
+  for (const slug of ['kiln', 'marlow-co', 'portage']) {
+    const held = block(opened(k, slug), 'Handed back or blocked');
+    assert.equal(held.drawn !== false, held.rows.length > 0, `${slug}: drawn over nothing, or hidden over a task`);
+  }
+  const portage = THINGS.findIndex((t) => t.name === 'Portage') + 1;
+  const open = k.list({ register: 'tasks', where: `thing is things#${portage}, state is review or blocked` } as never);
+  assert.ok(open.ok, sayOf(open));
+  for (const t of open.value.rows) assert.ok(k.update('tasks', t.id, { state: 'open' } as never, { actor: 'p_1', version: t.version } as never).ok);
+  assert.equal(block(opened(k, 'portage'), 'Handed back or blocked').drawn, false, 'a tile saying nothing is handed back');
 });
 
 test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE MONTH, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {

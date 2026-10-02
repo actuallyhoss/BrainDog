@@ -679,10 +679,13 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Add an account',
     'Cash ahead',
     'Waiting on you',
-    'Out of date',
-    'Late coming in',
-    'Late going out',
     'Accounts',
+    /* ONE TILE OF THREE LINES, SINCE money-core 3.5.0: an old balance, money late coming in and money late going out,
+       each a note with no heading of its own under one boxed section. */
+    'Heads up',
+    undefined,
+    undefined,
+    undefined,
     /* EVERYTHING AFTER ACCOUNTS IS FOLDED SHUT, SINCE money-core 3.4.0, and one view of the month is kept of three. */
     'Coming and going',
     'The next 30 days',
@@ -833,7 +836,9 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
   const old = ACCOUNTS.filter((a) => a.liquid === true && String(a.as_of) < day(-7)).length;
   assert.ok(old > 0, 'the sample keeps no old balance, so this proves nothing');
   assert.equal(reading(k, 'balances-stale'), old);
-  assert.notEqual(drawn('Out of date'), false, 'an old balance is not said on the page that reads it');
+  const stale = (out.value as { blocks: readonly { body?: string; drawn?: boolean }[] }).blocks.find((b) => String(b.body).startsWith('The oldest balance'));
+  assert.ok(stale && stale.drawn !== false, 'an old balance is not said on the page that reads it');
+  assert.notEqual(drawn('Heads up'), false, 'the line about an old balance is drawn with no tile round it');
 
   /* THE NEXT THIRTY DAYS AND NOTHING ELSE, each open, from tomorrow's side of today to the thirtieth day. */
   const due = blockOf(k, 'money', 'Due in the next 30 days');
@@ -867,6 +872,25 @@ test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line
     blocks.filter((b) => b.drawn !== false).map((b) => b.heading),
     [undefined, 'Add an account'],
   );
+});
+
+/**
+ * A RECORD WITH AN ACCOUNT AND NOTHING WRONG DRAWS NO HEADS UP. The box is gated on there being an account, and each of
+ * its lines on something stale or late, so on the most common healthy day every line is hidden and the box held only
+ * its bell heading. The record says the box is not drawn when nothing in it is (`pages.ts` `emptyBoxesShut`).
+ */
+test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an account and nothing stale or late', async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
+  const made = k.create('accounts', { name: 'Current account', kind: 'bank', balance: { amount: 250_000, currency: 'GBP' }, as_of: day(0), liquid: true } as never, { actor: 'p_test' });
+  assert.ok(made.ok, sayOf(made));
+  assert.equal(reading(k, 'cash-accounts'), 1);
+  for (const id of ['balances-stale', 'late-in', 'overdue']) assert.ok(!((reading(k, id) ?? 0) > 0), `${id} is true on a record with nothing wrong`);
+  const out = k.page('money');
+  assert.ok(out.ok, sayOf(out));
+  const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks;
+  assert.equal(blocks.find((b) => b.heading === 'Heads up')?.drawn, false, 'an empty Heads up box is drawn');
+  assert.notEqual(blocks.find((b) => b.heading === 'Coming and going')?.drawn, false, 'the fold after it is hidden with it');
 });
 
 test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a link and not a need', async () => {
@@ -1079,7 +1103,10 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   const drawn = () => {
     const out = k.page('money');
     assert.ok(out.ok, sayOf(out));
-    return (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks.filter((b) => b.drawn !== false).map((b) => b.heading);
+    /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
+    return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean }[] }).blocks
+      .filter((b) => b.drawn !== false)
+      .map((b) => (b.lead === true ? undefined : (b.heading ?? '')));
   };
   assert.ok(drawn().includes(undefined) && !drawn().includes('What you have, by book'));
   made('Home');

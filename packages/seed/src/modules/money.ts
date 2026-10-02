@@ -2207,6 +2207,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
    * CALMER AGAIN, SINCE money-core 3.4.0 (DIRECTION §35): the line leads and no tile beside it says its figures again,
    * one view of the month is kept where there were three, and everything after Accounts is folded under Coming and
    * going, so the page a person reads each morning is the line, the walk, what needs them and where the money sits.
+   *
+   * ONE HEADS UP, SINCE money-core 3.5.0 (the visual review of October 2nd): an old balance, money late coming in and
+   * money late going out are three lines of one tile under Accounts, each drawn only while it is true, where they were
+   * three tiles a line tall.
    */
   money: {
     page: 'money',
@@ -2320,14 +2324,43 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         tiles: true,
       },
       {
+        /* WHERE THE MONEY IS, SINCE money-core 3.3.0: Cash now cut into the accounts that hold it, each named as the
+           record names it, one track whose parts add up to the headline (`cash-by-account`). Drawn on every record with
+           an account, one book or several, because "which account is it in" is asked of three accounts as much as of two
+           books. What each account last said and when is on its row, a tap away. */
+        kind: 'split',
+        heading: 'Accounts',
+        icon: 'landmark',
+        /* THE WHOLE WIDTH SINCE money-core 3.4.0. The next 30 days it stood beside is the first under the fold, with the
+           month it walks. ABOVE HEADS UP SINCE money-core 3.5.0, which reads its balances. */
+        span: 12,
+        source: 'metric.cash-by-account',
+        limit: 6,
+        when: { metric: 'cash-accounts', gt: 0 },
+        empty: 'No account counts as cash yet.',
+      },
+      {
+        /* WHAT NEEDS A LOOK, AS ONE TILE OF THREE LINES, SINCE money-core 3.5.0: a balance more than a week old, money
+           late coming in and money late going out were three tiles the whole width, each one line tall, stacked like
+           three banners. A boxed section draws the blocks after it, up to the next section, on one surface, and each line
+           under it is drawn only while it is true, so the tile holds what is true today and nothing else. It sits last
+           above the fold, so the fold's section is what closes it. */
+        kind: 'section',
+        heading: 'Heads up',
+        icon: 'bell',
+        span: 12,
+        box: true,
+        /* ONLY ONCE THERE IS AN ACCOUNT, as every line under it reads money there is, so a fresh record reads its line
+           and the box to add an account and nothing else. */
+        when: { metric: 'cash-accounts', gt: 0 },
+      },
+      {
         /* A BALANCE MORE THAN A WEEK OLD IS SAID ON THE PAGE THAT READS IT, SINCE money-core 3.3.0. The accounts were
            cards that marked it (`stale:`), and Cash now cut by account carries no day; every figure here starts from
            these balances, so an old one is the one thing about them that needs the person. The day is the oldest, the
-           one Cash now's own note says. */
+           one Cash now's own note says. NO HEADING OF ITS OWN SINCE money-core 3.5.0: it is a line of Heads up. */
         kind: 'note',
         tone: 'warn',
-        heading: 'Out of date',
-        icon: 'refresh',
         span: 12,
         body: "The oldest balance in Cash now is from {{cash-as-of}}. Update it so this page starts from today's money.",
         when: { metric: 'balances-stale', gt: 0 },
@@ -2337,17 +2370,12 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            everybody's Money draws does not speak for one country's courts. IN A FINANCE PAGE'S WORDS, SINCE money-core
            3.3.0: money coming in and going out, invoices and bills, and never who owes whom.
 
-           EACH THE WHOLE WIDTH, SINCE money-core 3.3.0. They were half each, side by side, and each is drawn on its own
-           figure, so the usual day (one direction late, not both) left half a row empty beside it.
-
            A ROW IS WHOLE WHATEVER IS HIDDEN, everywhere on this page: a tile drawn on a figure of its own takes the
-           whole row, and two tiles share a row only when one figure draws both (`cash-accounts` for the headline row's
-           walk and for Accounts beside The next 30 days). Two tiles shown on different figures leave a hole the day
-           only one of them is true, and that is most days on most records. */
+           whole row, and two tiles share a row only when one figure draws both. Two tiles shown on different figures
+           leave a hole the day only one of them is true, and that is most days on most records. Inside Heads up each line
+           is the whole width of the tile for the same reason. */
         kind: 'note',
         tone: 'warn',
-        heading: 'Late coming in',
-        icon: 'clock',
         span: 12,
         body: 'Invoices past their due date: {{late-in}} still to come in.',
         when: { metric: 'late-in', gt: 0 },
@@ -2355,36 +2383,19 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
       {
         kind: 'note',
         tone: 'bad',
-        heading: 'Late going out',
-        icon: 'alert',
         span: 12,
         body: 'Bills past their due date: {{overdue}} still to pay.',
         when: { metric: 'overdue', gt: 0 },
       },
       {
-        /* WHERE THE MONEY IS, SINCE money-core 3.3.0: Cash now cut into the accounts that hold it, each named as the
-           record names it, one track whose parts add up to the headline (`cash-by-account`). Drawn on every record with
-           an account, one book or several, because "which account is it in" is asked of three accounts as much as of two
-           books. What each account last said and when is on its row, a tap away. */
-        kind: 'split',
-        heading: 'Accounts',
-        icon: 'landmark',
-        /* THE WHOLE WIDTH SINCE money-core 3.4.0, the last tile above the fold. The next 30 days it stood beside is the
-           first under it, with the month it walks. */
-        span: 12,
-        source: 'metric.cash-by-account',
-        limit: 6,
-        when: { metric: 'cash-accounts', gt: 0 },
-        empty: 'No account counts as cash yet.',
-      },
-      {
-        /* EVERYTHING AFTER ACCOUNTS IS FOLDED SHUT, SINCE money-core 3.4.0 ("i dont want a very 'busy' looking ui",
+        /* EVERYTHING AFTER ACCOUNTS AND HEADS UP IS FOLDED SHUT, SINCE money-core 3.4.0 ("i dont want a very 'busy' looking ui",
            October 2nd). Above it the page answers what there is, how long it lasts, what needs the person and where the
            money sits; under it are the month ahead and what already moved, a tap away and not on the page a person
            reads each morning. */
         kind: 'section',
         heading: 'Coming and going',
-        icon: 'arrow-up-down',
+        /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, SINCE money-core 3.5.0: `arrow-up-down` drew nothing there. */
+        icon: 'calendar',
         span: 12,
         fold: true,
         /* ONCE THERE IS AN ACCOUNT, as every walk and list under it is: a fresh record reads no folded heading. */
@@ -2581,7 +2592,8 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            book says what it has, how long it lasts and which accounts hold it. */
         kind: 'section',
         heading: 'Coming and going',
-        icon: 'arrow-up-down',
+        /* `calendar`, AS ON MONEY, SINCE money-core 3.5.0: `arrow-up-down` drew nothing on a folded heading. */
+        icon: 'calendar',
         span: 12,
         fold: true,
       },

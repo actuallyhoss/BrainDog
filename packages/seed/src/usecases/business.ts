@@ -125,11 +125,7 @@ export const BUSINESS = {
 /**
  * WHAT THE MODULES SAY TO A SMALL BUSINESS, by module and then by the module's own words (`MODULE_NAMES` in
  * `install.ts`). A business is not given the plain words the other use cases get: money it is owed is an invoice, and a
- * bakery reads "Late invoices" as its own where a person would read somebody else's record. So Money's late note names
- * the invoices it counts.
+ * bakery reads "invoices" as its own where a person would read somebody else's record. Money's late line already names
+ * the invoices it counts, and since money-core 3.5.0 it carries no heading to call Late invoices.
  */
-export const BUSINESS_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'money-core': {
-    'Late coming in': 'Late invoices',
-  },
-};
+export const BUSINESS_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {};

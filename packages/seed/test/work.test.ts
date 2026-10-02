@@ -12,7 +12,7 @@ import { fill, openRecord, type Kernel, type PageResult } from '@braindog/kernel
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { METRICS, NOW, TASKS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
+import { METRICS, NOW, PAGES, TASKS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -100,16 +100,20 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const headings = page.blocks.map((b) => b.heading);
   /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
      screen's bands of what is still to do top to bottom, and what is further off and what was finished folded shut. The
-     line has no heading: it is the sentence in the page's title. */
+     line has no heading: it is the sentence in the page's title. SINCE work 1.12.0 Today is the whole width over Late and
+     This week, which share a row. */
   assert.deepEqual(
     headings,
     [
-      undefined, 'What needs doing?', 'Late', 'Today', 'This week', 'With an agent', 'Waiting on you',
+      undefined, 'What needs doing?', 'Today', 'Late', 'This week', 'With an agent', 'Waiting on you',
       'Not this week', 'After this week', 'No due day', 'Later',
       'Done lately', 'How fast it moves', 'Done recently',
     ],
     headings.join(', '),
   );
+  /* LATE AND THIS WEEK SHARE A ROW, SINCE work 1.12.0, half each, and every other band is the whole width. */
+  const spans = Object.fromEntries((PAGES.work!.blocks as { heading?: string; span?: number }[]).filter((b) => b.heading).map((b) => [b.heading, b.span]));
+  assert.deepEqual([spans.Today, spans.Late, spans['This week'], spans['With an agent']], [12, 6, 6, 12]);
   for (const folded of ['Not this week', 'Done lately'])
     assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 

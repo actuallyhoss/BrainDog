@@ -438,6 +438,20 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHAT ON A PROJECT WAITS ON A PERSON, handed back to be checked or blocked: what its Handed back tile lists, so the
+     tile is drawn only while it lists something (portfolio 1.10.0, where it was drawn on everything open). */
+  'project-held-up': {
+    metric: 'project-held-up',
+    name: 'Handed back or blocked',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, state is review or blocked',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'project-done-7d': {
     metric: 'project-done-7d',
     name: 'Done this week',
@@ -616,15 +630,17 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     blocks: [
       /* THE OPENING SENTENCE, SAID FROM THE FIGURES, SINCE portfolio 1.6.0: the line under the page's title, and the one
          thing read before any tile. Two notes on the one figure, so exactly one of them draws: how many projects somebody
-         said are not going well, or that none is. `project(s) are` is settled by the count before it, so one project
-         "is" and two "are". Words from the figures only: which project is sliding and why is an agent's reading, and it
+         said are not going well, or that none is. Words from the figures only: which project is sliding and why is an agent's reading, and it
          arrives as a question in Decide, not as a sentence a page makes up. */
       {
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'projects-need-you', gt: 0 },
-        body: '{{projects-need-you}} project(s) in play are at risk or off track.',
+        /* HOW MANY ARE IN PLAY IS THE LINE'S, SINCE portfolio 1.10.0, where it was Right now's, a tile a third of a row
+           wide that ended well above the two splits beside it. `project(s)` is settled by the count before it, so one
+           project in play reads "1 project". */
+        body: '{{projects-live}} project(s) in play, {{projects-need-you}} at risk or off track.',
       },
       {
         kind: 'note',
@@ -633,26 +649,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { metric: 'projects-need-you', is: 0 },
         body: 'Nothing needs you. Every project in play is on track, or nobody has said otherwise.',
       },
-      {
-        /* IN PLAY CARRIES ITS TWELVE WEEKS AS A LINE, SINCE portfolio 1.6.0, read from the figure's own nightly series.
-
-           TWO FIGURES AND NOT FOUR, SINCE portfolio 1.8.0. Need you is the line above, said once, and Parked is a part of
-           Where they are beside it, so each was read twice.
-
-           A THIRD OF THE ROW, BESIDE THE TWO SPLITS, SINCE portfolio 1.9.0: the whole width held two numbers and a lot of
-           white. Drawn on `projects-live`, as the two beside it are, so the row is whole whenever any of it is and a
-           fresh record reads the line above rather than two noughts. */
-        kind: 'stat',
-        lead: true,
-        heading: 'Right now',
-        icon: 'gauge',
-        span: 4,
-        when: { metric: 'projects-live', gt: 0 },
-        cells: [
-          { metric: 'projects-live', label: 'In play', trend: '12w', note: '{{projects-with-agent}} with an agent' },
-          { metric: 'projects-aim-30d', label: 'Aiming within 30 days', note: '{{projects-past-aim}} past their day' },
-        ],
-      },
+      /* NO RIGHT NOW TILE, SINCE portfolio 1.10.0. It held In play and what aims to land within thirty days in a third of
+         the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
+         what aims within thirty days is Coming up, folded under Earnings, agents and dates; and what an agent holds is
+         With an agent beside it. */
       {
         /* WHERE THEY ARE, AS ONE TRACK, SINCE portfolio 1.6.0: every project by its status, earning, building, parked and
            finished, the parts of one whole with each labelled on the track. It reads Projects alone, as every block on
@@ -660,9 +660,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'split',
         heading: 'Where they are',
         icon: 'chart-pie',
-        /* FOUR, BETWEEN RIGHT NOW AND HOW THEY ARE GOING, SINCE portfolio 1.9.0 (eight beside it in 1.8.0): all three are
-           drawn on `projects-live`, so the row is whole whenever any of it is. */
-        span: 4,
+        /* HALF, BESIDE HOW THEY ARE GOING, SINCE portfolio 1.10.0 (a third beside Right now in 1.9.0): two tracks of one
+           height, both drawn on `projects-live`, so the row is whole and even whenever any of it is. */
+        span: 6,
         source: 'metric.projects-by-lane',
         when: { metric: 'projects-live', gt: 0 },
         empty: 'No project is written down yet.',
@@ -671,7 +671,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'split',
         heading: 'How they are going',
         icon: 'activity',
-        span: 4,
+        span: 6,
         source: 'metric.projects-by-health',
         unset: 'Not said yet',
         /* EACH PART IN ITS INTENT, so off track reads as trouble at a glance, in the theme's colour and not only in words. */
@@ -739,7 +739,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            person reads is the line, where the projects are, what needs them and the projects themselves. */
         kind: 'section',
         heading: 'Earnings, agents and dates',
-        icon: 'layout-list',
+        /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, SINCE portfolio 1.10.0: `layout-list` drew nothing there. */
+        icon: 'rows',
         span: 12,
         fold: true,
         /* ONLY WHILE ONE OF THE THREE UNDER IT HAS A PROJECT, so a fresh Overview ends on In play's line. */
@@ -862,11 +863,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * runs on sit in a rail four twelfths wide (`area: rail`), and the main column opens with one sentence said from the
    * figures. A span in either column is a share of that column. At a phone's width the rail comes after the main
    * column, so the sentence is still the first thing read.
-   *
-   * WHAT IS OPEN STAYS A CHECKLIST AND IS NOT A PATH. A `steps` block is drawn as a path only over a list that declares
-   * `steps:` with a done field that holds true or false (`ownSteps` in the kernel's `pages.ts`), and Work's tasks say
-   * where they are with a `state`. Over tasks a `steps` block would be a plain list with no tick, and the `todo` here
-   * already ticks a task done.
    */
   /**
    * ONE DECLARATION, FOUR PAGES. This was `kiln:`, with the name typed into six predicates, three
@@ -888,6 +884,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * its work moved, what is open and handed back, and the plan, and everything after them folded shut: who worked on it
    * and its notes, its money, and in the rail what it runs on with what that costs. Each date is drawn once, on the
    * plan, and the month so far is the chart's newest month and not a tile beside it. Still twenty-one blocks.
+   *
+   * EVEN ROWS, SINCE portfolio 1.10.0 (the visual review of October 2nd): where it stands and what is handed back sit in
+   * the rail under At a glance, one column of short tiles beside the chart, which takes the main column; What is open
+   * goes, the plan drawing the same tasks; and what is handed back is drawn only while it lists one. Twenty blocks.
    */
   project: {
     page: 'project',
@@ -923,18 +923,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         body: 'Next on {{name}}: {{next}}',
       },
       {
-        kind: 'stat',
-        heading: 'At a glance',
-        icon: 'gauge',
-        span: 12,
-        area: 'rail',
-        cells: [
-          { metric: 'project-open:{{name}}', label: 'Open' },
-          { metric: 'project-owed:{{name}}', label: 'Owed to you' },
-          { metric: 'project-cost:{{name}}', label: 'Costs a year' },
-        ],
-      },
-      {
         /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT THIS PROJECT, answered where it is shown, three at a time, and the rest
            are in Decide. A question names the row it is about (`about`, `things#1`), and `{{spoken}}` is this project's,
            so the queue holds this project's calls and no other's. No `empty:` of its own: with nothing waiting the queue
@@ -954,17 +942,32 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tiles: true,
       },
       {
+        kind: 'stat',
+        heading: 'At a glance',
+        icon: 'gauge',
+        span: 12,
+        area: 'rail',
+        cells: [
+          { metric: 'project-open:{{name}}', label: 'Open' },
+          { metric: 'project-owed:{{name}}', label: 'Owed to you' },
+          { metric: 'project-cost:{{name}}', label: 'Costs a year' },
+        ],
+      },
+      {
         /* WHERE IT STANDS, as whoever works on it last said: how it is going, what is next, how far along, and the agent
            on it. One card, because it is one project, and no `when:`: the row
-           is the page's own, so it is always there. FIVE BESIDE DONE, BY WEEK, SINCE portfolio 1.8.0, both drawn on every
-           project.
+           is the page's own, so it is always there.
 
            NOT THE NEXT STEP, SINCE portfolio 1.9.0: the line above says it, and the card said the same sentence again
-           straight under it. */
+           straight under it.
+
+           IN THE RAIL UNDER AT A GLANCE, SINCE portfolio 1.10.0, with what is handed back under it: one column of short
+           tiles beside the chart, where it was five twelfths of a row beside a chart twice its height. */
         kind: 'cards',
         heading: 'Where it stands',
         icon: 'target',
-        span: 5,
+        span: 12,
+        area: 'rail',
         source: 'register.things',
         where: 'name is {{name}}',
         columns: [
@@ -977,27 +980,16 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'Nobody has said where {{name}} stands yet.',
       },
       {
-        /* HOW ITS WORK IS MOVING, SINCE work 1.10.0: what was finished on it each of the last eight weeks, over Work's
-           `project-done-by-week`. It took the place of a tally of the open work by priority, which said again what the
-           list below draws on every task, so the page has a chart and not a row of chips, and stays three blocks under
-           the ceiling a use case adds to. */
-        kind: 'series',
-        heading: 'Done, by week',
-        icon: 'chart-column',
-        span: 7,
-        series: [{ metric: 'project-done-by-week:{{name}}', label: 'Done' }],
-        back: 8,
-        empty: 'Nothing on {{name}} was finished in these weeks.',
-      },
-      {
         /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last.
            Its own heading, since the questions above are what "Waiting on you" names on every module's page.
-           Drawn on what is open, as the list beside it is, so the row is whole whenever either is: handed back is inside
-           what `project-open` counts. */
+
+           IN THE RAIL, AND ONLY WHILE IT LISTS A TASK, SINCE portfolio 1.10.0 (`project-held-up`, over its own clauses).
+           It was drawn on everything open, to keep a row whole beside What is open, and that row is gone. */
         kind: 'table',
         heading: 'Handed back or blocked',
         icon: 'hourglass',
-        span: 7,
+        span: 12,
+        area: 'rail',
         source: 'register.tasks',
         where: 'thing is {{name}}, state is review or blocked',
         columns: [
@@ -1008,24 +1000,26 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 6,
-        when: { metric: 'project-open:{{name}}', gt: 0 },
+        when: { metric: 'project-held-up:{{name}}', gt: 0 },
         empty: 'Nothing on {{name}} is handed back or blocked.',
       },
       {
-        kind: 'todo',
-        heading: 'What is open',
-        icon: 'list-todo',
-        span: 5,
-        /* ITS PRIORITY AND THE AGENT ON IT AS THE LINE UNDER EACH TASK, SINCE portfolio 1.6.0, the two facts a todo row
-           draws after its due day: "high · claude" says which one to look at and whether anybody already is. */
-        columns: [{ field: 'what' }, { field: 'by' }, { field: 'priority' }, { field: 'agent' }],
-        source: 'register.tasks',
-        where: 'thing is {{name}}, state is open or doing',
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 8,
-        when: { metric: 'project-open:{{name}}', gt: 0 },
-        empty: 'Nothing open on {{name}}.',
+        /* HOW ITS WORK IS MOVING, SINCE work 1.10.0: what was finished on it each of the last eight weeks, over Work's
+           `project-done-by-week`. It took the place of a tally of the open work by priority, which said again what the
+           plan draws on every task, so the page has a chart and not a row of chips.
+
+           THE WHOLE OF THE MAIN COLUMN, SINCE portfolio 1.10.0, beside the rail's column of where it stands and what is
+           handed back, so no row ends at two heights. */
+        kind: 'series',
+        heading: 'Done, by week',
+        icon: 'chart-column',
+        span: 12,
+        series: [{ metric: 'project-done-by-week:{{name}}', label: 'Done' }],
+        back: 8,
+        empty: 'Nothing on {{name}} was finished in these weeks.',
       },
+      /* NO WHAT IS OPEN, SINCE portfolio 1.10.0: the plan under the chart draws every open task with a day, so the page
+         listed the same tasks twice, one tile above the other. A task with no day is on Work, narrowed to the project. */
       {
         /* ITS PLAN ON A TIME AXIS, AND ITS DATES ONCE, SINCE portfolio 1.8.0: a calendar of the month above it drew the
            same tasks on the same days a second time, so it went.
