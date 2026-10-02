@@ -178,7 +178,7 @@ export const FOUNDER = {
      1.14.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.12.0'S TEMPLATE: its line is the next step alone, Where it stands is
      headed by how it is going with the agent last, and what is handed back is a to-do with no Changed by. No block added
      or taken away, so a minor step. 1.13.0 is live. */
-  version: '1.14.0',
+  version: '1.15.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

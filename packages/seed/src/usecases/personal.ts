@@ -126,7 +126,7 @@ export const PERSONAL = {
      again, each track is drawn only while it has something, and what changed is folded shut. The Goals page and a
      project's page open on a line too, and every heading wears a glyph. Nine counts are added to draw them on, and
      nothing goes, so a minor step. */
-  version: '2.2.0',
+  version: '2.3.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',

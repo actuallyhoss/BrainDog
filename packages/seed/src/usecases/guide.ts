@@ -52,7 +52,7 @@ export const GUIDE = {
      had a tile of four; every heading wears a glyph; each list is drawn only while it holds something; the Guide folds
      what is done and kept under Everything so far; and a milestone's page draws its steps, choices and what helps only
      while it has them. Only counts are added, so a minor step. */
-  version: '1.5.0',
+  version: '1.6.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',

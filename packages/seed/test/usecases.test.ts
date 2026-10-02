@@ -73,7 +73,12 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
     for (const list of listsOf(u)) if (seeded.has(list.id)) assert.ok(k.count(list.id) >= 1, `${u.usecase}: ${list.id} has its example row`);
     const settings = value<{ values: Record<string, unknown>; config: Record<string, { label?: string }> }>(k.packConfig(`usecase-${u.usecase}`));
     assert.deepEqual(voiceOf(settings.values), u.voice, `${u.usecase}: the record holds the voice`);
-    assert.deepEqual(labelsOf(settings.values, settings.config), u.labels, `${u.usecase}: the record holds the labels`);
+    /* EVERY LIST CARRIES ITS WORDS (Settings > Words), defaulting to what the record already shows; the use case's own
+       words are among them. */
+    const declared = doc.config as Record<string, { default?: unknown; label?: string }>;
+    const held = labelsOf(Object.fromEntries(Object.entries(declared).map(([k, c]) => [k, c.default])), declared);
+    assert.deepEqual(labelsOf(settings.values, settings.config), held, `${u.usecase}: the record holds the labels`);
+    for (const [key, word] of Object.entries(u.labels)) assert.equal(held[key], word, `${u.usecase}: ${key} keeps the use case's own word`);
     sql.close();
   }
 });

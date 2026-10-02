@@ -15,7 +15,8 @@
  * first-party module's, and each word is a text setting, `label_<list>[__<field>[__<value>]]`, which the
  * display reads in place of the declaration's word and a person can change like a voice line. A list's singular and
  * the line saying what it holds are words too, `list:one` and `list:holds`, kept as `one_<list>` and `holds_<list>`,
- * because a field may be called `one` and a label key names fields after the dot.
+ * because a field may be called `one` and a label key names fields after the dot. Every list a use case holds has its
+ * name and singular declared, with the words it already shows as defaults, so any list can be renamed (`useCasePack`).
  *
  * A NAME TOO LONG FOR A SETTING IS KEPT BY ITS HASH. A setting name is at most 32 characters, and
  * `label_obligations__category__client_work` is 40, so a use case could not rename a value of Money's categories. Such a
@@ -113,6 +114,35 @@ export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: read
  * what "Install X first" names when a pack points at one nothing holds.
  */
 export const FIRST_PARTY_LISTS: ReadonlyMap<string, ModuleId> = new Map(MODULES.flatMap((m) => MODULE_LISTS[m].lists.map((l): [string, ModuleId] => [l, m])));
+
+/**
+ * WHAT A PERSON CALLS EACH FIRST-PARTY LIST, AND ONE OF IT, as the modules' manifests say: the defaults a use case's
+ * `label_<list>` and `one_<list>` settings start from for a module's list, so a record shows the module's own words until
+ * somebody types new ones. Held equal to the manifests by `packages/seed`'s tests, as `MODULE_LISTS` is.
+ *
+ * NOT EVERY LIST IN `MODULE_LISTS`. Money's `balances`, `fx` and `snapshots` hold what the module keeps for its own
+ * sums (a balance on a day, a rate, a night's figures) and nobody renames them; giving them words would put three more
+ * boxes on Settings > Words and push Personal past the 64 settings a pack may declare.
+ */
+export const MODULE_WORDS: Readonly<Record<string, { name: string; one: string }>> = {
+  things: { name: 'Projects', one: 'project' },
+  people: { name: 'People', one: 'person' },
+  accounts: { name: 'Accounts', one: 'account' },
+  books: { name: 'Books', one: 'book' },
+  categories: { name: 'Categories', one: 'category' },
+  installments: { name: 'Instalments', one: 'instalment' },
+  obligations: { name: 'Bills and invoices', one: 'item' },
+  recurring: { name: 'Repeating', one: 'repeating item' },
+  transactions: { name: 'Ledger', one: 'transaction' },
+  services: { name: 'Services', one: 'service' },
+  tasks: { name: 'Tasks', one: 'task' },
+  tracks: { name: 'Threads', one: 'thread' },
+  updates: { name: 'Updates', one: 'update' },
+  credentials: { name: 'Keys', one: 'key' },
+  learnings: { name: 'Learnings', one: 'learning' },
+  skills: { name: 'Skills', one: 'skill' },
+  tools: { name: 'Tools', one: 'tool' },
+};
 
 export type UseCase = {
   usecase: string;
@@ -428,19 +458,57 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
   });
 }
 
+/** One of a list, from its name, as the display makes it (`voice.ts` `singularOf` in the web): Bakes, bake. */
+const singularOf = (name: string): string => name.toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
+
+/**
+ * Every list a use case holds, with the name and singular its declaration gives it: its own lists, then each first-party
+ * module's in the order `modules` names them. A shared add-on's lists are not known here, so they get no words.
+ */
+function heldLists(u: UseCase): { list: string; name: string; one: string | undefined }[] {
+  const own = ((u.pack?.declarations ?? []) as unknown[]).flatMap((d) => {
+    if (!isObject(d) || Object.keys(d)[0] !== 'register' || typeof d.register !== 'string') return [];
+    return [{ list: d.register, name: typeof d.name === 'string' ? d.name : d.register, one: typeof d.one === 'string' ? d.one : undefined }];
+  });
+  const modules = u.modules.flatMap((m) => (Object.hasOwn(MODULE_LISTS, m) ? MODULE_LISTS[m as ModuleId].lists : []));
+  const named = modules.flatMap((list) => (Object.hasOwn(MODULE_WORDS, list) ? [{ list, ...MODULE_WORDS[list]! }] : []));
+  return [...own, ...named.filter((m) => !own.some((o) => o.list === m.list))];
+}
+
 /**
  * The pack document to plan and install for a use case, with its voice as settings, or `null` when it
  * carries none. The pack's version is the use case's, so a new voice is a new version.
+ *
+ * EVERY LIST IT HOLDS HAS A NAME AND A SINGULAR A PERSON CAN CHANGE. The record refuses a setting the pack does not
+ * declare, so Settings > Words could rename only the lists a use case already relabelled, and "Tasks" could not become
+ * "Bakes" on a founder's record. Each list the use case gives no word for is declared as `label_<list>` and `one_<list>`
+ * with the words the record already shows as defaults: the declaration's name, and its singular, or one made from the
+ * use case's own name for it where it renamed the list and gave no singular (`relabel` in the web makes the same one).
+ * So nothing on screen changes until somebody types a new word. A list whose declaration gives no singular gets the
+ * setting with no default, which leaves the display's own.
+ *
+ * THE LISTS' WORDS FILL WHAT ROOM IS LEFT, own lists first. A pack declares at most 64 settings, and what a use case wrote
+ * itself (its voice and labels) always fits; a list past the ceiling keeps its declaration's word and gets no box.
  */
 export function useCasePack(u: UseCase): Record<string, unknown> | null {
   if (u.pack === null) return null;
-  const config: Record<string, { type: 'text'; label: string; default: string }> = {};
+  const config: Record<string, { type: 'text'; label: string; default?: string }> = {};
   for (const key of VOICE_KEYS) {
     const line = u.voice[key];
     if (line !== undefined) config[voiceSetting(key)] = { type: 'text', label: VOICE_TITLES[key], default: line };
   }
   for (const [key, word] of Object.entries(u.labels))
     config[labelSetting(key)] = { type: 'text', label: labelTitle(key), default: word };
+  const room = (): boolean => Object.keys(config).length < SETTINGS_CEILING - HELD_SETTINGS;
+  for (const { list, name, one } of heldLists(u)) {
+    const called = u.labels[list] ?? name;
+    const singular = u.labels[`${list}:one`] ?? (called !== name ? singularOf(called) : one);
+    for (const [key, word] of [[list, called], [`${list}:one`, singular]] as const) {
+      const setting = labelSetting(key);
+      if (Object.hasOwn(config, setting) || !room()) continue;
+      config[setting] = { type: 'text', label: labelTitle(key), ...(word === undefined ? {} : { default: word }) };
+    }
+  }
   const settings: Record<string, { type: 'text' | 'bool'; label: string; default?: string }> = {
     ...config,
     [SHARED_VERSION]: { type: 'text', label: 'Last shared as' },

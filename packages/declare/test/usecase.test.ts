@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
+import { MODULE_LISTS, MODULE_WORDS, VOICE_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normalise, normaliseUseCase, useCasePack, voiceOf, type UseCase } from '../src/index.ts';
 
 const DOC = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   usecase: 'reading',
@@ -90,7 +90,7 @@ test('THE VOICE IS KEPT AS THE PACK\'S SETTINGS, AND READ BACK FROM THEM', async
   const pack = value<{ manifest: { pack: string; version: string; summary: string; config?: Record<string, { type: string; default?: unknown }> } }>(await normalise(doc));
   assert.equal(pack.manifest.pack, 'usecase-reading');
   assert.equal(pack.manifest.summary, u.summary);
-  assert.deepEqual(Object.keys(pack.manifest.config ?? {}).sort(), ['shared_version', 'speaks', 'voice_home', 'voice_needs_you']);
+  assert.deepEqual(Object.keys(pack.manifest.config ?? {}).sort(), ['label_books', 'one_books', 'shared_version', 'speaks', 'voice_home', 'voice_needs_you']);
   const defaults = Object.fromEntries(Object.entries(pack.manifest.config ?? {}).map(([k, c]) => [k, c.default]));
   assert.deepEqual(voiceOf(defaults), u.voice);
   assert.deepEqual(voiceOf({ voice_home: '  ', voice_lists: 3, other: 'x' }), {});
@@ -107,10 +107,11 @@ test('LABELS ARE KEPT AS THE PACK SETTINGS, BESIDE THE VOICE, AND READ BACK BY K
   const doc = useCasePack(u)!;
   const pack = value<{ manifest: { config?: Record<string, { type: string; default?: unknown; label?: string }> } }>(await normalise(doc));
   const config = pack.manifest.config ?? {};
-  assert.deepEqual(Object.keys(config).sort(), ['label_books', 'label_books__state', 'label_books__state__to_read', 'label_people', 'shared_version', 'speaks', 'voice_home', 'voice_needs_you']);
+  assert.deepEqual(Object.keys(config).sort(), ['label_books', 'label_books__state', 'label_books__state__to_read', 'label_people', 'one_books', 'shared_version', 'speaks', 'voice_home', 'voice_needs_you']);
   assert.equal(config.label_books__state__to_read?.label, 'Label: books, state, to read');
   const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
-  assert.deepEqual(labelsOf(defaults), labels);
+  /* BOOKS RENAMED SHELF WITH NO SINGULAR: one of it is a shelf, as the display already said. */
+  assert.deepEqual(labelsOf(defaults), { ...labels, 'books:one': 'shelf' });
   assert.deepEqual(voiceOf(defaults), u.voice);
   assert.equal(labelSetting('people.role.collaborator'), 'label_people__role__collaborator');
   assert.deepEqual(labelsOf({ label_books: ' ', label_people: 3, voice_home: 'x', label_: 'y' }), {});
@@ -128,8 +129,8 @@ test('A LABEL WHOSE SETTING NAME WOULD BE TOO LONG IS KEPT BY ITS HASH, AND READ
   assert.equal(labelSetting('books'), 'label_books', 'a name that fits keeps its form, so nothing a record holds is renamed');
   assert.equal(config[long]?.label, 'Label: obligations, category, client work');
   const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
-  assert.deepEqual(labelsOf(defaults, config), labels);
-  assert.deepEqual(labelsOf(defaults), { books: 'Shelf' }, 'without the declared settings a hashed label is left out');
+  assert.deepEqual(labelsOf(defaults, config), { ...labels, 'books:one': 'shelf' });
+  assert.deepEqual(labelsOf(defaults), { books: 'Shelf', 'books:one': 'shelf' }, 'without the declared settings a hashed label is left out');
   assert.equal(labelKeyOf(long, 'Label: obligations, category, premises'), null, 'a title that is not the hashed key is not read');
 });
 
@@ -147,6 +148,48 @@ test("A LIST'S SINGULAR AND ITS DESCRIPTION LINE ARE LABELS TOO, as one_<list> a
   assert.equal(refused(normaliseUseCase(DOC({ labels: { 'books:one': long } }))).at, 'labels.books:one', 'a singular is a word');
   assert.ok(normaliseUseCase(DOC({ labels: { 'books:holds': long.slice(0, 180) } })).ok, 'a description is a line');
   assert.equal(refused(normaliseUseCase(DOC({ labels: { 'books:many': 'x' } }))).code, 'VALUE_MALFORMED');
+});
+
+test('EVERY LIST A USE CASE HOLDS CAN BE RENAMED, and starts from the words the record already shows', async () => {
+  const u = value<UseCase>(normaliseUseCase(DOC({ modules: ['work', 'money-core'], labels: { tasks: 'Tickets' } })));
+  const pack = value<{ manifest: { config?: Record<string, { default?: unknown; label?: string }> } }>(await normalise(useCasePack(u)!));
+  const config = pack.manifest.config ?? {};
+  const defaults = Object.fromEntries(Object.entries(config).map(([k, c]) => [k, c.default]));
+  const labels = labelsOf(defaults, config);
+  /* ITS OWN LIST GIVES NO SINGULAR, so the setting is declared with none and the display keeps making its own. */
+  assert.equal(labels.books, 'Books');
+  assert.ok(Object.hasOwn(config, 'one_books') && config.one_books?.default === undefined);
+  assert.equal(config.one_books?.label, 'Label: one of books');
+  /* A MODULE'S LIST SAYS THE MODULE'S WORDS, and one renamed with no singular says one of the new name. */
+  assert.equal(labels.transactions, 'Ledger');
+  assert.equal(labels['transactions:one'], 'transaction');
+  assert.equal(labels['obligations:one'], 'item');
+  assert.equal(labels.tasks, 'Tickets');
+  assert.equal(labels['tasks:one'], 'ticket');
+  /* WHAT MONEY KEEPS FOR ITS OWN SUMS HAS NO BOX. */
+  for (const list of ['balances', 'fx', 'snapshots']) assert.equal(Object.hasOwn(config, `label_${list}`), false, list);
+  /* AND A SINGULAR THE USE CASE GAVE IS KEPT. */
+  const given = value<UseCase>(normaliseUseCase(DOC({ modules: ['work'], labels: { tasks: 'Bakes', 'tasks:one': 'loaf' } })));
+  assert.equal(((useCasePack(given)!.config as Record<string, { default?: string }>).one_tasks)?.default, 'loaf');
+  /* A MODULE THIS BUILD DOES NOT SHIP HAS NO LISTS HERE, and nothing is declared for it. */
+  const stranger = value<UseCase>(normaliseUseCase(DOC({ modules: ['bookshelf'] })));
+  assert.deepEqual(Object.keys(useCasePack(stranger)!.config as object).filter((k) => !k.startsWith('voice_')).sort(), ['label_books', 'one_books', 'shared_version', 'speaks']);
+});
+
+test("THE LISTS' WORDS FILL WHAT ROOM IS LEFT, own lists first, and never take the pack past its settings", async () => {
+  const many = Object.fromEntries(Array.from({ length: 58 }, (_, i) => [`list${i}`, 'x']));
+  const u = value<UseCase>(normaliseUseCase(DOC({ modules: ['money-core'], labels: many })));
+  const config = useCasePack(u)!.config as Record<string, unknown>;
+  assert.equal(Object.keys(config).length, 64);
+  assert.ok(Object.hasOwn(config, 'label_books') && Object.hasOwn(config, 'one_books'), 'its own list comes first');
+  assert.ok(!Object.hasOwn(config, 'label_accounts'), 'a module list past the ceiling keeps its own word');
+  assert.ok((await normalise(useCasePack(u)!)).ok);
+});
+
+test('EVERY FIRST-PARTY LIST A PERSON NAMES HAS ITS WORDS, and each word table names only real lists', () => {
+  const lists = Object.values(MODULE_LISTS).flatMap((m) => m.lists);
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'snapshots']);
+  assert.deepEqual(Object.keys(MODULE_WORDS).filter((l) => !lists.includes(l)), []);
 });
 
 test('THE VOICE RULE: a use case added goes beside the one speaking, or takes the voice when its id sorts first', () => {

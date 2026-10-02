@@ -79,7 +79,7 @@ export const TEAM = {
      2.13.0: a project's page takes portfolio 1.12.0's template: its line is the next step alone, Where it stands is
      headed by how it is going with the agent last, and the tickets handed back are a to-do with no Changed by. 2.12.0
      is live. */
-  version: '2.13.0',
+  version: '2.14.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

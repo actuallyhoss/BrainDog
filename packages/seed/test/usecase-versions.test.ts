@@ -960,6 +960,98 @@ const DECLARED: Record<string, Version> = {
       "`page.project` takes portfolio 1.12.0's template: its line is the next step alone, Where it stands is headed by how it is going with the agent last, and Handed back or blocked is a to-do with no Changed by -> c5289e93f09ad883",
     ],
   },
+  'personal@2.3.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson metric.budgets-set
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.steps-done metric.steps-left page.goals page.home-personal page.my-project
+      register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: 'ff4d843704645b48',
+    history: [
+      "Every list Personal holds declares its name and one of it, `setting.label_people` and `setting.one_transactions` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> ff4d843704645b48",
+    ],
+  },
+  'founder@1.15.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
+      page.home-founder page.organisation page.project register.datapoints register.organisations setting.label_accounts
+      setting.label_books setting.label_categories setting.label_datapoints setting.label_installments
+      setting.label_obligations setting.label_organisations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_organisations setting.one_people
+      setting.one_recurring setting.one_services setting.one_tasks setting.one_things setting.one_tracks
+      setting.one_transactions setting.one_updates setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '85d1552b3560b066',
+    history: [
+      "Every list Founder holds declares its name and one of it, `setting.label_tasks` and `setting.one_tasks` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> 85d1552b3560b066",
+    ],
+  },
+  'team@2.14.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'cc97ceef2fdaec44',
+    history: [
+      "Every list Team holds declares its name and one of it, `setting.label_tracks` and `setting.one_cycles` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> cc97ceef2fdaec44",
+    ],
+  },
+  'guide@1.6.0': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
+      metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources
+      metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d
+      metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources
+      metric.milestone-steps page.guide page.home-guide page.milestone register.choices register.milestones
+      register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed setting.label_choices
+      setting.label_milestones setting.label_resources setting.label_steps setting.one_choices setting.one_milestones
+      setting.one_resources setting.one_steps setting.shared_version setting.speaks setting.start_next_milestone
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_lists
+      setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '8a53a1f76198266d',
+    history: [
+      "Every list the guide holds declares one of it beside its name, `setting.one_milestones` and `setting.one_steps` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> 8a53a1f76198266d",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */
