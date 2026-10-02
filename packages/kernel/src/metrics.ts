@@ -969,8 +969,9 @@ function resolveRelative(
  */
 export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
   /* THE OPEN QUESTIONS ARE NOT ROWS OF A LIST, so the built-in figure over them is counted on its own
-     (`built-in-figures.ts`) and every caller of this reads it as it reads any other. */
-  if (decl.source === GOVERNANCE_OPEN) return readOpenQuestions(sql, ctx);
+     (`built-in-figures.ts`) and every caller of this reads it as it reads any other. `questions-open:<what>` comes here
+     with its `about` filled, and counts that one thing's. */
+  if (decl.source === GOVERNANCE_OPEN) return readOpenQuestions(sql, ctx, decl);
   const refusals: Refusal[] = [];
   const at = (code: string, fix: string, key?: string): void => {
     refusals.push({ code, fix: `${decl.metric}: ${fix}`, ...(key === undefined ? {} : { at: key }) });
