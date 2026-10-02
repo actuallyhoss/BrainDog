@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { MODULES } from '@braindog/declare';
 import { RULES } from '../src/index.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
-import { MODULE_NAMES, RULE_ASKED, RULE_DONE, RULE_NAMES, RULE_ROWS, USE_CASE_NAMES, moduleName, namesSaid, ruleAsked, ruleDone, ruleFolded, ruleName, useCaseName } from '../src/usecases/names.ts';
+import { MODULE_NAMES, RULE_ASKED, RULE_DONE, RULE_NAMES, RULE_ROWS, USE_CASE_NAMES, asPartOf, moduleName, namesSaid, ruleAsked, ruleDone, ruleFolded, ruleName, useCaseName } from '../src/usecases/names.ts';
 
 test('every starter use case is named as its title says, and no name is left over', () => {
   assert.deepEqual(Object.fromEntries(USE_CASES.map((u) => [u.usecase, u.title])), { ...USE_CASE_NAMES });
@@ -57,4 +57,9 @@ test('what a rule asked is said by the row it names, as its declared question wr
   assert.equal(ruleAsked('rule:recurring-missed', 'Ledger Post was due 4 days ago, GBP 39.00. Did it go through?'), 'Asked whether Ledger Post went through');
   assert.equal(ruleAsked('rule:invoice-late', 'Invoice 2026-041 was due 9 days ago, GBP 1,200.00. Chase it?'), 'Asked whether to chase Invoice 2026-041');
   assert.equal(ruleAsked('rule:renew-soon', 'Fenwick renews in 3 days for GBP 20.00. Keep it?'), 'Asked: Fenwick renews in 3 days for GBP 20.00. Keep it?');
+  /* A QUESTION THAT STARTS WITH A PLAIN WORD READS ON FROM "Asked:", and one that starts with a name keeps its capital. */
+  assert.equal(ruleAsked('system', 'The backup on 3 Sep did not run'), 'Asked: the backup on 3 Sep did not run');
+  assert.equal(asPartOf('Does Kiln licence per seat?'), 'does Kiln licence per seat?');
+  assert.equal(asPartOf('Kiln’s note is out of date'), 'Kiln’s note is out of date');
+  assert.equal(asPartOf('UPS was late'), 'UPS was late');
 });

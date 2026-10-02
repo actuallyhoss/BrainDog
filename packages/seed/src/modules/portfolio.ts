@@ -130,11 +130,12 @@ export const THINGS: Fields[] = [
 /**
  * WHAT AGENTS SAID ABOUT THE PROJECTS THEY HOLD, so Changed by names them. The agent on a project keeps where it stands
  * current, and a record says so in its history: the row goes in without these fields and the agent writes them after.
- * `hours` is how long ago, for the sample's ledger. `things` is the project's place in `THINGS`, from 1.
+ * `hours` is when, against the sample's `NOW`: the record writes each one then (`HISTORY`), and so does the sample's
+ * ledger. `things` is the project's place in `THINGS`, from 1.
  */
 export const PROJECTS_SAID: readonly { things: number; by: string; hours: number; fields: readonly string[]; note: string }[] = [
-  { things: 1, by: 'claude', hours: -6, fields: ['health', 'next', 'progress'], note: 'said Kiln is at risk until its licensing is settled' },
-  { things: 2, by: 'cursor', hours: -27, fields: ['next', 'progress'], note: 'set the next step on Marlow & Co to the chaser for 2026-041' },
+  { things: 1, by: 'claude', hours: -9.5, fields: ['health', 'next', 'progress'], note: 'said Kiln is at risk until its licensing is settled' },
+  { things: 2, by: 'cursor', hours: -10, fields: ['next', 'progress'], note: 'set the next step on Marlow & Co to the chaser for 2026-041' },
 ];
 
 export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
@@ -250,6 +251,8 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   'projects-live': { ...counted('projects-live', 'In play', LIVE), snapshot: { grain: 'day', into: 'series.projects-live' } },
   /* WHAT NEEDS A PERSON: a project somebody, or its agent, said is at risk or off track. */
   'projects-need-you': counted('projects-need-you', 'Need you', `${LIVE}, health is at_risk or off_track`, { lte: 0 }),
+  /* WHAT IS GOING WELL, which the line names beside what needs a push (portfolio 1.12.0). */
+  'projects-on-track': counted('projects-on-track', 'On track', `${LIVE}, health is on_track`),
   'projects-with-agent': counted('projects-with-agent', 'With an agent', `${LIVE}, agent is set`),
   'projects-aim-30d': counted('projects-aim-30d', 'Aiming within 30 days', `${LIVE}, aim after yesterday, aim before +31d`),
   'projects-past-aim': counted('projects-past-aim', 'Past the day they aimed for', `${LIVE}, aim before today`, { lte: 0 }),
@@ -639,10 +642,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'projects-need-you', gt: 0 },
-        /* HOW MANY ARE IN PLAY IS THE LINE'S, SINCE portfolio 1.10.0, where it was Right now's, a tile a third of a row
-           wide that ended well above the two splits beside it. `project(s)` is settled by the count before it, so one
-           project in play reads "1 project". */
-        body: '{{projects-live}} project(s) in play, {{projects-need-you}} at risk or off track.',
+        /* THE PROJECTS BY NAME, SINCE portfolio 1.12.0 (the visual review of October 2nd), where the line counted them
+           ("3 projects in play, 2 at risk or off track"): which need a push and which are on track, from what each one's
+           health says (`.names`), so the verb agrees with how many it names. A record with nothing on track says the
+           first half alone. */
+        body: '{{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track',
       },
       {
         kind: 'note',
@@ -669,7 +673,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'metric.projects-by-health',
         unset: 'Not said yet',
         tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' },
-        when: { metric: 'projects-live', gt: 0 },
+        /* ONLY PAST FOUR PROJECTS IN PLAY, SINCE portfolio 1.12.0 (the visual review of October 2nd). Three projects drew
+           three equal thirds, which says nothing the line and the cards under it do not; a bar earns its row when there
+           are too many cards to read at a glance. */
+        when: { metric: 'projects-live', gt: 4 },
         empty: 'No project is in play.',
       },
       /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and
@@ -690,8 +697,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'mark', as: 'mark' },
           { field: 'hue', as: 'hue' },
           { field: 'about', as: 'reply' },
-          { field: 'progress', label: 'How far along', as: 'ring' },
-          { field: 'health', label: 'Health', as: 'fact' },
+          /* NO LABELS ON HOW IT IS GOING, SINCE portfolio 1.12.0: "At risk" and a ring at 60% say what they are, and
+             "Health" and "How far along" under them on every card read as a form. An empty label draws none. */
+          { field: 'progress', label: '', as: 'ring' },
+          { field: 'health', label: '', as: 'fact' },
           /* NO LABEL, as the project page's first column carries none: a personal record renames
              this field to "Money made" (`usecases/personal.ts`), and a label typed in here would
              print "Earned in a year" over it and undo the rename on the one page that shows it per
@@ -883,7 +892,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          a bare title over a band of tiles. Now work handed back is the line when there is any, and otherwise the line
          is the project's own next step, the one sentence whoever works on it keeps current. A project with no next step
          written has neither: the app drops a lead clause whose hole it cannot fill (`leadOf`), so it never reads
-         "Next on Kiln:" over nothing. */
+         an empty line. */
       {
         kind: 'note',
         lead: true,
@@ -896,7 +905,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'project-in-review:{{name}}', is: 0 },
-        body: 'Next on {{name}}: {{next}}',
+        /* THE NEXT STEP ALONE, SINCE portfolio 1.12.0: the page's title already names the project, and "Next on Kiln:"
+           in front of it said so twice. */
+        body: '{{next}}',
       },
       {
         /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT THIS PROJECT, answered where it is shown, three at a time, and the rest
@@ -938,7 +949,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            straight under it.
 
            IN THE RAIL UNDER AT A GLANCE, SINCE portfolio 1.10.0, with what is handed back under it: one column of short
-           tiles beside the chart, where it was five twelfths of a row beside a chart twice its height. */
+           tiles beside the chart, where it was five twelfths of a row beside a chart twice its height.
+
+           HOW IT IS GOING LEADS AND THE AGENT COMES LAST, SINCE portfolio 1.12.0. A card with no title is headed by its
+           person, so the agent's name and mark were the first line of the tile; with the health as its title the card
+           reads "At risk", how far along, the day it aims for, and who is on it under them. */
         kind: 'cards',
         heading: 'Where it stands',
         icon: 'target',
@@ -947,8 +962,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'register.things',
         where: 'name is {{name}}',
         columns: [
-          { field: 'progress', label: 'How far along', as: 'ring' },
-          { field: 'health', label: 'Health', as: 'fact' },
+          { field: 'health', as: 'title' },
+          { field: 'progress', label: '', as: 'ring' },
           { field: 'aim', label: 'Aiming for', as: 'fact' },
           { field: 'agent', label: 'Agent', as: 'who' },
         ],
@@ -960,20 +975,19 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            Its own heading, since the questions above are what "Waiting on you" names on every module's page.
 
            IN THE RAIL, AND ONLY WHILE IT LISTS A TASK, SINCE portfolio 1.10.0 (`project-held-up`, over its own clauses).
-           It was drawn on everything open, to keep a row whole beside What is open, and that row is gone. */
-        kind: 'table',
+           It was drawn on everything open, to keep a row whole beside What is open, and that row is gone.
+
+           A TO-DO AND NOT A TABLE, SINCE portfolio 1.12.0: three columns squeezed into a rail cut "Decide the licensing
+           tie…" to a stub, and "Changed by: You, 3 Sep" told a person what they did themselves. Each task is one line
+           with its status beside it, and can be ticked off where it is read. */
+        kind: 'todo',
         heading: 'Handed back or blocked',
         icon: 'hourglass',
         span: 12,
         area: 'rail',
         source: 'register.tasks',
         where: 'thing is {{name}}, state is review or blocked',
-        columns: [
-          /* NO LABEL: headed by what one task is called, so a team whose tasks are Tickets reads Ticket. */
-          { field: 'what', width: 'minmax(16ch,1fr)' },
-          { field: 'state', label: 'Status', width: '11ch' },
-          { field: 'changed', label: 'Changed by', width: '15ch' },
-        ],
+        columns: [{ field: 'what' }, { field: 'state' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 6,
         when: { metric: 'project-held-up:{{name}}', gt: 0 },

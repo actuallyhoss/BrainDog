@@ -554,8 +554,9 @@ test('WHAT REPEATS IS WALKED FROM ONE LIST AT EVERY CADENCE, and a bill that say
   const { from, horizon } = cashWalk();
   assert.ok(from.some((leg) => leg.register === 'recurring'), 'the cash walk does not read the repeating list');
 
-  /* A WEEK IS SEVEN DAYS whatever month it falls in, so the cleaner's steps are a week apart all year. */
-  const walked = contribution(k, opening, from, horizon, 'recurring').walk.steps.filter((s) => s.source === 'recurring');
+  /* A WEEK IS SEVEN DAYS whatever month it falls in, so the cleaner's steps are a week apart all year. A YEAR AND NOT THE
+     LENGTH THE CHART OPENS ON, which is three months since money-core 3.7.0, with a year a press away. */
+  const walked = contribution(k, opening, from, 365, 'recurring').walk.steps.filter((s) => s.source === 'recurring');
   const cleaning = walked.filter((s) => s.label === 'Studio cleaning');
   assert.ok(cleaning.length >= 50, `a weekly line stepped ${cleaning.length} times in a year`);
   for (let i = 1; i < cleaning.length; i++)
@@ -1118,4 +1119,17 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   const two = drawn();
   assert.ok(!two.includes(undefined), 'one Cash now over two books is still said');
   assert.deepEqual(two.slice(0, 2), ['What you have, by book', 'Cash ahead']);
+});
+
+test('CASH AHEAD OPENS ON THREE MONTHS AND WALKS TO THE LONGEST LENGTH IT OFFERS, so a year and two are a press away', async () => {
+  /* SINCE money-core 3.7.0: the walk is `horizons:` long and says so (`reach`), and opens on `horizon:`. Opening on 90 days
+     before the record walked further took every longer length off the control. */
+  const k = await seeded();
+  const out = k.page('money');
+  assert.ok(out.ok, sayOf(out));
+  const ahead = out.value.blocks.find((b) => b.heading === 'Cash ahead') as { walk?: { horizon?: number; reach?: number; steps?: { day: string }[] } } | undefined;
+  assert.ok(ahead?.walk, 'Cash ahead drew no walk');
+  assert.equal(ahead.walk.horizon, 90);
+  assert.equal(ahead.walk.reach, 1825);
+  assert.ok((ahead.walk.steps ?? []).some((s) => s.day > day(365)), 'the walk stops at the length it opens on');
 });

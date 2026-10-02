@@ -33,7 +33,7 @@ export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
-import { day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
+import { NOW, day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
 import {
   ACCOUNTS,
   CATEGORIES,
@@ -412,6 +412,36 @@ function openRun(kernel: Kernel, fields: Fields, actor: string): Result<unknown>
   return kernel.create('session', patch as never, { actor, stamp });
 }
 
+const HOUR_MS = 3_600_000;
+
+/** An instant `days` from the sample's day, at `hh:mm` UTC. */
+const at = (days: number, hh: number, mm = 0): number => Date.parse(`${day(days)}T00:00:00.000Z`) + hh * HOUR_MS + mm * 60_000;
+
+/**
+ * WHEN THE SAMPLE'S HISTORY HAPPENED, oldest first, which is the order `installSeed` writes it in: overnight and this
+ * morning, on the sample's own day.
+ *
+ * ITS ROWS GO IN JUST AFTER MIDNIGHT AND NOT WEEKS BACK, because the record stamps a day on what a write finishes (a task
+ * done with no Done on is done the day it was written, `finished:`) and the agents' figures count rows by when they were
+ * written, so a row written into last month moved the sample's own numbers. What a row says about its past is in its
+ * own days. Then the questions were asked and two answered, the agents said where their projects stand
+ * (`PROJECTS_SAID`), the night's backup failed and asked, and the rules ran their pass this morning, one after another.
+ */
+export const HISTORY = {
+  kept: at(0, 0, 5),
+  asked: {
+    D41: { opened: at(0, 0, 30), decided: at(0, 0, 45) },
+    SG27: { opened: at(0, 1) },
+    SG29: { opened: at(0, 1, 30) },
+    SG30: { opened: at(0, 2, 35) },
+    SG31: { opened: at(0, 2, 50) },
+    SG33: { opened: at(0, 3), decided: at(0, 3, 5) },
+    SG34: { opened: at(0, 3, 17) },
+  } as Record<string, { opened: number; decided?: number }>,
+  rules: at(0, 6),
+  ruleStep: 35 * 60_000,
+} as const;
+
 export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Result<Seeded>> {
   /* ONCE, AND THE SECOND TIME SAYS SO. Run twice, this doubled every register — and reported the
      same counts both times, so nothing in the return value said what had happened. Worse, the second
@@ -439,6 +469,8 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
      no `transactions` in it and says nothing until the first message lands. Putting it in the batch
      that declares `transactions` and `accounts` is what keeps the first forwarded alert from being
      the test of whether the register was there. */
+  /* ON THE RECORD'S OWN CLOCK, NOT BACKDATED: an install arms what runs on a clock, and a pull armed in the night is
+     overdue the moment the record opens. The agents pack below arms nothing on a clock, so it goes in with the rows. */
   const installed = await kernel.install([
     ...declarations(),
     ...pageDeclarations(),
@@ -446,35 +478,49 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
     ...ingestDeclarations(),
   ]);
   if (!installed.ok) return installed as Result<Seeded>;
-  const agents = await installAgentsPack(kernel, actor);
+
+  /* WHAT THE SAMPLE HOLDS WAS WRITTEN OVER A NIGHT AND A MORNING, NOT IN ONE INSTANT (`HISTORY`), so its feeds read "5h
+     ago" and "11h ago" rather than "just now" on every line, and the question the night's backup raised says so. */
+  const agents = await kernel.backdate(HISTORY.kept, () => installAgentsPack(kernel, actor));
   if (!agents.ok) return agents as unknown as Result<Seeded>;
 
   let rows = 0;
-  for (const register of [...ORDER, ...AGENTS_ORDER])
-    for (const [i, entry] of (ROWS[register] ?? []).entries()) {
-      /* WHAT AN AGENT SAID ABOUT A PROJECT IS WRITTEN BY THE AGENT, after the row, so its history names it. */
-      const said = register === 'things' ? PROJECTS_SAID.find((s) => s.things === i + 1) : undefined;
-      const planted = said ? Object.fromEntries(Object.entries(entry).filter(([k]) => !said.fields.includes(k))) : entry;
-      const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, planted as Fields), { actor });
-      if (!out.ok) return out as unknown as Result<Seeded>;
-      if (said) {
-        const patch = Object.fromEntries(said.fields.map((k) => [k, entry[k] as Json]));
-        const wrote = kernel.update('things', `things#${said.things}`, patch as never, { actor: `agent:${said.by}` });
-        if (!wrote.ok) return wrote as unknown as Result<Seeded>;
+  const wrote = kernel.backdate(HISTORY.kept, (): Result<unknown> => {
+    for (const register of [...ORDER, ...AGENTS_ORDER])
+      for (const [i, entry] of (ROWS[register] ?? []).entries()) {
+        /* WHAT AN AGENT SAID ABOUT A PROJECT IS LEFT OUT OF THE ROW, and the agent writes it below, when it said it. */
+        const said = register === 'things' ? PROJECTS_SAID.find((s) => s.things === i + 1) : undefined;
+        const planted = said ? Object.fromEntries(Object.entries(entry).filter(([k]) => !said.fields.includes(k))) : entry;
+        const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, planted as Fields), { actor });
+        if (!out.ok) return out;
+        rows++;
       }
-      rows++;
-    }
+    return { ok: true, value: null };
+  });
+  if (!wrote.ok) return wrote as unknown as Result<Seeded>;
 
   /* THE QUESTIONS GO IN LAST, because SG30's rowset names rows of `things` at the version they were
-     written at, and a proposal is checked against the rows it names when it is filed. */
+     written at, and a proposal is checked against the rows it names when it is filed. So what the agents said goes in
+     just before SG30, oldest first, and SG30 is read again after it, at the versions their writes left. */
   let suggestions = 0;
   let decisions = 0;
-  for (const q of governanceSeed(kernel)) {
-    const opened = kernel.propose({ question: q.question, body_kind: q.body_kind, body: q.body }, actor);
+  for (const planned of governanceSeed(kernel)) {
+    if (planned.sample === 'SG30')
+      for (const said of [...PROJECTS_SAID].sort((a, b) => a.hours - b.hours)) {
+        const entry = ROWS.things?.[said.things - 1] ?? {};
+        const patch = Object.fromEntries(said.fields.map((k) => [k, entry[k] as Json]));
+        const out = kernel.backdate(NOW + said.hours * HOUR_MS, () => kernel.update('things', `things#${said.things}`, patch as never, { actor: `agent:${said.by}` }));
+        if (!out.ok) return out as unknown as Result<Seeded>;
+      }
+    const q = planned.sample === 'SG30' ? (governanceSeed(kernel).find((g) => g.sample === 'SG30') ?? planned) : planned;
+    const when = HISTORY.asked[q.sample] ?? { opened: HISTORY.kept };
+    /* A QUESTION THE RECORD RAISED ITSELF IS THE RECORD'S, and the night's failed backup is one. */
+    const by = q.by ?? actor;
+    const opened = kernel.backdate(when.opened, () => kernel.propose({ question: q.question, body_kind: q.body_kind, body: q.body }, by));
     if (!opened.ok) return opened as unknown as Result<Seeded>;
     suggestions++;
     if (q.decided === undefined) continue;
-    const decided = kernel.decide(opened.value.id, { decide: q.decided }, actor);
+    const decided = kernel.backdate(when.decided ?? when.opened, () => kernel.decide(opened.value.id, { decide: q.decided! }, actor));
     if (!decided.ok) return decided as unknown as Result<Seeded>;
     decisions++;
   }
@@ -486,8 +532,9 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
      for rows the sample already places by hand. */
   const ruled = await kernel.install([...ruleDeclarations(), ...automationDeclarations()]);
   if (!ruled.ok) return ruled as Result<Seeded>;
-  for (const rule of Object.values(RULES)) {
-    const applied = kernel.applyRule(rule.rule);
+  /* EACH RULE'S PASS AT ITS OWN TIME THIS MORNING, in the order they were declared, so Today's feed reads as a morning. */
+  for (const [i, rule] of Object.values(RULES).entries()) {
+    const applied = kernel.backdate(HISTORY.rules + i * HISTORY.ruleStep, () => kernel.applyRule(rule.rule));
     if (!applied.ok) return applied as unknown as Result<Seeded>;
   }
 
@@ -512,6 +559,8 @@ export type SeedQuestion = {
   body_kind: 'options' | 'rowset';
   body: Record<string, unknown>;
   decided?: { option: string; reason: string };
+  /** Who raised it, when it is not the person: the record itself, for what its own nightly work noticed. */
+  by?: string;
 };
 
 const option = (id: string, label: string, because: string, recommended = false) => ({
@@ -629,6 +678,7 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
           option('ignore', 'Ignore it', 'Tonight’s run will try again. If the reason has not gone away it will fail again, and ask again.'),
         ],
       },
+      by: 'system',
     },
   ];
 }

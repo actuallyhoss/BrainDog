@@ -341,13 +341,23 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - people 2.6.0: In touch, 12 weeks says its form as `who: true`, the word the app reads, where 2.5.0 wrote `people:
  *   true`. The record still reads the old word on a page that holds 2.5.0. A key renamed on a block that is already
  *   there, so the step is a minor one.
+ * - portfolio 1.12.0, people 2.7.0, work 1.13.0 and money-core 3.7.0: first lines that name things and fewer labels
+ *   (the visual review of October 2nd). Each page's line names what it is about from the record's own rows, through
+ *   the figure paths `.first`, `.names`, `.more` and `.since` (`kernel/src/pages.ts` `rowsValue`): the task late longest
+ *   on Work, who has gone quiet and since when on People, which projects need a push and which are on track on
+ *   Projects (a figure added, `projects-on-track`). How they are going draws only past four projects in play, the cards
+ *   lose their Health and How far along labels, and Cash ahead opens on three months with every longer length still on
+ *   its control, now that the record walks to the longest of `horizons:`. Notes split on a `when:`, a figure and a key
+ *   added, nothing taken away, so each step is a minor one. The project page moves with them, though no pack holds it
+ *   (`crossPack`): its line is the next step alone, Where it stands is headed by how it is going with the agent last,
+ *   and what is handed back is a to-do with no Changed by.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.11.0',
-  people: '2.6.0',
-  'money-core': '3.6.0',
+  portfolio: '1.12.0',
+  people: '2.7.0',
+  'money-core': '3.7.0',
   estate: '2.1.0',
-  work: '1.12.0',
+  work: '1.13.0',
 };
 
 type Body = Record<string, unknown>;

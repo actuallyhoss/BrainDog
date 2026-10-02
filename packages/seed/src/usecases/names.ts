@@ -107,11 +107,31 @@ export const ruleFolded = (id: string, things: readonly string[]): string | null
   return `${done.charAt(0).toUpperCase()}${done.slice(1)} ${things.length} ${rows}: ${namesSaid(things)}`;
 };
 
+/**
+ * THE WORDS A QUESTION MAY START WITH THAT ARE NOT A NAME, so `Asked: The backup…` reads `Asked: the backup…` and
+ * `Asked: Kiln…` keeps its capital. A closed list, because a name is anything and the words around a name are not.
+ */
+const PLAIN_START = new Set(
+  (
+    'the a an this that these those it its there here some any every each no one two ' +
+    'is are was were be do does did has have had can could should would will shall may might must ' +
+    'which what who whom whose when where why how whether if ' +
+    'add update move keep change set run retire park choose give make take send chase pay renew turn cancel close open ' +
+    'drop stop start file archive merge split mark rename delete remove'
+  ).split(' '),
+);
+
+/** A question as the second half of a line: its first letter lowered, unless it starts with a name. */
+export const asPartOf = (question: string): string => {
+  const first = /^[A-Z][a-z]*/u.exec(question)?.[0];
+  return first !== undefined && PLAIN_START.has(first.toLowerCase()) ? `${question.charAt(0).toLowerCase()}${question.slice(1)}` : question;
+};
+
 /** What a rule asked, as the feed says it: by the row it names where the rule is worded here, else the question itself. */
 export const ruleAsked = (id: string, question: string): string => {
   const said = Object.hasOwn(RULE_ASKED, bare(id)) ? RULE_ASKED[bare(id)]! : null;
   const at = said === null ? -1 : question.indexOf(said.ends);
-  return said !== null && at > 0 ? said.asked.replace('{{what}}', question.slice(0, at)) : `Asked: ${question}`;
+  return said !== null && at > 0 ? said.asked.replace('{{what}}', question.slice(0, at)) : `Asked: ${asPartOf(question)}`;
 };
 
 /** A rule by its name, from its id with or without `rule.` in front, or `null` for one this build does not ship. */

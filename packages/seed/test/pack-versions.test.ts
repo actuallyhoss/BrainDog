@@ -746,6 +746,21 @@ const DECLARED: Record<string, Version> = {
       "`page.portfolio` says each thing once: Needs you goes, since every card in play says its health and next step, and Where they are goes, leaving How they are going the whole width under the line -> 152fb1ab4e697789",
     ],
   },
+  'portfolio@1.12.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '9848954ea3aa36b4',
+    history: [
+      "`page.portfolio` names its projects: the line says which need a push and which are on track (`metric.projects-on-track` added), How they are going draws past four in play, and the cards lose their Health and How far along labels -> 9848954ea3aa36b4",
+    ],
+  },
   /** A VERSION AND NOT A RESET: money-core's last version is on `origin/master`. */
   'money-core@3.4.0': {
     holds: `
@@ -823,6 +838,30 @@ const DECLARED: Record<string, Version> = {
       "`page.money`'s and `page.money-book`'s Cash ahead walk a year again, `horizon: 365`, since the knob offers no length past the walk and 90 days took six months and a year away -> 54940b8157f20a22",
     ],
   },
+  'money-core@3.7.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.books-held metric.cash-accounts metric.cash-as-of
+      metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '043ae7e7914c74d9',
+    history: [
+      "`page.money`'s Cash ahead opens on 90 days with 180, 365 and 730 still on its control, the record walking to the longest of `horizons:` -> 043ae7e7914c74d9",
+    ],
+  },
   /** A VERSION AND NOT A RESET: estate's last version is on `origin/master`. */
   'estate@2.1.0': {
     holds: `
@@ -872,6 +911,23 @@ const DECLARED: Record<string, Version> = {
     declares: '90b06daec659222e',
     history: [
       "`page.work` draws Today the whole width and Late and This week half each beside one another under it, and Done lately wears `check`, a glyph a folded heading draws; the new `project-held-up` counts what on a project is handed back or blocked, so the project page draws that tile only while it lists a task -> 90b06daec659222e",
+    ],
+  },
+  'work@1.13.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-open metric.tasks-after-week-yours metric.tasks-done-7d
+      metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d metric.tasks-due-by-week metric.tasks-late-yours
+      metric.tasks-later metric.tasks-not-this-week metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours
+      metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '9e1faaf8dfe81776',
+    history: [
+      "`page.work`'s line names the task late longest (`tasks-late-yours.first`) and how many more, and is the counts only when nothing is late -> 9e1faaf8dfe81776",
     ],
   },
   'people@2.0.0': {
@@ -944,6 +1000,18 @@ const DECLARED: Record<string, Version> = {
     declares: '4fe7401face265f2',
     history: [
       "`page.people`'s In touch, 12 weeks says its form as `who: true` where 2.5.0 wrote `people: true`, the same line a person -> 4fe7401face265f2",
+    ],
+  },
+  'people@2.7.0': {
+    holds: `
+      metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-quiet
+      page.people page.someone
+      register.people
+      rule.meet-senders
+    `,
+    declares: '147b71896720725e',
+    history: [
+      "`page.people`'s line names who has gone quiet and since when (`people-quiet.first`, `.since`), and is the counts only when nobody is quiet -> 147b71896720725e",
     ],
   },
   'estate@1.1.0': {

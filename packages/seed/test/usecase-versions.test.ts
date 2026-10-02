@@ -792,6 +792,22 @@ const DECLARED: Record<string, Version> = {
       "`page.project` takes portfolio 1.10.0's template: Where it stands and Handed back or blocked sit in the rail beside Done, by week, which takes the main column, What is open goes since the plan draws the same tasks, and Handed back or blocked is drawn on `project-held-up` -> 7d1f8294e5b27fcb",
     ],
   },
+  /** A VERSION AND NOT A RESET: founder 1.13.0 is live. */
+  'founder@1.14.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '4af90534d88ddd3f',
+    history: [
+      "`page.project` takes portfolio 1.12.0's template: its line is the next step alone, Where it stands is headed by how it is going with the agent last, and Handed back or blocked is a to-do with no Changed by -> 4af90534d88ddd3f",
+    ],
+  },
   'guide@1.5.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
@@ -921,6 +937,27 @@ const DECLARED: Record<string, Version> = {
     declares: 'db3a5e3f560f4f27',
     history: [
       "`page.project` takes portfolio 1.10.0's template: Where it stands and the tickets handed back sit in the rail beside Done, by week, What is open goes since the plan draws the same tickets, and Handed back or blocked is drawn on `project-held-up` -> db3a5e3f560f4f27",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: team 2.12.0 is live. */
+  'team@2.13.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.one_tasks setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'c5289e93f09ad883',
+    history: [
+      "`page.project` takes portfolio 1.12.0's template: its line is the next step alone, Where it stands is headed by how it is going with the agent last, and Handed back or blocked is a to-do with no Changed by -> c5289e93f09ad883",
     ],
   },
 };

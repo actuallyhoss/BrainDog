@@ -2286,11 +2286,12 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            to shut down, so every list that moves money on a day is a leg: bills, what repeats, instalments, money on its
            way, and subscriptions where Estate is held. */
         from: CASH_LEGS,
-        /* A YEAR WALKED, AND THE KNOB OFFERS EVERY LENGTH UP TO IT, because the renderer offers a length only as far as
-           the walk reaches (`horizonChoices` in `packages/render/src/forecast.ts`). Opening on 90 days was tried for
-           3.6.0 and took the knob away with it: three months was then all a person could see, and an instalment plan or a
-           loan can run a decade. It waits on a walk that reaches further than the length the chart opens on. */
-        horizon: 365,
+        /* THREE MONTHS FIRST, SINCE money-core 3.7.0, AND EVERY LONGER LENGTH STILL ON THE KNOB. The question a person
+           asks of cash is the next few months, and a year down to −£150k was a picture of a year nobody plans. Opening on
+           90 days was tried for 3.6.0 and took the knob away with it, because the record walked only as far as the chart
+           opened; it now walks to the longest of `horizons:` and says so (`reach`), and the renderer offers every length
+           up to that (`horizonChoices` in `packages/render/src/forecast.ts`), so 180, 365 and 730 days are a press away. */
+        horizon: 90,
         horizons: [90, 180, 365, 730, 1825, 'last'],
         /* COUNTING A PLAN OR A STREAM IN OR OUT IS ONE CONTROL, `count`, and `leave` is folded into it: two controls over
            the same streams with opposite meanings was one question asked two ways. Drift draws a slider only for a pair
@@ -2307,7 +2308,7 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            `headline` (`headlineHeld` in `packages/kernel/src/pages.ts`), so the chart says it again. */
         headline: 'under',
         when: { metric: 'cash-accounts', gt: 0 },
-        empty: 'Nothing dated in the next twelve months.',
+        empty: 'Nothing is dated ahead yet.',
       },
       {
         /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT MONEY, answered where it is shown, three at a time, and the rest are in

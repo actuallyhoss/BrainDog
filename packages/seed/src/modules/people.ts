@@ -197,8 +197,18 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'people-count', gt: 0 },
-        body: '{{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days, {{people-quiet}} quiet for three months or more',
+        when: { metric: 'people-quiet', is: 0 },
+        body: '{{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days',
+      },
+      {
+        /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet
+           for three months or more": the one quiet longest and since when (`.first`, `.since`), and how many more. From
+           this record's people, whoever they are; a record where nobody is quiet says the counts above instead. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'people-quiet', gt: 0 },
+        body: '{{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
       },
       {
         /* WHEN YOU WERE LAST IN TOUCH, one mark on each person's last day, over twelve weeks. A person counts once, on

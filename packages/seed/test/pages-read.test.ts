@@ -135,9 +135,10 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
   const asked = k.block({ ...table, columns: [...(table.columns ?? []), { field: 'changed' }] });
   assert.deepEqual(asked.refusals, []);
   assert.equal(asked.changes?.length, asked.rows.length);
-  /* A MOVEMENT IS WRITTEN BY THE SEED AND MAY BE CATEGORISED BY A RULE AFTER, and the last of the two is the one said. */
+  /* A MOVEMENT IS WRITTEN BY THE SEED AND MAY BE CATEGORISED BY A RULE AFTER, and the last of the two is the one said.
+     THE SEED IS THE RECORD'S OWN HAND, A RULE AND NOT YOU (`byOf`), since nobody chose those writes at that moment. */
   assert.ok(
-    asked.changes?.every((c) => c !== null && ((c.by === 'you' && c.who === 'p_seed') || (c.by === 'rule' && c.who.startsWith('rule:')))),
+    asked.changes?.every((c) => c !== null && c.by === 'rule' && (c.who === 'p_seed' || c.who.startsWith('rule:'))),
     JSON.stringify(asked.changes?.slice(0, 2)),
   );
   sql.close();

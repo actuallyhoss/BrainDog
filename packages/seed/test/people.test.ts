@@ -62,16 +62,27 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
   const page = opened(k, 'people');
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
 
-  const lead = page.blocks[0]!;
-  assert.equal(lead.kind, 'note');
-  assert.equal((lead as { lead?: boolean }).lead, true);
-  const body = String((lead as { body?: string }).body);
-  for (const id of ['people-in-touch-30d', 'people-count', 'people-quiet']) assert.ok(body.includes(`{{${id}}}`), `the line does not say ${id}`);
+  /* TWO LINES ON ONE FIGURE, SO EXACTLY ONE IS DRAWN: who has gone quiet, by name, while anybody has, and otherwise the
+     counts (People 2.7.0). */
+  const leads = page.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
+  assert.equal(leads.length, 2);
+  const [counts, quiet] = leads as (typeof leads[number] & { body?: string; drawn?: boolean })[];
+  const body = String(counts!.body);
+  for (const id of ['people-in-touch-30d', 'people-count']) assert.ok(body.includes(`{{${id}}}`), `the line does not say ${id}`);
   /* HOW MANY IS A CLAUSE OF ITS OWN, and each other clause holds one figure, so a record with no Last in touch days
      (whoever `meet` added) reads "12 contacts" and never "0 of your 12 contacts were in touch". */
   const clauses = body.split(/,\s+/u);
   assert.match(clauses[0]!, /^\{\{people-count\}\} contact\(s\)$/u);
   for (const clause of clauses.slice(1)) assert.equal(clause.match(/\{\{/gu)?.length, 1, clause);
+  /* THE SAMPLE HAS SOMEBODY QUIET, so the named line is the one drawn, and it names the one quiet longest, from the rows. */
+  assert.equal(counts!.drawn, false);
+  assert.notEqual(quiet!.drawn, false);
+  assert.match(String(quiet!.body), /^\{\{people-quiet\.first\}\} has been quiet since \{\{people-quiet\.since\}\}/u);
+  const longest = [...PEOPLE].filter((p) => typeof p.in_touch === 'string' && p.in_touch < on(-90)).sort((a, b) => String(a.in_touch).localeCompare(String(b.in_touch)));
+  const values = (quiet as { values?: Record<string, unknown> }).values ?? {};
+  assert.equal(values['people-quiet.first'], longest[0]!.name);
+  assert.equal(values['people-quiet.since'], longest[0]!.in_touch);
+  assert.equal(values['people-quiet.more'], longest.length - 1);
 
   const read = (id: string) => {
     const out = k.metric(METRICS[id] as never);

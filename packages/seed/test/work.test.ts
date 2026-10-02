@@ -100,12 +100,12 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const headings = page.blocks.map((b) => b.heading);
   /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
      screen's bands of what is still to do top to bottom, and what is further off and what was finished folded shut. The
-     line has no heading: it is the sentence in the page's title. SINCE work 1.12.0 Today is the whole width over Late and
-     This week, which share a row. */
+     line has no heading: it is the sentence in the page's title, two of them on one figure since work 1.13.0, of which one
+     is drawn. SINCE work 1.12.0 Today is the whole width over Late and This week, which share a row. */
   assert.deepEqual(
     headings,
     [
-      undefined, 'What needs doing?', 'Today', 'Late', 'This week', 'With an agent', 'Waiting on you',
+      undefined, undefined, 'What needs doing?', 'Today', 'Late', 'This week', 'With an agent', 'Waiting on you',
       'Not this week', 'After this week', 'No due day', 'Later',
       'Done lately', 'How fast it moves', 'Done recently',
     ],
@@ -292,7 +292,9 @@ test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a headin
     const lead = page.blocks[0]!;
     assert.equal(lead.kind, 'note', `${slug} does not open on its line`);
     assert.equal((lead as { lead?: boolean }).lead, true);
-    assert.match(String((lead as { body?: string }).body), /\{\{open-tasks\}\} open task\(s\)/u);
+    /* WORK'S LINE NAMES THE TASK LATE LONGEST WHILE ANY IS, SINCE work 1.13.0, and is the counts otherwise. */
+    const counts = page.blocks.find((b) => (b as { lead?: boolean }).lead === true && /\{\{open-tasks\}\} open task\(s\)/u.test(String((b as { body?: string }).body)));
+    assert.ok(counts, `${slug} has no line of its counts`);
     const bare = page.blocks.filter((b) => typeof b.heading === 'string' && typeof (b as { icon?: unknown }).icon !== 'string').map((b) => b.heading);
     assert.deepEqual(bare, [], `${slug}: a heading with no glyph`);
   }
@@ -343,9 +345,16 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is the Late band’s
       assert.equal(read.value.value, b.matched ?? b.rows.length, `${heading} holds what ${metric} does not count`);
       assert.equal(b.drawn !== false, (b.matched ?? b.rows.length) > 0, `${heading} is drawn ${b.drawn === false ? 'hidden over tasks' : 'empty'}`);
     }
-    const lead = page.blocks[0] as { body?: string; values?: Record<string, unknown> };
-    assert.match(String(lead.body), /\{\{tasks-late-yours\}\} late/u);
-    assert.equal(lead.values?.['tasks-late-yours'] ?? 0, block(page, 'Late').matched ?? block(page, 'Late').rows.length);
+    /* THE LINE NAMES THE LATE BAND'S FIRST TASK AND COUNTS THE REST OF IT, or says nothing late when the band is empty. */
+    const late = block(page, 'Late');
+    const lead = page.blocks[0] as { body?: string; drawn?: boolean; values?: Record<string, unknown> };
+    assert.match(String(lead.body), /^\{\{tasks-late-yours\.first\}\} is late, and \{\{tasks-late-yours\.more\}\} more task\(s\) are too$/u);
+    const count = late.matched ?? late.rows.length;
+    assert.equal(lead.drawn !== false, count > 0);
+    if (count > 0) assert.equal(lead.values?.['tasks-late-yours.more'], count - 1);
+    /* AND THE TASK IT NAMES IS THE ONE LATE LONGEST, the earliest day in the band. */
+    const days = late.rows.map((r) => String(r.fields.by)).sort();
+    if (count > 0) assert.equal(late.rows.find((r) => r.fields.what === lead.values?.['tasks-late-yours.first'])?.fields.by, days[0]);
   };
   check();
   const yesterday = new Date(NOW - 86_400_000).toISOString().slice(0, 10);

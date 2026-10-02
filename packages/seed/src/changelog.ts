@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.12.0',
+      notes:
+        'Projects opens on which projects need a push and which are on track, by name. The cards drop their Health and How far along labels, and the bar of how they are going shows once more than four are in play. A project page opens on its next step, leads Where it stands with how it is going, and lists what is handed back as a to-do.',
+    },
+    {
       version: '1.11.0',
       notes: 'Projects says each thing once: the line, one track of how the projects in play are going, and the projects themselves. The Needs you table is gone, since every card says its health and next step.',
     },
@@ -47,6 +52,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '2.7.0', notes: 'People opens on who has gone quiet and since when, by name, and otherwise on who you have been in touch with lately.' },
     { version: '2.6.0', notes: 'Nothing changes on screen: In touch, 12 weeks is written the way the app now reads it.' },
     { version: '2.5.0', notes: 'In touch, 12 weeks names each person beside the weeks they were in touch, the latest first.' },
     {
@@ -65,6 +71,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.7.0',
+      notes: 'Cash ahead opens on the next three months. Six months, a year and two years are still a press away.',
+    },
     {
       version: '3.6.0',
       notes: 'Cash ahead no longer says again when the money runs out, since the line at the top does. The flag on the day stays.',
@@ -108,6 +118,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.13.0',
+      notes: 'Work opens on the task that has been late longest, by name, and how many more are late with it.',
+    },
     {
       version: '1.12.0',
       notes: 'Today runs the whole width, with what is late and what is due this week side by side under it.',

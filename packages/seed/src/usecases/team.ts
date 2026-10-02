@@ -75,8 +75,11 @@ export const TEAM = {
      when there are any and otherwise the project's next step, said once. 2.10.0 is live.
      2.12.0: a project's page takes portfolio 1.10.0's template: where it stands and the tickets handed back sit in the
      rail beside the chart, What is open goes since the plan draws the same tickets, and what is handed back is drawn
-     only while it lists one. 2.11.0 is live. */
-  version: '2.12.0',
+     only while it lists one. 2.11.0 is live.
+     2.13.0: a project's page takes portfolio 1.12.0's template: its line is the next step alone, Where it stands is
+     headed by how it is going with the agent last, and the tickets handed back are a to-do with no Changed by. 2.12.0
+     is live. */
+  version: '2.13.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -703,8 +706,9 @@ export const TEAM_NAMES: Readonly<Record<string, Readonly<Record<string, string>
   work: {
     Work: 'Tickets',
     'No agent holds a task.': 'No agent holds a ticket.',
-    '{{open-tasks}} open task(s), {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you':
-      '{{open-tasks}} open ticket(s), {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
+    '{{tasks-late-yours.first}} is late, and {{tasks-late-yours.more}} more task(s) are too':
+      '{{tasks-late-yours.first}} is late, and {{tasks-late-yours.more}} more ticket(s) are too',
+    '{{open-tasks}} open task(s), {{tasks-waiting}} waiting on you': '{{open-tasks}} open ticket(s), {{tasks-waiting}} waiting on you',
     '{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent':
       '{{open-tasks}} open ticket(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
   },

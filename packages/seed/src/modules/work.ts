@@ -722,14 +722,27 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     filters: [{ field: 'thing', control: 'chips' }],
     blocks: [
       {
-        /* THE PAGE'S ONE LINE, drawn in the title's tile, said from three figures. A clause whose figure is nought is
-           left out by the writer (`leadOf`), so a quiet week says only what there is; a record with nothing open says
-           nothing at all. Late is yours (`tasks-late-yours`), the count of the Late band under it, so the line and the
-           band never disagree; an agent's late task is counted where it is drawn, with the agent or waiting on you. */
+        /* THE PAGE'S ONE LINE, drawn in the title's tile. A clause whose figure is nought is left out by the writer
+           (`leadOf`), so a quiet week says only what there is; a record with nothing open says nothing at all. Late is
+           yours (`tasks-late-yours`), the count of the Late band under it, so the line and the band never disagree; an
+           agent's late task is counted where it is drawn, with the agent or waiting on you.
+
+           IT NAMES THE LATE TASK, SINCE work 1.13.0 (the visual review of October 2nd), where it counted the table:
+           "Turn auto-renew back on is late, and 6 more tasks are too" rather than "15 open tasks, 1 late". The task is
+           the one late longest (`.first`), from whatever this record's tasks are. With nothing late the line is the
+           counts, as it was. */
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{open-tasks}} open task(s), {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
+        when: { metric: 'tasks-late-yours', gt: 0 },
+        body: '{{tasks-late-yours.first}} is late, and {{tasks-late-yours.more}} more task(s) are too',
+      },
+      {
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'tasks-late-yours', is: 0 },
+        body: '{{open-tasks}} open task(s), {{tasks-waiting}} waiting on you',
       },
       {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the

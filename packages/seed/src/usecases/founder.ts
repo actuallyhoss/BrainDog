@@ -173,8 +173,12 @@ export const FOUNDER = {
      1.13.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.10.0'S TEMPLATE: where it stands and what is handed back sit in
      the rail beside the chart, which takes the main column, What is open goes since the plan draws the same tasks, and
      what is handed back is drawn only while it lists a task. A block taken away and none added; no list, field or
-     figure of this use case moves, so a minor step. 1.12.0 is live. */
-  version: '1.13.0',
+     figure of this use case moves, so a minor step. 1.12.0 is live.
+
+     1.14.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.12.0'S TEMPLATE: its line is the next step alone, Where it stands is
+     headed by how it is going with the agent last, and what is handed back is a to-do with no Changed by. No block added
+     or taken away, so a minor step. 1.13.0 is live. */
+  version: '1.14.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',

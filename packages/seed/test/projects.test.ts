@@ -81,11 +81,15 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   const overview = opened(k, 'portfolio');
   /* IN PLAY IS THE LINE'S, SINCE portfolio 1.10.0, beside what needs you, and what aims within thirty days is a figure
      the fold's Coming up is drawn under. */
+  /* AND SINCE portfolio 1.12.0 THE LINE NAMES THEM, which need a push and which are on track, from the rows. */
   const line = overview.blocks.find((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false) as { values?: Record<string, unknown> };
+  const named = (ok: (t: (typeof THINGS)[number]) => boolean) => THINGS.filter((t) => inPlay(t) && ok(t)).map((t) => String(t.name));
+  const and = (list: string[]) => (list.length < 2 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
   assert.deepEqual(line.values, {
-    'projects-live': THINGS.filter(inPlay).length,
-    'projects-need-you': THINGS.filter((t) => inPlay(t) && (t.health === 'at_risk' || t.health === 'off_track')).length,
+    'projects-need-you.names': and(named((t) => t.health === 'at_risk' || t.health === 'off_track')),
+    'projects-on-track.names': and(named((t) => t.health === 'on_track')),
   });
+  assert.equal(figure(k, 'projects-live'), THINGS.filter(inPlay).length);
   assert.equal(
     figure(k, 'projects-aim-30d'),
     THINGS.filter((t) => inPlay(t) && typeof t.aim === 'string' && t.aim >= TODAY && t.aim <= new Date(NOW + 30 * 86_400_000).toISOString().slice(0, 10)).length,
@@ -95,7 +99,9 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   assert.ok(!overview.blocks.some((b) => b.heading === 'Needs you'), 'Needs you says again what the cards say');
   const atRisk = block(overview, 'In play').rows.filter((r) => r.fields.health === 'at_risk' || r.fields.health === 'off_track');
   assert.deepEqual(names(atRisk).sort(), ['Kiln', 'Portage']);
-  const parts = block(overview, 'How they are going').readings?.[0]?.reading?.groups ?? [];
+  const byHealth = k.metric(PROJECT_METRICS['projects-by-health'] as never);
+  assert.ok(byHealth.ok, sayOf(byHealth));
+  const parts = byHealth.value.groups ?? [];
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
   assert.deepEqual((block(overview, 'How they are going') as { tones?: unknown }).tones, { on_track: 'good', at_risk: 'warn', off_track: 'bad' }, 'the record hands each part its intent to the page');
   assert.deepEqual(names(block(overview, 'Not in play').rows), ['Tallow']);
@@ -222,12 +228,14 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY AR
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
   assert.equal(leads.length, 2, 'the Overview declares its two opening sentences');
   assert.deepEqual(leads.map((b) => b.drawn !== false), [true, false], 'one sentence and not both, or neither');
-  assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-live\}\} project\(s\) in play, \{\{projects-need-you\}\} at risk or off track\.$/u);
+  assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
 
   /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
      (portfolio 1.11.0). */
   assert.ok(!overview.blocks.some((b) => b.heading === 'Where they are'), 'Where they are is still drawn');
-  const health = block(overview, 'How they are going').readings?.[0]?.reading?.groups ?? [];
+  const read = k.metric(PROJECT_METRICS['projects-by-health'] as never);
+  assert.ok(read.ok, sayOf(read));
+  const health = read.value.groups ?? [];
   assert.equal(health.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'a project in play is in no part');
 
   /* WHAT EACH ONE EARNS IS ONE TRACK, over the rows the Earning tile adds up. */
@@ -256,11 +264,16 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
      again beside it. */
   const row = blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading)));
   assert.deepEqual(row.map((b) => [b.heading, b.span]), [['How they are going', 12]], 'the row is not one whole tile');
-  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 0 }), 'the track draws with no project in play');
+  /* ONLY PAST FOUR IN PLAY, SINCE portfolio 1.12.0: three projects drew three equal thirds, which the line and the cards
+     already say. */
+  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 4 }), 'the track draws over a few projects');
   assert.deepEqual(blocks.findIndex((b) => b.heading === 'How they are going'), blocks.findIndex((b) => !b.lead), 'the row is not the first under the line');
 
   const k = await seeded();
-  assert.equal(block(opened(k, 'portfolio'), 'How they are going').drawn !== false, true);
+  const going = () => opened(k, 'portfolio').blocks.find((b) => b.heading === 'How they are going')!;
+  assert.equal(going().drawn, false, 'the track is drawn over three projects');
+  for (const name of ['Bindery', 'Lantern']) assert.ok(k.create('things', { name, lane: 'building', health: 'on_track' } as never, { actor: 'p_test' }).ok);
+  assert.notEqual(going().drawn, false, 'the track is not drawn over five projects');
 });
 
 test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be checked, and says the step once', async () => {
@@ -271,7 +284,8 @@ test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be ch
   assert.equal(leads.length, 1, 'not exactly one line');
   assert.equal(page.blocks.find((b) => b.drawn !== false), leads[0], 'the line is not the first thing drawn');
   const kiln = THINGS.find((t) => t.name === 'Kiln')!;
-  assert.equal((leads[0] as { body?: string }).body, `Next on Kiln: ${String(kiln.next)}`);
+  /* THE NEXT STEP ALONE, SINCE portfolio 1.12.0: the title already names the project. */
+  assert.equal((leads[0] as { body?: string }).body, String(kiln.next));
   const stands = block(page, 'Where it stands') as { columns?: { field?: string }[] };
   assert.ok(!(stands.columns ?? []).some((c) => c.field === 'next'), 'Where it stands says the line again');
 
