@@ -555,6 +555,33 @@
     overflow-wrap: anywhere;
   }
 
+  /* A GROUPED TIMELINE SAYS EACH DAY ONCE, as a small heading over its rows (`render/src/timeline.ts`), and the rows
+     under it leave their date blank. So the 11ch date track goes too, and the titles start on the list's own edge, as
+     a list with no marker does: an empty column down every row is space spent on nothing. */
+  .list > .item-day {
+    padding: var(--sp-3) var(--sp-3) var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .list > .item-day:first-child {
+    padding-block-start: var(--sp-1);
+  }
+
+  .list[data-kind='timeline'][data-days] > .item {
+    grid-template-areas:
+      'title state'
+      'detail detail'
+      'meta meta';
+    grid-template-columns: minmax(min(16ch, 100%), 1fr) auto;
+  }
+
+  .list[data-kind='timeline'][data-days] > .item > .item-marker {
+    display: none;
+  }
+
   /* `steps path`: A STONE A STEP, the stones in a column of their own and the line drawn through its
      middle behind them, so the hairlines between rows go and the line is the structure. The column is
      as wide as the word "Next", so every stone is centred on the same x whether it holds a tick, the
@@ -1073,6 +1100,40 @@
      glance away. */
   .tr[data-focused] {
     background: var(--s2);
+  }
+
+  /* THE HOST'S ROW CURSOR ON A LIST IS THE SAME BAND (`render/src/cursor.ts`): j and k walk the rows of every block on
+     a page, and the row they are on is the raised surface, as the table's caret row is. */
+  .list > .item[data-focused] {
+    background: var(--s2);
+  }
+
+  /* Forced colours paint every surface Canvas and drop the shadows, so the band is gone and the cursor with it: there
+     it is the ring the system's own focus wears, inside the row so it does not sit on the next. */
+  @media (forced-colors: active) {
+    :is(.list > .item, .feed-row, .queue-card)[data-focused] {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+
+  /* CALM BY DEFAULT (DIRECTION §35): a row's secondary line (when, who, a reason) waits for the pointer or the
+     keyboard to reach its row. Only where there is a pointer that hovers: on touch there is no hover to wait for, so the
+     line is always shown. It fades rather than folds, so the row keeps its height and nothing moves under the pointer. */
+  @media (hover: hover) and (pointer: fine) {
+    [data-calm] {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    /* A line the record set in bold ("**due today**") is the part that needs the person, and that never waits. */
+    [data-calm]:has(strong),
+    .list > .item:is(:hover, :focus-within, [data-focused]) > [data-calm],
+    .feed-row:is(:hover, :focus-within, [data-focused]) > [data-calm],
+    .feed-group:is(:hover, :focus-within) > .feed-head > [data-calm],
+    .queue-card:is(:hover, :focus-within, [data-focused]) [data-calm] {
+      opacity: 1;
+    }
   }
 
   /* THE KEYBOARD'S PLACE IS THE FOCUS RING EVERY CONTROL WEARS, in `--focus-in` and never the brand's

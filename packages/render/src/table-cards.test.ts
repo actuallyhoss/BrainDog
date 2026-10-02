@@ -1,7 +1,7 @@
 /**
  * A table row's link, on the one arm of `Table.svelte` that draws it: the phone's card list.
  *
- * A FILE OF ITS OWN BECAUSE THE ARM IS CHOSEN AT IMPORT. `cards.svelte.ts` reads `matchMedia` once, when it is
+ * A FILE OF ITS OWN BECAUSE THE ARM IS CHOSEN AT IMPORT. `rows-as-cards.svelte.ts` reads `matchMedia` once, when it is
  * first loaded, and answers the grid when there is no `window`, which is right for the SSR pass and is what
  * `parity.test.ts` needs for every table it compares. The grid arm draws no row as a link (the row is activated
  * through `onactivate`), so under that answer a row's `href` never reaches the markup and a test of it passes

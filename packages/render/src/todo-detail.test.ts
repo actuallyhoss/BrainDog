@@ -24,11 +24,11 @@ const block = (src: string): Block => {
   return seg as Block;
 };
 
-/** The markup a two-cell todo drew before this line existed, written out so it cannot drift with the code. */
+/** The markup a two-cell todo drew before this line existed, and its row keys (`cursor.ts`), written out so it cannot drift with the code. */
 const TWO_CELLS =
   '<figure class="block block-list" data-kind="todo" data-primitive="list"><ul class="list" data-kind="todo">' +
-  '<li class="item"><span class="item-marker" data-done="no" role="img" aria-label="not done"></span><span class="item-title">Draft the September issue</span><span class="item-detail">waiting on copy</span></li>' +
-  '<li class="item"><span class="item-marker" data-done="yes" role="img" aria-label="done">✓</span><span class="item-title">Send the quote</span><span class="item-detail"></span></li>' +
+  '<li class="item" data-row="0"><span class="item-marker" data-done="no" role="img" aria-label="not done"></span><span class="item-title">Draft the September issue</span><span class="item-detail">waiting on copy</span></li>' +
+  '<li class="item" data-row="1"><span class="item-marker" data-done="yes" role="img" aria-label="done">✓</span><span class="item-title">Send the quote</span><span class="item-detail"></span></li>' +
   '</ul></figure>';
 
 test('A TODO ROW OF FOUR CELLS IS DRAWN, not degraded as too wide', () => {
@@ -46,23 +46,23 @@ test('THE THIRD AND FOURTH CELLS ARE ONE LINE, after the detail, joined by a dot
   const html = toHTML([block('```todo\n[ ] Check the export | blocked on the bank | due 24 Sep | Claude, 3h ago\n```')]);
   assert.match(
     html,
-    /<span class="item-title">Check the export<\/span><span class="item-detail">blocked on the bank<\/span><span class="item-meta">due 24 Sep · Claude, 3h ago<\/span><\/li>/u,
+    /<span class="item-title">Check the export<\/span><span class="item-detail">blocked on the bank<\/span><span class="item-meta" data-calm="">due 24 Sep · Claude, 3h ago<\/span><\/li>/u,
   );
 });
 
 test('a third cell alone is the whole line, with no dot hanging off it', () => {
   const html = toHTML([block('```todo\n[ ] Check the export | blocked | due 24 Sep\n```')]);
-  assert.match(html, /<span class="item-meta">due 24 Sep<\/span><\/li>/u);
+  assert.match(html, /<span class="item-meta" data-calm="">due 24 Sep<\/span><\/li>/u);
 });
 
 test('a blank third cell leaves the fourth on its own, and never a leading dot', () => {
   const html = toHTML([block('```todo\n[ ] Check the export | blocked |  | Claude, 3h ago\n```')]);
-  assert.match(html, /<span class="item-meta">Claude, 3h ago<\/span><\/li>/u);
+  assert.match(html, /<span class="item-meta" data-calm="">Claude, 3h ago<\/span><\/li>/u);
 });
 
 test('THE LINE GOES THROUGH THE INLINE RENDERER like every other cell, so a link is a link', () => {
   const html = toHTML([block('```todo\n[ ] Check the export | blocked | **due today** | [Claude](/r/sessions/4)\n```')]);
-  assert.match(html, /<span class="item-meta"><strong>due today<\/strong> · <a href="\/r\/sessions\/4">Claude<\/a><\/span>/u);
+  assert.match(html, /<span class="item-meta" data-calm=""><strong>due today<\/strong> · <a href="\/r\/sessions\/4">Claude<\/a><\/span>/u);
 });
 
 test('A TWO-CELL TODO DRAWS EXACTLY WHAT IT DREW BEFORE', () => {

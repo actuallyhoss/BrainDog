@@ -63,6 +63,22 @@
     border-block-end: 0;
   }
 
+  /* THE HOST'S ROW CURSOR IS THE BAND A LIST'S CURSOR ROW WEARS (`blocks.css`), rounded, with the hairlines at its
+     edges gone. The row has no inline padding, so the band reaches a step past each side with two offset copies of
+     itself rather than padding that would move the words when the cursor arrives. */
+  .feed-row[data-focused] {
+    border-radius: var(--r-md);
+    border-block-end-color: transparent;
+    background: var(--s2);
+    box-shadow:
+      calc(var(--sp-2) * -1) 0 0 0 var(--s2),
+      var(--sp-2) 0 0 0 var(--s2);
+  }
+
+  .feed-row:has(+ .feed-row[data-focused]) {
+    border-block-end-color: transparent;
+  }
+
   /* THE COUNT IS WHAT IS READ FIRST, so it leads, in tabular figures down one edge. */
   .feed-count {
     color: var(--dim);

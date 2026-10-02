@@ -82,17 +82,22 @@ export function leadingCode(text: string): { currency: string; rest: string; sig
 export function symbolFigure(text: string): string | null {
   const coded = leadingCode(text);
   if (!coded) return null;
-  let symbol: string | undefined;
+  const symbol = symbolOf(coded.currency);
+  if (symbol === null) return null;
+  const minus = /^[\u2212-]/u.exec(coded.rest)?.[0] ?? '';
+  return `${coded.sign}${minus}${symbol}${coded.rest.slice(minus.length)}`;
+}
+
+/** The symbol British English writes a currency with (`\u00a3`, `US$`), or `null` for one it writes by its code (`EGP`). */
+function symbolOf(currency: string): string | null {
   try {
-    symbol = new Intl.NumberFormat('en-GB', { style: 'currency', currency: coded.currency, currencyDisplay: 'symbol' })
+    const symbol = new Intl.NumberFormat('en-GB', { style: 'currency', currency, currencyDisplay: 'symbol' })
       .formatToParts(0)
       .find((p) => p.type === 'currency')?.value;
+    return symbol && symbol.toUpperCase() !== currency ? symbol : null;
   } catch {
     return null;
   }
-  if (!symbol || symbol.toUpperCase() === coded.currency) return null;
-  const minus = /^[\u2212-]/u.exec(coded.rest)?.[0] ?? '';
-  return `${coded.sign}${minus}${symbol}${coded.rest.slice(minus.length)}`;
 }
 
 /**
@@ -106,9 +111,12 @@ export function figureChars(text: string): number | null {
   return longest > 10 ? longest : null;
 }
 
-/** A sentence with every figure `money` wrote in it drawn the way `symbolFigure` draws one. */
-export const symbolText = (text: string): string =>
-  text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => symbolFigure(hit) ?? hit);
+/**
+ * A sentence with every figure `money` wrote in it drawn the way `symbolFigure` draws one, or, for a `headline` (the
+ * page's one line, a tile's note), the way `headlineFigure` does.
+ */
+export const symbolText = (text: string, headline = false): string =>
+  text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => (headline ? headlineFigure(hit) : (symbolFigure(hit) ?? hit)));
 
 /**
  * ONE MINUS SIGN, in all four of them.
@@ -175,6 +183,43 @@ export function barFigure(text: string): string {
   const minor = /^0*$/u.test(p.minor) ? '' : `.${p.minor}`;
   return `${p.sign}${p.unit}${p.inner}${grouped(p.whole)}${minor}${p.code}`;
 }
+
+/**
+ * A FIGURE STANDING ON ITS OWN, AS A HEADLINE SAYS IT: `GBP 33,850.00` is `£33,850`, `EGP 412,300.00` is `EGP 412,300`.
+ *
+ * A headline is read at a glance, so `.00` under it is width that says nothing a round figure does not; a fraction that
+ * is not all zeros is part of the amount and stays (`£33,850.50`). ONE MARK OF CURRENCY, NEVER TWO: a figure written
+ * with a symbol and its code after it, `$4,800.00 USD` or `E£43,700.00 EGP`, is said by the code it names, as the
+ * unambiguous symbol where there is one (`US$4,800`) and as the code in front where there is not (`EGP 43,700`).
+ *
+ * DISPLAY ONLY, AND NEVER FOR A LEDGER. `money` still writes every minor unit, and a column of amounts keeps them so
+ * its digits line up and none is rounded away. Several amounts joined by ` · ` are each said this way. A figure that
+ * names no currency is not money and comes back as written: a bare `2026` may be a year, and grouping it would lie.
+ */
+export function headlineFigure(text: string): string {
+  return text
+    .split(/(\s·\s)/u)
+    .map((part, i) => (i % 2 === 1 ? part : headlineOne(part)))
+    .join('');
+}
+
+function headlineOne(text: string): string {
+  const p = figureParts(text);
+  if (!p) return text;
+  const coded = /^[A-Z]{3} $/u.test(p.unit) ? p.unit.trim() : '';
+  const code = p.code.trim() || coded;
+  /* A FIGURE WITH NO CURRENCY IN IT IS NOT ONE THIS FUNCTION SAYS. */
+  if (code === '' && p.unit === '') return text;
+  const body = `${grouped(p.whole)}${/^0*$/u.test(p.minor) ? '' : `.${p.minor}`}`;
+  if (code === '') return `${p.sign}${p.unit}${p.inner}${body}`;
+  const plus = p.sign === '+' ? '+' : '';
+  const minus = p.sign === MINUS || p.inner === MINUS ? MINUS : '';
+  const symbol = symbolOf(code);
+  return symbol === null ? `${plus}${code} ${minus}${body}` : `${plus}${minus}${symbol}${body}`;
+}
+
+/** An amount in minor units as a headline says it: `headlineMoney(3_385_000, 'GBP')` is `£33,850`. */
+export const headlineMoney = (minor: number, currency: string): string => headlineFigure(money(minor, currency));
 
 /** The steps a chart's axis counts in. British usage: a thousand is `k`, a million `m`, a billion `bn`. */
 const COMPACT = ['', 'k', 'm', 'bn', 'tn'] as const;

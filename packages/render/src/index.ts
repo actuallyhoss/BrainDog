@@ -68,6 +68,8 @@ export {
   type CaptureRowKind,
 } from './capture.ts';
 export { takeWorking, workingCell, WORKING_GLYPH, WORKING_LABEL, WORKING_MARK } from './working.ts';
+export { CHOICE_KEYS, choiceOf, rowAt, rowKey } from './cursor.ts';
+export { timelineDays } from './timeline.ts';
 export {
   TABLE_CHUNK,
   TABLE_ROWS_LABEL,
@@ -222,6 +224,8 @@ export {
   symbolFigure,
   symbolText,
   figureChars,
+  headlineFigure,
+  headlineMoney,
   axisFigure,
   barFigure,
 } from './format.ts';

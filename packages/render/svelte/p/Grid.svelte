@@ -13,7 +13,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { figureChars, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { figureChars, headlineFigure, hrefFor, inline, leadingCode, symbolFigure, symbolText, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { columnAt, columnsOf, dropTarget, lanes, moveTarget, type Moves } from '../../src/board.ts';
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { valueWord } from '../../src/format.ts';
@@ -421,9 +421,11 @@
            as the number, three capitals in front of every headline on the screen. The code stays,
            because money is never a bare number, and the text is unchanged; only the emphasis moves,
            the way `Money` already sets a row's amount. -->
-      {@const symbol = symbolFigure(row.cells[1] ?? '')}
-      {@const coded = leadingCode(row.cells[1] ?? '')}
-      {@const chars = figureChars(row.cells[1] ?? '')}
+      <!-- A STAT'S FIGURE IS A HEADLINE, said the way `headlineFigure` says one: `£33,850`, `EGP 412,300`. -->
+      {@const figure = headlineFigure(row.cells[1] ?? '')}
+      {@const symbol = symbolFigure(figure)}
+      {@const coded = leadingCode(figure)}
+      {@const chars = figureChars(figure)}
       <svelte:element
         this={href ? 'a' : 'div'}
         class="cell"
@@ -433,14 +435,14 @@
       >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="cell-figure num" data-fit={chars === null ? undefined : ''} style={chars === null ? undefined : `--chars:${chars}`}>
-          {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount-code">{coded.currency}</span>
+          {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span>
             <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text
-              nodes={inline(row.cells[1], opts)}
+              nodes={inline(figure, opts)}
               {opts}
             />{/if}
         </span>
         <Trend cls="cell-trend" label={row.cells[0] ?? ''} value={row.cells[3] ?? ''} {opts} />
-        <span class="cell-note"><Text nodes={inline(symbolText(row.cells[2] ?? ''), opts)} {opts} /></span>
+        <span class="cell-note"><Text nodes={inline(symbolText(row.cells[2] ?? '', true), opts)} {opts} /></span>
         {#if row.tone}
           <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
         {/if}

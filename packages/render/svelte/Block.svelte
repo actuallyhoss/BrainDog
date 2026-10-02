@@ -40,6 +40,8 @@
     onreschedule,
     oninput,
     onpath,
+    cursor,
+    onrowfocus,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -84,7 +86,25 @@
      * as a 44px toggle only when this is passed and as a picture of one otherwise.
      */
     onpath?: ((row: Row, done: boolean) => void) | undefined;
+    /**
+     * THE ROW CURSOR (`../src/cursor.ts`), READS AND NOT WRITES, so a host can walk a page's rows with j/k across its
+     * blocks: the key of the row it is on, drawn `data-focused`, and where it hears that focus moved into a row. Handed
+     * to the list primitive, whose `todo`, `timeline`, `feed` and `queue` rows carry `data-row` in both renderers.
+     */
+    cursor?: string | null | undefined;
+    onrowfocus?: ((key: string, row: Row) => void) | undefined;
   } = $props();
+
+  /** The list this block draws through, so `choose` can reach its queue. */
+  let list = $state<{ choose(i: number, key?: string | null): boolean } | undefined>(undefined);
+
+  /**
+   * A NUMBER KEY'S ANSWER: option `i` (0 is the first, which `1` presses) of the queue question under `key`, under the
+   * cursor, or the first. False where this block is not a queue the host can answer.
+   */
+  export function choose(i: number, key?: string | null): boolean {
+    return list?.choose(i, key) ?? false;
+  }
 
   const PRIMITIVE = { panel: Panel, grid: Grid, rows: Rows, proportional: Proportional, inline: InlineRun, list: List, media: Media };
 
@@ -156,7 +176,7 @@
          to the union the other six are in, it is a prop none of them declares. -->
     <Grid {block} {opts} {onmove} />
   {:else if spec.primitive === 'list'}
-    <List {block} {opts} {ontick} {onact} {onreschedule} />
+    <List bind:this={list} {block} {opts} {ontick} {onact} {onreschedule} {cursor} {onrowfocus} />
   {:else if spec.primitive === 'panel'}
     <Panel {block} {opts} {oncapture} />
   {:else if Draw}

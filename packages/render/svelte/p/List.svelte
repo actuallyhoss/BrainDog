@@ -17,12 +17,19 @@
   name. That is `19 §6`'s rule, that a control which cannot act is absent rather than greyed out,
   and it is the same branch `Text` makes for a hole: a checkbox that does nothing when pressed is
   worse than a picture of one, because it also spends a tab stop and a promise.
+
+  EVERY ROW CARRIES ITS KEY, AND THE HOST'S CURSOR IS DRAWN AS A HOVER IS (`../../src/cursor.ts`). `cursor` names the
+  row the host is on and marks it `data-focused`; `onrowfocus` tells the host when Tab or a click lands in a row, so
+  its j/k walk starts from where the reader is. `choose` answers the queue's question under the cursor with an option.
+  With neither passed, nothing on the screen changes.
 -->
 <script lang="ts">
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
+  import { timelineDays } from '../../src/timeline.ts';
+  import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
   import Queue from '../Queue.svelte';
@@ -37,6 +44,8 @@
     ontick,
     onact,
     onreschedule,
+    cursor,
+    onrowfocus,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -46,7 +55,32 @@
     onact?: ((row: Row, option: string) => void) | undefined;
     /** The same for a roadmap: where a dropped bar goes. Its absence is what keeps every bar a picture. */
     onreschedule?: ((row: Row, drop: RoadmapDrop) => void) | undefined;
+    /** The key of the row the host's cursor is on (`rowKey`), drawn `data-focused`. */
+    cursor?: string | null | undefined;
+    /** Where the host hears that focus moved into a row, with its key and the row. */
+    onrowfocus?: ((key: string, row: Row) => void) | undefined;
   } = $props();
+
+  /** The queue this list hands its question to, so `choose` can reach it. */
+  let queue = $state<{ choose(i: number, key?: string | null): boolean } | undefined>(undefined);
+
+  /**
+   * ANSWER THE QUEUE'S QUESTION WITH ITS OPTION `i` (0 is the first, which the key `1` presses), the question under
+   * `key`, or under the host's cursor, or the first. False where this is not a queue or nothing was answered.
+   */
+  export function choose(i: number, key?: string | null): boolean {
+    return queue?.choose(i, key) ?? false;
+  }
+
+  const days = $derived(block.kind === 'timeline' ? timelineDays(block.rows) : []);
+  const grouped = $derived(days.some((d) => d !== null));
+
+  /** One listener on the list, so a row reports focus however deep the control that took it. */
+  function focused(e: FocusEvent) {
+    const key = (e.target as Element | null)?.closest?.('[data-row]')?.getAttribute('data-row');
+    const row = key == null ? undefined : rowAt(block.rows, key);
+    if (key != null && row) onrowfocus?.(key, row);
+  }
 
   /* THE STRINGS ARE LOCAL, because `packages/render` depends on nothing and the app's copy file is
      neither reachable from here nor allowed to be. Every other word this package draws is the
@@ -107,11 +141,11 @@
 <!-- `feed` is on this primitive and groups its rows, so it has a drawer of its own, as `cards` does on `grid`, and so
      does `roadmap`, which draws its rows on a time axis rather than as a list of them, and `steps path`. -->
 {#if block.kind === 'feed'}
-<Feed {block} {opts} />
+<Feed {block} {opts} {cursor} {onrowfocus} />
 {:else if block.kind === 'agents'}
 <Agents {block} {opts} />
 {:else if block.kind === 'queue'}
-<Queue {block} {opts} {onact} />
+<Queue bind:this={queue} {block} {opts} {onact} {cursor} {onrowfocus} />
 {:else if block.kind === 'roadmap'}
 <Roadmap {block} {opts} {onreschedule} />
 {:else if block.kind === 'steps' && block.form === 'path'}
@@ -119,14 +153,21 @@
      plain `steps` block below still prints that cell as the state it was written as. -->
 <Path {block} {opts} />
 {:else}
-<svelte:element this={kindSpec(block.kind, opts.kinds)?.ordered ? 'ol' : 'ul'} class="list" data-kind={block.kind}>
+<svelte:element
+  this={kindSpec(block.kind, opts.kinds)?.ordered ? 'ol' : 'ul'}
+  class="list"
+  data-kind={block.kind}
+  data-days={grouped ? '' : undefined}
+  onfocusin={onrowfocus ? focused : undefined}
+>
   {#each block.rows as row, i}
+    {@const rowId = rowKey(row, i)}
     {#if block.kind === 'todo'}
       {@const state = tickState(row.done, ticks.get(i))}
       <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
       {@const title = takeWorking(row.cells[0] ?? '')}
       {@const meta = todoMeta(row.cells)}
-      <li class="item" data-arrived={row.arrived ? '' : undefined}>
+      <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         {#if ontick}
           <!-- `role="checkbox"` and not a bare button: what it does is set a state, not run a verb,
                and `aria-checked` is the only way a screen reader is told which state it is in
@@ -167,7 +208,7 @@
              changed it last, on Work's Waiting on you. Outside the box's name on purpose, which stays the task. And
              before the unsaved mark, so a reader hears the row's facts before what this session did to it. -->
         {#if meta.length}
-          <span class="item-meta"
+          <span class="item-meta" data-calm=""
             >{#each meta as part, n}{#if n > 0}{TODO_META_JOIN}{/if}<Text nodes={inline(part, opts)} {opts} />{/each}</span
           >
         {/if}
@@ -192,11 +233,15 @@
       </li>
     {:else if block.kind === 'timeline'}
       {@const title = takeWorking(row.cells[1] ?? '')}
-      <li class="item" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined}>
+      {@const day = days[i] ?? null}
+      <!-- A GROUPED TIMELINE SAYS EACH DAY ONCE, as a small heading over its rows, and the rows under it leave their own
+           date blank (`../../src/timeline.ts`). The heading is an item, so the list stays a list of its children. -->
+      {#if day !== null}<li class="item-day num"><Text nodes={inline(day, opts)} {opts} /></li>{/if}
+      <li class="item" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
              its own source. -->
-        <span class="item-marker num"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
+        <span class="item-marker num">{#if !grouped}<Text nodes={inline(row.cells[0] ?? '', opts)} {opts} />{/if}</span>
         <!-- The glyph sits with the TITLE, not at the far edge of the row. A tone belongs to the
              thing it qualifies, and five hundred pixels away it belongs to nothing — the same
              finding the stat cell's layout is built on (13 §2.3). -->
@@ -210,7 +255,7 @@
       </li>
     {:else}
       {@const title = takeWorking(row.cells[0] ?? '')}
-      <li class="item" data-arrived={row.arrived ? '' : undefined}>
+      <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         <span class="item-title"
           >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
         >

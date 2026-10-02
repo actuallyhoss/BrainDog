@@ -170,6 +170,14 @@ The Svelte `Block` takes four write callbacks and `toHTML` takes none: `onmove` 
 `onact` for a list, and `oncapture(register, text, inherited)` for a capture. A block drawn without them is
 the tree `toHTML` draws, so a read-only embed is the default rather than a mode.
 
+Every row a `todo`, `timeline`, list, `feed` or `queue` draws carries `data-row` with its key (`rowKey`:
+`register#seq` for a row the host drew from the record, its place otherwise), and every queue option
+carries `data-choice`, 1 to 9, in both renderers. So a host can walk a page's rows with j/k across its
+blocks. The Svelte `Block` also takes `cursor` (the key of the row the host is on, drawn `data-focused`)
+and `onrowfocus(key, row)`, and exports `choose(i)`, which answers the queue question under the cursor
+with option `i`. Secondary lines (a task's due line, when a feed line happened, who asked a question) wear
+`data-calm`, so a host's stylesheet can show them on hover or focus only.
+
 The subpath ships **no stylesheet**. The markup contract is the whole of what a host draws against:
 
 > Every block is one `<figure>` carrying its kind, its primitive and its tone as data attributes, with

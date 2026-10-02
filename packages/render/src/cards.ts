@@ -135,6 +135,25 @@ export function hueOf(value: string): number | null {
 const at = (n: number): string => String(Math.round(n * 100) / 100);
 
 /**
+ * The numbers of a run as written, one token each, a blank token a gap.
+ *
+ * A HOST WRITES A RUN MORE THAN ONE WAY, and a card's `trend` cell is filled by the record rather than typed: `18 20 - 24`
+ * is the dialect's, `[18,null,24]` is an array said as JSON and `18,,24` the same array said by `String()`. Where there
+ * are spaces or semicolons between the numbers, a comma inside one groups its thousands (`1,200 3,400`) and a comma after
+ * one is the list's; where there are none, the commas are the list's, and two together are a gap and never a zero.
+ */
+function runTokens(value: string): string[] {
+  const run = value.trim().replace(/^\[(.*)\]$/su, '$1').trim();
+  if (run === '') return [];
+  if (/[\s;]/u.test(run))
+    return run
+      .split(/[\s;]+/u)
+      .map((t) => t.replace(/,$/u, ''))
+      .filter(Boolean);
+  return run.split(',').map((t) => t.trim());
+}
+
+/**
  * A run of numbers as a line in a `0 0 1000 100` box, or null when there are fewer than two.
  *
  * A TOKEN THAT IS NOT A NUMBER IS A GAP, NEVER A ZERO. The line lifts off at it and starts again
@@ -142,9 +161,9 @@ const at = (n: number): string => String(Math.round(n * 100) / 100);
  * wrote, so the accessible name reads the same numbers the shape was drawn from.
  */
 export function trendOf(value: string): { d: string; end: string; said: string[] } | null {
-  const tokens = value.trim().split(/[\s,;]+/u).filter(Boolean);
+  const tokens = runTokens(value);
   const numbers = tokens.map((t) => {
-    const n = Number(t.replace(/−/gu, '-'));
+    const n = t === '' ? Number.NaN : Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, ''));
     return Number.isFinite(n) ? n : null;
   });
   const known = numbers.filter((n): n is number => n !== null);

@@ -33,6 +33,28 @@
     border-block-start: 0;
   }
 
+  /* THE HOST'S ROW CURSOR IS THE BAND A LIST'S CURSOR ROW WEARS (`blocks.css`), so j and k land on a question the way
+     they land on a task. The card has no inline padding and the first one none above it, so the band reaches a step
+     past its edges as a spread shadow rather than padding that would move the words when the cursor arrives, and the
+     hairlines it would cross go. */
+  .queue-card[data-focused] {
+    border-block-start-color: transparent;
+    border-radius: var(--r-md);
+    background: var(--s2);
+    box-shadow: 0 0 0 var(--sp-2) var(--s2);
+  }
+
+  .queue-card[data-focused] + .queue-card {
+    border-block-start-color: transparent;
+  }
+
+  /* A tile is already a well of its own, so its cursor is the focus ring every control wears, outside the well. */
+  .queue-card.queue-tile[data-focused] {
+    box-shadow: none;
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+  }
+
   .queue-by {
     display: flex;
     gap: var(--sp-2);
@@ -146,6 +168,30 @@
   .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
     background: var(--primary-hover);
     border-color: var(--primary-hover);
+  }
+
+  /* THE NUMBER KEY THAT ANSWERS, a cap at the start of the option's pill, drawn only on the question the cursor is on
+     and only when the host can answer it. Inside the pill so it costs the shared tracks nothing. */
+  .queue-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 18px;
+    block-size: 18px;
+    margin-inline-end: var(--sp-2);
+    padding: 0 4px;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    vertical-align: 0.1em;
+  }
+
+  /* On the ink pill the cap takes the pill's own letters, so it is still read and not lost on the fill. */
+  .queue-option[data-recommended] > .queue-act:not([data-on]) > .queue-key {
+    border-color: currentColor;
+    color: inherit;
   }
 
   .queue-label {
@@ -347,6 +393,13 @@
 
   @media (pointer: coarse) {
     .queue-ways-toggle {
+      min-block-size: var(--tap);
+    }
+
+    /* THE DOOR TO THE REST IS A TARGET LIKE ANY OTHER: a line of small type is 21px tall, and a thumb needs the tap. */
+    a.queue-more {
+      display: inline-flex;
+      align-items: center;
       min-block-size: var(--tap);
     }
   }

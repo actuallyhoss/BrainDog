@@ -24,7 +24,7 @@
   2.1.4 (19 §4).
 -->
 <script lang="ts">
-  import { rowsAsCards } from '../cards.svelte.ts';
+  import { rowsAsCards } from '../rows-as-cards.svelte.ts';
   import type { Snippet } from 'svelte';
   import { TONES, hrefFor, type RenderOptions } from '../../src/index.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';

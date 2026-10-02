@@ -30,7 +30,7 @@ registerHooks({
       const { js } = compile(readFileSync(filename, 'utf8'), { generate: 'server', filename });
       return { format: 'module', source: js.code, shortCircuit: true };
     }
-    /* A runes module (`cards.svelte.ts`, which `Table` reads) is TypeScript the compiler does not
+    /* A runes module (`rows-as-cards.svelte.ts`, which `Table` reads) is TypeScript the compiler does not
        strip, so the types come off first. */
     if (url.endsWith('.svelte.ts')) {
       const filename = fileURLToPath(url);
@@ -183,6 +183,13 @@ const SHAPES: Record<string, string> = {
   'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
   'sparklines of two lengths, one with a gap': '```sparkline\nCash | 18 20 x 24 | 24\n | 1 2 | 2\n```',
   'a split with an unnamed part': '```split\nRent | 300\n | 100\n```',
+  /* A LEDGER NEWEST FIRST, its days said once over their rows (`timeline.ts`), and one whose days never repeat. */
+  'a timeline grouped by day': '```timeline\n1 Oct | Tesco | GBP −42.10\n1 Oct | Salary | GBP 3,100.00 | good\n30 Sep | Rent | GBP −1,200.00\n```',
+  'a timeline whose days do not repeat': '```timeline\n1 Oct | Tesco\n30 Sep | Rent\n```',
+  /* A CARD'S TREND FILLED BY THE RECORD, said as an array with a gap in it, beside a figure. */
+  'cards whose trend the record filled': '```cards\ntitle | figure: Done | trend: By week\nBake | 12 | [3,null,5,4]\nNook |2 | 1,,2\nQuiet | 0 | \n```',
+  /* A STAT'S FIGURE IS A HEADLINE, with no `.00` (`headlineFigure`), in a currency with a symbol and one without. */
+  'a stat whose figures are headlines': '```stat\nCash now | GBP 33,850.00 | in 3 accounts · GBP 1,200.00 out\nIn Cairo | EGP 412,300.00 | \nSpent | GBP 12.50 | \nCame in | +EGP 850.00 | \n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
 };
 
@@ -285,7 +292,8 @@ test('a figure longer than a tile holds says its longest amount, as drawn, and a
   assert.equal(figureChars('EGP 43,700.00 · £24,800.00 · USD 21,300.00'), 13);
   assert.equal(figureChars(''), null);
   assert.equal(figureChars('E£43,700.00 EGP · £24,800.00'), 15, 'the no-break space before the dot still separates two amounts');
-  const html = toHTML([page('```stat\nCash now | EGP 43,700.00 · USD 1.00\nUsers | 36\n```')]);
+  /* A stat's figure is a headline (`headlineFigure`), so the length that has to fit is the one said without `.00`. */
+  const html = toHTML([page('```stat\nCash now | EGP 1,243,700.00 · USD 1.00\nUsers | 36\n```')]);
   assert.match(html, /<span class="cell-figure num" data-fit="" style="--chars:13">/u);
   assert.match(html, /<span class="cell-figure num">36<\/span>/u);
 });
@@ -445,4 +453,76 @@ test('A STONE IS A TOGGLE NAMED FOR ITS STEP only where the host can write it, a
   for (const s of stones) assert.ok(s.includes('role="checkbox"') && s.includes('tap'), s);
   assert.match(live, /<span class="path-next">Next<\/span>/u, 'the next stone still says so in a word');
   assert.doesNotMatch(tree(render(Block, { props: { block } }).body), /<button/u);
+});
+
+/* ── stat headlines, days, card trends and the row cursor ──────────────────── */
+
+test('A STAT SAYS ITS FIGURE AS A HEADLINE in both renderers: £33,850 and EGP 412,300, and a fraction that is not zero stays', () => {
+  const block = page(SHAPES['a stat whose figures are headlines']!);
+  for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
+    const figures = [...drawn.matchAll(/<span class="cell-figure num"[^>]*>([\s\S]*?)<\/span>(?=<svg|<span class="cell-note")/gu)].map((m) =>
+      m[1]!.replace(/<[^>]+>/gu, '').replace(/\s+/gu, ' ').trim(),
+    );
+    assert.deepEqual(figures, ['£33,850', 'EGP 412,300', '£12.50', '+EGP 850'], 'a sign written before a code stays in both');
+    assert.match(drawn, /in 3 accounts · £1,200 out/u, 'the note under a figure is a headline too');
+  }
+});
+
+test('A TIMELINE SAYS EACH DAY ONCE where days repeat, and leaves a timeline of distinct days as it was', () => {
+  const grouped = toHTML([page(SHAPES['a timeline grouped by day']!)]);
+  assert.deepEqual([...grouped.matchAll(/<li class="item-day num">([^<]*)<\/li>/gu)].map((m) => m[1]), ['1 Oct', '30 Sep']);
+  assert.match(grouped, /<ul class="list" data-kind="timeline" data-days="">/u);
+  assert.equal((grouped.match(/<span class="item-marker num"><\/span>/gu) ?? []).length, 3, 'each row leaves its own date blank');
+  const plain = toHTML([page(SHAPES['a timeline whose days do not repeat']!)]);
+  assert.doesNotMatch(plain, /item-day|data-days/u);
+  assert.match(plain, /<span class="item-marker num">1 Oct<\/span>/u);
+});
+
+test('A CARD DRAWS A SMALL LINE FROM A TREND THE RECORD FILLED, named by its numbers, with the gap said as a gap', () => {
+  const block = page(SHAPES['cards whose trend the record filled']!);
+  for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
+    const names = [...drawn.matchAll(/<svg aria-label="([^"]*)" class="cards-trend"/gu)].map((m) => m[1]);
+    assert.deepEqual(names, ['By week: 3, no value, 5, 4', 'By week: 1, no value, 2'], 'an empty trend draws no line');
+  }
+});
+
+test('EVERY ROW CARRIES ITS KEY, and only the host\'s cursor marks one: the record\'s own key where it has one', () => {
+  const block = page('```todo\n[ ] Check the export\n[ ] Send the quote\n```');
+  block.rows[1] = { ...block.rows[1]!, ref: { register: 'tasks', seq: 12, version: 3 } };
+  const bare = render(Block, { props: { block } }).body;
+  assert.deepEqual([...bare.matchAll(/data-row="([^"]*)"/gu)].map((m) => m[1]), ['0', 'tasks#12']);
+  assert.doesNotMatch(bare, /data-focused/u, 'with no cursor, nothing on the screen changes');
+  const Walked = Block as unknown as Component<{ block: BlockSegment; cursor: string }>;
+  const walked = render(Walked, { props: { block, cursor: 'tasks#12' } }).body;
+  assert.match(walked, /<li class="item"[^>]*data-row="tasks#12"[^>]*data-focused=""/u);
+  assert.equal((walked.match(/data-focused/gu) ?? []).length, 1);
+});
+
+test('A FEED LINE AND A QUEUE QUESTION CARRY THEIR KEYS TOO, and each option says the number key that answers it', () => {
+  const queue = page(SHAPES['a queue of two questions, one recommended, with more waiting']!);
+  const html = toHTML([queue]);
+  assert.deepEqual([...html.matchAll(/<article [^>]*data-row="([^"]*)"/gu)].map((m) => m[1]), ['0', '3']);
+  assert.deepEqual([...html.matchAll(/data-choice="(\d)"/gu)].map((m) => m[1]), ['1', '2', '1', '2']);
+  const feed = toHTML([page(SHAPES['a feed with bursts, a mark and a tone']!)]);
+  assert.deepEqual([...feed.matchAll(/<li class="feed-row"[^>]*data-row="([^"]*)"/gu)].map((m) => m[1]), ['0', '3', '1', '4'], 'grouped by who, each line keeping its own place');
+});
+
+test('THE KEY CAP IS DRAWN ON THE CURSOR\'S QUESTION ALONE, where the host can answer, and never in the mirror', () => {
+  const block = page(SHAPES['a queue of two questions, one recommended, with more waiting']!);
+  const Hosted = Block as unknown as Component<{ block: BlockSegment; cursor?: string; onact?: () => void }>;
+  const keyed = render(Hosted, { props: { block, cursor: '3', onact: () => {} } }).body;
+  const cards = keyed.split('<article').slice(1);
+  assert.equal((cards[0]!.match(/class="queue-key"/gu) ?? []).length, 0);
+  assert.deepEqual([...cards[1]!.matchAll(/<kbd class="queue-key" aria-hidden="true">(\d)<\/kbd>/gu)].map((m) => m[1]), ['1', '2']);
+  assert.match(cards[1]!, /data-focused=""/u);
+  assert.doesNotMatch(render(Hosted, { props: { block, cursor: '3' } }).body, /queue-key/u, 'no cap for a key that does nothing');
+  assert.doesNotMatch(toHTML([block]), /queue-key/u);
+});
+
+test('SECONDARY LINES ARE MARKED CALM in both renderers: a task\'s due line, when a feed line happened, who asked a question', () => {
+  for (const name of ['a todo whose rows carry a due day and who changed them', 'a feed with bursts, a mark and a tone', 'a queue of two questions, one recommended, with more waiting']) {
+    const block = page(SHAPES[name]!);
+    assert.match(toHTML([block]), /data-calm=""/u, name);
+    assert.match(render(Block, { props: { block } }).body, /data-calm=""/u, name);
+  }
 });

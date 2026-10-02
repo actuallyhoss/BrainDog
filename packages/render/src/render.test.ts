@@ -1075,6 +1075,21 @@ test('A TREND THAT MISSES A VALUE HAS A GAP THERE, NEVER A DIP TO ZERO', () => {
   assert.equal(trendOf('3 3 3')?.d, 'M0 50 L500 50 L1000 50', 'a flat run is drawn in the middle, not on the floor');
 });
 
+test('A TREND THE RECORD FILLED READS THE SAME AS ONE TYPED, however the run was said, and a gap stays a gap', () => {
+  const typed = trendOf('18 20 - 24');
+  for (const said of ['[18,null,24]', '18,,24', '[18, null, 24]']) {
+    const t = trendOf(said);
+    assert.deepEqual(t?.said, ['18', 'no value', '24'], said);
+    assert.equal(t?.d, 'M0 90 M1000 10', `${said}: two points either side of a gap, never a line through zero`);
+  }
+  assert.deepEqual(trendOf('[18,20,null,24]')?.d, typed?.d, 'an array draws the line the dialect draws');
+  assert.deepEqual(trendOf('1,200 3,400 2,100')?.said, ['1,200', '3,400', '2,100'], 'a comma between spaced numbers groups thousands');
+  assert.equal(trendOf('1,200 3,400')?.d, 'M0 90 L1000 10');
+  assert.deepEqual(trendOf('3, 5, 2')?.said, ['3', '5', '2']);
+  assert.equal(trendOf('[]'), null);
+  assert.equal(trendOf('[7]'), null);
+});
+
 test('a ring is a proportion or nothing: 3/5 and 60% draw an arc, a word keeps its words', () => {
   assert.equal(ringOf('3/5'), 0.6);
   assert.equal(ringOf('60%'), 0.6);
@@ -1166,18 +1181,18 @@ test('THE FEED KEEPS A MACHINE’S WORK APART FROM THE PERSON’S, and a burst i
   assert.deepEqual(groups, ['agent', 'rule', 'you'], 'agents, then rules, then you');
   assert.match(
     html,
-    /<li class="feed-row" data-new><span class="feed-count num">14<\/span><span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Claude<\/span> saves on <a href="\/r\/things\/4">Variable axis QA<\/a><\/span><span class="feed-when">3h ago<\/span><\/li>/u,
+    /<li class="feed-row" data-new data-row="\d+"><span class="feed-count num">14<\/span><span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Claude<\/span> saves on <a href="\/r\/things\/4">Variable axis QA<\/a><\/span><span class="feed-when" data-calm="">3h ago<\/span><\/li>/u,
   );
   assert.match(html, /<span class="feed-count num"><\/span>/u, 'a row with no count has a gap there, not a zero');
-  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new><span class="feed-count num">2<\/span><span class="feed-face" aria-hidden="true">L<\/span>/u);
+  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new data-row="\d+"><span class="feed-count num">2<\/span><span class="feed-face" aria-hidden="true">L<\/span>/u);
   assert.doesNotMatch(html, /style=/u);
 });
 
 test('new is said in words as well as in the accent: the head counts it, and a line says where the read rows begin', () => {
   const html = toHTML(onPage(FEED));
   assert.match(html, /<h3 class="feed-head">Agents<span class="feed-new num">14 new<\/span><\/h3>/u, 'a burst of fourteen is fourteen new things');
-  assert.match(html, /<li class="feed-seen">Before you last looked<\/li><li class="feed-row" data-intent="bad">/u);
-  assert.match(html, /<h3 class="feed-head">You<span class="feed-tally num">1<\/span><\/h3>/u, 'nothing new is a plain count');
+  assert.match(html, /<li class="feed-seen">Before you last looked<\/li><li class="feed-row" data-intent="bad" data-row="\d+">/u);
+  assert.match(html, /<h3 class="feed-head">You<span class="feed-tally num" data-calm="">1<\/span><\/h3>/u, 'nothing new is a plain count');
   assert.equal(html.match(/feed-seen/gu)?.length, 1, 'a group with nothing read, or nothing new, has no line');
 });
 
@@ -1204,7 +1219,7 @@ test('an empty feed says one of two things: nothing new, or no mark yet', () => 
 test('with no mark, nothing is new, and the rows are still drawn', () => {
   const html = toHTML(onPage('```feed\nagent | Claude | 3 | saves | 1h ago\nseen |\n```'));
   assert.doesNotMatch(html, /data-new|feed-new|feed-seen/u);
-  assert.match(html, /Agents<span class="feed-tally num">3<\/span>/u);
+  assert.match(html, /Agents<span class="feed-tally num" data-calm="">3<\/span>/u);
 });
 
 test('A LINE DIFF PAIRS WHAT IT CAN, and a changed line reads as the old one, then the new one', () => {

@@ -11,9 +11,29 @@
   import { FEED_EARLIER, MISSING, TONES, counted, feedNew, feedPlan, initialOf, inline, markOf, text, type Block, type RenderOptions } from '../src/index.ts';
   import { RUN_OPEN, runFaceOf, type RunFace } from '../src/cards.ts';
   import { hrefFor } from '../src/html.ts';
+  import { rowAt, rowKey } from '../src/cursor.ts';
+  import type { Row } from '../src/parse.ts';
   import Text from './Text.svelte';
 
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
+  let {
+    block,
+    opts = {},
+    cursor,
+    onrowfocus,
+  }: {
+    block: Block;
+    opts?: RenderOptions;
+    /** The key of the line the host's cursor is on (`rowKey`), drawn `data-focused`. */
+    cursor?: string | null | undefined;
+    /** Where the host hears that focus moved into a line, with its key and row. */
+    onrowfocus?: ((key: string, row: Row) => void) | undefined;
+  } = $props();
+
+  function focused(e: FocusEvent) {
+    const key = (e.target as Element | null)?.closest?.('[data-row]')?.getAttribute('data-row');
+    const row = key == null ? undefined : rowAt(block.rows, key);
+    if (key != null && row) onrowfocus?.(key, row);
+  }
 
   const plan = $derived(feedPlan(block.rows));
   const said = (v: string | undefined): string => text(inline(v ?? '', opts));
@@ -54,18 +74,19 @@
 {#if plan.groups.length === 0}
   <p class="feed-empty">{plan.empty}</p>
 {:else}
-  <div class="feed">
+  <div class="feed" onfocusin={onrowfocus ? focused : undefined}>
     {#each plan.groups as g}
       <div class="feed-group" data-by={g.by}>
-        <h3 class="feed-head">{g.label}{#if g.fresh > 0}<span class="feed-new num">{feedNew(g.fresh)}</span>{:else}<span class="feed-tally num">{g.total}</span>{/if}</h3>
+        <h3 class="feed-head">{g.label}{#if g.fresh > 0}<span class="feed-new num">{feedNew(g.fresh)}</span>{:else}<span class="feed-tally num" data-calm="">{g.total}</span>{/if}</h3>
         <ul class="feed-rows">
           {#each g.rows as { row, fresh }, i}
             {@const who = row.cells[1] ?? ''}
             {@const run = runFaceOf(who, null, false)}
             <!-- A rule is a square mark and an agent or a person a round face: told apart by shape. -->
             {@const face = g.by === 'rule' ? markOf(said(who)) : initialOf(said(who))}
+            {@const key = rowKey(row, block.rows.indexOf(row))}
             {#if i === g.earlier}<li class="feed-seen">{FEED_EARLIER}</li>{/if}
-            <li class="feed-row" data-new={fresh ? '' : undefined} data-intent={row.tone}>
+            <li class="feed-row" data-new={fresh ? '' : undefined} data-intent={row.tone} data-row={key} data-focused={cursor === key ? '' : undefined}>
               <span class="feed-count num">{#if counted(said(row.cells[2]))}<Text nodes={nodes(row.cells[2])} {opts} />{/if}</span>
               {#if run}{@render runFace(run)}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
               <span class="feed-what"
@@ -74,7 +95,7 @@
                   {opts}
                 />{#if row.tone}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
               >
-              <span class="feed-when"><Text nodes={nodes(row.cells[4])} {opts} /></span>
+              <span class="feed-when" data-calm=""><Text nodes={nodes(row.cells[4])} {opts} /></span>
             </li>
           {/each}
         </ul>

@@ -18,6 +18,9 @@ import * as path from './path.ts';
 import * as progress from './progress.ts';
 import * as queue from './queue.ts';
 import * as cards from './cards.ts';
+import * as format from './format.ts';
+import * as cursor from './cursor.ts';
+import * as timeline from './timeline.ts';
 
 const exported = root as Record<string, unknown>;
 
@@ -44,6 +47,14 @@ test('THE NEW NAMES IN THE OLDER MODULES ARE ON THE ROOT', () => {
     ['queueSuggested', queue],
     ['queueWays', queue],
     ['CARDS_NEXT', cards],
+    /* A headline figure is how the app's page line says money (`£33,850`), so the host reads it from the root. */
+    ['headlineFigure', format],
+    ['headlineMoney', format],
+    ['rowKey', cursor],
+    ['rowAt', cursor],
+    ['choiceOf', cursor],
+    ['CHOICE_KEYS', cursor],
+    ['timelineDays', timeline],
   ];
   for (const [name, mod] of wanted) {
     assert.ok(name in mod, `${name} is no longer exported by its module; this list is stale`);

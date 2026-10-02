@@ -25,7 +25,7 @@ import { SPARKLINE_POINT, TONES, type KindSpec } from './kinds.ts';
 import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
-import { MISSING, barFigure, day, figureChars, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
+import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
 import { QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -34,6 +34,8 @@ import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, todoMeta as metaCells } from './todo.ts';
+import { timelineDays } from './timeline.ts';
+import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
@@ -231,7 +233,7 @@ const cell = (name: string, value: string | undefined, opts: RenderOptions, extr
  */
 const todoMeta = (cells: readonly string[], opts: RenderOptions): string => {
   const parts = metaCells(cells);
-  return parts.length ? `<span class="item-meta">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>` : '';
+  return parts.length ? `<span class="item-meta" data-calm="">${parts.map((c) => renderInline(inline(c, opts), opts)).join(TODO_META_JOIN)}</span>` : '';
 };
 
 /** The dot itself, said the same way `Table`, `Grid` and `List` say it. */
@@ -335,11 +337,12 @@ function grid(b: Block, o: RenderOptions): string {
   const body = b.rows
     .map(
       (r) =>
-        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1])}>${
+        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1]))}>${
           /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
-             code at full size, and the two trees differed on every stat with an amount in it. */
-          r.cells[1] ? amount(r.cells[1], o) : MISSING
-        }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2]), o)}${toneGlyph(r.tone)}</div>`,
+             code at full size, and the two trees differed on every stat with an amount in it. A stat's
+             figure is a headline, so it is said the way `headlineFigure` says one: `£33,850`, not `£33,850.00`. */
+          r.cells[1] ? amount(headlineFigure(r.cells[1]), o) : MISSING
+        }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2], true), o)}${toneGlyph(r.tone)}</div>`,
     )
     .join('');
   return `<div class="grid" style="--cells:${b.rows.length}">${body}</div>`;
@@ -459,20 +462,30 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'calendar') return calendar(b, o);
   if (b.kind === 'link') return links(b, o);
   const tag = kindSpec(b.kind, o.kinds)?.ordered ? 'ol' : 'ul';
+  const days = b.kind === 'timeline' ? timelineDays(b.rows) : [];
+  const grouped = days.some((d) => d !== null);
   const body = b.rows
-    .map((r) => {
+    .map((r, i) => {
+      /* EVERY ROW CARRIES ITS KEY (`cursor.ts`), so a host walks a page's rows with one query across its blocks. */
+      const key = ` data-row="${escape(rowKey(r, i))}"`;
       if (b.kind === 'todo')
-        return `<li class="item"><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${todoMeta(r.cells, o)}</li>`;
-      if (b.kind === 'timeline')
+        return `<li class="item"${key}><span class="item-marker" data-done="${r.done ? 'yes' : 'no'}" role="img" aria-label="${r.done ? 'done' : 'not done'}">${r.done ? '✓' : ''}</span>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${todoMeta(r.cells, o)}</li>`;
+      if (b.kind === 'timeline') {
+        /* A GROUPED TIMELINE SAYS EACH DAY ONCE, over its rows, and the rows under it leave their own date blank
+           (`timeline.ts`). The heading is an item of the list, so the list stays a list of its children. */
+        const day = days[i] ?? null;
+        const head = day === null ? '' : `<li class="item-day num">${renderInline(inline(day, o), o)}</li>`;
         /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
            from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the
            detail instead, so the two renderers differed on every timeline row that carried a tone, and
            no shape here was a timeline with one. */
-        return `<li class="item"${toneAttrs(r.tone)}>${cell('item-marker num', r.cells[0], o)}${cell('item-title', r.cells[1], o, '', toneGlyph(r.tone))}${cell('item-detail', r.cells[2], o)}</li>`;
-      return `<li class="item">${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
+        const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', r.cells[0], o);
+        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', r.cells[1], o, '', toneGlyph(r.tone))}${cell('item-detail', r.cells[2], o)}</li>`;
+      }
+      return `<li class="item"${key}>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
     .join('');
-  return `<${tag} class="list" data-kind="${b.kind}">${body}</${tag}>`;
+  return `<${tag} class="list" data-kind="${b.kind}"${grouped ? ' data-days=""' : ''}>${body}</${tag}>`;
 }
 
 /**
@@ -886,17 +899,17 @@ function feed(b: Block, o: RenderOptions): string {
   const body = plan.groups
     .map((g) => {
       const head =
-        g.fresh > 0 ? `<span class="feed-new num">${escape(feedNew(g.fresh))}</span>` : `<span class="feed-tally num">${g.total}</span>`;
+        g.fresh > 0 ? `<span class="feed-new num">${escape(feedNew(g.fresh))}</span>` : `<span class="feed-tally num" data-calm="">${g.total}</span>`;
       const rows = g.rows
         .map(({ row: r, fresh }, i) => {
           const who = r.cells[1] ?? '';
           const face = g.by === 'rule' ? markOf(said(who)) : initialOf(said(who));
           const line = i === g.earlier ? `<li class="feed-seen">${escape(FEED_EARLIER)}</li>` : '';
-          return `${line}<li class="feed-row"${fresh ? ' data-new' : ''}${toneAttrs(r.tone)}><span class="feed-count num">${
+          return `${line}<li class="feed-row"${fresh ? ' data-new' : ''}${toneAttrs(r.tone)} data-row="${escape(rowKey(r, b.rows.indexOf(r)))}"><span class="feed-count num">${
             counted(said(r.cells[2])) ? drawn(r.cells[2]) : ''
           }</span><span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span><span class="feed-what"><span class="feed-who">${
             who ? drawn(who) : MISSING
-          }</span> ${drawn(r.cells[3])}${toneGlyph(r.tone)}</span><span class="feed-when">${drawn(r.cells[4])}</span></li>`;
+          }</span> ${drawn(r.cells[3])}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
         })
         .join('');
       return `<div class="feed-group" data-by="${g.by}"><h3 class="feed-head">${escape(g.label)}${head}</h3><ul class="feed-rows">${rows}</ul></div>`;
@@ -919,29 +932,32 @@ function queue(b: Block, o: RenderOptions): string {
   const tiles = b.form === 'tiles';
   const body = plan.items
     .map((item) => {
+      /* `data-choice` IS THE NUMBER KEY THAT ANSWERS WITH AN OPTION, 1 to 9 (`cursor.ts`), so a host can press it. */
       const options = item.options
         .map(
-          (opt) =>
-            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}>${visual(opt.shows, o)}<span class="queue-label">${escape(opt.label)}</span>${
+          (opt, n) =>
+            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}${n < CHOICE_KEYS ? ` data-choice="${n + 1}"` : ''}>${visual(opt.shows, o)}<span class="queue-label">${escape(opt.label)}</span>${
               opt.recommended ? `<span class="queue-rec">${escape(QUEUE_RECOMMENDED)}</span>` : ''
-            }${opt.because ? `<span class="queue-because">${drawn(opt.because)}</span>` : ''}</li>`,
+            }${opt.because ? `<span class="queue-because" data-calm="">${drawn(opt.because)}</span>` : ''}</li>`,
         )
         .join('');
+      const key = ` data-row="${escape(rowKey(item.row, b.rows.indexOf(item.row)))}"`;
       /* THE BAND IS A LABEL AND NOT AN ARGUMENT. It sits last on the by-line, in the same register as
          who asked and when, because it is the answer to "why is this card here" and not the card's
          content. `data-cost` carries the band's own word so a stylesheet can weight the dearest one
          without matching on English. */
       const cost = item.costLabel ? `<span class="queue-cost" data-cost="${escape(item.cost)}">${escape(item.costLabel)}</span>` : '';
-      const by = `<p class="queue-by"><span class="queue-who">${drawn(item.who)}</span><span class="queue-when">${drawn(item.when)}</span>${cost}</p>`;
+      /* WHO ASKED AND WHEN ARE THE CARD'S SECONDARY LINE, shown on hover or focus (`data-calm`); what it costs stays. */
+      const by = `<p class="queue-by"><span class="queue-who" data-calm="">${drawn(item.who)}</span><span class="queue-when" data-calm="">${drawn(item.when)}</span>${cost}</p>`;
       const question = `<h3 class="queue-question">${drawn(item.question)}</h3>`;
       const why = item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : '';
-      if (!tiles) return `<article class="queue-card"${toneAttrs(item.row.tone)}>${by}${question}${why}<ul class="queue-options">${options}</ul></article>`;
+      if (!tiles) return `<article class="queue-card"${toneAttrs(item.row.tone)}${key}>${by}${question}${why}<ul class="queue-options">${options}</ul></article>`;
       /* A TILE IS THE SAME CARD LED BY WHAT ITS RECOMMENDED OPTION IS, its ways to answer folded under it. The fold is a
          `details`, so it opens with no script in the mirror and in the app alike, and it starts shut: a tile that
          arrived showing one option picked out and the rest hidden would be the recommendation standing in for the
          choice. The recommendation is still a line of words, never a selection. */
       const suggested = item.options.find((opt) => opt.recommended);
-      return `<article class="queue-card queue-tile"${toneAttrs(item.row.tone)}>${suggested ? visual(suggested.shows, o) : ''}${by}${question}${
+      return `<article class="queue-card queue-tile"${toneAttrs(item.row.tone)}${key}>${suggested ? visual(suggested.shows, o) : ''}${by}${question}${
         suggested ? `<p class="queue-suggested">${escape(queueSuggested(suggested.label))}</p>` : ''
       }${why}<details class="queue-ways"><summary class="queue-ways-toggle">${escape(queueWays(item.options.length))}</summary><ul class="queue-options">${options}</ul></details></article>`;
     })
