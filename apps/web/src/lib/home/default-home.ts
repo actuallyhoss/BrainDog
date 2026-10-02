@@ -50,6 +50,9 @@ const HOUSE: HomeVoice = {
   nothingDue: words.nothingDue,
 };
 
+/** Today's lead note as `todayHome` declares it: words with no figure in them, which the rules never rewrite. */
+export const TODAY_LEAD = words.nothingNow;
+
 /** How far ahead "Coming up" looks, in days. */
 export const COMING_UP_DAYS = 14;
 
@@ -153,7 +156,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
     blocks: [
       /* THE PAGE'S LINE. Its words are the calm one; Home says the line worked out from the blocks over it (`homeDrawn`),
          and a record's own `home` page that writes its own line keeps it. */
-      { kind: 'note', lead: true, body: words.nothingNow },
+      { kind: 'note', lead: true, body: TODAY_LEAD },
       /* THE LINE A TASK IS TYPED INTO, with the light syntax ("tomorrow !urgent #Kiln") the page reader reads. */
       ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: words.addTask, icon: 'plus', register: TASKS } as PageBlock] : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
@@ -286,7 +289,23 @@ export type HomeDrawn = {
   lead: string | null;
   /** The line worked out from what is drawn, or `null` on a page that holds nothing it can be counted from. */
   sentence: Sentence | null;
+  /**
+   * The model's line for Home as the record sent it on the page's lead note (`said`, from Slash's `headline.home`) when
+   * the block still carries it, unread: `homeLineOf` (`home-line.ts`) judges it. `undefined` when the block does not.
+   */
+  slash: unknown;
 };
+
+/**
+ * THE MODEL'S LINE ON TODAY'S BODY, or `undefined`. The record sends Home's line on Today's lead note as `said`, only
+ * when Slash wrote it today from the reading Today holds now (`homeLineFor` in the record), and the page reader draws it
+ * as the note's words (`blockOf`). Today's lead is always `TODAY_LEAD`, so on Today's own body (`today`) a lead that
+ * reads anything else is Slash's. A page the record declares writes its own lead, so there it is never taken for one.
+ */
+export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
+  if (drawn.slash !== undefined) return drawn.slash;
+  return today && drawn.lead !== null && drawn.lead !== TODAY_LEAD ? drawn.lead : undefined;
+}
 
 /**
  * THE BLOCKS AS HOME DRAWS THEM, whichever page they came from.
@@ -313,6 +332,7 @@ export type HomeDrawn = {
 export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE): HomeDrawn {
   const today = dayOf(now);
   let lead: string | null = null;
+  let slash: unknown;
   const drawn = new Set<string>();
   const shaped: LiveBlock[] = [];
   /* WHERE EACH LATE PART OF WHAT FALLS DUE LANDED, which may join the late tasks before it. */
@@ -324,6 +344,7 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
       continue;
     }
     if (shaped.length === 0 && b.kind === 'note' && b.lead === true) {
+      slash = (b as { said?: unknown }).said;
       const said = typeof b.body === 'string' ? b.body.trim() : '';
       if (said !== '' && !said.includes('{{')) {
         lead = said;
@@ -358,7 +379,7 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
   /* AND THEN THE READER'S OWN RULE, so a section over nothing goes with its blocks here as it does on the page. */
   const out = emptyHidden(shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b)));
   for (const at of lateAt) lateTile(out, at, today, voice);
-  return { blocks: out, lead, sentence: sentenceFrom(shaped, today) };
+  return { blocks: out, lead, sentence: sentenceFrom(shaped, today), slash };
 }
 
 /** Whether a drawn block is a list of tasks whose every row was due today or before. */

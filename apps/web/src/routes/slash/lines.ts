@@ -1,6 +1,7 @@
 /**
  * What `/slash` says in figures and sentences: the line under the title, whose red phrase is the
- * suggestions waiting for him on Decide, and the "Suggestions" tile's figure, bar and reading line.
+ * suggestions waiting for him on Decide, the one list and who drafted each line of it, the "Suggestions" tile's figure,
+ * bar and reading line, and the quiet fold that holds the rest.
  *
  * EVERY NUMBER IS ONE `readSlash` ANSWERED. The tile counts `suggestionsOf(reading)` by where each stands and nothing
  * else, and the cap is the record's own `cap`, so no figure here is a guess.
@@ -8,7 +9,7 @@
  * PURE, SO `node --test` CAN IMPORT IT.
  */
 
-import type { Suggestion } from '../../lib/record/slash.ts';
+import { suggestionsOf, words as slashWords, type Reading, type Suggestion } from '../../lib/record/slash.ts';
 
 export const words = {
   /* The groups this screen adds to `slash.ts`'s. */
@@ -25,9 +26,21 @@ export const words = {
   partAnswered: 'Answered',
   /* The answer, in the Ask tile. */
   asked: 'You asked',
-  rowsRead: (n: number) => (n === 1 ? '1 row' : `${n.toLocaleString('en')} rows`),
+  /* How many it read, said without the system's word for them. */
+  rowsRead: (n: number) => (n === 1 ? 'one found' : `${n.toLocaleString('en')} found`),
   /* The hint under "What Slash suggests". */
   press: 'Put these on Decide and each waits there for your yes. Nothing changes until then.',
+  /* Who drafted a suggestion: Slash's own rules, or the model it names. */
+  byRules: 'From how you use BrainDog',
+  byModel: (name: string) => `Drafted by ${name}`,
+  /* The one fold under the list. */
+  more: 'More from Slash',
+  foldTally: 'where each suggestion stands',
+  foldNoticed: 'what Slash noticed',
+  foldAnswered: 'what you answered',
+  foldLately: 'what you asked lately',
+  foldDaily: 'the daily look',
+  foldDescribe: 'describing what you want',
 } as const;
 
 /** The title row's sentence, and the phrase inside it that needs him. */
@@ -78,4 +91,80 @@ export function tallyOf(suggestions: readonly Suggestion[], onDecide: number, ca
   const head = listed(clauses);
   const full = fresh > 0 && cap > 0 && onDecide >= cap ? ` Slash keeps at most ${cap} on Decide at once, so the new ones wait their turn.` : '';
   return { total: suggestions.length, parts, reading: `${head.charAt(0).toUpperCase()}${head.slice(1)}.${full}` };
+}
+
+/**
+ * WHO DRAFTED IT, as the line under a suggestion says it: "rules" is Slash's own reading of how this BrainDog is used,
+ * and anything else is the model the record names. `null` where nobody said, and then the line claims nobody: a rule's
+ * draft is never handed a model's name to sound clever, and a model's is never passed off as the rules'.
+ */
+export function byLine(by: string | null | undefined): string | null {
+  const name = by?.trim() ?? '';
+  if (name === '') return null;
+  return name === 'rules' ? words.byRules : words.byModel(name);
+}
+
+/** A suggestion and who drafted it (`byLine`'s input), or `null` where the record does not say. */
+export type Drafted = Suggestion & { by: string | null };
+
+const decideHref = (id: string): string => `/decide/${encodeURIComponent(id)}`;
+const idOf = (href: string | null): string | null => (href === null ? null : decodeURIComponent(href.slice('/decide/'.length)));
+
+/**
+ * EVERY SUGGESTION SLASH HAS MADE, with who drafted it: waiting on Decide first, since that is what needs him, then the
+ * new ones, then what he answered.
+ *
+ * WHO DRAFTED, MOST CERTAIN FIRST. The last press's `filed` names the drafter of each question it put on Decide, by id.
+ * Then the draft's own `by`, where the record sends one. Then the rules: the `slash` read asks no model, and every draft it
+ * hands back is `slashReading`'s, which only Slash's own rules write (`noticeUsage` and `catalogueDrafts` in
+ * `packages/record/src/slash.ts`, each `by: 'rules'`); the model's drafts reach Decide by a press and never come back in
+ * the reading.
+ *
+ * WHAT WAITS ON DECIDE THAT NO DRAFT MATCHES is listed too, from the record's own `waiting`: a question the model filed,
+ * or one whose draft has since changed. It waits on him all the same. Who drafted it is said only when the last press
+ * filed it, because the record keeps no note of it.
+ */
+export function suggestedOf(reading: Reading, filed: readonly { id: string; by: string }[] = []): Drafted[] {
+  const filedBy = new Map(filed.map((f) => [f.id, f.by]));
+  const byId = new Map<string, string | undefined>();
+  const byQuestion = new Map<string, string | undefined>();
+  for (const d of reading.drafts) {
+    const own = (d as { by?: unknown }).by;
+    const by = typeof own === 'string' && own.trim() !== '' ? own : 'rules';
+    if (d.asked) byId.set(d.asked.id, by);
+    else byQuestion.set(d.question, by);
+  }
+  const out: Drafted[] = suggestionsOf(reading).map((s) => {
+    const id = idOf(s.href);
+    const by = id === null ? byQuestion.get(s.question) : (filedBy.get(id) ?? byId.get(id));
+    return { ...s, by: by ?? 'rules' };
+  });
+  const listed = new Set(out.map((s) => s.href));
+  for (const w of reading.waiting) {
+    const href = decideHref(w.id);
+    if (!listed.has(href)) out.push({ question: w.question, state: 'waiting', href, said: slashWords.waiting, by: filedBy.get(w.id) ?? null });
+  }
+  const rank = { waiting: 0, new: 1, answered: 2 } as const;
+  return out.sort((a, b) => rank[a.state] - rank[b.state]);
+}
+
+/** What the fold under the list holds, each `true` only where this record has it to draw. */
+export type Folded = { tally: boolean; noticed: boolean; answered: boolean; lately: boolean; daily: boolean; describe: boolean };
+
+/**
+ * THE FOLD'S ONE LINE: what is inside, named, so a press is never a guess. Only what this record has is named, and with
+ * nothing to hold there is no fold at all (`null`).
+ */
+export function foldOf(has: Folded): string | null {
+  const parts = [
+    ...(has.noticed ? [words.foldNoticed] : []),
+    ...(has.answered ? [words.foldAnswered] : []),
+    ...(has.lately ? [words.foldLately] : []),
+    ...(has.tally ? [words.foldTally] : []),
+    ...(has.daily ? [words.foldDaily] : []),
+    ...(has.describe ? [words.foldDescribe] : []),
+  ];
+  if (parts.length === 0) return null;
+  const line = listed(parts);
+  return `${line.charAt(0).toUpperCase()}${line.slice(1)}`;
 }

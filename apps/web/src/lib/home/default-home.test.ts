@@ -7,7 +7,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, homeDrawn, railed, todayHome } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, homeDrawn, railed, slashLineOf, todayHome } from './default-home.ts';
+import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 
 const NOW = Date.parse('2026-10-02T09:00:00');
@@ -184,4 +185,37 @@ test('LATE IS ONE TILE: the late money joins the late tasks before it, under the
     ['Late', false, [4, 5]],
     ['Late', false, [2]],
   ]);
+});
+
+test('THE HEAD SAYS SLASH`S LINE WHEN THE RECORD SENT ONE, red only where it says the rules` phrase, and the rules` line otherwise', () => {
+  const tasks = block({ kind: 'todo', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }, { by: '2026-10-02' }], [4, 5]);
+  /* THE RECORD SENDS HOME'S LINE AS `said` ON TODAY'S LEAD NOTE, and the page reader draws it as the note's words. */
+  const page = (said?: string, extra: Partial<LiveBlock> = {}) => homeDrawn([block({ kind: 'note', lead: true, body: said ?? TODAY_LEAD, ...extra }), tasks], NOW);
+  const head = (said?: string, today = true) => {
+    const out = page(said);
+    return homeLineOf(out.sentence!, slashLineOf(out, today), NOW);
+  };
+  const rules = { text: 'Two things need you, and one is 2 days late.', needs: '2 days late', by: 'rules' };
+
+  /* NO LINE FROM THE RECORD: the rules' line and its red phrase, exactly as before. */
+  assert.equal(slashLineOf(page(), true), undefined);
+  assert.deepEqual(head(), rules);
+  /* SLASH'S LINE IS SAID, its red phrase the rules' own words in it, a count in digits or spelled. */
+  assert.deepEqual(head('The Kiln invoice is two days late; 2 things need you.'), {
+    text: 'The Kiln invoice is two days late; 2 things need you.',
+    needs: 'two days late',
+    by: 'slash',
+  });
+  /* WORDED ITS OWN WAY, it is drawn in ink throughout: no red the rules did not choose. */
+  assert.deepEqual(head('The Kiln invoice is overdue.'), { text: 'The Kiln invoice is overdue.', needs: '', by: 'slash' });
+  /* A PAGE THE RECORD DECLARES WRITES ITS OWN LEAD, which is never taken for Slash's line on Home. */
+  assert.deepEqual(head('Bake opens at nine.', false), rules);
+  /* A BLOCK THAT STILL CARRIES THE RECORD'S `said` IS READ FROM IT, and a dated line only on its day. */
+  assert.equal(slashLineOf(page(undefined, { said: 'Kiln first.' } as Partial<LiveBlock>), false), 'Kiln first.');
+  const dated = (day: string) => homeLineOf(page().sentence!, slashLineOf(page(undefined, { said: { text: 'Kiln first.', day, basis: 'b' } } as Partial<LiveBlock>), true), NOW);
+  assert.equal(dated(recordDay(NOW)).by, 'slash');
+  assert.deepEqual(dated('2026-09-01'), rules);
+  /* THE BLOCKS DRAWN ARE THE SAME WITH A LINE AS WITHOUT ONE. */
+  const shape = (o: ReturnType<typeof homeDrawn>) => o.blocks.map((b) => [b.kind, b.drawn, b.entries.length]);
+  assert.deepEqual(shape(page('Kiln first.')), shape(page()));
 });

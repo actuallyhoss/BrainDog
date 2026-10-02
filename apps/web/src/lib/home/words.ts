@@ -34,6 +34,9 @@ export const words = {
   nothingUrgent: 'Nothing is marked urgent.',
   noneWorking: 'No agent is working.',
 
+  /* WHO SAID THE LINE UNDER THE TITLE, when the model did (`home-line.ts`): shown on hover or focus, never at rest. */
+  byline: 'Slash · today',
+
   /* A RECORD WITH LISTS AND NOTHING PINNED, WAITING OR DUE: one calm sentence and one line on what fills the page. */
   nothingNow: 'Nothing needs you right now.',
   fillsWith: 'Questions waiting on you, what falls due and what changed while you were away show up here as your lists fill.',

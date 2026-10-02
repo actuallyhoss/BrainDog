@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { suggestionsOf, words as slash, type Reading } from '../../lib/record/slash.ts';
-import { sentenceOf, tallyOf, words } from './lines.ts';
+import { byLine, foldOf, sentenceOf, suggestedOf, tallyOf, words } from './lines.ts';
 
 const READING: Reading = {
   model: null,
@@ -64,9 +64,87 @@ test('NOTHING SUGGESTED, NO TILE: a number tile is never drawn over nothing', ()
   assert.equal(tallyOf([], 0, 3), null);
 });
 
+test('WHO DRAFTED IT IS SAID HONESTLY: the rules as how you use BrainDog, a model by its name', () => {
+  assert.equal(byLine('rules'), 'From how you use BrainDog');
+  assert.equal(byLine('glm-5.3-flash'), 'Drafted by glm-5.3-flash');
+  assert.equal(byLine(null), null);
+  assert.equal(byLine(''), null);
+
+  /* A HOST WITH A MODEL STILL SENDS THE RULES' DRAFTS on the read, and not one of them carries the model's name. */
+  const withModel: Reading = { ...READING, model: 'glm-5.3-flash' };
+  const all = suggestedOf(withModel);
+  assert.equal(all.length, 4);
+  for (const s of all) {
+    assert.equal(byLine(s.by), words.byRules, s.question);
+    assert.doesNotMatch(byLine(s.by) ?? '', /glm/u);
+  }
+
+  /* WHAT THE LAST PRESS FILED says who drafted it, by id, over the reading's guess. */
+  const pressed = suggestedOf(withModel, [{ id: 'SG3', by: 'glm-5.3-flash' }]);
+  assert.equal(byLine(pressed.find((s) => s.question === 'Add Watch?')?.by), 'Drafted by glm-5.3-flash');
+  assert.equal(byLine(pressed.find((s) => s.question === 'Turn off Notes?')?.by), words.byRules);
+
+  /* A DRAFT THE RECORD SENDS WITH ITS OWN `by` keeps it. */
+  const told = suggestedOf({ ...withModel, waiting: [], drafts: [{ ...READING.drafts[2]!, by: 'glm-5.3-flash' } as Reading['drafts'][number]] });
+  assert.equal(byLine(told[0]?.by), 'Drafted by glm-5.3-flash');
+});
+
+test('WHAT WAITS ON DECIDE LEADS THE LIST, the record’s own waiting included, and nothing is claimed for who drafted it unknown', () => {
+  const extra: Reading = { ...READING, waiting: [...READING.waiting, { id: 'SG9', question: 'Add a desk for the launch?' }] };
+  const all = suggestedOf(extra);
+  assert.deepEqual(
+    all.map((s) => [s.question, s.state]),
+    [
+      ['Add Watch?', 'waiting'],
+      ['Add a desk for the launch?', 'waiting'],
+      ['Give Logbook a page of its own?', 'new'],
+      ['Pin Kiln to Today?', 'new'],
+      ['Turn off Notes?', 'answered'],
+    ],
+  );
+  const desk = all.find((s) => s.question === 'Add a desk for the launch?');
+  assert.equal(desk?.href, '/decide/SG9');
+  assert.equal(desk?.by, null);
+  assert.equal(byLine(desk?.by), null);
+  assert.equal(byLine(suggestedOf(extra, [{ id: 'SG9', by: 'glm-5.3-flash' }]).find((s) => s.href === '/decide/SG9')?.by), 'Drafted by glm-5.3-flash');
+  /* The tile counts the same list the headline does. */
+  assert.equal(tallyOf(all, extra.waiting.length, extra.cap)?.total, 5);
+});
+
+test('THE FOLD NAMES ONLY WHAT IT HOLDS, and is not drawn over nothing', () => {
+  const none = { tally: false, noticed: false, answered: false, lately: false, daily: false, describe: false };
+  assert.equal(foldOf(none), null);
+  assert.equal(foldOf({ ...none, daily: true }), 'The daily look');
+  assert.equal(foldOf({ ...none, noticed: true, answered: true, lately: true, daily: true }), 'What Slash noticed, what you answered, what you asked lately and the daily look');
+  for (const line of [foldOf({ ...none, tally: true, noticed: true, answered: true, lately: true, daily: true, describe: true }) ?? '', words.more])
+    assert.doesNotMatch(line, /\b(rows?|lists?|items?|entit(y|ies))\b/iu, line);
+});
+
+test('THE SCREEN AT REST: the Ask tile and one list, with everything else in one fold that a press opens', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const markup = screen.slice(screen.indexOf('</svelte:head>'), screen.indexOf('<style>'));
+  const fold = markup.indexOf('<details class="more"');
+  assert.ok(fold > 0, 'no fold');
+  assert.equal((markup.match(/<details class="more"/gu) ?? []).length, 1, 'one fold, not several');
+  const rest = markup.slice(0, fold);
+  const inside = markup.slice(fold);
+  /* At rest: the Ask tile and the list's section, and no other tile. */
+  assert.equal((rest.match(/<(Tile|Section|SlashDaily)\b/gu) ?? []).length, 2, 'more than the Ask tile and one list at rest');
+  for (const part of ['<SlashDaily', 'words.noticed', 'pageWords.answeredTitle', 'askWords.lately', 'tally.reading', '<AskPage']) {
+    assert.ok(!rest.includes(part), `${part} is drawn at rest`);
+    assert.ok(inside.includes(part), `${part} is lost`);
+  }
+  assert.match(screen, /byLine\(/u);
+  /* THE FOLD'S LINE NAMES ONLY WHAT HAS SOMETHING IN IT: nothing noticed or asked yet is neither named nor drawn. */
+  assert.match(screen, /noticed: reading\.noticed\.length > 0/u);
+  assert.match(screen, /lately: modelHere && \(lately\?\.length \?\? 0\) > 0/u);
+  assert.ok(!inside.includes('words.noticedNone') && !inside.includes('askWords.latelyNone'), 'an empty part is drawn in the fold');
+});
+
 test('NO EM DASH in anything this screen adds', () => {
   for (const w of Object.values(words)) {
-    const line = typeof w === 'function' ? w(2) : w;
+    const line = typeof w === 'function' ? (w as (x: unknown) => string)(2) : w;
     assert.ok(!line.includes('—'), line);
   }
 });

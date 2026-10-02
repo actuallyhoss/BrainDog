@@ -8,8 +8,9 @@
   `/?classic` (`Today.svelte`) until this one does all it did.
 
   CALM BEFORE RICH (DIRECTION §35). One line under the title, worked out from the blocks drawn (`sentenceOf`), with the
-  phrase that needs the reader in red. A block with nothing in it is not drawn, and a rail with nothing in it gives its
-  width back to the main column.
+  phrase that needs the reader in red. When Slash wrote Home's line today the line is its (`home-line.ts`), red only
+  where it says the rules' phrase word for word, and who said it shows on hover or focus; nothing more is drawn at rest.
+  A block with nothing in it is not drawn, and a rail with nothing in it gives its width back to the main column.
 
   THE READ MARK is one value per person, written with MAX() only, and it advances when the person LEAVES the screen,
   never when it opens. The predecessor shipped it the other way round and found its own bug: For You had never once
@@ -35,8 +36,9 @@
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import PageView from '$lib/page/PageView.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
-  import { drawsAny, homeDrawn, railed, todayHome, type Holds, type HomeVoice } from '$lib/home/default-home.ts';
+  import { drawsAny, homeDrawn, railed, slashLineOf, todayHome, type Holds, type HomeVoice } from '$lib/home/default-home.ts';
   import { words } from '$lib/home/words.ts';
+  import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import { untrack } from 'svelte';
   import { typing } from '$lib/a11y/keys.svelte.ts';
 
@@ -170,6 +172,10 @@
     return { text: shaped.lead ?? nothing, needs: '' };
   });
 
+  /* AND THE MODEL'S LINE OVER IT when the record sent one written today; without one this is `lead` as it was. */
+  const line = $derived(lead && shaped && live ? homeLineOf(lead, slashLineOf(shaped, declares === null), live.now) : null);
+  const slashed = $derived(line?.by === 'slash' ? cutLine(line) : null);
+
   /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. A rail with
      nothing beside it, or nothing in it, is one column. */
   const drawn = $derived.by((): Opened | null => {
@@ -222,8 +228,22 @@
 
 <!-- `display: contents`, so the sticky head still sticks to the panel. -->
 <div class="home-head">
-  <PageHead {title} kicker={today} sentence={lead?.text} needs={lead?.needs || undefined} />
+  <PageHead {title} kicker={today} sentence={slashed ? slashSaid : lead?.text} needs={slashed ? undefined : lead?.needs || undefined} />
 </div>
+
+<!--
+  THE MODEL'S LINE, in the head's own sentence: the same words in the same type, and the rules' red phrase where it says
+  it. Who said it sits under the line, out of the flow and unseen until the line is hovered or focused, so the line at
+  rest is the line and nothing else.
+-->
+{#snippet slashSaid()}
+  {#if slashed}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <span class="home-line" tabindex="0"
+      >{slashed.before}{#if slashed.needs}<span class="needs" data-needs>{slashed.needs}</span>{/if}{slashed.after}<span class="home-by">{words.byline}</span></span
+    >
+  {/if}
+{/snippet}
 
 <div class="page">
   {#if data.refused}
@@ -284,6 +304,41 @@
 
   .home-head {
     display: contents;
+  }
+
+  /* THE LINE IS ITS SENTENCE'S ONE CHILD, so a block of its own changes nothing it draws; it holds who said it. */
+  .home-line {
+    position: relative;
+    display: block;
+    border-radius: var(--r-sm);
+    outline-offset: 4px;
+  }
+
+  /* WHO SAID IT: 13 in `--dim`, under the line and out of the flow, so showing it moves nothing. Not drawn at rest. */
+  .home-by {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: 0;
+    margin-block-start: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  .home-line:is(:hover, :focus) .home-by {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .home-by {
+      transition: none;
+    }
   }
 
   /* ── the page ─────────────────────────────────────────────────────────── */

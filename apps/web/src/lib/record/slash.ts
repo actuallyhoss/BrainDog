@@ -14,7 +14,7 @@ type Answer<T> = { ok: true; value: T } | Refused;
 export type SlashClient = { call: <T>(name: string, args?: Record<string, unknown>) => Promise<Answer<T>> };
 
 export type Noticed = { kind: string; subject: string; text: string };
-export type Draft = { question: string; body_kind: string; asked: { id: string; status: string } | null };
+export type Draft = { question: string; body_kind: string; by?: string; asked: { id: string; status: string } | null };
 /** Whether Slash looks once a day on its own, and the day it last did. */
 export type Daily = { on: boolean; last: string | null };
 export type Reading = { model: string | null; quiet: string | null; noticed: Noticed[]; drafts: Draft[]; waiting: { id: string; question: string }[]; cap: number; daily?: Daily };
