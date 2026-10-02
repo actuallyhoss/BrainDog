@@ -972,6 +972,26 @@ test('A SECTION AND A CARDS BLOCK INSTALL, and a column is one role on a card', 
   assert.equal(refusedWith(cards([{ field: 'what' }], { icon: 'A Receipt' })), 'DECLARATION_INVALID');
 });
 
+test('A QUEUE MAY LEAD WITH ITS FIRST QUESTION, and a headline the record wrote is read back', async () => {
+  /* `lead: true` on a queue draws its first question whole, with what accepting it does. It installs as a yes or a no,
+     and a block with no queue to lead is told which kinds read it. */
+  const queue = (also: Record<string, unknown>) =>
+    page({ requires: undefined, blocks: [{ kind: 'queue', heading: 'Waiting on you', source: 'governance.open', empty: 'Nothing waits.', ...also }] });
+  assert.equal(refusedWith(queue({ lead: true })), null, 'a queue that leads was refused');
+  assert.equal(refusedWith(queue({ lead: false })), null);
+  assert.equal(refusedWith(queue({ lead: 'yes' })), 'DECLARATION_INVALID');
+  const table = validateDeclaration(page({ blocks: [{ kind: 'table', source: 'register.obligations', columns: [{ field: 'what' }], lead: true }] }));
+  assert.match(table?.fix ?? '', /lead: is read by .*queue/);
+
+  /* `said` is the model's line, which the record puts on a lead after the read. A block is never DECLARED with it, and a
+     block read back with it is not refused by name. */
+  assert.match(validateDeclaration(block({ said: 'Two bills are due this week.' }))?.fix ?? '', /what a read answers/);
+  const { k, sql } = await record();
+  const back = k.block({ kind: 'note', body: 'Money', lead: true, said: 'Two bills are due this week.' } as never);
+  assert.ok(!(back.refusals ?? []).some((r) => /said/.test(r.fix)), 'a lead read back with its line was refused for said');
+  sql.close();
+});
+
 test('EVERY BLOCK MAY WEAR AN ICON, and its shape is still checked', () => {
   /* A tile's heading has an icon well whatever its kind, so `icon` is general: a stat with a glyph installs, and one
      whose icon names no glyph is refused at the block, not drawn as an empty well. */

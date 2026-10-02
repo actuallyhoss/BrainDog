@@ -38,7 +38,8 @@ const GENERAL = [
  * The keys only some kinds read, and which. A key here on any other kind is refused, at install and at read.
  *
  * EACH ROW IS WHAT THE CODE READS, not what a document hoped. `lead` is the hero figure of a `stat`, the one bigger card
- * of a `cards` block and the opening sentence of a `note`; `first` cuts a `feed`'s or an `agents` block's groups and
+ * of a `cards` block, the opening sentence of a `note` and a `queue`'s first question drawn whole, with what accepting
+ * it does; `first` cuts a `feed`'s or an `agents` block's groups and
  * a `steps` block's open rows; `range` draws a `progress` block's rows as bands; `box` puts the blocks after a `section`
  * on one surface; `tiles` draws a `queue` as tiles; `register` is the list a `capture` adds to and an `inputs` block
  * edits; `row` is a `diff`'s row and an `inputs` block's.
@@ -52,7 +53,7 @@ const GENERAL = [
  * `kindsReading`, which reads both, rather than this table.
  */
 export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
-  lead: ['stat', 'cards', 'note'],
+  lead: ['stat', 'cards', 'note', 'queue'],
   first: ['feed', 'agents', 'steps'],
   since: ['feed'],
   stale: ['cards'],
@@ -120,10 +121,13 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
  * block held from a reader keeps none of them beyond the empties, and the record's test holds its shell to this list:
  * `open`, `done_now`, `next`, `nexts` and `types` were measured answered here and left on a held block, where `open: 2`
  * counted the open steps of a list the reader may not open.
+ *
+ * `said` IS THE MODEL'S HEADLINE on a lead block, put on it by the record after the read, so a lead read
+ * back from the page with its line on it is not refused for a key the record wrote, and a held block keeps no line.
  */
 export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',
-  'scope_marks', 'feed', 'seen', 'history', 'values', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness',
+  'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness',
   'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
   'short_now', 'window', 'files',
@@ -191,14 +195,25 @@ export function wrongKindKey(key: string, kind: string): string {
  * holding pen's among them) uses `page`, `title`, `nav`, `icon`, `requires`, `blocks`, `for`, `pack`, `origin` and
  * `placed`, and nothing else. `icon`, `for` and `pack` were missing from the table while thirty-three pages, seven
  * templates and eight pages carried them, so the table was the thing that was wrong and it gains them. `layout` is
- * new. `filters` and `header` are in the table and refused apart, below, because nothing draws them.
+ * new. `filters` is read now: the reader's own choices over every block (`pages.ts` `readPage`). `header` is in the
+ * table and refused apart, below, because nothing draws it.
  */
 export const PAGE_KEYS: ReadonlySet<string> = new Set([
   'page', 'title', 'nav', 'icon', 'requires', 'blocks', 'for', 'pack', 'origin', 'derived_from', 'placed', 'tone', 'layout',
+  'filters',
 ]);
 
 /** Published in `06 §1.1` and read by nothing in this build, so the repair is a deploy rather than an edit. */
-export const PAGE_UNBUILT: ReadonlySet<string> = new Set(['filters', 'header']);
+export const PAGE_UNBUILT: ReadonlySet<string> = new Set(['header']);
+
+/** How a reader filter is drawn: a row of chips, or one segmented control for a field of a few values. */
+export const FILTER_CONTROLS = ['chips', 'segmented'] as const;
+
+/** The field types a reader filter offers values of: each holds one value a person can pick by name. */
+export const FILTER_TYPES: ReadonlySet<string> = new Set(['enum', 'ref', 'bool', 'text']);
+
+/** The most reader filters one page declares. Past four the strip is a form. */
+export const FILTERS_MOST = 4;
 
 /** The keys of `nav`. `tabs: true` draws every page of the section as a strip of tabs over each of them. */
 export const NAV_KEYS: ReadonlySet<string> = new Set(['section', 'order', 'icon', 'tabs']);

@@ -24,7 +24,7 @@ import { clausesOf, evaluate, quoteValue } from '@braindog/where';
 import { unquoted } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
-import { BLOCK_READS, kindsReading, wrongKindKey } from './block-keys.ts';
+import { BLOCK_READS, FILTER_TYPES, kindsReading, wrongKindKey } from './block-keys.ts';
 import { builtInFigure } from './built-in-figures.ts';
 import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
@@ -391,7 +391,54 @@ export type QueueOption = { key: string; label: string; because: string; recomme
  * `list` is the list the question's row is on, the register part of an `about` that names a row (`obligations#4`), and
  * `null` when it names none. A `governance.open` block answers it on every question it draws (`listOf`).
  */
-export type QueueQuestion = { id: string; who: string; at: string; kind: string; question: string; why: string; cost: Cost; options: QueueOption[]; about?: string; list?: string | null };
+export type QueueQuestion = {
+  id: string;
+  who: string;
+  at: string;
+  kind: string;
+  question: string;
+  why: string;
+  cost: Cost;
+  options: QueueOption[];
+  about?: string;
+  list?: string | null;
+  /**
+   * On a queue's lead question (`lead: true`): what was proposed, the body's kind, and what accepting it does, one
+   * short line read off the body (`does.ts`), so the first question is drawn whole with the change under it.
+   */
+  body_kind?: string;
+  does?: string;
+  /** On a question put off (`governance.later`): the day it comes back, and why it was put off. */
+  until?: string;
+  until_why?: string;
+};
+
+/** One answered question, as `governance.decided` reads it: what was asked, what was chosen, why, by whom and when. */
+export type DecidedQuestion = {
+  id: string;
+  question: string;
+  /** The option chosen, `accept` or `reject` for a question that offered none. */
+  answer: string;
+  /** The chosen option's own label, when the question offered options. */
+  answer_label?: string;
+  reason: string;
+  who: string;
+  at: string;
+  /** The kind of proposal it answered, and what that was about, when the question is still held. */
+  kind: string;
+  about?: string;
+};
+
+/** A reader filter as the page answers it: the field, its name, how it is drawn, the value chosen and each value with how many open rows hold it. */
+export type PageFilter = {
+  field: string;
+  label: string;
+  control: 'chips' | 'segmented';
+  chosen: string | null;
+  values: { value: string; label: string; count: number }[];
+  /** The lists its values were counted and named from, so a host holds the filter from a reader who may not read them. */
+  reads: string[];
+};
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
@@ -451,6 +498,15 @@ export type PageDeps = {
   identityOf?: (register: string) => { mark?: string; accent?: string } | null;
   /** The open questions, oldest first as the record holds them, and how many are open in all. */
   openQuestions?: (limit: number) => { questions: QueueQuestion[]; open: number };
+  /** The questions put off whose day has not come, soonest back first, and how many there are. */
+  laterQuestions?: (limit: number) => { questions: QueueQuestion[]; later: number };
+  /** The answered questions, latest first, and how many there are. */
+  decisions?: (limit: number) => { decisions: DecidedQuestion[]; total: number };
+  /**
+   * How many rows of `register` the predicate admits, by the value each holds in `field` (`null` for none), for a
+   * page's reader filters. Absent, the page counts them from `list`, which reads every row to do it.
+   */
+  tally?: (q: { register: string; field: string; where?: Predicate | undefined }) => Result<{ value: Json; n: number }[]>;
   /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
   tz?: string;
   /** The record's home currency, or `null` when it has none, which an `inputs` block answers as `home`. */
@@ -535,7 +591,10 @@ export type ListsBeside = {
 };
 
 /** The sources a block may name that are not a register. Named, so a new one is a refusal. */
-const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home']);
+const COMPUTED = new Set([
+  'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on', 'deadlines',
+  'figures.home',
+]);
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
 export const WHOLE_RECORD = '*';
@@ -549,7 +608,7 @@ export const WHOLE_RECORD = '*';
  * may open every list that holds a deadline may be shown them all, and naming `*` would hold them back from anybody
  * whose access is the lists themselves rather than the whole record.
  */
-const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open']);
+const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided']);
 
 /**
  * The kinds that ADD THEIR ROWS UP, whose `limit:` cuts the GROUPS they draw and never the rows they read.
@@ -830,8 +889,15 @@ export function railRoom(): (about: { register: string; section: string } | null
   };
 }
 
-/** One page, with every block run. */
-export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
+/**
+ * One page, with every block run.
+ *
+ * `filter` IS WHAT THE READER CHOSE in the page's own `filters:`, a value by field: `{ project: '12' }`. Each is ANDed
+ * onto every block over a list that has the field, and the answer's `filters` says which values each could take and
+ * how many open rows hold each. A field the page does not filter on is not applied, and a value the field cannot hold
+ * is answered as no choice, so an address kept from before a page changed still opens it.
+ */
+export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> {
   const every = resolvePages(deps);
   const found = every.find((p) => p.slug === slug);
   /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
@@ -858,6 +924,17 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
   /* AN EXPANDED PAGE SAYS WHICH ROW IT IS ABOUT, so a host can name the project without guessing it
      from the title. The title is already the row's, so this says nothing the page did not. */
   const title = found.row ? deps.titleOf(found.row.register) : null;
+  const laid = withAdds(
+    found.decl.blocks,
+    (deps.adds?.(`page.${found.decl.page}`) ?? []).map((a) => (found.row ? { ...a, block: fill(a.block, found.row) as PageBlock } : a)),
+  );
+  const filters = readerFilters(deps, found.decl, laid.map((l) => l.block), filter);
+  /* A SECTION WHOSE `when:` SAYS NO HIDES WHAT IT HOLDS, the blocks after it in its column up to the next section. It
+     hid only its own heading, so a fresh record drew the folded "Not this week" line with nothing under it, and the
+     blocks under a hidden heading stood on the page with no heading over them. They are not read: a block nobody
+     will see costs no query. Each column keeps its own: a section in the rail neither ends nor starts a fold in the
+     main column. */
+  const hiding = new Set<string>();
   return ok({
     ...found.decl,
     page: found.slug,
@@ -869,16 +946,247 @@ export function readPage(deps: PageDeps, slug: string): Result<PageResult> {
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
     /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
        (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
-    blocks: withAdds(
-      found.decl.blocks,
-      (deps.adds?.(`page.${found.decl.page}`) ?? []).map((a) => (found.row ? { ...a, block: fill(a.block, found.row) as PageBlock } : a)),
-    ).map(({ block: b, added }) => {
-      const read = readBlock(deps, b);
+    blocks: laid.map(({ block: b, added }) => {
+      const area = b !== null && typeof b === 'object' && b.area === 'rail' ? 'rail' : 'main';
+      if (b !== null && typeof b === 'object' && b.kind === 'section') hiding.delete(area);
+      else if (hiding.has(area) && b !== null && typeof b === 'object') {
+        const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false };
+        return added === undefined ? folded : { ...folded, added };
+      }
+      const read = readBlock(filters ? narrowed(deps, b, filters.clauses) : deps, b);
+      if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
       const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
       const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
       return added === undefined ? drawn : { ...drawn, added };
     }),
+    ...(filters ? { filters: filters.answer } : {}),
   });
+}
+
+/* ── the reader's filters ────────────────────────────────────────────────── */
+
+/** The most values one filter offers, most held first. Past this a strip of chips is a list nobody reads. */
+const FILTER_VALUES = 50;
+
+/** A field id the way a person reads it: `next_step` is "Next step". */
+const wordsOf = (id: string): string => {
+  const said = id.replace(/_/gu, ' ').trim();
+  return said === '' ? id : said[0]!.toUpperCase() + said.slice(1);
+};
+
+/** The register a block reads rows of, or `null` for one over a figure, a computed source or nothing. */
+const listRead = (b: PageBlock): string | null =>
+  b !== null && typeof b === 'object' && typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
+
+/** The row a chosen link points at, by its number (`12`), spoken id (`projects#12`) or row id, with its number and title. */
+type Pointed = { id: string; seq: number; label: string };
+
+function pointedAt(deps: PageDeps, to: string, value: string): Pointed | null {
+  const spoken = /^(?:([a-z][a-z0-9_-]*)#)?([1-9][0-9]*)$/u.exec(value);
+  if (spoken && spoken[1] !== undefined && spoken[1] !== to) return null;
+  const where: Predicate = spoken ? { field: 'seq', is: Number(spoken[2]) } : { field: 'id', is: value };
+  const got = deps.list({ register: to, where, limit: 1 });
+  const row = got.ok ? got.value.rows[0] : undefined;
+  if (!row || row.seq === null) return null;
+  const title = deps.titleOf(to);
+  const t = title && Object.hasOwn(row.fields, title) ? row.fields[title] : null;
+  return { id: row.id, seq: row.seq, label: typeof t === 'string' && t.trim() !== '' ? t : `#${row.seq}` };
+}
+
+/**
+ * The clause one chosen value makes on one list, or `null` when that list's field cannot hold it.
+ *
+ * `''` IS "NONE", the rows that hold nothing in the field, which is the "No project" chip. A link is chosen by the
+ * number of the row it points at, as an address keeps it, and the clause holds that row's id, which is what the field
+ * stores; a link to another list than the chosen row's is not narrowed by it.
+ */
+function clauseOf(field: string, spec: Schema['fields'][string], value: string, pointed: Pointed | null, to: string | undefined): Predicate | null {
+  if (value === '') return { field, empty: true };
+  switch (spec.type) {
+    case 'ref':
+      return pointed && spec.to === to ? { field, is: pointed.id } : null;
+    case 'bool':
+      return value === 'true' || value === 'false' ? { field, is: value === 'true' } : null;
+    case 'enum':
+      return (spec.values ?? []).includes(value) ? { field, is: value } : null;
+    case 'text':
+      return { field, is: value };
+    default:
+      return null;
+  }
+}
+
+/** A field's spec on one list when it is one a filter may pick a value of, else `undefined`. */
+const filterable = (schema: Schema | null, field: string): Schema['fields'][string] | undefined => {
+  const spec = schema && Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+  return spec && FILTER_TYPES.has(spec.type) ? spec : undefined;
+};
+
+/** The predicate the rows still open on a list read: not in one of its `done` states. Every row, on a list with none. */
+function openOn(deps: PageDeps, register: string, schema: Schema): Predicate[] {
+  const done = deps.lists?.().find((l) => l.id === register)?.done ?? [];
+  return schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
+}
+
+/** How many rows the predicate admits by their value in `field`, from `tally` when the host has it, else every row. */
+function tallied(deps: PageDeps, register: string, field: string, where: Predicate | undefined): Map<string, number> {
+  const out = new Map<string, number>();
+  const add = (v: Json | undefined, n: number): void => {
+    const key = v === null || v === undefined || v === '' ? '' : v === true || v === 1 ? 'true' : v === false || v === 0 ? 'false' : typeof v === 'string' ? v : String(v);
+    out.set(key, (out.get(key) ?? 0) + n);
+  };
+  if (deps.tally) {
+    const got = deps.tally({ register, field, where });
+    if (got.ok) for (const t of got.value) add(t.value, t.n);
+    return out;
+  }
+  const every = everyRow(deps, register, where);
+  if (every.ok) for (const r of every.value.rows) add(r.fields[field], 1);
+  return out;
+}
+
+/**
+ * A page's `filters:` answered: for each field it filters on, the values its open rows hold and how many hold each, and
+ * the clauses the reader's choices make on each list a block reads. `null` on a page that declares none.
+ *
+ * EACH COUNT IS UNDER THE OTHER CHOICES and not its own, as a strip of chips is read: with Kiln chosen, the counts of
+ * whose work it is are Kiln's, and the counts of the projects are still every project's. Only open rows are counted,
+ * because a chip saying 40 over a list of 3 things to do counts what is finished.
+ */
+function readerFilters(
+  deps: PageDeps,
+  decl: PageDecl,
+  blocks: readonly PageBlock[],
+  filter: Readonly<Record<string, string>> | undefined,
+): { answer: PageFilter[]; clauses: Map<string, Predicate[]> } | null {
+  const said = Array.isArray(decl.filters) ? (decl.filters as unknown[]) : [];
+  const declared = said.flatMap((f): { field: string; control: PageFilter['control'] }[] => {
+    const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown }) : {};
+    const control = one.control === 'chips' || one.control === 'segmented' ? one.control : null;
+    return typeof one.field === 'string' && control !== null ? [{ field: one.field, control }] : [];
+  });
+  if (declared.length === 0) return null;
+
+  /* THE LISTS THE PAGE'S BLOCKS READ, in the page's order: a filter narrows what is drawn, so a list no block draws is
+     not counted, and neither is one the reader may not read (`EvalContext.reads`), as `deadlines` leaves it out. The
+     first that holds a field is the one its values are named from. */
+  const readable = (r: string): boolean => deps.ctx.reads === undefined || deps.ctx.reads(r);
+  const lists = [...new Set(blocks.map(listRead).filter((r): r is string => r !== null && readable(r)))];
+  const schemas = new Map(lists.map((r) => [r, deps.schemaOf(r)] as const));
+
+  /* A CHOICE STANDS WHEN THE FIELD'S FIRST LIST CAN HOLD IT, and is then made on every list that has the field. A link
+     is answered by the number of the row it points at, however it was chosen, so the chip it lights is the one drawn. */
+  const chosen = new Map<string, { value: string; pointed: Pointed | null; to: string | undefined }>();
+  for (const { field } of declared) {
+    const said = filter && Object.hasOwn(filter, field) ? filter[field] : undefined;
+    if (typeof said !== 'string') continue;
+    const value = said.trim();
+    const home = lists.find((r) => filterable(schemas.get(r) ?? null, field));
+    const spec = home === undefined ? undefined : filterable(schemas.get(home) ?? null, field);
+    if (!spec) continue;
+    const pointed = spec.type === 'ref' && value !== '' && spec.to !== undefined && readable(spec.to) ? pointedAt(deps, spec.to, value) : null;
+    if (!clauseOf(field, spec, value, pointed, spec.to)) continue;
+    chosen.set(field, { value: pointed ? String(pointed.seq) : value, pointed, to: spec.to });
+  }
+  const clausesOn = (register: string, except?: string): Predicate[] => {
+    const schema = schemas.get(register) ?? deps.schemaOf(register);
+    return [...chosen].flatMap(([field, c]) => {
+      if (field === except) return [];
+      const spec = filterable(schema ?? null, field);
+      const clause = spec ? clauseOf(field, spec, c.value, c.pointed, c.to) : null;
+      return clause ? [clause] : [];
+    });
+  };
+  const clauses = new Map(lists.map((r) => [r, clausesOn(r)] as const));
+
+  const answer = declared.map(({ field, control }): PageFilter => {
+    const holding = lists.filter((r) => filterable(schemas.get(r) ?? null, field));
+    const home = holding[0];
+    const spec = home === undefined ? undefined : filterable(schemas.get(home) ?? null, field)!;
+    const label = wordsOf(spec?.label ?? field);
+    const picked = chosen.get(field);
+    const pick = picked?.value ?? null;
+    if (!spec || home === undefined) return { field, label, control, chosen: null, values: [], reads: [] };
+
+    /* EVERY LIST THAT HOLDS THE FIELD AS THE FIRST DOES, counted together: a link to projects on tasks and on notes is
+       one strip of projects. A list whose field is another type is a different question and is left out of the count. */
+    const counts = new Map<string, number>();
+    const reads: string[] = [];
+    for (const r of holding) {
+      const s = schemas.get(r)!;
+      const other = s.fields[field]!;
+      if (other.type !== spec.type || other.to !== spec.to) continue;
+      reads.push(r);
+      const parts = [...openOn(deps, r, s), ...clausesOn(r, field)];
+      const where: Predicate | undefined = parts.length === 0 ? undefined : parts.length === 1 ? parts[0] : { all: parts };
+      for (const [v, n] of tallied(deps, r, field, where)) counts.set(v, (counts.get(v) ?? 0) + n);
+    }
+
+    /* A LINK IS COUNTED BY THE ROW IT POINTS AT AND OFFERED BY THAT ROW'S NUMBER AND TITLE, which is what an address
+       keeps and a person reads. A row no longer there, or on a list the reader may not read, is not offered. */
+    const named = new Map<string, { value: string; label: string }>();
+    if (spec.type === 'ref' && spec.to !== undefined && readable(spec.to)) {
+      reads.push(spec.to);
+      const ids = [...counts.keys()].filter((k) => k !== '');
+      const title = deps.titleOf(spec.to);
+      const pointed = ids.length ? deps.list({ register: spec.to, where: { field: 'id', in: ids }, limit: 500 }) : null;
+      for (const r of pointed?.ok ? pointed.value.rows : []) {
+        if (r.seq === null) continue;
+        const t = title && Object.hasOwn(r.fields, title) ? r.fields[title] : null;
+        named.set(r.id, { value: String(r.seq), label: typeof t === 'string' && t.trim() !== '' ? t : `#${r.seq}` });
+      }
+    }
+    const valueOf = (key: string): { value: string; label: string } | null => {
+      if (key === '') return { value: '', label: `No ${label.toLowerCase()}` };
+      if (spec.type === 'ref') return named.get(key) ?? null;
+      if (spec.type === 'bool') return { value: key, label: key === 'true' ? 'Yes' : 'No' };
+      if (spec.type === 'enum') return { value: key, label: spec.labels?.[key] ?? wordsOf(key) };
+      return { value: key, label: key };
+    };
+    const values = [...counts]
+      .flatMap(([key, count]) => {
+        const v = valueOf(key);
+        return v ? [{ ...v, count }] : [];
+      })
+      .filter((v) => v.count > 0);
+    /* AN ENUM IN ITS DECLARED ORDER AND A YES BEFORE A NO, because those orders mean something; anything else most
+       held first. "None" is always last. */
+    const rank = (v: { value: string }): number =>
+      v.value === '' ? Number.MAX_SAFE_INTEGER : spec.type === 'enum' ? (spec.values ?? []).indexOf(v.value) : spec.type === 'bool' ? (v.value === 'true' ? 0 : 1) : 0;
+    values.sort((a, b) => rank(a) - rank(b) || b.count - a.count || a.label.localeCompare(b.label));
+    const shown = values.slice(0, FILTER_VALUES);
+    /* THE ONE CHOSEN IS OFFERED WHATEVER IT HOLDS, so the reader can see what they picked and take it off. */
+    if (pick !== null && !shown.some((v) => v.value === pick)) {
+      const kept = values.find((v) => v.value === pick);
+      shown.push(kept ?? { value: pick, label: picked?.pointed?.label ?? valueOf(pick)?.label ?? pick, count: 0 });
+    }
+    return { field, label, control, chosen: pick, values: shown, reads };
+  });
+  return { answer, clauses };
+}
+
+/**
+ * The reads one block makes, with the reader's choices ANDed onto every read of the list it draws.
+ *
+ * ONLY THE BLOCK'S OWN LIST, and only a read of its rows. The names of the projects its rows point at, the steps
+ * under a card, a `{{path}}` naming one row by its number: those are other reads, and a filter on what is drawn says
+ * nothing about them. So a read that names its rows by number or id is left as it is.
+ */
+function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string, readonly Predicate[]>): PageDeps {
+  const register = listRead(block);
+  const extra = register === null ? [] : (clauses.get(register) ?? []);
+  if (register === null || extra.length === 0) return deps;
+  const named = (where: Predicate | undefined): boolean => {
+    const leaf = where as Leaf | undefined;
+    return leaf !== undefined && (leaf.field === 'seq' || leaf.field === 'id');
+  };
+  const and = (where: Predicate | undefined): Predicate => (where === undefined ? (extra.length === 1 ? extra[0]! : { all: [...extra] }) : { all: [where, ...extra] });
+  const readings = deps.readings;
+  return {
+    ...deps,
+    list: (q) => deps.list(q.register === register && !named(q.where) ? { ...q, where: and(q.where) } : q),
+    ...(readings ? { readings: (q: Parameters<typeof readings>[0]) => readings(q.register === register ? { ...q, where: and(q.where) } : q) } : {}),
+  };
 }
 
 /**
@@ -1250,6 +1558,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
   if (block.source === 'actions') return actionsBlock(deps, block, base, also);
   if (block.source === 'governance.open') return openBlock(deps, block, base, also);
+  if (block.source === 'governance.later') return laterBlock(deps, block, base, also);
+  if (block.source === 'governance.decided') return decidedBlock(deps, block, base, also);
   if (block.source === 'runs_on') return runsOnBlock(deps, block, base, also);
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
@@ -2531,7 +2841,111 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   /* NO PREDICATE MEANS THE RECORD'S OWN COUNT, which is every open question rather than the page the read
      answered with. With one, the count is of what this page could see, and it says so by being smaller. */
   const matched = said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length;
-  return { ...base, queue: kept.slice(0, limit), matched };
+  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };
+}
+
+/**
+ * A queue's questions with only the lead's carrying what was proposed and what accepting does.
+ *
+ * THE LEAD IS DRAWN WHOLE AND THE REST ARE ONE LINE EACH, so the line saying what a yes changes travels on the first
+ * question alone: a queue of twenty is not twenty paragraphs nobody reads. Without `lead: true` none carries it.
+ */
+function ledBy(block: PageBlock, questions: readonly QueueQuestion[]): QueueQuestion[] {
+  return questions.map((q, at) => {
+    const { body_kind, does, ...rest } = q;
+    if (block.lead !== true || at > 0) return rest;
+    return { ...rest, body_kind: body_kind ?? q.kind, ...(does ? { does } : {}) };
+  });
+}
+
+/**
+ * A `queue` over `governance.later`: the questions put off whose day has not come, soonest back first, each with the
+ * day it comes back and why it was put off. The same shape and the same `where` an open question has, so a page draws
+ * them with the queue it draws the open ones with.
+ */
+function laterBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.laterQuestions)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what was put off onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.later comes soonest back first, so it takes no order:.', at: 'order' }) };
+  const said = predicateOf(block.where, OPEN, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
+  const read = deps.laterQuestions(Math.max(limit, QUEUE_CEILING));
+  const kept = read.questions
+    .map((q) => ({ ...q, list: listOf(q.about) }))
+    .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
+  const matched = said.predicate === undefined && read.questions.length < read.later ? read.later : kept.length;
+  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };
+}
+
+/**
+ * What a `governance.decided` block's `where` and columns may name: one row an answered question. `answer` is the
+ * option chosen and `answer_label` its own words; `kind` and `about` are the question's.
+ */
+const DECIDED: Schema = {
+  register: 'governance',
+  fields: {
+    question: { type: 'text' },
+    answer: { type: 'text' },
+    answer_label: { type: 'text' },
+    reason: { type: 'text' },
+    who: { type: 'text' },
+    at: { type: 'instant' },
+    kind: { type: 'enum', values: BODY_KINDS },
+    about: { type: 'text' },
+    list: { type: 'text' },
+  },
+};
+
+/** How many answered questions a block draws unasked, and the most it reads to find them. */
+const DECIDED_LIMIT = 10;
+const DECIDED_READ = 200;
+
+/**
+ * A block over `governance.decided`: what was answered, latest first, one row a decision. Rows rather than a queue,
+ * because nothing waits on them: a table, a timeline or a feed draws them as it draws any list's.
+ */
+function decidedBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
+  if (!deps.decisions)
+    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what was decided onto a page yet.', at: 'source' }) };
+  if (block.order?.length)
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.decided comes latest first, so it takes no order:.', at: 'order' }) };
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(DECIDED.fields, f));
+  if (unknown.length)
+    return {
+      ...base,
+      refusals: also({ code: 'FIELD_UNKNOWN', fix: `A decision has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(DECIDED.fields) }),
+    };
+  const said = predicateOf(block.where, DECIDED, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const limit = block.limit === undefined ? DECIDED_LIMIT : Math.min(DECIDED_READ, Math.max(0, Math.floor(block.limit)));
+  const read = deps.decisions(DECIDED_READ);
+  const rows = read.decisions
+    .map((d): Entry => ({
+      id: d.id,
+      register: DECIDED.register,
+      seq: null,
+      fields: {
+        question: d.question,
+        answer: d.answer,
+        answer_label: d.answer_label ?? null,
+        reason: d.reason,
+        who: d.who,
+        at: d.at,
+        kind: d.kind,
+        about: d.about ?? null,
+        list: listOf(d.about),
+      },
+      state: null,
+      version: 1,
+      created_at: d.at,
+      updated_at: d.at,
+      deleted_at: null,
+    }))
+    .filter((e) => evaluate(said.predicate, e.fields, DECIDED));
+  const matched = said.predicate === undefined && read.decisions.length < read.total ? read.total : rows.length;
+  return { ...base, rows: rows.slice(0, limit), matched };
 }
 
 /* ── the record's scheduled actions ──────────────────────────────────────── */

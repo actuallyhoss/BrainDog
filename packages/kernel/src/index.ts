@@ -122,7 +122,8 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult } from './pages.ts';
+import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult, type QueueQuestion } from './pages.ts';
+import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 import {
@@ -406,7 +407,8 @@ export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, 
 export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
-export type { BlockResult, PageBlock, PageDecl, PageDeps, PageResult, QueueOption, QueueQuestion } from './pages.ts';
+export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, QueueOption, QueueQuestion } from './pages.ts';
+export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
@@ -4585,6 +4587,73 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     };
   };
 
+  /** A governance body read back from its column: an object, or nothing when it is not one. */
+  const parsedBody = (body: unknown): Record<string, unknown> => {
+    let read = body;
+    if (typeof read === 'string')
+      try {
+        read = JSON.parse(read) as unknown;
+      } catch {
+        read = null;
+      }
+    return read !== null && typeof read === 'object' && !Array.isArray(read) ? (read as Record<string, unknown>) : {};
+  };
+
+  /** A pack named as its manifest names it, for the line saying what accepting a question does. */
+  const packName = (id: string): string | null => {
+    const row = sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', id);
+    if (!row) return null;
+    try {
+      const name = (JSON.parse(row.manifest) as { name?: unknown }).name;
+      return typeof name === 'string' && name.trim() !== '' ? name : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /*
+   * ONE SUGGESTION AS A QUEUE DRAWS IT, open or put off.
+   *
+   * THE OPTIONS ARE THE BODY'S OWN AND NOTHING IS INVENTED HERE. A proposal of any other kind is
+   * accepted or rejected, and those two words belong to whatever is drawing the screen: the kernel
+   * does not know what language the reader has, and a host that filled them in here would have two
+   * places saying "Accept". So a question of another kind comes back with no options and the drawer
+   * puts its own two there.
+   *
+   * A BODY IS WHATEVER THE PROPOSER WROTE, so every field is checked on the way out rather than
+   * trusted: an option missing its label is left out, not drawn as `undefined`. What accepting does
+   * is read off the body here, in the person's own names (`does.ts`), and a queue keeps it on its
+   * lead question alone.
+   */
+  const questionFrom = (r: Record<string, unknown>): QueueQuestion => {
+    const body = parsedBody(r.body);
+    const kind = String(r.body_kind ?? '');
+    const offered = kind === 'options' && Array.isArray(body.options) ? (body.options as unknown[]) : [];
+    const options = offered.flatMap((o) => {
+      if (o === null || typeof o !== 'object' || Array.isArray(o)) return [];
+      const one = o as Record<string, unknown>;
+      if (typeof one.id !== 'string' || typeof one.label !== 'string') return [];
+      /* WHAT THE OPTION IS, checked again on the way out: a body filed before `showsOf` existed holds whatever it was
+         sent, and a swatch is the one colour from data a drawer puts on a screen. */
+      const shows = showsOf(one.shows);
+      return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
+    });
+    const does = doesOf(kind, body, { list: (id) => registers.get(id)?.name ?? null, pack: packName });
+    return {
+      id: String(r.id),
+      who: String(r.opened_by ?? ''),
+      at: String(r.opened_at ?? ''),
+      kind,
+      question: questionOf(sql, String(r.id)) ?? '',
+      why: typeof body.context === 'string' ? body.context : '',
+      cost: costOf(kind, body),
+      options,
+      ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
+      body_kind: kind,
+      ...(does ? { does } : {}),
+    };
+  };
+
   const pageDeps = (): PageDeps => ({
     pages: () =>
       sql
@@ -4714,50 +4783,82 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * question. Within a band the OLDEST comes first, and that is the opposite of the SQL underneath:
      * `listGovernance` reads newest first because a queue nobody has answered is read from the top,
      * and once there is a rank, the one worth meeting is the expensive question that has been sitting
-     * rather than the expensive question that arrived a minute ago.
-     *
-     * THE OPTIONS ARE THE BODY'S OWN AND NOTHING IS INVENTED HERE. A proposal of any other kind is
-     * accepted or rejected, and those two words belong to whatever is drawing the screen: the kernel
-     * does not know what language the reader has, and a host that filled them in here would have two
-     * places saying "Accept". So a question of another kind comes back with no options and the drawer
-     * puts its own two there.
-     *
-     * A BODY IS WHATEVER THE PROPOSER WROTE, so every field is checked on the way out rather than
-     * trusted: an option missing its label is left out, not drawn as `undefined`.
+     * rather than the expensive question that arrived a minute ago. Each question is read by
+     * `questionFrom`, which says why its options are the body's own.
      */
     openQuestions: (limit) => {
       const nowMs = clock.now();
       const said = listGovernance({ sql, nowMs }, 'suggestion', { status: 'open', limit });
-      const rows = said.ok ? said.value : [];
-      const questions = rows.map((r) => {
-        const body = r.body !== null && typeof r.body === 'object' && !Array.isArray(r.body) ? (r.body as Record<string, unknown>) : {};
-        const offered = r.body_kind === 'options' && Array.isArray(body.options) ? (body.options as unknown[]) : [];
-        const options = offered.flatMap((o) => {
-          if (o === null || typeof o !== 'object' || Array.isArray(o)) return [];
-          const one = o as Record<string, unknown>;
-          if (typeof one.id !== 'string' || typeof one.label !== 'string') return [];
-          /* WHAT THE OPTION IS, checked again on the way out: a body filed before `showsOf` existed holds whatever it was
-             sent, and a swatch is the one colour from data a drawer puts on a screen. */
-          const shows = showsOf(one.shows);
-          return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
-        });
-        return {
-          id: String(r.id),
-          who: String(r.opened_by ?? ''),
-          at: String(r.opened_at ?? ''),
-          kind: String(r.body_kind ?? ''),
-          question: questionOf(sql, String(r.id)) ?? '',
-          why: typeof body.context === 'string' ? body.context : '',
-          cost: costOf(String(r.body_kind ?? ''), r.body),
-          options,
-          ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
-        };
-      });
+      const questions = (said.ok ? said.value : []).map(questionFrom);
       /* A STABLE SORT, and `opened_at` is the tie-break the band needs: two questions in one band
          come back in the order they were asked, oldest first. `id` settles a tie on the instant,
          because two proposals written in the same millisecond must not swap places between reads. */
       questions.sort((a, b) => costRank(a.cost) - costRank(b.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       return { questions, open: countOpenQuestions({ sql, nowMs }) };
+    },
+    /*
+     * THE QUESTIONS PUT OFF, for a page's Later: still open, with a day to come back that has not come, soonest back
+     * first. They leave this read on that day and join the open ones, which is the one place they are counted twice
+     * nowhere: `countOpenQuestions` reads the same day the other way.
+     */
+    laterQuestions: (limit) => {
+      const now = instant(clock.now());
+      const rows = sql.all<Record<string, unknown>>(
+        "SELECT id, body_kind, body, status, opened_by, opened_at, defer_until, defer_why FROM suggestion WHERE status = 'open' AND defer_until > ? ORDER BY defer_until ASC, rowid ASC LIMIT ?",
+        now,
+        Math.min(Math.max(1, Math.floor(limit)), 200),
+      );
+      const questions = rows.map((r) => {
+        const one = questionFrom(r);
+        return { ...one, until: String(r.defer_until ?? ''), until_why: typeof r.defer_why === 'string' ? r.defer_why : '' };
+      });
+      const later = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND defer_until > ?", now)?.n ?? 0;
+      return { questions, later };
+    },
+    /*
+     * WHAT WAS DECIDED, latest first, for a page's Decided: the question as it was asked, the option chosen and the
+     * reason given. The proposal it answered says what kind of question it was and what it was about, read from the
+     * suggestion the decision settled, and a chosen option is named by its own label.
+     */
+    decisions: (limit) => {
+      const said = listGovernance({ sql, nowMs: clock.now() }, 'decision', { limit });
+      const decisions = (said.ok ? said.value : []).map((d) => {
+        const settled = typeof d.suggestion === 'string' ? getGovernance(sql, 'suggestion', d.suggestion) : null;
+        const body = settled && settled.body !== null && typeof settled.body === 'object' && !Array.isArray(settled.body) ? (settled.body as Record<string, unknown>) : {};
+        const answer = String(d.answer ?? '');
+        const option = Array.isArray(body.options)
+          ? (body.options as unknown[]).find((o) => o !== null && typeof o === 'object' && (o as { id?: unknown }).id === answer)
+          : undefined;
+        const label = option ? (option as { label?: unknown }).label : undefined;
+        return {
+          id: String(d.id),
+          question: String(d.question ?? ''),
+          answer,
+          ...(typeof label === 'string' && label !== '' ? { answer_label: label } : {}),
+          reason: String(d.reason ?? ''),
+          who: String(d.decided_by ?? ''),
+          at: String(d.ts ?? ''),
+          kind: String(settled?.body_kind ?? ''),
+          ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
+        };
+      });
+      return { decisions, total: countGovernance(sql, 'decision') };
+    },
+    /* HOW MANY ROWS HOLD EACH VALUE OF ONE FIELD, for a page's reader filters, by the expression an index on the field
+       is built from and in one query, so a strip of chips over a long list does not read the list. */
+    tally: (q) => {
+      if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+      const schema = schemaOf(q.register);
+      const said = predicateOf(q.where, schema, evalContext());
+      if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
+      const c = compile(said.predicate, schema);
+      if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+      const rows = sql.all<{ value: Json; n: number }>(
+        `SELECT ${fieldSqlIn(schema, q.field)} AS value, COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql}) GROUP BY 1`,
+        q.register,
+        ...c.params,
+      );
+      return ok(rows);
     },
     /*
      * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,
@@ -6073,7 +6174,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * the other four and says what happened in the third — a page that fails whole is a page nobody
      * can use to find out what is wrong with it.
      */
-    page: (slug: string): Result<PageResult> => readPage(pageDeps(), slug),
+    page: (slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> => readPage(pageDeps(), slug, filter),
 
     /** One metric document by its id, so a caller can fill a parameter and read it. */
     metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),

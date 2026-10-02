@@ -53,7 +53,7 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+import { BLOCK_INSTALLS, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
@@ -835,9 +835,10 @@ const SOURCE = /^(?:register|metric)\.[a-z][a-z0-9_-]{0,31}$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
 /* A SOURCE MUST BE HERE AND IN `pages.ts`'s `COMPUTED`, or a block reading it is refused at install while the reader
    stands ready. `runs_on` is a project's keys, tools, skills and actions; `deadlines` is every row due soon and
-   `figures.home` the figures that ask a place on Home. */
+   `figures.home` the figures that ask a place on Home. `governance.later` is what was put off, soonest back first, and
+   `governance.decided` what was answered, latest first. */
 const COMPUTED_SOURCES = [
-  'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open',
+  'forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'governance.later', 'governance.decided',
   'runs_on', 'deadlines', 'figures.home',
 ] as const;
 
@@ -897,6 +898,52 @@ export type Known = ReadonlyMap<string, Record<string, Json>>;
 export type Owners = ReadonlyMap<string, string | null>;
 
 /**
+ * A page's reader filters, `[{ field, control }]`, or why they are not.
+ *
+ * EVERY BLOCK HONOURS THEM (`21 §3.5`), so a filter is a field a person picks one value of: an enum, a link to another
+ * list, a yes or no, or a word. A field none of the page's lists declares is refused when they are known, because a
+ * strip of chips over nothing is a control that changes nothing; a field only some lists hold narrows the blocks over
+ * those and leaves the rest as they are.
+ */
+function filtersFault(id: string, filters: unknown, requires: unknown, installed?: Known): Refusal | null {
+  if (filters === undefined) return null;
+  const shape = `${id}'s filters is a list of at most ${FILTERS_MOST}, each { field, control: ${FILTER_CONTROLS.join(' or ')} }.`;
+  if (!Array.isArray(filters)) return bad('DECLARATION_INVALID', shape, 'filters');
+  if (filters.length > FILTERS_MOST) return bad('OUT_OF_BOUNDS', `${id} declares ${filters.length} filters. ${shape}`, 'filters');
+  const seen = new Set<string>();
+  const lists = Array.isArray(requires) ? requires.filter((r): r is string => typeof r === 'string' && r.startsWith('register.')) : [];
+  for (const [i, raw] of filters.entries()) {
+    const at = `filters[${i}]`;
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return bad('DECLARATION_INVALID', shape, at);
+    const f = raw as { field?: unknown; control?: unknown };
+    const stray = Object.keys(f).find((k) => k !== 'field' && k !== 'control');
+    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}.${at} has ${stray}:, and a filter is { field, control }.`, at, ['field', 'control']);
+    if (typeof f.field !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(f.field))
+      return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(f.field ?? null)} as its field; a filter names one field of the page's lists.`, at);
+    if (!(FILTER_CONTROLS as readonly unknown[]).includes(f.control))
+      return bad('DECLARATION_INVALID', `${id}.${at}'s control is ${JSON.stringify(f.control ?? null)}; it is ${FILTER_CONTROLS.join(' or ')}.`, at, [...FILTER_CONTROLS]);
+    if (seen.has(f.field)) return bad('DECLARATION_INVALID', `${id} filters on ${f.field} twice. Keep one.`, at);
+    seen.add(f.field);
+    if (!installed || lists.length === 0) continue;
+    const typed = lists.flatMap((r) => {
+      const fields = installed.get(r)?.fields;
+      return Array.isArray(fields)
+        ? (fields as { id?: unknown; type?: unknown; retired?: unknown }[]).filter((d) => d?.id === f.field && d.retired !== true).map((d) => String(d.type))
+        : [];
+    });
+    if (typed.length === 0)
+      return bad('FIELD_UNKNOWN', `${id} filters on ${f.field}, and none of the lists it requires has a field called ${f.field}.`, at);
+    if (!typed.some((t) => FILTER_TYPES.has(t)))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} filters on ${f.field}, which is ${typed[0]}. A filter picks one value of a field that is ${[...FILTER_TYPES].join(', ')}.`,
+        at,
+      );
+  }
+  return null;
+}
+
+/**
  * A page declaration, checked against `06 §1.1` and `42 §4.5`.
  *
  * NOTHING CHECKED ONE, and a page is the declaration with the most ways to be quietly wrong,
@@ -929,7 +976,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     if (PAGE_UNBUILT.has(key))
       return bad(
         'NOT_IN_THIS_BUILD',
-        `${id} declares ${key}:, which the documents publish and this build draws nowhere. Take it off; a filter is a where: on each block for now.`,
+        `${id} declares ${key}:, which the documents publish and this build draws nowhere. Take it off; the page's title is its header for now.`,
         key,
       );
     if (!PAGE_KEYS.has(key)) return bad('DECLARATION_INVALID', `${id}: ${unreadPageKey(key)}`, key, [...PAGE_KEYS]);
@@ -982,6 +1029,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
   if (body.tone !== undefined && !(TONES as readonly unknown[]).includes(body.tone))
     return bad('DECLARATION_INVALID', `${String(body.tone)} is not an intent.`, 'tone', TONES as unknown as string[]);
+
+  const filtered = filtersFault(id, (body as { filters?: unknown }).filters, body.requires, installed);
+  if (filtered) return filtered;
 
   /* `06 §1.1`: *"a page cannot appear without its data"* — `requires` is what makes uninstalling a
      pack take its pages out of the nav with it. It is marked required there and is checked here only

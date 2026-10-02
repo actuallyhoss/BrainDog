@@ -142,7 +142,7 @@ the table.
 | `derived_from` | a declaration id — `register.domains` | — | when `origin: derived` |
 | `placed` | bool — in nav, or in the holding pen | `true` | no |
 | `tone` | intent — `good \| warn \| bad \| info` | — | no |
-| `filters` | `[{ field, control }]`: reader filters every block honours ([21-AUTHORING](21-AUTHORING.md) §3.5). **Specified and not built**: nothing draws it, so it is refused `NOT_IN_THIS_BUILD` rather than installed and ignored | `[]` | no |
+| `filters` | `[{ field, control: chips \| segmented }]`, at most 4, each a field of the lists the page's blocks read: reader filters ([21-AUTHORING](21-AUTHORING.md) §3.5). Every block over a list with the field is narrowed by the reader's choice (`page`'s `filter`, a value by field, `{ project: '12' }`), and the answer carries `filters: [{ field, label, control, chosen, values: [{ value, label, count }], reads }]`, counting open rows only, each count under the other choices. A filter counted from a list the reader may not read (its `reads`) is answered with no values and nothing chosen, and its choice narrows nothing | `[]` | no |
 | `header` | `{ count, action, filters, search, state }`, [29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5. **Specified and not built**, and refused `NOT_IN_THIS_BUILD` for the same reason | derived from the register | no |
 | `blocks` | `[block]`, at most 24 | — | yes |
 
