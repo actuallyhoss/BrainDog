@@ -110,6 +110,12 @@ export type ForecastModel = {
    * host sent none and the walk's last dated movement is it. The line is solid to it and dashed beyond.
    */
   known: string | null;
+  /**
+   * Whether the page's headline already says when the money runs out, from a `headline | under |  |` row. The sentence
+   * over the chart is then left off while the walk is the host's own, and the flag on the crossing stays: Money said one
+   * fact three times, "runs out in 57 days" over "Goes under on 30 Oct" over a flag reading 30 Oct (visual review 3).
+   */
+  headline: boolean;
 };
 
 /** Growth a year, in percent, of money going out and of money coming in. */
@@ -211,6 +217,7 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     home: homeOf(rows.find((r) => r[0]?.trim() === 'home')),
     spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
     known: knownOf(rows.find((r) => r[0]?.trim() === 'known'), today),
+    headline: rows.some((r) => r[0]?.trim() === 'headline' && r[1]?.trim() === 'under'),
   };
 }
 
@@ -677,6 +684,11 @@ export type ForecastPlan = {
   /** The sentence over the chart, and whether it is the warning. */
   said: string;
   warn: boolean;
+  /**
+   * Whether the sentence is drawn over the chart: not where the page's headline already says when the walk goes under
+   * (`headline`) and no knob has moved it off the walk the headline read. It is still said in the chart's name.
+   */
+  legend: boolean;
   past: string;
   /** The walk from today as far as the record knows it, solid, and `''` when nothing ahead of today is known. */
   walk: string;
@@ -698,9 +710,10 @@ export type ForecastPlan = {
    * The crossing's dot, where its label sits as a fraction across, and the thin rule from the label at the chart's top
    * edge down to the dot, so the flag says which point of the line it names.
    */
-  cross: { d: string; rule: string; at: string; day: string } | null;
+  cross: { d: string; rule: string; at: string; day: string; near: boolean } | null;
   low: string;
-  ticks: { at: string; label: string }[];
+  /** The month names under the chart; `edge` is the start's own month, set at the left edge rather than centred. */
+  ticks: { at: string; label: string; edge?: true }[];
   /** The start and the end of the time axis, for the scrub. */
   start: string;
   span: number;
@@ -728,6 +741,13 @@ const TICKS_MOST = 12;
 const TICKS_SPACED = 6;
 /** The months between two names on the time axis, tried in order: every month, a quarter, half a year, a year. */
 const TICK_EVERY = [1, 3, 6, 12] as const;
+/** How far across the first month name must sit for the start's own month to be named at the edge beside it. */
+const TICK_START_ROOM = 0.06;
+/**
+ * How near today the crossing is, as a share of the chart, for the two labels to be set apart: today's balance goes
+ * under its dot and the flag's day to the right of its rule. On a phone "30 Oct" sat on top of "£33,850".
+ */
+const FLAG_NEAR = 0.15;
 
 /**
  * A name on the time axis: the month, and the year where the names are a year apart or a year begins between them.
@@ -809,9 +829,16 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const ticks: ForecastPlan['ticks'] = starts
     .filter((s) => month(s.day) % every === 0)
     .map((s) => ({ at: at(s.d / span), label: tickLabel(s.day, every) }));
+  /* THE MONTH THE CHART STARTS IN IS NAMED AT ITS EDGE, where there is room before the first name: a walk from 3 Sep
+     named Oct to Aug and never the Sep it began in (visual review 3). A start on the 1st is its own month too. An axis
+     of years names the start's year, and wants twice the room for it: "Sep" beside "2027" read as September 2027. */
+  const yearly = every === 12;
+  if (ticks.length === 0 || Number(ticks[0]!.at) >= TICK_START_ROOM * (yearly ? 2 : 1))
+    ticks.unshift({ at: '0', label: yearly ? start.slice(0, 4) : tickLabel(start, every), edge: true });
 
   const c = shown.crossed;
   const said = c ? forecastUnder(shortDay(c.day)) : forecastAbove(shortDay(end));
+  const nowAt = daysBetween(start, model.today) / span;
   const figure = (v: number) => figureLike(model.template, v);
   /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
   const axis = levels.map((v) => ({ at: String(Math.round(Number(y(v)) * 100) / 10_000), label: axisFigure(figure(v)), zero: v === 0 }));
@@ -827,6 +854,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   return {
     said,
     warn: c !== null,
+    legend: !(c && model.headline && base === null),
     past,
     walk: drawn(shown.days.filter((p) => p.day <= known)),
     future: drawn(shown.days.filter((p) => p.day >= known)),
@@ -834,7 +862,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     below,
     now: {
       d: `M${x(model.today)} ${y(model.opening)}h0`,
-      at: at(daysBetween(start, model.today) / span),
+      at: at(nowAt),
       y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
       label: headlineFigure(figure(model.opening)),
     },
@@ -842,7 +870,13 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     zero: y(0),
     grid: levels.filter((v) => v !== 0).map((v) => `M0 ${y(v)}H1000`).join(' '),
     cross: c
-      ? { d: `M${x(c.day)} ${y(c.balance)}h0`, rule: `M${x(c.day)} 0V${y(c.balance)}`, at: at(daysBetween(start, c.day) / span), day: shortDay(c.day) }
+      ? {
+          d: `M${x(c.day)} ${y(c.balance)}h0`,
+          rule: `M${x(c.day)} 0V${y(c.balance)}`,
+          at: at(daysBetween(start, c.day) / span),
+          day: shortDay(c.day),
+          near: Math.abs(daysBetween(start, c.day) / span - nowAt) <= FLAG_NEAR,
+        }
       : null,
     low: `M${x(shown.lowest.day)} ${y(shown.lowest.balance)}h0`,
     ticks,

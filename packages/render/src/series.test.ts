@@ -71,6 +71,9 @@ test('a computed figure is written the way the host wrote its own', () => {
 
 test('a series of counts by week says each week by its day on a narrow chart, and its figures are counts', () => {
   const plan = seriesPlan([['Week', 'in: Done, then due', 'state'], ['Week of 20 Jul', '1', ''], ['Week of 7 Sep', '4', 'ahead']]);
-  assert.deepEqual(plan.buckets.map((b) => b.short), ['20', '7']);
+  assert.deepEqual(plan.buckets.map((b) => b.short), ['20 Jul', '7 Sep'], 'each a new month, so each says it');
   assert.equal(plan.top, '4');
+  const run = seriesPlan([['Week', 'in: Done'], ['Week of 20 Jul', '1'], ['Week of 27 Jul', '2'], ['Week of 3 Aug', '3'], ['Week of 10 Aug', '1']]);
+  assert.deepEqual(run.buckets.map((b) => b.short), ['20 Jul', '27', '3 Aug', '10'], 'the month on the first tick and where it changes');
+  assert.deepEqual(seriesPlan([['Month', 'in: Paid'], ['Sep 2026', '1'], ['Oct 2026', '2']]).buckets.map((b) => b.short), ['Sep', 'Oct'], 'a month is its name');
 });

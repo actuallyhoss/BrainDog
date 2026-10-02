@@ -3,7 +3,7 @@
   and the counted days said again as a table. `src/heat.ts` over `src/days.ts` decides every cell; `heat` in
   `src/html.ts` is this file's twin, and `heat.test.ts` holds the two to one tree with one clock.
 
-  THE `people` FORM IS A LINE A PERSON, a dot in each of the twelve weeks they were in touch, each person's dots named
+  THE `who` FORM IS A LINE A PERSON, a dot in each of the twelve weeks they were in touch, each person's dots named
   in words, so it needs no fold of numbers under it (`heatPeoplePlan`).
 
   IT IS ON `grid` AND HAD NO ARM THERE, so until this file the app drew a heat block as stat tiles: the day as a
@@ -34,18 +34,18 @@
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
   const plan = $derived(heatPlan(block.rows.map((r) => ({ day: said(r, 0), value: said(r, 1) })), roadmapToday(opts.now)));
   const skipped = $derived(plan.skipped.length ? heatSkipped(plan.skipped.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
-  const people = $derived(block.form === 'people' ? heatPeoplePlan(block.rows.map((r) => ({ day: said(r, 0), who: said(r, 1) })), roadmapToday(opts.now)) : null);
+  const people = $derived(block.form === 'who' ? heatPeoplePlan(block.rows.map((r) => ({ day: said(r, 0), who: said(r, 1) })), roadmapToday(opts.now)) : null);
   const missed = $derived(people?.skipped.length ? heatMissed(people.skipped.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
 </script>
 
 {#if people}
   {#if people.empty}
-    <div class="heat" data-form="people">
+    <div class="heat" data-form="who">
       <p class="heat-empty">{HEAT_NONE}</p>
       {#if missed}<p class="heat-skipped">{missed}</p>{/if}
     </div>
   {:else}
-    <div class="heat" data-form="people" style="--weeks:{people.weeks}">
+    <div class="heat" data-form="who" style="--weeks:{people.weeks}">
       <ol class="heat-people" aria-label={people.name}>
         {#each people.people as p}
           <li class="heat-person">

@@ -14,6 +14,7 @@
     TREND,
     agentMarkFill,
     cardLayout,
+    cardsCount,
     initialOf,
     inline,
     isQuiet,
@@ -109,7 +110,8 @@
 {#if rows.length === 0}
   <p class="cards-empty">{CARDS_NONE}</p>
 {:else}
-  <ul class="cards-grid">
+  <!-- AS MANY COLUMNS AS FIT, AND NEVER MORE THAN THERE ARE CARDS (`cardsCount`), so three cards fill the row. -->
+  <ul class="cards-grid" data-cards={cardsCount(rows.length)}>
     {#each rows as r, n}
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null}
       {@const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), opts.runs?.[n], isQuiet(L, r.cells)) : null}

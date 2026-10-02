@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { KINDS, isKind } from './kinds.ts';
 import { parse, type Block } from './parse.ts';
 import { toHTML } from './html.ts';
-import { DAY_SECONDS, ROADMAP_NONE, dragPatch, roadmapPlan, roadmapRow, type DragMode } from './roadmap.ts';
+import { DAY_SECONDS, ROADMAP_NONE, dragPatch, roadmapPlan, roadmapRow, roadmapShare, type DragMode } from './roadmap.ts';
 import { addDays } from './forecast.ts';
 import { day } from './format.ts';
 
@@ -174,10 +174,11 @@ test('toHTML draws the bars, the stem and today from the plan, where the plan pu
   assert.match(html, new RegExp(`class="roadmap-today" d="M${plan.today} `, 'u'));
   /* A LABEL'S `--at` IS A SHARE OF THE WIDTH, as the stylesheet multiplies it by 100%. It was first written in the
      box's thousand units, `483.61`, which puts every label 48,361% of the way across. */
-  assert.match(html, /data-stem="" style="--at:0\.4836;--line:0">Launch</u);
-  /* The months are said, the first with its year. */
-  assert.match(html, />Sep 2026</u);
-  assert.match(html, />Oct</u);
+  assert.match(html, new RegExp(`data-stem="" style="--at:${roadmapShare(plan.stems[0]!.label.x).replace('.', '\\.')};--line:0">Launch<`, 'u'));
+  assert.ok(Number(roadmapShare(plan.stems[0]!.label.x)) < 1);
+  /* Five weeks of work are named by the week, each Monday a day and a month. */
+  assert.match(html, /<ol class="roadmap-months" data-weekly="" aria-hidden="true"><li class="roadmap-month" style="--at:[\d.]+">7 Sep<\/li>/u);
+  assert.match(html, />5 Oct</u);
 });
 
 test('EVERY MARK IN THE DRAWING SAYS HOW IT IS PAINTED, so a page with no roadmap rules does not fill it black', () => {
@@ -222,6 +223,7 @@ test('ONE DOT A BAR: a toned window carries its named dot on its due day, and it
   const names = /<ol class="roadmap-names"[\s\S]*?<\/ol>/u.exec(html)?.[0] ?? '';
   assert.match(names, />Regate window<\/li>/u);
   assert.doesNotMatch(names, /class="glyph"/u, 'a second dot after the name read as two marks for one bar');
+  assert.doesNotMatch(names, /data-intent/u, 'a name drawn in the ink claimed its tone by colour with no glyph inside');
   assert.equal([...html.matchAll(/class="roadmap-due" role="img" aria-label="watch this"/gu)].length, 1);
 });
 

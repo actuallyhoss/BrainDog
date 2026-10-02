@@ -152,9 +152,9 @@ const SHAPES: Record<string, string> = {
   'nothing in view': '```heat | Done\n2025-01-06 | 3\n```',
   /* PEOPLE'S "IN TOUCH": the page reader writes each day as `day()` does, and one column, so every row is one. */
   'days as the page reader writes them, one a person': '```heat | In touch, 12 weeks\n2 Sep 2026\n1 Sep 2026\n27 Jul 2026\n28 Aug 2026\n```',
-  'the people form, a line a person': '```heat people | In touch, 12 weeks\n2 Sep 2026 | S. Marchetti\n1 Sep 2026 | J. Okonkwo\n12 Aug 2026 | S. Marchetti\n27 Jul 2026 | Ravensworth Ltd\nsoon | Pell & Vine\n2025-01-06 | Nordhaven\n```',
-  'the people form with nobody in view': '```heat people\n2025-01-06 | Nordhaven\n```',
-  'the people form with more than it draws': `\`\`\`heat people\n${Array.from({ length: 11 }, (_, i) => `2026-09-${String(i + 1).padStart(2, '0')} | Person ${i + 1}`).join('\n')}\n\`\`\``,
+  'the who form, a line a person': '```heat who | In touch, 12 weeks\n2 Sep 2026 | S. Marchetti\n1 Sep 2026 | J. Okonkwo\n12 Aug 2026 | S. Marchetti\n27 Jul 2026 | Ravensworth Ltd\nsoon | Pell & Vine\n2025-01-06 | Nordhaven\n```',
+  'the who form with nobody in view': '```heat who\n2025-01-06 | Nordhaven\n```',
+  'the who form with more than it draws': `\`\`\`heat who\n${Array.from({ length: 11 }, (_, i) => `2026-09-${String(i + 1).padStart(2, '0')} | Person ${i + 1}`).join('\n')}\n\`\`\``,
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {
@@ -222,12 +222,12 @@ test('THE PEOPLE FORM IS A LINE A PERSON ACROSS THE TWELVE WEEKS, a dot a week i
   assert.equal(p.outside, 1);
   assert.equal(p.name, '12 weeks to 22 Sep 2026, 3 people in touch.');
   assert.deepEqual(p.ticks, [{ week: 0, label: 'Jul' }, { week: 3, label: 'Aug' }, { week: 8, label: 'Sep' }]);
-  const html = toHTML(parse(SHAPES['the people form, a line a person']!), { now: NOW });
+  const html = toHTML(parse(SHAPES['the who form, a line a person']!), { now: NOW });
   assert.match(html, /<li class="heat-person"><span class="heat-who">S\. Marchetti<\/span><span class="heat-weeks" role="img" aria-label="in touch 2 of 12 weeks, last on 2 Sep 2026">/u);
   assert.equal(html.match(/class="heat-week"/gu)?.length, 36);
   assert.match(html, /<span class="heat-week" data-on="" title="week of 31 Aug 2026"><\/span>/u);
   assert.doesNotMatch(html, /Points on this chart|heat-grid|<details/u, 'each line says itself, so there is no fold of numbers');
-  assert.match(toHTML(parse(SHAPES['the people form with nobody in view']!), { now: NOW }), /heat-empty/u);
+  assert.match(toHTML(parse(SHAPES['the who form with nobody in view']!), { now: NOW }), /heat-empty/u);
 });
 
 test('THE PEOPLE FORM DRAWS THE LATEST FEW AND COUNTS THE REST, and two month names never sit on neighbouring weeks', () => {
@@ -237,10 +237,10 @@ test('THE PEOPLE FORM DRAWS THE LATEST FEW AND COUNTS THE REST, and two month na
   assert.equal(p.people[0]!.who, 'Person 11', 'the latest in touch first');
   assert.equal(p.more, 11 - HEAT_PEOPLE_MOST);
   assert.match(p.name, /11 people in touch/u, 'the sentence counts everyone');
-  const html = toHTML(parse(SHAPES['the people form with more than it draws']!), { now: NOW });
+  const html = toHTML(parse(SHAPES['the who form with more than it draws']!), { now: NOW });
   assert.equal(html.match(/class="heat-person"/gu)?.length, HEAT_PEOPLE_MOST);
   assert.match(html, /<p class="heat-more">3 more people in touch<\/p>/u);
-  assert.doesNotMatch(toHTML(parse(SHAPES['the people form, a line a person']!), { now: NOW }), /heat-outside/u, 'a time in touch long ago is counted, not said');
+  assert.doesNotMatch(toHTML(parse(SHAPES['the who form, a line a person']!), { now: NOW }), /heat-outside/u, 'a time in touch long ago is counted, not said');
   /* 5 Oct 2026: the first week is 20 Jul to 26 Jul and the next holds 1 Aug, so July goes unnamed. */
   const ticks = heatPeoplePlan([{ day: '2026-10-05', who: 'Ann' }], '2026-10-05').ticks;
   assert.deepEqual(ticks.map((t) => t.week), [1, 6, 10]);

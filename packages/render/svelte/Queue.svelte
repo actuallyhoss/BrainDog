@@ -30,13 +30,16 @@
   THE `lead` FORM DRAWS THE FIRST QUESTION WHOLE: what its agents recommend, why, and what accepting it changes, a line
   each (`does`), above its ways to answer. The rest are the cards they always were.
 
+  ONLY THE FIRST CARD SAYS WHY UNDER EACH WAY TO ANSWER. Every other card is its question and its pills, and its reasons
+  (the question's why and each option's because) sit in a `details` that starts shut (`queueReasoned`).
+
   A QUESTION CAN BE CHOSEN FOR AN ANSWER IN BULK ONLY WHERE THE HOST TAKES ONE. With `onselect` each card leads with a
   box named for its question; without it there is no box, and the markup is `toHTML`'s. Which are chosen is the host's
   to say in `selected` (by `rowKey`) where it holds that, and this card's own otherwise, dropped when the fence changes.
 -->
 <script lang="ts">
   import { QUEUE_RECOMMENDED, hrefFor, inline, queueMore, queuePlan, symbolText, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
-  import { QUEUE_DOES, fileSrc, queueSuggested, queueWays, type QueueShows } from '../src/queue.ts';
+  import { QUEUE_DOES, QUEUE_REASONS, fileSrc, queueReasoned, queueSuggested, queueWays, type QueueShows } from '../src/queue.ts';
   import { CHOICE_KEYS, choiceOf, rowAt, rowKey } from '../src/cursor.ts';
   import Text from './Text.svelte';
 
@@ -116,7 +119,7 @@
     >{:else if shows && src(shows)}<span class="queue-visual" data-shows="file"><img class="queue-file" src={hrefFor(opts, src(shows)!)} alt="" /></span
     >{/if}{/snippet}
 
-{#snippet options(item: (typeof plan.items)[number])}
+{#snippet options(item: (typeof plan.items)[number], reasoned: boolean)}
   {@const keyed = Boolean(onact) && cursor != null && cursor === keyOf(item.row)}
   <ul class="queue-options">
     {#each item.options as o, n}
@@ -136,7 +139,7 @@
           <span class="queue-label">{o.label}</span>
           {#if o.recommended}<span class="queue-rec">{QUEUE_RECOMMENDED}</span>{/if}
         {/if}
-        {#if o.because}<span class="queue-because" data-calm=""><Text nodes={nodes(o.because)} {opts} /></span>{/if}
+        {#if reasoned && o.because}<span class="queue-because" data-calm=""><Text nodes={nodes(o.because)} {opts} /></span>{/if}
       </li>
     {/each}
   </ul>
@@ -148,6 +151,10 @@
   <div class="queue" onfocusin={onrowfocus ? focused : undefined}>
     {#each plan.items as item, n}
       {@const whole = lead && n === 0}
+      <!-- ONLY THE CARD A PERSON ANSWERS NEXT SAYS WHY EACH WAY, as `html.ts`'s `queue`: every other card is its question
+           and its pills, its reasons in a fold that opens on demand (`queueReasoned`). -->
+      {@const reasoned = tiles || queueReasoned(n)}
+      {@const because = item.options.filter((o) => o.because)}
       {@const suggested = tiles || whole ? item.options.find((o) => o.recommended) : undefined}
       {@const key = keyOf(item.row)}
       {@const on = onselect ? isOn(key) : false}
@@ -182,7 +189,7 @@
         <!-- A QUESTION IS A CARD'S HEADLINE, its money said short (`£39`, not `£39.00 GBP`), as the mirror says it. -->
         <h3 class="queue-question"><Text nodes={nodes(symbolText(item.question, true))} {opts} /></h3>
         {#if suggested}<p class="queue-suggested">{queueSuggested(suggested.label)}</p>{/if}
-        {#if item.why}<p class="queue-why"><Text nodes={nodes(item.why)} {opts} /></p>{/if}
+        {#if item.why && reasoned}<p class="queue-why"><Text nodes={nodes(item.why)} {opts} /></p>{/if}
         {#if whole && item.does.length}
           <ul class="queue-does" aria-label={QUEUE_DOES}>
             {#each item.does as line}<li class="queue-does-line"><Text nodes={nodes(line)} {opts} /></li>{/each}
@@ -191,10 +198,21 @@
         {#if tiles}
           <details class="queue-ways">
             <summary class="queue-ways-toggle">{queueWays(item.options.length)}</summary>
-            {@render options(item)}
+            {@render options(item, true)}
           </details>
         {:else}
-          {@render options(item)}
+          {@render options(item, reasoned)}
+          {#if !reasoned && (because.length || item.why)}
+            <details class="queue-ways queue-reasons">
+              <summary class="queue-ways-toggle">{QUEUE_REASONS}</summary>
+              {#if item.why}<p class="queue-why"><Text nodes={nodes(item.why)} {opts} /></p>{/if}
+              {#if because.length}
+                <ul class="queue-reasons-list">
+                  {#each because as o}<li class="queue-reason"><span class="queue-reason-label">{o.label}</span> <Text nodes={nodes(o.because)} {opts} /></li>{/each}
+                </ul>
+              {/if}
+            </details>
+          {/if}
         {/if}
       </article>
     {/each}

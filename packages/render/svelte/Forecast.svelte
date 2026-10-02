@@ -301,12 +301,15 @@
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
     </svg>
     <!-- TODAY'S BALANCE BESIDE TODAY'S DOT, where the line starts, hidden like the axis: the chart's name says it. -->
-    <span class="forecast-now-label num" style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true">{p.now.label}</span>
+    <!-- A CROSSING NEAR TODAY SETS THE TWO LABELS APART: the balance under its dot, the flag's day after its rule. -->
+    <span class="forecast-now-label num" data-near-flag={p.cross?.near ? '' : undefined} style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true"
+      >{p.now.label}</span
+    >
     <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk. -->
     <ol class="forecast-axis" aria-hidden="true">
       {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} style="--at:{a.at}">{a.label}</li>{/each}
     </ol>
-    {#if p.cross}<span class="forecast-pin" style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
+    {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
     {#if readout}
       <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
         <span class="forecast-readout-day">{readout.day}</span>
@@ -318,7 +321,7 @@
     {/if}
   </div>
   <ol class="forecast-ticks" aria-hidden="true">
-    {#each p.ticks as t}<li class="forecast-tick" style="--at:{t.at}">{t.label}</li>{/each}
+    {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
   </ol>
 {/snippet}
 
@@ -464,7 +467,8 @@
   {#if !drawn || !shown || !plan}
     <p class="forecast-empty">{FORECAST_NONE}</p>
   {:else}
-    {@render said(plan)}
+    <!-- NO SENTENCE WHERE THE PAGE'S HEADLINE SAYS IT (`legend`), until a knob moves the walk off the one it read. -->
+    {#if plan.legend}{@render said(plan)}{/if}
     {@render chart(plan)}
     {#if soon}
       <p class="forecast-soon">{soon}</p>

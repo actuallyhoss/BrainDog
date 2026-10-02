@@ -79,9 +79,37 @@
     color: var(--dim);
   }
 
+  /* WHO ASKED STOPS IN AN ELLIPSIS RATHER THAN WRAPPING, so the by-line is one line on a phone: a rule's long name
+     put "4w ago" on a line of its own under it. The time never gives way; the name does, past a short measure. */
   .queue-who {
+    min-inline-size: 0;
+    max-inline-size: 28ch;
+    overflow: hidden;
     color: var(--ink2);
     font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .queue-when {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* WHO ASKED AND WHEN WAIT FOR THE CARD (DIRECTION §35), as the renderer marks them (`data-calm`, `blocks.css`), on
+     every host's by-line: Decide's answerable cards draw the same line with no mark on it, and showed it always. What
+     the question costs stays, because it is the card's place in the queue and not a detail of it. Only where there is
+     a pointer that hovers; under a thumb the line is always there. */
+  @media (hover: hover) and (pointer: fine) {
+    .queue-by > :not(.queue-cost, :has(strong)) {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .queue-card:is(:hover, :focus-within, [data-focused]) > .queue-by > *,
+    [data-row-cursor] > .queue-card > .queue-by > * {
+      opacity: 1;
+    }
   }
 
   /* THE BAND SITS AT THE END OF THE BY-LINE, pushed there rather than placed there, because it is
@@ -147,7 +175,8 @@
 
   /* WHERE A REASON IS GIVEN, EACH WAY IS A LINE: the button in a column of ONE fixed width, its reason beside it. The
      width is the queue's and not each question's, so every reason in the tile starts at one x, question after question,
-     and does not follow the longest button of its own question. A longer option wraps inside its pill. The suggestion's
+     and does not follow the longest button of its own question. It is wide enough for a short answer and its "Suggested"
+     on one line ("Keep the subdomain" took two at 12rem); a longer option wraps inside its pill. The suggestion's
      word goes under its button, in the button's column, so it never pushes that one reason out of line. */
   .queue-options:has(.queue-because) {
     display: grid;
@@ -156,7 +185,7 @@
 
   .queue-options:has(.queue-because) > .queue-option {
     display: grid;
-    grid-template-columns: 12rem minmax(0, 1fr);
+    grid-template-columns: 15rem minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-4);
     align-items: baseline;
   }
@@ -185,7 +214,15 @@
      wraps inside its pill rather than pushing the card sideways at 390. */
   .queue-act {
     justify-self: start;
+    /* "SUGGESTED" IS ITS OWN PART OF THE PILL, which never wraps (below): the option's words are one part and give way
+       inside themselves, the mark keeps its one line at their end, on their first line's baseline. A flex pill does
+       not centre a line in its height as a button does, so the padding puts a one-line pill's words in its middle and
+       a longer one grows from there. */
+    display: inline-flex;
+    align-items: baseline;
+    column-gap: var(--sp-2);
     min-block-size: var(--ctl-h);
+    padding-block: max(0px, calc((var(--ctl-h) - 2px - 1lh) / 2));
     padding-inline: var(--sp-4);
     border: 1px solid transparent;
     border-radius: var(--r-pill);
@@ -218,21 +255,22 @@
   }
 
   /* THE NUMBER KEY THAT ANSWERS, a cap at the start of the option's pill, drawn only on the question the cursor is on
-     and only when the host can answer it. Inside the pill so it costs the shared tracks nothing. */
+     and only when the host can answer it. Inside the pill so it costs the shared tracks nothing; the pill's own gap is
+     the step to the words. */
   .queue-key {
     display: inline-flex;
+    flex: none;
+    align-self: center;
     align-items: center;
     justify-content: center;
     min-inline-size: 18px;
     block-size: 18px;
-    margin-inline-end: var(--sp-2);
     padding: 0 4px;
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
     color: var(--dim);
     font-size: var(--t-xs);
     font-variant-numeric: tabular-nums;
-    vertical-align: 0.1em;
   }
 
   /* On the ink pill the cap takes the pill's own letters, so it is still read and not lost on the fill. */
@@ -265,8 +303,10 @@
      host draws it in the button, and a dot where it draws it after the button, whose word is then kept for a screen
      reader alone. Not while the option is the one being answered: its pill is the selected ground then, and says so. */
   .queue-act > .queue-rec {
-    margin-inline-start: var(--sp-2);
+    flex: none;
+    margin-inline-start: 0;
     padding: 0;
+    white-space: nowrap;
     background: none;
     color: inherit;
     opacity: 0.72;
@@ -278,7 +318,8 @@
     display: inline-block;
     inline-size: var(--dot);
     block-size: var(--dot);
-    margin-inline-start: var(--sp-2);
+    flex: none;
+    align-self: center;
     border-radius: var(--r-pill);
     background: currentColor;
     opacity: 0.72;
@@ -310,6 +351,14 @@
 
   .queue-lead > .queue-question {
     font-size: var(--t-xl);
+  }
+
+  /* THE AIR UNDER THE LEAD IS FOR A QUESTION UNDER IT. Where it is the last thing in its tile, alone in a box that is
+     the last of its own (Decide's answerable card), the tile's padding is the air, and the two together left a band of
+     nothing under Accept and Reject. */
+  .queue > .queue-lead:last-child,
+  :last-child > .queue-lead:only-child {
+    padding-block-end: 0;
   }
 
   /* ON A PHONE A QUESTION IS A STEP UNDER THE PAGE'S HEADLINE, not level with it: at 20 and 24 the questions under
@@ -606,6 +655,34 @@
   .queue-ways-toggle:hover {
     background: var(--s2);
     color: var(--ink);
+  }
+
+  /* `Why`: A CARD'S REASONS, FOLDED. Only the lead question says why each way under its pill; every other card keeps
+     them behind this one quiet word, which sits on the card's own edge (the pill's air hangs into the margin), and
+     opens to the question's reason and a line an option, the option's name in the second ink before its reason. */
+  .queue-reasons > .queue-ways-toggle {
+    margin-inline-start: calc(var(--sp-2) * -1);
+  }
+
+  /* Spaced by margins and not a grid, because a `details` takes no layout of its own in every engine yet. */
+  .queue-reasons > :not(summary) {
+    margin-block-start: var(--sp-2);
+  }
+
+  .queue-reasons-list {
+    display: grid;
+    gap: var(--sp-1);
+    max-inline-size: var(--measure);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .queue-reason-label {
+    color: var(--ink2);
+    font-weight: 500;
   }
 
   @media (pointer: coarse) {

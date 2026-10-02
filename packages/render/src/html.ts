@@ -26,10 +26,10 @@ import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
-import { QUEUE_DOES, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
+import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
 import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
 import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
@@ -876,7 +876,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}${tinted}>${picture}<div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${middle}${facts}${next}${who}</li>`;
     })
     .join('');
-  return `<ul class="cards-grid">${body}</ul>`;
+  return `<ul class="cards-grid" data-cards="${cardsCount(rows.length)}">${body}</ul>`;
 }
 
 /**
@@ -944,9 +944,11 @@ function feed(b: Block, o: RenderOptions): string {
           const line = i === g.earlier ? `<li class="feed-seen">${escape(FEED_EARLIER)}</li>` : '';
           return `${line}<li class="feed-row"${fresh ? ' data-new' : ''}${toneAttrs(r.tone)} data-row="${escape(rowKey(r, b.rows.indexOf(r)))}"><span class="feed-count num">${
             feedBurst(said(r.cells[2])) ? drawn(r.cells[2]) : ''
-          }</span>${lead}<span class="feed-what"><span class="feed-who">${
-            who ? drawn(who) : MISSING
-          }</span> ${renderInline(feedCasedNodes(inline(r.cells[3] ?? '', o)), o)}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
+          }</span>${lead}<span class="feed-what">${
+            /* A RULE THAT WORDED ITS OWN LINE SENDS NO WHO ("Tallyard categorised"), and draws none: a dash in front of
+               every rule's line read as something missing when nothing was. Anyone else without a name is still one. */
+            who || g.by !== 'rule' ? `<span class="feed-who">${who ? drawn(who) : MISSING}</span> ` : ''
+          }${renderInline(feedCasedNodes(inline(r.cells[3] ?? '', o)), o)}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
         })
         .join('');
       /* ONE GROUP DRAWS NO HEAD (`feedPlan`'s `lone`). */
@@ -973,14 +975,27 @@ function queue(b: Block, o: RenderOptions): string {
   const body = plan.items
     .map((item, n) => {
       /* `data-choice` IS THE NUMBER KEY THAT ANSWERS WITH AN OPTION, 1 to 9 (`cursor.ts`), so a host can press it. */
+      /* ONLY THE CARD A PERSON ANSWERS NEXT SAYS WHY EACH WAY, under its pill (`queueReasoned`). Every other card is its
+         question and its pills, with the reasons in a fold that opens on demand: Decide drew eight questions with a
+         paragraph under every option, three screens of small print on a phone (visual review 3). */
+      const reasoned = tiles || queueReasoned(n);
       const options = item.options
         .map(
           (opt, at) =>
             `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}${at < CHOICE_KEYS ? ` data-choice="${at + 1}"` : ''}>${visual(opt.shows, o)}<span class="queue-label">${escape(opt.label)}</span>${
               opt.recommended ? `<span class="queue-rec">${escape(QUEUE_RECOMMENDED)}</span>` : ''
-            }${opt.because ? `<span class="queue-because" data-calm="">${drawn(opt.because)}</span>` : ''}</li>`,
+            }${reasoned && opt.because ? `<span class="queue-because" data-calm="">${drawn(opt.because)}</span>` : ''}</li>`,
         )
         .join('');
+      const because = item.options.filter((opt) => opt.because);
+      const folded =
+        reasoned || (because.length === 0 && !item.why)
+          ? ''
+          : `<details class="queue-ways queue-reasons"><summary class="queue-ways-toggle">${escape(QUEUE_REASONS)}</summary>${item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : ''}${
+              because.length
+                ? `<ul class="queue-reasons-list">${because.map((opt) => `<li class="queue-reason"><span class="queue-reason-label">${escape(opt.label)}</span> ${drawn(opt.because)}</li>`).join('')}</ul>`
+                : ''
+            }</details>`;
       const key = ` data-row="${escape(rowKey(item.row, b.rows.indexOf(item.row)))}"`;
       /* THE BAND IS A LABEL AND NOT AN ARGUMENT. It sits last on the by-line, in the same register as
          who asked and when, because it is the answer to "why is this card here" and not the card's
@@ -1005,7 +1020,8 @@ function queue(b: Block, o: RenderOptions): string {
           suggested ? `<p class="queue-suggested">${escape(queueSuggested(suggested.label))}</p>` : ''
         }${why}${does}<ul class="queue-options">${options}</ul></article>`;
       }
-      if (!tiles) return `<article class="queue-card"${toneAttrs(item.row.tone)}${key}>${by}${question}${why}<ul class="queue-options">${options}</ul></article>`;
+      if (!tiles)
+        return `<article class="queue-card"${toneAttrs(item.row.tone)}${key}>${by}${question}${reasoned ? why : ''}<ul class="queue-options">${options}</ul>${folded}</article>`;
       /* A TILE IS THE SAME CARD LED BY WHAT ITS RECOMMENDED OPTION IS, its ways to answer folded under it. The fold is a
          `details`, so it opens with no script in the mirror and in the app alike, and it starts shut: a tile that
          arrived showing one option picked out and the rest hidden would be the recommendation standing in for the
@@ -1258,14 +1274,19 @@ function forecast(b: Block, o: RenderOptions): string {
     Object.entries(p)
       .map(([k, v]) => ` ${k}="${v}"`)
       .join('');
-  const said = `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>`;
+  /* NO SENTENCE WHERE THE PAGE'S HEADLINE SAYS IT (`legend`): the flag on the crossing stays. */
+  const said = plan.legend ? `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>` : '';
+  /* A CROSSING NEAR TODAY SETS THE TWO LABELS APART: today's balance under its dot, the flag's day after its rule. */
+  const near = plan.cross?.near ? ' data-near-flag=""' : '';
   const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis
     .map((a) => `<li class="forecast-axis-tick"${a.zero ? ' data-zero=""' : ''} style="--at:${a.at}">${escape(a.label)}</li>`)
     .join('')}</ol>`;
-  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-walk', plan.walk, painted(FORECAST_PAINT.walk))}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num" style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true">${escape(plan.now.label)}</span>${axis}${
-    plan.cross ? `<span class="forecast-pin" style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-walk', plan.walk, painted(FORECAST_PAINT.walk))}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true">${escape(plan.now.label)}</span>${axis}${
+    plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
   }</div>`;
-  const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks.map((t) => `<li class="forecast-tick" style="--at:${t.at}">${escape(t.label)}</li>`).join('')}</ol>`;
+  const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
+    .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
+    .join('')}</ol>`;
   const row = (when: string, what: string, move: string, balance: string) =>
     `<tr><th scope="row">${escape(when)}</th><td>${escape(what)}</td><td class="num">${escape(move)}</td><td class="num">${escape(balance)}</td></tr>`;
   const numbers = `<details class="forecast-numbers"><summary class="forecast-toggle">${escape(FORECAST_NUMBERS)}</summary><table class="forecast-table"><thead><tr>${[FORECAST_WHEN, FORECAST_WHAT, FORECAST_MOVE, FORECAST_BALANCE]
@@ -1334,15 +1355,16 @@ function roadmap(b: Block, o: RenderOptions): string {
   const names = `<ol class="roadmap-names" aria-hidden="true">${plan.bars
     .map(
       (bar) =>
-        `<li class="roadmap-name" data-side="${bar.label.side}"${toneAttrs(bar.tone)} style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}</li>`,
+        `<li class="roadmap-name" data-side="${bar.label.side}" style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}</li>`,
     )
     .join('')}${plan.stems
-    .map((s) => `<li class="roadmap-name" data-stem=""${toneAttrs(s.tone)} style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}</li>`)
+    .map((s) => `<li class="roadmap-name" data-stem="" style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}</li>`)
     .join('')}</ol>`;
-  /* ONE DOT A MARK: the names carry no glyph, because the dot on the due day is the tone and is named. A month band
-     too narrow for its name at the start edge is not named. */
-  const months = `<ol class="roadmap-months" aria-hidden="true">${plan.bands
-    .filter((m) => m.label)
+  /* ONE DOT A MARK: the names carry no glyph, because the dot on the due day is the tone and is named. NOR ANY
+     INTENT: a name is drawn in the ink whatever its mark's tone, and an intent on it with no glyph inside was colour
+     claiming a meaning it never drew (the a11y gate's `intent-without-glyph`, on `/p/kiln`). The axis names each
+     month wide enough to hold its name, or each Monday of a short span (`ticks`). */
+  const months = `<ol class="roadmap-months"${plan.weekly ? ' data-weekly=""' : ''} aria-hidden="true">${plan.ticks
     .map((m) => `<li class="roadmap-month"${m.odd ? ' data-odd=""' : ''} style="--at:${roadmapShare(m.x)}">${escape(m.label)}</li>`)
     .join('')}</ol>`;
   /* A LANE LIST, NOT A TABLE: a name with its span of days under it and a short bar where it lies in the span. It is
@@ -1420,7 +1442,7 @@ function ring(b: Block, o: RenderOptions): string {
  */
 function heat(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
-  if (b.form === 'people') return heatPeople(b, said, o);
+  if (b.form === 'who') return heatPeople(b, said, o);
   const plan = heatPlan(
     b.rows.map((r) => ({ day: said(r, 0), value: said(r, 1) })),
     roadmapToday(o.now),
@@ -1452,7 +1474,7 @@ function heat(b: Block, o: RenderOptions): string {
 }
 
 /**
- * `heat people`: a line a person across the twelve weeks, a dot in each week they were in touch (`heatPeoplePlan`).
+ * `heat who`: a line a person across the twelve weeks, a dot in each week they were in touch (`heatPeoplePlan`).
  * Each person's dots are named in words, so there is no fold of numbers under it.
  */
 function heatPeople(b: Block, said: (r: Row, i: number) => string, o: RenderOptions): string {
@@ -1461,7 +1483,7 @@ function heatPeople(b: Block, said: (r: Row, i: number) => string, o: RenderOpti
     roadmapToday(o.now),
   );
   const skipped = plan.skipped.length ? `<p class="heat-skipped">${escape(heatMissed(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
-  if (plan.empty) return `<div class="heat" data-form="people"><p class="heat-empty">${escape(HEAT_NONE)}</p>${skipped}</div>`;
+  if (plan.empty) return `<div class="heat" data-form="who"><p class="heat-empty">${escape(HEAT_NONE)}</p>${skipped}</div>`;
   const people = plan.people
     .map(
       (p) =>
@@ -1475,7 +1497,7 @@ function heatPeople(b: Block, said: (r: Row, i: number) => string, o: RenderOpti
     .join('');
   const ticks = plan.ticks.map((t) => `<li class="heat-tick" style="--week:${t.week}">${escape(t.label)}</li>`).join('');
   const more = plan.more ? `<p class="heat-more">${escape(heatPeopleMore(plan.more))}</p>` : '';
-  return `<div class="heat" data-form="people" style="--weeks:${plan.weeks}"><ol class="heat-people" aria-label="${escape(plan.name)}">${people}</ol><ol class="heat-ticks" aria-hidden="true">${ticks}</ol>${more}${skipped}</div>`;
+  return `<div class="heat" data-form="who" style="--weeks:${plan.weeks}"><ol class="heat-people" aria-label="${escape(plan.name)}">${people}</ol><ol class="heat-ticks" aria-hidden="true">${ticks}</ol>${more}${skipped}</div>`;
 }
 
 /**

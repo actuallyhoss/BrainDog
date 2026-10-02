@@ -21,7 +21,7 @@
  * in view only, so a big day in January does not wash September pale; and a day after today is not washed at all,
  * as `days.ts` marks it, because nothing on it has happened yet.
  *
- * THE `people` FORM IS `day | who`, one line a person and a dot a week (`heatPeoplePlan`), below.
+ * THE `who` FORM IS `day | who`, one line a person and a dot a week (`heatPeoplePlan`), below.
  *
  * ON A PHONE THE GRID IS EIGHT WEEKS, the last eight of these twelve. That is the host's stylesheet hiding the first
  * four columns, not a second plan: the scale stays the twelve weeks', so a day keeps its wash when the page narrows.
@@ -118,7 +118,7 @@ export const heatSkipped = (said: readonly string[]): string => `Not drawn, beca
 export const heatOutside = (n: number): string =>
   `${n} ${n === 1 ? 'day falls' : 'days fall'} outside the twelve weeks to today and ${n === 1 ? 'is' : 'are'} not drawn.`;
 
-/* ── the `people` form: one line a person, a dot a week ───────────────────── */
+/* ── the `who` form: one line a person, a dot a week ──────────────────────── */
 
 /** One person's line: who, a mark for each of the weeks drawn, how many of them hold one, and the latest day. */
 export type HeatPerson = { who: string; weeks: boolean[]; count: number; last: string };
@@ -148,7 +148,7 @@ export const HEAT_PEOPLE_MOST = 8;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * The `people` form: `day | who`, one row a time somebody was in touch, drawn as one line a person across the twelve
+ * The `who` form: `day | who`, one row a time somebody was in touch, drawn as one line a person across the twelve
  * weeks with a dot in each week they were in touch.
  *
  * A DAY GRID OF EIGHTY-FOUR CELLS ANSWERED "WHEN WAS ANYBODY IN TOUCH" AND NOBODY ASKED THAT. People's "In touch, 12

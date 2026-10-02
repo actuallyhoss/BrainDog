@@ -17,13 +17,19 @@
  * last day, because `by` is the day a task is due and it is worked on that day, so one ending on the
  * 10th and one starting on the 10th overlap.
  *
- * THE SPAN STARTS JUST BEFORE THE FIRST THING IN IT, and ends on the first of the month after the latest. It
+ * THE SPAN STARTS JUST BEFORE THE FIRST THING IN IT, and ends a few days after the latest. It
  * started on the first of the earliest month, so a plan that began on 30 August drew all of August as empty track
  * before its first bar (the kiln review). It now starts a few days ahead of the earliest day, or of today where today
  * fell inside that first month, so today's line is drawn wherever it was before, and never earlier than the first of
  * that month. A month band at the start edge too narrow for its name is left unnamed, and the year goes on the next.
  * It does not stretch to take in today otherwise: a plan wholly next summer would squeeze into the far tenth of the
- * box behind months of empty track. Today's line is simply absent when today is outside the span.
+ * box behind months of empty track. Today's line is simply absent when today is outside the span. The end was the first
+ * of the month after the latest, so Kiln's bars to 21 September drew the last third of the box as empty September
+ * (visual review 3); it now ends the same few days past the latest thing, or past today where the whole-month span
+ * held today, so today's line stays drawn wherever it was.
+ *
+ * A SHORT SPAN IS NAMED BY THE WEEK. Under ten weeks the axis says each Monday ("24 Aug", "31 Aug", "7 Sep"), where a
+ * month a name left "Aug 2026 · Sep" under five weeks of work. The month bands stay, shaded, under either.
  *
  * POSITIONS ARE MEASURED FROM THE START EDGE, in the `0 0 1000 100` box every chart shares. How a time
  * axis reads in a right-to-left layout is still open, so this plan
@@ -66,8 +72,11 @@ export type RoadmapStem = { row: number; day: string; title: string; tone?: Tone
  */
 export type RoadmapBand = { month: string; label: string; x: string; width: string; odd: boolean };
 
+/** A name on the time axis: a month band's name, or a Monday's day where the span is short (`RoadmapPlan.ticks`). */
+export type RoadmapTick = { x: string; label: string; odd: boolean };
+
 export type RoadmapPlan = {
-  /** The first day of the span, a few days before the earliest, and the day after its last, the first of a month. */
+  /** The first day of the span, a few days before the earliest, and the day after its last, a few days past the latest. */
   from: string;
   to: string;
   /** How many tracks the windows need, which is the most of them in hand on any one day. */
@@ -87,6 +96,12 @@ export type RoadmapPlan = {
   /** How many lines the stem labels need. */
   lines: number;
   bands: RoadmapBand[];
+  /**
+   * The names under the drawing: each Monday where the span is under ten weeks (`weekly`), and otherwise every month
+   * band wide enough to hold its name.
+   */
+  ticks: RoadmapTick[];
+  weekly: boolean;
   /** The today line's x, at the middle of today, or `null` when today is not in the span. */
   today: string | null;
   /** The rows that could not be placed, by index. */
@@ -103,6 +118,8 @@ const SPAN_LEAD = 0.03;
 const SPAN_LEAD_DAYS = 2;
 /** A month band at the start edge narrower than this, in the box's units, is too narrow for `Aug 2026`. */
 const SLIVER = 80;
+/** Under this many days the axis names each Monday rather than each month: ten weeks, about ten names. */
+const WEEKLY_DAYS = 70;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -169,16 +186,21 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
   });
 
   const days = [...windows.flatMap(({ r }) => [r.start, r.end]), ...singles.map(({ r }) => r.end)];
-  if (days.length === 0) return { from: '', to: '', tracks: 0, lanes: false, laneCount: 0, bars: [], stems: [], lines: 0, bands: [], today: null, skipped, empty: true };
+  if (days.length === 0)
+    return { from: '', to: '', tracks: 0, lanes: false, laneCount: 0, bars: [], stems: [], lines: 0, bands: [], ticks: [], weekly: false, today: null, skipped, empty: true };
 
   const sorted = [...days].sort();
   const month0 = `${sorted[0]!.slice(0, 7)}-01`;
-  const to = nextMonth(sorted.at(-1)!);
-  /* TODAY COUNTS AS THE FIRST THING WHERE THE WHOLE-MONTH SPAN HELD IT, so its line is drawn wherever it was drawn. */
-  const first = isDay(today) && today >= month0 && today < sorted[0]! ? today : sorted[0]!;
-  const lead = Math.max(SPAN_LEAD_DAYS, Math.round(daysBetween(first, to) * SPAN_LEAD));
+  const monthEnd = nextMonth(sorted.at(-1)!);
+  /* TODAY COUNTS AS THE FIRST OR THE LAST THING WHERE THE WHOLE-MONTH SPAN HELD IT, so its line is drawn wherever it was. */
+  const held = isDay(today) && today >= month0 && today < monthEnd;
+  const first = held && today < sorted[0]! ? today : sorted[0]!;
+  const last = held && today > sorted.at(-1)! ? today : sorted.at(-1)!;
+  const lead = Math.max(SPAN_LEAD_DAYS, Math.round((daysBetween(first, last) + 1) * SPAN_LEAD));
   const ahead = shifted(first, -lead);
   const from = ahead && ahead > month0 ? ahead : month0;
+  /* THE SAME FEW DAYS PAST THE LAST THING, and the first of the next month only where the calendar runs out first. */
+  const to = shifted(last, 1 + lead) || monthEnd;
   const span = daysBetween(from, to);
   const x = (day: string, offset = 0): number => ((daysBetween(from, day) + offset) / span) * 1000;
 
@@ -212,12 +234,28 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
   const laneOf = new Map(order.map(({ row }, i) => [row, i] as const));
   /* BESIDE ITS BAR, ON A LANE OF ITS OWN: over it when the bar is as wide as a name, after its end where a name fits
      before the edge, before its start where it fits there, and otherwise on whichever side has more room. */
-  const labelOf = (row: number, from: number, to: number): RoadmapLabel => {
+  /* WHAT A NAME SET BEFORE ITS BAR HAS: the box's edge on a lane of its own, and on a shared track only the first window
+     has any, since the name of the one before runs up to this one's start. */
+  const before = new Map<number, number>();
+  for (const on of byTrack.values()) on.forEach((w, i) => before.set(w.row, lanes || i === 0 ? w.from : 0));
+  const now = isDay(today) && today >= from && today < to ? x(today, 0.5) : null;
+  const placedLabel = (row: number, from: number, to: number): RoadmapLabel => {
     if (!lanes) return { x: at(from), side: 'over', room: at(next.get(row)! - from) };
     if (to - from >= labelWidth) return { x: at(from), side: 'over', room: at(to - from) };
     const afterRoom = 1000 - to;
     const after = afterRoom >= labelWidth || afterRoom >= from;
     return after ? { x: at(to), side: 'after', room: at(afterRoom) } : { x: at(from), side: 'before', room: at(from) };
+  };
+  /* A NAME TODAY'S LINE WOULD RUN THROUGH GOES BEFORE ITS BAR, where a whole name fits there and the line is not: the
+     line ran through the first task's name on Kiln's roadmap (visual review 3). */
+  const labelOf = (row: number, from: number, to: number): RoadmapLabel => {
+    const label = placedLabel(row, from, to);
+    if (now === null || label.side === 'before') return label;
+    const start = Number(label.x);
+    const room = before.get(row)!;
+    const crossed = now >= start && now <= start + Math.min(Number(label.room), labelWidth);
+    const clear = now < from - labelWidth || now > from;
+    return crossed && clear && room >= labelWidth ? { x: at(from), side: 'before', room: at(room) } : label;
   };
   const bars: RoadmapBar[] = windows.map(({ row, r }) => {
     const { from, to } = span_(r);
@@ -261,10 +299,12 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
   let named = false;
   for (let month = from, i = 0; month < to; month = nextMonth(month), i++) {
     const name = MONTHS[Number(month.slice(5, 7)) - 1]!;
-    const width = x(nextMonth(month)) - x(month);
-    /* THE FIRST NAMED MONTH SAYS ITS YEAR, so a sliver left unnamed at the edge hands the year on. */
+    /* THE LAST BAND STOPS AT THE SPAN'S END, which is no longer the first of a month. */
+    const width = Math.min(x(nextMonth(month)), 1000) - x(month);
+    /* THE FIRST NAMED MONTH SAYS ITS YEAR, so a sliver left unnamed at the edge hands the year on. A sliver at the end
+       edge is not named either: a span ending 3 October drew "Oct" in two days of track, cut to an ellipsis. */
     const withYear = !named || month.slice(5, 7) === '01';
-    const sliver = i === 0 && width < SLIVER;
+    const sliver = (i === 0 || nextMonth(month) >= to) && width < SLIVER;
     if (!sliver) named = true;
     bands.push({
       month: month.slice(0, 7),
@@ -274,6 +314,19 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
       odd: i % 2 === 1,
     });
   }
+
+  /* EACH MONDAY OF A SHORT SPAN, in the box's own units, the band it falls in setting its shade, but for one too near
+     the end edge to hold its name, which would be cut to an ellipsis as a sliver's month is. */
+  const weekly = span < WEEKLY_DAYS;
+  const mondays: RoadmapTick[] = [];
+  if (weekly) {
+    const weekday = new Date(`${from}T00:00:00Z`).getUTCDay();
+    for (let d = shifted(from, (8 - weekday) % 7); d && d < to && 1000 - x(d) >= SLIVER; d = shifted(d, 7)) {
+      const band = bands.findLast((b) => b.month <= d.slice(0, 7));
+      mondays.push({ x: at(x(d)), label: day(d).split(' ').slice(0, 2).join(' '), odd: band?.odd ?? false });
+    }
+  }
+  const ticks = weekly ? mondays : bands.filter((b) => b.label).map((b) => ({ x: b.x, label: b.label, odd: b.odd }));
 
   return {
     from,
@@ -285,7 +338,9 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
     stems,
     lines: ends.length,
     bands,
-    today: isDay(today) && today >= from && today < to ? at(x(today, 0.5)) : null,
+    ticks,
+    weekly,
+    today: now === null ? null : at(now),
     skipped,
     empty: false,
   };

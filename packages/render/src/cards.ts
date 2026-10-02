@@ -272,6 +272,18 @@ export function runFaceOf(cell: string, host: RunCell | null | undefined, quiet:
 }
 
 /**
+ * How many cards the grid holds, as the `data-cards` word the host's stylesheet caps its columns at: `1`, `2`, `3`, or
+ * `many` from `CARDS_WIDE` up, where as many columns as fit are already no more than there are cards.
+ *
+ * THE GRID TAKES AS MANY COLUMNS AS FIT, AND NEVER MORE THAN THERE ARE CARDS, `min(count, columns)`. Projects' three
+ * cards in play sat in four columns with a hole where the fourth would go (visual review 3); with the count on the grid
+ * the stylesheet sizes each track to at least its share of the row, so three cards fill it. An attribute and not a
+ * custom property, because a page kind places every mark by an attribute and adds no inline style.
+ */
+export const CARDS_WIDE = 4;
+export const cardsCount = (n: number): string => (n >= CARDS_WIDE ? 'many' : String(Math.max(1, Math.floor(n))));
+
+/**
  * The renderer's own words. It cannot import `apps/web`'s `copy.ts`, because it imports nothing
  * (the `graph` gate), so the few sentences it draws live here, as `Grid.svelte`'s `NOT_SAVED` does.
  */

@@ -8,9 +8,9 @@
 
 @layer components {
   /* ── cards: one card per row ─────────────────────────────────────────────
-     `auto-fill` over 17rem, so a lane of one card keeps a card's width rather than stretching across
-     the page, and `min()` so a container narrower than one card is one column, not a sideways
-     scroll. No breakpoint: the grid answers its container, which is 05 §6's rule for width.
+     `auto-fill` over 17rem, so a run of cards takes as many columns as fit, and `min()` so a container
+     narrower than one card is one column, not a sideways scroll. A grid of one to three cards is
+     capped at its count below, so a few cards fill the row instead of leaving holes. No breakpoint: the grid answers its container, which is 05 §6's rule for width.
      `cards-grid` and not `cards`, because the register's phone list and `/decide` already own that
      name, and a rule here is global. */
 
@@ -26,6 +26,21 @@
     padding: 0;
     list-style: none;
     clip-path: inset(2px 0 0);
+  }
+
+  /* NEVER MORE COLUMNS THAN CARDS (`data-cards`, from `src/cards.ts`): three cards sat in four columns with a hole
+     where the fourth would go. Each track is at least its share of the row, so a few cards fill it, and still at least
+     a card's width, so a narrow tile drops to fewer columns as before. `many` keeps the auto-fill above. */
+  .cards-grid[data-cards='1'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cards-grid[data-cards='2'] {
+    grid-template-columns: repeat(auto-fill, minmax(max(min(17rem, 100%), calc((100% - var(--sp-5)) / 2)), 1fr));
+  }
+
+  .cards-grid[data-cards='3'] {
+    grid-template-columns: repeat(auto-fill, minmax(max(min(17rem, 100%), calc((100% - 2 * var(--sp-5)) / 3)), 1fr));
   }
 
   /* A CARD IS A SECTION OF ITS TILE, and nothing inside it is boxed: the head, the figure and the facts with air

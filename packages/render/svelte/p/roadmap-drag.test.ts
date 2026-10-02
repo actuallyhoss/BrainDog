@@ -134,8 +134,9 @@ test('a date moves whole, and its stem is drawn at the middle of the day it will
   const plan = roadmapPlan([roadmapRow('Launch', '2026-09-30', '')], '2026-09-22');
   const stem = plan.stems[0]!;
   assert.deepEqual(dragWindow({ start: '', end: stem.day }, 'move', -3), { start: '', end: addDays(stem.day, -3) });
-  /* The span starts two days ahead of today, the 20th, and runs to 1 Oct: the 27th's middle is 7.5 of its 11 days in. */
-  assert.deepEqual(dragDrawn({ start: '', end: stem.day }, 'move', -3, plan), { x: '681.82', width: '0' });
+  /* The span starts two days ahead of today, the 20th, and runs two days past the 30th, to 3 Oct: the 27th's middle is
+     7.5 of its 13 days in. */
+  assert.deepEqual(dragDrawn({ start: '', end: stem.day }, 'move', -3, plan), { x: '576.92', width: '0' });
 });
 
 test('a bar under the pointer is drawn where the plan would put that window, in the same units', async () => {
@@ -145,10 +146,10 @@ test('a bar under the pointer is drawn where the plan would put that window, in 
   const bar = plan.bars.find((b) => b.title === 'Build')!;
   /* Not moved, it is exactly the bar the plan drew. */
   assert.deepEqual(dragDrawn(bar, 'move', 0, plan), { x: bar.x, width: bar.width });
-  /* Moved a week, the same width, a week along: seven of the sixty-one days in September and October. */
+  /* Moved a week, the same width, a week along: seven of the thirty-seven days from 1 Sep to two days past 5 Oct. */
   const moved = dragDrawn(bar, 'move', 7, plan);
   assert.equal(moved.width, bar.width);
-  assert.equal(moved.x, String(Math.round((7 / 61) * 1000 * 100) / 100));
+  assert.equal(moved.x, String(Math.round((7 / 37) * 1000 * 100) / 100));
   /* The start pulled past the end stops at one day, as `dragPatch` stops it. */
-  assert.equal(dragDrawn(bar, 'start', 40, plan).width, String(Math.round((1 / 61) * 1000 * 100) / 100));
+  assert.equal(dragDrawn(bar, 'start', 40, plan).width, String(Math.round((1 / 37) * 1000 * 100) / 100));
 });

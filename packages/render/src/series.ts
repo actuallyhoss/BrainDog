@@ -58,6 +58,9 @@ export type SeriesPlan = {
   sentence: string;
 };
 
+/** The day a week begins on and its month, inside a bucket's label: `20 Jul` of `Week of 20 Jul`. */
+const WEEK_DAY = /\b(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/u;
+
 /** A cell's magnitude, or `null` for a gap. */
 export const seriesValue = (cell: string): number | null => {
   const t = cell.trim();
@@ -146,14 +149,27 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     const words = label.split(/\s+/u);
     return words.length > 2 ? (words.at(-2) ?? label) : (words[0] ?? label);
   };
+  /* A WEEK SAYS ITS MONTH ON THE FIRST TICK AND WHERE THE MONTH CHANGES: "20 Jul", "27", "3 Aug". The phone's ticks were
+     bare day numbers, "20 27 3 10", which never said which month they were in (visual review 3). */
+  const weekOf = (label: string): { day: string; month: string } | null => {
+    const m = WEEK_DAY.exec(label);
+    return m ? { day: m[1]!, month: m[2]! } : null;
+  };
+  const weeks = body.map((r) => weekOf((r[0] ?? '').trim()));
+  const shortAt = (label: string, i: number): string => {
+    const w = weeks[i];
+    if (!w) return shortOf(label);
+    return i === 0 || weeks[i - 1]?.month !== w.month ? `${w.day} ${w.month}` : w.day;
+  };
   const buckets = body.map((r, i) => {
     const label = (r[0] ?? '').trim();
     const state = stateOf(stated ? r[stateAt] : undefined);
     const v = netOf(i);
     return {
       label,
-      /* The first word (`Sep` of `Sep 2026`), or the day a week begins on (`20` of `Week of 20 Jul`). */
-      short: shortOf(label),
+      /* The first word (`Sep` of `Sep 2026`), or the day a week begins on (`20` of `Week of 20 Jul`), with its month
+         where it is the first or a new one (`shortAt`). */
+      short: shortAt(label, i),
       state,
       said: state === 'partial' ? SERIES_PARTIAL : state === 'due' ? SERIES_DUE : state === 'ahead' ? SERIES_AHEAD : '',
       values: series.map((_, k) => (values[i]![k] === null ? MISSING : (r[k + 1] ?? '').trim())),

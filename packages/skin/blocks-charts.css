@@ -1320,6 +1320,18 @@
     translate: calc(-1 * var(--sp-2)) calc(-100% - var(--sp-1));
   }
 
+  /* UNDER THE DOT WHEN THE FLAG IS NEAR (`data-near-flag`, on the label or on the plot round it, from
+     `src/forecast.ts`). The crossing's flag sits over the chart's top edge, and with the day it names a few days off
+     today the two labels landed on one another at 390, "30 Oct" over "£33,850". Below, the figure starts at the dot's
+     own edge rather than after it, so it hangs from the dot and not over the line falling away to its end side. */
+  :is(.forecast-now-label[data-near-flag], [data-near-flag] .forecast-now-label) {
+    translate: calc(-1 * var(--sp-1)) var(--sp-2);
+  }
+
+  :is(.forecast-now-label[data-near-flag], [data-near-flag] .forecast-now-label):dir(rtl) {
+    translate: var(--sp-1) var(--sp-2);
+  }
+
   .forecast-pin {
     position: absolute;
     inset-block-start: 0;
@@ -1331,6 +1343,16 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     pointer-events: none;
+  }
+
+  /* AFTER ITS RULE WHEN TODAY IS NEAR (`data-side='end'`, from `src/forecast.ts`): centred over the rule, the day ran
+     into today's balance a few days back along the same top edge. It starts a step past the rule on the end side. */
+  .forecast-pin[data-side='end'] {
+    translate: var(--sp-1) calc(-100% - var(--sp-2));
+  }
+
+  .forecast-pin[data-side='end']:dir(rtl) {
+    translate: calc(-1 * var(--sp-1)) calc(-100% - var(--sp-2));
   }
 
   .forecast-readout[data-flip] {
@@ -1367,6 +1389,11 @@
     color: var(--dim);
     font-size: var(--t-xs);
     white-space: nowrap;
+  }
+
+  /* THE START'S OWN MONTH (`data-edge`) is set at the chart's start edge, not centred on it, where half of it fell off. */
+  .forecast-tick[data-edge] {
+    translate: 0 0;
   }
 
   .forecast-knobs {
@@ -1803,6 +1830,10 @@
     --lines: 0;
     --roadmap-lane: var(--sp-7);
     --roadmap-line: calc(var(--sp-4) + var(--sp-1));
+    /* A WINDOW IS THE INK RAMP'S MIDDLE GREY, as Done-by-week's bars are, and only a late one takes a colour (below).
+       Beige and brown for "close" read as mud beside the ink, in the dark scheme most of all. A name drawn over its
+       bar stays in plain ink: 55% holds the ink at 4.5:1 on it. */
+    --roadmap-bar: color-mix(in srgb, var(--ink) 55%, var(--bg));
     position: relative;
     display: flex;
     flex-direction: column;
@@ -1828,12 +1859,25 @@
     fill: none;
   }
 
+  /* THE DARK SCHEME TAKES A LIGHTER STEP. The ink is the light end there, so the same share of it is a brighter bar
+     than the tile's loudest figure; a third of it is the same weight the light scheme's 55% has, and the name over it
+     still reads. */
+  html[data-scheme='dark'] .roadmap {
+    --roadmap-bar: color-mix(in srgb, var(--ink) 35%, var(--bg));
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-scheme]) .roadmap {
+      --roadmap-bar: color-mix(in srgb, var(--ink) 35%, var(--bg));
+    }
+  }
+
   /* A WINDOW IS A THIN BAR WITH NO EDGE: a little over half its lane's height, centred in it, so the lane's air reads
-     as the gap between two pieces of work. An untoned one is the ramp's lightest grey and a toned one its intent at
-     three fifths into the tile, both light enough that a name drawn over the bar stays in plain ink. The renderer
-     sizes the rect to its lane; the scale is drawn about its own middle, so the due dot (`roadmapDue`) stays on it. */
+     as the gap between two pieces of work. Every window is the one grey whatever its tone, which its due dot still
+     says (`.roadmap-due`); only a late one is a muted brick. The renderer sizes the rect to its lane; the scale is
+     drawn about its own middle, so the due dot (`roadmapDue`) stays on it. */
   .roadmap-bar {
-    fill: var(--ramp-3);
+    fill: var(--roadmap-bar);
     fill-opacity: 1;
     stroke: none;
     rx: 3px;
@@ -1842,9 +1886,11 @@
     scale: 1 0.6;
   }
 
-  /* A TONED MARK IS A GROUP carrying the intent, so its window and its line take the tone from it. */
-  .roadmap-mark > .roadmap-bar {
-    fill: color-mix(in oklab, var(--tone-fill) 60%, var(--bg));
+  /* A TONED MARK IS A GROUP carrying the intent, so its line takes the tone from it. Its window keeps the grey unless
+     it is late (`bad`): that one is the intent's muted brick (`blocks.css`), never the brand's red, at a strength that
+     stands beside the grey bars in both schemes and keeps the ink over it at 4.5:1. */
+  .roadmap-mark[data-intent='bad'] > .roadmap-bar {
+    fill: color-mix(in oklab, var(--tone-fill) 85%, var(--bg));
     stroke: none;
   }
 
@@ -1994,6 +2040,12 @@
       text-wrap: pretty;
     }
 
+    /* THE TONE'S DOT KEEPS A STEP OFF THE WORDS. Drawn straight after the last letter it read as a part of the name,
+       "kilnfonts.example•". */
+    .roadmap-item-title > .glyph {
+      margin-inline-start: var(--sp-2);
+    }
+
     .roadmap-item-when {
       color: var(--dim);
       font-size: var(--t-sm);
@@ -2014,11 +2066,12 @@
       inset-inline-start: calc(var(--at) * 100%);
       inline-size: max(4px, calc(var(--span) * 100%));
       border-radius: inherit;
-      background: var(--ink);
+      background: var(--roadmap-bar);
     }
 
-    .roadmap-item[data-intent] .roadmap-item-bar {
-      background: var(--tone-fill);
+    /* The chart's own two paints: the grey for every window and the brick for a late one alone. */
+    .roadmap-item[data-intent='bad'] .roadmap-item-bar {
+      background: color-mix(in oklab, var(--tone-fill) 85%, var(--bg));
     }
   }
 
@@ -2182,14 +2235,14 @@
     font-size: var(--t-sm);
   }
 
-  /* `heat people`: A LINE A PERSON, a dot a week. The name holds a column of its own and the twelve weeks share the
+  /* `heat who`: A LINE A PERSON, a dot a week. The name holds a column of its own and the twelve weeks share the
      rest, so every person's dots sit square under the month names below them. A week they were in touch is a dot of
      ink and a week they were not is a hairline grey one, the same size, so the line reads as a rhythm and not as gaps.
      `--weeks` is the plan's, on `.heat`; a month name's `--week` counts from 0, after the name's column. The columns
      are `minmax(0, 1fr)` in both lists, so a month name wider than its week runs over the next one and never widens
      its own column out of line with the dots; it is centred on its week's dot. `--heat-who` is the name's column, and
      the month names' first column is that and the gap after it, so their weeks start where the dots' do. */
-  .heat[data-form='people'] {
+  .heat[data-form='who'] {
     --heat-who: 12rem;
   }
 
@@ -2262,7 +2315,7 @@
       display: none;
     }
 
-    .heat[data-form='people'] {
+    .heat[data-form='who'] {
       --heat-who: 7rem;
     }
   }

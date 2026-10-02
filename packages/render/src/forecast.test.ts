@@ -105,10 +105,23 @@ test('the plan holds zero in view, gaps in the past, a wash, a round axis and th
   assert.equal('up' in plan || 'down' in plan, false, 'no stems: a movement is the readout\'s and the table\'s');
   assert.equal(plan.base, '', 'no baseline until a knob moves');
   assert.ok(forecastPlan(m, scenario(m, { ...baseKnobs(m), late: 5 }), s).base.length > 0);
-  assert.deepEqual(plan.ticks.map((t) => t.label), ['Oct', 'Nov']);
+  assert.deepEqual(plan.ticks.map((t) => t.label), ['Sep', 'Oct', 'Nov'], 'the month it starts in, at the edge, then each month');
+  assert.deepEqual(plan.ticks.map((t) => t.edge ?? false), [true, false, false]);
   const read = readoutAt(m, s, plan, 1);
   assert.equal(read.flip, true);
   assert.equal(read.day, '16 Nov');
+});
+
+test('AN AXIS OF YEARS NAMES THE YEAR IT STARTS IN, and not a month that reads as the next year\'s', () => {
+  /* Five years name each January by its year; "Sep" beside "2027" read as September 2027. */
+  const five = ROWS.map((r) => (r[0] === 'horizon' ? ['horizon', '1825', '', ''] : r));
+  const m = forecastModel([['past', '2026-05-01', '', '£600.00'], ...five])!;
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.deepEqual(plan.ticks.map((t) => t.label), ['2026', '2027', '2028', '2029', '2030', '2031']);
+  assert.equal(plan.ticks[0]!.edge, true);
+  /* From 14 Sep the first January is too near the edge for a name before it, at a phone's width. */
+  const near = forecastModel(five)!;
+  assert.deepEqual(forecastPlan(near, scenario(near, baseKnobs(near)), null).ticks.map((t) => t.label), ['2027', '2028', '2029', '2030', '2031']);
 });
 
 test('toHTML draws the static walk, no controls, and a sentence without an opening', () => {
@@ -369,4 +382,35 @@ test('TODAY IS A DOT WITH ITS BALANCE, and the crossing flag is tied to the line
   assert.match(html, /<path class="forecast-walk" fill="none" stroke="currentColor" stroke-width="2"/u);
   assert.match(html, /<path class="forecast-cross-rule" /u);
   assert.match(html, /<span class="forecast-now-label num" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true">£1,000<\/span>/u);
+});
+
+test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS WHEN IT RUNS OUT, the flag kept, and back once a knob moves the walk', () => {
+  const plain = model();
+  assert.equal(forecastPlan(plain, scenario(plain, baseKnobs(plain)), null).legend, true, 'no headline row, the sentence stays');
+  const m = forecastModel([...ROWS, ['headline', 'under', '', '']])!;
+  assert.equal(m.headline, true);
+  const s = scenario(m, baseKnobs(m));
+  const plan = forecastPlan(m, s, null);
+  assert.equal(plan.legend, false);
+  assert.ok(plan.cross, 'the flag stays');
+  assert.match(plan.sentence, /Goes under on 20 Oct/u, 'and the chart\'s name still says it');
+  assert.equal(forecastPlan(m, scenario(m, { ...baseKnobs(m), late: 5 }), s).legend, true, 'a moved walk is not the one the headline read');
+  const above = forecastModel([['opening', '2026-09-17', 'Cash now', '£1,000.00'], ['horizon', '30', '', ''], ['headline', 'under', '', '']])!;
+  assert.equal(forecastPlan(above, scenario(above, baseKnobs(above)), null).legend, true, 'a walk that never goes under still says so');
+  const html = toHTML(parse(['```forecast', ...ROWS.map((r) => r.join(' | ')), 'headline | under |  | ', '```'].join('\n'), { page: true }));
+  assert.doesNotMatch(html, /forecast-said/u);
+  assert.match(html, /class="forecast-pin"/u);
+});
+
+test('A CROSSING NEAR TODAY SETS THE LABELS APART: the balance marked near the flag, the flag\'s day after its rule', () => {
+  const rows = [['opening', '2026-09-17', 'Cash now', '£1,000.00'], ['step', '2026-09-27', 'Rent', '−£2,000.00'], ['horizon', '180', '', '']];
+  const m = forecastModel(rows)!;
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.equal(plan.cross?.near, true, 'ten days of a hundred and eighty');
+  const far = model();
+  assert.equal(forecastPlan(far, scenario(far, baseKnobs(far)), null).cross?.near, false);
+  const html = toHTML(parse(['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n'), { page: true }));
+  assert.match(html, /<span class="forecast-now-label num" data-near-flag="" style=/u);
+  assert.match(html, /<span class="forecast-pin" data-side="end" style=/u);
+  assert.match(html, /<li class="forecast-tick" data-edge="" style="--at:0">Sep<\/li>/u);
 });

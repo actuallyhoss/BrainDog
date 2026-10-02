@@ -52,6 +52,10 @@
     display: grid;
     grid-template-columns: 3ch auto minmax(0, 1fr) auto;
     align-items: baseline;
+    /* THE LINE SITS IN THE MIDDLE OF ITS ROW. The row is taller than one line of words, and with the tracks packed at
+       its top every event hung off the hairline above it. The tracks are centred as one, so the count, the words and
+       the time keep the one baseline among themselves. */
+    align-content: center;
     gap: var(--sp-1) var(--sp-3);
     /* A STEP UNDER A LIST'S LINE, because an event is read, not pressed, and a feed of them is one plain line each. It
        follows the density setting with every other line. */

@@ -103,8 +103,9 @@
             <li class="feed-row" data-new={fresh ? '' : undefined} data-intent={row.tone} data-row={key} data-focused={cursor === key ? '' : undefined}>
               <span class="feed-count num">{#if feedBurst(said(row.cells[2]))}<Text nodes={nodes(row.cells[2])} {opts} />{/if}</span>
               {#if run}{@render runFace(run)}{:else if mark}{@render agentFace(mark, 'feed-face')}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
+              <!-- A RULE THAT WORDED ITS OWN LINE SENDS NO WHO, and draws none, as `html.ts`'s `feed`. -->
               <span class="feed-what"
-                ><span class="feed-who">{#if who}<Text nodes={nodes(who)} {opts} />{:else}{MISSING}{/if}</span> <Text
+                >{#if who || g.by !== 'rule'}<span class="feed-who">{#if who}<Text nodes={nodes(who)} {opts} />{:else}{MISSING}{/if}</span>{' '}{/if}<Text
                   nodes={feedCasedNodes(nodes(row.cells[3]))}
                   {opts}
                 />{#if row.tone}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span

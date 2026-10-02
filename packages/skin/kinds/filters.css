@@ -109,6 +109,30 @@
     }
   }
 
+  /* ON A PHONE THE STRIP IS ONE LINE THAT SCROLLS SIDEWAYS, with no bar drawn under it: Work's projects wrapped onto two
+     uneven lines and pushed the first tile down. A chip cut by the edge says there is more. The strip keeps the focus
+     ring's reach (2px out, 2px wide, `a11y.css`) as air inside its own scroll box, given back by its margin, so the ring
+     is not clipped by it. */
+  @media (width < 640px) {
+    .filters {
+      flex-wrap: nowrap;
+      margin: calc(var(--sp-1) * -1);
+      padding: var(--sp-1);
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+
+    .filters::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filters-group {
+      flex: none;
+      flex-wrap: nowrap;
+    }
+  }
+
   /* The counts wait with every other secondary part (`blocks.css`), and come back when the strip is reached. */
   @media (hover: hover) and (pointer: fine) {
     .filters-group:is(:hover, :focus-within) [data-calm] {

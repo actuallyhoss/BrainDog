@@ -91,6 +91,7 @@ const SHAPES: Record<string, string> = {
     '```feed\nagent | Claude | 14 | saves on [Variable axis QA](/r/things/4) | 3h ago\nrule | Late fees | 2 | reminders sent | 5h ago\n' +
     'seen | 2d ago\nagent | Codex |  | opened Kiln | 3d ago | bad\nyou | You | 1 | decision on Pricing | 4d ago\n```',
   'a feed row with nobody named': '```feed\nagent |  | 2 | saves | now\n```',
+  'a rule line that worded itself, with no who': '```feed\nrule |  |  | Tallyard categorised | now\nyou | You |  | paid it | 1h ago\n```',
   'a feed with nothing new': '```feed\nseen | 2d ago\n```',
   'what each agent did, with a folded rest and a tone':
     '```agents\nClaude | 3 | changed [Write the notes](/r/tickets/2) | 3h ago\nCodex | 1 | added Fix login | 5h ago | warn\nClaude | 9 |  | 1d ago\n```',
@@ -186,6 +187,8 @@ const SHAPES: Record<string, string> = {
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',
   'a forecast that goes under soon, with a late mark':
     '```forecast\nopening | 2026-09-17 | Cash now | £1,000.00\nstep | 2026-09-27 | Rent | −£2,000.00\nhorizon | 90 |  | \nknobs | late |  | \nlate | 12 |  | \nunder | 30 |  | \n```',
+  'a forecast whose page headline says when it runs out':
+    '```forecast\nopening | 2026-09-03 | Cash now | £1,000.00\nstep | 2026-10-30 | Rent | −£2,000.00\nhorizon | 90 |  | \nheadline | under |  | \n```',
   'a forecast that stays above zero, with no past': '```forecast\nopening | 2026-09-17 | Cash now | USD 1,000.00\nstep | 2026-09-18 | Rent | USD −100.00\nhorizon | 30 |  | \n```',
   'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
   'sparklines of two lengths, one with a gap': '```sparkline\nCash | 18 20 x 24 | 24\n | 1 2 | 2\n```',
@@ -632,6 +635,39 @@ test('THE LEAD QUESTION IS DRAWN WHOLE in both renderers, and only the first: it
     assert.match(cards[1]!, /^ class="queue-card"/u);
     assert.doesNotMatch(cards[1]!, /queue-does|queue-suggested/u, 'a card under the lead keeps its consequences for when it leads');
   }
+});
+
+test('ONLY THE FIRST CARD SAYS WHY UNDER EACH WAY, in both renderers: the rest are question and pills, their reasons folded', () => {
+  const block = page(SHAPES['a queue of two questions, one recommended, with more waiting']!);
+  for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
+    const cards = drawn.split('<article').slice(1);
+    assert.match(cards[0]!, /<span class="queue-because" data-calm>Covers the overrun<\/span>/u);
+    assert.match(cards[0]!, /class="queue-why"/u);
+    assert.doesNotMatch(cards[0]!, /queue-reasons/u);
+    assert.doesNotMatch(cards[1]!, /queue-because/u, 'no reason under a pill on a card nobody is on yet');
+    assert.match(cards[1]!, /<details class="queue-ways queue-reasons"><summary class="queue-ways-toggle">Why<\/summary>/u);
+    assert.match(cards[1]!, /<li class="queue-reason"><span class="queue-reason-label">Chase it<\/span> It is 12 days late<\/li>/u);
+    assert.doesNotMatch(cards[1]!, /queue-reason-label">Leave it/u, 'an option with no reason has no line in the fold');
+  }
+});
+
+test('A CARD GRID SAYS HOW MANY CARDS IT HOLDS, in both renderers, so it never takes more columns than cards', () => {
+  const grid = (n: number) => page(`\`\`\`cards\ntitle\n${Array.from({ length: n }, (_, i) => `Card ${i + 1}`).join('\n')}\n\`\`\``);
+  for (const [n, word] of [[1, '1'], [3, '3'], [4, 'many'], [9, 'many']] as const) {
+    const block = grid(n);
+    for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body]) assert.match(drawn, new RegExp(`<ul class="cards-grid" data-cards="${word}">`, 'u'), `${n} cards`);
+  }
+});
+
+test('A RULE LINE THAT WORDED ITSELF DRAWS NO WHO, where a line from anyone else with no name still marks the hole', () => {
+  const block = page(SHAPES['a rule line that worded itself, with no who']!);
+  for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
+    const rule = /<div class="feed-group" data-by="rule">.*?<\/div>/u.exec(drawn)?.[0] ?? '';
+    assert.match(rule, /<span class="feed-what">Tallyard categorised<\/span>/u, rule);
+    assert.doesNotMatch(rule, /feed-who/u);
+  }
+  const nobody = toHTML([page(SHAPES['a feed row with nobody named']!)]);
+  assert.match(nobody, /<span class="feed-who">/u);
 });
 
 test('A QUESTION CARRIES A BOX FOR ONE ANSWER IN BULK only where the host takes one, named for the question', () => {

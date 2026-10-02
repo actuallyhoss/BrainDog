@@ -22,8 +22,10 @@
   let { shown, total }: { shown: number; total: number } = $props();
 </script>
 
+<!-- "N MORE", AS EVERY OTHER TILE SAYS WHAT IT LEFT OUT. "Showing 1 of 21." made a reader do the sum to learn how
+     many were left, and read as a system's count rather than the person's things (visual review 3). -->
 {#if shown < total}
   <p class="cap-line" role="status">
-    Showing {shown.toLocaleString('en')} of {total.toLocaleString('en')} — narrow the filter or export.
+    {(total - shown).toLocaleString('en')} more. Narrow the filter or export to see them.
   </p>
 {/if}
