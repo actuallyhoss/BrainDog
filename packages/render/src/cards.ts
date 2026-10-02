@@ -284,6 +284,23 @@ export const CARDS_NEXT = 'Next';
 /** A run's face is a door to the run, named by what it does since its ring is not read out. */
 export const RUN_OPEN = 'Open this run';
 
+/**
+ * The mark an agent wears, as the host draws it: one path on a 24 grid, its fill rule, and its maker's tone, `ink` for a
+ * mark its maker draws in black or white and a word such as `claude` for one drawn in its maker's colour.
+ *
+ * AGENTS WEAR THEIR MAKERS' REAL MARKS (DIRECTION §34), and this package ships no art (05 §3, invariant 2), so the host
+ * answers `RenderOptions.agentMark` from its own drawings for the name a cell gives (`Claude`, `Cursor`). A card's who
+ * and a feed line's actor were a grey disc with a letter in it, `C`, which says neither the agent nor anything else.
+ */
+export type AgentMark = { d: string; rule: 'evenodd' | 'nonzero'; tone: string };
+
+/**
+ * The paint a mark's tone is drawn in, as an inline style, or `null` for the ink of whatever holds it: a maker's colour
+ * is the host's custom property of the same name (`--agent-claude`), and a tone that is not one plain word is ink. A host with no such property draws the mark in
+ * ink too, where a bare `var()` left it black on a dark page.
+ */
+export const agentMarkFill = (tone: string): string | null => (tone !== 'ink' && /^[a-z]+$/u.test(tone) ? `fill:var(--agent-${tone}, currentColor)` : null);
+
 /** A section's count is shown only when it counts something: a zero says nothing a sentence below it does not. */
 export const counted = (value: string): boolean => {
   const t = value.trim();

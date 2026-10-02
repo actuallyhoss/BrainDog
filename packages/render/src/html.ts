@@ -26,8 +26,8 @@ import { kindSpec } from './kind-spec.ts';
 import { inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
-import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
+import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { FEED_EARLIER, feedBurst, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
 import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
@@ -45,9 +45,9 @@ import { SERIES_NET, SERIES_NONE, seriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
-import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
+import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
-import { ROADMAP_DUE, ROADMAP_FROM, ROADMAP_NONE, ROADMAP_PAINT, ROADMAP_WHAT, roadmapDue, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
+import { ROADMAP_NONE, ROADMAP_PAINT, roadmapDue, roadmapLane, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatOutside, heatPlan, heatSkipped, heatTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
@@ -127,6 +127,12 @@ export type RenderOptions = InlineOptions & {
    * says so rather than nothing.
    */
   kinds?: Readonly<Record<string, KindSpec>>;
+  /**
+   * The mark an agent wears, for the name a cell gives it (`Claude`), or `null` for a name that is no agent's. A READ,
+   * like `icon`, because this package ships no art: the host answers from its makers' marks, and a card's who or a feed
+   * line's actor draws the mark in place of a letter. Absent, or answering `null`, a person keeps their initial.
+   */
+  agentMark?: (name: string) => AgentMark | null;
 };
 
 /** An address as the host serves it (`RenderOptions.href`). */
@@ -657,6 +663,9 @@ function media(b: Block): string {
  * `split`: one track cut into parts (`src/split.ts`), then a legend of dots, labels, figures and
  * shares, then the hole. A part is drawn in a neutral step, or in its intent when the row has one.
  * All zero, the track is a sentence and the legend still prints every figure.
+ *
+ * A LEGEND'S FIGURE IS A TILE'S, SAID SHORT (`headlineFigure`): Accounts read `£24,000.00 GBP 71%` beside a bar that
+ * already says the share, and the fold of numbers under it keeps every penny.
  */
 function split(b: Block, o: RenderOptions): string {
   const rows = b.rows.filter((r) => !r.hole);
@@ -676,7 +685,7 @@ function split(b: Block, o: RenderOptions): string {
     ? `<ul class="split-legend">${rows
         .map((r, i) => {
           const part = partOf(i);
-          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(r.cells[1] || MISSING, o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING), o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
         })
         .join('')}</ul>`
     : '';
@@ -769,6 +778,21 @@ function runFaceHtml(f: RunFace, o: RenderOptions): string {
 }
 
 /**
+ * An agent's face as its maker's mark, mirroring `Cards.svelte`'s and `Feed.svelte`'s `agentFace` snippet: the host's
+ * path on a 24 grid, filled in the maker's tone, inside the face slot it replaces. Hidden, as the letter was, because
+ * the agent is named in words beside it.
+ */
+function agentFaceHtml(m: AgentMark, cls: string): string {
+  const fill = agentMarkFill(m.tone);
+  return `<span class="${cls}" data-agent="" aria-hidden="true"><svg class="agent-mark" data-tone="${escape(m.tone)}" viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor"${
+    fill ? ` style="${fill}"` : ''
+  }><path d="${escape(m.d)}" fill-rule="${m.rule}" clip-rule="${m.rule}"></path></svg></span>`;
+}
+
+/** The mark the host draws for the name in a cell, or `null`. */
+const markFor = (o: RenderOptions, name: string): AgentMark | null => (name.trim() && o.agentMark ? o.agentMark(name.trim()) : null);
+
+/**
  * `cards`: one card per row after the first, which names what each column is (`src/cards.ts`).
  *
  * The grid's column count is the host's `auto-fill` over a minimum width, so a narrow container is
@@ -789,19 +813,22 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null;
       const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), o.runs?.[n], isQuiet(L, r.cells)) : null;
       const face = L.nameIsWho ? initialOf(said(r, L.name)) : null;
+      const nameMark = L.nameIsWho ? markFor(o, said(r, L.name)) : null;
       const lead = mark
         ? `<span class="cards-mark" aria-hidden="true">${escape(mark)}</span>`
         : L.nameIsWho && run
           ? runFaceHtml(run, o)
-          : face
-            ? `<span class="cards-face" aria-hidden="true">${escape(face)}</span>`
-            : '';
+          : nameMark
+            ? agentFaceHtml(nameMark, 'cards-face')
+            : face
+              ? `<span class="cards-face" aria-hidden="true">${escape(face)}</span>`
+              : '';
       const name = L.name >= 0 ? `<h3 class="cards-title">${r.cells[L.name] ? drawn(r, L.name) : MISSING}</h3>` : '';
       const when = L.when >= 0 && r.cells[L.when] ? `<span class="cards-when">${drawn(r, L.when)}</span>` : '';
 
       const figure =
         L.figure >= 0
-          ? `<span class="cards-figure"><span class="cards-value num">${r.cells[L.figure] ? amount(r.cells[L.figure]!, o) : MISSING}</span>${labelled(L.figure)}</span>`
+          ? `<span class="cards-figure"><span class="cards-value num">${r.cells[L.figure] ? amount(headlineFigure(r.cells[L.figure]!), o) : MISSING}</span>${labelled(L.figure)}</span>`
           : '';
       const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null;
       const trend = t
@@ -819,16 +846,15 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
             }<span class="cards-value num">${drawn(r, L.ring)}</span>${labelled(L.ring)}</span>`
           : '';
       const middle = figure || trend || ring ? `<div class="cards-body">${figure}${trend}${ring}</div>` : '';
-      const facts = L.facts.length
-        ? `<dl class="cards-facts">${L.facts
-            .map((i) => `<div class="cards-fact"><dt>${escape(label(i))}</dt><dd>${r.cells[i] ? drawn(r, i) : MISSING}</dd></div>`)
-            .join('')}</dl>`
+      /* A FACT NOBODY WROTE IS NOT DRAWN, as in `Cards.svelte`, and a card with no fact written has no list. */
+      const written = L.facts.filter((i) => r.cells[i]);
+      const facts = written.length
+        ? `<dl class="cards-facts">${written.map((i) => `<div class="cards-fact"><dt>${escape(label(i))}</dt><dd>${drawn(r, i)}</dd></div>`).join('')}</dl>`
         : '';
       const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null;
-      const who =
-        L.who >= 0 && r.cells[L.who]
-          ? `<div class="cards-who">${run ? runFaceHtml(run, o) : whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : ''}<span class="cards-name">${drawn(r, L.who)}</span></div>`
-          : '';
+      const whoMark = L.who >= 0 ? markFor(o, said(r, L.who)) : null;
+      const whoLead = run ? runFaceHtml(run, o) : whoMark ? agentFaceHtml(whoMark, 'cards-face') : whoFace ? `<span class="cards-face" aria-hidden="true">${escape(whoFace)}</span>` : '';
+      const who = L.who >= 0 && r.cells[L.who] ? `<div class="cards-who">${whoLead}<span class="cards-name">${drawn(r, L.who)}</span></div>` : '';
       /* DIMMED BY AN ATTRIBUTE, so the host's CSS decides how, and the card keeps every word it had. */
       const quiet = isQuiet(L, r.cells) ? ' data-quiet=""' : '';
       /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it, and an empty
@@ -904,11 +930,19 @@ function feed(b: Block, o: RenderOptions): string {
       const rows = g.rows
         .map(({ row: r, fresh }, i) => {
           const who = r.cells[1] ?? '';
-          const face = g.by === 'rule' ? markOf(said(who)) : initialOf(said(who));
+          /* A RULE WEARS NO LETTER, and an agent its maker's mark where the host draws one: `1 C` led every rule's line. */
+          const run = runFaceOf(who, null, false);
+          const mark = g.by === 'rule' ? null : markFor(o, said(who));
+          const face = g.by === 'rule' ? null : initialOf(said(who));
+          const lead = run
+            ? runFaceHtml(run, o)
+            : mark
+              ? agentFaceHtml(mark, 'feed-face')
+              : `<span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span>`;
           const line = i === g.earlier ? `<li class="feed-seen">${escape(FEED_EARLIER)}</li>` : '';
           return `${line}<li class="feed-row"${fresh ? ' data-new' : ''}${toneAttrs(r.tone)} data-row="${escape(rowKey(r, b.rows.indexOf(r)))}"><span class="feed-count num">${
-            counted(said(r.cells[2])) ? drawn(r.cells[2]) : ''
-          }</span><span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span><span class="feed-what"><span class="feed-who">${
+            feedBurst(said(r.cells[2])) ? drawn(r.cells[2]) : ''
+          }</span>${lead}<span class="feed-what"><span class="feed-who">${
             who ? drawn(who) : MISSING
           }</span> ${drawn(r.cells[3])}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
         })
@@ -947,11 +981,13 @@ function queue(b: Block, o: RenderOptions): string {
       /* THE BAND IS A LABEL AND NOT AN ARGUMENT. It sits last on the by-line, in the same register as
          who asked and when, because it is the answer to "why is this card here" and not the card's
          content. `data-cost` carries the band's own word so a stylesheet can weight the dearest one
-         without matching on English. */
-      const cost = item.costLabel ? `<span class="queue-cost" data-cost="${escape(item.cost)}">${escape(item.costLabel)}</span>` : '';
+         without matching on English. `call` draws no chip, as `QueueAnswer.svelte` draws none: every
+         question here is the reader's call, so "Your call" said nothing the card did not. */
+      const cost = item.costLabel && item.cost !== 'call' ? `<span class="queue-cost" data-cost="${escape(item.cost)}">${escape(item.costLabel)}</span>` : '';
       /* WHO ASKED AND WHEN ARE THE CARD'S SECONDARY LINE, shown on hover or focus (`data-calm`); what it costs stays. */
       const by = `<p class="queue-by"><span class="queue-who" data-calm="">${drawn(item.who)}</span><span class="queue-when" data-calm="">${drawn(item.when)}</span>${cost}</p>`;
-      const question = `<h3 class="queue-question">${drawn(item.question)}</h3>`;
+      /* A QUESTION IS A CARD'S HEADLINE, so its money is said short: "was due 4 days ago, £39. Did it go through?" */
+      const question = `<h3 class="queue-question">${drawn(symbolText(item.question, true))}</h3>`;
       const why = item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : '';
       /* THE LEAD QUESTION IS DRAWN WHOLE (`queue lead`): what its agents recommend, why, and what accepting it changes,
          a line each, above its ways to answer. Only the first, which is the one a person answers next; the rest are
@@ -1214,8 +1250,15 @@ function forecast(b: Block, o: RenderOptions): string {
   const shown = scenario(model, baseKnobs(model));
   const plan = forecastPlan(model, shown, null);
   const path = (cls: string, d: string, extra = '') => (d ? `<path class="${cls}"${extra} d="${d}" vector-effect="non-scaling-stroke"></path>` : '');
+  const painted = (p: Readonly<Record<string, string>>): string =>
+    Object.entries(p)
+      .map(([k, v]) => ` ${k}="${v}"`)
+      .join('');
   const said = `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>`;
-  const chart = `<div class="forecast-plot"${plan.rises ? ' data-rises' : ''}><span class="forecast-top num" aria-hidden="true">${escape(plan.top)}</span><span class="forecast-bottom num" aria-hidden="true">${escape(plan.bottom)}</span><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-zero', `M0 ${plan.zero}H1000`)}${path('forecast-base', plan.base)}${path('forecast-stem', plan.up, ' data-move="up"')}${path('forecast-stem', plan.down, ' data-move="down"')}${path('forecast-past', plan.past)}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg>${
+  const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis
+    .map((a) => `<li class="forecast-axis-tick"${a.zero ? ' data-zero=""' : ''} style="--at:${a.at}">${escape(a.label)}</li>`)
+    .join('')}</ol>`;
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg>${axis}${
     plan.cross ? `<span class="forecast-pin" style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
   }</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks.map((t) => `<li class="forecast-tick" style="--at:${t.at}">${escape(t.label)}</li>`).join('')}</ol>`;
@@ -1275,7 +1318,7 @@ function roadmap(b: Block, o: RenderOptions): string {
     )
     .join('')}${plan.bars
     .map((bar) => {
-      const lane = roadmapLane(bar.track, plan.tracks);
+      const lane = roadmapLane(bar.lane, plan.laneCount);
       const drawn = `<rect class="roadmap-bar"${paint(ROADMAP_PAINT.bar)} x="${bar.x}" y="${lane.y}" width="${bar.width}" height="${lane.height}" vector-effect="non-scaling-stroke"></rect>`;
       return toned(bar.tone, drawn, roadmapDue(bar.x, bar.width, lane));
     })
@@ -1285,18 +1328,27 @@ function roadmap(b: Block, o: RenderOptions): string {
   /* `--at` IS A SHARE OF THE WIDTH, as `blocks-charts.css` reads it for every chart's ticks (`calc(var(--at) * 100%)`),
      and the plan answers in the box's thousand units, so a label is put where its mark is only after dividing. */
   const names = `<ol class="roadmap-names" aria-hidden="true">${plan.bars
-    .map((bar) => `<li class="roadmap-name"${toneAttrs(bar.tone)} style="--at:${roadmapShare(bar.x)};--track:${bar.track}">${escape(bar.title)}${toneGlyph(bar.tone)}</li>`)
+    .map(
+      (bar) =>
+        `<li class="roadmap-name" data-side="${bar.label.side}"${toneAttrs(bar.tone)} style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}${toneGlyph(bar.tone)}</li>`,
+    )
     .join('')}${plan.stems
     .map((s) => `<li class="roadmap-name" data-stem=""${toneAttrs(s.tone)} style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}${toneGlyph(s.tone)}</li>`)
     .join('')}</ol>`;
   const months = `<ol class="roadmap-months" aria-hidden="true">${plan.bands
     .map((m) => `<li class="roadmap-month"${m.odd ? ' data-odd=""' : ''} style="--at:${roadmapShare(m.x)}">${escape(m.label)}</li>`)
     .join('')}</ol>`;
-  const table = `<div class="roadmap-numbers"><table class="roadmap-table"><thead><tr><th scope="col">${ROADMAP_WHAT}</th><th scope="col">${ROADMAP_FROM}</th><th scope="col">${ROADMAP_DUE}</th></tr></thead><tbody>${roadmapLines(plan)
-    .map((p) => `<tr><th scope="row">${escape(p.title)}${toneGlyph(p.tone)}</th><td class="num">${escape(p.from)}</td><td class="num">${escape(p.due)}</td></tr>`)
-    .join('')}</tbody></table></div>`;
+  /* A LANE LIST, NOT A TABLE: a name with its span of days under it and a short bar where it lies in the span. It is
+     what a screen reader reads beside the drawing and what a phone draws instead of it, where the three columns of
+     a table broke every name inside its words. */
+  const list = `<div class="roadmap-numbers"><ol class="roadmap-list">${roadmapLines(plan)
+    .map(
+      (p) =>
+        `<li class="roadmap-item"${toneAttrs(p.tone)} style="--at:${p.at};--span:${p.span}"><span class="roadmap-item-title">${escape(p.title)}${toneGlyph(p.tone)}</span> <span class="roadmap-item-when num">${escape(p.when)}</span><span class="roadmap-item-track" aria-hidden="true"><span class="roadmap-item-bar"></span></span></li>`,
+    )
+    .join('')}</ol></div>`;
 
-  return `<div class="roadmap" style="--tracks:${plan.tracks};--lines:${plan.lines}"><div class="roadmap-plot">${chart}${names}</div>${months}${table}${skipped}</div>`;
+  return `<div class="roadmap"${plan.lanes ? ' data-lanes=""' : ''} style="--tracks:${plan.laneCount};--lines:${plan.lines}"><div class="roadmap-plot">${chart}${names}</div>${months}${list}${skipped}</div>`;
 }
 
 /**
@@ -1332,8 +1384,8 @@ function ring(b: Block, o: RenderOptions): string {
 
   if (plan.form === 'progress') {
     const r = b.rows[0]!;
-    const target = r.cells[2] ? `<span class="ring-of">${RING_OF}</span><span class="ring-target">${drawn(r.cells[2])}</span>` : '';
-    return `<div class="prop ring" data-form="progress">${dial}<div class="ring-row"${toneAttrs(plan.intent)}><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-figures num"><span class="ring-value">${drawn(r.cells[1] || MISSING)}</span>${target}</span>${
+    const target = r.cells[2] ? `<span class="ring-of">${RING_OF}</span><span class="ring-target">${drawn(headlineFigure(r.cells[2]))}</span>` : '';
+    return `<div class="prop ring" data-form="progress">${dial}<div class="ring-row"${toneAttrs(plan.intent)}><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-figures num"><span class="ring-value">${drawn(headlineFigure(r.cells[1] || MISSING))}</span>${target}</span>${
       plan.left ? `<span class="ring-left num">${escape(plan.left)}</span>` : ''
     }${toneGlyph(plan.intent)}</div></div>`;
   }
@@ -1342,7 +1394,7 @@ function ring(b: Block, o: RenderOptions): string {
     .map((r, i) => {
       const arc = plan.arcs.find((a) => a.row === i);
       const share = plan.shares[i];
-      return `<li class="ring-item"${toneAttrs(r.tone)}><span class="ring-dot"${arc ? ` data-step="${arc.step}"` : ''} aria-hidden="true"></span><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-value num">${drawn(r.cells[1] || MISSING)}</span>${
+      return `<li class="ring-item"${toneAttrs(r.tone)}><span class="ring-dot"${arc ? ` data-step="${arc.step}"` : ''} aria-hidden="true"></span><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-value num">${drawn(headlineFigure(r.cells[1] || MISSING))}</span>${
         share ? `<span class="ring-share num">${escape(share)}</span>` : ''
       }${r.cells[2] ? `<span class="ring-note">${drawn(r.cells[2])}</span>` : ''}${toneGlyph(r.tone)}</li>`;
     })
@@ -1451,7 +1503,14 @@ function links(b: Block, o: RenderOptions): string {
       const title = l.href ? `<a class="item-title" href="${escape(hrefFor(o, l.href))}"${l.away ? ' rel="noreferrer"' : ''}>${words}</a>` : `<span class="item-title">${words}</span>`;
       const host = l.host ? `<span class="item-detail link-host">${escape(l.host)}</span>` : '';
       const note = l.note ? `<span class="item-meta link-note">${renderInline(inline(l.note, o), o)}</span>` : '';
-      return `<li class="item">${title}${host}${note}</li>`;
+      /* THE ROW'S GLYPH IN A WELL BEFORE THE TITLE, hidden because the title says what the row is; and a row with a
+         well that stays in this BrainDog ends in a chevron, as a settings row does. The well is drawn for a glyph
+         the host has no art for, empty, so the titles still line up; the chevron only with the host's art. */
+      const d = l.icon ? glyphPath(l.icon, o) : null;
+      const well = l.icon ? `<span class="link-well" aria-hidden="true">${d ? glyphSvg(d) : ''}</span>` : '';
+      const chevron = l.icon && l.inApp ? glyphPath('chevron-right', o) : null;
+      const end = chevron ? `<span class="link-chevron" aria-hidden="true">${glyphSvg(chevron)}</span>` : '';
+      return `<li class="item">${well}${title}${host}${note}${end}</li>`;
     })
     .join('');
   return `<ul class="list" data-kind="link">${body}</ul>`;

@@ -112,6 +112,49 @@
     visibility: hidden;
   }
 
+  /* AN AGENT'S FACE IS ITS MAKER'S MARK (`agentMark`), drawn on nothing, in the maker's tone where it has one. */
+  .feed-face[data-agent] {
+    padding: 2px;
+    background: transparent;
+  }
+
+  .feed-face > .agent-mark {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    fill: currentColor;
+  }
+
+  .feed-face > .agent-mark[data-tone='claude'] {
+    fill: var(--agent-claude);
+  }
+
+  .feed-face > .agent-mark[data-tone='gemini'] {
+    fill: var(--agent-gemini);
+  }
+
+  /* NO BURST IN A GROUP, NO COUNT COLUMN: a column of nothing pushed every line in by 3ch. */
+  .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .feed-rows:not(:has(.feed-count:not(:empty))) .feed-count {
+    display: none;
+  }
+
+  /* A RULE WEARS NO FACE, so its line gives the face's column back rather than keeping a gap for one. */
+  .feed-group[data-by='rule'] .feed-face:empty {
+    display: none;
+  }
+
+  .feed-group[data-by='rule'] .feed-row:has(> .feed-face:empty) {
+    grid-template-columns: 3ch minmax(0, 1fr) auto;
+  }
+
+  .feed-group[data-by='rule'] .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:has(> .feed-face:empty) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .feed-what {
     min-inline-size: 0;
     color: var(--ink2);
@@ -162,6 +205,28 @@
 
     .feed-when {
       grid-column: 3;
+    }
+
+    /* THE SAME COLUMNS GIVEN BACK ON A NARROW SLOT, and the time follows the words into whichever column they are in. */
+    .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .feed-group[data-by='rule'] .feed-row:has(> .feed-face:empty) {
+      grid-template-columns: 3ch minmax(0, 1fr);
+    }
+
+    .feed-rows:not(:has(.feed-count:not(:empty))) .feed-when,
+    .feed-group[data-by='rule'] .feed-row:has(> .feed-face:empty) > .feed-when {
+      grid-column: 2;
+    }
+
+    .feed-group[data-by='rule'] .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:has(> .feed-face:empty) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .feed-group[data-by='rule'] .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:has(> .feed-face:empty) > .feed-when {
+      grid-column: 1;
     }
   }
 }

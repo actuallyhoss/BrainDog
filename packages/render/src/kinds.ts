@@ -302,9 +302,9 @@ const TABLE = {
      its first rows and counting the rest, then an agenda of the days that hold anything (`src/calendar.ts`). On `list`,
      because a drawer that does not know the kind yet falls back to a dated list, as `roadmap` does. */
   calendar: { primitive: 'list', cells: 2, tone: true, minSpan: 6, purpose: 'plan' },
-  /* `title | url | note`: an https address, a mailto or a path of this BrainDog, the host under the title and nothing
-     fetched (`src/links.ts`). */
-  link: { primitive: 'list', cells: 3, optional: 1, tone: false, minSpan: 3, purpose: 'list' },
+  /* `title | url | note | icon`: an https address, a mailto or a path of this BrainDog, the host under the title and
+     nothing fetched, and a glyph's name drawn in a well before the title (`src/links.ts`). */
+  link: { primitive: 'list', cells: 4, optional: 2, tone: false, minSpan: 3, purpose: 'list' },
   /* `caption | file`: a tile a row, the picture where the host serves it and the file's name where it is not one
      (`src/gallery.ts`). */
   gallery: { primitive: 'grid', cells: 2, tone: false, minSpan: 4, purpose: 'media' },

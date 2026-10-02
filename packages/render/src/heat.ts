@@ -9,8 +9,13 @@
  *
  * A ROW IS A DAY AND HOW MUCH: `day | value`. Two rows on one day are added, as a register's rows on one day are
  * counted together, and a row with no value is one of something. A value that is not a number, or is below zero,
- * does not read, and neither does a day that is not `YYYY-MM-DD`; those rows are named under the grid by index, as
- * `roadmap` names its own, rather than drawn somewhere a reader could take for a real day.
+ * does not read, and neither does a day that is no day; those rows are named under the grid by index, as `roadmap`
+ * names its own, rather than drawn somewhere a reader could take for a real day.
+ *
+ * A DAY IS READ IN EITHER SPELLING THIS PACKAGE WRITES, `2026-09-02` and `2 Sep 2026`, as `calendarDay` reads one. The
+ * web's page reader projects every cell through `display()`, which writes a day field with `day()`, so People's "In
+ * touch, 12 weeks" reached here as `2 Sep 2026`, `1 Sep 2026`, ... and drew no grid at all: only `YYYY-MM-DD` was read,
+ * and every row was named under an empty tile as a day that does not read (measured on the seed's People page).
  *
  * A ROW DATED OUTSIDE THE WEEKS DRAWN IS COUNTED AND SAID, never placed. The busiest day is judged among the days
  * in view only, so a big day in January does not wash September pale; and a day after today is not washed at all,
@@ -20,7 +25,8 @@
  * four columns, not a second plan: the scale stays the twelve weeks', so a day keeps its wash when the page narrows.
  */
 
-import { heatGrid, isDay, washSteps, type Wash } from './days.ts';
+import { calendarDay } from './calendar.ts';
+import { heatGrid, washSteps, type Wash } from './days.ts';
 import { signedOf } from './bridge.ts';
 import { day } from './format.ts';
 
@@ -65,9 +71,9 @@ export function heatPlan(rows: readonly HeatInput[], today: string, weeks = HEAT
   const skipped: number[] = [];
   let outside = 0;
   rows.forEach((r, i) => {
-    const d = r.day.trim();
+    const d = calendarDay(r.day);
     const v = r.value.trim() === '' ? 1 : signedOf(r.value);
-    if (!isDay(d) || !Number.isFinite(v) || v < 0) skipped.push(i);
+    if (d === null || !Number.isFinite(v) || v < 0) skipped.push(i);
     else if (!inView.has(d)) outside++;
     else counts[d] = (counts[d] ?? 0) + v;
   });

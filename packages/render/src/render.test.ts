@@ -7,7 +7,7 @@ import { parse, splitRow } from './parse.ts';
 import { toHTML, verbatimText } from './html.ts';
 import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type Column, type TableRow } from '../svelte/types.ts';
 import { lanes } from './board.ts';
-import { ringDash, ringOf, trendOf } from './cards.ts';
+import { ringDash, ringOf, trendOf, type AgentMark } from './cards.ts';
 import { diffPlan, diffRows, lineDiff } from './diff.ts';
 import { inline, magnitudeOfCell, safeHref, text } from './inline.ts';
 import { leadingCode, symbolFigure, symbolText, bytes, integer, money, pct, quantity, relative, since, stamp, day, formatTyped, magnitudeOf, MISSING, valueWord } from './format.ts';
@@ -1054,7 +1054,9 @@ test('a card leads with its mark, is named by a heading, and wears its tone besi
     /<li class="cards-item" data-intent="warn"><div class="cards-head"><span class="cards-mark" aria-hidden="true">K<\/span><h3 class="cards-title">Fix the export<\/h3><span class="glyph" role="img" aria-label="watch this">/u,
   );
   assert.match(html, /<span class="cards-face" aria-hidden="true">C<\/span><span class="cards-name">Claude<\/span>/u, 'an agent is a face');
-  assert.match(html, /<dt>Next<\/dt><dd>—<\/dd>/u, 'a missing fact is the missing mark, not a blank');
+  const first = /<li class="cards-item" data-intent="warn">.*?<\/li>/u.exec(html)?.[0] ?? '';
+  assert.doesNotMatch(first, /cards-facts|<dd>—<\/dd>/u, 'a fact nobody wrote is not drawn, and a card with none has no list');
+  assert.match(html, /<dt>Next<\/dt><dd>Ship it<\/dd>/u, 'a fact that is written still is');
   assert.match(html, /<span class="cards-when">3m ago<\/span>/u);
 });
 
@@ -1103,7 +1105,12 @@ test('the figure is drawn with its currency symbol, and a missing figure is the 
   const html = toHTML(
     onPage('```cards\ntitle | figure: Owed | trend: Weekly | ring: Done\nKiln | GBP 4,800.00 | 18 20 - 24 | 3/5\nSite |  | 7 | nearly\n```'),
   );
-  assert.match(html, /<span class="cards-value num">£4,800.00<\/span><span class="cards-label">Owed<\/span>/u);
+  assert.match(html, /<span class="cards-value num">£4,800<\/span><span class="cards-label">Owed<\/span>/u, 'a card\'s figure is a tile\'s, said short');
+  assert.match(
+    toHTML(onPage('```cards\ntitle | figure: Earned\nKiln | £18,400.00\u00a0GBP\nSite | £4,200.50\n```')),
+    /cards-value num">£18,400<\/span>.*cards-value num">£4,200\.50<\/span>/u,
+    'one mark of currency, and a fraction that is part of the amount stays',
+  );
   assert.match(html, /<span class="cards-value num">—<\/span>/u);
   assert.match(html, /role="img" aria-label="Weekly: 18, 20, no value, 24"/u);
   assert.match(html, /stroke-dasharray="60 100"/u);
@@ -1184,8 +1191,34 @@ test('THE FEED KEEPS A MACHINE’S WORK APART FROM THE PERSON’S, and a burst i
     /<li class="feed-row" data-new data-row="\d+"><span class="feed-count num">14<\/span><span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Claude<\/span> saves on <a href="\/r\/things\/4">Variable axis QA<\/a><\/span><span class="feed-when" data-calm="">3h ago<\/span><\/li>/u,
   );
   assert.match(html, /<span class="feed-count num"><\/span>/u, 'a row with no count has a gap there, not a zero');
-  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new data-row="\d+"><span class="feed-count num">2<\/span><span class="feed-face" aria-hidden="true">L<\/span>/u);
+  /* A RULE WEARS NO LETTER: `L` for Late fees, `C` for Categorise, said nothing a rule's name beside it does not. */
+  assert.match(html, /data-by="rule"><h3 class="feed-head">Rules<span class="feed-new num">2 new<\/span><\/h3><ul class="feed-rows"><li class="feed-row" data-new data-row="\d+"><span class="feed-count num">2<\/span><span class="feed-face" aria-hidden="true"><\/span>/u);
   assert.doesNotMatch(html, /style=/u);
+});
+
+test('A LINE OF ONE THING HAS NO COUNT: `1 C Categorise what cleared` was eight rows of noise on Today', () => {
+  const html = toHTML(onPage('```feed\nrule | Categorise what cleared | 1 | changed TALLYARD | 2h ago\nrule | Chase late payments | 3 | reminders sent | 3h ago\n```'));
+  const counts = [...html.matchAll(/<span class="feed-count num">([^<]*)<\/span>/gu)].map((m) => m[1]);
+  assert.deepEqual(counts, ['', '3'], 'a one is a gap, a burst keeps its number');
+  assert.doesNotMatch(html, /<span class="feed-face" aria-hidden="true">[A-Z]<\/span>/u, 'and no rule wears its first letter');
+});
+
+test('AN AGENT WEARS ITS MAKER\'S MARK WHERE THE HOST DRAWS ONE, in the feed and on a card, and a person keeps their initial', () => {
+  const CLAUDE: AgentMark = { d: 'M1 1h22v22H1z', rule: 'nonzero', tone: 'claude' };
+  const CURSOR: AgentMark = { d: 'M2 2h20v20H2z', rule: 'evenodd', tone: 'ink' };
+  const agentMark = (name: string): AgentMark | null => (name === 'Claude' ? CLAUDE : name === 'Cursor' ? CURSOR : null);
+  const feed = toHTML(onPage(FEED), { agentMark });
+  assert.match(
+    feed,
+    /<span class="feed-face" data-agent="" aria-hidden="true"><svg class="agent-mark" data-tone="claude" viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" style="fill:var\(--agent-claude, currentColor\)"><path d="M1 1h22v22H1z" fill-rule="nonzero" clip-rule="nonzero"><\/path><\/svg><\/span><span class="feed-what"><span class="feed-who">Claude<\/span>/u,
+  );
+  assert.match(feed, /<span class="feed-face" aria-hidden="true">C<\/span><span class="feed-what"><span class="feed-who">Codex/u, 'an agent the host draws no mark for keeps its letter');
+  assert.match(feed, /<span class="feed-face" aria-hidden="true">Y<\/span><span class="feed-what"><span class="feed-who">You/u);
+  const cards = toHTML(onPage('```cards\ntitle: Project | fact: Health | who: Agent\nKiln | At risk | Claude\nMarlow | On track | Cursor\nPortage | Off track | J. Okonkwo\n```'), { agentMark });
+  assert.match(cards, /<div class="cards-who"><span class="cards-face" data-agent="" aria-hidden="true"><svg class="agent-mark" data-tone="claude"[^>]*><path d="M1 1h22v22H1z"/u);
+  assert.match(cards, /<div class="cards-who"><span class="cards-face" data-agent="" aria-hidden="true"><svg class="agent-mark" data-tone="ink" viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor"><path d="M2 2h20v20H2z" fill-rule="evenodd"/u, 'an ink mark has no paint of its own');
+  assert.match(cards, /<div class="cards-who"><span class="cards-face" aria-hidden="true">J<\/span>/u);
+  assert.doesNotMatch(toHTML(onPage(FEED)), /agent-mark/u, 'a host that draws no marks keeps the faces it had');
 });
 
 test('new is said in words as well as in the accent: the head counts it, and a line says where the read rows begin', () => {
@@ -1609,4 +1642,23 @@ test('A SPARKLINE PUTS THE POINTS IT DREW IN A TABLE FOR A SCREEN READER, a colu
   );
   assert.doesNotMatch(toHTML(parse('```sparkline\nLonely | 7 | 7\n```')), /<details/u, 'a line that did not draw has no points to show');
   assert.doesNotMatch(toHTML(parse('```stat\nCash | 10 | | 1 2 3\n```')), /<details/u, 'the stat trend cell keeps no fold');
+});
+
+test('A QUESTION IS A CARD\'S HEADLINE, so its money is said short, and its reason keeps the amount as written', () => {
+  const html = toHTML(
+    onPage(
+      '```queue\nq | s1 | A rule | 4w ago | Ledger Post was due 4 days ago, £39.00 GBP. Did it go through? | Invoice GBP 4,800.50 is open.\nopt | s1 | yes | It went through |  | \nopt | s1 | no | It stopped |  | \n```',
+    ),
+  );
+  assert.match(html, /<h3 class="queue-question">Ledger Post was due 4 days ago, £39\. Did it go through\?<\/h3>/u);
+  assert.match(html, /<p class="queue-why">Invoice GBP 4,800\.50 is open\.<\/p>/u);
+});
+
+test('A TILE\'S FIGURE AND NOTE ARE SAID SHORT even when the host already drew them with a symbol and the code after', () => {
+  /* At a glance read `£4,050 GBP` and Accounts `£24,000.00 GBP 71%`: the host's code hung on a no-break space. */
+  const html = toHTML(onPage('```stat\nOwed to you | £4,050.00 GBP | Keep above £0.00 GBP\n```'));
+  assert.match(html, /<span class="cell-figure num">£4,050<\/span>/u);
+  assert.match(html, /Keep above £0</u);
+  const split = toHTML(onPage('```split\nTax reserve | £24,000.00 GBP\nStudio current account | £9,850.00 GBP\n```'));
+  assert.match(split, /<span class="split-value num">£24,000<\/span><span class="split-share num">71%<\/span>/u);
 });

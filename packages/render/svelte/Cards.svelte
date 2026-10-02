@@ -12,10 +12,12 @@
     MISSING,
     TONES,
     TREND,
+    agentMarkFill,
     cardLayout,
     initialOf,
     inline,
     isQuiet,
+    headlineFigure,
     leadingCode,
     symbolFigure,
     markOf,
@@ -23,6 +25,7 @@
     ringOf,
     text,
     trendOf,
+    type AgentMark,
     type Block,
     type RenderOptions,
     type Row,
@@ -53,7 +56,17 @@
   const label = (i: number): string => L.labels[i] ?? '';
   const said = (r: Row, i: number): string => (i < 0 ? '' : text(inline(r.cells[i] ?? '', opts)));
   const nodes = (r: Row, i: number) => inline(r.cells[i] ?? '', opts);
+  /** The mark the host draws for the name in a cell, or `null`, as `markFor` in `src/html.ts`. */
+  const markFor = (name: string): AgentMark | null => (name.trim() && opts.agentMark ? opts.agentMark(name.trim()) : null);
 </script>
+
+<!-- AN AGENT'S FACE AS ITS MAKER'S MARK, as `agentFaceHtml` in `src/html.ts` draws one: the host's path, filled in the
+     maker's tone, in the face slot a letter used to fill. Hidden, because the agent is named in words beside it. -->
+{#snippet agentFace(m: AgentMark, cls: string)}{@const fill = agentMarkFill(m.tone)}<span class={cls} data-agent="" aria-hidden="true"
+    ><svg class="agent-mark" data-tone={m.tone} viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" style={fill ?? undefined}
+      ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule}></path></svg
+    ></span
+  >{/snippet}
 
 {#snippet labelled(i: number)}{#if label(i)}<span class="cards-label">{label(i)}</span>{/if}{/snippet}
 
@@ -101,11 +114,15 @@
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark)) : null}
       {@const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), opts.runs?.[n], isQuiet(L, r.cells)) : null}
       {@const face = L.nameIsWho ? initialOf(said(r, L.name)) : null}
-      {@const symbol = L.figure >= 0 ? symbolFigure(r.cells[L.figure] ?? '') : null}
-      {@const coded = L.figure >= 0 ? leadingCode(r.cells[L.figure] ?? '') : null}
+      {@const nameMark = L.nameIsWho ? markFor(said(r, L.name)) : null}
+      <!-- A CARD'S FIGURE IS A TILE'S, said short as `amount(headlineFigure(...))` in the mirror says it: `£18,400`. -->
+      {@const short = L.figure >= 0 ? headlineFigure(r.cells[L.figure] ?? '') : ''}
+      {@const symbol = L.figure >= 0 ? symbolFigure(short) : null}
+      {@const coded = L.figure >= 0 ? leadingCode(short) : null}
       {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
+      {@const whoMark = L.who >= 0 ? markFor(said(r, L.who)) : null}
       {@const hue = L.hue >= 0 ? hueOf(said(r, L.hue)) : null}
       {@const picture = L.picture >= 0 ? pictureSrc(r.cells[L.picture] ?? '', opts.file) : null}
       <!-- The lead is the first card of a `cards lead` block and no other, told rather than inferred (05 §4). The hue is a
@@ -122,6 +139,7 @@
         <div class="cards-head">
           {#if mark}<span class="cards-mark" aria-hidden="true">{mark}</span>
           {:else if L.nameIsWho && run}{@render runFace(run)}
+          {:else if nameMark}{@render agentFace(nameMark, 'cards-face')}
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}
           {#if L.name >= 0}<h3 class="cards-title">{#if r.cells[L.name]}<Text nodes={nodes(r, L.name)} {opts} />{:else}{MISSING}{/if}</h3>{/if}
           {#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}
@@ -135,7 +153,7 @@
               <span class="cards-figure"
                 ><span class="cards-value num"
                   >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}{coded.sign}<span class="amount-code">{coded.currency}</span>
-                    <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text nodes={nodes(r, L.figure)} {opts} />{/if}</span
+                    <Text nodes={inline(coded.rest, opts)} {opts} />{:else}<Text nodes={inline(short, opts)} {opts} />{/if}</span
                 >{@render labelled(L.figure)}</span
               >
             {/if}
@@ -170,14 +188,18 @@
             {/if}
           </div>
         {/if}
-        {#if L.facts.length}
+        <!-- A FACT NOBODY WROTE IS NOT DRAWN: "Met in —" on a person met in no project said a field was missing where
+             there was nothing to say. A card with no fact written draws no list at all. -->
+        {#if L.facts.some((i) => r.cells[i])}
           <dl class="cards-facts">
             {#each L.facts as i}
-              {@const scope = r.cells[i] && scoped(i) ? opts.scope : undefined}
-              <div class="cards-fact">
-                <dt>{label(i)}</dt>
-                <dd>{#if scope}{@render scopeChip(scope, r.cells[i] ?? '')}{:else if r.cells[i]}<Text nodes={nodes(r, i)} {opts} />{:else}{MISSING}{/if}</dd>
-              </div>
+              {#if r.cells[i]}
+                {@const scope = scoped(i) ? opts.scope : undefined}
+                <div class="cards-fact">
+                  <dt>{label(i)}</dt>
+                  <dd>{#if scope}{@render scopeChip(scope, r.cells[i] ?? '')}{:else}<Text nodes={nodes(r, i)} {opts} />{/if}</dd>
+                </div>
+              {/if}
             {/each}
           </dl>
         {/if}
@@ -185,7 +207,7 @@
         {#if L.next >= 0 && r.cells[L.next]}<p class="cards-next">{CARDS_NEXT}: <Text nodes={nodes(r, L.next)} {opts} /></p>{/if}
         {#if L.who >= 0 && r.cells[L.who]}
           <div class="cards-who">
-            {#if run}{@render runFace(run)}{:else if whoFace}<span class="cards-face" aria-hidden="true">{whoFace}</span>{/if}
+            {#if run}{@render runFace(run)}{:else if whoMark}{@render agentFace(whoMark, 'cards-face')}{:else if whoFace}<span class="cards-face" aria-hidden="true">{whoFace}</span>{/if}
             <span class="cards-name"><Text nodes={nodes(r, L.who)} {opts} /></span>
           </div>
         {/if}

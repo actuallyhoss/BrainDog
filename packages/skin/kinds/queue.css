@@ -9,8 +9,8 @@
 @layer components {
   /* ── queue: what is waiting on you ───────────────────────────────────────
      One card a question, because a question is read whole: who asked, what they are asking, why, and
-     the ways to answer it. The options are a list rather than a row of buttons, so a long reason sits
-     under the words it belongs to and the recommendation is read beside its own option and no other. */
+     the ways to answer it. The ways are a row of quiet buttons, and a line each only where a reason is
+     given, so the reason is read beside its own option and no other. */
 
   /* THE BLOCK IS ITS OWN CONTAINER, so a queue answers the width of the slot it was placed in rather
      than the width of the window. A queue at `span: 6` on a wide screen is as narrow as the same
@@ -92,6 +92,13 @@
     font-weight: 500;
   }
 
+  /* THE PLAINEST BAND IS NOT DRAWN. "Your call" is what every question is until something makes it dearer, so on every
+     card it said nothing and said it eight times down Decide. The card keeps the band, so the ranking still reads it;
+     only the three that tell a reader something are seen. */
+  .queue-cost[data-cost='call'] {
+    display: none;
+  }
+
   .queue-question {
     margin: 0;
     font-size: var(--t-lg);
@@ -105,13 +112,12 @@
     color: var(--ink2);
   }
 
-  /* THREE COLUMNS SHARED BY EVERY OPTION: the way to answer, the recommendation, the reason. The tracks are declared
-     once here and each option borrows them with `subgrid`, so the buttons line up down one edge, the reasons start at
-     one x, and the recommendation sits against the option it names. A reason under its option cost three lines an
-     option, and `/p/agents` opened on the queue and nothing else. */
+  /* THE WAYS TO ANSWER ARE ONE ROW OF QUIET BUTTONS when none of them carries a reason, side by side and as wide as
+     their words, because "Chase it" and "Not yet" stacked under each other read as a list of two things and not as the
+     two answers to one question. The suggestion's word sits beside the button it names. */
   .queue-options {
-    display: grid;
-    grid-template-columns: max-content max-content minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--sp-2);
     margin: 0;
     padding: 0;
@@ -119,18 +125,44 @@
   }
 
   .queue-option {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+  }
+
+  /* WHERE A REASON IS GIVEN, EACH WAY IS A LINE: the button in a column of ONE fixed width, its reason beside it. The
+     width is the queue's and not each question's, so every reason in the tile starts at one x, question after question,
+     and does not follow the longest button of its own question. A longer option wraps inside its pill. The suggestion's
+     word goes under its button, in the button's column, so it never pushes that one reason out of line. */
+  .queue-options:has(.queue-because) {
     display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    gap: var(--sp-1) var(--sp-3);
+    gap: var(--sp-3);
+  }
+
+  .queue-options:has(.queue-because) > .queue-option {
+    display: grid;
+    grid-template-columns: 12rem minmax(0, 1fr);
+    gap: var(--sp-1) var(--sp-4);
     align-items: baseline;
   }
 
-  /* EACH PART NAMES ITS OWN COLUMN, because an option with no recommendation would otherwise slide
-     its reason into the recommendation's track and the reasons would go ragged down the card. */
-  .queue-act,
-  .queue-label {
+  /* EACH PART NAMES ITS OWN CELL, so an option with no suggestion or no reason leaves its cell empty rather than sliding
+     the next part into it. */
+  .queue-options:has(.queue-because) .queue-act,
+  .queue-options:has(.queue-because) .queue-label {
+    grid-row: 1;
     grid-column: 1;
+    max-inline-size: 100%;
+  }
+
+  .queue-options:has(.queue-because) .queue-rec {
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  .queue-options:has(.queue-because) .queue-because {
+    grid-row: 1;
+    grid-column: 2;
   }
 
   /* AN ANSWER IS A PILL, the shape `QueueAnswer.svelte` already
@@ -202,7 +234,6 @@
   /* THE WORD BESIDE THE PRIMARY. What an agent suggests is worth saying and is not worth pre-pressing, so the option's
      pill is filled (above) and this quiet label names why, rather than the option reading as already chosen. */
   .queue-rec {
-    grid-column: 2;
     justify-self: start;
     padding-inline: var(--sp-2);
     border-radius: var(--r-pill);
@@ -212,7 +243,6 @@
   }
 
   .queue-because {
-    grid-column: 3;
     max-inline-size: var(--measure);
     color: var(--dim);
     font-size: var(--t-xs);
@@ -249,28 +279,45 @@
   }
 
   /* A BOX FOR ONE ANSWER IN BULK, drawn only where the host takes one: the task's box (`blocks.css`) squared, because
-     choosing a question is not finishing a task. In its own track at the start of the card, the card's parts in the
-     track beside it, so their edge does not move as boxes come and go between questions. */
+     choosing a question is not finishing a task. IT SITS AT THE END OF THE BY-LINE and takes no track of its own down
+     the card, so the question and its answers start at the tile's own edge whether the box is drawn, hidden until
+     hover, or always there under a thumb. A track down the card's start indented every question by the box and its
+     gap, 32px on a phone, for a control most people never press. */
   .queue-card:has(> .queue-select) {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: var(--sp-3);
   }
 
   .queue-card:has(> .queue-select) > :not(.queue-select) {
-    grid-column: 2;
+    grid-column: 1 / -1;
+  }
+
+  .queue-card:has(> .queue-select) > .queue-by {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  /* A TILE LEADS WITH ITS VISUAL, so where one is drawn it keeps the first row and the by-line and its box share the
+     second. Pinned to the first, the by-line would put the visual under it, where its pull to the tile's top edge lays
+     it over the by-line. */
+  .queue-card:has(> .queue-select) > .queue-visual {
+    grid-row: 1;
+  }
+
+  .queue-card:has(> .queue-select):has(> .queue-visual) > :is(.queue-by, .queue-select) {
+    grid-row: 2;
   }
 
   .queue-select {
     appearance: none;
-    grid-column: 1;
-    grid-row: 1 / span 2;
-    align-self: start;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     inline-size: 20px;
     block-size: 20px;
-    margin-block-start: 2px;
     padding: 0;
     border: 1.5px solid var(--edge);
     border-radius: var(--r-sm);
@@ -299,16 +346,20 @@
     color: var(--dim);
   }
 
-  /* AND UNDER IT AGAIN WHEN THE BLOCK IS NARROW, because three tracks in a phone's width leaves the
-     reason about a hundred pixels and a reason nobody can read is worse than a reason below its
-     option. The width is the BLOCK's and not the window's: a queue at `span: 6` on a wide screen is
-     as narrow as the same queue on a phone, and it is the block that has to fit. */
+  /* AND THE REASON UNDER ITS BUTTON WHEN THE BLOCK IS NARROW, because a reason in what is left of a phone's width
+     beside a fixed column is a reason nobody can read. The button stays as wide as its words and is never stretched to
+     the card's width, the suggestion's word stays under it, and the reason starts at the card's own edge, so a phone
+     adds no indent of its own. The width is the BLOCK's and not the window's: a queue at `span: 6` on a wide
+     screen is as narrow as the same queue on a phone, and it is the block that has to fit. */
   @container (inline-size < 34rem) {
-    .queue-options {
-      grid-template-columns: max-content minmax(0, 1fr);
+    .queue-options:has(.queue-because) > .queue-option {
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: var(--sp-2);
     }
 
-    .queue-because {
+    /* No row of its own: it takes the first one free under the button and its word, whichever of them are there. */
+    .queue-options:has(.queue-because) .queue-because {
+      grid-row: auto;
       grid-column: 1 / -1;
     }
   }
@@ -326,12 +377,33 @@
     color: var(--ink);
   }
 
-  /* AN OPTION'S VISUAL IS ITS OWN BOX, on the first track above the option's words, because the three
-     tracks are shared by every option (above) and a box beside the label would push the buttons out
-     of their one edge. Above the words it reads as a sample laid over its name. */
+  /* AN OPTION'S VISUAL IS ITS OWN BOX: beside the button in a row of answers, and above the button where each way is a
+     line, so the button column keeps its one edge. Above the words it reads as a sample laid over its name. */
   .queue-option > .queue-visual {
     grid-column: 1;
     justify-self: start;
+  }
+
+  .queue-options:has(.queue-because) .queue-option:has(> .queue-visual) {
+    > .queue-visual {
+      grid-row: 1;
+    }
+
+    > .queue-act,
+    > .queue-label,
+    > .queue-because {
+      grid-row: 2;
+    }
+
+    > .queue-rec {
+      grid-row: 3;
+    }
+  }
+
+  @container (inline-size < 34rem) {
+    .queue-options:has(.queue-because) .queue-option:has(> .queue-visual) > .queue-because {
+      grid-row: auto;
+    }
   }
 
   .queue-visual {

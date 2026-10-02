@@ -89,6 +89,27 @@
     block-size: 22px;
   }
 
+  /* AN AGENT'S FACE IS ITS MAKER'S MARK (`agentMark`), drawn on nothing, in the maker's tone where it has one. */
+  .cards-face[data-agent] {
+    padding: 2px;
+    background: transparent;
+  }
+
+  .cards-face > .agent-mark {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    fill: currentColor;
+  }
+
+  .cards-face > .agent-mark[data-tone='claude'] {
+    fill: var(--agent-claude);
+  }
+
+  .cards-face > .agent-mark[data-tone='gemini'] {
+    fill: var(--agent-gemini);
+  }
+
   /* THE UI FACE, NAMED. An `h3` takes the display face from the skin, and that face is for 20px and
      up; a card's name is body size, so it takes the face every other name in a list takes. */
   .cards-title {

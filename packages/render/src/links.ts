@@ -4,7 +4,9 @@
  * Kept out of the markup for the reason `path.ts` is: an answer here can be tested without a DOM, and two drawers
  * that each worked it out would be two answers.
  *
- * A ROW IS `title | url | note`, the note optional. Over a list, the block's `columns:` name the three fields.
+ * A ROW IS `title | url | note | icon`, the note and the icon optional. Over a list, the block's `columns:` name the
+ * fields. The icon is a glyph's name (`glyphs/names.ts`), drawn in a well before the title; a name that is no glyph is
+ * not drawn, so a row never reads out a word nobody meant as words.
  *
  * THREE KINDS OF ADDRESS, AND ONLY THREE: an `https:` address, a `mailto:` and a path of this BrainDog. It is the rule
  * `safeHref` already keeps for a link inside a sentence, less the `#anchor`, which on a list of links points at
@@ -16,7 +18,7 @@
  * What is drawn under the title is the address's own host, read off the text.
  */
 
-import { safeHref } from './inline.ts';
+import { glyphName, safeHref } from './inline.ts';
 
 /** The sentence the parser degrades a block with when a row's address is none of the three. */
 export const LINK_ADDRESS = 'A link is an https address, a mailto or a path of this BrainDog.';
@@ -65,8 +67,12 @@ export function linkHost(href: string): string {
   }
 }
 
-/** One row as it is drawn: its words, where it goes, what is said under it, and whether it leaves this BrainDog. */
-export type LinkLine<R> = { row: R; title: string; href: string | null; host: string; note: string; away: boolean };
+/**
+ * One row as it is drawn: its words, where it goes, what is said under it, whether it leaves this BrainDog, and the
+ * glyph its well draws (`''` for none). `inApp` is a path of this BrainDog, which a row with a well ends in a chevron
+ * for, as a settings row does.
+ */
+export type LinkLine<R> = { row: R; title: string; href: string | null; host: string; note: string; away: boolean; icon: string; inApp: boolean };
 
 /**
  * Every row as a line, in the order the rows came.
@@ -87,6 +93,8 @@ export function linkPlan<R extends { cells: readonly string[] }>(rows: readonly 
       host: href ? linkHost(href) : '',
       note: (row.cells[2] ?? '').trim(),
       away: href !== null && /^https:\/\//iu.test(href),
+      icon: glyphName(row.cells[3] ?? '') ?? '',
+      inApp: href !== null && href.startsWith('/'),
     };
   });
 }

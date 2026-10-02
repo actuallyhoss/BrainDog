@@ -41,8 +41,18 @@ import { MISSING, day } from './format.ts';
 /** One row as the plan reads it. An empty `start` makes it a single date at `end`. */
 export type RoadmapRow = { start: string; end: string; title: string; tone?: Tone };
 
-/** A window, as a bar on its track. `row` is its index in the rows handed in. */
-export type RoadmapBar = { row: number; track: number; start: string; end: string; title: string; tone?: Tone; x: string; width: string };
+/**
+ * Where a window's name is drawn, in the box's units: `over` the bar from its start, or beside it, `after` its end or
+ * `before` its start (the drawer sets it back by its own width), and how much of the box it has before it meets the
+ * next thing, which the host's stylesheet stops it at in an ellipsis.
+ */
+export type RoadmapLabel = { x: string; side: 'over' | 'after' | 'before'; room: string };
+
+/**
+ * A window, as a bar on its track. `row` is its index in the rows handed in. `track` is where the packing put it and
+ * `lane` the line it is drawn on, the same until the names do not fit (`RoadmapPlan.lanes`).
+ */
+export type RoadmapBar = { row: number; track: number; lane: number; start: string; end: string; title: string; tone?: Tone; x: string; width: string; label: RoadmapLabel };
 
 /** A single date, as a stem at the middle of its day, and where its label sits. */
 export type RoadmapStem = { row: number; day: string; title: string; tone?: Tone; x: string; label: { x: string; line: number } };
@@ -56,6 +66,16 @@ export type RoadmapPlan = {
   to: string;
   /** How many tracks the windows need, which is the most of them in hand on any one day. */
   tracks: number;
+  /**
+   * How many lines the windows are drawn on, and whether that is one a window (`lanes`) rather than one a track.
+   *
+   * A LANE A WINDOW WHEN THE NAMES DO NOT FIT ON THE TRACKS. Kiln's seven tasks ran end to end on one track, a few
+   * days each, so the packing was right and every name sat on one line over the next: "Turn auto-re" under
+   * "Variable axis" under "Decide the" in one smear (the kiln review). When any name would run into the next window
+   * on its track, every window takes its own line, in order of start, with its name beside it.
+   */
+  lanes: boolean;
+  laneCount: number;
   bars: RoadmapBar[];
   stems: RoadmapStem[];
   /** How many lines the stem labels need. */
@@ -137,7 +157,7 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
   });
 
   const days = [...windows.flatMap(({ r }) => [r.start, r.end]), ...singles.map(({ r }) => r.end)];
-  if (days.length === 0) return { from: '', to: '', tracks: 0, bars: [], stems: [], lines: 0, bands: [], today: null, skipped, empty: true };
+  if (days.length === 0) return { from: '', to: '', tracks: 0, lanes: false, laneCount: 0, bars: [], stems: [], lines: 0, bands: [], today: null, skipped, empty: true };
 
   const sorted = [...days].sort();
   const from = `${sorted[0]!.slice(0, 7)}-01`;
@@ -156,16 +176,47 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
     else busy[track] = r.end;
     placed.set(row, track);
   }
-  const bars: RoadmapBar[] = windows.map(({ row, r }) => ({
-    row,
-    track: placed.get(row)!,
-    start: r.start,
-    end: r.end,
-    title: r.title,
-    ...(r.tone ? { tone: r.tone } : {}),
-    x: at(x(r.start)),
-    width: at(x(addDays(r.end, 1)) - x(r.start)),
-  }));
+  /* THE NAMES ON THE TRACKS, measured at `labelWidth`: a name runs from its bar's start over the bar and past it, and
+     fits when it ends before the next window on its track begins. */
+  const span_ = (r: RoadmapRow): { from: number; to: number } => ({ from: x(r.start), to: x(addDays(r.end, 1)) });
+  const byTrack = new Map<number, { row: number; from: number; to: number }[]>();
+  for (const { row, r } of order) {
+    const t = placed.get(row)!;
+    byTrack.set(t, [...(byTrack.get(t) ?? []), { row, ...span_(r) }]);
+  }
+  const next = new Map<number, number>();
+  let lanes = false;
+  for (const on of byTrack.values())
+    on.forEach((w, i) => {
+      const after = on[i + 1]?.from ?? 1000;
+      next.set(w.row, after);
+      if (i + 1 < on.length && w.from + Math.max(w.to - w.from, labelWidth) > after) lanes = true;
+    });
+  const laneOf = new Map(order.map(({ row }, i) => [row, i] as const));
+  /* BESIDE ITS BAR, ON A LANE OF ITS OWN: over it when the bar is as wide as a name, after its end where a name fits
+     before the edge, before its start where it fits there, and otherwise on whichever side has more room. */
+  const labelOf = (row: number, from: number, to: number): RoadmapLabel => {
+    if (!lanes) return { x: at(from), side: 'over', room: at(next.get(row)! - from) };
+    if (to - from >= labelWidth) return { x: at(from), side: 'over', room: at(to - from) };
+    const afterRoom = 1000 - to;
+    const after = afterRoom >= labelWidth || afterRoom >= from;
+    return after ? { x: at(to), side: 'after', room: at(afterRoom) } : { x: at(from), side: 'before', room: at(from) };
+  };
+  const bars: RoadmapBar[] = windows.map(({ row, r }) => {
+    const { from, to } = span_(r);
+    return {
+      row,
+      track: placed.get(row)!,
+      lane: lanes ? laneOf.get(row)! : placed.get(row)!,
+      start: r.start,
+      end: r.end,
+      title: r.title,
+      ...(r.tone ? { tone: r.tone } : {}),
+      x: at(from),
+      width: at(to - from),
+      label: labelOf(row, from, to),
+    };
+  });
 
   /* LABELS SPACED BY THE SAME FIRST-FIT, left to right, a line at a time: a label goes on the first
      line whose last label has ended before it begins. A label that would run past the end edge is
@@ -206,6 +257,8 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
     from,
     to,
     tracks: busy.length,
+    lanes,
+    laneCount: lanes ? windows.length : busy.length,
     bars,
     stems,
     lines: ends.length,
@@ -443,8 +496,12 @@ export const ROADMAP_PAINT = {
   due: { fill: 'none', stroke: 'currentColor', 'stroke-width': '6', 'stroke-linecap': 'round' },
 } as const satisfies Record<string, Readonly<Record<string, string>>>;
 
-/** One placed row as the table under the drawing says it: its first day, or `—` on a date, and its due day. */
-export type RoadmapLine = { row: number; title: string; tone?: Tone; from: string; due: string };
+/**
+ * One placed row as the list under the drawing says it: its first day, or `—` on a date, its due day, the two said as
+ * one span (`4 – 6 Sep 2026`, `30 Aug – 6 Sep 2026`, or the one day), and where it lies in the span as two shares of
+ * the width, `at` and `span`, which a phone draws as a short bar under its name.
+ */
+export type RoadmapLine = { row: number; title: string; tone?: Tone; from: string; due: string; when: string; at: string; span: string };
 
 /**
  * Every placed row, in the order the rows came in, as the table a screen reader reads.
@@ -455,7 +512,36 @@ export type RoadmapLine = { row: number; title: string; tone?: Tone; from: strin
 export function roadmapLines(plan: RoadmapPlan): RoadmapLine[] {
   const tone = (t?: Tone): { tone?: Tone } => (t ? { tone: t } : {});
   return [
-    ...plan.bars.map((b) => ({ row: b.row, title: b.title, ...tone(b.tone), from: day(b.start), due: day(b.end) })),
-    ...plan.stems.map((s) => ({ row: s.row, title: s.title, ...tone(s.tone), from: MISSING, due: day(s.day) })),
+    ...plan.bars.map((b) => ({
+      row: b.row,
+      title: b.title,
+      ...tone(b.tone),
+      from: day(b.start),
+      due: day(b.end),
+      when: roadmapWhen(b.start, b.end),
+      at: roadmapShare(b.x),
+      span: roadmapShare(b.width),
+    })),
+    ...plan.stems.map((s) => ({ row: s.row, title: s.title, ...tone(s.tone), from: MISSING, due: day(s.day), when: day(s.day), at: roadmapShare(s.x), span: '0' })),
   ].sort((a, z) => a.row - z.row);
+}
+
+/**
+ * A window as one span of days, saying the year and the month once where both ends share them: `4 – 6 Sep 2026`,
+ * `30 Aug – 6 Sep 2026`, `28 Dec 2026 – 3 Jan 2027`, and a window of one day as that day.
+ *
+ * A PHONE READ THE TWO DAYS AS TWO COLUMNS, and at 390 the name beside them broke inside its words
+ * (`kilnfonts.exa mple`). One short span under the name leaves the name the whole line.
+ */
+export function roadmapWhen(start: string, end: string): string {
+  if (start === end) return day(end);
+  const [a, z] = [day(start), day(end)];
+  if (start.slice(0, 7) === end.slice(0, 7)) return `${a.split(' ')[0]} – ${z}`;
+  if (start.slice(0, 4) === end.slice(0, 4)) return `${a.split(' ').slice(0, 2).join(' ')} – ${z}`;
+  return `${a} – ${z}`;
+}
+
+/** Where a window's name is drawn while its bar is dragged: beside or over the bar where it is drawn now. */
+export function roadmapLabelAt(bar: RoadmapBar, drawn: { x: string; width: string }): string {
+  return bar.label.side === 'after' ? at(Number(drawn.x) + Number(drawn.width)) : drawn.x;
 }

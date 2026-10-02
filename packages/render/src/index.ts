@@ -23,6 +23,7 @@ export {
   FOLD_HIDE,
   FOLD_SHOW,
   TREND,
+  agentMarkFill,
   cardFault,
   cardLayout,
   counted,
@@ -32,6 +33,7 @@ export {
   ringDash,
   ringOf,
   trendOf,
+  type AgentMark,
   type CardLayout,
   type CardRole,
 } from './cards.ts';
@@ -103,6 +105,7 @@ export {
   FEED_NO_MARK,
   FEED_NOTHING_NEW,
   FEED_SEEN,
+  feedBurst,
   feedFault,
   feedNew,
   feedPlan,

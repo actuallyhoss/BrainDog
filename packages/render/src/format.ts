@@ -111,12 +111,18 @@ export function figureChars(text: string): number | null {
   return longest > 10 ? longest : null;
 }
 
+/** A figure a host drew symbol first with its code after, `−£24,000.00 GBP`, as it stands inside a sentence. */
+const SYMBOL_CODED = /(?<![\p{L}\p{N}])[+\u2212-]?[A-Z]{0,2}\p{Sc}[\u2212-]?[\d,]+(?:\.\d+)?[ \u00a0\u202f][A-Z]{3}\b/gu;
+
 /**
  * A sentence with every figure `money` wrote in it drawn the way `symbolFigure` draws one, or, for a `headline` (the
  * page's one line, a tile's note), the way `headlineFigure` does.
  */
-export const symbolText = (text: string, headline = false): string =>
-  text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => (headline ? headlineFigure(hit) : (symbolFigure(hit) ?? hit)));
+export const symbolText = (text: string, headline = false): string => {
+  const coded = text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => (headline ? headlineFigure(hit) : (symbolFigure(hit) ?? hit)));
+  /* A HEADLINE ALSO SAYS SHORT WHAT A HOST ALREADY DREW, `£24,000.00 GBP` with its code after: `£24,000`. */
+  return headline ? coded.replace(SYMBOL_CODED, (hit) => headlineFigure(hit)) : coded;
+};
 
 /**
  * ONE MINUS SIGN, in all four of them.
@@ -154,14 +160,35 @@ export const integer = (value: number): string => signed(value, (n) => n.toLocal
  * code and a space, or a currency sign with at most two capitals before it (`£`, `US$`, `CA$`), so a word
  * with a number in it (`Q3`) is not read as money. A sign written both before and after the unit is not a
  * figure anybody wrote on purpose, and is left alone. A hyphen is read as the minus it stands for.
+ *
+ * THE CODE AFTER A FIGURE MAY HANG ON A NO-BREAK SPACE. The web's money drawer writes `£24,000.00` and its code with
+ * U+00A0 between them, so a line of amounts never breaks inside one, and the plain space this pattern asked for read
+ * every such figure as no figure at all: the forecast's axis said `£31,035.00 GBP` in full and a tile kept its `.00`.
  */
-const FIGURE_PARTS = /^([+−-]?)([A-Z]{3} |[A-Z]{0,2}\p{Sc})?([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?( [A-Z]{3})?$/u;
+const FIGURE_PARTS = /^([+−-]?)([A-Z]{3} |[A-Z]{0,2}\p{Sc})?([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([ \u00a0\u202f][A-Z]{3})?$/u;
 
 type FigureParts = { sign: string; unit: string; inner: string; whole: string; minor: string; code: string };
 
+/**
+ * Whether three capitals are a currency anybody pays in. A CODE AFTER A FIGURE IS ONLY ONE WHEN IT IS A CURRENCY:
+ * "Top up £200 ISA" and "Pay the £120 EDF bill" end in three capitals too, and read as a code they were said
+ * `ISA 200` and `EDF 120`. A runtime that cannot list its currencies takes every three capitals, as before.
+ */
+let currencies: ReadonlySet<string> | null | undefined;
+const isCurrency = (code: string): boolean => {
+  if (currencies === undefined) {
+    try {
+      currencies = new Set(Intl.supportedValuesOf('currency'));
+    } catch {
+      currencies = null;
+    }
+  }
+  return currencies === null || currencies.has(code);
+};
+
 function figureParts(text: string): FigureParts | null {
   const m = FIGURE_PARTS.exec(text.trim());
-  if (!m || (m[1] && m[3])) return null;
+  if (!m || (m[1] && m[3]) || (m[6] && !isCurrency(m[6].trim()))) return null;
   const minus = (s: string | undefined): string => (s === '-' ? MINUS : (s ?? ''));
   return { sign: minus(m[1]), unit: m[2] ?? '', inner: minus(m[3]), whole: m[4]!.replaceAll(',', ''), minor: m[5] ?? '', code: m[6] ?? '' };
 }
@@ -170,18 +197,31 @@ function figureParts(text: string): FigureParts | null {
 const grouped = (digits: string): string => digits.replace(/^0+(?=\d)/u, '').replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
 
 /**
+ * ONE MARK OF CURRENCY, NEVER TWO, for a chart's short figures: a symbol with its code after it, `$4,800.00 USD`, is
+ * said by the code it names, as the unambiguous symbol where there is one (`US$`) and as the code in front where there
+ * is not (`EGP `). A figure written one way only keeps its unit as it was.
+ */
+function oneMark(p: FigureParts): { unit: string; code: string } {
+  const code = p.code.trim();
+  if (code === '' || p.unit === '' || /^[A-Z]{3} $/u.test(p.unit)) return { unit: p.unit, code: p.code };
+  return { unit: symbolOf(code) ?? `${code} `, code: '' };
+}
+
+/**
  * A BAR'S VALUE, GROUPED: `11200` is drawn `11,200` and `£11,200.00` is drawn `£11,200`.
  *
  * A bar is read against the bars beside it, so a zero minor part is noise down the whole column and is
  * dropped; a minor part that is not zero is part of the amount and stays. The unit, the sign and a code
  * after the figure stay where they were written. Text that is not one figure comes back unchanged: a
- * bar's value cell is the author's, and a sentence in it is not this function's to rewrite.
+ * bar's value cell is the author's, and a sentence in it is not this function's to rewrite. A symbol with its code
+ * after it is said once (`oneMark`): `$4,800.00 USD` is `US$4,800`.
  */
 export function barFigure(text: string): string {
   const p = figureParts(text);
   if (!p) return text;
   const minor = /^0*$/u.test(p.minor) ? '' : `.${p.minor}`;
-  return `${p.sign}${p.unit}${p.inner}${grouped(p.whole)}${minor}${p.code}`;
+  const { unit, code } = oneMark(p);
+  return `${p.sign}${unit}${p.inner}${grouped(p.whole)}${minor}${code}`;
 }
 
 /**
@@ -241,11 +281,12 @@ export function axisFigure(text: string): string {
   if (!p) return text;
   let n = Number(`${p.whole}.${p.minor || '0'}`);
   let i = 0;
+  const { unit, code } = oneMark(p);
   for (;;) {
     const said = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
     if (said < 1_000 || i === COMPACT.length - 1) {
       const body = `${said.toLocaleString(NUM, { maximumFractionDigits: 1 })}${COMPACT[i] ?? ''}`;
-      return said === 0 ? `${p.unit}${body}${p.code}` : `${p.sign}${p.unit}${p.inner}${body}${p.code}`;
+      return said === 0 ? `${unit}${body}${code}` : `${p.sign}${unit}${p.inner}${body}${code}`;
     }
     n /= 1_000;
     i += 1;

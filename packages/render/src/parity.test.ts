@@ -255,13 +255,19 @@ test('and the comparison is not vacuous: a tree that differs is told apart', () 
   assert.notEqual(a, b);
 });
 
-test('a forecast draws its knobs only where the host asks, and the rest of the tree is the same', () => {
+test('a forecast offers its knobs only where the host asks, closed behind one Adjust, and the rest of the tree is the same', () => {
   const block = page(SHAPES['a forecast with a past, stems, knobs and a crossing']!);
   const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
   const knobs = render(Knobbed, { props: { block, opts: { scenario: true } } }).body;
-  assert.match(knobs, /type="range"/u);
-  assert.match(knobs, /role="switch"/u);
-  assert.doesNotMatch(render(Block, { props: { block } }).body, /type="range"/u);
+  /* CLOSED AT EVERY WIDTH: the twenty-seven switches and six sliders stood open under the chart at 1440. Adjust is a
+     disclosure that names the knobs it opens, and they are in the page, hidden, until it is pressed. */
+  const adjust = /<button type="button" class="forecast-tool forecast-adjust" data-adjust="" aria-expanded="false" aria-controls="([^"]+)">Adjust<\/button>/u.exec(knobs);
+  assert.ok(adjust, 'Adjust is a closed disclosure');
+  const fold = new RegExp(`<div class="forecast-knobs" data-inline="" id="${adjust[1]}" hidden="">`, 'u');
+  assert.match(knobs, fold, 'the knobs Adjust controls are hidden until it is pressed');
+  assert.equal(knobs.match(/type="range"/gu)?.length ?? 0, knobs.split(fold)[1]!.match(/type="range"/gu)?.length ?? 0, 'every slider is inside the fold');
+  const plain = render(Block, { props: { block } }).body;
+  assert.doesNotMatch(plain, /type="range"|data-adjust/u);
 });
 
 test('a capture draws its field only where the host can write, prompted by its heading, and no Add until there is text', () => {
@@ -408,6 +414,32 @@ for (const [name, src] of Object.entries(DRAWN)) {
     assert.equal(noLocalControls(svelte), noLocalControls(html));
   });
 }
+
+test('a question in the `call` band draws no "Your call" chip on either surface, and the other three bands still do', () => {
+  const block = page(SHAPES['a queue ranked by what each question would cost to get wrong']!);
+  for (const drawn of [render(Block, { props: { block } }).body, toHTML([block])]) {
+    const chips = [...drawn.matchAll(/class="queue-cost" data-cost="([^"]*)"/gu)].map((m) => m[1]);
+    assert.deepEqual(chips, ['undo', 'shape', 'rows']);
+    assert.doesNotMatch(drawn, /Your call/u);
+  }
+});
+
+/** A host with art for two glyphs: the row's and the chevron a settings row ends in. */
+const ICONS = { icon: (name: string) => (name === 'sun' ? 'M12 3v2' : name === 'chevron-right' ? 'M9 18l6-6-6-6' : null) };
+
+test('the two renderers draw one tree: settings-style link rows, a well before the title and a chevron after an in-app path', () => {
+  const block = page('```link | Settings\nLook | /settings/look | Theme and type | sun\nHelp | https://example.com/help | Read first | sun\nNo art | /settings/x |  | moon\nNot a glyph | /settings/y |  | nonsense\n```');
+  const svelte = tree(render(Hosted, { props: { block, opts: ICONS } }).body);
+  const html = tree(toHTML([block], ICONS));
+  assert.equal(svelte, html);
+  const items = [...html.matchAll(/<li class="item">(.*?)<\/li>/gu)].map((m) => m[1]!);
+  assert.equal(items.length, 4);
+  assert.match(items[0]!, /^<span aria-hidden="true" class="link-well"><svg[^>]*><path d="M12 3v2">/u, 'the well is the first thing in the row, hidden');
+  assert.match(items[0]!, /<span aria-hidden="true" class="link-chevron"><svg[^>]*><path d="M9 18l6-6-6-6">.*<\/span>$/u, 'an in-app row ends in a chevron');
+  assert.doesNotMatch(items[1]!, /link-chevron/u, 'a row that leaves this BrainDog has no chevron');
+  assert.match(items[2]!, /^<span aria-hidden="true" class="link-well"><\/span>/u, 'a glyph with no art keeps an empty well, so the titles line up');
+  assert.doesNotMatch(items[3]!, /link-well|nonsense/u, 'a name that is no glyph is not drawn, and not read out');
+});
 
 test('THE SWITCH AND THE LOAD BUTTON ARE THE WHOLE OF THE DIFFERENCE, each drawn once in the app and never in the mirror', () => {
   const path = page(DRAWN['a path with a short view']!);
@@ -620,4 +652,25 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
   assert.match(live, /aria-label="Project" class="filters-group" data-control="chips"/u, 'seven values are chips');
   assert.match(live, /aria-label="Whose" class="filters-group" data-control="segmented"/u);
   assert.equal(tree(render(Filters, { props: { filters: [] } }).body), '', 'nothing to narrow by draws nothing');
+});
+
+/* ── agents in their makers' marks, where the host draws them ──────────────── */
+
+test('THE TWO RENDERERS DRAW ONE MARK FOR AN AGENT the host names, on a card, a card named for its agent, and a feed line', () => {
+  const marks: Record<string, { d: string; rule: 'evenodd' | 'nonzero'; tone: string }> = {
+    Claude: { d: 'M4 4h16v16H4z', rule: 'nonzero', tone: 'claude' },
+    Codex: { d: 'M2 2h20v20H2z', rule: 'evenodd', tone: 'ink' },
+  };
+  const opts = { agentMark: (name: string) => marks[name] ?? null };
+  const Marked = Block as unknown as Component<{ block: BlockSegment; opts: typeof opts }>;
+  for (const src of [
+    SHAPES['agents working now']!,
+    '```cards\nwho: Agent | fact: Doing\nClaude | Fix the export\nJ. Okonkwo | Proofs\n```',
+    SHAPES['a feed with bursts, a mark and a tone']!,
+  ]) {
+    const block = page(src);
+    const svelte = tree(render(Marked, { props: { block, opts } }).body);
+    assert.match(svelte, /class="agent-mark"/u, src);
+    assert.equal(svelte, tree(toHTML([block], opts)), src);
+  }
 });

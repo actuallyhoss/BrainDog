@@ -40,7 +40,8 @@ test('A SPLIT DRAWS A TRACK NAMED BY ITS SHARES, a legend that prints every figu
   const html = toHTML(parse(SPLIT));
   assert.match(html, /<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Payroll 60%, Rent 30%, Tools 10%">/u);
   assert.match(html, /<rect class="split-seg" data-step="1" data-intent="warn" x="600" y="0" width="300" height="100"><\/rect>/u);
-  assert.match(html, /<li class="split-item"><span class="split-dot" data-step="0" aria-hidden="true"><\/span><span class="split-label">Payroll<\/span><span class="split-value num">GBP 6,000.00<\/span><span class="split-share num">60%<\/span><span class="split-note">4 people<\/span><\/li>/u);
+  assert.match(html, /<li class="split-item"><span class="split-dot" data-step="0" aria-hidden="true"><\/span><span class="split-label">Payroll<\/span><span class="split-value num">£6,000<\/span><span class="split-share num">60%<\/span><span class="split-note">4 people<\/span><\/li>/u);
+  assert.match(html, /<td>GBP 6,000\.00<\/td>|>GBP 6,000\.00</u, 'the fold of numbers keeps every penny');
   assert.ok(html.indexOf('split-legend') < html.indexOf('split-hole'), 'the hole sits after the legend');
   assert.match(html, /<div class="split-hole" data-hole data-intent="warn">/u, 'no host, no button');
   assert.match(toHTML(parse(SPLIT), { hole: true }), /<button type="button" class="split-hole" data-hole data-intent="warn">/u);

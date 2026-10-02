@@ -1,7 +1,7 @@
 <!--
   `roadmap`: tasks on one time axis, a window as a bar on its track and a date as a stem, over alternate month
-  bands and today's line, with every placed row said again as a table. `src/roadmap.ts` decides every position,
-  lane, paint and line of the table; `roadmap` in `src/html.ts` is this file's twin, and `roadmap-parity.test.ts`
+  bands and today's line, with every placed row said again as a lane list. `src/roadmap.ts` decides every position,
+  lane, paint, name and line of the list; `roadmap` in `src/html.ts` is this file's twin, and `roadmap-parity.test.ts`
   holds the two to one tree.
 
   IT IS ON `list` AND HAD NO ARM THERE, so the app drew a roadmap as the generic list: the title, the due day as
@@ -22,12 +22,10 @@
   import { inline, text, TONES, type Block, type RenderOptions, type Row } from '../../src/index.ts';
   import { MISSING } from '../../src/format.ts';
   import {
-    ROADMAP_DUE,
-    ROADMAP_FROM,
     ROADMAP_NONE,
     ROADMAP_PAINT,
-    ROADMAP_WHAT,
     roadmapDue,
+    roadmapLabelAt,
     roadmapLane,
     roadmapLines,
     roadmapPlan,
@@ -139,14 +137,14 @@
     {#if skipped}<p class="roadmap-skipped">{skipped}</p>{/if}
   </div>
 {:else}
-  <div class="roadmap" style="--tracks:{plan.tracks};--lines:{plan.lines}">
+  <div class="roadmap" data-lanes={plan.lanes ? '' : undefined} style="--tracks:{plan.laneCount};--lines:{plan.lines}">
     <div class="roadmap-plot">
       <svg class="roadmap-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={roadmapSentence(plan)}>
         {#each plan.bands as m}
           <rect class="roadmap-band" data-odd={m.odd ? '' : undefined} {...m.odd ? ROADMAP_PAINT.band : ROADMAP_PAINT.even} x={m.x} y="0" width={m.width} height="100"></rect>
         {/each}
         {#each plan.bars as bar}
-          {@const lane = roadmapLane(bar.track, plan.tracks)}
+          {@const lane = roadmapLane(bar.lane, plan.laneCount)}
           {@const g = glyph(bar.tone)}
           {@const drawn = onreschedule ? barAt(bar) : bar}
           {#snippet span()}
@@ -228,7 +226,8 @@
            name goes with it, so the word under the pointer is the row being moved. -->
       <ol class="roadmap-names" aria-hidden="true">
         {#each plan.bars as bar}
-          <li class="roadmap-name" data-intent={bar.tone} style="--at:{roadmapShare(onreschedule ? barAt(bar).x : bar.x)};--track:{bar.track}">{bar.title}{@render mark(bar.tone)}</li>
+          {@const at = onreschedule ? roadmapLabelAt(bar, barAt(bar)) : bar.label.x}
+          <li class="roadmap-name" data-side={bar.label.side} data-intent={bar.tone} style="--at:{roadmapShare(at)};--room:{roadmapShare(bar.label.room)};--track:{bar.lane}">{bar.title}{@render mark(bar.tone)}</li>
         {/each}
         {#each plan.stems as s}
           <li class="roadmap-name" data-stem="" data-intent={s.tone} style="--at:{roadmapShare(s.label.x)};--line:{s.label.line}">{s.title}{@render mark(s.tone)}</li>
@@ -240,17 +239,13 @@
         <li class="roadmap-month" data-odd={m.odd ? '' : undefined} style="--at:{roadmapShare(m.x)}">{m.label}</li>
       {/each}
     </ol>
+    <!-- A LANE LIST, NOT A TABLE: what a screen reader reads beside the drawing and what a phone draws instead of it. -->
     <div class="roadmap-numbers">
-      <table class="roadmap-table">
-        <thead>
-          <tr><th scope="col">{ROADMAP_WHAT}</th><th scope="col">{ROADMAP_FROM}</th><th scope="col">{ROADMAP_DUE}</th></tr>
-        </thead>
-        <tbody>
-          {#each roadmapLines(plan) as p}
-            <tr><th scope="row">{p.title}{@render mark(p.tone)}</th><td class="num">{p.from}</td><td class="num">{p.due}</td></tr>
-          {/each}
-        </tbody>
-      </table>
+      <ol class="roadmap-list">
+        {#each roadmapLines(plan) as p}
+          <li class="roadmap-item" data-intent={p.tone} style="--at:{p.at};--span:{p.span}"><span class="roadmap-item-title">{p.title}{@render mark(p.tone)}</span> <span class="roadmap-item-when num">{p.when}</span><span class="roadmap-item-track" aria-hidden="true"><span class="roadmap-item-bar"></span></span></li>
+        {/each}
+      </ol>
     </div>
     {#if skipped}<p class="roadmap-skipped">{skipped}</p>{/if}
   </div>

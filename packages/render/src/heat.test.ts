@@ -150,6 +150,8 @@ const SHAPES: Record<string, string> = {
   'counted days, a zero, a day with no value, and today': '```heat | Done\n2026-09-14 | 3\n2026-09-14 | 1\n2026-09-16 | 0\n2026-09-21\n2026-09-22 | 2\n```',
   'a row that does not read and one before the weeks drawn': '```heat\n2026-08-03 | 5\nsoon | 1\n2025-01-06 | 3\n```',
   'nothing in view': '```heat | Done\n2025-01-06 | 3\n```',
+  /* PEOPLE'S "IN TOUCH": the page reader writes each day as `day()` does, and one column, so every row is one. */
+  'days as the page reader writes them, one a person': '```heat | In touch, 12 weeks\n2 Sep 2026\n1 Sep 2026\n27 Jul 2026\n28 Aug 2026\n```',
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {
@@ -172,4 +174,21 @@ test('and the comparison is not vacuous: the grid is on the Svelte side, and a d
   assert.match(svelte, /<span class="heat-day" data-today data-wash="2"/u);
   const later = tree(render(Block, { props: { block, opts: { now: NOW + 7 * 86_400_000 } } }).body);
   assert.notEqual(later, svelte);
+});
+
+test('A DAY IN EITHER SPELLING THIS PACKAGE WRITES IS READ: People\'s "In touch" drew no grid from `2 Sep 2026`', () => {
+  /* The web's page reader projects every cell through `display()`, which writes a day with `day()`. Read only as
+     `YYYY-MM-DD`, all four rows were named under an empty tile as days that do not read. */
+  const p = heatPlan(['2 Sep 2026', '1 Sep 2026', '27 Jul 2026', '28 Aug 2026'].map((day) => ({ day, value: '' })), TODAY);
+  assert.equal(p.empty, false);
+  assert.deepEqual(p.skipped, []);
+  assert.deepEqual(
+    p.cells.filter((c) => c.count !== null).map((c) => c.day),
+    ['2026-07-27', '2026-08-28', '2026-09-01', '2026-09-02'],
+  );
+  assert.equal(heatPlan([{ day: '2026-09-02T09:30:00Z', value: '2' }], TODAY).cells.find((c) => c.day === '2026-09-02')?.count, '2', 'an instant is its own day');
+  assert.deepEqual(heatPlan([{ day: '30 Feb 2026', value: '1' }, { day: '2 Sept 2026', value: '1' }], TODAY).skipped, [0, 1], 'nothing is guessed');
+  const html = toHTML(parse(SHAPES['days as the page reader writes them, one a person']!), { now: NOW });
+  assert.match(html, /<div class="heat-grid" role="img"/u);
+  assert.doesNotMatch(html, /heat-skipped/u);
 });

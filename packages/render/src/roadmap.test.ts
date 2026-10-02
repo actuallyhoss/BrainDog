@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { roadmapPlan, type RoadmapRow } from './roadmap.ts';
+import { roadmapLabelAt, roadmapLines, roadmapPlan, roadmapWhen, type RoadmapRow } from './roadmap.ts';
 
 const TODAY = '2026-09-22';
 const win = (start: string, end: string, title = `${start} to ${end}`): RoadmapRow => ({ start, end, title });
@@ -139,4 +139,63 @@ test('every position is measured from the start edge, inside the 1000 box', () =
   for (const b of plan.bars) assert.ok(Number(b.x) >= 0 && Number(b.x) + Number(b.width) <= 1000);
   assert.equal(plan.bars[0]!.width, '1000');
   assert.ok(Number(plan.today) < 1000);
+});
+
+/* ── names that fit, and lanes when they do not ─────────────────────────── */
+
+test('NAMES THAT FIT STAY OVER THEIR BARS ON THE TRACKS, each with the room before the next window', () => {
+  const plan = roadmapPlan([win('2026-09-01', '2026-09-10'), win('2026-09-20', '2026-09-30')], TODAY);
+  assert.equal(plan.lanes, false);
+  assert.equal(plan.laneCount, plan.tracks);
+  assert.deepEqual(plan.bars.map((b) => [b.lane, b.label.side]), [[0, 'over'], [0, 'over']]);
+  assert.equal(plan.bars[0]!.label.room, plan.bars[1]!.x, 'the first name may run as far as the second window');
+});
+
+test('KILN\'S PLAN: SHORT WINDOWS END TO END TAKE A LANE EACH, with the name beside the bar and never on top of the next', () => {
+  /* Seven tasks of a day or three each, end to end on one track: every name sat on one line over the next one. */
+  const rows = [
+    win('2026-08-30', '2026-08-30', 'Turn auto-renew back on'),
+    win('2026-09-04', '2026-09-06', 'Variable axis QA'),
+    win('2026-09-09', '2026-09-09', 'Decide the licensing tier split'),
+    win('2026-09-11', '2026-09-13', 'Illustrations'),
+    win('2026-09-15', '2026-09-15', 'Rotate the deploy key'),
+    win('2026-09-20', '2026-09-21', 'Write the specimen page'),
+  ];
+  const plan = roadmapPlan(rows, TODAY);
+  assert.equal(plan.tracks, 1, 'the packing is unchanged: nothing overlaps');
+  assert.equal(plan.lanes, true);
+  assert.equal(plan.laneCount, 6);
+  assert.deepEqual(plan.bars.map((b) => b.lane), [0, 1, 2, 3, 4, 5], 'a lane each, in order of start');
+  for (const b of plan.bars) {
+    assert.notEqual(b.label.side, 'over', `${b.title} is too short to hold its name`);
+    if (b.label.side === 'after') assert.ok(Math.abs(Number(b.label.x) - Number(b.x) - Number(b.width)) < 0.02, 'it starts where its bar ends');
+    else assert.equal(b.label.x, b.x);
+    assert.ok(Number(b.label.room) > 0);
+  }
+});
+
+test('A NAME NEAR THE END EDGE GOES BEFORE ITS BAR, where the room is', () => {
+  const plan = roadmapPlan([win('2026-09-01', '2026-09-02', 'A'), win('2026-09-04', '2026-09-05', 'C'), win('2026-09-06', '2026-09-28', 'B'), win('2026-09-29', '2026-09-30', 'Last')], TODAY);
+  const last = plan.bars.find((b) => b.title === 'Last')!;
+  assert.equal(plan.lanes, true);
+  assert.equal(last.label.side, 'before');
+  assert.equal(last.label.room, last.x);
+  const wide = plan.bars.find((b) => b.title === 'B')!;
+  assert.equal(wide.label.side, 'over', 'a bar as wide as a name keeps it over itself');
+  assert.equal(roadmapLabelAt(last, { x: '500', width: '20' }), '500');
+});
+
+test('A WINDOW IS SAID AS ONE SPAN OF DAYS, the month and the year once where both ends share them', () => {
+  assert.equal(roadmapWhen('2026-09-04', '2026-09-06'), '4 – 6 Sep 2026');
+  assert.equal(roadmapWhen('2026-08-30', '2026-09-06'), '30 Aug – 6 Sep 2026');
+  assert.equal(roadmapWhen('2026-12-28', '2027-01-03'), '28 Dec 2026 – 3 Jan 2027');
+  assert.equal(roadmapWhen('2026-09-09', '2026-09-09'), '9 Sep 2026');
+  const plan = roadmapPlan([win('2026-09-01', '2026-09-15', 'Build'), on('2026-09-30', 'Launch')], TODAY);
+  assert.deepEqual(
+    roadmapLines(plan).map((l) => [l.title, l.when, l.at, l.span]),
+    [
+      ['Build', '1 – 15 Sep 2026', '0', '0.5'],
+      ['Launch', '30 Sep 2026', '0.9833', '0'],
+    ],
+  );
 });

@@ -6,7 +6,7 @@
   `Proportional.svelte`: a button when the host passes `hole`, a marked row otherwise.
 -->
 <script lang="ts">
-  import { inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
+  import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
   import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
@@ -52,7 +52,7 @@
         <li class="split-item" data-intent={row.tone}>
           <span class="split-dot" data-step={part?.step} aria-hidden="true"></span>
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-          <span class="split-value num"><Text nodes={inline(row.cells[1] || MISSING, opts)} {opts} /></span>
+          <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING), opts)} {opts} /></span>
           {#if part}<span class="split-share num">{part.share}</span>{/if}
           <span class="split-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
           {#if row.tone}

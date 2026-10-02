@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { headlineFigure, headlineMoney, money, symbolFigure, symbolText } from './format.ts';
+import { axisFigure, barFigure, headlineFigure, headlineMoney, money, symbolFigure, symbolText } from './format.ts';
 
 test('A HEADLINE SAYS A WHOLE AMOUNT WITHOUT ITS ZEROS, and keeps a fraction that is part of the amount', () => {
   assert.equal(headlineFigure(money(3_385_000, 'GBP')), '£33,850');
@@ -39,4 +39,31 @@ test('A LEDGER STAYS EXACT: money, symbolFigure and a sentence not marked as a h
   assert.equal(symbolFigure(money(3_385_000, 'GBP')), '£33,850.00');
   assert.equal(symbolText('Cash is GBP 33,850.00 across 2 accounts'), 'Cash is £33,850.00 across 2 accounts');
   assert.equal(symbolText('Cash is GBP 33,850.00 and EGP 412,300.00', true), 'Cash is £33,850 and EGP 412,300');
+});
+
+test('A FIGURE A HOST DREW WITH ITS CODE AFTER A NO-BREAK SPACE IS STILL ONE FIGURE, and says its currency once', () => {
+  /* The web's money drawer writes `£24,000.00` and `GBP` with U+00A0 between, so a line never breaks inside an amount;
+     read only with a plain space, every such figure kept its `.00` and its code on tiles and on the forecast's axis. */
+  assert.equal(headlineFigure('£24,000.00\u00a0GBP'), '£24,000');
+  assert.equal(headlineFigure('−£39.00\u202fGBP'), '−£39');
+  assert.equal(axisFigure('£31,035.00\u00a0GBP'), '£31k');
+  assert.equal(axisFigure('$4,800.00 USD'), 'US$4.8k', 'an axis says one mark of currency too');
+  assert.equal(barFigure('£11,200.00\u00a0GBP'), '£11,200');
+});
+
+test('A HEADLINE SENTENCE SAYS SHORT WHAT A HOST ALREADY DREW, and a sentence not marked a headline keeps it exact', () => {
+  const said = 'Bills past their due date: £10,540.00\u00a0GBP still to pay, and −£39.00 GBP on one.';
+  assert.equal(symbolText(said, true), 'Bills past their due date: £10,540 still to pay, and −£39 on one.');
+  assert.equal(symbolText(said), said);
+  assert.equal(symbolText('Invoice 2026-041 for £4,800.50 GBP', true), 'Invoice 2026-041 for £4,800.50', 'a fraction that is part of it stays');
+  assert.equal(symbolText('Q3£ 12 GBP', true), 'Q3£ 12 GBP', 'nothing that is not a figure is touched');
+});
+
+test('three capitals after a figure are a code only when they are a currency: an ISA or a bill keeps its words', () => {
+  assert.equal(symbolText('Top up £200 ISA before April?', true), 'Top up £200 ISA before April?');
+  assert.equal(symbolText('Pay the £120.00 EDF bill, and £39.00 GBP to Bupa', true), 'Pay the £120.00 EDF bill, and £39 to Bupa');
+  assert.equal(headlineFigure('£5 USB'), '£5 USB');
+  assert.equal(barFigure('£2,000 ISA'), '£2,000 ISA');
+  assert.equal(axisFigure('£2,000 ISA'), '£2,000 ISA');
+  assert.equal(headlineFigure('£24,000.00 GBP'), '£24,000', 'a real code is still read');
 });

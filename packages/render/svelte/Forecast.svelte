@@ -1,7 +1,7 @@
 <!--
-  `forecast`: the cash walk as a line, the remembered balance solid and the walk dashed, stems for
-  the movements worth seeing, the day it goes under, and every movement in a fold. `src/forecast.ts`
-  decides the paths and the words; `forecast` in `src/html.ts` is this file's twin.
+  `forecast`: the cash walk as a line over a soft wash, the remembered balance solid and the walk dashed, a value axis
+  of round steps that holds zero, the day it goes under, and every movement in a fold. `src/forecast.ts` decides the
+  paths and the words; `forecast` in `src/html.ts` is this file's twin.
 
   THE KNOBS AND THE SCRUB EXIST ONLY WHERE THE HOST ASKS FOR THEM (`opts.scenario`). They live in
   this component's memory and never in the address, and without them the drawing is the walk the
@@ -11,17 +11,19 @@
   count, the sell day with no holdings figure in this walk's money, and Show in with no rate into another
   currency. A slider that changes nothing reads as a forecast that ignored it.
 
-  ON A PHONE THE KNOBS LIVE IN A SHEET behind one "Adjust" control, and the chart keeps the screen. Both
-  the knobs under the chart and the button that opens the sheet are drawn, and the block's own width
-  (`blocks-charts.css`, a container query) shows one of them, so the choice follows the space the block
-  has and not the width of the window. The sheet and the full-screen view are native `<dialog>`s, because
-  this package draws for hosts that have no sheet of their own; a key pressed inside one stays inside it,
-  so a host's shortcuts do not act on the page behind a sheet it does not know is open.
+  THE KNOBS ARE CLOSED BEHIND ONE QUIET "Adjust" AT EVERY WIDTH, a disclosure (`aria-expanded`, `aria-controls`).
+  They stood open under the chart wherever the block had the room, and at 1440 that was a wall: twenty-seven What
+  counts switches, six sliders and an orphan "Every movement" under a chart that should have been the answer (the
+  money review). Adjust opens them under the chart at every width, so the line moves in view while a slider does; a
+  phone used to get a sheet instead, which hid the chart the slider was moving. Closed, the knobs are `hidden`, so the
+  control Adjust names is always in the page. The full-screen view is a native `<dialog>`, because this package draws
+  for hosts that have no sheet of their own; a key pressed inside it stays inside it, so a host's shortcuts do not act
+  on the page behind a view it does not know is open.
 -->
 <script lang="ts">
   import { inline, text, TONES, type Block, type RenderOptions } from '../src/index.ts';
   import { figureLike } from '../src/figure.ts';
-  import { day } from '../src/format.ts';
+  import { day, headlineFigure } from '../src/format.ts';
   import {
     FORECAST_ADJUST,
     FORECAST_BALANCE,
@@ -29,6 +31,7 @@
     FORECAST_COUNT,
     FORECAST_COUNT_IN,
     FORECAST_COUNT_OUT,
+    FORECAST_COUNTS_SHOWN,
     FORECAST_FULL,
     FORECAST_GROW_IN,
     FORECAST_GROW_OUT,
@@ -37,6 +40,7 @@
     FORECAST_MOVE,
     FORECAST_NONE,
     FORECAST_NUMBERS,
+    FORECAST_PAINT,
     FORECAST_RESET,
     FORECAST_SELL_NOTE,
     FORECAST_SHOW_IN,
@@ -53,6 +57,7 @@
     forecastDays,
     forecastDrift,
     forecastDriftNote,
+    forecastMore,
     forecastModel,
     forecastPerMonth,
     forecastPerYear,
@@ -202,17 +207,24 @@
     track(e);
   };
 
-  /* ── the sheet the knobs open in on a phone, and the chart full screen ─────── */
+  /* ── Adjust: a disclosure over the knobs, under the chart at every width ── */
 
-  let sheet = $state<HTMLDialogElement>();
+  /** Names the knobs for Adjust's `aria-controls`, one id a drawn forecast, the same on the server and in the page. */
+  const uid = $props.id();
+  let knobsOpen = $state(false);
+
+  /* WHAT COUNTS SHOWS ITS HEAVIEST FEW A SIDE, and the rest wait behind one "N more". A switch already turned off
+     stays in view wherever it ranks, so what was left out can always be counted back in. */
+  let everyCount = $state(false);
+  const shownOf = (list: readonly Counted[]): Counted[] =>
+    everyCount ? [...list] : list.filter((h, i) => i < FORECAST_COUNTS_SHOWN || held.leave.includes(h.label));
+  const countsHidden = $derived(everyCount ? 0 : counts.in.length + counts.out.length - shownOf(counts.in).length - shownOf(counts.out).length);
+
+  /* ── the chart full screen ─────── */
+
   let full = $state<HTMLDialogElement>();
-  /* WHAT EACH DIALOG HOLDS IS DRAWN ONLY WHILE IT IS OPEN, so the knobs are not in the page twice behind a closed one. */
-  let adjusting = $state(false);
+  /* WHAT THE DIALOG HOLDS IS DRAWN ONLY WHILE IT IS OPEN, so the chart is not in the page twice behind a closed one. */
   let enlarged = $state(false);
-  const openSheet = () => {
-    adjusting = true;
-    sheet?.showModal();
-  };
   const openFull = () => {
     enlarged = true;
     full?.showModal();
@@ -265,24 +277,25 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="forecast-plot"
-    data-rises={p.rises ? '' : undefined}
     onpointerdown={grab}
     onpointermove={track}
     onpointerleave={() => (scrub = null)}
     onpointercancel={() => (scrub = null)}
   >
-    <span class="forecast-top num" aria-hidden="true">{p.top}</span>
-    <span class="forecast-bottom num" aria-hidden="true">{p.bottom}</span>
     <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={p.sentence}>
+      {#if p.grid}<path class="forecast-grid" {...FORECAST_PAINT.grid} d={p.grid} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.area}<path class="forecast-area" {...FORECAST_PAINT.area} d={p.area} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-zero" d="M0 {p.zero}H1000" vector-effect="non-scaling-stroke"></path>
       {#if p.base}<path class="forecast-base" d={p.base} vector-effect="non-scaling-stroke"></path>{/if}
-      {#if p.up}<path class="forecast-stem" data-move="up" d={p.up} vector-effect="non-scaling-stroke"></path>{/if}
-      {#if p.down}<path class="forecast-stem" data-move="down" d={p.down} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.past}<path class="forecast-past" d={p.past} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-future" d={p.future} vector-effect="non-scaling-stroke"></path>
       <path class="forecast-low" d={p.low} vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
     </svg>
+    <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk. -->
+    <ol class="forecast-axis" aria-hidden="true">
+      {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} style="--at:{a.at}">{a.label}</li>{/each}
+    </ol>
     {#if p.cross}<span class="forecast-pin" style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
     {#if readout}
       <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
@@ -307,8 +320,8 @@
   </div>
 {/snippet}
 
-<!-- EVERY KNOB, drawn under the chart where the block has the room and in the Adjust sheet where it does not. -->
-{#snippet adjust(m: ForecastModel, s: Scenario)}
+<!-- EVERY KNOB, opened by Adjust under the chart. -->
+{#snippet knobsOf(m: ForecastModel, s: Scenario)}
   {#if showChoices.length}
     <div class="forecast-knob" role="group" aria-label={FORECAST_SHOW_IN}>
       <span class="forecast-knob-name" aria-hidden="true">{FORECAST_SHOW_IN}</span>
@@ -345,7 +358,7 @@
         <label class="forecast-knob">
           <span class="forecast-knob-name">{k ? forecastSpendIn(k) : FORECAST_SPEND}</span>
           <input class="forecast-range" type="range" min="0" max={range.max} step={range.step} value={spendOf(k) * rate} oninput={(e) => setSpend(k, e)} />
-          <span class="forecast-knob-value num">{forecastPerMonth(figureLike(template, spendOf(k) * rate))}</span>
+          <span class="forecast-knob-value num">{forecastPerMonth(headlineFigure(figureLike(template, spendOf(k) * rate)))}</span>
           <span class="forecast-knob-note">{FORECAST_SPEND_NOTE}</span>
         </label>
       {/each}
@@ -359,7 +372,7 @@
           {#if list.length}
             <div class="forecast-counts" role="group" aria-label={side}>
               <span class="forecast-counts-side" aria-hidden="true">{side}</span>
-              {#each list as h (h.label)}
+              {#each shownOf(list) as h (h.label)}
                 <button type="button" class="forecast-chip" role="switch" aria-checked={!held.leave.includes(h.label)} onclick={() => toggle(h.label)}
                   ><span class="switch-track" aria-hidden="true"></span><span class="forecast-chip-label">{h.label}</span><span class="forecast-chip-amount num"
                     >{h.amount}</span
@@ -369,6 +382,7 @@
             </div>
           {/if}
         {/each}
+        {#if countsHidden > 0}<button type="button" class="forecast-tool forecast-more" onclick={() => (everyCount = true)}>{forecastMore(countsHidden)}</button>{/if}
       </div>
     {/if}
     {#if m.knobs.includes('grow')}
@@ -413,14 +427,22 @@
       <p class="forecast-soon">{soon}</p>
     {/if}
     {#if opts.scenario}
+      <!-- ADJUST IS A DISCLOSURE, the same quiet pill as full screen, pressed while the knobs under it are open. -->
       <div class="forecast-tools">
-        {#if controls}<button type="button" class="forecast-tool forecast-adjust" onclick={openSheet}>{FORECAST_ADJUST}</button>{/if}
+        {#if controls}<button
+            type="button"
+            class="forecast-tool forecast-adjust"
+            data-adjust=""
+            aria-expanded={knobsOpen}
+            aria-controls="{uid}-knobs"
+            onclick={() => (knobsOpen = !knobsOpen)}>{FORECAST_ADJUST}</button
+          >{/if}
         <button type="button" class="forecast-tool" onclick={openFull}>{FORECAST_FULL}</button>
       </div>
     {/if}
-    <!-- THE KNOBS COME AFTER THE CHART, so the answer is read before the questions a reader may ask of it. -->
+    <!-- THE KNOBS COME AFTER THE CHART, and only once asked for, so the answer is read before the questions a reader may ask of it. -->
     {#if controls}
-      <div class="forecast-knobs" data-inline="">{@render adjust(drawn, shown)}</div>
+      <div class="forecast-knobs" data-inline="" id="{uid}-knobs" hidden={!knobsOpen}>{@render knobsOf(drawn, shown)}</div>
     {/if}
     <!-- WHAT THE KNOBS CHANGED, under every walk they move: the one with the controls, and each other walk of its group. -->
     {#if (knobbed || group) && moved && base}
@@ -456,25 +478,6 @@
       </table>
     </details>
     {#if opts.scenario}
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <dialog
-        class="forecast-sheet"
-        style="--pulled: {pulled}px"
-        bind:this={sheet}
-        aria-label={FORECAST_ADJUST}
-        onclick={outside}
-        onkeydown={within}
-        onclose={() => (adjusting = false)}
-      >
-        {@render handle()}
-        <div class="forecast-sheet-head">
-          <h2 class="forecast-sheet-title">{FORECAST_ADJUST}</h2>
-          <button type="button" class="forecast-tool" onclick={() => sheet?.close()}>{FORECAST_CLOSE}</button>
-        </div>
-        {#if adjusting && controls}
-          <div class="forecast-sheet-body"><div class="forecast-knobs">{@render adjust(drawn, shown)}</div></div>
-        {/if}
-      </dialog>
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <dialog
         class="forecast-sheet"

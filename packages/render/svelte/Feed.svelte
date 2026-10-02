@@ -3,12 +3,13 @@
   Drawn to the same tree as `html.ts`'s `feed`; `src/parity.test.ts` compiles this file and compares
   the two.
 
-  The count leads each row, because the number is the part
-  that decides whether a row is worth reading. A new row is told apart by words as well as by the
-  accent: the group's head says how many are new, and a line says where the read ones begin.
+  The count leads each row, because the number is the part that decides whether a row is worth reading, and only
+  where it is a burst of more than one (`feedBurst`): a `1` in front of every line said nothing. An agent wears its
+  maker's mark where the host draws one, and a rule wears no letter. A new row is told apart by words as well as by
+  the accent: the group's head says how many are new, and a line says where the read ones begin.
 -->
 <script lang="ts">
-  import { FEED_EARLIER, MISSING, TONES, counted, feedNew, feedPlan, initialOf, inline, markOf, text, type Block, type RenderOptions } from '../src/index.ts';
+  import { FEED_EARLIER, MISSING, TONES, agentMarkFill, feedBurst, feedNew, feedPlan, initialOf, inline, text, type AgentMark, type Block, type RenderOptions } from '../src/index.ts';
   import { RUN_OPEN, runFaceOf, type RunFace } from '../src/cards.ts';
   import { hrefFor } from '../src/html.ts';
   import { rowAt, rowKey } from '../src/cursor.ts';
@@ -38,7 +39,17 @@
   const plan = $derived(feedPlan(block.rows));
   const said = (v: string | undefined): string => text(inline(v ?? '', opts));
   const nodes = (v: string | undefined) => inline(v ?? '', opts);
+  /** The mark the host draws for the name in a cell, or `null`, as `markFor` in `src/html.ts`. */
+  const markFor = (name: string): AgentMark | null => (name.trim() && opts.agentMark ? opts.agentMark(name.trim()) : null);
 </script>
+
+<!-- AN AGENT'S FACE AS ITS MAKER'S MARK, as `agentFaceHtml` in `src/html.ts` draws one: the host's path, filled in the
+     maker's tone, in the face slot a letter used to fill. Hidden, because the agent is named in words beside it. -->
+{#snippet agentFace(m: AgentMark, cls: string)}{@const fill = agentMarkFill(m.tone)}<span class={cls} data-agent="" aria-hidden="true"
+    ><svg class="agent-mark" data-tone={m.tone} viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" style={fill ?? undefined}
+      ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule}></path></svg
+    ></span
+  >{/snippet}
 
 <!-- A RUN'S FACE, as `Cards.svelte`'s own `runFace` snippet draws one: every place a run is named draws
      the agent face, and a feed line's actor is a run wherever `sessions.live` names one. -->
@@ -82,13 +93,14 @@
           {#each g.rows as { row, fresh }, i}
             {@const who = row.cells[1] ?? ''}
             {@const run = runFaceOf(who, null, false)}
-            <!-- A rule is a square mark and an agent or a person a round face: told apart by shape. -->
-            {@const face = g.by === 'rule' ? markOf(said(who)) : initialOf(said(who))}
+            <!-- A RULE WEARS NO LETTER, an agent its maker's mark where the host draws one, and a person their initial. -->
+            {@const mark = g.by === 'rule' ? null : markFor(said(who))}
+            {@const face = g.by === 'rule' ? null : initialOf(said(who))}
             {@const key = rowKey(row, block.rows.indexOf(row))}
             {#if i === g.earlier}<li class="feed-seen">{FEED_EARLIER}</li>{/if}
             <li class="feed-row" data-new={fresh ? '' : undefined} data-intent={row.tone} data-row={key} data-focused={cursor === key ? '' : undefined}>
-              <span class="feed-count num">{#if counted(said(row.cells[2]))}<Text nodes={nodes(row.cells[2])} {opts} />{/if}</span>
-              {#if run}{@render runFace(run)}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
+              <span class="feed-count num">{#if feedBurst(said(row.cells[2]))}<Text nodes={nodes(row.cells[2])} {opts} />{/if}</span>
+              {#if run}{@render runFace(run)}{:else if mark}{@render agentFace(mark, 'feed-face')}{:else}<span class="feed-face" aria-hidden="true">{face ?? ''}</span>{/if}
               <span class="feed-what"
                 ><span class="feed-who">{#if who}<Text nodes={nodes(who)} {opts} />{:else}{MISSING}{/if}</span> <Text
                   nodes={nodes(row.cells[3])}

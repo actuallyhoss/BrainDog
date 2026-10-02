@@ -78,21 +78,43 @@
      The ONLY place an intent becomes a colour. A component cannot render `warn` without going
      through here, and the glyph is emitted by the renderer, not by a call site (13 §2.3). */
 
+  /* A STATE'S FILL IS ITS THEME FILL TAKEN TOWARD THE EDGE GREY, so a dot, a share of a bar or a window on a plan
+     says on track, at risk or off track without shouting it. The theme solves its fills for a chip that must be found,
+     and drawn as they are the four were the loudest things on Projects, the off-track red a twin of the brand's own red
+     beside the logo. Mixed in OKLab, so the hue holds and only the colour's strength drops; the lightness barely moves,
+     so the fill still stands off the tile as the theme checked it would. `bad` keeps the most of its own, because a
+     thing off track is the one a person may need to act on. */
   [data-intent='good'] {
     --tone: var(--earn);
-    --tone-fill: var(--earn-fill);
+    --tone-fill: color-mix(in oklab, var(--earn-fill) 60%, var(--edge));
   }
   [data-intent='warn'] {
     --tone: var(--warn);
-    --tone-fill: var(--warn-fill);
+    --tone-fill: color-mix(in oklab, var(--warn-fill) 60%, var(--edge));
   }
   [data-intent='bad'] {
     --tone: var(--danger);
-    --tone-fill: var(--danger-fill);
+    --tone-fill: color-mix(in oklab, var(--danger-fill) 70%, var(--edge));
   }
   [data-intent='info'] {
     --tone: var(--info);
-    --tone-fill: var(--info-fill);
+    --tone-fill: color-mix(in oklab, var(--info-fill) 60%, var(--edge));
+  }
+
+  /* ASKED FOR MORE CONTRAST, A STATE GETS ITS THEME FILL WHOLE: the high-contrast palette solved it to be found. */
+  @media (prefers-contrast: more) {
+    [data-intent='good'] {
+      --tone-fill: var(--earn-fill);
+    }
+    [data-intent='warn'] {
+      --tone-fill: var(--warn-fill);
+    }
+    [data-intent='bad'] {
+      --tone-fill: var(--danger-fill);
+    }
+    [data-intent='info'] {
+      --tone-fill: var(--info-fill);
+    }
   }
 
   /* AN INTENT ON A ROW OR A FIGURE IS A DOT, NOT A SYMBOL. The renderer still emits
@@ -125,11 +147,27 @@
     --ramp-1: color-mix(in srgb, var(--ink) 72%, var(--bg));
     --ramp-2: color-mix(in srgb, var(--ink) 45%, var(--bg));
     --ramp-3: color-mix(in srgb, var(--ink) 22%, var(--bg));
+    /* MONEY IN, AND WORK DONE, AS A BAR: the good state's calm fill (the intent map above), for the bars that are not a
+       state of their own but the one series in colour. */
+    --in-fill: color-mix(in oklab, var(--earn-fill) 60%, var(--edge));
     margin: 0 0 var(--sp-5);
+  }
+
+  @media (prefers-contrast: more) {
+    .block {
+      --in-fill: var(--earn-fill);
+    }
   }
 
   .measure {
     max-inline-size: var(--measure);
+  }
+
+  /* A TILE IS AS TALL AS WHAT IT HOLDS, and not as tall as the tile beside it. Stretched to its row, a tile of one task
+     beside a tile of six was a white panel mostly blank, the emptiest thing on Kiln drawn the size of the fullest. The
+     page grid is the app's; this is the one thing the skin says about the tiles in it. */
+  .block-slot {
+    align-self: start;
   }
 
   /* A HEADING IS A NAME, in ink and in sentence case, at a tile heading's step. */

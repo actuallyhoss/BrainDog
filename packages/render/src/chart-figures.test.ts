@@ -13,7 +13,7 @@ test('A BAR\'S VALUE IS GROUPED, and a zero minor part is dropped while any othe
   assert.equal(barFigure('£11,200.00'), '£11,200');
   assert.equal(barFigure('£11200.50'), '£11,200.50');
   assert.equal(barFigure(money(1_120_000, 'GBP')), 'GBP 11,200');
-  assert.equal(barFigure('$4,800.00 USD'), '$4,800 USD');
+  assert.equal(barFigure('$4,800.00 USD'), 'US$4,800', 'one mark of currency, never a symbol and its code');
   assert.equal(barFigure('−£39.00'), '−£39');
   assert.equal(barFigure('+£850.00'), '+£850');
   // A hyphen is the minus it stands for.

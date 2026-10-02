@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { against, baseKnobs, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
+import { against, baseKnobs, countsOf, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -93,17 +93,16 @@ test('the horizon offers what fits, and the heaviest movements are summed by lab
   assert.deepEqual(largest(model())[0], { label: 'Tax', amount: '−£2,400.00' });
 });
 
-test('the plan holds zero in view, gaps in the past, stems and the crossing', () => {
+test('the plan holds zero in view, gaps in the past, a wash, a round axis and the crossing', () => {
   const m = model();
   const s = scenario(m, baseKnobs(m));
   const plan = forecastPlan(m, s, null);
   assert.match(plan.past, /^M[\d.]+ [\d.]+ M/u, 'a day with no point breaks the remembered line');
   assert.ok(plan.lo <= -900 && plan.hi >= 1500);
-  assert.ok(plan.up.length > 0 && plan.down.length > 0);
   assert.equal(plan.warn, true);
   assert.equal(plan.said, 'Goes under on 20 Oct');
   assert.equal(plan.cross?.day, '20 Oct');
-  assert.equal(plan.rises, false, 'a walk that goes under keeps the bottom of the axis in the near corner');
+  assert.equal('up' in plan || 'down' in plan, false, 'no stems: a movement is the readout\'s and the table\'s');
   assert.equal(plan.base, '', 'no baseline until a knob moves');
   assert.ok(forecastPlan(m, scenario(m, { ...baseKnobs(m), late: 5 }), s).base.length > 0);
   assert.deepEqual(plan.ticks.map((t) => t.label), ['Oct', 'Nov']);
@@ -282,4 +281,44 @@ test('AN `of` ROW SPEAKS FOR THE STEP DIRECTLY ABOVE IT ONLY, and not for a step
     ['of', 'Plan', 'USD to GBP', ''],
   ])!;
   assert.deepEqual(m.steps, [{ day: '2026-10-01', label: 'A', delta: 1 }]);
+});
+
+test('THE AXIS IS ROUND STEPS DOWN ONE SIDE, zero among them, said short, and the scale is the balances\' alone', () => {
+  const m = model();
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  /* The walk runs from −£900 to £1,500, so the steps are a thousand: £2k, £1k, £0, −£1k, top first. */
+  assert.deepEqual(plan.axis.map((a) => a.label), ['£2k', '£1k', '£0', '−£1k']);
+  assert.deepEqual(plan.axis.map((a) => a.at), ['0', '0.3333', '0.6667', '1']);
+  assert.deepEqual(plan.axis.filter((a) => a.zero).map((a) => a.label), ['£0']);
+  assert.equal(plan.zero, '66.67', 'the zero rule is where the axis says £0');
+  assert.equal(plan.grid, 'M0 0H1000 M0 33.33H1000 M0 100H1000', 'a faint rule at every other step');
+  assert.deepEqual([plan.lo, plan.hi], [-1000, 2000]);
+});
+
+test('THE WASH IS ONE CLOSED SHAPE from the zero rule, under the remembered line and the walk', () => {
+  const m = model();
+  const plan = forecastPlan(m, scenario(m, baseKnobs(m)), null);
+  assert.match(plan.area, new RegExp(`^M0 ${plan.zero} L0 `, 'u'), 'it starts on zero under the first remembered day');
+  assert.match(plan.area, new RegExp(`L1000 ${plan.zero}Z$`, 'u'), 'and closes on zero under the horizon');
+});
+
+test('A FIGURE A HOST DREW WITH ITS CODE AFTER IT IS SAID SHORT on the axis, the readout and the switches, and exact in the table', () => {
+  const rows = ROWS.map((r) => (/£/u.test(r[3] ?? '') ? [r[0]!, r[1]!, r[2]!, `${r[3]}\u00a0GBP`] : r));
+  const m = forecastModel(rows)!;
+  const s = scenario(m, baseKnobs(m));
+  const plan = forecastPlan(m, s, null);
+  assert.deepEqual(plan.axis.map((a) => a.label), ['£2k', '£1k', '£0', '−£1k'], 'not £2,000.00 GBP');
+  assert.equal(readoutAt(m, s, plan, 1).balance, '−£900');
+  assert.deepEqual(countsOf(m).out[0], { label: 'Tax', amount: '−£2,400' });
+  const src = ['```forecast', ...rows.map((r) => r.join(' | ')), '```'].join('\n');
+  assert.match(toHTML(parse(src, { page: true })), /<td class="num">−£1,200\.00\u00a0GBP<\/td>/u, 'the table keeps every penny and the code');
+});
+
+test('toHTML draws the wash, the axis down one side and no stems', () => {
+  const src = ['```forecast', ...ROWS.map((r) => r.join(' | ')), '```'].join('\n');
+  const html = toHTML(parse(src, { page: true }));
+  assert.match(html, /<path class="forecast-area" fill="currentColor" fill-opacity="0\.06" stroke="none" d="M0 /u);
+  assert.match(html, /<ol class="forecast-axis" aria-hidden="true"><li class="forecast-axis-tick" style="--at:0">£2k<\/li>/u);
+  assert.match(html, /<li class="forecast-axis-tick" data-zero="" style="--at:0\.6667">£0<\/li>/u);
+  assert.doesNotMatch(html, /forecast-stem|forecast-top|forecast-bottom/u);
 });

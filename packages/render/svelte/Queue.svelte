@@ -35,7 +35,7 @@
   to say in `selected` (by `rowKey`) where it holds that, and this card's own otherwise, dropped when the fence changes.
 -->
 <script lang="ts">
-  import { QUEUE_RECOMMENDED, hrefFor, inline, queueMore, queuePlan, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { QUEUE_RECOMMENDED, hrefFor, inline, queueMore, queuePlan, symbolText, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import { QUEUE_DOES, fileSrc, queueSuggested, queueWays, type QueueShows } from '../src/queue.ts';
   import { CHOICE_KEYS, choiceOf, rowAt, rowKey } from '../src/cursor.ts';
   import Text from './Text.svelte';
@@ -167,13 +167,15 @@
         {/if}
         {#if suggested && tiles}{@render visual(suggested.shows)}{/if}
         <!-- The band is a label and not an argument: last on the by-line, in the same register as who
-             asked and when, because it answers "why is this card here" rather than being the card. -->
+             asked and when, because it answers "why is this card here" rather than being the card. `call` draws
+             nothing: every question in the queue is the reader's call, so "Your call" said nothing a card did not. -->
         <p class="queue-by">
           <span class="queue-who" data-calm=""><Text nodes={nodes(item.who)} {opts} /></span><span class="queue-when" data-calm=""
             ><Text nodes={nodes(item.when)} {opts} /></span
-          >{#if item.costLabel}<span class="queue-cost" data-cost={item.cost}>{item.costLabel}</span>{/if}
+          >{#if item.costLabel && item.cost !== 'call'}<span class="queue-cost" data-cost={item.cost}>{item.costLabel}</span>{/if}
         </p>
-        <h3 class="queue-question"><Text nodes={nodes(item.question)} {opts} /></h3>
+        <!-- A QUESTION IS A CARD'S HEADLINE, its money said short (`£39`, not `£39.00 GBP`), as the mirror says it. -->
+        <h3 class="queue-question"><Text nodes={nodes(symbolText(item.question, true))} {opts} /></h3>
         {#if suggested}<p class="queue-suggested">{queueSuggested(suggested.label)}</p>{/if}
         {#if item.why}<p class="queue-why"><Text nodes={nodes(item.why)} {opts} /></p>{/if}
         {#if whole && item.does.length}

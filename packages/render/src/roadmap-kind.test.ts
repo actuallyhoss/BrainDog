@@ -209,10 +209,11 @@ test('EVERY MARK IN THE DRAWING SAYS HOW IT IS PAINTED, so a page with no roadma
   assert.ok(Math.max(...opacity('roadmap-band')) < Math.min(...opacity('roadmap-bar')), 'a band is quieter than a bar');
 });
 
-test('the rows are also a table a screen reader reads, and the tone keeps its glyph', () => {
+test('the rows are also a lane list a screen reader reads, each with its span of days, and the tone keeps its glyph', () => {
   const html = toHTML(parse(FENCE), { now: NOW });
-  assert.match(html, /<th scope="row">Build the kiln page<\/th><td class="num">1 Sep 2026<\/td><td class="num">10 Sep 2026<\/td>/u);
-  assert.match(html, /<th scope="row">Launch<\/th><td class="num">—<\/td><td class="num">30 Sep 2026<\/td>/u);
+  assert.match(html, /<span class="roadmap-item-title">Build the kiln page<\/span> <span class="roadmap-item-when num">1 – 10 Sep 2026<\/span>/u);
+  assert.match(html, /<span class="roadmap-item-title">Launch<\/span> <span class="roadmap-item-when num">30 Sep 2026<\/span>/u);
+  assert.doesNotMatch(html, /roadmap-table/u, 'no three-column table to break a name inside its words on a phone');
   assert.match(html, /Regate window<span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>/u);
 });
 
@@ -220,13 +221,13 @@ test('THE TABLE KEEPS THE ORDER THE ROWS CAME IN, a date written first read firs
   /* The plan hands back bars and then stems, so a table built in that order put every window ahead of every date.
      Removing the sort left the test above green, because its fence writes its date after its windows (measured). */
   const html = toHTML(parse('```roadmap | Order\nLaunch | 2026-09-30\nBuild | 2026-09-10 | 10\n```'), { now: NOW });
-  assert.deepEqual([...html.matchAll(/<th scope="row">([^<]+)<\/th>/gu)].map((m) => m[1]), ['Launch', 'Build']);
+  assert.deepEqual([...html.matchAll(/<span class="roadmap-item-title">([^<]+)<\/span>/gu)].map((m) => m[1]), ['Launch', 'Build']);
 });
 
 test('a row that could not be placed is named under the drawing, never drawn somewhere it does not belong', () => {
   const html = toHTML(parse(FENCE), { now: NOW });
   assert.match(html, /<p class="roadmap-skipped">[^<]*Someday[^<]*<\/p>/u);
-  assert.equal(/<th scope="row">Someday/u.test(html), false);
+  assert.equal(/<span class="roadmap-item-title">Someday/u.test(html), false);
 });
 
 /* ── a date the calendar cannot say ───────────────────────────────────────── */
@@ -240,7 +241,7 @@ test('AN EFFORT TOO LONG FOR THE CALENDAR IS A ROW SKIPPED, NOT A DOCUMENT THROW
     const html = toHTML(parse(fence(effort)), { now: NOW });
     assert.match(html, /Before/u);
     assert.match(html, /<p class="roadmap-skipped">[^<]*Too long[^<]*<\/p>/u);
-    assert.match(html, /<th scope="row">Fine<\/th>/u);
+    assert.match(html, /<span class="roadmap-item-title">Fine<\/span>/u);
   }
 });
 

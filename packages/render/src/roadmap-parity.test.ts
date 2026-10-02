@@ -73,6 +73,9 @@ const SHAPES: Record<string, string> = {
   'a fraction of a day, a link in a title, and today outside the span':
     '```roadmap | Next year\n[Kiln](/r/tasks/4) | 2027-07-20 | 0.5 d\nGlaze | 2027-08-02 | 1.5\n```',
   'nothing that can be drawn': '```roadmap | Later\nSomeday | soon\nWhenever | 2026-13-40 | 2\n```',
+  /* KILN'S PLAN: short tasks end to end on one track, whose names do not fit on it, so each takes a lane of its own. */
+  'short windows end to end, a lane each with the name beside it':
+    '```roadmap | The plan\nTurn auto-renew back on for kilnfonts.example | 30 Aug 2026 | 1\nVariable axis QA on the new cut | 6 Sep 2026 | 3\nDecide the licensing tier split | 9 Sep 2026 | 1\nIllustrations for the specimen page | 13 Sep 2026 | 3 | warn\nRotate the Fenwick deploy key | 15 Sep 2026 | 1\nWrite the specimen page | 21 Sep 2026 | 2\n```',
 };
 
 for (const [name, src] of Object.entries(SHAPES)) {

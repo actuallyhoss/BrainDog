@@ -2,8 +2,13 @@
  * What `forecast` decides, as functions both drawers call.
  *
  * A forecast is a cash walk drawn as a line: the balance the record remembered, solid, up to today,
- * and the walk from today's balance, dashed, to the horizon. Every movement big enough to see stands
- * on the zero rule as a stem, and the first day the balance goes under is marked and said in words.
+ * and the walk from today's balance, dashed, to the horizon, over a soft wash down to the zero rule. The value axis is
+ * a few round steps that always hold zero, said short (`£50k`, `£0`, `−£50k`), and the first day the balance goes under
+ * is marked and said in words.
+ *
+ * NO STEMS. Every movement worth a twentieth of the range stood on the zero rule as a stem, which on a year's walk was
+ * a few grey ticks nobody could read against a balance line (the money review called them stray), and their deltas
+ * stretched the axis past anything the balance reached. What moved on a day is the scrub's readout and the table's.
  *
  * THE KNOBS ARE ARITHMETIC OVER THE STEPS THE HOST SENT, not a second query. Clients paying later
  * moves every incoming step; spending the record does not know about takes a little every day; a
@@ -18,7 +23,7 @@
  * know about a step beyond its day and amount comes on an `of` row under it, written only when the host knows it.
  */
 
-import { MISSING, axisFigure, exponentOf, money } from './format.ts';
+import { MISSING, axisFigure, exponentOf, headlineFigure, money } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
 
@@ -630,7 +635,8 @@ export function countsOf(model: ForecastModel, most = 5): { in: Counted[]; out: 
   const heaviest = (a: [string, { weight: number }], b: [string, { weight: number }]) => b[1].weight - a[1].weight;
   const once = all.filter(([, g]) => g.n === 1).sort(heaviest).slice(0, most);
   const offered = [...all.filter(([, g]) => g.n > 1), ...once].sort(heaviest);
-  const said = ([label, g]: [string, { sum: number }]): Counted => ({ label, amount: figureLike(model.template, g.sum) });
+  /* A SWITCH'S AMOUNT IS SAID SHORT, `−£54,560`, since it says how much a stream weighs and the table says it exactly. */
+  const said = ([label, g]: [string, { sum: number }]): Counted => ({ label, amount: headlineFigure(figureLike(model.template, g.sum)) });
   return { in: offered.filter(([, g]) => g.sum > 0).map(said), out: offered.filter(([, g]) => g.sum <= 0).map(said) };
 }
 
@@ -656,10 +662,12 @@ export type ForecastPlan = {
   warn: boolean;
   past: string;
   future: string;
+  /** The soft wash between the balance and the zero rule, remembered and walked alike, as one closed path. */
+  area: string;
   base: string;
   zero: string;
-  up: string;
-  down: string;
+  /** The rules at the axis's other round steps, faint, and `''` when zero is the only one. */
+  grid: string;
   /** The crossing's dot and where its label sits, as a fraction across. */
   cross: { d: string; at: string; day: string } | null;
   low: string;
@@ -669,16 +677,18 @@ export type ForecastPlan = {
   span: number;
   lo: number;
   hi: number;
-  /** The top and the bottom of the value axis, written like the opening figure. */
-  top: string;
-  bottom: string;
   /**
-   * Whether the walk ends higher than it starts. The bottom of the axis is written in the corner the walk is not near: the
-   * near one when it falls, the far one when it rises, where a rising walk started from the bottom and drew over it.
+   * The value axis, top first: each round step as a share of the height from the top (`--at`), said short, and which of
+   * them is zero. ONE SIDE AND ONE SCALE, where the axis was its top in the far corner and its bottom in the near one,
+   * each the walk's own extreme to the penny (`£31,035.00 GBP` over `−£127,489.90 GBP`), which no reader could read
+   * a level between.
    */
-  rises: boolean;
+  axis: { at: string; label: string; zero: boolean }[];
   sentence: string;
 };
+
+/** About how many round steps the value axis is cut into; `roundStep` rounds up, so never more than this and one. */
+const AXIS_STEPS = 4;
 
 /** How many month names the time axis holds at most, when it names every month. */
 const TICKS_MOST = 12;
@@ -703,23 +713,21 @@ function tickLabel(day: string, every: number): string {
 
 /**
  * The paths, the marks and the words for one scenario, with the baseline drawn faint when a knob has
- * moved. The value axis always holds zero, and a stem stands for every movement worth at least a
- * twentieth of the range the balances cover.
+ * moved. The value axis always holds zero, and runs from the round step at or below the lowest balance
+ * to the one at or above the highest.
  */
 export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenario | null = null): ForecastPlan {
   const start = model.past[0]?.day ?? model.today;
   const end = addDays(model.today, shown.horizon);
   const span = Math.max(1, daysBetween(start, end));
   const values = [0, ...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
-  let lo = Math.min(...values);
-  let hi = Math.max(...values);
-  const range = hi - lo || 1;
-  const stems = shown.steps.filter((s) => Math.abs(s.delta) >= range * 0.05);
-  lo = Math.min(lo, ...stems.map((s) => s.delta));
-  hi = Math.max(hi, ...stems.map((s) => s.delta));
-  if (hi === lo) hi = lo + 1;
+  const step = roundStep((Math.max(...values) - Math.min(...values)) / AXIS_STEPS);
+  const lo = Math.floor(Math.min(...values) / step) * step;
+  const hi = Math.max(lo + step, Math.ceil(Math.max(...values) / step) * step);
   const x = (day: string) => at((daysBetween(start, day) / span) * 1000);
   const y = (v: number) => at(((hi - v) / (hi - lo)) * 100);
+  const levels: number[] = [];
+  for (let v = hi; v >= lo - step / 2; v -= step) levels.push(Math.abs(v) < step / 2 ? 0 : v);
 
   let past = '';
   let prev: string | null = null;
@@ -732,11 +740,12 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const line = (days: Scenario['days']) =>
     days.filter((p) => p.day <= end).map((p, i) => `${i ? 'L' : 'M'}${x(p.day)} ${y(p.balance)}`).join(' ');
 
-  const stem = (dir: 1 | -1) =>
-    stems
-      .filter((s) => Math.sign(s.delta) === dir)
-      .map((s) => `M${x(s.day)} ${y(0)}V${y(s.delta)}`)
-      .join(' ');
+  /* THE WASH RUNS UNDER BOTH LINES AS ONE SHAPE, down to the zero rule at its two ends, so a walk that goes under
+     washes the part below zero as well; a day the record did not remember is bridged, as the eye bridges it. */
+  const points = [...model.past.map((p) => ({ day: p.day, v: p.value })), ...shown.days.filter((p) => p.day <= end).map((p) => ({ day: p.day, v: p.balance }))];
+  const area = points.length > 1
+    ? `M${x(points[0]!.day)} ${y(0)} ${points.map((p) => `L${x(p.day)} ${y(p.v)}`).join(' ')} L${x(points.at(-1)!.day)} ${y(0)}Z`
+    : '';
 
   const starts: { d: number; day: string }[] = [];
   for (let d = 0; d <= span; d++) {
@@ -756,6 +765,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const c = shown.crossed;
   const said = c ? forecastUnder(shortDay(c.day)) : forecastAbove(shortDay(end));
   const figure = (v: number) => figureLike(model.template, v);
+  /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
+  const axis = levels.map((v) => ({ at: String(Math.round(Number(y(v)) * 100) / 10_000), label: axisFigure(figure(v)), zero: v === 0 }));
   const sentence = [
     `${model.label || FORECAST_BALANCE} ${figure(model.opening)} ${FORECAST_TODAY}`,
     model.past.length ? forecastRecorded(shortDay(model.past[0]!.day), figure(model.past[0]!.value)) : '',
@@ -770,10 +781,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     warn: c !== null,
     past,
     future: line(shown.days),
+    area,
     base: base ? line(base.days) : '',
     zero: y(0),
-    up: stem(1),
-    down: stem(-1),
+    grid: levels.filter((v) => v !== 0).map((v) => `M0 ${y(v)}H1000`).join(' '),
     cross: c ? { d: `M${x(c.day)} ${y(c.balance)}h0`, at: at(daysBetween(start, c.day) / span), day: shortDay(c.day) } : null,
     low: `M${x(shown.lowest.day)} ${y(shown.lowest.balance)}h0`,
     ticks,
@@ -781,9 +792,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     span,
     lo,
     hi,
-    top: axisFigure(figure(hi)),
-    bottom: axisFigure(figure(lo)),
-    rises: (shown.days.filter((p) => p.day <= end).at(-1)?.balance ?? model.opening) > (model.past[0]?.value ?? model.opening),
+    axis,
     sentence: `${sentence}.`,
   };
 }
@@ -807,10 +816,19 @@ export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastP
     at: at(daysBetween(plan.start, day) / plan.span),
     flip: f > 0.5,
     day: shortDay(day),
-    balance: balance === null ? MISSING : figureLike(model.template, balance),
-    moves: shown.steps.filter((s) => s.day === day).slice(0, 3).map((s) => ({ label: s.label, amount: figureLike(model.template, s.delta) })),
+    balance: balance === null ? MISSING : headlineFigure(figureLike(model.template, balance)),
+    moves: shown.steps.filter((s) => s.day === day).slice(0, 3).map((s) => ({ label: s.label, amount: headlineFigure(figureLike(model.template, s.delta)) })),
   };
 }
+
+/**
+ * The paints the wash and the faint rules carry as attributes, as `ROADMAP_PAINT` gives its marks, so a page with no rule
+ * for them draws a quiet wash and hairlines rather than a black slab; every rule in the host's stylesheet wins over them.
+ */
+export const FORECAST_PAINT = {
+  area: { fill: 'currentColor', 'fill-opacity': '0.06', stroke: 'none' },
+  grid: { fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.08' },
+} as const satisfies Record<string, Readonly<Record<string, string>>>;
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */
 export const FORECAST_NONE = 'There is no balance to walk from, so there is no forecast yet.';
@@ -829,6 +847,12 @@ export const FORECAST_GROW_IN = 'Money in grows by';
 export const FORECAST_COUNT = 'What counts';
 export const FORECAST_COUNT_IN = 'Money in';
 export const FORECAST_COUNT_OUT = 'Money out';
+/**
+ * How many switches What counts shows a side before the rest wait behind "N more". The seed's year of money out was
+ * twenty-five of them in a wall, heaviest first, and the first few are the ones a question is asked of.
+ */
+export const FORECAST_COUNTS_SHOWN = 6;
+export const forecastMore = (n: number): string => `${n} more`;
 export const FORECAST_SELL_NOTE = 'empty keeps them';
 export const forecastPerYear = (n: number): string => `${n}% a year`;
 /**
@@ -844,7 +868,7 @@ export const forecastDriftNote = (pair: string): string => `above zero, one ${cu
 /** The sell knob, naming what it sells as the host called it: `Gold, Bonds sold on`. */
 export const forecastSold = (labels: readonly string[]): string => `${labels.join(', ')} sold on`;
 export const FORECAST_RESET = 'Reset';
-/** The one control a phone draws for every knob, which opens them in a sheet. */
+/** The one quiet control for every knob: it opens them under the chart where the block has the room, and in a sheet where it does not. */
 export const FORECAST_ADJUST = 'Adjust';
 export const FORECAST_FULL = 'Open full screen';
 export const FORECAST_CLOSE = 'Close';

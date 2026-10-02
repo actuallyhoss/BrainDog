@@ -238,7 +238,19 @@
       grid-template-columns: minmax(0, auto) auto minmax(auto, 1fr);
       align-items: baseline;
       padding-block: var(--sp-3);
-      border-block-end: 1px solid var(--line);
+    }
+
+    /* THE HAIRLINE IS BETWEEN TWO ROWS, ON THE SECOND ONE'S TOP, and a row that is a door gives back the margin it
+       borrows for its wash, so its wash is the row. That margin reached a step past the row on every side, up into the
+       row above, which put the row above's hairline through this row's figure on a rounded corner. */
+    .block[data-kind='stat'] .cell + .cell {
+      border-block-start: 1px solid var(--line);
+    }
+
+    .block[data-kind='stat'] a.cell {
+      margin: 0;
+      padding-inline: 0;
+      border-radius: 0;
     }
 
     .block[data-kind='stat'] .cell:has(> .cell-trend) {
@@ -250,10 +262,6 @@
 
     .block[data-kind='stat'] .grid:has(> .cell > .cell-trend) > .cell {
       grid-template-rows: none;
-    }
-
-    .block[data-kind='stat'] .cell:last-child {
-      border-block-end: 0;
     }
 
     .block[data-kind='stat'] .cell .glyph {

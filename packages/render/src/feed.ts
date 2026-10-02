@@ -37,6 +37,17 @@ export const FEED_EARLIER = 'Before you last looked';
 export const feedNew = (n: number): string => `${n} new`;
 
 /**
+ * Whether a line's count is drawn: a burst of more than one. A line is one thing unless it says otherwise, so a `1` in
+ * front of every line said nothing, and "Since you were away" was eight rows of `1 C Categorise what cleared changed
+ * TALLYARD` (the home review). A count that is not a number is the author's words, and stays.
+ */
+export const feedBurst = (count: string): boolean => {
+  const t = count.trim();
+  const n = Number(t.replace(/,/gu, ''));
+  return t !== '' && n !== 0 && n !== 1;
+};
+
+/**
  * What is wrong with a feed's rows, in words, or null when nothing is.
  *
  * The parser degrades the block with this, because a row filed under a group that does not exist

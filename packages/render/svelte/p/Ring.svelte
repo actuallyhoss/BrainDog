@@ -8,7 +8,7 @@
   every one before this file, while `toHTML` drew the dial).
 -->
 <script lang="ts">
-  import { inline, TONES, MISSING, text, type Block, type Row, type RenderOptions } from '../../src/index.ts';
+  import { headlineFigure, inline, TONES, MISSING, text, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from '../../src/ring.ts';
   import Text from '../Text.svelte';
 
@@ -56,8 +56,8 @@
       <div class="ring-row" data-intent={plan.intent}>
         <span class="ring-label"><Text nodes={inline(r.cells[0] ?? '', opts)} {opts} /></span>
         <span class="ring-figures num"
-          ><span class="ring-value"><Text nodes={inline(r.cells[1] || MISSING, opts)} {opts} /></span>{#if r.cells[2]}<span class="ring-of">{RING_OF}</span><span
-              class="ring-target"><Text nodes={inline(r.cells[2], opts)} {opts} /></span
+          ><span class="ring-value"><Text nodes={inline(headlineFigure(r.cells[1] || MISSING), opts)} {opts} /></span>{#if r.cells[2]}<span class="ring-of">{RING_OF}</span><span
+              class="ring-target"><Text nodes={inline(headlineFigure(r.cells[2]), opts)} {opts} /></span
             >{/if}</span
         >
         {#if plan.left}<span class="ring-left num">{plan.left}</span>{/if}
@@ -70,7 +70,7 @@
           <li class="ring-item" data-intent={r.tone}>
             <span class="ring-dot" data-step={arc?.step} aria-hidden="true"></span>
             <span class="ring-label"><Text nodes={inline(r.cells[0] ?? '', opts)} {opts} /></span>
-            <span class="ring-value num"><Text nodes={inline(r.cells[1] || MISSING, opts)} {opts} /></span>
+            <span class="ring-value num"><Text nodes={inline(headlineFigure(r.cells[1] || MISSING), opts)} {opts} /></span>
             {#if plan.shares[i]}<span class="ring-share num">{plan.shares[i]}</span>{/if}
             {#if r.cells[2]}<span class="ring-note"><Text nodes={inline(r.cells[2], opts)} {opts} /></span>{/if}
             {@render mark(r.tone)}
