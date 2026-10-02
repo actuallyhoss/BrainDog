@@ -24,6 +24,7 @@
 import type { Clock, Result, Sql } from '@braindog/ports';
 import type { Predicate } from '@braindog/where';
 import type { PatternDraft } from './jobs.ts';
+import type { MappingAnswer, MappingAsk, SetupAnswer, SetupAsk } from './propose.ts';
 
 export type { Result };
 
@@ -72,10 +73,11 @@ export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3';
 export type ModelRate = { in: number; out: number };
 
 /**
- * The four templates this package calls. `46 §4.5` describes eight and names no automation's question; `answer` is
- * an automation's question, and the other five of the eight have no caller here yet.
+ * The six templates this package calls. `46 §4.5` describes eight and names no automation's question; `answer` is
+ * an automation's question, `setup` and `mapping` are the first run's two asks, and the other five of the eight have no
+ * caller here yet.
  */
-export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer';
+export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping';
 
 export type PromptTemplate = {
   model: ModelId;
@@ -203,6 +205,16 @@ export type Tier = 'a' | 'b' | 'byo';
  * a number written in three places is three numbers the day one of them moves.
  */
 export const ASK_CAP_DEFAULT = 80;
+
+/**
+ * The monthly ask limit of a record on Free, the plan a record made without paying is on (DIRECTION §35): Slash credits,
+ * as the pricing page counts them. Cloud's is `ASK_CAP_DEFAULT`.
+ *
+ * NAMED HERE BESIDE IT, for the same reason: the site's Free card says it, and `apps/site/src/lib/plans.test.ts` holds
+ * the card to this. The Worker lowers a record to it when the record is put on Free, holds a save above it while it is
+ * there, and raises it back to `ASK_CAP_DEFAULT` when it is paid for (`slashPlanMoved` in `apps/worker/src/slash.ts`).
+ */
+export const ASK_CAP_FREE = 20;
 
 /**
  * The asks a month Slash's background work may spend on the included model: the daily look, an automation's question,
@@ -345,6 +357,10 @@ export interface Slash {
    * rule's name, as `read`'s is keyed in the asker's; it takes no `CallContext` because nobody is asking.
    */
   answer(ask: Ask, inference?: Inference): Promise<Result<{ text: string }>>;
+  /** The first run's setup from what a person typed about themselves, held to the catalogue the browser offered (`propose.ts`). */
+  proposeSetup(ask: SetupAsk, ctx: CallContext, inference?: Inference): Promise<Result<SetupAnswer>>;
+  /** How a file exported from another app maps into the record's lists, from its columns and first entries. */
+  proposeMapping(ask: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>>;
   configure(patch: SetupPatch, ctx: CallContext): Result<Setup>;
   status(): Status;
   /** The owner's latest asks, newest first, at most `limit` of them (`ASKS_MOST` in `index.ts`). */

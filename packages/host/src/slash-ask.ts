@@ -1,7 +1,7 @@
 /**
  * Slash's doors: `POST /api/slash/read`, `GET /api/slash/status`, `POST /api/slash/settings`,
- * `POST /api/slash/propose`, `GET /api/slash/asks` and `POST /api/slash/pattern`, the half both hosts
- * share. `docs/46` §5.2, `23 §7` and `§8`.
+ * `POST /api/slash/propose`, `GET /api/slash/asks`, `POST /api/slash/pattern`, and the first run's
+ * `POST /api/slash/setup` and `POST /api/slash/mapping`, the half both hosts share. `docs/46` §5.2, `23 §7` and `§8`.
  *
  * THE READ WAS ALONE FOR A DAY. The Slash object both hosts
  * build had five methods and only `read` had a door, so tier stayed `a`, the cap stayed 80, and an owner
@@ -104,6 +104,9 @@ export type SlashAskEngine<C> = {
   propose(question: string, ctx: C, byok?: unknown, askId?: string, inference?: unknown): Promise<Result<unknown>>;
   history?(limit: number, ctx: C): Result<unknown>;
   proposePattern?(samples: readonly unknown[], ctx: C, inference?: unknown): Promise<Result<unknown>>;
+  /** The first run's two asks (`packages/slash/src/propose.ts`), each handed the body whole: the engine reads it itself. */
+  proposeSetup?(ask: unknown, ctx: C, inference?: unknown): Promise<Result<unknown>>;
+  proposeMapping?(ask: unknown, ctx: C, inference?: unknown): Promise<Result<unknown>>;
 };
 
 /**
@@ -181,7 +184,7 @@ export function slashAskDoor<C>(
 }
 
 /** A Slash door this file answers. */
-export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern';
+export type SlashRoute = 'read' | 'status' | 'settings' | 'propose' | 'asks' | 'pattern' | 'setup' | 'mapping';
 
 /** The two doors that are a GET: they read and change nothing, so a browser sends them with no `Origin`. */
 const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks']);
@@ -195,7 +198,7 @@ const GETS: ReadonlySet<SlashRoute> = new Set(['status', 'asks']);
  * the router on `!== null`. `packages/host/test/slash-ask.test.ts` reads both hosts' wiring as text for it.
  */
 export function servesSlash(pathname: string): SlashRoute | null {
-  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern)\/*$/.exec(pathname);
+  const hit = /^\/+api\/+slash\/+(read|status|settings|propose|asks|pattern|setup|mapping)\/*$/.exec(pathname);
   return hit ? (hit[1] as SlashRoute) : null;
 }
 
@@ -226,6 +229,12 @@ export const PATTERN_SAMPLES_MOST = 10;
  * never proposes, and the test measures `sent.length === 1` for a `read` that answered rows.
  */
 const BODY_LIMIT = 4_000;
+
+/**
+ * The first run's envelope: the catalogue the screen was drawn from rides along with what was typed, and the setup's offer
+ * alone is about 3 KB. The engine cuts every part to its own size (`setupAskOf`, `mappingAskOf`); this stops a megabyte.
+ */
+const FIRST_RUN_BODY_LIMIT = 32_000;
 
 type Header = readonly [string, string];
 
@@ -270,7 +279,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if (route === null)
     return refusal(404, {
       code: 'ROUTE_UNKNOWN',
-      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks and /api/slash/pattern.",
+      fix: "Slash's doors are /api/slash/read, /api/slash/status, /api/slash/settings, /api/slash/propose, /api/slash/asks, /api/slash/pattern, /api/slash/setup and /api/slash/mapping.",
     });
   const path = `/api/slash/${route}`;
   const verb = GETS.has(route) ? 'GET' : 'POST';
@@ -321,12 +330,16 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   if ((request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() !== 'application/json')
     return refusal(400, { code: 'BODY_MALFORMED', fix: `${path} takes a JSON object, sent as application/json.` });
   const raw = await request.text();
-  if (raw.length > BODY_LIMIT)
-    return route === 'settings'
-      ? refusal(400, { code: 'BODY_MALFORMED', fix: "Slash's settings are a few short fields, and this is far longer than all of them." })
-      : route === 'pattern'
-        ? refusal(400, { code: 'BODY_MALFORMED', fix: `A pattern is asked for with at most ${PATTERN_SAMPLES_MOST} arrivals, and this is far longer.`, at: 'samples' })
-        : refusal(400, { code: 'BODY_MALFORMED', fix: 'A question is a sentence, and Slash reads the first 400 bytes of it.', at: 'question' });
+  if (raw.length > (route === 'setup' || route === 'mapping' ? FIRST_RUN_BODY_LIMIT : BODY_LIMIT))
+    return route === 'setup'
+      ? refusal(400, { code: 'BODY_MALFORMED', fix: 'The first run sends what you said and what it offered, and this is far longer than both.' })
+      : route === 'mapping'
+        ? refusal(400, { code: 'BODY_MALFORMED', fix: 'A file is read from its headings and first few entries, and this is far longer than those.' })
+        : route === 'settings'
+          ? refusal(400, { code: 'BODY_MALFORMED', fix: "Slash's settings are a few short fields, and this is far longer than all of them." })
+          : route === 'pattern'
+            ? refusal(400, { code: 'BODY_MALFORMED', fix: `A pattern is asked for with at most ${PATTERN_SAMPLES_MOST} arrivals, and this is far longer.`, at: 'samples' })
+            : refusal(400, { code: 'BODY_MALFORMED', fix: 'A question is a sentence, and Slash reads the first 400 bytes of it.', at: 'question' });
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -366,6 +379,7 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   }
 
   if (route === 'pattern') return pattern(body, door, ctx);
+  if (route === 'setup' || route === 'mapping') return firstRun(route, body, door, ctx);
 
   /* THE TYPE AND NOT THE CONTENTS. A blank question is the engine's own refusal, in the engine's own
      words ("Ask Slash a question first. A blank ask has nothing to read."), and saying it twice in
@@ -449,6 +463,33 @@ async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, 
   if (!read.ok) return slashReply(read);
   const samples = read.value;
   return answer(() => draft(samples, ctx, own));
+}
+
+/**
+ * `POST /api/slash/setup` and `POST /api/slash/mapping`: the first run's two asks, a setup from what a person said about
+ * themselves and a mapping for a file they exported elsewhere. Neither writes: the answer is a proposal the first run draws,
+ * and the person's one press is what writes it.
+ *
+ * THE BODY GOES TO THE ENGINE WHOLE, AFTER A CHECK OF ITS KEYS. The engine reads it into its own shape (`setupAskOf`,
+ * `mappingAskOf` in `packages/slash/src/propose.ts`), so a malformed part is a smaller ask or the engine's own refusal and
+ * never a throw. A key neither takes is refused here, as the pattern door refuses one.
+ *
+ * ON HIS OWN KEY WHERE HE CHOSE IT, as every ask is, and an engine built before these two answers 501 in `NO_MODEL`'s words,
+ * which the first run reads as "use the rules".
+ */
+async function firstRun<C>(route: 'setup' | 'mapping', body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
+  const takes = route === 'setup' ? ['said', 'offer', 'today'] : ['file', 'columns', 'sample', 'lists'];
+  const stray = Object.keys(body).find((k) => !takes.includes(k));
+  if (stray !== undefined)
+    return refusal(422, { code: 'FIELD_UNKNOWN', fix: `${stray} is not something this call takes. It takes ${takes.join(', ')}.`, at: stray, allowed: takes });
+  if (!door.engine) return refusal(501, NO_MODEL);
+  const engine = await built(door.engine);
+  if (engine instanceof Response) return engine;
+  const ask = (route === 'setup' ? engine.proposeSetup : engine.proposeMapping)?.bind(engine);
+  if (ask === undefined) return refusal(501, NO_MODEL);
+  const own = await opened(door, ctx);
+  if (own instanceof Response) return own;
+  return answer(() => ask(body, ctx, own));
 }
 
 /**

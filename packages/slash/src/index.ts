@@ -47,7 +47,7 @@ import { no, ok, type Result } from '@braindog/ports';
 import { answering } from './answer.ts';
 import { core as makeCore, openStore, TIERS } from './call.ts';
 import { patterns } from './jobs.ts';
-import { palette } from './propose.ts';
+import { palette, setups } from './propose.ts';
 import {
   ASK_CAP_DEFAULT,
   PROVIDERS,
@@ -99,7 +99,8 @@ export type {
   Verb,
   Where,
 } from './types.ts';
-export { ASK_CAP_DEFAULT, BACKGROUND_ASKS_MONTH, PROVIDERS, VERBS } from './types.ts';
+export { ASK_CAP_DEFAULT, ASK_CAP_FREE, BACKGROUND_ASKS_MONTH, PROVIDERS, VERBS } from './types.ts';
+export { mappingAskOf, mappingOf, setupAskOf, setupOf, type MappingAnswer, type MappingAsk, type MappingList, type SetupAnswer, type SetupAsk, type SetupOffer } from './propose.ts';
 export type { IngestDeclaration, PatternDraft } from './jobs.ts';
 export { SKILL_BODY_MOST, SKILL_DRAFT_INSTRUCTIONS, SKILL_LEARNINGS_MOST, skillDraftShaped, type SkillDraftInput, type SkillDrafted } from './skill-draft.ts';
 
@@ -203,6 +204,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   const asking = palette(core, deps.record, deps.inference);
   const pattern = patterns(core, deps.record, deps.inference);
   const automation = answering(core, deps.inference);
+  const firstRun = setups(core, deps.inference);
 
   /** Where the own key is asked, as the owner last saved it, whatever the tier is now. */
   const own = (): { provider: Provider | null; base_url: string | null } => {
@@ -363,6 +365,9 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     digestProse: pattern.digestProse,
     embedTexts: pattern.embedTexts,
     answer: automation.answer,
+    /* THE FIRST RUN'S TWO ASKS, on the same ledger and the same month's count as a question (`setups` in `propose.ts`). */
+    proposeSetup: (ask, ctx, inference) => firstRun.proposeSetup(ask, ctx, inference),
+    proposeMapping: (ask, ctx, inference) => firstRun.proposeMapping(ask, ctx, inference),
     configure,
     status,
     history,

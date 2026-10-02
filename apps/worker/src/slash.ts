@@ -357,6 +357,11 @@ export type SlashEngineDeps = SlashWire & {
    */
   sql: Sql;
   clock: Clock;
+  /**
+   * The plan the Directory meters this record under (`free`, `hosted`, `plus`), asked once when the engine is built, or
+   * `null` where it could not be asked. Free's asks follow from it (`slashPlanMoved`); absent is a host with no plans.
+   */
+  plan?: (() => Promise<string | null>) | undefined;
 };
 
 /**
@@ -403,10 +408,97 @@ export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, dep
      holds a save on his own key to a live API token (`slashGuardedEngine`). It reads the tiers this Worker runs as the
      package does, so a record saved on `byo` is counted where the package answers it. */
   const guarded = slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants(), tiers: CLOUD_TIERS });
-  if (included === undefined) return keyOnly(guarded, deps.sql);
+  /* THE PLAN'S ASKS, NOW THE STORE EXISTS: a record put on Free before Slash was first asked is lowered here, on the build,
+     because there was no `slash_settings` row to lower when the plan was set. */
+  const plan = deps.plan === undefined ? null : await deps.plan().catch(() => null);
+  if (plan !== null) planMoved(slash, deps.sql, plan);
+  if (included === undefined) return planCeiling(keyOnly(guarded, deps.sql), deps.sql);
   /* AND ON THE INCLUDED MODEL, HELD UNDER THE OPERATOR'S CEILING, outermost so its check runs before either count below
-     it and with no `await` between them and the package's hold. */
-  return operatorCeiling(guarded, deps, Math.floor(includedMonthNeurons(env) / worstAsk(slash)));
+     it and with no `await` between them and the package's hold. The plan's own ceiling is a save's alone, so it sits
+     outside and counts nothing. */
+  return planCeiling(operatorCeiling(guarded, deps, Math.floor(includedMonthNeurons(env) / worstAsk(slash))), deps.sql);
+}
+
+/* ── the plan's asks ─────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Where Slash's store keeps the plan's ceiling on `ask_cap` while the record is on a plan that has one, which is Free.
+ * A key of this host's in `slash_meta`, beside the package's own (`version`, `own.provider`, `own.base_url`), which the
+ * package never reads.
+ */
+export const PLAN_ASK_CAP = 'plan.ask_cap';
+
+/** Whether Slash's store has been made in this storage: before the first ask it has not, and there is nothing to move. */
+const slashStored = (sql: Sql): boolean =>
+  sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_meta'") !== undefined &&
+  sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_settings'") !== undefined;
+
+/** The plan's ceiling on `ask_cap`, or `null` on a plan with none. */
+const planCapOf = (sql: Sql): number | null => {
+  if (!slashStored(sql)) return null;
+  const said = sql.one<{ value: string }>('SELECT value FROM slash_meta WHERE key = ?', PLAN_ASK_CAP)?.value;
+  return said !== undefined && /^[0-9]+$/u.test(said) ? Number(said) : null;
+};
+
+/**
+ * A record's Slash asks, moved with its plan (DIRECTION §35, "Free leads"): on Free the month's asks are `ASK_CAP_FREE`,
+ * and paid for they are `ASK_CAP_DEFAULT` again.
+ *
+ * ON FREE THE CAP IS LOWERED AND NEVER RAISED, so an owner who set fewer keeps fewer, and the ceiling is kept beside it for
+ * `planCeiling` to hold a save to. OFF FREE IT IS RAISED ONCE, and only where the ceiling was kept, which is a record that
+ * was on Free: a renewal moves nothing, and an owner who set zero to turn Slash off is left off.
+ *
+ * TAKES THE PACKAGE AS AN ARGUMENT for the reason `worstAsk` does: the two numbers are named there, and `46 §5.1` has this
+ * Worker load it only once an engine is being built.
+ */
+const planMoved = (slash: Pick<typeof import('@braindog/slash'), 'ASK_CAP_FREE' | 'ASK_CAP_DEFAULT'>, sql: Sql, plan: string): void => {
+  if (!slashStored(sql)) return;
+  const held = planCapOf(sql);
+  sql.transactionSync(() => {
+    if (plan === 'free') {
+      sql.exec('UPDATE slash_settings SET ask_cap = MIN(ask_cap, ?) WHERE singleton = 1', slash.ASK_CAP_FREE);
+      sql.exec(
+        'INSERT INTO slash_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+        PLAN_ASK_CAP,
+        String(slash.ASK_CAP_FREE),
+      );
+    } else if (held !== null) {
+      sql.exec('UPDATE slash_settings SET ask_cap = ? WHERE singleton = 1 AND ask_cap > 0 AND ask_cap < ?', slash.ASK_CAP_DEFAULT, slash.ASK_CAP_DEFAULT);
+      sql.exec('DELETE FROM slash_meta WHERE key = ?', PLAN_ASK_CAP);
+    }
+  });
+};
+
+/**
+ * The record's plan has moved: billing put it on Free, or it was paid for (`Record$.planMoved` in `index.ts`).
+ *
+ * NOTHING TO DO WHERE SLASH HAS NOT BEEN ASKED, and the package is not loaded for it: the store is made on the first
+ * build, which reads the plan itself. Where it has, the package was already loaded to make it.
+ */
+export async function slashPlanMoved(sql: Sql, plan: string): Promise<void> {
+  if (!slashStored(sql)) return;
+  planMoved(await import('@braindog/slash'), sql, plan);
+}
+
+/**
+ * The engine, with a save above the plan's ceiling refused in a sentence that names the plan and the way up.
+ *
+ * A SAVE'S CHECK AND NOT AN ASK'S. The cap itself is the package's to keep, and `planMoved` has already lowered it, so
+ * every ask is held to it by the count it always was; what this stops is an owner on Free typing a higher number into
+ * Settings. Read from the store on each save, so a record paid for a second ago may raise it at once.
+ */
+function planCeiling(engine: Slash, sql: Sql): Slash {
+  const held = Object.create(engine) as Slash;
+  held.configure = (patch, ctx) => {
+    const owner = ctx.principal.kind === 'person' && ctx.principal.level === 'owner';
+    const most = owner && typeof patch.ask_cap === 'number' ? planCapOf(sql) : null;
+    if (most !== null && typeof patch.ask_cap === 'number' && patch.ask_cap > most)
+      return no('VALUE_MALFORMED', `Free comes with ${most} Slash asks a month, so the monthly ask limit is ${most} or lower. Cloud comes with more.`, {
+        at: 'ask_cap',
+      });
+    return engine.configure(patch, ctx);
+  };
+  return held;
 }
 
 /**
@@ -450,6 +542,8 @@ function keyOnly(engine: Slash, sql: Sql): Slash {
   only.propose = (question, ctx, byok, askId, inference) => (onOwnKey(sql) ? engine.propose(question, ctx, byok, askId, inference) : refused());
   only.proposePattern = (samples, ctx, inference) => (onOwnKey(sql) ? engine.proposePattern(samples, ctx, inference) : refused());
   only.answer = (ask, inference) => (onOwnKey(sql) ? engine.answer(ask, inference) : refused());
+  only.proposeSetup = (ask, ctx, inference) => (onOwnKey(sql) ? engine.proposeSetup(ask, ctx, inference) : refused());
+  only.proposeMapping = (ask, ctx, inference) => (onOwnKey(sql) ? engine.proposeMapping(ask, ctx, inference) : refused());
   return only;
 }
 
@@ -520,6 +614,8 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
   capped.proposePattern = (samples, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposePattern(samples, ctx, inference));
   capped.draftPattern = (samples) => (spent() ? Promise.resolve(refused()) : engine.draftPattern(samples));
   capped.digestProse = (digest) => (spent() ? Promise.resolve(ok({ text: '' })) : engine.digestProse(digest));
+  capped.proposeSetup = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeSetup(ask, ctx, inference));
+  capped.proposeMapping = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeMapping(ask, ctx, inference));
   /* THE RUN'S OWN SENTENCE, NAMING THE RULE AND THE STEP, as the package's own cap refusal does. Any code but
      `UNREACHABLE` is one `serveAsks` acks `done`, so the run stops here and the ladder does not ask again. */
   capped.answer = (ask, inference) => {

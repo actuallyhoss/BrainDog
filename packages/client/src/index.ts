@@ -819,8 +819,8 @@ export function createClient(options: ClientOptions) {
 
   /**
    * The host's own doors: the app's key doors, `POST /api/keys/put` and `POST /api/keys/open`, and Slash's,
-   * `POST /api/slash/read`, `/api/slash/settings`, `/api/slash/propose` and `/api/slash/pattern` (and its two GETs, in
-   * `hostGet` below).
+   * `POST /api/slash/read`, `/api/slash/settings`, `/api/slash/propose`, `/api/slash/pattern`, and the first run's
+   * `/api/slash/setup` and `/api/slash/mapping` (and its two GETs, in `hostGet` below).
    *
    * NOT THROUGH `call`, BECAUSE THEY ARE NOT METHODS. `ROUTES` is the record's surface; these are a host step in
    * front of it at a fixed path, and a name in `NAMES` would be a name `handlersFor` had to route. The key doors
@@ -832,7 +832,7 @@ export function createClient(options: ClientOptions) {
    * browser's own and it sends both by itself.
    */
   async function hostDoor<T>(
-    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern',
+    path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern' | 'slash/setup' | 'slash/mapping',
     args: Record<string, unknown>,
   ): Promise<Result<T>> {
     return hostAnswer<T>(() =>
@@ -941,6 +941,14 @@ export function createClient(options: ClientOptions) {
      * nothing: the proposal goes to Decide like any other, and is refused once the month's asks are spent.
      */
     slashPattern: (samples: readonly string[]) => hostDoor<SlashProposal>('slash/pattern', { samples: [...samples] }),
+    /**
+     * The first run's two asks: a setup from what a person said about themselves, `{ said, offer, today }`, and how a
+     * file exported elsewhere maps into the record, `{ file, columns, sample, lists }`. Both propose and neither writes.
+     * THE ANSWER'S SHAPE IS THE CALLER'S TO NAME, because it is `@braindog/slash`'s `SetupAnswer` and `MappingAnswer`,
+     * which this package may not import (`Reading` above says why).
+     */
+    slashSetup: <T = unknown>(ask: Record<string, unknown>) => hostDoor<T>('slash/setup', ask),
+    slashMapping: <T = unknown>(ask: Record<string, unknown>) => hostDoor<T>('slash/mapping', ask),
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),

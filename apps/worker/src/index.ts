@@ -36,7 +36,7 @@ import { createRecordApi, type CallContext, type Deposited, type IngestVerificat
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
-import { createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { FREE_JOIN_REFUSED, FREE_ONE_PERSON, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
@@ -55,7 +55,7 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 
 import { alarmScheduler } from './alarm.ts';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel } from './slash.ts';
-import { slashErasing } from './slash.ts';
+import { slashErasing, slashPlanMoved } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers } from './catalogue.ts';
@@ -109,7 +109,6 @@ import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 /* BILLING: the account's four billing doors, and the Stripe client they call through. */
 import { billingDoors, type BillingDeps } from './billing.ts';
-import { billingKey } from './billing.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
@@ -591,6 +590,58 @@ export class Record$ extends DurableObject<Env> {
    */
   #lapsed: boolean | undefined;
 
+  /**
+   * The plan the Directory meters this record under, as it last said, or `undefined` before it was asked.
+   *
+   * IN MEMORY AND NOT IN STORAGE, unlike `#lapsed`, because the Directory is where the plan is kept and an evicted object
+   * asks it again (`#planOf`). Billing tells this object when it moves (`planMoved`), so a cached plan is never stale
+   * for longer than a failed RPC, and the next wake reads it fresh.
+   */
+  #plan: string | undefined;
+
+  /** The plan, asked of the Directory once a wake, or `null` where it could not be asked. Not cached when it fails. */
+  async #planOf(api: RecordApi): Promise<string | null> {
+    if (this.#plan !== undefined) return this.#plan;
+    const record = api.kernel.identity()?.id;
+    if (!record) return null;
+    try {
+      const plan = await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).planFor(record);
+      if (plan === null) return null;
+      this.#plan = plan;
+      return plan;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * This record's plan has moved: billing's free door, a payment, or Stripe saying the subscription changed
+   * (`BillingDeps.setPlan` in `account`). Free's Slash asks and its one person follow (`slashPlanMoved`, `#oneOnly`).
+   * AN RPC AND NEVER A ROUTE: only billing, after the Directory has taken the plan, says it.
+   */
+  async planMoved(plan: string): Promise<void> {
+    this.#plan = plan;
+    await slashPlanMoved(guardedSql(this.ctx.storage), plan);
+  }
+
+  /**
+   * Free's one person (DIRECTION §35), at the record's own `invite`, which every door reaches it through: the app's call,
+   * an agent's tool and the CLI alike. A free record takes an invitation to nobody, and a change to somebody already on
+   * it is let through, since that is its owner. The sentence offers the way on, which is Cloud.
+   *
+   * WRAPPED HERE AND NOT IN THE RECORD, because the record does not know its plan: the Directory does, and this object
+   * asks it (`#planOf`) only when somebody is being invited. The Directory refuses the join as well (`joinable`), so a
+   * link minted before this check is refused when it is spent.
+   */
+  #oneOnly(api: RecordApi): void {
+    const invite = api.invite.bind(api);
+    api.invite = async (args, ctx) => {
+      const member = typeof args?.person === 'string' && api.kernel.members().some((m) => m.person_id === args.person);
+      if (!member && (await this.#planOf(api)) === 'free') return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: FREE_ONE_PERSON, at: 'plan' } };
+      return invite(args, ctx);
+    };
+  }
+
   /** Set or clear this record's lapse: billing's webhook, when a payment moves it into or out of one. */
   async setLapsed(on: boolean): Promise<void> {
     await this.ctx.storage.put(LAPSED, on);
@@ -649,7 +700,7 @@ export class Record$ extends DurableObject<Env> {
        `answersSlash` below and `/api/version`'s `slash` are one fact. The storage is this object's own, the one the door's
        engine is handed, so the two engines count one `ask_cap`. Before this line a Worker with a model said `slash: true`
        and refused `ask_slash` at propose as if it had none (`test/slash-answers.test.ts`). */
-    this.#answers = workerSlashAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() } });
+    this.#answers = workerSlashAnswers(this.env, () => api, { sql, clock: { now: () => Date.now() }, plan: () => this.#planOf(api) });
     /* AND WHAT ANSWERS ITS MODEL JOBS, over the same storage, so a job's ledger row sits beside every ask's and the
        background allowance is counted out of the one `slash_call` table (`@braindog/host/model-jobs`). */
     this.#jobs = workerModelJobs(this.env, () => api, { sql, clock: { now: () => Date.now() } });
@@ -794,6 +845,8 @@ export class Record$ extends DurableObject<Env> {
         }
       /* EVERY ACK FROM HERE ON WRITES ITS `outbox` LINE, and the first open of this build says so once (`#booted`). */
       loggingAcks(api, sql);
+      /* FREE IS ONE PERSON: an invitation to anybody not already on it is refused, in the owner's own sentence. */
+      this.#oneOnly(api);
       /* AN ERASURE REACHES SLASH'S LEDGER TOO, in this same storage (`slashErasing`). */
       slashErasing(api, sql);
       await this.#booted(api);
@@ -1101,6 +1154,14 @@ export class Record$ extends DurableObject<Env> {
       .members()
       .filter((m) => m.level === 'owner' && m.suspended_at === null && m.email !== null && m.email !== '')
       .map((m) => m.email ?? '');
+  }
+
+  /** How many people are on this record, suspended ones left out: whether a cancelled plan fits Free (billing.ts fitsFree). `null` for a record deleted or refused by this build. */
+  async walkPeople(): Promise<number | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    if (api.kernel.refused()) return null;
+    return api.kernel.members().filter((m) => m.suspended_at === null).length;
   }
 
   /**
@@ -1708,7 +1769,7 @@ export class Record$ extends DurableObject<Env> {
       this.#slash ??= workerSlashDoor(
         this.env,
         () => api,
-        { sql: guardedSql(this.ctx.storage), clock: { now: () => Date.now() } },
+        { sql: guardedSql(this.ctx.storage), clock: { now: () => Date.now() }, plan: () => this.#planOf(api) },
         new Set([`https://${this.env.PUBLIC_HOST ?? ''}`]),
       );
       return serveSlash(request, this.#slash, ctx);
@@ -2057,6 +2118,16 @@ export class Directory$ extends DurableObject<Env> {
   /** The record an accepted invitation names, reachable by its new member. */
   joinRecord(record: string, person: string): Result<null> {
     return this.#directory().join(record, person);
+  }
+
+  /** Whether a person may join a record as its plan has it, asked before an invitation is spent: `null` is yes (`joinable`). */
+  joinable(record: string, person: string): Refusal | null {
+    return this.#directory().joinable(record, person);
+  }
+
+  /** The plan a record is metered under, for the record's own object (`Record$.#planOf`), or `null` for one not held here. */
+  planFor(record: string): Plan | null {
+    return this.#directory().planFor(record);
   }
 
   /**
@@ -3307,11 +3378,24 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     claimed: async (slug) => directory.slugClaimed(slug),
     provisionable,
     provision: (args) => provision(env, args),
-    /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. */
-    setPlan: (record, plan) => directory.setPlan(record, plan),
+    /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. AND SO DO ITS SLASH
+       ASKS AND WHO MAY JOIN IT, which are the record's own object's to keep (`Record$.planMoved`). A record that misses
+       the word reads the plan from the Directory when it next wakes, so a failed RPC is logged and the plan still stands. */
+    setPlan: async (record, plan) => {
+      const refused = await directory.setPlan(record, plan);
+      if (refused !== null) return refused;
+      try {
+        await env.RECORD.get(env.RECORD.idFromName(record)).planMoved(plan);
+      } catch (e) {
+        op({ op: 'billing', did: 'plan.record', ok: false, rec: record, error: e instanceof Error ? e.message : String(e) }, 'error');
+      }
+      return null;
+    },
     /* THE RECORD'S OWN SWITCH, over RPC to its object by id: while it is on, the record
        answers reads and refuses writes, and its alarm runs the drain and nothing else. */
     setLapsed: (record, on) => env.RECORD.get(env.RECORD.idFromName(record)).setLapsed(on),
+    /* WHO IS ON IT, from the record's own member table: a cancelled plan goes back to Free only for one person. */
+    people: (record) => env.RECORD.get(env.RECORD.idFromName(record)).walkPeople(),
     stripe: (key) => stripeOf(key, () => Date.now()),
   };
   return serveAccount(request, {
@@ -3453,9 +3537,10 @@ const signupRefused = (status: number, refusal: Refusal, extra: readonly (readon
  * envelope, so the page reads them as it reads every sign-in answer.
  *
  * `/auth/signup/name` ALSO SAYS WHETHER SIGN-UP IS OPEN, and the Turnstile site key when it is, because the page is a
- * stranger's and has no other door that answers without a session. While `BILLING` is off (`billingKey`) sign-up is
- * shut: the name answer says `open: false`, the page asks nothing, and `start` refuses with the sentence. A proof
- * already in a mailbox is still spent by `verify`, which makes a person and no record.
+ * stranger's and has no other door that answers without a session. It is open wherever `PUBLIC_HOST` is set, billing
+ * on or off, because the record a stranger makes first is a free one. Unset, sign-up is shut: the name answer says
+ * `open: false`, the page asks nothing, and `start` refuses with the sentence. A proof already in a mailbox is still
+ * spent by `verify`, which makes a person and no record.
  *
  * TURNSTILE IS CHECKED ON `start` WHEN `TURNSTILE_SECRET` IS SET, against the address Cloudflare wrote
  * (`cf-connecting-ip`, as `remoteip`), and a failed or missing answer is a 403 with a sentence. Unset, the Directory's
@@ -3478,7 +3563,9 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
   /* THE RPC STUB'S TYPE IS A CAST, as `serveAuth`'s door is: the Directory answers `AuthResult` over the wire. */
   const ask = ((call: SignupCall) => directory.auth(call)) as unknown as (call: SignupCall) => Promise<AuthResult>;
   const ip = request.headers.get('cf-connecting-ip') ?? '';
-  const open = billingKey(env).ok;
+  /* OPEN WHEREVER THIS HOST HAS AN ADDRESS, since Free needs no payment (DIRECTION §35): a record is made at no charge
+     (`plan: 'free'` at `/account/billing/checkout`), and the paid plans are offered where billing is on. */
+  const open = (env.PUBLIC_HOST ?? '').trim() !== '';
 
   if (method === 'GET') {
     const slug = new URL(request.url).searchParams.get('slug') ?? '';
@@ -3589,11 +3676,18 @@ function invites(env: Env): InviteDoor {
        type is a cast, so it is cast to the door's own answer, which `serveInvite` reads field by field. */
     look: async (inviteToken) => {
       const found = await recordOf(inviteToken);
-      return found ? ((await found.stub.acceptInvite({ token: inviteToken })) as unknown as Awaited<ReturnType<InviteDoor['look']>>) : gone;
+      if (!found) return gone;
+      /* A FREE RECORD IS ONE PERSON, SAID WHEN THE LINK IS OPENED, before a new address is sent a proof it cannot use. */
+      if ((await directory.planFor(found.id)) === 'free') return { ok: false, refusal: { code: 'FORBIDDEN', fix: FREE_JOIN_REFUSED, at: 'plan' } };
+      return (await found.stub.acceptInvite({ token: inviteToken })) as unknown as Awaited<ReturnType<InviteDoor['look']>>;
     },
     accept: async (inviteToken, person) => {
       const found = await recordOf(inviteToken);
       if (!found) return gone;
+      /* FREE IS ONE PERSON, ASKED BEFORE THE RECORD SPENDS THE LINK, so a refused join leaves no member row behind in the
+         record for the Directory to disagree with, and the link still works once the record is on Cloud. */
+      const stop = (await directory.joinable(found.id, person.id)) as Refusal | null;
+      if (stop !== null) return { ok: false, refusal: stop };
       const out = (await found.stub.acceptInvite({ token: inviteToken, person })) as unknown as Result<unknown>;
       if (!out.ok) return out;
       const joined = (await directory.joinRecord(found.id, person.id)) as unknown as Result<null>;

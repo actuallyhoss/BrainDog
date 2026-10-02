@@ -1054,6 +1054,8 @@ type Guarded = {
   propose(question: string, ctx: CallContext, byok?: unknown, askId?: string, inference?: SlashInference): Promise<Result<unknown>>;
   configure(patch: Record<string, unknown>, ctx: CallContext): Result<unknown>;
   answer?(ask: SlashAsk, inference?: SlashInference): Promise<Result<{ text: string }>>;
+  proposeSetup?(ask: unknown, ctx: CallContext, inference?: SlashInference): Promise<Result<unknown>>;
+  proposeMapping?(ask: unknown, ctx: CallContext, inference?: SlashInference): Promise<Result<unknown>>;
 };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1190,6 +1192,16 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
       };
     return engine.configure(patch, ctx);
   };
+  /* THE FIRST RUN'S TWO ASKS ARE ON THE SAME COUNT. Each settles as `kind = 'read'` (`setups` in
+     `packages/slash/src/propose.ts`), which `drafted()` already counts, so on `byo` they stop where a question stops. */
+  for (const k of ['proposeSetup', 'proposeMapping'] as const) {
+    const fn = engine[k]?.bind(engine) as ((ask: unknown, ctx: CallContext, inference?: SlashInference) => Promise<Result<unknown>>) | undefined;
+    if (fn === undefined) continue;
+    (guarded as Guarded)[k] = (ask, ctx, inference) => {
+      const stop = spent();
+      return stop ? Promise.resolve({ ok: false, refusal: stop }) : fn(ask, ctx, inference);
+    };
+  }
   return guarded;
 }
 

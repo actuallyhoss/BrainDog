@@ -444,6 +444,9 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
   /* THE TWO NEWER DOORS: the owner's list of asks, and a pattern from arrivals. */
   assert.equal(servesSlash('/api/slash/asks'), 'asks');
   assert.equal(servesSlash('/api/slash/pattern'), 'pattern');
+  /* AND THE FIRST RUN'S TWO. */
+  assert.equal(servesSlash('/api/slash/setup'), 'setup');
+  assert.equal(servesSlash('/api/slash/mapping/'), 'mapping');
 });
 
 /**

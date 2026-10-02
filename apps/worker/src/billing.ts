@@ -10,6 +10,16 @@
  * is paid for on one of them, and its allowance follows the plan it pays for. A switch is confirmed on Stripe's own page
  * and takes effect when it is confirmed; the webhook moves the record's plan when Stripe says the subscription changed.
  *
+ * AND FREE BESIDE THEM, WHICH NOTHING SELLS (DIRECTION §35, "Free leads"). Checkout with `plan: 'free'` for a new name
+ * makes the record there and then, with no Stripe call and no billing row, on the Directory's `free` allowance; one free
+ * record a person. A free record is upgraded by paying for it on Cloud or Cloud Plus, which is checkout with its `record`.
+ *
+ * A PAID PLAN CANCELLED MOVES THE RECORD BACK TO FREE when it fits Free: one person on it, and no other free record of
+ * theirs. It stays writable and leaves the delete ladder alone; its row keeps the Stripe customer and loses the
+ * subscription, which is how the list, checkout and the portal tell it apart. A record with colleagues, or an owner who
+ * already has a free record, goes read-only and onto the ladder as before. This is a DEFAULT TAKEN FOR THE OWNER
+ * (DIRECTION §35, "Free leads"): he has not ruled on it, and `fitsFree` below is the one place to change it.
+ *
  * NOTHING IS WRITTEN FOR A RECORD NOBODY PAID FOR. A record with no billing row is
  * not billed and never lapses; a row is written only when a checkout completes, and only a verified Stripe event moves
  * it after that.
@@ -62,10 +72,21 @@ export const HOSTED_PLANS = {
   plus: { name: 'Cloud Plus', price: '$29 a month', directory: 'plus', setting: 'STRIPE_PRICE_PLUS' },
 } as const;
 
+/**
+ * The free plan: the words a person reads and the Directory's plan, and no Stripe price, because nothing is sold.
+ *
+ * NOT IN `HOSTED_PLANS`, so no door that charges can name it: `planAsked` answers only a plan with a price, and the
+ * list's `plans` are what a checkout sells. `plans.test.ts` holds the name and the price to `apps/site/src/lib/plans.ts`.
+ */
+export const FREE_PLAN = { name: 'Free', price: '$0', directory: 'free' } as const;
+
 export type HostedPlan = keyof typeof HOSTED_PLANS;
 
-/** The Directory's name for a plan a record can be paid for on. */
-export type MeteredPlan = (typeof HOSTED_PLANS)[HostedPlan]['directory'];
+/** A plan as the list names it: one a record is paid for on, or Free. */
+export type ListedPlan = HostedPlan | 'free';
+
+/** The Directory's name for a plan billing puts a record on: one it is paid for on, or Free. */
+export type MeteredPlan = (typeof HOSTED_PLANS)[HostedPlan]['directory'] | typeof FREE_PLAN.directory;
 
 const PLAN_IDS: readonly HostedPlan[] = ['cloud', 'plus'];
 
@@ -130,13 +151,15 @@ const planPrices = (env: BillingEnv): string[] => PLAN_IDS.map((p) => priceOf(en
 export const planOfPrice = (env: BillingEnv, price: string | null): HostedPlan | null =>
   price === null ? null : (PLAN_IDS.find((p) => priceOf(env, p) === price) ?? null);
 
-/** The plan the Directory meters a record under, read as a plan a person pays for. Taken as text, so a plan it adds later reads as Cloud. */
-const planOfMeter = (plan: string): HostedPlan => (plan === HOSTED_PLANS.plus.directory ? 'plus' : 'cloud');
+/** The plan the Directory meters a record under, as the list names it. Taken as text, so a plan it adds later reads as Cloud. */
+const planOfMeter = (plan: string): ListedPlan =>
+  plan === FREE_PLAN.directory ? 'free' : plan === HOSTED_PLANS.plus.directory ? 'plus' : 'cloud';
 
-/** The plan a body asked for: `cloud` when it named none. */
+/** The plan a body asked to pay for: `cloud` when it named none. Free is never paid for, so it is refused here by name. */
 function planAsked(asked: unknown): Result<HostedPlan> {
   if (asked === undefined || asked === null) return ok('cloud');
   if (asked === 'cloud' || asked === 'plus') return ok(asked);
+  if (asked === 'free') return no('VALUE_MALFORMED', 'Free is not paid for, so there is no payment page for it.', { at: 'plan', allowed: PLAN_IDS });
   return no('VALUE_MALFORMED', `plan is ${PLAN_IDS.join(' or ')}.`, { at: 'plan', allowed: PLAN_IDS });
 }
 
@@ -215,12 +238,24 @@ export type BillingDeps = {
   setPlan: (record: string, plan: MeteredPlan) => Promise<Refusal | null>;
   /** The record's own lapse switch (`Record$.setLapsed`). */
   setLapsed: (record: string, on: boolean) => Promise<void>;
+  /**
+   * How many people are on the record, from its own member table (suspended ones left out), or `null` when it cannot
+   * say (deleted, refused by this build). Whether a cancelled record fits Free. ABSENT, a cancelled plan lapses as it
+   * always did, because a record nobody counted might hold colleagues Free would shut out.
+   */
+  people?: (record: string) => Promise<number | null>;
   /** A Stripe client over the secret key. */
   stripe: (key: string) => Stripe;
 };
 
 /** The doors `serveAccount` is handed for billing's four rows. */
 export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'webhook'>>;
+
+/**
+ * A row whose record went back to Free when its plan was cancelled: it keeps its customer and has no subscription. Any
+ * row a payment wrote names one, so this is never a paid record.
+ */
+export const backOnFree = (row: Pick<BillingRow, 'subscription' | 'state'>): boolean => row.subscription === null && row.state !== 'lapsed';
 
 export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
   const ownedRow = async (person: string, record: unknown): Promise<BillingRow | null> => {
@@ -229,10 +264,77 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     return rows.find((r) => r.record === record) ?? null;
   };
 
+  /** The open records this person owns, from the Directory's usage ledger, as of today. */
+  const ownedOpen = async (person: string): Promise<Result<AccountUsage['records']>> => {
+    const today = new Date(deps.clock()).toISOString().slice(0, 10);
+    const owned = await deps.usage(person, { from: today, to: today });
+    return owned.ok ? ok(owned.value.records.filter((r) => !r.closed)) : owned;
+  };
+
+  /**
+   * A name for a new record, with the person's name and the zone, checked the way `/auth/provision` checks them.
+   *
+   * THE SAME TWO SENTENCES `prepare` REFUSES WITH (`Directory$.prepare` in `index.ts`), asked here because a paid record
+   * is made only after the payment, and `prepare` would refuse then what this lets through now.
+   */
+  const newName = async (body: Record<string, unknown>): Promise<Result<{ slug: string; name: string | null; tz: string }>> => {
+    const slug = typeof body['slug'] === 'string' ? body['slug'].trim() : '';
+    const wrong = badSlug(slug);
+    if (wrong !== null) return no('VALUE_MALFORMED', wrong, { at: 'slug' });
+    const held = await deps.claimed(slug);
+    if (held === 'taken') return no('ALREADY_KNOWN', `${slug} is already a record here.`, { at: 'slug' });
+    if (held === 'released') return no('ALREADY_KNOWN', `${slug} was the name of another record and is never given out again.`, { at: 'slug' });
+    const named = personName(body['name']);
+    if (!named.ok) return named;
+    const name = named.value;
+    const zone = deps.provisionable({ ...(name !== null ? { name } : {}), tz: body['tz'] });
+    if (!zone.ok) return zone;
+    return ok({ slug, name, tz: zone.value });
+  };
+
+  /* ── POST /account/billing/checkout with plan free ────────────────────── */
+
+  /**
+   * A free record, made there and then: `{ slug, name?, tz?, plan: 'free' }`. Answers `{ url, record, slug }`, the url
+   * being the new record's `/start`, so a page that goes wherever checkout says lands in it.
+   *
+   * NO STRIPE, NO ROW AND NO BILLING SETTING. Nothing is sold, so a host with billing off still makes one; only the
+   * origin is needed, for the address to land on.
+   *
+   * ONE FREE RECORD A PERSON, which is Free's "one record" (`apps/site/src/lib/plans.ts`): a person who has one is told
+   * which, and that a second is on a paid plan. Read from the Directory's own plans, so a free record upgraded to Cloud
+   * frees the place.
+   *
+   * THE PLAN IS SET AFTER THE RECORD IS MADE, because `provision` makes it under the Directory's default. A refusal
+   * there is a line, not a stop: the record exists and its name is taken, and refusing now would strand both.
+   */
+  const makeFree = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    const origin = originOf(env);
+    if (!origin.ok) return origin;
+    if (body['record'] !== undefined) return no('VALUE_MALFORMED', 'Free is for a new record. A record already made keeps its plan.', { at: 'plan' });
+    const asked = await newName(body);
+    if (!asked.ok) return asked;
+    const owned = await ownedOpen(who.person);
+    if (!owned.ok) return owned;
+    const free = owned.value.find((r) => r.plan === FREE_PLAN.directory);
+    if (free !== undefined)
+      return no('ALREADY_KNOWN', `${free.slug ?? 'One of your records'} is your free record. A second record is on Cloud or Cloud Plus.`, { at: 'plan' });
+    const { slug, name, tz } = asked.value;
+    const made = await deps.provision({ slug, email: who.email, tz, ...(name !== null ? { name } : {}) });
+    if (!made.ok) return made;
+    const refusal = await deps.setPlan(made.value.record, FREE_PLAN.directory);
+    if (refusal !== null) op({ op: 'billing', did: 'plan', ok: false, rec: made.value.record, code: refusal.code }, 'error');
+    const link = `${origin.value}/app/${made.value.slug}/start`;
+    await sendMail(env, 'welcome', who.email, { record: made.value.slug, link });
+    op({ op: 'billing', door: 'checkout', ok: true, plan: 'free' });
+    return ok({ url: link, record: made.value.record, slug: made.value.slug });
+  };
+
   /* ── GET /account/billing ─────────────────────────────────────────────── */
 
   /**
    * Every open record this person owns, each paid, behind, lapsed or not billed, and the plans this host sells.
+   * A free record is `unbilled` on plan `free`, with Free's price, so Settings can name it and offer the upgrade.
    *
    * OWNED, NOT REACHED, as the Directory's `usage` and `for` both are: billing is the owner's, so a member of somebody
    * else's record sees nothing of it here. A record with no row is `unbilled`, which is every record the operator made.
@@ -250,15 +352,17 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const records = owned.value.records
       .filter((r) => !r.closed)
       .map((r) => {
-        const row = rows.find((b) => b.record === r.record);
-        const plan = planOfPrice(env, row?.price ?? null) ?? planOfMeter(r.plan);
+        /* A RECORD BACK ON FREE IS LISTED AS ONE MADE FREE, with nothing billed and no period, so it is offered the upgrade. */
+        const held = rows.find((b) => b.record === r.record);
+        const row = held && !(backOnFree(held) && r.plan === FREE_PLAN.directory) ? held : undefined;
+        const plan: ListedPlan = planOfPrice(env, row?.price ?? null) ?? planOfMeter(r.plan);
         const lapsedAt = row?.state === 'lapsed' ? row.lapsed_at : null;
         return {
           record: r.record,
           slug: r.slug,
           state: row ? row.state : 'unbilled',
           plan,
-          price: HOSTED_PLANS[plan].price,
+          price: plan === 'free' ? FREE_PLAN.price : HOSTED_PLANS[plan].price,
           ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
           ...(lapsedAt !== null ? { lapsed_at: lapsedAt, delete_on: lapsedAt + LAPSE_DELETES_DAYS * DAY_MS } : {}),
         };
@@ -281,8 +385,13 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    *
    * FIVE AN HOUR A PERSON, counted by Stripe: the person pays as one Stripe customer (`customerFor`), and that
    * customer's newest checkouts are the count, so the limit holds on every Worker at once.
+   *
+   * `{ record, plan? }` IS ALSO A FREE RECORD'S UPGRADE: one this person owns, open, on the Directory's `free` plan, with
+   * no billing row or with the row of a plan it was cancelled from (`backOnFree`), whose customer pays again. The payment
+   * writes its row and moves its plan, as paying again does.
    */
   const checkout = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    if (body['plan'] === 'free') return makeFree(who, body);
     const key = billingKey(env);
     if (!key.ok) return key;
     const origin = originOf(env);
@@ -298,31 +407,33 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     let metadata: Record<string, string>;
     let back: string;
     if (body['record'] !== undefined) {
-      /* PAYING AGAIN, AND ONLY FOR A LAPSE. The same sentence for a record that is not this person's and one that does
-         not exist, so the answer says nothing about somebody else's. */
+      /* PAYING AGAIN FOR A LAPSE, OR PAYING FOR A FREE RECORD. The same sentence for a record that is not this person's
+         and one that does not exist, so the answer says nothing about somebody else's. */
       const row = await ownedRow(who.person, body['record']);
-      if (row === null || row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for again by that id.', { at: 'record' });
-      if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This record is paid for. Manage payment changes the card or the plan.', { at: 'record' });
-      customer = row.customer;
-      metadata = { person: who.person, record: row.record, plan: plan.value };
-      back = `${origin.value}/app/${row.slug}/settings/billing`;
+      if (row === null || backOnFree(row)) {
+        const owned = await ownedOpen(who.person);
+        if (!owned.ok) return owned;
+        const free = owned.value.find((r) => r.record === body['record'] && r.plan === FREE_PLAN.directory && r.slug !== null);
+        if (free === undefined || free.slug === null || (row === null && (await deps.billing({ op: 'of', record: free.record })) !== null))
+          return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
+        const paying = row === null ? await deps.billing({ op: 'for', person: who.person }) : [row];
+        customer = paying[0]?.customer ?? (await customerFor(stripe, who.person, who.email));
+        metadata = { person: who.person, record: free.record, plan: plan.value };
+        back = `${origin.value}/app/${free.slug}/settings/billing`;
+      } else {
+        if (row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
+        if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This record is paid for. Manage payment changes the card or the plan.', { at: 'record' });
+        customer = row.customer;
+        metadata = { person: who.person, record: row.record, plan: plan.value };
+        back = `${origin.value}/app/${row.slug}/settings/billing`;
+      }
     } else {
-      const slug = typeof body['slug'] === 'string' ? body['slug'].trim() : '';
-      const wrong = badSlug(slug);
-      if (wrong !== null) return no('VALUE_MALFORMED', wrong, { at: 'slug' });
-      /* THE SAME TWO SENTENCES `prepare` REFUSES WITH (`Directory$.prepare` in `index.ts`), asked here because the
-         record is made only after the payment, and `prepare` would refuse then what this lets through now. */
-      const held = await deps.claimed(slug);
-      if (held === 'taken') return no('ALREADY_KNOWN', `${slug} is already a record here.`, { at: 'slug' });
-      if (held === 'released') return no('ALREADY_KNOWN', `${slug} was the name of another record and is never given out again.`, { at: 'slug' });
-      const named = personName(body['name']);
-      if (!named.ok) return named;
-      const name = named.value;
-      const zone = deps.provisionable({ ...(name !== null ? { name } : {}), tz: body['tz'] });
-      if (!zone.ok) return zone;
+      const asked = await newName(body);
+      if (!asked.ok) return asked;
+      const { slug, name, tz } = asked.value;
       const paying = await deps.billing({ op: 'for', person: who.person });
       customer = paying[0]?.customer ?? (await customerFor(stripe, who.person, who.email));
-      metadata = { person: who.person, email: who.email, slug, tz: zone.value, plan: plan.value, ...(name !== null ? { name } : {}) };
+      metadata = { person: who.person, email: who.email, slug, tz, plan: plan.value, ...(name !== null ? { name } : {}) };
       back = `${origin.value}/app/signup`;
     }
     if (customer === null) {
@@ -386,6 +497,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       if (price === null)
         return no('NOT_IN_THIS_BUILD', `${HOSTED_PLANS[plan.value].setting} is not set, so ${HOSTED_PLANS[plan.value].name} is not sold on this host.`, { at: 'plan' });
       if (row.state === 'lapsed') return no('FORBIDDEN', 'Billing for this record has lapsed. Pay again, on the plan you choose, and it is switched as it is paid for.', { at: 'record' });
+      if (backOnFree(row)) return no('FORBIDDEN', 'This record is on Free. Pay for it on the plan you choose, and it moves as it is paid for.', { at: 'record' });
       if (row.price === price) return no('ALREADY_KNOWN', `This record is on ${HOSTED_PLANS[plan.value].name} already.`, { at: 'plan' });
       const sub = row.subscription === null ? null : await subscriptionOf(stripe, row.subscription, planPrices(env));
       if (sub === null || sub.item === null) {
@@ -474,7 +586,19 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const record = meta['record'];
     if (record !== undefined) {
       const before = await deps.billing({ op: 'of', record });
-      if (before === null || before.customer !== customer) throw new Error('a payment again for a record whose customer is another');
+      if (before === null) {
+        /* A FREE RECORD PAID FOR, which has no row until now. Taken only for an open record the person who paid owns,
+           so a payment naming somebody else's moves nothing; the row is last, as for a new record. A second delivery
+           finds the row and reads as paying again, which writes the same things. */
+        const owned = await ownedOpen(person);
+        if (!owned.ok) throw new Error('the records of the person who paid could not be read');
+        if (!owned.value.some((r) => r.record === record)) throw new Error('a payment for a record the person who paid does not own');
+        if (state === 'lapsed') await deps.setLapsed(record, true);
+        await planFollows(record, sub.price);
+        await setRow({ record, person, customer, subscription: sub.id, price: sub.price, state, period_end: sub.period_end });
+        return 'upgraded';
+      }
+      if (before.customer !== customer) throw new Error('a payment again for a record whose customer is another');
       await lapseSwitch(before, record, state);
       await planFollows(record, sub.price);
       await setRow({ record, subscription: sub.id, price: sub.price, state, period_end: sub.period_end });
@@ -533,6 +657,36 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
   };
 
   /**
+   * Whether a record whose plan was cancelled goes back to Free rather than lapsing: one person on it, and no other free
+   * record of its owner's, since Free is one record and one person. `false` while nobody can count the people on it.
+   * A count that fails throws, so Stripe sends the event again rather than the record lapsing on a guess.
+   */
+  const fitsFree = async (row: BillingRow): Promise<boolean> => {
+    if (deps.people === undefined) return false;
+    if ((await deps.people(row.record)) !== 1) return false;
+    const owned = await ownedOpen(row.person);
+    if (!owned.ok) throw new Error('the records of the person who paid could not be read');
+    return !owned.value.some((r) => r.record !== row.record && r.plan === FREE_PLAN.directory);
+  };
+
+  /**
+   * A paid plan cancelled, for a record that fits Free: back on Free, writable, and off the ladder. DEFAULT TAKEN FOR THE
+   * OWNER (DIRECTION §35): a person who stops paying keeps what Free gives them instead of losing it in ninety days.
+   *
+   * IN THE WEBHOOK'S ORDER: the lapse switch (off, for a record already lapsed by an unpaid card), then the plan, then
+   * the row last. The row keeps its customer, so the upgrade pays as the same Stripe customer, and loses its
+   * subscription, price and period, so nothing the old subscription says finds it again. A row refused leaves the
+   * subscription on it, and the next delivery comes back here.
+   */
+  const toFree = async (before: BillingRow): Promise<string> => {
+    await lapseSwitch(before, before.record, 'active');
+    const refusal = await deps.setPlan(before.record, FREE_PLAN.directory);
+    if (refusal !== null) op({ op: 'billing', did: 'plan', ok: false, rec: before.record, code: refusal.code }, 'error');
+    await setRow({ record: before.record, subscription: null, price: null, period_end: null, state: 'active' });
+    return 'free';
+  };
+
+  /**
    * A subscription created, changed or ended: the row that pays by it follows its state, price and period.
    *
    * THE SUBSCRIPTION IS READ AGAIN FROM STRIPE rather than taken from the event, so events that arrive out of order all
@@ -548,7 +702,9 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (before === undefined) return 'unknown';
     const sub: SubscriptionSeen | null = (await subscriptionOf(stripe, id, planPrices(env))) ?? subscriptionSeen(object, planPrices(env));
     if (sub === null) return 'ignored';
-    const state = type === 'customer.subscription.deleted' ? 'lapsed' : stateOf(sub.status);
+    const cancelled = type === 'customer.subscription.deleted' || sub.status === 'canceled';
+    if (cancelled && (await fitsFree(before))) return toFree(before);
+    const state = cancelled ? 'lapsed' : stateOf(sub.status);
     await lapseSwitch(before, before.record, state ?? before.state);
     await planFollows(before.record, sub.price);
     await setRow({ record: before.record, price: sub.price, period_end: sub.period_end, ...(state !== null ? { state } : {}) });

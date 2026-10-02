@@ -33,7 +33,7 @@ import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 import { compile, type Schema } from '@braindog/where';
 
 import type { Core } from './call.ts';
-import { BODIES, PROMPTS, type AnsweredKind } from './prompts.ts';
+import { BODIES, fenced, PROMPTS, type AnsweredKind } from './prompts.ts';
 import {
   checkSchema,
   citable,
@@ -971,4 +971,317 @@ const checkText = (
   }
 
   return ok({ text, citations, body: {}, said });
+};
+
+/* ── the first run's two asks ──────────────────────────────────────────── */
+
+/**
+ * What the first run may build, as the browser hands it: the use cases and the modules this build ships, each module
+ * with its lists and their field ids. HANDED IN AND NOT READ HERE, because this package may not import the catalogue
+ * (`46 §1`); the host passes what the person's own screen was drawn from, and every id the model answers is held to it.
+ */
+export type SetupOffer = {
+  usecases: readonly { id: string; title: string; summary: string }[];
+  modules: readonly { id: string; name: string; lists: readonly { id: string; name: string; fields: readonly string[] }[] }[];
+};
+
+/** What one person typed about themselves, with the catalogue it is read against and their day (`YYYY-MM-DD`). */
+export type SetupAsk = { said: string; offer: SetupOffer; today: string };
+
+/** The setup the model proposed, every id one it was offered and every phrase one the person typed. */
+export type SetupAnswer = {
+  name: string | null;
+  summary: string;
+  usecase: string | null;
+  also: string[];
+  modules: string[];
+  currency: string | null;
+  heard: { phrase: string; became: string }[];
+  names: { list: string; name: string }[];
+  rows: { list: string; fields: Record<string, unknown> }[];
+  draft: string | null;
+  /** Who answered, as the ledger names it. */
+  by: string;
+};
+
+/** A list an export may go into, with each field's id, type and, for an enum, its values. */
+export type MappingList = { id: string; name: string; fields: readonly { id: string; type: string; values?: readonly string[] | undefined }[] };
+
+/** The first entries of a file the person exported elsewhere, and the lists it may go into. */
+export type MappingAsk = { file: string; columns: readonly string[]; sample: readonly Readonly<Record<string, string>>[]; lists: readonly MappingList[] };
+
+/** How the file maps into the record: a list and the columns that fill its fields, or a name for a new list. */
+export type MappingAnswer = {
+  list: string | null;
+  fields: { column: string; field: string }[];
+  fixed: { field: string; value: string }[];
+  summary: string;
+  name: string | null;
+  by: string;
+};
+
+export type Setups = {
+  proposeSetup(ask: SetupAsk, ctx: CallContext, inference?: Inference): Promise<Result<SetupAnswer>>;
+  proposeMapping(ask: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>>;
+};
+
+/** What a person types about themselves, at most: two thousand bytes, a long paragraph. */
+const SAID_BYTES = 2000;
+/** The entries of a file the model is shown, at most, and how long one value may be when it is. */
+const SAMPLE_MOST = 8;
+const VALUE_BYTES = 160;
+/** Columns one file may name, as the schema's own ceiling on what it maps. */
+const COLUMNS_MOST = 40;
+
+const ISO = /^[A-Z]{3}$/u;
+const lower = (s: string): string => s.toLocaleLowerCase();
+const oneLine = (s: string, bytes: number): string => firstBytes(s.replace(/\s+/gu, ' ').trim(), bytes);
+const textOf = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * WHAT THE MODEL SAID, HELD TO WHAT IT WAS OFFERED AND WHAT WAS TYPED. An id outside the offer is dropped, a phrase not in
+ * the person's own words is dropped, a name they did not type is dropped, and a currency is kept only as a code. What it
+ * cannot vouch for, the field values of an entry, is passed on as it came, and the browser checks each against the list's
+ * own declaration before anything is shown (`apps/web/src/lib/start/propose.ts`, `fromModel`).
+ */
+export const setupOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string): SetupAnswer => {
+  const said = lower(ask.said);
+  const cases = new Set(ask.offer.usecases.map((u) => u.id));
+  const mods = new Set(ask.offer.modules.map((m) => m.id));
+  const lists = new Map(ask.offer.modules.flatMap((m) => m.lists.map((l) => [l.id, new Set(l.fields)] as const)));
+  const typed = (s: string): boolean => s !== '' && said.includes(lower(s));
+  const usecase = cases.has(textOf(raw['usecase'])) ? textOf(raw['usecase']) : null;
+  const name = textOf(raw['name']);
+  const currency = textOf(raw['currency']).toUpperCase();
+  const draft = oneLine(textOf(raw['draft']), 400);
+  const heard: SetupAnswer['heard'] = [];
+  for (const h of Array.isArray(raw['heard']) ? raw['heard'] : []) {
+    const phrase = isRecord(h) ? textOf(h['phrase']) : '';
+    const became = isRecord(h) ? oneLine(textOf(h['became']), 80) : '';
+    if (typed(phrase) && became !== '' && !heard.some((x) => lower(x.phrase) === lower(phrase))) heard.push({ phrase, became });
+  }
+  const names: SetupAnswer['names'] = [];
+  for (const n of Array.isArray(raw['names']) ? raw['names'] : []) {
+    const list = isRecord(n) ? textOf(n['list']) : '';
+    const word = isRecord(n) ? oneLine(textOf(n['name']), 40) : '';
+    if (lists.has(list) && typed(word) && !names.some((x) => x.list === list)) names.push({ list, name: word });
+  }
+  const rows: SetupAnswer['rows'] = [];
+  for (const r of Array.isArray(raw['rows']) ? raw['rows'] : []) {
+    const list = isRecord(r) ? textOf(r['list']) : '';
+    const fields = isRecord(r) && isRecord(r['fields']) ? r['fields'] : null;
+    const own = lists.get(list);
+    if (!own || fields === null) continue;
+    const kept = Object.fromEntries(Object.entries(fields).filter(([k]) => own.has(k)));
+    if (Object.keys(kept).length > 0) rows.push({ list, fields: kept });
+  }
+  return {
+    name: typed(name) && name.length <= 60 ? name : null,
+    summary: oneLine(textOf(raw['summary']), 200),
+    usecase,
+    also: [...new Set(strings(raw['also']).filter((id) => cases.has(id) && id !== usecase))],
+    modules: [...new Set(strings(raw['modules']).filter((id) => mods.has(id)))],
+    currency: ISO.test(currency) ? currency : null,
+    heard,
+    names,
+    rows,
+    draft: draft === '' ? null : draft,
+    by,
+  };
+};
+
+/**
+ * THE FILE'S MAPPING, HELD TO ITS COLUMNS AND THE LIST NAMED. A column the file does not have, a field the list does not
+ * declare, a second column on one field, and a fixed value an enum does not take are each dropped; a list outside the
+ * offer is no list, which is how the model says the file needs a new one.
+ */
+export const mappingOf = (raw: Record<string, unknown>, ask: MappingAsk, by: string): MappingAnswer => {
+  const list = ask.lists.find((l) => l.id === textOf(raw['list'])) ?? null;
+  const fields: MappingAnswer['fields'] = [];
+  const fixed: MappingAnswer['fixed'] = [];
+  if (list !== null) {
+    const declared = new Map(list.fields.map((f) => [f.id, f] as const));
+    for (const m of Array.isArray(raw['fields']) ? raw['fields'] : []) {
+      const column = isRecord(m) ? textOf(m['column']) : '';
+      const field = isRecord(m) ? textOf(m['field']) : '';
+      const exact = ask.columns.find((c) => c === column) ?? ask.columns.find((c) => lower(c.trim()) === lower(column));
+      if (exact === undefined || !declared.has(field) || fields.some((f) => f.field === field)) continue;
+      fields.push({ column: exact, field });
+    }
+    for (const x of Array.isArray(raw['fixed']) ? raw['fixed'] : []) {
+      const field = isRecord(x) ? textOf(x['field']) : '';
+      const value = isRecord(x) ? textOf(x['value']) : '';
+      const f = declared.get(field);
+      if (f?.type !== 'enum' || !(f.values ?? []).includes(value) || fields.some((m) => m.field === field) || fixed.some((m) => m.field === field)) continue;
+      fixed.push({ field, value });
+    }
+  }
+  const name = oneLine(textOf(raw['name']), 40);
+  return { list: list?.id ?? null, fields, fixed, summary: oneLine(textOf(raw['summary']), 200), name: list === null && name !== '' ? name : null, by };
+};
+
+/** Strings out of a value that should be a list of them, each cut to `bytes`. */
+const texts = (v: unknown, bytes: number): string[] => strings(v).map((x) => oneLine(x, bytes)).filter((x) => x !== '');
+
+/**
+ * THE ASK AS THE DOOR HANDS IT, WHICH IS WHATEVER A BROWSER SENT: every list a list, every id text, every name cut to a
+ * line, and an entry of the wrong shape dropped. What is left is what the prompt is built from and the answer held to,
+ * so a malformed offer is a smaller offer and never a throw.
+ */
+export const setupAskOf = (raw: unknown): SetupAsk => {
+  const r = isRecord(raw) ? raw : {};
+  const offer = isRecord(r['offer']) ? r['offer'] : {};
+  const usecases = (Array.isArray(offer['usecases']) ? offer['usecases'] : []).filter(isRecord).flatMap((u) =>
+    typeof u['id'] === 'string' && u['id'] !== '' ? [{ id: oneLine(u['id'], 64), title: oneLine(textOf(u['title']), 80), summary: oneLine(textOf(u['summary']), 240) }] : [],
+  );
+  const modules = (Array.isArray(offer['modules']) ? offer['modules'] : []).filter(isRecord).flatMap((m) =>
+    typeof m['id'] === 'string' && m['id'] !== ''
+      ? [
+          {
+            id: oneLine(m['id'], 64),
+            name: oneLine(textOf(m['name']), 80),
+            lists: (Array.isArray(m['lists']) ? m['lists'] : []).filter(isRecord).flatMap((l) =>
+              typeof l['id'] === 'string' && l['id'] !== '' ? [{ id: oneLine(l['id'], 64), name: oneLine(textOf(l['name']), 80), fields: texts(l['fields'], 64).slice(0, 40) }] : [],
+            ),
+          },
+        ]
+      : [],
+  );
+  const today = textOf(r['today']);
+  return { said: textOf(r['said']), offer: { usecases: usecases.slice(0, 40), modules: modules.slice(0, 40) }, today: /^\d{4}-\d{2}-\d{2}$/u.test(today) ? today : '' };
+};
+
+/** `setupAskOf`'s twin for a file: its name, its columns, its first entries as text, and the lists it may go into. */
+export const mappingAskOf = (raw: unknown): MappingAsk => {
+  const r = isRecord(raw) ? raw : {};
+  const columns = texts(r['columns'], 80).slice(0, COLUMNS_MOST);
+  const sample = (Array.isArray(r['sample']) ? r['sample'] : [])
+    .filter(isRecord)
+    .slice(0, SAMPLE_MOST)
+    .map((e) => Object.fromEntries(columns.map((c) => [c, typeof e[c] === 'string' || typeof e[c] === 'number' ? String(e[c]) : ''])));
+  const lists = (Array.isArray(r['lists']) ? r['lists'] : []).filter(isRecord).flatMap((l) =>
+    typeof l['id'] === 'string' && l['id'] !== ''
+      ? [
+          {
+            id: oneLine(l['id'], 64),
+            name: oneLine(textOf(l['name']), 80),
+            fields: (Array.isArray(l['fields']) ? l['fields'] : []).filter(isRecord).flatMap((f) =>
+              typeof f['id'] === 'string' && typeof f['type'] === 'string'
+                ? [{ id: oneLine(f['id'], 64), type: oneLine(f['type'], 24), ...(Array.isArray(f['values']) ? { values: texts(f['values'], 64).slice(0, 30) } : {}) }]
+                : [],
+            ),
+          },
+        ]
+      : [],
+  );
+  return { file: oneLine(textOf(r['file']), 120), columns, sample, lists: lists.slice(0, 60) };
+};
+
+/** A string of the file's as one JSON-encoded line, with `<` written so it cannot open or close a fence. */
+const quoted = (s: string): string => JSON.stringify(s).replaceAll('<', '\\u003c');
+
+/** `id: title. summary`, one a line. */
+const caseLines = (offer: SetupOffer): string => offer.usecases.map((u) => `${u.id}: ${u.title}. ${u.summary}`).join('\n');
+/** `money-core (Money)` and under it one list a line, `  obligations (Bills and invoices): what, amount, due`. */
+const moduleLines = (offer: SetupOffer): string =>
+  offer.modules.map((m) => [`${m.id} (${m.name})`, ...m.lists.map((l) => `  ${l.id} (${l.name}): ${l.fields.join(', ')}`)].join('\n')).join('\n');
+/** `transactions (Ledger): what:text · on:day · direction:enum[in/out]`, one a line. */
+const listLines = (lists: readonly MappingList[]): string =>
+  lists.map((l) => `${l.id} (${l.name}): ${l.fields.map((f) => `${f.id}:${f.type}${f.values && f.values.length > 0 ? `[${f.values.join('/')}]` : ''}`).join(' · ')}`).join('\n');
+
+/**
+ * The first run's two asks, over the ledger every other ask is held and settled in.
+ *
+ * ONE ASK EACH, COUNTED AS A QUESTION IS. Each holds a `read` row before its model is called, so the month's count and
+ * `ask_cap` stop the next one as they stop a question at the palette (`asksUsed`), and a call that never reached a model
+ * releases its hold. The person's own sentence is the row's `question`, as a question at the palette is; a file's
+ * entries never are, only its name.
+ *
+ * THE OWNER ALONE, since the setup is the record's and the month's asks are theirs. Nothing here writes to the record:
+ * the answer is a proposal the first run draws, and the person's one press is what writes it.
+ */
+export const setups = (core: Core, fallback: Inference): Setups => {
+  const spent = (): Refusal | null => {
+    const s = core.settings();
+    if (s.tier !== 'a' || core.asksUsed() < s.ask_cap) return null;
+    return { code: 'SLASH_BUDGET_SPENT', fix: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key, or wait.` };
+  };
+  const owner = (ctx: CallContext): Refusal | null =>
+    ctx.principal.kind === 'person' && ctx.principal.level === 'owner' ? null : { code: 'FORBIDDEN', fix: 'Only the record owner sets up what it keeps.' };
+
+  /** Hold, ask, settle: the one path both asks take, answering the checked object or the refusal the ledger kept. */
+  const asked = async (
+    id: 'setup' | 'mapping',
+    question: string,
+    slots: Record<string, string>,
+    inference: Inference | undefined,
+    trim?: { slot: string; lines: readonly string[] },
+  ): Promise<Result<{ value: Record<string, unknown>; by: string }>> => {
+    const s = core.settings();
+    const template = PROMPTS[id];
+    const model = s.tier === 'a' ? template.model : (s.model ?? template.model);
+    const held = core.reserve('read', s.tier, model);
+    try {
+      const named = naming(inference ?? fallback);
+      const ran = await core.run({ id, slots, inference: named.inference, model, ...(trim ? { trim } : {}) });
+      const by = named.sent() ?? ran.model;
+      core.account({
+        id: held,
+        kind: 'read',
+        tier: s.tier,
+        model: by,
+        usage: ran.usage,
+        ms: ran.ms,
+        status: ran.out.ok ? 'ok' : 'error',
+        code: refused(ran.out) ? ran.out.refusal.code : undefined,
+        question,
+      });
+      return ran.out.ok ? ok({ value: ran.out.value, by }) : ran.out;
+    } finally {
+      core.release(held);
+    }
+  };
+
+  const proposeSetup = async (raw: SetupAsk, ctx: CallContext, inference?: Inference): Promise<Result<SetupAnswer>> => {
+    const stop = owner(ctx) ?? spent();
+    if (stop) return { ok: false, refusal: stop };
+    const ask = setupAskOf(raw);
+    const said = firstBytes(ask.said.trim(), SAID_BYTES);
+    if (said === '') return no('VALUE_MALFORMED', 'Say who you are first. A blank answer has nothing to read.', { at: 'said' });
+    if (ask.offer.usecases.length === 0 && ask.offer.modules.length === 0)
+      return no('VALUE_MALFORMED', 'The first run offered nothing to choose from, so the model was not asked.', { at: 'offer' });
+    const out = await asked(
+      'setup',
+      firstBytes(said, ASK_BYTES),
+      { '%USECASES%': caseLines(ask.offer), '%MODULES%': moduleLines(ask.offer), '%TODAY%': ask.today === '' ? 'not said' : ask.today, '%SAID%': fenced('said', said) },
+      inference,
+    );
+    return out.ok ? ok(setupOf(out.value.value, { ...ask, said }, out.value.by)) : out;
+  };
+
+  const proposeMapping = async (raw: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>> => {
+    const stop = owner(ctx) ?? spent();
+    if (stop) return { ok: false, refusal: stop };
+    const ask = mappingAskOf(raw);
+    const columns = ask.columns;
+    if (columns.length === 0 || ask.sample.length === 0) return no('VALUE_MALFORMED', 'The file has no columns or no entries to read.', { at: 'sample' });
+    if (ask.lists.length === 0) return no('VALUE_MALFORMED', 'The first run offered no list to map the file into, so the model was not asked.', { at: 'lists' });
+    /* EACH ENTRY IN ITS OWN FENCE, its values cut to a line: a file is somebody else's app's data, and a cell holding
+       "ignore the above" is the case `fenced` exists for. */
+    const lines = ask.sample.slice(0, SAMPLE_MOST).map((row, i) =>
+      fenced(`entry-${i + 1}`, JSON.stringify(Object.fromEntries(columns.map((c) => [c, oneLine(String(row[c] ?? ''), VALUE_BYTES)])))),
+    );
+    const file = oneLine(ask.file, 120);
+    const out = await asked(
+      'mapping',
+      `Read the file ${file}`,
+      /* THE FILE'S NAME AND HEADINGS ARE ITS OWN TEXT TOO: one line each, and no `<` to close a fence with. */
+      { '%FILE%': quoted(file), '%COLUMNS%': columns.map(quoted).join(', '), '%LISTS%': listLines(ask.lists) },
+      inference,
+      { slot: '%SAMPLE%', lines },
+    );
+    return out.ok ? ok(mappingOf(out.value.value, { ...ask, columns }, out.value.by)) : out;
+  };
+
+  return { proposeSetup, proposeMapping };
 };
