@@ -292,9 +292,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       /* `n` puts the caret in the page's capture line (`.capture-input`), where a task is typed. */
       'today-new': { route: '/', press: ['n'] },
 
-      /* THE WORK SCREEN, at `/?work` (`lib/work/Work.svelte`). Its keys act on the task under the cursor, so every one
-         but the move and the two that open a box is pressed with the cursor on the first task. `e` opens the task's
-         words in place, `d` and `m` open the row's menu on the day and on the move. */
+      /* THE WORK PAGE, at `/?work` (`lib/work/Work.svelte`, the declared `page.work`, whose keys are the page
+         reader's). Its keys act on the task under the cursor, so every one but the move and the one that goes to the
+         capture line is pressed with the cursor on the first task. `e` opens the task beside the page with the caret
+         in its words, `d` and `m` open the row's menu on the day and on the move. */
       'work-move': {
         runs: [
           { route: '/?work', press: ['j'] },
@@ -305,10 +306,8 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       'work-edit': { route: '/?work', setup: onFirst, press: ['e'] },
       'work-due': { route: '/?work', setup: onFirst, press: ['d'] },
       'work-lane': { route: '/?work', setup: onFirst, press: ['m'] },
-      /* Both letters the row prints, each on its own: either puts the caret in the capture line. */
-      'work-new': { runs: ['n', 'c'].map((letter) => ({ route: '/?work', press: [letter] })) },
-      /* The screen's own search, taken in the capture phase before the shell would open the palette on it. */
-      'work-find': { route: '/?work', press: ['/'] },
+      /* The page reader's `n` puts the caret in the capture line. */
+      'work-new': { route: '/?work', press: ['n'] },
 
       'row-down': { route: GRID, setup: focusFirstCell, press: ['j'] },
       /* Down first: `k` on the first row has nowhere to go, and silence there is the right answer. */
@@ -384,18 +383,38 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
          the gate saw, so `o` could have been unbound and this row stayed green. The setup walks the cursor to the
          first block whose bar links its list (`a.block-source`, `BlockSlot.svelte`), and the change is `o` opening it. */
       'block-move': { route: '/p/kiln', press: ['j'] },
+      /* AND A PAGE THAT DRAWS ROWS IS WALKED ROW BY ROW (`PageBody.svelte`, `homeKey`), so on `/p/kiln` `j` puts the row
+         cursor (`data-row-cursor`) on a task and never moves the block cursor at all. The setup waited for a block
+         cursor that never came, walked off the end of the rows into a block with no list behind it, and `o` there is
+         rightly silent: the gate read a working key as dead. It stops now on whichever cursor is on a block with a
+         list, a block's own or a row's. */
       'block-source': {
         route: '/p/kiln',
         setup: async (page) => {
           for (let i = 0; i < 20; i++) {
             await page.keyboard.press('j');
             await page.waitForTimeout(120);
-            if (await page.evaluate(() => document.querySelector('.block-slot[data-cursor] a.block-source') !== null)) return;
+            const ready = await page.evaluate(
+              () =>
+                document.querySelector('.block-slot[data-cursor] a.block-source') !== null ||
+                document.querySelector('[data-row-cursor]')?.closest('.block-slot')?.querySelector('a.block-source') != null,
+            );
+            if (ready) return;
           }
         },
         press: ['o'],
       },
       'block-link': { route: '/p/kiln', press: ['j', 'y'] },
+
+      /* THE ROW KEYS OF A PAGE AT ITS OWN ADDRESS (`/p/<slug>`, PageBody in mode=page with a host), pressed with the
+         row cursor on a row each can act on, as Today's are. `/p/work` and not `/?work`, which the work-* recipes
+         already press, so the page's own address is the one proved here. `/p/money` draws the record's open questions
+         as rows, which is where a number has an option to choose; the tick and the answer are held, as Today's are. */
+      'page-tick': { route: '/p/work', setup: held(onTask), press: ['x'] },
+      'page-edit': { route: '/p/work', setup: onTask, press: ['e'] },
+      'page-menu': { route: '/p/work', setup: onTask, press: ['m'] },
+      'page-new': { route: '/p/work', press: ['n'] },
+      'page-answer': { route: '/p/money', setup: held(onQuestion), press: ['1'] },
 
       /* The gate is a question, and a question has an address. There is no `/gate` route. SG5 is the
          seeded record's Kiln licensing question (the sample's SG31): open, with three options. */
@@ -404,13 +423,15 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       /* SG5 is not the last open question, so `j` has a next one to go to. */
       'gate-next': { route: '/decide/SG5', press: ['j'] },
 
-      /* THE QUEUES. The cursor starts on nothing, so a first `j` is the change for `decide-move`; every other
-         key is pressed with the cursor already placed by `setup`, or the `j` would be what changed the page. */
-      'decide-move': { route: '/decide', press: ['j'] },
-      'decide-answer': { route: '/decide', setup: onFirst, press: ['1'] },
-      'decide-approve': { route: '/decide', setup: onSuggested, press: ['a'] },
-      'decide-defer': { route: '/decide', setup: onFirst, press: ['d'] },
-      'decide-select': { route: '/decide', setup: onFirst, press: ['x'] },
+      /* THE QUEUES, on the classic screen at `/decide?classic`: 1-9, a, d and x on the `#q-` cards are its keys, and
+         the declared page at `/decide` walks with the page reader's (j, k, x, Enter). The cursor starts on nothing,
+         so a first `j` is the change for `decide-move`; every other key is pressed with the cursor already placed by
+         `setup`, or the `j` would be what changed the page. */
+      'decide-move': { route: '/decide?classic', press: ['j'] },
+      'decide-answer': { route: '/decide?classic', setup: onFirst, press: ['1'] },
+      'decide-approve': { route: '/decide?classic', setup: onSuggested, press: ['a'] },
+      'decide-defer': { route: '/decide?classic', setup: onFirst, press: ['d'] },
+      'decide-select': { route: '/decide?classic', setup: onFirst, press: ['x'] },
       'inbox-move': { route: '/inbox', setup: arrivals, press: ['j'] },
       'inbox-file': { route: '/inbox', setup: async (page) => (await arrivals(page), onFirst(page)), press: ['e'] },
       'inbox-select': { route: '/inbox', setup: async (page) => (await arrivals(page), onFirst(page)), press: ['x'] },

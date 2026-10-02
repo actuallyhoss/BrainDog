@@ -208,9 +208,9 @@ const HELD = {
     ids: ['agents'],
     why: "the Work screen's view of the tasks agents hold (yours, agents', all), which is not the Agents pack.",
   },
-  'apps/web/src/lib/work/Work.svelte': {
-    ids: ['agents'],
-    why: "the tier chart's side for the tasks agents hold, which is not the Agents pack.",
+  'apps/web/src/lib/work/page.ts': {
+    ids: ['work'],
+    why: "the declared Work page's slug, `page.work`, which `/?work` draws.",
   },
   'apps/web/src/routes/packs/+page.svelte': {
     ids: ['updates'],
