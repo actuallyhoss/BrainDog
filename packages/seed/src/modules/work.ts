@@ -418,6 +418,53 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /* WHAT IS FOLDED UNDER NOT THIS WEEK, SINCE work 1.11.0, each over its band's own clauses, and the three together for
+     the section over them, so no band is drawn empty and a record with nothing further off draws no folded heading. */
+  'tasks-after-week-yours': {
+    metric: 'tasks-after-week-yours',
+    name: 'Yours, after this week',
+    source: 'register.tasks',
+    where: `${YOURS}, by after +7d`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-undated-yours': {
+    metric: 'tasks-undated-yours',
+    name: 'Yours, with no due day',
+    source: 'register.tasks',
+    where: `${YOURS}, by is empty`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* A TREE AND NOT A SENTENCE, because it is an `or` of three bands, and a sentence ORs only the values of one field. */
+  'tasks-not-this-week': {
+    metric: 'tasks-not-this-week',
+    name: 'Not this week',
+    source: 'register.tasks',
+    where: {
+      any: [
+        {
+          all: [
+            { field: 'state', in: ['open', 'doing'] },
+            { field: 'agent', empty: true },
+            { any: [{ field: 'by', after: '+7d' }, { field: 'by', empty: true }] },
+          ],
+        },
+        { field: 'state', is: 'backlog' },
+      ],
+    },
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   /* WHAT WAITS ON A PERSON: work an agent handed back to be checked, and work that cannot move. */
   'tasks-waiting': {
     metric: 'tasks-waiting',
@@ -652,6 +699,10 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * what waits on a person, With an agent what an agent holds, and the day divides what is yours. A band is drawn on a
    * figure that counts exactly its own tasks (Late, Today and This week over the `-yours` figures), so it is never hidden
    * while it holds one and never drawn empty.
+   *
+   * CALMER, SINCE work 1.11.0 (DIRECTION §35): the line, the capture line and the five bands of what is still to do,
+   * then two folds, Not this week and Done lately. Open is said once, in the line, so the figures tile went; how fast work
+   * moves is a line over eight weeks under Done lately. A strip of projects narrows every band (`filters:`).
    */
   work: {
     page: 'work',
@@ -661,6 +712,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     icon: 'task',
     requires: ['register.tasks'],
     pack: 'work',
+    /* ONE PROJECT AT A TIME, SINCE work 1.11.0: a strip of the projects that have open work, chosen once and narrowing
+       every band, where the Work screen drew the same choice as a select, as chips and as a tile. The field is the
+       tasks' `thing`, which the page calls Project; a record without Projects has no such field, and no strip
+       (`without` in `packs/first-party.ts`). */
+    filters: [{ field: 'thing', control: 'chips' }],
     blocks: [
       {
         /* THE PAGE'S ONE LINE, drawn in the title's tile, said from three figures. A clause whose figure is nought is
@@ -681,19 +737,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         icon: 'plus',
         span: 12,
         register: 'tasks',
-      },
-      {
-        /* TWO FIGURES, EACH DRAWING ITS EIGHT WEEKS AS A LINE from its nightly series (`snapshot` above): how much is
-           open, and how much was finished. Drawn once there is work. */
-        kind: 'stat',
-        heading: 'Right now',
-        icon: 'activity',
-        span: 12,
-        when: { metric: 'open-tasks', gt: 0 },
-        cells: [
-          { metric: 'open-tasks', label: 'Open', trend: '8w', note: '{{tasks-with-agents}} with an agent' },
-          { metric: 'tasks-done-7d', label: 'Done in 7 days', trend: '8w', note: '{{tasks-done-7d-agents}} of them by an agent' },
-        ],
       },
       {
         /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
@@ -771,6 +814,77 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing waits on you.',
       },
       {
+        /* WHAT IS FURTHER OFF, FOLDED SHUT: yours after this week, yours with no day, and what is kept for later. A
+           section folds the blocks after it, so these are a tap away and not on the page a person reads each morning.
+           No Due day is its own band because no sentence can put a task with no day under After this week (`IN_HAND`). */
+        kind: 'section',
+        heading: 'Not this week',
+        icon: 'archive',
+        span: 12,
+        fold: true,
+        when: { metric: 'tasks-not-this-week', gt: 0 },
+      },
+      {
+        kind: 'todo',
+        heading: 'After this week',
+        icon: 'calendar-days',
+        span: 12,
+        source: 'register.tasks',
+        where: `${YOURS}, by after +7d`,
+        columns: [{ field: 'what' }, { field: 'by' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        when: { metric: 'tasks-after-week-yours', gt: 0 },
+        empty: 'Nothing after this week.',
+      },
+      {
+        /* The project is its detail, because there is no day to show. */
+        kind: 'todo',
+        heading: 'No due day',
+        icon: 'circle-dashed',
+        span: 12,
+        source: 'register.tasks',
+        where: `${YOURS}, by is empty`,
+        columns: [{ field: 'what' }, { field: 'thing' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        when: { metric: 'tasks-undated-yours', gt: 0 },
+        empty: 'Everything has a day.',
+      },
+      {
+        kind: 'todo',
+        heading: 'Later',
+        icon: 'archive',
+        span: 12,
+        source: 'register.tasks',
+        where: 'state is backlog',
+        columns: [{ field: 'what' }, { field: 'thing' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        when: { metric: 'tasks-later', gt: 0 },
+        empty: 'Nothing kept for later.',
+      },
+      {
+        /* WHAT WAS FINISHED, FOLDED SHUT, SINCE work 1.11.0: how fast work moves and what moved, a tap away. Above the
+           fold the page is what is still to do. */
+        kind: 'section',
+        heading: 'Done lately',
+        icon: 'circle-check',
+        span: 12,
+        fold: true,
+        when: { metric: 'tasks-done-7d', gt: 0 },
+      },
+      {
+        /* HOW FAST IT MOVES, DRAWING ITS EIGHT WEEKS AS A LINE from its nightly series (`snapshot` above). ONE FIGURE AND
+           NOT TWO, SINCE work 1.11.0: Open was the line's own first figure, said again under it. */
+        kind: 'stat',
+        heading: 'How fast it moves',
+        icon: 'chart-line',
+        span: 12,
+        when: { metric: 'tasks-done-7d', gt: 0 },
+        cells: [{ metric: 'tasks-done-7d', label: 'Done in 7 days', trend: '8w', note: '{{tasks-done-7d-agents}} of them by an agent' }],
+      },
+      {
         /* WHAT WAS FINISHED IN THE LAST SEVEN DAYS, NEWEST FIRST, ticked, so a task closed by mistake is opened again
            from here. Over Done in 7 days' own clauses, and drawn while that figure has any. */
         kind: 'todo',
@@ -784,53 +898,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         limit: 8,
         when: { metric: 'tasks-done-7d', gt: 0 },
         empty: 'Nothing done this week.',
-      },
-      {
-        /* WHAT IS FURTHER OFF, FOLDED SHUT: yours after this week, yours with no day, and what is kept for later. A
-           section folds the blocks after it, so these are a tap away and not on the page a person reads each morning.
-           No Due day is its own band because no sentence can put a task with no day under After this week (`IN_HAND`). */
-        kind: 'section',
-        heading: 'Not this week',
-        icon: 'archive',
-        span: 12,
-        fold: true,
-      },
-      {
-        kind: 'todo',
-        heading: 'After this week',
-        icon: 'calendar-days',
-        span: 4,
-        source: 'register.tasks',
-        where: `${YOURS}, by after +7d`,
-        columns: [{ field: 'what' }, { field: 'by' }],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 8,
-        empty: 'Nothing after this week.',
-      },
-      {
-        /* The project is its detail, because there is no day to show. */
-        kind: 'todo',
-        heading: 'No due day',
-        icon: 'circle-dashed',
-        span: 4,
-        source: 'register.tasks',
-        where: `${YOURS}, by is empty`,
-        columns: [{ field: 'what' }, { field: 'thing' }],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 8,
-        empty: 'Everything has a day.',
-      },
-      {
-        kind: 'todo',
-        heading: 'Later',
-        icon: 'archive',
-        span: 4,
-        source: 'register.tasks',
-        where: 'state is backlog',
-        columns: [{ field: 'what' }, { field: 'thing' }],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 8,
-        empty: 'Nothing kept for later.',
       },
     ],
   },
@@ -885,6 +952,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
           { field: 'by', label: 'Due', width: '13ch', align: 'end' },
         ],
         order: [{ field: 'by', dir: 'asc' }],
+        when: { metric: 'open-tasks', gt: 0 },
         empty: 'Nothing open.',
         limit: 50,
       },

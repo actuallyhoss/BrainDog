@@ -162,8 +162,9 @@ test('THE GUIDE SAYS WHERE YOU ARE AND WHAT IS NEXT, and says nothing about what
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused: ${JSON.stringify(b.refusals)}`);
   const hidden = blocks.filter((b) => b.drawn === false).map((b) => b.heading);
   assert.deepEqual(hidden, ['Blocked', 'Steps done, by week', 'Taken by agents', 'Choices made', 'Done lately']);
-  const sofar = block(blocks, 'So far');
-  assert.deepEqual(sofar.readings?.map((r) => r.reading.value), [0, 5, 0, 2]);
+  /* SO FAR IS THE PAGE'S LINE SINCE guide 1.5.0, said from the figures the tile of four drew. */
+  assert.deepEqual(blocks[0]!.kind, 'note');
+  assert.deepEqual(['guide-milestones-reached', 'guide-steps-open', 'guide-steps-done-7d', 'guide-choices-open'].map((m) => figure(k, m)), [0, 5, 0, 2]);
   assert.equal(block(blocks, 'Where you are').rows?.length, 1);
   assert.equal(block(blocks, 'Your next steps').rows?.length, 5);
   assert.equal(block(blocks, 'What helps').rows?.length, 3);
@@ -179,7 +180,8 @@ test('THE GUIDE SAYS WHERE YOU ARE AND WHAT IS NEXT, and says nothing about what
 
   const home = pageOf(k, 'home-guide');
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual(home.filter((b) => b.drawn === false).map((b) => b.heading), ['Blocked']);
+  /* AND NO BAND FOR A DECISION WHILE NONE IS ASKED, SINCE guide 1.5.0. */
+  assert.deepEqual(home.filter((b) => b.drawn === false).map((b) => b.heading), ['A decision waiting', 'Blocked']);
 });
 
 test('AN AGENT TAKES A STEP, RECORDS A CHOICE WITH ITS REASON AND ADDS WHAT HELPED, and the Guide says who did each', async () => {
@@ -207,7 +209,7 @@ test('AN AGENT TAKES A STEP, RECORDS A CHOICE WITH ITS REASON AND ADDS WHAT HELP
   const done = block(blocks, 'Done lately');
   assert.deepEqual(said(done), [['List ten episode ideas', 'agent:claude']]);
   assert.equal(done.rows?.[0]?.fields.done_on, TODAY, 'the record fills the day a step was done');
-  assert.deepEqual(block(blocks, 'So far').readings?.map((r) => r.reading.value), [0, 3, 1, 1]);
+  assert.deepEqual(['guide-milestones-reached', 'guide-steps-open', 'guide-steps-done-7d', 'guide-choices-open'].map((m) => figure(k, m)), [0, 3, 1, 1]);
   assert.equal(figure(k, 'guide-steps-blocked'), 1);
   assert.equal(block(blocks, 'Steps done, by week').refusals?.length ?? 0, 0);
   assert.ok(block(blocks, 'What helps').rows?.some((r) => r.fields.name === 'A guide to recording remote interviews'));

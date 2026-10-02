@@ -74,10 +74,13 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   const figures = Object.fromEntries((block(overview, 'Right now').readings ?? []).map((r) => [r.metric, r.reading?.value]));
   assert.deepEqual(figures, {
     'projects-live': THINGS.filter(inPlay).length,
-    'projects-need-you': THINGS.filter((t) => inPlay(t) && (t.health === 'at_risk' || t.health === 'off_track')).length,
     'projects-aim-30d': THINGS.filter((t) => inPlay(t) && typeof t.aim === 'string' && t.aim >= TODAY && t.aim <= new Date(NOW + 30 * 86_400_000).toISOString().slice(0, 10)).length,
-    'projects-parked': THINGS.filter((t) => t.lane === 'parked').length,
   });
+  /* NEED YOU IS THE LINE'S, SINCE portfolio 1.8.0, said once, and the table under it names them. */
+  assert.equal(
+    block(overview, 'Needs you').rows.length,
+    THINGS.filter((t) => inPlay(t) && (t.health === 'at_risk' || t.health === 'off_track')).length,
+  );
   assert.deepEqual(names(block(overview, 'Needs you').rows).sort(), ['Kiln', 'Portage']);
   const parts = block(overview, 'How they are going').readings?.[0]?.reading?.groups ?? [];
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
@@ -233,7 +236,7 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   assert.ok(THINGS.every((t) => typeof t.about === 'string' && t.about !== ''), 'a sample project says nothing about what it is');
 });
 
-test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS THIS MONTH’S MONEY, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {
+test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE MONTH, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {
   const k = await seeded();
   /* THE SAMPLE MOVED NO MONEY ON KILN THIS MONTH, so two movements are written today, one each way, and the month's
      figures are asked about money that is there rather than three noughts that agree with anything. */
@@ -253,17 +256,20 @@ test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS THIS MONTH’S MO
   assert.ok((weeks.bars?.values[0] ?? []).reduce((n: number, v) => n + (v ?? 0), 0) > 0, 'nothing finished on Kiln in the weeks drawn');
   assert.ok(glance['project-open:Kiln'] !== undefined);
 
-  /* KEPT IS IN LESS OUT, TO THE MINOR UNIT, because it is one figure over the same rows, signed by direction. */
-  const month = Object.fromEntries((block(page, 'This month so far').readings ?? []).map((r) => [r.metric.split(':')[0], r.reading?.value ?? 0]));
-  assert.deepEqual(month, { 'project-in-month': 50_000, 'project-out-month': 12_000, 'project-kept-month': 38_000 });
+  /* THIS MONTH IS THE CHART'S NEWEST MONTH, SINCE portfolio 1.8.0, and not a tile beside it saying it again: in and out
+     to the minor unit, over the same rows. */
+  const byMonth = block(page, 'Money by month');
+  assert.deepEqual(byMonth.bars?.values.map((line) => Math.abs(line.at(-1) ?? 0)), [50_000, 12_000]);
+  assert.ok(!page.blocks.some((b) => b.heading === 'This month so far'), 'the month so far is said beside the chart that draws it');
 
   /* WHAT IT RUNS ON IS CARDS IN THE RAIL, what renews first first, and the dates are weeks above the plan. */
   const alive = page.blocks.find((b) => b.heading === 'Keeping it alive')!;
   assert.deepEqual([alive.kind, (alive as { area?: string }).area], ['cards', 'rail']);
   const renews = alive.rows.map((r) => String(r.fields.renews ?? '')).filter((d) => d !== '');
   assert.deepEqual(renews, [...renews].sort());
+  /* EACH DATE IS DRAWN ONCE, SINCE portfolio 1.8.0, on the plan: a calendar above it drew the same tasks again. */
   const headings = page.blocks.map((b) => b.heading);
-  assert.ok(headings.indexOf('Dates') >= 0 && headings.indexOf('Dates') < headings.indexOf('The plan'), 'the weeks come before the plan');
+  assert.ok(!headings.includes('Dates') && headings.includes('The plan'), 'the dated work is drawn twice');
   assert.equal((page.blocks.find((b) => b.heading === 'Waiting on you') as { tiles?: boolean }).tiles, true, 'the questions are not tiles');
 });
 
@@ -273,7 +279,9 @@ test('A PROJECT PAGE ON A RECORD WITH NO MONEY HAS NO MONTH OF MONEY, rather tha
   const headings = (team.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.ok(!headings.includes('This month so far'), 'a row of money figures was made up from the tasks instead');
   assert.ok(!headings.includes('Money by month') && !headings.includes('Keeping it alive'));
-  assert.ok(headings.includes('Done, by week') && headings.includes('Dates'), 'what a record without Money still has');
+  assert.ok(headings.includes('Done, by week') && headings.includes('The plan'), 'what a record without Money still has');
+  /* AND NO FOLDED HEADING OVER NOTHING: the Money section goes with the blocks it held. */
+  assert.ok(!headings.includes('Money'), 'a record without Money draws a Money section with nothing under it');
   /* AND A FULL RECORD'S PAGE LEAVES A USE CASE THREE BLOCKS UNDER THE CEILING OF TWENTY-FOUR. */
   assert.ok((projectTemplate(['things', 'tasks', 'people', 'obligations', 'transactions', 'services']).blocks as unknown[]).length <= 21);
 });

@@ -28,8 +28,7 @@
 
 import { exponentOf } from '@braindog/kernel';
 
-/** Money's lists that hold a day something falls due, as the `deadlines` source names them (`list is ...`). */
-const MONEY_DUE = 'list is obligations or recurring or installments';
+import { counted } from './counted.ts';
 
 /**
  * THE BLOCKS HOME AND THE GOALS PAGE SHARE: how far each savings goal, habit and goal has come.
@@ -38,10 +37,18 @@ const MONEY_DUE = 'list is obligations or recurring or installments';
  * toward, and a track is set against what was logged (`toward:`). A habit counts only this week's rows, from Monday, so
  * it starts again every week without anybody resetting it; a goal counts every row.
  */
-const savingsProgress = (span: number) => ({
+/**
+ * `gated` IS HOME'S, SINCE 2.2.0: Home draws a track only while it has something to track, and the Goals page draws each
+ * whatever it holds, because there its empty line is how a person learns what to add.
+ */
+const gate = (gated: boolean, metric: string) => (gated ? { when: { metric, gt: 0 } } : {});
+
+const savingsProgress = (span: number, gated = false) => ({
   kind: 'progress',
   heading: 'Savings goals',
+  icon: 'piggy-bank',
   span,
+  ...gate(gated, 'savings-active'),
   source: 'register.savings_goals',
   where: 'state is not paused',
   columns: [{ field: 'name' }, { field: 'target' }, { field: 'by' }],
@@ -51,10 +58,12 @@ const savingsProgress = (span: number) => ({
   empty: 'No savings goal yet. Add one and how close you are shows here.',
 });
 
-const habitsProgress = (span: number) => ({
+const habitsProgress = (span: number, gated = false) => ({
   kind: 'progress',
   heading: 'Habits this week',
+  icon: 'repeat',
   span,
+  ...gate(gated, 'habits-active'),
   source: 'register.goals',
   where: 'state is active, kind is habit',
   columns: [{ field: 'what' }, { field: 'target' }, { field: 'unit' }],
@@ -64,10 +73,12 @@ const habitsProgress = (span: number) => ({
   empty: 'No habits yet. Add one, like running three times a week, and log each time.',
 });
 
-const goalsProgress = (span: number) => ({
+const goalsProgress = (span: number, gated = false) => ({
   kind: 'progress',
   heading: 'Goals',
+  icon: 'goal',
   span,
+  ...gate(gated, 'goals-active'),
   source: 'register.goals',
   where: 'state is active, kind is goal',
   columns: [{ field: 'what' }, { field: 'target' }, { field: 'unit' }],
@@ -85,7 +96,9 @@ const goalsProgress = (span: number) => ({
 const budgetProgress = (heading: string) => ({
   kind: 'progress',
   heading,
+  icon: 'wallet',
   span: 12,
+  when: { metric: 'budgets-set', gt: 0 },
   source: 'register.categories',
   where: 'state is live, direction is out, budget is set',
   columns: [{ field: 'name' }, { field: 'budget' }],
@@ -107,8 +120,13 @@ export const PERSONAL = {
      them; every money figure is in the record's own currency; Home is rebuilt over Money.
      Major, because two lists and a page go. No record holds Personal to lose their rows.
      2.1.0: the voice says more of the record its own way, Home's empty lines and Decide's and the Inbox's among them
-    . Each is a new setting a person can change at /packs, so a minor step. */
-  version: '2.1.0',
+    . Each is a new setting a person can change at /packs, so a minor step.
+     2.2.0: calmer (DIRECTION §35). Home opens on one line said from Money's figures where a tile of three stood, what
+     needs you comes first, Coming up is the one list of what falls due where Bills this week drew the same bills
+     again, each track is drawn only while it has something, and what changed is folded shut. The Goals page and a
+     project's page open on a line too, and every heading wears a glyph. Nine counts are added to draw them on, and
+     nothing goes, so a minor step. */
+  version: '2.2.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -129,7 +147,8 @@ export const PERSONAL = {
     needs_you: 'Worth a look',
     nothing_needs_you: 'Nothing needs you right now',
     since_away: 'Since you last looked',
-    lists: 'My lists',
+    /* "My things", AND IT WAS "My lists": what sits under it is the person's bills and goals, and a list is only how they are kept. */
+    lists: 'My things',
     /* THE REST OF THE LINES, warm and plain: a bill, a plan, something you are saving toward. */
     overdue: 'Running late',
     nothing_now: 'Nothing needs you right now. Enjoy your day.',
@@ -384,6 +403,17 @@ export const PERSONAL = {
         window: '30d',
         compare: 'none',
       },
+      /* WHAT HOME AND THE GOALS PAGE ARE DRAWN ON, SINCE 2.2.0, each over its tile's own clauses, so no tile is drawn
+         over nothing. Counts, with no good or bad number. */
+      counted('budgets-set', 'Budgets set', 'register.categories', 'state is live, direction is out, budget is set'),
+      counted('savings-active', 'Savings goals on the go', 'register.savings_goals', 'state is not paused'),
+      counted('goals-active', 'Goals on the go', 'register.goals', 'state is active, kind is goal'),
+      counted('habits-active', 'Habits on the go', 'register.goals', 'state is active, kind is habit'),
+      counted('goals-held', 'Goals and habits', 'register.goals'),
+      counted('goal-log-held', 'Logged', 'register.goal_log'),
+      counted('put-by-held', 'Put by', 'register.put_by'),
+      counted('steps-left', 'Steps left on a project', 'register.project_steps', 'thing is {{it}}, done is false'),
+      counted('steps-done', 'Steps done on a project', 'register.project_steps', 'thing is {{it}}, done is true'),
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: what I have, the bills falling due this
            week, what is left of the budget, my projects with the next step on each, and my goals, then the house Home's
@@ -396,29 +426,39 @@ export const PERSONAL = {
         requires: ['register.accounts', 'register.categories', 'register.things', 'register.project_steps', 'register.goals', 'register.goal_log'],
         blocks: [
           {
-            /* MONEY'S OWN FIGURES, READ IN A PERSON'S WORDS. Cash now is every liquid account rolled forward to today
-               (money-core `cash-now`), so it says what is there and not what was typed on the day an account was added. */
-            kind: 'stat',
-            heading: 'What I have',
+            /* THE PAGE'S ONE LINE, SINCE 2.2.0, said from Money's own figures in a person's words: what is in the
+               accounts and what moves in the next thirty days. It was a tile of three figures; a clause whose figure is
+               nought is left out by the writer, so a record with no account reads no line. Cash now is every liquid
+               account rolled forward to today (money-core `cash-now`), so it says what is there and not what was typed
+               on the day an account was added. */
+            kind: 'note',
+            lead: true,
             span: 12,
-            cells: [
-              { metric: 'cash-now', label: 'In my accounts', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
-              { metric: 'arriving-30d', label: 'Coming in, 30 days' },
-              { metric: 'leaving-30d', label: 'Going out, 30 days' },
-            ],
+            body: '{{cash-now}} in my accounts, {{arriving-30d}} coming in and {{leaving-30d}} going out in the next 30 days',
           },
           {
-            /* EVERY MONEY LIST'S DUE DAYS AT ONCE: a bill, a pay day or a subscription that comes round, and a part of
-               something paid in parts. The record reads the days each list declares `deadline: true`, overdue first. */
+            /* WHAT NEEDS THE PERSON, FIRST UNDER THE LINE SINCE 2.2.0, and only while something is asked. */
+            kind: 'queue',
+            heading: '{{config:voice_needs_you}}',
+            icon: 'ask',
+            span: 12,
+            source: 'governance.open',
+            limit: 5,
+            when: { metric: 'questions-open', gt: 0 },
+            empty: '{{config:voice_nothing_needs_you}}',
+          },
+          {
+            /* EVERY DAY SOMETHING FALLS DUE IN THE NEXT TWO WEEKS, bills, pay days and parts of a plan among them, as the
+               house Home draws it. ONE LIST SINCE 2.2.0: Bills this week above it drew the same bills a second time. */
             kind: 'timeline',
-            heading: 'Bills this week',
+            heading: 'Coming up',
+            icon: 'calendar-clock',
             span: 12,
             source: 'deadlines',
-            horizon: 7,
-            where: MONEY_DUE,
+            horizon: 14,
             columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-            limit: 8,
-            empty: 'Nothing is due this week.',
+            limit: 12,
+            empty: 'Nothing falls due in the next two weeks.',
           },
           budgetProgress('Budget left'),
           {
@@ -426,6 +466,7 @@ export const PERSONAL = {
                record reads from Project steps (`steps:` on that list, `nextsOf` in the kernel). */
             kind: 'cards',
             heading: 'My projects',
+            icon: 'rocket',
             span: 12,
             source: 'register.things',
             where: 'lane is building or earning',
@@ -436,33 +477,22 @@ export const PERSONAL = {
             ],
             order: [{ field: 'seq', dir: 'asc' }],
             limit: 6,
+            when: { metric: 'projects-live', gt: 0 },
             empty: 'No projects on the go. Add one you make or do for the love of it, and its next step shows here.',
           },
-          goalsProgress(12),
-          habitsProgress(12),
+          goalsProgress(12, true),
+          habitsProgress(12, true),
           {
-            /* THE HOUSE HOME'S THREE, as `defaultHome` in the web draws them, so a person's own Home still answers what
-               needs them, what falls due in a fortnight and what changed since they last looked. */
-            kind: 'queue',
-            heading: '{{config:voice_needs_you}}',
+            /* WHAT CHANGED SINCE THE PERSON LAST LOOKED, FOLDED SHUT, SINCE 2.2.0: above it Home is what needs them and
+               what is coming. */
+            kind: 'section',
+            heading: '{{config:voice_since_away}}',
+            icon: 'history',
             span: 12,
-            source: 'governance.open',
-            limit: 5,
-            empty: '{{config:voice_nothing_needs_you}}',
-          },
-          {
-            kind: 'timeline',
-            heading: 'Coming up',
-            span: 12,
-            source: 'deadlines',
-            horizon: 14,
-            columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-            limit: 12,
-            empty: 'Nothing falls due in the next two weeks.',
+            fold: true,
           },
           {
             kind: 'feed',
-            heading: '{{config:voice_since_away}}',
             span: 12,
             source: 'activity',
             since: 'seen',
@@ -478,13 +508,31 @@ export const PERSONAL = {
         icon: 'star',
         requires: ['register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by'],
         blocks: [
+          {
+            /* THE PAGE'S ONE LINE, SINCE 2.2.0: what is put by, and how many goals and habits are on the go. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            body: '{{saved-toward-goals}} put by so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go',
+          },
           savingsProgress(12),
-          habitsProgress(6),
-          goalsProgress(6),
+          /* EACH THE WHOLE WIDTH SINCE 2.2.0, so a record keeping habits and no goals leaves no half row. */
+          habitsProgress(12),
+          goalsProgress(12),
+          {
+            /* WHAT WAS LOGGED AND PUT BY, AND EVERY GOAL, FOLDED SHUT, SINCE 2.2.0: looked up, not read each time. */
+            kind: 'section',
+            heading: 'Lately',
+            icon: 'history',
+            span: 12,
+            fold: true,
+          },
           {
             kind: 'table',
             heading: 'Logged lately',
+            icon: 'notebook-pen',
             span: 12,
+            when: { metric: 'goal-log-held', gt: 0 },
             source: 'register.goal_log',
             columns: [
               { field: 'what', label: 'What', width: 'minmax(14ch,1fr)' },
@@ -499,7 +547,9 @@ export const PERSONAL = {
           {
             kind: 'table',
             heading: 'Put by lately',
+            icon: 'piggy-bank',
             span: 12,
+            when: { metric: 'put-by-held', gt: 0 },
             source: 'register.put_by',
             columns: [
               { field: 'what', label: 'What', width: 'minmax(14ch,1fr)' },
@@ -514,7 +564,9 @@ export const PERSONAL = {
           {
             kind: 'table',
             heading: 'Every goal',
+            icon: 'list',
             span: 12,
+            when: { metric: 'goals-held', gt: 0 },
             source: 'register.goals',
             columns: [
               { field: 'what', label: 'Goal', width: 'minmax(18ch,1fr)' },
@@ -537,9 +589,12 @@ export const PERSONAL = {
         icon: 'thing',
         requires: ['register.things', 'register.project_steps'],
         blocks: [
+          /* THE PAGE'S LINE, SINCE 2.2.0: what the project is, in the person's own words on its row. */
+          { kind: 'note', lead: true, span: 12, body: '{{about}}' },
           {
             kind: 'progress',
             heading: 'Progress',
+            icon: 'gauge',
             span: 12,
             source: 'register.project_steps',
             where: 'thing is {{name}}',
@@ -549,7 +604,9 @@ export const PERSONAL = {
           {
             kind: 'todo',
             heading: 'Still to do',
+            icon: 'list-todo',
             span: 12,
+            when: { metric: 'steps-left:{{name}}', gt: 0 },
             source: 'register.project_steps',
             where: 'thing is {{name}}, done is false',
             columns: [{ field: 'what' }, { field: 'by' }],
@@ -560,7 +617,9 @@ export const PERSONAL = {
           {
             kind: 'table',
             heading: 'Done',
+            icon: 'circle-check',
             span: 12,
+            when: { metric: 'steps-done:{{name}}', gt: 0 },
             source: 'register.project_steps',
             where: 'thing is {{name}}, done is true',
             columns: [{ field: 'what', label: 'Step', width: 'minmax(16ch,1fr)' }],

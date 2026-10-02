@@ -41,8 +41,10 @@ export const BUSINESS = {
   usecase: 'business',
   /* 1.2.0 BECAUSE IT GAINS A PACK AND A PAGE, its own Home, where it had none: a declaration added is a minor step.
      1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them, each a new setting a
-     person can change at /packs. */
-  version: '1.3.1',
+     person can change at /packs.
+     1.4.0: calmer (DIRECTION §35). Home opens on one line of what needs your call, every heading wears a glyph, and
+     the questions are drawn only while one is asked. */
+  version: '1.4.0',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
@@ -78,12 +80,15 @@ export const BUSINESS = {
         icon: 'home',
         requires: ['register.session'],
         blocks: [
-          { kind: 'stat', lead: true, heading: 'What you have', span: 12, source: 'figures.home' },
+          /* THE PAGE'S ONE LINE, SINCE 1.4.0, said from the one figure every record has whatever it installs. */
+          { kind: 'note', lead: true, span: 12, body: '{{questions-open}} question(s) need your call' },
+          { kind: 'stat', lead: true, heading: 'What you have', icon: 'wallet', span: 12, source: 'figures.home' },
           {
             /* EVERY LIST THAT HOLDS A DUE DAY, overdue first and then by day: an invoice, a bill, a renewal and a task
                are one week, and the amount carries its own sign. */
             kind: 'table',
             heading: 'Due this week',
+            icon: 'calendar-clock',
             span: 12,
             source: 'deadlines',
             horizon: 7,
@@ -95,10 +100,11 @@ export const BUSINESS = {
             limit: 8,
             empty: 'Nothing is due this week.',
           },
-          { kind: 'queue', heading: 'Needs your call', span: 12, source: 'governance.open', limit: 5 },
+          { kind: 'queue', heading: 'Needs your call', icon: 'ask', span: 12, source: 'governance.open', limit: 5, when: { metric: 'questions-open', gt: 0 } },
           {
             kind: 'table',
             heading: 'Working now',
+            icon: 'session',
             span: 12,
             source: 'sessions.live',
             where: 'state is active',
@@ -109,7 +115,7 @@ export const BUSINESS = {
             ],
             limit: 6,
           },
-          { kind: 'feed', heading: 'What changed', span: 12, source: 'activity', first: 8, empty: 'Nothing has changed yet.' },
+          { kind: 'feed', heading: 'What changed', icon: 'history', span: 12, source: 'activity', first: 8, empty: 'Nothing has changed yet.' },
         ],
       },
     ],

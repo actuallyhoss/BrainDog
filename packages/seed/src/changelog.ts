@@ -20,6 +20,11 @@ export type ModuleChange = { version: string; notes: string };
 
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
+    {
+      version: '1.8.0',
+      notes:
+        'The Overview is calmer: one line of what needs you, where the projects are and how they are going, then the projects in play, with what each earns, what agents hold and what is coming up folded away. A project page shows six things and folds its history, money and what it runs on.',
+    },
     { version: '1.7.0', notes: 'Each project in play shows a small line of the work finished on it each week, when you use Work.' },
     {
       version: '1.5.0',
@@ -45,6 +50,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.4.0',
+      notes:
+        'Money is calmer: the line at the top says your cash and how long it lasts, with no tile repeating it, the month is drawn once as a chart, and everything after Accounts is folded away until you open it.',
+    },
+    {
       version: '3.3.0',
       notes:
         'Money is calmer: one line of what your money is doing and how far cash moved on a month ago, cash by account, the month ahead as a calendar and what moved as a list. A balance older than a week is flagged, and questions show only when something is asked.',
@@ -62,6 +72,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   estate: [
     {
+      version: '2.1.0',
+      notes:
+        'Services is calmer: a new record reads one note of what belongs here, each part shows only when it has something, and what each domain points at and every service are folded away until you open them.',
+    },
+    {
       version: '2.0.0',
       notes:
         'Services keeps subscriptions, memberships, insurance and utilities, opens with what it costs a month, asks before a renewal and marks a passed one lapsing. Every target is a setting with no default.',
@@ -69,6 +84,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.11.0',
+      notes: 'Work shows what is still to do, folds what is further off and what was done, and has a strip of your projects to look at one at a time.',
+    },
     {
       version: '1.10.0',
       notes:
@@ -84,5 +103,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.7.0', notes: 'An update can be written by anybody, not only one of four agent vendors.' },
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
-  agents: [{ version: '1.3.0', notes: 'The version this build ships.' }],
+  agents: [
+    {
+      version: '1.4.0',
+      notes: 'Agents opens on one line of who is working and what waits on you, shows where runs left off, and folds how the brain grew, its lessons and its skills until you open them.',
+    },
+    { version: '1.3.0', notes: 'The version this build ships.' },
+  ],
 };

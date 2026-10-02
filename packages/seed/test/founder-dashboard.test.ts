@@ -77,7 +77,8 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
     value(k.create('datapoints', { name: 'Sign-ups', value: 10 + d, organisation: org.id, source: 'reported', at: new Date(NOW - d * DAY).toISOString() }, OWNER));
 
   const dashboard = value<{ blocks: Drawn[] }>(k.page('dashboard')).blocks;
-  assert.deepEqual(dashboard.map((b) => b.kind), ['note', 'note', 'stat', 'bar', 'stat', 'lines', 'table', 'table']);
+  /* EVERY NUMBER AND ORGANISATION FOLDED UNDER A SECTION SINCE founder 1.11.0. */
+  assert.deepEqual(dashboard.map((b) => b.kind), ['note', 'note', 'stat', 'bar', 'stat', 'lines', 'section', 'table', 'table']);
   for (const b of dashboard) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   /* THE OPENING SENTENCE IS THE ONE THE NUMBERS ANSWER: forty were reported, so it counts them, and the one for a
      month with none does not draw. */
@@ -87,7 +88,7 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
   assert.deepEqual(dashboard[4]!.measures?.map((m) => m.name), ['Sign-ups'], 'the example datapoint is in no tile');
   assert.deepEqual(dashboard[5]!.measures?.map((m) => m.name), ['Sign-ups'], 'and in no chart');
   assert.equal(dashboard[4]!.measures?.[0]?.now.at(-1), 10, 'today is the last day, and its reading the newest');
-  assert.ok((dashboard[6]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
+  assert.ok((dashboard[7]!.rows ?? []).some((r) => r.fields.source === 'example'), 'the latest numbers still list it, marked');
   assert.equal(dashboard[3]!.rows?.length, 2, 'the example organisation and Harbour Studio');
 
   const pages = k.pages() as unknown as { slug: string; title: string }[];
@@ -110,26 +111,28 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
   assert.ok(page, 'a project has its own page');
   const blocks = value<{ blocks: Drawn[] }>(k.page(page.slug)).blocks;
   assert.deepEqual(blocks.map((b) => b.heading), [
+    /* THE TWO OPENING SENTENCES FIRST, which carry no heading: nothing is handed back, and nothing is open, so the second
+       draws. The figures beside them sit in the rail. */
+    undefined,
+    undefined,
     'At a glance',
-    /* THE TWO OPENING SENTENCES, which carry no heading: nothing is handed back, and nothing is open, so the second draws. */
-    undefined,
-    undefined,
     'Waiting on you',
     'Where it stands',
-    /* THE TEMPLATE SINCE work 1.10.0: its finished work by the week, its dates as weeks, and this month's money. */
+    /* THE TEMPLATE SINCE portfolio 1.8.0: six tiles above the fold, then who worked on it, its money, and in the rail
+       what it runs on, each folded shut. */
     'Done, by week',
     'Handed back or blocked',
     'What is open',
+    'The plan',
+    'History and notes',
     'Agents',
     'What changed',
-    'Dates',
-    'The plan',
-    'This month so far',
-    'Money by month',
-    'Money',
-    'Keeping it alive',
     'Notes',
+    'Money',
+    'Money by month',
+    'Bills and invoices',
     'Runs on',
+    'Keeping it alive',
     'Keys',
     'Tools and servers',
     'Skills',
@@ -138,9 +141,9 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Send numbers here',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual((blocks[0] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');
-  assert.equal(blocks[1]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
-  assert.notEqual(blocks[2]!.drawn, false, 'and nothing is open, so that one is');
+  assert.deepEqual((blocks[2] as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'with Estate present, what it costs a year takes the place the task figures held');
+  assert.equal(blocks[0]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
+  assert.notEqual(blocks[1]!.drawn, false, 'and nothing is open, so that one is');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */
   /* FOUND BY HEADING, since the template's blocks move with each version and a place in the list says nothing. */
   const headed = (heading: string) => blocks.find((b) => b.heading === heading)!;

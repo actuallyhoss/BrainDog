@@ -681,6 +681,81 @@ const DECLARED: Record<string, Version> = {
       "`page.work`'s Late, Today and This week are drawn on the new `tasks-late-yours`, `tasks-today-yours` and `tasks-week-yours`, each over its band's own clauses, the line's late is `tasks-late-yours`, and `tasks-with-agents` counts only what an agent has in hand, so no band is drawn empty -> e2d0a0a7ab0b4a2c",
     ],
   },
+  /** A VERSION AND NOT A RESET: portfolio's last version is on `origin/master`. */
+  'portfolio@1.8.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: 'b20a259181fb4e84',
+    history: [
+      "`page.portfolio` is calmer: Right now drops Need you, which is the line's, and Parked, which is a part of Where they are; the Earning tile goes, its year being the sum of What each one earns; Where they are sits beside How they are going; What each one earns, With an agent and Coming up are folded under a new section; every heading wears a glyph, and each tile is drawn only while its figure has any, Coming up and the parked list over the new `projects-aiming` and `projects-not-in-play` -> d09b14bf722cc8c4",
+      "`page.portfolio`'s fold over what each earns, what agents hold and what is coming up is drawn only while one of them has a project, over the new `projects-looked-up`, so a fresh Overview reads no folded heading over nothing -> b20a259181fb4e84",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: money-core's last version is on `origin/master`. */
+  'money-core@3.4.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.books-held metric.cash-accounts metric.cash-as-of
+      metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '6c498d04c8ca76e8',
+    history: [
+      "`page.money` is calmer: the What you have tile beside the line goes, since it said the line's figures again, Cash ahead and the box for a first account take the whole width, Where this month's money went and Every month go so the month is drawn once, and everything after Accounts is folded under Coming and going; `page.money-book` folds the month ahead and what moved under its accounts the same way -> 6c498d04c8ca76e8",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: estate's last version is on `origin/master`. */
+  'estate@2.1.0': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+    `,
+    declares: 'f88101804e05c342',
+    history: [
+      "`page.estate` is calmer: it says what belongs on a fresh record in one note, the note about a domain pointing nowhere comes under the line, At a glance drops Cost per year, which is the line's month again, the chips by type go, what each domain points at and every service are folded under a new section, every heading wears a glyph, and each tile is drawn only while its figure has any, over the new `renews-90d`, `domains-held` and `services-held` -> f88101804e05c342",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
+  'work@1.11.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-in-review metric.project-open metric.tasks-after-week-yours metric.tasks-done-7d metric.tasks-done-7d-agents
+      metric.tasks-done-by-week metric.tasks-due-7d metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later
+      metric.tasks-not-this-week metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-week-yours metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'f4bd85839419fa6a',
+    history: [
+      "`page.work` is calmer and filters by project: Open goes from the figures, being the line's own first figure, how fast work moves and what was done are folded under Done lately, the bands under Not this week are drawn only while they hold a task over the new `tasks-after-week-yours`, `tasks-undated-yours` and `tasks-not-this-week`, and a strip of the tasks' projects narrows every band (`filters:` on `thing`); `page.work-board`'s table is drawn only while something is open -> f4bd85839419fa6a",
+    ],
+  },
   'people@2.0.0': {
     holds: ` page.people register.people `,
     declares: 'a197d208773e19c1',

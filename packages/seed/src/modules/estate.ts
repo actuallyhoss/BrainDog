@@ -243,6 +243,41 @@ export const ESTATE_METRICS: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* WHAT THE SERVICES PAGE'S TILES ARE DRAWN ON, SINCE estate 2.1.0, each over its tile's own clauses, so no tile is drawn
+     over nothing. */
+  'renews-90d': {
+    metric: 'renews-90d',
+    name: 'Renews in 90 days',
+    source: 'register.services',
+    where: 'state is not cancelled, renews after yesterday, renews before +90d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'domains-held': {
+    metric: 'domains-held',
+    name: 'Domains',
+    source: 'register.services',
+    where: 'kind is domain',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'services-held': {
+    metric: 'services-held',
+    name: 'Services',
+    source: 'register.services',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'estate-year': {
     metric: 'estate-year',
     name: 'Cost per year',
@@ -315,6 +350,11 @@ export const ESTATE_AUTOMATIONS: Record<string, unknown>[] = [
 ];
 
 export const ESTATE_PAGES: Record<string, SeedPage> = {
+  /**
+   * CALMER, SINCE estate 2.1.0 (DIRECTION §35): the line, what needs the person, two figures, the month by type and the
+   * next ninety days, and what each domain points at and every service folded shut. Every heading wears a glyph, every
+   * tile is drawn only while it has something, and a fresh record reads one note of what belongs here.
+   */
   estate: {
     page: 'estate',
     title: 'Renewals',
@@ -342,53 +382,73 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         body: '{{estate-month}} a month to keep everything running.',
       },
       {
+        /* WHAT A FRESH RECORD READS, SINCE estate 2.1.0, in place of every tile under it: each is drawn only while there is
+           something to draw, so with no service the page says what belongs here and nothing else. */
+        kind: 'note',
+        heading: 'Nothing kept yet',
+        icon: 'server',
+        span: 12,
+        body: 'Add a domain, hosting or a subscription, and what it costs a month and when it renews show here.',
+        when: { metric: 'services-held', lt: 1 },
+      },
+      {
+        /* UNDER THE LINE, SINCE estate 2.1.0, because it is the one tile here that needs the person: a domain still paid
+           for that resolves nowhere. */
+        kind: 'note',
+        tone: 'warn',
+        heading: 'Points at nothing',
+        icon: 'circle-alert',
+        span: 12,
+        body: 'Something here renews and points at nothing. A domain that resolves nowhere still costs what it costs.',
+        /* AND THE GATE COUNTS THE SET THE SENTENCE IS ABOUT. It counted `lapsing`, which is one row
+           and that row points somewhere, while the services that point nowhere are all live: the
+           note drew, truthfully-looking, about rows it was not describing. */
+        when: { metric: 'points-nowhere', gt: 0 },
+      },
+      {
+        /* TWO FIGURES AND NOT THREE, SINCE estate 2.1.0: Cost per year was the line's month said again at twelve times
+           its size. */
         kind: 'stat',
         heading: 'At a glance',
+        icon: 'gauge',
         span: 12,
+        when: { metric: 'services-held', gt: 0 },
         cells: [
           { metric: 'renews-30d', label: 'Renews in 30 days' },
-          { metric: 'estate-year', label: 'Cost per year' },
           { metric: 'lapsing', label: 'Lapsing' },
         ],
       },
       {
         /* WHAT `renew-soon` HAS ASKED ABOUT SERVICES, answered where it is shown, three at a time, and the rest are in
-           Decide. No `empty:` of its own: with nothing waiting the queue says its own line. */
+           Decide. No `empty:` of its own: with nothing waiting the queue says its own line. Only while something is
+           asked. */
         kind: 'queue',
         heading: 'Waiting on you',
+        icon: 'ask',
         span: 12,
         source: 'governance.open',
         where: 'list is services',
         limit: 3,
+        when: { metric: 'questions-open', gt: 0 },
       },
       {
         /* THE MONTH IN PARTS, ONE A TYPE, the parts of the figure the page opens with, over the same rows at the same
-           share, so a yearly domain is in it at a twelfth and not left out for being on another cycle. */
+           share, so a yearly domain is in it at a twelfth and not left out for being on another cycle. THE WHOLE WIDTH
+           SINCE estate 2.1.0: the chips beside it counted the same types again, and went. */
         kind: 'split',
         heading: 'Each month, by type',
-        span: 5,
+        icon: 'chart-pie',
+        span: 12,
         source: 'metric.estate-month-by-kind',
         limit: 6,
+        when: { metric: 'estate-month', gt: 0 },
         empty: 'Nothing to pay for yet.',
-      },
-      {
-        kind: 'chips',
-        heading: 'What it is made of',
-        span: 7,
-        /* Grouped and counted by the first column, so this is six chips rather than fifteen. */
-        columns: [{ field: 'kind' }],
-        source: 'register.services',
-        /* THE PHRASE `19 §6` QUOTES AS THE FAILURE, in this record's own first-party pack. "Nothing
-           here yet" names nothing, says nothing about what belongs, and reads identically whether a
-           filter missed or the list has never held a row — which is the collapse the section is
-           about. A block's `empty:` is the one sentence its author gets, so it says what would be
-           here. */
-        empty: 'Nothing to break down until a service is added.',
       },
       {
         kind: 'timeline',
         heading: 'Next ninety days',
-        span: 6,
+        icon: 'calendar-clock',
+        span: 12,
         /* WRITTEN DOWN, because it used to live in the reader as a filter keyed on
            register-and-kind. The heading says ninety days and now the declaration does too. */
         /* BOUNDED AT BOTH ENDS. A window with an upper bound and no lower one sorts a renewal that
@@ -400,26 +460,38 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         source: 'register.services',
         order: [{ field: 'renews', dir: 'asc' }],
         limit: 8,
+        when: { metric: 'renews-90d', gt: 0 },
         empty: 'Nothing renews in the next ninety days.',
+      },
+      {
+        /* WHAT EACH DOMAIN POINTS AT AND EVERY SERVICE, FOLDED SHUT, SINCE estate 2.1.0 (DIRECTION §35): they are looked
+           up, not read each time the page opens. */
+        kind: 'section',
+        heading: 'Everything you keep',
+        icon: 'archive',
+        span: 12,
+        fold: true,
+        when: { metric: 'services-held', gt: 0 },
       },
       {
         kind: 'params',
         heading: 'What each domain points at',
-        /* SIX, and it has to be six. `params` is a `rows` primitive, so `floorFor` widens it to two
-           twelfths per declared column — three columns is a floor of 6 — and a declaration of 5 was
-           silently clamped up. Its row partner was 7, the row came to 13, and the page wrapped into
-           two rows with a five-twelfth hole in one and a six-twelfth hole in the other. */
-        span: 6,
+        icon: 'globe',
+        /* THE WHOLE WIDTH SINCE estate 2.1.0, drawn only while there is a domain. `params` is a `rows` primitive, so
+           `floorFor` widens it to two twelfths per declared column, and three columns is a floor of 6. */
+        span: 12,
         columns: [{ field: 'name' }, { field: 'points_at' }, { field: 'provider' }],
         source: 'register.services',
         where: 'kind is domain',
         order: [{ field: 'name', dir: 'asc' }],
         limit: 6,
+        when: { metric: 'domains-held', gt: 0 },
         empty: 'No domains.',
       },
       {
         kind: 'table',
         heading: 'Everything',
+        icon: 'rows',
         span: 12,
         source: 'register.services',
         columns: [
@@ -434,17 +506,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
            the Services section, and it was the fifth surface still using the fourth name. */
         empty: 'No services yet.',
         limit: 50,
-      },
-      {
-        kind: 'note',
-        tone: 'warn',
-        heading: 'Points at nothing',
-        span: 12,
-        body: 'Something here renews and points at nothing. A domain that resolves nowhere still costs what it costs.',
-        /* AND THE GATE COUNTS THE SET THE SENTENCE IS ABOUT. It counted `lapsing`, which is one row
-           and that row points somewhere, while the services that point nowhere are all live: the
-           note drew, truthfully-looking, about rows it was not describing. */
-        when: { metric: 'points-nowhere', gt: 0 },
+        when: { metric: 'services-held', gt: 0 },
       },
     ],
   },

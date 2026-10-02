@@ -66,6 +66,23 @@ const schemaOf = (register: string): Schema => ({
 });
 
 /**
+ * A TREE'S RELATIVE DAYS AS THE DAYS THEY NAME, `+7d` as the day a week after the clock's, which is what `parseWhere`
+ * makes of the same words in a sentence and what the record reads them as. `evaluate` reads a tree as it is written, so
+ * without this a tree's `after: '+7d'` was compared as the text `+7d` and Work's `tasks-not-this-week` read 11 by hand
+ * against the record's 8, the 7 after this week, none undated and the 1 kept for later.
+ */
+const daysOf = <T,>(node: T): T => {
+  if (Array.isArray(node)) return node.map(daysOf) as T;
+  if (node === null || typeof node !== 'object') return node;
+  return Object.fromEntries(
+    Object.entries(node).map(([key, v]) => {
+      const rel = (key === 'after' || key === 'before') && typeof v === 'string' ? /^([+-]\d+)d$/u.exec(v) : null;
+      return [key, rel ? new Date(NOW + Number(rel[1]) * 86_400_000).toISOString().slice(0, 10) : daysOf(v)];
+    }),
+  ) as T;
+};
+
+/**
  * The reference reading: the same declaration, over the same rows, in TypeScript.
  *
  * It knows nothing about SQL and shares no code with the evaluator beyond `parseWhere` and
@@ -78,7 +95,7 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
   /* A TREE IS ALREADY WHAT A SENTENCE COMPILES TO (`SeedMetric.where`), so it is read as the predicate itself. */
   const said =
     typeof decl.where === 'object'
-      ? { predicate: decl.where, bad: [] as { fix: string }[] }
+      ? { predicate: daysOf(decl.where), bad: [] as { fix: string }[] }
       : parseWhere(decl.where, schema, {
           nowMs: NOW,
           refByTitle: (to, title) => {

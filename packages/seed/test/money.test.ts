@@ -436,8 +436,8 @@ test('THE TILES AND THE BRIDGE ON `/p/money` ADD UP THE SAME MOVEMENTS, so no tw
   const arriving = figure('arriving-30d');
   const leaving = figure('leaving-30d');
   assert.deepEqual([arriving.label, leaving.label], ['Coming in, 30 days', 'Going out, 30 days']);
-  const hero = blockOf(k, 'money', 'What you have');
-  assert.deepEqual(hero.readings?.map((r) => r.metric), ['cash-now', 'runway-days'], 'the headline tile says the thirty days the bridge says');
+  /* AND NO TILE ON MONEY SAYS THE LINE'S FIGURES AGAIN, SINCE money-core 3.4.0: What you have went into the line. */
+  assert.ok(!(MONEY_PAGES.money!.blocks as { kind: string }[]).some((b) => b.kind === 'stat'), 'a tile beside the line says its figures again');
 
   const bridge = blockOf(k, 'money', 'The next 30 days');
   const steps = bridge.walk?.steps;
@@ -488,8 +488,9 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
      the money there is and no longer with who owes whom. */
   /* NONE ON `/p/money` SINCE money-core 3.3.0: the thirty days are the bridge's there, beside the calendar of them. */
   assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 0, 'the Money page says the thirty days twice again');
+  /* AND ON THE FOUNDER'S DASHBOARD ALONE SINCE founder 1.11.0, whose Overview opens on a line of the cash there is. */
   const founder = cells.filter((c) => c.where.startsWith('founder ') && (c.metric === 'arriving-30d' || c.metric === 'leaving-30d'));
-  assert.equal(founder.length, 4, 'the two founder dashboards are not both in the sweep');
+  assert.equal(founder.length, 2, 'the founder dashboard is not in the sweep');
   for (const c of cells) assert.equal(c.label, nameOf(c.metric), `${c.where} labels ${c.metric} "${c.label}" where the figure is called "${nameOf(c.metric)}"`);
 
   /* AND THE CEILING ON `out-30d` IS WORDED FOR THE SAME FIGURE, because a person reading "Most going
@@ -674,7 +675,6 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.deepEqual(headings, [
     /* THE HEADLINE LINE, which carries no heading: it is the sentence in the page's headline tile. */
     undefined,
-    'What you have',
     'What you have, by book',
     'Add an account',
     'Cash ahead',
@@ -683,11 +683,11 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Late coming in',
     'Late going out',
     'Accounts',
+    /* EVERYTHING AFTER ACCOUNTS IS FOLDED SHUT, SINCE money-core 3.4.0, and one view of the month is kept of three. */
+    'Coming and going',
     'The next 30 days',
     'Due in the next 30 days',
     'Instalments',
-    "Where this month's money went",
-    'Every month',
     'In and out, by month',
     'Being chased',
     'What moved',
@@ -748,17 +748,19 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
     const blocks = page.blocks as Block[];
     for (const b of blocks) if (b.heading !== undefined) assert.match(String(b.icon), /^[a-z][a-z0-9-]*$/u, `${slug}: ${b.heading} wears no glyph`);
 
-    /* FOUR TWELFTHS AND EIGHT, ONE ROW: the figure and the line it walks, read as one question. */
+    /* A BOOK'S PAGE: FOUR TWELFTHS AND EIGHT, ONE ROW, the figure and the line it walks, read as one question. MONEY'S:
+       the walk the whole width under the line, since money-core 3.4.0, with no tile beside it saying the line again. */
     const stat = blocks.findIndex((b) => b.kind === 'stat');
     const walk = blocks.findIndex((b) => b.kind === 'forecast');
-    assert.equal(blocks[stat]!.span, 4, `${slug}: the headline tile is not a third of the row`);
-    assert.equal(blocks[walk]!.span, 8, `${slug}: Cash ahead does not fill the rest of the headline's row`);
-    /* ONLY WHAT TAKES ONE OF THEIR PLACES: a book's bar for the figure, and the box for a first account for the walk,
-       each drawn only while the tile it stands in for is not. */
-    assert.ok(
-      blocks.slice(stat + 1, walk).every((b) => (b.kind === 'bar' && b.span === 4) || (b.kind === 'capture' && b.span === 8)),
-      `${slug}: something stands between the headline and its walk`,
-    );
+    if (stat >= 0) {
+      assert.equal(blocks[stat]!.span, 4, `${slug}: the headline tile is not a third of the row`);
+      assert.equal(blocks[walk]!.span, 8, `${slug}: Cash ahead does not fill the rest of the headline's row`);
+      assert.equal(walk, stat + 1, `${slug}: something stands between the headline and its walk`);
+    } else {
+      assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole width`);
+      /* ONLY WHAT TAKES THE LINE'S OR THE WALK'S PLACE: a book's bar for the line, and the box for a first account. */
+      assert.ok(blocks.slice(1, walk).every((b) => b.kind === 'bar' || b.kind === 'capture'), `${slug}: something stands between the line and its walk`);
+    }
 
     /* WHAT A PERSON READS, AND ONLY THAT: a `where:` is the record's grammar, and `direction is owed to me` is an id. */
     const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
@@ -797,13 +799,9 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
     [['cash-now', 'cash-accounts'], ['cash-now.change'], ['runway-days']],
   );
 
-  /* EVERY TILE BESIDE CASH NOW DRAWS ITS TWELVE WEEKS, and each figure remembers its nights so there is a line to draw. */
-  const hero = (MONEY_PAGES.money!.blocks as { kind: string; cells?: { metric: string; trend?: string }[] }[]).find((b) => b.kind === 'stat')!;
-  assert.deepEqual(hero.cells?.map((c) => c.metric), ['cash-now', 'runway-days']);
-  for (const c of hero.cells ?? []) {
-    assert.equal(c.trend, '12w', `${c.metric} draws no line`);
-    assert.equal((MONEY_METRICS[c.metric] as { snapshot?: { into: string } }).snapshot?.into, `series.${c.metric}`, `${c.metric} remembers no night`);
-  }
+  /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */
+  for (const metric of ['cash-now', 'runway-days'])
+    assert.equal((MONEY_METRICS[metric] as { snapshot?: { into: string } }).snapshot?.into, `series.${metric}`, `${metric} remembers no night`);
 
   /* ONE TRACK A PLAN: the parts that go out and are not cancelled, which the host counts paid against all by `plan`. */
   const parts = blockOf(k, 'money', 'Instalments');
@@ -858,7 +856,7 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
  * box to add the first account, which is the one thing to do. Waiting on you is drawn only while something is asked
  * (`questions-open`), so a record nobody has asked anything of draws no band saying so.
  */
-test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its headline and the box to add an account', async () => {
+test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line and the box to add an account', async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
   const out = k.page('money');
@@ -867,7 +865,7 @@ test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its head
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.deepEqual(
     blocks.filter((b) => b.drawn !== false).map((b) => b.heading),
-    [undefined, 'What you have', 'Add an account'],
+    [undefined, 'Add an account'],
   );
 });
 
@@ -1083,9 +1081,9 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
     assert.ok(out.ok, sayOf(out));
     return (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks.filter((b) => b.drawn !== false).map((b) => b.heading);
   };
-  assert.ok(drawn().includes('What you have'));
+  assert.ok(drawn().includes(undefined) && !drawn().includes('What you have, by book'));
   made('Home');
   const two = drawn();
-  assert.ok(!two.includes(undefined) && !two.includes('What you have'), 'one Cash now over two books is still said');
+  assert.ok(!two.includes(undefined), 'one Cash now over two books is still said');
   assert.deepEqual(two.slice(0, 2), ['What you have, by book', 'Cash ahead']);
 });

@@ -155,9 +155,10 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
   const student = await made('student');
   const home = value<{ blocks: Drawn[] }>(student.k.page(homePageOf('usecase-student'))).blocks;
   /* THE CAPTURE FIRST, SINCE STUDENT 1.3.0, and no example row under anything. */
-  assert.deepEqual(home.map((b) => b.heading), ['Add homework', 'Due this week', 'This week', 'Study streak', 'Coming up']);
+  /* THE LINE FIRST SINCE STUDENT 1.5.0, which says nothing on a new record, and the capture under it. */
+  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Add homework', 'Due this week', 'This week', 'Study streak', 'Coming up']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(home[1]!.rows?.length ?? 0, 0, 'a new student record has nothing due');
+  assert.equal(home[2]!.rows?.length ?? 0, 0, 'a new student record has nothing due');
   student.sql.close();
 
   const founder = await made('founder');
@@ -172,30 +173,32 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
      lapsing. So the row count below is found by heading, because by position it had come to read "Due this week" and
      counted nothing. */
   const drawnBlocks = blocks.filter((b) => (b as { drawn?: boolean }).drawn !== false);
-  assert.deepEqual(drawnBlocks.map((b) => b.heading), ['What you have', 'What you have, by organisation', 'Bring your money in', 'Numbers this week', 'Due this week', 'Lapsing', 'Working now']);
+  /* SINCE FOUNDER 1.11.0 THE LINE LEADS, and Due this week and Lapsing are drawn only while they hold something: on a
+     new record neither does, so neither is drawn. */
+  assert.deepEqual(drawnBlocks.map((b) => b.heading), [undefined, 'What you have, by organisation', 'Bring your money in', 'Numbers this week', 'Working now']);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  /* `runway-days` HAS NO VERDICT ON A RECORD THIS YOUNG: it walks 365 days of balance and a record made today has
-     none, so its own reading answers `null` with no refusal, not a failure to work out (`money.ts`'s `cashSeries`). */
-  for (const cell of drawnBlocks[0]!.readings ?? []) assert.ok(cell.reading && !cell.refusal, `${cell.metric} cannot be worked out`);
-  const rowsUnder = (heading: string): number | undefined => drawnBlocks.find((b) => b.heading === heading)?.rows?.length;
-  assert.equal(rowsUnder('Due this week'), 0);
-  assert.equal(rowsUnder('Lapsing'), 0);
+  const hidden = blocks.filter((b) => (b as { drawn?: boolean }).drawn === false).map((b) => b.heading);
+  assert.ok(hidden.includes('Due this week') && hidden.includes('Lapsing'), hidden.join(', '));
   founder.sql.close();
 });
 
 test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six milestones', async () => {
   const team = await made('team');
   const board = value<{ blocks: Drawn[] }>(team.k.page(homePageOf('team'))).blocks;
-  assert.deepEqual(board.map((b) => b.heading), ['Agents suggest', 'In flight', 'Blocked', 'Due this week', 'This cycle', 'Open tickets, each morning', 'Bring the team in']);
+  /* THE LINE FIRST AND HOW THE CYCLE IS GOING FOLDED UNDER THE REST, SINCE TEAM 2.10.0. */
+  assert.deepEqual(board.map((b) => b.heading), [
+    undefined, 'Agents suggest', 'In flight', 'Blocked', 'Due this week', 'Bring the team in', 'How the cycle is going', 'This cycle', 'Open tickets, each morning',
+  ]);
   for (const b of board) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(board[1]!.rows?.length, 2, 'two tickets are in flight');
-  assert.equal(board[2]!.rows?.length, 1, 'one ticket is blocked');
+  const under = (heading: string) => board.find((b) => b.heading === heading)!;
+  assert.equal(under('In flight').rows?.length, 2, 'two tickets are in flight');
+  assert.equal(under('Blocked').rows?.length, 1, 'one ticket is blocked');
   /* ONE, AND THE SECOND OF THE TWO WAS THE BLOCKED TICKET DRAWN TWICE. Home asks the same tickets
      three questions in a row, and `Due this week` used to answer about rows `Blocked` and `In flight`
      had already drawn, so this count was the double count. */
-  assert.equal(board[3]!.rows?.length, 1, 'what is due that the two headings above have not drawn');
+  assert.equal(under('Due this week').rows?.length, 1, 'what is due that the two headings above have not drawn');
   const agentWork = value<{ blocks: Drawn[] }>(team.k.page('agent-work')).blocks;
-  assert.deepEqual(agentWork.map((b) => b.kind), ['cards', 'table', 'agents', 'table']);
+  assert.deepEqual(agentWork.map((b) => b.kind), ['note', 'cards', 'table', 'agents', 'table']);
   for (const b of agentWork) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   team.sql.close();
 
@@ -204,16 +207,19 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   assert.equal(guide.k.count('steps'), 3);
   const home = value<{ blocks: Drawn[] }>(guide.k.page(homePageOf('guide'))).blocks;
   /* BLOCKED APPEARS WHEN A STEP IS (`when:`), so a new guide's Home is every other block. */
-  assert.deepEqual(home.filter((b) => (b as { drawn?: boolean }).drawn !== false).map((b) => b.heading), ['Where you are', 'A decision waiting', 'Next three steps', 'Waiting on you', 'Resources']);
+  /* AND SINCE GUIDE 1.5.0 THE LINE LEADS, and a decision is drawn only while one is asked. */
+  assert.deepEqual(home.filter((b) => (b as { drawn?: boolean }).drawn !== false).map((b) => b.heading), [undefined, 'Where you are', 'Next three steps', 'Waiting on you', 'Resources']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(home[0]!.rows?.length, 6, 'the path draws the six milestones');
+  assert.equal(home[1]!.rows?.length, 6, 'the path draws the six milestones');
   guide.sql.close();
 });
 
-test('A PERSONAL HOME OPENS ON WHAT I HAVE, THE BILLS OF THE WEEK, THE BUDGET LEFT, PROJECTS AND GOALS, and every page reads', async () => {
+test('A PERSONAL HOME OPENS ON WHAT I HAVE, WHAT IS COMING UP, THE BUDGET LEFT, PROJECTS AND GOALS, and every page reads', async () => {
   const { k, sql } = await made('personal');
   const home = value<{ blocks: (Drawn & { kind: string })[] }>(k.page(homePageOf('personal'))).blocks;
-  assert.deepEqual(home.map((b) => b.heading), ['What I have', 'Bills this week', 'Budget left', 'My projects', 'Goals', 'Habits this week', 'Worth a look', 'Coming up', 'Since you last looked']);
+  /* SINCE PERSONAL 2.2.0: the line where What I have stood, what needs you first, one list of what falls due, and what
+     changed folded shut; the feed under the fold carries no heading of its own. */
+  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Worth a look', 'Coming up', 'Budget left', 'My projects', 'Goals', 'Habits this week', 'Since you last looked', undefined]);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   for (const slug of ['money', 'goals', 'portfolio']) {
     const page = value<{ blocks: Drawn[] }>(k.page(slug)).blocks;

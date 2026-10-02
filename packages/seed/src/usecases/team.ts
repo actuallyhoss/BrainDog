@@ -16,6 +16,7 @@
  */
 
 import { projectTemplate } from '../modules/portfolio.ts';
+import { counted } from './counted.ts';
 
 type Body = Record<string, unknown>;
 
@@ -66,8 +67,11 @@ export const TEAM = {
      keeps no money or services, so the month's money and what it runs on are left off as before. 2.7.0 is on
      `origin/master`, so the change is a version and not a reset.
      2.9.0: a project's page draws what was finished on it each week in place of the tickets tallied by priority, and
-     Work's page says "No agent holds a ticket." in the short line it now has. 2.8.0 is on `origin/master`. */
-  version: '2.9.0',
+     Work's page says "No agent holds a ticket." in the short line it now has. 2.8.0 is on `origin/master`.
+     2.10.0: calmer (DIRECTION §35). Home, Cycles and Agent work open on one line said from new counts of tickets,
+     every heading wears a glyph, each list is drawn only while it holds a ticket, and Home folds how the cycle is
+     going under what needs the team. A project's page takes portfolio 1.8.0's template. 2.9.0 is on `origin/master`. */
+  version: '2.10.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -87,7 +91,8 @@ export const TEAM = {
     needs_you: 'Waiting on a call',
     nothing_needs_you: 'No call is waiting on you',
     since_away: 'What the team and its agents did',
-    lists: 'Team lists',
+    /* "Our things", AND IT WAS "Team lists": shared, as the team says it, and a list is only how the record keeps the tickets. */
+    lists: 'Our things',
     /* THE REST OF THE LINES, brisk and shared: a ticket, a call, the team and its agents. */
     working_now: 'On it now',
     coming_up: 'Due soon',
@@ -198,6 +203,13 @@ export const TEAM = {
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },
+      /* WHAT THE TEAM'S PAGES ARE DRAWN ON, SINCE 2.10.0, each over its list's own clauses. */
+      counted('tickets-in-flight', 'In flight', 'register.tasks', IN_FLIGHT),
+      counted('tickets-blocked', 'Blocked', 'register.tasks', 'state is blocked'),
+      counted('tickets-due-else', 'Else due this week', 'register.tasks', `${LIVE}, state is not doing or review or blocked, by before +8d`),
+      counted('tickets-planned', 'Planned into a cycle', 'register.cycle_plan'),
+      counted('tickets-taken', 'Taken by agents', 'register.tasks', 'agent is set, state is not done or dropped'),
+      counted('tickets-done-by-agents', 'Finished by agents', 'register.tasks', 'agent is set, state is done'),
       {
         /* HOME, AS A TEAM ANSWERS IT: what agents suggest, what is moving and who is on it, what is stuck, what is
            due, and how far the cycle has come, with no place on the rail. */
@@ -207,14 +219,23 @@ export const TEAM = {
         requires: ['register.tasks', 'register.cycle_plan', 'register.cycle_days'],
         blocks: [
           {
+            /* THE PAGE'S ONE LINE, SINCE 2.10.0: how much is open, what is stuck and what the agents suggest. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            body: '{{open-tasks}} open ticket(s), {{tickets-blocked}} blocked, {{questions-open}} suggestion(s) from agents',
+          },
+          {
             /* FIRST, BECAUSE AN AGENTIC TASK LIST IS ONE WHERE THE AGENTS PROPOSE: a ticket to open, a priority to
                change, an owner to set, each answered here with Keep or No thanks and never by opening Decide. */
             kind: 'queue',
             heading: 'Agents suggest',
+            icon: 'ask',
             span: 12,
             source: 'governance.open',
             where: 'list is tasks',
             limit: 3,
+            when: { metric: 'questions-open', gt: 0 },
             empty: 'No agent is suggesting anything right now.',
           },
           {
@@ -226,9 +247,11 @@ export const TEAM = {
                whose agent has a run going now, so a lead sees at a glance which tickets are moving this minute. */
             kind: 'cards',
             heading: '{{config:voice_right_now}}',
+            icon: 'activity',
             span: 12,
             source: 'register.tasks',
             where: IN_FLIGHT,
+            when: { metric: 'tickets-in-flight', gt: 0 },
             columns: [
               { field: 'what', as: 'title' },
               { field: 'owner', label: 'Owner', as: 'who' },
@@ -243,9 +266,11 @@ export const TEAM = {
           {
             kind: 'table',
             heading: 'Blocked',
+            icon: 'octagon-alert',
             span: 12,
             source: 'register.tasks',
             where: 'state is blocked',
+            when: { metric: 'tickets-blocked', gt: 0 },
             columns: [TICKET, { field: 'owner', label: 'Owner', width: 'minmax(10ch,16ch)' }, { field: 'by', label: 'Due', width: '13ch', align: 'end' }],
             limit: 8,
             empty: 'Nobody is blocked.',
@@ -263,9 +288,11 @@ export const TEAM = {
                move on the Work pack's Overview, and a usability pass said what the
                overlap costs: the first reading is that the board is double-counting. */
             heading: 'Due this week',
+            icon: 'calendar-clock',
             span: 12,
             source: 'register.tasks',
             where: `${LIVE}, state is not doing or review or blocked, by before +8d`,
+            when: { metric: 'tickets-due-else', gt: 0 },
             columns: [TICKET, { field: 'priority', label: 'Priority', width: '10ch' }, { field: 'state', label: 'Status', width: '12ch' }, { field: 'by', label: 'Due', width: '13ch', align: 'end' }],
             order: [{ field: 'by', dir: 'asc' }],
             limit: 8,
@@ -276,10 +303,29 @@ export const TEAM = {
             empty: 'Nothing else is due this week.',
           },
           {
+            kind: 'link',
+            heading: 'Bring the team in',
+            icon: 'user-plus',
+            span: 12,
+            authored: [
+              { cells: ['Invite your team', INVITE, 'Send each teammate a link to this board'] },
+              { cells: ['Connect an agent', CONNECT, 'The line to paste into Claude Code so an agent can take tickets'] },
+            ],
+          },
+          {
+            /* HOW THE CYCLE IS GOING, FOLDED SHUT, SINCE 2.10.0: above it Home is what needs the team this week. */
+            kind: 'section',
+            heading: 'How the cycle is going',
+            icon: 'gauge',
+            span: 12,
+            fold: true,
+          },
+          {
             /* HOW FAR THE CYCLE HAS COME: the planned tickets ticked done against every ticket planned, one track a
                cycle. The newest cycle first, since the one a team is in is the one it asks about. */
             kind: 'progress',
             heading: 'This cycle',
+            icon: 'goal',
             span: 6,
             source: 'register.cycle_plan',
             columns: [{ field: 'cycle' }, { field: 'done' }],
@@ -292,21 +338,13 @@ export const TEAM = {
                weeks before, from the Cycle days the standup agent or a teammate writes. */
             kind: 'lines',
             heading: 'Open tickets, each morning',
+            icon: 'chart-line',
             span: 6,
             source: 'register.cycle_days',
             columns: [{ field: 'day' }, { field: 'open' }],
             back: 14,
             bucket: 'day',
             empty: 'No cycle day is written yet. The standup agent adds one each morning, or add today by hand.',
-          },
-          {
-            kind: 'link',
-            heading: 'Bring the team in',
-            span: 12,
-            authored: [
-              { cells: ['Invite your team', INVITE, 'Send each teammate a link to this board'] },
-              { cells: ['Connect an agent', CONNECT, 'The line to paste into Claude Code so an agent can take tickets'] },
-            ],
           },
         ],
       },
@@ -321,8 +359,16 @@ export const TEAM = {
         requires: ['register.tasks', 'register.cycles', 'register.cycle_plan'],
         blocks: [
           {
+            /* THE PAGE'S ONE LINE, SINCE 2.10.0. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            body: '{{tickets-planned}} ticket(s) planned into cycles, {{tickets-blocked}} blocked',
+          },
+          {
             kind: 'table',
             heading: 'Cycles',
+            icon: 'repeat',
             span: 12,
             source: 'register.cycles',
             columns: [
@@ -337,7 +383,9 @@ export const TEAM = {
           {
             kind: 'table',
             heading: 'Cycle plan',
+            icon: 'list-checks',
             span: 12,
+            when: { metric: 'tickets-planned', gt: 0 },
             source: 'register.cycle_plan',
             columns: [
               { field: 'task', label: 'Ticket', width: 'minmax(20ch,1fr)' },
@@ -350,9 +398,11 @@ export const TEAM = {
           {
             kind: 'table',
             heading: 'Blocked',
+            icon: 'octagon-alert',
             span: 12,
             source: 'register.tasks',
             where: 'state is blocked',
+            when: { metric: 'tickets-blocked', gt: 0 },
             columns: [
               TICKET,
               { field: 'owner', label: 'Owner', width: 'minmax(10ch,18ch)' },
@@ -378,11 +428,19 @@ export const TEAM = {
         requires: ['register.tasks'],
         blocks: [
           {
+            /* THE PAGE'S ONE LINE, SINCE 2.10.0. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            body: '{{tickets-taken}} ticket(s) with an agent, {{tickets-done-by-agents}} finished by agents',
+          },
+          {
             /* THE RUNS THE RECORD KNOWS ARE GOING (2.6.0), each with the agent's face and what it says it is doing, read
                from `sessions.live` as Home's own runs are. This page listed the `session` list by hand, and drew an
                empty list on a record whose agents were working. */
             kind: 'cards',
             heading: 'Working now',
+            icon: 'session',
             span: 12,
             source: 'sessions.live',
             columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
@@ -392,7 +450,9 @@ export const TEAM = {
           {
             kind: 'table',
             heading: 'Taken by agents',
+            icon: 'bot',
             span: 12,
+            when: { metric: 'tickets-taken', gt: 0 },
             source: 'register.tasks',
             where: 'agent is set, state is not done or dropped',
             columns: [
@@ -408,6 +468,7 @@ export const TEAM = {
             /* WHAT EACH AGENT DID, from the record's own log, one group per agent: the changes, not only the runs. */
             kind: 'agents',
             heading: 'What agents did',
+            icon: 'activity',
             span: 12,
             source: 'activity',
             first: 5,
@@ -416,7 +477,9 @@ export const TEAM = {
           {
             kind: 'table',
             heading: 'Finished by agents',
+            icon: 'circle-check',
             span: 12,
+            when: { metric: 'tickets-done-by-agents', gt: 0 },
             source: 'register.tasks',
             where: 'agent is set, state is done',
             columns: [TICKET, { field: 'agent', label: 'Agent', width: '12ch' }, { field: 'done_on', label: 'Done on', width: '13ch', align: 'end' }],

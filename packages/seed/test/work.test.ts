@@ -71,10 +71,9 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
   const k = await seeded();
   for (const slug of ['work', 'work-board']) for (const b of opened(k, slug).blocks) assert.deepEqual(b.refusals, [], `${slug} ${b.heading}`);
 
-  const figures = Object.fromEntries((block(opened(k, 'work'), 'Right now').readings ?? []).map((r) => [r.metric, r.reading?.value]));
-  /* TWO FIGURES SINCE work 1.10.0: how much is open, and how much was finished. */
+  const figures = Object.fromEntries((block(opened(k, 'work'), 'How fast it moves').readings ?? []).map((r) => [r.metric, r.reading?.value]));
+  /* ONE FIGURE SINCE work 1.11.0, how much was finished, folded under Done lately: how much is open is the line's. */
   assert.deepEqual(figures, {
-    'open-tasks': TASKS.filter(open).length,
     'tasks-done-7d': TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length,
   });
   /* AND THE FIGURES THE BANDS ARE DRAWN ON, which the line says too. */
@@ -83,6 +82,7 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
     assert.ok(out.ok, sayOf(out));
     return out.value.value;
   };
+  assert.equal(read('open-tasks'), TASKS.filter(open).length);
   assert.equal(read('tasks-waiting'), TASKS.filter((t) => t.state === 'review' || t.state === 'blocked').length);
   assert.equal(read('tasks-due-7d'), TASKS.filter((t) => live(t) && String(t.by) >= TODAY && String(t.by) < new Date(NOW + 8 * 86_400_000).toISOString().slice(0, 10)).length);
   assert.ok(Number(read('tasks-waiting')) > 0, 'the sample shows a queue');
@@ -99,14 +99,19 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const page = opened(k, 'work');
   const headings = page.blocks.map((b) => b.heading);
   /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
-     screen's bands top to bottom, and what is further off folded shut. The line has no heading: it is the sentence in
-     the page's title. */
+     screen's bands of what is still to do top to bottom, and what is further off and what was finished folded shut. The
+     line has no heading: it is the sentence in the page's title. */
   assert.deepEqual(
     headings,
-    [undefined, 'What needs doing?', 'Right now', 'Late', 'Today', 'This week', 'With an agent', 'Waiting on you', 'Done recently', 'Not this week', 'After this week', 'No due day', 'Later'],
+    [
+      undefined, 'What needs doing?', 'Late', 'Today', 'This week', 'With an agent', 'Waiting on you',
+      'Not this week', 'After this week', 'No due day', 'Later',
+      'Done lately', 'How fast it moves', 'Done recently',
+    ],
     headings.join(', '),
   );
-  assert.equal((page.blocks.find((b) => b.heading === 'Not this week') as { fold?: boolean }).fold, true, 'what is further off is not folded');
+  for (const folded of ['Not this week', 'Done lately'])
+    assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 
   /* PAST ITS DATE IS LATE, AND ON TOP, because it is still the next thing to do. The sample's is four days late. */
   const late = block(page, 'Late');
@@ -188,7 +193,7 @@ test('AN AGENT TAKES A TASK, SPLITS IT, HANDS IT BACK AND A PERSON FINISHES IT, 
   overview = opened(k, 'work');
   assert.ok(!block(overview, 'Waiting on you').rows.some((r) => r.fields.what === title));
   assert.ok(block(overview, 'Done recently').rows.some((r) => r.fields.what === title));
-  const done = (block(overview, 'Right now').readings ?? []).find((r) => r.metric === 'tasks-done-7d');
+  const done = (block(overview, 'How fast it moves').readings ?? []).find((r) => r.metric === 'tasks-done-7d');
   assert.equal(done?.reading?.value, TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length + 1);
 });
 
@@ -254,20 +259,22 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
   for (const b of opened(k, 'work-board').blocks) assert.deepEqual(b.refusals, [], `work-board ${b.heading}`);
 });
 
+/* NO TILE ON WORK DRAWS OPEN'S LINE SINCE work 1.11.0, since the line says Open once, so the nights it remembers are read
+   where they are kept, for the tiles a person or a use case puts it on. */
 test('OPEN IS REMEMBERED EACH DAY, so its figure draws a line once the record has run a night', async () => {
   let now = NOW;
-  const k = await openRecord(openSqlite(), { now: () => now });
+  const sql = openSqlite();
+  const k = await openRecord(sql, { now: () => now });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
-  const cell = () => (block(opened(k, 'work'), 'Right now').readings ?? []).find((r) => r.metric === 'open-tasks');
-  assert.equal(cell()?.trend, undefined, 'no line is drawn before a snapshot has run');
+  const points = () => sql.all<{ value: number }>("SELECT value FROM metric_point WHERE series IN ('open-tasks', 'series.open-tasks') ORDER BY at");
+  assert.deepEqual(points(), [], 'a night is remembered before a snapshot has run');
 
   /* THE NEXT NIGHT: the snapshot armed at install runs, and yesterday's count is written. */
   now = NOW + 86_400_000;
   await k.drain();
-  const trend = cell()?.trend;
-  assert.ok(trend, 'Open has a line after the first night');
-  assert.equal(trend!.at(-1), TASKS.filter(open).length, 'the last point is the day before, counted as it stood');
+  assert.ok(points().length > 0, 'Open remembers no night after the first');
+  assert.equal(points().at(-1)!.value, TASKS.filter(open).length, 'the last point is the day before, counted as it stood');
 });
 
 /**
@@ -292,15 +299,15 @@ test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a headin
     assert.ok(!headings.includes(gone), `${gone} is still drawn`);
 });
 
-test('EVERY FIGURE ON RIGHT NOW IS REMEMBERED EACH NIGHT, so each tile draws a line and not only Open', async () => {
+test('THE FIGURE ON HOW FAST IT MOVES IS REMEMBERED EACH NIGHT, so its tile draws a line', async () => {
   let now = NOW;
   const k = await openRecord(openSqlite(), { now: () => now });
   const out = await installSeed(k);
   assert.ok(out.ok, sayOf(out));
   now = NOW + 86_400_000;
   await k.drain();
-  const cells = block(opened(k, 'work'), 'Right now').readings ?? [];
-  assert.equal(cells.length, 2);
+  const cells = block(opened(k, 'work'), 'How fast it moves').readings ?? [];
+  assert.equal(cells.length, 1);
   for (const c of cells) assert.ok(c.trend, `${c.metric} draws no line after a night`);
 });
 

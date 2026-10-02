@@ -47,8 +47,12 @@ export const GUIDE = {
      beside it, the next three steps to tick and what helps. A milestone says whether it is passed, which the record
      keeps in step with its status, and what it comes after.
      1.4.0: the voice says more of the record its own way, Home's empty lines, the add verb and the pen's line among
-     them. Each is a new setting a person can change at /packs, so a minor step. */
-  version: '1.4.0',
+     them. Each is a new setting a person can change at /packs, so a minor step.
+     1.5.0: calmer (DIRECTION §35). Home and the Guide open on one line said from the guide's figures, where the Guide
+     had a tile of four; every heading wears a glyph; each list is drawn only while it holds something; the Guide folds
+     what is done and kept under Everything so far; and a milestone's page draws its steps, choices and what helps only
+     while it has them. Only counts are added, so a minor step. */
+  version: '1.5.0',
   title: 'New project guide',
   summary: 'The milestones of your project, the next step to take, the choices to make and what helps along the way.',
   author: 'BrainDog',
@@ -246,6 +250,13 @@ export const GUIDE = {
       /* WHETHER THE IDEA STAGE HAS ENDED, which is when the guide asks about running the project (`GUIDE_GROWS`). */
       count('guide-idea-left', 'Idea milestones still to reach', 'register.milestones', 'stage is idea, state is not reached'),
       count('guide-idea-reached', 'Idea milestones reached', 'register.milestones', 'stage is idea, state is reached'),
+      /* WHAT THE PAGES' TILES ARE DRAWN ON, SINCE 1.5.0, each over its tile's own clauses. `{{it}}` is a milestone's
+         own `what`, filled from the milestone's page. */
+      count('guide-milestones-underway', 'Milestones underway', 'register.milestones', 'state is underway'),
+      count('guide-resources', 'What helps', 'register.resources'),
+      count('milestone-steps', 'Steps of a milestone', 'register.steps', 'milestone is {{it}}'),
+      count('milestone-choices', 'Choices on a milestone', 'register.choices', 'milestone is {{it}}'),
+      count('milestone-resources', 'What helps with a milestone', 'register.resources', 'milestone is {{it}}'),
       {
         /* PROGRESS OVER TIME: steps done by the week they were done, from the day the record fills. */
         ...count('guide-steps-done-by-week', 'Steps done, by week', 'register.steps', 'state is done, done_on after -63d'),
@@ -277,11 +288,20 @@ export const GUIDE = {
         requires: ['register.milestones', 'register.steps', 'register.choices', 'register.resources'],
         blocks: [
           {
+            /* THE PAGE'S ONE LINE, SINCE 1.5.0: how far along the way the project is, and what is left to do and decide. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            body: '{{guide-milestones-reached}} of {{guide-milestones}} milestone(s) reached, {{guide-steps-open}} step(s) to take, {{guide-choices-open}} choice(s) to make',
+          },
+          {
             /* THE MILESTONES AS A PATH, top to bottom in their order: the ones passed are done, the first not passed is
-               next, and the rest are later. The record marks them from `passed`, so the path and the status agree. */
+               next, and the rest are later. The record marks them from `passed`, so the path and the status agree. THE
+               WHOLE WIDTH SINCE 1.5.0, as every tile on this page is, so none leaves a half row when it is not drawn. */
             kind: 'steps',
             heading: '{{config:voice_right_now}}',
-            span: 7,
+            icon: 'milestone',
+            span: 12,
             source: 'register.milestones',
             columns: [{ field: 'what' }, { field: 'stage' }],
             order: [{ field: 'order', dir: 'asc' }],
@@ -293,18 +313,22 @@ export const GUIDE = {
                milestone, or a choice an agent has weighed up. Answered here, never by opening Decide. */
             kind: 'queue',
             heading: 'A decision waiting',
-            span: 5,
+            icon: 'ask',
+            span: 12,
             source: 'governance.open',
             where: 'list is choices or milestones',
             tiles: true,
             limit: 1,
+            when: { metric: 'questions-open', gt: 0 },
             empty: 'No decision is waiting on you.',
           },
           {
             /* THREE, AND EACH ONE TICKED WHERE IT IS: a step ticked here is done, and the next one moves up. */
             kind: 'todo',
             heading: 'Next three steps',
-            span: 7,
+            icon: 'list-todo',
+            span: 12,
+            when: { metric: 'guide-steps-open', gt: 0 },
             source: 'register.steps',
             where: 'state is to_do or doing',
             columns: [{ field: 'what' }, { field: 'by' }],
@@ -315,7 +339,8 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Blocked',
-            span: 5,
+            icon: 'octagon-alert',
+            span: 12,
             when: { metric: 'guide-steps-blocked', gt: 0 },
             source: 'register.steps',
             where: 'state is blocked',
@@ -326,9 +351,11 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: '{{config:voice_needs_you}}',
+            icon: 'scale',
             span: 12,
             source: 'register.choices',
             where: 'state is open',
+            when: { metric: 'guide-choices-open', gt: 0 },
             columns: [
               { field: 'question', label: 'Question', width: 'minmax(20ch,1fr)' },
               { field: 'milestone', label: 'Milestone', width: 'minmax(10ch,20ch)' },
@@ -340,7 +367,9 @@ export const GUIDE = {
             /* WHAT HELPS, last, because it is what a person reaches for once they know the step they are taking. */
             kind: 'table',
             heading: 'Resources',
+            icon: 'book-open',
             span: 12,
+            when: { metric: 'guide-resources', gt: 0 },
             source: 'register.resources',
             columns: [
               { field: 'name', label: 'Resource', width: 'minmax(18ch,1fr)' },
@@ -361,24 +390,21 @@ export const GUIDE = {
         requires: ['register.milestones', 'register.steps', 'register.choices', 'register.resources'],
         blocks: [
           {
-            kind: 'stat',
+            /* THE PAGE'S ONE LINE, SINCE 1.5.0, where a tile of four figures stood: two of them, the steps to take and the
+               choices to make, are the lists under it, so the line says how far along the way it is and how fast it moves. */
+            kind: 'note',
             lead: true,
-            heading: 'So far',
             span: 12,
-            cells: [
-              { metric: 'guide-milestones-reached', label: 'Milestones reached', note: 'of {{guide-milestones}}' },
-              /* NO NOTE THAT WOULD SAY NOUGHT ON THE FIRST DAY: what is blocked, done or made has a block of its own once it is. */
-              { metric: 'guide-steps-open', label: 'Steps to take' },
-              { metric: 'guide-steps-done-7d', label: 'Done in 7 days' },
-              { metric: 'guide-choices-open', label: 'Choices to make' },
-            ],
+            body: '{{guide-milestones-reached}} of {{guide-milestones}} milestone(s) reached, {{guide-steps-done-7d}} step(s) done this week',
           },
           {
             kind: 'table',
             heading: '{{config:voice_right_now}}',
+            icon: 'flag',
             span: 12,
             source: 'register.milestones',
             where: 'state is underway',
+            when: { metric: 'guide-milestones-underway', gt: 0 },
             columns: [
               { field: 'what', label: 'Milestone', width: 'minmax(20ch,1fr)' },
               { field: 'stage', label: 'Stage', width: '10ch' },
@@ -391,7 +417,9 @@ export const GUIDE = {
           {
             kind: 'steps',
             heading: 'Your next steps',
+            icon: 'list-todo',
             span: 12,
+            when: { metric: 'guide-steps-open', gt: 0 },
             source: 'register.steps',
             where: 'state is to_do or doing',
             columns: [{ field: 'what' }, { field: 'by' }, { field: 'milestone' }],
@@ -402,6 +430,7 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Blocked',
+            icon: 'octagon-alert',
             span: 12,
             when: { metric: 'guide-steps-blocked', gt: 0 },
             source: 'register.steps',
@@ -412,9 +441,11 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Choices to make',
+            icon: 'scale',
             span: 12,
             source: 'register.choices',
             where: 'state is open',
+            when: { metric: 'guide-choices-open', gt: 0 },
             columns: [
               { field: 'question', label: 'Question', width: 'minmax(20ch,1fr)' },
               MILESTONE,
@@ -425,6 +456,7 @@ export const GUIDE = {
             /* HOW FAR EACH MILESTONE IS, by its steps done: a milestone with no steps yet has nothing to fill. */
             kind: 'progress',
             heading: 'How far each milestone is',
+            icon: 'gauge',
             span: 12,
             source: 'register.steps',
             columns: [{ field: 'milestone' }, { field: 'state' }],
@@ -434,8 +466,17 @@ export const GUIDE = {
             empty: 'Give a milestone its steps and how far it is shows here.',
           },
           {
+            /* WHAT IS DONE AND KEPT, FOLDED SHUT, SINCE 1.5.0: above it the page is what to do next. */
+            kind: 'section',
+            heading: 'Everything so far',
+            icon: 'history',
+            span: 12,
+            fold: true,
+          },
+          {
             kind: 'series',
             heading: 'Steps done, by week',
+            icon: 'chart-column',
             span: 12,
             when: { metric: 'guide-steps-done', gt: 0 },
             series: [{ metric: 'guide-steps-done-by-week', label: 'Done' }],
@@ -446,8 +487,10 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Milestones',
+            icon: 'milestone',
             span: 12,
             source: 'register.milestones',
+            when: { metric: 'guide-milestones', gt: 0 },
             columns: [
               { field: 'what', label: 'Milestone', width: 'minmax(20ch,1fr)' },
               { field: 'stage', label: 'Stage', width: '10ch' },
@@ -460,8 +503,10 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'What helps',
+            icon: 'book-open',
             span: 12,
             source: 'register.resources',
+            when: { metric: 'guide-resources', gt: 0 },
             columns: [
               { field: 'name', label: 'Resource', width: 'minmax(20ch,1fr)' },
               { field: 'kind', label: 'Kind', width: '10ch' },
@@ -474,6 +519,7 @@ export const GUIDE = {
             /* WHO DID WHAT: a step an agent holds, and the choices and steps finished, each with who changed it last. */
             kind: 'table',
             heading: 'Taken by agents',
+            icon: 'bot',
             span: 12,
             when: { metric: 'guide-steps-agents', gt: 0 },
             source: 'register.steps',
@@ -484,6 +530,7 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Choices made',
+            icon: 'circle-check',
             span: 12,
             when: { metric: 'guide-choices-made', gt: 0 },
             source: 'register.choices',
@@ -501,6 +548,7 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Done lately',
+            icon: 'check',
             span: 12,
             when: { metric: 'guide-steps-done', gt: 0 },
             source: 'register.steps',
@@ -525,6 +573,7 @@ export const GUIDE = {
           {
             kind: 'progress',
             heading: 'Progress',
+            icon: 'gauge',
             span: 12,
             source: 'register.steps',
             where: 'milestone is {{what}}',
@@ -535,9 +584,12 @@ export const GUIDE = {
             /* EVERY STEP OF IT IN ORDER, with its status, so what is done stays beside what is left. */
             kind: 'steps',
             heading: 'Steps',
+            icon: 'list-todo',
             span: 12,
             source: 'register.steps',
             where: 'milestone is {{what}}',
+            /* ONLY ONCE IT HAS ONE, SINCE 1.5.0: with none, Progress above says so, and the two said it twice. */
+            when: { metric: 'milestone-steps:{{what}}', gt: 0 },
             columns: [{ field: 'what' }, { field: 'by' }, { field: 'state' }],
             order: [{ field: 'order', dir: 'asc' }],
             limit: 12,
@@ -546,9 +598,11 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'Choices',
+            icon: 'scale',
             span: 12,
             source: 'register.choices',
             where: 'milestone is {{what}}',
+            when: { metric: 'milestone-choices:{{what}}', gt: 0 },
             columns: [
               { field: 'question', label: 'Question', width: 'minmax(16ch,1fr)' },
               { field: 'state', label: 'Status', width: '10ch' },
@@ -560,9 +614,11 @@ export const GUIDE = {
           {
             kind: 'table',
             heading: 'What helps',
+            icon: 'book-open',
             span: 12,
             source: 'register.resources',
             where: 'milestone is {{what}}',
+            when: { metric: 'milestone-resources:{{what}}', gt: 0 },
             columns: [
               { field: 'name', label: 'Resource', width: 'minmax(18ch,1fr)' },
               { field: 'kind', label: 'Kind', width: '10ch' },

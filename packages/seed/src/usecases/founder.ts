@@ -20,6 +20,7 @@
  */
 import { DUE_THIS_WEEK } from '../modules/money.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
+import { counted } from './counted.ts';
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
 const HOLDS = ['things', 'people', 'accounts', 'obligations', 'transactions', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
@@ -33,8 +34,8 @@ const numbers = (where: string | null, empty: string, line: string) => {
   const said = ['source is not example', ...(where ? [where] : [])].join(', ');
   const columns = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }];
   return [
-    { kind: 'stat', heading: 'The numbers', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
-    { kind: 'lines', heading: 'Thirty days against the thirty before', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty: line },
+    { kind: 'stat', heading: 'The numbers', icon: 'hash', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
+    { kind: 'lines', heading: 'Thirty days against the thirty before', icon: 'chart-line', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty: line },
   ];
 };
 
@@ -56,27 +57,23 @@ const BROWSE_MONEY = '/packs/browse?q=money';
 const BROWSE_LIVE = '/packs/browse?q=polls';
 
 /**
- * WHAT YOU HAVE, AS MONEY'S OWN PAGE SAYS IT (`MONEY_PAGES.money` in `../modules/money.ts`): Cash now, how long it
- * lasts and what moves in the next thirty days while the record keeps one set of money, and Cash now a book once it
- * keeps two, because one figure over two books adds a company's money to a person's own.
+ * WHAT YOU HAVE, AS MONEY'S OWN PAGE SAYS IT (`MONEY_PAGES.money` in `../modules/money.ts`): one line of the cash there
+ * is and how long it lasts while the record keeps one set of money, and Cash now a book once it keeps two, because one
+ * figure over two books adds a company's money to a person's own. A LINE AND NOT A TILE SINCE 1.11.0, as Money's is
+ * since money-core 3.4.0: the tile beside it said the same figures again.
  */
 const WHAT_YOU_HAVE: Record<string, unknown>[] = [
   {
-    kind: 'stat',
+    kind: 'note',
     lead: true,
-    heading: 'What you have',
     span: 12,
-    cells: [
-      { metric: 'cash-now', label: 'Cash now', trend: '12w' },
-      { metric: 'runway-days', label: 'Lasts until' },
-      { metric: 'arriving-30d', label: 'Coming in, 30 days' },
-      { metric: 'leaving-30d', label: 'Going out, 30 days' },
-    ],
+    body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it runs out in {{runway-days}} day(s).',
     when: { metric: 'books-held', lt: 2 },
   },
   {
     kind: 'bar',
     heading: 'What you have, by book',
+    icon: 'book',
     span: 12,
     source: 'metric.cash-by-book',
     unset: 'In no book',
@@ -96,6 +93,7 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
   {
     kind: 'lines',
     heading: 'Numbers this week',
+    icon: 'chart-line',
     span: 12,
     source: 'register.datapoints',
     columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
@@ -107,6 +105,7 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
   {
     kind: 'link',
     heading: 'Numbers this week',
+    icon: 'send',
     span: 12,
     when: { metric: 'datapoints-30d', lt: 1 },
     authored: [
@@ -160,8 +159,13 @@ export const FOUNDER = {
 
      1.10.0 BECAUSE THE PROJECT PAGE TAKES WORK 1.10.0'S TEMPLATE: what was finished on the project each week, as a
      chart, in place of the tally of its open work by priority, which said again what the list under it says. Still
-     twenty-one blocks under this page's three. 1.9.0 is on `origin/master`, so the change is a version and not a reset. */
-  version: '1.10.0',
+     twenty-one blocks under this page's three. 1.9.0 is on `origin/master`, so the change is a version and not a reset.
+
+     1.11.0 BECAUSE THE PAGES ARE CALMER (DIRECTION §35): Home opens on one line of the cash there is where a tile of
+     four figures stood, every heading wears a glyph, each list is drawn only while it holds something, the Dashboard
+     folds every number and organisation under the numbers it charts, and a project's page takes portfolio 1.8.0's
+     template, six tiles and then its history, money and what it runs on folded shut. 1.10.0 is on `origin/master`. */
+  version: '1.11.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -181,7 +185,8 @@ export const FOUNDER = {
     needs_you: 'Needs your call',
     nothing_needs_you: 'Nothing needs your call',
     since_away: 'While you were building',
-    lists: 'Lists',
+    /* "Your things", AND IT WAS "Lists": the system's word for how the record stores them, said back over the house heading. */
+    lists: 'Your things',
     /* THE REST OF THE LINES, direct and about the work: a call to make, what shipped, what reports a number. */
     working_now: 'Agents at work',
     coming_up: 'Due soon',
@@ -271,6 +276,10 @@ export const FOUNDER = {
         window: '30d',
         compare: 'none',
       },
+      /* WHAT THE FOUNDER'S PAGES ARE DRAWN ON, SINCE 1.11.0, each over its list's own clauses. */
+      counted('datapoints-held', 'Numbers', 'register.datapoints'),
+      counted('organisations-held', 'Organisations', 'register.organisations'),
+      counted('due-this-week', 'Due this week', 'register.obligations', 'state is open or part, due before +8d'),
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: the money across every organisation and
            the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
@@ -293,6 +302,7 @@ export const FOUNDER = {
                this file names no provider (`tools/gates/shell-words.mjs`). */
             kind: 'bar',
             heading: 'What you have, by organisation',
+            icon: 'building-2',
             span: 8,
             source: 'register.organisations',
             columns: [{ field: 'name' }, { field: 'accounts' }],
@@ -301,20 +311,24 @@ export const FOUNDER = {
           {
             kind: 'link',
             heading: 'Bring your money in',
+            icon: 'plug',
             span: 4,
             authored: [{ cells: ['Connect a bank or a payments feed', BROWSE_MONEY, 'Balances and payments arrive on their own'] }],
           },
           ...NUMBERS_THIS_WEEK,
-          DUE_THIS_WEEK,
+          /* ONLY WHILE SOMETHING IS DUE, SINCE 1.11.0, over the table's own clauses. */
+          { ...DUE_THIS_WEEK, when: { metric: 'due-this-week', gt: 0 } },
           {
             /* THE SET ESTATE'S OWN `lapsing` TILE COUNTS, `state is lapsing` and nothing else, so the number on
                the Services page and the rows here are one set. Soonest renewal first, since that is the one
                that goes first. */
             kind: 'table',
             heading: 'Lapsing',
+            icon: 'clock-alert',
             span: 12,
             source: 'register.services',
             where: 'state is lapsing',
+            when: { metric: 'lapsing', gt: 0 },
             columns: [
               { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)' },
               { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
@@ -328,6 +342,7 @@ export const FOUNDER = {
             /* THE RUNS STILL WORKING, as the house Home draws them, which hides this block when none is. */
             kind: 'table',
             heading: 'Working now',
+            icon: 'session',
             span: 12,
             source: 'sessions.live',
             where: 'state is active',
@@ -375,6 +390,7 @@ export const FOUNDER = {
           {
             kind: 'stat',
             heading: 'Across your organisations',
+            icon: 'wallet',
             lead: true,
             span: 12,
             /* THE MONEY THERE IS AND HOW LONG IT LASTS, AND NOT WHO OWES WHOM, since 1.7.0: the same tiles as Money's
@@ -390,9 +406,11 @@ export const FOUNDER = {
           {
             kind: 'bar',
             heading: 'Balance by organisation',
+            icon: 'building-2',
             span: 12,
             area: 'rail',
             source: 'register.organisations',
+            when: { metric: 'organisations-held', gt: 0 },
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
           },
@@ -400,10 +418,21 @@ export const FOUNDER = {
              here, so "no project has reported a number" read as wrong beside it. */
           ...numbers(null, 'When a project reports a number, it shows here. Examples are left out.', 'Each measure draws a line once a project reports it.'),
           {
+            /* EVERY NUMBER AND EVERY ORGANISATION, FOLDED SHUT, SINCE 1.11.0: the tiles and lines above draw the same
+               numbers, and these are looked up. */
+            kind: 'section',
+            heading: 'Every number and organisation',
+            icon: 'layout-list',
+            span: 12,
+            fold: true,
+          },
+          {
             kind: 'table',
             heading: 'Latest numbers',
+            icon: 'list',
             span: 12,
             source: 'register.datapoints',
+            when: { metric: 'datapoints-held', gt: 0 },
             columns: [
               { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },
               { field: 'value', label: 'Value', width: '14ch', align: 'end' },
@@ -419,8 +448,10 @@ export const FOUNDER = {
           {
             kind: 'table',
             heading: 'Organisations',
+            icon: 'building',
             span: 12,
             source: 'register.organisations',
+            when: { metric: 'organisations-held', gt: 0 },
             columns: [
               { field: 'name', label: 'Organisation', width: 'minmax(20ch,1fr)' },
               { field: 'kind', label: 'Kind', width: '14ch' },
@@ -444,6 +475,7 @@ export const FOUNDER = {
           {
             kind: 'bar',
             heading: 'Balance',
+            icon: 'wallet',
             span: 12,
             source: 'register.organisations',
             where: 'name is {{name}}',
@@ -456,6 +488,7 @@ export const FOUNDER = {
                adds no field to another pack's list), so the organisation's own list is the one answer. */
             kind: 'table',
             heading: 'Projects',
+            icon: 'rocket',
             span: 12,
             source: 'register.organisations',
             where: 'name is {{name}}',
@@ -465,6 +498,7 @@ export const FOUNDER = {
           {
             kind: 'table',
             heading: 'Latest numbers',
+            icon: 'list',
             span: 12,
             source: 'register.datapoints',
             where: 'organisation is {{name}}',

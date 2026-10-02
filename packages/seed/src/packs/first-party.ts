@@ -307,13 +307,21 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - portfolio 1.7.0: each card in play draws a line of the work finished on it each week, over Work's
  *   `project-done-by-week`, left out on a record without Work. A column added and nothing taken away, so the step is a
  *   minor one.
+ * - money-core 3.4.0, work 1.11.0, estate 2.1.0 and portfolio 1.8.0: every page is calmer (DIRECTION §35). Each opens
+ *   on its line, shows at most six tiles before the rest is folded shut, wears a glyph on every heading, draws a tile
+ *   only while its figure has any, and says none of the line's figures again: Money loses the What you have tile and
+ *   two of its three views of the month, Work its Open figure, Services its Cost per year and chips by type, and the
+ *   Overview its Need you and Parked figures and its Earning tile. Work's page filters by project (`filters:`). Figures
+ *   are added to draw tiles on and blocks are taken away, no list or field, so each step is a minor one. The project
+ *   page moves with them, though no pack holds it (`crossPack`): six tiles, then its history, its money and what it
+ *   runs on folded shut, its dates drawn once on the plan and its month once on the chart.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.7.0',
+  portfolio: '1.8.0',
   people: '2.4.0',
-  'money-core': '3.3.0',
-  estate: '2.0.0',
-  work: '1.10.0',
+  'money-core': '3.4.0',
+  estate: '2.1.0',
+  work: '1.11.0',
 };
 
 type Body = Record<string, unknown>;
@@ -459,6 +467,13 @@ function without(d: Body, gone: ReadonlySet<string>): Body | null {
      no projects has none to count. */
   if (typeof d.metric === 'string' && typeof d.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(d.where as string)))
     return null;
+  /* A READER'S FILTER ON A FIELD THAT IS GONE GOES WITH IT: Work's strip of projects is over `thing`, and the kernel
+     refuses a page filtering on a field none of its lists has (`filtersFault` in `packages/kernel/src/declare.ts`). */
+  if (Array.isArray(d.filters)) {
+    const kept = (d.filters as Body[]).filter((f) => !gone.has(String(f.field)));
+    if (kept.length > 0) out.filters = kept;
+    else delete out.filters;
+  }
   if (Array.isArray(d.blocks))
     out.blocks = (d.blocks as Body[])
       .filter((b) => !(GROUPED.has(String(b.kind)) && Array.isArray(b.columns) && gone.has(String((b.columns as Body[])[0]?.field))))

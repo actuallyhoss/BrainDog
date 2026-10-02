@@ -43,12 +43,13 @@ const blocksOf = (slug: string): Block[] => (PAGES[slug]!.blocks as unknown as B
 
 /* ── the page draws it ───────────────────────────────────────────────────── */
 
-test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a figure and in a block over the rows', () => {
+test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a block over the rows and once', () => {
   const blocks = blocksOf('portfolio');
 
+  /* NO EARNING TILE, SINCE portfolio 1.8.0: its year was the sum of the split below said a second time beside it. The
+     figures stay declared, and a use case's page may draw them. */
   const cells = blocks.flatMap((b) => (b.cells ?? []).map((c) => c.metric ?? ''));
-  assert.ok(cells.includes('projects-earning'), 'no tile on the Overview says what the projects earn in a year');
-  assert.ok(cells.includes('projects-earning-change'), 'no tile on the Overview compares the year with the year before');
+  assert.ok(!cells.includes('projects-earning'), 'a tile on the Overview says the year the split adds up to');
 
   /* THE BAR AND THE CARD ARE ASKED FOR SEPARATELY, because one assertion over every block passed
      while the bar was gutted: the `In play` cards also carry a `revenue` column, so "some block
@@ -206,17 +207,14 @@ test('AND A PROJECT THAT STATED LAST YEAR AND NOTHING THIS YEAR DOES NOT PRINT A
   sql.close();
 });
 
-test('THE EARNING TILE SAYS HOW MANY PROJECTS THE TOTAL IS OVER, so a total of nothing cannot be read as a year', () => {
-  const earning = blocksOf('portfolio').find((b) => (b.cells ?? []).some((c) => c.metric === 'projects-earning'));
-  assert.ok(earning, 'no block on the Overview draws projects-earning');
-
-  const cell = (earning.cells ?? []).find((c) => c.metric === 'projects-earning');
-  const note = String(cell?.note ?? '');
-  assert.ok(
-    note.includes('{{projects-earning-said}}'),
-    `the tile's note is ${JSON.stringify(note)}, which says nothing about how many projects stated a figure, so GBP 0.00 stands on the page as a year somebody measured`,
-  );
-  assert.ok(METRICS['projects-earning-said'], 'projects-earning-said is not declared, so the note names a figure the record cannot answer');
+/* THE EARNING TILE SAID HOW MANY PROJECTS ITS TOTAL WAS OVER, so a total of nothing could not be read as a year. It went at
+   portfolio 1.8.0, and what each one earns is drawn only while a project has said what it earns, which is the same
+   guard on the block that is left: a record nobody told draws no money at all, rather than nought. */
+test('WHAT EACH ONE EARNS IS DRAWN ONLY WHILE A PROJECT SAYS IT, so a total of nothing cannot be read as a year', () => {
+  const earns = blocksOf('portfolio').find((b) => b.kind === 'split' && (b.columns ?? []).some((c) => c.field === 'revenue')) as (Block & { when?: unknown }) | undefined;
+  assert.ok(earns, 'no block on the Overview draws what each project earns');
+  assert.deepEqual(earns.when, { metric: 'projects-earning-said', gt: 0 }, 'the split draws over projects that said nothing about what they earn');
+  assert.ok(METRICS['projects-earning-said'], 'projects-earning-said is not declared, so the split is drawn on a figure the record cannot answer');
 });
 
 test('and that count is of the projects that stated a figure, never of the projects in play', async () => {

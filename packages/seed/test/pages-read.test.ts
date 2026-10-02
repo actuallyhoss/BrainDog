@@ -145,12 +145,19 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
 
 test('a `stat` block comes back with readings, each in its own currency', async () => {
   const { k, sql } = await seeded();
-  const stat = page(k, 'money').blocks.find((b) => b.kind === 'stat')!;
-  assert.ok(stat.readings && stat.readings.length >= 2);
+  /* A BOOK'S PAGE, SINCE money-core 3.4.0: Money's own leads with a line and no tile, and a book's leads with the money
+     in it, so the sample's current account is filed in a book here and that book's page is read. */
+  const book = k.create('books', { name: 'Studio' } as never, { actor: 'p_test' });
+  assert.ok(book.ok, sayOf(book));
+  const current = k.list({ register: 'accounts', where: 'name is Studio current account', limit: 1 });
+  assert.ok(current.ok && current.value.rows[0], 'the sample has no current account');
+  assert.ok(k.update('accounts', current.value.rows[0].id, { book: (book.value as { id: string }).id }, { actor: 'p_test' }).ok);
+  const stat = page(k, 'studio').blocks.find((b) => b.kind === 'stat')!;
+  assert.ok(stat.readings && stat.readings.length >= 1);
 
-  /* THE MONEY THERE IS, which the page leads with since money-core 3.0.0; the walk's thirty days are the bridge's since 3.3.0. */
-  for (const metric of ['cash-now']) {
-    const cell: NonNullable<typeof stat.readings>[number] = stat.readings.find((r) => r.metric === metric)!;
+  /* THE MONEY THERE IS, which the page leads with. */
+  for (const metric of ['book-cash']) {
+    const cell: NonNullable<typeof stat.readings>[number] = stat.readings.find((r) => r.metric.split(':')[0] === metric)!;
     assert.ok(cell?.reading, cell?.refusal ? `${cell.refusal.code}: ${cell.refusal.fix}` : `${metric}: no reading`);
     assert.ok((cell.reading.value ?? 0) > 0, `${metric} read nothing`);
     assert.equal(cell.reading.unit, 'GBP');
@@ -158,7 +165,7 @@ test('a `stat` block comes back with readings, each in its own currency', async 
 
   /* A RECORD THAT HAS NEVER SNAPSHOTTED HAS NO LINE, and the figure still reads. The sample's ninety
      days are the browser's; a record's series starts the day its figure is declared. */
-  const cash = stat.readings.find((r) => r.metric === 'cash-now')!;
+  const cash = stat.readings.find((r) => r.metric.startsWith('book-cash'))!;
   assert.equal(cash.trend, undefined);
   assert.equal(stat.lead, true);
   sql.close();

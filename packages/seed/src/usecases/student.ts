@@ -6,6 +6,11 @@
  * on it, so a student who switches People off loses nothing this use case holds.
  */
 
+import { counted } from './counted.ts';
+
+/** Work not handed in yet, which every figure about what is left to do reads. */
+const TO_HAND_IN = 'state is not handed_in or marked';
+
 export const STUDENT = {
   usecase: 'student',
   /* 1.2.1 BECAUSE HOME'S EMPTY TITLE LOSES ITS FULL STOP. A title ends without one everywhere else, and a record is
@@ -13,8 +18,11 @@ export const STUDENT = {
      1.3.0: Home leads with Add homework, then what is due this week, the week's study as a strip and the study streak;
      the lists are "My lists", not "Notebooks"; and the pack plants no example course.
      1.4.0: the voice says more of the record the way a student hears it, Home's empty lines, the add verb and the
-     pen's line among them. Each is a new setting a person can change at /packs, so a minor step. */
-  version: '1.4.0',
+     pen's line among them. Each is a new setting a person can change at /packs, so a minor step.
+     1.5.0: calmer (DIRECTION §35). Home and Studies open on one line said from new counts, every heading wears a
+     glyph, each list is drawn only while it holds something, and Studies draws what is due once, on the board, where
+     a table of it stood above. Only counts are added, so a minor step. */
+  version: '1.5.0',
   title: 'Student',
   summary: 'Your courses, what is due and when, and how each piece of work went.',
   author: 'BrainDog',
@@ -34,9 +42,9 @@ export const STUDENT = {
     needs_you: 'Coming up',
     nothing_needs_you: 'Nothing is due',
     since_away: 'Since you last looked',
-    /* "My lists", AND IT WAS "Notebooks": a notebook is a thing a student writes in, and the rail's word is for the
-       lists the record keeps, so it read as though the record held their notes. */
-    lists: 'My lists',
+    /* "My things", AND IT WAS "My lists", AND BEFORE THAT "Notebooks": a notebook is a thing a student writes in, so it
+       read as though the record held their notes, and a list is only how the record keeps their courses and homework. */
+    lists: 'My things',
     /* THE REST OF WHAT A STUDENT READS, SAID AS A STUDENT HEARS IT: what is due, work, a course. Nothing here
        names an invoice, a payment or a balance, and nothing is "overdue". */
     coming_up: 'Due soon',
@@ -131,6 +139,13 @@ export const STUDENT = {
           { id: 'tags', type: 'list', of: 'text' },
         ],
       },
+      /* WHAT HOME AND STUDIES ARE DRAWN ON, SINCE 1.5.0, each over its tile's own clauses. */
+      counted('homework-open', 'Work to hand in', 'register.assignments', TO_HAND_IN),
+      counted('homework-due-7d', 'Due this week', 'register.assignments', `${TO_HAND_IN}, due before +8d`),
+      counted('homework-later', 'Due after this week', 'register.assignments', `${TO_HAND_IN}, due after +7d`),
+      counted('study-held', 'Study sessions', 'register.study_sessions'),
+      counted('study-done-12w', 'Study done in twelve weeks', 'register.study_sessions', 'done is true, on after -84d'),
+      counted('courses-held', 'Courses', 'register.courses'),
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: Add homework first, because a piece of
            work not written down the moment it is set is the one forgotten; then what is due this week, the week's
@@ -143,10 +158,19 @@ export const STUDENT = {
         requires: ['register.assignments', 'register.study_sessions'],
         blocks: [
           {
+            /* THE PAGE'S ONE LINE, SINCE 1.5.0: how much is left to hand in, and how much of it this week. A clause whose
+               figure is nought is left out, so a new record reads no line and starts at the box under it. */
+            kind: 'note',
+            lead: true,
+            span: 12,
+            body: '{{homework-open}} piece(s) of work to hand in, {{homework-due-7d}} due this week',
+          },
+          {
             /* THE HEADING IS THE PROMPT (`render/src/capture.ts`), and a piece of work added here is To do with no day
                until the student gives it one. */
             kind: 'capture',
             heading: 'Add homework',
+            icon: 'plus',
             span: 12,
             register: 'assignments',
           },
@@ -155,12 +179,14 @@ export const STUDENT = {
                assignment's `due` is one, so this is the same row its reminders ring for. */
             kind: 'timeline',
             heading: 'Due this week',
+            icon: 'calendar-clock',
             span: 12,
             source: 'deadlines',
             horizon: 7,
             where: 'list is assignments',
             columns: [{ field: 'day' }, { field: 'title' }],
             limit: 8,
+            when: { metric: 'homework-due-7d', gt: 0 },
             empty: '{{config:voice_nothing_needs_you}}',
           },
           {
@@ -168,11 +194,13 @@ export const STUDENT = {
                anything (`kernel/src/kinds/calendar.ts`), which is the week strip; on a desk it is this month. */
             kind: 'calendar',
             heading: '{{config:voice_right_now}}',
+            icon: 'calendar',
             span: 12,
             source: 'register.study_sessions',
             columns: [{ field: 'what' }, { field: 'on' }],
             back: 0,
             ahead: 0,
+            when: { metric: 'study-held', gt: 0 },
             empty: 'No study time planned this week.',
           },
           {
@@ -180,18 +208,22 @@ export const STUDENT = {
                studied, so a run of days reads as a run and a day off is left pale rather than counted against anybody. */
             kind: 'heat',
             heading: 'Study streak',
+            icon: 'activity',
             span: 12,
             source: 'register.study_sessions',
             where: 'done is true, on after -84d',
             columns: [{ field: 'on' }, { field: 'minutes' }],
+            when: { metric: 'study-done-12w', gt: 0 },
             empty: 'No study done yet. Tick a session done and your streak starts here.',
           },
           {
             kind: 'table',
             heading: '{{config:voice_needs_you}}',
+            icon: 'calendar-range',
             span: 12,
             source: 'register.assignments',
             where: 'state is not handed_in or marked, due after +7d',
+            when: { metric: 'homework-later', gt: 0 },
             columns: [
               { field: 'what', label: 'Assignment', width: 'minmax(18ch,1fr)' },
               { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
@@ -211,23 +243,18 @@ export const STUDENT = {
         requires: ['register.assignments', 'register.courses', 'register.study_sessions'],
         blocks: [
           {
-            kind: 'table',
-            heading: 'Due next',
+            /* THE PAGE'S ONE LINE, SINCE 1.5.0. */
+            kind: 'note',
+            lead: true,
             span: 12,
-            source: 'register.assignments',
-            where: 'state is not handed_in or marked',
-            columns: [
-              { field: 'what', label: 'Assignment', width: 'minmax(20ch,1fr)' },
-              { field: 'course', label: 'Course', width: 'minmax(10ch,18ch)' },
-              { field: 'due', label: 'Due', width: '15ch', align: 'end' },
-            ],
-            order: [{ field: 'due', dir: 'asc' }],
-            limit: 20,
-            empty: 'Nothing is due.',
+            body: '{{homework-open}} piece(s) of work to hand in, {{courses-held}} course(s)',
           },
+          /* NO DUE NEXT TABLE SINCE 1.5.0: it drew the work not handed in a second time above the board, which holds every
+             piece in its column with its day. */
           {
             kind: 'board',
             heading: 'By status',
+            icon: 'board',
             span: 12,
             source: 'register.assignments',
             columns: [{ field: 'state' }, { field: 'what' }, { field: 'due' }],
@@ -236,7 +263,9 @@ export const STUDENT = {
           {
             kind: 'table',
             heading: 'Study sessions',
+            icon: 'clock',
             span: 12,
+            when: { metric: 'study-held', gt: 0 },
             source: 'register.study_sessions',
             columns: [
               { field: 'what', label: 'Session', width: 'minmax(20ch,1fr)' },
@@ -251,6 +280,7 @@ export const STUDENT = {
           {
             kind: 'table',
             heading: 'Courses',
+            icon: 'graduation-cap',
             span: 12,
             source: 'register.courses',
             columns: [

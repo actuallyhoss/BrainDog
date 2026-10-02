@@ -732,6 +732,121 @@ const DECLARED: Record<string, Version> = {
       "Home now speaks in your use case's own words: `setting.voice_coming_up`, `setting.voice_fills_with` and `setting.voice_nothing_due` -> 8aff433fb66740ab",
     ],
   },
+  /* THE CALM PAGES OF OCTOBER 2nd (DIRECTION §35): each use case's last version is on `origin/master`, so these are versions and not resets. */
+  'business@1.4.0': {
+    holds: `
+      page.home-business
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: '2f3916a53302a82b',
+    history: [
+      "`page.home-business` opens on one line of what needs your call, every heading wears a glyph, and its questions are drawn only while one is asked -> 2f3916a53302a82b",
+    ],
+  },
+  'founder@1.11.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'd31dacd4bde48875',
+    history: [
+      "`page.home-founder` opens on one line of the cash there is where a tile of four stood, every heading wears a glyph, Due this week and Lapsing are drawn only while they hold something, over the new `due-this-week`, `page.dashboard` folds every number and organisation under a new section, and `page.project` takes portfolio 1.8.0's template -> c890c842e559e6ee",
+      "`setting.voice_lists` reads Your things where it said Lists, the system's word set back over the rail's own heading -> d31dacd4bde48875",
+    ],
+  },
+  'guide@1.5.0': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
+      metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources
+      metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d
+      metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources
+      metric.milestone-steps
+      page.guide page.home-guide page.milestone
+      register.choices register.milestones register.resources register.steps
+      rule.guide_milestone_open rule.guide_milestone_passed
+      setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.shared_version
+      setting.speaks setting.start_next_milestone setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '92ac75caf5943601',
+    history: [
+      "`page.home-guide` and `page.guide` open on one line said from the guide's figures, the Guide's tile of four goes into it, every heading wears a glyph, each list is drawn only while it holds something, the Guide folds what is done and kept, and `page.milestone` draws its lists over the new `milestone-steps`, `milestone-choices` and `milestone-resources` -> 92ac75caf5943601",
+    ],
+  },
+  'personal@2.2.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      metric.budgets-set metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active
+      metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held
+      metric.saved-toward-goals metric.savings-active metric.steps-done metric.steps-left
+      page.goals page.home-personal page.my-project
+      register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_goal_log setting.label_goals
+      setting.label_obligations setting.label_people__role__accountant setting.label_people__role__client
+      setting.label_people__role__collaborator setting.label_people__role__contractor setting.label_project_steps
+      setting.label_put_by setting.label_savings_goals setting.label_things setting.label_things__lane__building
+      setting.label_things__lane__earning setting.label_things__lane__parked setting.label_things__lane__retired
+      setting.label_things__revenue setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_obligations
+      setting.one_things setting.shared_version setting.speaks setting.voice_add_first setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '79487cc2b08095a7',
+    history: [
+      "`page.home-personal` opens on one line said from Money's figures where a tile of three stood, what needs you comes first, Coming up is the one list of what falls due where Bills this week drew the same bills again, each track is drawn only while it has something and what changed is folded shut; `page.goals` and `page.my-project` open on a line; every heading wears a glyph; nine counts are added to draw them on, `budgets-set` among them -> 4d6965ce8afdc0ca",
+      "`setting.voice_lists` reads My things where it said My lists, so the rail's heading names what you keep and not how it is stored -> 79487cc2b08095a7",
+    ],
+  },
+  'student@1.5.0': {
+    holds: `
+      metric.courses-held metric.homework-due-7d metric.homework-later metric.homework-open metric.study-done-12w
+      metric.study-held
+      page.home-student page.studies
+      register.assignments register.courses register.study_sessions
+      setting.label_assignments setting.label_courses setting.label_study_sessions setting.one_assignments
+      setting.one_courses setting.one_study_sessions setting.shared_version setting.speaks setting.voice_add_first
+      setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '454996961e56245c',
+    history: [
+      "`page.home-student` and `page.studies` open on one line said from new counts, `homework-open` among them, every heading wears a glyph, each list is drawn only while it holds something, and Studies draws what is due once, on the board -> 7788553dcdf73875",
+      "`setting.voice_lists` reads My things where it said My lists, so the rail's heading names a student's courses and homework and not how they are stored -> 454996961e56245c",
+    ],
+  },
+  'team@2.10.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.one_tasks setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'b0282fe5149e1e94',
+    history: [
+      "`page.home-team`, `page.cycles` and `page.agent-work` open on one line said from new counts of tickets, `tickets-blocked` among them, every heading wears a glyph, each list is drawn only while it holds a ticket, Home folds how the cycle is going, and `page.project` takes portfolio 1.8.0's template -> af38996e0bebb2b2",
+      "`setting.voice_lists` reads Our things where it said Team lists, so the rail's heading names the team's tickets and not how they are stored -> b0282fe5149e1e94",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

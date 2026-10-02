@@ -90,8 +90,10 @@ function drawn(k: Kernel, slug: string): Drawn[] {
 test("HOME, THE DASHBOARD, AN ORGANISATION AND ESTATE'S OWN PAGE ALL READ with Estate in, and Home still speaks as a founder", async () => {
   const k = await founder();
   const home = drawn(k, 'home-founder');
-  assert.equal(home[0]!.heading, 'What you have', "Home leads with the founder's money, not Estate's page");
-  assert.deepEqual(home[0]!.cells?.map((c) => c.label), ['Cash now', 'Lasts until', 'Coming in, 30 days', 'Going out, 30 days']);
+  /* A LINE OF THE CASH THERE IS SINCE founder 1.11.0, where a tile of four figures stood. */
+  const line = home[0] as { kind?: string; lead?: boolean; body?: string };
+  assert.deepEqual([line.kind, line.lead], ['note', true], "Home leads with the founder's money, not Estate's page");
+  assert.match(String(line.body), /\{\{cash-now\}\}/u);
   drawn(k, 'dashboard');
   drawn(k, 'estate');
   const pages = k.pages() as unknown as { slug: string; title: string }[];
@@ -108,7 +110,8 @@ test("A FOUNDER'S PROJECT DRAWS WHAT IT RUNS ON: a domain pointed at it is on it
   const page = pages.find((p) => p.title === 'Harbour app');
   assert.ok(page, 'a project has its own page');
   const blocks = drawn(k, page.slug) as (Drawn & { rows?: { fields: Record<string, unknown> }[] })[];
-  assert.deepEqual((blocks[0]!.cells ?? []).map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'the cost tile is back now the services are held');
+  const glance = blocks.find((b) => b.heading === 'At a glance');
+  assert.deepEqual((glance?.cells ?? []).map((c) => c.label), ['Open', 'Owed to you', 'Costs a year'], 'the cost tile is back now the services are held');
   const alive = blocks.find((b) => b.heading === 'Keeping it alive');
   assert.ok(alive, `no services block among ${blocks.map((b) => b.heading).join(', ')}`);
   assert.deepEqual(alive.rows?.map((r) => r.fields.name), ['harbour.example']);
