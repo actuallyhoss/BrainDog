@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.11.0',
+      notes: 'Projects says each thing once: the line, one track of how the projects in play are going, and the projects themselves. The Needs you table is gone, since every card says its health and next step.',
+    },
+    {
       version: '1.10.0',
       notes:
         'Projects opens on how many are in play and how many are at risk, with where they are and how they are going side by side under it. A project page keeps where it stands and what is handed back in a column beside its chart, and lists its open work once, on the plan.',
@@ -43,6 +47,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '2.6.0', notes: 'Nothing changes on screen: In touch, 12 weeks is written the way the app now reads it.' },
     { version: '2.5.0', notes: 'In touch, 12 weeks names each person beside the weeks they were in touch, the latest first.' },
     {
       version: '2.4.0',
@@ -60,6 +65,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.6.0',
+      notes: 'Cash ahead no longer says again when the money runs out, since the line at the top does. The flag on the day stays.',
+    },
     {
       version: '3.5.0',
       notes: 'An old balance, money late coming in and money late going out are one Heads up under your accounts, each line there only while it is true.',

@@ -67,5 +67,52 @@ export const ruleDone = (id: string): string | null => {
   return Object.hasOwn(RULE_DONE, bare) ? RULE_DONE[bare]! : null;
 };
 
+/**
+ * WHAT A FIRST-PARTY RULE'S ROWS ARE, by the rule's id, for a feed line that folds a run of its writes into one: six
+ * lines of "TALLYARD categorised" read as `Categorised 6 payments: Tallyard, Northern Rail and 4 more`. Only rules worded
+ * in `RULE_DONE`; any other folded run keeps the verb and names the rows.
+ */
+export const RULE_ROWS: Readonly<Record<string, string>> = {
+  'txn-categorise': 'payments',
+  'recurring-ended': 'repeats',
+};
+
+/**
+ * WHAT A FIRST-PARTY RULE ASKED, by the rule's id: where in its question the row's name ends, and the line the feed says.
+ * "Since you were away" led with the rule's name, `Catch a repeat that did not happen suggested Ledger Post, sen…`; the
+ * line is what was asked, `Asked whether Ledger Post went through`. `names.test.ts` holds each `ends` to the question
+ * the rule declares, and a question that does not read that way is said as `Asked: <question>`.
+ */
+export const RULE_ASKED: Readonly<Record<string, { ends: string; asked: string }>> = {
+  'invoice-late': { ends: ' was due ', asked: 'Asked whether to chase {{what}}' },
+  'recurring-missed': { ends: ' was due ', asked: 'Asked whether {{what}} went through' },
+  'project-past-aim': { ends: ' was aiming for ', asked: 'Asked whether to move {{what}}’s day or park it' },
+};
+
+const bare = (id: string): string => id.replace(/^rule[.:]/u, '');
+
+/** A few names as a person lists them: `A`, `A and B`, `A, B and C`, and past three `A, B and 4 more`, counting every row. */
+export const namesSaid = (names: readonly string[]): string => {
+  const distinct = [...new Set(names)];
+  if (distinct.length <= 1) return distinct[0] ?? '';
+  if (names.length <= 3 && distinct.length === names.length) return `${distinct.slice(0, -1).join(', ')} and ${distinct.at(-1)!}`;
+  return `${distinct.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+};
+
+/** A rule's folded run over `things` as one line, `Categorised 6 payments: …`, or `null` for a rule this build does not word. */
+export const ruleFolded = (id: string, things: readonly string[]): string | null => {
+  const done = ruleDone(id);
+  const rows = Object.hasOwn(RULE_ROWS, bare(id)) ? RULE_ROWS[bare(id)]! : null;
+  if (done === null || rows === null) return null;
+  return `${done.charAt(0).toUpperCase()}${done.slice(1)} ${things.length} ${rows}: ${namesSaid(things)}`;
+};
+
+/** What a rule asked, as the feed says it: by the row it names where the rule is worded here, else the question itself. */
+export const ruleAsked = (id: string, question: string): string => {
+  const said = Object.hasOwn(RULE_ASKED, bare(id)) ? RULE_ASKED[bare(id)]! : null;
+  const at = said === null ? -1 : question.indexOf(said.ends);
+  return said !== null && at > 0 ? said.asked.replace('{{what}}', question.slice(0, at)) : `Asked: ${question}`;
+};
+
 /** A rule by its name, from its id with or without `rule.` in front, or `null` for one this build does not ship. */
 export const ruleName = (id: string): string | null => RULE_NAMES[id.replace(/^rule[.:]/u, '')] ?? null;

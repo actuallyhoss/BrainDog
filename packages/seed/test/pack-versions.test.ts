@@ -730,6 +730,22 @@ const DECLARED: Record<string, Version> = {
       "`page.portfolio` loses Right now, whose In play is said by the line now (`projects-live` beside `projects-need-you`), so Where they are and How they are going take half the row each, and the fold over what each earns, agents and dates wears `rows`, a glyph a folded heading draws -> 1e0e3cab192a5910",
     ],
   },
+  /** A VERSION AND NOT A RESET: portfolio 1.10.0 is live. */
+  'portfolio@1.11.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '152fb1ab4e697789',
+    history: [
+      "`page.portfolio` says each thing once: Needs you goes, since every card in play says its health and next step, and Where they are goes, leaving How they are going the whole width under the line -> 152fb1ab4e697789",
+    ],
+  },
   /** A VERSION AND NOT A RESET: money-core's last version is on `origin/master`. */
   'money-core@3.4.0': {
     holds: `
@@ -778,6 +794,33 @@ const DECLARED: Record<string, Version> = {
     declares: 'a3bc48d1fa79d146',
     history: [
       "`page.money`'s Out of date, Late coming in and Late going out notes lose their headings and become three lines of one boxed Heads up section under Accounts, drawn once there is an account (`cash-accounts`) and each line still on its own figure; Coming and going wears `calendar` on `page.money` and `page.money-book`, a glyph a folded heading draws -> a3bc48d1fa79d146",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: money-core 3.5.0 is live. */
+  'money-core@3.6.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.books-held metric.cash-accounts metric.cash-as-of
+      metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '54940b8157f20a22',
+    history: [
+      "`page.money`'s and `page.money-book`'s Cash ahead open on `horizon: 90`, the next three months, with 180, 365 and longer still offered -> fed57bc77115f933",
+      "`page.money`'s Cash ahead declares `headline: under`, so it leaves its own sentence off while the line over the page says when the money runs out -> c5af9aa1e3761e6f",
+      "`page.money`'s and `page.money-book`'s Cash ahead walk a year again, `horizon: 365`, since the knob offers no length past the walk and 90 days took six months and a year away -> 54940b8157f20a22",
     ],
   },
   /** A VERSION AND NOT A RESET: estate's last version is on `origin/master`. */
@@ -888,6 +931,19 @@ const DECLARED: Record<string, Version> = {
     declares: '8d5e640aac89fdd2',
     history: [
       "`page.people`'s In touch, 12 weeks heat block is drawn a line a person, `people: true` over columns `in_touch` then `name`, in place of a grid of days that never said who -> 8d5e640aac89fdd2",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: people 2.5.0 is live. */
+  'people@2.6.0': {
+    holds: `
+      metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-quiet
+      page.people page.someone
+      register.people
+      rule.meet-senders
+    `,
+    declares: '4fe7401face265f2',
+    history: [
+      "`page.people`'s In touch, 12 weeks says its form as `who: true` where 2.5.0 wrote `people: true`, the same line a person -> 4fe7401face265f2",
     ],
   },
   'estate@1.1.0': {

@@ -708,6 +708,11 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   const ahead = (page.blocks as { heading?: string; horizons?: unknown; knobs?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
   assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
   assert.ok(!(ahead.knobs as string[]).includes('leave'), '`leave` is a second control over the streams `count` moves');
+
+  /* AND IT LEAVES ITS OWN SENTENCE TO THE LINE OVER THE PAGE, while that line is drawn (money-core 3.6.0). */
+  const drawn = (out.value as { blocks: readonly DrawnBlock[] }).blocks as readonly (DrawnBlock & { kind?: string; lead?: boolean; drawn?: boolean; headline?: string })[];
+  assert.ok(drawn.some((b) => b.kind === 'note' && b.lead === true && b.drawn !== false), 'the sample draws no line over Money, so this asks nothing');
+  assert.equal(drawn.find((b) => b.heading === 'Cash ahead')?.headline, 'under');
 });
 
 /**

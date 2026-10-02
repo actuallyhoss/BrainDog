@@ -615,8 +615,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    *
    * CALMER, SINCE portfolio 1.8.0 (DIRECTION §35): the line, then where the projects are and how they are going, what
    * needs you and the projects in play, and what each earns, what agents hold and what is coming up folded under them.
-   * No figure is said twice: Need you is the line's, Parked is a part of Where they are, and the year earned is the sum
-   * of What each one earns. Every heading wears a glyph, and every tile over the projects is drawn only while it holds one.
+   * No figure is said twice: Need you is the line's, and the year earned is the sum of What each one earns. Every heading wears a glyph, and every tile over the projects is drawn only while it holds one.
+   *
+   * EACH THING ONCE, SINCE portfolio 1.11.0: the line, one track of how they are going, and the cards, with Needs you and
+   * Where they are gone (the visual review of October 2nd).
    */
   portfolio: {
     page: 'portfolio',
@@ -654,51 +656,25 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
          what aims within thirty days is Coming up, folded under Earnings, agents and dates; and what an agent holds is
          With an agent beside it. */
       {
-        /* WHERE THEY ARE, AS ONE TRACK, SINCE portfolio 1.6.0: every project by its status, earning, building, parked and
-           finished, the parts of one whole with each labelled on the track. It reads Projects alone, as every block on
-           this page does. */
-        kind: 'split',
-        heading: 'Where they are',
-        icon: 'chart-pie',
-        /* HALF, BESIDE HOW THEY ARE GOING, SINCE portfolio 1.10.0 (a third beside Right now in 1.9.0): two tracks of one
-           height, both drawn on `projects-live`, so the row is whole and even whenever any of it is. */
-        span: 6,
-        source: 'metric.projects-by-lane',
-        when: { metric: 'projects-live', gt: 0 },
-        empty: 'No project is written down yet.',
-      },
-      {
+        /* HOW THE PROJECTS IN PLAY ARE GOING, AS ONE TILE, SINCE portfolio 1.11.0. Where they are and How they are going
+           were two half-width tracks under a line that already counts the projects in play and the ones at risk, so the
+           row said the line twice; the health track is the one that says something the line does not (which part is
+           off track, and how much of it nobody has said about). What is parked or finished is folded under the cards, and
+           `projects-by-lane` stays declared for a page that draws it. EACH PART IN ITS INTENT, so off track reads as
+           trouble at a glance, in the theme's colour and not only in words. */
         kind: 'split',
         heading: 'How they are going',
         icon: 'activity',
-        span: 6,
+        span: 12,
         source: 'metric.projects-by-health',
         unset: 'Not said yet',
-        /* EACH PART IN ITS INTENT, so off track reads as trouble at a glance, in the theme's colour and not only in words. */
         tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' },
         when: { metric: 'projects-live', gt: 0 },
         empty: 'No project is in play.',
       },
-      {
-        /* THE QUEUE: what somebody said is not going well, what is next, and who said it last, so a person sees whether
-           it was them, a colleague or an agent. THE WHOLE WIDTH, AND ONLY WHILE ONE DOES, SINCE portfolio 1.8.0. */
-        kind: 'table',
-        heading: 'Needs you',
-        icon: 'circle-alert',
-        span: 12,
-        source: 'register.things',
-        where: `${LIVE}, health is at_risk or off_track`,
-        columns: [
-          PROJECT,
-          { field: 'health', label: 'Health', width: '12ch' },
-          { field: 'next', label: 'Next', width: 'minmax(20ch,2fr)' },
-          { field: 'changed', label: 'Changed by', width: '16ch' },
-        ],
-        order: [{ field: 'aim', dir: 'asc' }],
-        limit: 12,
-        when: { metric: 'projects-need-you', gt: 0 },
-        empty: 'Nothing needs you. Every project in play is on track, or nobody has said otherwise.',
-      },
+      /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and
+         the cards under it say both on every project in play, while the line counts them: Kiln's next step was on the
+         page three times. */
       {
         kind: 'cards',
         heading: 'In play',

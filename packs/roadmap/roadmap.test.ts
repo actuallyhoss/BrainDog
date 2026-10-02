@@ -141,8 +141,9 @@ test('THE COLUMNS ARE THE ORDER THE KIND READS: title, due day, effort, which is
   const plan = roadmapPlan(rows, '2026-09-24');
   assert.deepEqual(plan.skipped, []);
   assert.deepEqual([plan.bars.length, plan.stems.length], [3, 1]);
-  /* THE SPAN STARTS JUST BEFORE THE FIRST THING ON IT, and no longer on the first of its month (`roadmapPlan`). */
-  assert.deepEqual([plan.from, plan.to], ['2026-09-22', '2026-12-01']);
+  /* THE SPAN STARTS JUST BEFORE THE FIRST THING ON IT AND ENDS A FEW DAYS AFTER THE LAST, and on neither month edge
+     (`roadmapPlan`). */
+  assert.deepEqual([plan.from, plan.to], ['2026-09-22', '2026-11-23']);
   close();
 });
 

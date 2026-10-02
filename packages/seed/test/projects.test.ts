@@ -90,26 +90,22 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
     figure(k, 'projects-aim-30d'),
     THINGS.filter((t) => inPlay(t) && typeof t.aim === 'string' && t.aim >= TODAY && t.aim <= new Date(NOW + 30 * 86_400_000).toISOString().slice(0, 10)).length,
   );
-  /* NEED YOU IS THE LINE'S, SINCE portfolio 1.8.0, said once, and the table under it names them. */
-  assert.equal(
-    block(overview, 'Needs you').rows.length,
-    THINGS.filter((t) => inPlay(t) && (t.health === 'at_risk' || t.health === 'off_track')).length,
-  );
-  assert.deepEqual(names(block(overview, 'Needs you').rows).sort(), ['Kiln', 'Portage']);
+  /* NEED YOU IS THE LINE'S, SINCE portfolio 1.8.0, said once, and SINCE portfolio 1.11.0 the cards in play say which:
+     each carries its health and its next step, so a table of the same projects said them again. */
+  assert.ok(!overview.blocks.some((b) => b.heading === 'Needs you'), 'Needs you says again what the cards say');
+  const atRisk = block(overview, 'In play').rows.filter((r) => r.fields.health === 'at_risk' || r.fields.health === 'off_track');
+  assert.deepEqual(names(atRisk).sort(), ['Kiln', 'Portage']);
   const parts = block(overview, 'How they are going').readings?.[0]?.reading?.groups ?? [];
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
   assert.deepEqual((block(overview, 'How they are going') as { tones?: unknown }).tones, { on_track: 'good', at_risk: 'warn', off_track: 'bad' }, 'the record hands each part its intent to the page');
   assert.deepEqual(names(block(overview, 'Not in play').rows), ['Tallow']);
 
-  /* WHO SAID IT: the agent on a project, where it wrote where the project stands, and a person everywhere else. */
-  const queue = block(overview, 'Needs you');
-  const said = Object.fromEntries(queue.rows.map((r, i) => [String(r.fields.name), queue.changes?.[i]?.who]));
-  assert.deepEqual(said, { Kiln: 'agent:claude', Portage: 'p_seed' });
+  /* WHO SAID IT: the agent on a project, where it wrote where the project stands. */
   const held = block(overview, 'With an agent');
   assert.deepEqual(held.rows.map((r, i) => [r.fields.name, held.changes?.[i]?.by]), [['Kiln', 'agent'], ['Marlow & Co', 'agent']]);
 });
 
-test('AN AGENT TAKES A PROJECT, SAYS IT IS OFF TRACK, AND A PERSON PUTS IT RIGHT, and the queue says who did each', async () => {
+test('AN AGENT TAKES A PROJECT, SAYS IT IS OFF TRACK, AND A PERSON PUTS IT RIGHT, and the page says who did each', async () => {
   const k = await seeded();
   const agent = { actor: 'agent:codex' };
   const person = { actor: 'p_1' };
@@ -123,15 +119,14 @@ test('AN AGENT TAKES A PROJECT, SAYS IT IS OFF TRACK, AND A PERSON PUTS IT RIGHT
   const held = holds.rows.findIndex((r) => r.fields.name === 'Marlow & Co');
   assert.ok(held >= 0, 'the project is not under With an agent');
   assert.equal(holds.rows[held]!.fields.agent, 'codex');
-  const queue = block(overview, 'Needs you');
-  const at = queue.rows.findIndex((r) => r.fields.name === 'Marlow & Co');
-  assert.ok(at >= 0, 'what the agent said is not in the queue');
-  assert.deepEqual([queue.changes?.[at]?.by, queue.changes?.[at]?.who], ['agent', 'agent:codex']);
+  assert.deepEqual([holds.changes?.[held]?.by, holds.changes?.[held]?.who], ['agent', 'agent:codex']);
+  const card = () => block(opened(k, 'portfolio'), 'In play').rows.find((r) => r.fields.name === 'Marlow & Co');
+  assert.equal(card()?.fields.health, 'off_track', 'what the agent said is not on its card');
 
-  /* A PERSON READS IT AND SAYS IT IS ON TRACK: it leaves the queue, and the page names them. */
+  /* A PERSON READS IT AND SAYS IT IS ON TRACK: its card says so, and the page names them. */
   assert.ok(k.update('things', ref, { health: 'on_track' }, person).ok);
   overview = opened(k, 'portfolio');
-  assert.ok(!names(block(overview, 'Needs you').rows).includes('Marlow & Co'));
+  assert.equal(card()?.fields.health, 'on_track');
   const after = block(overview, 'With an agent');
   const now = after.rows.findIndex((r) => r.fields.name === 'Marlow & Co');
   assert.deepEqual([after.changes?.[now]?.by, after.changes?.[now]?.who], ['you', 'p_1']);
@@ -154,13 +149,12 @@ test('AN AGENT PROPOSES PARKING A PROJECT, NOTHING CHANGES UNTIL A PERSON ACCEPT
     'agent:claude',
   );
   assert.ok(filed.ok, sayOf(filed));
-  assert.ok(names(block(opened(k, 'portfolio'), 'Needs you').rows).includes('Portage'), 'a proposal changed the project before anybody answered');
+  assert.ok(names(block(opened(k, 'portfolio'), 'In play').rows).includes('Portage'), 'a proposal changed the project before anybody answered');
 
   const decided = k.decide(filed.value.id, { decide: { option: 'accept', reason: 'Nothing moves on it until the domain is chosen' } }, 'p_1');
   assert.ok(decided.ok, sayOf(decided));
   const overview = opened(k, 'portfolio');
   assert.ok(!names(block(overview, 'In play').rows).includes('Portage'));
-  assert.ok(!names(block(overview, 'Needs you').rows).includes('Portage'), 'a parked project is not in the queue');
   assert.equal(block(overview, 'Parked and finished').matched, 2);
   const parked = block(overview, 'Not in play');
   const at = parked.rows.findIndex((r) => r.fields.name === 'Portage');
@@ -216,12 +210,11 @@ test('PROJECTS INSTALLS ALONE: a record with only projects, its Overview opens a
   const overview = opened(k, 'portfolio');
   for (const b of overview.blocks) assert.deepEqual(b.refusals, [], `portfolio ${b.heading}`);
   assert.deepEqual(names(block(overview, 'In play').rows), ['Learn to bind books']);
-  assert.deepEqual(block(overview, 'Needs you').rows, []);
 });
 
 /* ── the new look (portfolio 1.6.0) ─────────────────────────────────────────── */
 
-test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS ONE TRACK, and each card says what its project is', async () => {
+test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY ARE GOING AS ONE TRACK, and each card says what its project is', async () => {
   const k = await seeded();
   const overview = opened(k, 'portfolio');
 
@@ -231,10 +224,11 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   assert.deepEqual(leads.map((b) => b.drawn !== false), [true, false], 'one sentence and not both, or neither');
   assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-live\}\} project\(s\) in play, \{\{projects-need-you\}\} at risk or off track\.$/u);
 
-  /* EVERY PROJECT IS A PART OF WHERE THEY ARE, parked and finished among them. */
-  const lanes = block(overview, 'Where they are').readings?.[0]?.reading?.groups ?? [];
-  assert.equal(lanes.reduce((n, g) => n + Number(g.value), 0), THINGS.length, 'a project is in no part');
-  assert.deepEqual(Object.fromEntries(lanes.map((g) => [g.key, g.value])), Object.fromEntries([...new Set(THINGS.map((t) => String(t.lane)))].map((lane) => [lane, THINGS.filter((t) => t.lane === lane).length])));
+  /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
+     (portfolio 1.11.0). */
+  assert.ok(!overview.blocks.some((b) => b.heading === 'Where they are'), 'Where they are is still drawn');
+  const health = block(overview, 'How they are going').readings?.[0]?.reading?.groups ?? [];
+  assert.equal(health.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'a project in play is in no part');
 
   /* WHAT EACH ONE EARNS IS ONE TRACK, over the rows the Earning tile adds up. */
   const earns = overview.blocks.find((b) => b.heading === 'What each one earns')!;
@@ -249,7 +243,7 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   assert.ok(THINGS.every((t) => typeof t.about === 'string' && t.about !== ''), 'a sample project says nothing about what it is');
 });
 
-test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a capital, and its first row is two even halves', async () => {
+test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a capital, and its first row is one whole tile', async () => {
   /* SINCE portfolio 1.9.0 the title is Projects and the statuses read Building and Earning. SINCE portfolio 1.10.0 Right
      now is gone into the line: a third of the row beside two splits a third its height ended the row at three heights. */
   const page = PAGES.portfolio!;
@@ -258,13 +252,15 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
   assert.deepEqual(lane.values.map((v) => lane.labels?.[v]), ['Building', 'Earning', 'Parked', 'Finished']);
   const blocks = page.blocks as { kind: string; heading?: string; span?: number; when?: unknown; lead?: boolean }[];
   assert.ok(!blocks.some((b) => b.heading === 'Right now'), 'Right now is drawn beside the line that says its figure');
+  /* SINCE portfolio 1.11.0 the row is one track of how they are going, the whole width: Where they are said the line
+     again beside it. */
   const row = blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading)));
-  assert.deepEqual(row.map((b) => b.span), [6, 6], 'the two do not make one row');
-  assert.ok(row.every((b) => JSON.stringify(b.when) === JSON.stringify({ metric: 'projects-live', gt: 0 })), 'part of the row draws when the rest does not');
-  assert.deepEqual(blocks.findIndex((b) => b.heading === 'Where they are'), blocks.findIndex((b) => !b.lead), 'the row is not the first under the line');
+  assert.deepEqual(row.map((b) => [b.heading, b.span]), [['How they are going', 12]], 'the row is not one whole tile');
+  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 0 }), 'the track draws with no project in play');
+  assert.deepEqual(blocks.findIndex((b) => b.heading === 'How they are going'), blocks.findIndex((b) => !b.lead), 'the row is not the first under the line');
 
   const k = await seeded();
-  assert.equal(block(opened(k, 'portfolio'), 'Where they are').drawn !== false, true);
+  assert.equal(block(opened(k, 'portfolio'), 'How they are going').drawn !== false, true);
 });
 
 test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be checked, and says the step once', async () => {

@@ -333,11 +333,19 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - people 2.5.0: In touch, 12 weeks is a line a person (`people: true`, columns `day | who`), the latest drawn and the
  *   rest counted, in place of a grid of days that said when anybody was in touch and never who. A key on a block that is
  *   already there, no list, field or figure added or taken away, so the step is a minor one.
+ * - portfolio 1.11.0 and money-core 3.6.0: each thing said once (the visual review of October 2nd). Projects loses Needs
+ *   you, whose health and next step every card in play already says, and Where they are, leaving one track of how they
+ *   are going the whole width. Cash ahead leaves its own sentence off while the line over the page says when the money
+ *   runs out (`headline: under`). Blocks taken away and a key added, no list, field or figure, so each step is a minor
+ *   one.
+ * - people 2.6.0: In touch, 12 weeks says its form as `who: true`, the word the app reads, where 2.5.0 wrote `people:
+ *   true`. The record still reads the old word on a page that holds 2.5.0. A key renamed on a block that is already
+ *   there, so the step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.10.0',
-  people: '2.5.0',
-  'money-core': '3.5.0',
+  portfolio: '1.11.0',
+  people: '2.6.0',
+  'money-core': '3.6.0',
   estate: '2.1.0',
   work: '1.12.0',
 };

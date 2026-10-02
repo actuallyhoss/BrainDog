@@ -91,8 +91,8 @@ test('THE CHART MARKS EACH PERSON ON THE LAST DAY THEY WERE IN TOUCH, and everyo
   const chart = page.blocks.find((b) => b.kind === 'heat');
   assert.ok(chart, 'People draws no chart');
   assert.equal(chart.rows.length, PEOPLE.filter(after(-84)).length);
-  /* A LINE A PERSON, SINCE People 2.5.0: the day then who, so each dot is drawn beside a name. */
-  assert.equal((chart as { people?: unknown }).people, true, 'the chart is not drawn a line a person');
+  /* A LINE A PERSON, SINCE People 2.5.0 (`who:` since 2.6.0): the day then who, so each dot is drawn beside a name. */
+  assert.equal((chart as { who?: unknown }).who, true, 'the chart is not drawn a line a person');
   assert.deepEqual(chart.columns?.map((c) => c.field), ['in_touch', 'name']);
   assert.ok(chart.rows.every((r) => typeof r.fields.name === 'string' && r.fields.name !== ''), 'a mark on the chart names nobody');
 

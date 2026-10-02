@@ -2286,8 +2286,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            to shut down, so every list that moves money on a day is a leg: bills, what repeats, instalments, money on its
            way, and subscriptions where Estate is held. */
         from: CASH_LEGS,
-        /* A YEAR DRAWN FIRST, AND UP TO FIVE AND TO THE LAST DATED MOVEMENT OFFERED, because an instalment plan or a loan
-           can run a decade and a quarter is too short to see one end. */
+        /* A YEAR WALKED, AND THE KNOB OFFERS EVERY LENGTH UP TO IT, because the renderer offers a length only as far as
+           the walk reaches (`horizonChoices` in `packages/render/src/forecast.ts`). Opening on 90 days was tried for
+           3.6.0 and took the knob away with it: three months was then all a person could see, and an instalment plan or a
+           loan can run a decade. It waits on a walk that reaches further than the length the chart opens on. */
         horizon: 365,
         horizons: [90, 180, 365, 730, 1825, 'last'],
         /* COUNTING A PLAN OR A STREAM IN OR OUT IS ONE CONTROL, `count`, and `leave` is folded into it: two controls over
@@ -2299,6 +2301,11 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            walk goes under inside a month. */
         late: 'days-late-in',
         under: 30,
+        /* THE LINE OVER THE PAGE ALREADY SAYS WHEN IT RUNS OUT, SINCE money-core 3.6.0, so the chart leaves its own
+           sentence off and keeps the flag on the day. Money said one fact three times: "runs out in 57 days" over "Goes
+           under on 30 Oct" over a flag reading 30 Oct. With two books there is no line, and the record answers no
+           `headline` (`headlineHeld` in `packages/kernel/src/pages.ts`), so the chart says it again. */
+        headline: 'under',
         when: { metric: 'cash-accounts', gt: 0 },
         empty: 'Nothing dated in the next twelve months.',
       },
