@@ -35,6 +35,7 @@ import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
 import type { MetricDecl } from '@braindog/kernel';
+import type { PageFilter } from '@braindog/kernel';
 import {
   ANSWER_KEYS,
   fill,
@@ -113,6 +114,22 @@ import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, drafted
 import { describedGrammar } from './grammar.ts';
 import { skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
 import {
+  figureText,
+  HEADLINE_PAGES_MOST,
+  headlineBasis,
+  headlineFault,
+  headlineKey,
+  holesOf,
+  leadBlockOf,
+  linesIn,
+  rulesLine,
+  storedHeadline,
+  type HeadlineFigure,
+  type HeadlineInput,
+  type HeadlinePage,
+  type SlashHeadline,
+} from './headlines.ts';
+import {
   BODY_DEPTH,
   SAID_DEPTH,
   automation as oneAutomation,
@@ -149,6 +166,8 @@ export type { PenItem } from './emergent.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
+export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
+export { HEADLINE_MOST, HEADLINE_PAGES_MOST, headlineFault, type HeadlineFigure, type HeadlineInput, type HeadlinePage, type SlashHeadline } from './headlines.ts';
 
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
@@ -1066,15 +1085,45 @@ export type Build = {
  * step that checks the count, so a press in flight is already counted by the next one.
  */
 export type SlashMeter = {
-  /** `draft` for a press or the daily look, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
+  /** `draft` for a press or a description, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
   hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
   /**
-   * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 60 a month), never one of his: the daily look's skill
-   * drafts. OPTIONAL, AND A METER WITHOUT IT DRAFTS NO SKILL, because `hold` counts against his asks and a
-   * background draft must never spend one of those.
+   * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 60 a month), never one of his: everything the daily
+   * look asks on its own, its draft, a skill's next version and the pages' headlines, each named by `kind`. OPTIONAL, AND
+   * A METER WITHOUT IT LETS THE LOOK ASK NOTHING, because `hold` counts against his asks and Free's `ASK_CAP_FREE` are his
+   * alone: the look falls to the rules, and no skill or headline is drafted.
    */
-  background?(): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
+  background?(kind?: SlashBackground): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
 };
+
+/**
+ * What a background ask is for, so a host can count each kind apart and one kind cannot eat the month: `skill`, a skill's
+ * next version; `look`, the daily look's own draft; `headline`, the night's lines for every page at once.
+ */
+export type SlashBackground = 'skill' | 'look' | 'headline';
+
+/**
+ * What a reader chose on a page's filters, as `page` takes it: a value by field, or the same as JSON text where it came
+ * up a query string. `undefined` for none, and `false` for anything else, which `page` refuses rather than reads.
+ */
+function filterOf(said: unknown): Record<string, string> | undefined | false {
+  if (said === undefined || said === null || said === '') return undefined;
+  let value = said;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return false;
+    }
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const out: Record<string, string> = {};
+  for (const [field, chosen] of Object.entries(value)) {
+    if (typeof chosen !== 'string') return false;
+    out[field] = chosen;
+  }
+  return Object.keys(out).length === 0 ? undefined : out;
+}
 
 /** A held ask. Exactly one of the two is called: `settle` for a call that left this host, `release` for one that never did. */
 export type SlashHeld = {
@@ -1971,11 +2020,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * note. The ask is counted exactly; its price is an estimate until `SlashModel` answers usage too.
    */
   const slashTokens = (value: unknown): number => Math.ceil(new TextEncoder().encode(JSON.stringify(value) ?? '').length / 3);
-  const slashAsked = async <I>(kind: 'draft' | 'form', input: I, ask: (input: I) => Promise<unknown>): Promise<{ raw: unknown } | { spent: string }> => {
+  const slashAsked = async <I>(kind: 'draft' | 'form' | SlashBackground, input: I, ask: (input: I) => Promise<unknown>): Promise<{ raw: unknown } | { spent: string }> => {
     let held: SlashHeld | undefined;
-    if (deps.slashMeter) {
+    const meter = deps.slashMeter;
+    if (meter) {
+      /* A LOOK OR A HEADLINE IS THE ALLOWANCE THE RECORD SPENDS ON ITS OWN, never one of the person's asks: a meter that
+         cannot count one asks nothing, since `hold` would spend his (`SlashMeter.background`). */
+      const background = kind !== 'draft' && kind !== 'form';
+      if (background && !meter.background) return { spent: 'This host cannot count an ask against the background allowance, so its model was not asked.' };
       /* A LEDGER THAT CANNOT BE READ IS A CAP THAT CANNOT BE CHECKED, so the model is not asked: the side a spend errs on. */
-      const hold = await deps.slashMeter.hold(kind).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
+      const hold = await (background ? meter.background!(kind) : meter.hold(kind)).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
       if (!hold.ok) return { spent: hold.refusal.fix };
       held = hold.value;
     }
@@ -2054,7 +2108,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { filed, filedKeys, skipped };
   };
 
-  const slashFile = async (ctx?: CallContext): Promise<SlashFiled> => {
+  /**
+   * `daily` IS THE LOOK SLASH TAKES ON ITS OWN (`slashTick`), and its ask is the background allowance's, never the
+   * person's: Free's `ASK_CAP_FREE` asks are spent by what he presses and types, and a look nobody asked for, spending
+   * one a day, would have spent all twenty before the month was out.
+   */
+  const slashFile = async (ctx?: CallContext, daily = false): Promise<SlashFiled> => {
     const r = slashReading(ctx);
     const drawn = drawnVersions(sql);
     let drafts: SlashDraft[] = r.drafts;
@@ -2066,7 +2125,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (model && r.quiet === null) {
       try {
         const asked = await slashAsked<Parameters<SlashModel['draft']>[0]>(
-          'draft',
+          daily ? 'look' : 'draft',
           {
             usage: r.usage,
             noticed: r.noticed,
@@ -2169,7 +2228,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       let held: SlashHeld | undefined;
       if (meter?.background) {
-        const hold = await meter.background().catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
+        const hold = await meter.background('skill').catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
         if (!hold.ok) {
           dropped.push(`${hold.refusal.fix} No next version of ${b.name} was drafted.`);
           break;
@@ -2200,6 +2259,96 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const { filed, skipped } = await slashFiling(drafts, r);
     for (const s of skipped) dropped.push(`${s.question} was not filed: ${s.why}`);
     return { filed, dropped };
+  };
+
+  /**
+   * THE DAILY LOOK'S HEADLINE STEP: one line a page, written by the model from the page's lead note and its figures, and
+   * kept as Slash's pref `headline.<page>` (`headlines.ts`). The page read sends it on the lead note while the figures
+   * still hash to what it was written from, and the app says it in place of the rules' line.
+   *
+   * ONE ASK FOR EVERY PAGE, ON THE BACKGROUND ALLOWANCE AND NEVER HIS. Every page in the rail with a lead note that has a
+   * figure goes into the one ask, except a page whose figures have not moved since its line was written: a record whose
+   * money sat still all week spends no ask at all. A meter that cannot count a background ask asks nothing.
+   *
+   * A LINE IS KEPT ONLY WHEN IT PASSES `headlineFault`: one line of at most 140 characters, no number the model was not
+   * handed, and none of the system's words. A line that fails is said in the look's log and the rules' line stands.
+   */
+  const slashHeadlines = async (today: string): Promise<{ said: string[]; dropped: string[] }> => {
+    const model = deps.slashModel;
+    if (!model?.headline) return { said: [], dropped: [] };
+    const headline = model.headline.bind(model);
+    const prefs = kernel.prefsOf(SLASH);
+    const due: { page: HeadlinePage; basis: string }[] = [];
+    for (const p of kernel.pages()) {
+      if (due.length >= HEADLINE_PAGES_MOST) break;
+      if (p.nav === null || p.about !== null) continue;
+      const read = kernel.page(p.slug);
+      if (!read.ok) continue;
+      const lead = leadBlockOf(read.value.blocks);
+      if (lead === null) continue;
+      const basis = headlineBasis(p.slug, lead);
+      if (storedHeadline(prefs[headlineKey(p.slug)])?.basis === basis) continue;
+      /* HOW FAR EACH FIGURE MOVED, asked of the record in one block over every figure the note names, so the model can say
+         "up on last month" from the record's own arithmetic rather than its guess. */
+      const holes = holesOf(lead.body);
+      let moved: Record<string, JsonValue> = {};
+      const asked = holes.filter((h) => !h.includes('.') && !Object.hasOwn(lead.values, `${h}.change`));
+      if (asked.length > 0)
+        try {
+          moved = (kernel.block({ kind: 'note', body: asked.map((h) => `{{${h}.change}}`).join(' ') } as never).values ?? {}) as Record<string, JsonValue>;
+        } catch {
+          moved = {};
+        }
+      const changes = { ...moved, ...lead.values };
+      const figures: HeadlineFigure[] = [];
+      for (const id of holes) {
+        if (id.endsWith('.change')) continue;
+        const value = figureText(lead.values[id]);
+        if (value === null) continue;
+        const change = typeof changes[`${id}.change`] === 'string' ? (changes[`${id}.change`] as string) : undefined;
+        figures.push({ id, value, ...(change === undefined ? {} : { change }) });
+      }
+      if (figures.length === 0) continue;
+      due.push({ page: { page: p.slug, title: p.title, rules: rulesLine(lead.body, lead.values), figures }, basis });
+    }
+    if (due.length === 0) return { said: [], dropped: [] };
+    const input: HeadlineInput = { today, pages: due.map((d) => d.page) };
+    let raw: unknown;
+    try {
+      const got = await slashAsked('headline', input, (i) => headline(i));
+      if ('spent' in got) return { said: [], dropped: [`${got.spent} No page's headline was written.`] };
+      raw = got.raw;
+    } catch {
+      return { said: [], dropped: ["The model did not answer, so no page's headline was written."] };
+    }
+    const lines = linesIn(raw);
+    if (lines === null) return { said: [], dropped: ["The model did not answer a line a page, so no page's headline was written."] };
+    const said: string[] = [];
+    const dropped: string[] = [];
+    for (const d of due) {
+      const text = Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined;
+      const fault = headlineFault(text, d.page);
+      if (fault) {
+        dropped.push(`${fault} Its own line stands.`);
+        continue;
+      }
+      const kept: SlashHeadline = { text: (text as string).trim(), day: today, basis: d.basis };
+      kernel.setPref(SLASH, headlineKey(d.page.page), kept);
+      said.push(d.page.page);
+    }
+    return { said, dropped };
+  };
+
+  /**
+   * The line the model wrote for a page's lead note, when the figures it was written from still hold: the lead block's
+   * index and the text, or `null`. Asked of a block AS THIS CALLER IS SHOWN IT, so a lead held from a reader, whose values
+   * are blanked, hashes to something else and carries no line written from figures she cannot read.
+   */
+  const headlineFor = (slug: string, blocks: readonly unknown[]): { at: number; text: string } | null => {
+    const lead = leadBlockOf(blocks);
+    if (lead === null) return null;
+    const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(slug)]);
+    return stored !== null && stored.basis === headlineBasis(slug, lead) ? { at: lead.at, text: stored.text } : null;
   };
 
   /**
@@ -2340,12 +2489,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * The computed sources that read across the whole record rather than any one list: the log, the scheduled actions and
-   * the open questions. Measured: the last two on a Desk page handed a member invited to Obligations a diary rowset's
-   * question and a bank key's host and label, while `governance` and `actions` both held those back from her. The
-   * record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
+   * the questions, open, put off and answered. Measured: the actions and the open questions on a Desk page handed a
+   * member invited to Obligations a diary rowset's question and a bank key's host and label, while `governance` and
+   * `actions` both held those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
    * block is held whether or not the kernel's answer carries a name for the whole record.
    */
-  const ACROSS = new Set(['activity', 'actions', 'governance.open']);
+  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided']);
 
   /**
    * The lists one block reads that `kernel.blockRegisters` may not name: each leg of a cash walk, and `session` for a
@@ -2515,8 +2664,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* THE OPEN QUESTIONS ASK MORE THAN THE CEILING, because `governance` holds a rowset about a list back from a reader
        who may not read that list, and a member at `read` with Diary held to `append` has no ceiling: `wholeRecord` called
        her whole, and the queue drew her the Diary rowset's question that `governance` held back. So a queue is for
-       whoever reads every list. */
-    const whole = b.source === 'governance.open' ? readsEveryList(ctx) : wholeRecord(ctx);
+       whoever reads every list, and so are the questions put off and the ones answered, which name the same rowsets. */
+    const whole = typeof b.source === 'string' && b.source.startsWith('governance.') ? readsEveryList(ctx) : wholeRecord(ctx);
     const log: Refusal | null =
       typeof b.source === 'string' && ACROSS.has(b.source) && (!whole || allows(ctx, 'read') !== null)
         ? {
@@ -2526,7 +2675,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? 'What happened across this BrainDog is shown to people who can read all of it.'
                 : b.source === 'actions'
                   ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
-                  : 'The questions open across this BrainDog are shown to people who can read all of it.',
+                  : 'The questions asked across this BrainDog are shown to people who can read all of it.',
             at: 'source',
           }
         : null;
@@ -4853,12 +5002,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const today = new Date(clock.now()).toISOString().slice(0, 10);
       if (state.last === today) return { ran: false, why: 'today' };
       kernel.setPref(SLASH, SLASH_LAST, today);
-      const out = await slashFile();
+      const out = await slashFile(undefined, true);
       /* THE SKILL STEP COMES AFTER, so a skill's next version takes a slot on Decide the look's own drafts left, and what
          it passed over or found unchanged is said in the same log (`dropped`). */
       const skills = await slashSkills();
       out.filed.push(...skills.filed);
       out.dropped.push(...skills.dropped);
+      /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
+      out.dropped.push(...(await slashHeadlines(today)).dropped);
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
       return { ran: true, ...out };
     },
@@ -4950,8 +5101,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * A PAGE IS SCOPED LIKE ANYTHING ELSE. A block over a register the caller cannot reach comes back
      * refused rather than filled — and the page still draws, because one block's refusal is one
      * block. A caller who can see three of five registers sees three blocks and two sentences.
+     *
+     * `filter` IS WHAT THE READER CHOSE in the page's `filters:`, a value by field (`{ project: '12' }`), handed to the
+     * kernel, which narrows every block over a list with the field and answers what each filter could take. A filter
+     * whose values were counted from a list this reader may not read (its `reads`) is held back as a held block is, with
+     * no values and nothing chosen, and its choice narrows nothing.
      */
-    async page(args: { slug: string }, ctx: CallContext) {
+    async page(args: { slug: string; filter?: unknown }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       /* THE OTHER HALF OF "never read, never rendered" (24 §4.2). One row per page per day, and the
@@ -4962,6 +5118,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          not, and the exception did not even reach the client: the request simply hung. */
       if (typeof args?.slug !== 'string' || !args.slug)
         return no('REQUIRED_MISSING', 'A page is asked for by its slug.', { at: 'slug' });
+      const filter = filterOf(args.filter);
+      if (filter === false) return no('VALUE_MALFORMED', 'filter is a value by field the page filters on, such as {"project":"12"}.', { at: 'filter' });
       /* A PAGE THIS CALLER CANNOT SEE IS A PAGE THAT DOES NOT EXIST, AND `allowed` IS WHAT THEY MAY OPEN.
          Measured: `pages` hid a page and `page` served it by its slug, so a member invited to Obligations read a diary
          entry's full text as the title and body of the page made for its row, and an ordinary page's title, prose, a
@@ -4986,7 +5144,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           refusal: { ...said, fix: said.fix.split(NOWHERE).join(args.slug), ...(said.allowed ? { allowed: said.allowed.filter((slug) => shown.has(slug)) } : {}) },
         };
       }
-      const out = kernel.page(args.slug);
+      let out = kernel.page(args.slug, filter);
+      /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
+         list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
+         the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
+         read again, so a value she was never offered narrows nothing either. */
+      const unseen = (f: PageFilter): boolean => !everyList && f.reads.some((list) => readable(ctx, list) !== null);
+      if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
+        const kept = { ...filter };
+        for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
+        out = kernel.page(args.slug, kept);
+      }
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and
          kept it for four hundred days: a read that writes, with the subject chosen by the reader.
@@ -4997,10 +5165,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!out.ok) return out;
       /* THE VERSION A WRITE OVER THIS PAGE CARRIES (`setDeclaration`). A page declared `for:` rows has none of its own slug. */
       const declared = pageDeclaredAt(args.slug);
+      const blocks = out.value.blocks.map((b) => heldBlock(ctx, b));
+      /* THE MODEL'S LINE ON THE LEAD NOTE, AS `said`, while its figures hold (`slashHeadlines`). */
+      const line = headlineFor(args.slug, blocks);
+      const filters = out.value.filters as PageFilter[] | undefined;
       return ok({
         ...out.value,
         ...(declared ? { declared_version: declared.version } : {}),
-        blocks: out.value.blocks.map((b) => heldBlock(ctx, b)),
+        ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
+        blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
       });
     },
 

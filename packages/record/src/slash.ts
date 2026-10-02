@@ -27,6 +27,8 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel, Tried } from '@braindog/kernel';
 import { coerce } from '@braindog/kernel';
 import { labelSetting, voiceSetting } from '@braindog/declare';
+import { KINDS, isKind } from 'braindog-render';
+import type { HeadlineInput } from './headlines.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -725,6 +727,12 @@ export interface SlashModel {
    * it drafts no skill, and the daily look's log says so. The host passes `@braindog/slash`'s `SKILL_DRAFT_INSTRUCTIONS`.
    */
   skill?(input: SkillDraftInput): Promise<unknown>;
+  /**
+   * One plain line a page saying what matters now, from its lead note's figures (`headlineFault` checks each line).
+   * OPTIONAL: a model without it writes no headline, and each page's lead note says the rules' line as it always has. The
+   * host answers `{"lines":{"<page>":"..."}}` and passes `@braindog/host`'s `SLASH_HEADLINE_INSTRUCTIONS`.
+   */
+  headline?(input: HeadlineInput): Promise<unknown>;
 }
 
 export type SlashModelInput = {
@@ -1395,6 +1403,127 @@ function faultsOf(seen: Result<SlashPreview>): { at: string; fix: string }[] {
      first live run. `would`, `waiting` and `skipped` are what a live run does past the try, and are not faults. */
   for (const t of seen.value.tried ?? [])
     for (const s of t.steps) if (s.state === 'failed') faults.push({ at: `${t.rule}.${s.path}`, fix: s.say });
+  /* AND WHAT DRAWS BUT IS NOT A GOOD PAGE, so the same repair that mends a refusal mends a page that opens on nothing,
+     leaves a hole in a row, or calls the person's things rows (DIRECTION §35). */
+  faults.push(...calmFaults(seen.value.pages));
+  return faults;
+}
+
+/* ── the page quality bar ──────────────────────────────────────────────── */
+
+/** A page's width in twelfths, which every row before its last fills. */
+const COLUMNS = 12;
+
+/** At most this many blocks are drawn before a page's first section; more go in a section, folded. */
+export const PAGE_TILES_FIRST = 6;
+
+/** The system's words, which a heading never says about the person's own things (DIRECTION §35). */
+const HEADING_WORDS = /\b(?:rows?|lists?|list items?|registers?|blocks?|entit(?:y|ies))\b/iu;
+
+/** A block as a preview drew it, read here only for the keys the bar looks at. */
+type DrawnBlock = {
+  kind?: unknown;
+  lead?: unknown;
+  body?: unknown;
+  heading?: unknown;
+  span?: unknown;
+  area?: unknown;
+  columns?: unknown;
+  source?: unknown;
+  empty?: unknown;
+  when?: unknown;
+  drawn?: unknown;
+  added?: unknown;
+};
+
+/**
+ * The narrowest a block survives, as the app lays it out (`apps/web/src/lib/record/arrange.ts` `spanOf`): its kind's
+ * own floor, and two twelfths a column for a kind that lays its cells side by side. A declared span below that is
+ * widened by the page, so the row is measured as it is drawn and not as it is written.
+ */
+const spanOf = (b: DrawnBlock): number => {
+  const kind = typeof b.kind === 'string' ? b.kind : '';
+  const spec = isKind(kind) ? KINDS[kind] : undefined;
+  const base = spec?.minSpan ?? 4;
+  const columns = Array.isArray(b.columns) ? b.columns.length : 0;
+  const floor = (spec?.primitive === 'table' || spec?.primitive === 'rows') && columns > 0 ? Math.min(COLUMNS, Math.max(base, columns * 2)) : base;
+  const declared = typeof b.span === 'number' && Number.isInteger(b.span) ? b.span : COLUMNS;
+  return Math.min(COLUMNS, Math.max(floor, declared));
+};
+
+/** Whether a block draws the person's things one under another: a kind that lists or plans, over a source. */
+const drawsRows = (b: DrawnBlock): boolean => {
+  const kind = typeof b.kind === 'string' ? b.kind : '';
+  const purpose = isKind(kind) ? KINDS[kind].purpose : undefined;
+  return typeof b.source === 'string' && (purpose === 'list' || purpose === 'plan');
+};
+
+/** What a heading is called in a fix, so the model knows which block it was. */
+const named = (b: DrawnBlock, i: number): string => (typeof b.heading === 'string' && b.heading.trim() ? `"${b.heading.trim()}"` : `block ${i + 1}`);
+
+/**
+ * What keeps a drawn page from being a good one, each with the path the model mends it by. DIRECTION §35's bar, the same
+ * one `SLASH_INSTRUCTIONS` describes to the model:
+ *
+ * - THE FIRST BLOCK IS A LEAD NOTE WITH A FIGURE IN IT, the one line that answers the page's question;
+ * - ITS ROWS TILE TO TWELVE, every row before the last full, measured as the app lays them out (`layout.test.ts`);
+ * - EVERY BLOCK THAT DRAWS ROWS SAYS `empty:` OR CARRIES `when:`, so a part with nothing in it is not a blank box;
+ * - AT MOST `PAGE_TILES_FIRST` BLOCKS BEFORE THE FIRST SECTION, so the first screen is a few things, not all of them;
+ * - NO HEADING SAYS row, list, register, block or entity.
+ *
+ * MEASURED ON WHAT THE PREVIEW DREW, NOT ON WHAT WAS WRITTEN, so a block whose `when:` said no is not counted in a row it
+ * is not drawn in, and a block another pack lays on the page (`added`) is not the draft's to mend. A page that already
+ * stood is held only to what the draft made worse: a fault the page had before it (`was`) is not this draft's.
+ */
+export function calmFaults(pages: readonly SlashPreviewedPage[]): { at: string; fix: string }[] {
+  const faults: { at: string; fix: string }[] = [];
+  for (const page of pages) {
+    const before = Array.isArray(page.was) ? new Set(pageFaults(page.id, page.was as DrawnBlock[]).map((f) => f.fix)) : new Set<string>();
+    for (const f of pageFaults(page.id, page.blocks as DrawnBlock[])) if (!before.has(f.fix)) faults.push(f);
+  }
+  return faults;
+}
+
+function pageFaults(id: string, all: readonly DrawnBlock[]): { at: string; fix: string }[] {
+  const faults: { at: string; fix: string }[] = [];
+  const blocks = all.map((b, i) => ({ b, i })).filter(({ b }) => b !== null && typeof b === 'object' && b.added === undefined);
+  const first = blocks[0]?.b;
+  if (first && !(first.kind === 'note' && first.lead === true && typeof first.body === 'string' && /\{\{[^{}]+\}\}/u.test(first.body)))
+    faults.push({
+      at: `${id}.blocks[${blocks[0]!.i}]`,
+      fix: 'The page opens with one lead sentence: a note with "lead": true whose body says what matters now with at least one real {{figure}}.',
+    });
+  /* THE ROWS AS THE PAGE FILLS THEM: a block that does not fit starts a new row. Only what is drawn, in the main column. */
+  let width = 0;
+  let row: { b: DrawnBlock; i: number }[] = [];
+  const shown = blocks.filter(({ b }) => b.drawn !== false && b.area !== 'rail');
+  for (const one of shown) {
+    const span = spanOf(one.b);
+    if (width + span > COLUMNS) {
+      if (width < COLUMNS)
+        faults.push({
+          at: `${id}.blocks[${row[0]!.i}]`,
+          fix: `The row starting at ${named(row[0]!.b, row[0]!.i)} is ${width} of 12 wide, so it leaves a hole. Make its spans add up to 12, such as 8 and 4, or three of 4.`,
+        });
+      width = 0;
+      row = [];
+    }
+    width += span;
+    row.push(one);
+  }
+  for (const { b, i } of blocks) {
+    if (drawsRows(b) && typeof b.empty !== 'string' && b.when === undefined)
+      faults.push({ at: `${id}.blocks[${i}]`, fix: `${named(b, i)} says nothing when it has nothing to show. Give it "empty", the sentence shown then, or a "when" that leaves it out.` });
+    if (typeof b.heading === 'string' && HEADING_WORDS.test(b.heading))
+      faults.push({ at: `${id}.blocks[${i}].heading`, fix: `The heading ${named(b, i)} says the system's word. Name the person's own things instead, as the record calls them.` });
+  }
+  const opening = shown.findIndex(({ b }) => b.kind === 'section');
+  const ahead = opening === -1 ? shown.length : opening;
+  if (ahead > PAGE_TILES_FIRST)
+    faults.push({
+      at: `${id}.blocks[${shown[PAGE_TILES_FIRST]!.i}]`,
+      fix: `The page draws ${ahead} blocks before its first section, and a calm page shows at most ${PAGE_TILES_FIRST}. Put the rest in a section with "fold": true.`,
+    });
   return faults;
 }
 

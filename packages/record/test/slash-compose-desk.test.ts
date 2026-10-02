@@ -130,6 +130,8 @@ const desk = (mended: boolean) => ({
     layout: { rail: 4 },
     requires: ['register.parts', 'register.steps'],
     blocks: [
+      /* THE LEAD LINE A GOOD PAGE OPENS ON (`calmFaults`), which shifts the two faults to the second and third blocks. */
+      { kind: 'note', lead: true, span: 12, body: '{{steps.count}} step(s) across {{parts.count}} part(s).' },
       {
         kind: 'steps',
         span: 12,
@@ -164,6 +166,7 @@ const desk = (mended: boolean) => ({
         columns: [{ field: 'what' }, { field: 'due' }],
         back: 0,
         ahead: 2,
+        empty: 'Nothing is due.',
       },
     ],
   },
@@ -180,7 +183,7 @@ const PART = {
     nav: { section: 'Launch', order: 20, tabs: true },
     requires: ['register.parts', 'register.steps'],
     blocks: [
-      { kind: 'note', body: '{{what}}' },
+      { kind: 'note', lead: true, span: 12, body: '{{what}}, one of {{parts.count}} part(s).' },
       {
         kind: 'steps',
         span: 12,
@@ -207,8 +210,9 @@ const NUMBERS = {
     nav: { section: 'Launch', order: 90, tabs: true },
     requires: ['register.checks'],
     blocks: [
+      { kind: 'note', lead: true, span: 12, body: '{{checks.count}} price check(s) so far.' },
       { kind: 'inputs', register: 'checks', heading: 'The price check', columns: [{ field: 'price' }, { field: 'making' }, { field: 'packing' }, { field: 'sending' }], row: 'checks#1' },
-      { kind: 'table', span: 12, heading: 'What one costs', source: 'register.checks', columns: [{ field: 'what' }, { field: 'price' }, { field: 'cost' }] },
+      { kind: 'table', span: 12, heading: 'What one costs', source: 'register.checks', columns: [{ field: 'what' }, { field: 'price' }, { field: 'cost' }], empty: 'No price check yet.' },
     ],
   },
 };
@@ -286,8 +290,8 @@ test('A DESCRIBED DESK WITH TWO FAULTS IS REFUSED ON BOTH, REPAIRED IN ONE ASK, 
   assert.equal(repair.drafts.length, 1);
   const said = JSON.stringify(repair.refusals);
   assert.ok(repair.refusals.every((r) => r.at.startsWith('page.desk.blocks[')), said);
-  assert.ok(repair.refusals.some((r) => r.at.startsWith('page.desk.blocks[0]') && /\bstage\b/u.test(r.fix)), `the path's where was not refused: ${said}`);
-  assert.ok(repair.refusals.some((r) => r.at.startsWith('page.desk.blocks[1]') && /\bcolour\b/u.test(r.fix)), `the card's colour was not refused: ${said}`);
+  assert.ok(repair.refusals.some((r) => r.at.startsWith('page.desk.blocks[1]') && /\bstage\b/u.test(r.fix)), `the path's where was not refused: ${said}`);
+  assert.ok(repair.refusals.some((r) => r.at.startsWith('page.desk.blocks[2]') && /\bcolour\b/u.test(r.fix)), `the card's colour was not refused: ${said}`);
 
   /* ONE DRAFT, DRAWN CLEAN: every page of it, every block, over the model's rows. */
   assert.equal(out.by, 'test model');

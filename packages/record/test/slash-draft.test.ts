@@ -54,7 +54,7 @@ const WRONG = { id: 'page.desk', kind: 'page', body: { page: 'desk', title: 'Des
 const RIGHT = {
   id: 'page.desk',
   kind: 'page',
-  body: { page: 'desk', title: 'Desk', requires: ['register.tasks'], blocks: [{ kind: 'table', span: 12, source: 'register.tasks', empty: 'No steps yet.' }] },
+  body: { page: 'desk', title: 'Desk', requires: ['register.tasks'], blocks: [{ kind: 'note', lead: true, span: 12, body: '{{tasks.count}} step(s) so far.' }, { kind: 'table', span: 12, source: 'register.tasks', empty: 'No steps yet.' }] },
 };
 const drafted = (to: unknown, rows?: unknown) => ({ drafts: [{ question: 'A desk for my launch?', body_kind: 'change', body: { to }, ...(rows === undefined ? {} : { rows }) }] });
 
@@ -149,7 +149,8 @@ test('slashDraft ANSWERS THE DRAFTS WITH THEIR ROWS AND WHAT THEY DREW, and file
   assert.deepEqual(Object.keys(d!.rows), ['tasks']);
   assert.equal(d!.rows.tasks!.length, SAMPLE_ROWS_MOST);
   assert.equal(d!.preview.pages[0]?.id, 'page.desk');
-  const drawn = (d!.preview.pages[0]?.blocks[0]?.rows ?? []).map((r) => r.fields.what);
+  /* THE SECOND BLOCK, under the lead line a good page opens on. */
+  const drawn = (d!.preview.pages[0]?.blocks[1]?.rows ?? []).map((r) => r.fields.what);
   assert.ok(drawn.includes('Sample 0'), `the preview did not draw the sample rows: ${JSON.stringify(drawn)}`);
 
   /* NOTHING FILED AND NOTHING KEPT: no question, no page, and the one row the record had. */

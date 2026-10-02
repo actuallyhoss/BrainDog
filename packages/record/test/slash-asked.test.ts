@@ -85,7 +85,7 @@ const DESK = {
     nav: { section: 'Work', order: 10 },
     requires: ['register.tasks'],
     blocks: [
-      { kind: 'note', span: 12, body: '{{done-steps}} of {{tasks.count}} steps are done.' },
+      { kind: 'note', lead: true, span: 12, body: '{{done-steps}} of {{tasks.count}} steps are done.' },
       { kind: 'table', span: 12, source: 'register.tasks', empty: 'No steps yet.' },
     ],
   },
@@ -643,7 +643,7 @@ test('A DESCRIPTION THAT WOULD REPLACE WHAT EXISTS SAYS SO IN WORDS THE RECORD W
 const pageDraft = (n: number) => ({
   question: `Desk ${n}?`,
   body_kind: 'change',
-  body: { to: { id: `page.d${n}`, kind: 'page', body: { page: `d${n}`, title: `D${n}`, requires: ['register.tasks'], blocks: [{ kind: 'table', span: 12, source: 'register.tasks', empty: 'x' }] } } },
+  body: { to: { id: `page.d${n}`, kind: 'page', body: { page: `d${n}`, title: `D${n}`, requires: ['register.tasks'], blocks: [{ kind: 'note', lead: true, span: 12, body: '{{tasks.count}} step(s).' }, { kind: 'table', span: 12, source: 'register.tasks', empty: 'x' }] } } },
 });
 
 test('WITH DECIDE FULL, A DESCRIPTION IS NOT SENT: measured before, 8 presses, 8 model calls and 8 ledger rows filing [1,1,1,0,0,0,0,0]', async () => {
