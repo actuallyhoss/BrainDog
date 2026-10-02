@@ -342,6 +342,52 @@ test('WITH NEITHER A meets: NOR A people LIST, meet refuses and says what would 
   sql.close();
 });
 
+test('A meets: THAT NAMES in_touch HAS THE DAY MOVED FORWARD BY EVERY MEET, and never back', async () => {
+  /* People's Last in touch was only ever typed, so a record whose people came from agents read nobody in touch. */
+  const fields = [...PEOPLE_FIELDS, { id: 'last', type: 'day' }];
+  const role = { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into', in_touch: 'last' };
+  const { k, sql } = await met([register('people', fields, { meets: role })]);
+  assert.deepEqual(k.meetsList(), { register: 'people', fields: role });
+
+  value(k.meet({ name: 'Ada', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, AGENT));
+  assert.equal(k.get('people#1')!.fields.last, DAY, 'a new person was not stamped in touch today');
+
+  value(k.create('people', { name: 'Grace', email: 'grace@example.com', last: '2026-08-01' }, OWNER));
+  value(k.meet({ email: 'grace@example.com', where: 'mail from Grace' }, AGENT));
+  assert.equal(k.get('people#2')!.fields.last, DAY, 'an older day was left standing');
+
+  value(k.create('people', { name: 'Alan', email: 'alan@example.com', last: '2026-12-01' }, OWNER));
+  value(k.meet({ email: 'alan@example.com', where: 'mail from Alan' }, AGENT));
+  assert.equal(k.get('people#3')!.fields.last, '2026-12-01', 'a later day the person typed was moved back');
+  sql.close();
+
+  /* A field that is not a day cannot play it, and the install says so. */
+  const sql2 = openSqlite();
+  const k2 = await openRecord(sql2, fixedClock(NOW));
+  const wrong = refused(await k2.install([PROJECTS, register('people', [...PEOPLE_FIELDS, { id: 'last', type: 'text' }], { meets: role })]));
+  assert.match(wrong.fix, /in_touch/);
+  sql2.close();
+});
+
+test('A MERGE OF TWO PEOPLE KEEPS THE LATER DAY IN TOUCH of the two', async () => {
+  const fields = [...PEOPLE_FIELDS, { id: 'last', type: 'day' }];
+  const role = { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into', in_touch: 'last' };
+  const { k, sql } = await met([register('people', fields, { meets: role })]);
+  value(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com', last: '2026-06-01' }, OWNER));
+  const twin = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@work.example', where: 'mail from Ada' }, AGENT));
+  const body = k.governanceRow('suggestion', twin.merge!)!.body as { rows: { at: string; patch: Record<string, unknown> }[] };
+  assert.equal(body.rows.find((r) => r.at === 'people#1')?.patch.last, DAY, 'the kept person lost the newer day');
+  sql.close();
+});
+
+test('A people LIST WITH NO KEY PLAYS in_touch ONLY WHEN IT HAS THE DAY FIELD, so an older record is met as before', async () => {
+  const { k, sql } = await met([register('people', [...PEOPLE_FIELDS, { id: 'in_touch', type: 'day' }])]);
+  assert.equal(k.meetsList()?.fields.in_touch, 'in_touch');
+  value(k.meet({ name: 'Ada', where: 'x' }, AGENT));
+  assert.equal(k.get('people#1')!.fields.in_touch, DAY);
+  sql.close();
+});
+
 test('THE people LIST WITH NO KEY IS STILL MET, and a field it lacks is named without blaming a pack that never declared it', async () => {
   const { k, sql } = await met([register('people', PEOPLE_FIELDS)]);
   assert.deepEqual(k.meetsList(), {

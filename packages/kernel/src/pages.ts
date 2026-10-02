@@ -25,6 +25,7 @@ import { unquoted } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import { BLOCK_READS, kindsReading, wrongKindKey } from './block-keys.ts';
+import { builtInFigure } from './built-in-figures.ts';
 import { kindModule } from './kinds/index.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
@@ -37,6 +38,7 @@ import { runway, type Leg, type Only, type Runway } from './forecast.ts';
 import { figureLists } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
+import { isBucket } from './buckets.ts';
 import { isStale, SESSION_PREFIX, STALE_MS } from './session.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
@@ -54,7 +56,12 @@ export type PageBlock = {
    * `as: 'scope'` draws where the row applies. `sign:` writes a money column's figure with `−` where an enum says the
    * money goes out, and a column named `changed`, on a register with no such field, says who changed the row last.
    */
-  columns?: { field: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
+  /**
+   * `metric:` IN PLACE OF `field:` is a card's `trend`: a figure grouped by a date bucket, `{{field}}` in its id filled
+   * from each card's row (`project-done-by-week:{{name}}`), read once a card and answered as `trends`. Such a column
+   * names no field, so its `field` is absent whatever this type says of the rest.
+   */
+  columns?: { field: string; metric?: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
   cells?: { metric: string; label?: string; trend?: string; note?: string }[];
   /**
@@ -70,8 +77,9 @@ export type PageBlock = {
   tiles?: boolean;
   /** A `section`'s: the blocks after it, up to the next section, drawn on one surface. */
   box?: boolean;
-  /** A `section`'s: whether it starts shut, and the glyph beside its heading. */
+  /** A `section`'s: whether it starts shut. */
   fold?: boolean;
+  /** Any block's: the glyph in the well beside its heading. */
   icon?: string;
   /**
    * Over a register with a scope field: the rows of the project `where:` names, then the rows that
@@ -249,6 +257,12 @@ export type BlockResult = PageBlock & {
    * order the steps list declares, aligned with `rows`. `null` for a row with no open step.
    */
   nexts?: (string | null)[];
+  /**
+   * A `cards` block's with a column `{ metric, as: trend }`: that figure for each card, one number a bucket oldest first,
+   * aligned with `rows`. A bucket with no value is `null`, a gap, except on a count or a sum, where nothing counted is
+   * nought. `null` for a card whose figure has nothing in the buckets drawn, which draws no line.
+   */
+  trends?: ((number | null)[] | null)[];
   /** A `steps` block's over a list that declares `steps:`: whether each row is done, aligned with `rows`. */
   done_now?: boolean[];
   /** And the index in `rows` of the first row not done, `null` when every row is. */
@@ -1409,7 +1423,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      an empty cell under a heading that promises one, which reads as "no value" rather than as "no
      such thing" — and the difference is whether anybody investigates. */
   const unknown = (block.columns ?? [])
-    .filter((c) => !(block.kind === 'cards' && c.as === 'next'))
+    .filter((c) => !(block.kind === 'cards' && (c.as === 'next' || c.metric !== undefined)))
     .map((c) => c.field)
     .filter((f) => f !== 'seq' && f !== CHANGED && !Object.hasOwn(schema.fields, f));
   /* A CARD'S NEXT STEP IS A FIELD OF THE STEPS LIST, not of the list the cards are over, so it is checked there. */
@@ -1433,6 +1447,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   /* A CARD'S PICTURE AND ITS HUE ARE FIELDS OF THE CARD'S OWN ROW, checked here where the list is in hand. */
   const roled = roleFault(block, register, schema);
   if (roled) return { ...base, refusals: also(roled) };
+  /* A CARD'S TREND IS A FIGURE, checked before any card reads it, so an unknown one is said once and not once a card. */
+  const trendFault = trendColumnFault(deps, block);
+  if (trendFault) return { ...base, refusals: also(trendFault) };
 
   /* A SIGN IS READ FROM AN ENUM AND ONE OF ITS VALUES, or the figure would carry a sign nothing decides. */
   const unsigned = (block.columns ?? []).find((c) => {
@@ -1511,6 +1528,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...(scope ? scopesOf(deps, rows, scope) : {}),
     ...ringsOf(deps, block, register, rows),
     ...nextsOf(deps, block, register, rows),
+    ...trendsOf(deps, block, rows),
     ...(marks ? { done_now: marks, next: lead === undefined ? null : lead.at } : {}),
     ...inShort,
   };
@@ -1594,6 +1612,67 @@ function nextsOf(deps: PageDeps, block: PageBlock, register: string, rows: reado
     }),
   };
 }
+
+/** How many buckets a card's trend reaches back, the current one among them: eight weeks is two months of a project. */
+const TREND_BUCKETS = 8;
+
+/** A cards block's trend column over a figure, or `undefined`. */
+const trendColumn = (block: PageBlock) => (block.kind === 'cards' ? block.columns?.find((c) => c.as === 'trend' && typeof c.metric === 'string') : undefined);
+
+/** A trend figure's id, `project-done-by-week:{{name}}`, as the figure it names and the parameter after it, unfilled. */
+const trendNamed = (metric: string): { id: string; param: string | null } => {
+  const at = metric.indexOf(':');
+  return at < 0 ? { id: metric, param: null } : { id: metric.slice(0, at), param: metric.slice(at + 1) };
+};
+
+/**
+ * Why a card's trend figure cannot be drawn, or `null`: no figure has the name, or it is not grouped by a date bucket,
+ * so it has no run of weeks or months to draw. Asked of the declaration alone, before a card is read.
+ */
+function trendColumnFault(deps: PageDeps, block: PageBlock): Refusal | null {
+  const col = trendColumn(block);
+  if (!col) return null;
+  const { id } = trendNamed(col.metric!);
+  const decl = deps.metric(id);
+  if (!decl) return { code: 'METRIC_UNKNOWN', fix: `There is no figure called ${id} for a card's trend to draw.`, at: 'columns' };
+  if (!isBucket(decl.bucket))
+    return { code: 'DECLARATION_INVALID', fix: `${id} is not grouped by a date and a bucket, so a card has no weeks or months of it to draw. Name a figure with group_by: a day and bucket:.`, at: 'columns' };
+  return null;
+}
+
+/**
+ * EACH CARD'S TREND: the figure its trend column names, with `{{field}}` filled from the card's own row, read over the
+ * last `TREND_BUCKETS` buckets by the series' own arithmetic (`barsOf`), so a project card's line and the project page's
+ * chart of the same figure are the same numbers.
+ *
+ * NOTHING COUNTED IS NOUGHT ON A COUNT OR A SUM, and a gap on anything else. A week in which no task of a project was
+ * finished is a week of nought, and a line that lifted off there would say nothing was known about it; an average of
+ * nothing is not nought, so there the gap stays. A card whose figure has nothing in any bucket, whose hole its row
+ * cannot fill, or whose figure is in several currencies at once draws no line: two currencies are never one line.
+ */
+function trendsOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { trends?: ((number | null)[] | null)[] } {
+  const col = trendColumn(block);
+  if (!col) return {};
+  return {
+    trends: rows.map((row) => {
+      const filled = String(fill(col.metric!, row));
+      if (filled.includes('{{')) return null;
+      const { id, param } = trendNamed(filled);
+      const decl = deps.metric(id);
+      if (!decl) return null;
+      const counted = isCounted(decl.value);
+      const lineOf = (named: string): MetricDecl | null => (named === filled ? (param === null ? decl : (fill(decl, null, param) as MetricDecl)) : null);
+      const got = barsOf([{ metric: filled }], TREND_BUCKETS, 0, lineOf, deps.read);
+      if ('refusal' in got || got.bars.split) return null;
+      const line = got.bars.values[0] ?? [];
+      if (line.every((v) => v === null)) return null;
+      return counted ? line.map((v) => v ?? 0) : line;
+    }),
+  };
+}
+
+/** Whether a figure counts or adds up, so a bucket with nothing in it is nought rather than unknown. */
+const isCounted = (value: unknown): boolean => value !== null && typeof value === 'object' && ('count' in value || 'sum' in value);
 
 /**
  * The field type each card role that draws a stored value must name: a `picture` leads the card with a file the record
@@ -3028,7 +3107,7 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
      reads its moves and its checks, and a walk its legs and the figure it opens from, so a page with one on it is held
      from a member who may not read those lists as it is on Home and in the sell knob (`listsRead`). */
   const addFigure = (id: string): void => {
-    const d = metric?.(id);
+    const d = metric?.(id) ?? builtInFigure(id);
     if (d) for (const list of listsRead(d, (other) => metric?.(other) ?? null)) named.add(list);
   };
   if (decl.for?.register) named.add(decl.for.register);
@@ -3113,6 +3192,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     for (const name of acrossLists(block, beside)) named.add(name);
     /* A BAR OR A SPLIT OVER A FIGURE READS THE FIGURE'S LIST. */
     if (typeof block.source === 'string' && block.source.startsWith('metric.')) addFigure(block.source.slice('metric.'.length));
+    /* AND A CARD'S TREND READS ITS FIGURE'S LISTS, once a card, so a member who may not open Tasks is not drawn how many
+       of a project's tasks were finished each week. */
+    for (const c of block.kind === 'cards' && Array.isArray(block.columns) ? block.columns : [])
+      if (c !== null && typeof c === 'object' && typeof c.metric === 'string') addFigure(trendNamed(c.metric).id);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
        statement about that number whether or not the block is on the page. */
     if (block.when?.metric) {
@@ -3124,13 +3207,19 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const said = pathOf(path);
       if (!said) continue;
       if ('metric' in said) addFigure(said.metric);
-      else named.add(said.register);
+      else if ('change' in said) {
+        if (metric?.(said.change) ?? builtInFigure(said.change)) addFigure(said.change);
+        else if (LIST_ID.test(said.change)) named.add(said.change);
+      } else named.add(said.register);
     }
   }
   return [...named];
 }
 
 /* ── live values ─────────────────────────────────────────────────────────── */
+
+/** A list's id as a path names it: a figure's id may hold a dash, a list's may not. */
+const LIST_ID = /^[a-z][a-z0-9_]*$/;
 
 /** Lexically a path, `05 §7.1`, as the renderer reads one. */
 const PATH = /^[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?(?:\.[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?)*$/;
@@ -3188,11 +3277,20 @@ export function pathsOf(block: PageBlock): string[] {
  */
 function pathOf(
   path: string,
-): { metric: string } | { register: string; seq: number; field: string } | { register: string; count: true } | { register: string; state: string } | null {
+):
+  | { metric: string }
+  | { change: string }
+  | { register: string; seq: number; field: string }
+  | { register: string; count: true }
+  | { register: string; state: string }
+  | null {
   const parts = path.split('.');
   if (parts.length === 1) return /^[a-z][a-z0-9_-]*$/.test(path) ? { metric: path } : null;
   if (parts.length !== 2) return null;
   const [head, tail] = parts as [string, string];
+  /* `<figure>.change` IS HOW FAR A FIGURE MOVED (`changeOf`). A list called `tasks` with a state called `change` would
+     say the same words, so the record decides between the two by whether a figure of that name is declared. */
+  if (tail === 'change' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head };
   const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
   if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
   if (!/^[a-z][a-z0-9_]*$/.test(head)) return null;
@@ -3216,7 +3314,15 @@ function figure(v: Json | undefined): Json | undefined {
  * when the register declares it, so `tasks#1.constructor` is nothing rather than the prototype.
  */
 function valueAt(deps: PageDeps, path: string): Json | undefined {
-  const said = pathOf(path);
+  const parsed = pathOf(path);
+  if (!parsed) return undefined;
+  /* A FIGURE'S CHANGE WHEN A FIGURE HAS THE NAME, and otherwise the count of a list's rows in a state called `change`,
+     which is what these words read as before a figure could be asked how far it moved. */
+  if ('change' in parsed) {
+    const decl = deps.metric(parsed.change);
+    if (decl) return changeOf(deps, decl);
+  }
+  const said = 'change' in parsed ? (LIST_ID.test(parsed.change) ? { register: parsed.change, state: 'change' } : null) : parsed;
   if (!said) return undefined;
   if ('metric' in said) {
     const decl = deps.metric(said.metric);
@@ -3248,6 +3354,44 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
   const listed = deps.list({ register: said.register, where: { field: 'seq', is: said.seq }, limit: 1 });
   const row = listed.ok ? listed.value.rows[0] : undefined;
   return row && Object.hasOwn(row.fields, said.field) ? figure(row.fields[said.field]) : undefined;
+}
+
+/** How far before the remembered point a figure's change may look for one, past the day its window names. */
+const CHANGE_SLACK_DAYS = 7;
+
+/**
+ * `{{cash-now.change}}`: how far a figure moved since its window ago, as a signed whole percent (`+8%`, `−8%`, `0%`), or
+ * nothing.
+ *
+ * AGAINST WHAT THE RECORD REMEMBERED, NOT A SECOND READ. Cash now is a balance, and the same rows read a month back say
+ * today's balance again, so the figure's own comparison (`delta`) is empty for exactly the figure a headline wants to
+ * say moved. The night's point is what the figure was (`metric_point`), so the change is now against the newest point
+ * on or before the day the window names (30 days for `window: 30d`), looking at most a week further back for one.
+ *
+ * NOTHING WHEN THERE IS NOTHING TRUE TO SAY, and a lead note then drops the clause (`leadOf`): no point that old, a
+ * figure in several currencies or none, a point written in another currency than today's figure (two currencies are
+ * never set against each other), or a point at nought, which no percent is of.
+ */
+function changeOf(deps: PageDeps, decl: MetricDecl): Json | undefined {
+  if (!deps.points) return undefined;
+  const read = deps.read(decl);
+  if (!read.ok || read.value.parts || read.value.value === null || read.value.refusals.length) return undefined;
+  const now = read.value.value;
+  const DAY = 86_400_000;
+  const span = windowMs(decl.window ?? '30d') ?? 30 * DAY;
+  const days = Math.max(1, Math.round(span / DAY));
+  const at = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const clock = deps.ctx.asOfMs ?? deps.ctx.nowMs;
+  const then = deps.points(decl.metric, at(clock - (days + CHANGE_SLACK_DAYS) * DAY), at(clock - days * DAY)).at(-1);
+  if (!then || !Number.isFinite(then.value) || then.value === 0) return undefined;
+  /* A POINT IS KEPT AS THE NIGHT WROTE IT (`metrics.ts` `point`): a bare number with no unit, `''` or `count`, and a
+     fraction scaled to basis points under `pct.bp`. Read as it was stored, an average of 1.25 a month ago was a unit
+     today's 1.5 does not have, and never said it moved. */
+  const bare = (unit: string | null | undefined): string | null => (!unit || unit === 'count' || unit === 'pct.bp' ? null : unit);
+  if (bare(then.unit) !== bare(read.value.unit)) return undefined;
+  const was = then.unit === 'pct.bp' ? then.value / 10_000 : then.value;
+  const pct = Math.round(((now - was) / Math.abs(was)) * 100);
+  return pct > 0 ? `+${pct}%` : pct < 0 ? `−${-pct}%` : '0%';
 }
 
 /** Every path in a block the record holds a value for, or `undefined` when there are none. */
@@ -3317,6 +3461,7 @@ function horizonsOk(said: unknown): boolean {
  * knob named by its source would hand a member invited to Accounts the sum of Transactions she cannot open.
  */
 const listsRead = (decl: MetricDecl, figure: (id: string) => MetricDecl | null): string[] =>
+  /* The count of open questions names the whole record there (`WHOLE_RECORD`), as the queue over the same source does. */
   typeof decl.source === 'string' ? figureLists(decl, figure) : [];
 
 /**

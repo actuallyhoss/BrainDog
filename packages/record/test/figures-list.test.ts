@@ -55,12 +55,13 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
     `${listed.length} of ${declared.length} listed`,
   );
   /* Measured on this record before the method existed: 36 declared and 18 drawn; money-core 3.0.0 made it 41, and its
-     books and a project's monthly series made it 47, and a project page's month (money-core 3.2.0) made it 51. The
+     books and a project's monthly series made it 47, a project page's month (money-core 3.2.0) made it 51, and People's
+     four figures over Last in touch with money-core 3.3.0's cash by account, bills due and old balances made it 58. The
      number is asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its
      own. */
-  assert.equal(declared.length, 51);
+  assert.equal(declared.length, 58);
   const late = listed.find((f) => f.id === 'late-in');
-  assert.deepEqual(late, { id: 'late-in', name: 'Late to you', format: 'money', list: 'obligations', pack: 'money-core', param: false });
+  assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
      a project's own figures and its monthly series, and a book's cash. */
   assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['book-cash', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed']);
@@ -116,7 +117,7 @@ test('SOMEBODY INVITED TO ONE LIST IS LISTED EXACTLY THE FIGURES metric ADMITS T
   assert.deepEqual(listed, await answered(api, declared, wren));
   /* AND THE CONTROL, so an empty list on both sides cannot pass: she reads the accounts, and the figures over them alone.
      `cash-now` is not one since money-core 3.0.0, because it rolls the balances and transactions too, which she cannot read. */
-  assert.deepEqual(listed, ['cash-accounts', 'cash-as-of']);
+  assert.deepEqual(listed, ['balances-stale', 'cash-accounts', 'cash-as-of']);
   sql.close();
 });
 
@@ -146,7 +147,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 51);
+  assert.equal(listed.length, 58);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

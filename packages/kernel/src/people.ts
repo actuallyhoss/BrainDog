@@ -8,7 +8,9 @@
  *
  * IT CHANGES AS LITTLE AS IT CAN. A match gains a dated line saying where they were met, the run's
  * project, and whichever of email, name or handle it was missing. Nothing it already holds is
- * overwritten, because what an agent saw in a commit is weaker than what a person typed.
+ * overwritten, because what an agent saw in a commit is weaker than what a person typed. The one
+ * exception is the last day in touch, where the list names one (`in_touch`): being met today is a
+ * fact, so the day moves forward to the line's day, and never back.
  *
  * THE LIST IS WHICHEVER DECLARES `meets:`, and each field is the one its part names (`roles.ts`). A record older
  * than the key is met into the list called `people` under the parts' own names. A list may leave out `handles` and
@@ -73,6 +75,12 @@ const normalName = (name: string): string => name.trim().replace(/\s+/g, ' ').to
 
 const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
+/** The later of a day and what a row holds, `undefined` for neither; a value that is not a day counts as none. */
+const later = (a: unknown, b: unknown): string | undefined => {
+  const days = [a, b].filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return days.at(-1);
+};
+
 /** The `met` lines of two lists as one, oldest first, and no more than the cap. Lines start with their day, so they sort. */
 /* Ordered by the date alone, and stably, so two meetings on one day keep the order they happened in
    and the cap drops the oldest, never the newest. */
@@ -90,7 +98,7 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
      `merged_into` and `projects` is install's to check; the named list was never asked it. */
   for (const part of PARTS.meets) {
     const field = at[part.part as keyof MeetsFields];
-    if (field === undefined && part.optional === true && list.declared) continue;
+    if (field === undefined && part.optional === true && (list.declared || part.later === true)) continue;
     if (field === undefined || !plays(part, list.declaredFields.find((f) => f.id === field)))
       return no<Met>(
         'FIELD_UNKNOWN',
@@ -106,7 +114,8 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
   const { name, email, handle, where } = said.value;
   if (handle !== undefined && at.handles === undefined)
     return no<Met>('FIELD_UNKNOWN', `${own}'s meets: names no handles, so there is nowhere to keep a handle. Nothing was written.`, { at: 'handle' });
-  const line = `${instant(deps.nowMs).slice(0, 10)} · ${where}`;
+  const day = instant(deps.nowMs).slice(0, 10);
+  const line = `${day} · ${where}`;
   /* NO projects PART, NO PROJECT. The run may well be in one; the list has nowhere to say so. */
   const project = at.projects === undefined ? null : deps.project();
 
@@ -124,6 +133,7 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
         linked = true;
       }
     }
+    if (at.in_touch !== undefined && later(day, f[at.in_touch]) === day) patch[at.in_touch] = day;
     if (email !== undefined && typeof f[at.email] !== 'string') patch[at.email] = email;
     if (name !== undefined && typeof f[at.name] !== 'string') patch[at.name] = name;
     if (at.handles !== undefined) {
@@ -138,6 +148,7 @@ export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
       ...(email === undefined ? {} : { [at.email]: email }),
       ...(handle === undefined || at.handles === undefined ? {} : { [at.handles]: [handle] }),
       ...(project === null || at.projects === undefined ? {} : { [at.projects]: [project] }),
+      ...(at.in_touch === undefined ? {} : { [at.in_touch]: day }),
       [at.met]: [line],
     });
   }
@@ -263,6 +274,10 @@ function nearMatch(deps: PeopleDeps, list: Role<MeetsFields>, person: Row): Resu
     }
     const met = metLines(listOf(keep.fields[at.met]), listOf(fold.fields[at.met]));
     if (JSON.stringify(met) !== JSON.stringify(listOf(keep.fields[at.met]))) patch[at.met] = met;
+    if (at.in_touch !== undefined) {
+      const touched = later(keep.fields[at.in_touch], fold.fields[at.in_touch]);
+      if (touched !== undefined && touched !== keep.fields[at.in_touch]) patch[at.in_touch] = touched;
+    }
 
     const rows = [
       ...(Object.keys(patch).length === 0 ? [] : [{ at: keepName, version: keep.version, patch }]),

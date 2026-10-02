@@ -222,6 +222,7 @@ import {
 import { slashMayWrite } from './slash.ts';
 import { meet as meetPerson, type MeetArgs, type Met } from './people.ts';
 import { meetsRole, ratesRole, type MeetsFields } from './roles.ts';
+import { builtInFigure } from './built-in-figures.ts';
 import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, provisionalTitle, type Found, type SessionHints } from './session.ts';
 import {
   deviceApprove,
@@ -4594,7 +4595,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         "SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0",
         `metric.${id}`,
       );
-      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl) : null;
+      /* A DECLARED FIGURE FIRST, and the record's own figures after (`built-in-figures.ts`), so a page can gate on
+         how many questions are waiting without a pack declaring the count. */
+      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl) : builtInFigure(id);
     },
     read: (decl) => evaluateMetric(sql, decl, evalContext()),
     list: (q) => {

@@ -28,6 +28,7 @@ import { fixOf, no, ok } from '@braindog/ports';
 import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
+import { GOVERNANCE_OPEN, readOpenQuestions } from './built-in-figures.ts';
 import type { Leg } from './forecast.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
@@ -967,6 +968,9 @@ function resolveRelative(
  * with it fixed one at a time is three round trips for whoever is writing it.
  */
 export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
+  /* THE OPEN QUESTIONS ARE NOT ROWS OF A LIST, so the built-in figure over them is counted on its own
+     (`built-in-figures.ts`) and every caller of this reads it as it reads any other. */
+  if (decl.source === GOVERNANCE_OPEN) return readOpenQuestions(sql, ctx);
   const refusals: Refusal[] = [];
   const at = (code: string, fix: string, key?: string): void => {
     refusals.push({ code, fix: `${decl.metric}: ${fix}`, ...(key === undefined ? {} : { at: key }) });

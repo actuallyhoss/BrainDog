@@ -784,7 +784,7 @@ const CARD_FACTS = 3;
 /** The field types a list of steps may be put in order by: lowest first. */
 const ORDERS_STEPS: readonly string[] = ['int', 'number', 'decimal', 'day', 'instant', 'text'];
 
-/** `42 §4.2`'s `Glyph`: a `section`'s icon names one. */
+/** `42 §4.2`'s `Glyph`: a block's icon names one, whatever its kind. */
 const GLYPH = /^[a-z][a-z0-9-]{0,31}$/u;
 
 /** `06 §1.1`: at most 24 blocks, 1–16 `requires`, and the twelfths a `span` is measured in. */
@@ -1226,8 +1226,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         );
     }
 
-    /* A `section`'s keys. Another kind carrying one is refused above by `KEY_KINDS`; here only the shape is checked,
-       because `fold: 'yes'` would draw a section shut by accident. */
+    /* A `section`'s fold, and the icon any block may carry. Another kind carrying `fold` is refused above by
+       `KEY_KINDS`; here only the shape is checked, because `fold: 'yes'` would draw a section shut by accident and an
+       icon that names no glyph draws an empty well. */
     if (block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
@@ -1396,7 +1397,22 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (!Array.isArray(columns) || columns.length === 0 || columns.length > COLUMN_CEILING)
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${COLUMN_CEILING} columns.`, at);
       const roles = new Map<string, number>();
-      for (const column of columns as { field?: unknown; as?: unknown }[]) {
+      for (const column of columns as { field?: unknown; as?: unknown; metric?: unknown }[]) {
+        /* A CARD'S TREND MAY NAME A FIGURE IN PLACE OF A FIELD, grouped by a date bucket and read once a card with
+           `{{field}}` in its id filled from the card's row (`pages.ts` `trendsOf`). Nothing else draws a figure in a
+           column, so a `metric:` anywhere else would install and draw nothing. */
+        if (column !== null && typeof column === 'object' && column.metric !== undefined) {
+          if (block.kind !== 'cards' || column.as !== 'trend')
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column a metric:, which only a card's trend reads: { metric, as: trend } on a cards block.`, at);
+          if (column.field !== undefined)
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column both a field and a metric. A trend column names the figure alone.`, at);
+          if (typeof column.metric !== 'string' || !METRIC_ID.test(metricNamed(column.metric)))
+            return bad('DECLARATION_INVALID', `${id}.${at}'s trend names a figure by its id, with {{field}} after a colon for a figure of each card, as project-done-by-week:{{name}}.`, at);
+          const n = (roles.get('trend') ?? 0) + 1;
+          roles.set('trend', n);
+          if (n > 1) return bad('OUT_OF_BOUNDS', `${id}.${at} has ${n} columns as trend. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`, at);
+          continue;
+        }
         if (typeof column?.field !== 'string' || column.field === '')
           return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(column?.field ?? null)} as a column, and a column names a field.`, at);
         /* `as` IS A COLUMN'S ROLE ON A CARD, and only a `cards` block reads it. On any other kind it

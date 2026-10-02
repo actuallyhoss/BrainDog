@@ -5,7 +5,7 @@
  * the rows of whatever list was called `fx`, read by four fixed field names, and `meet` wrote the list called `people`
  * by six. Measured: the same rates under the id `rates`, or under `fx` called `from`, `to`, `price` and `day`,
  * converted nothing, and a list called `contacts` with exactly People's fields could not be met into. A register now
- * says `rates: { currency, base, rate, as_of }` or `meets: { name, email, met, merged_into, handles?, projects? }`,
+ * says `rates: { currency, base, rate, as_of }` or `meets: { name, email, met, merged_into, handles?, projects?, in_touch? }`,
  * each part naming the field that plays it, beside `scopes:` which already works this way.
  *
  * ONE KEY PER ROLE, EVERY PART NAMED. A generic `role: rates` would have had to fix the field names again, which is
@@ -31,8 +31,14 @@ export type RoleList = { id: string; fields?: readonly RoleField[]; rates?: unkn
 
 export type RoleKey = 'rates' | 'meets';
 
-/** One part of a role: the types its field may be, what that is in words, and whether a role may leave it out. */
-export type Part = { part: string; types: readonly string[]; of?: string; says: string; optional?: true; to?: 'self' | 'projects' };
+/**
+ * One part of a role: the types its field may be, what that is in words, and whether a role may leave it out.
+ *
+ * `later` IS A PART ADDED AFTER THE NAMED LISTS' FIELDS WERE FIXED. A keyless `people` from before it has no such field,
+ * and requiring it there would refuse every meet on a record nobody touched, so a keyless list plays a later part only
+ * when it has a field of that name that plays it.
+ */
+export type Part = { part: string; types: readonly string[]; of?: string; says: string; optional?: true; to?: 'self' | 'projects'; later?: true };
 
 /**
  * What each part's field must be, in the order `meet` has always checked them, so a refusal names the same field
@@ -55,6 +61,7 @@ export const PARTS: Readonly<Record<RoleKey, readonly Part[]>> = {
     { part: 'projects', types: ['list'], of: 'ref', says: 'a list of refs to projects', optional: true, to: 'projects' },
     { part: 'met', types: ['list'], of: 'text', says: 'a list of text' },
     { part: 'merged_into', types: ['ref'], says: 'a ref to its own list', to: 'self' },
+    { part: 'in_touch', types: ['day'], says: 'a day', optional: true, later: true },
   ],
 };
 
@@ -68,7 +75,8 @@ export const HOLDS: Readonly<Record<RoleKey, string>> = { rates: 'the rates', me
 export type RatesFields = { currency: string; base: string; rate: string; as_of: string };
 
 /** The parts of the people `meet` writes, each naming its field. */
-export type MeetsFields = { name: string; email: string; met: string; merged_into: string; handles?: string; projects?: string };
+/** `in_touch` is the last day they were in touch, which `meet` moves to the day of the line it writes. */
+export type MeetsFields = { name: string; email: string; met: string; merged_into: string; handles?: string; projects?: string; in_touch?: string };
 
 /** A role resolved: the list that plays it, each part's field, and whether the list declared it or was found by name. */
 export type Role<F> = { register: string; fields: F; declared: boolean };
@@ -101,7 +109,10 @@ function roleOf(key: RoleKey, lists: Iterable<RoleList>): Role<Record<string, st
     return { register: one.id, fields: { ...fields }, declared: true };
   }
   const legacy = all.find((l) => l.id === LEGACY[key]);
-  return legacy ? { register: legacy.id, fields: named(key), declared: false } : null;
+  if (!legacy) return null;
+  const fields = named(key);
+  for (const p of PARTS[key]) if (p.later === true && !plays(p, legacy.fields?.find((f) => f.id === p.part))) delete fields[p.part];
+  return { register: legacy.id, fields, declared: false };
 }
 
 /** The list holding the record's rates. */

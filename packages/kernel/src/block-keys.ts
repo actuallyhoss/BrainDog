@@ -26,11 +26,12 @@ const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined 
  * The keys a block declaration may carry, whatever its kind.
  *
  * `area` puts the block in a page's main column or its rail, which a page with a `layout` has (`declare.ts` refuses it
- * on a page without one).
+ * on a page without one). `icon` is the glyph in the well beside a block's heading, so every tile wears one; it was a
+ * section's alone, and a page that gave its stat tile a glyph was refused at install while the host drew it fine.
  */
 const GENERAL = [
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit', 'target', 'authored', 'empty',
-  'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area',
+  'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area', 'icon',
 ] as const;
 
 /**
@@ -62,7 +63,6 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   tones: ['bar', 'split'],
   document: ['note'],
   fold: ['section'],
-  icon: ['section'],
   box: ['section'],
   panel: ['section'],
   tiles: ['queue'],
@@ -125,7 +125,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',
   'scope_marks', 'feed', 'seen', 'history', 'values', 'bars', 'measures', 'past', 'changes', 'working_now', 'lateness',
   'late_name', 'sells', 'fx',
-  'fills', 'rings', 'queue', 'nexts', 'done_now', 'next', 'open', 'types', 'home',
+  'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
   'short_now', 'window', 'files',
 ];
 
@@ -172,7 +172,6 @@ export const unreadBlockKey = (key: string): string =>
 const WRONG_KIND: Readonly<Record<string, string>> = {
   first: 'To draw fewer rows, write limit: instead.',
   lead: 'Take it off, or draw these rows as cards.',
-  icon: 'Put a section before this block and give the section the icon.',
   fold: 'Put a section before this block and fold the section.',
   box: 'Put a section before this block and give the section box: true.',
   register: 'A block that reads rows names them with source: register.<id>.',

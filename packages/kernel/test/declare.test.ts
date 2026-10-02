@@ -972,6 +972,17 @@ test('A SECTION AND A CARDS BLOCK INSTALL, and a column is one role on a card', 
   assert.equal(refusedWith(cards([{ field: 'what' }], { icon: 'A Receipt' })), 'DECLARATION_INVALID');
 });
 
+test('EVERY BLOCK MAY WEAR AN ICON, and its shape is still checked', () => {
+  /* A tile's heading has an icon well whatever its kind, so `icon` is general: a stat with a glyph installs, and one
+     whose icon names no glyph is refused at the block, not drawn as an empty well. */
+  const stat = (icon: unknown) =>
+    page({ blocks: [{ kind: 'stat', heading: 'Owed', icon, cells: [{ label: 'Open', metric: 'open-count' }] }] });
+  assert.equal(refusedWith(stat('chart-column')), null);
+  const bad = validateDeclaration(stat('A Chart'));
+  assert.equal(`${bad?.code} at ${bad?.at}`, 'DECLARATION_INVALID at blocks[0]');
+  assert.match(bad?.fix ?? '', /glyph/);
+});
+
 test('A PACK BLOCK KIND IS ITS SPEC, and a malformed one is refused with the key named', () => {
   /* The renderer draws a pack's kind from the spec it declares (`kindSpec`), so every number in it is checked at install
      and not first seen by a reader. */
