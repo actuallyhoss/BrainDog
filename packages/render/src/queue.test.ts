@@ -128,3 +128,26 @@ test('a well-formed queue has no fault', () => {
     null,
   );
 });
+
+test('A `does` LINE BELONGS TO THE QUESTION ABOVE IT, in order, and one before any question is a fault', () => {
+  const plan = queuePlan(
+    rows(
+      ['q', 's1', 'Slash', 'now', 'Install Money?', ''],
+      ['does', 's1', 'Adds a Money page'],
+      ['opt', 's1', 'accept', 'Install it', '', ''],
+      ['does', 's1', 'Adds 3 accounts'],
+      ['does', 's1', ''],
+      ['q', 's2', 'Claude', 'now', 'Raise it?', ''],
+      ['opt', 's2', 'raise', 'Raise it', '', ''],
+    ),
+  );
+  assert.deepEqual(plan.items.map((i) => i.does), [['Adds a Money page', 'Adds 3 accounts'], []]);
+  assert.equal(queueFault([['does', 's1', 'Adds a page'], ['q', 's1', 'C', 'now', 'Q?', ''], ['opt', 's1', 'a', 'A', '', '']]), 'a line of what it changes before any question');
+  assert.equal(queueFault([['q', 's1', 'C', 'now', 'Q?', ''], ['does', 's1', 'Adds a page'], ['opt', 's1', 'a', 'A', '', '']]), null);
+  assert.equal(queueFault([['q', 's1', 'C', 'now', 'Q?', ''], ['does', 's1', 'Adds a page']]), 'a question with no way to answer it', 'a line of what it changes is not a way to answer');
+});
+
+test('THE BAND FOR ADDING THINGS SAYS SO IN THE PERSON\'S WORDS, not the system\'s', () => {
+  for (const word of Object.values(QUEUE_COSTS)) assert.doesNotMatch(word, /\brows?\b|\blist\b|\bentit/u, word);
+  assert.equal(QUEUE_COSTS.rows, 'Adds to your things');
+});

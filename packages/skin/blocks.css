@@ -440,6 +440,20 @@
     margin-block-start: var(--sp-1);
   }
 
+  /* A TASK WITH A MENU TAKES A FOURTH TRACK at the end of its first line for the control, so the state keeps its own and
+     nothing on the row moves when a host passes `onmenu`. */
+  .list > .item:has(> .item-more) {
+    grid-template-areas:
+      'marker title state more'
+      '. detail detail detail'
+      '. meta meta meta';
+    grid-template-columns: auto minmax(min(16ch, 100%), 1fr) auto auto;
+  }
+
+  .list > .item > .item-more {
+    grid-area: more;
+  }
+
   .list > .item > :is(.item-detail, .item-meta, .item-state):empty {
     display: none;
   }
@@ -524,6 +538,71 @@
     padding: 0;
     background-color: transparent;
     cursor: pointer;
+  }
+
+  /* A TITLE THAT OPENS ITS TASK IS STILL THE TITLE: the button takes the words' own type and colour, no face of its own,
+     and says it can be pressed only under the pointer or the keyboard, with the underline a link wears. */
+  .item-open {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .item-open:hover,
+  .item-open:focus-visible {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  /* AND UNDER A THUMB THE TITLE IS A 44px TARGET, though its words are one 23px line. `.tap`'s trick, as a bar part's
+     name takes it (`kinds/proportional.css`): an invisible box grown round the button, so the words do not move and the
+     row keeps its look. A title that wraps to two lines is already taller than the tap and grows nothing. */
+  @media (pointer: coarse) {
+    .item-open {
+      position: relative;
+    }
+
+    .item-open::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2)) 0;
+    }
+  }
+
+  /* THE TASK'S MENU, THREE DOTS IN THE QUIET INK, a 28px well that shows on hover and keeps the 44px hit box `.tap`
+     gives it. Calm: it waits with the row's other secondary parts (`[data-calm]`, below). */
+  .item-more {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    inline-size: 28px;
+    block-size: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .item-more > svg {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+  }
+
+  .item-more:hover,
+  .item-more[aria-expanded='true'] {
+    background: var(--s2);
+    color: var(--ink);
   }
 
   /* A TICKED BOX IS AN INK FILL WITH THE GROUND SHOWING THROUGH AS THE TICK, as every checked control in the product is
@@ -1128,6 +1207,7 @@
 
     /* A line the record set in bold ("**due today**") is the part that needs the person, and that never waits. */
     [data-calm]:has(strong),
+    [data-calm][aria-expanded='true'],
     .list > .item:is(:hover, :focus-within, [data-focused]) > [data-calm],
     .feed-row:is(:hover, :focus-within, [data-focused]) > [data-calm],
     .feed-group:is(:hover, :focus-within) > .feed-head > [data-calm],

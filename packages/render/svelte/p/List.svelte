@@ -22,6 +22,11 @@
   row the host is on and marks it `data-focused`; `onrowfocus` tells the host when Tab or a click lands in a row, so
   its j/k walk starts from where the reader is. `choose` answers the queue's question under the cursor with an option.
   With neither passed, nothing on the screen changes.
+
+  A TASK OPENS AND HAS A MENU ONLY WHERE THE HOST HAS ONE. With `onopen` a todo's title is a button that hands the host
+  its row, which docks it in a panel; with `onmenu` a quiet trailing control (`data-calm`, shown on hover or focus)
+  hands it the row and itself to anchor a menu to. With neither the row is exactly `toHTML`'s, the same branch the box
+  makes: a control that cannot act is absent.
 -->
 <script lang="ts">
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
@@ -46,9 +51,20 @@
     onreschedule,
     cursor,
     onrowfocus,
+    onopen,
+    onmenu,
+    onselect,
+    selected,
   }: {
     block: Block;
     opts?: RenderOptions;
+    /** Where a task's title opens it. Its absence is what keeps the title words. */
+    onopen?: ((row: Row) => void) | undefined;
+    /** Where a task's menu opens, with the control pressed to anchor it to. Its absence is what keeps the control away. */
+    onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
+    /** A queue's: where a question is chosen or let go for one answer in bulk, and which the host holds as chosen. */
+    onselect?: ((row: Row, on: boolean) => void) | undefined;
+    selected?: readonly string[] | undefined;
     /** The host's place to put the answer. Its absence is what keeps the box an image. */
     ontick?: ((row: Row, done: boolean) => void) | undefined;
     /** The same for a queue: where an answer goes. Its absence is what keeps an option a word. */
@@ -89,6 +105,8 @@
   const UNSAVED = 'Not saved';
   /** The accessible name of a box on a row whose title is empty. A control is never unnamed. */
   const TASK = 'Task';
+  /** The accessible name of a task's menu control, before the task it is for. */
+  const MORE = 'More for';
 
   /**
    * This session's answers, held BY POSITION beside the document's rather than merged into it.
@@ -145,7 +163,7 @@
 {:else if block.kind === 'agents'}
 <Agents {block} {opts} />
 {:else if block.kind === 'queue'}
-<Queue bind:this={queue} {block} {opts} {onact} {cursor} {onrowfocus} />
+<Queue bind:this={queue} {block} {opts} {onact} {cursor} {onrowfocus} {onselect} {selected} />
 {:else if block.kind === 'roadmap'}
 <Roadmap {block} {opts} {onreschedule} />
 {:else if block.kind === 'steps' && block.form === 'path'}
@@ -167,6 +185,7 @@
       <!-- `working: true`'s dot, on the cell `blocks.ts` marked, which for a todo is its own name. -->
       {@const title = takeWorking(row.cells[0] ?? '')}
       {@const meta = todoMeta(row.cells)}
+      {@const named = text(inline(title.text ?? '', opts)) || TASK}
       <li class="item" data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         {#if ontick}
           <!-- `role="checkbox"` and not a bare button: what it does is set a state, not run a verb,
@@ -183,7 +202,7 @@
             role="checkbox"
             class="item-marker tap"
             aria-checked={state.done}
-            aria-label={text(inline(takeWorking(row.cells[0] ?? '').text ?? '', opts)) || TASK}
+            aria-label={named}
             data-done={state.done ? 'yes' : 'no'}
             tabindex={i === at ? 0 : -1}
             {@attach (el) => {
@@ -192,6 +211,7 @@
                 if (boxes[i] === el) boxes[i] = null;
               };
             }}
+            onfocus={() => (at = i)}
             onclick={() => tick(i, row)}
             onkeydown={(e) => key(e, i)}>{state.done ? '✓' : ''}</button
           >
@@ -200,9 +220,23 @@
             >{row.done ? '✓' : ''}</span
           >
         {/if}
-        <span class="item-title"
-          >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
-        >
+        {#if onopen}
+          <!-- THE TITLE OPENS THE TASK, as a button inside the title's own span, so the row's tracks do not move when a
+               host passes `onopen`. A link in the title is drawn as its words here: two targets on one line of text is
+               a press that lands on the wrong one. Tab reaches it on the one row the box's roving tabindex is on, as it
+               does the menu's control, so a long list is still one stop and not two a task. -->
+          <span class="item-title"
+            ><button type="button" class="item-open" tabindex={i === at ? 0 : -1} onfocus={() => (at = i)} onclick={() => onopen?.(row)}
+              >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{text(
+                inline(title.text ?? '', opts),
+              )}</button
+            ></span
+          >
+        {:else}
+          <span class="item-title"
+            >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} /></span
+          >
+        {/if}
         <span class="item-detail"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
         <!-- THE THIRD AND FOURTH CELLS, when the row carries either, as one quiet line: when it falls due and who
              changed it last, on Work's Waiting on you. Outside the box's name on purpose, which stays the task. And
@@ -229,6 +263,23 @@
             <span class="glyph" role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span>
             {UNSAVED}
           </span>
+        {/if}
+        {#if onmenu}
+          <!-- LAST, AND QUIET: three dots that wait for the pointer or the keyboard to reach the row (`data-calm`), named
+               for the task, with the 44px hit box the tick has. -->
+          <button
+            type="button"
+            class="item-more tap"
+            data-calm=""
+            aria-haspopup="menu"
+            aria-label="{MORE} {named}"
+            tabindex={i === at ? 0 : -1}
+            onfocus={() => (at = i)}
+            onclick={(e) => onmenu?.(row, e.currentTarget)}
+            ><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"
+              ><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg
+            ></button
+          >
         {/if}
       </li>
     {:else if block.kind === 'timeline'}

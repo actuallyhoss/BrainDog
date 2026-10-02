@@ -218,6 +218,80 @@
     font-size: var(--t-xs);
   }
 
+  /* `queue lead`: THE FIRST QUESTION, READ WHOLE. One step larger than the cards under it and nothing louder: no well,
+     no border, no colour of its own. What accepting it changes is a short list in the quiet ink, a hairline down its
+     start the only mark, so the consequences read as a part of the question and not as a second card. */
+  .queue-lead {
+    gap: var(--sp-3);
+    padding-block-end: var(--sp-5);
+  }
+
+  .queue-lead > .queue-question {
+    font-size: var(--t-xl);
+  }
+
+  /* The line above its ways already says which one is recommended, so the option's own pill would say it a second time
+     on the one card read whole. The option keeps `data-recommended`, and with it the ink fill where it can be pressed. */
+  .queue-lead .queue-rec {
+    display: none;
+  }
+
+  .queue-does {
+    display: grid;
+    gap: var(--sp-1);
+    max-inline-size: var(--measure);
+    margin: 0;
+    padding: 0 0 0 var(--sp-3);
+    border-inline-start: 2px solid var(--line);
+    list-style: none;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  /* A BOX FOR ONE ANSWER IN BULK, drawn only where the host takes one: the task's box (`blocks.css`) squared, because
+     choosing a question is not finishing a task. In its own track at the start of the card, the card's parts in the
+     track beside it, so their edge does not move as boxes come and go between questions. */
+  .queue-card:has(> .queue-select) {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--sp-3);
+  }
+
+  .queue-card:has(> .queue-select) > :not(.queue-select) {
+    grid-column: 2;
+  }
+
+  .queue-select {
+    appearance: none;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 20px;
+    block-size: 20px;
+    margin-block-start: 2px;
+    padding: 0;
+    border: 1.5px solid var(--edge);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--on-ink);
+    font-size: var(--t-xs);
+    cursor: pointer;
+  }
+
+  .queue-select[aria-checked='true'] {
+    background: var(--on);
+    border-color: var(--on);
+  }
+
+  /* A CHOSEN QUESTION IS THE RAISED SURFACE the cursor band uses, and nothing louder: the box says it in shape. */
+  .queue-card[data-selected]:not([data-focused]) {
+    border-radius: var(--r-md);
+    background: var(--s1);
+    box-shadow: 0 0 0 var(--sp-2) var(--s1);
+  }
+
   .queue-more,
   .queue-empty {
     max-inline-size: var(--measure);

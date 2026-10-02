@@ -287,7 +287,9 @@ const TABLE = {
      is also the order the rows arrive in. Page-only, because the questions are the record's own. */
   /* An option row's seventh cell is what the option IS (`swatch:`, `figure:` or `file:`), and the `tiles` form draws a
      tile per question led by its recommended option's visual, the ways to answer folded under it. */
-  queue: { primitive: 'list', cells: 7, forms: ['tiles'], tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
+  /* The `lead` form draws its first question whole, the one a person answers next: its recommendation, its why and
+     its `does` lines (what accepting it changes), the rest of the questions as cards under it. */
+  queue: { primitive: 'list', cells: 7, forms: ['tiles', 'lead'], tone: true, pageOnly: true, minSpan: 6, purpose: 'list' },
   /* The one-line add (`src/capture.ts`): `into | register | label | where` once, then `set | field | value` for each
      equality a new row inherits. On the panel, because it is one bounded field and not rows of anything. Page-only,
      because what it writes into is the record's, and a write-up has no host to write with. */

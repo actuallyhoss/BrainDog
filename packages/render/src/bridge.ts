@@ -111,6 +111,6 @@ export const bridgeSentence = (rows: readonly { label: string; value: string }[]
 /** The heads of the fold's table: each row's label, then its amount as written. */
 export const BRIDGE_STEP = 'Step';
 export const BRIDGE_AMOUNT = 'Amount';
-export const BRIDGE_UNKNOWN = 'A row here has no number, so the bars are not drawn.';
+export const BRIDGE_UNKNOWN = 'One step has no number, so the bars are not drawn.';
 export const bridgeOff = (sum: number, end: number): string =>
-  `These rows do not add up: the start and the movements come to ${said(sum)}, and the end says ${said(end)}.`;
+  `These steps do not add up: the start and the movements come to ${said(sum)}, and the end says ${said(end)}.`;

@@ -42,6 +42,10 @@
     onpath,
     cursor,
     onrowfocus,
+    onopen,
+    onmenu,
+    onselect,
+    selected,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -93,6 +97,19 @@
      */
     cursor?: string | null | undefined;
     onrowfocus?: ((key: string, row: Row) => void) | undefined;
+    /**
+     * A TASK'S TWO VERBS, READS OF THE HOST'S AND NOT WRITES: open the row (a docked panel), and its menu, anchored to
+     * the control pressed. Handed to the list primitive, whose `todo` rows draw a title button and a quiet trailing
+     * control only when each is passed.
+     */
+    onopen?: ((row: Row) => void) | undefined;
+    onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
+    /**
+     * A QUEUE'S BULK CHOICE: a box on each question only when `onselect` is passed, and which questions the host holds
+     * as chosen, by `rowKey`, where it holds them. Handed to the list primitive, which hands it to the queue alone.
+     */
+    onselect?: ((row: Row, on: boolean) => void) | undefined;
+    selected?: readonly string[] | undefined;
   } = $props();
 
   /** The list this block draws through, so `choose` can reach its queue. */
@@ -176,7 +193,7 @@
          to the union the other six are in, it is a prop none of them declares. -->
     <Grid {block} {opts} {onmove} />
   {:else if spec.primitive === 'list'}
-    <List bind:this={list} {block} {opts} {ontick} {onact} {onreschedule} {cursor} {onrowfocus} />
+    <List bind:this={list} {block} {opts} {ontick} {onact} {onreschedule} {cursor} {onrowfocus} {onopen} {onmenu} {onselect} {selected} />
   {:else if spec.primitive === 'panel'}
     <Panel {block} {opts} {oncapture} />
   {:else if Draw}

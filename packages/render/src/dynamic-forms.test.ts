@@ -97,7 +97,7 @@ test('INPUTS IS A KIND, page-only, on the rows primitive, and every new form is 
   assert.equal(KINDS.inputs.primitive, 'rows');
   assert.deepEqual(
     Object.fromEntries((['note', 'cards', 'steps', 'queue', 'progress'] as const).map((k) => [k, KINDS[k].forms ?? []])),
-    { note: ['lead'], cards: ['lead'], steps: ['path'], queue: ['tiles'], progress: ['budget', 'range'] },
+    { note: ['lead'], cards: ['lead'], steps: ['path'], queue: ['tiles', 'lead'], progress: ['budget', 'range'] },
   );
   for (const src of ['```note lead\nThree of nine are done.\n```', '```steps path | The path\nCut | x | next\n```', '```progress range | Budget\nBox | £10 | £5 | £20\n```'])
     assert.equal(one(src).type, 'block', src);

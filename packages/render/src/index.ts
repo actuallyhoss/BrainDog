@@ -15,7 +15,7 @@
  */
 
 export { parse, splitRow, type Block, type Degraded, type Markdown, type ParseOptions, type Row, type RowRef, type Segment } from './parse.ts';
-export { toHTML, captioned, describe, escape, holeLabel, hrefFor, verbatimText, type RenderOptions } from './html.ts';
+export { toHTML, filtersHTML, captioned, describe, escape, holeLabel, hrefFor, verbatimText, type RenderOptions } from './html.ts';
 export {
   CARD_ROLES,
   CARDS_NEXT,
@@ -40,6 +40,7 @@ export { AGENTS_EARLIER, AGENTS_NOTHING, AGENT_VERBS, agentDoing, agentsPlan, ty
 export {
   QUEUE_CLEARED,
   QUEUE_COSTS,
+  QUEUE_DOES,
   QUEUE_RECOMMENDED,
   QUEUE_ROWS,
   fileSrc,
@@ -69,6 +70,18 @@ export {
 } from './capture.ts';
 export { takeWorking, workingCell, WORKING_GLYPH, WORKING_LABEL, WORKING_MARK } from './working.ts';
 export { CHOICE_KEYS, choiceOf, rowAt, rowKey } from './cursor.ts';
+export {
+  FILTERS_ALL,
+  FILTER_CHIPS,
+  SEGMENTED_MOST,
+  filtersMore,
+  filtersPlan,
+  type Filter,
+  type FilterChoice,
+  type FilterPlan,
+  type FilterValue,
+  type OnFilter,
+} from './filters.ts';
 export { timelineDays } from './timeline.ts';
 export {
   TABLE_CHUNK,

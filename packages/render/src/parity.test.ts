@@ -147,6 +147,13 @@ const SHAPES: Record<string, string> = {
      none, and every queue written before the ranking existed is this shape. (A band that is spelled
      and unknown is a FAULT and degrades the block, so it cannot be a parity shape: it is asserted in
      `queue.test.ts`.) */
+  /* THE LEAD FORM: the first question whole, what it recommends, why, and what accepting it changes; the second the
+     card it always was, its own `does` line left for when it leads. */
+  'a queue led by its first question, with what accepting it changes':
+    '```queue lead\nq | s1 | Slash | 3h ago | Install Money? | You track three accounts by hand. | shape\n' +
+    'does | s1 | Adds a Money page\ndoes | s1 | Adds **3** accounts to your things\n' +
+    'opt | s1 | accept | Install it |  | true\nopt | s1 | reject | Not now |  | \n' +
+    'q | s2 | Claude | 1d ago | Raise the retainer? |  | call\ndoes | s2 | Changes one figure\nopt | s2 | raise | Raise it |  | \nmore | 2 | /decide\n```',
   'a queue whose question came with no band':
     '```queue\nq | s1 | Claude | now | Which? | \nopt | s1 | a | A |  | \n```',
   'a diff with a change in the middle':
@@ -525,4 +532,92 @@ test('SECONDARY LINES ARE MARKED CALM in both renderers: a task\'s due line, whe
     assert.match(toHTML([block]), /data-calm=""/u, name);
     assert.match(render(Block, { props: { block } }).body, /data-calm=""/u, name);
   }
+});
+
+/* ── a task's two verbs, a queue's lead and bulk choice, and the filter strip ─────────────────────── */
+
+const TASKS = '```todo\n[ ] Check the export | blocked on the bank | due 24 Sep | \n[x] Send the quote\n[ ] [Kiln](/r/things/1) launch\n```';
+type Verbs = { block: BlockSegment; onopen?: (row: unknown) => void; onmenu?: (row: unknown, anchor: unknown) => void };
+
+test('A TASK\'S TITLE OPENS IT AND ITS MORE CONTROL IS QUIET only where the host passes each, and neither touches the box', () => {
+  const block = page(TASKS);
+  const Verbed = Block as unknown as Component<Verbs>;
+  const bare = tree(render(Block, { props: { block } }).body);
+  assert.equal(bare, tree(toHTML([block])), 'with neither, the markup is the mirror\'s');
+  assert.doesNotMatch(bare, /item-open|item-more|<button/u);
+
+  const opened = tree(render(Verbed, { props: { block, onopen: () => {} } }).body);
+  const titles = [...opened.matchAll(/<span class="item-title"><button class="item-open" tabindex="(?:0|-1)" type="button">([^<]*)<\/button><\/span>/gu)].map((m) => m[1]);
+  assert.deepEqual(titles, ['Check the export', 'Send the quote', 'Kiln launch'], 'a link in a title is its words inside the button');
+  assert.doesNotMatch(opened, /<button[^>]*><a /u, 'no link inside a button');
+  assert.doesNotMatch(opened, /item-more/u);
+
+  const menued = tree(render(Verbed, { props: { block, onmenu: () => {} } }).body);
+  const more = [...menued.matchAll(/<button [^>]*class="item-more tap"[^>]*>/gu)].map((m) => m[0]);
+  assert.equal(more.length, 3, 'one a task');
+  for (const b of more) assert.ok(b.includes('data-calm') && b.includes('aria-haspopup="menu"'), b);
+  /* A long list is one Tab stop and not two a task: the title and the menu ride the box's roving tabindex. */
+  assert.deepEqual(more.map((b) => /tabindex="(-?\d)"/u.exec(b)?.[1]), ['0', '-1', '-1']);
+  assert.equal((opened.match(/class="item-open" tabindex="0"/gu) ?? []).length, 1);
+  assert.ok(more[0]!.includes('aria-label="More for Check the export"'), more[0]);
+  assert.doesNotMatch(menued, /item-open/u);
+  /* The rest of the row is the mirror's, the control taken off. */
+  assert.equal(menued.replace(/<button [^>]*class="item-more tap"[^>]*>.*?<\/button>/gu, ''), bare);
+});
+
+test('THE LEAD QUESTION IS DRAWN WHOLE in both renderers, and only the first: its recommendation, why and what it changes', () => {
+  const block = page(SHAPES['a queue led by its first question, with what accepting it changes']!);
+  for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
+    const cards = drawn.split('<article').slice(1);
+    assert.equal(cards.length, 2);
+    assert.match(cards[0]!, /class="queue-card queue-lead"/u);
+    assert.match(cards[0]!, /<p class="queue-suggested">Recommended: Install it<\/p>/u);
+    assert.match(cards[0]!, /<p class="queue-why">You track three accounts by hand\.<\/p>/u);
+    assert.match(cards[0]!, /<ul aria-label="What it changes" class="queue-does"><li class="queue-does-line">Adds a Money page<\/li><li class="queue-does-line">Adds <strong>3<\/strong> accounts to your things<\/li><\/ul>/u);
+    assert.match(cards[1]!, /^ class="queue-card"/u);
+    assert.doesNotMatch(cards[1]!, /queue-does|queue-suggested/u, 'a card under the lead keeps its consequences for when it leads');
+  }
+});
+
+test('A QUESTION CARRIES A BOX FOR ONE ANSWER IN BULK only where the host takes one, named for the question', () => {
+  const block = page(SHAPES['a queue of two questions, one recommended, with more waiting']!);
+  type Select = { block: BlockSegment; onselect?: (row: unknown, on: boolean) => void; selected?: string[] };
+  const Selectable = Block as unknown as Component<Select>;
+  assert.doesNotMatch(render(Block, { props: { block } }).body, /queue-select|data-selected/u);
+  const live = tree(render(Selectable, { props: { block, onselect: () => {}, selected: ['3'] } }).body);
+  const boxes = [...live.matchAll(/<button [^>]*class="queue-select tap"[^>]*>/gu)].map((m) => m[0]);
+  assert.equal(boxes.length, 2);
+  for (const b of boxes) assert.ok(b.includes('role="checkbox"'), b);
+  assert.ok(boxes[0]!.includes('aria-checked="false"') && boxes[0]!.includes('aria-label="Raise the retainer?"'), boxes[0]);
+  assert.ok(boxes[1]!.includes('aria-checked="true"') && boxes[1]!.includes('aria-label="Chase invoice 2026-049?"'), boxes[1]);
+  assert.equal((live.match(/data-selected/gu) ?? []).length, 1, 'the host\'s choice is the one marked');
+});
+
+const { default: Filters } = (await import(new URL('../svelte/Filters.svelte', import.meta.url).href)) as {
+  default: Component<{ filters: unknown; chosen?: Record<string, string>; onfilter?: (field: string, value: string | null) => void }>;
+};
+const { filtersHTML } = await import('./html.ts');
+const FILTERS = [
+  { field: 'project', label: 'Project', values: ['Bake', 'Nook', 'Kiln', 'Site', 'Marsh', 'Estate', 'Quiet'].map((label, i) => ({ value: String(i + 1), label, count: 9 - i })) },
+  { field: 'whose', label: 'Whose', control: 'segmented' as const, values: [{ value: 'mine', label: 'Mine', count: 4 }, { value: 'agents', label: 'Agents', count: 2 }] },
+  { field: 'empty', label: 'Nothing to choose', values: [{ value: 'x', label: 'Only', count: 1 }] },
+];
+
+test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and a select where the host can act', () => {
+  for (const chosen of [{}, { project: '7' }, { whose: 'mine' }]) {
+    const svelte = tree(render(Filters, { props: { filters: FILTERS, chosen } }).body);
+    assert.equal(svelte, tree(filtersHTML(FILTERS, chosen)), JSON.stringify(chosen));
+    assert.doesNotMatch(svelte, /<button|<select|Nothing to choose/u, 'a field with one value is not drawn');
+  }
+  const read = tree(filtersHTML(FILTERS, { project: '7' }));
+  assert.deepEqual([...read.matchAll(/<span class="filters-choice"( data-on)?>([^<]*)/gu)].slice(0, 7).map((m) => `${m[2]}${m[1] ? '*' : ''}`), ['All', 'Bake', 'Nook', 'Kiln', 'Site', 'Quiet*', 'All*'], 'the choice is drawn wherever it sits, and a field with none chosen is on All');
+  assert.match(read, /<span class="filters-more">2 more<\/span>/u);
+
+  const live = tree(render(Filters, { props: { filters: FILTERS, chosen: { whose: 'mine' }, onfilter: () => {} } }).body);
+  const pressed = [...live.matchAll(/<button aria-pressed="(true|false)" class="filters-choice" type="button">([^<]*)/gu)].map((m) => `${m[2]}${m[1] === 'true' ? '*' : ''}`);
+  assert.deepEqual(pressed, ['All*', 'Bake', 'Nook', 'Kiln', 'Site', 'Marsh', 'All', 'Mine*', 'Agents']);
+  assert.match(live, /<select aria-label="Project" class="filters-more"><option value>2 more<\/option><option value="6">Estate<\/option><option value="7">Quiet<\/option><\/select>/u);
+  assert.match(live, /aria-label="Project" class="filters-group" data-control="chips"/u, 'seven values are chips');
+  assert.match(live, /aria-label="Whose" class="filters-group" data-control="segmented"/u);
+  assert.equal(tree(render(Filters, { props: { filters: [] } }).body), '', 'nothing to narrow by draws nothing');
 });

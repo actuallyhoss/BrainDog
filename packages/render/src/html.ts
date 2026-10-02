@@ -28,7 +28,8 @@ import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, cardLayout, counted, initialOf, isQuiet, markOf, ringDash, ringOf, runFaceOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedNew, feedPlan } from './feed.ts';
-import { QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
+import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
+import { QUEUE_DOES, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueSuggested, queueWays, type QueueShows } from './queue.ts';
 import { PATH_DONE, PATH_NEXT, pathMore, pathPlan } from './path.ts';
 import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
@@ -930,13 +931,14 @@ function queue(b: Block, o: RenderOptions): string {
   if (plan.items.length === 0) return `<p class="queue-empty">${escape(plan.empty)}</p>`;
   const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
   const tiles = b.form === 'tiles';
+  const lead = b.form === 'lead';
   const body = plan.items
-    .map((item) => {
+    .map((item, n) => {
       /* `data-choice` IS THE NUMBER KEY THAT ANSWERS WITH AN OPTION, 1 to 9 (`cursor.ts`), so a host can press it. */
       const options = item.options
         .map(
-          (opt, n) =>
-            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}${n < CHOICE_KEYS ? ` data-choice="${n + 1}"` : ''}>${visual(opt.shows, o)}<span class="queue-label">${escape(opt.label)}</span>${
+          (opt, at) =>
+            `<li class="queue-option"${opt.recommended ? ' data-recommended' : ''}${at < CHOICE_KEYS ? ` data-choice="${at + 1}"` : ''}>${visual(opt.shows, o)}<span class="queue-label">${escape(opt.label)}</span>${
               opt.recommended ? `<span class="queue-rec">${escape(QUEUE_RECOMMENDED)}</span>` : ''
             }${opt.because ? `<span class="queue-because" data-calm="">${drawn(opt.because)}</span>` : ''}</li>`,
         )
@@ -951,6 +953,18 @@ function queue(b: Block, o: RenderOptions): string {
       const by = `<p class="queue-by"><span class="queue-who" data-calm="">${drawn(item.who)}</span><span class="queue-when" data-calm="">${drawn(item.when)}</span>${cost}</p>`;
       const question = `<h3 class="queue-question">${drawn(item.question)}</h3>`;
       const why = item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : '';
+      /* THE LEAD QUESTION IS DRAWN WHOLE (`queue lead`): what its agents recommend, why, and what accepting it changes,
+         a line each, above its ways to answer. Only the first, which is the one a person answers next; the rest are
+         the cards they always were. */
+      if (lead && n === 0) {
+        const suggested = item.options.find((opt) => opt.recommended);
+        const does = item.does.length
+          ? `<ul class="queue-does" aria-label="${escape(QUEUE_DOES)}">${item.does.map((line) => `<li class="queue-does-line">${drawn(line)}</li>`).join('')}</ul>`
+          : '';
+        return `<article class="queue-card queue-lead"${toneAttrs(item.row.tone)}${key}>${by}${question}${
+          suggested ? `<p class="queue-suggested">${escape(queueSuggested(suggested.label))}</p>` : ''
+        }${why}${does}<ul class="queue-options">${options}</ul></article>`;
+      }
       if (!tiles) return `<article class="queue-card"${toneAttrs(item.row.tone)}${key}>${by}${question}${why}<ul class="queue-options">${options}</ul></article>`;
       /* A TILE IS THE SAME CARD LED BY WHAT ITS RECOMMENDED OPTION IS, its ways to answer folded under it. The fold is a
          `details`, so it opens with no script in the mirror and in the app alike, and it starts shut: a tile that
@@ -1578,3 +1592,24 @@ export const describe = (b: Block, o: RenderOptions = {}): string =>
   [b.heading, ...b.rows.map((r) => r.cells.filter(Boolean).map((c) => plain(inline(c, o))).join(', '))]
     .filter(Boolean)
     .join('. ');
+
+/**
+ * A page's filter strip, read-only (`src/filters.ts`): each field as a group of words, "All" first, the choice the page
+ * is narrowed to marked `data-on`, and how many more values there are past the first few. `svelte/Filters.svelte` is
+ * its twin with no `onfilter`; with one, the same words are buttons and the rest a select.
+ */
+export function filtersHTML(filters: readonly Filter[], chosen: Readonly<Record<string, string>> = {}): string {
+  const plans = filtersPlan(filters, chosen);
+  if (plans.length === 0) return '';
+  const choice = (label: string, on: boolean, count: number | null): string =>
+    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${escape(label)}${count === null ? '' : `<span class="filters-count num" data-calm="">${count}</span>`}</span>`;
+  const groups = plans
+    .map(
+      (p) =>
+        `<div class="filters-group" role="group" aria-label="${escape(p.label)}" data-control="${p.control}" data-field="${escape(p.field)}">${choice(FILTERS_ALL, p.all, null)}${p.shown
+          .map((v) => choice(v.label, v.on, v.count))
+          .join('')}${p.rest.length ? `<span class="filters-more">${escape(filtersMore(p.rest.length))}</span>` : ''}</div>`,
+    )
+    .join('');
+  return `<div class="filters">${groups}</div>`;
+}

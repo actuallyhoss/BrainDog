@@ -42,6 +42,7 @@ export { default as Links } from './Links.svelte';
 export { default as Gallery } from './Gallery.svelte';
 export { default as Embed } from './Embed.svelte';
 export { default as Path } from './Path.svelte';
+export { default as Filters } from './Filters.svelte';
 
 /* Which body a list draws, as a fact both layers read — `Table` chooses between its own two, and a
    host chooses between this component and its own card list. Two subscriptions could disagree for a

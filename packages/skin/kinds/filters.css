@@ -1,0 +1,118 @@
+/*
+ * The filter strip over a declared page (`packages/render/svelte/Filters.svelte`, and `filtersHTML` in the mirror): one
+ * group a field, a segmented control where it has a few values and chips where it has more.
+ *
+ * Gathered by `blocks-kinds.css` with the kind sheets, because only a declared page draws it. It keeps `blocks.css`'s one
+ * rule: no colour is written, every value is a role.
+ *
+ * CALM (DIRECTION §35): one line, no box around it, the chosen value the one ink fill, every other a word on the
+ * ground that takes the second surface under the pointer. Counts wait for the pointer or the keyboard (`data-calm`).
+ */
+
+@layer components {
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-5);
+  }
+
+  .filters-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+
+  /* A SEGMENTED FIELD IS ONE TRACK of the second surface with its segments cut into it, so a few values read as one
+     control and not as a row of chips beside the next field's. */
+  .filters-group[data-control='segmented'] {
+    flex-wrap: nowrap;
+    padding: 2px;
+    border-radius: var(--r-pill);
+    background: var(--s1);
+  }
+
+  .filters-choice {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-3);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: none;
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  button.filters-choice {
+    cursor: pointer;
+  }
+
+  button.filters-choice:hover {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  /* THE CHOSEN VALUE IS THE PRIMARY'S FILL, as a checked control is everywhere in the product: ink, with the ground's
+     letters. `data-on` is the mirror's spelling of the same fact. */
+  .filters-choice:is([aria-pressed='true'], [data-on]),
+  button.filters-choice[aria-pressed='true']:hover {
+    background: var(--on);
+    color: var(--on-ink);
+  }
+
+  .filters-count {
+    color: inherit;
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE REST OF A FIELD'S VALUES, behind one native select that says how many: a quiet word with the platform's own
+     list under it. */
+  .filters-more {
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: none;
+    color: var(--dim);
+    font: inherit;
+    font-size: var(--t-sm);
+  }
+
+  select.filters-more {
+    cursor: pointer;
+  }
+
+  select.filters-more:hover {
+    background: var(--s2);
+    color: var(--ink);
+  }
+
+  @media (pointer: coarse) {
+    .filters-choice,
+    .filters-more {
+      min-block-size: var(--tap);
+    }
+
+    /* BOTH AXES: "All" is one short word, and at 40 wide it was a 40x44 target. The word sits in the middle of the
+       wider pill. */
+    .filters-choice {
+      min-inline-size: var(--tap);
+      justify-content: center;
+    }
+  }
+
+  /* The counts wait with every other secondary part (`blocks.css`), and come back when the strip is reached. */
+  @media (hover: hover) and (pointer: fine) {
+    .filters-group:is(:hover, :focus-within) [data-calm] {
+      opacity: 1;
+    }
+  }
+}

@@ -33,7 +33,7 @@ test('A BRIDGE STANDS ITS START AND END ON ZERO and floats each movement from th
 test('ROWS THAT DO NOT ADD UP ARE SAID IN WORDS, and the bars are still drawn as written', () => {
   const plan = bridgePlan([9000, 2000, -1600, 9000]);
   assert.equal(plan.bars?.length, 4);
-  assert.equal(plan.warn, 'These rows do not add up: the start and the movements come to 9,400, and the end says 9,000.');
+  assert.equal(plan.warn, 'These steps do not add up: the start and the movements come to 9,400, and the end says 9,000.');
 });
 
 test('a row with no number draws no bars and says why; under two rows there is nothing to walk', () => {
@@ -53,7 +53,7 @@ test('A BRIDGE IS A CHART NAMED BY ITS ROWS, then the rows as text with their in
   const html = toHTML(parse('```bridge | This month\nStart | £9,000\nComing in | +£2,000 | 5 invoices\nGoing out | −£1,600\nEnd of month | £9,000\n```'));
   assert.match(html, /<div class="prop bridge" style="--cells:4"><svg class="bridge-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="Start £9,000, Coming in \+£2,000, Going out −£1,600, End of month £9,000">/u);
   assert.match(html, /<li class="bridge-row" data-move="down"><span class="bridge-label">Going out<\/span><svg class="bridge-inline" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><rect class="bridge-bar" data-move="down" x="[\d.]+" y="0" width="[\d.]+" height="100"><\/rect><\/svg><span class="bridge-value num">−£1,600<\/span>/u);
-  assert.match(html, /<p class="bridge-warn" data-intent="warn"><span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>These rows do not add up/u);
+  assert.match(html, /<p class="bridge-warn" data-intent="warn"><span class="glyph" role="img" aria-label="watch this">⚠︎<\/span>These steps do not add up/u);
   assert.equal(parse('```bridge\nA | 1 | n | good\n```')[0]?.type, 'degraded', 'a bridge row takes no tone');
 });
 

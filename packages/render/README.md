@@ -178,6 +178,13 @@ and `onrowfocus(key, row)`, and exports `choose(i)`, which answers the queue que
 with option `i`. Secondary lines (a task's due line, when a feed line happened, who asked a question) wear
 `data-calm`, so a host's stylesheet can show them on hover or focus only.
 
+Three more reads draw controls only when passed, and nothing otherwise: `onopen(row)` makes a todo's title a
+button that opens it, `onmenu(row, anchor)` adds a quiet trailing "more" control to each task, and
+`onselect(row, on)` (with the host's `selected` keys, if it holds them) puts a box on each queue question for
+one answer in bulk. `queue lead` draws its first question whole: the recommendation, why, and the `does`
+rows (`does | id | line`) saying what accepting it changes. `Filters` (with `filtersHTML` as its mirror)
+is the strip a host draws over a page that names `filters:`, taking `filters`, `chosen` and `onfilter`.
+
 The subpath ships **no stylesheet**. The markup contract is the whole of what a host draws against:
 
 > Every block is one `<figure>` carrying its kind, its primitive and its tone as data attributes, with

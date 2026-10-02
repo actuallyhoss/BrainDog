@@ -21,6 +21,7 @@
  *
  *   q    | id | who | when | question | why | cost
  *   opt  | id | key | label | because | recommended | shows, optional
+ *   does | id | what accepting it changes, one line a row, optional
  *   more | n | where the rest of them are, optional
  *
  * The `more` row, last and at most one, is how many are waiting past the ones drawn, so a person
@@ -57,8 +58,13 @@
 
 import { safeHref } from './inline.ts';
 
+/**
+ * A `does` ROW IS ONE LINE OF WHAT ACCEPTING THE QUESTION ABOVE IT CHANGES ("Adds 12 tasks to Work"), written by the
+ * record from the proposal's body. Only the `lead` form draws them, on its first question, which is the one a person is
+ * about to answer: a line of consequences under every card in the list is a page of small print nobody reads.
+ */
 /** The kinds of row, by their first cell. Closed, because a row filed under none of them is a fault. */
-export const QUEUE_ROWS = ['q', 'opt', 'more'] as const;
+export const QUEUE_ROWS = ['q', 'opt', 'does', 'more'] as const;
 
 export type QueueRowKind = (typeof QUEUE_ROWS)[number];
 
@@ -70,6 +76,8 @@ const isRowKind = (s: string): s is QueueRowKind => (QUEUE_ROWS as readonly stri
  */
 export const QUEUE_CLEARED = 'Nothing is waiting on you.';
 export const QUEUE_RECOMMENDED = 'Recommended';
+/** The accessible name of the lead question's lines of what accepting it changes. Never drawn as a heading. */
+export const QUEUE_DOES = 'What it changes';
 
 /**
  * What each cost band is called on screen, and the closed set of them.
@@ -87,7 +95,7 @@ export const QUEUE_RECOMMENDED = 'Recommended';
 export const QUEUE_COSTS: Record<string, string> = {
   undo: 'Hard to undo',
   shape: 'Changes the setup',
-  rows: 'Adds rows',
+  rows: 'Adds to your things',
   call: 'Your call',
 };
 
@@ -187,6 +195,10 @@ export function queueFault(rows: readonly (readonly string[])[]): string | null 
       ended = true;
       continue;
     }
+    if (word === 'does') {
+      if (!open) return 'a line of what it changes before any question';
+      continue;
+    }
     if (word === 'q') {
       if (open && options === 0) return 'a question with no way to answer it';
       /* A BAND WITH NO WORD IS A FAULT, AND NO BAND AT ALL IS NOT. A host writing a queue by hand may
@@ -236,6 +248,8 @@ export type QueueItem<R> = {
   /** That band's word, or `''` for a band this package has no word for. */
   costLabel: string;
   options: QueueOption<R>[];
+  /** What accepting it changes, a line each, from its `does` rows. Empty when the record wrote none. */
+  does: string[];
 };
 
 const cell = (cells: readonly string[], i: number): string => (cells[i] ?? '').trim();
@@ -263,12 +277,17 @@ export function queuePlan<R extends { cells: readonly string[] }>(rows: readonly
     }
     if (word === 'q') {
       const band = cell(row.cells, 6);
-      items.push({ row, id: cell(row.cells, 1), who: cell(row.cells, 2), when: cell(row.cells, 3), question: cell(row.cells, 4), why: cell(row.cells, 5), cost: band, costLabel: queueCost(band), options: [] });
+      items.push({ row, id: cell(row.cells, 1), who: cell(row.cells, 2), when: cell(row.cells, 3), question: cell(row.cells, 4), why: cell(row.cells, 5), cost: band, costLabel: queueCost(band), options: [], does: [] });
       continue;
     }
-    if (word !== 'opt') continue;
+    if (word !== 'opt' && word !== 'does') continue;
     const at = items.at(-1);
     if (!at) continue;
+    if (word === 'does') {
+      const line = cell(row.cells, 2);
+      if (line !== '') at.does.push(line);
+      continue;
+    }
     at.options.push({
       row,
       key: cell(row.cells, 2),

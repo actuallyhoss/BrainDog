@@ -26,10 +26,17 @@
   cursor (or the first) with option `i`, so a host binds 1-9 without reaching into the markup. The key is drawn as a cap
   beside each option of that one question only, and only where the host walks a cursor and can act: a hint for a key
   that does nothing is noise, and on every card at once it is a chip cloud.
+
+  THE `lead` FORM DRAWS THE FIRST QUESTION WHOLE: what its agents recommend, why, and what accepting it changes, a line
+  each (`does`), above its ways to answer. The rest are the cards they always were.
+
+  A QUESTION CAN BE CHOSEN FOR AN ANSWER IN BULK ONLY WHERE THE HOST TAKES ONE. With `onselect` each card leads with a
+  box named for its question; without it there is no box, and the markup is `toHTML`'s. Which are chosen is the host's
+  to say in `selected` (by `rowKey`) where it holds that, and this card's own otherwise, dropped when the fence changes.
 -->
 <script lang="ts">
-  import { QUEUE_RECOMMENDED, hrefFor, inline, queueMore, queuePlan, type Block, type RenderOptions, type Row } from '../src/index.ts';
-  import { fileSrc, queueSuggested, queueWays, type QueueShows } from '../src/queue.ts';
+  import { QUEUE_RECOMMENDED, hrefFor, inline, queueMore, queuePlan, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { QUEUE_DOES, fileSrc, queueSuggested, queueWays, type QueueShows } from '../src/queue.ts';
   import { CHOICE_KEYS, choiceOf, rowAt, rowKey } from '../src/cursor.ts';
   import Text from './Text.svelte';
 
@@ -39,11 +46,17 @@
     onact,
     cursor,
     onrowfocus,
+    onselect,
+    selected,
   }: {
     block: Block;
     opts?: RenderOptions;
     /** The host's place to put the answer: the question's row, and the id of the option pressed. */
     onact?: ((row: Row, option: string) => void) | undefined;
+    /** Where the host hears a question chosen or let go for one answer in bulk. Its absence is what keeps the box away. */
+    onselect?: ((row: Row, on: boolean) => void) | undefined;
+    /** The keys (`rowKey`) of the questions the host holds as chosen, where it holds them rather than this card. */
+    selected?: readonly string[] | undefined;
     /** The key of the question the host's cursor is on (`rowKey`), drawn `data-focused`. */
     cursor?: string | null | undefined;
     /** Where the host hears that focus moved into a question, with its key and row. */
@@ -69,8 +82,29 @@
     if (key != null && row) onrowfocus?.(key, row);
   }
 
+  /* THIS CARD'S OWN CHOICE, where the host holds none, belonging to one fence as `List`'s ticks do. */
+  let mine = $state(new Set<string>());
+  let drawn = $state('');
+  $effect(() => {
+    if (block.raw === drawn) return;
+    drawn = block.raw;
+    mine = new Set();
+  });
+  const isOn = (key: string): boolean => (selected ? selected.includes(key) : mine.has(key));
+  function pick(row: Row, key: string) {
+    const on = !isOn(key);
+    if (!selected) {
+      const next = new Set(mine);
+      if (on) next.add(key);
+      else next.delete(key);
+      mine = next;
+    }
+    onselect?.(row, on);
+  }
+
   const plan = $derived(queuePlan(block.rows));
   const tiles = $derived(block.form === 'tiles');
+  const lead = $derived(block.form === 'lead');
   const nodes = (v: string | undefined) => inline(v ?? '', opts);
   /** A file visual's address, only where the host gave one of its own (`fileSrc`). */
   const src = (shows: QueueShows): string | null => ('file' in shows ? fileSrc(opts.file?.(shows.file.row, shows.file.field)) : null);
@@ -107,11 +141,31 @@
   <p class="queue-empty">{plan.empty}</p>
 {:else}
   <div class="queue" onfocusin={onrowfocus ? focused : undefined}>
-    {#each plan.items as item}
-      {@const suggested = tiles ? item.options.find((o) => o.recommended) : undefined}
+    {#each plan.items as item, n}
+      {@const whole = lead && n === 0}
+      {@const suggested = tiles || whole ? item.options.find((o) => o.recommended) : undefined}
       {@const key = keyOf(item.row)}
-      <article class={tiles ? 'queue-card queue-tile' : 'queue-card'} data-intent={item.row.tone} data-row={key} data-focused={cursor === key ? '' : undefined}>
-        {#if suggested}{@render visual(suggested.shows)}{/if}
+      {@const on = onselect ? isOn(key) : false}
+      <article
+        class={tiles ? 'queue-card queue-tile' : whole ? 'queue-card queue-lead' : 'queue-card'}
+        data-intent={item.row.tone}
+        data-row={key}
+        data-focused={cursor === key ? '' : undefined}
+        data-selected={on ? '' : undefined}
+      >
+        {#if onselect}
+          <!-- The box `List` draws for a task, named for the question alone, so "Raise the retainer?, checkbox, not
+               checked" is what a reader hears. The 44px hit area is the `tap` pseudo-element and costs no layout. -->
+          <button
+            type="button"
+            role="checkbox"
+            class="queue-select tap"
+            aria-checked={on}
+            aria-label={text(nodes(item.question)) || item.id}
+            onclick={() => pick(item.row, key)}>{on ? '✓' : ''}</button
+          >
+        {/if}
+        {#if suggested && tiles}{@render visual(suggested.shows)}{/if}
         <!-- The band is a label and not an argument: last on the by-line, in the same register as who
              asked and when, because it answers "why is this card here" rather than being the card. -->
         <p class="queue-by">
@@ -122,6 +176,11 @@
         <h3 class="queue-question"><Text nodes={nodes(item.question)} {opts} /></h3>
         {#if suggested}<p class="queue-suggested">{queueSuggested(suggested.label)}</p>{/if}
         {#if item.why}<p class="queue-why"><Text nodes={nodes(item.why)} {opts} /></p>{/if}
+        {#if whole && item.does.length}
+          <ul class="queue-does" aria-label={QUEUE_DOES}>
+            {#each item.does as line}<li class="queue-does-line"><Text nodes={nodes(line)} {opts} /></li>{/each}
+          </ul>
+        {/if}
         {#if tiles}
           <details class="queue-ways">
             <summary class="queue-ways-toggle">{queueWays(item.options.length)}</summary>
