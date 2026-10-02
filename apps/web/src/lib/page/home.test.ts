@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import type { LiveBlock } from '../record/page-live.ts';
-import { emptyHidden, foldOf, FOLD_AT, holdsNothing, openOf, optionOf, stepRow } from './home.ts';
+import { emptyHidden, foldOf, FOLD_AT, holdsNothing, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
 
 /** A block as the record answers one, holding nothing unless the case says what. */
 const block = (over: Partial<LiveBlock> & { kind: string }): LiveBlock =>
@@ -109,6 +109,25 @@ test('THE ENDS HOLD, and a place past the end is read as nowhere', () => {
   assert.equal(stepRow(3, 0, -1), 0);
   assert.equal(stepRow(3, 1, 1), 2);
   assert.equal(stepRow(3, 7, 1), 0);
+});
+
+test('TWO LISTS IN ONE BLOCK THAT NUMBER THEIR ROWS ALIKE ARE STILL SIX ROWS, so j walks past the first three', () => {
+  /* Kiln's notes draw two lists, each `0 1 2`. With one key for two rows the cursor found the fourth as the first, and
+     `j` went round the same rows for ever. */
+  const keys = rowKeys([
+    { slot: 'b-11', row: '0' },
+    { slot: 'b-11', row: '1' },
+    ...['0', '1', '2', '0', '1', '2'].map((row) => ({ slot: 'b-12', row })),
+  ]);
+  assert.equal(new Set(keys).size, keys.length, keys.join(' '));
+  assert.deepEqual(keys.slice(2), ['b-12|0', 'b-12|1', 'b-12|2', 'b-12|@3', 'b-12|@4', 'b-12|@5']);
+  keys.forEach((key, at) => assert.equal(keys.indexOf(key), at, 'each row is found where it is drawn'));
+});
+
+test('A ROW WITH NO ID IS HELD BY ITS PLACE IN ITS BLOCK, and a whole block by a key no row can have', () => {
+  assert.deepEqual(rowKeys([{ slot: 'b-1', row: undefined }, { slot: 'b-1', row: 'tasks#3' }, { slot: 'b-2', row: undefined }]), ['b-1|@0', 'b-1|tasks#3', 'b-2|@0']);
+  assert.equal(wholeKey('b-8'), 'b-8|@block');
+  assert.ok(!rowKeys([{ slot: 'b-8', row: 'block' }]).includes(wholeKey('b-8')));
 });
 
 test('1 TO 9 ANSWER THE FIRST TO THE NINTH OPTION, and no other key answers', () => {

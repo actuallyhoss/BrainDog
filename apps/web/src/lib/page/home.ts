@@ -107,6 +107,30 @@ export function foldOf(kind: string, count: number, open: boolean): { shown: num
 /* ── the row cursor ────────────────────────────────────────────────────────── */
 
 /**
+ * The key the cursor holds each row by, in the order the page draws them: its block and its own id, or its place in the
+ * block where it has none (`@n`).
+ *
+ * ONE KEY PER ROW, EVEN WHEN TWO LISTS IN ONE BLOCK NUMBER THEIR ROWS ALIKE. A prose block with two lists in it draws
+ * `0 1 2` twice, and the cursor finds its row by key, so the fourth row read as the first and `j` went round the same
+ * six rows of Kiln's notes for ever. A repeat is told apart by its place in the block, which no id can collide with.
+ */
+export function rowKeys(rows: readonly { slot: string; row: string | undefined }[]): string[] {
+  const seen = new Set<string>();
+  const n = new Map<string, number>();
+  return rows.map(({ slot, row }) => {
+    const at = n.get(slot) ?? 0;
+    n.set(slot, at + 1);
+    let key = `${slot}|${row ?? `@${at}`}`;
+    if (seen.has(key)) key = `${slot}|@${at}`;
+    seen.add(key);
+    return key;
+  });
+}
+
+/** The key of a block the cursor stops on as a whole, beside the rows' own (`rowKeys`). `@`, so no row id is it. */
+export const wholeKey = (slot: string): string => `${slot}|@block`;
+
+/**
  * The row `by` steps from `at` in a list of `count`, as Today moves: from nowhere, down is the first and up the last,
  * and the ends hold. `-1` is nowhere, and stays nowhere in an empty list.
  */

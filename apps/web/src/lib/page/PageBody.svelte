@@ -30,7 +30,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
   import { boxesOf, layoutOf, mainSpan, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
-  import { emptyHidden, openOf, optionOf, stepRow } from './home.ts';
+  import { emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
   import type { RowHost } from './row-host.svelte.ts';
@@ -372,7 +372,14 @@
      THE ROWS ARE FOUND IN THE PAGE AS DRAWN: every element that says it is a row (`data-row`, which the renderer's
      primitives and `QueueAnswer` carry), and a list item of the renderer's lists where a primitive does not say so yet.
      The cursor is kept by the row's own id and its block, so a page read again keeps it on the same row, and a row that
-     left (a task ticked away) hands it to the row that took its place. */
+     left (a task ticked away) hands it to the row that took its place.
+
+     AND ON A PAGE AT ITS OWN ADDRESS, A BLOCK THAT DRAWS RECORDS FROM A LIST BUT NO ROW TO STOP ON IS A STOP OF ITS OWN
+     (`whole`): cards, a table, a plan. A page that draws rows is walked row by row and the block cursor is off, so `o`
+     and `y` are the block's the row sits in. Kiln's lists are drawn as cards and tables, and its only rows are in its
+     feed and its notes, which have no list behind them, so `o` and `y` could not reach a single block of it. A block
+     that holds no records (Work's capture line) is still no stop. Enter on a whole block goes into it, as the block
+     cursor's Enter does. */
   let pageEl = $state<HTMLElement | null>(null);
   let rowKey = $state<string | null>(null);
   let rowAt = -1;
@@ -383,17 +390,22 @@
   const ROW = '[data-row], .block .list > li.item';
 
   /** Every row the page draws now, in reading order, each with the key the cursor holds it by. */
-  function rowsNow(): { el: HTMLElement; key: string }[] {
+  function rowsNow(): { el: HTMLElement; key: string; whole?: true }[] {
     if (!pageEl) return [];
     const all = [...pageEl.querySelectorAll<HTMLElement>(ROW)];
     const outer = all.filter((el) => !all.some((o) => o !== el && o.contains(el)));
-    const seen = new Map<string, number>();
-    return outer.map((el) => {
-      const slot = el.closest('.block-slot')?.id ?? '';
-      const n = seen.get(slot) ?? 0;
-      seen.set(slot, n + 1);
-      return { el, key: `${slot}|${el.dataset.row ?? `@${n}`}` };
-    });
+    const keys = rowKeys(outer.map((el) => ({ slot: el.closest('.block-slot')?.id ?? '', row: el.dataset.row })));
+    const rows: { el: HTMLElement; key: string; whole?: true }[] = outer.map((el, i) => ({ el, key: keys[i]! }));
+    if (mode !== 'page' || !host || rows.length === 0) return rows;
+    const wholes = [...pageEl.querySelectorAll<HTMLElement>('.block-slot')]
+      .filter((s) => {
+        const b = blocks[Number(s.id.slice(`${ids}b-`.length)) - 1];
+        /* THE DOOR ITS BAR DRAWS, and not `doorOf` alone: a source the record answers across its lists has no list to
+           open (`BlockSlot.svelte`, `listNamed`), and its bar says so by drawing none. */
+        return b !== undefined && b.rows.length > 0 && s.querySelector('a.block-source') !== null && !outer.some((r) => s.contains(r));
+      })
+      .map((el) => ({ el, key: wholeKey(el.id), whole: true as const }));
+    return [...rows, ...wholes].sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
   }
 
   /** Draws the cursor on the row it holds, or on the row that took its place, and takes focus there when asked. */
@@ -468,6 +480,9 @@
     const rows = rowsNow();
     const at = rows.findIndex((r) => r.key === rowKey);
     const under = rows[at]?.el;
+    /* A BLOCK THE CURSOR HOLDS AS A WHOLE (`rowsNow`) is no row: its boxes and its options are its rows', not its own. */
+    const whole = rows[at]?.whole === true;
+    const row = whole ? undefined : under;
     /* THE ROW OF THE RECORD UNDER THE CURSOR, where it is one: a question or a line of an author's fence is not. */
     const record = host && under ? rowOfKey(under.dataset.row) : null;
     switch (e.key) {
@@ -484,7 +499,7 @@
       case 'x': {
         /* THE ROW'S OWN BOX, pressed, so the tick is the one a pointer makes, with its receipt and its Undo. On a
            question it is the box that chooses it for an answer with others. */
-        const box = under?.querySelector<HTMLElement>('[role="checkbox"]');
+        const box = row?.querySelector<HTMLElement>('[role="checkbox"]');
         if (!box) return;
         box.click();
         break;
@@ -525,6 +540,10 @@
       }
       case 'Enter': {
         if (control || !under) return;
+        if (whole) {
+          enter(Number(under.id.slice(`${ids}b-`.length)) - 1);
+          break;
+        }
         /* ON A PAGE A ROW OF THE RECORD OPENS BESIDE THE PAGE, in the panel, and the page stays where it was. */
         if (record && host?.open(record)) break;
         const to = openOf(under.dataset.open, under.dataset.row);
@@ -555,12 +574,12 @@
         rowKey = null;
         rowAt = -1;
         markRow(false);
-        if (on instanceof HTMLElement && on.hasAttribute('data-row')) on.blur();
+        if (on instanceof HTMLElement && (on.hasAttribute('data-row') || on === under)) on.blur();
         break;
       default: {
         /* THE OPTION BY ITS NUMBER, pressed, so the answer is the one the card's own button sends. */
         const n = optionOf(e.key);
-        const option = n === null ? null : under?.querySelectorAll<HTMLElement>('.queue-act')[n];
+        const option = n === null ? null : row?.querySelectorAll<HTMLElement>('.queue-act')[n];
         if (!option) return;
         option.click();
       }

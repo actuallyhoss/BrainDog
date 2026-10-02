@@ -229,11 +229,22 @@
       font-size: var(--t-md);
     }
 
+    /* AT 320 THE TWO PICKERS AND "until" OUTRAN THE ROW BY FORTY PIXELS: each picker shares what is left and gives
+       up its intrinsic width before the row does. */
     .quiet-pickers {
+      display: flex;
       flex-basis: 100%;
+      min-inline-size: 0;
+    }
+
+    .quiet-field {
+      flex: 1 1 0;
+      min-inline-size: 0;
     }
 
     .quiet-time {
+      inline-size: 100%;
+      min-inline-size: 0;
       min-block-size: var(--tap);
     }
   }

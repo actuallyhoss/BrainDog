@@ -688,6 +688,7 @@
   @media (pointer: coarse) {
     .queue-ways-toggle {
       min-block-size: var(--tap);
+      min-inline-size: var(--tap);
     }
 
     /* THE DOOR TO THE REST IS A TARGET LIKE ANY OTHER: a line of small type is 21px tall, and a thumb needs the tap. */
