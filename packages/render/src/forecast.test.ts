@@ -414,3 +414,24 @@ test('A CROSSING NEAR TODAY SETS THE LABELS APART: the balance marked near the f
   assert.match(html, /<span class="forecast-pin" data-side="end" style=/u);
   assert.match(html, /<li class="forecast-tick" data-edge="" style="--at:0">Sep<\/li>/u);
 });
+
+test('A CHART CAN OPEN ON THREE MONTHS OVER A LONGER WALK, and the knob offers every length up to the walk\'s own reach', () => {
+  const rows = [...ROWS.filter((r) => r[0] !== 'horizon'), ['horizon', '90', '', ''], ['reach', '730', '', ''], ['horizons', '90 180 365 730 1825 last', '', '']];
+  const m = forecastModel(rows)!;
+  assert.equal(m.horizon, 90, 'it opens on the length the block asked for');
+  assert.equal(m.reach, 730);
+  assert.deepEqual(
+    horizonChoices(m).map((c) => c.label),
+    ['3 months', '6 months', '1 year', '2 years', 'To the end'],
+    'five years is past the walk, and the end is the last dated movement',
+  );
+  const opened = scenario(m, baseKnobs(m));
+  assert.equal(opened.horizon, 90);
+  assert.equal(opened.steps.at(-1)!.day, '2026-10-20', 'at rest it walks the three months it opens on');
+  assert.equal(scenario(m, { ...baseKnobs(m), horizon: 365 }).steps.at(-1)!.day, '2026-12-30', 'and a year when a person asks for one');
+  assert.equal(scenario(m, { ...baseKnobs(m), horizon: 5000 }).horizon, 730, 'never past the walk');
+  assert.equal(knobsMoved(m, baseKnobs(m)), false);
+  /* No `reach` row, or one shorter than the opening, is a walk that reaches as far as it opens. */
+  assert.equal(model().reach, 60);
+  assert.equal(forecastModel([...rows.filter((r) => r[0] !== 'reach'), ['reach', '30', '', '']])!.reach, 90);
+});

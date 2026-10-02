@@ -87,7 +87,7 @@ export {
   type FilterValue,
   type OnFilter,
 } from './filters.ts';
-export { timelineDays } from './timeline.ts';
+export { dayThisYear, rowsCell, timelineCell, timelineDays } from './timeline.ts';
 export {
   TABLE_CHUNK,
   TABLE_ROWS_LABEL,
@@ -249,4 +249,5 @@ export {
   headlineMoney,
   axisFigure,
   barFigure,
+  zeroFigure,
 } from './format.ts';

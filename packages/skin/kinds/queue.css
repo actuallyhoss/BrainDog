@@ -20,12 +20,21 @@
     container-type: inline-size;
   }
 
-  /* A QUESTION IS A SECTION OF ITS TILE, with a hairline between one and the next, and not a card inside the tile. */
+  /* A QUESTION IS A SECTION OF ITS TILE, with a hairline between one and the next, and not a card inside the tile.
+
+     TWO TRACKS, THE SECOND EMPTY UNTIL SOMETHING SITS AT THE END OF A LINE: the bulk box beside the by-line, the cost
+     beside the ways to answer (below). Every part spans both by default, gap included, so a card with neither is the
+     one column it always was. */
   .queue-card {
     display: grid;
-    gap: var(--sp-2);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-2) var(--sp-3);
     padding-block: var(--sp-4);
     border-block-start: 1px solid var(--line);
+  }
+
+  .queue-card > * {
+    grid-column: 1 / -1;
   }
 
   .queue-card:first-child {
@@ -97,37 +106,84 @@
   }
 
   /* WHO ASKED AND WHEN WAIT FOR THE CARD (DIRECTION §35), as the renderer marks them (`data-calm`, `blocks.css`), on
-     every host's by-line: Decide's answerable cards draw the same line with no mark on it, and showed it always. What
-     the question costs stays, because it is the card's place in the queue and not a detail of it. Only where there is
-     a pointer that hovers; under a thumb the line is always there. */
+     every host's by-line: Decide's answerable cards draw the same line with no mark on it, and showed it always. Only
+     where there is a pointer that hovers; under a thumb the line is always there.
+
+     AT REST THE LINE TAKES NO ROOM. Faded and kept, it was an empty band above every question on Today, Decide, Money
+     and Kiln, with "Hard to undo" floating alone at its far end (visual review 4). It is not drawn until the pointer or
+     the keyboard reaches its card, and then it fades in where it belongs. A part the record set in bold never waits,
+     so a line holding one keeps its place, with only its plain parts faded. So does a line a host still ends with the
+     cost, which is the card's place in the queue and not a detail of it. A page's j and k mark the card itself when it
+     is a row of the page (`data-row-cursor`), and a host's box round it when the card sits in one. */
   @media (hover: hover) and (pointer: fine) {
+    .queue-by:not(:has(strong, .queue-cost:not([data-cost='call']))) {
+      display: none;
+    }
+
+    .queue-card:is(:hover, :focus-within, [data-focused], [data-row-cursor]) > .queue-by,
+    [data-row-cursor] > .queue-card > .queue-by {
+      display: flex;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    @starting-style {
+      .queue-card:is(:hover, :focus-within, [data-focused], [data-row-cursor]) > .queue-by,
+      [data-row-cursor] > .queue-card > .queue-by {
+        opacity: 0;
+      }
+    }
+
     .queue-by > :not(.queue-cost, :has(strong)) {
       opacity: 0;
       transition: opacity var(--d-state) var(--ease-out);
     }
 
-    .queue-card:is(:hover, :focus-within, [data-focused]) > .queue-by > *,
+    .queue-card:is(:hover, :focus-within, [data-focused], [data-row-cursor]) > .queue-by > *,
     [data-row-cursor] > .queue-card > .queue-by > * {
       opacity: 1;
     }
   }
 
-  /* THE BAND SITS AT THE END OF THE BY-LINE, pushed there rather than placed there, because it is
-     the one thing on that line that is about the card's PLACE in the list rather than about the
-     card. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that shouts is a
-     ranking that decides.
+  /* THE BAND SITS AT THE END OF THE WAYS TO ANSWER, in the card's second track on the line of whatever comes just before
+     it (the options, or a tile's fold), because it answers "how careful should this answer be" and is read beside the
+     answers. Both hosts draw it after them (`Queue.svelte`, `html.ts`, `QueueAnswer.svelte`). On the line's first pill
+     it is centred on the pill's height. Quiet, in the same pill as `queue-rec`, for the same reason: a ranking that
+     shouts is a ranking that decides.
 
      THE WORD CARRIES IT AND THE COLOUR DOES NOT. Four bands on four colours would be a legend a
      reader has to learn and an a11y failure the moment one of them is the only difference, so the
      dearest band takes weight and the darker ink, and the other three are identical. `data-cost` is
      matched rather than the English, so a translated label still weights the right card. */
   .queue-cost {
-    margin-inline-start: auto;
     padding-inline: var(--sp-2);
     border-radius: var(--r-pill);
     background: var(--s1);
     color: var(--ink2);
+    font-size: var(--t-xs);
     white-space: nowrap;
+  }
+
+  /* An older host's cost at the end of its by-line is pushed there. */
+  .queue-by > .queue-cost {
+    margin-inline-start: auto;
+  }
+
+  .queue-card > .queue-cost {
+    grid-column: 2;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .queue-card > :has(+ .queue-cost:not([data-cost='call'])) {
+    grid-column: 1;
+  }
+
+  .queue-card > .queue-options + .queue-cost {
+    margin-block-start: calc((var(--ctl-h) - 1lh) / 2);
+  }
+
+  .queue-card > .queue-ways + .queue-cost {
+    margin-block-start: calc((var(--ctl-h-sm) - 1lh) / 2);
   }
 
   .queue-cost[data-cost='undo'] {
@@ -403,18 +459,18 @@
      the card, so the question and its answers start at the tile's own edge whether the box is drawn, hidden until
      hover, or always there under a thumb. A track down the card's start indented every question by the box and its
      gap, 32px on a phone, for a control most people never press. */
-  .queue-card:has(> .queue-select) {
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: var(--sp-3);
-  }
-
-  .queue-card:has(> .queue-select) > :not(.queue-select) {
-    grid-column: 1 / -1;
-  }
-
   .queue-card:has(> .queue-select) > .queue-by {
     grid-row: 1;
     grid-column: 1;
+  }
+
+  /* WHERE THE BY-LINE WAITS FOR THE POINTER (above), the question takes the box's line while it does, so the box does
+     not hold a row of its own above the question: that was the empty band again, one box high. The question keeps the
+     first track whether the by-line is drawn or not, so its words never rewrap under the pointer. */
+  @media (hover: hover) and (pointer: fine) {
+    .queue-card:has(> .queue-select) > .queue-question {
+      grid-column: 1;
+    }
   }
 
   /* A TILE LEADS WITH ITS VISUAL, so where one is drawn it keeps the first row and the by-line and its box share the
@@ -433,6 +489,8 @@
     grid-column: 2;
     grid-row: 1;
     align-self: center;
+    /* At the track's end, which a cost on the same card can make wider than the box. */
+    justify-self: end;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -481,6 +539,21 @@
     .queue-options:has(.queue-because) .queue-because {
       grid-row: auto;
       grid-column: 1 / -1;
+    }
+
+    /* THE COST GOES UNDER THE WAYS TO ANSWER, at the card's own edge, rather than squeezing a phone's pills into what is
+       left beside it. */
+    .queue-card > :has(+ .queue-cost:not([data-cost='call'])),
+    .queue-card > .queue-cost {
+      grid-column: 1 / -1;
+    }
+
+    .queue-card > .queue-cost {
+      justify-self: start;
+    }
+
+    .queue-card > :is(.queue-options, .queue-ways) + .queue-cost {
+      margin-block-start: 0;
     }
   }
 
@@ -638,6 +711,7 @@
   .queue-ways-toggle {
     display: inline-flex;
     align-items: center;
+    gap: var(--sp-2);
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
     border-radius: var(--r-sm);
@@ -655,6 +729,26 @@
   .queue-ways-toggle:hover {
     background: var(--s2);
     color: var(--ink);
+  }
+
+  /* THE FOLD SAYS IT OPENS WITH THE HOUSE CHEVRON, the one the forecast's Adjust draws (`blocks-charts.css`): two
+     strokes of the word's own ink, pointing down while shut and turned up once open. A bare grey "Why" said nothing
+     about being pressable (visual review 4). */
+  .queue-ways-toggle::after {
+    content: '';
+    flex: none;
+    inline-size: 0.4em;
+    block-size: 0.4em;
+    margin-block-start: -0.2em;
+    border-inline-end: 1.5px solid currentColor;
+    border-block-end: 1.5px solid currentColor;
+    rotate: 45deg;
+    transition: rotate var(--d-state) var(--ease-out);
+  }
+
+  .queue-ways[open] > .queue-ways-toggle::after {
+    margin-block: 0.2em 0;
+    rotate: 225deg;
   }
 
   /* `Why`: A CARD'S REASONS, FOLDED. Only the lead question says why each way under its pill; every other card keeps
@@ -689,6 +783,11 @@
     .queue-ways-toggle {
       min-block-size: var(--tap);
       min-inline-size: var(--tap);
+    }
+
+    /* The fold is a tap tall here, so the cost beside it centres on that. */
+    .queue-card > .queue-ways + .queue-cost {
+      margin-block-start: calc((var(--tap) - 1lh) / 2);
     }
 
     /* THE DOOR TO THE REST IS A TARGET LIKE ANY OTHER: a line of small type is 21px tall, and a thumb needs the tap. */

@@ -8,8 +8,7 @@
 @layer components {
   /* ── feed: what happened, grouped by who did it ──────────────────────────
      "Since you last looked": a list without a box, the count leading every row, and
-     full ink only on what is new. The block is its own container, so a narrow slot moves the time
-     under the words without a breakpoint. */
+     full ink only on what is new. The block is its own container, so it answers the width of its slot. */
 
   .feed {
     display: grid;
@@ -208,35 +207,14 @@
     color: var(--dim);
   }
 
+  /* THE TIME STAYS ON THE WORDS' LINE AT EVERY WIDTH. A narrow slot (the rail) used to wrap it under the words, where it
+     waits for the pointer (`data-calm`), so every event at rest was its line and an empty second one, and the words hung
+     at the top of a row twice their height (visual review 4). On the line it keeps its own short track at the end and
+     the words give way to it in an ellipsis, so an event is one line however narrow its tile. A narrow slot only draws
+     the tracks a step closer, so the words keep what room there is. */
   @container (inline-size < 30rem) {
     .feed-row {
-      grid-template-columns: 3ch auto minmax(0, 1fr);
-    }
-
-    .feed-when {
-      grid-column: 3;
-    }
-
-    /* THE SAME COLUMNS GIVEN BACK ON A NARROW SLOT, and the time follows the words into whichever column they are in. */
-    .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row {
-      grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .feed-group[data-by='rule'] .feed-row:has(> .feed-face:empty) {
-      grid-template-columns: 3ch minmax(0, 1fr);
-    }
-
-    .feed-rows:not(:has(.feed-count:not(:empty))) .feed-when,
-    .feed-group[data-by='rule'] .feed-row:has(> .feed-face:empty) > .feed-when {
-      grid-column: 2;
-    }
-
-    .feed-group[data-by='rule'] .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:has(> .feed-face:empty) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .feed-group[data-by='rule'] .feed-rows:not(:has(.feed-count:not(:empty))) .feed-row:has(> .feed-face:empty) > .feed-when {
-      grid-column: 1;
+      column-gap: var(--sp-2);
     }
   }
 }

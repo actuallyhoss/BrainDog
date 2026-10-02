@@ -17,6 +17,16 @@
     margin: 0;
   }
 
+  /* A FIELD-ONLY CAPTURE DRAWS NO HEADING ROW. Where the block's heading is the field's own prompt (`capturePrompt`),
+     the renderer marks the capture `data-bare`, and the tile is the field alone: "Add a task" over a field that says
+     "Add a task" was the one thing said twice (visual review 4). The field's own name (`aria-label`) still carries the
+     words, and the region keeps its name, since a reference to a hidden heading still reads its text. While the page is
+     being arranged the bar comes back, because it is what a block is moved by. The page's styles are not in a layer,
+     so only an important declaration here outranks them, as a section's bar is hidden (`section.css`). */
+  .block-slot:not([data-arranging]):has(> .block[data-kind='capture'] .capture[data-bare]) > .block-bar {
+    display: none !important;
+  }
+
   .capture-field {
     display: flex;
     align-items: center;

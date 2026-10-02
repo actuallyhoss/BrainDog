@@ -33,7 +33,7 @@
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
-  import { timelineDays } from '../../src/timeline.ts';
+  import { timelineCell, timelineDays } from '../../src/timeline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
@@ -287,12 +287,12 @@
       {@const day = days[i] ?? null}
       <!-- A GROUPED TIMELINE SAYS EACH DAY ONCE, as a small heading over its rows, and the rows under it leave their own
            date blank (`../../src/timeline.ts`). The heading is an item, so the list stays a list of its children. -->
-      {#if day !== null}<li class="item-day num"><Text nodes={inline(day, opts)} {opts} /></li>{/if}
+      {#if day !== null}<li class="item-day num"><Text nodes={inline(timelineCell(day, opts.now), opts)} {opts} /></li>{/if}
       <li class="item" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
         <!-- The date cell goes through the inline renderer like every other cell. It did not, and a
              timeline written with `{{ago:…}}` — which is how you write one that stays true — printed
              its own source. -->
-        <span class="item-marker num">{#if !grouped}<Text nodes={inline(row.cells[0] ?? '', opts)} {opts} />{/if}</span>
+        <span class="item-marker num">{#if !grouped}<Text nodes={inline(timelineCell(row.cells[0], opts.now), opts)} {opts} />{/if}</span>
         <!-- The glyph sits with the TITLE, not at the far edge of the row. A tone belongs to the
              thing it qualifies, and five hundred pixels away it belongs to nothing — the same
              finding the stat cell's layout is built on (13 §2.3). -->
@@ -302,7 +302,8 @@
             {opts}
           />{#if row.tone}{' '}<span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}</span
         >
-        <span class="item-detail"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
+        <!-- Each cell as it is said (`timelineCell`): a day this year without its year, an amount of nothing not at all. -->
+        <span class="item-detail"><Text nodes={inline(timelineCell(row.cells[2], opts.now), opts)} {opts} /></span>
       </li>
     {:else}
       {@const title = takeWorking(row.cells[0] ?? '')}

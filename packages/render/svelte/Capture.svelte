@@ -29,7 +29,11 @@
   } = $props();
 
   const plan = $derived(capturePlan(block.rows));
-  const prompt = $derived(plan ? capturePrompt(plain(inline(block.heading ?? '', opts)), plan) : '');
+  const heading = $derived(plain(inline(block.heading ?? '', opts)).trim());
+  const prompt = $derived(plan ? capturePrompt(heading, plan) : '');
+  /* THE FIELD SAYS ITS OWN HEADING, so it is drawn alone: a tile reading "Add a task" over a field reading "Add a task"
+     said one thing twice (visual review 4). `data-bare` tells the host's stylesheet the tile needs no heading row. */
+  const bare = $derived(heading !== '' && prompt === heading);
   let typed = $state('');
   const ready = $derived(captureSubmit(plan, typed) !== null);
 
@@ -45,7 +49,7 @@
 {#if !plan}
   <div class="capture"></div>
 {:else if oncapture}
-  <form class="capture" onsubmit={submit}>
+  <form class="capture" data-bare={bare ? '' : undefined} onsubmit={submit}>
     <span class="capture-field">
       <input class="capture-input" type="text" name="capture" autocomplete="off" enterkeyhint="done" placeholder={prompt} aria-label={prompt} bind:value={typed} />
       {#if ready}<button type="submit" class="capture-add">{CAPTURE_ADD}</button>{/if}

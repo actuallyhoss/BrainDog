@@ -1873,8 +1873,8 @@
   }
 
   /* A WINDOW IS A THIN BAR WITH NO EDGE: a little over half its lane's height, centred in it, so the lane's air reads
-     as the gap between two pieces of work. Every window is the one grey whatever its tone, which its due dot still
-     says (`.roadmap-due`); only a late one is a muted brick. The renderer sizes the rect to its lane; the scale is
+     as the gap between two pieces of work. Every window is the one grey whatever its tone; only a late one is a muted
+     brick, with its due dot (`.roadmap-due`). The renderer sizes the rect to its lane; the scale is
      drawn about its own middle, so the due dot (`roadmapDue`) stays on it. */
   .roadmap-bar {
     fill: var(--roadmap-bar);
@@ -1913,11 +1913,31 @@
     stroke-linecap: round;
   }
 
+  /* A WINDOW'S DOT IS DRAWN ONLY WHEN IT IS LATE. At the end of every grey bar it sat where the name starts, a small
+     brown mark before each label that read as a stray (visual review 4); the bar's own grey already says the work is
+     fine. The late one keeps its dot beside its brick, and a date's stem keeps its dot, which is the date's mark. The
+     list under the chart still reads every tone. */
+  .roadmap-mark:has(> .roadmap-bar):not([data-intent='bad']) > .roadmap-due {
+    display: none;
+  }
+
   /* TODAY IS ONE HAIRLINE OF INK. In the live violet it was the only second hue on the tile and the first thing seen;
      a fixed line of the ink says where now is and lets the work be read. */
   .roadmap-today {
     stroke: var(--ink);
     stroke-width: 1px;
+  }
+
+  /* IN THE DARK SCHEME IT TAKES THE SECOND INK. The ink is the light end there, so the full step was the brightest
+     thing on the page (visual review 4); `--ink2` still clears the grey bars and reads as now. */
+  html[data-scheme='dark'] .roadmap-today {
+    stroke: var(--ink2);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-scheme]) .roadmap-today {
+      stroke: var(--ink2);
+    }
   }
 
   .roadmap-names,
@@ -1965,6 +1985,13 @@
 
   .roadmap-name[data-side='before'] {
     translate: -100% -50%;
+  }
+
+  /* A NAME THAT COULD NOT MOVE OFF TODAY'S RULE sits on the tile's own surface, so the rule passes under its words
+     rather than through them. */
+  .roadmap-name[data-today] {
+    background: var(--bg);
+    border-radius: var(--r-sm);
   }
 
   /* A DATE'S NAME sits above the chart on the line the plan spaced it to, where its stem meets the top. */

@@ -73,7 +73,14 @@ export type ForecastModel = {
   template: string;
   past: { day: string; value: number }[];
   steps: ForecastStep[];
+  /** How many days the chart opens on: the horizon knob at rest. */
   horizon: number;
+  /**
+   * How far the host walked, in days, from a `reach | 730 |  |` row: never less than `horizon`, and the same when the
+   * host sent none. A chart can open on three months over a walk of two years, and the knob offers every length up to
+   * the walk's own reach rather than only up to the length it opened on (visual review 4).
+   */
+  reach: number;
   /**
    * The lengths the horizon knob offers as the block declared them (`horizons:`), each whole days or `last`, the walk's
    * last dated movement; `null` when the host sent none, and the knob offers a quarter, half a year and a year.
@@ -193,6 +200,7 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
   const value = signedOf(opening?.[3] ?? '');
   if (!opening || !ISO.test(today) || !Number.isFinite(value)) return null;
   const horizonCell = Number(rows.find((r) => r[0]?.trim() === 'horizon')?.[1]);
+  const horizon = Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180;
   const knobWords = (rows.find((r) => r[0]?.trim() === 'knobs')?.[1] ?? '').split(/\s+/u);
   return {
     today,
@@ -205,7 +213,8 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
       return r[0]?.trim() === 'past' && ISO.test(d) && d < today && Number.isFinite(v) ? [{ day: d, value: v }] : [];
     }),
     steps: stepsOf(rows, today),
-    horizon: Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180,
+    horizon,
+    reach: Math.max(horizon, whole(rows.find((r) => r[0]?.trim() === 'reach')?.[1], 1) ?? 0),
     horizons: horizonsOf(rows.find((r) => r[0]?.trim() === 'horizons')),
     knobs: FORECAST_KNOBS.filter((k) => knobWords.includes(k)),
     late: whole(rows.find((r) => r[0]?.trim() === 'late')?.[1]),
@@ -453,9 +462,12 @@ const scaled = (v: number, by: number): number => (by === 1 ? v : Math.sign(v) *
 const grownBy = (percent: number, today: string, day: string): number =>
   percent === 0 ? 1 : (1 + percent / 100) ** (Math.max(0, daysBetween(today, day)) / YEAR_DAYS);
 
+/** How far the walk reaches: the host's own reach, and never less than the length the chart opens on. */
+const reachOf = (model: ForecastModel): number => Math.max(model.horizon, model.reach);
+
 /** The walk with the knobs applied. */
 export function scenario(model: ForecastModel, knobs: Knobs): Scenario {
-  const horizon = Math.max(1, Math.min(model.horizon, Math.round(knobs.horizon)));
+  const horizon = Math.max(1, Math.min(reachOf(model), Math.round(knobs.horizon)));
   const end = addDays(model.today, horizon);
   const leave = new Set(knobs.leave);
   const grow = knobs.grow ?? { in: 0, out: 0 };
@@ -522,14 +534,17 @@ const HORIZON_SLACK = 7;
 /**
  * The horizon choices that fit inside the walk the host made, in the order the block declared them, each once.
  *
- * NO CHOICE REACHES PAST THE WALK. The host walks as far as the block's `horizon:` and no further (`pages.ts`
- * `recordedOf`), so a five-year choice over a one-year walk would draw the same year under a longer name. `last` is the
- * day of the walk's last dated movement, which the walk itself holds.
+ * NO CHOICE REACHES PAST THE WALK. The host walks as far as it says (`reach`, else `horizon`) and no further, so a
+ * five-year choice over a one-year walk would draw the same year under a longer name. But every length up to the walk's
+ * reach is offered, and not only up to the length the chart opens on: a chart opening on three months over a two-year
+ * walk still offers half a year, a year and two (visual review 4). `last` is the day of the walk's last dated movement,
+ * which the walk itself holds.
  */
 export function horizonChoices(model: ForecastModel): HorizonChoice[] {
   const out: HorizonChoice[] = [];
+  const reach = reachOf(model);
   for (const h of model.horizons ?? HORIZONS_SAID) {
-    const choice = h === 'last' ? lastChoice(model) : h - HORIZON_SLACK <= model.horizon ? { days: Math.min(h, model.horizon), label: spanWords(h) } : null;
+    const choice = h === 'last' ? lastChoice(model) : h - HORIZON_SLACK <= reach ? { days: Math.min(h, reach), label: spanWords(h) } : null;
     if (choice && !out.some((c) => c.days === choice.days)) out.push(choice);
   }
   return out;
@@ -538,7 +553,7 @@ export function horizonChoices(model: ForecastModel): HorizonChoice[] {
 /** "To the end": as far as the walk's last dated movement, or `null` when nothing is dated after today. */
 function lastChoice(model: ForecastModel): HorizonChoice | null {
   const last = model.steps.reduce((most, s) => (s.day > most ? s.day : most), model.today);
-  const days = Math.min(daysBetween(model.today, last), model.horizon);
+  const days = Math.min(daysBetween(model.today, last), reachOf(model));
   return days >= 1 ? { days, label: FORECAST_TO_END } : null;
 }
 

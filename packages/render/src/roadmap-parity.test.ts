@@ -99,3 +99,14 @@ test('and the comparison is not vacuous: the chart is on both sides, and a diffe
   const later = tree(render(Block, { props: { block, opts: { now: NOW + 7 * 86_400_000 } } }).body);
   assert.notEqual(later, svelte);
 });
+
+test('A NAME TODAY\'S LINE STILL RUNS THROUGH IS MARKED ON BOTH SIDES, where its bar is too near the edge for it to go before', () => {
+  /* Kiln on 1 Sep: the first bar starts at the edge, its name runs past today's line, and there is no room before it. */
+  const [seg] = parse(SHAPES['short windows end to end, a lane each with the name beside it']!);
+  const block = seg as BlockSegment;
+  const now = Date.UTC(2026, 8, 1, 12);
+  const svelte = tree(render(Block, { props: { block, opts: { now } } }).body);
+  assert.equal(svelte, tree(toHTML([block], { now })));
+  assert.match(svelte, /<li class="roadmap-name" data-side="after" data-today style="[^"]*">Turn auto-renew back on for kilnfonts\.example<\/li>/u);
+  assert.equal(svelte.match(/data-today/gu)?.length, 1, 'only the name the line runs through');
+});

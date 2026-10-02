@@ -145,6 +145,13 @@
   </ul>
 {/snippet}
 
+<!-- The band is a label and not an argument: after the ways to answer, at the end of the options row, as `html.ts`'s
+     `queue`, because it says how careful an answer should be rather than being the card. On the by-line it floated
+     alone in an empty band (visual review 4). `call` draws nothing: every question in the queue is the reader's call. -->
+{#snippet cost(item: (typeof plan.items)[number])}{#if item.costLabel && item.cost !== 'call'}<span class="queue-cost" data-cost={item.cost}
+      >{item.costLabel}</span
+    >{/if}{/snippet}
+
 {#if plan.items.length === 0}
   <p class="queue-empty">{plan.empty}</p>
 {:else}
@@ -178,13 +185,10 @@
           >
         {/if}
         {#if suggested && tiles}{@render visual(suggested.shows)}{/if}
-        <!-- The band is a label and not an argument: last on the by-line, in the same register as who
-             asked and when, because it answers "why is this card here" rather than being the card. `call` draws
-             nothing: every question in the queue is the reader's call, so "Your call" said nothing a card did not. -->
         <p class="queue-by">
           <span class="queue-who" data-calm=""><Text nodes={nodes(item.who)} {opts} /></span><span class="queue-when" data-calm=""
             ><Text nodes={nodes(item.when)} {opts} /></span
-          >{#if item.costLabel && item.cost !== 'call'}<span class="queue-cost" data-cost={item.cost}>{item.costLabel}</span>{/if}
+          >
         </p>
         <!-- A QUESTION IS A CARD'S HEADLINE, its money said short (`£39`, not `£39.00 GBP`), as the mirror says it. -->
         <h3 class="queue-question"><Text nodes={nodes(symbolText(item.question, true))} {opts} /></h3>
@@ -200,8 +204,10 @@
             <summary class="queue-ways-toggle">{queueWays(item.options.length)}</summary>
             {@render options(item, true)}
           </details>
+          {@render cost(item)}
         {:else}
           {@render options(item, reasoned)}
+          {@render cost(item)}
           {#if !reasoned && (because.length || item.why)}
             <details class="queue-ways queue-reasons">
               <summary class="queue-ways-toggle">{QUEUE_REASONS}</summary>

@@ -113,8 +113,11 @@ export const queueCost = (band: string): string => (Object.hasOwn(QUEUE_COSTS, b
 export const queueMore = (n: number): string => `${n} more`;
 /** A tile's line naming the option its agents recommend, in the word the card already uses for it. */
 export const queueSuggested = (label: string): string => `${QUEUE_RECOMMENDED}: ${label}`;
-/** What the fold holding a card's reasons is called, on every card but the one a person answers next. */
-export const QUEUE_REASONS = 'Why';
+/**
+ * What the fold holding a card's reasons is called, on every card but the one a person answers next. A question, so it
+ * reads as something to open: the bare "Why" was a grey word nothing said would open (visual review 4).
+ */
+export const QUEUE_REASONS = 'Why?';
 /**
  * Whether the card at `n` says why under each way to answer, rather than in a fold: the first only, which is the one a
  * person answers next. Eight questions with a paragraph under every option made Decide three screens long on a phone

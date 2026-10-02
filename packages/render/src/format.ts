@@ -193,6 +193,17 @@ function figureParts(text: string): FigureParts | null {
   return { sign: minus(m[1]), unit: m[2] ?? '', inner: minus(m[3]), whole: m[4]!.replaceAll(',', ''), minor: m[5] ?? '', code: m[6] ?? '' };
 }
 
+/**
+ * WHETHER A CELL IS AN AMOUNT OF NOTHING: one figure in a currency, every digit of it zero (`−GBP 0.00`, `+£0`). `signed`
+ * asks only about one written as money moving, with its `+` or `−`. A bare `0` names no currency and is not money.
+ */
+export function zeroFigure(text: string, signed = false): boolean {
+  const p = figureParts(text);
+  if (!p || (p.unit === '' && p.code === '')) return false;
+  if (signed && p.sign === '' && p.inner === '') return false;
+  return /^0+$/u.test(p.whole) && /^0*$/u.test(p.minor);
+}
+
 /** Whole digits with a comma every three, by the string and never through a float, so no digit of a large amount moves. */
 const grouped = (digits: string): string => digits.replace(/^0+(?=\d)/u, '').replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
 

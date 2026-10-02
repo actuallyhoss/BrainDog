@@ -35,7 +35,7 @@ import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, todoMeta as metaCells } from './todo.ts';
-import { timelineDays } from './timeline.ts';
+import { rowsCell, timelineCell, timelineDays } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
@@ -359,13 +359,15 @@ function grid(b: Block, o: RenderOptions): string {
 
 function rows(b: Block, o: RenderOptions): string {
   if (b.kind === 'inputs') return inputs(b, o);
+  /* A DAY THIS YEAR DROPS ITS YEAR, AND MONEY MOVING BY NOTHING IS NOT SAID (`rowsCell`). An empty value is still
+     `MISSING`; a value said as nothing is a known nothing, and draws no mark at all. */
   const body = b.rows
-    .map(
-      (r) =>
-        `<div class="row">${cell('row-label', r.cells[0], o)}<span class="row-value num">${
-          r.cells[1] ? renderInline(inline(r.cells[1], o), o) : MISSING
-        }</span>${cell('row-note', r.cells[2], o)}</div>`,
-    )
+    .map((r) => {
+      const value = r.cells[1] ? rowsCell(r.cells[1], o.now) : undefined;
+      return `<div class="row">${cell('row-label', r.cells[0], o)}<span class="row-value num">${
+        value === undefined ? MISSING : value ? renderInline(inline(value, o), o) : ''
+      }</span>${cell('row-note', rowsCell(r.cells[2], o.now), o)}</div>`;
+    })
     .join('');
   return `<div class="rows">${body}</div>`;
 }
@@ -483,13 +485,14 @@ function list(b: Block, o: RenderOptions): string {
         /* A GROUPED TIMELINE SAYS EACH DAY ONCE, over its rows, and the rows under it leave their own date blank
            (`timeline.ts`). The heading is an item of the list, so the list stays a list of its children. */
         const day = days[i] ?? null;
-        const head = day === null ? '' : `<li class="item-day num">${renderInline(inline(day, o), o)}</li>`;
+        /* EACH CELL AS IT IS SAID (`timelineCell`): a day this year without its year, and an amount of nothing not at all. */
+        const head = day === null ? '' : `<li class="item-day num">${renderInline(inline(timelineCell(day, o.now), o), o)}</li>`;
         /* THE GLYPH SITS WITH THE TITLE, as `List.svelte` has drawn it since a tone five hundred pixels
            from the thing it qualifies was found to qualify nothing (13 §2.3). This drew it after the
            detail instead, so the two renderers differed on every timeline row that carried a tone, and
            no shape here was a timeline with one. */
-        const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', r.cells[0], o);
-        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', r.cells[1], o, '', toneGlyph(r.tone))}${cell('item-detail', r.cells[2], o)}</li>`;
+        const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', timelineCell(r.cells[0], o.now), o);
+        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', r.cells[1], o, '', toneGlyph(r.tone))}${cell('item-detail', timelineCell(r.cells[2], o.now), o)}</li>`;
       }
       return `<li class="item"${key}>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
@@ -997,14 +1000,14 @@ function queue(b: Block, o: RenderOptions): string {
                 : ''
             }</details>`;
       const key = ` data-row="${escape(rowKey(item.row, b.rows.indexOf(item.row)))}"`;
-      /* THE BAND IS A LABEL AND NOT AN ARGUMENT. It sits last on the by-line, in the same register as
-         who asked and when, because it is the answer to "why is this card here" and not the card's
-         content. `data-cost` carries the band's own word so a stylesheet can weight the dearest one
-         without matching on English. `call` draws no chip, as `QueueAnswer.svelte` draws none: every
-         question here is the reader's call, so "Your call" said nothing the card did not. */
+      /* THE BAND IS A LABEL AND NOT AN ARGUMENT. It sits after the ways to answer, at the end of the options row,
+         because it is the answer to "how careful should this answer be" and not the card's content: on the by-line it
+         floated alone at the far right of an otherwise calm, empty band (visual review 4). `data-cost` carries the
+         band's own word so a stylesheet can weight the dearest one without matching on English. `call` draws no chip,
+         as `QueueAnswer.svelte` draws none: every question here is the reader's call, so "Your call" said nothing. */
       const cost = item.costLabel && item.cost !== 'call' ? `<span class="queue-cost" data-cost="${escape(item.cost)}">${escape(item.costLabel)}</span>` : '';
-      /* WHO ASKED AND WHEN ARE THE CARD'S SECONDARY LINE, shown on hover or focus (`data-calm`); what it costs stays. */
-      const by = `<p class="queue-by"><span class="queue-who" data-calm="">${drawn(item.who)}</span><span class="queue-when" data-calm="">${drawn(item.when)}</span>${cost}</p>`;
+      /* WHO ASKED AND WHEN ARE THE CARD'S SECONDARY LINE, shown on hover or focus (`data-calm`). */
+      const by = `<p class="queue-by"><span class="queue-who" data-calm="">${drawn(item.who)}</span><span class="queue-when" data-calm="">${drawn(item.when)}</span></p>`;
       /* A QUESTION IS A CARD'S HEADLINE, so its money is said short: "was due 4 days ago, £39. Did it go through?" */
       const question = `<h3 class="queue-question">${drawn(symbolText(item.question, true))}</h3>`;
       const why = item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : '';
@@ -1018,10 +1021,10 @@ function queue(b: Block, o: RenderOptions): string {
           : '';
         return `<article class="queue-card queue-lead"${toneAttrs(item.row.tone)}${key}>${by}${question}${
           suggested ? `<p class="queue-suggested">${escape(queueSuggested(suggested.label))}</p>` : ''
-        }${why}${does}<ul class="queue-options">${options}</ul></article>`;
+        }${why}${does}<ul class="queue-options">${options}</ul>${cost}</article>`;
       }
       if (!tiles)
-        return `<article class="queue-card"${toneAttrs(item.row.tone)}${key}>${by}${question}${reasoned ? why : ''}<ul class="queue-options">${options}</ul>${folded}</article>`;
+        return `<article class="queue-card"${toneAttrs(item.row.tone)}${key}>${by}${question}${reasoned ? why : ''}<ul class="queue-options">${options}</ul>${cost}${folded}</article>`;
       /* A TILE IS THE SAME CARD LED BY WHAT ITS RECOMMENDED OPTION IS, its ways to answer folded under it. The fold is a
          `details`, so it opens with no script in the mirror and in the app alike, and it starts shut: a tile that
          arrived showing one option picked out and the rest hidden would be the recommendation standing in for the
@@ -1029,7 +1032,7 @@ function queue(b: Block, o: RenderOptions): string {
       const suggested = item.options.find((opt) => opt.recommended);
       return `<article class="queue-card queue-tile"${toneAttrs(item.row.tone)}${key}>${suggested ? visual(suggested.shows, o) : ''}${by}${question}${
         suggested ? `<p class="queue-suggested">${escape(queueSuggested(suggested.label))}</p>` : ''
-      }${why}<details class="queue-ways"><summary class="queue-ways-toggle">${escape(queueWays(item.options.length))}</summary><ul class="queue-options">${options}</ul></details></article>`;
+      }${why}<details class="queue-ways"><summary class="queue-ways-toggle">${escape(queueWays(item.options.length))}</summary><ul class="queue-options">${options}</ul></details>${cost}</article>`;
     })
     .join('');
   const said = escape(queueMore(plan.more));
@@ -1355,7 +1358,7 @@ function roadmap(b: Block, o: RenderOptions): string {
   const names = `<ol class="roadmap-names" aria-hidden="true">${plan.bars
     .map(
       (bar) =>
-        `<li class="roadmap-name" data-side="${bar.label.side}" style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}</li>`,
+        `<li class="roadmap-name" data-side="${bar.label.side}"${bar.label.today ? ' data-today=""' : ''} style="--at:${roadmapShare(bar.label.x)};--room:${roadmapShare(bar.label.room)};--track:${bar.lane}">${escape(bar.title)}</li>`,
     )
     .join('')}${plan.stems
     .map((s) => `<li class="roadmap-name" data-stem="" style="--at:${roadmapShare(s.label.x)};--line:${s.label.line}">${escape(s.title)}</li>`)

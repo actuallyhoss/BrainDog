@@ -307,6 +307,10 @@ test('a capture draws its field only where the host can write, prompted by its h
   assert.doesNotMatch(field, /disabled|capture-elsewhere|figcaption/u);
   const without = tree(render(Block, { props: { block } }).body);
   assert.doesNotMatch(without, /<input|<button|<form/u, 'with nowhere to write, nothing takes a key');
+  /* THE FIELD SAYS ITS HEADING, so it is marked bare and the host draws it with no heading row over it. */
+  assert.match(field, /<form class="capture" data-bare>/u);
+  const { heading: _named, ...unnamed } = block;
+  assert.match(tree(render(Writable, { props: { block: unnamed, oncapture: () => {} } }).body), /<form class="capture">/u, 'with no heading of its own, nothing is marked');
 });
 
 test('THE BOX STILL TICKS ON A ROW THAT CARRIES A LINE UNDER ITS TITLE, and is still named for the task alone', () => {
@@ -447,6 +451,9 @@ test('a question in the `call` band draws no "Your call" chip on either surface,
     const chips = [...drawn.matchAll(/class="queue-cost" data-cost="([^"]*)"/gu)].map((m) => m[1]);
     assert.deepEqual(chips, ['undo', 'shape', 'rows']);
     assert.doesNotMatch(drawn, /Your call/u);
+    /* AFTER THE WAYS TO ANSWER, NOT ON THE BY-LINE, where it floated alone in a calm, empty band (visual review 4). */
+    assert.doesNotMatch(tree(drawn), /<p class="queue-by">(?:(?!<\/p>).)*queue-cost/u);
+    assert.match(tree(drawn), /<\/ul><span class="queue-cost" data-cost="undo">Hard to undo<\/span>/u);
   }
 });
 
@@ -541,6 +548,20 @@ test('A TIMELINE SAYS EACH DAY ONCE where days repeat, and leaves a timeline of 
   const plain = toHTML([page(SHAPES['a timeline whose days do not repeat']!)]);
   assert.doesNotMatch(plain, /item-day|data-days/u);
   assert.match(plain, /<span class="item-marker num">1 Oct<\/span>/u);
+});
+
+test('A DAY THIS YEAR DROPS ITS YEAR AND AN AMOUNT OF NOTHING IS NOT SAID, on a timeline and on rows, in both renderers', () => {
+  const opts = { now: Date.UTC(2026, 9, 2, 12) };
+  const due = page('```timeline\n1 Jul 2026 | Legal review | −GBP 9,190.00\n1 Jul 2026 | Wildcard certificate | −GBP 0.00\n28 Dec 2025 | Old bill | −GBP 12.00\n```');
+  const spec = page('```spec\nAiming for | 20 Sep 2026 | \nMoved | +GBP 0.00 | 1 Jul 2026\nBalance | GBP 0.00 | \n```');
+  for (const block of [due, spec]) assert.equal(tree(render(Hosted, { props: { block, opts } }).body), tree(toHTML([block], opts)));
+  const timeline = tree(toHTML([due], opts));
+  assert.deepEqual([...timeline.matchAll(/<li class="item-day num">([^<]*)<\/li>/gu)].map((m) => m[1]), ['1 Jul', '28 Dec 2025']);
+  assert.match(timeline, /Wildcard certificate<\/span><span class="item-detail"><\/span>/u, 'not −£0');
+  const rows = tree(toHTML([spec], opts));
+  assert.match(rows, /<span class="row-value num">20 Sep<\/span>/u);
+  assert.match(rows, /<span class="row-value num"><\/span><span class="row-note">1 Jul<\/span>/u, 'money that moved by nothing says nothing, not a dash');
+  assert.match(rows, /<span class="row-value num">GBP 0\.00<\/span>/u, 'a balance of nothing is still said');
 });
 
 test('A CARD DRAWS A SMALL LINE FROM A TREND THE RECORD FILLED, named by its numbers, with the gap said as a gap', () => {
@@ -645,7 +666,7 @@ test('ONLY THE FIRST CARD SAYS WHY UNDER EACH WAY, in both renderers: the rest a
     assert.match(cards[0]!, /class="queue-why"/u);
     assert.doesNotMatch(cards[0]!, /queue-reasons/u);
     assert.doesNotMatch(cards[1]!, /queue-because/u, 'no reason under a pill on a card nobody is on yet');
-    assert.match(cards[1]!, /<details class="queue-ways queue-reasons"><summary class="queue-ways-toggle">Why<\/summary>/u);
+    assert.match(cards[1]!, /<details class="queue-ways queue-reasons"><summary class="queue-ways-toggle">Why\?<\/summary>/u);
     assert.match(cards[1]!, /<li class="queue-reason"><span class="queue-reason-label">Chase it<\/span> It is 12 days late<\/li>/u);
     assert.doesNotMatch(cards[1]!, /queue-reason-label">Leave it/u, 'an option with no reason has no line in the fold');
   }

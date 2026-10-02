@@ -263,3 +263,12 @@ test('A WINDOW IS SAID AS ONE SPAN OF DAYS, the month and the year once where bo
     ],
   );
 });
+
+test('A NAME TODAY\'S LINE RUNS THROUGH WITH NO ROOM BEFORE ITS BAR STAYS, AND SAYS SO, so the host sets it over the line', () => {
+  const rows = [win('2026-08-29', '2026-08-30', 'A'), win('2026-09-05', '2026-09-08', 'B'), win('2026-09-10', '2026-09-11', 'C'), win('2026-09-20', '2026-09-22', 'D')];
+  const crossed = roadmapPlan(rows, '2026-09-01', 150);
+  const a = crossed.bars.find((x) => x.title === 'A')!;
+  assert.deepEqual(a.label, { x: a.x, side: 'over', room: a.label.room, today: true }, 'A starts at the edge, so its name cannot go before it');
+  assert.ok(crossed.bars.filter((x) => x.title !== 'A').every((x) => x.label.today === undefined), 'a name the line misses is not marked');
+  assert.ok(roadmapPlan(rows, '2026-09-09', 150).bars.every((x) => x.label.today === undefined), 'and with today between names, none is');
+});

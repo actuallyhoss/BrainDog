@@ -55,7 +55,16 @@ export type RoadmapRow = { start: string; end: string; title: string; tone?: Ton
  * `before` its start (the drawer sets it back by its own width), and how much of the box it has before it meets the
  * next thing, which the host's stylesheet stops it at in an ellipsis.
  */
-export type RoadmapLabel = { x: string; side: 'over' | 'after' | 'before'; room: string };
+export type RoadmapLabel = {
+  x: string;
+  side: 'over' | 'after' | 'before';
+  room: string;
+  /**
+   * Set where today's line still runs through the name after it is placed: there was no room before its bar. The
+   * drawers mark the name (`data-today`), so the host's stylesheet can set the words over the line rather than under it.
+   */
+  today?: true;
+};
 
 /**
  * A window, as a bar on its track. `row` is its index in the rows handed in. `track` is where the packing put it and
@@ -247,15 +256,22 @@ export function roadmapPlan(rows: readonly RoadmapRow[], today: string, labelWid
     return after ? { x: at(to), side: 'after', room: at(afterRoom) } : { x: at(from), side: 'before', room: at(from) };
   };
   /* A NAME TODAY'S LINE WOULD RUN THROUGH GOES BEFORE ITS BAR, where a whole name fits there and the line is not: the
-     line ran through the first task's name on Kiln's roadmap (visual review 3). */
+     line ran through the first task's name on Kiln's roadmap (visual review 3). Where it cannot, because the bar starts
+     too near the edge for a name before it, the name stays and says so (`today`), and the host sets its words over the
+     line: at 1440 the line still read "Turn auto-renew ba|ck on" (visual review 4). */
+  const crosses = (label: RoadmapLabel): boolean => {
+    if (now === null) return false;
+    const reach = Math.min(Number(label.room), labelWidth);
+    const start = label.side === 'before' ? Number(label.x) - reach : Number(label.x);
+    return now >= start && now <= start + reach;
+  };
   const labelOf = (row: number, from: number, to: number): RoadmapLabel => {
     const label = placedLabel(row, from, to);
-    if (now === null || label.side === 'before') return label;
-    const start = Number(label.x);
+    if (!crosses(label)) return label;
     const room = before.get(row)!;
-    const crossed = now >= start && now <= start + Math.min(Number(label.room), labelWidth);
-    const clear = now < from - labelWidth || now > from;
-    return crossed && clear && room >= labelWidth ? { x: at(from), side: 'before', room: at(room) } : label;
+    const moved: RoadmapLabel = { x: at(from), side: 'before', room: at(room) };
+    if (label.side !== 'before' && room >= labelWidth && !crosses(moved)) return moved;
+    return { ...label, today: true };
   };
   const bars: RoadmapBar[] = windows.map(({ row, r }) => {
     const { from, to } = span_(r);

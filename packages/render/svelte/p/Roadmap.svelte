@@ -229,7 +229,7 @@
       <ol class="roadmap-names" aria-hidden="true">
         {#each plan.bars as bar}
           {@const at = onreschedule ? roadmapLabelAt(bar, barAt(bar)) : bar.label.x}
-          <li class="roadmap-name" data-side={bar.label.side} style="--at:{roadmapShare(at)};--room:{roadmapShare(bar.label.room)};--track:{bar.lane}">{bar.title}</li>
+          <li class="roadmap-name" data-side={bar.label.side} data-today={bar.label.today ? '' : undefined} style="--at:{roadmapShare(at)};--room:{roadmapShare(bar.label.room)};--track:{bar.lane}">{bar.title}</li>
         {/each}
         {#each plan.stems as s}
           <li class="roadmap-name" data-stem="" style="--at:{roadmapShare(s.label.x)};--line:{s.label.line}">{s.title}</li>

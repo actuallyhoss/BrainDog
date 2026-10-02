@@ -12,6 +12,7 @@
 -->
 <script lang="ts">
   import { inline, MISSING, type Block, type RenderOptions } from '../../src/index.ts';
+  import { rowsCell } from '../../src/timeline.ts';
   import Text from '../Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -19,12 +20,15 @@
 
 <div class="rows">
   {#each block.rows as row}
+    <!-- A day this year drops its year and money moving by nothing is not said (`rowsCell`), as `html.ts` draws it: an
+         empty value is `MISSING`, a value said as nothing is a known nothing and draws no mark. -->
+    {@const value = row.cells[1] ? rowsCell(row.cells[1], opts.now) : undefined}
     <div class="row">
       <span class="row-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       <span class="row-value num">
-        {#if row.cells[1]}<Text nodes={inline(row.cells[1], opts)} {opts} />{:else}{MISSING}{/if}
+        {#if value === undefined}{MISSING}{:else if value}<Text nodes={inline(value, opts)} {opts} />{/if}
       </span>
-      <span class="row-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
+      <span class="row-note"><Text nodes={inline(rowsCell(row.cells[2], opts.now), opts)} {opts} /></span>
     </div>
   {/each}
 </div>
