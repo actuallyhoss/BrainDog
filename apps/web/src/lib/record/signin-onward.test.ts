@@ -40,7 +40,7 @@ const LAYOUT = readFileSync(join(ROUTES, '+layout.svelte'), 'utf8');
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-const BOOT = { record: { slug: 'walk', name: 'Sami', locale: 'en' }, registers: [], now: '2026-09-23T06:30:00.000Z' };
+const BOOT = { record: { slug: 'walk', name: 'Sami', locale: 'en', currency: 'GBP' }, registers: [], now: '2026-09-23T06:30:00.000Z' };
 
 /** A host that refuses `boot` until somebody signs in, and then answers the record, which is the walk exactly. */
 function host(): { io: Fetch; signIn: () => void; asked: () => number } {

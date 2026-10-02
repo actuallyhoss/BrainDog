@@ -23,7 +23,8 @@ import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
-import { learnHome } from './api.ts';
+import { homeOf, learnHome } from './api.ts';
+import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { copy } from '../copy.ts';
 import type { SwitcherRow } from './switcher.ts';
@@ -38,6 +39,21 @@ import { penOf, type PenItem } from '../design/pen.ts';
 import type { Prefs } from '../nav-prefs.svelte.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
+
+/**
+ * What the record's settings and money say its currency is, read where its `boot` named none (`readImplied`).
+ *
+ * `setting` is the `home_currency` a pack's settings hold, asked only of a host older than `Boot.record.currency`: a
+ * newer one answers that field from the same setting. `held` is every currency the record's money is in, as far as the
+ * caller may read it, and `homeOf` takes it only when it is one.
+ */
+export type Implied = { setting: string | null; held: string[] };
+
+/**
+ * What `readBoot` read beside each `boot` it answered, by that answer. BESIDE IT AND NOT ON IT, because the boot a
+ * screen is handed (`lib/data/record.ts` `source.boot()`) is the record's own answer, word for word.
+ */
+const IMPLIED = new WeakMap<Boot, Implied>();
 
 export type Booted = { from: 'live'; boot: Boot } | { from: 'refused'; code: string; fix: string };
 
@@ -205,6 +221,14 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     if (out.ok) {
       /* THE PAGES' TITLES ARE KEPT WHERE A SCREEN LOOKS A PAGE UP BY SLUG (`held.ts`), which was the sample's copy alone. */
       learnPages(out.value.pages ?? []);
+      /* AND WHERE THE RECORD NAMED NO CURRENCY, WHAT ITS MONEY IS IN, asked before the shell is built so the first
+         screen is drawn in it. A record that named one costs nothing more, and NOR DOES A HOST THAT SENT `money`: it
+         read the money itself and folded the one currency into `currency`, so `null` beside it is none, or two. */
+      const record = out.value.record;
+      if (record && homeOf(record.currency) === null && !Object.hasOwn(record, 'money')) {
+        const implied = await readImplied(client, out.value).catch(() => null);
+        if (implied) IMPLIED.set(out.value, implied);
+      }
       return { from: 'live', boot: out.value };
     }
     const said = 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The record changed while it was being read.' };
@@ -216,6 +240,64 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     return { from: 'refused', code: said.code, fix: said.fix };
   })();
   return kept;
+}
+
+type Client = ReturnType<typeof createClient>;
+
+/**
+ * The currency a record's settings and money imply, for a `boot` that named none.
+ *
+ * THE SETTING ONLY FROM A HOST OLDER THAN THE FIELD, AND ONLY THE SETTING. `Boot.record.currency` is the kernel's
+ * `homeCurrency`, the `home_currency` of the first enabled pack declaring one, so a host that sends `null` has already
+ * read the setting and found none. A host that sends no key at all is asked the same question here, pack by pack in id
+ * order as the kernel asks it, and is not read for its money: that host drew its figures in codes before and still
+ * does where nobody set a currency.
+ *
+ * THE MONEY BY ITS TWO ENDS. A list sorts a money field by currency first (the kernel's `list` order), with an empty
+ * value last either way, so the first row ascending and the first descending hold the lowest and the highest currency
+ * the field holds: equal, and the field is in one. Two rows a field, read only over lists that hold rows, and a list
+ * the caller may not read adds nothing. A list this tab already knows the fields of is not asked for them again.
+ */
+export async function readImplied(client: Client, b: Boot): Promise<Implied> {
+  if (b.record && !Object.hasOwn(b.record, 'currency')) return { setting: await readSetting(client), held: [] };
+  const lists = b.registers.filter((r) => r.count > 0 && r.id !== 'session');
+  const fields = await Promise.all(
+    lists.map(async (r): Promise<[string, string[]]> => {
+      const known = REGISTERS[r.id];
+      if (known) return [r.id, known.fields.filter((f) => f.type === 'money').map((f) => f.id)];
+      const said = await client.schema(r.id);
+      const decl = said.ok ? (said.value as { fields?: unknown } | null) : null;
+      const all = decl && Array.isArray(decl.fields) ? (decl.fields as { id?: unknown; type?: unknown }[]) : [];
+      return [r.id, all.flatMap((f) => (f.type === 'money' && typeof f.id === 'string' ? [f.id] : []))];
+    }),
+  );
+  const ends = await Promise.all(
+    fields.flatMap(([register, ids]) =>
+      ids.flatMap((field) =>
+        (['asc', 'desc'] as const).map(async (dir) => {
+          const page = await client.list({ register, order: [{ field, dir }], limit: 1 });
+          const row = page.ok ? (page.value.rows[0] as { fields?: Record<string, unknown> } | undefined) : undefined;
+          return currencyOf(row?.fields?.[field]);
+        }),
+      ),
+    ),
+  );
+  return { setting: null, held: [...new Set(ends.filter((c): c is string => c !== null))].sort() };
+}
+
+/** The `home_currency` the first enabled pack declaring one holds, by id, or `null`. */
+async function readSetting(client: Client): Promise<string | null> {
+  const packs = await client.packs();
+  if (!packs.ok) return null;
+  const on = packs.value.filter((p) => p.disabled_at === null).map((p) => p.id).sort();
+  const read = await Promise.all(on.map((id) => client.packConfig({ id })));
+  for (const r of read) {
+    const v = r.ok ? (r.value as { config?: Record<string, unknown>; values?: Record<string, unknown> } | null) : null;
+    if (!v?.config || !Object.hasOwn(v.config, 'home_currency')) continue;
+    const home = homeOf(null, v.values?.home_currency);
+    if (home) return home;
+  }
+  return null;
 }
 
 /**
@@ -598,7 +680,7 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
  * THE SWITCHER STARTS AT THE RECORD YOU ARE IN, and the root layout replaces that row with the account's own list. `boot`
  * names this record and no other, so one row is the most this function can honestly claim.
  */
-export function layoutOf(b: Boot): Shell {
+export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b)): Shell {
   const record = b.record ?? null;
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';
@@ -676,9 +758,11 @@ export function layoutOf(b: Boot): Shell {
       slug: record?.slug ?? '',
       name: record?.name ?? '',
       locale: record?.locale ?? 'en',
-      /* THE CURRENCY A PERSON CHOSE, KEPT WHERE EVERY FIGURE ASKS FOR IT (`learnHome`), and never counted from the rows.
-         A refused `boot` has no record, so its shell says none and forgets the last record's. */
-      currency: learnHome(record?.currency ?? null),
+      /* THE CURRENCY A PERSON CHOSE, KEPT WHERE EVERY FIGURE ASKS FOR IT (`learnHome`), and never counted from the rows
+         this tab holds. Where nobody chose, the setting an older host did not send, else the record's money when it is
+         all one currency (`readImplied`). A refused `boot` has no record, so its shell says none and forgets the last
+         record's. */
+      currency: learnHome(record?.currency ?? null, record ? implied?.setting : null, record ? (implied?.held ?? []) : []),
       /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows.
          A LIST WITH A SAVED VIEW STAYS EVEN AT ZERO ROWS: the rail nests a view under its list and drops it from
          Views by matching against these, so dropping the list here strands the view under the generic heading.

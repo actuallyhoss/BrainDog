@@ -50,7 +50,8 @@ const BOOT = {
   ],
   now: '2026-09-15T12:00:00.000Z',
   waiting: [{ id: 'SG4', body_kind: 'options', opened_by: 'p_2', opened_at: '2026-09-14T08:00:00.000Z', question: 'Renew the domain?' }],
-  record: { slug: 'the-studio', name: 'The Studio', locale: 'en' },
+  /* IN POUNDS, AS ITS `boot` SAYS: a record that names no currency is asked what its money is in (`home-currency.test.ts`). */
+  record: { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: 'GBP' },
   me: { kind: 'person', person: 'p_1', name: 'Ada', level: 'write' },
   pages: [
     { slug: 'money', title: 'Money', nav: { section: 'Work', order: 2 }, icon: 'no-such-icon' },

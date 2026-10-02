@@ -18,7 +18,7 @@
 
 import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
-import { useCaseName } from '@braindog/seed/usecases/names';
+import { ruleDone, useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -60,25 +60,47 @@ export function currencyFor(register: string, field: string): string | null {
 }
 
 /**
- * The record's home currency, which a screen writes with its symbol alone: the one its `boot` said, or `null` where
- * nobody has chosen one.
+ * The record's home currency, which a screen writes with its symbol alone: the one its `boot` said, else the one its
+ * money is all in, or `null` where nobody has chosen one and the money is in several.
  *
  * IT WAS A COUNT OF THE ROWS, AND A COUNT IS A GUESS. This answered the currency most of `ROWS` was in, and `ROWS` is
  * `held.ts`'s, which nothing fills in a shipped tab, so on a live record it could only answer null: a figure in the
  * record's own currency kept its code after it ("£33,850.00 GBP"), and an empty money box fell through to sterling.
  * The record knows the answer, the `home_currency` a person chose, and says it in `boot` (`Boot.record.currency`).
  * `layoutOf` (`boot-live.ts`) keeps it here as it builds the shell, so this is the booted shell's currency and never a
- * second reading of anything.
+ * second reading of anything. Where nobody chose, it is the one currency the record's money is in (`homeOf`), which
+ * `readBoot` asked the record for before the shell was built.
  */
 let home: string | null = null;
 export const homeCurrency = (): string | null => home;
 
+const CODE = /^[A-Z]{3}$/u;
+
 /**
- * Keep the currency a record's `boot` said, and answer it, so the shell's `index.currency` and `homeCurrency()` are one
- * value. A shell over a refusal says none, so a record opened after another is never drawn in the first one's money;
- * and what is not a three-letter code is no currency at all, rather than a code printed beside every figure.
+ * The record's home currency from what it said and what it holds: the one its `boot` named, else the one its settings
+ * hold, else the one currency its money is in when every amount it holds is in that one.
+ *
+ * A RECORD NOBODY SET A CURRENCY ON WAS DRAWN IN CODES, "£39.00 GBP", on a record whose every amount is sterling.
+ * Nobody chose, but nothing is left to choose between: one currency is the record's own by the only reading there is.
+ * TWO ARE NEVER GUESSED BETWEEN, so a record holding sterling and dollars with none chosen keeps the code on both, and
+ * a setting is read as the kernel reads it (`homeFrom`), trimmed and in capitals.
  */
-export const learnHome = (currency: string | null): string | null => (home = currency !== null && /^[A-Z]{3}$/u.test(currency) ? currency : null);
+export function homeOf(said: unknown, setting: unknown = null, held: Iterable<string> = []): string | null {
+  if (typeof said === 'string' && CODE.test(said)) return said;
+  const set = typeof setting === 'string' ? setting.trim().toUpperCase() : '';
+  if (CODE.test(set)) return set;
+  const codes = new Set([...held].filter((c) => CODE.test(c)));
+  return codes.size === 1 ? [...codes][0]! : null;
+}
+
+/**
+ * Keep the currency a record's `boot` said, or what `homeOf` reads from its settings and money where it said none, and
+ * answer it, so the shell's `index.currency` and `homeCurrency()` are one value. A shell over a refusal says none, so a
+ * record opened after another is never drawn in the first one's money; and what is not a three-letter code is no
+ * currency at all, rather than a code printed beside every figure.
+ */
+export const learnHome = (currency: string | null, setting: unknown = null, held: Iterable<string> = []): string | null =>
+  (home = homeOf(currency, setting, held));
 
 /* ── values ──────────────────────────────────────────────────────────────── */
 
@@ -1404,7 +1426,32 @@ export function feedThing(target: string | null): string | null {
   if (usecase) return copy.feedUseCase(useCaseName(usecase));
   const pack = /^pack:(.+)$/u.exec(target)?.[1];
   if (pack) return copy.feedPack(pack);
-  return /^suggestion:(SG\d+)$/u.exec(target)?.[1] ?? target;
+  /* A QUESTION THE RECORD DID NOT NAME, from a host older than the one that says what it asks (`thing`), is a question
+     and never its number: "suggested SG10" handed the reader an id. */
+  if (/^(?:suggestion:SG|decision:D)\d+$/u.test(target)) return FEED_QUESTION;
+  return target;
+}
+
+/** What a feed line calls a question the record sent without its words. */
+const FEED_QUESTION = 'a question';
+
+/** The verbs that write a row, after which a worded rule's line is the row and what was done to it. */
+const ROW_WRITES: ReadonlySet<string> = new Set(['edit', 'state', 'link', 'tag']);
+
+/**
+ * WHAT A FEED LINE SAYS WAS DONE, in the person's words: the event's own note, a record setting itself up, a worded
+ * rule's write as the row and what was done to it, and otherwise the verb and the thing.
+ *
+ * A RULE THE PRODUCT WORDS (`ruleDone`) IS SAID AS ITS ROW: eight lines of "Categorise what cleared changed TALLYARD"
+ * read as `Tallyard categorised`, the face beside it already naming the rule. A note the rule wrote is its own words,
+ * and a question it asked is the question.
+ */
+function feedWhat(r: FeedRow): string {
+  if (r.kind === 'setup') return setupSaid(r.target, r.rows ?? 0);
+  const thing = r.thing ?? feedThing(r.target);
+  const done = r.by === 'rule' && r.who !== null && (r.note === null || r.note.trim() === '') ? ruleDone(r.who) : null;
+  if (done !== null && thing !== null && r.kind !== null && ROW_WRITES.has(r.kind)) return `${thing} ${done}`;
+  return agentDoing(r.kind, thing, r.note);
 }
 
 /**
@@ -1433,7 +1480,7 @@ const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test
 export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.by, r.who === null ? '' : feedWho(r.who, me, names), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? feedThing(r.target), r.note), whenOf(r.at, now)],
+    cells: [r.by, r.who === null ? '' : feedWho(r.who, me, names), String(r.count), feedWhat(r), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));

@@ -234,6 +234,17 @@
     text-align: start;
   }
 
+  /* A ROW WITH NOTHING UNDER ITS TITLE CENTRES THE TITLE ON ITS WELL AND ITS ACTION: the empty second line took the
+     height the well and the Open button span, and the title sat at the top. */
+  .settings-place .ledger-lead .line:has(> .line-amount:empty) > .line-main {
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .settings-place .ledger-lead .line-amount:empty {
+    display: none;
+  }
+
   .settings-place .ledger-lead .line-when {
     grid-column: 3;
     grid-row: 1 / span 2;

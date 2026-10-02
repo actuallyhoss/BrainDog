@@ -1173,6 +1173,7 @@ function formOf(block: BlockResult): string {
   if (block.kind === 'steps' && marksOf(block)) return ' path';
   if (block.kind === 'queue' && keyOf(block, 'lead') === true) return ' lead';
   if (block.kind === 'queue' && keyOf(block, 'tiles') === true) return ' tiles';
+  if (block.kind === 'heat' && keyOf(block, 'people') === true) return ' people';
   return '';
 }
 
@@ -1509,11 +1510,12 @@ export function draw(
      AN `inputs` VALUE IS WHAT ITS BOX OPENS ON AND WHAT `inputs-write.ts` READS BACK, so it keeps the record's own
      spelling too: on a record whose home is pounds the box would open on `£1,200.00`, and `$` is the symbol of more than
      one currency, so what came back could not say which it was in.
-     A TILE'S FIGURE IS A HEADLINE, the second cell of each `stat` row, and says a round amount without its ".00". */
+     A TILE'S FIGURE IS A HEADLINE, the second cell of each `stat` row, and says a round amount without its ".00"; every
+     other cell is a table's or a ledger's, where amounts are compared, and keeps its pence. */
   const home = homeCurrency();
   const segments = toSegments(block, kinds).map((s) =>
     s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' && s.kind !== 'inputs'
-      ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c, j) => symbolText(c, home, s.kind === 'stat' && j === 1)) })) }
+      ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c, j) => symbolText(c, home, s.kind === 'stat' && j === 1 ? 'headline' : 'exact')) })) }
       : s,
   );
   /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the

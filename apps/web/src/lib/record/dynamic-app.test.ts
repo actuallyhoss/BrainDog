@@ -367,3 +367,40 @@ test('INPUTS ARE ONE ROW\'S FIELDS, field, label, type and value, and each row n
   /* AND THE RECORD'S HOME CURRENCY, as the kernel answers it beside the types, which a bare figure is written in: none is set here. */
   assert.equal(block.home, null);
 });
+
+/* ── who was in touch ───────────────────────────────────────────────────── */
+
+test('A HEAT WITH people: true IS DRAWN A LINE A PERSON, its rows the day and then who', async () => {
+  const CONTACTS = {
+    id: 'contacts',
+    name: 'Contacts',
+    one: 'contact',
+    title: 'name',
+    fields: [{ id: 'name', type: 'text', required: true }, { id: 'in_touch', type: 'day' }],
+  };
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const page: Declaration = {
+    id: 'page.circle',
+    kind: 'page',
+    body: {
+      page: 'circle',
+      title: 'Circle',
+      requires: ['register.contacts'],
+      blocks: [
+        { kind: 'heat', heading: 'In touch', people: true, source: 'register.contacts', columns: [{ field: 'in_touch' }, { field: 'name' }], empty: 'Nobody.' },
+      ],
+    } as never,
+  };
+  const out = await k.install([register(CONTACTS), page]);
+  assert.ok(out.ok, JSON.stringify(out));
+  for (const [name, in_touch] of [['Ada', '2026-09-22'], ['Bo', '2026-09-03']]) assert.ok(k.create('contacts', { name, in_touch }, OWNER).ok);
+  REGISTERS.contacts = CONTACTS as never;
+  const read = k.page('circle') as { ok: boolean; value: { blocks: Record<string, unknown>[] } };
+  assert.ok(read.ok, JSON.stringify(read));
+  const b = fence(named(read.value.blocks.map((x) => blockOf(x as never, new Map(), NOW)), 'In touch'));
+  assert.equal(b.form, 'people');
+  assert.deepEqual(cells(b).map((c) => c[1]).sort(), ['Ada', 'Bo']);
+  const html = toHTML([b], { today: '2026-09-25' } as never);
+  assert.match(html, /data-form="people"/u);
+  assert.match(html, /class="heat-who">Ada</u);
+});

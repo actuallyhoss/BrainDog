@@ -298,21 +298,34 @@ export function drawn(text: string, home: string | null): Drawn | null {
 }
 
 /**
+ * How a figure is set where it stands: `exact` in a ledger or a table, every minor unit shown, since that is where
+ * amounts are compared; `sentence` in words a person reads, a note, a question, a line of the feed, where a fraction
+ * of all zeros says nothing ("£39", "−£9,190"); and `headline`, a figure standing on its own in a tile, set as a
+ * sentence sets it.
+ */
+export type Setting = 'exact' | 'sentence' | 'headline';
+
+/**
  * A sentence with every figure `money()` wrote in it redrawn the same way, as plain text.
  *
- * `headline` IS A FIGURE STANDING ON ITS OWN, a tile's, where a fraction of all zeros is dropped: "£33,850" and
- * "EGP 58,185", because ".00" under a headline is width a phone does not have and says nothing a round figure does not.
- * A fraction that is not all zeros is part of the figure and stays. A headline drops the code after a symbol, too: one
- * mark of currency is enough there.
+ * THE HOME CURRENCY IS WRITTEN BY ITS SYMBOL ALONE IN EVERY SETTING, "£39" and never "£39 GBP", and any other keeps
+ * its code after the figure in every setting too, "$4,800 USD": two currencies never look alike, a headline's
+ * included, since the narrow `$` is the same mark for four dollars. That is the design system's rule (`2.3`).
+ *
+ * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence or
+ * under a headline is width a phone does not have and says nothing a round figure does not. A fraction that is not all
+ * zeros is part of the figure and stays. `true` is `headline` and `false` is `sentence`, as the callers that predate
+ * the settings pass them; a table cell asks for `exact`.
  */
-export function symbolText(text: string, home: string | null, headline = false): string {
+export function symbolText(text: string, home: string | null, setting: Setting | boolean = 'sentence'): string {
+  const exact = setting === 'exact';
   return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
     const d = drawn(hit, home);
-    if (!d) return hit;
-    const fraction = headline && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;
+    /* THREE CAPITALS THE RUNTIME DOES NOT LIST AS TENDER ARE NOT MONEY, and their figure is left as it was written. */
+    if (!d || !TENDER.has(hit.slice(0, 3))) return hit;
+    const fraction = !exact && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;
     /* THE CODE STAYS WITH ITS AMOUNT, so a line of amounts in several currencies breaks between them and never inside one. */
-    /* A HEADLINE CARRIES ONE MARK OF CURRENCY, its symbol: "£33,850" and never "£33,850 GBP". */
-    return `${d.lead}${d.whole}${fraction}${d.iso && !headline ? ` ${d.iso}` : ''}`;
+    return `${d.lead}${d.whole}${fraction}${d.iso ? ` ${d.iso}` : ''}`;
   });
 }
 
@@ -331,9 +344,9 @@ const TENDER: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
 const grouped = (whole: string): string => whole.replace(/,/gu, '').replace(/\B(?=(?:\d{3})+$)/gu, ',');
 
 /**
- * A sentence the record stored, with every amount in it drawn as a screen draws one: `£2,400.00` in the record's own
- * currency, `$4,800.00 USD` in any other, `−£39.00` for money out, and `EGP 58,185.54` for a currency written by its
- * code.
+ * A sentence the record stored, with every amount in it drawn as a screen draws one: `£2,400` in the record's own
+ * currency, `$4,800 USD` in any other, `−£39` for money out, `£12.50` where the pence are not round, and `EGP 58,185.54`
+ * for a currency written by its code. A caller drawing a ledger passes `exact` and keeps every `.00`.
  *
  * AT THE READER, NOT IN THE ROUTE. Home's feed, History, Decide's titles and options and a notification all print words
  * somebody else wrote, so the module that reads them (`news-live.ts`, `governance.ts`, the audit reader) hands them on
@@ -349,9 +362,9 @@ const grouped = (whole: string): string => whole.replace(/,/gu, '').replace(/\B(
  * this module imports `api.ts`, which imports it back: neither reads the other at load, only inside a call, so the cycle
  * leaves no binding unset when it is read.
  */
-export function moneyInText(text: string, home: string | null = homeCurrency()): string {
+export function moneyInText(text: string, home: string | null = homeCurrency(), setting: Setting = 'sentence'): string {
   const spoken = text.replace(STORED, (hit, currency: string, minus: string, whole: string, fraction: string | undefined) =>
     TENDER.has(currency) ? `${currency} ${minus ? '−' : ''}${grouped(whole)}${fraction ?? ''}` : hit,
   );
-  return symbolText(spoken, home);
+  return symbolText(spoken, home, setting);
 }

@@ -1197,6 +1197,8 @@
                 <a class="incoming-more tap" href={at(rel.href)}>All {rel.total} <Icon name="arrow" size="s" /></a>
               {/if}
             {/snippet}
+            <!-- A LEDGER, SO ITS AMOUNTS ARE EXACT: a linked invoice reads '£1,200.00', to the penny, as every other ledger
+                 does, not the sentence's rounded '£1,200'. -->
             <ul class="ledger ledger-lead" aria-label="{rel.name} · {rel.label}">
               {#each rel.rows as r (r.key)}
                 {@const rest = r.cells.slice(1).filter((c): c is string => Boolean(c))}
@@ -1204,8 +1206,8 @@
                   <a class="line line-tall" href={at(r.href ?? '')}>
                     <span class="line-mark"><IconWell name={rel.icon} size="l" /></span>
                     <span class="line-main">
-                      <span class="line-title" dir="auto">{moneyInText(r.cells[0] || r.key)}</span>
-                      {#if rest.length > 0}<span class="line-detail">{rest.map((c) => moneyInText(c)).join(' · ')}</span>{/if}
+                      <span class="line-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency(), 'exact')}</span>
+                      {#if rest.length > 0}<span class="line-detail">{rest.map((c) => moneyInText(c, homeCurrency(), 'exact')).join(' · ')}</span>{/if}
                     </span>
                     {#if r.tone}
                       <span class="line-when" data-intent={r.tone}><span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span></span>

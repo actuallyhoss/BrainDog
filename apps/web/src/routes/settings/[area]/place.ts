@@ -85,7 +85,9 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     title: 'This record',
     icon: 'archive',
     areas: [
-      area('/settings/backups', 'Backups', 'archive', 'Copies of this record to restore from'),
+      /* ITS OWN GLYPH, NOT ITS GROUP'S: Backups wore the box `This record` is headed with, so the group's heading and its
+         first row carried one mark and read as one thing said twice. A copy to go back to is the clock turned back. */
+      area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
       area('/settings/billing', 'Billing', 'money', 'What this record costs'),
       area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
       /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`. A person who wants a copy of their data clicks the row

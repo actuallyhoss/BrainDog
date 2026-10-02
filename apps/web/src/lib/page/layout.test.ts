@@ -19,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import { blockOf } from '../record/page-live.ts';
-import { boxesOf, layoutOf, mainSpan, splitAreas, sticks, type Layout } from './layout.ts';
+import { boxesOf, layoutOf, mainSpan, splitAreas, sticks, widened, type Layout } from './layout.ts';
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
@@ -214,4 +214,28 @@ test('THE RECORD`S PAGE READ CARRIES `layout`, `area` AND `box` TO THE SPLIT THE
   assert.deepEqual(headings(main), ['Where it stands', 'Every step']);
   assert.deepEqual(headings(rail), ['Pinned', 'Asked', 'Later']);
   assert.deepEqual(boxesOf(main).map((r) => ({ box: r.box, items: headings(r.items) })), [{ box: true, items: ['Where it stands', 'Every step'] }]);
+});
+
+/* A ROW THE AUTHOR FILLED STAYS FILLED. Work's Late and This week are six each, each on its own `when:`. */
+const shown = (span: number) => ({ span, drawn: true });
+const hidden = (span: number) => ({ span, drawn: false });
+
+test('A HALF WHOSE PARTNER IS HIDDEN TAKES THE WHOLE ROW, either way round, and the next row keeps its own widths', () => {
+  assert.deepEqual(widened([shown(12), hidden(6), shown(6), shown(6), shown(6)]), [12, 6, 12, 6, 6]);
+  assert.deepEqual(widened([shown(6), hidden(6), shown(12)]), [12, 6, 12]);
+});
+
+test('A ROW THAT LOSES ONE OF THREE SHARES ITS ROOM by span, and a row with nothing hidden is drawn as declared', () => {
+  assert.deepEqual(widened([shown(4), hidden(4), shown(4)]), [6, 4, 6]);
+  assert.deepEqual(widened([shown(8), hidden(4)]), [12, 4]);
+  assert.deepEqual(widened([shown(3), shown(3), hidden(6)]), [6, 6, 6]);
+  assert.deepEqual(widened([shown(6), shown(6), shown(4), shown(8)]), [6, 6, 4, 8]);
+});
+
+test('A ROW THAT WAS NEVER WHOLE IS LEFT AS IT WAS, and a row with nothing drawn gives nobody its room', () => {
+  /* A six alone before a twelve is half the page by choice. A six that does not fit beside an eight starts the next
+     row, so the eight is left as it is and that row is the one that widens. */
+  assert.deepEqual(widened([shown(6), shown(12)]), [6, 12]);
+  assert.deepEqual(widened([shown(8), hidden(6), shown(6)]), [8, 6, 12]);
+  assert.deepEqual(widened([hidden(6), hidden(6), shown(6)]), [6, 6, 6]);
 });

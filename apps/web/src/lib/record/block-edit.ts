@@ -93,6 +93,7 @@ export const blockWords = {
     lead: { stat: 'Draw the first figure large', cards: 'Draw the first card larger', note: 'Open with the first sentence larger' },
     range: { progress: 'Draw each row as a band from low to high' },
     tiles: { queue: 'Draw the questions as tiles' },
+    people: { heat: 'Draw a line for each person, a dot a week' },
     box: { section: 'Put the blocks after it on one surface' },
     fold: { section: 'Start folded shut' },
   } as Record<Flag, Record<string, string>>,
@@ -116,20 +117,21 @@ export const blockWords = {
 /* ── which form words a kind reads ───────────────────────────────────────── */
 
 /** The yes-or-no form words (`declare.ts` refuses any value but a boolean for these). */
-export type Flag = 'lead' | 'range' | 'tiles' | 'box' | 'fold';
+export type Flag = 'lead' | 'range' | 'tiles' | 'people' | 'box' | 'fold';
 
 /** `KEY_KINDS`' rows for the words the editor draws a control for. */
 const READS: Readonly<Record<Flag | 'first' | 'short', readonly string[]>> = {
   lead: ['stat', 'cards', 'note'],
   range: ['progress'],
   tiles: ['queue'],
+  people: ['heat'],
   box: ['section'],
   fold: ['section'],
   first: ['feed', 'agents', 'steps'],
   short: ['steps'],
 };
 
-const FLAGS: readonly Flag[] = ['lead', 'range', 'tiles', 'box', 'fold'];
+const FLAGS: readonly Flag[] = ['lead', 'range', 'tiles', 'people', 'box', 'fold'];
 
 /** The form words `kind` reads, which are the only ones its sheet offers. */
 export function formOf(kind: string): { flags: Flag[]; first: boolean; short: boolean } {

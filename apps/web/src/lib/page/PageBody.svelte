@@ -12,7 +12,8 @@
   out what it answered.
 -->
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
   import { at as inApp } from '../at.ts';
@@ -28,13 +29,14 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { boxesOf, layoutOf, mainSpan, slotOf, splitAreas, sticks, type Run } from './layout.ts';
+  import { boxesOf, layoutOf, mainSpan, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
   import { emptyHidden, openOf, optionOf, stepRow } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
   import type { RowHost } from './row-host.svelte.ts';
   import { rowOfKey } from './row-verbs.ts';
   import JustChanged from './JustChanged.svelte';
+  import { leadIndex } from './lead.ts';
 
   let {
     mode,
@@ -46,6 +48,7 @@
     ids = '',
     level = 2,
     headed = false,
+    strip = null,
     host = null,
     pick = null,
   }: {
@@ -69,6 +72,8 @@
     level?: 2 | 3;
     /** The page's head rides over the top of the lead tile on a wide screen (`PageHead`'s `over`), so the tile leaves it room. */
     headed?: boolean;
+    /** What narrows the page (its filter strip), drawn under the headline on a page whose head rides over it. */
+    strip?: Snippet | null;
     /**
      * The page's hold on one row at a time (`row-host.svelte.ts`): the docked panel, the row menu and Just changed, which
      * the row keys and the renderer's `onopen` and `onmenu` reach. `null` where rows are only ticked.
@@ -121,13 +126,40 @@
   const split = $derived(splitAreas(pairs, layout, (x) => x.slot.area));
 
   /**
-   * THE ORDER A READER MEETS THE BLOCKS IN, which is the main column and then the rail: the order the page draws them
-   * in, the order a phone stacks them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
+   * THE HEADLINE, LIFTED: the page's sentence when the head rides over it (`headed`, `lead.ts`). On a page with a rail it
+   * is drawn across the page over both columns, so the head's row and its tools sit over a tile as wide as they are,
+   * and the main column starts under it.
+   */
+  const lifted = $derived.by((): Laid | null => {
+    if (!headed) return null;
+    const at = leadIndex(pairs.map((x) => x.block));
+    return at < 0 ? null : (pairs[at] ?? null);
+  });
+  /** Each column's pairs, less the headline lifted over both: a sentence declared in the rail is lifted too, and drawn once. */
+  const mainRest = $derived(lifted ? split.main.filter((x) => x !== lifted) : split.main);
+  const railRest = $derived(lifted ? split.rail.filter((x) => x !== lifted) : split.rail);
+
+  /**
+   * ON A PHONE THE RAIL COMES FIRST, on a page at its own address: its blocks are the page at a glance (Kiln's figures,
+   * a desk's pins), and stacked under the main column they were the last thing on a long screen. In the markup and not
+   * by `order`, so Tab, a screen reader and `j` meet the blocks in the order the eye does. Home keeps its rail last,
+   * because Home's main column is what needs the reader.
+   */
+  const wide = new MediaQuery('(width >= 900px)', true);
+  const railFirst = $derived(mode === 'page' && layout !== null && !wide.current);
+
+  /**
+   * THE ORDER A READER MEETS THE BLOCKS IN, which is the headline, the main column and then the rail (the rail first on
+   * a phone): the order the page draws them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
    *
    * ONLY THE BLOCKS THAT ARE DRAWN. A block whose `when:` said no has no element, so a cursor on it is a cursor nobody
    * can see, and `j` on a page that opens with three of them pressed three times before anything moved.
    */
-  const reading = $derived((layout ? [...split.main, ...split.rail] : pairs).filter((x) => x.block.drawn));
+  const reading = $derived.by(() => {
+    if (!layout) return pairs.filter((x) => x.block.drawn);
+    const top = lifted ? [lifted] : [];
+    return (railFirst ? [...top, ...railRest, ...mainRest] : [...top, ...mainRest, ...railRest]).filter((x) => x.block.drawn);
+  });
 
   /**
    * The runs an area draws in. A boxed section and the blocks after it share one surface while reading; while arranging
@@ -135,6 +167,28 @@
    * is a listitem whose parent is not the list.
    */
   const runsOf = (list: Laid[]): Run<Laid>[] => (arranging ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
+
+  /**
+   * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
+   * (`layout.ts` `widened`): a half whose partner's `when:` said no takes the whole row rather than sitting beside a
+   * hole. Each twelve-column flow on its own: the main column (or the page, with no rail) and each box in it. The rail
+   * is one stack and has no rows. NOT WHILE ARRANGING, where the bar names a block's own width and that is what is drawn.
+   */
+  const spans = $derived.by(() => {
+    const out = new Map<number, number>();
+    if (arranging) return out;
+    for (const run of runsOf(layout ? mainRest : pairs)) {
+      const got = widened(run.items.map((x) => ({ span: x === lifted ? COLUMNS : x.slot.span, drawn: x.block.drawn })));
+      run.items.forEach((x, n) => {
+        if (x !== lifted && got[n] !== x.slot.span) out.set(x.slot.i, got[n]!);
+      });
+    }
+    return out;
+  });
+
+  /** Whether each column draws anything: a column whose every block said no to `when:` is not drawn, as an empty one is not. */
+  const mainShown = $derived(mainRest.some((x) => x.block.drawn));
+  const railShown = $derived(railRest.some((x) => x.block.drawn));
 
   /* WHETHER THE RAIL STAYS IN VIEW, measured, since `sticky: true` is honoured only while the rail fits (`sticks`). The
      room is the scrolling column's height under the page head, the same `--sticky` offset the rail sticks at. */
@@ -572,7 +626,7 @@
       class="block-slot"
       id="{ids}b-{slot.i + 1}"
       aria-labelledby="{ids}h-{slot.i + 1}"
-      style="--span:{slot.span}"
+      style="--span:{spans.get(slot.i) ?? slot.span}"
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}
       role={arranging ? 'listitem' : 'region'}
@@ -644,7 +698,11 @@
         pick={mode === 'preview' ? null : pick}
       />
     </div>
-    {#if headed && host && mode === 'page' && at === 0}<JustChanged {host} />{/if}
+    {#if lifted?.at === at}
+      <!-- UNDER THE HEADLINE: what narrows the page, then what changed on it, before what it holds. -->
+      {#if strip}<div class="page-strip">{@render strip()}</div>{/if}
+      {#if host && mode === 'page'}<JustChanged {host} />{/if}
+    {/if}
   {/if}
 {/snippet}
 
@@ -664,41 +722,57 @@
   {/each}
 {/snippet}
 
+<!-- THE MAIN COLUMN AND THE RAIL, each a snippet so a phone can draw the rail first without a second copy of either. -->
+{#snippet mainArea()}
+  {#if layout && mainShown}
+    <div
+      class="area"
+      data-area="main"
+      style="--area-span:{railShown ? mainSpan(layout) : COLUMNS}"
+      role={arranging ? 'list' : undefined}
+      aria-label={arranging ? copy.mainColumn : undefined}
+    >
+      {@render column(mainRest)}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet railArea()}
+  {#if layout && railShown}
+    <div
+      class="area"
+      data-area="rail"
+      style="--area-span:{mainShown ? layout.rail : COLUMNS}"
+      data-sticky={stuck ? '' : undefined}
+      role={arranging ? 'list' : undefined}
+      aria-label={arranging ? copy.sideRail : undefined}
+      bind:this={railEl}
+      bind:clientHeight={railHeight}
+    >
+      {@render column(railRest)}
+    </div>
+  {/if}
+{/snippet}
+
 <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only in the mode where they
      are reorderable; announcing "list, 5 items" to somebody reading a page is describing the furniture. ON A PAGE WITH A
      RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
-<div class="page" data-mode={mode} data-headed={headed ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
+<div class="page" data-mode={mode} data-headed={lifted ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
   <!-- JUST CHANGED OPENS THE PAGE, before what it holds; on a page whose head rides over its lead tile it follows that
        tile instead, or the head would sit over it. -->
-  {#if host && mode === 'page' && !arranging && !headed}<JustChanged {host} />{/if}
+  {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
+  {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
-         draws as one column rather than beside an empty part of the screen. -->
-    {#if split.main.length > 0}
-      <div
-        class="area"
-        data-area="main"
-        style="--area-span:{mainSpan(layout)}"
-        role={arranging ? 'list' : undefined}
-        aria-label={arranging ? copy.mainColumn : undefined}
-      >
-        {@render column(split.main)}
-      </div>
-    {/if}
-    {#if split.rail.length > 0}
-      <div
-        class="area"
-        data-area="rail"
-        style="--area-span:{layout.rail}"
-        data-sticky={stuck ? '' : undefined}
-        role={arranging ? 'list' : undefined}
-        aria-label={arranging ? copy.sideRail : undefined}
-        bind:this={railEl}
-        bind:clientHeight={railHeight}
-      >
-        {@render column(split.rail)}
-      </div>
+         draws as one column rather than beside an empty part of the screen. The headline is over both. -->
+    {#if lifted}{@render slotted(lifted)}{/if}
+    {#if railFirst}
+      {@render railArea()}
+      {@render mainArea()}
+    {:else}
+      {@render mainArea()}
+      {@render railArea()}
     {/if}
   {:else}
     {@render column(pairs)}
@@ -874,6 +948,34 @@
     }
   }
 
+  /* THE HEADLINE TAKES THE WHOLE ROW, over both columns on a page with a rail, whatever span its author gave it. */
+  .page[data-headed] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+    grid-column: 1 / -1;
+  }
+
+  /* WHAT NARROWS THE PAGE, under its headline and across the row, with the gap a row of tiles keeps. */
+  .page-strip {
+    grid-column: 1 / -1;
+    min-inline-size: 0;
+  }
+
+  /**
+   * ON A PHONE THE PAGE'S SENTENCE IS THE HEADLINE TOO, at `--t-title` in ink, as it is at 40 from 900px up. It was
+   * body size under the 30px name, so the one line that says what is true read as a caption, and the questions under
+   * it read louder than it. The name steps down to the label over it (`PageHead`'s `over`).
+   */
+  @media (width < 900px) {
+    .page[data-mode='page'] > .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(p) {
+      margin: 0;
+      color: var(--ink);
+      font-size: var(--t-title);
+      font-weight: 600;
+      line-height: calc(34 / 28);
+      letter-spacing: -0.02em;
+      text-wrap: pretty;
+    }
+  }
+
   /* A group heading keeps air above it and none below, so it reads as the head of the tiles after it. */
   .block-slot:not(.box > *):has(> :global(.block[data-kind='section'])) {
     padding-block-start: var(--sp-5);
@@ -963,7 +1065,7 @@
     inset-block-end: var(--mid);
   }
 
-  /* ONE COLUMN below 900px, in declaration order, the tiles full width in the 16 gutters. 13 §10 has two
+  /* ONE COLUMN below 900px, in declaration order (a page's rail first, `railFirst`), the tiles full width in the 16 gutters. 13 §10 has two
      breakpoints and 05 §6 allows width to change LAYOUT but never size. There is no second stored layout for narrow,
      because a second layout is a second thing to keep in sync and nobody ever does. */
   @media (width < 900px) {

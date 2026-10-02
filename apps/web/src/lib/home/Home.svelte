@@ -302,14 +302,14 @@
     min-inline-size: 0;
   }
 
-  /* A QUESTION WRAPS TO TWO LINES AND NO MORE on Home, so three of them fit above the fold; its own card on Decide says
-     it whole. */
+  /* A QUESTION WRAPS TO THREE LINES AND NO MORE on Home; its own card on Decide says it whole. Two cut a question with
+     a figure in it before the figure ("was due 4 days ago, £39. Did …") on a phone, and the figure is the question. */
   .body :global(.queue-question) {
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   /* ONE LINE PER EVENT in what changed: Home is not the log, and the row is the door to the rest of the sentence. */
@@ -332,6 +332,20 @@
   @media (width < 640px) {
     .body :global(.grid:has(> .cell:nth-child(2))) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* ON A PHONE A QUESTION IS A STEP UNDER THE HEADLINE, not level with it: at 20 and 24 bold the questions under the
+     28px line read as the headline, and the page opened on three of them. The first question keeps one step over the
+     rest, as `queue lead` does at every width. */
+  @media (width < 900px) {
+    .body :global(.queue-question) {
+      font-size: var(--t-group);
+      font-weight: 600;
+    }
+
+    .body :global(.queue-lead > .queue-question) {
+      font-size: var(--t-lg);
     }
   }
 </style>

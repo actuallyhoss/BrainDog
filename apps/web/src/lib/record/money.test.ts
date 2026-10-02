@@ -378,8 +378,9 @@ test('THE HOME CURRENCY IS WRITTEN WITH ITS SYMBOL, and any other keeps its code
 });
 
 test('a sentence redraws its figures, and a currency with no symbol keeps its code in front', () => {
-  assert.equal(symbolText('no more than GBP 20,000.00', 'GBP'), 'no more than £20,000.00');
-  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4.00 EUR', 'the code stays with its amount');
+  assert.equal(symbolText('no more than GBP 20,000.00', 'GBP'), 'no more than £20,000');
+  assert.equal(symbolText('was EUR 4.00', 'GBP'), 'was €4 EUR', 'the code stays with its amount');
+  assert.equal(symbolText('was EUR 4.50', 'GBP'), 'was €4.50 EUR');
   assert.equal(symbolText('costs ZZZ 12.00', 'GBP'), 'costs ZZZ 12.00');
 });
 
@@ -389,13 +390,23 @@ test('A CURRENCY ENGLISH WRITES BY ITS CODE IS SAID ONCE, code first, home or no
   assert.equal(symbolText('EGP 58,185.54 in the bank', 'EGP'), 'EGP 58,185.54 in the bank');
 });
 
-test('A HEADLINE DROPS A FRACTION OF ALL ZEROS, and a sentence keeps its pence', () => {
+test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps its pence', () => {
   assert.equal(symbolText('GBP 33,850.00', 'GBP', true), '£33,850');
   assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'EGP 58,185');
   assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,850.50', 'a fraction that is not all zeros is part of the figure');
-  assert.equal(symbolText('GBP 33,850.00', 'GBP'), '£33,850.00');
-  assert.equal(symbolText('Cash is GBP 33,850.00', 'USD', true), 'Cash is £33,850', 'a headline carries one mark of currency, never the symbol and the code');
-  assert.equal(symbolText('was EUR 4.00', 'GBP', true), 'was €4');
+  assert.equal(symbolText('GBP 33,850.00', 'GBP'), '£33,850');
+  assert.equal(symbolText('Bills past their due date: GBP 10,540.00 still to pay.', 'GBP', 'sentence'), 'Bills past their due date: £10,540 still to pay.');
+  assert.equal(symbolText('GBP 33,850.00', 'GBP', 'exact'), '£33,850.00');
+  assert.equal(symbolText('GBP 0.00', 'GBP', 'exact'), '£0.00');
+  assert.equal(symbolText('GBP 0.00', 'GBP'), '£0');
+  assert.equal(symbolText('USD 4,800.00', 'GBP', 'exact'), '$4,800.00 USD');
+});
+
+test('ANY OTHER CURRENCY KEEPS ITS CODE IN EVERY SETTING, a headline too, and the home one never carries it', () => {
+  assert.equal(symbolText('Cash is GBP 33,850.00', 'USD', true), 'Cash is £33,850 GBP', 'a sterling figure on a dollar record read as its own');
+  assert.equal(symbolText('was EUR 4.00', 'GBP', true), 'was €4 EUR');
+  assert.equal(symbolText('CAD 1,200.00 and USD 1,200.00', 'USD'), '$1,200 CAD and $1,200', 'two dollars looked alike');
+  assert.equal(symbolText('GBP 39.00', null), '£39 GBP', 'with no home currency every figure keeps its code');
 });
 
 /**

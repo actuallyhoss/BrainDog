@@ -47,7 +47,8 @@
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
-  import { layoutOf } from './layout.ts';
+  import { emptyHidden } from './home.ts';
+  import { leadIndex } from './lead.ts';
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
   import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
@@ -173,18 +174,21 @@
   let arranger = $state<ReturnType<typeof Arrange>>();
 
   /**
-   * WHETHER THE PAGE OPENS ON ITS SENTENCE, read as a tile that holds the page's name and tools as well. On a wide screen
-   * the head then rides inside that tile, over its top, and the sentence under it is the headline. Not while arranging,
-   * where every block is a list item with a bar of its own, and not on a page with a rail, whose first block is the
-   * main column's and not the page's.
+   * WHETHER THE PAGE OPENS ON ITS SENTENCE, read as a tile that holds the page's name and tools as well (`lead.ts`). The
+   * head then rides inside that tile, over its top, and the sentence under it is the headline, at every width. Not while
+   * arranging, where every block is a list item with a bar of its own. A page a reader may narrow keeps it, with the
+   * filter strip under the headline (`PageBody`'s `strip`), and a page with a rail keeps it, with the headline over both
+   * columns. The blocks are read as the body draws them, so a block it hides for holding nothing does not stand first.
    */
-  const led = $derived.by(() => {
-    if (!live || arranging || showSource || layoutOf(live.page.page) !== null) return false;
-    /* NOR OVER A FILTER STRIP, which stands between the head and the first tile. */
-    if (mode === 'page' && filtersOf(live.page.page).length > 0) return false;
-    const first = live.page.blocks[0];
-    return first !== undefined && first.drawn && first.kind === 'note' && first.lead === true;
-  });
+  const led = $derived(!!live && !arranging && !showSource && leadIndex(emptyHidden(live.page.blocks)) >= 0);
+
+  /**
+   * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
+   * generic "One screen that gathers what you keep an eye on" under its title as well (`define`), which on Work stood
+   * between the name and the page's own sentence and said less than it. Read whether or not the page opens on it, so the
+   * line does not come back while arranging or reading the source.
+   */
+  const headlined = $derived(!!live && emptyHidden(live.page.blocks).some((b) => b.drawn && b.kind === 'note' && b.lead === true));
 
   /** Declared, then added. One list, so ordering and spans do not care which is which. */
   const all = $derived<LiveBlock[]>(live ? [...live.page.blocks, ...extra.map((b) => added(b, live.page.blocks))] : []);
@@ -249,13 +253,13 @@
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
   <div class="hosted">
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
-       at one. -->
+       at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
     icon={iconFor(live.page.page.icon, 'doc')}
     hue={hueOf(live.page.page.identity)}
     kicker={live.page.page.nav?.section}
     title={live.page.page.title}
-    define="page"
+    define={headlined ? undefined : 'page'}
     over={led}
   >
     {#snippet actions()}
@@ -270,9 +274,11 @@
     {/snippet}
   </PageHead>
 
-  {#if strip}
-    <!-- THE RENDERER'S STRIP, one group a field, "All" first, the rest behind one select (`braindog-render` `Filters`). -->
-    <div class="page-filters"><Filters {filters} {chosen} {onfilter} /></div>
+  <!-- THE RENDERER'S STRIP, one group a field, "All" first, the rest behind one select (`braindog-render` `Filters`).
+       Under the headline on a page that opens on one, and between the head and the first tile otherwise. -->
+  {#snippet narrow()}<Filters {filters} {chosen} {onfilter} />{/snippet}
+  {#if strip && !led}
+    <div class="page-filters">{@render narrow()}</div>
   {/if}
 
   {#if showSource}
@@ -287,6 +293,7 @@
       {writes}
       {arrangement}
       headed={led}
+      strip={strip && led ? narrow : null}
       host={hosting ? host : null}
       pick={hosting ? picked : null}
     />

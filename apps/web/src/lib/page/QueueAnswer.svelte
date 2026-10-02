@@ -235,6 +235,8 @@
             {#if way.shows && 'swatch' in way.shows}<span class="queue-visual" data-shows="swatch" aria-hidden="true"
                 >{#each way.shows.swatch as colour}<span class="queue-swatch" style="--swatch:{colour}"></span>{/each}</span
               >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
+            <!-- "SUGGESTED" IS A MARK INSIDE ITS PILL, after the words (`kinds/queue.css`). The space keeps the label and the
+                 mark two words in the button's name, since an inline span adds none. -->
             {#if answerable}
               <button
                 type="button"
@@ -242,12 +244,13 @@
                 id="{uid}-opt-{way.key}"
                 data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
                 aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
-                onclick={() => press(way)}>{way.label}</button
+                onclick={() => press(way)}
+                >{way.label}{#if way.recommended}{' '}<span class="queue-rec">{queueWords.suggested}</span>{/if}</button
               >
             {:else}
               <span class="queue-label">{way.label}</span>
+              {#if way.recommended}<span class="queue-rec">{queueWords.suggested}</span>{/if}
             {/if}
-            {#if way.recommended}<span class="queue-rec">{queueWords.suggested}</span>{/if}
             {#if way.because}<span class="queue-because" dir="auto">{way.because}</span>{/if}
           </li>
         {/each}

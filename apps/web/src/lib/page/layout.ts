@@ -131,3 +131,49 @@ export function boxesOf<T>(blocks: readonly T[], read: (b: T) => { kind?: unknow
  */
 export const sticks = (layout: Layout | null, rail: number, room: number): boolean =>
   layout?.sticky === true && rail > 0 && rail <= room;
+
+/** What `widened` reads off a block in a flow: its span in force, and whether the record drew it. */
+export type Placed = { readonly span: number; readonly drawn: boolean };
+
+/**
+ * The span each block of one twelve-column flow is drawn at, once the blocks the record did not draw are gone.
+ *
+ * A ROW THE AUTHOR FILLED STAYS FILLED. Work declares Late and This week at six each, and each says `when:` it holds a
+ * task, so on a day with only one of them the other half of the row was an empty hole beside it, and the flow then
+ * pulled the next row's first tile up beside it. The rows are read as the author declared them, hidden blocks
+ * included, packed the way the grid packs (a block that does not fit in what is left of a row starts the next); a row
+ * whose declared spans make the whole twelve, and which lost some of its blocks, gives their room to the ones still
+ * drawn, each in proportion to its own span. One half left of two halves is the whole row; two thirds left of three are
+ * halves.
+ *
+ * A ROW THAT WAS NEVER WHOLE IS LEFT AS IT WAS: a six declared alone before a twelve is half the page by choice.
+ *
+ * Hidden blocks keep their span (nothing draws them). PURE, so `layout.test.ts` holds the rule.
+ */
+export function widened(blocks: readonly Placed[], columns: number = COLUMNS): number[] {
+  const out = blocks.map((b) => b.span);
+  const spans = blocks.map((b) => Math.min(Math.max(1, b.span), columns));
+  let row: number[] = [];
+  let used = 0;
+  const close = () => {
+    const shown = row.filter((n) => blocks[n]!.drawn);
+    const kept = shown.reduce((sum, n) => sum + spans[n]!, 0);
+    if (used === columns && shown.length > 0 && shown.length < row.length) {
+      let left = columns;
+      shown.forEach((n, k) => {
+        const span = k === shown.length - 1 ? left : Math.max(1, Math.floor((spans[n]! * columns) / kept));
+        out[n] = span;
+        left -= span;
+      });
+    }
+    row = [];
+    used = 0;
+  };
+  spans.forEach((span, n) => {
+    if (used + span > columns) close();
+    row.push(n);
+    used += span;
+  });
+  close();
+  return out;
+}

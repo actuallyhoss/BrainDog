@@ -472,8 +472,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.2.0",
       "versions": [
+        {
+          "version": "2.2.0",
+          "checksum": "9d54a6e6e753f10794d26b8caa582a67e9b6385c325491c8cd9efb3ad45ccac0",
+          "bytes": 27332,
+          "published_at": "2026-10-02T04:00:32.615Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [
+              "Add the three costs of the price check together, and the least price they allow"
+            ],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Tiles sit in even rows: on the desk the next move and what is already done stack in one box, the calls waiting on you come straight under the line and are shown once, and a part's own card sits at the top of the column beside its path."
+        },
         {
           "version": "2.1.0",
           "checksum": "0b13d0000519094cd85abd29c23b2f3eefe92e51a0accb095b23fc40ef75fc45",

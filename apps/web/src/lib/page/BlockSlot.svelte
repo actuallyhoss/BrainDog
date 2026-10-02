@@ -34,7 +34,7 @@
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { fileAt, resolverOf, type LiveBlock } from '$lib/record/page-live.ts';
-  import { glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
+  import { glyphSet, glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
   import { agentKindOf, liveOf } from '../ui/face.ts';
   import { AGENT_MARKS, isMarked } from '$lib/ui/agent-marks.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -152,6 +152,7 @@
     /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
     href: inApp,
     icon,
+    iconSet: glyphSet,
     /* AN AGENT'S MARK, ON A CARD'S OR A FEED ROW'S FACE: the maker's drawing for the name a cell gives (`Claude`,
        `Cursor`), from the same set the app's faces draw, or nothing, and the renderer keeps the initial. */
     agentMark: (name: string) => {

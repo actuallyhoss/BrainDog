@@ -691,13 +691,16 @@ test('a page over a list this build does not ship asks the record for that list,
   assert.ok(sent.includes('schema'));
 });
 
-test('a live feed names its reader as You, anybody else without an id, and a pack or a question in words', () => {
+test('a live feed names its reader as You, anybody else without an id, a pack or a question in words, and a worded rule by its row', () => {
   const me = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
   const at = '2026-09-16T11:00:00.000Z';
   const { rows } = feedTable(
     [
       { by: 'you', who: me, count: 1, kind: 'delete', target: 'tickets#5', note: null, at, thing: 'Tidy the backlog labels' },
       { by: 'you', who: 'p_01M2PAZ28BN3FTKQB266DVT4HZ', count: 1, kind: 'suggest', target: 'suggestion:SG1', note: null, at },
+      { by: 'rule', who: 'rule:invoice-late', count: 1, kind: 'suggest', target: 'suggestion:SG10', note: null, at, thing: 'Raise the Kiln retainer' },
+      { by: 'rule', who: 'rule:txn-categorise', count: 1, kind: 'edit', target: 'transactions#4', note: null, at, thing: 'TALLYARD' },
+      { by: 'rule', who: 'rule:cash-stale', count: 1, kind: 'note', target: 'accounts#2', note: 'The balance of Tax reserve was last set 9 days ago.', at, thing: 'Tax reserve' },
       { by: 'rule', who: 'system', count: 1, kind: 'install', target: 'pack:usecase-team', note: null, at },
       { by: 'rule', who: 'system', count: 1, kind: 'install', target: 'pack:polish-log', note: null, at },
     ],
@@ -710,7 +713,10 @@ test('a live feed names its reader as You, anybody else without an id, and a pac
     rows.map((r) => [r.cells[1], r.cells[3]]),
     [
       ['You', 'deleted Tidy the backlog labels'],
-      ['Someone on this record', 'suggested SG1'],
+      ['Someone on this record', 'suggested a question'],
+      ['Chase late payments', 'suggested Raise the Kiln retainer'],
+      ['Categorise what cleared', 'TALLYARD categorised'],
+      ['Keep balances current', 'The balance of Tax reserve was last set 9 days ago.'],
       ['BrainDog', 'installed the Team board use case'],
       ['BrainDog', 'installed the polish-log add-on'],
     ],

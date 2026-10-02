@@ -735,9 +735,11 @@
      * THE SENTENCE IS THE HEADLINE ON A PHONE TOO, at `--t-title` in ink, as it is at 40 from 900px up: on a phone it
      * dropped to body size under a 30px title, so the one line that says what is true today read as a caption to the
      * page's name. The name steps down to the label over it, as it does on a wide screen, and the bar still says the
-     * name once both have scrolled away.
+     * name once both have scrolled away. A head `over` a lead tile steps down the same way: its headline is the tile's
+     * (`PageBody`), set at the same size.
      */
-    .head[data-said] .title {
+    .head[data-said] .title,
+    .head[data-over] .title {
       color: var(--ink2);
       font-size: var(--t-md);
       font-weight: 500;
@@ -745,8 +747,15 @@
       letter-spacing: 0;
     }
 
-    .head[data-said] .count {
+    .head[data-said] .count,
+    .head[data-over] .count {
       font-size: var(--t-md);
+    }
+
+    /* OVER A HEADLINE THE DEFINITION STEPS ASIDE, as it does from 900px up: a grey clause between the name and the
+       headline split the one line the screen opens on from the label over it. */
+    .head-define[data-over] {
+      display: none;
     }
 
     .head[data-said] + .sentence {
