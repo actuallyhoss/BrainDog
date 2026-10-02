@@ -57,6 +57,15 @@ import { routesOf } from './routes.mjs';
 export const needs = ['web-build'];
 
 /**
+ * TWO PARTS AT MOST, CUT BY WIDTH. The sweep is the longest gate in the directory, and on the hosted
+ * runner it alone ran into `gates.yml`'s ceiling. Every width is one browser context and none of them
+ * reads another, so `run.mjs` may hand this gate `{ part, of }` and each part sweeps every `of`th width,
+ * the floor and the breakpoints dealt alternately so neither part is all phones. The variant pass has
+ * its own four widths and is not cut, so it rides with part 1 alone and is never run twice.
+ */
+export const slices = 2;
+
+/**
  * THE WHOLE SWEEP, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
  *
  * IT OWNS A PORT, A RECORD AND A BROWSER, AND A CALLED GATE HAS TO GIVE THEM BACK, which a spawned
@@ -73,7 +82,7 @@ export const needs = ['web-build'];
  * IT RETURNS 1 OR 3 AND FALLS OFF THE END FOR A PASS, which is what `self-test`'s `silent-pass` grep
  * rests on: a pass is the end of the function and never a statement inside it.
  */
-export default async function layout(root = join(import.meta.dirname, '..', '..')) {
+export default async function layout(root = join(import.meta.dirname, '..', '..'), { part = 1, of = 1 } = {}) {
   const ROOT = join(root, 'apps', 'web', 'build');
 
   /**
@@ -287,6 +296,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* One pixel either side of each. `width < 900px` is on at 899 and off at 900, and those are two
        different layouts that both have to hold. */
     const widths = [...new Set([...FLOOR, ...bps.flatMap((b) => [b - 1, b])])].sort((a, b) => a - b);
+    /* THIS PART'S WIDTHS AND NO OTHER, dealt in turn so each width is in exactly one part. Whole, it is all of them. */
+    widths.splice(0, Infinity, ...widths.filter((_, i) => i % of === part - 1));
 
     /* WHICH BUILD IS ON THE PORT. One server, pointed at the record under measurement. A second server
        would be a second port, and this file already knows what a port collision costs. */
@@ -589,61 +600,63 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
        what four of them prove, and the other three are three browser contexts on every `pnpm gates`. */
     if (process.env.BRAINDOG_GATE_SEED) variantWidths.length = 1;
 
-    for (const v of present) {
-      serving = v.root;
-      base = v.prerendered ? '' : APP_BASE;
-      asking = v.record ?? null;
-      /* THE PORT ANSWERS FOR THE VARIANT BEFORE ANYTHING IS MEASURED ON IT, which is what `answers` proves of the main
-         record above: a pass over a forward that still pointed at the first record would be the first record again. */
-      if (asking !== null) await answers(`http://localhost:${PORT}`);
-      for (const width of variantWidths) {
-        const context = await browser.newContext({
-          viewport: { width, height: L.viewportHeightPx },
-          reducedMotion: 'reduce',
-          hasTouch: width < 640,
-          isMobile: width < 640,
-          bypassCSP: true,
-        });
-        const page = await context.newPage();
-        process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
-        for (const route of v.routes) {
-          await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
-          /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
-             over nothing. The site is prerendered and says so in `VARIANTS`. */
-          const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
-          if (unmeasured) {
-            findings.push(unmeasured);
-            process.stdout.write('!');
-            continue;
+    /* THE VARIANTS ONCE, IN THE FIRST PART, because they do not depend on the width list above. */
+    if (part === 1)
+      for (const v of present) {
+        serving = v.root;
+        base = v.prerendered ? '' : APP_BASE;
+        asking = v.record ?? null;
+        /* THE PORT ANSWERS FOR THE VARIANT BEFORE ANYTHING IS MEASURED ON IT, which is what `answers` proves of the main
+           record above: a pass over a forward that still pointed at the first record would be the first record again. */
+        if (asking !== null) await answers(`http://localhost:${PORT}`);
+        for (const width of variantWidths) {
+          const context = await browser.newContext({
+            viewport: { width, height: L.viewportHeightPx },
+            reducedMotion: 'reduce',
+            hasTouch: width < 640,
+            isMobile: width < 640,
+            bypassCSP: true,
+          });
+          const page = await context.newPage();
+          process.stdout.write(`    ${v.name} @${String(width).padStart(4)} `);
+          for (const route of v.routes) {
+            await page.goto(`http://localhost:${PORT}${base}${route}`, { waitUntil: 'domcontentloaded' });
+            /* THE SAME READINESS, or the variant pass is the half of this gate that can still go green
+               over nothing. The site is prerendered and says so in `VARIANTS`. */
+            const unmeasured = ready.check(`${v.name}${route} @${width}`, route, await ready.settled(page, v.prerendered));
+            if (unmeasured) {
+              findings.push(unmeasured);
+              process.stdout.write('!');
+              continue;
+            }
+            /* THE SAME PREPARATION, or "the identical check" is only true of the function. An un-laid-out
+               rowgroup has no geometry and cannot overflow; the seed is what makes this pass answerable by
+               `self-test`, which otherwise passes on the main loop alone however little the variant pass
+               measures. */
+            await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
+            if (process.env.BRAINDOG_GATE_SEED)
+              await page.evaluate(() => {
+                const h = document.createElement('h2');
+                h.textContent = 'seeded';
+                h.style.cssText = 'width:2000px;white-space:nowrap';
+                document.getElementById('main')?.prepend(h);
+              });
+            await page.waitForTimeout(L.settleMs);
+            const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
+            checked++;
+            process.stdout.write(out.length ? '!' : '.');
+            for (const o of out) findings.push(`${v.name}${route} @${width}  ${o}`);
           }
-          /* THE SAME PREPARATION, or "the identical check" is only true of the function. An un-laid-out
-             rowgroup has no geometry and cannot overflow; the seed is what makes this pass answerable by
-             `self-test`, which otherwise passes on the main loop alone however little the variant pass
-             measures. */
-          await page.addStyleTag({ content: '.rowgroup{content-visibility:visible !important}' });
-          if (process.env.BRAINDOG_GATE_SEED)
-            await page.evaluate(() => {
-              const h = document.createElement('h2');
-              h.textContent = 'seeded';
-              h.style.cssText = 'width:2000px;white-space:nowrap';
-              document.getElementById('main')?.prepend(h);
-            });
-          await page.waitForTimeout(L.settleMs);
-          const out = await page.evaluate(MEASURE, [width, L.widthTolerancePx, width < 640]);
-          checked++;
-          process.stdout.write(out.length ? '!' : '.');
-          for (const o of out) findings.push(`${v.name}${route} @${width}  ${o}`);
+          process.stdout.write('\n');
+          await context.close();
         }
-        process.stdout.write('\n');
-        await context.close();
       }
-    }
     serving = ROOT;
     asking = null;
 
     console.log(
       `  layout: ${checked} page-runs over ${widths.length} widths ` +
-        `(${bps.join(', ')} + floor), ${findings.length} finding(s)`,
+        `(${of === 1 ? `${bps.join(', ')} + floor` : `${widths.join(', ')}, part ${part} of ${of}`}), ${findings.length} finding(s)`,
     );
 
     for (const f of findings.slice(0, L.findingsShown)) console.error(`      ${f}`);

@@ -295,6 +295,58 @@ if (SELECTED.length === 0) {
 const omitted = NAMES.filter((n) => !SELECTED.some(([name]) => name === n));
 
 /**
+ * ONE PART OF THAT SELECTION, so one run can be several jobs that share one build.
+ *
+ *   node tools/gates/run.mjs --only layout,a11y --shard 1/2     the first of two parts
+ *   node tools/gates/run.mjs --shard 2/2 --list                 what the second part holds, and run nothing
+ *
+ * `gates.yml` hit its 35-minute ceiling on every push from 1 October: on the hosted runner `layout` alone
+ * is 21 to 27 minutes and `a11y` 11, back to back in one job. Raising the ceiling buys the same minutes
+ * on every run, so the run is split instead, and the split is THIS FILE'S rather than the workflow's.
+ * A matrix that named a list of gates per job would be the hand-written list `--except` argues against:
+ * a gate added tomorrow would land in no job. Here every selected gate lands in exactly one part, by
+ * construction, so the matrix only says how many parts there are.
+ *
+ * THE PARTS ARE BALANCED BY `COST`, longest first, each to the part that holds least so far, and each
+ * part then runs in registry order, so `typecheck` still goes first in whichever part holds it. The same
+ * flags give the same parts on every machine, which is what lets two jobs agree without talking.
+ *
+ * AND A GATE THAT CAN BE CUT says so with `export const slices = <n>`, the most parts it can be cut into,
+ * read off the module like `needs`. Sharded across M jobs it is cut into the smaller of n and M, and each
+ * part is called as `gate(root, { part, of })`; unsharded it is called whole, as every gate always was.
+ * Only an imported gate can be cut, because only a call can carry the part.
+ *
+ * A PART WITH NOTHING IN IT IS EXIT 2, for the reason an empty selection is: it is a job that would spend a
+ * runner to report that it ran nothing, and the matrix is wider than the selection.
+ */
+const shardAt = process.argv.indexOf('--shard');
+let SHARD = null;
+if (shardAt !== -1) {
+  const m = /^(\d+)\/(\d+)$/u.exec(process.argv[shardAt + 1] ?? '');
+  if (m === null || Number(m[1]) < 1 || Number(m[1]) > Number(m[2])) {
+    console.error('  --shard takes N/M, the Nth of M parts, counted from 1: `--shard 1/2`.');
+    process.exit(2);
+  }
+  SHARD = { at: Number(m[1]), of: Number(m[2]) };
+}
+const LIST = process.argv.includes('--list');
+
+/**
+ * ABOUT HOW MANY SECONDS EACH SLOW GATE TAKES, AND EVERY GATE NOT HERE IS ONE.
+ *
+ * Measured on the hosted `ubuntu-latest` runner `CI_RUNNER` names: the full run of 28 September and the
+ * push runs of 1 October (`◂` lines). Every other gate took under six seconds there. These are weights
+ * for balancing the parts and never a budget: a stale figure makes the parts uneven, and no figure can
+ * leave a gate unrun.
+ */
+const COST = { layout: 1450, a11y: 690, 'self-test': 168, keys: 86, typecheck: 63, prefs: 58 };
+const costed = Object.keys(COST).filter((n) => !NAMES.includes(n));
+if (costed.length) {
+  console.error(`  COST names ${costed.join(', ')}, and no gate is called that.`);
+  process.exit(2);
+}
+
+/**
  * WHAT A GATE CANNOT RUN WITHOUT, READ BEFORE ANY GATE HAS RUN. `52 §5.1` step 2.
  *
  * THE DEFECT THIS CLOSES SHIPPED TWICE. Until this existed the runner spawned every gate and read
@@ -529,6 +581,14 @@ function importedNeeds(name, needs) {
   return needs;
 }
 
+/** What `mod.slices` may be: absent, or how many parts at most this gate can be cut into. */
+function importedSlices(name, slices) {
+  if (slices === undefined) return 1;
+  if (!Number.isInteger(slices) || slices < 1)
+    refuse(`${name} exports a \`slices\` of ${JSON.stringify(slices)}, and it is the most parts the gate can be cut into, a whole number from 1.`);
+  return slices;
+}
+
 const dialects = new Map();
 for (const [name, [cmd, argv]] of SELECTED) {
   const file = scriptOf(argv);
@@ -620,7 +680,39 @@ for (const [name, [cmd, argv]] of SELECTED) {
       `${name} names \`export default\` and it is not a function this runner can call. A gate is either a ` +
         `default-exported function that returns 1, 3 or nothing, or a script with no default export at all.`,
     );
-  dialects.set(name, { how: 'imported', gate: mod.default, needs: mod.needs });
+  dialects.set(name, { how: 'imported', gate: mod.default, needs: mod.needs, slices: importedSlices(name, mod.slices) });
+}
+
+/* EVERY PART OF THE SELECTION, in registry order, and the ones this run asks. Unsharded, a part is a whole
+   gate and this run asks all of them, so nothing below changes for `pnpm gates`. */
+const UNITS = SELECTED.flatMap(([name, entry]) => {
+  const of = SHARD === null ? 1 : Math.min(dialects.get(name).slices ?? 1, SHARD.of);
+  return Array.from({ length: of }, (_, i) => ({ name, entry, part: of === 1 ? null : { part: i + 1, of }, cost: (COST[name] ?? 1) / of }));
+});
+const label = (u) => (u.part === null ? u.name : `${u.name} (part ${u.part.part} of ${u.part.of})`);
+
+function shardOf(units, { at, of }) {
+  const load = Array(of).fill(0);
+  const holds = Array.from({ length: of }, () => new Set());
+  const longest = units.map((u, i) => [u, i]).sort(([a, i], [b, j]) => b.cost - a.cost || i - j);
+  for (const [u] of longest) {
+    const k = load.indexOf(Math.min(...load));
+    load[k] += u.cost;
+    holds[k].add(u);
+  }
+  return units.filter((u) => holds[at - 1].has(u));
+}
+
+const RUN = SHARD === null ? UNITS : shardOf(UNITS, SHARD);
+if (RUN.length === 0) {
+  console.error(
+    `  part ${SHARD.at} of ${SHARD.of} holds no gate: this selection is ${UNITS.length} part(s), so the matrix is wider than it.`,
+  );
+  process.exit(2);
+}
+if (LIST) {
+  for (const u of RUN) console.log(label(u));
+  process.exit(0);
 }
 
 /* ASKED ONCE FOR THE WHOLE RUN, not once per gate. A build that appears halfway through must not
@@ -699,11 +791,15 @@ process.on('exit', () => {
  */
 const took = (name, t0) => console.log(`  ◂ ${name} · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 
-for (const [name, [cmd, args, opts]] of SELECTED) {
+for (const unit of RUN) {
+  const { name } = unit;
+  const [cmd, args, opts] = unit.entry;
   const d = dialects.get(name);
   /* THE DIALECT IS ON THE LINE, because two ways of running a gate is two things that can be wrong
-     and a reader of one screen of output should not have to work out which one a gate took. */
-  process.stdout.write(`\n▸ ${name} · ${d.how}\n`);
+     and a reader of one screen of output should not have to work out which one a gate took. A part
+     says which part after it, so `▸ <name>` still finds the gate. */
+  const of = unit.part === null ? '' : ` · part ${unit.part.part} of ${unit.part.of}`;
+  process.stdout.write(`\n▸ ${name} · ${d.how}${of}\n`);
   const t0 = performance.now();
   /* THE RUNNER'S REFUSAL, AND IT READS DIFFERENTLY FROM A GATE'S SKIP ON PURPOSE. Nothing was
      spawned, so nobody measured anything and nobody reported on it. It joins `skipped` because
@@ -713,7 +809,7 @@ for (const [name, [cmd, args, opts]] of SELECTED) {
   if (unmet) {
     for (const need of unmet)
       console.log(`  ${name} was not run: it needs ${NEEDS[need].what}, and ${why.get(need)}. \`${NEEDS[need].how}\``);
-    skipped.push(name);
+    skipped.push(unit);
     continue;
   }
   if (d.how === 'imported') {
@@ -724,14 +820,14 @@ for (const [name, [cmd, args, opts]] of SELECTED) {
          property the gates had as scripts, where a pass was an unset `process.exitCode`, and
          `self-test`'s `silent-pass` grep is built on it: an explicit 0 in a gate is always an early
          return, and an early return that reports a pass is what that grep catches. */
-      status = (await d.gate(root)) ?? 0;
+      status = (await (unit.part === null ? d.gate(root) : d.gate(root, unit.part))) ?? 0;
     } catch (cause) {
       /* A THROW IS THIS GATE'S FAILURE AND NOT THE RUN'S. Spawning gave that for nothing: a child
          that died took its own exit code with it and the next gate still ran. In this process an
          uncaught throw would end the run with the gates below it never asked, which is the one thing
          this file says it will not do. */
       console.error(`  ${name} threw rather than reporting: ${cause?.stack ?? cause}`);
-      failed.push(name);
+      failed.push(label(unit));
       took(name, t0);
       continue;
     } finally {
@@ -747,43 +843,48 @@ for (const [name, [cmd, args, opts]] of SELECTED) {
       console.error(
         `  ${name} returned ${JSON.stringify(status)}, and a gate returns 1 for a finding, 3 for a skip, or nothing.`,
       );
-      failed.push(name);
-    } else if (status === 3) skipped.push(name);
-    else if (status !== 0) failed.push(name);
+      failed.push(label(unit));
+    } else if (status === 3) skipped.push(unit);
+    else if (status !== 0) failed.push(label(unit));
     continue;
   }
   const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: false, ...opts });
   took(name, t0);
-  if (r.status === 3) skipped.push(name);
-  else if (r.status !== 0) failed.push(name);
+  if (r.status === 3) skipped.push(unit);
+  else if (r.status !== 0) failed.push(label(unit));
 }
 
 /* `--allow-skip` NAMES THE PREREQUISITE THIS JOB DOES NOT HAVE, one gate at a time, so that the job
    which does have it still goes red. A blanket "skips are fine here" is the same waiver the
    paragraph above refuses. */
-const disallowed = skipped.filter((name) => !allowSkip.includes(name));
+const disallowed = skipped.filter((u) => !allowSkip.includes(u.name)).map(label);
 if (disallowed.length && process.env.CI) failed.push(...disallowed);
 
 // NAMED, not counted. "1 of 8 gates failed" over a screen of eight gates' output is a search.
-const ran = SELECTED.length - skipped.length;
-const aside = skipped.length === 0 ? '' : ', and ' + skipped.length + ' could not run: ' + skipped.join(', ');
+const ran = RUN.length - skipped.length;
+const aside = skipped.length === 0 ? '' : ', and ' + skipped.length + ' could not run: ' + skipped.map(label).join(', ');
 /* AND A RUN THAT WAS ASKED FOR LESS SAYS SO. "14 of 14 gates passed" beside a nineteen-gate corpus
    is the sentence a subset would otherwise print, and it reads as the whole thing. */
 const unasked = omitted.length === 0 ? '' : '\n  ' + omitted.length + ' were not asked for: ' + omitted.join(', ') + '.';
+/* AND A PART SAYS WHAT THE OTHER PARTS HOLD, so its green line cannot read as the whole run's. */
+const others = UNITS.filter((u) => !RUN.includes(u)).map(label);
+const elsewhere =
+  SHARD === null ? '' : '\n  this is part ' + SHARD.at + ' of ' + SHARD.of + (others.length === 0 ? '.' : ', and the others run: ' + others.join(', ') + '.');
 /* AND THE SPLIT BETWEEN THE TWO DIALECTS, once, at the bottom. Four gates are still scripts, so
    the number that says how many were called is worth printing rather than counting by eye up the
    screen: it is how anybody notices a gate that quietly changed dialect, in either direction. */
-const byImport = SELECTED.filter(([name]) => dialects.get(name).how === 'imported').map(([name]) => name);
+const byImport = RUN.filter((u) => dialects.get(u.name).how === 'imported').map(label);
 const how =
   '\n  ' +
   (byImport.length === 0
-    ? 'all ' + SELECTED.length + ' were spawned.'
-    : byImport.length + ' of ' + SELECTED.length + ' were imported rather than spawned: ' + byImport.join(', ') + '.');
+    ? 'all ' + RUN.length + ' were spawned.'
+    : byImport.length + ' of ' + RUN.length + ' were imported rather than spawned: ' + byImport.join(', ') + '.');
 console.log(
   (failed.length === 0
-    ? '\n  ' + ran + ' of ' + SELECTED.length + ' gates passed' + aside + '.'
-    : '\n  ' + [...new Set(failed)].length + ' of ' + SELECTED.length + ' gates failed: ' + [...new Set(failed)].join(', ') + '.') +
+    ? '\n  ' + ran + ' of ' + RUN.length + ' gates passed' + aside + '.'
+    : '\n  ' + [...new Set(failed)].length + ' of ' + RUN.length + ' gates failed: ' + [...new Set(failed)].join(', ') + '.') +
     unasked +
+    elsewhere +
     how +
     '\n',
 );

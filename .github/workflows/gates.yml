@@ -3,14 +3,15 @@ name: gates
 # EVERY GATE, AND WHEN THEY RUN.
 #
 # Every gate `run.mjs` registers, which is why this names no count: the count this line carried
-# went stale twice. The minute figures below are the browser time as it was last measured and have
-# NOT been taken again since the registry grew, so treat them as the shape of the argument rather
-# than as a current measurement.
+# went stale twice. The "nineteen minutes" below is the argument as it was first made, on the PC.
 #
-# `pnpm gates` is about nineteen minutes, and nearly all of it is two gates driving a headless
-# browser over a built app: `layout` is 627 page-runs (every route, at both sides of every
-# breakpoint the stylesheets declare, plus three floor widths) and `a11y` is 212 axe audits (every
-# route, two schemes, two widths, plus the site). The others are seconds.
+# MEASURED ON THE HOSTED RUNNER (28 September and 1 October), nearly all of a run is two gates
+# driving a headless browser over a built app: `layout` is about 1450 page-runs (every route, at
+# both sides of every breakpoint the stylesheets declare, plus three floor widths) and took 21 to 27
+# minutes; `a11y` is about 370 axe audits (every route, two schemes, two widths, plus the site) and
+# took 11. `self-test`, `keys`, `typecheck` and `prefs` are a minute or three each, and the rest are
+# seconds. Back to back in one job that is past the 35-minute ceiling, so from 2 October the run is
+# split into parts that share one build: see `jobs:` below.
 #
 # THE CHOICE, MADE EXPLICITLY: every gate on a weekly schedule, on demand, and on a pull request
 # only when it carries the `full-gates` label; and `layout` and `a11y` alone on a push to master
@@ -119,23 +120,111 @@ defaults:
     shell: bash
 
 jobs:
-  gates:
+  # ONE BUILD, A MATRIX OF PARTS, AND ONE CHECK THAT IS STILL CALLED `gates`.
+  #
+  # `gates-build` builds the app and the site once and hands them on as an artifact. Each
+  # `gates-shard` downloads that build and runs one part of the selection (`run.mjs --shard N/M`).
+  # `gates` waits for both and is red unless every one of them was green, which is what keeps the
+  # check's name: a branch rule or a person reading this workflow's `gates` check gets one answer,
+  # as before the split. `deploy.yml` follows `ci` by name and reads nothing here.
+  #
+  # PARTS AND NOT A LONGER CEILING, because the minutes are the owner's money. `CI_RUNNER` names
+  # `ubuntu-latest`, so every job here is a hosted machine billed by the minute. From 1 October
+  # every push ran into the 35-minute ceiling and was cancelled, which is 35 minutes spent to prove
+  # nothing; a longer ceiling buys the same minutes on every run and a cancelled push still pays
+  # for all of them. Parts side by side finish sooner and a superseded run is cancelled having
+  # spent less. What a part costs on top is its own checkout, install and browser, about two
+  # minutes, and that is why the build is made once rather than in every part.
+  #
+  # THREE PARTS, AND THE WORKFLOW NAMES HOW MANY AND NEVER WHICH GATES. `run.mjs` cuts the selection
+  # by measured cost and puts every gate in exactly one part, so a gate added tomorrow is in one of
+  # them; a list per job would be the list `--except` argues against. `layout` declares `slices = 2`,
+  # so it is cut by width into two halves that count as two gates here. A push's parts are then
+  # `layout` 1 of 2, `layout` 2 of 2 and `a11y`; every other trigger's are each half of `layout`
+  # with a few of the smaller gates beside it, and `a11y` with the rest. Every part is about 13 to
+  # 18 minutes. `node tools/gates/run.mjs --shard 2/3 --list` prints what a part holds.
+  #
+  # ON THE SELF-HOSTED FALLBACK (`CI_RUNNER` unset) the parts queue on the one machine, each under
+  # its own ceiling, and since every browser gate takes port 0 two of them on one machine would not
+  # collide either.
+  gates-build:
     # A pull request runs this only when it is asked to. Written as "not a pull request, or
     # labelled" so a push, a schedule and a manual dispatch need no clause of their own: a new
-    # trigger added above is included by default rather than silently skipped.
+    # trigger added above is included by default rather than silently skipped. The parts need this
+    # job, so they are skipped with it.
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')
+    # NOT `build`, which is `ci.yml`'s job and its check. Two checks of one name on one commit is a
+    # branch rule that cannot say which one it means.
+    name: gates build
     # SELF-HOSTED, BECAUSE THE ACCOUNT RAN OUT OF ACTIONS MINUTES (September 17th, the owner's call).
-    # Self-hosted minutes are free. Set the repository variable CI_RUNNER to ubuntu-24.04 to go back.
+    # Self-hosted minutes are free. The repository variable CI_RUNNER names the hosted image instead.
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    # A cold install and two Vite builds, measured at under two minutes on the hosted runner.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      # THE BUILD IS A PREREQUISITE, NOT A STEP, AND BOTH ROOTS MATTER. `bundle` refuses a build
+      # older than the newest source; `layout` and `a11y` measure `apps/web/build` over the gates'
+      # seeded record and over its variant records (`tools/gates/record.mjs`: the Cloud's half of
+      # every host branch, a record with machines and keys connected, and one with enough decisions
+      # to overflow a search group), and `apps/site/build`, which is the first page a stranger sees.
+      # The variants were three more Vite builds until they became records; they
+      # differed only in the sample's constants, which no live screen reads, so they drew the same
+      # screens as the main build and the branches they were for went unmeasured.
+      #
+      # A missing root is not a quiet loss of coverage: the gate exits 3, `run.mjs` calls that a
+      # skip, and a skip under CI is red.
+      - run: pnpm --filter @braindog/web build
+      - run: pnpm --filter @braindog/site build
+
+      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE, the same line as `ci.yml`'s build job,
+      # and here it is load-bearing rather than tidy. Both builds start with
+      # `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and the favicons; the
+      # `theme` gate is `theme.mjs --check`. Without this line the build regenerates the palette and
+      # a committed palette that has drifted from its generator ships in the build the parts measure.
+      # The parts check out the committed file and never build, so their `theme` reads it as committed.
+      - run: git diff --exit-code
+
+      # WHAT THE GATES READ OF THE BUILD, and `.svelte-kit/output/client` is the half that is easy to
+      # miss: `bundle` reads Vite's manifest there, beside the shell in `build/app`. It is a hidden
+      # folder, and upload-artifact leaves hidden files out unless told. The three paths share
+      # `apps/` as their root, so that is where each part puts them back. ONE DAY, because the build
+      # is this run's and no other run reads it, and stored artifacts are billed too. `overwrite`
+      # because a re-run is the same run: the first attempt's `builds` is still there, and v4 refuses
+      # a second artifact of one name in one run rather than replacing it.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: builds
+          overwrite: true
+          path: |
+            apps/web/build
+            apps/web/.svelte-kit/output/client
+            apps/site/build
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  gates-shard:
+    needs: gates-build
+    name: gates ${{ matrix.part }} of ${{ strategy.job-total }}
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     # 52 §7 BUDGETS THIS AT 5 MINUTES AND THAT NUMBER IS FROM BEFORE THE GATES MOVED. The spec put
     # the rendered-box work in Playwright specs under `ci.yml`'s `pnpm test:browser` and left
     # `gates.yml` holding scripts alone; the tree instead drives the browser from inside
-    # `layout.mjs`, `a11y.mjs`, `keys.mjs` and `prefs.mjs`, so this job is the whole pyramid above
-    # the unit tests. 35 minutes is the measured nineteen, plus a build, plus the first-run browser
-    # download on a cold cache, plus room for one retry-free bad day. It is a ceiling for a hang,
-    # not a budget: 52 §7's real budget belongs in `budgets.json`, and there is no `ci` section
-    # there to hold it.
+    # `layout.mjs`, `a11y.mjs`, `keys.mjs` and `prefs.mjs`, so these parts are the whole pyramid
+    # above the unit tests. 35 minutes is well over the longest part, about 18 since `layout` was cut
+    # in two, plus about two of setup and the first-run browser download on a cold cache. It is a
+    # ceiling for a hang, not a budget, and it was NOT raised for the split: 52 §7's real budget
+    # belongs in `budgets.json`, and there is no `ci` section there to hold it.
     timeout-minutes: 35
+    strategy:
+      # EVERY PART RUNS TO THE END, for the reason `run.mjs` reports every failure rather than the
+      # first: a run that names one problem when there are four costs four runs.
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -156,7 +245,7 @@ jobs:
       # Pointing it at the Windows path would be no better: the self-hosted runner is a PC whose
       # browser is already installed and persists between runs, and the install below found it in
       # one second, so a cache there would restore 150 MB from GitHub to overwrite files that were
-      # already on disk. The cache is for the day `CI_RUNNER` names a hosted image again, where every job starts empty.
+      # already on disk. The cache is for a hosted image, where every job starts empty.
       - if: runner.environment == 'github-hosted'
         uses: actions/cache@v4
         id: browser-cache
@@ -176,50 +265,62 @@ jobs:
       - if: steps.browser-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
-      # THE BUILD IS A PREREQUISITE, NOT A STEP, AND BOTH ROOTS MATTER. `bundle` refuses a build
-      # older than the newest source; `layout` and `a11y` measure `apps/web/build` over the gates'
-      # seeded record and over its variant records (`tools/gates/record.mjs`: the Cloud's half of
-      # every host branch, a record with machines and keys connected, and one with enough decisions
-      # to overflow a search group), and `apps/site/build`, which is the first page a stranger sees.
-      # The variants were three more Vite builds until they became records; they
-      # differed only in the sample's constants, which no live screen reads, so they drew the same
-      # screens as the main build and the branches they were for went unmeasured.
-      #
-      # A missing root is not a quiet loss of coverage: the gate exits 3, `run.mjs` calls that a
-      # skip, and a skip under CI is red.
-      - run: pnpm --filter @braindog/web build
-      - run: pnpm --filter @braindog/site build
+      # THE ONE BUILD, AFTER THE CHECKOUT, AND THE ORDER IS LOAD-BEARING. `run.mjs` and `bundle`
+      # refuse a build older than the newest source by file time, so the build has to be newer than
+      # every file the checkout wrote. Downloaded before it, the checkout's clean would delete it.
+      - uses: actions/download-artifact@v4
+        with:
+          name: builds
+          path: apps
 
-      # AND THE BUILD MUST NOT HAVE CHANGED A TRACKED FILE, the same line as `ci.yml`'s build job,
-      # and here it is load-bearing rather than tidy. Both builds start with
-      # `pnpm --filter @braindog/skin theme`, which WRITES `tokens.css` and the favicons; the
-      # `theme` gate below is `theme.mjs --check`. Without this line the build regenerates the
-      # palette, the gate compares the regenerated file against itself, and a committed palette
-      # that has drifted from its generator passes the one check written to catch it.
-      - run: git diff --exit-code
+      # AND ITS TIMES ARE NOW, whatever the zip carried. A file time kept from the build job is
+      # older than this job's checkout, and `bundle` reads Vite's manifest's own time, so the build
+      # this run made from this commit would be refused as stale. The freshness check is for a desk
+      # whose build may be last week's; here the build is this commit's by construction.
+      - run: find apps/web/build apps/web/.svelte-kit/output/client apps/site/build -exec touch {} +
 
       # A PUSH TO MASTER RUNS THE TWO BROWSER GATES AND NOTHING ELSE. `ci` ran every other gate on
       # the same commit, so running them again here spends the runner to learn nothing, and the
       # `paths` list above is written against these two alone.
       - if: github.event_name == 'push'
-        run: pnpm gates -- --only layout,a11y
+        run: pnpm gates -- --only layout,a11y --shard ${{ matrix.part }}/${{ strategy.job-total }}
 
-      # EVERY OTHER TRIGGER RUNS ALL OF THEM. No `--only`, no `--except`: this is the job that has
-      # every prerequisite, so a skip here is a fact about the build above and is correctly red.
-      # `--allow-skip deploy-parity` AND NOT AN EXCLUSION, which is the difference between "this job
-      # does not ask" and "this job asks and accepts one answer". 52 §5 writes it this way on
-      # purpose: the gate still runs here, still prints the sentence naming what it lacks, and is
-      # still red if it fails for any reason other than having no live host to measure. Excluding it
-      # would also hide the day it stops being able to run at all.
+      # EVERY OTHER TRIGGER RUNS ALL OF THEM, across the parts. No `--only`, no `--except`: these
+      # are the jobs that have every prerequisite, so a skip here is a fact about the build and is
+      # correctly red. `--allow-skip deploy-parity` AND NOT AN EXCLUSION, which is the difference
+      # between "this job does not ask" and "this job asks and accepts one answer". 52 §5 writes it
+      # this way on purpose: the gate still runs here, still prints the sentence naming what it
+      # lacks, and is still red if it fails for any reason other than having no live host to
+      # measure. Excluding it would also hide the day it stops being able to run at all.
       - if: github.event_name != 'push'
-        run: pnpm gates -- --allow-skip deploy-parity
+        run: pnpm gates -- --allow-skip deploy-parity --shard ${{ matrix.part }}/${{ strategy.job-total }}
 
       # THE A11Y GATE'S OWN RUN, which it writes to `.a11y.log`: the per-route, per-scheme detail
       # behind a summary line that names counts. It is an ARTEFACT FOR A PERSON and never an
-      # assertion (22 §10); nothing reads it back.
+      # assertion (22 §10); nothing reads it back. Named by part, because two artifacts of one name
+      # in one run is an upload that fails, and only the part holding `a11y` writes one. `overwrite`
+      # for the re-run of a failed part, which is the same run and still holds the first attempt's log.
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: a11y-log
+          name: a11y-log-${{ matrix.part }}
+          overwrite: true
           path: .a11y.log
           if-no-files-found: ignore
+
+  gates:
+    needs: [gates-build, gates-shard]
+    # `!cancelled()` AND NOT `always()`, so a run a newer push superseded stays cancelled instead of
+    # spending a runner to report it. A failed build or part still reaches this job, which is the
+    # point of it: without it a red part would leave this check skipped, and a skipped check reads
+    # as passed. The label clause is the build's, so an unlabelled pull request skips all three.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-gates')) }}
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    timeout-minutes: 5
+    steps:
+      - env:
+          BUILD: ${{ needs.gates-build.result }}
+          PARTS: ${{ needs.gates-shard.result }}
+        run: |
+          echo "the build: $BUILD. every part: $PARTS."
+          test "$BUILD" = success && test "$PARTS" = success

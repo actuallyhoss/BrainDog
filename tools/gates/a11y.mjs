@@ -287,9 +287,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     { name: 'keymap sheet', route: '/r/obligations', keys: ['?'], expect: 'dialog[open]' },
     { name: 'palette', route: '/', keys: ['/'], expect: '[role="listbox"], [role="dialog"]' },
     { name: 'page: declaration', route: '/p/kiln', keys: ['Shift+E'], expect: '.source, pre' },
-    /* Arranging has no key: it is a button, and only on desktop. 13 §10 keeps authoring off phones,
-       and `.arrange-slot` is display:none below 900px rather than a control that exists and refuses. */
-    { name: 'page: arrange mode', route: '/p/kiln', click: '.arrange-slot button', expect: '[role="listitem"]', desktop: true },
+    /* Arranging has no key: it is Edit layout in the page head's ⋯ menu, and only on desktop. 13 §10 keeps
+       authoring off phones, and the menu offers Edit layout only from 900px rather than an item that exists and
+       refuses. So the step opens the menu, then picks the item (`ChangePage.svelte` names both for this gate). */
+    { name: 'page: arrange mode', route: '/p/kiln', click: ['.page-more .menu-trigger', '[role="menuitem"][data-arrange]'], expect: '[role="listitem"]', desktop: true },
     /* THE EMPTY STATES, WHICH NO ROUTE AT REST EVER REACHES. `19 §6` designs five and says collapsing
        them is the failure; an audit measured `no-results`, `cleared`, `no-permission` and `error`
        rendering zero times across forty-two routes, so four fifths of that section had never been in
@@ -669,13 +670,13 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
                runs and a gate nobody waits for. `Nine` was the count when this was written, and `STATES`
                holds fourteen. */
             await page.locator('[role="row"]').first().click({ timeout: 1200 }).catch(() => {});
-            if (st.click) await page.locator(st.click).first().click({ timeout: 1200 }).catch(() => {});
+            for (const sel of [st.click].flat().filter(Boolean)) await page.locator(sel).first().click({ timeout: 1200 }).catch(() => {});
             for (const k of st.keys ?? []) {
               await page.keyboard.press(k);
               await page.waitForTimeout(120);
             }
             if (!(await page.locator(st.expect).first().isVisible().catch(() => false))) {
-              broken.push(`${app.name} ${st.name} ${scheme}@${width}: after ${st.click ?? st.keys.join(' ')}, no ${st.expect}`);
+              broken.push(`${app.name} ${st.name} ${scheme}@${width}: after ${st.click ? [st.click].flat().join(' then ') : st.keys.join(' ')}, no ${st.expect}`);
               process.stdout.write('?');
               continue;
             }
