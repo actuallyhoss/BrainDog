@@ -1171,11 +1171,16 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
 
     /* THE FLAGS THE NEW FORMS ARE TOLD BY, each a yes or a no, because a string here is a form drawn by accident:
        `lead: 'no'` is truthy wherever it is read. */
-    for (const flag of ['lead', 'range', 'tiles', 'box'] as const) {
+    for (const flag of ['lead', 'range', 'tiles', 'who', 'box'] as const) {
       const value = (raw as Record<string, unknown>)[flag];
       if (value !== undefined && typeof value !== 'boolean')
         return bad('DECLARATION_INVALID', `${id}.${at}'s ${flag} is ${JSON.stringify(value)}; it is true or false.`, at);
     }
+    /* A FORECAST'S `headline:` SAYS WHAT THE PAGE'S OPENING LINE ALREADY SAYS OF IT, and the one thing it can say is when
+       the money runs out. */
+    const headline = (raw as { headline?: unknown }).headline;
+    if (headline !== undefined && headline !== 'under')
+      return bad('DECLARATION_INVALID', `${id}.${at}'s headline is ${JSON.stringify(headline)}; it is under, when the page's opening line says when the money runs out.`, at, ['under']);
     const first = (raw as { first?: unknown }).first;
     if (first !== undefined && !isInt(first, 1, FIRST_MAX))
       return bad('OUT_OF_BOUNDS', `${id}.${at}: first ${JSON.stringify(first)} is not a count of rows from 1 to ${FIRST_MAX}.`, at);

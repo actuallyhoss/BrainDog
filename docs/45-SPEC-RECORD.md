@@ -296,7 +296,8 @@ type Cursor      = number | string;                                        // a 
 type WhatsNew    = { events: EventLine[]; upTo: Cursor | null; sinceCapped: boolean };                 // ≤ 60, newest first
 type HistoryPage = { events: EventLine[]; cursor: Cursor | null };                                     // newest first
 type Boot        = { registers: RegisterCount[]; now: string; sessions: LiveRun[]; waiting: Waiting[];
-                     record: { slug; name; locale } | null; me: { kind; person; name; level };
+                     record: { slug; name; locale; currency; money } | null; currency: string | null; money: string[];
+                     me: { kind; person; name; level };
                      pages: { slug; title; nav; icon; list; about: { register; seq } | null }[]; counts: { decide: number; inbox: number | null };
                      whatsNew: WhatsNew };
 type Whoami      = { principal: CallContext['principal']; levels: { register: string; level: Level }[]; registers: '*' | string[] };
@@ -610,7 +611,11 @@ draws: `record`, `me` (with the member's name), `pages` filtered as `pages` filt
 invitation is spent by signing in, so a host that cannot take one has no sign-in, and a host that never said is `false`.
 A self-host started without a key, or a Worker with no `SESSION_SECRET`, answers `/account/records` 401 on every load,
 the same answer an ended session gets, so the app reads `signIn` instead and skips that read where it is `false`
-(50 §5.13). *(`signIn` added September 16th 2026.)* It is
+(50 §5.13). *(`signIn` added September 16th 2026.)* `currency` and `money` are also sent at the top level, the same
+values as `record.currency` and `record.money`, and they are sent when `record` is `null`: a record nobody named (a
+self-host before its first run, the gates' record) still draws its money in the currency its own pack set, where it
+had written "£39 GBP" in every sentence. `record` stays `null` there, since a reader tells an unprovisioned record by it.
+*(Added October 2nd 2026.)* It is
 not yet one transaction. A session's briefing comes from `context`, not `boot`.
 
 *As built, September 2026:* `me.prefs` is every key the person set with

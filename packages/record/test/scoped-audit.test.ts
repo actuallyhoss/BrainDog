@@ -349,9 +349,12 @@ test('THE OWNER READS WHAT THEY READ BEFORE: every page, every block, the predic
   await predict(api);
 
   /* Every page the kernel resolves, the two made for each of two diary rows included. */
-  const pages = value<{ slug: string; title: string }[]>(await api.pages(owner));
+  const pages = value<{ slug: string; title: string; about: { register: string; seq: number | null } | null }[]>(await api.pages(owner));
   assert.equal(pages.length, api.kernel.pages().length);
   assert.ok(pages.some((p) => p.title === 'Dues for Dinner with the auditor'));
+  /* A PAGE MADE FOR A ROW SAYS WHICH, and one somebody wrote says none, so Settings > Pages can fold the first kind. */
+  assert.equal(pages.find((p) => p.slug === 'dinner-with-the-auditor')?.about?.register, 'diary');
+  assert.equal(pages.find((p) => p.slug === 'desk')?.about, null);
   for (const slug of ['dinner-with-the-auditor', 'private', 'dues', 'desk']) assert.ok(pages.some((p) => p.slug === slug), `${slug} left the owner's pages`);
   const entry = value<PageOut>(await api.page({ slug: 'dinner-with-the-auditor' }, owner));
   assert.equal(entry.title, 'Dinner with the auditor');

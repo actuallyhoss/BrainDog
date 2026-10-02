@@ -89,6 +89,12 @@ export type Boot = {
      */
     money?: string[];
   } | null;
+  /**
+   * `record.currency` and `record.money`, sent whether or not the record has a name, so a record nobody named still
+   * tells its shell the home currency. Absent from a host older than the field.
+   */
+  currency?: string | null;
+  money?: string[];
   /** Who is asking: the person behind the call, their name, and what they hold on the record. */
   me?: {
     kind: 'person' | 'token' | 'system';

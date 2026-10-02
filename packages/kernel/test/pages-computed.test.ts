@@ -608,3 +608,29 @@ test('WORKING: TRUE MARKS THE ROWS AN AGENT IS ON RIGHT NOW, by the run that sig
   assert.equal(early.working_now, undefined);
   sql.close();
 });
+
+test("A RULE'S RUN OVER SEVERAL ROWS OF ONE LIST IS ONE FEED ROW naming each row once, and nobody else's is folded", () => {
+  const at = '2026-09-15T12:00:00Z';
+  const filed = (target: string, thing: string, actor = 'rule:txn-categorise', note: string | null = null): ActivityEvent => ({ ts: at, actor, kind: 'edit', target, note, thing });
+  const rows = feedRows([
+    filed('transactions#36', 'TALLYARD'),
+    filed('transactions#35', 'NORTHERN RAIL'),
+    filed('transactions#32', 'TALLYARD'),
+    filed('transactions#32', 'TALLYARD'),
+    filed('transactions#31', 'KILN STOREFRONT PAYOUT'),
+    filed('installments#5', 'Proofing press', 'rule:txn-categorise'),
+    filed('transactions#29', 'FENWICK CLOUD', 'p_1'),
+    filed('transactions#28', 'HALDEN', 'p_1'),
+    filed('transactions#27', 'LEDGER POST', 'rule:txn-categorise', 'Filed under Software.'),
+  ]);
+  assert.deepEqual(
+    rows.map((r) => [r.who, r.count, r.target, r.things ?? null]),
+    [
+      ['rule:txn-categorise', 5, 'transactions#36', ['TALLYARD', 'NORTHERN RAIL', 'TALLYARD', 'KILN STOREFRONT PAYOUT']],
+      ['rule:txn-categorise', 1, 'installments#5', null],
+      ['p_1', 1, 'transactions#29', null],
+      ['p_1', 1, 'transactions#28', null],
+      ['rule:txn-categorise', 1, 'transactions#27', null],
+    ],
+  );
+});

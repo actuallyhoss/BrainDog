@@ -248,6 +248,28 @@ test('WHERE NOBODY CHOSE A CURRENCY, BOOT NAMES THE ONE ALL THE MONEY IS IN, nev
   sql.close();
 });
 
+test('A RECORD NOBODY NAMED STILL SAYS WHAT CURRENCY IT IS DRAWN IN, beside a `record` that stays null', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  assert.ok((await api.kernel.install([OBLIGATIONS, DIARY])).ok);
+  const BILLS = {
+    id: 'register.bills',
+    kind: 'register' as const,
+    body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'amount', type: 'money' }] } as never,
+  };
+  assert.ok((await api.kernel.install([BILLS])).ok);
+  value(await api.create({ register: 'bills', fields: { what: 'Kiln rent', amount: { amount: 120_000, currency: 'GBP' } } }, owner));
+  const boot = value<Boot>(await api.boot(owner));
+  assert.equal(boot.record, null, 'a record nobody named was given a name');
+  assert.equal(boot.currency, 'GBP', 'the gates\' record wrote "£39 GBP" in every sentence for want of this');
+  assert.deepEqual(boot.money, ['GBP']);
+  /* AND A NAMED RECORD SAYS IT IN BOTH PLACES, the same. */
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  const named = value<Boot>(await api.boot(owner));
+  assert.deepEqual([named.record?.currency, named.currency, named.money], ['GBP', 'GBP', ['GBP']]);
+  sql.close();
+});
+
 test('A SCOPED BOOT NAMES NOTHING OUTSIDE ITS SCOPE, in any of its parts', async () => {
   const { api, sql } = await record();
   value(await api.create({ register: 'obligations', fields: { what: 'Invoice 41' } }, owner));

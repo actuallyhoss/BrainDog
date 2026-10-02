@@ -98,16 +98,23 @@ async function decideRenewals(kernel) {
 }
 
 /**
+ * Every gate record's name, which `startRecord` gives it before the seed goes in.
+ *
+ * A RECORD NOBODY NAMED IS NOT WHAT A PERSON READS. The gates' record was a self-host nobody ran `init` on, so `boot`
+ * answered `record: null` and a review measured a shell with no name over it; `connected` alone was named, because a
+ * bearer carries the record it is for and `createToken` refused "This record has no id yet". Named first, so the owner's
+ * grant is the oldest line in its history and not news on the first screen. The owner is `p_self`, the person the
+ * server key and open mode already read as (`apps/selfhost` `owner`).
+ */
+export const IDENTITY = { id: 'rec_01J8Z3N4W5X6Y7Z8A9B0C1D2E3', slug: 'the-studio', name: 'The Studio', tz: 'Europe/London', locale: 'en-GB', owner: { id: 'p_self' } };
+
+/**
  * A machine signed in, a machine waiting, and a key, for `connected`.
  *
- * THE RECORD NEEDS AN ID FIRST. A bearer carries the record it is for, and the gates' record is a self-host nobody ran
- * `init` on, so `createToken` and the device flow's exchange both refused it "This record has no id yet" until
- * `createRecord` named it. The device flow is asked at `localhost`, because the self-host signs devices in only at the
- * origin it serves and refuses a flow started by another name.
+ * The device flow is asked at `localhost`, because the self-host signs devices in only at the origin it serves and
+ * refuses a flow started by another name.
  */
-async function connect(kernel, port, key) {
-  const named = kernel.createRecord({ id: 'rec_01J8Z3N4W5X6Y7Z8A9B0C1D2E3', slug: 'the-studio', name: 'The Studio', tz: 'Europe/London', locale: 'en-GB', owner: { id: 'p_self' } });
-  if (!named.ok) throw new Error(`the connected record could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
+async function connect(port, key) {
   const at = `http://localhost:${port}`;
   const send = async (path, body, bearer = false) => {
     const headers = { 'content-type': 'application/json', ...(bearer && key !== undefined ? { authorization: `Bearer ${key}` } : {}) };
@@ -158,6 +165,8 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
      drops a rejection, so the caller sees why the record did not start and not why it did not stop; `close()` as
      `start` writes it never rejects, and a throw inside its `server.close` callback is uncaught rather than dropped. */
   try {
+    const named = running.api.kernel.createRecord(IDENTITY);
+    if (!named.ok) throw new Error(`the gate's record could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
     const seeded = await installSeed(running.api.kernel);
     if (!seeded.ok) throw new Error(`the gate's record could not take the seed: ${seeded.refusal?.fix ?? 'no reason given'}`);
     /* ONE PERSON, SO THE KEY IS A WAY IN. Sign-in offers the server key only where the Directory holds exactly one
@@ -172,7 +181,7 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
     const saved = running.api.kernel.saveView(VIEW, { actor: 'p_seed' });
     if (!saved.ok) throw new Error(`the gate's record could not save its view: ${saved.refusal?.fix ?? 'no reason given'}`);
     if (variant === 'busy') await decideRenewals(running.api.kernel);
-    if (variant === 'connected') await connect(running.api.kernel, running.server.address().port, key);
+    if (variant === 'connected') await connect(running.server.address().port, key);
   } catch (e) {
     await running.close().catch(() => {});
     throw e;

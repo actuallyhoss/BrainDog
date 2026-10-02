@@ -83,7 +83,7 @@ const PAGE = {
     first: 'on steps, the first 1 to 50 open rows, with the rest behind a count: the short view of a path',
     range: 'true on progress: each row a band from low to high with what was spent marked on it, columns [label, spent, low, high]',
     tiles: "true on a queue: one tile per question, with its recommended option's shows ({swatch: [#rrggbb]}, {figure: text} or {file: {row, field}}). A question's body.about names what it is about, and where: about is <name> reads it",
-    people: 'true on heat: a line a person, a dot in each of the twelve weeks they were in touch, columns [day, who]',
+    who: 'true on heat: a line a person, a dot in each of the twelve weeks they were in touch, columns [day, who]',
     when: '{metric}: drawn only when that figure calls for it',
   },
   paths: '{{<metric>}} in any text is that figure, {{<list>.count}} how many rows the list has, {{<list>.<value>}} how many are in that value of its state, and {{icon:<glyph>}} a glyph',

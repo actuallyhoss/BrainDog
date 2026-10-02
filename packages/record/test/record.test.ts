@@ -1671,7 +1671,9 @@ test('A PAGE LIST IS SCOPED, because a title is a sentence about what the record
   /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is for, and shipping it would hand
      back the names the filter exists to withhold. */
   const rows = value(await api.pages(owner)) as Record<string, unknown>[];
-  for (const p of rows) assert.deepEqual(Object.keys(p).sort(), ['slug', 'title'], 'a page carried more than its name');
+  for (const p of rows) assert.deepEqual(Object.keys(p).sort(), ['about', 'slug', 'title'], 'a page carried more than its name and the row it is about');
+  /* A PAGE SOMEBODY WROTE IS ABOUT NO ROW, so Settings > Pages lists it as theirs. */
+  assert.ok(rows.every((p) => p.about === null), JSON.stringify(rows));
   sql.close();
 });
 

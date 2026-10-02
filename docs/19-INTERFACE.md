@@ -444,6 +444,11 @@ risks abandonment. Never a skeleton on a toast, a menu item, a modal or a button
 loading indicator."* And `aria-busy="true"` on the region being filled, `aria-live="polite"` on the
 destination — **not on the skeleton**, which is decorative — and `aria-busy` must be set back.
 
+**The money is the record's from the first screen.** `boot` sends `currency` and `money` at its top level, the same
+values as `record.currency` and `record.money`, and sends them even when `record` is `null` (a record nobody named
+yet). The shell draws every amount in that currency by its symbol alone and never asks for it again before the first
+screen ([45-SPEC-RECORD](45-SPEC-RECORD.md) §boot). *(Added October 2nd 2026.)*
+
 ### Empty — the section that decides whether the product lives
 
 **Five named states.** Collapsing them into one *"Nothing here yet"* is the failure.

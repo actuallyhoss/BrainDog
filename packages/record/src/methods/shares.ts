@@ -67,7 +67,7 @@ export type SharedPage = {
 };
 
 /** How a block is drawn: the owner's words on the page and where they sit. None names a list, a field, a row or a page. */
-const LOOKS = ['kind', 'heading', 'span', 'area', 'tone', 'lead', 'range', 'tiles', 'people', 'box', 'fold', 'icon', 'empty', 'body'] as const;
+const LOOKS = ['kind', 'heading', 'span', 'area', 'tone', 'lead', 'range', 'tiles', 'who', 'box', 'fold', 'icon', 'empty', 'body'] as const;
 
 /**
  * What the record computed that names no row: counts, figures, buckets and the flags aligned with the rows a block drew.

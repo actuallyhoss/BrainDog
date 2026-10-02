@@ -175,6 +175,7 @@ the table.
 | `under` | int, 1–365. On a `forecast`, say under the chart "Cash goes under in N days" when the walk goes under within this many days | never said | no |
 | `horizon` | int, days. On a `forecast`, how far ahead the walk reads, or `last` for its last dated movement (`forecast.ts` `runway`). Over `deadlines`, how many days ahead of today a row may fall due, 0 to 366 | 180 on a `forecast`, 14 over `deadlines` | no |
 | `horizons` | a list of lengths, each a whole number of days or `last` (the walk's last dated movement), at most `HORIZONS_MOST` of them (`pages.ts`). On a `forecast`, the lengths its horizon knob offers | the knob's own | no |
+| `headline` | `under`. On a `forecast`, the page's opening line already says when the money runs out, so the sentence over the chart is left off and the flag on the crossing stays. The record answers it only while a lead `note` on the page is drawn | absent | no |
 | `unset` | text. On a `bar` or `split`, the label of a last row holding what no part does (rows with no value in the grouped field, or the figure less its parts), linked to those rows; absent, those rows are not drawn apart | not drawn apart | no |
 | `tone` | intent | — | no |
 | `body` | markdown in the dialect | — | `note` |
@@ -188,6 +189,7 @@ the table.
 | `lead` | bool. On a `stat`, its first figure is the screen's one hero figure; on `cards`, the first card is drawn two tracks wide; on a `note`, its body is the page's opening sentence, said with the plural and nought rules a figure's note has | `false` | no |
 | `range` | bool. On a `progress` over a register, each row is a band from its low to its high on one scale shared by the rows (the largest high), what was spent marked on it, and a total line. It names four columns in order: the label, what was spent, the low and the high, the last three number or money fields in one currency | `false` | no |
 | `tiles` | bool. On a `queue`, one tile per question, showing its recommended option as what it is | `false` | no |
+| `who` | bool. On a `heat`, a line a person with a dot in each of the twelve weeks they were in touch, `columns: [{ field: <a day> }, { field: <a name> }]`. Written `people` before People 2.6.0, which the record still reads | `false` | no |
 | `box` | bool. On a `section`, the blocks after it, up to the next section, are drawn on one surface | `false` | no |
 | `panel` | `actions \| reporting`. On a `section` of a page per row (`for:`), the host panel drawn for the page's row under the section's heading: what the row's work runs on and is scheduled to do, or where its numbers are sent. Refused on a page with no `for:`. It is not `source: actions`, which lists the record's scheduled actions | none | no |
 | `field` | a field id on that row, `document` or `text`. On a `diff`, the field whose versions it compares | — | `diff` |

@@ -106,6 +106,19 @@ test('AND A HEAT PAST ONE READ IS REFUSED in the sentence every kind that adds u
   sql.close();
 });
 
+test('A HEAT WRITTEN `people: true` BEFORE PEOPLE 2.6.0 STILL READS, as `who:`, and the install takes only the new word', async () => {
+  const { k, sql } = await record(pageOf({ ...HEAT, who: true }), [{ what: 'Day', on: day(0), hours: 1, state: 'done' }]);
+  assert.deepEqual(first(k).refusals, []);
+  /* A PAGE A RECORD HOLDING 2.5.0 KEPT, read as it was installed then. */
+  const old = k.block({ ...HEAT, people: true } as never) as Answered & { who?: unknown; people?: unknown };
+  assert.deepEqual(old.refusals, []);
+  assert.equal(old.who, true);
+  assert.equal(old.people, undefined, 'the old word rode through beside the new one');
+  const refused = await k.install([pageOf({ ...HEAT, people: true })]);
+  assert.equal(refused.ok, false, 'a page written with the old word installed');
+  sql.close();
+});
+
 /* ── ring ─────────────────────────────────────────────────────────────── */
 
 const TEN = Array.from({ length: 10 }, (_, n) => ({ what: `Task ${n}`, on: day(-n), state: n < 3 ? 'done' : 'open' }));

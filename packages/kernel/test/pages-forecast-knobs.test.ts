@@ -190,3 +190,27 @@ test('ONE WALK A CURRENCY CARRIES NO SELLS, since each walk is drawn with the bl
   assert.equal(out.walks?.length, 2);
   assert.equal(out.sells, undefined);
 });
+
+test('A WALK SAYS THE PAGE’S LINE SAYS WHEN IT RUNS OUT only while that line is drawn, and `headline:` takes one word', async () => {
+  const k = await record();
+  assert.deepEqual(k.block(walk({ headline: 'under' })).refusals, []);
+  const wrong = k.block(walk({ headline: 'over' as never }));
+  assert.equal(wrong.refusals[0]?.at, 'headline');
+  /* THE LINE IS DRAWN ON ONE PAGE AND HELD BACK BY ITS `when:` ON THE OTHER, as Money's is with two books. */
+  const page = (slug: string, gt: number): Declaration => ({
+    id: `page.${slug}`,
+    kind: 'page',
+    body: {
+      page: slug,
+      title: slug,
+      blocks: [
+        { kind: 'note', lead: true, body: 'It runs out soon.', when: { metric: 'cash-now', gt } },
+        { ...walk({ headline: 'under' }), heading: 'Cash ahead', empty: 'Nothing dated.' },
+      ],
+    } as never,
+  });
+  value(await k.install([page('said', 0), page('unsaid', 1_000_000_000)]));
+  const forecastOn = (slug: string) => value<{ blocks: Record<string, unknown>[] }>(k.page(slug)).blocks.find((b) => b.kind === 'forecast')!;
+  assert.equal(forecastOn('said').headline, 'under');
+  assert.equal(forecastOn('unsaid').headline, undefined, 'the chart left its sentence off for a line nobody drew');
+});

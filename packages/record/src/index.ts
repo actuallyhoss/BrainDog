@@ -819,6 +819,14 @@ export type Boot = {
    * host that sent it has already asked what the web otherwise asks before the first screen (`boot-live.ts`).
    */
   record: { slug: string; name: string; locale: string; currency: string | null; money: string[] } | null;
+  /**
+   * `record.currency` and `record.money` again, SENT WHETHER OR NOT THE RECORD HAS A NAME. A record nobody named (a
+   * self-host before its first run, the gates' record) answered `record: null`, and so its shell never learnt the home
+   * currency its own pack set and wrote "£39 GBP" in every sentence. `record` stays `null` there, since a reader tells an
+   * unprovisioned record by it; the money it is drawn in is the record's either way.
+   */
+  currency: string | null;
+  money: string[];
   /** Who is asking: the person behind the call, the name they gave, and what they hold on the record. */
   me: {
     kind: 'person' | 'token' | 'system';
@@ -4167,7 +4175,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -4179,8 +4187,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* EVERY INSTALLED PAGE, READ ONCE: the rail below is the ones this caller may open, and the pen asks of all of them
        which lists a page already reads and which slugs are taken. */
     const every = kernel.pages();
+    const drawn = drawnIn(ctx);
     return {
-      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawnIn(ctx) } : null,
+      record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
+      ...drawn,
       me: {
         /* A RUNNER NEVER BOOTS, since `scoped` refuses it before this is read, so `Boot.me.kind` keeps its three and a
            principal that is neither a person nor a token reads as the record's own, with no level. */
@@ -4852,7 +4862,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           .filter((p) => seesPage(ctx, p))
           /* AND THE REGISTER LIST DOES NOT TRAVEL. It is what the filter is FOR, and shipping it
              would hand back the names the filter exists to withhold. */
-          .map((p) => ({ slug: p.slug, title: p.title })),
+          /* WHICH ROW A PAGE GREW OUT OF DOES, as `boot` sends it, so Settings > Pages can fold the pages made for each
+             person or project under one line rather than list them as pages somebody wrote. It names no row the caller
+             cannot read: `seesPage` above already dropped a page about one. */
+          .map((p) => ({ slug: p.slug, title: p.title, about: p.about ? { register: p.about.register, seq: p.about.seq } : null })),
       );
     },
 

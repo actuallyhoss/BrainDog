@@ -75,6 +75,8 @@ export type PageBlock = {
   range?: boolean;
   /** A `queue`'s: one tile per question, drawn with its recommended option's visual. */
   tiles?: boolean;
+  /** A `heat`'s: a line a person, a dot in each week they were in touch, columns `day | who`. `people:` until People 2.6.0. */
+  who?: boolean;
   /** A `section`'s: the blocks after it, up to the next section, drawn on one surface. */
   box?: boolean;
   /** A `section`'s: whether it starts shut. */
@@ -158,6 +160,12 @@ export type PageBlock = {
    * movement. Checked here and drawn by the host, which walks no further than `horizon:` whatever is chosen.
    */
   horizons?: (number | 'last')[];
+  /**
+   * A `forecast`'s: what the page's opening line already says of the walk, which is `under`, when the money runs out.
+   * The host then leaves the sentence over the chart off and keeps the flag on the crossing. Answered only while a lead
+   * note on the same page is drawn (`headlineHeld`), since a line that is not drawn says nothing.
+   */
+  headline?: 'under';
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
   /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral. */
@@ -368,6 +376,11 @@ export type FeedRow = {
    * answers it on every row it draws, and its `where` reads it as `list is tasks` (`listOf`).
    */
   list?: string | null;
+  /**
+   * The names of the rows a rule's run folded into this one line, newest first, one a row: a rule that categorised six
+   * payments is one line naming six, not six lines (`feedRows`). Absent from a row that is one target's.
+   */
+  things?: string[];
 };
 
 /** One way to answer a question, as a queue draws it. `because` is the reason its author gave for it. */
@@ -962,8 +975,24 @@ export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<
        because the page is in hand here; the word itself was checked with the block (`kinds/words.ts` `panelFault`). */
     /* AND WHAT OTHER PACKS ADD TO IT, laid among its own blocks as it is read and never written into its declaration
        (`page-adds.ts`). A page made from a template fills each addition from its row, as `resolvePages` filled its own. */
-    blocks: emptyBoxesShut(blocks),
+    blocks: headlineHeld(emptyBoxesShut(blocks)),
     ...(filters ? { filters: filters.answer } : {}),
+  });
+}
+
+/**
+ * The page's blocks with a forecast's `headline:` taken off when no lead note on the page is drawn.
+ *
+ * THE OPENING LINE IS WHAT SAYS WHEN THE MONEY RUNS OUT, and a forecast that leaves its own sentence off for it has to
+ * know the line is there. Money's line is drawn only while the record keeps one set of money (`books-held`), so a
+ * record with two books read no line and a chart that no longer said when the walk goes under either.
+ */
+function headlineHeld(blocks: readonly BlockResult[]): BlockResult[] {
+  const said = blocks.some((b) => b.kind === 'note' && b.lead === true && b.drawn !== false && b.refusals.length === 0);
+  return blocks.map((b) => {
+    if (said || b.headline === undefined) return b;
+    const { headline: _unsaid, ...rest } = b;
+    return rest as BlockResult;
   });
 }
 
@@ -1276,7 +1305,7 @@ const kitOf = (deps: PageDeps): KindKit => ({
  */
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   try {
-    return readBlockAsWritten(deps, block);
+    return readBlockAsWritten(deps, renamed(block));
   } catch (e) {
     return {
       ...(block !== null && typeof block === 'object' ? shorn(block) : block),
@@ -1291,6 +1320,17 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
       ],
     };
   }
+}
+
+/**
+ * A block with a key it was written under at an earlier build said by its name now: a `heat`'s `people: true` is `who:`
+ * since People 2.6.0. A record still holding 2.5.0 has the old word on its page, and that page reads as it did until
+ * the record takes the update, rather than drawing a refusal where its chart was.
+ */
+function renamed(block: PageBlock): PageBlock {
+  if (block === null || typeof block !== 'object' || block.kind !== 'heat' || !Object.hasOwn(block, 'people')) return block;
+  const { people, ...rest } = block as PageBlock & { people?: unknown };
+  return rest.who === undefined ? { ...rest, who: people as boolean } : rest;
 }
 
 /** Whether a block's `cells:` is something other than what the type says: a list of figures, each naming its metric. */
@@ -2187,6 +2227,8 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
         at: 'horizons',
       },
     };
+  if (block.headline !== undefined && block.headline !== 'under')
+    return { refusal: { code: 'DECLARATION_INVALID', fix: "headline: is under, when the page's opening line says when the money runs out.", at: 'headline', allowed: ['under'] } };
   if (block.recorded === undefined) return {};
   const id = typeof block.recorded === 'string' ? block.recorded.replace(/^series\./u, '') : '';
   const opening = block.opening !== null && typeof block.opening === 'object' ? block.opening.metric : null;
@@ -2581,16 +2623,45 @@ export function byOf(actor: string): FeedBy {
   return 'you';
 }
 
+/** Whether a rule's line may take `e` in as one more row: the same rule, the same kind of write, no words of its own. */
+const foldsInto = (last: FeedRow, e: ActivityEvent): boolean =>
+  last.by === 'rule' &&
+  last.who === e.actor &&
+  last.kind !== null &&
+  last.kind === e.kind &&
+  (last.note === null || last.note.trim() === '') &&
+  (e.note === null || e.note.trim() === '') &&
+  typeof last.thing === 'string' &&
+  typeof e.thing === 'string' &&
+  listOf(last.target) !== null &&
+  listOf(last.target) === listOf(e.target);
+
 /**
  * Events, newest first, as feed rows: a run of events by one actor, of one kind, on one target is
  * one row with a count, and past `first` rows a group's remainder is one row, so no count is lost.
+ *
+ * AND A RULE'S RUN OVER SEVERAL ROWS OF ONE LIST IS ONE ROW TOO, naming each row in `things`. "Since you were away"
+ * read "TALLYARD categorised" six times down the page, one line a payment the rule filed in the same moment; it is one
+ * line now, and the host words it (`Categorised 6 payments: Tallyard, Northern Rail and 4 more`). Only a rule's, and
+ * only where neither line wrote words of its own: a note a rule wrote is that row's, and a person's or an agent's
+ * edits to different rows are different work.
  */
 export function feedRows(events: readonly ActivityEvent[], first?: number): FeedRow[] {
   const bursts: FeedRow[] = [];
+  /* THE ROWS EACH FOLDED LINE NAMES, by target, so a row the rule wrote twice is named once. */
+  const named = new Map<FeedRow, Set<string | null>>();
   for (const e of events) {
     const last = bursts.at(-1);
     if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
-    else
+    else if (last && foldsInto(last, e)) {
+      const seen = named.get(last) ?? new Set([last.target]);
+      named.set(last, seen);
+      last.count += 1;
+      if (!seen.has(e.target)) {
+        seen.add(e.target);
+        last.things = [...(last.things ?? [last.thing as string]), e.thing as string];
+      }
+    } else
       bursts.push({
         by: byOf(e.actor),
         who: e.actor,
