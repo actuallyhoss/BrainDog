@@ -2,11 +2,11 @@ DRAFT for review, not in force.
 
 # Terms of Service
 
-Last updated: 2026-10-01
+Last updated: 2026-10-02
 
 ## The short version
 
-- BrainDog is a hosted service at brain.dog. You pay for each record by the month, and there is no free plan.
+- BrainDog is a hosted service at brain.dog. Free gives one person one record at no charge. Cloud and Cloud Plus are paid by the month, for each record.
 - What you put in your record is yours. We host it and run it for you, and we don't sell it or use it for ads.
 - You can export the whole record as one file at any time, even if a payment has failed.
 - Slash, the assistant, can be wrong. Nothing it writes goes into your record until a person accepts it.
@@ -104,22 +104,21 @@ If you find a security problem, please tell us at support@brain.dog before telli
 
 ## Plans and prices
 
-- **Cloud** is US$12 a month for each record. **Cloud Plus** is US$29 a month for each record.
+- **Free** costs nothing and needs no card. It is one record for one person, and each person can have one free record.
+- **Cloud** is US$12 a month for each record. **Cloud Plus** is US$29 a month for each record. You can move a free record to either from Settings.
 - Each plan includes a monthly amount of Slash credits, automation and script runs, requests to other services, data fetched and script time. The pricing page (brain.dog/pricing) lists them. People, pages, lists and history are never counted.
 - Allowances reset on the first of each month (UTC). What you don't use doesn't carry over.
 - When you reach an allowance, work that needs more waits for the next month, and your record tells you what is waiting.
 
 **Slash credits.** One question or one draft uses one credit, however long Slash works on it. Slash's own daily check, your daily email and learning how to file things never use your credits.
 
-**Credit packs.** [owner: the pricing page offers credit packs and extra usage, but billing.ts sells only the two plans today; keep these two paragraphs only once both are built] You can buy packs of extra credits. They are used after the month's credits run out, and they don't expire while the record exists. Credits have no cash value, and can't be sold, transferred or moved to another record. When a record is deleted, its unused credits end with it. [owner: confirm packs are not refunded once any credit is used]
-
-**Extra usage.** Extra usage is off until you turn it on. If you turn it on, you set a monthly cap, and we charge for usage past your plan at the prices on the pricing page, and never past your cap.
+Credits have no cash value, and can't be sold, transferred or moved to another record. We don't sell extra credits or extra usage today; if we start, these terms will say how before you can buy any.
 
 ## Payment
 
 - Payments are handled by Stripe. We never see your card number.
-- There is no free plan and no free trial.
-- Plans are billed monthly in advance, from the day you pay. Extra usage is billed after the month it was used. [owner: confirm when extra usage is billed]
+- Free is never billed, and there is no free trial of a paid plan.
+- Paid plans are billed monthly in advance, from the day you pay.
 - Prices are in US dollars. [owner: tax is off until Stripe Tax is turned on; say whether prices include or exclude tax]
 - You can change plan or cancel at any time from Settings, on Stripe's own page. A change of plan takes effect straight away. [owner: confirm how the Stripe customer portal prorates a mid-month change] A cancellation takes effect at the end of the period you've paid for, and the record then becomes read-only (see below). [owner: set the customer portal to cancel at the end of the period, not at once]
 - We may change our prices. We'll tell you by email at least 30 days before a new price applies to you. If you don't agree, you can cancel before it does.
@@ -136,7 +135,7 @@ If you find a security problem, please tell us at support@brain.dog before telli
 ## If a payment fails, or your plan ends
 
 - **Payment failed.** Your record keeps working while Stripe tries your card again. Update your card in Settings to fix it.
-- **Plan ended.** If the plan is cancelled, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
+- **Plan ended.** [owner: billing.ts makes a cancelled paid record read-only, as below; say if it should move back to Free instead] If the plan is cancelled, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
 - **You can always export.** An owner can export the whole record at any time while it is read-only. We never hold your data back to make you pay.
 - **Before we delete it, we tell you.** We email the payer and every owner when the record becomes read-only, and again 60 days and 83 days later.
 - **After 90 days** of being read-only, the record is deleted, and we email you to say so. Paying again at any time before then brings it straight back.

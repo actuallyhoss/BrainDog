@@ -11,7 +11,7 @@
    *   inbox    three messages arrive, the shape is learned once, and every one is filed.
    *   agents   the connect sheet, with the makers' own marks and the record's MCP address.
    *   yours    three plain facts about whose the record is.
-   *   plans    the two plans, and the colleagues who cost nothing.
+   *   plans    Free, first and largest, then the plans for pros in one quieter tile (DIRECTION §35).
    *   close    one line and the button.
    *
    * NOTHING SAID TWICE. The price is said once, in the plans, and not beside the first button; the pages a record
@@ -31,9 +31,10 @@
   import { MCP_URL, SIGNUP, SOURCE, site } from '$lib/copy.ts';
   import { home } from '$lib/copy/home.ts';
   import type { IconName } from '$lib/icons.ts';
-  import { PLANS } from '$lib/plans.ts';
+  import { PAID, plan } from '$lib/plans.ts';
 
   const h = home.home;
+  const free = plan('free');
   const agents = Object.keys(AGENT_MARKS) as MarkedAgent[];
 
   /* THE ADDRESS COPIES FOR REAL, and says so for two seconds. Without a clipboard the address is still there to select. */
@@ -166,31 +167,34 @@
   </div>
 </section>
 
-<!-- ── The plans, and the colleagues who cost nothing. ── -->
+<!-- ── The plans: Free first and largest, then the plans for pros, quieter. ── -->
 <section class="band spaced" aria-labelledby="plans-title">
   <div class="in">
     <div class="yours-head">
-      <h2 class="h2" id="plans-title">{h.plans.title}</h2>
+      <div class="plans-words">
+        <h2 class="h2" id="plans-title">{h.plans.title}</h2>
+        <p class="lede">{h.plans.lead}</p>
+      </div>
       <a class="onward" href="/pricing">{h.plans.more}<Icon name="arrow" size="m" /></a>
     </div>
     <div class="frame plans">
-      {#each PLANS as p (p.id)}
-        <div class="tile plan">
-          <span class="plan-name">{p.name}</span>
-          <span class="plan-price"><span class="price">{p.price}</span><span class="meta">{p.unit}</span></span>
-          <span class="meta">{p.for}</span>
-          <dl class="allow">
-            <div><dt>{h.plans.meters.credits}</dt><dd class="num">{p.allowance.credits}</dd></div>
-            <div><dt>{h.plans.meters.runs}</dt><dd class="num">{p.allowance.runs.toLocaleString('en-US')}</dd></div>
-          </dl>
-        </div>
-      {/each}
-      <div class="tile plan free">
-        <span class="faces" role="img" aria-label={h.plans.faces.join(', ')}>
-          {#each h.plans.faces as f (f)}<span class="face" data-initial={f.slice(0, 1)}></span>{/each}
-        </span>
-        <span class="plan-name">{h.plans.free.head}</span>
-        <span class="meta">{h.plans.free.said}</span>
+      <div class="tile plan">
+        <span class="plan-name">{free.name}</span>
+        <span class="plan-price"><span class="price">{free.price}</span><span class="meta">{free.unit}</span></span>
+        <span class="meta">{free.for}</span>
+        <dl class="allow">
+          <div><dt>{h.plans.meters.credits}</dt><dd class="num">{free.allowance.credits.toLocaleString('en-US')}</dd></div>
+          <div><dt>{h.plans.meters.runs}</dt><dd class="num">{free.allowance.runs.toLocaleString('en-US')}</dd></div>
+        </dl>
+      </div>
+      <div class="tile plan pros">
+        <span class="plan-name">{h.plans.pros.head}</span>
+        <span class="meta">{h.plans.pros.said}</span>
+        <dl class="allow">
+          {#each PAID as p (p.id)}
+            <div><dt>{p.name}</dt><dd class="num">{h.plans.price(p.price, p.unit)}</dd></div>
+          {/each}
+        </dl>
       </div>
     </div>
   </div>
@@ -379,10 +383,24 @@
 
   /* ── Plans ─────────────────────────────────────────────────────────────── */
 
+  .plans-words {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  /* FREE TAKES THE WIDER SHARE; the plans for pros sit beside it, in smaller type. */
   .plans {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     gap: var(--inset);
+  }
+
+  .pros .plan-name {
+    font-size: var(--t-md);
+  }
+
+  .pros .allow {
+    margin-block-start: auto;
   }
 
   .plan {
@@ -433,37 +451,6 @@
     margin: 0;
     color: var(--ink);
     font-weight: 600;
-  }
-
-  .free {
-    justify-content: flex-end;
-  }
-
-  .faces {
-    display: flex;
-    margin-block-end: auto;
-  }
-
-  /* THE FACES ARE CIRCLES, one overlapping the next, each the initial of a colleague the Team example names. */
-  .face {
-    display: grid;
-    place-items: center;
-    inline-size: 36px;
-    block-size: 36px;
-    border-radius: var(--r-pill);
-    background: var(--ink2);
-    box-shadow: 0 0 0 2px var(--bg);
-    color: var(--on-ink);
-    font-size: var(--t-app-sm);
-    font-weight: 600;
-  }
-
-  .face::before {
-    content: attr(data-initial);
-  }
-
-  .face + .face {
-    margin-inline-start: -8px;
   }
 
   /* ── The close ─────────────────────────────────────────────────────────── */

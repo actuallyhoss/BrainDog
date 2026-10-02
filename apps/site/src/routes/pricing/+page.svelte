@@ -2,56 +2,52 @@
   /**
    * Pricing, drawn as Bento tiles on the ground (the design system).
    *
-   * TWO PLANS, WHAT EACH INCLUDES, AND WHAT MORE COSTS, on the owner's ask of 26 September:
-   * "include the credits/usages offered on the plans, show extra usage pricings, add another extended plan". Every
-   * figure is read from `plans.ts`, which is the one file to edit when a price or an allowance changes, and which
-   * `plans.test.ts` holds to the Worker's own `HOSTED_PLANS` and `ALLOWANCE`. Every sentence is read from
-   * `copy/pricing.ts`, and what a drawing works out (a ratio, a price a credit, a gap between prices) is worked out
-   * here from those figures, so it moves when they do.
+   * FREE LEADS (DIRECTION §35, the owner on 2 October): "i dont like how it brands the $12 as the go to. instead i want
+   * the product to have the free tier to be what's highlighted, and then the subscriptions as an extra thing for
+   * pros". So the page's headline is Free's, its first and largest tile is Free with the one filled button, and Cloud
+   * and Cloud Plus share one quieter tile beside it, a line each. Every figure is read from `plans.ts`, which
+   * `plans.test.ts` holds to the Worker's own `HOSTED_PLANS`, `FREE_PLAN` and `ALLOWANCE`; every sentence is read from
+   * `copy/pricing.ts`; what a drawing works out (a scale, the automations Free runs a day) is worked out here from
+   * those figures, so it moves when they do.
    *
-   *   plans     the answer and the two plans: the same price for one person as for four, then a tile a plan.
-   *   usage     every allowance as a pair of bars on one scale, Cloud against Cloud Plus.
-   *   extra     what both plans include, the credit packs, and extra usage with its cap, drawn.
-   *   faq       the questions a buyer asks before paying.
+   *   plans     the answer: Free, then the plans for pros.
+   *   usage     every allowance as three bars on one scale, Free in ink, and the line that packs and extra usage are
+   *             coming later.
+   *   every     what every plan includes, and the one place they differ (people).
+   *   faq       the questions a person asks before starting.
    *   close     one line and the button.
    *
-   * NO PRE-LAUNCH VARIANT. The site describes the product as it is on launch day and is not deployed with this copy
-   * before then, so the buttons go to sign-up and no line says what is not open yet.
+   * NO CREDIT PACKS AND NO EXTRA USAGE ARE SOLD HERE, because neither is built (`plans.ts` says where each would be).
    */
   import Icon from '$lib/Icon.svelte';
   import { SIGNUP, site } from '$lib/copy.ts';
-  import { EXTRA, PACKS, PLANS, plan } from '$lib/plans.ts';
+  import { PAID, PLANS, plan } from '$lib/plans.ts';
   import type { IconName } from '$lib/icons.ts';
 
   const p = site.pricing;
-  const cloud = plan('cloud');
-  const plus = plan('plus');
+  const free = plan('free');
 
   const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
   const word = (n: number): string => (Number.isInteger(n) && n >= 0 && n < WORDS.length ? (WORDS[n] ?? String(n)) : String(n));
-  const dollars = (price: string): number => Number.parseFloat(price.replace(/[^0-9.]/g, '')) || 0;
-  const usd = (n: number): string => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+  const grouped = (n: number): string => n.toLocaleString('en-US');
 
-  /** An allowance's name, for the extra-usage row that extends it, so the two lists say one name. */
-  const nameOf = (key: string): string => p.usage.find((u) => u.key === key)?.name ?? '';
-
-  /* THE PAIRED BARS: each meter on its own scale, the larger plan the whole track. */
+  /* THE BARS: each meter on its own scale, the largest plan the whole track, every plan a bar under its name. */
   const meters = p.usage.map((u) => {
-    const a = cloud.allowance[u.key];
-    const b = plus.allowance[u.key];
-    const top = Math.max(a, b, 1);
-    return { ...u, a, b, wa: (a / top) * 100, wb: (b / top) * 100 };
+    const top = Math.max(1, ...PLANS.map((pl) => pl.allowance[u.key]));
+    return { ...u, bars: PLANS.map((pl) => ({ id: pl.id, name: pl.name, n: pl.allowance[u.key], w: (pl.allowance[u.key] / top) * 100 })) };
   });
-  const ratios = new Set(meters.map((m) => (m.a > 0 ? m.b / m.a : 0)));
-  const times = ratios.size === 1 ? ([...ratios][0] ?? 0) : 0;
-  const gap = usd(dollars(plus.price) - dollars(cloud.price));
 
-  /* WHAT BOTH PLANS INCLUDE, once where the plans agree, and each plan's own where they do not. */
+  /* WHAT FREE'S RUNS COVER: automations that run once a day, every day of a 31-day month. */
+  const daily = Math.floor(free.allowance.runs / 31);
+
+  /* ON EVERY PLAN: one value where the plans agree, and Free's beside the paid plans' where they do not. */
   const ROW_GLYPHS: IconName[] = ['people', 'server', 'refresh', 'inbox', 'download'];
+  const valueOf = (row: readonly string[]): string => {
+    const [, f = '', ...paid] = row;
+    if (paid.every((v) => v === f)) return f;
+    return paid.every((v) => v === paid[0]) ? p.differs(f, paid[0] ?? '') : row.slice(1).join(' · ');
+  };
   const kept = (text: string): number => Number.parseInt(text.match(/\d+/)?.[0] ?? '0', 10);
-
-  /* THE PACKS: a price a credit, and each pack's size against the largest. */
-  const packMax = Math.max(1, ...PACKS.map((x) => x.credits));
 </script>
 
 <svelte:head>
@@ -63,61 +59,57 @@
   <meta property="og:description" content={site.meta.pricing.description} />
 </svelte:head>
 
-<!-- ── The answer, and the two plans ── -->
+<!-- ── The answer: Free, then the plans for pros ── -->
 <section class="band" aria-labelledby="pricing-h1">
   <div class="in">
     <div class="tiles">
-      <div class="tile lead span-4 intro">
+      <article class="tile lead span-7" aria-labelledby="pricing-h1">
+        <header class="tile-head">
+          <span class="well ink"><Icon name="person" /></span>
+          <span class="tile-title">{free.name}</span>
+        </header>
         <h1 class="h2" id="pricing-h1">{p.title}</h1>
         <p class="lede">{p.sub}</p>
-        <div class="same">
-          <div class="same-row">
-            <span class="faces" aria-hidden="true"><span class="face you"><Icon name="person" size="s" /></span></span>
-            <span class="same-who">{p.perRecord.alone}</span>
-            <span class="same-price num">{cloud.price} {cloud.unit.replace(', per record', '')}</span>
-          </div>
-          <div class="same-row">
-            <span class="faces" aria-hidden="true">
-              <span class="face you"><Icon name="person" size="s" /></span>
-              {#each p.perRecord.faces as f (f)}<span class="face">{f.slice(0, 1)}</span>{/each}
-            </span>
-            <span class="same-who">{p.perRecord.team}</span>
-            <span class="same-price num">{cloud.price} {cloud.unit.replace(', per record', '')}</span>
-          </div>
-          <p class="reading">{p.perRecord.note}</p>
-        </div>
-      </div>
+        <p class="price"><span class="figure">{free.price}</span><span class="meta">{free.unit}</span></p>
+        <p class="summary">
+          <Icon name="coins" size="m" />
+          <span>{p.summary(grouped(free.allowance.credits), grouped(free.allowance.runs))}</span>
+        </p>
+        <ul class="points">
+          {#each p.plans.free.points as point (point)}
+            <li><Icon name="check" size="m" />{point}</li>
+          {/each}
+        </ul>
+        <a class="btn btn-primary btn-lg cta" href={free.href} rel={free.external ? 'external' : undefined}
+          >{p.plans.free.cta}<Icon name="arrow" size="s" /></a
+        >
+      </article>
 
-      {#each PLANS as pl (pl.id)}
-        <article class="tile lead span-4 plan" aria-labelledby="plan-{pl.id}">
-          <header class="tile-head">
-            <span class="well"><Icon name="cloud" /></span>
-            <h2 class="tile-title plan-name" id="plan-{pl.id}">{pl.name}</h2>
-          </header>
-          <p class="price"><span class="figure">{pl.price}</span><span class="meta">{pl.unit}</span></p>
-          <p class="lede">{pl.for}</p>
-          <p class="summary">
-            <Icon name="coins" size="m" />
-            <span>{p.summary(pl.allowance.credits.toLocaleString('en-US'), pl.allowance.runs.toLocaleString('en-US'))}</span>
-          </p>
-          <ul class="points">
-            {#each p.plans[pl.id].points as point (point)}
-              <li><Icon name="check" size="m" />{point}</li>
-            {/each}
-          </ul>
-          <a
-            class="btn btn-lg cta"
-            class:btn-primary={pl.id === 'cloud'}
-            href={pl.href}
-            rel={pl.external ? 'external' : undefined}>{p.plans[pl.id].cta}<Icon name="arrow" size="s" /></a
-          >
-        </article>
-      {/each}
+      <article class="tile lead span-5 pros" aria-labelledby="pros-title">
+        <header class="tile-head">
+          <span class="well"><Icon name="zap" /></span>
+          <h2 class="tile-title" id="pros-title">{p.prosTitle}</h2>
+        </header>
+        <p class="pros-lead">{p.prosLead}</p>
+        <ul class="paid">
+          {#each PAID as pl (pl.id)}
+            <li>
+              <span class="pd-top">
+                <span class="pd-name">{pl.name}</span>
+                <span class="pd-price num">{pl.price} <span class="meta">{pl.unit.replace(', per record', '')}</span></span>
+              </span>
+              <span class="pd-line">{p.prosLine(grouped(pl.allowance.credits), grouped(pl.allowance.runs))}</span>
+              <span class="pd-points">{p.plans[pl.id].points.join(' · ')}</span>
+              <a class="btn btn-sm pd-cta" href={pl.href} rel={pl.external ? 'external' : undefined}>{p.plans[pl.id].cta}</a>
+            </li>
+          {/each}
+        </ul>
+      </article>
     </div>
   </div>
 </section>
 
-<!-- ── Every allowance, Cloud against Cloud Plus ── -->
+<!-- ── Every allowance, plan against plan ── -->
 <section class="band" id="usage" aria-labelledby="usage-title">
   <div class="in">
     <div class="tiles">
@@ -125,98 +117,51 @@
         <header class="tile-head">
           <span class="well"><Icon name="bars" /></span>
           <h2 class="tile-title" id="usage-title">{p.usageTitle}</h2>
-          <span class="legend" aria-hidden="true">
-            <span><i class="key grey"></i>{cloud.name}, {cloud.price}</span>
-            <span><i class="key"></i>{plus.name}, {plus.price}</span>
-          </span>
         </header>
         <p class="lede">{p.usageLead}</p>
         <div class="compare" role="table" aria-labelledby="usage-title">
           <div class="sr" role="row">
             <span role="columnheader">{p.what}</span>
-            <span role="columnheader">{cloud.name}</span>
-            <span role="columnheader">{plus.name}</span>
+            {#each PLANS as pl (pl.id)}<span role="columnheader">{pl.name}</span>{/each}
           </div>
           {#each meters as m (m.key)}
             <div class="c-row" role="row">
-              <span class="c-term" role="rowheader"><b>{m.name}</b><span>{m.said}</span></span>
-              <span class="c-bar a" role="cell">
-                <span class="track"><span class="fill grey" style="--w:{m.wa}%"></span></span>
-                <span class="c-n num"><span class="sr">{cloud.name}: </span>{m.amount(m.a)}</span>
-              </span>
-              <span class="c-bar b" role="cell">
-                <span class="track"><span class="fill" style="--w:{m.wb}%"></span></span>
-                <span class="c-n num strong"><span class="sr">{plus.name}: </span>{m.amount(m.b)}</span>
-              </span>
+              <span class="c-term" role="rowheader" style="--plans:{m.bars.length}"><b>{m.name}</b><span>{m.said}</span></span>
+              {#each m.bars as b (b.id)}
+                <span class="c-bar" class:lead={b.id === 'free'} role="cell">
+                  <span class="c-plan" aria-hidden="true">{b.name}</span>
+                  <span class="track"><span class="fill" style="--w:{b.w}%"></span></span>
+                  <span class="c-n num"><span class="sr">{b.name}: </span>{m.amount(b.n)}</span>
+                </span>
+              {/each}
             </div>
           {/each}
         </div>
-        {#if times > 0}<p class="reading">{p.compareReading(word(times), gap)}</p>{/if}
+        {#if daily > 0}<p class="reading">{p.compareReading(p.automations(daily, word(daily)))}</p>{/if}
+        <p class="meta">{p.later}</p>
       </article>
     </div>
   </div>
 </section>
 
-<!-- ── What both include, and what more costs ── -->
-<section class="band" id="extra" aria-label={p.extraTitle}>
+<!-- ── On every plan ── -->
+<section class="band" aria-labelledby="every-title">
   <div class="in">
     <div class="tiles">
-      <article class="tile lead span-5 reveal" aria-labelledby="both-title">
-        <header class="tile-head"><span class="well"><Icon name="check" /></span><h2 class="tile-title" id="both-title">{p.bothTitle}</h2></header>
-        <ul class="both">
+      <article class="tile lead reveal">
+        <header class="tile-head"><span class="well"><Icon name="check" /></span><h2 class="tile-title" id="every-title">{p.bothTitle}</h2></header>
+        <ul class="every">
           {#each p.rows as row, i (row[0])}
             <li>
               <span class="well"><Icon name={ROW_GLYPHS[i] ?? 'check'} /></span>
               <span class="b-name">{row[0]}</span>
-              {#if row[1] === row[2]}
-                <span class="b-val">{row[1]}</span>
-              {:else}
-                <span class="b-val">{cloud.name}: {row[1]} · {plus.name}: {row[2]}</span>
-              {/if}
+              <span class="b-val">{valueOf(row)}</span>
               {#if row[0] === 'Backups' && kept(row[1]) > 0}
                 <span class="copies" role="img" aria-label={p.backupsLabel(kept(row[1]))}>
                   {#each Array.from({ length: kept(row[1]) }, (_, n) => n) as n (n)}<i class:new={n === kept(row[1]) - 1}></i>{/each}
                 </span>
               {/if}
             </li>
-          {/each}
-        </ul>
-      </article>
-
-      <article class="tile lead span-3 reveal" aria-labelledby="packs-title">
-        <header class="tile-head"><span class="well"><Icon name="coins" /></span><h2 class="tile-title" id="packs-title">{p.packsTitle}</h2></header>
-        <p class="lede">{p.packsLead}</p>
-        <ul class="packs">
-          {#each PACKS as pack (pack.credits)}
-            <li>
-              <span class="pk-top"><span class="pk-n">{p.packsPer(pack.credits)}</span><span class="pk-price num">{pack.price}</span></span>
-              <span class="meta">{p.perCredit(usd(dollars(pack.price) / pack.credits))}</span>
-              <span class="track thin" aria-hidden="true"><span class="fill" style="--w:{(pack.credits / packMax) * 100}%"></span></span>
-            </li>
-          {/each}
-        </ul>
-        <p class="reading">{p.packsFree}</p>
-      </article>
-
-      <article class="tile lead span-4 reveal" aria-labelledby="extra-title">
-        <header class="tile-head"><span class="well"><Icon name="gauge" /></span><h2 class="tile-title" id="extra-title">{p.extraUsageTitle}</h2></header>
-        <p class="lede">{p.extraLead}</p>
-        <div class="cap" role="img" aria-label={p.cap.label}>
-          <span class="cap-bar">
-            <span class="cap-plan"></span>
-            <span class="cap-extra"></span>
-            <span class="cap-line"></span>
-          </span>
-          <span class="cap-legend">
-            <span><i class="key"></i>{p.cap.plan}</span>
-            <span><i class="key grey"></i>{p.cap.extra}</span>
-            <span><i class="key dash"></i>{p.cap.cap}</span>
-          </span>
-        </div>
-        <p class="reading">{p.cap.reading}</p>
-        <ul class="extra-list">
-          {#each EXTRA as e (e.key)}
-            <li><span class="e-name">{nameOf(e.key)}</span><span class="e-price num">{e.price}</span><span class="meta">{e.per}</span></li>
           {/each}
         </ul>
       </article>
@@ -259,66 +204,7 @@
 </section>
 
 <style>
-  /* ── The answer: the same price for one as for four ─────────────────── */
-
-  .same {
-    display: grid;
-    gap: var(--sp-2);
-    margin-block-start: auto;
-  }
-
-  .same-row {
-    display: grid;
-    grid-template-columns: 7.5em minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--row-h-2);
-    padding-inline: var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
-  }
-
-  .faces {
-    display: flex;
-  }
-
-  /* A person is a circle with an initial (the icon set's faces); they overlap as a group does. */
-  .face {
-    display: grid;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    margin-inline-end: -8px;
-    background: var(--ink2);
-    border: 2px solid var(--s1);
-    border-radius: var(--r-pill);
-    color: var(--on-ink);
-    font-size: var(--t-app-xs);
-    font-weight: 600;
-  }
-
-  .face.you {
-    background: var(--ink);
-  }
-
-  .same-who {
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 500;
-  }
-
-  .same-price {
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 600;
-  }
-
-  /* ── A plan ──────────────────────────────────────────────────────────── */
-
-  .plan-name {
-    font-size: var(--t-group);
-    line-height: 24px;
-  }
+  /* ── Free ────────────────────────────────────────────────────────────── */
 
   .price {
     display: flex;
@@ -375,68 +261,92 @@
     margin-block-start: auto;
   }
 
-  /* ── The paired bars ─────────────────────────────────────────────────── */
+  /* ── For pros: quieter, a line a plan ────────────────────────────────── */
 
-  .legend,
-  .cap-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1) var(--sp-4);
+  .pros-lead {
+    margin: 0;
     color: var(--ink2);
     font-size: var(--t-site-small);
+    line-height: 22px;
   }
 
-  .legend {
-    margin-inline-start: auto;
+  .paid {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  .legend span,
-  .cap-legend span {
-    display: inline-flex;
+  .paid li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px var(--sp-3);
     align-items: center;
-    gap: 6px;
+    padding-block: var(--sp-4);
+    border-block-start: 1px solid var(--line);
   }
 
-  .key {
-    display: inline-block;
-    inline-size: 10px;
-    block-size: 10px;
-    background: var(--ink);
-    border-radius: 3px;
+  .pd-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-1) var(--sp-3);
+    grid-column: 1 / -1;
   }
 
-  .key.grey {
-    background: var(--dim);
+  .pd-name {
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
   }
 
-  .key.dash {
-    inline-size: 2px;
-    block-size: 12px;
-    background: none;
-    border-inline-start: 2px dashed var(--ink);
-    border-radius: 0;
+  .pd-price {
+    color: var(--ink);
+    font-size: var(--t-site-small);
+    font-weight: 600;
   }
+
+  .pd-price .meta {
+    font-weight: 400;
+  }
+
+  .pd-line,
+  .pd-points {
+    grid-column: 1;
+    color: var(--ink2);
+    font-size: var(--t-site-small);
+    line-height: 20px;
+  }
+
+  .pd-points {
+    color: var(--dim);
+  }
+
+  .pd-cta {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+  }
+
+  /* ── The bars ────────────────────────────────────────────────────────── */
 
   .compare {
     display: grid;
   }
 
+  /* A METER: its name down the left, beside one bar a plan, the plans in the order the page offers them. */
   .c-row {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    grid-template-areas:
-      'term a'
-      'term b';
-    column-gap: var(--sp-5);
-    row-gap: 6px;
+    gap: 6px var(--sp-5);
     align-items: center;
     padding-block: var(--sp-3);
     border-block-start: 1px solid var(--line);
   }
 
   .c-term {
-    grid-area: term;
     display: grid;
+    grid-row: 1 / span var(--plans);
     gap: 2px;
   }
 
@@ -452,29 +362,23 @@
   }
 
   .c-bar {
+    grid-column: 2;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 11em;
+    grid-template-columns: 6.5em minmax(0, 1fr) 11em;
     align-items: center;
     gap: var(--sp-3);
   }
 
-  .c-bar.a {
-    grid-area: a;
-  }
-
-  .c-bar.b {
-    grid-area: b;
+  .c-plan {
+    color: var(--dim);
+    font-size: var(--t-site-small);
   }
 
   .track {
     display: block;
-    block-size: 12px;
+    block-size: 10px;
     background: var(--s1);
     border-radius: var(--r-pill);
-  }
-
-  .track.thin {
-    block-size: 8px;
   }
 
   .fill {
@@ -482,12 +386,8 @@
     inline-size: var(--w);
     min-inline-size: 6px;
     block-size: 100%;
-    background: var(--ink);
-    border-radius: var(--r-pill);
-  }
-
-  .fill.grey {
     background: var(--dim);
+    border-radius: var(--r-pill);
   }
 
   .c-n {
@@ -495,33 +395,35 @@
     font-size: var(--t-site-small);
   }
 
-  .c-n.strong {
+  /* FREE IS THE INK BAR, the plan the page leads with; the paid plans are the grey ones beside it. */
+  .c-bar.lead .c-plan,
+  .c-bar.lead .c-n {
     color: var(--ink);
     font-weight: 600;
   }
 
-  /* ── Included, packs and extra usage ─────────────────────────────────── */
+  .c-bar.lead .fill {
+    background: var(--ink);
+  }
 
-  .both,
-  .packs,
-  .extra-list {
+  /* ── On every plan ───────────────────────────────────────────────────── */
+
+  .every {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sp-6);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .both li {
+  .every li {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding-block: 10px;
     border-block-start: 1px solid var(--line);
-  }
-
-  .both li:first-child {
-    border-block-start: 0;
   }
 
   .b-name {
@@ -555,93 +457,6 @@
 
   .copies i.new {
     background: var(--ink);
-  }
-
-  .packs {
-    margin-block-start: auto;
-  }
-
-  .packs li {
-    display: grid;
-    gap: 4px;
-    padding-block: var(--sp-3);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .pk-top {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-  }
-
-  .pk-n {
-    flex: 1;
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 500;
-  }
-
-  .pk-price {
-    color: var(--ink);
-    font-size: var(--t-lg);
-    font-weight: 600;
-  }
-
-  /* The cap: the plan in ink, extra usage in grey up to a dashed cap, and nothing past it. */
-  .cap {
-    display: grid;
-    gap: var(--sp-2);
-  }
-
-  .cap-bar {
-    position: relative;
-    display: flex;
-    block-size: 14px;
-    background: var(--s1);
-    border-radius: var(--r-pill);
-  }
-
-  .cap-plan {
-    inline-size: 52%;
-    background: var(--ink);
-    border-start-start-radius: var(--r-pill);
-    border-end-start-radius: var(--r-pill);
-  }
-
-  .cap-extra {
-    inline-size: 26%;
-    background: var(--dim);
-  }
-
-  .cap-line {
-    position: absolute;
-    inset-block: -5px;
-    inset-inline-start: 78%;
-    border-inline-start: 2px dashed var(--ink);
-  }
-
-  .extra-list li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: var(--sp-3);
-    padding-block: var(--sp-2);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .e-name {
-    color: var(--ink);
-    font-size: var(--t-site-small);
-  }
-
-  .e-price {
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 600;
-    text-align: end;
-  }
-
-  .extra-list .meta {
-    grid-column: 1 / -1;
   }
 
   /* ── Questions ───────────────────────────────────────────────────────── */
@@ -692,10 +507,19 @@
   @media (width < 900px) {
     .c-row {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-areas:
-        'term'
-        'a'
-        'b';
+    }
+
+    .c-term {
+      grid-row: auto;
+      margin-block-end: var(--sp-1);
+    }
+
+    .c-bar {
+      grid-column: 1;
+    }
+
+    .every {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
@@ -705,19 +529,22 @@
     }
 
     .c-bar {
-      grid-template-columns: minmax(0, 1fr) 9em;
-    }
-
-    .same-row {
-      grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .same-price {
-      grid-column: 2;
+      grid-template-columns: 5.5em minmax(0, 1fr) 8.5em;
+      gap: var(--sp-2);
     }
 
     .cta {
       align-self: stretch;
+    }
+
+    .paid li {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .pd-cta {
+      grid-column: 1;
+      grid-row: auto;
+      justify-self: start;
     }
   }
 </style>

@@ -21,6 +21,7 @@
 
   const s = site.slash;
   const d = s.drawn;
+  const free = plan('free');
   const cloud = plan('cloud');
   const plus = plan('plus');
 
@@ -58,10 +59,13 @@
   const inbox = site.home.inbox;
   const merchants = inbox.rows.map((r) => r[0]);
 
-  /* CREDITS: each plan's month and each pack, on one scale. */
+  /* CREDITS: each plan's month and each pack, on one scale. FREE LEADS (DIRECTION §35): Free is first and the one bar
+     in ink, and the paid plans follow as more. `PACKS` is empty until one is sold, so no pack bar is drawn and the
+     meta line says they are coming later. */
   const credits = [
+    { label: free.name, n: free.allowance.credits, shown: String(free.allowance.credits), ink: true },
     { label: cloud.name, n: cloud.allowance.credits, shown: String(cloud.allowance.credits), ink: false },
-    { label: plus.name, n: plus.allowance.credits, shown: String(plus.allowance.credits), ink: true },
+    { label: plus.name, n: plus.allowance.credits, shown: String(plus.allowance.credits), ink: false },
     ...PACKS.map((p) => ({ label: s.allowance.packs, n: p.credits, shown: `${s.allowance.packsN(p.credits)} · ${p.price}`, ink: false })),
   ];
   const creditMax = Math.max(1, ...credits.map((c) => c.n));

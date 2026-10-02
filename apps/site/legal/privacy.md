@@ -57,7 +57,7 @@ Payments are handled by Stripe. Stripe collects your card details, your billing 
 
 So that a payment makes the right record, we give Stripe your email address, our reference for you, and the new record's name, web address, time zone and plan. We never give Stripe what's in a record.
 
-We keep Stripe's reference for you and your subscription, your plan, whether it is paid, when the paid period ends, and when a record became read-only. We also count how much of each allowance a record uses each day, so we can show it and bill extra usage if you turned it on.
+We keep Stripe's reference for you and your subscription, your plan, whether it is paid, when the paid period ends, and when a record became read-only. We also count how much of each allowance a record uses each day, so we can show it and hold the record to its plan's allowance.
 
 ### What's in your record
 

@@ -86,6 +86,19 @@ export type Entry = {
  * checker only requires that a day never reappears after it has ended.
  */
 export const ENTRIES: Entry[] = [
+  /* FREE LEADS (DIRECTION §35), WRITTEN BEFORE ITS COMMIT: the work was not committed when this was written, and an
+     anchor is never guessed. The commit that lands sign-up's free path goes first in `commits`, and the checker
+     reports this entry as unanchored until it does. */
+  {
+    date: '2026-10-02',
+    kind: 'shipped',
+    title: 'Free leads: one record for one person, with no card',
+    body:
+      'Free is one record for one person, with the whole app and a monthly allowance of Slash, at no charge. ' +
+      'Sign-up makes a free record at once, with no payment step. ' +
+      'Cloud and Cloud Plus are the plans for pros, and credit packs and extra usage are coming later.',
+    commits: [],
+  },
   /* THE LAST WORK LANDED AS A FEW LARGE COMMITS, NOT ONE PER THING. Each batch was committed whole
      (`c651475b`, `daba3453`, `4c204b5c`, `bfe14e39`), and an anchor must be unique, so each of those commits
      carries one entry naming what a person notices most, and the rest of that work is not written up
@@ -244,19 +257,20 @@ export const ENTRIES: Entry[] = [
     date: '2026-09-25',
     kind: 'changed',
     /* THE ONE ENTRY THAT NAMES SPARK, AND IT HAS TO. The two entries below that said Spark were
-       renamed with everything else, because the page describes the product as it is. A self-hoster
-       whose environment still sets `SPARK_ENDPOINT` would get no model after the rename and no error
-       either, since the host reads only `SLASH_*`, so this entry is the only place he is told.
+       renamed with everything else, because the page describes the product as it is. An environment
+       that still sets `SPARK_ENDPOINT` would get no model after the rename and no error either, since
+       only `SLASH_*` is read, so this entry is the only place its owner is told. It names no way of
+       running BrainDog (DIRECTION §33: the site does not advertise one).
        `test/slash.test.ts` fails if any other sentence on any page names Spark.
 
        ANCHORED ON THE DECISION, BECAUSE THE RENAME HAD NOT BEEN COMMITTED WHEN THIS WAS WRITTEN: it
        was committed after. `bb960c22` is the decision, the owner's word and the list of what moves, and
        `62fabc69` is the survey that mapped it. The rename's own commits belong after them as evidence. */
-    title: 'Spark is now called Slash, and a self-host’s settings are renamed with it',
+    title: 'Spark is now called Slash, and its settings are renamed with it',
     body:
       'The assistant is called Slash in the app, the command line and the documents. ' +
-      'A self-host reads its model from SLASH_ENDPOINT, SLASH_MODEL and SLASH_KEY, and ignores the SPARK_ names it read before. ' +
-      'Rename them by hand, or the host runs as if no model were configured.',
+      'Its model is read from SLASH_ENDPOINT, SLASH_MODEL and SLASH_KEY, and the SPARK_ names read before are ignored. ' +
+      'Rename them by hand, or Slash runs as if no model were configured.',
     commits: ['bb960c22', '62fabc69'],
   },
   {
@@ -397,7 +411,7 @@ export const ENTRIES: Entry[] = [
     kind: 'shipped',
     /* THE SWITCH IS THE HOST'S, whatever `82eae966`'s subject says about the record's: the kernel's
        `answersSlash` is off unless the host says it serves the question, and each host says so only
-       where a model stands behind Slash (`apps/selfhost/src/server.ts`, `apps/worker/src/index.ts`,
+       where a model stands behind Slash (`apps/worker/src/index.ts` and its sibling host,
        from `eb1a131b` and `6d78d936` later the same day). */
     title: 'An automation can put a question to Slash, where a model is there to answer it',
     body:
@@ -412,8 +426,7 @@ export const ENTRIES: Entry[] = [
     title: 'A key sealed on the Cloud can be opened, where every read had failed',
     body:
       'The Cloud’s database hands a stored value back in a form the unseal read as empty. ' +
-      'Every key read there answered WRONG_KEY, and the self-host was never affected. The value ' +
-      'is read whole now.',
+      'Every key read there answered WRONG_KEY. The value is read whole now.',
     commits: ['973f2ecc'],
   },
   {
@@ -422,8 +435,8 @@ export const ENTRIES: Entry[] = [
     title: 'A script can be part of a record, and it runs in a sandbox',
     body:
       'A script is proposed like any other change, and Decide shows its source and the host each ' +
-      'key goes to. It runs in QuickJS on the self-host and in its own Worker on the Cloud, under ' +
-      'ceilings on time, memory, fetches and writes. A key reaches only the host its vault entry opens.',
+      'key goes to. It runs in a sandbox of its own, under ceilings on time, memory, fetches and ' +
+      'writes. A key reaches only the host its vault entry opens.',
     commits: ['94ba1ad8', 'bc82bae5', 'f5c02b73', 'eafe8c20', '7adc7d0c', 'd23ac77d', '1f252e34'],
   },
   {
@@ -513,7 +526,7 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-20',
     kind: 'shipped',
-    title: 'A message sent in from outside reaches the record, and both hosts open the door',
+    title: 'A message sent in from outside reaches the record',
     body:
       'An arrival lands on a route of its own and is read for what it holds. One that nothing ' +
       'understands is kept whole rather than dropped. A sender can no longer talk the check out ' +
@@ -532,16 +545,6 @@ export const ENTRIES: Entry[] = [
   },
   {
     date: '2026-09-20',
-    kind: 'shipped',
-    title: 'A self-host can be reached from a phone, over https, on a name that stays',
-    body:
-      'It could not hold a session, so nobody could sign in away from the desk. It serves https ' +
-      'with a certificate you supply, and prints the origin a passkey is bound to. Changing ' +
-      'that name stops every passkey already registered, and the file says so.',
-    commits: ['9066cb63'],
-  },
-  {
-    date: '2026-09-20',
     kind: 'changed',
     title: 'Every command takes --json, which the specification has promised since it was written',
     body:
@@ -553,11 +556,11 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-20',
     kind: 'shipped',
-    title: 'The hosted Worker writes the nightly copy the self-host already wrote',
+    title: 'The Cloud keeps a nightly copy of every record',
     body:
       'A nightly job walks the directory, and each record signs its whole file into object ' +
-      'storage. Thirty are kept, which is what a self-host has done for a week. The copy ' +
-      'refuses to write until an operator sets a real key to seal it.',
+      'storage. Thirty nights are kept. The copy refuses to write until an operator sets a ' +
+      'real key to seal it.',
     commits: ['c64eb36c', 'e85bd55c'],
   },
   {
@@ -634,7 +637,7 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-17',
     kind: 'fixed',
-    title: 'A report key is held to six hundred rows a minute on both hosts',
+    title: 'A report key is held to six hundred rows a minute',
     body:
       'A key with no ceiling on it can fill a record with text. It is refused with how long to ' +
       'wait now, and the answer carries that time in its own header.',
@@ -775,8 +778,7 @@ export const ENTRIES: Entry[] = [
     title: 'A machine signs itself in from the command line, and Settings approves it',
     body:
       'braindog login signs a machine in, and onboarding opens by asking who you are. Settings ' +
-      'approves the machine and opens the key doors. Device sign-in sits in the kernel, so both ' +
-      'hosts get it.',
+      'approves the machine and opens the key doors.',
     commits: ['f0c9af3f', '301843d1', '72befe0b'],
   },
   {
@@ -804,17 +806,17 @@ export const ENTRIES: Entry[] = [
     kind: 'shipped',
     title: 'Agents reach the record, and a session can ask where it stands',
     body:
-      'An agent gets the same typed surface a person does, over MCP, from the command line and ' +
-      'from both hosts. One call returns its run, its project, the last handoff and what is ' +
+      'An agent gets the same typed surface a person does, over MCP and from the command line. ' +
+      'One call returns its run, its project, the last handoff and what is ' +
       'waiting on the owner.',
     commits: ['b291dcf0', 'd92523ec'],
   },
   {
     date: '2026-09-11',
     kind: 'shipped',
-    title: 'Signing in works end to end on a self-host',
+    title: 'Signing in works end to end',
     body:
-      'Sign-in worked in halves, so nobody could get all the way in on a self-host. It works ' +
+      'Sign-in worked in halves, so nobody could get all the way in. It works ' +
       'end to end now, and its page was rebuilt around it. The landing page dropped its ' +
       'screenshots and reads its first list from a record.',
     commits: ['d7459d26', '4464966e'],
@@ -1068,9 +1070,9 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-06',
     kind: 'shipped',
-    title: 'Both hosts authenticate, and a record is created with the keys it needs',
+    title: 'Signing in reaches the record, and a record is created with the keys it needs',
     body:
-      "Neither host did the record's half of signing somebody in. Both do it now. A record was " +
+      "Nothing did the record's half of signing somebody in. It is done now. A record was " +
       'being created without its key-encrypting key and two others, so its vault could hold ' +
       'nothing.',
     commits: ['885d23ff', 'be4a04a2'],

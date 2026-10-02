@@ -24,8 +24,8 @@ export const shell = {
     pricing: {
       title: 'Pricing · BrainDog',
       description:
-        'From $12 a month per record, with Slash credits included. Colleagues are free on ' +
-        'every plan, and extra usage is off until you turn it on.',
+        'Free for one person, with the whole app and Slash included. Cloud and Cloud Plus add more ' +
+        'Slash, more automations and colleagues.',
     },
     agents: {
       title: 'For agents · BrainDog',
@@ -62,7 +62,7 @@ export const shell = {
     source: 'GitHub',
     open: 'Open the app',
     signin: 'Sign in',
-    start: 'Start your record',
+    start: 'Start for free',
     menu: 'Menu',
   },
 

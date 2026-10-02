@@ -11,7 +11,8 @@ export const home = {
     title: 'Give your business',
     titleAccent: 'a memory',
     sub: 'Everything you keep track of, in one place. You and your AI agents keep it up to date, and every change says who made it.',
-    primary: 'Start your record',
+    /* FREE LEADS (DIRECTION §35): the first button says what it costs, which is nothing. */
+    primary: 'Start for free',
     secondary: 'See pricing',
   },
 
@@ -127,13 +128,21 @@ export const home = {
       glyphs: ['server', 'undo', 'code'],
     },
 
+    /**
+     * THE PLANS, FREE FIRST (DIRECTION §35): the heading is Free's and never a price, Free is the large tile with its
+     * figures, and the paid plans share one quieter tile, a line each. The figures are `lib/plans.ts`.
+     */
     plans: {
-      title: 'Priced per record, not per person.',
-      /* The two meters each plan is drawn with. */
+      title: 'Free for one person.',
+      lead: 'The whole app, for one record, with no card and no trial that runs out.',
+      /* The two meters Free is drawn with. */
       meters: { credits: 'Slash credits a month', runs: 'automation runs a month' },
-      /* THE TEAM EXAMPLE'S FOUR (`lib/examples/team.ts`), drawn as the faces on the free seats. */
-      faces: ['Omar', 'Lena', 'Maya', 'Jun'],
-      free: { head: 'Colleagues are free', said: 'On both plans, with any level of access.' },
+      pros: {
+        head: 'For pros',
+        said: 'More Slash and automations, and colleagues in the same record at no extra cost.',
+      },
+      /* A paid plan's line in the pros tile: its price, then its unit, read from `lib/plans.ts`. */
+      price: (price: string, unit: string) => `${price} ${unit.replace(', per record', '')}`,
       more: 'Full pricing',
     },
   },
@@ -141,7 +150,7 @@ export const home = {
   closing: {
     title: 'Start your record.',
     body: 'Tell it who you are and what it is for, and Slash sets up the first lists and pages.',
-    primary: 'Start your record',
+    primary: 'Start for free',
     secondary: 'See the pricing',
   },
 } as const;

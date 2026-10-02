@@ -31,11 +31,13 @@ export const forPages = {
     /* What a screen reader calls the row of the example's pages under 900px, where the rail is not drawn. */
     pages: 'Pages in this record',
     rowsTitle: 'What it does for you',
-    /* The price line reads its figure from `lib/plans.ts`, so it cannot drift from the pricing page. */
-    price: (price: string, unit: string) => `From ${price} ${unit}. Colleagues are free on every plan.`,
+    /* FREE LEADS (DIRECTION §35): the line under the example names Free first and the paid plans as more. It keeps
+       `Person.svelte`'s two arguments, the paid plan's figure and unit, so the call does not change; "$12 a month" is
+       never the headline. */
+    price: (_price: string, _unit: string) => 'Free for one person, with the whole app. Cloud and Cloud Plus add colleagues and more.',
     pricing: 'See the pricing',
     /* The header's filled action (`copy/shell.ts` `nav.start`), which opens `SIGNUP`. */
-    start: 'Start your record',
+    start: 'Start for free',
     others: 'Written for someone else',
 
     who: {

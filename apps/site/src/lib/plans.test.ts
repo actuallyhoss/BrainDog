@@ -2,9 +2,9 @@
  * The plans the site prices, held to the code that sells them and the code that meters them.
  *
  * WHY THIS TEST. `plans.ts` is where the owner changes a price or an
- * allowance, and three other files act on the same figures: the checkout sells `HOSTED_PLANS` in
- * `apps/worker/src/billing.ts`, the Directory holds a record to `ALLOWANCE` in
- * `packages/record/src/directory.ts`, and Slash starts a record at `ASK_CAP_DEFAULT` in
+ * allowance, and three other files act on the same figures: the checkout sells `HOSTED_PLANS` and makes Free as
+ * `FREE_PLAN` in `apps/worker/src/billing.ts`, the Directory holds a record to `ALLOWANCE` in
+ * `packages/record/src/directory.ts`, and Slash starts a record at `ASK_CAP_DEFAULT` (Free's at `ASK_CAP_FREE`) in
  * `packages/slash/src/types.ts`. A figure moved in one and not the others is a page that promises
  * what the record does not do, so each check reads the other package's value and not a copy of it.
  *
@@ -17,7 +17,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { site } from './copy.ts';
-import { EXTRA, PLANS, type Allowance } from './plans.ts';
+import { home } from './copy/home.ts';
+import { PACKS, PAID, PLANS, type Allowance } from './plans.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
 
@@ -26,21 +27,36 @@ type Meters = { runs: number; requests: number; bytes: number; ms: number };
 const { ALLOWANCE } = (await import(new URL('packages/record/src/directory.ts', REPO).href)) as {
   ALLOWANCE: { [plan: string]: Meters | null };
 };
-const { HOSTED_PLANS } = (await import(new URL('apps/worker/src/billing.ts', REPO).href)) as {
+const { HOSTED_PLANS, FREE_PLAN } = (await import(new URL('apps/worker/src/billing.ts', REPO).href)) as {
   HOSTED_PLANS: { [plan: string]: { name: string; price: string; directory: string } };
+  FREE_PLAN: { name: string; price: string; directory: string };
 };
-const { ASK_CAP_DEFAULT } = (await import(new URL('packages/slash/src/types.ts', REPO).href)) as { ASK_CAP_DEFAULT: number };
+const { ASK_CAP_DEFAULT, ASK_CAP_FREE } = (await import(new URL('packages/slash/src/types.ts', REPO).href)) as {
+  ASK_CAP_DEFAULT: number;
+  ASK_CAP_FREE: number;
+};
 
 const HOUR_MS = 3_600_000;
 const GB = 1_000_000_000;
 
+/** The Directory plan each of the site's plans is metered under, from billing.ts. */
+const meteredAs = (id: string): string => (id === 'free' ? FREE_PLAN.directory : (HOSTED_PLANS[id]?.directory ?? ''));
+
+test('Free is the first plan, and the site sells nothing for it', () => {
+  assert.equal(PLANS[0]?.id, 'free', 'plans.ts draws a paid plan before Free, and Free leads (DIRECTION §35)');
+  const free = PLANS[0]!;
+  assert.equal(free.name, FREE_PLAN.name, `plans.ts calls Free "${free.name}" and billing.ts "${FREE_PLAN.name}"`);
+  assert.equal(free.price, FREE_PLAN.price, `plans.ts says Free is ${free.price} and billing.ts "${FREE_PLAN.price}"`);
+  assert.ok(!('free' in HOSTED_PLANS), 'billing.ts sells Free at checkout');
+});
+
 test('the site prices exactly the plans the checkout sells, by the same name and price', () => {
   assert.deepEqual(
-    PLANS.map((p) => p.id).sort(),
+    PAID.map((p) => p.id).sort(),
     Object.keys(HOSTED_PLANS).sort(),
-    'plans.ts and HOSTED_PLANS in apps/worker/src/billing.ts name different plans',
+    'plans.ts and HOSTED_PLANS in apps/worker/src/billing.ts name different paid plans',
   );
-  for (const plan of PLANS) {
+  for (const plan of PAID) {
     const sold = HOSTED_PLANS[plan.id];
     assert.ok(sold, `billing.ts sells no ${plan.id}`);
     assert.equal(plan.name, sold.name, `plans.ts calls ${plan.id} "${plan.name}" and billing.ts "${sold.name}"`);
@@ -52,21 +68,23 @@ test('the site prices exactly the plans the checkout sells, by the same name and
 
 test("each plan's allowance is the one the Directory holds the record to", () => {
   for (const plan of PLANS) {
-    const directory = HOSTED_PLANS[plan.id]?.directory ?? '';
+    const directory = meteredAs(plan.id);
     const held = ALLOWANCE[directory];
     assert.ok(held, `the Directory has no allowance for ${directory}, which billing.ts meters ${plan.name} under`);
     const a = plan.allowance;
     assert.equal(a.runs, held.runs, `${plan.name}: the site says ${a.runs} runs, the Directory holds ${held.runs}`);
     assert.equal(a.requests, held.requests, `${plan.name}: the site says ${a.requests} requests, the Directory holds ${held.requests}`);
-    assert.equal(a.gb * GB, held.bytes, `${plan.name}: the site says ${a.gb} GB, the Directory holds ${held.bytes} bytes`);
+    assert.equal(Math.round(a.gb * GB), held.bytes, `${plan.name}: the site says ${a.gb} GB, the Directory holds ${held.bytes} bytes`);
     assert.equal(a.hours * HOUR_MS, held.ms, `${plan.name}: the site says ${a.hours} hours, the Directory holds ${held.ms} ms`);
   }
 });
 
-test("Cloud's Slash credits are the monthly ask limit a record starts with", () => {
+test("Cloud's and Free's Slash credits are the monthly ask limits Slash names for them", () => {
   const cloud = PLANS.find((p) => p.id === 'cloud');
-  assert.ok(cloud, 'plans.ts has no Cloud plan');
+  const free = PLANS.find((p) => p.id === 'free');
+  assert.ok(cloud && free, 'plans.ts has no Cloud or no Free');
   assert.equal(cloud.allowance.credits, ASK_CAP_DEFAULT, `the site says ${cloud.allowance.credits} credits and packages/slash starts a record at ${ASK_CAP_DEFAULT}`);
+  assert.equal(free.allowance.credits, ASK_CAP_FREE, `the site says Free has ${free.allowance.credits} credits and packages/slash names ${ASK_CAP_FREE}`);
 });
 
 test('Cloud Plus is five times the Cloud allowance, as its card says', () => {
@@ -81,10 +99,21 @@ test('Cloud Plus is five times the Cloud allowance, as its card says', () => {
   }
 });
 
-test('the allowance table has a row for every meter, and every extra-usage price extends one', () => {
-  const cloud = PLANS.find((p) => p.id === 'cloud');
-  assert.ok(cloud, 'plans.ts has no Cloud plan');
+test('the allowance table has a row for every meter', () => {
   const rows = site.pricing.usage.map((u) => u.key);
-  assert.deepEqual([...rows].sort(), Object.keys(cloud.allowance).sort(), 'copy/pricing.ts usage leaves out a meter, or names one plans.ts has not');
-  for (const e of EXTRA) assert.ok(rows.includes(e.key), `extra usage prices ${e.key}, which the allowance table does not show`);
+  for (const plan of PLANS)
+    assert.deepEqual([...rows].sort(), Object.keys(plan.allowance).sort(), `copy/pricing.ts usage leaves out a meter of ${plan.name}, or names one plans.ts has not`);
+});
+
+test('nothing promises what the checkout does not sell: no packs, no billed extra usage, and no $12 headline', () => {
+  /* PACKS AND EXTRA USAGE ARE NOT BUILT (`billing.ts` sells two plans; `mayRun` holds a record at its allowance). */
+  assert.equal(PACKS.length, 0, 'plans.ts puts a credit pack on sale, and billing.ts sells none');
+  const said = JSON.stringify({
+    pricing: site.pricing,
+    home: home.home.plans,
+    slash: [site.slash.allowance.lead, site.slash.allowance.packsUnit(PACKS), site.slash.drawn.creditsReading('five')],
+  });
+  assert.doesNotMatch(said, /never charged past|charge for usage past|pack adds|top up with a pack/i, 'the pricing copy still sells packs or extra usage');
+  for (const head of [site.pricing.title, site.pricing.sub, home.home.plans.title])
+    assert.doesNotMatch(head, /\$\d/, `"${head}" is a headline with a price in it, and Free leads`);
 });
