@@ -714,6 +714,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'revenue', as: 'fact' },
           { field: 'next', label: 'Next step', as: 'fact' },
           { field: 'agent', label: 'Agent', as: 'who' },
+          /* HOW ITS WORK IS MOVING, AS A LINE ON THE CARD: what was finished on it each week, over Work's
+             `project-done-by-week`, the same numbers the project's own page charts. A record without Work, or a project
+             nothing was finished on, draws no line, and the card is as it was. */
+          { metric: 'project-done-by-week:{{name}}', as: 'trend' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
         limit: 12,
@@ -823,8 +827,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    * on is a rail you stop reading.
    */
   /**
-   * THE SHAPE OF IT SINCE portfolio 1.6.0, AS THE BOARD FOR A PROJECT DRAWS IT: the
-   * open work tallied by priority above the list of it, what came in, went out and was kept this month beside the twelve
+   * THE SHAPE OF IT SINCE portfolio 1.6.0, AS THE BOARD FOR A PROJECT DRAWS IT: the work finished on it each week (a
+   * tally by priority until work 1.10.0), what came in, went out and was kept this month beside the twelve
    * months, the dated work as a strip of weeks above the plan's time axis, and what it runs on as cards in the rail with
    * what each costs and when it renews. Twenty-one blocks, so a use case can add three of its own under the ceiling of
    * twenty-four a page may declare (`usecases/founder.ts` adds exactly three).
@@ -901,20 +905,17 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         empty: 'Nobody has said where {{name}} stands yet.',
       },
       {
-        /* WHAT IS OPEN ON IT, COUNTED BY HOW SOON IT MATTERS, SINCE portfolio 1.6.0: urgent, high, normal and low as a
-           tally above the list, so "one of them is urgent" is read before any row. A count of the rows by the first
-           column, over Open's own clauses (`project-open`), and a task nobody gave a priority is counted as unset rather
-           than left out, so the chips add up to Open. Over Work's tasks, which a project page always has. */
-        kind: 'chips',
-        heading: 'Open, by priority',
+        /* HOW ITS WORK IS MOVING, SINCE work 1.10.0: what was finished on it each of the last eight weeks, over Work's
+           `project-done-by-week`. It took the place of a tally of the open work by priority, which said again what the
+           list below draws on every task, so the page has a chart and not a row of chips, and stays three blocks under
+           the ceiling a use case adds to. */
+        kind: 'series',
+        heading: 'Done, by week',
+        icon: 'chart-column',
         span: 12,
-        source: 'register.tasks',
-        where: 'thing is {{name}}, state is not backlog or done or dropped',
-        columns: [{ field: 'priority' }],
-        /* THE ROWS IT COUNTS IN THE ORDER THE LIST BELOW READS THEM, so a reader that draws the rows and one that only
-           counts them are handed the same rows in the same order. */
-        order: [{ field: 'by', dir: 'asc' }],
-        empty: 'Nothing is open on {{name}}.',
+        series: [{ metric: 'project-done-by-week:{{name}}', label: 'Done' }],
+        back: 8,
+        empty: 'Nothing on {{name}} was finished in these weeks.',
       },
       {
         /* THE WORK ON IT THAT WAITS ON A PERSON: handed back by an agent to be checked, or blocked, and who changed it last.

@@ -34,7 +34,7 @@ export const FIRST_PARTY: readonly FirstPartyId[] = ['portfolio', 'people', 'mon
 const SUMMARIES: Record<FirstPartyId, string> = {
   portfolio: 'The things you run, and the plan for each.',
   people: 'Clients, contractors and accountants, and what each one is for.',
-  'money-core': 'What you owe and what you are owed, with a date and a currency.',
+  'money-core': 'Cash, what comes in and what goes out, with a date and a currency.',
   estate: 'Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews.',
   work: 'Tasks, the threads of work they belong to, and how each thread is going.',
 };
@@ -288,13 +288,32 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   the questions are tiles, and what is paid in parts is one track a plan. Three figures a project page reads are
  *   Money's by the list they read: `project-in-month`, `project-out-month` and `project-kept-month`. Figures and blocks
  *   added and nothing taken away, so the step is a minor one.
+ * - money-core 3.3.0: Money is calmer. One line of what the money is doing, Cash now cut by account (`cash-by-account`)
+ *   in place of a card an account, the month ahead as a calendar (`due-items-30d`), what moved as a list, an Out of date
+ *   note over `balances-stale`, and receivables and payables named as such. The line says how far cash moved on a month
+ *   ago (`{{cash-now.change}}`) when the night remembered it, Waiting on you is drawn only while something is asked
+ *   (`questions-open`), and a tile shares a row only with one drawn on the same figure, so no row is left half empty
+ *   whatever is hidden. Figures added and no list or field taken away, so the step is a minor one.
+ * - people 2.4.0: People gains Last in touch (`in_touch`), which `meet` moves to the day it writes a line (`meets:`),
+ *   and four figures over it, and its page opens on one line. A field and figures added, so the step is a minor one.
+ * - work 1.10.0: Work is the Work screen's bands, declared: Late, Today, This week, With an agent, Waiting on you and
+ *   Done recently, each drawn only while it holds something, what is further off folded, and two figures in place of
+ *   four. A figure is added (`project-done-by-week`) and blocks are taken away, no list or field, so the step is a
+ *   minor one. The project page moves with it, though no pack holds that page (`crossPack`): its finished work by the
+ *   week takes the place of the tally of open work by priority, which said again what its list says. Late, Today and
+ *   This week are each drawn on a figure of your own tasks over the band's own clauses (`tasks-late-yours`,
+ *   `tasks-today-yours`, `tasks-week-yours`), and With an agent counts only what an agent has in hand, so no band is
+ *   drawn empty and the line's 'late' is the Late band's count.
+ * - portfolio 1.7.0: each card in play draws a line of the work finished on it each week, over Work's
+ *   `project-done-by-week`, left out on a record without Work. A column added and nothing taken away, so the step is a
+ *   minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.6.0',
-  people: '2.3.1',
-  'money-core': '3.2.0',
+  portfolio: '1.7.0',
+  people: '2.4.0',
+  'money-core': '3.3.0',
   estate: '2.0.0',
-  work: '1.9.1',
+  work: '1.10.0',
 };
 
 type Body = Record<string, unknown>;
@@ -460,7 +479,8 @@ export type DocumentOptions = {
 /** One first-party pack as a document, with its example rows. `null` for an id that is not one of the five. */
 export function firstPartyDocument(id: string, options: DocumentOptions = {}): Record<string, unknown> | null {
   if (!(FIRST_PARTY as readonly string[]).includes(id)) return null;
-  const whole = split().packs.get(id as FirstPartyId)!;
+  const every = split();
+  const whole = every.packs.get(id as FirstPartyId)!;
   const links = LINKS[id as FirstPartyId] ?? [];
   const gone = new Set<string>();
   if (options.holds !== undefined) {
@@ -492,10 +512,28 @@ export function firstPartyDocument(id: string, options: DocumentOptions = {}): R
     if (held === null || !Array.isArray(d.blocks)) return d;
     return { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: walked(b.from as Body[], true) } : b)) };
   };
+  /* A CARD'S TREND OVER ANOTHER MODULE'S FIGURE IS LEFT OUT when the record will not hold the list that figure reads, as
+     a leg is: Projects' cards draw Work's `project-done-by-week`, and a record with Projects alone has no such figure, so
+     the kernel would refuse the whole block (`METRIC_UNKNOWN`) for a line it could never draw. With no `holds` the
+     column stays, as every leg of a block does. */
+  const listOf = new Map<string, string>(
+    [...every.packs.values()]
+      .flatMap((p) => p.declarations)
+      .flatMap((d) => (typeof d.metric === 'string' && typeof d.source === 'string' && d.source.startsWith('register.') ? [[d.metric, d.source.slice('register.'.length)] as const] : [])),
+  );
+  const drawable = (c: Body): boolean => {
+    if (held === null || typeof c.metric !== 'string') return true;
+    const list = listOf.get(c.metric.split(':')[0]!);
+    return list === undefined || own.has(list) || held.has(list);
+  };
+  const trends = (d: Body): Body =>
+    held === null || !Array.isArray(d.blocks)
+      ? d
+      : { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter(drawable) } : b)) };
   const pack = {
     declarations: whole.declarations.flatMap((d) => {
       const kept = without(d, gone);
-      return kept === null ? [] : [legs(kept)];
+      return kept === null ? [] : [trends(legs(kept))];
     }),
     seeds: (options.seeds ?? whole.seeds).map((s) => ({
       ...s,

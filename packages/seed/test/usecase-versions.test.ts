@@ -481,6 +481,22 @@ const DECLARED: Record<string, Version> = {
       "`page.project` takes portfolio 1.6.0's project template: the open work tallied by priority, the month's money in, out and kept beside the money by month, the dated work as weeks above the plan, the questions as tiles and what it runs on as cards in the rail -> fa99bd60f9e8a1cb",
     ],
   },
+  'founder@1.10.0': {
+    holds: `
+      metric.datapoints-30d
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear setting.voice_no_questions
+      setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits
+      setting.voice_working_now
+    `,
+    declares: 'fc6b2ff202345346',
+    history: [
+      "`page.project` takes work 1.10.0's project template: what was finished on the project each week as a chart, over `project-done-by-week`, in place of the open work tallied by priority -> fc6b2ff202345346",
+    ],
+  },
   'team@2.3.0': {
     holds: `
       page.agent-work page.cycles page.home-team page.project register.cycle_plan register.cycles
@@ -598,6 +614,24 @@ const DECLARED: Record<string, Version> = {
     declares: '1102c3039476f0ab',
     history: [
       "`page.project` takes portfolio 1.6.0's project template: the open tickets tallied by priority above the list of them, their dates as weeks above the plan, and the questions about the project as tiles -> 1102c3039476f0ab",
+    ],
+  },
+  'team@2.9.0': {
+    holds: `
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review setting.one_tasks
+      setting.shared_version setting.speaks setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_nothing_needs_you setting.voice_right_now setting.voice_since_away
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_inbox_clear
+      setting.voice_no_questions setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_working_now
+    `,
+    declares: 'fc93f116495a41d6',
+    history: [
+      "`page.project` takes work 1.10.0's project template: what was finished on the project each week as a chart, over `project-done-by-week`, in place of the open tickets tallied by priority -> fc93f116495a41d6",
     ],
   },
   'guide@1.2.0': {

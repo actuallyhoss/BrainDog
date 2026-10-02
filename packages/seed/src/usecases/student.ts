@@ -276,6 +276,5 @@ export const STUDENT = {
 export const STUDENT_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   work: {
     Work: 'Homework',
-    'Open work by project': 'Open homework by project',
   },
 };

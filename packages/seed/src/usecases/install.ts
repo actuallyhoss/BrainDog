@@ -59,15 +59,14 @@ type ModuleWords = Readonly<Record<string, Readonly<Record<string, string>>>>;
  */
 const PLAIN_NAMES: ModuleWords = {
   'money-core': {
-    'Owed to you, 30 days': 'Due to you, 30 days',
-    'Owed by you, 30 days': 'To pay, 30 days',
-    'Owed to you': 'Due to you',
-    'Owed by you': 'Still to pay',
-    'Late to you': 'Late coming in',
-    'Money you are owed has gone past its date: {{late-in}} in all.': 'Money due to you has gone past its date: {{late-in}} in all.',
-    'Most owed by you in 30 days': 'Most to pay in 30 days',
-    'Most owed to you at once': 'Most due to you at once',
-    'Most owed by you at once': 'Most to pay at once',
+    'Receivables, 30 days': 'Due to you, 30 days',
+    'Payables, 30 days': 'To pay, 30 days',
+    'Receivables': 'Due to you',
+    'Payables': 'Still to pay',
+    'Most payables due in 30 days': 'Most to pay in 30 days',
+    'Most receivables at once': 'Most due to you at once',
+    'Most payables at once': 'Most to pay at once',
+    'Late payables': 'Late to pay',
   },
   portfolio: {
     'Owed to you': 'Due to you',

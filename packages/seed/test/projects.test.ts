@@ -233,7 +233,7 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   assert.ok(THINGS.every((t) => typeof t.about === 'string' && t.about !== ''), 'a sample project says nothing about what it is');
 });
 
-test('A PROJECT PAGE TALLIES ITS OPEN WORK BY PRIORITY, SAYS THIS MONTH’S MONEY, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {
+test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS THIS MONTH’S MONEY, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {
   const k = await seeded();
   /* THE SAMPLE MOVED NO MONEY ON KILN THIS MONTH, so two movements are written today, one each way, and the month's
      figures are asked about money that is there rather than three noughts that agree with anything. */
@@ -245,10 +245,13 @@ test('A PROJECT PAGE TALLIES ITS OPEN WORK BY PRIORITY, SAYS THIS MONTH’S MONE
   const page = opened(k, 'kiln');
   const glance = Object.fromEntries((block(page, 'At a glance').readings ?? []).map((r) => [r.metric, r.reading?.value]));
 
-  /* THE TALLY ADDS UP TO OPEN, because it counts Open's own rows by priority and a task with none is counted too. */
-  const tally = block(page, 'Open, by priority');
-  assert.equal(tally.kind, 'chips');
-  assert.equal(tally.matched, glance['project-open:Kiln'], 'the tally is over other rows than Open');
+  /* ITS WEEKS ARE ITS OWN, since work 1.10.0: what was finished on Kiln each week, as counts and not money. */
+  const weeks = block(page, 'Done, by week');
+  assert.equal(weeks.kind, 'series');
+  assert.equal(weeks.bars?.bucket, 'week');
+  assert.equal(weeks.bars?.unit, null, 'counts, not money');
+  assert.ok((weeks.bars?.values[0] ?? []).reduce((n: number, v) => n + (v ?? 0), 0) > 0, 'nothing finished on Kiln in the weeks drawn');
+  assert.ok(glance['project-open:Kiln'] !== undefined);
 
   /* KEPT IS IN LESS OUT, TO THE MINOR UNIT, because it is one figure over the same rows, signed by direction. */
   const month = Object.fromEntries((block(page, 'This month so far').readings ?? []).map((r) => [r.metric.split(':')[0], r.reading?.value ?? 0]));
@@ -270,7 +273,26 @@ test('A PROJECT PAGE ON A RECORD WITH NO MONEY HAS NO MONTH OF MONEY, rather tha
   const headings = (team.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.ok(!headings.includes('This month so far'), 'a row of money figures was made up from the tasks instead');
   assert.ok(!headings.includes('Money by month') && !headings.includes('Keeping it alive'));
-  assert.ok(headings.includes('Open, by priority') && headings.includes('Dates'), 'what a record without Money still has');
+  assert.ok(headings.includes('Done, by week') && headings.includes('Dates'), 'what a record without Money still has');
   /* AND A FULL RECORD'S PAGE LEAVES A USE CASE THREE BLOCKS UNDER THE CEILING OF TWENTY-FOUR. */
   assert.ok((projectTemplate(['things', 'tasks', 'people', 'obligations', 'transactions', 'services']).blocks as unknown[]).length <= 21);
+});
+
+/**
+ * EACH CARD IN PLAY DRAWS ITS WEEKS, since portfolio 1.7.0: the work finished on that project by the week, over Work's
+ * `project-done-by-week`, one line a card. A record that will not hold Work's tasks has no such figure, so the column
+ * is left out of the document it installs and the block is not refused for a line it could never draw.
+ */
+test('A PROJECT’S CARD DRAWS ITS FINISHED WORK BY THE WEEK, and a record without Work is given no such line', async () => {
+  const k = await seeded();
+  const cards = block(opened(k, 'portfolio'), 'In play') as ReturnType<typeof block> & { trends?: readonly (readonly (number | null)[] | null)[] };
+  assert.equal(cards.trends?.length, cards.rows.length, 'one line a card, or none');
+  assert.ok(cards.trends.some((t) => Array.isArray(t) && t.some((v) => (v ?? 0) > 0)), 'no project on the sample finished anything in these weeks');
+
+  const trendOf = (holds: string[]) =>
+    ((firstPartyDocument('portfolio', { holds })!.declarations as { page?: string; blocks?: { heading?: string; columns?: { metric?: string }[] }[] }[])
+      .find((d) => d.page === 'portfolio')!
+      .blocks!.find((b) => b.heading === 'In play')!.columns ?? []).some((c) => c.metric !== undefined);
+  assert.equal(trendOf(['things', 'tasks']), true);
+  assert.equal(trendOf(['things']), false, 'Projects alone is given a line over a figure it will not hold');
 });

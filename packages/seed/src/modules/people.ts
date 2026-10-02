@@ -12,7 +12,7 @@
 
 import type { MeetsFields } from '@braindog/kernel';
 
-import { gbp, type Fields, type SeedPage, type SeedRegister } from './base.ts';
+import { day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
 
 /**
  * People's one list, which also says it is the list `meet` writes, and keeps a person other rows still name.
@@ -24,13 +24,16 @@ type PeopleRegister = SeedRegister & { meets: MeetsFields; delete: 'refuse_while
 
 /* ── people ───────────────────────────────────────────────────────────────── */
 
+/* `in_touch` IS THE LAST DAY EACH ONE WAS HEARD FROM OR WRITTEN TO, since People 2.4.0, and the shape of the set is
+   the point: three this month, one five weeks back, one quiet since the spring, and a registry nobody has written to
+   at all, so the page's line has a quiet person to name and its chart has days that are busy and days that are not. */
 export const PEOPLE: Fields[] = [
-  { name: 'Halden Type Co', role: 'client', rate: null, email: 'ap@halden.example', note: 'Pays on 45 days, always' },
-  { name: 'Ravensworth Ltd', role: 'client', rate: null, email: 'accounts@ravensworth.example', note: '' },
-  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'] },
-  { name: 'Pell & Vine', role: 'accountant', rate: null, email: 'hello@pellvine.example', note: 'Year end is 31 March' },
+  { name: 'Halden Type Co', role: 'client', rate: null, email: 'ap@halden.example', note: 'Pays on 45 days, always', in_touch: day(-6) },
+  { name: 'Ravensworth Ltd', role: 'client', rate: null, email: 'accounts@ravensworth.example', note: '', in_touch: day(-38) },
+  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'], in_touch: day(-2) },
+  { name: 'Pell & Vine', role: 'accountant', rate: null, email: 'hello@pellvine.example', note: 'Year end is 31 March', in_touch: day(-128) },
   { name: 'Nordhaven Registry', role: 'other', rate: null, email: 'support@nordhaven.example', note: '' },
-  { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'] },
+  { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'], in_touch: day(-1) },
 ];
 
 /**
@@ -71,8 +74,10 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
        kernel knowing a pack's list by name. Declared, the kernel reads the role off this key, checks every part at
        install, and falls back on the name only for a record still on People 2.0.0 or earlier, until its next update.
        `projects` is the one part that goes when the record holds no Projects: `packs/first-party.ts` drops it with the
-       `projects` field it names, so a student's People still installs and `meet` records a person and links nobody. */
-    meets: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into' },
+       `projects` field it names, so a student's People still installs and `meet` records a person and links nobody.
+       `in_touch` SINCE People 2.4.0: `meet` moves Last in touch to the day of the line it writes, so an agent meeting
+       someone or a mail arriving from them keeps the People page's figures current without anyone typing a day. */
+    meets: { name: 'name', email: 'email', handles: 'handles', projects: 'projects', met: 'met', merged_into: 'merged_into', in_touch: 'in_touch' },
     /* A CLIENT WITH BILLS AGAINST THEIR NAME IS NOT DELETED OUT FROM UNDER THEM, since People 2.2.0. A payment's or a
        bill's `party` and a task's `owner` point here, and deleting the person they name left each one pointing at a row
        nobody could open, so the money and the work belonged to nobody. The write path now refuses that delete and says
@@ -100,12 +105,79 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       /* Where and when each meeting happened, one dated line each, newest last. */
       { id: 'met', label: 'Met', type: 'list', of: 'text' },
       { id: 'merged_into', label: 'Merged into', type: 'ref', to: 'people' },
+      /* THE LAST DAY THEY WERE HEARD FROM OR WRITTEN TO, since People 2.4.0: what the page's line and its chart are read
+         from. A day and not an instant, because "in touch on Tuesday" is what a person says. Empty is never, and a
+         person with no day is in no count below but Everyone's. */
+      { id: 'in_touch', label: 'Last in touch', type: 'day', index: true },
     ],
   },
 };
 
+/** A month is how the page's line counts who you are in touch with. */
+const IN_TOUCH_30D = 'in_touch after -31d';
+
+/**
+ * PEOPLE'S FIGURES, since People 2.4.0: how many people the record keeps, how many were in touch lately, and how many
+ * have gone quiet. Counts of people and never a score, read from People's own list alone, so the figures install
+ * wherever People does (the module note above says why People reads no other list).
+ */
+export const PEOPLE_METRICS: Record<string, SeedMetric> = {
+  'people-count': {
+    metric: 'people-count',
+    name: 'People',
+    source: 'register.people',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'people-in-touch-30d': {
+    metric: 'people-in-touch-30d',
+    name: 'In touch, 30 days',
+    source: 'register.people',
+    where: IN_TOUCH_30D,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* WHAT THE CHART DRAWS, counted, so the chart is left off a page with nobody in touch in its twelve weeks. */
+  'people-in-touch-12w': {
+    metric: 'people-in-touch-12w',
+    name: 'In touch, 12 weeks',
+    source: 'register.people',
+    where: 'in_touch after -84d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* NOT A VERDICT: an accountant you speak to once a year is quiet and fine. The line names how many, and the cards say who. */
+  'people-quiet': {
+    metric: 'people-quiet',
+    name: 'Quiet for three months',
+    source: 'register.people',
+    where: 'in_touch before -90d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+};
+
 export const PEOPLE_PAGES: Record<string, SeedPage> = {
-  /** Placed under its own section, since People 2.2.0: it waited off the rail, in the holding pen, until somebody moved it. */
+  /**
+   * Placed under its own section, since People 2.2.0: it waited off the rail, in the holding pen, until somebody moved it.
+   *
+   * THREE TILES, SINCE People 2.4.0, AND THE FIRST IS A SENTENCE. Who you have been in touch with this month and who has
+   * gone quiet, said from People's own figures; then those days as a chart; then everyone, the one you spoke to last
+   * first. A block with nothing to say is left off rather than drawn empty, so a record with nobody in it opens on its
+   * cards' empty line alone. Every tile's heading wears a glyph (`icon:`), as the look asks.
+   */
   people: {
     page: 'people',
     title: 'People',
@@ -114,24 +186,59 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     requires: ['register.people'],
     blocks: [
       {
+        /* THE PAGE'S ONE LINE, said from the figures, so the line and the chart under it cannot disagree. A clause whose
+           every figure is nought is left out by the writer (`leadOf` in apps/web), so a record where nobody is quiet
+           does not say "0 quiet". `contact(s)` because the writer settles a plural by adding an s, and "persons" is
+           not a word anybody says.
+
+           HOW MANY STANDS IN A CLAUSE OF ITS OWN, so the line never says "0 of your 12 contacts were in touch" about a
+           record that simply has no Last in touch days yet (people `meet` adds, until it stamps the day): it says
+           "12 contacts" and stops. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'people-count', gt: 0 },
+        body: '{{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days, {{people-quiet}} quiet for three months or more',
+      },
+      {
+        /* WHEN YOU WERE LAST IN TOUCH, one mark on each person's last day, over twelve weeks. A person counts once, on
+           their latest day, so a busy week is many people and not one person written to often. */
+        kind: 'heat',
+        heading: 'In touch, 12 weeks',
+        icon: 'handshake',
+        span: 12,
+        source: 'register.people',
+        where: 'in_touch after -84d',
+        columns: [{ field: 'in_touch' }],
+        when: { metric: 'people-in-touch-12w', gt: 0 },
+        empty: 'Nobody was in touch in the last twelve weeks.',
+      },
+      {
         /* CARDS, with a face for each person, rather than a table of four columns read
            as a directory. Each card still opens the person's row. Their role, and the projects they were
-           met in, because most people here arrive from an agent's commit rather than by hand, and the
-           newest first, because the person met yesterday is the one somebody is asking about.
+           met in, because most people here arrive from an agent's commit rather than by hand, and the one you
+           were in touch with last first, because that is the one somebody is asking about. A person nobody has
+           been in touch with comes after, newest first.
 
            NOT THE `met` LINES, which the card drew whole: "2026-08-27 · commit 8b1e4d0 in portage" is where an
            agent was when it met them, in the agent's words, and a card is read by a person. The lines stay on
            the row, where the history of a person is read. */
         kind: 'cards',
         heading: 'Everyone',
+        icon: 'people',
+        span: 12,
         source: 'register.people',
         columns: [
           { field: 'name', label: 'Name', as: 'who' },
           { field: 'role', label: 'Role', as: 'fact' },
           { field: 'projects', label: 'Met in', as: 'fact' },
+          { field: 'in_touch', label: 'Last in touch', as: 'when' },
         ],
-        order: [{ field: 'seq', dir: 'desc' }],
-        empty: 'Nobody yet.',
+        order: [
+          { field: 'in_touch', dir: 'desc' },
+          { field: 'seq', dir: 'desc' },
+        ],
+        empty: 'Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail.',
       },
     ],
   },
@@ -168,7 +275,10 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
     requires: ['register.people'],
     blocks: [
       {
+        /* THE PERSON, AS THE PAGE'S HEADLINE TILE since People 2.4.0: one card drawn wide (`lead`), with the day you
+           were last in touch beside who they are. */
         kind: 'cards',
+        lead: true,
         span: 12,
         source: 'register.people',
         where: 'name is {{name}}',
@@ -177,6 +287,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'role', label: 'Role', as: 'fact' },
           { field: 'projects', label: 'Met in', as: 'fact' },
           { field: 'email', label: 'Email', as: 'fact' },
+          { field: 'in_touch', label: 'Last in touch', as: 'when' },
         ],
         limit: 1,
         empty: 'Nothing is kept about {{name}} yet.',
@@ -190,6 +301,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            `met` is a list, one line per meeting. */
         kind: 'note',
         heading: 'Met',
+        icon: 'handshake',
         span: 12,
         body: '{{met}}',
         empty: 'Nothing is kept about how {{name}} was met yet.',
@@ -202,6 +314,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         document: true,
         heading: 'Notes',
+        icon: 'doc',
         span: 12,
         body: '{{note}}',
         empty: 'Nothing is written about {{name}} yet.',

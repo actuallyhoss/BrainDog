@@ -156,8 +156,12 @@ export const FOUNDER = {
      by month, its dated work as weeks above the plan, its questions as tiles and what it runs on as cards in the rail.
      1.8.0 is on `origin/master`, so a record on it is offered this only through a new version. Blocks added and nothing
      taken away, so a minor step; the template is twenty-one blocks, so the three this page adds under it land exactly
-     on the ceiling of twenty-four. */
-  version: '1.9.0',
+     on the ceiling of twenty-four.
+
+     1.10.0 BECAUSE THE PROJECT PAGE TAKES WORK 1.10.0'S TEMPLATE: what was finished on the project each week, as a
+     chart, in place of the tally of its open work by priority, which said again what the list under it says. Still
+     twenty-one blocks under this page's three. 1.9.0 is on `origin/master`, so the change is a version and not a reset. */
+  version: '1.10.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -532,7 +536,6 @@ export const FOUNDER_EXAMPLES = [
  */
 export const FOUNDER_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'money-core': {
-    'Late to you': 'Late invoices',
-    'Money you are owed has gone past its date: {{late-in}} in all.': 'Invoices have gone past their date unpaid: {{late-in}} in all.',
+    'Late coming in': 'Late invoices',
   },
 };

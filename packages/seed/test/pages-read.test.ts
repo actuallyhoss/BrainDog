@@ -123,8 +123,8 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
      the block's `limit:` draws, so the two numbers differ here rather than only in principle. */
   const { k, sql } = await seeded();
   const money = page(k, 'money');
-  const table = money.blocks.find((b) => b.kind === 'table' && b.source === 'register.transactions');
-  assert.ok(table, 'the Money page draws no table of what moved');
+  const table = money.blocks.find((b) => b.kind === 'timeline' && b.source === 'register.transactions');
+  assert.ok(table, 'the Money page draws no list of what moved');
 
   assert.deepEqual(table.refusals, []);
   assert.ok(table.rows.length > 0, 'the block drew nothing');
@@ -146,10 +146,10 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
 test('a `stat` block comes back with readings, each in its own currency', async () => {
   const { k, sql } = await seeded();
   const stat = page(k, 'money').blocks.find((b) => b.kind === 'stat')!;
-  assert.ok(stat.readings && stat.readings.length >= 3);
+  assert.ok(stat.readings && stat.readings.length >= 2);
 
-  /* THE MONEY THERE IS AND THE WALK'S THIRTY DAYS, which the page leads with since money-core 3.0.0. */
-  for (const metric of ['cash-now', 'arriving-30d', 'leaving-30d']) {
+  /* THE MONEY THERE IS, which the page leads with since money-core 3.0.0; the walk's thirty days are the bridge's since 3.3.0. */
+  for (const metric of ['cash-now']) {
     const cell: NonNullable<typeof stat.readings>[number] = stat.readings.find((r) => r.metric === metric)!;
     assert.ok(cell?.reading, cell?.refusal ? `${cell.refusal.code}: ${cell.refusal.fix}` : `${metric}: no reading`);
     assert.ok((cell.reading.value ?? 0) > 0, `${metric} read nothing`);
@@ -252,7 +252,7 @@ test('a block that names a field the register does not declare says so, and draw
 
   // Read one block by hand with a column nobody declared: the refusal names the field and the ones
   // that exist, so whoever wrote it can fix it without opening the schema.
-  const block = out.value.blocks.find((b) => b.source === 'register.transactions' && b.kind === 'table' && b.columns);
+  const block = out.value.blocks.find((b) => b.source === 'register.transactions' && b.kind === 'timeline' && b.columns);
   assert.ok(block, 'the Money page draws no table to read by hand');
   const result = k.block({ ...block, columns: [{ field: 'colour' }] });
   assert.equal(result.refusals[0]?.code, 'FIELD_UNKNOWN');
@@ -318,7 +318,7 @@ test('THE MONEY PAGE READS WHOLE ON A RECORD, and every walk on it starts from C
   const rent = forecast.walk!.steps.filter((s) => s.label === 'Studio rent');
   assert.ok(rent.length >= 11, `the rent came round ${rent.length} times in a year`);
 
-  const accounts = money.blocks.find((b) => b.kind === 'cards')!;
-  assert.equal(accounts.rows.length, 3);
+  const accounts = money.blocks.find((b) => b.source === 'metric.cash-by-account')!;
+  assert.equal(accounts.readings?.[0]?.reading?.groups?.length, 2);
   sql.close();
 });

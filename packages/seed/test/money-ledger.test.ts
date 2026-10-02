@@ -128,7 +128,8 @@ test('THE RULE FILES WHAT IT CAN AND THE FIGURE COUNTS WHAT IS LEFT, which is th
   assert.equal(read.value.value, left, 'the figure and the rows disagree about what is uncategorised');
 });
 
-/* THE LEDGER'S TABLE IS ON THE MONEY PAGE SINCE money-core 3.0.0, which is one page where Overview and Ledger were two. */
+/* THE LEDGER IS ON THE MONEY PAGE SINCE money-core 3.0.0, which is one page where Overview and Ledger were two, and a calm
+   list of the newest twelve since 3.3.0, where it was a table of ten. */
 test('THE MONEY PAGE OPENS WITH NO BLOCK REFUSED, and What moved draws the newest rows the register holds', async () => {
   const k = await seeded();
   const page = opened(k, 'money');
@@ -136,5 +137,5 @@ test('THE MONEY PAGE OPENS WITH NO BLOCK REFUSED, and What moved draws the newes
 
   const moved = page.blocks.find((b) => b.heading === 'What moved');
   assert.ok(moved, 'the page has no What moved');
-  assert.equal((moved.rows ?? []).length, 10, 'the newest ten, as the block asks for');
+  assert.equal((moved.rows ?? []).length, 12, 'the newest twelve, as the block asks for');
 });

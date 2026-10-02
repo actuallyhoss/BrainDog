@@ -124,7 +124,6 @@ export const BUSINESS = {
  */
 export const BUSINESS_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'money-core': {
-    'Late to you': 'Late invoices',
-    'Money you are owed has gone past its date: {{late-in}} in all.': 'Invoices have gone past their date unpaid: {{late-in}} in all.',
+    'Late coming in': 'Late invoices',
   },
 };

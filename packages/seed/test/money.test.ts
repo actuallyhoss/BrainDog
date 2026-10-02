@@ -429,15 +429,15 @@ test('AN INSTALMENT IS A DATED AMOUNT AND THE WALK HAD NEVER READ ONE, so the ba
 test('THE TILES AND THE BRIDGE ON `/p/money` ADD UP THE SAME MOVEMENTS, so no two of them answer one question twice', async () => {
   const k = await seeded();
 
-  const stat = blockOf(k, 'money', 'What you have');
-  const tile = (metric: string) => {
-    const cell = stat.readings?.find((r) => r.metric === metric);
-    assert.ok(cell?.reading, `the hero draws ${metric}`);
-    return { value: cell.reading.value, label: cell.label };
-  };
-  const arriving = tile('arriving-30d');
-  const leaving = tile('leaving-30d');
+  /* THE FIGURES AND NOT THE TILES, SINCE money-core 3.3.0: the Money page says the thirty days once, as the bridge, and
+     no longer draws the two walk figures beside Cash now. They are still declared, and a use case's page draws them
+     (`founder`), so they are still held to the bridge to the penny. */
+  const figure = (metric: string) => ({ value: reading(k, metric), label: String((METRICS[metric] as { name?: unknown }).name) });
+  const arriving = figure('arriving-30d');
+  const leaving = figure('leaving-30d');
   assert.deepEqual([arriving.label, leaving.label], ['Coming in, 30 days', 'Going out, 30 days']);
+  const hero = blockOf(k, 'money', 'What you have');
+  assert.deepEqual(hero.readings?.map((r) => r.metric), ['cash-now', 'runway-days'], 'the headline tile says the thirty days the bridge says');
 
   const bridge = blockOf(k, 'money', 'The next 30 days');
   const steps = bridge.walk?.steps;
@@ -486,7 +486,8 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
   /* THE COUNTS ARE ASSERTED BECAUSE A SWEEP THAT FINDS NOTHING PASSES EVERY LOOP BELOW IT: the walk's two tiles on
      `/p/money`, and the same two on each of the founder's Overview and Dashboard, which since founder 1.7.0 lead with
      the money there is and no longer with who owes whom. */
-  assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 2, 'the Money page no longer leads with the walk');
+  /* NONE ON `/p/money` SINCE money-core 3.3.0: the thirty days are the bridge's there, beside the calendar of them. */
+  assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 0, 'the Money page says the thirty days twice again');
   const founder = cells.filter((c) => c.where.startsWith('founder ') && (c.metric === 'arriving-30d' || c.metric === 'leaving-30d'));
   assert.equal(founder.length, 4, 'the two founder dashboards are not both in the sweep');
   for (const c of cells) assert.equal(c.label, nameOf(c.metric), `${c.where} labels ${c.metric} "${c.label}" where the figure is called "${nameOf(c.metric)}"`);
@@ -494,7 +495,7 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
   /* AND THE CEILING ON `out-30d` IS WORDED FOR THE SAME FIGURE, because a person reading "Most going
      out in 30 days" over a box that caps what is OWED sets it against money the figure never counts.
      The test above it proves the rename costs nobody their saved sum. */
-  assert.equal(MONEY_TARGET_SETTINGS['out-30d']?.label, 'Most owed by you in 30 days');
+  assert.equal(MONEY_TARGET_SETTINGS['out-30d']?.label, 'Most payables due in 30 days');
 });
 
 /**
@@ -657,9 +658,12 @@ const blockOf = (k: Kernel, slug: string, heading: string): DrawnBlock => {
 };
 
 /**
- * ONE PAGE CALLED MONEY, IN THE ORDER A PERSON READS IT: what there is, where it is, what is waiting, what is ahead,
- * what is due, and what happened. Overview, Ledger and the house Home retire, and a page holds no rows, so nothing goes
- * with them.
+ * ONE PAGE CALLED MONEY, IN THE ORDER A PERSON READS IT: what the money is doing, what there is beside where it is going,
+ * what needs the person, what falls due and its arithmetic, where the money sits and goes, and what happened. Overview,
+ * Ledger and the house Home retire, and a page holds no rows, so nothing goes with them.
+ *
+ * FEWER, BIGGER TILES SINCE money-core 3.3.0: the thirty-day tiles beside Cash now, the accounts as cards, the table of
+ * what is coming up and the feed of what agents did are gone, each said once elsewhere on the page or in History.
  */
 test('MONEY IS ONE PAGE, and every block on it answers on the sample without a refusal', async () => {
   assert.deepEqual(Object.keys(MONEY_PAGES), ['money', 'money-book'], 'money-core declares a page besides Money and one a book');
@@ -668,25 +672,25 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
   const headings = (page.blocks as { heading?: string }[]).map((b) => b.heading);
   assert.deepEqual(headings, [
-    /* THE OPENING SENTENCE, SINCE money-core 3.2.0, which carries no heading: it is the line under the page's title. */
+    /* THE HEADLINE LINE, which carries no heading: it is the sentence in the page's headline tile. */
     undefined,
     'What you have',
     'What you have, by book',
-    'Accounts',
     'Add an account',
-    'Waiting on you',
     'Cash ahead',
+    'Waiting on you',
+    'Out of date',
+    'Late coming in',
+    'Late going out',
+    'Accounts',
     'The next 30 days',
-    'Coming up',
-    'Being chased',
-    'Late to you',
-    'Late to pay',
-    "Where this month's money went",
+    'Due in the next 30 days',
     'Instalments',
-    'In and out, by month',
+    "Where this month's money went",
     'Every month',
+    'In and out, by month',
+    'Being chased',
     'What moved',
-    'What agents and rules did',
   ]);
   /* NO LAW ON A PAGE EVERYBODY DRAWS: the late notes say what is late in words any record's owner reads. */
   assert.ok(!JSON.stringify(page).includes('Statutory'), 'a note speaks for one country');
@@ -704,26 +708,98 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
 });
 
 /**
- * THE NEW LOOK'S MONEY (money-core 3.2.0): a sentence said from two figures the tiles draw,
- * every tile beside Cash now carrying twelve weeks as a line, and one track a plan for what is paid in parts.
+ * NO ROW OF MONEY IS LEFT HALF EMPTY, WHATEVER IS HIDDEN, since money-core 3.3.0. Every tile is drawn on its own figure,
+ * so the sample is one of thousands of pages a record can draw: each figure a `when:` reads is set to nought, one or two
+ * in turn, every tile is drawn or not as its `when:` says, and every row the page lays out, greedily as the page does,
+ * is the whole twelve.
  */
-test('MONEY OPENS WITH ONE SENTENCE WHILE THE WALK GOES UNDER INSIDE THE YEAR, and what is paid in parts is one track a plan', async () => {
+test('NO ROW OF MONEY IS LEFT HALF EMPTY, whichever of its tiles a record draws', () => {
+  type When = { metric: string; gt?: number; gte?: number; lt?: number };
+  const blocks = MONEY_PAGES.money!.blocks as { heading?: string; span?: number; when?: When }[];
+  const gates = [...new Set(blocks.flatMap((b) => (b.when ? [b.when.metric] : [])))];
+  const shown = (w: When | undefined, at: Record<string, number>): boolean => {
+    if (w === undefined) return true;
+    const v = at[w.metric]!;
+    return (w.gt === undefined || v > w.gt) && (w.gte === undefined || v >= w.gte) && (w.lt === undefined || v < w.lt);
+  };
+  for (let n = 0; n < 3 ** gates.length; n++) {
+    const at = Object.fromEntries(gates.map((g, i) => [g, Math.floor(n / 3 ** i) % 3]));
+    const drawn = blocks.filter((b) => shown(b.when, at));
+    let width = 0;
+    for (const b of drawn) {
+      const span = b.span ?? 12;
+      if (width + span > 12) {
+        assert.equal(width, 12, `a row is ${width} of 12 before ${String(b.heading)} with ${JSON.stringify(at)}`);
+        width = 0;
+      }
+      width += span;
+    }
+    assert.equal(width, 12, `the last row is ${width} of 12 with ${JSON.stringify(at)}`);
+  }
+});
+
+/**
+ * THE LOOK, AS THE DECLARATION SAYS IT: a glyph on every tile's heading, the headline figure beside its walk, and words
+ * a finance app uses. Read off both pages Money declares, because a book's page is drawn in the same look.
+ */
+test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no word on either page says who owes whom', () => {
+  type Block = { kind: string; heading?: string; icon?: string; span?: number; body?: string; empty?: string; unset?: string; cells?: { label?: string; note?: string }[] };
+  for (const [slug, page] of Object.entries(MONEY_PAGES)) {
+    const blocks = page.blocks as Block[];
+    for (const b of blocks) if (b.heading !== undefined) assert.match(String(b.icon), /^[a-z][a-z0-9-]*$/u, `${slug}: ${b.heading} wears no glyph`);
+
+    /* FOUR TWELFTHS AND EIGHT, ONE ROW: the figure and the line it walks, read as one question. */
+    const stat = blocks.findIndex((b) => b.kind === 'stat');
+    const walk = blocks.findIndex((b) => b.kind === 'forecast');
+    assert.equal(blocks[stat]!.span, 4, `${slug}: the headline tile is not a third of the row`);
+    assert.equal(blocks[walk]!.span, 8, `${slug}: Cash ahead does not fill the rest of the headline's row`);
+    /* ONLY WHAT TAKES ONE OF THEIR PLACES: a book's bar for the figure, and the box for a first account for the walk,
+       each drawn only while the tile it stands in for is not. */
+    assert.ok(
+      blocks.slice(stat + 1, walk).every((b) => (b.kind === 'bar' && b.span === 4) || (b.kind === 'capture' && b.span === 8)),
+      `${slug}: something stands between the headline and its walk`,
+    );
+
+    /* WHAT A PERSON READS, AND ONLY THAT: a `where:` is the record's grammar, and `direction is owed to me` is an id. */
+    const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
+    assert.ok(read.length > 10, `${slug}: the sweep read almost nothing, so it proves nothing`);
+    for (const t of read) assert.doesNotMatch(t, /\bowe[ds]?\b|\byou owe\b|\bowing\b/iu, `${slug} says "${t}"`);
+  }
+
+  /* AND THE FIGURES AND SETTINGS SAY IT IN THE SAME WORDS, wherever a figure or a ceiling is listed. */
+  for (const m of Object.values(MONEY_METRICS)) assert.doesNotMatch(String(m.name), /\bowe[ds]?\b/iu, `${m.metric} is called ${String(m.name)}`);
+  for (const [metric, s] of Object.entries(MONEY_TARGET_SETTINGS)) assert.doesNotMatch(s.label, /\bowe[ds]?\b/iu, `${metric}'s ceiling is called ${s.label}`);
+  for (const f of REGISTERS.snapshots!.fields) assert.doesNotMatch(String(f.label ?? ''), /\bowe[ds]?\b/iu, `a night's ${f.id} is called ${String(f.label)}`);
+});
+
+/**
+ * THE HEADLINE LINE, SINCE money-core 3.3.0: said on every record that keeps one set of money, from the figures the
+ * tiles draw, with the day count only while the walk goes under (the writer leaves a clause out when its figure has no
+ * value). And what is paid in parts is one track a plan (money-core 3.2.0).
+ */
+test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in parts is one track a plan', async () => {
   const k = await seeded();
   const out = k.page('money');
   assert.ok(out.ok, sayOf(out));
-  const blocks = (out.value as { blocks: readonly (DrawnBlock & { kind: string; lead?: boolean; drawn?: boolean; values?: Record<string, unknown> })[] }).blocks;
+  const blocks = (out.value as { blocks: readonly (DrawnBlock & { kind: string; lead?: boolean; drawn?: boolean; body?: string; values?: Record<string, unknown> })[] }).blocks;
 
-  /* THE SENTENCE IS THE FIRST BLOCK, AND DRAWS EXACTLY WHEN THE WALK GOES UNDER, from the same two figures as the tiles. */
+  /* THE LINE IS THE FIRST BLOCK, AND IT READS THE FIGURES THE TILES DRAW. */
   const lead = blocks[0]!;
   assert.deepEqual([lead.kind, lead.lead], ['note', true]);
-  const runway = reading(k, 'runway-days');
-  assert.ok(runway !== null && runway > 0, 'the sample walk goes under inside the year, which is the case the sentence is for');
-  assert.notEqual(lead.drawn, false, 'the walk goes under and the page says nothing');
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-now', 'runway-days']);
-  assert.equal(lead.values?.['runway-days'], runway);
+  assert.notEqual(lead.drawn, false, 'a record with one set of money reads no line about it');
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'runway-days']);
+  assert.equal(lead.values?.['runway-days'], reading(k, 'runway-days'));
+  assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
+  /* THE DAY COUNT AND HOW FAR CASH MOVED IN A MONTH ARE EACH THEIR OWN CLAUSE, so a record whose money lasts the year, or
+     that has no night a month back to measure from, loses that clause and keeps the rest. */
+  assert.deepEqual(
+    lead.body?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
+    [['cash-now', 'cash-accounts'], ['cash-now.change'], ['runway-days']],
+  );
 
   /* EVERY TILE BESIDE CASH NOW DRAWS ITS TWELVE WEEKS, and each figure remembers its nights so there is a line to draw. */
   const hero = (MONEY_PAGES.money!.blocks as { kind: string; cells?: { metric: string; trend?: string }[] }[]).find((b) => b.kind === 'stat')!;
+  assert.deepEqual(hero.cells?.map((c) => c.metric), ['cash-now', 'runway-days']);
   for (const c of hero.cells ?? []) {
     assert.equal(c.trend, '12w', `${c.metric} draws no line`);
     assert.equal((MONEY_METRICS[c.metric] as { snapshot?: { into: string } }).snapshot?.into, `series.${c.metric}`, `${c.metric} remembers no night`);
@@ -735,6 +811,64 @@ test('MONEY OPENS WITH ONE SENTENCE WHILE THE WALK GOES UNDER INSIDE THE YEAR, a
   assert.equal(parts.matched, leaving.length);
   assert.deepEqual([...new Set(parts.rows.map((r) => String(r.fields.plan)))], [...new Set(leaving.map((r) => String(r.plan)))]);
   assert.equal(parts.rows.filter((r) => r.fields.state === 'paid').length, leaving.filter((r) => r.state === 'paid').length, 'the paid parts are what the track fills with');
+});
+
+/**
+ * WHERE THE MONEY SITS, WHAT FALLS DUE AND WHAT MOVED, read off the drawn page: the accounts add up to the headline, the
+ * calendar holds the next thirty days and nothing else, and the ledger is newest first with every minor unit.
+ */
+test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and what moved is newest first', async () => {
+  const k = await seeded();
+
+  /* ONE PART AN ACCOUNT, NAMED AS THE RECORD NAMES IT, and the parts are the headline to the penny. */
+  const accounts = blockOf(k, 'money', 'Accounts') as DrawnBlock & { readings?: readonly { reading: { value: number | null; groups?: { key: string; value: number | null }[] } | null }[] };
+  const split = accounts.readings?.[0]?.reading;
+  assert.ok(split?.groups && split.groups.length > 1, 'the sample keeps two accounts as cash, and the tile draws one part');
+  assert.deepEqual(split.groups.map((g) => g.key).sort(), ACCOUNTS.filter((a) => a.liquid === true).map((a) => String(a.name)).sort());
+  assert.equal(split.groups.reduce((n, g) => n + (g.value ?? 0), 0), reading(k, 'cash-now'), 'the accounts do not add up to Cash now');
+  const out = k.page('money');
+  assert.ok(out.ok, sayOf(out));
+  const drawn = (heading: string) => (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks.find((b) => b.heading === heading)?.drawn;
+  assert.equal(drawn('Add an account'), false, 'the box to add a first account is drawn on a record that has one');
+
+  /* A BALANCE MORE THAN A WEEK OLD IS SAID ON THE PAGE, now the accounts are no longer cards that mark it. */
+  const old = ACCOUNTS.filter((a) => a.liquid === true && String(a.as_of) < day(-7)).length;
+  assert.ok(old > 0, 'the sample keeps no old balance, so this proves nothing');
+  assert.equal(reading(k, 'balances-stale'), old);
+  assert.notEqual(drawn('Out of date'), false, 'an old balance is not said on the page that reads it');
+
+  /* THE NEXT THIRTY DAYS AND NOTHING ELSE, each open, from tomorrow's side of today to the thirtieth day. */
+  const due = blockOf(k, 'money', 'Due in the next 30 days');
+  assert.equal(due.rows.length, reading(k, 'due-items-30d'), 'the calendar and the figure it is drawn under count two sets');
+  assert.ok(due.rows.length > 0, 'nothing falls due on the sample, so this proves nothing');
+  for (const r of due.rows) {
+    assert.ok(['open', 'part'].includes(String(r.fields.state)), `${String(r.fields.what)} is ${String(r.fields.state)}`);
+    assert.ok(String(r.fields.due) >= day(0) && String(r.fields.due) <= day(30), `${String(r.fields.what)} falls due on ${String(r.fields.due)}`);
+  }
+
+  /* NEWEST FIRST, AND THE AMOUNT AS THE ROW HOLDS IT: a ledger keeps every minor unit. */
+  const moved = blockOf(k, 'money', 'What moved');
+  const days = moved.rows.map((r) => String(r.fields.on));
+  assert.deepEqual(days, [...days].sort().reverse());
+  assert.ok(moved.rows.every((r) => Number.isInteger((r.fields.amount as { amount: number }).amount)));
+});
+
+/**
+ * A FRESH RECORD READS A CALM PAGE: no tile whose question has no answer yet. What is left is the headline tile and the
+ * box to add the first account, which is the one thing to do. Waiting on you is drawn only while something is asked
+ * (`questions-open`), so a record nobody has asked anything of draws no band saying so.
+ */
+test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its headline and the box to add an account', async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
+  const out = k.page('money');
+  assert.ok(out.ok, sayOf(out));
+  const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean; refusals: readonly unknown[] }[] }).blocks;
+  for (const b of blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
+  assert.deepEqual(
+    blocks.filter((b) => b.drawn !== false).map((b) => b.heading),
+    [undefined, 'What you have', 'Add an account'],
+  );
 });
 
 test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a link and not a need', async () => {
@@ -915,4 +1049,43 @@ test('THE LISTS SAY WHAT 3.0.0 PROMISED, and nothing a record holds is renamed',
     assert.ok(category.includes(v), `${v} is not a category a bill may hold`);
   /* THE DAY IS ON A BILL'S PHONE CARD, the one fact a person scanning bills looks for. */
   assert.deepEqual(bills.mobile, ['what', 'amount', 'due']);
+});
+
+/**
+ * A BOOK'S PAGE IN THE SAME LOOK, AND THE MONEY PAGE ONCE THERE ARE TWO: each book reads its own tiles whole, and the
+ * Money page stops saying one Cash now over both, the line and the tile together, and says what each book holds in the
+ * headline tile's place beside the walk.
+ */
+test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is a figure a book", async () => {
+  const k = await seeded();
+  const made = (name: string) => {
+    const out = k.create('books', { name } as never, { actor: 'p_test' });
+    assert.ok(out.ok, sayOf(out));
+    return (out.value as { id: string }).id;
+  };
+  const studio = made('Studio');
+  const current = k.list({ register: 'accounts', where: 'name is Studio current account', limit: 1 });
+  assert.ok(current.ok && current.value.rows[0], 'the sample has no current account');
+  assert.ok(k.update('accounts', current.value.rows[0].id, { book: studio }, { actor: 'p_test' }).ok);
+  const bill = k.create('obligations', { what: 'Studio rates', direction: 'owed_by_me', amount: { amount: 40_000, currency: 'GBP' }, due: day(10), state: 'open', book: studio } as never, { actor: 'p_test' });
+  assert.ok(bill.ok, sayOf(bill));
+
+  const page = k.page('studio');
+  assert.ok(page.ok, sayOf(page));
+  const blocks = (page.value as { blocks: readonly (DrawnBlock & { kind: string })[] }).blocks;
+  for (const b of blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
+  const due = blocks.find((b) => b.kind === 'calendar')!;
+  assert.deepEqual(due.rows.map((r) => r.fields.what), ['Studio rates'], "the book's calendar holds another book's bills");
+
+  /* ONE BOOK IS ONE SET OF MONEY STILL; A SECOND IS WHERE ONE CASH NOW STOPS MEANING ANYTHING. */
+  const drawn = () => {
+    const out = k.page('money');
+    assert.ok(out.ok, sayOf(out));
+    return (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks.filter((b) => b.drawn !== false).map((b) => b.heading);
+  };
+  assert.ok(drawn().includes('What you have'));
+  made('Home');
+  const two = drawn();
+  assert.ok(!two.includes(undefined) && !two.includes('What you have'), 'one Cash now over two books is still said');
+  assert.deepEqual(two.slice(0, 2), ['What you have, by book', 'Cash ahead']);
 });

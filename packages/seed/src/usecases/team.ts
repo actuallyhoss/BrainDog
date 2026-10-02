@@ -64,8 +64,10 @@ export const TEAM = {
      2.8.0: a project's page takes Portfolio 1.6.0's template, built to the new look: the open tickets tallied by
      priority above the list of them, their dates as weeks above the plan, and the questions about it as tiles. A team
      keeps no money or services, so the month's money and what it runs on are left off as before. 2.7.0 is on
-     `origin/master`, so the change is a version and not a reset. */
-  version: '2.8.0',
+     `origin/master`, so the change is a version and not a reset.
+     2.9.0: a project's page draws what was finished on it each week in place of the tickets tallied by priority, and
+     Work's page says "No agent holds a ticket." in the short line it now has. 2.8.0 is on `origin/master`. */
+  version: '2.9.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',
@@ -632,7 +634,10 @@ export async function backlogAgain(io: { rows: TicketIo['rows']; link: (register
 export const TEAM_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   work: {
     Work: 'Tickets',
-    'Open work by project': 'Open tickets by project',
-    'No agent holds a task. An agent takes one by setting itself as its agent.': 'No agent holds a ticket. An agent takes one by setting itself as its agent.',
+    'No agent holds a task.': 'No agent holds a ticket.',
+    '{{open-tasks}} open task(s), {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you':
+      '{{open-tasks}} open ticket(s), {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
+    '{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent':
+      '{{open-tasks}} open ticket(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
   },
 };

@@ -116,8 +116,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     undefined,
     'Waiting on you',
     'Where it stands',
-    /* PORTFOLIO 1.6.0'S TEMPLATE: the open work tallied by priority, its dates as weeks, and this month's money. */
-    'Open, by priority',
+    /* THE TEMPLATE SINCE work 1.10.0: its finished work by the week, its dates as weeks, and this month's money. */
+    'Done, by week',
     'Handed back or blocked',
     'What is open',
     'Agents',

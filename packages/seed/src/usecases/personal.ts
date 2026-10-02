@@ -605,9 +605,9 @@ export const PERSONAL_TARGETS: Readonly<Record<string, { lte: number } | { gte: 
  * what their pay and bills do and what they spent, so its page says that and not a studio's in and out. The forecast's
  * late knob is called by the figure it marks, so "Money in arrives late by" becomes a person's pay.
  *
- * NOT "Bills this week" OVER MONEY'S "Coming up", which reads thirty days ahead and holds pay days as well as bills: a
- * relabel changes words and not what a block reads, so the heading says what is under it. The week's bills are on this
- * use case's own Home (`home-personal`).
+ * NOT "Bills this week" OVER MONEY'S "Due in the next 30 days", which reads thirty days ahead: a relabel changes words
+ * and not what a block reads, so the heading says what is under it. The week's bills are on this use case's own Home
+ * (`home-personal`).
  */
 export const PERSONAL_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'money-core': {
@@ -615,16 +615,15 @@ export const PERSONAL_NAMES: Readonly<Record<string, Readonly<Record<string, str
     'What you have': 'What I have',
     'What you have, by book': 'What I have, by book',
     'Cash now': 'In my accounts',
-    'Coming up': 'Bills and pay coming up',
-    'Nothing falls due in the next 30 days.': 'No bill or pay day falls in the next 30 days.',
+    'Due in the next 30 days': 'Bills due in the next 30 days',
+    'Nothing falls due in the next 30 days.': 'No bill falls due in the next 30 days.',
     "Where this month's money went": 'Spent this month',
     'Nothing has gone out this month.': 'Nothing spent this month yet.',
     'In and out, by month': 'Pay and spending, by month',
     'Money in': 'Pay',
     'Money out': 'Spent',
     'Being chased': 'Still waiting for',
-    'Late to pay': 'Bills gone late',
-    'Money you owe has gone past its date: {{overdue}} in all.': 'Bills have gone past their date: {{overdue}} in all.',
+    'Late going out': 'Bills gone late',
     'Most days money in may be late': 'Most days pay may be late',
   },
 };

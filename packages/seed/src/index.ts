@@ -54,7 +54,7 @@ export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './mod
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
 import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
-import { PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
+import { PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_METRICS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 
 /* ── registers ────────────────────────────────────────────────────────────── */
@@ -161,7 +161,7 @@ export const ROWS: Record<string, readonly Fields[]> = {
 
 
 /* ── the metrics it ships with ──────────────────────────────────── */
-export const METRICS: Record<string, SeedMetric> = { ...MONEY_METRICS, ...ESTATE_METRICS, ...PROJECT_METRICS, ...WORK_METRICS };
+export const METRICS: Record<string, SeedMetric> = { ...MONEY_METRICS, ...ESTATE_METRICS, ...PROJECT_METRICS, ...WORK_METRICS, ...PEOPLE_METRICS };
 
 
 

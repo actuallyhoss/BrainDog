@@ -160,6 +160,32 @@ const DECLARED: Record<string, Version> = {
       "`page.money` is built to the new look: it opens with a sentence said from `cash-now` and `runway-days`, Cash ahead sits beside the next thirty days, its questions are tiles, and what is paid in parts is one track a plan over `register.installments`; `runway-days`, `arriving-30d` and `leaving-30d` are remembered each night so their tiles draw twelve weeks as a line, and a project page's month is read from the new `project-in-month`, `project-out-month` and `project-kept-month` -> 02e1f91a8c99d21c",
     ],
   },
+  'money-core@3.3.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.books-held metric.cash-accounts metric.cash-as-of
+      metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.runway-days metric.spent-30d
+      metric.spent-by-category-month metric.txn-uncategorised
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '510bf2c44fa10717',
+    history: [
+      "`page.money` is calmer: one line of what the money is doing, Cash now and how long it lasts beside Cash ahead, the month ahead as a calendar beside the bridge, Cash now cut by account over the new `cash-by-account` in place of a card an account, what moved as a list, a glyph on every tile and each tile drawn only while it has something to say, the calendar under the new `due-items-30d`; `page.money-book` takes the same tiles; no figure, setting or `register.snapshots` field says who owes whom, receivables and payables in their place; an `Out of date` note over the new `balances-stale` says an old balance on the page that reads it, and `Add an account` sits beside the headline tile while there is no account -> b22d572f1793ca16",
+      "`page.money`'s line says how far `cash-now` moved on a month ago (`{{cash-now.change}}`), Waiting on you is drawn only while `questions-open` has any, and Where this month's money went takes a row of its own with Accounts and Instalments half each, so every row is whole when it is not drawn -> a3502edb4320d804",
+      "`page.money`'s tiles share a row only when one figure draws both: Accounts (8) beside The next 30 days (4), both on `cash-accounts`, and every tile drawn on a figure of its own the whole width, so no row is half empty whatever is hidden -> 510bf2c44fa10717",
+    ],
+  },
   'portfolio@1.5.0': {
     holds: `
       metric.projects-aim-30d metric.projects-by-health metric.projects-earning metric.projects-earning-before
@@ -189,6 +215,24 @@ const DECLARED: Record<string, Version> = {
     declares: '229b3838334777f4',
     history: [
       "`page.portfolio` is built to the new look: it opens with a sentence said from `projects-need-you`, draws every project's status as one track over the new `projects-by-lane`, draws what each earns as a split where it was a bar, and its cards wear the project's mark, hue and the new `about` line of `register.things`; `projects-live` and `projects-earning` are remembered each night, so In play and Earning draw twelve weeks as a line -> 229b3838334777f4",
+    ],
+  },
+  /**
+   * A VERSION AND NOT A RESET, because 1.6.0 is on `origin/master`. No id is gained or lost; one column moved inside
+   * `page.portfolio`, which the history line says.
+   */
+  'portfolio@1.7.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-by-health metric.projects-by-lane metric.projects-earning metric.projects-earning-before
+      metric.projects-earning-change metric.projects-earning-said metric.projects-live metric.projects-need-you metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: 'cb05e11cd1166509',
+    history: [
+      "`page.portfolio`'s cards in play draw a line of the work finished on each project by the week, over Work's `project-done-by-week`, left out on a record that will not hold Work's tasks -> cb05e11cd1166509",
     ],
   },
   'money-core@1.1.0': { declares: '5cb37a57b9de3499' },
@@ -619,6 +663,24 @@ const DECLARED: Record<string, Version> = {
     declares: '03c89c8b18be3c6d',
     history: ['Nothing new is declared: the step lets a record whose links were left out when a use case installed it take the update, which puts the `thing` and `owner` of `register.tasks` back -> 03c89c8b18be3c6d'],
   },
+  'work@1.10.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-in-review metric.project-open metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week
+      metric.tasks-due-7d metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-overdue
+      metric.tasks-today-yours metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'e2d0a0a7ab0b4a2c',
+    history: [
+      "`page.work` is the Work screen's bands, declared: one line said from the figures, the capture line, Open and Done in 7 days as the only figures, then Late, Today, This week, With an agent, Waiting on you and Done recently, each drawn only while its figure has any, and After this week, No due day and Later folded under Not this week; the chart of the weeks, the bar by project and the queue of questions go; `page.work-board` opens on one line; every tile's heading wears a glyph; `tasks-waiting`, `tasks-due-7d` and `tasks-done-7d` are remembered each night; and the new `project-done-by-week` counts one project's finished work by week -> f1bccb1108ea8511",
+      '`tasks-waiting` and `tasks-due-7d` are no longer remembered each night, since Right now draws only Open and Done in 7 days and nothing reads their weeks -> df54fed030771614',
+      "`page.work`'s Late, Today and This week are drawn on the new `tasks-late-yours`, `tasks-today-yours` and `tasks-week-yours`, each over its band's own clauses, the line's late is `tasks-late-yours`, and `tasks-with-agents` counts only what an agent has in hand, so no band is drawn empty -> e2d0a0a7ab0b4a2c",
+    ],
+  },
   'people@2.0.0': {
     holds: ` page.people register.people `,
     declares: 'a197d208773e19c1',
@@ -652,6 +714,19 @@ const DECLARED: Record<string, Version> = {
     holds: ` page.people page.someone register.people rule.meet-senders `,
     declares: 'fd9751362adfd6e0',
     history: ['Nothing new is declared: the step lets a record whose links were left out when a use case installed it take the update, which puts the `projects` of `register.people` back -> fd9751362adfd6e0'],
+  },
+  'people@2.4.0': {
+    holds: `
+      metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-quiet
+      page.people page.someone
+      register.people
+      rule.meet-senders
+    `,
+    declares: '1dbd61f8aaef95cc',
+    history: [
+      "`register.people` gains `in_touch`, the last day someone was in touch, and four figures read it; `page.people` opens on one line said from `people-count`, `people-in-touch-30d` and `people-quiet`, draws those days as a chart, lists everyone the latest first and wears a glyph on every heading, and `page.someone` leads with the person -> 858ae04a5cc16b2f",
+      "`register.people` names `in_touch` in its `meets:`, so `meet` moves Last in touch to the day of the line it writes, now that the kernel reads that part -> 1dbd61f8aaef95cc",
+    ],
   },
   'estate@1.1.0': {
     holds: `

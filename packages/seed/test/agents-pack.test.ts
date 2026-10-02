@@ -277,9 +277,10 @@ test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, then 
 
 test('the People page lists the newest person first, with where they were met', async () => {
   const { k, sql } = await seeded();
-  const [everyone] = opened(k, 'people');
-  assert.deepEqual(everyone?.refusals, []);
-  assert.equal(everyone?.rows[0]?.fields.name, ROWS.people!.at(-1)?.name);
+  /* BY ITS HEADING, since people 2.4.0 opens the page on its one line. */
+  const everyone = headed(opened(k, 'people'), 'Everyone');
+  assert.deepEqual(everyone.refusals, []);
+  assert.equal(everyone.rows[0]?.fields.name, ROWS.people!.at(-1)?.name);
   sql.close();
 });
 

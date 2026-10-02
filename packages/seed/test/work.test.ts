@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { openRecord, type Kernel, type PageResult } from '@braindog/kernel';
+import { fill, openRecord, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
@@ -72,13 +72,20 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
   for (const slug of ['work', 'work-board']) for (const b of opened(k, slug).blocks) assert.deepEqual(b.refusals, [], `${slug} ${b.heading}`);
 
   const figures = Object.fromEntries((block(opened(k, 'work'), 'Right now').readings ?? []).map((r) => [r.metric, r.reading?.value]));
+  /* TWO FIGURES SINCE work 1.10.0: how much is open, and how much was finished. */
   assert.deepEqual(figures, {
     'open-tasks': TASKS.filter(open).length,
-    'tasks-waiting': TASKS.filter((t) => t.state === 'review' || t.state === 'blocked').length,
-    'tasks-due-7d': TASKS.filter((t) => live(t) && String(t.by) >= TODAY && String(t.by) < new Date(NOW + 8 * 86_400_000).toISOString().slice(0, 10)).length,
     'tasks-done-7d': TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length,
   });
-  assert.ok(figures['tasks-waiting']! > 0, 'the sample shows a queue');
+  /* AND THE FIGURES THE BANDS ARE DRAWN ON, which the line says too. */
+  const read = (id: string) => {
+    const out = k.metric(METRICS[id] as never);
+    assert.ok(out.ok, sayOf(out));
+    return out.value.value;
+  };
+  assert.equal(read('tasks-waiting'), TASKS.filter((t) => t.state === 'review' || t.state === 'blocked').length);
+  assert.equal(read('tasks-due-7d'), TASKS.filter((t) => live(t) && String(t.by) >= TODAY && String(t.by) < new Date(NOW + 8 * 86_400_000).toISOString().slice(0, 10)).length);
+  assert.ok(Number(read('tasks-waiting')) > 0, 'the sample shows a queue');
 });
 
 /**
@@ -91,17 +98,29 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   const k = await seeded();
   const page = opened(k, 'work');
   const headings = page.blocks.map((b) => b.heading);
-  /* THE CAPTURE LINE COMES FIRST, so a task is written down before anything is read. */
-  assert.deepEqual(headings.slice(0, 4), ['What needs doing?', 'Right now', 'Today', 'This week'], headings.join(', '));
+  /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
+     screen's bands top to bottom, and what is further off folded shut. The line has no heading: it is the sentence in
+     the page's title. */
+  assert.deepEqual(
+    headings,
+    [undefined, 'What needs doing?', 'Right now', 'Late', 'Today', 'This week', 'With an agent', 'Waiting on you', 'Done recently', 'Not this week', 'After this week', 'No due day', 'Later'],
+    headings.join(', '),
+  );
+  assert.equal((page.blocks.find((b) => b.heading === 'Not this week') as { fold?: boolean }).fold, true, 'what is further off is not folded');
 
-  /* PAST ITS DATE IS TODAY'S, because it is still the next thing to do. The sample's is four days late. */
-  const today = block(page, 'Today');
-  assert.equal(today.kind, 'todo');
-  assert.ok(today.rows.some((r) => r.fields.what === 'Turn auto-renew back on for kilnfonts.example'), 'the late task is not under Today');
+  /* PAST ITS DATE IS LATE, AND ON TOP, because it is still the next thing to do. The sample's is four days late. */
+  const late = block(page, 'Late');
+  assert.equal(late.kind, 'todo');
+  assert.deepEqual(late.rows.map((r) => r.fields.what), ['Turn auto-renew back on for kilnfonts.example']);
+  assert.ok(!block(page, 'This week').rows.some((r) => String(r.fields.by) <= TODAY), 'This week holds what is late or due today');
 
-  /* NOT THE BAR, which reads every task in play to add up their effort and draws a project per bar, never a task. */
+  /* DONE RECENTLY IS THE LAST SEVEN DAYS, NEWEST FIRST. */
+  const done = block(page, 'Done recently').rows.map((r) => String(r.fields.done_on));
+  assert.ok(done.length > 0 && done.every((d) => d > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)), done.join(', '));
+  assert.deepEqual(done, [...done].sort().reverse(), 'not newest first');
+
   const untickable = page.blocks
-    .filter((b) => b.kind !== 'todo' && b.kind !== 'bar')
+    .filter((b) => b.kind !== 'todo')
     .flatMap((b) => b.rows.filter((r) => typeof r.fields.what === 'string' && !['done', 'dropped'].includes(String(r.fields.state))).map((r) => `${b.heading}: ${String(r.fields.what)}`));
   assert.deepEqual(untickable, [], 'a task in play drawn in a block with no tick');
 });
@@ -111,8 +130,8 @@ test('OPEN LEAVES OUT WORK KEPT FOR LATER AND SAYS IT BESIDE, and the sample boa
   const later = TASKS.filter((t) => t.state === 'backlog').length;
   assert.ok(later > 0, 'the sample keeps a task for later');
   assert.ok(TASKS.filter(live).length > TASKS.filter(open).length);
-  const note = (block(opened(k, 'work'), 'Right now') as { cells?: { metric: string; note?: string }[] }).cells?.find((c) => c.metric === 'open-tasks')?.note;
-  assert.ok(String(note).includes('{{tasks-later}} kept for later'),'Open says what is kept for later beside it');
+  /* KEPT FOR LATER HAS ITS OWN BAND, folded under Not this week, since work 1.10.0 cut the figures to two. */
+  assert.equal(block(opened(k, 'work'), 'Later').rows.length, later, 'what is kept for later is not under Later');
   const read = k.metric(METRICS['tasks-later'] as never);
   assert.ok(read.ok, sayOf(read));
   assert.equal(read.value.value, later);
@@ -123,11 +142,12 @@ test('THE BOARD HAS A COLUMN FOR WORK AN AGENT HANDED BACK, and progress is coun
   const k = await seeded();
   const board = block(opened(k, 'work-board'), 'By status');
   assert.ok(board.rows.some((r) => r.fields.state === 'review'));
-  const series = block(opened(k, 'work'), 'Done, and due ahead');
-  assert.equal(series.bars?.bucket, 'week');
-  assert.equal(series.bars?.unit, null, 'counts, not money');
-  const past = series.bars!.states.flatMap((s, i) => (s === '' ? [series.bars!.values[0]![i] ?? 0] : []));
-  assert.ok(past.reduce((n, v) => n + (v ?? 0), 0) > 0, 'nothing finished in the weeks drawn');
+  /* THE WEEKS ARE THE FIGURE'S, read whole, since the page draws them as Done in 7 days' line and a project's page draws
+     its own (`project-done-by-week`). */
+  const weeks = k.metric(METRICS['tasks-done-by-week'] as never);
+  assert.ok(weeks.ok, sayOf(weeks));
+  const counted = (weeks.value.groups ?? []).reduce((n, g) => n + Number(g.value ?? 0), 0);
+  assert.ok(counted > 0, 'nothing finished in the weeks counted');
 });
 
 test('AN AGENT TAKES A TASK, SPLITS IT, HANDS IT BACK AND A PERSON FINISHES IT, and the page says who did each', async () => {
@@ -162,12 +182,12 @@ test('AN AGENT TAKES A TASK, SPLITS IT, HANDS IT BACK AND A PERSON FINISHES IT, 
   assert.ok(at >= 0, 'the handed-back task is not in the queue');
   assert.equal(queue.rows[at]!.fields.note, 'New key issued and the old one revoked. Check the deploy.');
 
-  /* FINISH: a person checks it and marks it done, the record dates it, and it leaves the queue for Done lately. */
+  /* FINISH: a person checks it and marks it done, the record dates it, and it leaves the queue for Done recently. */
   assert.ok(k.update('tasks', ref, { state: 'done' }, person).ok);
   assert.equal(k.get(ref)!.fields.done_on, TODAY, 'the record fills the day it was finished');
   overview = opened(k, 'work');
   assert.ok(!block(overview, 'Waiting on you').rows.some((r) => r.fields.what === title));
-  assert.ok(block(overview, 'Done lately').rows.some((r) => r.fields.what === title));
+  assert.ok(block(overview, 'Done recently').rows.some((r) => r.fields.what === title));
   const done = (block(overview, 'Right now').readings ?? []).find((r) => r.metric === 'tasks-done-7d');
   assert.equal(done?.reading?.value, TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length + 1);
 });
@@ -220,10 +240,16 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
   const tasks = (doc.declarations as { register?: string; fields?: { id: string }[] }[]).find((d) => d.register === 'tasks')!;
   assert.ok(!tasks.fields!.some((f) => f.id === 'thing' || f.id === 'owner'), 'no project and no owner on a record without them');
 
+  /* A NEW LIST IS THE CAPTURE LINE: every band waits for something to hold, and what is further off stays folded. */
+  const fresh = opened(k, 'work');
+  assert.deepEqual(
+    fresh.blocks.filter((b) => b.drawn !== false && b.kind !== 'note' && b.kind !== 'section' && b.heading !== 'After this week' && b.heading !== 'No due day' && b.heading !== 'Later').map((b) => b.heading),
+    ['What needs doing?'],
+  );
+
   assert.ok(k.create('tasks', { what: 'Problem set 3', state: 'open', by: TODAY }, { actor: 'p_1' }).ok);
   const overview = opened(k, 'work');
   for (const b of overview.blocks) assert.deepEqual(b.refusals, [], `work ${b.heading}`);
-  assert.ok(!overview.blocks.some((b) => b.heading === 'Open work by project'), 'the bar by project is left out, not drawn empty');
   assert.ok(block(overview, 'Today').rows.some((r) => r.fields.what === 'Problem set 3'));
   for (const b of opened(k, 'work-board').blocks) assert.deepEqual(b.refusals, [], `work-board ${b.heading}`);
 });
@@ -242,4 +268,76 @@ test('OPEN IS REMEMBERED EACH DAY, so its figure draws a line once the record ha
   const trend = cell()?.trend;
   assert.ok(trend, 'Open has a line after the first night');
   assert.equal(trend!.at(-1), TASKS.filter(open).length, 'the last point is the day before, counted as it stood');
+});
+
+/**
+ * THE CALMER PAGE, since work 1.10.0: one line in the title said from the figures, a glyph on every tile's heading, and
+ * a line on every figure once the record has run a night.
+ */
+test('WORK OPENS ON ONE LINE SAID FROM ITS FIGURES, and every tile with a heading wears a glyph', async () => {
+  const k = await seeded();
+  for (const slug of ['work', 'work-board']) {
+    const page = opened(k, slug);
+    const lead = page.blocks[0]!;
+    assert.equal(lead.kind, 'note', `${slug} does not open on its line`);
+    assert.equal((lead as { lead?: boolean }).lead, true);
+    assert.match(String((lead as { body?: string }).body), /\{\{open-tasks\}\} open task\(s\)/u);
+    const bare = page.blocks.filter((b) => typeof b.heading === 'string' && typeof (b as { icon?: unknown }).icon !== 'string').map((b) => b.heading);
+    assert.deepEqual(bare, [], `${slug}: a heading with no glyph`);
+  }
+  /* FEWER TILES: what drew the same tasks or the same finished work twice is gone, and so are the chart of the weeks,
+     the bar by project and the queue of questions, which the figures, a project's page and Decide draw. */
+  const headings = opened(k, 'work').blocks.map((b) => b.heading);
+  for (const gone of ['Next two weeks', 'Done, 12 weeks', 'Done, and due ahead', 'Open work by project', 'Agents suggest'])
+    assert.ok(!headings.includes(gone), `${gone} is still drawn`);
+});
+
+test('EVERY FIGURE ON RIGHT NOW IS REMEMBERED EACH NIGHT, so each tile draws a line and not only Open', async () => {
+  let now = NOW;
+  const k = await openRecord(openSqlite(), { now: () => now });
+  const out = await installSeed(k);
+  assert.ok(out.ok, sayOf(out));
+  now = NOW + 86_400_000;
+  await k.drain();
+  const cells = block(opened(k, 'work'), 'Right now').readings ?? [];
+  assert.equal(cells.length, 2);
+  for (const c of cells) assert.ok(c.trend, `${c.metric} draws no line after a night`);
+});
+
+test('A PROJECT’S FINISHED WORK IS COUNTED BY THE WEEK, one project at a time, for the line its page draws', async () => {
+  const k = await seeded();
+  /* FILLED AS A PAGE FILLS `project-done-by-week:Kiln`, through the kernel's own `fill`. */
+  const read = k.metric(fill(METRICS['project-done-by-week'], null, 'Kiln') as never);
+  assert.ok(read.ok, sayOf(read));
+  const kiln = TASKS.filter((t) => t.thing === 1 && t.state === 'done' && String(t.done_on ?? TODAY) > new Date(NOW - 63 * 86_400_000).toISOString().slice(0, 10)).length;
+  const counted = (read.value.groups ?? []).reduce((n, g) => n + Number(g.value ?? 0), 0);
+  assert.ok(kiln > 1, 'the sample finished more than one Kiln task in nine weeks');
+  assert.equal(counted, kiln, JSON.stringify(read.value.groups));
+});
+
+/**
+ * NO BAND IS DRAWN EMPTY, since work 1.10.0: Late, Today, This week and With an agent are each drawn on a figure over the
+ * band's own clauses, so a band is drawn exactly while it holds a task, and the line's 'late' is the Late band's count.
+ * An agent's task due today or past its day is drawn with the agent, and no band of yours is drawn for it.
+ */
+test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is the Late band’s count', async () => {
+  const k = await seeded();
+  const gates: Record<string, string> = { Late: 'tasks-late-yours', Today: 'tasks-today-yours', 'This week': 'tasks-week-yours', 'With an agent': 'tasks-with-agents' };
+  const check = () => {
+    const page = opened(k, 'work');
+    for (const [heading, metric] of Object.entries(gates)) {
+      const b = block(page, heading);
+      const read = k.metric(METRICS[metric] as never);
+      assert.ok(read.ok, sayOf(read));
+      assert.equal(read.value.value, b.matched ?? b.rows.length, `${heading} holds what ${metric} does not count`);
+      assert.equal(b.drawn !== false, (b.matched ?? b.rows.length) > 0, `${heading} is drawn ${b.drawn === false ? 'hidden over tasks' : 'empty'}`);
+    }
+    const lead = page.blocks[0] as { body?: string; values?: Record<string, unknown> };
+    assert.match(String(lead.body), /\{\{tasks-late-yours\}\} late/u);
+    assert.equal(lead.values?.['tasks-late-yours'] ?? 0, block(page, 'Late').matched ?? block(page, 'Late').rows.length);
+  };
+  check();
+  const yesterday = new Date(NOW - 86_400_000).toISOString().slice(0, 10);
+  for (const by of [TODAY, yesterday]) assert.ok(k.create('tasks', { what: `An agent's task due ${by}`, state: 'open', agent: 'claude', by }, { actor: 'p_1' }).ok);
+  check();
 });

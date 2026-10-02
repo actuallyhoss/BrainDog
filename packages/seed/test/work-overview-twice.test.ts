@@ -9,7 +9,8 @@
  * Fenwick invoice against services` were each drawn three times.
  *
  * WHAT THIS HOLDS. Since work 1.6.0 the Overview draws what is in play as lists that tick, one heading per
- * question: Today, This week, After this week, No due day, Waiting on you, With an agent and Later. EVERY ONE IS HELD
+ * question, and since work 1.10.0 they are the Work screen's bands: Late, Today, This week, With an agent, Waiting on
+ * you, and folded under Not this week, After this week, No due day and Later. EVERY ONE IS HELD
  * APART FROM EVERY OTHER here, `With an agent` included. Under 1.5.0 it was not, on the argument that a row there
  * answered a different question; that argument held for a table and does not hold for a list a person ticks down,
  * where one task under two headings is two ticks for one piece of work.
@@ -87,11 +88,13 @@ const block = (page: PageResult, heading: string) => {
   return found;
 };
 
-const GROUPS = ['Today', 'This week', 'After this week', 'No due day', 'Waiting on you', 'With an agent', 'Later'];
+/* WHAT IS IN PLAY, BAND BY BAND, since work 1.10.0 drew the Work screen's bands; and Done recently, which ticks too. */
+const GROUPS = ['Late', 'Today', 'This week', 'After this week', 'No due day', 'Waiting on you', 'With an agent', 'Later'];
+const TICKS = [...GROUPS, 'Done recently'];
 
 test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS AND NONE IS LEFT OUT, because a person ticking down the page would tick it twice or never', async () => {
   const { page: sample, sql: first } = await overview();
-  for (const heading of ['Today', 'This week', 'Waiting on you', 'With an agent']) assert.ok(block(sample, heading).rows.length > 0, `the sample draws nothing under ${heading}, so this does not bite`);
+  for (const heading of ['Late', 'This week', 'Waiting on you', 'With an agent']) assert.ok(block(sample, heading).rows.length > 0, `the sample draws nothing under ${heading}, so this does not bite`);
   first.close();
 
   const sql = openSqlite();
@@ -104,6 +107,8 @@ test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS AND NONE IS LEFT OUT, because
     { what: 'Handed back by an agent, due today', state: 'review', agent: 'claude', by: today },
     { what: 'Taken by an agent, due today', state: 'doing', agent: 'claude', by: today },
     { what: 'Kept for later, dated this week', state: 'backlog', by: on(3) },
+    { what: 'Yours, two days late', state: 'open', by: on(-2) },
+    { what: 'Handed back by an agent, late', state: 'review', agent: 'claude', by: on(-2) },
     { what: 'Yours, due today', state: 'open', by: today },
     { what: 'Yours, due tomorrow', state: 'open', by: on(1) },
     { what: 'Yours, due in seven days', state: 'open', by: on(7) },
@@ -137,10 +142,10 @@ test('NO TASK IS DRAWN UNDER TWO OF WORK’S LISTS AND NONE IS LEFT OUT, because
     .map((r) => `${String(r.fields.what)} (${String(r.fields.state)}, ${String(r.fields.agent ?? 'no agent')}, ${String(r.fields.by ?? 'no day')})`);
   assert.deepEqual(left, [], 'in play and under none of the lists');
 
-  assert.deepEqual(lists.map((b) => String(b.heading)).sort(), [...GROUPS].sort(), 'the lists that tick are not the ones this names');
+  assert.deepEqual(lists.map((b) => String(b.heading)).sort(), [...TICKS].sort(), 'the lists that tick are not the ones this names');
   assert.deepEqual(
     corners.map((c) => where.get(c.what)),
-    [['Waiting on you'], ['With an agent'], ['Later'], ['Today'], ['This week'], ['This week'], ['After this week'], ['No due day'], ['With an agent'], ['Later']],
+    [['Waiting on you'], ['With an agent'], ['Later'], ['Late'], ['Waiting on you'], ['Today'], ['This week'], ['This week'], ['After this week'], ['No due day'], ['With an agent'], ['Later']],
     'each corner is drawn once, under the heading that answers it',
   );
   sql.close();

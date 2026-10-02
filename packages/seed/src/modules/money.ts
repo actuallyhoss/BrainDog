@@ -26,6 +26,12 @@
  * money may say which book a row is in, and each book is a page of its own under Money. A question a rule asks is
  * answered where it is asked: "Chase it" stamps the day on the bill (`MONEY_AUTOMATIONS`), and "It stopped" ends a
  * repeating line.
+ *
+ * MONEY-CORE 3.3.0 IS CALMER, AND SPEAKS AS A FINANCE APP. The page is fewer, bigger tiles, each drawn only while its
+ * question has an answer on this record: one line of what the money is doing, Cash now beside its walk, the month ahead
+ * as a calendar beside its arithmetic, Cash now cut by account (`cash-by-account`, new), and what moved as a list. No
+ * figure, field or setting says who owes whom any more: money due in is receivables and money due out is payables, and
+ * every id stays.
  */
 
 import type { Leg, RatesFields, RegisterDecl } from '@braindog/kernel';
@@ -1075,8 +1081,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
       { id: 'what', label: 'Night', type: 'text', search: true },
       { id: 'on', label: 'Date', type: 'day', unique: true, required: true },
       { id: 'cash', label: 'Cash', type: 'money', required: true },
-      { id: 'owed_to_me', label: 'Owed to you', type: 'money' },
-      { id: 'owed_by_me', label: 'Owed by you', type: 'money' },
+      { id: 'owed_to_me', label: 'Receivables', type: 'money' },
+      { id: 'owed_by_me', label: 'Payables', type: 'money' },
       /* CASH PLUS WHAT IS OWED TO YOU LESS WHAT YOU OWE. Stored rather than derived, because a snapshot
          is a reading and a reading recomputed later from rows that have changed is not one. */
       { id: 'net', label: 'Net', type: 'money' },
@@ -1160,15 +1166,15 @@ export const MONEY_TARGET_SETTINGS: Readonly<Record<string, { setting: string; t
   /* `most_out_30d` IS THE KEY AND THE WORDS ARE ONLY WORDS, so this label follows its figure: a saved ceiling is kept
      under the key whatever the label says (`test/money.test.ts`), and the ceiling caps what is OWED inside the thirty
      days rather than everything that leaves, which is `leaving-30d`'s. */
-  'out-30d': { setting: 'most_out_30d', type: 'money', label: 'Most owed by you in 30 days' },
+  'out-30d': { setting: 'most_out_30d', type: 'money', label: 'Most payables due in 30 days' },
   'leaving-30d': { setting: 'most_leaving_30d', type: 'money', label: 'Most going out in 30 days' },
   'every-month-out': { setting: 'most_out_every_month', type: 'money', label: 'Most going out every month' },
   'every-month-by-category': { setting: 'most_on_one_category', type: 'money', label: 'Most a month on one category' },
   'spent-by-category-month': { setting: 'most_spent_on_one_category', type: 'money', label: 'Most spent on one category in a month' },
   'spent-30d': { setting: 'most_spent_30d', type: 'money', label: 'Most spent in 30 days' },
   'due-30d': { setting: 'most_due_30d', type: 'money', label: 'Most due in 30 days' },
-  'owed-to-you': { setting: 'most_owed_to_you', type: 'money', label: 'Most owed to you at once' },
-  'owed-by-you': { setting: 'most_owed_by_you', type: 'money', label: 'Most owed by you at once' },
+  'owed-to-you': { setting: 'most_owed_to_you', type: 'money', label: 'Most receivables at once' },
+  'owed-by-you': { setting: 'most_owed_by_you', type: 'money', label: 'Most payables at once' },
   'installments-left': { setting: 'most_left_in_parts', type: 'money', label: 'Most left to pay in parts' },
   'installments-due-30d': { setting: 'most_parts_due_30d', type: 'money', label: 'Most in parts due in 30 days' },
   'days-late-in': { setting: 'most_days_late', type: 'number', label: 'Most days money in may be late' },
@@ -1371,6 +1377,26 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   },
 
   /**
+   * CASH NOW, ONE PART AN ACCOUNT, SINCE money-core 3.3.0: the same roll, grouped by the name each account is called, so
+   * the Money page's Accounts tile cuts Cash now into the accounts it is held in and its parts add up to the headline.
+   *
+   * DRAWN WHATEVER THE NUMBER OF BOOKS: one book with three accounts still wants to see where its money sits, which the
+   * by-book bar could never say. The name is the record's own ("HSBC current", "Tax reserve"), never a word of ours.
+   */
+  'cash-by-account': {
+    metric: 'cash-by-account',
+    name: 'Cash now, by account',
+    source: 'register.accounts',
+    where: 'liquid is true',
+    value: ROLLED,
+    group_by: 'name',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
    * CASH NOW IN ONE BOOK, read once per book as a project's figures are read once per project: `book-cash:Personal`
    * fills `{{it}}` with the book's name. The figure a book's page leads with and its walk starts from.
    */
@@ -1420,6 +1446,22 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     value: { min: 'as_of' },
     format: 'day',
     target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * HOW MANY OF CASH NOW'S BALANCES ARE MORE THAN A WEEK OLD, SINCE money-core 3.3.0: the week `cash-stale` tells about,
+   * over the accounts Cash now reads. What the Money page's "Out of date" note is drawn under (`when:`).
+   */
+  'balances-stale': {
+    metric: 'balances-stale',
+    name: 'Balances over a week old',
+    source: 'register.accounts',
+    where: 'liquid is true, as_of before -7d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
     window: '30d',
     compare: 'none',
   },
@@ -1498,7 +1540,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
    */
   'in-30d': {
     metric: 'in-30d',
-    name: 'Owed to you, 30 days',
+    name: 'Receivables, 30 days',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before +31d`,
     value: { sum: 'amount' },
@@ -1517,7 +1559,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
    */
   'out-30d': {
     metric: 'out-30d',
-    name: 'Owed by you, 30 days',
+    name: 'Payables, 30 days',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before +31d`,
     value: { sum: 'amount' },
@@ -1575,7 +1617,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   /* MONEY YOU ARE OWED THAT IS PAST ITS DATE, the other side of `overdue`. */
   'late-in': {
     metric: 'late-in',
-    name: 'Late to you',
+    name: 'Late receivables',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, due before today`,
     value: { sum: 'amount' },
@@ -1729,7 +1771,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
 
   'owed-to-you': {
     metric: 'owed-to-you',
-    name: 'Owed to you',
+    name: 'Receivables',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me`,
     value: { sum: 'amount' },
@@ -1756,7 +1798,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
    */
   'owed-by-you': {
     metric: 'owed-by-you',
-    name: 'Owed by you',
+    name: 'Payables',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me`,
     value: { sum: 'amount' },
@@ -1783,6 +1825,24 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     window: '30d',
   },
 
+  /**
+   * HOW MANY BILLS AND INVOICES FALL DUE IN THE NEXT THIRTY DAYS, either way, SINCE money-core 3.3.0. A count and not a
+   * sum, because the two directions are not one quantity; it is what the Money page's calendar of the month ahead is
+   * drawn under (`when:`), so a month with nothing in it is not a tile of empty days. The calendar's own sentence, word
+   * for word, so the figure and the tile cannot disagree about which rows they mean.
+   */
+  'due-items-30d': {
+    metric: 'due-items-30d',
+    name: 'Bills and invoices due, 30 days',
+    source: 'register.obligations',
+    where: `${OPEN}, due after yesterday, due before +31d`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   /* ONE DIRECTION, like the two tiles it sits beside. This once added receivables to payables and
      painted the sum in the alarm colour: GBP 17,740.00 was GBP 7,200 you are owed plus GBP 10,540
      you owe. Those are not the same problem, and the sum is not a quantity. */
@@ -1792,7 +1852,7 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
        money YOU are late paying, and the saved view called "Overdue" is everything late in both
        directions. Two clicks apart, one word, two sets: a person reading `GBP 10,540` under
        "Overdue" and then opening the view was looking at a different question with no way to know. */
-    name: 'Overdue to pay',
+    name: 'Late payables',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed by me, due before today`,
     value: { sum: 'amount' },
@@ -1919,10 +1979,11 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * A BALANCE MORE THAN A WEEK OLD IS TOLD, SINCE money-core 3.1.0, AND IT WAS A QUESTION IN DECIDE.
    *
    * The question's only useful answer was typing a number, which Decide has no box for: "Update it" closed the question
-   * and left the balance as old as it was. The number is typed where the account is, and the Accounts card on the Money
-   * page already says a balance is out of date (`stale:`). So this tells instead of asking: a notification that is not
-   * urgent is a note on the account signed by the rule and nothing else (`packages/kernel/src/rules.ts`), which the
-   * Money page's "What agents and rules did" reads, once for each day a balance was set (`once_per`). NO DIGEST READS
+   * and left the balance as old as it was. The number is typed where the account is, and the Money page already says a
+   * balance is out of date (its "Out of date" note over `balances-stale` since 3.3.0, and a book's Accounts cards,
+   * `stale:`). So this tells instead of asking: a notification that is not urgent is a note on the account signed by the
+   * rule and nothing else (`packages/kernel/src/rules.ts`), which History reads, once for each day a balance was set
+   * (`once_per`). NO DIGEST READS
    * IT: a digest reads the lists and figures its declaration names (`sectionsOf` in `packages/kernel/src/digest.ts`),
    * and money-core declares none.
    */
@@ -2106,6 +2167,20 @@ export const DUE_THIS_WEEK: Readonly<Record<string, unknown>> = {
   empty: 'Nothing is due this week.',
 };
 
+/**
+ * THE SENTENCE A MONEY TILE GOES UNDER: open bills and invoices due in the next thirty days, either way, as the calendar
+ * reads them and `due-items-30d` counts them. ONE STRING, so the tile and the figure it is drawn under cannot drift.
+ */
+const DUE_30D = `${OPEN}, due after yesterday, due before +31d`;
+
+/**
+ * WHAT MOVED, AS A CALM LIST BY DAY, SINCE money-core 3.3.0: the day, what the bank called it, and the amount signed
+ * by its own direction, newest first. It was a table of five columns, which is a spreadsheet on the one page everybody
+ * reads; which account and what it was for are on the row, a tap away. THE AMOUNT KEEPS EVERY MINOR UNIT, because this
+ * is the ledger and a ledger is exact: only a headline drops `.00`.
+ */
+const MOVED_COLUMNS = [{ field: 'on' }, { field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }];
+
 export const MONEY_PAGES: Record<string, SeedPage> = {
   /**
    * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then what comes in and goes out;
@@ -2118,6 +2193,15 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
    * over bills, Ledger looked back over payments, and a person asking what happened to their money had to know which of the two answered it. A page holds no rows, so the two that retire take nothing
    * with them. IT NEEDS NO PEOPLE: who a row is with is a link (`LINKS` in `packs/first-party.ts`), and no block here
    * reads it, so Money installs and draws on a record with People off.
+   *
+   * FEWER, BIGGER TILES, SINCE money-core 3.3.0 ("i dont want a very 'busy' looking ui, rather very tailored and to the
+   * point", October 2nd). Every tile answers one question and none answers another's: the thirty-day in and out are the
+   * bridge's and no longer two more figures beside Cash now; what falls due is a calendar of the month ahead and not a
+   * table beside it; where the money sits is Cash now cut by account, which adds up to the headline, and not a card an
+   * account with the same balances again; and what agents and rules did is History's, where it is read whole. A tile
+   * whose question has no answer on this record is not drawn (`when:`), so a fresh record reads its sentence, its cash
+   * and the box to add an account, and a record with nothing late reads no word about lateness. Every tile's heading
+   * wears a glyph (`icon:`), as the look asks (`loop/design/SYSTEM.md` §6).
    */
   money: {
     page: 'money',
@@ -2128,102 +2212,78 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
     pack: 'money-core',
     blocks: [
       {
-        /* THE OPENING SENTENCE, SAID FROM THE FIGURES, SINCE money-core 3.2.0: the line under the page's title. What
-           there is, and the day count the walk below goes under in, read from the same two figures the tiles draw, so
-           the sentence and the tiles cannot disagree. Only while the walk goes under inside the year it reads
-           (`runway-days` has no value otherwise), because that is the one fact on this page that needs somebody; a
-           record whose money lasts the year has its figures and no sentence. The count settles `day(s)`. */
+        /* THE HEADLINE LINE, SAID FROM THE FIGURES: what the money is doing, in one sentence inside the page's headline
+           tile with its name and tools. Since money-core 3.3.0 it is said on every record that keeps one set of money,
+           and not only while the walk goes under: what there is and where, then, only while it is true, the day count
+           the walk below goes under in. A clause whose figure has no value is left out by the writer (`leadOf`), so a
+           record whose money lasts the year reads "Cash is £33,850 across 2 accounts" and stops there, and a record with
+           no account yet reads no sentence at all. The figures are the tiles' own, so the line and the tiles cannot
+           disagree. With two books or more one Cash now adds a company's money to a person's own, so the line goes
+           with the tile it would sum.
+
+           HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, SINCE money-core 3.3.0 (`{{cash-now.change}}`, "+8% on a month
+           ago"), said against the point the night remembered thirty days back. A record with no point that old, or a
+           point in another currency, has no change, and the clause drops with nothing left of it. */
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'runway-days', gt: 0 },
-        body: 'You have {{cash-now}}, and on what is due to come and go it runs out in {{runway-days}} day(s).',
+        when: { metric: 'books-held', lt: 2 },
+        body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it runs out in {{runway-days}} day(s).',
       },
       {
-        /* WHAT YOU HAVE, THEN HOW LONG IT LASTS, THEN WHAT MOVES IN THE NEXT THIRTY DAYS. The figures after it read the one walk
-           "Cash ahead" and "The next 30 days" draw below (`CASH_LEGS`), so a tile and the chart under it cannot give two
-           answers about the same month. Cash now carries its twelve weeks as a line.
+        /* WHAT YOU HAVE AND HOW LONG IT LASTS, BESIDE THE LINE THAT SHOWS IT, SINCE money-core 3.3.0: four twelfths
+           beside Cash ahead's eight, so the figure and its walk are read as one question. Two figures and not four: what
+           comes in and goes out over thirty days is the bridge's, a chart that adds up, and was said twice.
 
-           ONLY WHILE THE RECORD KEEPS ONE SET OF MONEY, since money-core 3.1.0. With two books or more, one Cash now
-           adds a company's money to a person's own, so the block below draws a figure a book instead. The other three
-           tiles go with it, because each is a sum over every book too: how long the money lasts is read on each book's
-           page, from that book's walk. "Cash ahead" below stays the walk of the whole record. */
+           ONLY WHILE THE RECORD KEEPS ONE SET OF MONEY, since money-core 3.1.0. With two books or more the bar below draws
+           a figure a book instead; how long each book's money lasts is read on that book's page, from its own walk. */
         kind: 'stat',
         lead: true,
         heading: 'What you have',
-        span: 12,
+        icon: 'wallet',
+        span: 4,
         cells: [
           /* EVERY TILE CARRIES ITS TWELVE WEEKS AS A LINE, SINCE money-core 3.2.0, from each figure's own nightly series. */
           { metric: 'cash-now', label: 'Cash now', trend: '12w', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' },
           { metric: 'runway-days', label: 'Lasts until', trend: '12w' },
-          { metric: 'arriving-30d', label: 'Coming in, 30 days', trend: '12w' },
-          { metric: 'leaving-30d', label: 'Going out, 30 days', trend: '12w' },
         ],
         when: { metric: 'books-held', lt: 2 },
       },
       {
         /* WHAT YOU HAVE IN EACH BOOK, once there are two: Cash now rolled per book, the same arithmetic as the figure it
-           stands in for (`cash-by-book`). An account in no book is a part of its own, named, so no money leaves the
-           picture because nobody filed it. */
+           stands in for (`cash-by-book`), in the headline tile's place beside the walk. An account in no book is a part of
+           its own, named, so no money leaves the picture because nobody filed it. */
         kind: 'bar',
         heading: 'What you have, by book',
-        span: 12,
+        icon: 'book',
+        span: 4,
         source: 'metric.cash-by-book',
         unset: 'In no book',
         when: { metric: 'books-held', gte: 2 },
         empty: 'No account counts as cash yet.',
       },
       {
-        /* WHERE THE MONEY IS, one card an account, with the day each balance was true. SECOND AND NOT LAST, because a
-           fresh record's first job is to say what is in the bank, and every figure above reads from it. */
-        kind: 'cards',
-        heading: 'Accounts',
-        span: 8,
-        source: 'register.accounts',
-        columns: [
-          { field: 'name', as: 'title' },
-          { field: 'balance', as: 'figure' },
-          { field: 'kind', label: 'Type', as: 'fact' },
-          { field: 'as_of', label: 'As of', as: 'when' },
-        ],
-        order: [{ field: 'seq', dir: 'asc' }],
-        /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). */
-        stale: { field: 'as_of', after: '7d' },
-        empty: 'No accounts yet. Add what is in the bank and this page starts from it.',
-      },
-      {
-        /* THE FIRST BALANCE IS ADDED HERE, beside the accounts it joins, and not from a link at the foot of the page that
-           leaves it. */
+        /* THE FIRST BALANCE IS ADDED HERE, IN THE WALK'S PLACE, while there is none: the first thing a fresh record does,
+           and every figure on this page reads from it, so it sits beside the headline tile it fills and a fresh page is one
+           row and not a third of one. Cash ahead takes these eight twelfths once there is cash to walk from, and an
+           account after the first is added from the list. */
         kind: 'capture',
         heading: 'Add an account',
-        span: 4,
+        icon: 'plus',
+        span: 8,
         register: 'accounts',
-      },
-      {
-        /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT MONEY, answered where it is shown, three at a time, and the rest are in
-           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED` in
-           `packages/render/src/queue.ts`). */
-        kind: 'queue',
-        heading: 'Waiting on you',
-        span: 12,
-        source: 'governance.open',
-        /* EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0, so a question an agent asks about a balance check, a category or
-           a book is answered here too, and not only in Decide. */
-        where: 'list is obligations or transactions or accounts or recurring or installments or balances or categories or books',
-        limit: 3,
-        /* ONE TILE A QUESTION, SINCE money-core 3.2.0, led by what its recommended answer shows, the ways to answer under
-           it, so "let it read the bank's texts?" is read as its options and not as a line in a list. */
-        tiles: true,
+        when: { metric: 'cash-accounts', lt: 1 },
       },
       {
         /* HOW LONG THE MONEY LASTS: cash remembered up to today, then the walk from Cash now, a repeating row
            spent every time it comes round. A reader can ask what if clients pay later, what if there is
            spending the record does not know, or what if a large movement does not happen; the answer is
-           arithmetic over the same walk, and nothing is written. Every movement is in the fold under it. */
+           arithmetic over the same walk, and nothing is written. Every movement is in the fold under it.
+           Drawn once there is cash to walk from: with no account, Cash now has no value and the line no start. */
         kind: 'forecast',
         heading: 'Cash ahead',
-        /* EIGHT, BESIDE THE NEXT THIRTY DAYS' FOUR, SINCE money-core 3.2.0: the line ahead and the arithmetic of its first
-           month read side by side, as one question. Eight is the narrowest a walk stays legible at. */
+        icon: 'chart-line',
+        /* EIGHT, BESIDE THE HEADLINE TILE'S FOUR, SINCE money-core 3.3.0. Eight is the narrowest a walk stays legible at. */
         span: 8,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
@@ -2246,46 +2306,192 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
            walk goes under inside a month. */
         late: 'days-late-in',
         under: 30,
+        when: { metric: 'cash-accounts', gt: 0 },
         empty: 'Nothing dated in the next twelve months.',
       },
       {
-        /* THE NEXT THIRTY DAYS AS ARITHMETIC: cash now, plus what arrives, less what leaves, and where
-           that lands. It walks what the block above it walks, over a shorter horizon, and it is the same array,
-           so a leg in one and not the other cannot become two answers about the same thirty days. */
+        /* WHAT A RULE OR AN AGENT HAS ASKED ABOUT MONEY, answered where it is shown, three at a time, and the rest are in
+           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED` in
+           `packages/render/src/queue.ts`). RIGHT UNDER THE HEADLINE, SINCE money-core 3.3.0, because it is the one tile
+           here that needs the person, and what needs the person comes before what explains. */
+        kind: 'queue',
+        heading: 'Waiting on you',
+        icon: 'ask',
+        span: 12,
+        source: 'governance.open',
+        /* ONLY WHILE SOMETHING IS ASKED, SINCE money-core 3.3.0 (`questions-open`, the record's own count of what is open
+           in Decide), so a record with nothing waiting draws no band under its headline. */
+        when: { metric: 'questions-open', gt: 0 },
+        /* EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0, so a question an agent asks about a balance check, a category or
+           a book is answered here too, and not only in Decide. */
+        where: 'list is obligations or transactions or accounts or recurring or installments or balances or categories or books',
+        limit: 3,
+        /* ONE TILE A QUESTION, SINCE money-core 3.2.0, led by what its recommended answer shows, the ways to answer under
+           it, so "let it read the bank's texts?" is read as its options and not as a line in a list. */
+        tiles: true,
+      },
+      {
+        /* A BALANCE MORE THAN A WEEK OLD IS SAID ON THE PAGE THAT READS IT, SINCE money-core 3.3.0. The accounts were
+           cards that marked it (`stale:`), and Cash now cut by account carries no day; every figure here starts from
+           these balances, so an old one is the one thing about them that needs the person. The day is the oldest, the
+           one Cash now's own note says. */
+        kind: 'note',
+        tone: 'warn',
+        heading: 'Out of date',
+        icon: 'refresh',
+        span: 12,
+        body: "The oldest balance in Cash now is from {{cash-as-of}}. Update it so this page starts from today's money.",
+        when: { metric: 'balances-stale', gt: 0 },
+      },
+      {
+        /* NOTES THAT DRAW ONLY WHEN THEY ARE TRUE, and say what is late, never what the law says about it: a page
+           everybody's Money draws does not speak for one country's courts. IN A FINANCE PAGE'S WORDS, SINCE money-core
+           3.3.0: money coming in and going out, invoices and bills, and never who owes whom.
+
+           EACH THE WHOLE WIDTH, SINCE money-core 3.3.0. They were half each, side by side, and each is drawn on its own
+           figure, so the usual day (one direction late, not both) left half a row empty beside it.
+
+           A ROW IS WHOLE WHATEVER IS HIDDEN, everywhere on this page: a tile drawn on a figure of its own takes the
+           whole row, and two tiles share a row only when one figure draws both (`cash-accounts` for the headline row's
+           walk and for Accounts beside The next 30 days). Two tiles shown on different figures leave a hole the day
+           only one of them is true, and that is most days on most records. */
+        kind: 'note',
+        tone: 'warn',
+        heading: 'Late coming in',
+        icon: 'clock',
+        span: 12,
+        body: 'Invoices past their due date: {{late-in}} still to come in.',
+        when: { metric: 'late-in', gt: 0 },
+      },
+      {
+        kind: 'note',
+        tone: 'bad',
+        heading: 'Late going out',
+        icon: 'alert',
+        span: 12,
+        body: 'Bills past their due date: {{overdue}} still to pay.',
+        when: { metric: 'overdue', gt: 0 },
+      },
+      {
+        /* WHERE THE MONEY IS, SINCE money-core 3.3.0: Cash now cut into the accounts that hold it, each named as the
+           record names it, one track whose parts add up to the headline (`cash-by-account`). Drawn on every record with
+           an account, one book or several, because "which account is it in" is asked of three accounts as much as of two
+           books. What each account last said and when is on its row, a tap away. */
+        kind: 'split',
+        heading: 'Accounts',
+        icon: 'landmark',
+        /* EIGHT, BESIDE THE NEXT 30 DAYS' FOUR: both are drawn on `cash-accounts`, so the row is whole on every record
+           that draws either. */
+        span: 8,
+        source: 'metric.cash-by-account',
+        limit: 6,
+        when: { metric: 'cash-accounts', gt: 0 },
+        empty: 'No account counts as cash yet.',
+      },
+      {
+        /* THE NEXT THIRTY DAYS AS ARITHMETIC, BESIDE WHERE THE MONEY SITS: cash now, plus what arrives, less what leaves,
+           and where that lands. It walks what Cash ahead walks, over a shorter horizon, and it is the same array, so a
+           leg in one and not the other cannot become two answers about the same thirty days. */
         kind: 'bridge',
         heading: 'The next 30 days',
+        icon: 'scale',
         span: 4,
         source: 'forecast.runway',
         opening: { metric: 'cash-now' },
         from: CASH_LEGS,
         horizon: 30,
+        when: { metric: 'cash-accounts', gt: 0 },
         empty: 'Nothing dated in the next 30 days.',
       },
       {
-        /* WHAT FALLS DUE IN THE NEXT THIRTY DAYS, ACROSS MONEY'S LISTS THAT HOLD A DUE DAY, overdue first and then by
-           day, in the order the record gives (`deadlines`). The amount carries its own sign, so which way a row's money
-           goes is a property of the row rather than the table it sits in. */
-        kind: 'table',
-        heading: 'Coming up',
+        /* WHAT FALLS DUE IN THE NEXT THIRTY DAYS, ON THE DAYS IT FALLS, SINCE money-core 3.3.0: a calendar of the month
+           ahead where a table of twelve rows was, each bill and invoice named as the record names it on its day, and an
+           agenda of the days under it. This month and the next, because thirty days from today cross into it. Only while
+           something falls due (`due-items-30d`, the same sentence); what is already late is the two notes above. */
+        kind: 'calendar',
+        heading: 'Due in the next 30 days',
+        icon: 'calendar',
         span: 12,
-        source: 'deadlines',
-        where: 'list is obligations or recurring or installments',
-        horizon: 30,
-        columns: [
-          { field: 'title', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
-          { field: 'day', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        limit: 12,
+        source: 'register.obligations',
+        where: DUE_30D,
+        columns: [{ field: 'what' }, { field: 'due' }],
+        back: 0,
+        ahead: 1,
+        when: { metric: 'due-items-30d', gt: 0 },
         empty: 'Nothing falls due in the next 30 days.',
+      },
+      {
+        /* WHAT IS BEING PAID IN PARTS, ONE TRACK A PLAN, SINCE money-core 3.2.0: the parts paid against every part of the
+           plan, "3 of 8", read off the list's own status, where a part that is paid is done (`installments.done`). A
+           plan is the parts that share its `plan`, so no plan is a row anybody has to keep in step with its parts. A
+           cancelled part is out of both counts, as it is out of the walk, and money coming in by parts is not what this
+           asks, so only what goes out is drawn. Only while something is left to pay in parts. */
+        kind: 'progress',
+        heading: 'Instalments',
+        icon: 'credit-card',
+        span: 12,
+        source: 'register.installments',
+        where: 'direction is out, state is not cancelled',
+        columns: [{ field: 'plan' }, { field: 'state' }],
+        limit: 6,
+        when: { metric: 'installments-left', gt: 0 },
+        empty: 'Nothing is being paid in parts.',
+      },
+      {
+        /* WHERE THIS MONTH'S MONEY WENT, BY WHAT IT WAS FOR, from what moved and not from what was promised: the clauses
+           of `spent-by-category-month`, cleared and not between your own accounts. What no category holds is said last
+           and opens those rows, so the hole is a job and not a gap. Only once something has gone out this month: it is
+           the tile most often missing, since nothing has cleared in the first days of a month. */
+        kind: 'split',
+        heading: "Where this month's money went",
+        icon: 'chart-pie',
+        span: 12,
+        source: 'register.transactions',
+        where: 'state is cleared, transfer is false, direction is out, on at least bom',
+        columns: [{ field: 'category' }, { field: 'amount' }],
+        limit: 6,
+        unset: 'Uncategorised',
+        when: { metric: 'spent-by-category-month', gt: 0 },
+        empty: 'Nothing has gone out this month.',
+      },
+      {
+        /* WHAT GOES OUT EVERY MONTH, by what it is for, at each line's monthly share: the parts of `every-month-out`, over
+           the same rows, under what this month's money went on, the other split by what it was for. */
+        kind: 'split',
+        heading: 'Every month',
+        icon: 'repeat',
+        span: 12,
+        source: 'metric.every-month-by-category',
+        limit: 6,
+        unset: 'Uncategorised',
+        when: { metric: 'every-month-out', gt: 0 },
+        empty: 'Nothing repeats every month.',
+      },
+      {
+        /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in
+           the three after, with what was left each month as a line. The current month is so far, and the months ahead
+           are what is due once plus what repeats at its monthly share, in every one of them. */
+        kind: 'series',
+        heading: 'In and out, by month',
+        icon: 'chart-column',
+        span: 12,
+        series: [
+          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
+          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
+        ],
+        back: 12,
+        ahead: 3,
+        net: true,
+        when: { metric: 'out-by-month', gt: 0 },
+        empty: 'Nothing moved or due in these months.',
       },
       {
         /* WHAT SOMEBODY CHOSE TO CHASE, AND SINCE WHEN, from the answer in Decide (`invoice-chased`), oldest first. Only
            while something is being chased: a table that is empty on nearly every record is noise on the one page
-           everybody reads. `Coming up` cannot carry it, because a deadline row says its day and amount and nothing
-           else of the row it came from. */
+           everybody reads. */
         kind: 'table',
         heading: 'Being chased',
+        icon: 'bell',
         span: 12,
         source: 'register.obligations',
         where: `${OPEN}, direction is owed to me, chased is set`,
@@ -2301,111 +2507,19 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing is being chased.',
       },
       {
-        /* NOTES THAT DRAW ONLY WHEN THEY ARE TRUE, and say what is late, never what the law says about it: a page
-           everybody's Money draws does not speak for one country's courts. */
-        kind: 'note',
-        tone: 'warn',
-        heading: 'Late to you',
-        span: 12,
-        body: 'Money you are owed has gone past its date: {{late-in}} in all.',
-        when: { metric: 'late-in', gt: 0 },
-      },
-      {
-        kind: 'note',
-        tone: 'bad',
-        heading: 'Late to pay',
-        span: 12,
-        body: 'Money you owe has gone past its date: {{overdue}} in all.',
-        when: { metric: 'overdue', gt: 0 },
-      },
-      {
-        /* WHERE THIS MONTH'S MONEY WENT, BY WHAT IT WAS FOR, from what moved and not from what was promised: the clauses
-           of `spent-by-category-month`, cleared and not between your own accounts. What no category holds is said last
-           and opens those rows, so the hole is a job and not a gap. AFTER WHAT IS COMING, SINCE money-core 3.2.0, and
-           beside what is being paid in parts, the two things this month is spending on. */
-        kind: 'split',
-        heading: "Where this month's money went",
-        span: 7,
-        source: 'register.transactions',
-        where: 'state is cleared, transfer is false, direction is out, on at least bom',
-        columns: [{ field: 'category' }, { field: 'amount' }],
-        limit: 6,
-        unset: 'Uncategorised',
-        empty: 'Nothing has gone out this month.',
-      },
-      {
-        /* WHAT IS BEING PAID IN PARTS, ONE TRACK A PLAN, SINCE money-core 3.2.0: the parts paid against every part of the
-           plan, "3 of 8", read off the list's own status, where a part that is paid is done (`installments.done`). A
-           plan is the parts that share its `plan`, so no plan is a row anybody has to keep in step with its parts. A
-           cancelled part is out of both counts, as it is out of the walk, and money coming in by parts is not what this
-           asks, so only what goes out is drawn. */
-        kind: 'progress',
-        heading: 'Instalments',
-        span: 5,
-        source: 'register.installments',
-        where: 'direction is out, state is not cancelled',
-        columns: [{ field: 'plan' }, { field: 'state' }],
-        limit: 6,
-        empty: 'Nothing is being paid in parts.',
-      },
-      {
-        /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in
-           the three after, with what was left each month as a line. The current month is so far, and the months ahead
-           are what is due once plus what repeats at its monthly share, in every one of them. */
-        kind: 'series',
-        heading: 'In and out, by month',
-        span: 12,
-        series: [
-          { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
-          { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
-        ],
-        back: 12,
-        ahead: 3,
-        net: true,
-        empty: 'Nothing moved or due in these months.',
-      },
-      {
-        /* WHAT GOES OUT EVERY MONTH, by what it is for, at each line's monthly share: the parts of `every-month-out`, over
-           the same rows. */
-        kind: 'split',
-        heading: 'Every month',
-        span: 12,
-        source: 'metric.every-month-by-category',
-        limit: 6,
-        unset: 'Uncategorised',
-        empty: 'Nothing repeats every month.',
-      },
-      {
-        /* WHAT MOVED, NEWEST FIRST. The amount carries its own sign from the row. Ten, so the page stays a page; the list
-           holds the rest, and the table's own link opens it. */
-        kind: 'table',
+        /* WHAT MOVED, NEWEST FIRST, AS A CALM LIST (`MOVED_COLUMNS`). Twelve, so the page stays a page; the list holds the
+           rest, and the block's own link opens it. Drawn once there is an account, whose first payment it waits for. */
+        kind: 'timeline',
         heading: 'What moved',
+        icon: 'receipt',
         span: 12,
         source: 'register.transactions',
         where: 'state is not void',
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'account', label: 'Account', width: 'minmax(10ch,16ch)' },
-          { field: 'category', label: 'For', width: 'minmax(8ch,14ch)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
-          { field: 'on', label: 'Date', width: '13ch', align: 'end' },
-        ],
+        columns: MOVED_COLUMNS,
         order: [{ field: 'on', dir: 'desc' }],
-        limit: 10,
+        limit: 12,
+        when: { metric: 'cash-accounts', gt: 0 },
         empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
-      },
-      {
-        /* WHAT RULES AND AGENTS DID TO MONEY, from the record's own log, so a payment a rule filed or a balance an agent
-           wrote is seen where the money is and not only in History. EVERY LIST MONEY HOLDS, SINCE money-core 3.1.0: an
-           answer in Decide that chased a bill or ended a repeating line is a rule's write to that row, and an agent's
-           balance check or category is a write to Money as much as a payment is. */
-        kind: 'feed',
-        heading: 'What agents and rules did',
-        span: 12,
-        source: 'activity',
-        where: 'actor is agent or rule, list is transactions or obligations or accounts or recurring or installments or balances or categories or books',
-        first: 5,
-        empty: 'Nothing has been changed here by a rule or an agent yet.',
       },
     ],
   },
@@ -2421,6 +2535,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
    * A CAPTURE HERE FILES INTO THIS BOOK. A capture presets a link only where its sentence names the row by its spoken
    * id (`captureFills` in `packages/kernel/src/pages.ts`), because a title is a guess at a row, so the capture says
    * `{{spoken}}` where every other block says the name a person reads.
+   *
+   * THE MONEY PAGE'S TILES, SINCE money-core 3.3.0: the headline figure beside its walk, the month ahead as a calendar
+   * beside its arithmetic, and what moved as a calm list. The accounts stay cards here, each with the day its balance was
+   * true, because a book's few accounts are the page's subject and Cash now by account is a figure of the whole record.
    */
   'money-book': {
     page: 'money-book',
@@ -2435,38 +2553,17 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         kind: 'stat',
         lead: true,
         heading: 'What you have',
-        span: 12,
-        cells: [{ metric: 'book-cash:{{name}}', label: 'Cash now' }],
-      },
-      {
-        kind: 'cards',
-        heading: 'Accounts',
-        span: 8,
-        source: 'register.accounts',
-        where: 'book is {{name}}',
-        columns: [
-          { field: 'name', as: 'title' },
-          { field: 'balance', as: 'figure' },
-          { field: 'kind', label: 'Type', as: 'fact' },
-          { field: 'as_of', label: 'As of', as: 'when' },
-        ],
-        order: [{ field: 'seq', dir: 'asc' }],
-        stale: { field: 'as_of', after: '7d' },
-        empty: 'No account is in {{name}} yet. Add one here and it is filed in this book.',
-      },
-      {
-        kind: 'capture',
-        heading: 'Add an account',
+        icon: 'wallet',
         span: 4,
-        register: 'accounts',
-        where: 'book is {{spoken}}',
+        cells: [{ metric: 'book-cash:{{name}}', label: 'Cash now' }],
       },
       {
         /* THIS BOOK'S WALK, FROM THIS BOOK'S CASH, over this book's bills, repeating lines, instalments and money on its
            way (`BOOK_LEGS`). No `sell`: what a record holds to sell is filed in no book. */
         kind: 'forecast',
         heading: 'Cash ahead',
-        span: 12,
+        icon: 'chart-line',
+        span: 8,
         source: 'forecast.runway',
         opening: { metric: 'book-cash:{{name}}' },
         from: BOOK_LEGS,
@@ -2478,9 +2575,23 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing in {{name}} is dated in the next twelve months.',
       },
       {
+        /* WHAT THIS BOOK HAS DUE IN THE NEXT THIRTY DAYS, ON ITS DAYS, from the bills themselves, which say their book. */
+        kind: 'calendar',
+        heading: 'Due in the next 30 days',
+        icon: 'calendar',
+        span: 8,
+        source: 'register.obligations',
+        where: `${DUE_30D}, book is {{name}}`,
+        columns: [{ field: 'what' }, { field: 'due' }],
+        back: 0,
+        ahead: 1,
+        empty: 'Nothing in {{name}} falls due in the next 30 days.',
+      },
+      {
         kind: 'bridge',
         heading: 'The next 30 days',
-        span: 5,
+        icon: 'scale',
+        span: 4,
         source: 'forecast.runway',
         opening: { metric: 'book-cash:{{name}}' },
         from: BOOK_LEGS,
@@ -2488,9 +2599,36 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing in {{name}} is dated in the next 30 days.',
       },
       {
+        kind: 'cards',
+        heading: 'Accounts',
+        icon: 'landmark',
+        span: 8,
+        source: 'register.accounts',
+        where: 'book is {{name}}',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'balance', as: 'figure' },
+          { field: 'kind', label: 'Type', as: 'fact' },
+          { field: 'as_of', label: 'As of', as: 'when' },
+        ],
+        order: [{ field: 'seq', dir: 'asc' }],
+        /* A BALANCE OLDER THAN A WEEK IS SAID TO BE OUT OF DATE (25 §9). */
+        stale: { field: 'as_of', after: '7d' },
+        empty: 'No account is in {{name}} yet. Add one here and it is filed in this book.',
+      },
+      {
+        kind: 'capture',
+        heading: 'Add an account',
+        icon: 'plus',
+        span: 4,
+        register: 'accounts',
+        where: 'book is {{spoken}}',
+      },
+      {
         kind: 'split',
         heading: "Where this month's money went",
-        span: 7,
+        icon: 'chart-pie',
+        span: 12,
         source: 'register.transactions',
         where: 'state is cleared, transfer is false, direction is out, on at least bom, book is {{name}}',
         columns: [{ field: 'category' }, { field: 'amount' }],
@@ -2499,37 +2637,15 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         empty: 'Nothing has gone out of {{name}} this month.',
       },
       {
-        /* WHAT THIS BOOK OWES AND IS OWED IN THE NEXT THIRTY DAYS, late first. From the bills themselves and not from
-           `deadlines`, whose rows carry no book to be filtered by. */
-        kind: 'table',
-        heading: 'Coming up',
-        span: 12,
-        source: 'register.obligations',
-        where: `${OPEN}, due before +31d, book is {{name}}`,
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
-          { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'due', dir: 'asc' }],
-        limit: 12,
-        empty: 'Nothing in {{name}} falls due in the next 30 days.',
-      },
-      {
-        kind: 'table',
+        kind: 'timeline',
         heading: 'What moved',
+        icon: 'receipt',
         span: 12,
         source: 'register.transactions',
         where: 'state is not void, book is {{name}}',
-        columns: [
-          { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-          { field: 'account', label: 'Account', width: 'minmax(10ch,16ch)' },
-          { field: 'category', label: 'For', width: 'minmax(8ch,14ch)' },
-          { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
-          { field: 'on', label: 'Date', width: '13ch', align: 'end' },
-        ],
+        columns: MOVED_COLUMNS,
         order: [{ field: 'on', dir: 'desc' }],
-        limit: 10,
+        limit: 12,
         empty: 'Nothing has moved in {{name}} yet.',
       },
     ],

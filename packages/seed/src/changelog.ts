@@ -20,6 +20,7 @@ export type ModuleChange = { version: string; notes: string };
 
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
+    { version: '1.7.0', notes: 'Each project in play shows a small line of the work finished on it each week, when you use Work.' },
     {
       version: '1.5.0',
       notes:
@@ -27,6 +28,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    {
+      version: '2.4.0',
+      notes:
+        'Each person carries the last day they were in touch. People opens on one line of who you have been in touch with lately and who has gone quiet, draws it as a chart and lists everyone, the latest first.',
+    },
     { version: '2.3.1', notes: 'People now links each person to the projects you met them in on a BrainDog set up before this fix.' },
     {
       version: '2.3.0',
@@ -38,6 +44,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.3.0',
+      notes:
+        'Money is calmer: one line of what your money is doing and how far cash moved on a month ago, cash by account, the month ahead as a calendar and what moved as a list. A balance older than a week is flagged, and questions show only when something is asked.',
+    },
     {
       version: '3.1.0',
       notes:
@@ -58,6 +69,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.10.0',
+      notes:
+        'Work opens on one line of what is open, late and waiting on you, then the capture line. Late, Today, This week, With an agent, Waiting on you and Done recently each show only when they hold something, and what is further off is folded away. Late counts only your own tasks, as its list does. A project page shows what got done on it each week.',
+    },
     { version: '1.9.1', notes: 'Tasks and threads now say which project they are for and who holds them on a BrainDog set up before this fix.' },
     {
       version: '1.9.0',

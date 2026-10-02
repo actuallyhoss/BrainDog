@@ -309,8 +309,8 @@ const WAITING = 'state is review or blocked';
  * THE LISTS ARE CUT SO THAT NO TASK CAN FALL UNDER TWO, and the cut is by state first, then by agent, then by day.
  * Waiting on you takes `WAITING` whoever holds the task, because a task an agent handed back is waiting on a person
  * and not on the agent. With an agent takes the rest of what an agent holds. What is left is yours, and the day
- * divides it: Today (on or before it), This week, After this week, and No due day. Later is the backlog, whatever its
- * date, which is the word the Board already uses for it.
+ * divides it: Late, Today, This week, After this week, and No due day. Later is the backlog, whatever its date, which
+ * is the word the Board already uses for it.
  *
  * A TASK OF YOURS WITH NO DUE DAY HAS A LIST OF ITS OWN because no sentence the grammar reads can put it under After
  * this week. At 1.6.0 it was under none of the six: a task created with nothing but a description, state `open` by
@@ -378,6 +378,46 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /**
+   * YOURS, BAND BY BAND, SINCE work 1.10.0: what is late, due today and due later this week among the tasks in your own
+   * hands (`YOURS`, taken on and no agent holding it), each over its band's own clauses on Work's page. Past their date
+   * and Due in 7 days count the backlog and what an agent holds too, so the line said '2 late' over a Late band that
+   * said nothing of yours was, and Today drew 'Nothing due today.' on a day only an agent's task fell due. A band drawn
+   * on its own count is drawn exactly while it holds a task.
+   */
+  'tasks-late-yours': {
+    metric: 'tasks-late-yours',
+    name: 'Yours, late',
+    source: 'register.tasks',
+    where: `${YOURS}, by before today`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-today-yours': {
+    metric: 'tasks-today-yours',
+    name: 'Yours, due today',
+    source: 'register.tasks',
+    where: `${YOURS}, by is today`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'tasks-week-yours': {
+    metric: 'tasks-week-yours',
+    name: 'Yours, due this week',
+    source: 'register.tasks',
+    where: `${YOURS}, by after today, by before +8d`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   /* WHAT WAITS ON A PERSON: work an agent handed back to be checked, and work that cannot move. */
   'tasks-waiting': {
     metric: 'tasks-waiting',
@@ -390,17 +430,21 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /* WHAT AN AGENT HAS IN HAND, SINCE work 1.10.0, over the With an agent band's own clauses: taken on and not handed
+     back. It counted every live task an agent was named on, so a task it handed back was counted here and again as
+     waiting on you, and the band was drawn over nothing on a day an agent held only that. */
   'tasks-with-agents': {
     metric: 'tasks-with-agents',
     name: 'With an agent',
     source: 'register.tasks',
-    where: `${LIVE}, agent is set`,
+    where: `${IN_HAND}, agent is set`,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
   },
+  /* REMEMBERED DAILY since work 1.10.0, as Open is, so the two figures on Right now each draw their weeks as a line. */
   'tasks-done-7d': {
     metric: 'tasks-done-7d',
     name: 'Done in 7 days',
@@ -411,6 +455,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
+    snapshot: { grain: 'day', into: 'series.tasks-done-7d' },
   },
   'tasks-done-7d-agents': {
     metric: 'tasks-done-7d-agents',
@@ -429,6 +474,25 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     name: 'Done, by week',
     source: 'register.tasks',
     where: 'state is done, done_on after -63d',
+    value: { count: 'id' },
+    group_by: 'done_on',
+    bucket: 'week',
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /**
+   * ONE PROJECT'S FINISHED WORK, BY THE WEEK IT WAS FINISHED, since work 1.10.0: the line a project draws of how its work
+   * is moving, read as `project-done-by-week:<project>` the way `project-done-7d:<project>` is. Work's, because it reads
+   * tasks alone, and left out with every figure over `thing` on a record that holds no projects (`without` in
+   * `packs/first-party.ts`).
+   */
+  'project-done-by-week': {
+    metric: 'project-done-by-week',
+    name: 'Done, by week',
+    source: 'register.tasks',
+    where: 'thing is {{it}}, state is done, done_on after -63d',
     value: { count: 'id' },
     group_by: 'done_on',
     bucket: 'week',
@@ -572,8 +636,22 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    * due, how the work moved week by week, where it sits, and what agents took. The board is its own page beside it.
    *
    * SINCE work 1.9.0 IT IS A TO-DO FIRST: the capture line leads, the lists of yours are ordered by tier and then by due
-   * day, and beside what agents hold are what they ask (`governance.open`), what falls due in two weeks (`deadlines`) and
-   * what was finished day by day (`heat`).
+   * day, and beside what agents hold are what they ask (`governance.open`).
+   *
+   * SINCE work 1.10.0 IT IS THE WORK SCREEN'S BANDS, declared (`apps/web/src/lib/work/Work.svelte`), so that screen can
+   * be drawn from this page: one line of what matters, the capture line, two figures, then Late, Today, This week, With
+   * an agent, Waiting on you and Done recently, top to bottom, each the whole width, and what is further off folded shut
+   * under Not this week. A band with nothing in it is not drawn (`when:`), so a quiet day shows what there is and a new
+   * record shows the capture line alone. The figures are cut to Open and Done in 7 days, the load and how fast it
+   * moves; what is late and what waits on you is in the line and in its own band. The chart of the weeks, the bar by
+   * project and the queue of what agents ask went: the figures draw their weeks, a project's page draws its own, and
+   * Decide holds the questions.
+   *
+   * EVERY BAND STILL HOLDS A TASK ONCE. A sentence cannot read "late, and not with an agent" as one band and "with an
+   * agent, and not late" as the next (`IN_HAND` above), so the cut is by state first, as before: Waiting on you takes
+   * what waits on a person, With an agent what an agent holds, and the day divides what is yours. A band is drawn on a
+   * figure that counts exactly its own tasks (Late, Today and This week over the `-yours` figures), so it is never hidden
+   * while it holds one and never drawn empty.
    */
   work: {
     page: 'work',
@@ -585,191 +663,174 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     pack: 'work',
     blocks: [
       {
+        /* THE PAGE'S ONE LINE, drawn in the title's tile, said from three figures. A clause whose figure is nought is
+           left out by the writer (`leadOf`), so a quiet week says only what there is; a record with nothing open says
+           nothing at all. Late is yours (`tasks-late-yours`), the count of the Late band under it, so the line and the
+           band never disagree; an agent's late task is counted where it is drawn, with the agent or waiting on you. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        body: '{{open-tasks}} open task(s), {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
+      },
+      {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the
            one carried in your head. The heading is the field's prompt (`render/src/capture.ts`), and a task added here
-           is To do with no day, so it lands under No due day until somebody gives it one. */
+           is To do with no day, so it lands under Not this week until somebody gives it one. */
         kind: 'capture',
         heading: 'What needs doing?',
+        icon: 'plus',
         span: 12,
         register: 'tasks',
       },
       {
+        /* TWO FIGURES, EACH DRAWING ITS EIGHT WEEKS AS A LINE from its nightly series (`snapshot` above): how much is
+           open, and how much was finished. Drawn once there is work. */
         kind: 'stat',
-        lead: true,
         heading: 'Right now',
+        icon: 'activity',
         span: 12,
+        when: { metric: 'open-tasks', gt: 0 },
         cells: [
-          { metric: 'open-tasks', label: 'Open', trend: '8w', note: '{{tasks-with-agents}} with an agent, {{tasks-later}} kept for later' },
-          { metric: 'tasks-waiting', label: 'Waiting on you', note: 'to check, or blocked' },
-          { metric: 'tasks-due-7d', label: 'Due in 7 days', note: '{{tasks-overdue}} past their date' },
-          { metric: 'tasks-done-7d', label: 'Done in 7 days', note: '{{tasks-done-7d-agents}} of them by an agent' },
+          { metric: 'open-tasks', label: 'Open', trend: '8w', note: '{{tasks-with-agents}} with an agent' },
+          { metric: 'tasks-done-7d', label: 'Done in 7 days', trend: '8w', note: '{{tasks-done-7d-agents}} of them by an agent' },
         ],
       },
       {
         /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
-           every `todo` row (`apps/web/src/routes/p/[slug]/+page.svelte:810`); drawn as tables, the only lists on
-           Work's own Overview were the ones nobody could tick. PAST ITS DATE IS TODAY'S, because it is still the next
-           thing to do, and a separate Overdue list would put the most urgent work under the least read heading. */
+           every `todo` row. Late, Today and This week are yours, cut at today and at a week, ordered by tier and then
+           by day. */
         kind: 'todo',
-        heading: 'Today',
-        span: 6,
+        heading: 'Late',
+        icon: 'alert',
+        span: 12,
         source: 'register.tasks',
-        where: `${YOURS}, by before +1d`,
+        where: `${YOURS}, by before today`,
         columns: [{ field: 'what' }, { field: 'by' }],
         order: TIER_THEN_DUE,
-        limit: 8,
-        empty: 'Nothing of yours is due today.',
+        limit: 12,
+        when: { metric: 'tasks-late-yours', gt: 0 },
+        empty: 'Nothing of yours is late.',
+      },
+      {
+        kind: 'todo',
+        heading: 'Today',
+        icon: 'calendar',
+        span: 12,
+        source: 'register.tasks',
+        where: `${YOURS}, by is today`,
+        columns: [{ field: 'what' }, { field: 'thing' }],
+        order: TIER_THEN_DUE,
+        limit: 12,
+        when: { metric: 'tasks-today-yours', gt: 0 },
+        empty: 'Nothing due today.',
       },
       {
         kind: 'todo',
         heading: 'This week',
-        span: 6,
+        icon: 'calendar-days',
+        span: 12,
         source: 'register.tasks',
         where: `${YOURS}, by after today, by before +8d`,
         columns: [{ field: 'what' }, { field: 'by' }],
         order: TIER_THEN_DUE,
-        limit: 8,
-        empty: 'Nothing else of yours is due this week.',
-      },
-      {
-        /* THE QUEUE A PERSON WORKS FROM, with the note as the reason it waits and, under it, when the task falls due
-           and who changed it last: the two facts the 1.5.0 table carried. `todo` is `cells: 4, optional: 2` in
-           `braindog-render`'s `kinds.ts`, and both renderers draw the third and fourth cells as one quiet line
-           joined by a dot (`src/todo.ts`). THE KIND WIDENED IN c6e2a331 AND THIS BLOCK DID NOT: it kept two columns,
-           so the page padded every row to `title | detail |  | ` and the line stayed empty (measured, and held by
-           `test/waiting-due.test.ts`). `changed` is
-           not a field of tasks; the kernel reads it from each row's history. */
-        kind: 'todo',
-        heading: 'Waiting on you',
-        span: 7,
-        source: 'register.tasks',
-        where: WAITING,
-        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'changed' }],
-        order: [{ field: 'by', dir: 'asc' }],
-        limit: 8,
-        empty: 'Nothing is waiting on you.',
+        limit: 12,
+        when: { metric: 'tasks-week-yours', gt: 0 },
+        empty: 'Nothing else this week.',
       },
       {
         /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
-           waits on you, above. */
+           waits on you, below. */
         kind: 'todo',
         heading: 'With an agent',
-        span: 5,
+        icon: 'session',
+        span: 12,
         source: 'register.tasks',
         where: `${IN_HAND}, agent is set`,
         columns: [{ field: 'what' }, { field: 'agent' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         working: true,
-        empty: 'No agent holds a task. An agent takes one by setting itself as its agent.',
+        when: { metric: 'tasks-with-agents', gt: 0 },
+        empty: 'No agent holds a task.',
       },
       {
-        /* WHAT AN AGENT OR A RULE HAS ASKED ABOUT A TASK, answered where it is shown, three at a time, and the rest are in
-           Decide. No `empty:` of its own: with nothing waiting the queue says its own line (`QUEUE_CLEARED`). */
-        kind: 'queue',
-        heading: 'Agents suggest',
-        span: 6,
-        source: 'governance.open',
-        where: 'list is tasks',
-        limit: 3,
+        /* WHAT WAITS ON A PERSON, with the note as the reason it waits and, under it, when the task falls due and who
+           changed it last. `todo` is `cells: 4, optional: 2` in `braindog-render`'s `kinds.ts`, and both renderers draw
+           the third and fourth cells as one quiet line joined by a dot (`src/todo.ts`, held by
+           `test/waiting-due.test.ts`). `changed` is not a field of tasks; the kernel reads it from each row's history. */
+        kind: 'todo',
+        heading: 'Waiting on you',
+        icon: 'hourglass',
+        span: 12,
+        source: 'register.tasks',
+        where: WAITING,
+        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'changed' }],
+        order: [{ field: 'by', dir: 'asc' }],
+        limit: 8,
+        when: { metric: 'tasks-waiting', gt: 0 },
+        empty: 'Nothing waits on you.',
       },
       {
-        /* WHAT FALLS DUE IN THE NEXT FOURTEEN DAYS, on a time axis, overdue first and then by day, in the order the
-           record gives (`deadlines` takes no `order:`). Not finished is the list's own `done` states. */
-        kind: 'timeline',
-        heading: 'Next two weeks',
-        span: 6,
-        source: 'deadlines',
-        where: 'list is tasks',
-        horizon: 14,
-        columns: [{ field: 'day' }, { field: 'title' }],
-        limit: 12,
-        empty: 'Nothing falls due in the next two weeks.',
+        /* WHAT WAS FINISHED IN THE LAST SEVEN DAYS, NEWEST FIRST, ticked, so a task closed by mistake is opened again
+           from here. Over Done in 7 days' own clauses, and drawn while that figure has any. */
+        kind: 'todo',
+        heading: 'Done recently',
+        icon: 'circle-check',
+        span: 12,
+        source: 'register.tasks',
+        where: 'state is done, done_on after -8d',
+        columns: [{ field: 'what' }, { field: 'done_on' }, { field: 'agent' }],
+        order: [{ field: 'done_on', dir: 'desc' }],
+        limit: 8,
+        when: { metric: 'tasks-done-7d', gt: 0 },
+        empty: 'Nothing done this week.',
+      },
+      {
+        /* WHAT IS FURTHER OFF, FOLDED SHUT: yours after this week, yours with no day, and what is kept for later. A
+           section folds the blocks after it, so these are a tap away and not on the page a person reads each morning.
+           No Due day is its own band because no sentence can put a task with no day under After this week (`IN_HAND`). */
+        kind: 'section',
+        heading: 'Not this week',
+        icon: 'archive',
+        span: 12,
+        fold: true,
       },
       {
         kind: 'todo',
         heading: 'After this week',
-        span: 7,
+        icon: 'calendar-days',
+        span: 4,
         source: 'register.tasks',
         where: `${YOURS}, by after +7d`,
         columns: [{ field: 'what' }, { field: 'by' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
-        empty: 'Nothing of yours is due after this week.',
+        empty: 'Nothing after this week.',
       },
       {
-        /* WHAT IS YOURS AND HAS NO DAY, which no other list can hold: `IN_HAND` above says why it cannot be After this
-           week's. The project is its detail, because there is no day to show. */
+        /* The project is its detail, because there is no day to show. */
         kind: 'todo',
         heading: 'No due day',
-        span: 5,
+        icon: 'circle-dashed',
+        span: 4,
         source: 'register.tasks',
         where: `${YOURS}, by is empty`,
         columns: [{ field: 'what' }, { field: 'thing' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
-        empty: 'Everything of yours has a due day.',
-      },
-      {
-        /* WHAT WAS FINISHED, DAY BY DAY, for the last twelve weeks: a task counts once on the day it was done, and a day
-           nothing was finished is left pale rather than counted as idle. On a phone the host draws the last eight
-           weeks of the same grid. The grid starts on a Monday 77 to 83 days back, so the window reaches 83 days and
-           no drawn day is missing; early in a week a few rows fall before the grid, and the drawer counts and says them. */
-        kind: 'heat',
-        heading: 'Done, 12 weeks',
-        span: 5,
-        source: 'register.tasks',
-        where: 'state is done, done_on after -84d',
-        columns: [{ field: 'done_on' }],
-        empty: 'Nothing was finished in the last twelve weeks.',
-      },
-      {
-        kind: 'series',
-        heading: 'Done, and due ahead',
-        span: 7,
-        series: [{ metric: 'tasks-done-by-week', then: 'tasks-due-by-week', label: 'Done, then due' }],
-        back: 8,
-        ahead: 4,
-        empty: 'Nothing was finished or is due in these weeks.',
-      },
-      {
-        /* WHERE THE OPEN WORK SITS, in days of effort, and what belongs to no project, last. A task with no size adds
-           nothing and draws no bar, so open work nobody sized says the empty line rather than "No project 0 d". */
-        kind: 'bar',
-        heading: 'Open work by project',
-        span: 5,
-        source: 'register.tasks',
-        where: LIVE,
-        columns: [{ field: 'thing' }, { field: 'effort' }],
-        limit: 6,
-        unset: 'No project',
-        empty: 'No open work has a size yet.',
+        empty: 'Everything has a day.',
       },
       {
         kind: 'todo',
         heading: 'Later',
-        span: 7,
+        icon: 'archive',
+        span: 4,
         source: 'register.tasks',
         where: 'state is backlog',
         columns: [{ field: 'what' }, { field: 'thing' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
-        empty: 'Nothing is kept for later.',
-      },
-      {
-        kind: 'table',
-        heading: 'Done lately',
-        span: 12,
-        source: 'register.tasks',
-        where: 'state is done',
-        columns: [
-          DESCRIPTION,
-          { field: 'agent', label: 'Agent', width: '10ch' },
-          { field: 'done_on', label: 'Done on', width: '13ch', align: 'end' },
-        ],
-        order: [{ field: 'done_on', dir: 'desc' }],
-        limit: 6,
-        empty: 'Nothing is done yet.',
+        empty: 'Nothing kept for later.',
       },
     ],
   },
@@ -784,8 +845,16 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     pack: 'work',
     blocks: [
       {
+        /* THE BOARD'S ONE LINE, since work 1.10.0: how much is on it, and the two columns that need somebody. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        body: '{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
+      },
+      {
         kind: 'board',
         heading: 'By status',
+        icon: 'board',
         span: 12,
         columns: [{ field: 'state' }, { field: 'what' }, { field: 'thing' }],
         source: 'register.tasks',
@@ -802,6 +871,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
       {
         kind: 'table',
         heading: 'Everything open',
+        icon: 'rows',
         span: 12,
         source: 'register.tasks',
         /* WHAT OPEN COUNTS: work kept for later has its own column on the board above. */
