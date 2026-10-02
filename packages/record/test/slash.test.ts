@@ -97,7 +97,7 @@ type Reading = {
   quiet: string | null;
   noticed: { kind: string; subject: string; text: string }[];
   drafts: { question: string; body_kind: string; asked: { id: string; status: string } | null }[];
-  waiting: { id: string; question: string }[];
+  waiting: { id: string; question: string; by: string | null }[];
 };
 type Filed = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] };
 
@@ -298,6 +298,36 @@ test('A MODEL DRAFTS BEHIND THE PORT, and what it answers goes through the same 
   sql.close();
 });
 
+test('WHO DRAFTED A FILED QUESTION IS KEPT WITH IT, so a reload still says the rules or the model, and an old one says neither', async () => {
+  const model: SlashModel = {
+    name: 'test model',
+    draft: async () => ({ drafts: [{ question: 'Turn off Log? You have a page for it now.', body_kind: 'pack', body: { disable: 'log' } }] }),
+  };
+  /* THE RULES' THREE FIRST, then the model's one in the slot a dismissal frees. */
+  const { api, sql, clock } = await used();
+  const rules = value<Filed>(await api.slashPropose({}, owner));
+  assert.equal(rules.filed.length, 3);
+  value(await api.decide({ id: rules.filed[2]!.id, resolved_as: 'wont-fix', reason: 'not now' }, owner));
+  const withModel = await createRecordApi({ sql, clock, catalogue: CATALOGUE, slashModel: model });
+  const drafted = value<Filed>(await withModel.slashPropose({}, owner));
+  assert.deepEqual(drafted.filed.map((f) => f.by), ['test model']);
+
+  /* A RELOAD: a record opened again over the same file, with no press to remember anything. */
+  const reopened = await createRecordApi({ sql, clock, catalogue: CATALOGUE });
+  const by = Object.fromEntries(value<Reading>(await reopened.slash({}, owner)).waiting.map((w) => [w.id, w.by]));
+  assert.deepEqual(by, { [rules.filed[0]!.id]: 'rules', [rules.filed[1]!.id]: 'rules', [drafted.filed[0]!.id]: 'test model' });
+
+  /* A QUESTION FILED BEFORE THE RECORD KEPT THIS says nobody, rather than being passed off as the rules'. */
+  sql.exec('UPDATE suggestion SET drafted_by = NULL WHERE id = ?', rules.filed[0]!.id);
+  const old = value<Reading>(await reopened.slash({}, owner)).waiting.find((w) => w.id === rules.filed[0]!.id);
+  assert.equal(old?.by, null);
+
+  /* AND A PROPOSAL ANYBODY ELSE FILES KEEPS NO DRAFTER: the column is Slash's, and no caller's body can claim one. */
+  const theirs = value<{ id: string }>(await api.propose({ question: 'Set up?', body_kind: 'pack', body: { install: 'watch' } }, owner));
+  assert.equal(sql.one<{ d: string | null }>('SELECT drafted_by AS d FROM suggestion WHERE id = ?', theirs.id)?.d, null);
+  sql.close();
+});
+
 test('A MODEL THAT FAILS OR SAYS NOTHING USEFUL leaves the rules to speak', async () => {
   const broken: SlashModel = { name: 'broken', draft: async () => { throw new Error('offline'); } };
   const a = await used({ model: broken });
@@ -409,8 +439,9 @@ test('THE WORDS FOLLOW USE: a page the owner keeps opening lends its list its na
   assert.ok(id, JSON.stringify(out));
   /* FILED THROUGH `prepare`: the body carries what the label was, as a token's settings proposal does. */
   const row = api.kernel.governanceRow('suggestion', id!) as { body: { pack: string; values: Record<string, unknown>; before: Record<string, unknown> } };
-  assert.deepEqual(row.body.values, { label_tickets: 'Issues' });
-  assert.deepEqual(row.body.before, { label_tickets: 'Tickets' });
+  /* THE SINGULAR RIDES ON THE NAME'S CARD, one question for one rename, now every list declares it. */
+  assert.deepEqual(row.body.values, { label_tickets: 'Issues', one_tickets: 'issue' });
+  assert.deepEqual(row.body.before, { label_tickets: 'Tickets', one_tickets: null });
   assert.equal((await settingsOf(api, 'usecase-team')).label_tickets, 'Tickets', 'filing changed the label');
 
   value(await api.decide({ id: id!, decide: { option: 'accept', reason: 'yes' } }, owner));
@@ -458,7 +489,6 @@ test('A LIST RENAMED IS RENAMED IN ALL THREE WORDS: its name, one of it, and the
   const words = seen.drafts.filter((d) => d.body_kind === 'settings').map((d) => d.question);
   assert.deepEqual(words, [
     'Call Tickets Issues everywhere? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
-    'Call one of them issue? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
     'Say Issues holds every issue we know about? The line reads "every ticket we know about" now, in the old word.',
   ]);
   for (const q of words) assert.ok(!q.includes('—'), `an em dash in: ${q}`);

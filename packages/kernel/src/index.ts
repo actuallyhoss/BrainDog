@@ -7188,10 +7188,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * Open a suggestion. The body is checked here, so the person answering it never finds it broken.
      *
      * A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are, and the run is found only once the
-     * body has passed, so a refused proposal opens none. A bare name signs as itself.
+     * body has passed, so a refused proposal opens none. A bare name signs as itself. `drafted` is who drafted it,
+     * Slash's rules or a model, kept on `suggestion.drafted_by`.
      */
-    propose: (p: Proposal, w: WriteContext | string): Result<{ id: string }> =>
-      transaction(() => openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p)),
+    propose: (p: Proposal, w: WriteContext | string, drafted?: string): Result<{ id: string }> =>
+      transaction(() => openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p, drafted)),
 
     /** A suggestion's question, which is its `suggest` event and no column: what a person reads it by. */
     question: (id: string): string | null => questionOf(sql, id),

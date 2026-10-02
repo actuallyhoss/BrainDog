@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 
 import type { Param, Sql } from '@braindog/ports';
 
-import { applyMigrations } from '../src/migrate.ts';
+import { MIGRATIONS, applyMigrations } from '../src/migrate.ts';
 import { openRecord } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -59,7 +59,7 @@ test('A SQLITE WITHOUT FTS5 OPENS AS A REFUSAL, NOT A THROW', async () => {
   const blind = refusing(existing, /\bentry_fts\b/, 'no such module: fts5');
   const again = await applyMigrations(blind, clock);
   assert.equal(again.state.refusal?.code, 'RECORD_UNAVAILABLE');
-  assert.equal(again.state.applied.length, 20, 'the ledger it read is still reported');
+  assert.equal(again.state.applied.length, MIGRATIONS.length, 'the ledger it read is still reported');
 
   const kernel = await openRecord(blind, clock);
   const created = kernel.createRecord({

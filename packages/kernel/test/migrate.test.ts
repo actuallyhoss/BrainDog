@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 20, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] });
+  assert.deepEqual(result.value, { kernel: 21, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -53,9 +53,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 20);
+  assert.equal(sql.all('SELECT version FROM migration').length, 21);
   sql.close();
 });
 
@@ -126,7 +126,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -287,6 +287,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '2d37be52999866741056861e33ac6c4b3431837b5384e53824f236bc770213a4',
     '4d783603c20778c92773e360b2bd43de74a08e93b7eebc799da9cdb1089cadc8',
     '71399f1445217c57c48bb0aefa833b650e72cd45965a98249ce841bfd999237d',
+    '45ce9ef61c6754bdaba142ec61837fe51bce8bea2ff3115d25a20e328d1333b0',
   ]);
 });
 
@@ -312,7 +313,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -338,13 +339,15 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
   /* And migration 19's and 20's columns, for the same reason. */
   sql.exec('ALTER TABLE member DROP COLUMN row_where');
   sql.exec('ALTER TABLE record DROP COLUMN quiet');
+  /* And migration 21's, which no rebuild above 13 takes away. */
+  sql.exec('ALTER TABLE suggestion DROP COLUMN drafted_by');
   sql.exec('DELETE FROM migration WHERE version >= 13');
   sql.exec("INSERT INTO outbox (id, created, kind, payload, state, attempts) VALUES ('j1', '2026-09-01T00:00:00.000Z', 'script.run', '{}', 'failed', 3)");
   assert.throws(() => sql.exec("INSERT INTO outbox (id, created, kind, payload) VALUES ('j2', 'x', 'infer.ask', '{}')"), /CHECK/);
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20]);
+  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20, 21]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
     { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },

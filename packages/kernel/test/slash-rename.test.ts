@@ -209,6 +209,8 @@ test('A RECORD OPENED UNDER THE RENAMED BUILD HOLDS THE OLD NAME NOWHERE, and ev
      left them would be a record no older build ever wrote. */
   sql.exec('ALTER TABLE member DROP COLUMN row_where');
   sql.exec('ALTER TABLE record DROP COLUMN quiet');
+  /* And migration 21's on `suggestion`, for the same reason. */
+  sql.exec('ALTER TABLE suggestion DROP COLUMN drafted_by');
   const k = await openRecord(sql, fixedClock(NOW), { sign: SIGNER, answersSlash: true });
 
   assert.deepEqual(holdingOld(sql), [], 'the old name survived the open');

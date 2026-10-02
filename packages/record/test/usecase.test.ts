@@ -113,7 +113,7 @@ test('THE EXPORT CARRIES THE ARRANGEMENT AND NO ROW THAT WAS NOT PICKED', async 
   const out = value<Exported>(await api.exportUseCase({ title: 'My study desk' }, owner));
   assert.equal(out.file, 'study-1.0.1.usecase.json');
   assert.deepEqual(out.doc.modules, ['people']);
-  assert.deepEqual(out.doc.labels, { courses: 'Modules' });
+  assert.deepEqual(out.doc.labels, { courses: 'Modules', people: 'People', 'people:one': 'person' });
   assert.equal((out.doc.voice as Record<string, string>).home, 'Desk');
   const ids = out.doc.pack.declarations.map((d) => String(d.register ?? d.page));
   assert.deepEqual(ids.sort(), ['courses', 'home-study', 'reading', 'studies']);

@@ -634,13 +634,6 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       worded.add(list.id);
       const seen = `You opened the ${title} page, which shows ${word}, ${plural(p.opens30, 'time')} on ${p.openDays30} separate days in the last thirty days.`;
       noticed.push({ kind: 'label', subject: list.id, text: `You opened ${title}, a page of ${word}, ${plural(p.opens30, 'time')} in the last thirty days.` });
-      drafts.push({
-        key: '',
-        question: `Call ${word} ${title} everywhere? ${seen}`,
-        body_kind: 'settings',
-        body: { pack: tone.pack, values: { [setting]: title } },
-        by: 'rules',
-      });
 
       /**
        * AND THE TWO WORDS THAT GO WITH THE NAME. A list carries three: what it is called, what ONE of it is called, and
@@ -653,14 +646,17 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       const oneSetting = labelSetting(`${list.id}:one`);
       const oneHeld = tone.settings[oneSetting];
       const one = singularOf(title);
-      if (oneHeld && one !== '' && one !== (oneHeld.value ?? oneHeld.default ?? '').toLowerCase())
-        drafts.push({
-          key: '',
-          question: `Call one of them ${one}? ${seen}`,
-          body_kind: 'settings',
-          body: { pack: tone.pack, values: { [oneSetting]: one } },
-          by: 'rules',
-        });
+      /* ONE QUESTION FOR ONE RENAME: the singular rides on the name's own card, since every list now declares it, and two
+         cards on Decide for one word was the busy screen §35 asks against. */
+      const values: Record<string, string> = { [setting]: title };
+      if (oneHeld && one !== '' && one !== (oneHeld.value ?? oneHeld.default ?? '').toLowerCase()) values[oneSetting] = one;
+      drafts.push({
+        key: '',
+        question: `Call ${word} ${title} everywhere? ${seen}`,
+        body_kind: 'settings',
+        body: { pack: tone.pack, values },
+        by: 'rules',
+      });
 
       /* WHAT IT HOLDS, IN THE NEW WORD. Only the old word is swapped, so the sentence stays the one its author wrote; a
          line that never named the old word has nothing here to draft and is left alone. */

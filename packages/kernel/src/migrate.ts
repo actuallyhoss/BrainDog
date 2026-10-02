@@ -37,6 +37,7 @@ import automationWatch0017 from './migrations/0017_automation_watch.ts';
 import jobs0018 from './migrations/0018_jobs.ts';
 import memberWhere0019 from './migrations/0019_member_where.ts';
 import quiet0020 from './migrations/0020_quiet.ts';
+import draftedBy0021 from './migrations/0021_drafted_by.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -62,6 +63,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 18, slug: 'jobs', sql: jobs0018 },
   { version: 19, slug: 'member_where', sql: memberWhere0019 },
   { version: 20, slug: 'quiet', sql: quiet0020 },
+  { version: 21, slug: 'drafted_by', sql: draftedBy0021 },
 ];
 
 /**
@@ -89,6 +91,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * of the list, which is what that file's grants meant, so the format is still 1.
  * Migration 20 adds one nullable column to `record`, which an older file imports without and reads as NULL, the quiet
  * hours every record kept before it, so the format is still 1.
+ * Migration 21 adds one nullable column to `suggestion`, which an older file imports without and reads as NULL, a
+ * question whose drafter nobody kept, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

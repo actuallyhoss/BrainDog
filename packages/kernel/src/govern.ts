@@ -301,8 +301,12 @@ const MAX_ROWS = 200;
  *
  * `actor` MAY BE ASKED FOR, and then it is asked only once the body has passed. A token's proposal is
  * signed by its run, and working out the run can open one: a proposal refused here must open nothing.
+ *
+ * `drafted` IS WHO DRAFTED IT, when that is not who filed it: Slash files both its rules' drafts and a model's
+ * (`suggestion.drafted_by`, migration 21). A parameter and not a field of `Proposal`, so a caller's own proposal
+ * cannot claim to be one.
  */
-export function propose(deps: GovernDeps, actor: string | (() => string), p: Proposal): Result<{ id: string }> {
+export function propose(deps: GovernDeps, actor: string | (() => string), p: Proposal, drafted?: string): Result<{ id: string }> {
   if (!p?.question?.trim())
     return no<{ id: string }>('REQUIRED_MISSING', 'A proposal is a question somebody can answer.', { at: 'question' });
   if (!(BODY_KINDS as readonly string[]).includes(p.body_kind))
@@ -398,12 +402,13 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
   deps.sql.exec(
-    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, ?, ?, 'open', ?, ?)",
+    "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, drafted_by) VALUES (?, ?, ?, 'open', ?, ?, ?)",
     id,
     p.body_kind,
     JSON.stringify(body),
     by,
     at,
+    drafted ?? null,
   );
   /* THE QUESTION GOES IN `to_v`, WHICH IS WHERE 45 §5.4 PUTS IT — and `note` is capped at 280 by
      the rule that a note is one sentence a human reads in six weeks. A question is not a note: it is

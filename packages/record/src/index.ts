@@ -30,6 +30,7 @@ import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scan
 import { fixOf, no, ok } from '@braindog/ports';
 import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
+import { ACCENTS } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
@@ -787,7 +788,21 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
  * device, which a cookie or `localStorage` cannot do, and `29 §4` says a dismissal is terminal on every device. The
  * browser may keep a first-paint copy of `nav.shape` and `pen.suggest`, written from these and never read as the truth.
  */
-export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed', 'home.page', 'nav.labels', 'notify.muted'] as const;
+export const PREF_KEYS = [
+  'nav.order',
+  'nav.hidden',
+  'nav.shape',
+  'pen.suggest',
+  'pen.dismissed',
+  'home.page',
+  'nav.labels',
+  'notify.muted',
+  'look.scheme',
+  'look.size',
+  'look.density',
+  'look.contrast',
+  'look.accent',
+] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
  * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
@@ -796,6 +811,11 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  * `home.page` is the address the app opens on (absent is Today); `nav.labels` is the person's own name for a page,
  * address by address. `notify.muted` is the rules whose notices this person does not want (`rule:installment-due-soon`),
  * newest last: their notes leave this person's notices, and an urgent one still reaches them (`mutedFor`).
+ *
+ * THE FIVE `look.*` KEYS ARE HOW THE APP LOOKS TO THIS PERSON, on every device they sign in on (`35`, "density, theme and
+ * accent"): `look.scheme` light, dark or the device's own (absent is the device's own), `look.size` and `look.density` the
+ * cookie's own words (`apps/web/src/lib/pref.ts`), `look.contrast` the high-contrast palette, and `look.accent` one of the
+ * suggested accents by name, or `House`. The browser keeps a first-paint copy of each, written from these.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -806,7 +826,23 @@ export type Prefs = {
   'home.page'?: string;
   'nav.labels'?: Record<string, string>;
   'notify.muted'?: string[];
+  'look.scheme'?: LookScheme;
+  'look.size'?: LookSize;
+  'look.density'?: LookDensity;
+  'look.contrast'?: boolean;
+  'look.accent'?: string;
 };
+
+/** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
+export const LOOK_SCHEMES = ['light', 'dark', 'system'] as const;
+export type LookScheme = (typeof LOOK_SCHEMES)[number];
+export const LOOK_SIZES = ['sm', 'base', 'md'] as const;
+export type LookSize = (typeof LOOK_SIZES)[number];
+export const LOOK_DENSITIES = ['compact', 'comfortable', 'roomy'] as const;
+export type LookDensity = (typeof LOOK_DENSITIES)[number];
+/* THE SWATCHES BY NAME, READ FROM `ACCENTS` and not written again here, so a swatch added or taken out in
+   `@braindog/theme` is one the record takes or refuses the same day. `House` is the control beside them. */
+export const LOOK_ACCENTS: readonly string[] = ['House', ...ACCENTS.map((a) => a.name)];
 
 /** How many rules one person may mute: more than any record declares, and few enough that the list stays a list. */
 const MUTED_MOST = 200;
@@ -1481,6 +1517,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         kernel.propose(
           { question, body_kind: 'rowset', body: { register: n.register, rows: [{ at: `${n.register}#${next.seq}`, version: next.version, patch: { [n.field]: n.to } }] } },
           SLASH,
+          'rules',
         );
       }
     } catch {
@@ -2024,9 +2061,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const seen = noticeUsage(usage, offered, partial);
     /* ASKED: anything Slash filed, in any state, and anything anybody filed that is still open. */
     const asked = new Map<string, { id: string; status: string }>();
-    const waiting: { id: string; question: string }[] = [];
-    for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string }>(
-      "SELECT id, body, status, opened_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
+    /* `by` IS WHO DRAFTED IT, as `slashFiling` kept it: `rules`, a model's name, or `null` for a question filed before the
+       record kept that (migration 21), which says neither rather than guess. */
+    const waiting: { id: string; question: string; by: string | null }[] = [];
+    for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string; drafted_by: string | null }>(
+      "SELECT id, body, status, opened_by, drafted_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
       SLASH,
     )) {
       try {
@@ -2034,7 +2073,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       } catch {
         /* a body that will not parse asks nothing */
       }
-      if (row.opened_by === SLASH && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id });
+      if (row.opened_by === SLASH && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id, by: row.drafted_by });
     }
     const shown = ctx === undefined || !partial ? waiting : waiting.filter((w) => {
       const row = kernel.governanceRow('suggestion', w.id);
@@ -2139,7 +2178,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         skipped.push({ question: d.question, why: 'Slash has asked this before.' });
         continue;
       }
-      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SLASH);
+      /* WHO DRAFTED IT IS KEPT WITH IT, so a reload still says whether it came from how he uses BrainDog or a model. */
+      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SLASH, d.by);
       if (!put.ok) {
         skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
         continue;
@@ -5225,7 +5265,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!formed.ok) return not('invalid', formed.why);
       const prepared = await arrangement.prepare('arrange', { why: [spec.why], rows: formed.rows });
       if (!prepared.ok) return not('invalid', 'refusal' in prepared ? prepared.refusal.fix : undefined);
-      const put = kernel.propose({ question: spec.question.slice(0, 280), body_kind: 'arrange', body: prepared.value }, SLASH);
+      const put = kernel.propose({ question: spec.question.slice(0, 280), body_kind: 'arrange', body: prepared.value }, SLASH, model.name);
       if (!put.ok) return not('invalid', 'refusal' in put ? put.refusal.fix : undefined);
       const counts: Record<string, number> = {};
       for (const r of formed.rows) counts[r.register] = (counts[r.register] ?? 0) + 1;
@@ -5981,8 +6021,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * One thing this person arranged for themselves, one key of `PREF_KEYS` at a time: `nav.order`, the rail's order;
      * `nav.hidden`, the pages taken out of it; `nav.shape`, a rail, a bar or a menu; `pen.suggest`, whether the holding
      * pen offers anything; `pen.dismissed`, what it offered and they turned down; `home.page`, the page the app opens on;
-     * `nav.labels`, their own names for pages; `notify.muted`, the rules whose notices they do not want. `null` takes a
-     * key away. `boot` answers them on `me.prefs`.
+     * `nav.labels`, their own names for pages; `notify.muted`, the rules whose notices they do not want; the five `look.*`,
+     * how the app looks to them. `null` takes a key away. `boot` answers them on `me.prefs`.
      *
      * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
      * screen, and it is not the record's history. Any level may, since it changes nothing anybody else sees.
@@ -6041,6 +6081,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
         /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
         kept = [...new Set(value)].slice(-MUTED_MOST);
+      } else if (value !== null && key === 'look.contrast') {
+        if (typeof value !== 'boolean') return no('VALUE_MALFORMED', 'look.contrast is true or false, or null to take it away.', { at: 'value' });
+        kept = value;
+      } else if (value !== null && (key === 'look.scheme' || key === 'look.size' || key === 'look.density' || key === 'look.accent')) {
+        /* ONE CLOSED LIST EACH, and the refusal names every word it takes. */
+        const allowed: readonly string[] =
+          key === 'look.scheme' ? LOOK_SCHEMES : key === 'look.size' ? LOOK_SIZES : key === 'look.density' ? LOOK_DENSITIES : LOOK_ACCENTS;
+        if (typeof value !== 'string' || !allowed.includes(value))
+          return no('VALUE_MALFORMED', `${key} is ${allowed.join(', ')}, or null to take it away.`, { at: 'value', allowed: [...allowed] });
+        kept = value;
       }
       kernel.setPref(ctx.principal.id, key, kept);
       return ok({ key, value: kept });

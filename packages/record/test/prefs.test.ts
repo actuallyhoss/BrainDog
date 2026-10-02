@@ -137,3 +137,50 @@ test("A RULE A PERSON MUTED LEAVES THEIR NOTICES, its urgent notes still reach t
   assert.deepEqual(await notes(ada), ['rule:installment-due-soon', 'rule:payment-failed']);
   sql.close();
 });
+
+test('HOW THE APP LOOKS FOLLOWS THE PERSON: scheme, size, density, contrast and accent are kept for them, and any other word is refused', async () => {
+  const { api, sql } = await record();
+  const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string } }).refusal.code);
+  const look = {
+    'look.scheme': 'dark',
+    'look.size': 'md',
+    'look.density': 'compact',
+    'look.contrast': true,
+    'look.accent': 'Ink blue',
+  } as const;
+  for (const [key, value] of Object.entries(look)) {
+    const kept = await api.setPref({ key, value }, ada);
+    assert.ok(kept.ok, JSON.stringify(kept));
+    assert.deepEqual(kept.value, { key, value });
+  }
+  assert.deepEqual(await prefsOf(api, ada), look);
+  assert.deepEqual(await prefsOf(api, bo), {}, "somebody else's screen followed Ada's look");
+
+  /* THE DEVICE'S OWN SCHEME AND THE HOUSE COLOUR ARE CHOICES TOO, and every suggested swatch is one by its name. */
+  for (const value of ['light', 'system']) assert.equal(code(await api.setPref({ key: 'look.scheme', value }, ada)), 'ok');
+  for (const value of ['House', 'Moss', 'Plum', 'Ochre', 'Teal']) assert.equal(code(await api.setPref({ key: 'look.accent', value }, ada)), 'ok');
+
+  /* ANYTHING ELSE IS REFUSED, NAMING WHAT IT TAKES, and nothing is kept. */
+  const wrong: [string, unknown][] = [
+    ['look.scheme', 'sepia'],
+    ['look.scheme', true],
+    ['look.size', 'lg'],
+    ['look.size', 16],
+    ['look.density', 'cosy'],
+    ['look.contrast', 'on'],
+    ['look.accent', '#3C72CE'],
+    ['look.accent', 'ink blue'],
+    ['look.accent', 'Brick'],
+  ];
+  for (const [key, value] of wrong) assert.equal(code(await api.setPref({ key, value }, ada)), 'VALUE_MALFORMED', `${key} ${JSON.stringify(value)}`);
+  const said = await api.setPref({ key: 'look.density', value: 'cosy' }, ada);
+  assert.ok(!said.ok);
+  assert.equal((said as unknown as { refusal: { fix: string } }).refusal.fix, 'look.density is compact, comfortable, roomy, or null to take it away.');
+  assert.equal(code(await api.setPref({ key: 'look.scheme', value: 'dark' }, agent)), 'FORBIDDEN');
+  assert.deepEqual(await prefsOf(api, ada), { ...look, 'look.scheme': 'system', 'look.accent': 'Teal' }, 'a refused look was kept');
+
+  /* null takes each away, and the app looks as the device and the record say. */
+  for (const key of Object.keys(look)) await api.setPref({ key, value: null }, ada);
+  assert.deepEqual(await prefsOf(api, ada), {});
+  sql.close();
+});
