@@ -646,6 +646,15 @@
     text-decoration: none;
   }
 
+  /* A THUMB'S TARGET, like every other link on a phone, without growing the line at rest on a mouse. */
+  @media (pointer: coarse) {
+    .slash-drafts-link {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
+
   .slash-drafts-link:hover,
   .slash-drafts-link:focus-visible {
     color: var(--ink2);

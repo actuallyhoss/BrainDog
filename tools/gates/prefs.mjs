@@ -440,8 +440,13 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    *
    * `nav.order` AND `nav.hidden` ARE EXCUSED because the rail keeps them through the same `nav-prefs.svelte.ts` path the
    * three cases above measure, and their cookie and `localStorage` copies are what the `nav` case already loads.
+   *
+   * THE FIVE `look.*` KEYS ARE EXCUSED because the record's answer is adopted into the very cookie the scheme, size,
+   * density, contrast and accent cases load (`apps/web/src/lib/theme/follow.ts`), so what they change on screen is
+   * measured there; `follow.test.ts` proves the record's answer wins over the cookie. `notify.muted` changes no screen at
+   * all: it decides which notices a person is sent, and the kernel's digest tests are what ask whether it does.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'look.scheme', 'look.size', 'look.density', 'look.contrast', 'look.accent', 'notify.muted']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);
