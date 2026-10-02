@@ -104,7 +104,7 @@ test('only a host that says nobody signs in is spared the account read', () => {
 test('a line of the log becomes a feed item in words, and the reader is "you"', () => {
   const items = newsOf(BOOT.whatsNew.events as never, 'p_2');
   assert.deepEqual(items[0], { at: '2026-09-15T09:00:00.000Z', by: 'rule.renewal', text: 'Added Rent', href: '/r/obligations/3' });
-  assert.deepEqual(items[1], { at: '2026-09-15T09:00:00.000Z', by: 'you', text: 'Asked: Renew the domain?', href: '/decide/SG4' });
+  assert.deepEqual(items[1], { at: '2026-09-15T09:00:00.000Z', by: 'you', text: 'Asked: renew the domain?', href: '/decide/SG4' });
   assert.equal(newsOf([line({ kind: 'export', note: null })] as never, null)[0]?.text, 'Export');
   assert.equal(newsOf([line({ kind: 'export' })] as never, null)[0]?.href, '/audit');
 });

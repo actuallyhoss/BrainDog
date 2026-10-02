@@ -170,11 +170,15 @@ const queueBlock = (queue: QueueQuestion[], total: number, lead = false): LiveBl
 
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
-test('the head says the record’s count, in red when it is over the aim or one waiting is hard to undo', () => {
-  const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, n === 4 ? 'undo' : 'call', n === 0));
+test('the head says the record’s count with no quota in red, and red only for questions waiting past two weeks', () => {
+  const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, 'call', n === 0));
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK, () => 'Claude');
-  assert.equal(shaped.sentence.text, 'Five questions wait on you, two over the aim of three. Claude suggests “Yes” for the first.');
-  assert.equal(shaped.sentence.needs, 'two over');
+  assert.equal(shaped.sentence.text, 'Five questions wait on you. Claude suggests “Yes” for the first.');
+  assert.equal(shaped.sentence.needs, '');
+  const old = qs.map((q, n) => (n < 2 ? { ...q, at: new Date(CLOCK - 20 * DAY).toISOString() } : q));
+  const waited = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 5, true), queueBlock(old, 5)], CLOCK, () => 'Claude');
+  assert.equal(waited.sentence.text, 'Five questions wait on you, two of them for over two weeks. Claude suggests “Yes” for the first.');
+  assert.equal(waited.sentence.needs, 'two of them for over two weeks');
   assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q2', 'q3', 'q4', 'q5']);
   assert.equal(shaped.blocks[2]?.total, 4);
   /* THE FIRST CARD COUNTS ONLY ITSELF, so it draws no "4 more" door back to this page over the four drawn under it. */
@@ -182,8 +186,8 @@ test('the head says the record’s count, in red when it is over the aim or one 
   assert.equal(shaped.open, 5);
 
   const one = decideDrawn([noteBlock(), queueBlock([question('q1', 'undo')], 1, true), queueBlock([question('q1', 'undo')], 1)], CLOCK);
-  assert.equal(one.sentence.text, 'One question waits on you.');
-  assert.equal(one.sentence.needs, 'One question waits on you');
+  assert.equal(one.sentence.text, 'One question waits on you. It is hard to undo.');
+  assert.equal(one.sentence.needs, '');
   /* THE REST HOLD NOTHING BUT THE FIRST, so they are not drawn, and the indexes stay. */
   assert.equal(one.blocks.length, 3);
   assert.equal(one.blocks[2]?.drawn, false);

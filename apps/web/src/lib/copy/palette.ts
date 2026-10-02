@@ -133,4 +133,45 @@ export const palette = {
   } as const,
   /* Phase 1's last reads: what a question found by `/search` on a record says beside its title. */
   searchOpenQuestion: 'Open question',
+
+  /**
+   * CHANGING THE APP IN WORDS (`palette/customise.ts`, DIRECTION §35). A row is drawn only when the query names it, so
+   * every title is the words somebody types, and every line under it says where the change lands. Each names the
+   * person's own page by the name their nav shows.
+   */
+  customise: {
+    group: 'Customise',
+    dark: 'Dark mode',
+    light: 'Light mode',
+    system: 'Match the system',
+    textSm: 'Small text',
+    textBase: 'Normal text',
+    textMd: 'Large text',
+    compact: 'Compact spacing',
+    comfortable: 'Comfortable spacing',
+    roomy: 'Roomy spacing',
+    thisDevice: 'On this device',
+    /* THE TOAST AFTER A LOOK CHANGES, which has nothing to add but where it was kept. */
+    lookSet: (name: string) => `${name}, on this device.`,
+    openOn: (name: string) => `Open on ${name}`,
+    openOnDetail: 'The page BrainDog opens first',
+    homeSet: (name: string) => `BrainDog opens on ${name} now.`,
+    hide: (name: string) => `Hide ${name}`,
+    hideDetail: 'From your nav. Nothing is deleted.',
+    hidden: (name: string) => `${name} is hidden from your nav.`,
+    show: (name: string) => `Show ${name}`,
+    showDetail: 'Back in your nav',
+    rename: (from: string, to: string) => `Rename ${from} to ${to}`,
+    renameDetail: 'In your nav. The page keeps its own name.',
+    renamed: (from: string, to: string) => `${from} is ${to} in your nav.`,
+    unnamed: (own: string) => `${own} has its own name again.`,
+    renameAsk: (name: string) => `Rename ${name}`,
+    renameAskDetail: 'Type the new name after “to”',
+    /* WHAT THE BOX SAYS ONCE "Rename Money" IS PRESSED: the sentence, waiting for its last word. */
+    renameFill: (name: string) => `Rename ${name} to `,
+    page: 'Customise this page',
+    pageDetail: 'Its layout, what it shows, how it is built',
+    quiet: 'Quiet hours',
+    quietDetail: 'Settings › Notifications',
+  },
 } as const;

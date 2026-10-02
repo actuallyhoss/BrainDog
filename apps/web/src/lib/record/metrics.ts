@@ -185,17 +185,23 @@ export const fxNow = (): { home: string | null; rates: readonly Rate[] } => fxSo
  * A figure's target line, in the currency the figure is written in: the declared one, or converted into the one it was
  * added up in and saying so. Empty when the figure is in another currency and no rate converts its target.
  */
-export function targetSaid(decl: MetricDecl, r: { unit?: string | null | undefined; targetIn?: TargetIn | undefined }): string {
+export function targetSaid(
+  decl: MetricDecl,
+  r: { unit?: string | null | undefined; targetIn?: TargetIn | undefined; value?: number | null | undefined },
+): string {
+  /* THE FIGURE GOES WITH IT, so a limit says nothing while it is kept and how far over once it is not (`targetLine`). */
+  const value = r.value ?? null;
   /* A BARE `money` FORMAT NAMES NO CURRENCY (money-core 3.0.0: the record's home one), so its target is said in the
      currency the record read the figure in, never as a bare number of minor units. */
-  if (decl.format === 'money' && r.unit && /^[A-Z]{3}$/u.test(r.unit)) return targetLine({ ...decl, format: `money.${r.unit}` });
-  if (!offTarget(decl, r.unit)) return targetLine(decl);
+  if (decl.format === 'money' && r.unit && /^[A-Z]{3}$/u.test(r.unit)) return targetLine({ ...decl, format: `money.${r.unit}` }, value);
+  if (!offTarget(decl, r.unit)) return targetLine(decl, value);
   if (!r.targetIn) return '';
   const from = r.targetIn.from ?? decl.format!.slice('money.'.length);
-  const line = targetLine({ ...decl, format: `money.${r.targetIn.currency}`, target: r.targetIn.target });
+  /* THE FIGURE WAS ADDED UP IN `targetIn.currency`, the currency its target was converted into, so the two compare. */
+  const line = targetLine({ ...decl, format: `money.${r.targetIn.currency}`, target: r.targetIn.target }, value);
   /* NOTHING IS NOTHING IN EVERY CURRENCY, so a bound of zero is not said to be converted; nor is one typed in this currency. */
   const bound = 'lte' in r.targetIn.target ? r.targetIn.target.lte : r.targetIn.target.gte;
-  return bound === 0 || from === r.targetIn.currency ? line : copy.targetConverted(line, from);
+  return !line || bound === 0 || from === r.targetIn.currency ? line : copy.targetConverted(line, from);
 }
 
 /**
@@ -625,6 +631,18 @@ export function leadOf(template: string, said: (path: string) => string | null):
   const one = (count: string): boolean => count.trim() === '1';
   return kept
     .join(', ')
+    /* A VERB AFTER A FIGURE'S NAMES AGREES WITH HOW MANY IT NAMED (`{{projects-need-you.names}} need(s) a push`): "Kiln
+       needs a push", "Kiln and Portage need a push". The `(s)` after names is a verb's, so it is kept for one and dropped
+       for several, the other way round from a noun's; `is` and its kind take `VERB`'s forms. */
+    .replace(
+      /(\{\{\s*([a-z][a-z0-9_-]*\.names)\s*\}\})(\s+)(?:([A-Za-z]+)\(s\)|(are|is|were|was|have|has)\b)/gu,
+      (_, hole: string, path: string, gap: string, verb: string | undefined, be: string | undefined) => {
+        const single = !/ and /u.test(said(path) ?? '');
+        if (verb !== undefined) return `${hole}${gap}${verb}${single ? 's' : ''}`;
+        const forms = VERB[be!]!;
+        return `${hole}${gap}${single ? forms[0] : forms[1]}`;
+      },
+    )
     .replace(
       /(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}|(?<![\d.,])\b\d[\d,]*(?:\.\d+)?)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)(?:(\s+)(are|is|were|was|have|has)\b)?/gu,
       (_, figure: string, path: string | undefined, between: string, word: string, gap: string | undefined, verb: string | undefined) => {
@@ -687,13 +705,18 @@ export function meetsTarget(decl: MetricDecl, value: number | null): boolean | n
  * THE FIGURE IS WRITTEN AS `format` WRITES IT, code first, so the screen's `symbolText` redraws it in the record's
  * currency like every other figure in a note; only a fraction of all zeros is dropped, because a target is a round
  * line somebody set and ".00" on it is width a phone does not have.
+ *
+ * WITH THE FIGURE'S VALUE, a limit is said only when it is broken ("3 over your limit"); without it, as the rule.
  */
-export const targetLine = (decl: MetricDecl): string => {
+export const targetLine = (decl: MetricDecl, value?: number | null): string => {
   /* A TARGET THAT NAMES A SETTING AND NO NUMBER YET (a money ceiling with no default) has no line to say. */
   const target = decl.target as { lte?: unknown; gte?: unknown };
   const under = typeof target.lte === 'number';
   const bound = typeof target.lte === 'number' ? target.lte : typeof target.gte === 'number' ? target.gte : null;
   if (bound === null) return '';
+  /* A LIMIT WITH ITS FIGURE BESIDE IT says nothing while the figure keeps to it, since "Limit 5" under a 2 is a rule
+     nobody broke, and says how far over once it does not: the tone already says which side it is on. */
+  if (under && typeof value === 'number') return value <= bound ? '' : `${format(decl.format, value - bound).replace(/\.0+$/u, '')} over your limit`;
   if (under && bound === 0) return 'None expected';
   const figure = format(decl.format, bound).replace(/\.0+$/u, '');
   if (under) return `Limit ${figure}`;

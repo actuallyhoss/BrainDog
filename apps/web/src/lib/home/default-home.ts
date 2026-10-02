@@ -22,7 +22,7 @@
 import type { PageBlock } from '../record/schema.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import { bare, emptyHidden, says } from '../page/home.ts';
-import { sentenceOf, type Sentence } from './today-tiles.ts';
+import { lateSaid, sentenceOf, type Sentence } from './today-tiles.ts';
 import { words } from './words.ts';
 /* THE LIST A TASK IS KEPT IN, named once for every work screen (`lib/work/list.ts`), never again here. */
 import { TASKS } from '../work/list.ts';
@@ -98,14 +98,16 @@ const TILES = { tiles: true } as const;
  * a bill is not, and Home draws them on one surface under one name (`homeDrawn`), the tasks first.
  */
 export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
-  /* WHAT FELL DUE AND WAS NOT DONE, across every list: what the late tasks above leave is the money. */
+  /* WHAT FELL DUE AND WAS NOT DONE, across every list: what the late tasks above leave is the money. ONE LINE A THING,
+     oldest first as the record answers it, "Legal review, February · −£9,190 · 2 months late": a date heading over
+     each of six rows read as a ledger, and how late it is says more than the day it was due (`homeDrawn`). */
   const lateMoney: PageBlock = {
-    kind: 'timeline',
+    kind: 'spec',
     heading: voice.overdue,
     icon: 'clock',
     source: 'deadlines',
     where: 'day before today',
-    columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+    columns: [{ field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }, { field: 'day' }],
     limit: 8,
     empty: words.nothingLate,
   };
@@ -271,7 +273,7 @@ const asked = (b: LiveBlock): number => Math.max(b.total, b.queue?.length ?? 0);
  * limit.
  */
 const hollow = (b: LiveBlock): boolean =>
-  bare(b) || (!says(b) && (b.kind === 'todo' || b.kind === 'timeline' || b.kind === 'table') && b.entries.length === 0);
+  bare(b) || (!says(b) && (b.kind === 'todo' || b.kind === 'timeline' || b.kind === 'table' || b.kind === 'spec') && b.entries.length === 0);
 
 /** The first day one of a block's own columns holds for a row, `YYYY-MM-DD`, or `null`. */
 function dayIn(b: LiveBlock, fields: Record<string, unknown>): string | null {
@@ -370,16 +372,80 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
       /* THE RECORD ANSWERS WHAT IS LATE FIRST, so a block drawn full of late rows has more late rows past its limit, and
          Late says so; once a row that is not late is drawn, the rest past the limit are the later days'. */
       lateAt.push(shaped.length);
-      shaped.push(pick(b, late, voice.overdue, rest.length === 0 ? late.length + b.total - b.entries.length : late.length));
+      shaped.push(howLate(pick(b, late, voice.overdue, rest.length === 0 ? late.length + b.total - b.entries.length : late.length), today));
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
     }
     shaped.push(newOnly(b));
   }
+  const kept = shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b));
+  /* WHAT CHANGED LEAVES OUT WHAT THE PAGE ALREADY SAYS, and goes if that was all of it. */
+  const told = toldOf(kept);
+  const fed = kept.map((b) => {
+    if (!b.drawn || says(b) || b.kind !== 'feed') return b;
+    const cut = untold(b, told);
+    return hollow(cut) ? { ...cut, drawn: false } : cut;
+  });
   /* AND THEN THE READER'S OWN RULE, so a section over nothing goes with its blocks here as it does on the page. */
-  const out = emptyHidden(shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b)));
+  const out = emptyHidden(fed);
   for (const at of lateAt) lateTile(out, at, today, voice);
   return { blocks: out, lead, sentence: sentenceFrom(shaped, today), slash };
+}
+
+/**
+ * LATE ROWS SAY HOW LATE, on a block that draws a row a line: the day each was due becomes "2 months late". A timeline
+ * keeps its days, because there the day is the heading the rows sit under.
+ */
+function howLate(b: LiveBlock, today: string): LiveBlock {
+  const at = b.kind === 'timeline' ? -1 : b.columns.findIndex((c) => c.field === 'day');
+  if (at === -1 || !aligned(b)) return b;
+  const rows = b.rows.map((r, n) => {
+    const day = b.entries[n]!.fields.day;
+    if (typeof day !== 'string' || !DAY.test(day)) return r;
+    const cells = [...r.cells];
+    cells[at] = lateSaid(day.slice(0, 10), today);
+    return { ...r, cells };
+  });
+  return { ...b, rows };
+}
+
+/** What a page already shows that a feed line could say again: the rows drawn in what falls due, and the questions drawn in What needs you, as a feed line names them (`suggestion:SG3`). */
+type Told = { rows: ReadonlySet<string>; asks: ReadonlySet<string> };
+
+function toldOf(blocks: readonly LiveBlock[]): Told {
+  const rows = new Set<string>();
+  const asks = new Set<string>();
+  for (const b of blocks) {
+    if (!b.drawn || says(b)) continue;
+    if (isDue(b)) for (const e of b.entries) if (typeof e.fields.row === 'string') rows.add(e.fields.row);
+    if (isQueue(b) && b.source === 'governance.open') for (const q of b.queue ?? []) asks.add(`suggestion:${q.id}`);
+  }
+  return { rows, asks };
+}
+
+/**
+ * A FEED WITHOUT THE LINES THE PAGE ALREADY SAYS. A question a rule or an agent asked is drawn in What needs you while
+ * it is open there, and once it is answered the answer is a line of its own; one past What needs you's few, or answered
+ * already, keeps its line, since nothing else on the page says it. And a rule's note about a row that falls due
+ * ("Halden licence, 3 of 4 is due today: £2,400.") is that row, drawn in Late or Coming up. Neither is said twice.
+ * The feed's lines and its drawn rows are cut together, so the two stay one for one.
+ */
+function untold(b: LiveBlock, told: Told): LiveBlock {
+  const feed = b.feed;
+  if (!feed) return b;
+  const lines = b.rows.filter((r) => r.key !== 'seen');
+  if (lines.length !== feed.length) return b;
+  const keep = feed.map((r) => {
+    if (typeof r.target !== 'string') return true;
+    if (r.kind === 'suggest') return !told.asks.has(r.target);
+    return !(r.by === 'rule' && r.kind === 'note' && told.rows.has(r.target));
+  });
+  if (keep.every(Boolean)) return b;
+  let n = 0;
+  const rows = b.rows.filter((r) => r.key === 'seen' || keep[n++]);
+  const left = feed.filter((_, i) => keep[i]);
+  const gone = feed.length - left.length;
+  return { ...b, feed: left, rows, shown: Math.max(0, b.shown - gone), total: Math.max(left.length, b.total - gone) };
 }
 
 /** Whether a drawn block is a list of tasks whose every row was due today or before. */

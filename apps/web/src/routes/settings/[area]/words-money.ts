@@ -1,0 +1,127 @@
+/**
+ * Settings > Words and money: which add-on keeps the record's home currency, and which of the speaking use case's
+ * settings are its lists' names, their singulars and its house lines, read off what that pack declares.
+ *
+ * THE SAME SETTINGS `/packs/<id>` DRAWS, AS A PERSON READS THEM. That page draws every setting a use case declares in
+ * schema order under titles like "Label: one of tickets", which is a developer's surface (`research-customise-35.md`
+ * gap 4). This reads the same `packConfig` answer and sorts it into what a person changes: each list's name and what
+ * one of it is called, the tab names, and the rest of the lines. It writes through the same `setPackConfig`, so the
+ * record keeps one copy of each word and a share of the use case carries what was typed here.
+ *
+ * ONLY WHAT THE PACK DECLARES IS DRAWN. The record refuses a setting the pack does not declare (`writePackConfig`,
+ * FIELD_UNKNOWN), so a list the use case gives no word for has no box here rather than a box that is refused.
+ *
+ * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE.
+ */
+
+import { VOICE_LINES, labelsOf, singularOf, type VoiceKey } from '../../../lib/voice.ts';
+import type { ConfigDecl, PackConfig, PackState } from '../../../lib/record/packs.ts';
+
+/** The setting a home currency is kept under, the kernel's `HOME_CURRENCY_SETTING`, spelt as `packs.ts` spells it. */
+export const HOME_CURRENCY = 'home_currency';
+
+/**
+ * THE VOICE KEYS THAT NAME A TAB, and the most characters each may have: `@braindog/declare` `VOICE_TAB_KEYS`, which
+ * the shell may not import (`voice.ts` says why). The phone's tab bar cuts a longer one mid-word.
+ */
+export const TAB_KEYS: readonly VoiceKey[] = ['home', 'decide', 'inbox', 'lists'];
+export const TAB_MOST = 12;
+
+/** One word or line the pack declares: the setting it is kept under, what it is called, what it holds and its default. */
+export type Word = { setting: string; title: string; value: string; fallback: string };
+
+/** One list's words: its name and what one of it is called, either absent where the pack gives no word for it. */
+export type ListWords = { list: string; name: Word | null; one: Word | null };
+
+/** What the speaking use case lets a person change, sorted the way the area draws it. */
+export type Spoken = { lists: ListWords[]; tabs: Word[]; lines: Word[] };
+
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** A text setting as a `Word`, its fallback the declared default or, for a house line, the house voice's own. */
+function wordOf(s: PackConfig, setting: string, title: string, house = ''): Word {
+  const decl = s.config[setting] as ConfigDecl;
+  const fallback = text(decl.default) || house;
+  return { setting, title, value: text(s.values[setting]) || fallback, fallback };
+}
+
+/**
+ * The lists, tabs and lines a use case's settings hold. A list setting is read back to its label key through the same
+ * reader the shell uses (`labelsOf`), so a long one kept by its hash lands on its list as a short one does. Field and
+ * value labels and a list's "holds" line stay at `/packs/<id>`: this area is the words a person reads on every screen.
+ */
+export function wordsOf(s: PackConfig): Spoken {
+  const lists = new Map<string, ListWords>();
+  const voiced = new Map<VoiceKey, Word>();
+  for (const [setting, decl] of Object.entries(s.config)) {
+    if (decl.type !== 'text') continue;
+    if (setting.startsWith('voice_')) {
+      const key = setting.slice('voice_'.length) as VoiceKey;
+      if (Object.hasOwn(VOICE_LINES, key)) voiced.set(key, wordOf(s, setting, decl.label ?? VOICE_LINES[key], VOICE_LINES[key]));
+      continue;
+    }
+    const key = Object.keys(labelsOf({ [setting]: '-' }, s.config))[0];
+    if (key === undefined || key.includes('.') || key.endsWith(':holds')) continue;
+    const list = key.replace(/:one$/u, '');
+    const held = lists.get(list) ?? { list, name: null, one: null };
+    if (key.endsWith(':one')) held.one = wordOf(s, setting, list);
+    else held.name = wordOf(s, setting, list);
+    lists.set(list, held);
+  }
+  const ordered = (Object.keys(VOICE_LINES) as VoiceKey[]).flatMap((k) => {
+    const w = voiced.get(k);
+    return w ? [[k, w] as const] : [];
+  });
+  return {
+    lists: [...lists.values()],
+    tabs: ordered.filter(([k]) => TAB_KEYS.includes(k)).map(([, w]) => w),
+    lines: ordered.filter(([k]) => !TAB_KEYS.includes(k)).map(([, w]) => w),
+  };
+}
+
+/**
+ * What Save sends: only the words that moved. A box cleared, or typed back to the use case's own word, sends `null`,
+ * which the record reads as the default, so nothing is kept that only repeats it.
+ */
+export function changesOf(words: readonly Word[], typed: Readonly<Record<string, string>>): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const w of words) {
+    const now = (typed[w.setting] ?? w.value).trim();
+    if (now === w.value.trim()) continue;
+    out[w.setting] = now === '' || now === w.fallback ? null : now;
+  }
+  return out;
+}
+
+/** What puts the words a save changed back: each as it was held, or `null` where it held its default. */
+export const undoOf = (words: readonly Word[], sent: Readonly<Record<string, unknown>>): Record<string, string | null> =>
+  Object.fromEntries(words.filter((w) => Object.hasOwn(sent, w.setting)).map((w) => [w.setting, w.value === w.fallback ? null : w.value]));
+
+/**
+ * The singular a renamed list is offered while nobody has typed one: "Bakes" offers "bake". The record's own rule
+ * (`voice.ts` `relabel`) makes it the same way, but only where the use case declares no singular, and a declared one
+ * would keep saying "task" under "Bakes".
+ */
+export const oneFor = (name: string): string => singularOf(name.trim());
+
+/** A pack as read for this area: its state and, where the record answered, its settings. */
+export type Read = { state: PackState; settings: PackConfig | null };
+
+/**
+ * THE PACK THAT KEEPS THE HOME CURRENCY, by the kernel's own rule (`declare.ts` `homeCurrency`): of the packs switched
+ * on, by id, the first whose settings hold a code, else the first that declares the setting at all, which is where
+ * first run writes it (`start/accept.ts`). Writing anywhere else would leave the kernel reading an earlier one.
+ */
+export function currencyPackOf(packs: readonly Read[]): PackConfig | null {
+  const keeping = packs
+    .filter((p) => p.state.disabled_at === null && p.settings !== null && Object.hasOwn(p.settings.config, HOME_CURRENCY))
+    .sort((a, b) => (a.state.id < b.state.id ? -1 : a.state.id > b.state.id ? 1 : 0))
+    .map((p) => p.settings as PackConfig);
+  return keeping.find((s) => /^[A-Z]{3}$/u.test(text(s.values[HOME_CURRENCY]).trim().toUpperCase())) ?? keeping[0] ?? null;
+}
+
+/** The home currency a pack holds, as the kernel reads it: three letters in capitals, else none. */
+export const currencyIn = (s: PackConfig | null): string => {
+  const code = text(s?.values[HOME_CURRENCY]).trim().toUpperCase();
+  return /^[A-Z]{3}$/u.test(code) ? code : '';
+};

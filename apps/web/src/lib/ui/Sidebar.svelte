@@ -165,7 +165,7 @@
    */
   type Tool = { href: string; label: string; icon: IconName; count?: number; title?: string };
   const tools = $derived<Tool[]>([
-    ...(spine.includes('inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' as const, count: inbox }] : []),
+    ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' as const, count: inbox }] : []),
     { href: '/slash', label: copy.suggestions, icon: 'slash', title: copy.slashRail },
     { href: '/automations', label: copy.automations, icon: 'refresh' },
     { href: '/jobs', label: copy.jobs, icon: 'play' },

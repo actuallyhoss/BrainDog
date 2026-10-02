@@ -4,6 +4,7 @@
  */
 
 import type { Allowance } from '../plans.ts';
+import { home } from './home.ts';
 
 /** A figure a month, grouped the way every figure on the site is. */
 const aMonth = (n: number): string => `${n.toLocaleString('en-US')} a month`;
@@ -22,58 +23,15 @@ export const pricing = {
       'or a rule, or see what needs you today. Nothing it writes goes in until you say yes.',
     primary: 'Start for free',
     secondary: 'How credits work',
-    /** The palette the page and the home page draw. Every figure is the Personal record's. */
-    demo: {
-      label: 'Slash, drawn',
-      placeholder: 'Ask, or say what you want',
-      accept: 'Accept',
-      reject: 'Reject',
-      modes: [
-        {
-          id: 'ask',
-          label: 'Ask',
-          prompt: 'What do I owe in the next two weeks?',
-          lead: 'GBP 910.99, across four bills.',
-          rows: [
-            ['Streaming subscription', 'GBP 10.99', 'In 2 days'],
-            ['Phone contract', 'GBP 18.00', 'In 3 days'],
-            ['Rent', 'GBP 850.00', 'In 6 days'],
-            ['Gym membership', 'GBP 32.00', 'In 12 days'],
-          ],
-          source: 'From Bills',
-        },
-        {
-          id: 'draft',
-          label: 'Draft',
-          prompt: 'Make me a page for the Lisbon trip',
-          lead: 'A new page, Trip to Lisbon, with three blocks:',
-          rows: [
-            ['A figure', 'GBP 420.00 of GBP 900.00 put by', ''],
-            ['A list', 'Every row in Put by for the trip', ''],
-            ['A chart', 'What was put by, month by month', ''],
-          ],
-          source: 'Waits in Decide until you accept it',
-        },
-        {
-          id: 'notice',
-          label: 'Notice',
-          prompt: 'This morning',
-          lead: 'Rent is due in 6 days, and pay day is in 10.',
-          rows: [
-            ['Current account', 'GBP 1,240.56', 'Today'],
-            ['Rent', 'GBP 850.00', 'In 6 days'],
-          ],
-          source: 'Your current account covers it',
-        },
-      ],
-    },
+    /** The palette this page and the home page draw. Its words are the home page's, in `copy/home.ts`. */
+    demo: home.home.slash.demo,
     abilities: [
       {
         id: 'ask',
         title: 'Ask',
         lead:
           'Ask the way you would ask a person. The answer comes from your own lists, says which one, and ' +
-          'you can click a number to see the rows behind it.',
+          'you can click a number to see what makes it up.',
         examples: ['What do I owe in the next two weeks?', 'Which clients are late, and by how much?', 'How much went on hosting this year?'],
       },
       {
@@ -207,7 +165,8 @@ export const pricing = {
       { key: 'runs', name: 'Automation and script runs', said: 'Each time a pull, an automation or a script runs.', amount: aMonth },
       // What a run fetches is metered as requests; a delivery the outbox sends is `COUNTED_ONLY` and never limited.
       { key: 'requests', name: 'Requests to other services', said: 'Pulls and calls your automations and scripts make.', amount: aMonth },
-      { key: 'gb', name: 'Data fetched', said: 'What those requests bring back.', amount: (n: number) => `${n} GB a month` },
+      // Free's 0.1 GB reads as 100 MB: a decimal of a gigabyte is a figure nobody says.
+      { key: 'gb', name: 'Data fetched', said: 'What those requests bring back.', amount: (n: number) => (n < 1 ? `${Math.round(n * 1000)} MB a month` : `${n} GB a month`) },
       // `ms` in `Allowance`, shown in hours.
       { key: 'hours', name: 'Script time', said: 'Time your scripts spend running.', amount: (n: number) => `${n} hours a month` },
     ] as { key: keyof Allowance; name: string; said: string; amount: (n: number) => string }[],

@@ -20,7 +20,7 @@ import { isStale, railRoom } from '@braindog/kernel';
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
    own manifest said it. */
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
-import { useCaseName } from '@braindog/seed/usecases/names';
+import { asPartOf, useCaseName } from '@braindog/seed/usecases/names';
 
 import { iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
 import { homeOf, learnHome } from './api.ts';
@@ -531,7 +531,7 @@ function textOf(e: EventLine): string {
     const what = noteOf(e.register, e);
     return e.title ? `${e.title}: ${what}` : sentence(what);
   }
-  if (e.kind === 'suggest' && e.title) return `Asked: ${e.title}`;
+  if (e.kind === 'suggest' && e.title) return `Asked: ${asPartOf(e.title)}`;
   if (e.kind === 'decide' && e.title) return copy.feedDecided(e.title, null);
   if (e.kind === 'declare') {
     const said = declaredOf(e.target, e.note);

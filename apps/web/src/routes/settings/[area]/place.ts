@@ -85,6 +85,9 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     title: 'This record',
     icon: 'archive',
     areas: [
+      /* THE RECORD'S OWN WORDS AND ITS CURRENCY, which every screen reads and every member sees, so they are the
+         record's and not the person's: the first row of this group, ahead of what it keeps and costs. */
+      area('/settings/words', 'Words and money', 'tag', 'What your lists are called, and your currency'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: Backups wore the box `This record` is headed with, so the group's heading and its
          first row carried one mark and read as one thing said twice. A copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),

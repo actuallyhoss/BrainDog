@@ -14,18 +14,21 @@ const NOW = Date.parse('2026-09-29T09:40:00Z');
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
 const opt = (title: string, recommended = false) => ({ key: title.toLowerCase(), title, body: '', recommended });
 
-test('the count is said in words; over the aim only “two over” is red, and the count is when one is hard to undo', () => {
-  const two = sentenceOf([{ band: 'call' }, { band: 'rows' }], { options: [opt('Accept', true), opt('Not now')] }, 'claude');
+test('the count is said in words, then what is hard to undo or what the first suggests; red only for what has waited past two weeks', () => {
+  const two = sentenceOf([{ band: 'call' }, { band: 'rows' }], { options: [opt('Accept', true), opt('Not now')] }, 'claude', NOW);
   assert.deepEqual(two, { text: 'Two questions wait on you. claude suggests “Accept” for the first.', needs: '' });
 
-  const undo = sentenceOf([{ band: 'undo' }], { options: [opt('Per seat', true)] });
-  assert.deepEqual(undo, { text: 'One question waits on you. “Per seat” is suggested.', needs: 'One question waits on you' });
+  const undo = sentenceOf([{ band: 'undo' }], { options: [opt('Per seat', true)] }, '', NOW);
+  assert.deepEqual(undo, { text: 'One question waits on you. It is hard to undo.', needs: '' });
 
-  const five = sentenceOf([{}, {}, {}, {}, {}], { options: [opt('Yes'), opt('No')] });
-  assert.equal(five?.text, 'Five questions wait on you, two over the aim of three.');
-  assert.equal(five?.needs, 'two over');
+  /* NO AIM, NO QUOTA: eight is a count, and nothing in it is red until something is late. */
+  const eight = sentenceOf([{ band: 'undo' }, {}, {}, {}, {}, {}, {}, {}], { options: [opt('Yes'), opt('No')] }, '', NOW);
+  assert.deepEqual(eight, { text: 'Eight questions wait on you. The first one is hard to undo.', needs: '' });
+
+  const stale = sentenceOf([{ opened: daysAgo(20) }, { opened: daysAgo(16) }, { opened: daysAgo(1) }], { options: [opt('Yes', true)] }, '', NOW);
+  assert.deepEqual(stale, { text: 'Three questions wait on you, two of them for over two weeks. “Yes” is suggested for the first.', needs: 'two of them for over two weeks' });
   /* THE RED PHRASE IS INSIDE THE SENTENCE, so PageHead can cut round it. */
-  assert.ok(five && five.text.includes(five.needs));
+  assert.ok(stale && stale.text.includes(stale.needs));
 });
 
 test('nothing waiting is not a sentence, because the cleared state says it', () => {
@@ -116,13 +119,16 @@ test('the queue draws its sentence, its lead and its chart from this module, and
     assert.ok(page.includes(hook), `the queue no longer draws ${hook}`);
 });
 
-test('the declared page says the same sentence from a count, a flag and the first suggestion', () => {
-  assert.deepEqual(countSentence(0, false, 'Yes'), null);
-  assert.deepEqual(countSentence(2, false, 'Per seat', 'Claude'), { text: 'Two questions wait on you. Claude suggests “Per seat” for the first.', needs: '' });
-  assert.deepEqual(countSentence(1, true, undefined), { text: 'One question waits on you.', needs: 'One question waits on you' });
+test('the declared page says the same sentence from a count, how many are hard to undo, the first suggestion and how many are late', () => {
+  assert.deepEqual(countSentence(0, 0, 'Yes'), null);
+  assert.deepEqual(countSentence(2, 0, 'Per seat', 'Claude'), { text: 'Two questions wait on you. Claude suggests “Per seat” for the first.', needs: '' });
+  assert.deepEqual(countSentence(1, 1, undefined), { text: 'One question waits on you. It is hard to undo.', needs: '' });
+  assert.deepEqual(countSentence(5, 2, 'Yes'), { text: 'Five questions wait on you. The first two are hard to undo.', needs: '' });
+  assert.equal(countSentence(2, 2, 'Yes')?.text, 'Two questions wait on you. Both are hard to undo.');
+  assert.deepEqual(countSentence(1, 0, undefined, '', 1), { text: 'One question waits on you, for over two weeks.', needs: 'for over two weeks' });
   /* AND THE CLASSIC SCREEN'S SENTENCE IS THIS ONE, over the questions it holds whole. */
   const waiting = [{ band: 'call' }, { band: 'undo' }] as never[];
-  assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never), countSentence(2, true, 'Per seat'));
+  assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never, '', NOW), countSentence(2, 1, 'Per seat'));
 });
 
 test('the gate draws its sentence from this module', () => {

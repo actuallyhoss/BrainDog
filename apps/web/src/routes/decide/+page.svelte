@@ -42,7 +42,7 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
-  import { callsRead, dayWord, decideDrawn, readCalls, readDecide, WORDS, type Call } from './views.ts';
+  import { callsRead, dayWord, decideDrawn, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
   import { words } from './words.ts';
 
   let { data } = $props();
@@ -76,11 +76,19 @@
   /** A read of the page's own is out: `listen` waits for it rather than asking again on top of it. */
   let reading = false;
 
+  /* AN ARRANGED DECIDE IS THE RECORD'S OWN PAGE: once Done installed `decide`, its body is read and drawn, and the
+     preview is only what a record that never arranged it sees. */
+  async function storedDecide(): Promise<DecideBody | undefined> {
+    if (!shell.pages.includes('decide')) return undefined;
+    const one = await (await import('$lib/record/pages-live.ts')).pagesReader(apiBase()).readOne('decide');
+    return one.from === 'live' ? (one.page.body as unknown as DecideBody) : undefined;
+  }
+
   async function read(): Promise<boolean> {
     reading = true;
     client ??= createClient({ base: apiBase() });
     try {
-      const [out, called] = await Promise.all([readDecide(apiBase()), readCalls(client)]);
+      const [out, called] = await Promise.all([storedDecide().then((body) => readDecide(apiBase(), body)), readCalls(client)]);
       /* THE CALLS ARE THE PAGE'S COMPANY, NOT ITS CONDITION: a refusal of them keeps what was drawn before. */
       if (called.from === 'live') calls = called.value;
       /* A HOST TOO OLD TO DRAW THE BODY IS TOLD FROM THE FIRST ANSWER, and a later read that is refused keeps the page
@@ -149,11 +157,15 @@
   <!-- THE LINE SAYS HOW MANY WAIT, in words with the first question's suggestion, so the title carries no count; on a
        page with nothing at all to draw the cleared mark under it says that, once. Asking yourself a question is the one
        ink pill, and only for somebody who may answer. -->
-  <PageHead icon="decide" title={said('decide')} sentence={cleared ? undefined : shaped?.sentence.text} needs={shaped?.sentence.needs || undefined}>
-    {#snippet actions()}
-      {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
-    {/snippet}
-  </PageHead>
+  <!-- THE NAME IS THE NAV'S OWN ITEM, so over the line it is kept for a screen reader and not drawn; with no line it is
+       the page's only heading and stays. `display: contents`, so the sticky head still sticks. -->
+  <div class="decide-head" data-named={!cleared && shaped?.sentence.text ? '' : undefined}>
+    <PageHead icon="decide" title={said('decide')} sentence={cleared ? undefined : shaped?.sentence.text} needs={shaped?.sentence.needs || undefined}>
+      {#snippet actions()}
+        {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
+      {/snippet}
+    </PageHead>
+  </div>
 
   <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
 
@@ -222,6 +234,19 @@
 {/if}
 
 <style>
+  .decide-head {
+    display: contents;
+  }
+
+  .decide-head[data-named] :global(.head .title) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /* ONE COLUMN, the page's own: its blocks carry their spans, and Decide adds no column of its own beside them. */
   .page {
     display: flex;

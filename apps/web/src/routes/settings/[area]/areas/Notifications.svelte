@@ -1,5 +1,6 @@
 <!--
-  Settings > Notifications: when this product interrupts, the record's quiet hours, and whether this device is rung.
+  Settings > Notifications: when this product interrupts, the rules that tell you things and which of them you muted,
+  the record's quiet hours, and whether this device is rung.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
@@ -14,7 +15,10 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import PushToggle from '$lib/ui/PushToggle.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { untrack } from 'svelte';
+  import { forget } from '$lib/record/boot-live.ts';
   import { ownsRecord } from '../../levels.ts';
+  import { actorOf, mutedAfter, mutedOf, tellsQuietly } from '../muted.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
 
@@ -22,8 +26,15 @@
   let props: AreaProps = $props();
   const owner = $derived(ownsRecord(props.shell.me));
 
-  /* This area's own words. */
-  const words = { notHereYet: 'Not on this record yet' } as const;
+  /* This area's own words. Urgent is one line: what interrupts, by name, and not how the vault and the limits work. */
+  const words = {
+    notHereYet: 'Not on this record yet',
+    urgentAre: 'Keys about to expire, runs held back, and anything a rule marks urgent.',
+    tellers: 'Rules that tell you',
+    tellersWhy: 'Turn one off and its notices leave your digest. Only yours: anything urgent still reaches you.',
+    tells: (name: string) => `${name} tells you`,
+    muted: 'Off for you',
+  } as const;
 
   let client: ReturnType<typeof createClient> | null = null;
   const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
@@ -80,24 +91,105 @@
 
   /* ON PUTS THE DEFAULT BACK rather than inventing a window: 22:00 to 08:00 is what every record started with. */
   const flip = (): void => void put(on ? 'off' : null);
+
+  /* ── the rules that tell you ─────────────────────────────────────────────
+     ONE QUIET SWITCH A RULE, AND ONLY FOR A RULE THAT TELLS YOU SOMETHING: a rule with a `notify` step that is not
+     urgent, read off the automations this person may read (`lib/flow/source.ts`), each body asked for once. Off puts the
+     rule in this person's `notify.muted`, through the same `setPref` Navigation writes, so its notices leave their
+     digest and nobody else's; anything urgent still reaches them. A record with no such rule draws no section. */
+  type Teller = { actor: string; name: string };
+  let tellers = $state<Teller[]>([]);
+  /** This person's muted rules: the shell's answer, then what the last switch kept. */
+  let switched = $state<string[] | null>(null);
+  const muted = $derived(switched ?? mutedOf((props.shell.me as { prefs?: Record<string, unknown> }).prefs?.['notify.muted']));
+  let muting = $state(false);
+  let muteRefusal = $state('');
+
+  async function readTellers(): Promise<void> {
+    const m = await import('$lib/flow/source.ts');
+    const at = opened();
+    const out = await m.openAutomations((url, init) => fetch(url, init), apiBase()).catch(() => null);
+    const rows = out?.first.ok ? out.first.value.filter((r) => r.enabled) : [];
+    const read = await Promise.all(
+      rows.map(async (r) => {
+        const one = await out!.source.automation(r.id).catch(() => null);
+        return one?.ok && tellsQuietly(one.value.body) ? [{ actor: actorOf(r.id), name: r.name }] : [];
+      }),
+    );
+    /* A READ THAT FAILS DRAWS NO SWITCH AND REFUSES NOTHING: the switches are an extra, and the rest of the area stands. */
+    closed(true, at);
+    tellers = read.flat();
+  }
+
+  /* ASKED ONCE FOR THIS VISIT, whatever shell comes after. */
+  let toldAsked = false;
+  $effect(() => {
+    if (toldAsked || props.shell.refused) return;
+    toldAsked = true;
+    untrack(() => void readTellers());
+  });
+
+  async function mute(t: Teller): Promise<void> {
+    if (muting) return;
+    const was = muted;
+    const next = mutedAfter(was, t.actor, was.includes(t.actor));
+    muting = true;
+    muteRefusal = '';
+    switched = next ?? [];
+    const out = await clientOf()
+      .setPref('notify.muted', next)
+      .catch(() => null);
+    muting = false;
+    if (out?.ok) {
+      /* THE SHELL KEEPS THE PREFS IT BOOTED WITH, so the next screen asks the record again. */
+      forget();
+      return;
+    }
+    switched = was;
+    muteRefusal = out && 'refusal' in out ? out.refusal.fix : copy.recordNotReached;
+  }
 </script>
 
 <!--
   `09` SPECIFIES A COMPLETE MECHANISM WITH ONE SETTING, the record's quiet hours (`09 §5` rule 3). Everything else is
-  still a constant, digests are pack declarations, and muting is turned off at the source: edit or retire the rule that
-  raises it. So the facts below still REPORT, and the quiet hours are the one thing on this screen that is the record's
-  and can be changed, by an owner. The last switch is Web Push for this device, which is kept by the browser and
-  the record, not a preference over what interrupts.
+  still a constant and digests are pack declarations, so the facts below REPORT, and the quiet hours are the one thing on
+  this screen that is the record's and can be changed, by an owner. A rule that tells you something has a switch of
+  its own, which is this person's (`notify.muted`), not the record's. The last switch is Web Push for this device,
+  which is kept by the browser and the record, not a preference over what interrupts.
 -->
 <Section title={copy.whenWeInterrupt}>
   <p class="hint">{copy.batchByDefault}</p>
   <!-- WHAT INTERRUPTS, AS ROWS OF FACT: each rule this record holds about interrupting, with its glyph, its name and
        the one sentence that says it. Nothing here is a control, so no row carries one. -->
-  <StateRow icon="alert" title={copy.urgentKinds} line={copy.urgentKindsAre} />
+  <StateRow icon="alert" title={copy.urgentKinds} line={words.urgentAre} />
   <StateRow icon="clock" title={copy.interruptCap} line={copy.interruptCapIs} />
   <StateRow icon="bell" title={copy.unreadCount} line={copy.unreadCountIs} />
-  <p class="hint after">{copy.muteAtSource}</p>
 </Section>
+
+{#if tellers.length > 0}
+  <Section title={words.tellers}>
+    <p class="hint">{words.tellersWhy}</p>
+    {#each tellers as t (t.actor)}
+      {@const tells = !muted.includes(t.actor)}
+      <StateRow icon="bell" title={t.name} line={tells ? undefined : words.muted}>
+        {#snippet action()}
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={tells}
+            aria-label={words.tells(t.name)}
+            disabled={muting}
+            onclick={() => void mute(t)}><span class="switch-track"></span></button
+          >
+        {/snippet}
+      </StateRow>
+    {/each}
+    {#if muteRefusal}
+      <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {muteRefusal}</p>
+    {/if}
+  </Section>
+{/if}
 
 <Section title={copy.quietHours}>
   {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
@@ -115,9 +207,12 @@
               <span class="field quiet-field">
                 <input class="field-input quiet-time" id="quiet-from" type="time" value={from} disabled={busy} onchange={(e) => pick('from', e)} />
               </span>
-              <label class="quiet-word" for="quiet-to">{copy.quietUntil}</label>
-              <span class="field quiet-field">
-                <input class="field-input quiet-time" id="quiet-to" type="time" value={to} disabled={busy} onchange={(e) => pick('to', e)} />
+              <!-- "TO" AND ITS TIME ARE ONE PIECE, which wraps under the first time where the two will not fit side by side. -->
+              <span class="quiet-to">
+                <label class="quiet-word" for="quiet-to">{copy.quietUntil}</label>
+                <span class="field quiet-field">
+                  <input class="field-input quiet-time" id="quiet-to" type="time" value={to} disabled={busy} onchange={(e) => pick('to', e)} />
+                </span>
               </span>
             </span>
           {:else}
@@ -180,17 +275,25 @@
     line-height: var(--lh-body);
   }
 
-  .quiet-pickers {
+  .quiet-pickers,
+  .quiet-to {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  .quiet-to {
+    flex-wrap: nowrap;
   }
 
   .quiet-field {
     inline-size: auto;
   }
 
+  /* A TIME IS NEVER CUT: "10:00 PM" and its picker's mark need nine characters, whatever the row has left. */
   .quiet-time {
+    min-inline-size: 9ch;
     min-block-size: var(--ctl-h);
     font-variant-numeric: tabular-nums;
   }
@@ -214,10 +317,6 @@
     line-height: var(--lh-body);
   }
 
-  .after {
-    margin-block-start: var(--sp-3);
-  }
-
   /* AT A PHONE'S WIDTH THE SENTENCE TAKES ITS OWN LINE AND THE TWO PICKERS SIT SIDE BY SIDE UNDER IT, each a full
      touch target, with the switch still at the end of the row rather than under the pickers. */
   @media (width < 520px) {
@@ -229,22 +328,25 @@
       font-size: var(--t-md);
     }
 
-    /* AT 320 THE TWO PICKERS AND "until" OUTRAN THE ROW BY FORTY PIXELS: each picker shares what is left and gives
-       up its intrinsic width before the row does. */
+    /* AT 320 THE TWO PICKERS AND "to" OUTRAN THE ROW, and squeezing them cut the times to "10:00 P": each picker keeps
+       its nine characters, grows into what is left, and "to" with its time wraps under the first when both will not fit. */
     .quiet-pickers {
       display: flex;
       flex-basis: 100%;
       min-inline-size: 0;
     }
 
-    .quiet-field {
-      flex: 1 1 0;
-      min-inline-size: 0;
+    .quiet-pickers > .quiet-field,
+    .quiet-to {
+      flex: 1 1 auto;
+    }
+
+    .quiet-to > .quiet-field {
+      flex: 1 1 auto;
     }
 
     .quiet-time {
       inline-size: 100%;
-      min-inline-size: 0;
       min-block-size: var(--tap);
     }
   }

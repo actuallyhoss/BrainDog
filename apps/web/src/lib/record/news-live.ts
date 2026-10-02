@@ -97,7 +97,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
     value: r.unit ? money(Math.round(r.value), r.unit) : format(decl?.format, r.value),
     /* THE TARGET LINE GOES WITH THE TICK, because "never below zero" under a figure no row contributed to is a bound
        every such figure satisfies, printed as though something had been checked against it. */
-    note: [unsaid ? NO_ROW_SAID : decl && !offTarget(decl, r.unit) ? targetLine(decl) : '', across].filter(Boolean).join(' · '),
+    note: [unsaid ? NO_ROW_SAID : decl && !offTarget(decl, r.unit) ? targetLine(decl, r.value) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(door ? { href: door } : {}),
   };

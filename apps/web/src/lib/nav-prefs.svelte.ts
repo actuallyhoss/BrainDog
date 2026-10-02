@@ -48,11 +48,13 @@ export type Prefs = {
   'pen.dismissed'?: string[];
   /**
    * THE PAGE THE APP OPENS ON, by its address (`/p/money`, `/?work`). Absent is Today, which is `/`. The record keeps it
-   * once `home.page` is one of its `PREF_KEYS`; until then a record refuses it and the screen says so.
+   * as one of its `PREF_KEYS`; a host older than the key refuses it and the screen says so.
    */
   'home.page'?: string;
   /** THE NAMES THIS PERSON GAVE PAGES IN THEIR NAV, address to name. The page's own title is untouched. */
   'nav.labels'?: Record<string, string>;
+  /** THE RULES WHOSE NOTICES THIS PERSON MUTED, as `rule:<id>`. Urgent notices always arrive. */
+  'notify.muted'?: string[];
 };
 
 /** What a change came to: kept by the record, kept on this device, or refused with the record's sentence. */

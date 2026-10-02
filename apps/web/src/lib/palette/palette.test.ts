@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import '../record/fixtures/fill.ts';
 import { ACTS, COMMANDS, UNDO_LAST, admits, commands, type Command } from './admit.ts';
+import { QUIET_HREF, customise, type Here, type Offer, type Place } from './customise.ts';
 import { BINDINGS, type Binding } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from '../record/declared.ts';
@@ -105,10 +106,10 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
 });
 
 test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
-  /* FOURTEEN, and it was thirteen: every row went somewhere or undid something until `Add to <list>: <text>`. The count
-     is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it should
-     arrive with the line that says so. */
-  assert.equal(COMMANDS.length, 14, `the palette declares ${COMMANDS.length} rows`);
+  /* FIFTEEN, and it was fourteen: `Customise` joined the add row (DIRECTION §35). The count is exact on purpose,
+     because a row added or lost here is a change to what every screen can reach, and it should arrive with the line
+     that says so. */
+  assert.equal(COMMANDS.length, 15, `the palette declares ${COMMANDS.length} rows`);
   const add = COMMANDS.find((c) => c.id === 'c-add');
   assert.ok(add, 'no row adds anything');
   assert.equal(admits(add), null, `the add row is refused: ${admits(add)}`);
@@ -221,6 +222,9 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
       assert.equal(read.tone, undefined, `${id} carries a verdict against a target nobody typed`);
       continue;
     }
+    /* A LIMIT KEPT SAYS NOTHING (`targetLine`): "Limit 5" under a 2 is a rule nobody broke. A broken one always says how
+       far over, and a floor always says its line. */
+    if (typeof target.lte === 'number' && read.tone === 'good') continue;
     assert.ok(read.note.trim().length > 0, `${id} prints a bare figure, which is a number you look at`);
   }
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */
@@ -269,9 +273,152 @@ test('AND IT REACHES THE ROWS YOU CHANGED LAST, off a ledger the record was alre
 test('every act the palette can perform is a named one, so no row smuggles in an argument', () => {
   /* A closure hanging off a declaration would let the next acting row take an object, and test 1
      would stop being checkable. The list is closed and the palette switches on the name. */
-  assert.deepEqual([...ACTS], ['undo', 'add']);
+  assert.deepEqual([...ACTS], ['undo', 'add', 'customise']);
   for (const c of COMMANDS) {
     if (c.href !== null) continue;
     assert.ok(c.act !== undefined && (ACTS as readonly string[]).includes(c.act), `${c.id} acts, and does not say what it does`);
+  }
+});
+
+/* ── customising the app in words (DIRECTION §35) ─────────────────────────── */
+
+const place = (href: string, name: string, more: Partial<Place> = {}): Place => ({ href, name, own: name, icon: 'doc', hide: true, rename: true, ...more });
+
+/** A fresh device on a record with a Money page, a Money flow page, Inbox and the app's own screens. */
+const fresh: Here = {
+  look: {},
+  places: [
+    place('/', 'Today', { hide: false, rename: false }),
+    place('/decide', 'Decide', { hide: false, rename: false }),
+    place('/inbox', 'Inbox', { rename: false }),
+    place('/p/money', 'Money'),
+    place('/p/money-flow', 'Money flow'),
+    place('/r/invoices', 'Invoices', { hide: false, rename: false }),
+  ],
+  hidden: [],
+  home: null,
+  pageMenu: false,
+};
+
+const kinds = (offers: Offer[]) => offers.map((o) => o.change.kind);
+
+test('AN EMPTY QUERY DRAWS NO CUSTOMISE ROW, so a freshly opened palette looks as it did', () => {
+  for (const q of ['', '   ']) assert.deepEqual(customise(q, { ...fresh, pageMenu: true }), []);
+  /* AND THE DECLARATION IS ABSENT WITH NOTHING TO DRAW, by the standing rule, so `commands()` with no offers is the list
+     it always was. */
+  const idle = commands({ undoable: false, creation: null }).map((c) => c.id);
+  assert.ok(!idle.includes('c-customise'), 'the customise row is offered with nothing typed');
+  assert.deepEqual(commands({ undoable: false, creation: null, customise: [] }).map((c) => c.id), idle);
+  const armed = commands({ undoable: false, creation: null, customise: customise('dark', fresh) }).map((c) => c.id);
+  assert.deepEqual(armed.filter((id) => id !== 'c-customise'), idle);
+  assert.ok(armed.includes('c-customise'));
+});
+
+test('the customise declaration passes the three tests, as an act that names its own target', () => {
+  const row = COMMANDS.find((c) => c.id === 'c-customise');
+  assert.ok(row);
+  assert.equal(admits(row), null, `the customise row is refused: ${admits(row)}`);
+  assert.equal(admits({ ...good, href: null, act: 'customise' }), null);
+});
+
+test('"dark", "compact", "open on money" and "hide inbox" each offer exactly one row, and the right one', () => {
+  const dark = customise('dark', fresh);
+  assert.equal(dark.length, 1, `"dark" offers ${dark.map((o) => o.title).join(', ')}`);
+  assert.deepEqual(dark[0]?.change, { kind: 'look', key: 'scheme', value: 'dark', name: dark[0]?.title });
+
+  const compact = customise('compact', fresh);
+  assert.equal(compact.length, 1, `"compact" offers ${compact.map((o) => o.title).join(', ')}`);
+  assert.deepEqual(compact[0]?.change, { kind: 'look', key: 'density', value: 'compact', name: compact[0]?.title });
+
+  /* MONEY AND NOT MONEY FLOW TOO: a name typed whole picks the page called that. */
+  const money = customise('open on money', fresh);
+  assert.equal(money.length, 1, `"open on money" offers ${money.map((o) => o.title).join(', ')}`);
+  assert.deepEqual(money[0]?.change, { kind: 'home', href: '/p/money', name: 'Money' });
+  assert.equal(money[0]?.title, 'Open on Money');
+
+  const inbox = customise('hide inbox', fresh);
+  assert.equal(inbox.length, 1, `"hide inbox" offers ${inbox.map((o) => o.title).join(', ')}`);
+  assert.deepEqual(inbox[0]?.change, { kind: 'hide', href: '/inbox', name: 'Inbox' });
+
+  /* CASE AND SPACING ARE NOT PART OF THE SENTENCE. */
+  assert.deepEqual(customise('  Open   on  MONEY ', fresh).map((o) => o.id), money.map((o) => o.id));
+});
+
+test('a row that would change nothing is absent: already dark, already hidden, already the page it opens on', () => {
+  assert.deepEqual(customise('dark', { ...fresh, look: { scheme: 'dark' } }), []);
+  assert.deepEqual(customise('compact', { ...fresh, look: { density: 'compact' } }), []);
+  assert.deepEqual(customise('hide inbox', { ...fresh, hidden: ['/inbox'] }), []);
+  assert.deepEqual(customise('open on money', { ...fresh, home: '/p/money' }), []);
+  /* TODAY IS WHERE A FRESH RECORD OPENS, so opening on it is offered only once something else is first. */
+  assert.deepEqual(customise('open on today', fresh), []);
+  assert.deepEqual(kinds(customise('open on today', { ...fresh, home: '/p/money' })), ['home']);
+  /* AND "match the system" ONLY ONCE THE DEVICE HAS A SCHEME OF ITS OWN. */
+  assert.ok(!customise('system', fresh).some((o) => o.id === 'cz-scheme-system'));
+  assert.ok(customise('system', { ...fresh, look: { scheme: 'dark' } }).some((o) => o.id === 'cz-scheme-system'));
+  /* A HIDDEN PAGE IS SHOWN AGAIN BY NAME, and only a hidden one. */
+  assert.deepEqual(kinds(customise('show inbox', { ...fresh, hidden: ['/inbox'] })), ['show']);
+  assert.deepEqual(customise('show inbox', fresh), []);
+});
+
+test('a verb that takes a page draws nothing until a page is named, and a page the nav cannot hide is not offered', () => {
+  for (const q of ['hide', 'open on', 'rename', 'open on nowhere', 'hide nothing at all']) assert.deepEqual(customise(q, fresh), [], q);
+  /* TODAY, DECIDE AND A LIST ARE NOT ROWS OF THE NAV A PERSON CAN TAKE AWAY. */
+  assert.deepEqual(customise('hide today', fresh), []);
+  assert.deepEqual(customise('hide invoices', fresh), []);
+  /* AND A NAME THAT IS ONLY A PREFIX REACHES EVERY PAGE IT STARTS. */
+  assert.deepEqual(customise('open on mon', fresh).map((o) => o.title), ['Open on Money', 'Open on Money flow']);
+});
+
+test('one or two letters draw nothing, so the rows never crowd a query that is still being typed', () => {
+  for (const q of ['d', 'da', 'c', 'co', '?']) assert.deepEqual(customise(q, fresh), [], q);
+  assert.deepEqual(kinds(customise('dar', fresh)), ['look']);
+  /* A WORD NONE OF THEM SAYS DRAWS NONE OF THEM. */
+  assert.deepEqual(customise('invoice from acme', fresh), []);
+});
+
+test('rename asks for the new name, then renames, in the person\'s own capitals', () => {
+  const ask = customise('rename money', fresh);
+  assert.equal(ask.length, 1);
+  assert.deepEqual(ask[0]?.change, { kind: 'fill', text: 'Rename Money to ' });
+  /* THE BOX AFTER THE PRESS STILL MAKES THE SAME ROW, so pressing it again cannot go anywhere new. */
+  assert.deepEqual(kinds(customise('Rename Money to ', fresh)), ['fill']);
+  const done = customise('rename money to Cash', fresh);
+  assert.equal(done.length, 1);
+  assert.deepEqual(done[0]?.change, { kind: 'rename', href: '/p/money', own: 'Money', from: 'Money', to: 'Cash' });
+  assert.equal(done[0]?.title, 'Rename Money to Cash');
+  /* A NAME THE NAV CANNOT CARRY IS NOT OFFERED: Inbox and the lists keep their own. */
+  assert.deepEqual(customise('rename inbox to Mail', fresh), []);
+  /* A PAGE WHOSE OWN NAME HOLDS "to" IS STILL NAMED. */
+  assert.deepEqual(kinds(customise('rename back to work', { ...fresh, places: [place('/p/back', 'Back to work')] })), ['fill']);
+});
+
+test('customise this page is offered only over a page that has its menu, and quiet hours go to Notifications', () => {
+  assert.deepEqual(customise('customise this page', fresh), []);
+  assert.deepEqual(kinds(customise('customise this page', { ...fresh, pageMenu: true })), ['page']);
+  assert.deepEqual(kinds(customise('edit layout', { ...fresh, pageMenu: true })), ['page']);
+  const quiet = customise('quiet hours', fresh);
+  assert.equal(quiet.length, 1);
+  assert.deepEqual(quiet[0]?.change, { kind: 'go', href: QUIET_HREF });
+  assert.equal(QUIET_HREF, '/settings/notifications');
+});
+
+test('every customise row is named in words a person reads, and says where the change lands', () => {
+  const all = [
+    ...customise('scheme', { ...fresh, look: { scheme: 'dark' } }),
+    ...customise('text size', fresh),
+    ...customise('density', fresh),
+    ...customise('open on mon', fresh),
+    ...customise('hide inbox', fresh),
+    ...customise('rename money to Cash', fresh),
+    ...customise('customise', { ...fresh, pageMenu: true }),
+    ...customise('quiet', fresh),
+  ];
+  assert.ok(all.length >= 12, `only ${all.length} rows were drawn`);
+  for (const o of all) {
+    assert.ok(o.title.trim() && o.detail.trim(), `${o.id} has no title or no line under it`);
+    /* §35: THE WORDS NAME THE PERSON'S OWN THINGS, never the system's. */
+    assert.doesNotMatch(`${o.title} ${o.detail}`, /\b(row|rows|list item|entity)\b/iu, `${o.id} says "${o.title} · ${o.detail}"`);
+    /* AND TEST 3 OF `admit.ts`: typing a row's own title finds the row. A rename's sentence is typed, not found. */
+    if (o.complete !== undefined) assert.equal(admits({ ...good, title: o.title }), null, `${o.title} is not a name anybody could type`);
   }
 });

@@ -42,11 +42,13 @@ test('the project strip narrows by the field the page declares, `thing`, which t
 test('the Work page opens on its line, then the capture line over the tasks', () => {
   assert.ok(work, 'the work module declares page.work');
   assert.equal(work.page, WORK_PAGE);
-  const [first, second] = work.blocks;
-  assert.equal(first?.kind, 'note');
-  assert.equal(first?.lead, true);
-  assert.equal(second?.kind, 'capture');
-  assert.equal(second?.register, TASKS);
+  /* ONE LEAD LINE A STATE (work 1.13.0): the late task named when there is one, the counts when there is not, each
+     behind its own `when:`, so the page still opens on one line and then the capture. */
+  const lines = work.blocks.findIndex((b) => !(b.kind === 'note' && b.lead === true));
+  assert.ok(lines >= 1, 'the page opens on its line');
+  for (const b of work.blocks.slice(0, lines)) assert.ok(b.when, 'two lead lines with no when: would both draw');
+  assert.equal(work.blocks[lines]?.kind, 'capture');
+  assert.equal(work.blocks[lines]?.register, TASKS);
 });
 
 test('every list the Work page draws is the tasks, so each task it shows opens in the panel and takes the keys', () => {

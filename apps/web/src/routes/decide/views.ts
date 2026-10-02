@@ -29,7 +29,7 @@ import { blockOf, type Fetch, type LiveBlock, type Opened } from '../../lib/reco
 import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
 import { copy } from '../../lib/copy.ts';
-import { countSentence, WORDS as LEAD } from './lead.ts';
+import { ageDays, countSentence, STALE_DAYS, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
 
 type Row = Record<string, unknown>;
@@ -241,7 +241,9 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
   const drawn = new Set<string>();
   let first: QueueQuestion | undefined;
   let open = 0;
-  let undo = false;
+  /* EACH QUESTION ONCE, by id, for how many are hard to undo and how many have waited past two weeks. */
+  const hard = new Set<string>();
+  const late = new Set<string>();
   let decided: string | null = null;
   const shaped = blocks.map((b, n): LiveBlock => {
     if (says(b) || !b.drawn) return b;
@@ -259,7 +261,10 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
     }
     if (!isOpen(b) || !b.queue) return b;
     open = Math.max(open, asked(b));
-    if (b.queue.some((q) => q.cost === 'undo')) undo = true;
+    for (const q of b.queue) {
+      if (q.cost === 'undo') hard.add(q.id);
+      if (ageDays(q.at, now) > STALE_DAYS) late.add(q.id);
+    }
     const fresh = b.queue.filter((q) => !drawn.has(q.id));
     for (const q of fresh) drawn.add(q.id);
     if (isLead(b)) first ??= fresh[0];
@@ -272,7 +277,7 @@ export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: 
   });
   first ??= shaped.find((b) => isOpen(b) && b.drawn && b.queue?.length)?.queue?.[0];
   const option = first?.options.find((o) => o.recommended)?.label;
-  const waiting = countSentence(open, undo, option, first ? who(first) : '');
+  const waiting = countSentence(open, hard.size, option, first ? who(first) : '', late.size);
   const quiet = decided ? words.lastDecided(since(decided, now)) : (calm ?? words.nothingWaiting);
   const out = emptyHidden(shaped);
   return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn) };

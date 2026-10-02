@@ -772,7 +772,9 @@ test("A TILE SAYS THE RECORD'S TARGET, not the build's, so a person's Money is n
   const decl = METRICS['out-30d']!;
   const said = (target?: unknown) =>
     blockOf({ kind: 'stat', cells: [{ metric: 'out-30d' }], readings: [{ metric: 'out-30d', reading: { value: 115_749, unit: 'GBP', rows: 7, met: true, refusals: [] }, ...(target === undefined ? {} : { target }) }], rows: [], matched: 0, refusals: [] } as never, new Map(), Date.UTC(2026, 8, 17, 12)).metrics?.[0]?.note;
-  assert.match(String(said({ lte: 250_000 })), /Limit GBP 2,500$/u);
+  /* A LIMIT IS SAID ONCE IT IS BROKEN, by how far: GBP 1,157.49 against the record's GBP 1,000, not the build's. */
+  assert.match(String(said({ lte: 100_000 })), /GBP 157\.49 over your limit$/u);
+  assert.equal(said({ lte: 250_000 }), '', 'a limit that is kept is said anyway');
   assert.equal(said(), said(decl.target), 'without one, the build says its own');
 });
 

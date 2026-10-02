@@ -224,10 +224,9 @@
           onclick={() => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
         >
       {/if}
-      <!-- The band is last on the by-line, in the register of who asked and when, as the renderer draws it. -->
+      <!-- WHO ASKED AND WHEN, and nothing else: a calm by-line takes no room until the card is pointed at (`kinds/queue.css`). -->
       <p class="queue-by">
-        <Face name={asker.name} kind={asker.kind} size="s" /><span class="queue-who">{asker.name}</span><span class="queue-when">{when}</span
-        >{#if band}<span class="queue-cost" data-cost={question.cost}>{band}</span>{/if}
+        <Face name={asker.name} kind={asker.kind} size="s" /><span class="queue-who">{asker.name}</span><span class="queue-when">{when}</span>
       </p>
       <h3 class="queue-question" dir="auto">{saidOf(question.question)}</h3>
       {#if reasoned && why}<p class="queue-why" dir="auto">{why}</p>{/if}
@@ -264,6 +263,9 @@
           </li>
         {/each}
       </ul>
+      <!-- WHAT THE ANSWER COSTS SITS AFTER THE OPTIONS, at the end of their row, as the renderer draws it: it is about the
+           answer, so it belongs beside the answers and not on the by-line. -->
+      {#if band}<span class="queue-cost" data-cost={question.cost}>{band}</span>{/if}
       {#if !reasoned && (why || reasons.length > 0)}
         <!-- THE REASONS OF EVERY CARD BUT THE FIRST ARE FOLDED, one press away, in the renderer's own fold, word and
              classes (`kinds/queue.css`): a page of questions is read by its questions and answers, not by a paragraph

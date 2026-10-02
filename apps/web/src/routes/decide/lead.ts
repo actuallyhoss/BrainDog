@@ -14,7 +14,7 @@
 import { citedWords } from '../../lib/cite.ts';
 import type { Question } from '../../lib/record/schema.ts';
 
-/** The most questions the queue aims to hold at once; the figure `targetLine` says as "Limit 3". */
+/** The most questions the queue aims to hold at once; the classic screen's figure says it as "Limit 3". The line never does. */
 export const AIM = 3;
 
 /** Past this many days a question has waited too long, and its bar and its age are drawn in the red that means late. */
@@ -93,34 +93,52 @@ export const suggestedOf = (q: Pick<Question, 'options'> | undefined): string | 
 /**
  * THE SENTENCE UNDER THE TITLE, and the phrase in it that needs him.
  *
- * "Two questions wait on you. claude suggests “Accept” for the first." Red is kept to the words that need him: over the
- * aim, only "two over" is red, since the count itself is not the trouble; within the aim but with a question that is
- * hard to undo, the count is; otherwise nothing is red. The
- * suggestion is the first question's own, said with who asked it when that is known, and left out when there is none.
+ * "Eight questions wait on you. The first one is hard to undo." How many wait, and then the one thing worth knowing
+ * before reading them: which are hard to undo, or else what the first suggests, with who asked it when that is known.
+ * RED IS ONLY FOR WHAT IS LATE, a question that has waited past two weeks ("two of them for over two weeks"); a count is
+ * never the trouble, and the queue keeps no quota to be over. Questions come dearest first, so the hard ones lead.
  * NOTHING WAITING IS NOT A SENTENCE: the screen's cleared state already says it, with when the last one was decided.
  */
 export function sentenceOf(
-  waiting: readonly Pick<Question, 'band'>[],
+  waiting: readonly Partial<Pick<Question, 'band' | 'opened'>>[],
   first: Pick<Question, 'options'> | undefined,
   who = '',
+  now = Date.now(),
 ): { text: string; needs: string } | null {
-  return countSentence(waiting.length, waiting.some((q) => q.band === 'undo'), suggestedOf(first), who);
+  const hard = waiting.filter((q) => q.band === 'undo').length;
+  const late = waiting.filter((q) => typeof q.opened === 'string' && ageDays(q.opened, now) > STALE_DAYS).length;
+  return countSentence(waiting.length, hard, suggestedOf(first), who, late);
 }
 
 /**
  * THE SAME SENTENCE FROM WHAT A DECLARED QUEUE ANSWERS: how many are open (the record's own count, which may be more
- * than the questions it sent), whether any of them is hard to undo, and the first one's suggested option by its label.
- * `sentenceOf` is this over the questions the classic screen holds whole, so the two screens say one sentence.
+ * than the questions it sent), how many of them are hard to undo, the first one's suggested option by its label, and
+ * how many have waited past two weeks. `sentenceOf` is this over the questions the classic screen holds whole, so the
+ * two screens say one sentence.
  */
-export function countSentence(n: number, undo: boolean, option: string | undefined, who = ''): { text: string; needs: string } | null {
+export function countSentence(n: number, undo: number | boolean, option: string | undefined, who = '', late = 0): { text: string; needs: string } | null {
   if (n <= 0) return null;
   const count = n === 1 ? 'One question waits on you' : `${capital(numberWord(n))} questions wait on you`;
-  const over = n > AIM;
-  const past = `${numberWord(n - AIM)} over`;
-  const aim = over ? `, ${past} the aim of ${numberWord(AIM)}` : '';
+  const stale = Math.min(Math.max(0, late), n);
+  const overdue =
+    stale === 0 ? '' : stale === n ? (n === 1 ? 'for over two weeks' : 'all of them for over two weeks') : `${numberWord(stale)} of them for over two weeks`;
+  const hard = Math.min(Number(undo), n);
   const which = n > 1 ? ' for the first' : '';
-  const suggests = option ? (who ? ` ${who} suggests “${option}”${which}.` : ` “${option}” is suggested${which}.`) : '';
-  return { text: `${count}${aim}.${suggests}`, needs: over ? past : undo ? count : '' };
+  const then =
+    hard > 0
+      ? n === 1
+        ? ' It is hard to undo.'
+        : hard === n
+          ? ` ${n === 2 ? 'Both' : 'All of them'} are hard to undo.`
+          : hard === 1
+            ? ' The first one is hard to undo.'
+            : ` The first ${numberWord(hard)} are hard to undo.`
+      : option
+        ? who
+          ? ` ${who} suggests “${option}”${which}.`
+          : ` “${option}” is suggested${which}.`
+        : '';
+  return { text: `${count}${overdue ? `, ${overdue}` : ''}.${then}`, needs: overdue };
 }
 
 /**

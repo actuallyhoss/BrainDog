@@ -18,6 +18,7 @@ import {
   lanesReading,
   lateSaid,
   projectColour,
+  lateBy,
   sentenceOf,
   shareReading,
   sinceIcon,
@@ -32,16 +33,29 @@ import type { DayRow, DueRow, SessionRow, TaskRow } from '../record/today-live.t
 
 const TODAY = '2026-09-29';
 
-test('THE SENTENCE: the count of what needs him, how late the oldest late thing is, and who is working when nothing does', () => {
-  assert.deepEqual(sentenceOf(4, ['2026-09-27'], 3, TODAY), { text: 'Four things need you, and one is 2 days late.', needs: '2 days late' });
-  assert.deepEqual(sentenceOf(1, ['2026-09-28'], 0, TODAY), { text: 'One thing needs you, and it is 1 day late.', needs: '1 day late' });
-  assert.deepEqual(sentenceOf(5, ['2026-09-20', '2026-09-27'], 0, TODAY), { text: 'Five things need you, and two are late, the oldest 9 days late.', needs: 'two are late' });
-  assert.deepEqual(sentenceOf(2, ['2026-09-20', '2026-09-27'], 0, TODAY).needs, 'both are late');
+test('THE SENTENCE: the late work first and red, said once, then what else needs him; who is working when nothing does', () => {
+  assert.deepEqual(sentenceOf(4, ['2026-09-27'], 3, TODAY), { text: 'One thing is two days late. Three more need you.', needs: 'two days late' });
+  assert.deepEqual(sentenceOf(1, ['2026-09-28'], 0, TODAY), { text: 'One thing is a day late.', needs: 'a day late' });
+  assert.deepEqual(sentenceOf(5, ['2026-09-20', '2026-09-27'], 0, TODAY), { text: 'Two things are late, the oldest by nine days. Three more need you.', needs: 'Two things are late' });
+  assert.deepEqual(sentenceOf(2, ['2026-09-20', '2026-09-27'], 0, TODAY), { text: 'Two things are late, the oldest by nine days.', needs: 'Two things are late' });
+  assert.deepEqual(sentenceOf(3, ['2026-09-20', '2026-09-27'], 0, TODAY).text, 'Two things are late, the oldest by nine days. One more needs you.');
+  assert.deepEqual(sentenceOf(19, ['2026-07-29', '2026-08-01', '2026-08-09', '2026-08-25', '2026-09-01', '2026-09-20', '2026-09-27'], 0, TODAY), {
+    text: 'Seven things are late, the oldest by two months. Twelve more need you.',
+    needs: 'Seven things are late',
+  });
   assert.deepEqual(sentenceOf(4, [], 3, TODAY), { text: 'Four things need you, and three agents are working.', needs: 'Four things need you' });
   assert.deepEqual(sentenceOf(4, [], 0, TODAY), { text: 'Four things need you.', needs: 'Four things need you' });
   assert.deepEqual(sentenceOf(0, [], 0, TODAY), { text: 'Nothing needs you, and no agent is working.', needs: '' });
   assert.deepEqual(sentenceOf(0, [], 1, TODAY), { text: 'Nothing needs you, and one agent is working.', needs: '' });
-  assert.equal(sentenceOf(12, [], 0, TODAY).text, '12 things need you.');
+  assert.equal(sentenceOf(12, [], 0, TODAY).text, 'Twelve things need you.');
+  assert.equal(sentenceOf(23, [], 0, TODAY).text, '23 things need you.');
+});
+
+test('HOW LATE, IN WORDS: a day, then days, weeks and months, counted in words to ten', () => {
+  assert.equal(lateBy('2026-09-28', TODAY), 'a day');
+  assert.equal(lateBy('2026-09-24', TODAY), 'five days');
+  assert.equal(lateBy('2026-09-01', TODAY), 'four weeks');
+  assert.equal(lateBy('2026-06-01', TODAY), 'four months');
 });
 
 test('LATE, WAITED AND RUNNING ARE SAID THE WAY A PERSON SAYS THEM', () => {

@@ -53,6 +53,49 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   assert.deepEqual(raw.filter((b) => b.area === 'rail').map((b) => b.kind), ['table', 'stat', 'timeline', 'feed']);
 });
 
+test('LATE MONEY IS A LINE A THING, oldest first, saying how late it is rather than the day it was due', () => {
+  const late = DEFAULT_HOME.blocks.find((b) => b.source === 'deadlines' && b.where === 'day before today') as unknown as { kind: string; columns: { field: string }[] };
+  assert.equal(late.kind, 'spec');
+  assert.deepEqual(late.columns.map((c) => c.field), ['title', 'amount', 'day']);
+  const money = block({ kind: 'spec', source: 'deadlines', columns: [{ field: 'title' }, { field: 'amount' }, { field: 'day' }] as never }, [
+    { row: 'obligations#2', day: '2026-07-01' },
+    { row: 'obligations#3', day: '2026-09-29' },
+  ]);
+  (money as { rows: unknown[] }).rows = [
+    { key: 'obligations#2', cells: ['Legal review, February', '−£9,190', '1 Jul 2026'] },
+    { key: 'obligations#3', cells: ['Ledger Post, sending plan', '−£39', '29 Sep 2026'] },
+  ];
+  const out = shown(homeDrawn([money], NOW).blocks);
+  assert.deepEqual(out[0]!.rows.map((r) => r.cells), [
+    ['Legal review, February', '−£9,190', '3 months late'],
+    ['Ledger Post, sending plan', '−£39', '3 days late'],
+  ]);
+});
+
+test('WHAT CHANGED LEAVES OUT WHAT THE PAGE ALREADY SAYS: open questions, and a rule`s note about a row that falls due', () => {
+  const queue = block({ kind: 'queue', source: 'governance.open', queue: [{ id: 'SG3' }] as never, total: 4 });
+  const due = block({ kind: 'timeline', source: 'deadlines' }, [{ row: 'installments#5', day: '2026-10-02' }]);
+  const lines = [
+    { by: 'rule', who: 'rule:recurring-missed', kind: 'suggest', target: 'suggestion:SG3', note: null, at: '2026-10-02T08:50:00Z' },
+    { by: 'rule', who: 'rule:installment-due-soon', kind: 'note', target: 'installments#5', note: 'Halden licence, 3 of 4 is due today: £2,400.', at: '2026-10-02T08:40:00Z' },
+    { by: 'rule', who: 'rule:cash-stale', kind: 'note', target: 'accounts#2', note: 'The balance of Tax reserve was last set 9 days ago.', at: '2026-10-02T08:30:00Z' },
+  ];
+  const feed = block({ kind: 'feed', source: 'activity', feed: lines as never });
+  (feed as { rows: unknown[] }).rows = lines.map((_, n) => ({ key: String(n), cells: [] }));
+  const out = shown(homeDrawn([queue, due, feed], NOW).blocks).find((b) => b.kind === 'feed')!;
+  assert.deepEqual(out.feed?.map((r) => r.target), ['accounts#2']);
+  assert.deepEqual(out.rows.map((r) => r.key), ['2']);
+  /* WITH NOTHING WAITING AND NOTHING FALLING DUE, EVERY LINE STAYS; and a feed left with nothing is not drawn. */
+  assert.equal(shown(homeDrawn([feed], NOW).blocks)[0]!.feed?.length, 3);
+  const asked = block({ kind: 'feed', source: 'activity', feed: [lines[0]] as never });
+  (asked as { rows: unknown[] }).rows = [{ key: '0', cells: [] }];
+  assert.deepEqual(shown(homeDrawn([queue, asked], NOW).blocks).map((b) => b.kind), ['queue']);
+  /* A QUESTION WHAT NEEDS YOU DOES NOT DRAW (past its few, or answered) keeps its line: nothing else says it. */
+  const elsewhere = block({ kind: 'feed', source: 'activity', feed: [{ ...lines[0], target: 'suggestion:SG9' }] as never });
+  (elsewhere as { rows: unknown[] }).rows = [{ key: '0', cells: [] }];
+  assert.equal(shown(homeDrawn([queue, elsewhere], NOW).blocks).find((b) => b.kind === 'feed')?.feed?.length, 1);
+});
+
 test('THE PAGE LINE IS LIFTED INTO THE HEAD, and one that fills figures stays the author tile', () => {
   const plain = homeDrawn([block({ kind: 'note', lead: true, body: 'Calm.' }), block({ kind: 'chips', body: 'Kiln · Bake' })], NOW);
   assert.equal(plain.lead, 'Calm.');
@@ -80,7 +123,7 @@ test('A ROW IS DRAWN ONCE: a late urgent task is in the first block, and a deadl
     ['', [3]],
   ]);
   /* THE LINE COUNTS WHAT IS DRAWN: three tasks and a late bill, the oldest from Tuesday. */
-  assert.deepEqual(out.sentence, { text: 'Four things need you, and two are late, the oldest 3 days late.', needs: 'two are late' });
+  assert.deepEqual(out.sentence, { text: 'Two things are late, the oldest by three days. Two more need you.', needs: 'Two things are late' });
 });
 
 test('WHAT CHANGED IS ONLY WHAT IS NEW, and a block with nothing to show is not drawn', () => {
@@ -195,7 +238,7 @@ test('THE HEAD SAYS SLASH`S LINE WHEN THE RECORD SENT ONE, red only where it say
     const out = page(said);
     return homeLineOf(out.sentence!, slashLineOf(out, today), NOW);
   };
-  const rules = { text: 'Two things need you, and one is 2 days late.', needs: '2 days late', by: 'rules' };
+  const rules = { text: 'One thing is two days late. One more needs you.', needs: 'two days late', by: 'rules' };
 
   /* NO LINE FROM THE RECORD: the rules' line and its red phrase, exactly as before. */
   assert.equal(slashLineOf(page(), true), undefined);

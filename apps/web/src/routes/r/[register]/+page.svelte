@@ -17,7 +17,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { onDestroy, tick, untrack } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { said } from '$lib/voice.svelte.ts';
@@ -48,7 +48,29 @@
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { draftOf, editable, patchOf, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
-  import { chipOn, dropChip, filterableOf, laneFieldOf, listedOf, nextSort, readingOf, toggleChip, viewOf, weighed, type Receipt, type View } from './parts/list.ts';
+  import {
+    chipOn,
+    defaultFrom,
+    defaultKey,
+    defaultParams,
+    dropChip,
+    filterableOf,
+    laneChoicesOf,
+    laneFieldOf,
+    listedOf,
+    nextSort,
+    readDefault,
+    readingOf,
+    sameDefault,
+    toggleChip,
+    viewOf,
+    weighed,
+    writeDefault,
+    type Keep,
+    type ListDefault,
+    type Receipt,
+    type View,
+  } from './parts/list.ts';
   import CaptureLine from './parts/CaptureLine.svelte';
   import CapturePlus from './parts/CapturePlus.svelte';
   import ChipsBar from './parts/ChipsBar.svelte';
@@ -235,6 +257,15 @@
     const all = { ...pref.read().columns };
     if (kept.length > 0) all[id] = kept;
     else delete all[id];
+    pref.write({ columns: all });
+  }
+
+  /** The columns a kept default hides, taken as this list's answer in the cookie too. */
+  function setColumns(off: readonly string[]) {
+    hidden = new Set(off);
+    const all = { ...pref.read().columns };
+    if (off.length === 0) delete all[id];
+    else all[id] = [...off];
     pref.write({ columns: all });
   }
 
@@ -846,6 +877,73 @@
     });
 
   /**
+   * THE FIELD THE BOARD'S LANES ARE (`laneFieldOf`): the state unless Display chose another choice field, which the
+   * address carries as `?lane=` so a link to a board by priority opens by priority. Choosing the one the board takes by
+   * itself writes nothing.
+   */
+  const lane = $derived(laneFieldOf(decl, page.url.searchParams.get('lane')));
+  const lanes = $derived(laneChoicesOf(decl));
+  const setLane = (field: string) =>
+    setParam((p) => {
+      if (field === laneFieldOf(decl)?.id) p.delete('lane');
+      else p.set('lane', field);
+    });
+
+  /**
+   * THE WAY THIS PERSON KEEPS THIS LIST: "Keep as my default" in Display saves its order, view, lanes and hidden columns
+   * (`ListDefault`), and a list opened with nothing in its address opens that way. On this device for now, under the
+   * record, the person and the list, and the sheet says so.
+   *
+   * OPENED, NOT EVERY TIME THE ADDRESS IS EMPTY. Clear goes to the bare address of the list it is on, and Clear means
+   * the list's declared order; so a default applies only on arriving at the list from somewhere else, or on a first
+   * load, and once its declaration is in hand, since a default is held up against the fields the list has now. It
+   * replaces the address rather than pushing one, so Back does not walk into the bare list and out again.
+   */
+  const store = (): Keep | null => {
+    try {
+      return typeof localStorage === 'undefined' ? null : localStorage;
+    } catch {
+      return null;
+    }
+  };
+  const keepKey = $derived(defaultKey(shell.index?.slug ?? '', String(shell.me?.person ?? ''), id));
+  let kept = $state<ListDefault | null>(null);
+  $effect(() => {
+    kept = readDefault(store(), keepKey);
+  });
+  const current = $derived(defaultFrom(page.url.searchParams, hidden));
+  const isDefault = $derived(kept !== null && sameDefault(kept, current));
+
+  let opening = $state<string | null>(null);
+  afterNavigate(({ from, to }) => {
+    if (!to || to.url.search !== '' || from?.url.pathname === to.url.pathname) return;
+    opening = to.params?.register ?? null;
+  });
+  $effect(() => {
+    if (opening === null || opening !== id || !decl) return;
+    opening = null;
+    if (page.url.search !== '') return;
+    const d = untrack(() => readDefault(store(), keepKey));
+    if (!d) return;
+    const { params, hidden: off } = defaultParams(d, decl);
+    untrack(() => setColumns(off));
+    if (params.size > 0) void goto(`?${params}`, { replaceState: true, noScroll: true, keepFocus: true });
+  });
+
+  /* The page's own words for a device that would not keep the default. */
+  const keepWords = { notKept: 'This browser would not keep your default. A private window keeps nothing.' } as const;
+
+  function keepDefault() {
+    const d = defaultFrom(page.url.searchParams, hidden);
+    if (writeDefault(store(), keepKey, d)) kept = d;
+    else void toasts.push(keepWords.notKept, { intent: 'warn' });
+  }
+
+  function forgetDefault() {
+    if (writeDefault(store(), keepKey, null)) kept = null;
+  }
+
+  /**
    * THE ROWS THE LIST'S OWN FIGURES ARE OVER: the rows the record holds, without a line still being typed in and
    * without a row archived on this screen, which the list keeps in its place wearing its receipt but no longer holds.
    */
@@ -1191,8 +1289,19 @@
    */
   function setRowState(seq: number, state: string) {
     const said = saidInLine(decl?.state ?? '', state);
-    const field = decl?.state;
-    if (!field) return;
+    if (decl?.state) setRowValue(seq, decl.state, state, said);
+  }
+
+  /**
+   * A CARD DROPPED IN A LANE OF A BOARD LAID OUT BY ANOTHER CHOICE FIELD (Display's "Lanes by"): the same move, the same
+   * receipt and the same way back, on that field.
+   */
+  function moveOnBoard(seq: number, value: string, field?: string) {
+    if (!field || field === decl?.state) setRowState(seq, value);
+    else setRowValue(seq, field, value, saidInLine(field, value));
+  }
+
+  function setRowValue(seq: number, field: string, state: string, said: string) {
     const was = asked;
     const list = id;
     const before = rowAt(seq);
@@ -2384,7 +2493,7 @@
           {openCardMenu}
         />
       {:else}
-        <!-- THE BOARD AND THE CARDS: the same rows as white cards on the ground, in lanes by state or in one grid. A card
+        <!-- THE BOARD AND THE CARDS: the same rows as white cards on the ground, in lanes or in one grid. A card
              moves lanes by being dragged, through the same `setRowState` its menu's "Set to" presses. -->
         <ListBoard
           register={id}
@@ -2400,7 +2509,8 @@
           more={cursor !== null && loaded < DOM_CAP}
           {receiptFor}
           {openCardMenu}
-          setRowState={changes && states.length > 0 ? setRowState : undefined}
+          lane={lane?.id}
+          setRowState={changes && lane ? moveOnBoard : undefined}
         />
       {/if}
 
@@ -2460,6 +2570,14 @@
     {unsort}
     {hide}
     {showAll}
+    board={view === 'board'}
+    {lanes}
+    lane={lane?.id}
+    {setLane}
+    {kept}
+    {isDefault}
+    keep={keepDefault}
+    forget={forgetDefault}
   />
 
   <!-- One row's verbs: `⇧F10`, the context-menu key, and the ⋯ on a grid row or a card. -->

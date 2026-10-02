@@ -9,7 +9,7 @@
    *   rules       its ground rules, each with its glyph, beside how credits work drawn as bars.
    *   close       start a record.
    *
-   * EVERY FIGURE IN A DRAWING IS ONE THE PAGE ALREADY SAYS: the palette demo's rows (`copy/pricing.ts`), the home
+   * EVERY FIGURE IN A DRAWING IS ONE THE PAGE ALREADY SAYS: the palette demo's rows (`copy/home.ts`), the home
    * page's inbox scene and `plans.ts`. What is worked out here (a share, a sum, a ratio) is worked out from them, so a
    * figure changed there is changed in the drawing too.
    */
@@ -28,11 +28,11 @@
   const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
   const word = (n: number): string => (Number.isInteger(n) && n >= 0 && n < WORDS.length ? (WORDS[n] ?? String(n)) : String(n));
 
-  /** `GBP 1,240.56` as a number, and a number back in the palette's own spelling. */
-  const amount = (text: string): number => Number.parseFloat(text.replace(/[^0-9.]/g, '')) || 0;
-  const currency = (text: string): string => text.match(/^[A-Z]{3}/)?.[0] ?? '';
-  const money = (unit: string, n: number): string =>
-    `${unit} ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  /** `£1,240.56` as whole pence, and pence back in the palette's own spelling, its symbol and its pence. */
+  const amount = (text: string): number => Math.round((Number.parseFloat(text.replace(/[^0-9.]/g, '')) || 0) * 100);
+  const currency = (text: string): string => text.match(/^[^\d\s]+/)?.[0] ?? '';
+  const money = (unit: string, pence: number): string =>
+    `${unit}${(pence / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const [askMode, draftMode, noticeMode] = s.demo.modes;
   const byId = Object.fromEntries(s.abilities.map((a) => [a.id, a])) as Record<string, (typeof s.abilities)[number]>;

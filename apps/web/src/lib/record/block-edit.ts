@@ -64,6 +64,16 @@ export const blockWords = {
   when: 'Show it only when',
   whenHelp: 'A sentence about a figure, such as owed > 0. Empty draws it always.',
   whenKept: 'This block is shown by a rule the editor cannot draw, so it is kept as written.',
+  sort: 'Sort by',
+  sortNone: 'None',
+  sortUp: 'Lowest first',
+  sortDown: 'Highest first',
+  sortDir: 'Which way',
+  sortHelp: 'Lowest first starts from the earliest date, the smallest figure and A.',
+  sortKept: 'This block sorts in a way the editor cannot draw, so it is kept as written. Change it in How this is built.',
+  sortUnread: 'This list could not be read, so its sort is kept as it is.',
+  sortThen: ', then ',
+  sortSaidAs: (field: string, up: boolean) => `${field}, ${up ? 'lowest' : 'highest'} first`,
   empty: 'When nothing matches',
   emptyHelp: 'The sentence drawn when the filter admits no row.',
   width: 'Width',
@@ -170,7 +180,28 @@ export type Draft = {
   shortLabel: string;
   when: string | null;
   empty: string;
+  /** The field the rows are sorted by, or `''` for the order the list keeps. */
+  sortField: string;
+  sortDir: SortDir;
+  /** The stored order is one the sheet cannot draw (several fields, or not a list of terms), so it goes back untouched. */
+  sortKept: boolean;
 };
+
+/** Which way a block's rows are sorted: the kernel's own words (`declare.ts` refuses any other). */
+export type SortDir = 'asc' | 'desc';
+
+/**
+ * The one sort the sheet draws, from a stored `order`: `[{ field, dir }]` with one term, or `null` for anything else.
+ * A TERM WITH NO `dir` RUNS HIGHEST FIRST, as the kernel and the sample both read it (`o.dir === 'asc' ? 'ASC' : 'DESC'`
+ * in `@braindog/kernel`, `sortRows` in `api.ts`), so the sheet shows the way the block is really sorted.
+ */
+function oneSort(order: unknown): { field: string; dir: SortDir } | null {
+  if (!Array.isArray(order) || order.length !== 1) return null;
+  const term: unknown = order[0];
+  if (!isObject(term) || typeof term.field !== 'string' || term.field === '') return null;
+  if (term.dir !== undefined && term.dir !== 'asc' && term.dir !== 'desc') return null;
+  return { field: term.field, dir: term.dir === 'asc' ? 'asc' : 'desc' };
+}
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -184,8 +215,15 @@ function columnsOf(block: BlockBody): DraftColumn[] {
   });
 }
 
+/** A stored order the sheet keeps as written, said in words: each field in turn and which way, no `dir` running down. */
+export function sortSaid(order: unknown): string {
+  const terms = Array.isArray(order) ? (order as unknown[]).filter(isObject) : [];
+  return terms.map((t) => blockWords.sortSaidAs(text(t.field).replace(/_/g, ' '), t.dir === 'asc')).join(blockWords.sortThen);
+}
+
 export function draftOf(block: BlockBody): Draft {
   const short = isObject(block.short) ? block.short : null;
+  const sort = oneSort(block.order);
   return {
     heading: text(block.heading),
     source: typeof block.source === 'string' ? block.source : null,
@@ -196,6 +234,9 @@ export function draftOf(block: BlockBody): Draft {
     shortLabel: text(short?.label),
     when: block.when === undefined || typeof block.when === 'string' ? text(block.when) : null,
     empty: text(block.empty),
+    sortField: sort?.field ?? '',
+    sortDir: sort?.dir ?? 'asc',
+    sortKept: block.order !== undefined && sort === null,
   };
 }
 
@@ -263,6 +304,13 @@ export function patchOf(before: BlockBody, draft: Draft, where?: { value: unknow
   }
 
   if (draft.when !== null) put('when', draft.when.trim() || undefined);
+  /* THE SORT IS WRITTEN AS THE KERNEL'S `order`, one term, and only when it says something new: a stored term with no
+     `dir` already runs highest first, so the same field the same way goes back as it was written. */
+  if (!draft.sortKept) {
+    const had = oneSort(before.order);
+    const unmoved = had !== null && had.field === draft.sortField && had.dir === draft.sortDir;
+    put('order', draft.sortField === '' ? undefined : unmoved ? before.order : [{ field: draft.sortField, dir: draft.sortDir }]);
+  }
   /* A BLOCK OVER A LIST KEEPS ITS EMPTY SENTENCE (06 §1.1 makes it mandatory there), so a cleared box leaves the stored
      one in place rather than taking off a key the record would then refuse the page without. */
   const empty = draft.empty.trim();

@@ -16,7 +16,12 @@ export const words = {
   answeredTitle: 'What you answered',
   allAnswered: 'You have answered everything Slash suggested. What it notices next is drafted here.',
   /* The title row's red phrase. */
-  waitOn: (n: number) => (n === 1 ? 'One suggestion waits for you on Decide' : `${n} suggestions wait for you on Decide`),
+  waitOn: (n: number) => (n === 1 ? 'One suggestion waits for you on Decide' : `${counted(n)} suggestions wait for you on Decide`),
+  /* The title row with nothing waiting: what is new, else that everything was answered, else that there is nothing. */
+  fresh: (n: number) => (n === 1 ? 'Slash has one new suggestion.' : `Slash has ${counted(n).toLowerCase()} new suggestions.`),
+  allSettled: 'You have answered everything Slash suggested.',
+  /* The empty tile's one thing to do, where a model can answer it: the Ask field's own example, asked. */
+  tryAsk: (q: string) => `Try: ${q}`,
   /* The tile. */
   tileTitle: 'Suggestions',
   tileMeta: 'Nothing changes until you say yes',
@@ -46,14 +51,24 @@ export const words = {
 /** The title row's sentence, and the phrase inside it that needs him. */
 export type Sentence = { text: string; needs: string | undefined };
 
+const SPELLED = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'] as const;
+
+/** A count that opens a sentence: a word to ten, figures after. */
+const counted = (n: number): string => SPELLED[n] ?? n.toLocaleString('en-GB');
+
 /**
- * THE LINE UNDER "Slash": what waits for him first, in red, then who drafts (`draftedBy`, the screen's line).
- * With nothing waiting it is who drafts alone, with no red, because nothing on this screen is late.
+ * THE LINE UNDER "Slash" IS THE STATE, never the host: what waits for him on Decide, in red; else how many are new; else
+ * that he answered everything; else that there is nothing yet (`empty`, the record's own words). Who drafts is not the
+ * headline: it is one dim line at the foot of the screen, linked to the setting that adds a model.
  */
-export function sentenceOf(by: string, waiting: number): Sentence {
-  if (waiting <= 0) return { text: by, needs: undefined };
-  const needs = words.waitOn(waiting);
-  return { text: `${needs}. ${by}`, needs };
+export function sentenceOf(waiting: number, fresh: number, suggested: number, empty: string): Sentence {
+  if (waiting > 0) {
+    const needs = words.waitOn(waiting);
+    return { text: `${needs}.`, needs };
+  }
+  if (fresh > 0) return { text: words.fresh(fresh), needs: undefined };
+  if (suggested > 0) return { text: words.allSettled, needs: undefined };
+  return { text: /[.!?]$/u.test(empty) ? empty : `${empty}.`, needs: undefined };
 }
 
 /** One part of the tile's bar. */

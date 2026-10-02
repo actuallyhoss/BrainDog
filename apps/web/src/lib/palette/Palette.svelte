@@ -65,6 +65,11 @@
   import { listName } from '../record/names.ts';
   import { commands, type Act, type Creation } from './admit.ts';
   import { addRow, creation, offered, words as createWords } from './create.ts';
+  import { customise, type Change, type Look, type Place } from './customise.ts';
+  import { apply as applyChange, lookNow, pageMenu } from './customise-apply.ts';
+  import { navPrefs } from '../nav-prefs.svelte.ts';
+  import { said as voiced } from '../voice.svelte.ts';
+  import { spineOf, type SpineCounts } from '../spine.ts';
   import type { List, Recent } from '../record/palette.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
@@ -110,6 +115,8 @@
     ask?: string | undefined;
     /** The row the add row writes, read out of the query. Only that row carries it. */
     creation?: Creation | undefined;
+    /** What a customise row changes (`customise.ts`). Only those rows carry it. */
+    change?: Change | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -133,7 +140,12 @@
     page.data as {
       live?: boolean;
       now?: number;
-      index?: { registers?: List[] };
+      index?: { registers?: (List & { views?: { href: string }[] })[] };
+      /* `null` FOR A CALLER WHO MAY NOT BE TOLD WHAT ARRIVED, who has no Inbox to open on or hide. */
+      inbox?: number | null;
+      /* WHAT THE SPINE IS DRAWN FROM, so Inbox is offered to hide only while the nav draws it (`+layout.svelte`). */
+      counts?: SpineCounts;
+      open?: number;
       /* EVERY LIST, THE EMPTY ONES TOO, and who is asking: what the add row is offered on, and to whom (`create.ts`). */
       lists?: { id: string; name: string }[];
       me?: { level: string; lists: string[] | null };
@@ -245,6 +257,36 @@
   const addLists = $derived(isLive ? offered(shell) : []);
   const addNamed = $derived(new Map(addLists.map((l) => [l.id, l.name])));
 
+  /**
+   * WHAT A CUSTOMISE ROW CAN NAME (`customise.ts`): the app's own screens, the nav's pages under the names this person
+   * gave them, and the lists. Only a page the nav draws can be hidden or renamed in it, as Settings › Navigation holds,
+   * so not a tabbed page past the rail's budget (`cut`); Inbox can be hidden too, but only once the spine draws it
+   * (`spineOf`), since before anything arrives there is nothing to take away. A page made for each row of a list is left
+   * to its list, as the nav leaves it.
+   */
+  const places = $derived.by((): Place[] => {
+    const views = new Set((shell.index?.registers ?? []).flatMap((r) => (r.views ?? []).map((v) => v.href)));
+    const screen = (href: string, name: string, icon: IconName, hide = false): Place => ({ href, name, own: name, icon, hide, rename: false });
+    return [
+      screen('/', copy.today, 'today'),
+      screen('/decide', voiced('decide'), 'decide'),
+      ...(typeof shell.inbox === 'number'
+        ? [screen('/inbox', voiced('inbox'), 'inbox', spineOf(shell.counts ?? { decide: shell.open ?? 0, inbox: shell.inbox }).includes('inbox'))]
+        : []),
+      screen('/audit', copy.audit, 'activity'),
+      ...nav
+        .filter((e) => !e.row)
+        .map((e): Place => {
+          const mine = !views.has(e.href) && !(e as { cut?: true }).cut;
+          return { href: e.href, name: mine ? navPrefs.labelOf(e.href, e.title) : e.title, own: e.title, icon: e.icon, hide: mine, rename: mine };
+        }),
+      ...lists.map((l) => screen(`/r/${l.id}`, l.name, l.icon)),
+    ];
+  });
+  /** How it looks on this device and whether the screen behind has a page menu, read each time the palette opens. */
+  let look = $state<Look>({});
+  let pageHere = $state(false);
+
   let reading: Promise<Reader> | null = null;
   const reader = (): Promise<Reader> =>
     (reading ??= import('../record/palette-live.ts').then((m) => m.paletteReader(page.url.origin)));
@@ -311,6 +353,8 @@
        and a sentence that names its list and its title is not a query about anything else in the record. Under the
        rows it would be the row a reader typed out in full and then had to arrow down to. */
     [createWords.group]: -1,
+    /* AND THE CUSTOMISE ROWS WITH IT, for the same reason: "dark" or "hide inbox" is a thing to do, typed out. */
+    [copy.customise.group]: -1,
     [copy.records]: 0,
     [RECENT]: 2,
     [copy.decide]: 3,
@@ -378,6 +422,11 @@
     /* THE ROW THE QUERY WOULD ADD, in the modes that draw commands. Only a list this build can title a row in, and this
        caller may add to, is offered, which is `offered`; any other name leaves the sentence as a query like any other. */
     creation: parsed.prefix === null || parsed.prefix === '>' ? creation(parsed.text, addLists) : null,
+    /* THE CHANGES THE QUERY NAMES, in the same modes, and none with nothing typed: an empty palette is as it was. */
+    customise:
+      parsed.prefix === null || parsed.prefix === '>'
+        ? customise(parsed.text, { look, places, hidden: navPrefs.hidden, home: navPrefs.home, pageMenu: pageHere })
+        : [],
   });
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
@@ -506,7 +555,7 @@
          `commands(live)` and never `COMMANDS`: the admission rule and the standing rule are both
          applied in there, so no row this file draws can have skipped them. */
       const every = commands(live);
-      const admitted = every.filter((c) => c.act !== 'add');
+      const admitted = every.filter((c) => c.act !== 'add' && c.act !== 'customise');
       /* THE ADD ROW IS NOT FOUND BY ITS TITLE, it is made out of the query. `commands(live)` holds it only while
          `live.creation` does, so asking for it is asking the standing rule, and it is drawn as the sentence it will
          write rather than as its declaration's name. No `complete`: the box already says exactly what `⇥` would.
@@ -518,6 +567,12 @@
         const list = addNamed.get(made.register) ?? listName(made.register);
         out.push({ id: adding.id, title: createWords.row(list, made.title), href: null, group: createWords.group, icon: adding.icon, act: adding.act, creation: made });
       }
+      /* THE CUSTOMISE ROWS, drawn as the sentences the query makes and only while it makes one, for the add row's
+         reason: `commands(live)` holds their declaration only while `live.customise` has a row in it. */
+      const changing = every.find((c) => c.act === 'customise');
+      if (changing && !live.creation)
+        for (const o of live.customise ?? [])
+          out.push({ id: o.id, title: o.title, detail: o.detail, href: null, group: changing.group, icon: o.icon, act: changing.act, change: o.change, complete: o.complete });
       const exact = admitted.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
       const rest = admitted.filter((c) => !exact.includes(c) && starts(c.title));
       out.push(
@@ -834,6 +889,8 @@
       untrack(() => (opener.seed = ''));
       cursor = 0;
       slash = null;
+      look = lookNow();
+      pageHere = pageMenu() !== null;
       if (slashHere) warm();
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
@@ -859,6 +916,11 @@
     if (!row) return;
     /* SLASH'S ROW ANSWERS IN THE PANEL, so it is the one row that leaves it open. */
     if (row.ask !== undefined) return askSlash(row.ask);
+    /* A RENAME WITH NO NEW NAME YET WRITES THE SENTENCE INTO THE BOX, and the palette stays open for its last word. */
+    if (row.change?.kind === 'fill') {
+      q = row.change.text;
+      return void input?.focus();
+    }
     open = false;
     /* THE ONE ROW THAT DOES SOMETHING RATHER THAN GO SOMEWHERE. It is checked on the act rather
        than on a flag, so no row's behaviour is described in two places. The standing rule means it
@@ -872,6 +934,7 @@
       if (row.creation) void add(row.creation);
       return;
     }
+    if (row.act === 'customise' && row.change) return customiseRun(row.change);
     if (row.href !== null) goto(at(row.href));
   }
 
@@ -907,6 +970,17 @@
         }),
     });
     void invalidateAll();
+  }
+
+  /**
+   * A CUSTOMISE ROW, PRESSED. The writes are `customise-apply.ts`'s, through the writers Settings uses. Quiet hours go to
+   * their one area; "Customise this page" opens the page's own menu, once the dialog has closed and handed focus back,
+   * so the menu opens over the page with focus in it.
+   */
+  function customiseRun(change: Change) {
+    if (change.kind === 'go') return void goto(at(change.href));
+    if (change.kind === 'page') return void setTimeout(() => pageMenu()?.click(), 0);
+    applyChange(change);
   }
 
   function onkeydown(e: KeyboardEvent) {

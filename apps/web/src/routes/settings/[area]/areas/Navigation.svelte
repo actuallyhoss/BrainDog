@@ -94,7 +94,7 @@
 
   /* THE PAGES THIS PERSON HID FROM THEIR NAV, by the name the rail gave them, and the way back. */
   const hiddenPages = $derived(
-    navPrefs.hidden.map((href) => ({ href, title: navPrefs.labelOf(href, shell.nav.find((e) => e.href === href)?.title ?? href) })),
+    navPrefs.hidden.map((href) => ({ href, title: navPrefs.labelOf(href, shell.nav.find((e) => e.href === href)?.title ?? (href === '/inbox' ? voiceSaid('inbox') : href)) })),
   );
   function showAgain(p: { href: string; title: string }) {
     void navPrefs.show(p.href).then((saved) => {

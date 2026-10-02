@@ -2,8 +2,10 @@
   Slash: `/slash`.
 
   CALM AT REST (`DIRECTION §35`). The screen answers one question first, in the line under the title: what waits for him
-  on Decide, in red, then who drafts. Under it are the Ask field, where the host has a model, and one list: what Slash
-  suggests, what waits on Decide first. That is all that is drawn at rest, two tiles and the line.
+  on Decide, in red, else what is new, else that there is nothing yet. Under it are the Ask field, where the host has a
+  model, and one tile: what Slash suggests, what waits on Decide first, or with nothing yet one sentence and one thing to
+  try. That is all that is drawn at rest, two tiles and the line. Who drafts is one dim line at the foot, linked to the
+  setting that adds a model: it is about the host, and never the headline.
 
   EVERYTHING ELSE IS ONE PRESS AWAY, in one quiet fold under the list, a `<details>` so a key and a thumb both open it:
   what Slash noticed, what you answered, what you asked lately, where each suggestion stands, the daily look and the
@@ -40,6 +42,7 @@
   import { read } from '$lib/data/record.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { askSlash, canAsk, draftedBy, nothingYet, readSlash, words, type Asked, type Reading, type SlashClient } from '$lib/record/slash.ts';
+  import { outOfAsks } from '$lib/ui/slash-asks.ts';
   import { changeWords } from '$lib/record/slash.ts';
   import AskPage from '$lib/page/AskPage.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -74,8 +77,12 @@
 
   /** How many of Slash's suggestions wait for his answer on Decide: the title row's red phrase. */
   const waitingOn = $derived(suggestions.filter((s) => s.state === 'waiting').length);
-  /** The line under the title: what waits on him, then who drafts. Nothing until the record has answered. */
-  const sentence = $derived(phase === 'ready' && reading ? sentenceOf(draftedBy(reading, asked), waitingOn) : null);
+  /** The line under the title: what waits on him, else what is new, else nothing yet. Nothing until the record has answered. */
+  const sentence = $derived(
+    phase === 'ready' && reading ? sentenceOf(waitingOn, stillOpen.length - waitingOn, suggestions.length, words.emptyTitle) : null,
+  );
+  /** Who drafts, said once at the foot of the screen. */
+  const drafts = $derived(phase === 'ready' && reading ? draftedBy(reading, asked) : null);
   /** "Suggestions": the one figure on this screen, where each suggestion stands, or nothing with none. */
   const tally = $derived(reading && !nothingYet(reading) ? tallyOf(suggestions, reading.waiting.length, reading.cap) : null);
 
@@ -345,74 +352,77 @@
       </Tile>
     {/if}
 
-    {#if nothingYet(reading)}
-      <!-- A NEW RECORD HAS NOTHING UNDER EITHER HEADING, so it gets one sentence of what Slash will do, and the reason it is
-           quiet when the record is young. -->
-      <Empty kind="no-data-yet" glyph="star" title={words.emptyTitle} body={reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`} />
-    {:else}
-      <!-- THE ONE LIST: what Slash suggests, what waits on Decide first, each saying who drafted it, WITH THE SCREEN'S ONE
-           PRIMARY at the end of its heading. The press puts the new ones on Decide and changes nothing else. -->
-      <Section title={words.suggests} count={stillOpen.length}>
-        {#snippet aside()}
-          {#if reading && reading.quiet === null && stillOpen.length > 0 && canAsk(reading)}
-            <Button weight="primary" disabled={busy} onclick={() => void press()}>{busy ? words.asking : words.ask}</Button>
-          {/if}
-        {/snippet}
-        {#if reading.quiet !== null}
-          <p class="slash-said">{reading.quiet}</p>
-        {:else if stillOpen.length === 0}
-          <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>
-        {:else}
-          {#if canAsk(reading)}<p class="slash-hint">{pageWords.press}</p>{/if}
-          <ul class="ledger ledger-lead slash-list">
-            {#each stillOpen as s (s.href ?? s.question)}
-              {@const by = byLine(s.by)}
-              <!-- A SUGGESTION WAITING ON DECIDE NEEDS HIM, so its verb always shows; a new one is his to put there. -->
-              <li class="slash-suggestion" data-state={s.state} data-needs={s.state === 'waiting' ? '' : undefined}>
-                <div class="line line-tall">
-                  <span class="line-mark"><IconWell name="decide" size="l" /></span>
-                  <span class="line-main">
-                    <span class="line-title slash-question">{s.question}</span>
-                    <span class="line-detail slash-state"
-                      ><span class="dot" data-state={s.state} aria-hidden="true"></span>{s.said}{#if by}<span class="slash-by">{by}</span>{/if}</span
-                    >
-                  </span>
-                  {#if s.href}
-                    <span class="line-verbs"><Button size="sm" href={s.href}>{words.open}</Button></span>
-                  {/if}
-                </div>
-              </li>
-            {/each}
-          </ul>
+    <!-- THE ONE TILE: what Slash suggests, what waits on Decide first, each saying who drafted it, WITH THE SCREEN'S ONE
+         PRIMARY in its heading. The press puts the new ones on Decide and changes nothing else. With nothing suggested yet
+         it is the same tile, holding one sentence and, where a model can answer, one thing to try. -->
+    <Tile icon="decide" title={words.suggests} count={nothingYet(reading) ? undefined : stillOpen.length || undefined} data-part="suggests">
+      {#snippet actions()}
+        {#if reading && !nothingYet(reading) && reading.quiet === null && stillOpen.length > 0 && canAsk(reading)}
+          <Button weight="primary" disabled={busy} onclick={() => void press()}>{busy ? words.asking : words.ask}</Button>
         {/if}
+      {/snippet}
+      {#if nothingYet(reading)}
+        <p class="slash-empty">{reading.quiet === null ? words.emptyBody : `${reading.quiet} ${words.emptyBody}`}</p>
+        {#if modelHere}
+          <!-- ONE THING TO DO: the Ask field's own example, asked in the tile above. -->
+          <button type="button" class="slash-try tap" disabled={asking} onclick={() => askAgain(askWords.placeholder)}
+            ><Icon name="slash" size="s" /><span>{pageWords.tryAsk(askWords.placeholder)}</span></button
+          >
+        {/if}
+      {:else if reading.quiet !== null}
+        <p class="slash-said">{reading.quiet}</p>
+      {:else if stillOpen.length === 0}
+        <p class="slash-said">{suggestions.length === 0 ? words.suggestsNone : pageWords.allAnswered}</p>
+      {:else}
+        {#if canAsk(reading)}<p class="slash-hint">{pageWords.press}</p>{/if}
+        <ul class="ledger ledger-lead slash-list">
+          {#each stillOpen as s (s.href ?? s.question)}
+            {@const by = byLine(s.by)}
+            <!-- A SUGGESTION WAITING ON DECIDE NEEDS HIM, so its verb always shows; a new one is his to put there. -->
+            <li class="slash-suggestion" data-state={s.state} data-needs={s.state === 'waiting' ? '' : undefined}>
+              <div class="line line-tall">
+                <span class="line-mark"><IconWell name="decide" size="l" /></span>
+                <span class="line-main">
+                  <span class="line-title slash-question">{s.question}</span>
+                  <span class="line-detail slash-state"
+                    ><span class="dot" data-state={s.state} aria-hidden="true"></span>{s.said}{#if by}<span class="slash-by">{by}</span>{/if}</span
+                  >
+                </span>
+                {#if s.href}
+                  <span class="line-verbs"><Button size="sm" href={s.href}>{words.open}</Button></span>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
 
-        {#if asked && (asked.skipped.length > 0 || asked.dropped.length > 0)}
-          <!-- WHAT THE LAST PRESS LEFT OFF DECIDE, and why, right under the press that left it, in the same tile. -->
-          <h3 class="slash-sub">{words.skipped}</h3>
-          <ul class="ledger ledger-lead slash-list">
-            {#each asked.skipped as s (s.question)}
-              <li>
-                <div class="line line-tall">
-                  <span class="line-mark"><IconWell name="info" size="l" /></span>
-                  <span class="line-main">
-                    <span class="line-title slash-question">{s.question}</span>
-                    <span class="line-detail slash-wrap">{s.why}</span>
-                  </span>
-                </div>
-              </li>
-            {/each}
-            {#each asked.dropped as d (d)}
-              <li>
-                <div class="line">
-                  <span class="line-mark"><IconWell name="info" size="l" /></span>
-                  <span class="line-main"><span class="line-title slash-wrap slash-sentence">{d}</span></span>
-                </div>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </Section>
-    {/if}
+      {#if asked && (asked.skipped.length > 0 || asked.dropped.length > 0)}
+        <!-- WHAT THE LAST PRESS LEFT OFF DECIDE, and why, right under the press that left it, in the same tile. -->
+        <h3 class="slash-sub">{words.skipped}</h3>
+        <ul class="ledger ledger-lead slash-list">
+          {#each asked.skipped as s (s.question)}
+            <li>
+              <div class="line line-tall">
+                <span class="line-mark"><IconWell name="info" size="l" /></span>
+                <span class="line-main">
+                  <span class="line-title slash-question">{s.question}</span>
+                  <span class="line-detail slash-wrap">{s.why}</span>
+                </span>
+              </div>
+            </li>
+          {/each}
+          {#each asked.dropped as d (d)}
+            <li>
+              <div class="line">
+                <span class="line-mark"><IconWell name="info" size="l" /></span>
+                <span class="line-main"><span class="line-title slash-wrap slash-sentence">{d}</span></span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </Tile>
 
     {#if folded}
       <!--
@@ -523,6 +533,11 @@
         </div>
       </details>
     {/if}
+
+    {#if drafts}
+      <!-- WHO DRAFTS, ONCE, AT THE FOOT: a fact about the host, linked to where a model is set up or changed. -->
+      <p class="slash-drafts"><a class="slash-drafts-link" href={at(outOfAsks.settings)}>{drafts}</a></p>
+    {/if}
   {/if}
 </div>
 
@@ -585,6 +600,57 @@
 
   .slash-hint {
     margin-block-end: var(--sp-2);
+  }
+
+  /* THE EMPTY TILE'S SENTENCE, in the ink at the reading measure: it is what this screen says, not a footnote. */
+  .slash-empty {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* ONE THING TO TRY, a quiet line that asks the example in the Ask tile: a press, drawn as words and not as a button. */
+  .slash-try {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .slash-try:hover:not(:disabled) span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* WHO DRAFTS, at the foot of the screen in the quietest ink, a link to the setting that changes it. */
+  .slash-drafts {
+    margin: 0;
+    max-inline-size: var(--measure);
+    font-size: var(--t-xs);
+    line-height: 16px;
+  }
+
+  .slash-drafts-link {
+    color: var(--dim);
+    text-decoration: none;
+  }
+
+  .slash-drafts-link:hover,
+  .slash-drafts-link:focus-visible {
+    color: var(--ink2);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   /* WHAT THE LAST PRESS LEFT OFF, under the list it pressed: a quiet heading, not a tile of its own. */

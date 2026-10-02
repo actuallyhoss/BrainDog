@@ -66,6 +66,54 @@ export const home = {
       title: 'Press / and ask.',
       lead: 'Ask what you owe this month and it shows the bills. Ask for a page and it builds one. Nothing it writes goes in until you say yes.',
       more: 'More about Slash',
+      /**
+       * THE PALETTE this band and `/slash` draw (`pricing.ts` reads it from here). Every figure is the Personal
+       * record's, said as the app says money: a symbol and the pence, never a code. The four bills add to the lead.
+       */
+      demo: {
+        label: 'Slash, drawn',
+        placeholder: 'Ask, or say what you want',
+        accept: 'Accept',
+        reject: 'Reject',
+        modes: [
+          {
+            id: 'ask',
+            label: 'Ask',
+            prompt: 'What do I owe in the next two weeks?',
+            lead: '£910.99, across four bills.',
+            rows: [
+              ['Streaming subscription', '£10.99', 'In 2 days'],
+              ['Phone contract', '£18.00', 'In 3 days'],
+              ['Rent', '£850.00', 'In 6 days'],
+              ['Gym membership', '£32.00', 'In 12 days'],
+            ],
+            source: 'From Bills',
+          },
+          {
+            id: 'draft',
+            label: 'Draft',
+            prompt: 'Make me a page for the Lisbon trip',
+            lead: 'A new page, Trip to Lisbon, with three blocks:',
+            rows: [
+              ['A figure', '£420.00 of £900.00 put by', ''],
+              ['A list', 'Everything put by for the trip', ''],
+              ['A chart', 'What was put by, month by month', ''],
+            ],
+            source: 'Waits in Decide until you accept it',
+          },
+          {
+            id: 'notice',
+            label: 'Notice',
+            prompt: 'This morning',
+            lead: 'Rent is due in 6 days, and pay day is in 10.',
+            rows: [
+              ['Current account', '£1,240.56', 'Today'],
+              ['Rent', '£850.00', 'In 6 days'],
+            ],
+            source: 'Your current account covers it',
+          },
+        ],
+      },
     },
 
     agents: {
@@ -93,9 +141,9 @@ export const home = {
       doors: ['Email', 'Webhook', 'Stripe', 'Mercury'],
       steps: ['Arrives', 'Learned once', 'Filed'],
       arrivals: [
-        { from: 'Card alert', text: 'You paid GBP 32.00 to PUREGYM on 3 Oct.' },
-        { from: 'Card alert', text: 'You paid GBP 18.00 to VODAFONE on 4 Oct.' },
-        { from: 'Card alert', text: 'You paid GBP 64.20 to TESCO STORES on 5 Oct.' },
+        { from: 'Card alert', text: 'You paid £32.00 to PUREGYM on 3 Oct.' },
+        { from: 'Card alert', text: 'You paid £18.00 to VODAFONE on 4 Oct.' },
+        { from: 'Card alert', text: 'You paid £64.20 to TESCO STORES on 5 Oct.' },
       ],
       pattern: {
         name: 'Card alerts',
@@ -110,9 +158,9 @@ export const home = {
       list: 'Spending',
       columns: ['What', 'Amount', 'On'],
       rows: [
-        ['Puregym', 'GBP 32.00', '3 Oct'],
-        ['Vodafone', 'GBP 18.00', '4 Oct'],
-        ['Tesco Stores', 'GBP 64.20', '5 Oct'],
+        ['Puregym', '£32.00', '3 Oct'],
+        ['Vodafone', '£18.00', '4 Oct'],
+        ['Tesco Stores', '£64.20', '5 Oct'],
       ],
     },
 
@@ -136,7 +184,7 @@ export const home = {
       title: 'Free for one person.',
       lead: 'The whole app, for one record, with no card and no trial that runs out.',
       /* The two meters Free is drawn with. */
-      meters: { credits: 'Slash credits a month', runs: 'automation runs a month' },
+      meters: { credits: 'Slash credits a month', runs: 'Automation runs a month' },
       pros: {
         head: 'For pros',
         said: 'More Slash and automations, and colleagues in the same record at no extra cost.',

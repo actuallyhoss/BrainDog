@@ -367,6 +367,9 @@ function forecastRows(block: BlockResult): string[] {
        so a holding the host could not convert is not offered rather than added as the wrong amount. */
     ...((block as BlockResult & { sells?: readonly ForecastSell[] }).sells ?? []).map((s) => `sell |  | ${escapeCell(s.label)} | ${said(s.value)}`),
     `horizon | ${typeof walk.horizon === 'number' ? walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180} |  | `,
+    /* HOW FAR THE RECORD WALKED PAST THE LENGTH IT OPENS ON, so the length control offers up to it and not only up to
+       the opening length (`packages/render/src/forecast.ts` `horizonChoices`). */
+    ...(typeof walk.reach === 'number' ? [`reach | ${walk.reach} |  | `] : []),
     /* THE LENGTHS THE HORIZON KNOB OFFERS, as the block declared them (`horizons:`); the renderer offers each only as far as the walk reaches. */
     ...(block.horizons?.length ? [`horizons | ${block.horizons.join(' ')} |  | `] : []),
     ...(block.knobs?.length ? [`knobs | ${block.knobs.join(' ')} |  | `] : []),

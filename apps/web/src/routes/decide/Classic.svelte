@@ -271,7 +271,7 @@
 
   /* THE SENTENCE UNDER THE TITLE, about what still waits and what the first of it suggests (`lead.ts`). */
   const firstWaiting = $derived(order.find((q) => !settledHere.has(q.id)));
-  const sentence = $derived(from === 'live' ? sentenceOf(waiting, firstWaiting, firstWaiting ? askerOf(firstWaiting) : '') : null);
+  const sentence = $derived(from === 'live' ? sentenceOf(waiting, firstWaiting, firstWaiting ? askerOf(firstWaiting) : '', now) : null);
 
   /* HOW LONG EACH HAS WAITED, in the queue's order, the open one in ink and anything past two weeks in red. */
   const waited = $derived(waitedOf(waiting, lead?.id, now));

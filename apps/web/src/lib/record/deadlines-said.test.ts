@@ -40,11 +40,12 @@ test('TODAY SAYS WHAT FALLS DUE AS DAYS AND SIGNED MONEY, in Overdue and in Comi
   const { blocks } = homeDrawn(reads, NOW);
   const due = blocks.filter((b) => b.drawn && b.source === 'deadlines');
   assert.equal(due.length, 2, 'Late and Coming up are not both drawn');
-  const read = reads[0]!;
-
-  const day = read.columns.findIndex((c) => c.field === 'day');
-  const amount = read.columns.findIndex((c) => c.field === 'amount');
+  /* EACH BLOCK'S OWN COLUMNS, since Late draws a row a line with the day last (`default-home.ts` `lateMoney`) and Coming
+     up keeps the day first. */
+  const at = (b: (typeof due)[number], field: string) => b.columns.findIndex((c) => c.field === field);
   for (const b of due) {
+    const day = at(b, 'day');
+    const amount = at(b, 'amount');
     const drawn = toSegments(b);
     const cells = cellsOf(drawn);
     assert.ok(cells.length > 0, `${b.heading} drew no rows`);
@@ -57,10 +58,11 @@ test('TODAY SAYS WHAT FALLS DUE AS DAYS AND SIGNED MONEY, in Overdue and in Comi
       assert.equal(rows[n]?.cells[amount]?.trim(), row.cells[amount] ?? '', `${b.heading} row ${n}'s amount`);
     });
   }
-  /* EACH AMOUNT CARRIES ITS SIGN, AND EACH DAY READS AS ONE. */
-  const said = due.flatMap((b) => b.rows);
-  assert.ok(said.some((r) => /^[+−]/u.test(String(r.cells[amount] ?? ''))), 'no amount is signed');
-  assert.ok(said.every((r) => r.cells[day] === null || /^\d{1,2} [A-Z][a-z]{2} \d{4}$/u.test(String(r.cells[day]))), said.map((r) => r.cells[day]).join(', '));
+  /* EACH AMOUNT CARRIES ITS SIGN, AND EACH DAY READS AS ONE, or as how late it is on a row of what is late. */
+  const amounts = due.flatMap((b) => b.rows.map((r) => r.cells[at(b, 'amount')]));
+  const days = due.flatMap((b) => b.rows.map((r) => r.cells[at(b, 'day')]));
+  assert.ok(amounts.some((c) => /^[+−]/u.test(String(c ?? ''))), 'no amount is signed');
+  assert.ok(days.every((c) => c === null || /^\d{1,2} [A-Z][a-z]{2}( \d{4})?$|^\d+ [a-z]+ late$/u.test(String(c))), days.join(', '));
 });
 
 test('A VALUE NO FIELD DECLARES IS SAID BY ITS SHAPE, never as [object Object] or a stored day', () => {

@@ -46,3 +46,24 @@ test('a range keeps its pence on the low and the high alike', () => {
   assert.ok(block?.type === 'block');
   assert.deepEqual(inSymbols(block).rows[0]?.cells, ['Design', '£350.00', '£300.00', '£600.00']);
 });
+
+test('the home page and /slash draw their demo money with a symbol and the pence, never a code', async () => {
+  const { home } = await import('../src/lib/copy/home.ts');
+  const { pricing } = await import('../src/lib/copy/pricing.ts');
+  const h = home.home;
+  assert.equal(pricing.slash.demo, h.slash.demo, '/slash draws a palette of its own, not the home page’s');
+  const said = [
+    ...h.slash.demo.modes.flatMap((m) => [m.lead, ...m.rows.flat()]),
+    ...h.inbox.arrivals.map((a) => a.text),
+    ...h.inbox.rows.flat(),
+  ];
+  assert.deepEqual(said.filter((s) => CODED.test(s)), []);
+  assert.ok(said.includes('£910.99, across four bills.') && said.includes('You paid £32.00 to PUREGYM on 3 Oct.'));
+});
+
+test('a part of a gigabyte is said in megabytes', async () => {
+  const { pricing } = await import('../src/lib/copy/pricing.ts');
+  const gb = pricing.pricing.usage.find((u) => u.key === 'gb');
+  assert.equal(gb?.amount(0.1), '100 MB a month');
+  assert.equal(gb?.amount(5), '5 GB a month');
+});

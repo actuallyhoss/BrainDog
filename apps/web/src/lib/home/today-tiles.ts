@@ -69,27 +69,41 @@ export function dayNamed(day: string, today: string): string {
 /** The sentence under the title, and the one phrase in it that needs him, drawn red; `''` when nothing does. */
 export type Sentence = { text: string; needs: string };
 
+const OPENERS = [...SPELLED, 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+
+/** A count that opens a sentence, spelled out to twenty with its capital, so no sentence starts on a figure. */
+const opening = (n: number): string => upper(OPENERS[n] ?? n.toLocaleString('en-GB'));
+
+/** How far past its day something is, in words: "a day", "five days", "three weeks", "two months". */
+export function lateBy(due: string, today: string): string {
+  const n = Math.max(1, daysBetween(due, today));
+  if (n === 1) return 'a day';
+  if (n < 14) return `${counted(n)} days`;
+  if (n < 60) return `${counted(Math.round(n / 7))} weeks`;
+  const months = Math.round(n / 30.44);
+  return `${counted(months)} ${plural(months, 'month')}`;
+}
+
 /**
- * "Four things need you, and one is 2 days late." THE PHRASE THAT NEEDS HIM IS RED, and only that phrase: how late the
- * late work is when some is, or else the count of what needs him. With nothing needing him it says who is working, in
- * ink, because a calm morning is not an alarm.
+ * "Seven things are late, the oldest by two months. Twelve more need you." THE LATE WORK LEADS, and it is the one
+ * phrase drawn red: "late" is said once, and how late is the oldest. What else needs him follows as a count. With
+ * nothing late the count is the line, and with nothing needing him it says who is working, in ink, because a calm
+ * morning is not an alarm. Counts are words to ten, as a person writes them.
  *
  * `late` is the late work, oldest first, as `YYYY-MM-DD`; `agents` the runs working now.
  */
 export function sentenceOf(needing: number, late: readonly string[], agents: number, today: string): Sentence {
   const working = agents === 0 ? 'no agent is working' : agents === 1 ? 'one agent is working' : `${counted(agents)} agents are working`;
-  if (needing === 0) return { text: `Nothing needs you, and ${working}.`, needs: '' };
-  const head = `${upper(counted(needing))} ${plural(needing, 'thing needs', 'things need')} you`;
+  if (needing === 0 && late.length === 0) return { text: `Nothing needs you, and ${working}.`, needs: '' };
   if (late.length > 0) {
-    const oldest = late[0]!;
-    const how = lateSaid(oldest, today);
-    if (late.length === 1) {
-      if (needing === 1) return { text: `${head}, and it is ${how}.`, needs: how };
-      return { text: `${head}, and one is ${how}.`, needs: how };
-    }
-    const all = late.length === needing ? (needing === 2 ? 'both are late' : 'all of them are late') : `${counted(late.length)} are late`;
-    return { text: `${head}, and ${all}, the oldest ${how}.`, needs: all };
+    const how = lateBy(late[0]!, today);
+    const red = late.length === 1 ? `${how} late` : `${opening(late.length)} things are late`;
+    const lead = late.length === 1 ? `One thing is ${red}.` : `${red}, the oldest by ${how}.`;
+    const rest = Math.max(0, needing - late.length);
+    const more = rest === 0 ? '' : rest === 1 ? ' One more needs you.' : ` ${opening(rest)} more need you.`;
+    return { text: `${lead}${more}`, needs: red };
   }
+  const head = `${opening(needing)} ${plural(needing, 'thing needs', 'things need')} you`;
   if (agents === 0) return { text: `${head}.`, needs: head };
   return { text: `${head}, and ${working}.`, needs: head };
 }

@@ -18,7 +18,7 @@
 
 import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
-import { namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
+import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -1293,8 +1293,10 @@ export type Walk = {
   crossed: WalkStep | null;
   /** On a walk drawn once per currency: the opening figure remembered in this walk's currency, oldest first. */
   past?: readonly { at: string; value: number }[] | undefined;
-  /** How many days the record walked, `last` resolved to the walk's last dated movement. */
+  /** How many days the chart opens on, `last` resolved to the walk's last dated movement. */
   horizon?: number | undefined;
+  /** How many days the record walked, when that is further than `horizon`, so the length control can offer more. */
+  reach?: number | undefined;
 };
 
 /** Where a step's row opens: this build's `href`, or the record's `register#seq` as that row's address. */
@@ -1459,6 +1461,13 @@ function feedLine(r: FeedRow): { what: string; whole: boolean; counted?: true } 
   const thing = r.thing ?? feedThing(r.target);
   const rule = r.by === 'rule' && r.who !== null ? r.who : null;
   const noted = r.note !== null && r.note.trim() !== '';
+  /* A QUESTION NOBODY ASKED BY HAND IS WHAT IT ASKS, from a rule, the record or an agent alike. "BrainDog suggested The
+     backup on 3 Sep did not run" sat under You with a capital mid-sentence; it reads `Asked: the backup on 3 Sep did not
+     run`. An agent keeps its name in front, since its group is every agent's. */
+  if (r.kind === 'suggest' && r.thing && r.by !== 'you') {
+    if (rule !== null) return { what: ruleAsked(rule, r.thing), whole: true };
+    return { what: `asked: ${asPartOf(r.thing)}`, whole: false };
+  }
   if (rule === null) return { what: agentDoing(r.kind, thing, r.note), whole: false };
   if (noted) return { what: agentDoing(r.kind, thing, r.note), whole: true };
   const folded = r.things && r.things.length > 1 ? r.things : null;
@@ -1469,7 +1478,6 @@ function feedLine(r: FeedRow): { what: string; whole: boolean; counted?: true } 
   }
   const done = ruleDone(rule);
   if (done !== null && thing !== null && r.kind !== null && ROW_WRITES.has(r.kind)) return { what: `${thing} ${done}`, whole: true };
-  if (r.kind === 'suggest' && r.thing) return { what: ruleAsked(rule, r.thing), whole: true };
   return { what: agentDoing(r.kind, thing, r.note), whole: false };
 }
 

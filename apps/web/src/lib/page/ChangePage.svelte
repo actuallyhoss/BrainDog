@@ -8,10 +8,15 @@
   Edit layout is offered from 900px only, since authoring is a desktop surface (13 §10); a phone still changes a page
   by describing it, and still reads how it is built.
 
+  ON A HOME (Today, Decide) THE SAME MENU, with what that home can take: Edit layout always, and Change this page and How
+  this is built once the record holds the page, the second at the page's own address since a home draws no source.
+  A menu with nothing to offer is not drawn.
+
   ITS OWN FILE, NOT LINES IN `PageView.svelte`, which several units write: the head's actions region there is one line
   that mounts this, and the styles for the trigger and the menu live here with them.
 -->
 <script lang="ts">
+  import { at } from '$lib/at.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { MediaQuery } from 'svelte/reactivity';
@@ -28,6 +33,8 @@
     showSource,
     reread,
     onarrange = null,
+    source = 'here',
+    change = true,
   }: {
     /** The page's address, which the description is about. */
     slug: string;
@@ -39,6 +46,10 @@
     reread: () => Promise<void>;
     /** Opens Edit layout, or `null` where this reader may not arrange the page or it is drawn as its source. */
     onarrange?: (() => void) | null;
+    /** Where How this is built is drawn: `here` toggles it in place, an address goes there, and `null` offers none. */
+    source?: 'here' | string | null;
+    /** Whether Change this page is offered, for a page the record holds. */
+    change?: boolean;
   } = $props();
 
   let open = $state(false);
@@ -49,14 +60,14 @@
 
   /* ONLY AN OWNER MAY ASK SLASH TO DRAFT, as the record's `slashDraft` holds, so a member is not offered a press that
      is always refused. A reader of the sample has no person, and is shown it, since the sheet says why nothing drafts. */
-  const mayChange = $derived(page.data.me?.owner !== false);
+  const mayChange = $derived(change && page.data.me?.owner !== false);
 
   /* EDIT LAYOUT FROM 900px, the width the arranging mode is drawn for. Read as the menu is drawn, so a window narrowed
      with the menu shut offers it no more. */
   const wide = new MediaQuery('(width >= 900px)', false);
 
   /* THE SOURCE KEEPS THE REST OF THE ADDRESS, as ⇧E does, so on /?work it stays on Work, filters and all. */
-  function source(on: boolean) {
+  function toggle(on: boolean) {
     const q = new URLSearchParams(page.url.searchParams);
     q.set('src', on ? '1' : '0');
     void goto(`?${q}`, { replaceState: true, noScroll: true });
@@ -64,25 +75,35 @@
 
   function toSource() {
     open = false;
-    source(true);
+    if (source === 'here') toggle(true);
+    else if (source) void goto(at(source));
   }
+
+  /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
+  const offers = $derived(mayChange || source !== null || (onarrange !== null && wide.current));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
+{#if offers}
 <span class="page-more">
 <Menu label={words.more(title)} align="end" bind:open={menu}>
   {#snippet trigger()}
     <span class="change-more"><Icon name="more" size="s" /><span class="change-vh">{words.more(title)}</span></span>
   {/snippet}
   {#if mayChange}<button type="button" class="mi" role="menuitem" onclick={() => (open = true)}><Icon name="ask" size="s" />{words.change}</button>{/if}
-  <button type="button" class="mi" role="menuitem" onclick={() => source(!showSource)}
-    ><Icon name="code" size="s" />{showSource ? copy.pageBack : copy.pageSource}</button
-  >
+  {#if source === 'here'}
+    <button type="button" class="mi" role="menuitem" onclick={() => toggle(!showSource)}
+      ><Icon name="code" size="s" />{showSource ? copy.pageBack : copy.pageSource}</button
+    >
+  {:else if source}
+    <button type="button" class="mi" role="menuitem" onclick={toSource}><Icon name="code" size="s" />{copy.pageSource}</button>
+  {/if}
   {#if onarrange && wide.current}
     <button type="button" class="mi" role="menuitem" data-arrange onclick={() => onarrange?.()}><Icon name="grid" size="s" />{copy.arrange}</button>
   {/if}
 </Menu>
 </span>
+{/if}
 
 {#if mayChange}
   <Sheet bind:open title={words.change}>

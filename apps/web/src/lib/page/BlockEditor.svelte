@@ -30,8 +30,10 @@
     patchOf,
     readList,
     rolesFor,
+    sortSaid,
     type Draft,
     type DraftColumn,
+    type SortDir,
   } from '$lib/record/block-edit.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
   import type { Patch } from '$lib/record/page-write.ts';
@@ -47,6 +49,7 @@
     slug,
     index,
     added,
+    held = null,
     block,
     span,
     area,
@@ -61,6 +64,11 @@
     index: number;
     /** The block as declared in this session's arranging, when it was added and is not stored yet. */
     added: BlockBody | null;
+    /**
+     * The block as declared on a page the record does not hold yet (Today or Decide before their first Done,
+     * `home-arrange.ts`), read from there because there is no stored one to read.
+     */
+    held?: BlockBody | null;
     /** The block as drawn, for its kind and its name while the stored one is read. */
     block: LiveBlock;
     /** The width it takes now, in twelfths. */
@@ -102,9 +110,10 @@
     unread = null;
     touched = false;
     whereNow = undefined;
-    if (added) {
-      stored = added;
-      draft = draftOf(added);
+    const given = added ?? held;
+    if (given) {
+      stored = given;
+      draft = draftOf(given);
       return undefined;
     }
     let live = true;
@@ -177,6 +186,9 @@
     draft.source = `register.${id}`;
     touched = true;
     whereNow = undefined;
+    /* AND ITS SORT, whose field the new list may not have: one kept as written goes too, or the record refuses it. */
+    draft.sortField = '';
+    draft.sortKept = false;
     const seed = seedBlock(kind, id);
     draft.columns = (seed?.columns ?? []).map((c) => ({ field: c.field, label: c.label ?? '', as: c.as ?? '', rest: {} }));
   }
@@ -212,6 +224,23 @@
   }
 
   const count = (where: Predicate | undefined) => (register ? countRows(apiBase(), register, where) : Promise.resolve(null));
+
+  /* ── the sort ───────────────────────────────────────────────────────────
+     ONE FIELD AND ONE WAY, which is the sort a person means; a stored sort of several fields is kept as written
+     (`block-edit.ts` `sortKept`). The way is asked only once a field is chosen, so the part is one select at rest. */
+
+  /** The fields a block may be sorted by: the list's, and the one it sorts by now if the list no longer has it. */
+  const sortChoices = $derived.by((): { id: string; name: string }[] => {
+    const out = (fields ?? []).filter((f) => !f.retired).map((f) => ({ id: f.id, name: fieldName(f) }));
+    const now = draft?.sortField ?? '';
+    if (now && !out.some((f) => f.id === now)) out.unshift({ id: now, name: now.replace(/_/g, ' ') });
+    return out;
+  });
+
+  const ways: readonly { dir: SortDir; said: string }[] = [
+    { dir: 'asc', said: blockWords.sortUp },
+    { dir: 'desc', said: blockWords.sortDown },
+  ];
 
   /* ── columns ────────────────────────────────────────────────────────────── */
 
@@ -299,6 +328,38 @@
           <p class="help">{blockWords.filterKept}</p>
         {:else}
           <QueryBuilder value={whereValue} {fields} {register} onchange={onwhere} {count} now={route.data.now} />
+        {/if}
+      </section>
+
+      <section class="part" aria-labelledby="{uid}-sort">
+        <h3 class="label" id="{uid}-sort">{blockWords.sort}</h3>
+        {#if draft.sortKept}
+          <p class="kept">{sortSaid(stored?.order)}</p>
+          <p class="help">{blockWords.sortKept}</p>
+        {:else if fields}
+          <label class="sr" for="{uid}-sort-field">{blockWords.sort}</label>
+          <select id="{uid}-sort-field" class="choose" bind:value={draft.sortField}>
+            <option value="">{blockWords.sortNone}</option>
+            {#each sortChoices as f (f.id)}
+              <option value={f.id}>{f.name}</option>
+            {/each}
+          </select>
+          {#if draft.sortField}
+            <div class="segmented" role="group" aria-label={blockWords.sortDir}>
+              {#each ways as way (way.dir)}
+                <button
+                  type="button"
+                  class="segment"
+                  data-on={draft.sortDir === way.dir ? '' : undefined}
+                  aria-pressed={draft.sortDir === way.dir ? 'true' : 'false'}
+                  onclick={() => draft && (draft.sortDir = way.dir)}>{way.said}</button
+                >
+              {/each}
+            </div>
+          {/if}
+          <p class="help">{blockWords.sortHelp}</p>
+        {:else}
+          <p class="help">{fieldsFailed ? blockWords.sortUnread : blockWords.filterLoading}</p>
         {/if}
       </section>
 

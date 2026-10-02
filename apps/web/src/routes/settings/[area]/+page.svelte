@@ -59,6 +59,7 @@
   import Billing from './areas/Billing.svelte';
   import Export from './areas/Export.svelte';
   import Delete from './areas/Delete.svelte';
+  import Words from './areas/Words.svelte';
 
   /**
    * THE SHELL, AND NOT THE SAMPLE.
@@ -147,8 +148,11 @@
     if (area === undefined || declares) untrack(() => void readIndex());
   });
 
-  /* THIS SCREEN'S OWN WORD: the index's one tool. */
-  const words = { arrange: 'Arrange' } as const;
+  /* THIS SCREEN'S OWN WORDS: the index's one tool, and its line where the record has no health to say. */
+  const words = {
+    arrange: 'Arrange',
+    lead: (name: string) => `How ${name || 'BrainDog'} looks and opens, who can reach it, and what it keeps.`,
+  } as const;
 
   /**
    * ARRANGE: the index made the person's own page, at `/p/settings`, where Edit layout moves and removes its tiles,
@@ -280,7 +284,17 @@
 {#if known}
   <PageHead icon="settings" kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} />
 {:else}
-  <PageHead icon="settings" title={copy.settings} sentence={health ? healthLine : undefined} actions={mayArrange ? indexTools : undefined} />
+  <!-- THE INDEX OPENS ON A LEAD TILE, as a declared page does: its name and Arrange ride over the top of the tile and the
+       line under them is the headline. Arrange waits for the pointer or the keyboard to reach the tile. `display:
+       contents`, so the sticky head still sticks. -->
+  <div class="index-head">
+    <PageHead
+      icon="settings"
+      title={copy.settings}
+      sentence={health ? healthLine : words.lead(shell.refused ? '' : shell.index.name)}
+      actions={mayArrange ? indexTools : undefined}
+    />
+  </div>
 {/if}
 
 {#if !known}
@@ -325,6 +339,8 @@
       <Ingest {shell} {area} />
     {:else if area === 'notifications'}
       <Notifications {shell} {area} />
+    {:else if area === 'words'}
+      <Words {shell} {area} />
     {:else if area === 'backups'}
       <Backups {shell} {area} />
     {:else if area === 'billing'}
@@ -346,6 +362,23 @@
 {/if}
 
 <style>
+  .index-head {
+    display: contents;
+  }
+
+  /* ARRANGE ON HOVER OR FOCUS, where a pointer hovers: at rest the tile is its name and its line. Under a thumb, where
+     nothing hovers, it is always there. */
+  @media (hover: hover) and (pointer: fine) {
+    .index-head :global(.head-actions) {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .index-head :global(.lead-wrap:is(:hover, :focus-within) .head-actions) {
+      opacity: 1;
+    }
+  }
+
   /* THE INDEX IS ONE COLUMN, the page's own, as Home's body is: its tiles carry their spans. */
   .settings-index {
     min-inline-size: 0;

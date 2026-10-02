@@ -360,7 +360,11 @@ export function sinceWho(
 
 /* ── money ──────────────────────────────────────────────────────────────── */
 
-type Walk = { from?: unknown; currency?: unknown; steps?: unknown; crossed?: unknown; horizon?: unknown };
+type Walk = { from?: unknown; currency?: unknown; steps?: unknown; crossed?: unknown; horizon?: unknown; reach?: unknown };
+
+/** How far a walk reached, which is past the length it opens on when the page offers longer ones. */
+const lengthOf = (w: Walk): number => (typeof w.reach === 'number' ? w.reach : typeof w.horizon === 'number' ? w.horizon : 0);
+
 type Step = { day: string; balance: number };
 
 const stepsOf = (w: Walk): Step[] =>
@@ -387,7 +391,7 @@ export function forecastOf(blocks: readonly unknown[], today: string, weeks = 13
      reaches past the weeks drawn here. */
   const fit = walks
     .filter((w) => typeof w.from === 'number' && typeof w.currency === 'string' && (currency === null || w.currency === currency))
-    .sort((a, b) => (typeof b.horizon === 'number' ? b.horizon : 0) - (typeof a.horizon === 'number' ? a.horizon : 0))[0];
+    .sort((a, b) => lengthOf(b) - lengthOf(a))[0];
   if (!fit) return null;
   const opening = fit.from as number;
   const steps = stepsOf(fit).sort((a, b) => a.day.localeCompare(b.day));

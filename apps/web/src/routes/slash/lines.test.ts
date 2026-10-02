@@ -22,16 +22,18 @@ const READING: Reading = {
   cap: 3,
 };
 
-test('WHAT WAITS ON DECIDE LEADS THE SENTENCE, and it is the red phrase the sentence holds', () => {
-  const s = sentenceOf(slash.byRules, 1);
-  assert.equal(s.needs, 'One suggestion waits for you on Decide');
-  assert.ok(s.text.startsWith(`${s.needs}. `));
-  assert.ok(s.text.endsWith(slash.byRules));
+test('THE LINE IS THE STATE: what waits on Decide leads, in red, and who drafts is never the headline', () => {
+  const s = sentenceOf(1, 2, 4, slash.emptyTitle);
+  assert.deepEqual(s, { text: 'One suggestion waits for you on Decide.', needs: 'One suggestion waits for you on Decide' });
+  assert.equal(sentenceOf(3, 0, 3, slash.emptyTitle).needs, 'Three suggestions wait for you on Decide');
+  assert.ok(!s.text.includes(slash.byRules));
 });
 
-test('NOTHING WAITING, NO RED: the sentence is who drafts, and only that', () => {
-  assert.deepEqual(sentenceOf(slash.byRules, 0), { text: slash.byRules, needs: undefined });
-  assert.equal(sentenceOf('x', 3).needs, '3 suggestions wait for you on Decide');
+test('NOTHING WAITING, NO RED: what is new, else everything answered, else nothing yet', () => {
+  assert.deepEqual(sentenceOf(0, 2, 3, slash.emptyTitle), { text: 'Slash has two new suggestions.', needs: undefined });
+  assert.deepEqual(sentenceOf(0, 0, 3, slash.emptyTitle), { text: words.allSettled, needs: undefined });
+  assert.deepEqual(sentenceOf(0, 0, 0, 'Nothing to suggest yet'), { text: 'Nothing to suggest yet.', needs: undefined });
+  assert.deepEqual(sentenceOf(0, 0, 0, 'Nothing to suggest yet.'), { text: 'Nothing to suggest yet.', needs: undefined });
 });
 
 test('THE TILE COUNTS WHERE EACH SUGGESTION STANDS, and leaves out a part with none', () => {

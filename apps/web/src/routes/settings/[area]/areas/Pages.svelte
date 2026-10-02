@@ -7,18 +7,21 @@
   first, and Hide. Fewer things on screen: Open and the menu wait for the pointer or the keyboard to reach their row,
   and under a thumb, where nothing hovers, the menu is always there.
 
-  CALM. What the app opens on is one line at the top. A group whose only page has the group's own name draws no
-  heading over it. The pages a row made (a person's, a project's) are folded into one "N more pages", and the add-ons
-  are one line at the foot with their icons, the door to the screen where each is turned off or on.
+  CALM, AND IN THE NAV'S ORDER. What the app opens on is one line at the top. Every page is then one row of one list, a
+  hairline between each, in the order the nav draws them: Today, the sections, Activity and Decide among them, as the
+  top bar and More hold them. A page under a section named otherwise says so on its row rather than under a heading.
+  The pages a row made (a person's, a project's) are folded into one "N more pages" row, and the add-ons are one line
+  at the foot with their icons, the door to the screen where each is turned off or on.
 
   WHAT IS A PERSON'S OWN AND WHAT IS THE RECORD'S. The name in the nav, the page it opens on and what is hidden are this
   person's (`nav-prefs.svelte.ts`: `nav.labels`, `home.page`, `nav.hidden`), kept for them on the record and on this
   device without one. The layout and a change through Slash are the page itself, which only an owner may change, so a
   colleague is offered neither.
 
-  THE HOME PAGE AND THE NAMES NEED TWO KEYS THE RECORD DOES NOT TAKE YET. `home.page` and `nav.labels` join
-  `PREF_KEYS` in `packages/record/src/index.ts`; until they do, a record refuses them in its own sentence and the screen
-  puts the choice back and says so. The shell reads `navPrefs.home` and `navPrefs.relabel` to draw them.
+  THE HOME PAGE AND THE NAMES ARE TWO KEYS THE RECORD KEEPS, `home.page` and `nav.labels` in `PREF_KEYS`
+  (`packages/record/src/index.ts`). A record that still refuses one (a host older than the keys) says so in its own
+  sentence, and the screen puts the choice back and says so. The shell reads `navPrefs.home` and `navPrefs.relabel` to
+  draw them. What a list itself is called, for everybody, is the record's word and lives in Words and money.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -26,7 +29,9 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { arrange } from '$lib/nav.ts';
+  import { WORK, arrange, flatNav } from '$lib/nav.ts';
+  import { said as voiced } from '$lib/voice.svelte.ts';
+  import { TASKS } from '$lib/work/list.ts';
   import { LABEL_MOST, navPrefs, type Saved } from '$lib/nav-prefs.svelte.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -69,6 +74,7 @@
     opensFirst: 'Opens first',
     isHidden: 'Hidden from your nav',
     called: (own: string) => `Called ${own} on its page`,
+    under: (section: string) => `In ${section}`,
     morePages: (n: number) => (n === 1 ? '1 more page' : `${n} more pages`),
     none: 'No pages yet',
     noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages Slash makes for you.',
@@ -94,7 +100,7 @@
    * One page as this area lists it: where it is, its own title, its glyph, and its slug when it is a declared page
    * (`/p/<slug>`). A thread in the nav is not one, so it has no layout to edit and no page for Slash to change.
    */
-  type Listed = { href: string; slug: string | null; own: string; icon: IconName; inNav: boolean; row: boolean };
+  type Listed = { href: string; slug: string | null; own: string; icon: IconName; inNav: boolean; row: boolean; section?: string; app?: true };
 
   const slugOf = (href: string): string => href.replace(/^\/p\//u, '');
   /* A PAGE WITH NO TITLE TO READ IS NAMED BY ITS ADDRESS, in words: `client-portal` is Client portal. */
@@ -109,8 +115,9 @@
    */
   const views = $derived(new Set(shell.index.registers.flatMap((r) => r.views.map((v) => v.href))));
   const inNav = $derived(shell.nav.filter((e) => !e.cut && !e.row && !views.has(e.href)));
+  const sections = $derived(arrange(inNav, navPrefs.order));
   const groups = $derived(
-    arrange(inNav, navPrefs.order).map(
+    sections.map(
       ([section, list]) =>
         [
           section,
@@ -119,17 +126,32 @@
     ),
   );
 
-  /* A GROUP WHOSE ONLY PAGE HAS THE GROUP'S OWN NAME DRAWS NO HEADING ("Money" over Money says it twice), and such
-     groups side by side are one list, in the nav's order. */
+  /* NAMES ARE COMPARED AS A PERSON READS THEM, case and spaces aside. */
   const same = (a: string, b: string): boolean => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
-  const headed = $derived.by(() => {
-    const out: { head: string | null; list: Listed[] }[] = [];
-    for (const [section, list] of groups) {
-      const only = list.length === 1 ? list[0]! : null;
-      const head = only && (same(only.own, section) || same(navPrefs.labelOf(only.href, only.own), section)) ? null : section;
-      const last = out.at(-1);
-      if (head === null && last && last.head === null) last.list.push(...list);
-      else out.push({ head, list: [...list] });
+
+  /**
+   * EVERY PAGE OF THE NAV AS ONE LIST, IN THE NAV'S OWN ORDER (`flatNav`, the rule the top bar and More draw by): Today,
+   * the sections a day runs through, Activity, Decide, then what sits under More. Today, Activity and Decide are the
+   * app's own screens, listed with the rest so the list is the whole nav; they open and are chosen to open first, and
+   * have no layout of their own to edit yet. A section's pages follow its row, each saying its section when its name
+   * does not. Decide is listed whether or not anything waits on it today, since this is where it is found.
+   */
+  const ordered = $derived.by((): Listed[] => {
+    const holdsTasks = shell.index.registers.some((r) => r.id === TASKS);
+    const flat = flatNav(sections, 1, { today: copy.today, activity: copy.audit, decide: voiced('decide') }, { work: holdsTasks ? WORK : null });
+    const bySection = new Map(groups.map(([section, list]) => [section.trim().toLocaleLowerCase(), { section, list }] as const));
+    const app = (href: string, own: string, icon: IconName): Listed => ({ href, slug: null, own, icon, inNav: true, row: false, app: true });
+    const out: Listed[] = [];
+    for (const item of [...flat.main, ...flat.more]) {
+      if (item.key === 'today') out.push(app('/', item.label, 'today'));
+      else if (item.key === 'activity') out.push(app('/audit', item.label, 'activity'));
+      else if (item.key === 'decide') out.push(app('/decide', item.label, 'decide'));
+      else {
+        if (item.href === WORK && holdsTasks) out.push(app(WORK, item.label, item.icon as IconName));
+        const held = bySection.get(item.label.trim().toLocaleLowerCase());
+        if (!held) continue;
+        for (const p of held.list) out.push(same(p.own, held.section) ? p : { ...p, section: held.section });
+      }
     }
     return out;
   });
@@ -194,17 +216,17 @@
   const FOLD = 8;
   let unfolded = $state(false);
   const othersShown = $derived(unfolded ? others : others.filter((p) => !p.row).slice(0, FOLD));
-  const total = $derived(inNav.length + others.length);
+  const total = $derived(ordered.length + others.length);
 
   /* ── the home page ── */
 
-  /* TODAY IS THE PAGE THE APP DRAWS ITSELF, and every page of the nav is a choice beside them. A home
+  /* TODAY IS THE PAGE THE APP DRAWS ITSELF, and every row of the nav is a choice beside it. A home
      set to a page the nav no longer holds is still offered, so the select never shows a choice that is not the one
      kept. */
   const homes = $derived.by(() => {
     const out: { href: string; name: string }[] = [
       { href: '/', name: copy.today },
-      ...inNav.map((e) => ({ href: e.href, name: navPrefs.labelOf(e.href, e.title) })),
+      ...ordered.filter((p) => p.href !== '/').map((p) => ({ href: p.href, name: navPrefs.labelOf(p.href, p.own) })),
     ];
     const home = navPrefs.home;
     if (home !== null && !out.some((o) => o.href === home)) {
@@ -317,9 +339,9 @@
 {#snippet pageRow(p: Listed)}
   {@const title = navPrefs.labelOf(p.href, p.own)}
   {@const hidden = p.inNav && navPrefs.isHidden(p.href)}
-  {@const first = navPrefs.home === p.href}
+  {@const first = navPrefs.home === p.href || (p.href === '/' && navPrefs.home === null)}
   <li class="page-row" data-hidden={hidden ? '' : undefined}>
-    <div class="line" class:line-tall={first || hidden || title !== p.own}>
+    <div class="line" class:line-tall={first || hidden || title !== p.own || p.section !== undefined}>
       <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
       <span class="line-main">
         <a class="line-title page-link" href={at(p.href)}>{title}</a>
@@ -329,12 +351,14 @@
           <span class="line-detail">{words.isHidden}</span>
         {:else if title !== p.own}
           <span class="line-detail">{words.called(p.own)}</span>
+        {:else if p.section}
+          <span class="line-detail">{words.under(p.section)}</span>
         {/if}
       </span>
       <span class="line-amount"></span>
       <span class="line-when line-verbs page-acts">
         <span class="page-open" aria-hidden="true">{words.open}</span>
-        <span class="page-menu">
+        {#if !(p.app && first)}<span class="page-menu">
           <Menu label={words.more(title)} align="end">
             {#snippet trigger()}
               <span class="page-more"><Icon name="more" size="s" /><span class="vh">{words.more(title)}</span></span>
@@ -343,15 +367,15 @@
               <a class="mi wide-only" role="menuitem" href={at(p.href)}>{words.layout}</a>
               <button type="button" class="mi" role="menuitem" onclick={() => startChange(p)}>{words.slash}</button>
             {/if}
-            {#if p.inNav}
+            {#if p.inNav && !p.app}
               <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}>{words.rename}</button>
             {/if}
             <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}>{first ? words.notFirst : words.first}</button>
-            {#if p.inNav}
+            {#if p.inNav && !p.app}
               <button type="button" class="mi" role="menuitem" onclick={() => toggleHidden(p, title)}>{hidden ? words.show : words.hide}</button>
             {/if}
           </Menu>
-        </span>
+        </span>{/if}
       </span>
     </div>
   </li>
@@ -369,22 +393,26 @@
   {#if total === 0}
     <Empty kind="cleared" title={words.none} body={words.noneWhy} />
   {:else}
-    {#each headed as g, n (g.head ?? `-${n}`)}
-      {#if g.head}<p class="group-head">{g.head}</p>{/if}
-      <ul class="ledger ledger-lead pages">
-        {#each g.list as p (p.href)}{@render pageRow(p)}{/each}
-      </ul>
-    {/each}
+    <!-- ONE LIST, ONE RHYTHM: a hairline between every row, the nav's order, and no gap round a page on its own. -->
+    <ul class="ledger ledger-lead pages">
+      {#each ordered as p (p.href)}{@render pageRow(p)}{/each}
+    </ul>
     {#if others.length > 0}
       <p class="group-head">{words.other}</p>
-      {#if othersShown.length > 0}
-        <ul class="ledger ledger-lead pages">
-          {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
-        </ul>
-      {/if}
-      {#if others.length > othersShown.length}
-        <div class="fold"><Button weight="bare" onclick={() => (unfolded = true)}>{words.morePages(others.length - othersShown.length)}</Button></div>
-      {/if}
+      <ul class="ledger ledger-lead pages">
+        {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
+        {#if others.length > othersShown.length}
+          <!-- THE REST IS A ROW LIKE THE OTHERS, its chevron saying a press opens more. -->
+          <li class="page-row page-fold">
+            <button type="button" class="line fold-line" onclick={() => (unfolded = true)}>
+              <span class="line-mark"><IconWell name="doc" size="l" /></span>
+              <span class="line-main"><span class="line-title">{words.morePages(others.length - othersShown.length)}</span></span>
+              <span class="line-amount"></span>
+              <span class="line-when fold-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
+            </button>
+          </li>
+        {/if}
+      </ul>
     {/if}
   {/if}
   <!-- THE ADD-ONS THE PAGES CAME WITH, as one line: what is on, and the door to where each is turned off or on. -->
@@ -468,8 +496,7 @@
     font-weight: 500;
   }
 
-  .pages + .group-head,
-  .pages + .pages {
+  .pages + .group-head {
     margin-block-start: var(--sp-4);
   }
 
@@ -556,8 +583,29 @@
     white-space: nowrap;
   }
 
-  .fold {
-    margin-block-start: var(--sp-2);
+  /* THE FOLD IS A ROW: the row's own grid and hairline, a button so a key and a thumb both open it. */
+  .fold-line {
+    inline-size: 100%;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .fold-line .line-title {
+    color: var(--ink2);
+  }
+
+  .fold-go {
+    color: var(--dim);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .fold-line:hover {
+      background: var(--hover-wash);
+    }
   }
 
   /* THE ADD-ONS' LINE, at the foot and quiet: their icons, how many are on, and Manage. */

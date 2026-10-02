@@ -40,6 +40,7 @@ import { copy } from '../copy.ts';
 import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
 import { words } from './create.ts';
+import type { Offer } from './customise.ts';
 
 /**
  * The verbs the palette can perform in place rather than travel to.
@@ -54,8 +55,11 @@ import { words } from './create.ts';
  * `create.ts`, so there is still no object somebody has to pick on a screen before the row can
  * run, which is what test 1 asks. What it takes is `Live.creation`, which the palette computes
  * and this file only asks about, so the declaration stays a name.
+ *
+ * `customise` IS THE SAME SHAPE. `Dark mode`, `Open on Money`, `Hide Inbox`: the change and the thing it changes are
+ * words in the box, read by `customise()` in `customise.ts`, and what it takes is `Live.customise`.
  */
-export const ACTS = ['undo', 'add'] as const;
+export const ACTS = ['undo', 'add', 'customise'] as const;
 export type Act = (typeof ACTS)[number];
 
 /**
@@ -66,7 +70,7 @@ export type Act = (typeof ACTS)[number];
  * Tasks from the inbox, from a page and from Settings. No binding is needed to prove that, and
  * inventing one to satisfy the test would put a key in the `?` sheet that does nothing.
  */
-const NAMES_ITS_TARGET: readonly Act[] = ['add'];
+const NAMES_ITS_TARGET: readonly Act[] = ['add', 'customise'];
 
 /** A row a query can make: the list it goes in and the words it is titled with. `create.ts` reads it. */
 export type Creation = { register: string; title: string };
@@ -77,6 +81,11 @@ export type Live = {
   undoable: boolean;
   /** The row the query would add, or `null` while the query is not the whole sentence. */
   creation: Creation | null;
+  /**
+   * The changes the query names (`customise.ts`), empty for an empty query and for any query that names none. Absent is
+   * empty, so a caller that knows nothing of them is answered as before.
+   */
+  customise?: readonly Offer[];
 };
 
 export type Command = {
@@ -233,5 +242,19 @@ export const COMMANDS: readonly Command[] = [
     group: copy.commands,
     icon: 'plus',
     when: (live) => live.creation !== null,
+  },
+  /**
+   * AND THE ROWS THAT CHANGE THE APP ITSELF (DIRECTION §35), drawn like the add row: as the sentences the query makes,
+   * `Dark mode`, `Open on Money`, `Hide Inbox`, and only while it makes one. With nothing typed there are none, so a
+   * freshly opened palette looks as it always has.
+   */
+  {
+    id: 'c-customise',
+    title: copy.customise.group,
+    href: null,
+    act: 'customise',
+    group: copy.customise.group,
+    icon: 'settings',
+    when: (live) => (live.customise?.length ?? 0) > 0,
   },
 ];

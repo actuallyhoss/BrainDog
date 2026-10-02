@@ -998,7 +998,9 @@ test('THE MONEY PAGE DRAWS ITS CASH AHEAD as a forecast: the opening, ninety day
   assert.equal(marks[0], 'opening');
   assert.ok(marks.filter((m) => m === 'past').length >= 80, 'the sample remembers ninety days of cash');
   assert.equal(marks.filter((m) => m === 'step').length, forecast.walk!.steps.length, 'every movement, not a slice of them');
-  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '365']);
+  /* THREE MONTHS FIRST AND FIVE YEARS WALKED, SINCE money-core 3.7.0, so every longer length is still on the control. */
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'horizon')?.cells.slice(0, 2), ['horizon', '90']);
+  assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'reach')?.cells.slice(0, 2), ['reach', '1825']);
   /* `leave` IS FOLDED INTO `count` AND `sell` IS OFFERED, since money-core 3.0.0: one control over the streams, not two
      with opposite meanings, and what a pack declares sellable. */
   assert.deepEqual(segment.rows.find((r) => r.cells[0] === 'knobs')?.cells.slice(0, 2), ['knobs', 'horizon late spend count grow drift sell']);
@@ -1186,8 +1188,9 @@ test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LA
   /* THE NEWEST THING SAID ABOUT A ROW IS WHO CHANGED IT: a rule matched Halden's reply on 2026-041. */
   const halden = table.rows.find((r) => r.key === 'obligations#1')!;
   assert.match(String(halden.cells[changed]), /^Late reply, \d{1,2} [A-Z][a-z]{2}$/u);
+  /* ANY OTHER IS THE SAMPLE'S OWN HAND, which is BrainDog's and not yours (`byOf`). */
   const other = table.rows.find((r) => r.key !== 'obligations#1')!;
-  assert.match(String(other.cells[changed]), /^You, \d{1,2} [A-Z][a-z]{2}$/u);
+  assert.match(String(other.cells[changed]), /^BrainDog, \d{1,2} [A-Z][a-z]{2}$/u);
 
   /* A SIGN NOTHING DECIDES IS REFUSED, as the record refuses it. */
   const bad = readBlock({ ...table, columns: [{ field: 'amount', sign: { field: 'what', minus: 'x' } }] } as never);

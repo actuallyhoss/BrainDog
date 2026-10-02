@@ -2,8 +2,8 @@
   A declared page, drawn: the one reader every declared page goes through, wherever it is drawn.
 
   ONE READER, THREE MODES. `page` is `/p/<slug>`: the head, the source,
-  Edit layout, the writes and the keys. `home` is Home's body: no head, no source and no Edit layout, and the writes stay
-  on. `preview` is a page not yet installed, drawn as it would be: inert, with no writes, no arranging and no source,
+  Edit layout, the writes and the keys. `home` is Home's and Decide's body: no head and no source, the writes stay on,
+  and the page menu waits at the body's top end until the pointer or focus is on the page (`home-arrange.ts`). `preview` is a page not yet installed, drawn as it would be: inert, with no writes, no arranging and no source,
   and with `was` it is drawn beside the page as it is now, one at a time on a phone. Home and Decide each drew a
   declared page a second and a third way, as a flat stack of blocks with no layout; they draw it through this now.
 
@@ -56,6 +56,8 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { may } from '$lib/record/may.ts';
   import { words } from './words.ts';
+  import { holdsOf, keptAs, previewedBody, readToArrange, voiceOf, type ToArrange } from './home-arrange.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import BatchBar from './BatchBar.svelte';
   import { filterOf, filterQuery, filtersOf } from './filters.ts';
   import { Picked } from './picked.svelte.ts';
@@ -183,6 +185,15 @@
   const led = $derived(!!live && !arranging && !showSource && leadIndex(emptyHidden(live.page.blocks)) >= 0);
 
   /**
+   * WHETHER THE NAME OVER THE HEADLINE WOULD ONLY SAY THE NAV AGAIN: a page that is its own section's ("Money" in the
+   * Money section) is the item the top bar already marks, so its name is not drawn over the headline as well. It stays
+   * the page's `h1` for a screen reader. A page under another ("Kiln" in Projects) keeps it, as it says where it is.
+   */
+  const named = $derived(
+    led && !!live && (live.page.page.nav?.section ?? '').trim().toLowerCase() === live.page.page.title.trim().toLowerCase(),
+  );
+
+  /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
    * generic "One screen that gathers what you keep an eye on" under its title as well (`define`), which on Work stood
    * between the name and the page's own sentence and said less than it. Read whether or not the page opens on it, so the
@@ -190,8 +201,52 @@
    */
   const headlined = $derived(!!live && emptyHidden(live.page.blocks).some((b) => b.drawn && b.kind === 'note' && b.lead === true));
 
+  /* ── arranging a home ──────────────────────────────────────────────────────
+     TODAY AND DECIDE ARRANGE THEIR BODY, NOT WHAT THEIR SCREEN DREW (`home-arrange.ts`): the mode reads the body again,
+     one block for each it declares, and a body nobody installed yet is installed by the first Done. */
+  const shell = $derived(route.data as unknown as Shell);
+  /** The page this home arranges and whether the record holds it, or `null` off a home or for one with nothing to arrange. */
+  const kept = $derived(mode === 'home' && live ? keptAs(slug, shell.pages ?? []) : null);
+  /** The home's body as the mode moves it, from the moment Edit layout is chosen until the arrangement is let go. */
+  let toArrange = $state.raw<ToArrange | null>(null);
+  let opening = false;
+
+  async function arrangeHome() {
+    const on = kept;
+    if (!on || opening) return;
+    opening = true;
+    try {
+      const got = await readToArrange(apiBase(), on, () => previewedBody(slug, holdsOf(shell), voiceOf(said)));
+      if ('fix' in got) {
+        toasts.push(got.fix, { intent: 'warn' });
+        return;
+      }
+      /* AND THE MODE OPENS IN THE SAME TURN, over the body just read: the arrangement's props read it as they are asked,
+         and the let-go below never sees a body held with no mode open. */
+      extra = [];
+      toArrange = got;
+      const begin = arranger?.entry();
+      if (begin) begin();
+      else toArrange = null;
+    } finally {
+      opening = false;
+    }
+  }
+
+  /* LET GO ONCE THE MODE IS SHUT AND NOTHING IS IN FORCE: after Cancel, and after Done once the page is read again, so
+     the arranged order is drawn until the page as written replaces it. */
+  $effect(() => {
+    if (toArrange && !arrangement.editing && arrangement.slots === null) {
+      toArrange = null;
+      extra = [];
+    }
+  });
+
+  /** The blocks the page is laid out from: the home's body while it is arranged, else what the record answered. */
+  const laidFrom = $derived<LiveBlock[]>(toArrange ? toArrange.blocks : (live?.page.blocks ?? []));
+
   /** Declared, then added. One list, so ordering and spans do not care which is which. */
-  const all = $derived<LiveBlock[]>(live ? [...live.page.blocks, ...extra.map((b) => added(b, live.page.blocks))] : []);
+  const all = $derived<LiveBlock[]>(live ? [...laidFrom, ...extra.map((b) => added(b, laidFrom))] : []);
 
   /**
    * ⇧E toggles the declaration, on a page at its own address. Shift, not a bare `e`, because bare `e` means
@@ -251,7 +306,7 @@
 {:else if mode === 'page'}
   <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
        0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
-  <div class="hosted">
+  <div class="hosted" data-named={named ? '' : undefined}>
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. Not on a page that has its own headline sentence, which says what this page is better than the noun. -->
   <PageHead
@@ -307,8 +362,50 @@
 {:else if mode === 'home'}
   <!-- HOME'S BODY: the use case's page with its layout, spans and boxes, under Home's own head. Writes stay on, so a
        task is ticked on Home as it is on its page. -->
-  <PageBody mode="home" page={live.page.page} blocks={all} now={live.now} {writes} ids="home-" pick={select ? picked : null} />
-  {#if select}<BatchBar {picked} />{/if}
+  <div class="home-page" data-arranging={arranging ? '' : undefined}>
+    {#if kept}
+      <!-- THE PAGE'S ⋯, AS EVERY DECLARED PAGE HAS, waiting at the body's top end and drawn only while the pointer or
+           focus is on the page (DIRECTION §35: secondary controls appear on hover or focus); while arranging, the
+           mode's own Add a block, Cancel and Done in its place, in view. -->
+      <div class="home-tools">
+        {#if !arranging}
+          <ChangePage
+            slug={kept.id}
+            title={live.page.page.title}
+            showSource={false}
+            {reread}
+            source={kept.installed ? `/p/${kept.id}?src=1` : null}
+            change={kept.installed}
+            onarrange={arranger?.entry() ? () => void arrangeHome() : null}
+          />
+        {/if}
+        <Arrange
+          bind:this={arranger}
+          {arrangement}
+          slug={kept.id}
+          page={toArrange?.page ?? live.page.page}
+          declared={laidFrom}
+          {all}
+          bind:extra
+          showSource={false}
+          {reread}
+          install={toArrange?.install ?? null}
+          reopen={() => void arrangeHome()}
+        />
+      </div>
+    {/if}
+    <PageBody
+      mode="home"
+      page={toArrange?.page ?? live.page.page}
+      blocks={all}
+      now={toArrange?.now ?? live.now}
+      {writes}
+      ids="home-"
+      pick={select && !arranging ? picked : null}
+      arrangement={kept ? arrangement : null}
+    />
+  </div>
+  {#if select && !arranging}<BatchBar {picked} />{/if}
 {:else}
   <!-- A PREVIEW, INERT: the page as it will be drawn, with nothing on it that writes. Its title is a heading under the
        screen's own, and each block's name one step under that. -->
@@ -352,6 +449,71 @@
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
     transition: padding-inline-end var(--d-enter) var(--ease-out);
+  }
+
+  /* THE NAME THE NAV ALREADY SAYS, kept for a screen reader and taken off the screen: the tools keep their place at the
+     end of the row, and the headline is the first thing read. */
+  .hosted[data-named] :global(.head[data-over] .title) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ── a home's page menu ───────────────────────────────────────────────────
+     AT THE BODY'S TOP END, raised into the space over it, where a page at its own address has its ⋯ in the head. Not
+     drawn at rest: it comes in while the pointer is anywhere on the page or focus is in it, and stays while its menu is
+     open. ONE STEP UNDER THE CHROME (`--z-sheet`, the sticky head's and the tab bar's), over the content: scrolled up
+     under the head it goes under the head's glass with the blocks, and never sits over the head's own buttons (Decide's
+     Ask a question) where a press meant for them would land on it. A pointer that cannot hover never meets it by
+     accident; it is reached by focus there. */
+  .home-page {
+    position: relative;
+    min-inline-size: 0;
+  }
+
+  .home-tools {
+    position: absolute;
+    inset-block-end: 100%;
+    inset-inline-end: 0;
+    z-index: calc(var(--z-sheet) - 1);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-block-end: var(--sp-1);
+    opacity: 0;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  .home-page:hover > .home-tools,
+  .home-tools:focus-within,
+  .home-tools:has(:global([aria-expanded='true'])) {
+    opacity: 1;
+  }
+
+  /* AND ONLY AT REST: while arranging the row holds Add a block, Cancel and Done, which a finger has to reach. */
+  @media (hover: none) {
+    .home-page:not([data-arranging]) > .home-tools:not(:focus-within) {
+      pointer-events: none;
+    }
+  }
+
+  /* WHILE ARRANGING THE MODE'S CONTROLS ARE A ROW OF THEIR OWN over the blocks, in view, as they sit in a page's head. */
+  .home-page[data-arranging] > .home-tools {
+    position: static;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-block-end: var(--sp-3);
+    padding: 0;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .home-tools {
+      transition: none;
+    }
   }
 
   /* THE STRIP SITS IN THE PAGE'S OWN GUTTER AND CAP, over the first tile, with the gap a row of tiles keeps. */

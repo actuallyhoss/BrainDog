@@ -2,19 +2,20 @@
   Display options: what YOU see, never what the record says. `v`, and the Display button at the end
   of the bar.
 
-  Two things live here, the order and the columns, and neither is a filter. The order is in the
-  address, so the page writes it (`sortBy`, `unsort`); which columns are hidden is a view preference
-  kept per list and per reader in the cookie, so the page keeps that too (`hide`, `showAll`). This
-  file draws both and holds nothing.
+  The order, the board's lanes and the columns live here, and none is a filter. The order and the
+  lanes are in the address, so the page writes them (`sortBy`, `unsort`, `setLane`); which columns
+  are hidden is a view preference kept per list and per reader in the cookie, so the page keeps that
+  too (`hide`, `showAll`). The last line keeps all of it as this person's default for the list
+  (`keep`, `forget`). This file draws them and holds nothing.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
-  import { columnsFor } from '$lib/record/api.ts';
-  import type { RegisterDecl } from '$lib/record/schema.ts';
+  import { columnsFor, labelOf } from '$lib/record/api.ts';
+  import type { FieldDecl, RegisterDecl } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { wayOf } from './list.ts';
+  import { wayOf, type ListDefault } from './list.ts';
 
   let {
     open = $bindable(false),
@@ -28,6 +29,14 @@
     unsort,
     hide,
     showAll,
+    board,
+    lanes,
+    lane,
+    setLane,
+    kept,
+    isDefault,
+    keep,
+    forget,
   }: {
     open?: boolean;
     register: string;
@@ -42,10 +51,29 @@
     unsort: () => void;
     hide: (field: string, off: boolean) => void;
     showAll: () => void;
+    /** The list is drawn as a board, so which field its lanes are is a choice to offer. */
+    board: boolean;
+    /** The choice fields a board can be laid out by (`laneChoicesOf`). */
+    lanes: readonly FieldDecl[];
+    lane: string | undefined;
+    setLane: (field: string) => void;
+    /** Whether this person has a default kept for the list, and whether the list is drawn that way now. */
+    kept: ListDefault | null;
+    isDefault: boolean;
+    keep: () => void;
+    forget: () => void;
   } = $props();
 
   /* This part's own words: the order things were added in as one of the choices, and the direction's group. */
-  const words = { rowOrder: 'Order added', direction: 'Direction' } as const;
+  const words = {
+    rowOrder: 'Order added',
+    direction: 'Direction',
+    lanes: 'Lanes by',
+    keep: 'Keep as my default',
+    forget: 'Forget',
+    willOpen: (name: string) => `${name} will open this way for you, on this device.`,
+    opens: (name: string) => `${name} opens this way for you, on this device.`,
+  } as const;
 </script>
 
 <Sheet bind:open title={copy.display}>
@@ -117,6 +145,23 @@
       {/if}
     {/if}
 
+    <!-- WHICH FIELD THE BOARD'S LANES ARE, offered only while it is a board and there is more than one to choose.
+         Not on a phone either, which draws cards whatever the address says. -->
+    {#if board && lanes.length > 1}
+      <fieldset class="filter-group lanes-group">
+        <legend class="filter-legend">{words.lanes}</legend>
+        <div class="filter-values">
+          {#each lanes as f (f.id)}
+            {@const on = (lane ?? lanes[0]?.id) === f.id}
+            <label class="filter-value" data-on={on ? '' : undefined}>
+              <input type="radio" name="display-lane" value={f.id} checked={on} onchange={() => setLane(f.id)} />
+              {labelOf(f)}
+            </label>
+          {/each}
+        </div>
+      </fieldset>
+    {/if}
+
     <!-- NOT ON A PHONE. Below 640px the register draws cards, and a card shows the declaration's
          `mobile:` fields rather than the columns chosen here, so this section toggled six columns
          that were not drawn: fifteen controls in a sheet whose one useful act on a phone is
@@ -144,6 +189,20 @@
         {/each}
       </div>
     </fieldset>
+
+    <!-- ONE LINE TO KEEP IT, AND IT SAYS WHERE IT IS KEPT. A list opened with nothing in its address opens the way it
+         was kept; Clear still goes back to the list's own order. While the list is drawn as kept, the line says so
+         and the press becomes Forget. -->
+    <div class="keep">
+      {#if isDefault}
+        <p class="keep-line"><Icon name="check" size="s" />{words.opens(decl.name)}</p>
+        <Button weight="bare" onclick={() => forget()}>{words.forget}</Button>
+      {:else}
+        <Button weight="quiet" onclick={() => keep()}><Icon name="star" size="s" />{words.keep}</Button>
+        <p class="keep-line">{words.willOpen(decl.name)}</p>
+        {#if kept}<Button weight="bare" onclick={() => forget()}>{words.forget}</Button>{/if}
+      {/if}
+    </div>
   </div>
 
   {#snippet footer()}
@@ -257,8 +316,29 @@
     margin-block-start: calc(-1 * var(--sp-3));
   }
 
+  /* The default is its own short line under the choices it keeps, set off by a hairline. */
+  .keep {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--line);
+  }
+
+  .keep-line {
+    display: inline-flex;
+    flex: 1 1 16rem;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
   @media (width < 640px) {
-    .columns-group {
+    .columns-group,
+    .lanes-group {
       display: none;
     }
   }

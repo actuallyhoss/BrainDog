@@ -246,7 +246,8 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/u;
  *
  * IN THE ADDRESS, as `?view=board`, beside the filters and the sort: a link to a board opens on the board. The table
  * is the list's own shape and has no parameter, so every address written before the switch existed still opens as it
- * did. A board is asked for only where the list has lanes to draw (`laneFieldOf`); anywhere else it is the table.
+ * did. A board is asked for only where the list has lanes to draw (`laneFieldOf`); anywhere else it is the table. The
+ * field the lanes are is `?lane=`, chosen in Display, and absent means the state.
  */
 export type View = 'table' | 'board' | 'cards';
 
@@ -254,25 +255,38 @@ export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): Vi
   asked === 'cards' ? 'cards' : asked === 'board' && laneFieldOf(decl) ? 'board' : 'table';
 
 /**
- * THE FIELD A BOARD'S LANES ARE, which is the list's declared state: an enum of two to twelve values. A list with no
- * state has nothing to lay out in lanes, and a state of forty values is a table read sideways.
+ * THE FIELDS A BOARD CAN BE LAID OUT BY: every live choice field of two to twelve values, the list's state first and the
+ * rest in the order the list declares them. A choice of one value is one lane, and a choice of forty is a table read
+ * sideways, so neither is offered.
  */
-export function laneFieldOf(decl: RegisterDecl | undefined): FieldDecl | undefined {
-  const f = decl?.state ? decl.fields.find((x) => x.id === decl.state) : undefined;
-  const n = f?.values?.length ?? 0;
-  return f?.type === 'enum' && n >= 2 && n <= 12 ? f : undefined;
+export function laneChoicesOf(decl: RegisterDecl | undefined): FieldDecl[] {
+  const fit = (decl?.fields ?? []).filter((f) => {
+    const n = f.values?.length ?? 0;
+    return f.type === 'enum' && !f.retired && n >= 2 && n <= 12;
+  });
+  return [...fit.filter((f) => f.id === decl?.state), ...fit.filter((f) => f.id !== decl?.state)];
 }
 
-/** One lane of a board: a declared value and the rows in it, or `null` for the rows whose state is unset. */
+/**
+ * THE FIELD A BOARD'S LANES ARE: the one the address asks for (`?lane=priority`, chosen in Display) when it is one of the
+ * choices, else the list's state, else its first choice field. A list with no choice field has nothing to lay out in
+ * lanes and is never a board.
+ */
+export function laneFieldOf(decl: RegisterDecl | undefined, asked?: string | null): FieldDecl | undefined {
+  const choices = laneChoicesOf(decl);
+  return choices.find((f) => f.id === asked) ?? choices[0];
+}
+
+/** One lane of a board: a declared value and the rows in it, or `null` for the rows whose value is unset. */
 export type Lane = { value: string | null; entries: Entry[] };
 
 /**
- * THE ROWS IN LANES, one per declared value in the order the list declares them, and each lane in the order the rows
- * came. A row whose state is empty, or holds a value the list no longer declares, goes in a last lane of its own, drawn
- * only when it holds something: a row is never left off the board because its state is not one of the lanes.
+ * THE ROWS IN LANES, one per declared value of the lane field in the order the list declares them, and each lane in the
+ * order the rows came. A row whose value is empty, or holds one the list no longer declares, goes in a last lane of its
+ * own, drawn only when it holds something: a row is never left off the board because it is in none of the lanes.
  */
-export function lanesOf(decl: RegisterDecl | undefined, entries: readonly Entry[]): Lane[] {
-  const f = laneFieldOf(decl);
+export function lanesOf(decl: RegisterDecl | undefined, entries: readonly Entry[], asked?: string | null): Lane[] {
+  const f = laneFieldOf(decl, asked);
   if (!f) return [];
   const values = f.values ?? [];
   const lanes: Lane[] = values.map((value) => ({ value, entries: [] }));
@@ -283,6 +297,105 @@ export function lanesOf(decl: RegisterDecl | undefined, entries: readonly Entry[
     else lanes[at]!.entries.push(e);
   }
   return rest.length > 0 ? [...lanes, { value: null, entries: rest }] : lanes;
+}
+
+/* ── the way a person keeps a list: their default, on this device for now ─────────────────────────────────── */
+
+/**
+ * HOW ONE PERSON LIKES ONE LIST TO OPEN: its order, its view, the field its board is laid out by and the columns they
+ * hide. Each is what the address or the column cookie already says while they look; the default is that, kept, so a
+ * list opened with nothing in its address opens the way they left it rather than in the order it was declared.
+ *
+ * ON THIS DEVICE FOR NOW, in `localStorage` under the record, the person and the list, and Display says so. It is
+ * not a filter and not a view: which rows a person is looking at stays a saved view everyone can open.
+ */
+export type ListDefault = {
+  /** `field:dir`, as `?sort=` spells it. Absent is the list's own order. */
+  sort?: string | undefined;
+  view?: 'board' | 'cards' | undefined;
+  /** The field a board's lanes are, when it is not the one the board takes by itself. */
+  lane?: string | undefined;
+  hidden: string[];
+};
+
+/** Where one person's default for one list is kept. */
+export const defaultKey = (record: string, person: string, register: string): string =>
+  `bd.list-default:${record}:${person}:${register}`;
+
+/** The storage a default is kept in, as much of it as this needs, so a test can hand in a map or one that throws. */
+export type Keep = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+/**
+ * A KEPT DEFAULT READ BACK, or `null` for none. Anything that is not the shape is none, because the device is a place
+ * other code and other builds have written to, and a list that will not open is a worse answer than its own order.
+ * A store that throws (a private window, blocked site data) is none too.
+ */
+export function readDefault(store: Keep | null, key: string): ListDefault | null {
+  let raw: string | null = null;
+  try {
+    raw = store?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Record<string, unknown>;
+    if (!v || typeof v !== 'object') return null;
+    const text = (x: unknown) => (typeof x === 'string' && x !== '' ? x : undefined);
+    return {
+      sort: text(v.sort),
+      view: v.view === 'board' || v.view === 'cards' ? v.view : undefined,
+      lane: text(v.lane),
+      hidden: Array.isArray(v.hidden) ? v.hidden.filter((h): h is string => typeof h === 'string') : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps a default, or forgets it with `null`. Answers whether the device took it, and never throws. */
+export function writeDefault(store: Keep | null, key: string, d: ListDefault | null): boolean {
+  try {
+    if (!store) return false;
+    if (d) store.setItem(key, JSON.stringify(d));
+    else store.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What the screen shows right now, as a default: the address's order, view and lane, and the hidden columns. A lane
+ * left in the address after the board was switched off is not kept, since nothing on screen is laid out by it.
+ */
+export function defaultFrom(p: URLSearchParams, hidden: ReadonlySet<string>): ListDefault {
+  const view = p.get('view');
+  return {
+    sort: p.get('sort') || undefined,
+    view: view === 'board' || view === 'cards' ? view : undefined,
+    lane: (view === 'board' && p.get('lane')) || undefined,
+    hidden: [...hidden].sort(),
+  };
+}
+
+/** Whether two defaults would open the list the same way. */
+export const sameDefault = (a: ListDefault | null, b: ListDefault | null): boolean =>
+  JSON.stringify(a && { ...a, hidden: [...a.hidden].sort() }) === JSON.stringify(b && { ...b, hidden: [...b.hidden].sort() });
+
+/**
+ * THE ADDRESS A LIST OPENS ON UNDER A DEFAULT, held up against what the list declares now: an order by a field it no
+ * longer has is dropped, a board on a list with no lanes is dropped, a lane that is not a choice is dropped, and a
+ * hidden column it no longer has is dropped. The rest still applies. An empty answer is nothing to change.
+ */
+export function defaultParams(d: ListDefault, decl: RegisterDecl | undefined): { params: URLSearchParams; hidden: string[] } {
+  const fields = new Set(['seq', ...(decl?.fields.filter((f) => !f.retired).map((f) => f.id) ?? [])]);
+  const params = new URLSearchParams();
+  const [field, dir] = (d.sort ?? '').split(':');
+  if (field && fields.has(field)) params.set('sort', `${field}:${dir === 'desc' ? 'desc' : 'asc'}`);
+  if (d.view === 'cards' || (d.view === 'board' && laneFieldOf(decl))) params.set('view', d.view);
+  if (d.view === 'board' && d.lane && laneChoicesOf(decl).some((f) => f.id === d.lane)) params.set('lane', d.lane);
+  return { params, hidden: d.hidden.filter((h) => fields.has(h) && h !== decl?.title) };
 }
 
 /** Whether a row is in one of the list's finished states ("Paid", "Done"). */
@@ -504,7 +617,8 @@ export function figureSplit(
   label: (value: string) => string,
   titleOf: (e: Entry) => string,
 ): { items: { label: string; value: number }[]; reading: string } | null {
-  const lanes = lanesOf(decl, entries).filter((l) => l.value !== null);
+  /* BY STATE ONLY: the tile says where the money is in the list's own progress, whatever the board is laid out by. */
+  const lanes = decl.state && laneFieldOf(decl)?.id === decl.state ? lanesOf(decl, entries).filter((l) => l.value !== null) : [];
   const sum = (rows: readonly Entry[]) => rows.reduce((n, e) => n + (fig.valueOf(e) ?? 0), 0);
   const items =
     lanes.length > 0

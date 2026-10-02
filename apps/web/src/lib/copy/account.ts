@@ -380,25 +380,10 @@ export const account = {
   quietOwner: 'Only an owner can change these.',
   quietDefault: 'Put back 22:00 to 08:00',
   urgentKinds: 'Urgent',
-  /* WHAT THE RECORD ITSELF RAISES, AND THEN WHAT A RULE DOES. This said "a payment failing, a domain expiring inside 7
-     days" as if they were the product's own, and the kernel raises neither: `notify` in `digest.ts` interrupts for what
-     a rule declares `urgent: true`, and what it raises by itself is two things: a vault credential two days from
-     expiry (`vault.ts`), and a scheduled action held back, paused because its key is missing or refused or stopped at
-     its daily limit of calls from rules (`actions.ts`, whose `notify` the kernel routes with `urgent: true`). The first
-     rewrite named only the credential, and missed the action's three call sites. A payment and a domain
-     are what one use case's rules might say, not what BrainDog does. */
-  urgentKindsAre: 'A credential in the vault expiring inside 48 hours, a scheduled action held back because its key is missing or it reached its daily limit, and anything a rule marks urgent. Each rule says so itself, and adding an add-on shows which of its rules would interrupt you.',
   interruptCap: 'At most',
   interruptCapIs: 'One urgent interruption an hour.',
   unreadCount: 'Unread',
   unreadCountIs: 'One number, on the record, in one place.',
-  /* IT POINTED AT A SCREEN THAT DOES NOT EXIST. "Change the rule that raises it" is a route this
-     product has not got: there is no rules screen, no link, and nothing in the nav that reaches
-     one. Advice a reader cannot follow is worse than no advice, because they go looking. What is
-     true is that a rule raised it and the rule is named on the notification itself. */
-  /* "THERE IS NO SWITCH HERE" STOPPED BEING TRUE WHEN THE DEVICE ROW BELOW LANDED ON THE SAME SCREEN. What still has no
-     switch is muting one kind of interruption, which is what this sentence was always about. */
-  muteAtSource: 'There is no switch that mutes one of these. Each is raised by a rule, and the rule is named on it.',
 
   /* notifications on this device: Web Push, drawn only where the host has a key.
      THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */

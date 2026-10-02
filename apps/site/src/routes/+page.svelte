@@ -100,7 +100,7 @@
       <a class="onward" href="/slash">{h.slash.more}<Icon name="arrow" size="m" /></a>
     </div>
     <div class="frame">
-      <SlashPalette demo={site.slash.demo} />
+      <SlashPalette demo={h.slash.demo} />
     </div>
   </div>
 </section>

@@ -56,7 +56,7 @@
   import { listName } from '$lib/record/names.ts';
   import type { LivePageDecl } from '$lib/record/page-live.ts';
   import type { Patch } from '$lib/record/page-write.ts';
-  import type { BlockBody } from '$lib/record/pages-live.ts';
+  import type { BlockBody, PageBody } from '$lib/record/pages-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import AddBlock from '$lib/ui/AddBlock.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -75,6 +75,8 @@
     extra = $bindable(),
     showSource,
     reread,
+    install = null,
+    reopen = null,
   }: {
     arrangement: Arrangement;
     /** The page's address, which the arrangement is written against. */
@@ -90,6 +92,16 @@
     showSource: boolean;
     /** Reads the page again once the arrangement is written. */
     reread: () => Promise<void>;
+    /**
+     * The body a page drawn but not yet kept is installed as on its first write: Today or Decide, previewed by their
+     * screens and arranged through `home-arrange.ts`. `null` for a page the record holds, which is arranged in place.
+     */
+    install?: PageBody | null;
+    /**
+     * Opens the mode again after an edit, where the page is arranged from a read of its own rather than from the blocks
+     * drawn (a home, `home-arrange.ts`). `null` re-opens it over `all`.
+     */
+    reopen?: (() => void) | null;
   } = $props();
 
   const layout = $derived(layoutOf(page));
@@ -209,6 +221,7 @@
    */
   async function write(edit: { i: number; patch: Patch; name: string } | null): Promise<boolean> {
     if (saving) return false;
+    if (install) return keep(install, edit);
     saving = true;
     const title = page.title;
     const m = await import('$lib/record/page-write.ts');
@@ -239,8 +252,46 @@
     });
     if (edit) {
       await tick();
-      beginArrange();
+      if (reopen) reopen();
+      else beginArrange();
     }
+    return true;
+  }
+
+  /**
+   * THE FIRST WRITE ON A PAGE NOT KEPT YET INSTALLS IT, laid out as arranged and with the edit in it, and Put back
+   * retires it (`home-arrange.ts`). The shell is read again, so the screen reads the page it now holds before its preview.
+   * The mode closes after an edit too, since the page it was arranging now has an address of its own to be arranged at.
+   */
+  async function keep(body: PageBody, edit: { i: number; patch: Patch; name: string } | null): Promise<boolean> {
+    saving = true;
+    const [m, h] = await Promise.all([import('$lib/record/page-write.ts'), import('./home-arrange.ts')]);
+    const placed = arrangement.body.map((b) => ({
+      i: b.block,
+      span: b.span,
+      ...(b.area ? { area: b.area } : {}),
+      ...(edit && edit.i === b.block ? { edit: edit.patch } : {}),
+    }));
+    const laid = declared.length === body.blocks.length ? m.arrangedBody(body, placed, extra) : null;
+    const out = laid ? await m.setBody(apiBase(), laid) : { from: 'refused' as const, fix: copy.arrangeMoved };
+    saving = false;
+    if (out.from !== 'written') {
+      toasts.push(out.fix, { intent: 'warn' });
+      return false;
+    }
+    arrangement.commit();
+    await h.reboot();
+    await reread();
+    extra = [];
+    arrangement.slots = null;
+    toasts.push(edit ? blockWords.saved(edit.name) : copy.arranged(page.title), {
+      undo: () =>
+        void h.unkeep(apiBase(), body.page).then(async (back) => {
+          if (!back.ok) toasts.push(back.fix, { intent: 'warn' });
+          await h.reboot();
+          await reread();
+        }),
+    });
     return true;
   }
 
@@ -309,6 +360,7 @@
     {slug}
     index={editing.slot.i}
     added={addedBody(editing.slot.i)}
+    held={install && editing.slot.i < declared.length ? (install.blocks[editing.slot.i] ?? null) : null}
     block={editing.block}
     span={editing.slot.span}
     area={layout ? (editing.slot.area ?? 'main') : null}

@@ -1,6 +1,6 @@
 <!--
-  The list as white cards on the ground, from 640px up: in lanes by state (the board), or in one wrapping grid (the
-  cards). The design system draws content on white and lists on the ground, and a board is both: each lane is a column of the
+  The list as white cards on the ground, from 640px up: in lanes by state, or by the choice field Display chose (the
+  board), or in one wrapping grid (the cards). The design system draws content on white and lists on the ground, and a board is both: each lane is a column of the
   ground with its heading and a hairline under it, as a group on the ground is, and each row is a white card at level 1.
 
   A CARD SAYS WHAT A ROW IS AND WHEN IT IS DUE. The project's mark or the person's face, the title, the figure at the
@@ -19,7 +19,7 @@
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
-  import { display, identityFor } from '$lib/record/api.ts';
+  import { display, identityFor, labelOf } from '$lib/record/api.ts';
   import type { Names } from '$lib/record/remote.ts';
   import { isMoney, type Entry, type RegisterDecl } from '$lib/record/schema.ts';
   import Chip from '$lib/ui/Chip.svelte';
@@ -43,11 +43,12 @@
     more,
     receiptFor,
     openCardMenu,
+    lane,
     setRowState,
   }: {
     register: string;
     decl: RegisterDecl;
-    /** Lanes by state, or one grid. */
+    /** Lanes, or one grid. */
     mode: 'board' | 'cards';
     /** The rows to draw, already cut to `DOM_CAP` by the page. */
     entries: readonly Entry[];
@@ -64,19 +65,22 @@
     more: boolean;
     receiptFor: (seq: number) => Receipt | undefined;
     openCardMenu: (seq: number, el: HTMLElement) => void;
-    /** Absent for a caller whose level cannot change the list, and no card is draggable then. */
-    setRowState?: ((seq: number, state: string) => void) | undefined;
+    /** The field the lanes are, as Display chose it; absent is the list's state (`laneFieldOf`). */
+    lane?: string | undefined;
+    /** Absent for a caller whose level cannot change the list, and no card is draggable then. A card dropped in a
+        lane takes that lane's value of the lane field. */
+    setRowState?: ((seq: number, value: string, field?: string) => void) | undefined;
   } = $props();
 
   /* This part's own words. */
   const words = {
-    board: (name: string) => `${name} by state`,
+    board: (name: string, by: string) => `${name} by ${by.toLowerCase()}`,
     unset: 'Not set',
     empty: 'Nothing here',
   } as const;
 
-  const laneField = $derived(laneFieldOf(decl));
-  const lanes = $derived(mode === 'board' ? lanesOf(decl, entries) : []);
+  const laneField = $derived(laneFieldOf(decl, lane));
+  const lanes = $derived(mode === 'board' ? lanesOf(decl, entries, lane) : []);
   const faced = $derived(ofPeople(decl));
   const dated = $derived(deadlineOf(decl));
 
@@ -98,7 +102,7 @@
     return display(register, id, raw, now, names);
   }
 
-  /** What a lane is called: the state's own label, or "Not set" for the rows whose state is none of them. */
+  /** What a lane is called: the value's own label, or "Not set" for the rows whose value is none of them. */
   const laneSaid = (value: string | null): string => (value === null || !laneField ? words.unset : valueSaid(laneField, value));
 
   /* ── moving a card between lanes ────────────────────────────────────────── */
@@ -111,9 +115,10 @@
     const seq = dragging;
     dragging = null;
     over = null;
-    if (seq === null || value === null || !setRowState || !decl.state) return;
+    const field = laneField?.id;
+    if (seq === null || value === null || !setRowState || !field) return;
     const row = entries.find((e) => e.seq === seq);
-    if (row && String(row.fields[decl.state] ?? '') !== value) setRowState(seq, value);
+    if (row && String(row.fields[field] ?? '') !== value) setRowState(seq, value, field);
   }
 </script>
 
@@ -201,7 +206,7 @@
 {#if mode === 'board'}
   <!-- A REGION THAT SCROLLS SIDEWAYS, so a keyboard can reach it and a screen reader can name it. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="board" role="region" aria-label={words.board(decl.name)} tabindex="0">
+  <div class="board" role="region" aria-label={words.board(decl.name, laneField ? labelOf(laneField) : 'state')} tabindex="0">
     {#each lanes as lane (lane.value ?? '')}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <section

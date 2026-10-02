@@ -9,9 +9,9 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
-import { NOW, installSeed } from '@braindog/seed';
+import { NOW, PAGES, installSeed } from '@braindog/seed';
 
-import { page } from './fixtures/readers.ts';
+import { page, readBlock } from './fixtures/readers.ts';
 import { toSegments } from './blocks.ts';
 import { drawerOf } from '../page/kinds/index.ts';
 /* THE SAMPLE'S ROW NAMES, which a live tab learns from the record and this test asks the mirror about by name. */
@@ -110,7 +110,9 @@ test('THE CARDS IN PLAY SAY WHICH PROJECTS ARE NOT GOING WELL, with no table say
 });
 
 test('HOW THEY ARE GOING DRAWS EACH PART IN ITS INTENT, and a part nobody has said about stays neutral', () => {
-  const split = page('portfolio')!.blocks.find((b) => b.heading === 'How they are going')!;
+  /* DRAWN ONLY PAST FOUR PROJECTS IN PLAY, SINCE portfolio 1.12.0, so the sample's three are read without its `when:`. */
+  const declared = (PAGES.portfolio!.blocks as { heading?: string }[]).find((b) => b.heading === 'How they are going')!;
+  const split = readBlock({ ...declared, when: undefined } as never);
   const said = JSON.stringify(toSegments(split));
   for (const tone of ['good', 'warn', 'bad']) assert.ok(said.includes(`"tone":"${tone}"`), `no part is drawn ${tone}: ${said}`);
 });

@@ -451,7 +451,7 @@ export function metric(id: string): Metric {
          which `19 §2` names as one of the three spine screens. */
       note: none
         ? copy.nothingIn('Decisions')
-        : targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0]),
+        : targetLine({ format: 'int', target: { lte: 3 } } as Parameters<typeof targetLine>[0], QUEUE.length),
       ...(none ? {} : { tone: QUEUE.length > 3 ? ('warn' as const) : ('good' as const) }),
       href: '/decide',
     };

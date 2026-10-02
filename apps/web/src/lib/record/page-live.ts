@@ -561,6 +561,8 @@ function walkOf(v: unknown): Walk | null {
     ...(pastOf(v.past) ? { past: pastOf(v.past)! } : {}),
     /* THE WALK'S OWN LENGTH, `horizon: 'last'` resolved (kernel's `Runway.horizon`), for the horizon knob's readout. */
     ...(typeof v.horizon === 'number' ? { horizon: v.horizon } : {}),
+    /* AND HOW FAR IT WALKED PAST THAT, which the length control offers up to (`reach` rows, `blocks.ts`). */
+    ...(typeof v.reach === 'number' && Number.isInteger(v.reach) && v.reach > 0 ? { reach: v.reach } : {}),
   };
 }
 
@@ -1109,6 +1111,9 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
   return (path) => {
     if (!values || !Object.hasOwn(values, path)) return null;
     const v = values[path];
+    /* `<figure>.since` IS A DAY, said as the month a person would: "quiet since April", and the year only when it is not
+       this one. */
+    if (path.endsWith('.since') && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v)) return monthOf(v);
     if (typeof v === 'string') return v;
     if (typeof v === 'number') {
       if (Object.hasOwn(METRICS, path) && METRICS[path]?.format === 'day') return format('day', v);
@@ -1126,6 +1131,13 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     }
     return null;
   };
+}
+
+/** A day as its month, `April`, with the year when it is not this year's, `April 2025`. */
+function monthOf(day: string): string {
+  const at = new Date(`${day}T12:00:00Z`);
+  const month = at.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+  return at.getUTCFullYear() === new Date().getUTCFullYear() ? month : `${month} ${at.getUTCFullYear()}`;
 }
 
 /* A FILE'S NAME IS ITS HASH, and only a hash in the one shape the record writes is ever put in an address: a value an

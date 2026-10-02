@@ -190,6 +190,10 @@
   const openHref = (b: { register?: string | undefined; where?: string | undefined }): string | null =>
     b.register ? registerHref(b.register, b.where) : null;
 
+  /** How many days a forecast's walk ran: as far as it reached, else the length it opened on, else the block's. */
+  const walkedDays = (b: LiveBlock): number =>
+    typeof b.walk?.reach === 'number' ? b.walk.reach : typeof b.walk?.horizon === 'number' ? b.walk.horizon : typeof b.horizon === 'number' ? b.horizon : 180;
+
   /**
    * The predicate a reader sees, MINUS the clause that names the page they are already on.
    *
@@ -402,13 +406,15 @@
      1 of 21. Open Tasks for the rest" under one row of Today was a sentence about the page, read before the row. A
      BLOCK OVER NO LIST OPENS WHERE `o` DOES (`door.ts`), so "12 more" under what changed is Activity and not a count
      with nowhere to press. A FORECAST KEEPS ITS SENTENCE: its rows are days walked, and "120 more" would not say they
-     are days. -->
+     are days, AND IT COUNTS THEM OVER THE DAYS THE RECORD WALKED (`walk.reach`), which since a walk opens on a shorter
+     length than it runs to is further than the length it opened on: "of 1,825 over 90 days" counted five years under a
+     three-month label. -->
 {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded}
   {@const to = openHref(block)}
   {@const door = to && source ? to : block.register ? null : doorOf(block)}
   {#if block.source === 'forecast.runway'}
     <p class="block-slice" role="status">
-      {copy.ofWhichWalked(block.shown, block.total, typeof block.walk?.horizon === 'number' ? block.walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180)}.{#if to && source}{' '}
+      {copy.ofWhichWalked(block.shown, block.total, walkedDays(block))}.{#if to && source}{' '}
         <a class="tap" href={inApp(to)}>{copy.openTheRest(source)}</a>
       {/if}
     </p>

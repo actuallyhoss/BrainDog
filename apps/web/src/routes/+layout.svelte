@@ -160,7 +160,7 @@
      chunk for one word. Settings goes to `/settings`, the index of areas below 900px. */
   const USAGE = 'Usage';
   const places = $derived([
-    ...(spine.includes('inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
+    ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
     ['/slash', copy.suggestions, 'slash'],
     ['/automations', copy.automations, 'refresh'],
     ['/jobs', copy.jobs, 'play'],

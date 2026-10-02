@@ -101,6 +101,19 @@ test('WHAT GOOD LOOKS LIKE IS WHAT A PERSON SAYS, not an inequality', () => {
     assert.ok(!/[≤≥]/.test(said), `a glyph nobody types: ${said}`);
 });
 
+test('A LIMIT BESIDE ITS FIGURE SAYS NOTHING WHILE IT IS KEPT, and how far over once it is not', () => {
+  /* "Limit 5" under Kiln's 2 open was a rule nobody broke, said on every glance. */
+  assert.equal(targetLine({ format: 'int', target: { lte: 5 } } as MetricDecl, 2), '');
+  assert.equal(targetLine({ format: 'int', target: { lte: 5 } } as MetricDecl, 5), '', 'right at the limit is within it');
+  assert.equal(targetLine({ format: 'int', target: { lte: 5 } } as MetricDecl, 8), '3 over your limit');
+  assert.equal(targetLine({ format: 'money.GBP', target: { lte: 0 } } as MetricDecl, 0), '');
+  assert.equal(targetLine({ format: 'money.GBP', target: { lte: 2_000_000 } } as MetricDecl, 2_015_050), 'GBP 150.50 over your limit');
+  /* A FLOOR IS STILL SAID AS ONE, and with no figure a limit is said as the rule. */
+  assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl, 1), 'At least 3');
+  assert.equal(targetLine({ format: 'int', target: { lte: 5 } } as MetricDecl), 'Limit 5');
+  assert.equal(targetLine({ format: 'int', target: { lte: 5 } } as MetricDecl, null), 'Limit 5');
+});
+
 /* ── money and bare numbers, which is mixed too ──────────────────────────── */
 
 test('A METRIC REFUSES TO SUM MONEY WITH A UNITLESS NUMBER', () => {
