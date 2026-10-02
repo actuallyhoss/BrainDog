@@ -24,7 +24,7 @@ export const lists = {
   /* SAID WITHOUT SENDING ANYBODY ANYWHERE. This was "Open the row to change it", which was true while the row page
      edited types the grid did not. The two now ask the same `editable` (`field-draft.ts`), so a cell the grid refuses
      is a field the row refuses too, and a sentence sending the reader there sent them to a second refusal. */
-  cellNotEdited: (field: string, why: string) => `${field} is ${why}, so neither this list nor its row can change it.`,
+  cellNotEdited: (field: string, why: string) => `${field} is ${why}, so it cannot be changed here.`,
   /* ONE REASON PER TYPE THE GRID REFUSES, AND ONLY THOSE. The first version gave two reasons for six types, so `e`
      on an update's `When` answered *When is a row in another list*, which was not true of an instant: a wrong sentence
      is worse than the silence it replaced, because silence is not a claim. The grid then learnt to edit money, ref,
@@ -48,7 +48,7 @@ export const lists = {
   /* WHAT A ROW IS CALLED WHEN IT HAS NO NAME YET. `undoRowOf` puts the row's title in the control's
      accessible name, and a row typed into the capture line has a title only if the capture WAS the
      title; the grid falls back to `#<seq>`, which for a pending row is the negative sentinel. */
-  thisRow: 'this row',
+  thisRow: 'this one',
   undoRowOf: (row: string) => `Put ${row} back`,
   archiveRow: (row: string) => `Archive ${row}`,
   moreOn: (row: string) => `More on ${row}`,
@@ -78,7 +78,7 @@ export const lists = {
   addRow: 'Add',
   noneChosen: 'None',
   yes: 'Yes',
-  secretsLiveInTheVault: 'Passwords and keys go in the Vault. A row records what one opens.',
+  secretsLiveInTheVault: 'Passwords and keys go in the Vault. This records what one opens.',
   /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is
      disabled, and the register's own declaration is what says which fields cannot be left out — so
      the sentence names them rather than saying "some fields". */
@@ -119,8 +119,8 @@ export const lists = {
   columns: 'Columns',
   always: 'always',
   showAll: 'Show every column',
-  rowMenu: 'Actions for this row',
-  archive: 'Archive the row',
+  rowMenu: 'More actions',
+  archive: 'Archive it',
   selected: 'selected',
   clear: 'Clear the selection',
   /* The picker's two labels, written out rather than built by concatenation — the screenshot
@@ -186,7 +186,7 @@ export const lists = {
     return said.length < 2 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')}, and ${said.at(-1) ?? ''}`;
   },
   backToView: 'Back to the saved view',
-  rowsWord: (n: number) => (n === 1 ? 'row' : 'rows'),
+  rowsWord: (n: number) => (n === 1 ? 'item' : 'items'),
   select: 'Select',
   deselect: 'Deselect',
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
@@ -204,8 +204,8 @@ export const lists = {
   editRow: 'Edit',
   /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
      a word the product invented for a thing every other product calls a preview. */
-  peek: 'Preview the row',
-  openRow: 'Open the row',
+  peek: 'Preview',
+  openRow: 'Open',
   copyId: 'Copy number',
   copyLink: 'Copy link',
   includesExample: 'includes 1 example',
@@ -223,13 +223,13 @@ export const lists = {
   writeConflict: (row: string) => `${row} was changed somewhere else first. It now shows the latest version, so check it and try again.`,
   writeMarkSaved: 'Saved',
   writeBulk: (landed: number, total: number, state: string) =>
-    landed === total ? `${total} ${total === 1 ? 'row' : 'rows'} set to ${state}.` : `${landed} of ${total} rows set to ${state}.`,
+    landed === total ? `${total} ${total === 1 ? 'item' : 'items'} set to ${state}.` : `${landed} of ${total} set to ${state}.`,
   noteLabel: 'Add a note',
   notePlaceholder: 'Write a note…',
   noteAdd: 'Add note',
-  writeArchivedSome: (landed: number, total: number) => `${landed} of ${total} rows archived.`,
+  writeArchivedSome: (landed: number, total: number) => `${landed} of ${total} archived.`,
   writeMarkRestored: 'Restored',
-  viewEmpty: 'No rows match this view yet.',
+  viewEmpty: 'Nothing matches this view yet.',
   viewTitle: (list: string, reads: string) => `${list}: ${reads}`,
   viewSaved: (title: string) => `Saved ${title}. It is under Views.`,
   viewNeedsFilter: 'Filter or search the list first. What is on screen is what a view saves.',
@@ -260,10 +260,10 @@ export const lists = {
   rowRestore: 'Put back',
   rowRestored: (what: string) => `${what} is back.`,
   /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */
-  rowArchivedNote: 'This row is archived. It is left out of every list until it is put back.',
+  rowArchivedNote: 'This is archived. It is left out of every list until it is put back.',
   /* What points at this row, when the record refuses that read alone: the sections are absent and the
      reason is said once, rather than the page looking like nothing points here. */
-  linksRefused: 'What points at this row could not be read',
+  linksRefused: 'What points here could not be read',
   /* WHICH FIELD POINTS HERE, and only where two of one list's fields do: a milestone's page headed its choices
      "Choices milestone 1", which is the field's id read as part of the heading. */
   linkedThrough: (field: string) => `through ${field.toLowerCase()}`,

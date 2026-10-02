@@ -73,7 +73,7 @@ export const pages = {
   kindNames: {
     bar: 'Bar chart',
     gauge: 'Gauge',
-    chips: 'Facts in a row',
+    chips: 'Facts side by side',
     spec: 'Label and value',
     params: 'Settings',
     todo: 'To-do list',
@@ -81,7 +81,7 @@ export const pages = {
     timeline: 'Timeline',
     board: 'Board',
     comparison: 'Comparison table',
-    table: 'Table of rows',
+    table: 'Table',
     note: 'Note',
     quote: 'Quote',
     code: 'Code',
@@ -102,7 +102,7 @@ export const pages = {
   kinds: {
     bar: 'amounts side by side, biggest first',
     gauge: 'one number against its target',
-    chips: 'a few short facts in a row',
+    chips: 'a few short facts side by side',
     spec: 'label, value, note. The workhorse',
     params: 'settings and their values',
     todo: 'things to do, with a date',
@@ -125,7 +125,7 @@ export const pages = {
   } as Record<string, string>,
   arrangeNothing: 'Nothing moved.',
   arranged: (title: string) => `${title} rearranged.`,
-  arrangeTemplate: 'This page is drawn once for each row from one shared layout, so it cannot be rearranged from one of those rows.',
+  arrangeTemplate: 'This page is drawn once for each item from one shared layout, so it cannot be rearranged from one of those items.',
   arrangeMoved: 'This page changed while it was being arranged. Open it again, then arrange it.',
   blockAddedLive: (name: string) => `Added a ${name}. Press Done to keep it.`,
 
@@ -187,7 +187,7 @@ export const pages = {
   /** The heading over one currency's chart, when a chart is drawn once per currency. */
   inCurrency: (currency: string) => `In ${currency}`,
   noSources: 'Nothing feeds this record yet',
-  noSourcesWhy: 'A connector pulls rows in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
+  noSourcesWhy: 'A connector pulls things in on a schedule from a mailbox, a bank feed or a repository, and reports here when it fails.',
   ingestPrompt: 'read my record, then set up a connector for the mailbox I file invoices in',
 
   /** Names the source block so tabbing into it says which page it is the workings of. */
@@ -226,13 +226,13 @@ export const pages = {
        what is coming: the reader knows what a payment is and does not have to be taught. */
     `The next ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')} payments in and out over ${days} days`,
   pageRowConflict: (title: string) => `${title} was changed somewhere else first. The page has been read again, so try once more.`,
-  pageRowUnknown: 'This could not be saved from here, because the page did not say which row it is.',
+  pageRowUnknown: 'This could not be saved from here, because the page did not say which item it is.',
   pageRowNoState: 'This could not be saved from here, because its list has no state to mark it done with.',
   /* A path's own add line (`page/AddStep.svelte`), and what it says when the record did not say where a step goes. */
   pathStepAdd: 'Add a step',
   pathStepNew: 'A new step',
   pathStepAdded: (title: string) => `Added ${title}.`,
-  pathStepNowhere: 'A step could not be added from here, because nothing says which row these steps belong to.',
+  pathStepNowhere: 'A step could not be added from here, because nothing says which item these steps belong to.',
   /* Lane O: the page's source as a file. The name is on the button because the name is the point —
      one page, one file, called what the declaration's first line calls it. */
   pageSourceSave: (file: string) => `Download ${file}`,
@@ -248,5 +248,5 @@ export const INPUTS_SAID = {
   comma: 'A comma here only groups thousands, as in 1,250.50. Write a part of one with a point: 1.20, not 1,20.',
   noCurrency: (typed: string): string => `Nothing says which currency this is in yet, so type its three-letter code with the figure, as USD ${typed}.`,
   changed: (label: string, now: string, typed: string): string =>
-    `This row was changed somewhere else while you typed, and ${label} now holds ${now}. What you typed, ${typed}, was not written: type it again to write it over.`,
+    `This was changed somewhere else while you typed, and ${label} now holds ${now}. What you typed, ${typed}, was not written: type it again to write it over.`,
 } as const;

@@ -490,7 +490,7 @@ test('"IF" IS A BRANCH AND SAYS SO: its arms are "If so" and "If not", and the c
 
 /*
  * A TREE CONDITION WAS LOST BETWEEN THE CARD AND THE FILE. An installed rule that tags only bills above 500 drew
- * its trigger card as "When a row in bills is added or changed", because `draftOf` put a tree `when` in `rest` where
+ * its trigger card as "When an item in bills is added or changed", because `draftOf` put a tree `when` in `rest` where
  * nothing drew it; typing a sentence then filed the tree anyway, because `...others` came after `...when`; and switched
  * to a clock, `faultsOf` said nothing while the record refused the body on Send.
  */
@@ -499,14 +499,14 @@ const bigBills = { rule: 'paid-tag', register: 'bills', when: { field: 'amount',
 test('C2: A TREE CONDITION IS HELD IN THE DRAFT WHERE THE CARD CAN SEE IT, and a typed sentence is what gets filed', () => {
   const d = draftOf('paid-tag', bigBills);
   assert.deepEqual(d.whenTree, { field: 'amount', gt: 500 }, 'the tree is the draft’s, not hidden in rest');
-  assert.equal(sayStart(d), 'When a row in bills is added or changed, only when amount is more than 500');
+  assert.equal(sayStart(d), 'When an item in bills is added or changed, only when amount is more than 500');
   assert.deepEqual(bodyOf(d), bigBills, 'opened and not touched, it files what it read');
   const typed = { ...d, when: 'what is Rent' };
   assert.equal(bodyOf(typed).when, 'what is Rent', 'the sentence the person typed is the one filed');
-  assert.equal(sayStart(typed), 'When a row in bills is added or changed, only when what is Rent', 'and the card says the one filed');
+  assert.equal(sayStart(typed), 'When an item in bills is added or changed, only when what is Rent', 'and the card says the one filed');
   assert.deepEqual(bodyOf({ ...typed, when: '  ' }).when, bigBills.when, 'the box emptied again, the tree it opened with comes back');
   const deep = draftOf('x', { ...bigBills, when: { any: [{ field: 'amount', gt: 500 }, { field: 'what', is: 'Rent' }] } });
-  assert.equal(sayStart(deep), 'When a row in bills is added or changed, only when the condition holds', 'a tree the builder cannot read is still named');
+  assert.equal(sayStart(deep), 'When an item in bills is added or changed, only when the condition holds', 'a tree the builder cannot read is still named');
 });
 
 test('A SWITCH AWAY FROM A CHANGE TAKES THE CONDITION WITH IT, both forms, and an edit of the change keeps it', () => {

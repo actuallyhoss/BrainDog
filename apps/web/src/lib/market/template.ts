@@ -47,7 +47,7 @@ export type Template = {
 export const templateWords = {
   open: 'Share as a template',
   title: 'Share as a template',
-  lead: 'An add-on of this page alone, for somebody else to install. No rows go in: each project, person or row it filters on becomes a setting they pick.',
+  lead: 'An add-on of this page alone, for somebody else to install. None of what it shows goes in: each project, person or item it filters on becomes a setting they pick.',
   reading: 'Reading the page',
   unread: 'The record answered in a way this version of BrainDog does not read.',
   addsPage: (title: string): string => `The page ${title}`,

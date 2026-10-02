@@ -20,4 +20,17 @@ export const words = {
   bindTitle: 'Which list to show',
   bindWhy: 'This page shows no list yet. Choose the list it should show.',
   bindNone: 'This record has no list yet, so anything added here would have nothing to show.',
+  /**
+   * A captured line's receipt: the row by its words, the list it went to, what the line said beside its words ("Due Thu
+   * 1 Oct", "Kiln"), and what was filled on the reader's behalf.
+   */
+  added: (what: string, list: string, read: readonly string[], filled: readonly string[]) =>
+    `Added “${what}” to ${list}${read.length > 0 ? ` · ${read.join(' · ')}` : ''}${filled.length > 0 ? `, with ${and(filled)} filled in` : ''}.`,
+  /** A long block folded in place: what is under the fold, one press away. */
+  more: (n: number) => `${n} more`,
 } as const;
+
+/** "a", "a and b", "a, b and c". */
+function and(parts: readonly string[]): string {
+  return parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+}

@@ -89,6 +89,13 @@ test('a question is told from a thing to do', () => {
   assert.equal(isQuestion(''), false);
 });
 
+test('a task that opens with do, have, is, can or will is still a task, unless a question follows the word', () => {
+  for (const task of ['Do expenses', 'Have the car serviced', 'Do my taxes', 'Can tomatoes for winter', 'Will review', 'When back, call mum', 'What to buy for mum', "Don't forget the milk", 'Do it today', 'Have it fixed by Friday', 'When I get home, call mum', 'Where we keep the keys'])
+    assert.equal(isQuestion(task), false, task);
+  for (const asked of ['Have I paid rent', 'Do we owe Halden anything', 'Is the rent paid', 'Is there anything late', 'Can you chase Halden', 'Who owes me money', "What's due", 'Where’s the contract', 'How many invoices are open', 'When is rent due', 'Did Halden pay?', 'Does it need signing', 'Is it paid', 'What do I owe Halden'])
+    assert.equal(isQuestion(asked), true, asked);
+});
+
 test('a new task is written with the state for new work, the line, and the filter standing in for a project', () => {
   const s = shapeOf(SEED.tasks as unknown as RegisterDecl);
   const c = contextOf(s, '2026-09-29', ctx.projects);

@@ -15,6 +15,10 @@
  *
  * A REFUSAL IS SAID IN THE PERSON'S WORDS ("Money was not added.") with the record's own sentence kept beside it for
  * Details and for the log. Whatever went in stays in: an install is not undone because a later step was refused.
+ *
+ * AND A FILE THE PERSON POINTED AT GOES IN LAST, once the list it maps into is there: a list this build ships is
+ * installed with the rest, and a list of the file's own is filed as a change and accepted in this press, as what Slash
+ * drafted is. Its entries are the file's, each checked against the list before it is sent (`lib/start/export.ts`).
  */
 
 import type { createClient } from '@braindog/client';
@@ -25,6 +29,8 @@ import { firstRun } from '../../lib/first-run.ts';
 import { packDocument, relabelDocument, type PackState } from '../../lib/record/packs.ts';
 import { fileDrafted, type Drafted, type SlashClient } from '../../lib/record/slash.ts';
 import { hear, introduce, personRow, PEOPLE } from '../../lib/who.ts';
+import { allLists } from '../../lib/start/lists.ts';
+import { entriesOf, newListDeclarations, ownList, type Export, type Mapping } from '../../lib/start/export.ts';
 import type { Proposal } from '../../lib/start/propose.ts';
 import { afterInstall, installShared, keepVoice, planShared, speakingStates } from '../packs/sharing.ts';
 import { words } from './preview.ts';
@@ -57,6 +63,9 @@ export type Accepting = {
    * lists, figures and pages, filed and accepted in this same press. Its sample rows are never written.
    */
   drafted?: Drafted | null;
+  /** A file the person pointed at and how it maps, when they kept it, and the language its days are read in. */
+  imported?: { file: Export; mapping: Mapping } | null;
+  locale?: string;
 };
 
 /** One thing that was not made: the person's sentence and the record's. */
@@ -117,8 +126,18 @@ async function packsOf(client: Client): Promise<{ ok: true; value: PackState[] }
 /** A module by the name a person knows it by. */
 const nameOf = (id: string): string => moduleName(id);
 
+/**
+ * A MODULE'S LISTS IN THE PERSON'S OWN WORDS: "Shops" for Projects where that is what they called them. The list's name
+ * is the module's declaration, so renaming it here is what the record keeps and Settings can rename again.
+ */
+export function named(doc: Record<string, unknown> | null, names: Readonly<Record<string, string>> | undefined): Record<string, unknown> | null {
+  if (doc === null || names === undefined || !Array.isArray(doc.declarations)) return doc;
+  const declarations = (doc.declarations as Body[]).map((d) => (typeof d.register === 'string' && names[d.register] ? { ...d, name: names[d.register] } : d));
+  return { ...doc, declarations };
+}
+
 /** Install one module alone, for a proposal with no use case: planned, then installed with exactly that plan's hash. */
-async function addModule(client: Client, id: string, held: readonly PackState[]): Promise<string | null> {
+async function addModule(client: Client, id: string, held: readonly PackState[], names?: Readonly<Record<string, string>>): Promise<string | null> {
   const state = held.find((p) => p.id === id);
   if (state) {
     if (state.disabled_at === null) return null;
@@ -127,7 +146,7 @@ async function addModule(client: Client, id: string, held: readonly PackState[])
     const on = (await client.enablePack({ id })) as Wire<unknown>;
     return on.ok ? null : fixOf(on, '');
   }
-  const doc = await packDocument(id, held);
+  const doc = named(await packDocument(id, held), names);
   if (!doc) return '';
   const planned = (await client.planPack({ doc, source: { kind: 'local' } })) as Wire<{ diff?: { planHash?: unknown; approve?: unknown } }>;
   if (!planned.ok) return fixOf(planned, '');
@@ -165,7 +184,10 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   const held = await packsOf(client);
   if (!held.ok) return { failed: [{ said: firstRun.notAllMade, why: held.why }], left: asked.proposal.rows, nav, filed: false };
   let states = held.value;
-  const who = hear(asked.sentence);
+  /* THE NAME THE PROPOSAL CARRIES, which the model may have read where the rules did not; the words after it stay the note. */
+  const heard = hear(asked.sentence);
+  const who = asked.proposal.name === heard.name ? heard : { name: asked.proposal.name, bio: heard.name === null ? heard.bio : asked.sentence.trim() };
+  const names = asked.proposal.names;
   const u = asked.usecase === null ? null : (useCase(asked.usecase) ?? null);
   /* PEOPLE IS NEVER TURNED BACK ON BEHIND SOMEBODY WHO TURNED IT OFF. A name heard in the
      sentence keeps People in the proposal, and on a record where it is off that name is said back and stored nowhere;
@@ -180,7 +202,13 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
     /* THE CHOSEN ONE CARRIES WHAT THE PERSON KEPT; ONE BESIDE IT CARRIES ITS OWN MODULES, all in by then. */
     const file = await fileFor(one, one === u ? modules : one.modules, asked.today, who.bio);
     if (!file) continue;
-    const planned = await planShared(client, { text: JSON.stringify(file), source: 'local' }, states, (m, h, id) => packDocument(m, h, id), (m, h, id) => relabelDocument(m, h, id));
+    const planned = await planShared(
+      client,
+      { text: JSON.stringify(file), source: 'local' },
+      states,
+      async (m, h, id) => named(await packDocument(m, h, id), names),
+      async (m, h, id) => named(await relabelDocument(m, h, id), names),
+    );
     if (!planned.ok) {
       failed.push({ said: firstRun.notAdded(one.title), why: planned.fix });
       continue;
@@ -197,7 +225,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   }
   if (!u)
     for (const id of modules) {
-      const refused = await addModule(client, id, states);
+      const refused = await addModule(client, id, states, names);
       if (refused !== null) failed.push({ said: firstRun.notAdded(nameOf(id)), why: refused });
       const now = await packsOf(client);
       if (now.ok) states = now.value;
@@ -280,5 +308,57 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
     left.push({ register: row.register, fields, ...(still === undefined ? {} : { party: still }) });
   }
 
+  /* ── the file they pointed at ─────────────────────────────────────────── */
+  if (asked.imported) {
+    const now = await packsOf(client);
+    if (now.ok) states = now.value;
+    /* THE CURRENCY THE PREVIEW DREW THE FILE IN: the one chosen for Money, or the one typed where Money is not kept. */
+    const done = await importFile(client, asked.imported, asked.currency ?? asked.proposal.currency, asked.locale ?? 'en', states);
+    failed.push(...done);
+  }
+
   return { failed, left, nav, filed };
+}
+
+/** How many entries go to the record at once: enough to be quick, few enough not to crowd one record. */
+const AT_ONCE = 4;
+
+/**
+ * THE FILE'S ENTRIES, WRITTEN INTO THE LIST IT MAPS TO: a list of its own filed and accepted first, as a drafted change
+ * is, then each entry checked against its list and created. What could not be written is one line, with how many and
+ * the record's first sentence for why; nothing else of the press is undone for it.
+ */
+export async function importFile(
+  client: Client,
+  imported: { file: Export; mapping: Mapping },
+  currency: string | null,
+  locale: string,
+  states: readonly PackState[],
+): Promise<NotMade[]> {
+  const { file, mapping } = imported;
+  let own = undefined;
+  if (mapping.list === null) {
+    const taken = [...new Set([...states.flatMap((p) => p.registers), ...allLists().map((l) => l.id)])];
+    own = ownList(file, mapping.name, currency, locale, taken);
+    const change: Drafted = { question: firstRun.importAsk(mapping.name), change: { to: { declarations: newListDeclarations(own, mapping.summary) } }, rows: {}, preview: { pages: [] } };
+    const kept = await fileDrafted(client as unknown as SlashClient, change, true);
+    if (kept.kind !== 'kept') return [{ said: firstRun.importNotMade(mapping.name), why: kept.kind === 'refused' ? kept.fix : (kept.fix ?? '') }];
+  } else if (!states.some((p) => p.disabled_at === null && p.registers.includes(mapping.list ?? ''))) {
+    return [{ said: firstRun.importNotMade(mapping.name), why: '' }];
+  }
+  const out = entriesOf(file, mapping, currency, locale, own);
+  const queue = [...out.fields];
+  let refused = 0;
+  let why = '';
+  const worker = async () => {
+    for (let fields = queue.shift(); fields !== undefined; fields = queue.shift()) {
+      const wrote = (await client.create({ register: out.register, fields }).catch(() => null)) as Wire<unknown> | null;
+      if (wrote?.ok) continue;
+      refused++;
+      if (why === '') why = wrote ? fixOf(wrote, '') : '';
+    }
+  };
+  await Promise.all(Array.from({ length: AT_ONCE }, worker));
+  const missed = refused + out.skipped;
+  return missed === 0 ? [] : [{ said: firstRun.importMissed(missed, file.entries.length, mapping.name), why }];
 }

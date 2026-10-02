@@ -13,7 +13,7 @@
 
 export const query = {
   /** The group's own control: how its conditions join. A condition row says the rest of the sentence. */
-  queryJoin: 'Rows matching',
+  queryJoin: 'Show what matches',
   /** The three joins `docs/21 §4.1` names, as a person says them. */
   queryAll: 'all of these',
   queryAny: 'any of these',
@@ -31,7 +31,7 @@ export const query = {
   /** The depth meter beside Add a group, which stands in for an error at the cap. */
   queryDepth: (at: number, cap: number): string => `Groups ${at} of ${cap} deep`,
   /** Nothing narrows yet. */
-  queryEverything: 'Every row. Add a condition to narrow it.',
+  queryEverything: 'Everything. Add a condition to narrow it.',
   /** A value that is a choice, before one is made. */
   queryChoose: 'Choose',
   /** A yes-or-no field's two answers. */
@@ -49,7 +49,7 @@ export const query = {
   queryCouldNotRead: (after: string | null): string => (after ? `Could not read after "${after}"` : 'Could not read the first condition'),
   queryNoSentence: 'Groups cannot be written as one sentence, so the text here only reads.',
   /** A filter the record holds that the rows above cannot draw, kept whole rather than dropped. */
-  queryUndrawn: 'Part of this filter cannot be drawn as rows. It still applies as it is.',
+  queryUndrawn: 'Part of this filter cannot be shown here. It still applies as it is.',
   /** The count under the builder: the record's own answer for the list and this filter. */
   queryMatches: (n: number, of: number): string => `Matches ${n} of ${of}`,
   queryCounting: 'Counting',

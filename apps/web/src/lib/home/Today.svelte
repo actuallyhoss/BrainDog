@@ -1,10 +1,13 @@
 <!--
-  Today: the screen every record opens on, and the one the owner reads first each morning.
+  Today as it was drawn by hand, before it was a declared page: what needs you, who is working, what changed and money.
 
-  Under the title, one sentence says what the morning holds, with the one phrase that needs him in red. Then the next
-  two weeks as a strip of days. On the left, on the ground: what needs you, with its verbs and their keys, and the days
-  coming up under it. On the right, three tiles: the agents at work and their day as swimlanes, what changed since you
-  were last here, and cash with the walk ahead.
+  Under the title, one sentence says what the morning holds, with the one phrase that needs him in red. On the left:
+  what needs you, the next two weeks as a strip of days, and the days coming up. On the right, up to three tiles: the
+  agents at work and their day as swimlanes, what changed since you were last here, and cash with the walk ahead.
+
+  CALM BEFORE RICH (DIRECTION §35). Nothing is drawn to say it is empty: with nothing needing you the sentence says so
+  and the list is not drawn, and a tile with nothing to show is not drawn either. A row's verbs and the keys appear on
+  hover or focus, never standing; `?` lists every key.
 
   A SITUATION, NOT A BOARD. What needs you is unfiltered: open questions answered where they are shown, work past its
   day, work handed back to be checked, work due today and work marked urgent, and money late or due today. A section a
@@ -22,7 +25,8 @@
   Enter opens it, 1 to 9 answer the question under it, and n opens the line a task is typed into. None of them is `/`,
   `?` or `g`, which are the shell's, and a `g` pressed first leaves the key after it to the shell.
 
-  The page the record used to open on is kept at `/?overview`, under More (`routes/+page.svelte`).
+  KEPT AT `/?classic` (`routes/+page.svelte`) while Today is drawn as a declared page (`Home.svelte`), until that page
+  does all this one does; `/` and `/?overview` both open the declared one.
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
@@ -85,7 +89,6 @@
   /* THE PLAIN WORDS THIS SCREEN SAYS, kept beside it. */
   const words = {
     needs: 'Needs you',
-    needsNone: 'Nothing needs you right now.',
     today: 'due today',
     urgent: 'urgent',
     review: 'waits on your review',
@@ -93,21 +96,15 @@
     showMore: (n: number) => `${n} more that need you`,
     showFewer: 'Show fewer',
     agentsTile: 'Agents working',
-    allOn: (host: string) => `all on ${host}`,
-    workingNone: 'No agent is working right now.',
     doingNothing: 'has not said what it is doing',
     working: (n: number) => (n === 1 ? 'One is working now.' : `${n} are working now.`),
     since: 'Since you were here',
-    sinceNone: 'Nothing new since you were last here.',
     sinceSubject: 'What changed since you were last here',
     activity: 'Activity',
     money: 'Money',
     cash: 'Cash',
     cashNow: 'Cash now',
-    cashNone: 'No account counts as cash yet.',
     week: 'The next two weeks',
-    coming: 'Coming up',
-    openWork: 'Open Work',
     moreOn: (n: number) => `${n} more on Work`,
     agent: (name: string) => name.charAt(0).toUpperCase() + name.slice(1),
     onIt: (name: string) => `${name.charAt(0).toUpperCase() + name.slice(1)} is on it`,
@@ -400,6 +397,15 @@
   };
   const cashTile = $derived(lead !== null && (forecast !== null || bookParts.length > 0));
 
+  /* ── what is drawn at all ──────────────────────────────────────────────────── */
+
+  /* A TILE WITH NOTHING TO SAY IS NOT DRAWN: no agent at work, nothing new since the mark, no cash counted. The sentence
+     at the top already says the quiet half, and the main column takes the width when the side holds nothing. */
+  const agentsShown = $derived(Boolean(t && (t.runs.length > 0 || sessions.length > 0)));
+  const sinceShown = $derived(Boolean(t && t.since.total > 0));
+  const cashShown = $derived(Boolean(money && ((lead && cashTile) || money.cash.length > 0)));
+  const sideShown = $derived(agentsShown || sinceShown || cashShown);
+
   /* ── the keyboard ──────────────────────────────────────────────────────────── */
 
   type Keyed = { key: string; href: string; tick: Tickable | null; question: boolean };
@@ -513,7 +519,7 @@
 
 <svelte:head><title>{titleOf(copy.today)}</title></svelte:head>
 
-<PageHead title={copy.today} count={t ? needing : undefined} sentence={said?.text} needs={said?.needs || undefined} led={Boolean(t && said)}>
+<PageHead title={copy.today} sentence={said?.text} needs={said?.needs || undefined} led={Boolean(t && said)}>
   {#snippet actions()}
     {#if takesTasks && !data.refused}
       <button
@@ -539,50 +545,39 @@
   {:else if today.state !== 'ready' && today.state !== 'empty'}
     <ReadState state={today.state} refusal={today.refusal} onretry={() => void today.reread()} />
   {:else if t}
-    <div class="today">
-      <!-- ══ THE NEXT TWO WEEKS ══ -->
-      <div class="t-week">
-        <Tile aria-label={words.week}>
-          <WeekStrip days={strip} today={day} subject={words.week} />
-          <p class="reading">{stripSaid}</p>
-        </Tile>
-      </div>
-
-      <!-- ══ THE LEAD TILE: the day, the sentence, and what needs you ══ -->
-      <div class="t-needs tile">
-        {#if said}
-          <LeadHead meta={daySaid(day)} sentence={said.text} needs={said.needs || undefined}>
-            {#snippet aside()}
-              {#if keyed.length > 0}
-                <span class="hints" aria-hidden="true">
-                  <Kbd keys="j" /><Kbd keys="k" /><span class="hint">{words.keys.move}</span>
-                  {#if mayWrite}<Kbd keys="x" /><span class="hint">{words.keys.done}</span>{/if}
-                  <Kbd keys="↵" /><span class="hint">{words.keys.open}</span>
-                  {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
-                </span>
-              {/if}
-              {#if takesTasks}
-                <button
-                  type="button"
-                  class="add tap"
-                  aria-label={words.addTask}
-                  title={words.addTip}
-                  aria-expanded={capturing}
-                  aria-controls={capturing ? 'today-capture' : undefined}
-                  onclick={() => (capturing ? closeCapture() : void openCapture())}
-                >
-                  <Icon name="plus" size="l" />
-                </button>
-              {/if}
-            {/snippet}
-          </LeadHead>
-        {/if}
-        <Section title={words.needs} count={needing}>
-          {#snippet aside()}
-            {#if data.lists.some((l) => l.id === TASKS)}
-              <a class="aside-link tap" href={at('/?work')}>{words.openWork}<Icon name="arrow" size="s" /></a>
-            {/if}
-          {/snippet}
+    <div class="today" data-alone={sideShown ? undefined : ''}>
+      <div class="t-main">
+        <!-- ══ THE LEAD TILE: the day, the sentence, and what needs you ══ -->
+        <div class="t-needs tile" data-quiet={needing === 0 && !capturing ? '' : undefined}>
+          {#if said}
+            <LeadHead meta={daySaid(day)} sentence={said.text} needs={said.needs || undefined}>
+              {#snippet aside()}
+                <!-- THE KEYS SHOW ONCE THE KEYBOARD IS IN THE LIST, never before: a reader with a mouse never meets them,
+                     and `?` lists them all. -->
+                {#if keyed.length > 0}
+                  <span class="hints" aria-hidden="true">
+                    <Kbd keys="j" /><Kbd keys="k" /><span class="hint">{words.keys.move}</span>
+                    {#if mayWrite}<Kbd keys="x" /><span class="hint">{words.keys.done}</span>{/if}
+                    <Kbd keys="↵" /><span class="hint">{words.keys.open}</span>
+                    {#if t.questions.length > 0}<Kbd keys="1" /><Kbd keys="2" /><Kbd keys="3" /><span class="hint">{words.keys.answer}</span>{/if}
+                  </span>
+                {/if}
+                {#if takesTasks}
+                  <button
+                    type="button"
+                    class="add tap"
+                    aria-label={words.addTask}
+                    title={words.addTip}
+                    aria-expanded={capturing}
+                    aria-controls={capturing ? 'today-capture' : undefined}
+                    onclick={() => (capturing ? closeCapture() : void openCapture())}
+                  >
+                    <Icon name="plus" size="l" />
+                  </button>
+                {/if}
+              {/snippet}
+            </LeadHead>
+          {/if}
 
           {#if capturing}
             <form class="capture" id="today-capture" onsubmit={ask}>
@@ -608,166 +603,171 @@
             </form>
           {/if}
 
-          {#if needing === 0}
-            <p class="none">{words.needsNone}</p>
-          {:else}
-            <ul class="ledger ledger-lead rows">
-              {#each shownNeeds as n (n.key)}
-                <li data-row={n.key} data-cursor={cursor === n.key ? '' : undefined} data-needs onfocusin={() => (cursor = n.key)}>
-                  {#if n.kind === 'question'}
-                    <Question bind:this={answers[n.key]} question={n.q} now={t.now} onanswered={answered} />
-                  {:else if n.kind === 'task'}
-                    {@render taskRow(n.task, n.href, true)}
-                  {:else}
-                    {@render billRow(n.bill, n.href, true)}
-                  {/if}
-                </li>
-              {/each}
-              {#if needs.length > FIRST}
-                <li>
-                  <button type="button" class="line line-short more-row" aria-expanded={unfolded} onclick={() => (unfolded = !unfolded)}>
-                    <span class="line-mark more-mark" data-open={unfolded ? '' : undefined}><Icon name="chevron" size="m" /></span>
-                    <span class="line-main"><span class="line-title">{unfolded ? words.showFewer : words.showMore(needs.length - FIRST)}</span></span>
-                  </button>
-                </li>
-              {/if}
-              {#if moreQuestions > 0}
-                <li>
-                  <a class="line line-short more-row" href={at('/decide')}>
-                    <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
-                    <span class="line-main"><span class="line-title">{words.moreQuestions(moreQuestions)}</span></span>
-                  </a>
-                </li>
-              {/if}
-            </ul>
-          {/if}
-        </Section>
-      </div>
-
-      <!-- ══ THE DAYS COMING UP ══ -->
-      {#if groups.length > 0}
-        <div class="t-coming">
-          {#each groups as g (g.key)}
-            <Section title={g.title} count={g.items.length}>
-              {#snippet aside()}<span class="span-said">{g.span}</span>{/snippet}
+          <!-- WHAT NEEDS YOU, and nothing when nothing does: the sentence above has already said so. -->
+          {#if needing > 0}
+            <Section title={words.needs}>
               <ul class="ledger ledger-lead rows">
-                {#each g.items.slice(0, PER_GROUP) as l (l.key)}
-                  <li data-row={l.key} data-cursor={cursor === l.key ? '' : undefined} onfocusin={() => (cursor = l.key)}>
-                    {#if l.kind === 'task'}
-                      {@render taskRow(l.task, l.href, false)}
+                {#each shownNeeds as n (n.key)}
+                  <li data-row={n.key} data-cursor={cursor === n.key ? '' : undefined} onfocusin={() => (cursor = n.key)}>
+                    {#if n.kind === 'question'}
+                      <Question bind:this={answers[n.key]} question={n.q} now={t.now} onanswered={answered} />
+                    {:else if n.kind === 'task'}
+                      {@render taskRow(n.task, n.href, true)}
                     {:else}
-                      {@render billRow(l.bill, l.href, false)}
+                      {@render billRow(n.bill, n.href, true)}
                     {/if}
                   </li>
                 {/each}
-                {#if g.items.length > PER_GROUP}
+                {#if needs.length > FIRST}
                   <li>
-                    <a class="line line-short more-row" href={at('/?work')}>
+                    <button type="button" class="line line-short more-row" aria-expanded={unfolded} onclick={() => (unfolded = !unfolded)}>
+                      <span class="line-mark more-mark" data-open={unfolded ? '' : undefined}><Icon name="chevron" size="m" /></span>
+                      <span class="line-main"><span class="line-title">{unfolded ? words.showFewer : words.showMore(needs.length - FIRST)}</span></span>
+                    </button>
+                  </li>
+                {/if}
+                {#if moreQuestions > 0}
+                  <li>
+                    <a class="line line-short more-row" href={at('/decide')}>
                       <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
-                      <span class="line-main"><span class="line-title">{words.moreOn(g.items.length - PER_GROUP)}</span></span>
+                      <span class="line-main"><span class="line-title">{words.moreQuestions(moreQuestions)}</span></span>
                     </a>
                   </li>
                 {/if}
               </ul>
             </Section>
-          {/each}
+          {/if}
         </div>
-      {/if}
 
-      <!-- ══ THE TILES ══ -->
-      <div class="t-side">
-        {#if t.runs.length > 0 || sessions.length > 0}
-          <Tile class="t-agents" icon="session" title={words.agentsTile} count={t.runs.length} meta={t.host ? words.allOn(t.host) : undefined}>
-            {#if t.runs.length > 0}
-              <ul class="runs">
-                {#each t.runs as r, i (r.seq ?? i)}
-                  {@const s = r.seq === null ? undefined : bySeq.get(r.seq)}
-                  <li class="run">
-                    <AgentFace agent={r.agent} run={r.seq === null ? '' : `S${r.seq}`} live={quiet(r.seen, t.now) ? 'quiet' : 'working'} size="s" />
-                    <span class="run-main">
-                      <span class="run-name">{words.agent(r.agent)}</span>
-                      {#if r.project}<span class="run-where">{r.project}</span>{/if}
-                      <span class="run-doing" dir="auto">{r.doing || words.doingNothing}</span>
-                    </span>
-                    <span class="run-time num">{s ? elapsedSaid(t.now - s.opened) : r.seen ? since(r.seen, t.now) : ''}</span>
+        <!-- ══ THE NEXT TWO WEEKS, only when something falls in them ══ -->
+        {#if dated.length > 0}
+          <div class="t-week">
+            <Tile icon="calendar" title={words.week}>
+              <WeekStrip days={strip} today={day} subject={words.week} />
+              <p class="reading">{stripSaid}</p>
+            </Tile>
+          </div>
+        {/if}
+
+        <!-- ══ THE DAYS COMING UP ══ -->
+        {#if groups.length > 0}
+          <div class="t-coming">
+            {#each groups as g (g.key)}
+              <Section title={g.title}>
+                {#snippet aside()}<span class="span-said">{g.span}</span>{/snippet}
+                <ul class="ledger ledger-lead rows">
+                  {#each g.items.slice(0, PER_GROUP) as l (l.key)}
+                    <li data-row={l.key} data-cursor={cursor === l.key ? '' : undefined} onfocusin={() => (cursor = l.key)}>
+                      {#if l.kind === 'task'}
+                        {@render taskRow(l.task, l.href, false)}
+                      {:else}
+                        {@render billRow(l.bill, l.href, false)}
+                      {/if}
+                    </li>
+                  {/each}
+                  {#if g.items.length > PER_GROUP}
+                    <li>
+                      <a class="line line-short more-row" href={at('/?work')}>
+                        <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
+                        <span class="line-main"><span class="line-title">{words.moreOn(g.items.length - PER_GROUP)}</span></span>
+                      </a>
+                    </li>
+                  {/if}
+                </ul>
+              </Section>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- ══ BESIDE IT: the tiles, each only when it has something to show ══ -->
+      {#if sideShown}
+        <div class="t-side">
+          {#if agentsShown}
+            <Tile class="t-agents" icon="session" title={words.agentsTile} count={t.runs.length}>
+              {#if t.runs.length > 0}
+                <ul class="runs">
+                  {#each t.runs as r, i (r.seq ?? i)}
+                    {@const s = r.seq === null ? undefined : bySeq.get(r.seq)}
+                    <li class="run">
+                      <AgentFace agent={r.agent} run={r.seq === null ? '' : `S${r.seq}`} live={quiet(r.seen, t.now) ? 'quiet' : 'working'} size="s" />
+                      <span class="run-main">
+                        <span class="run-name">{words.agent(r.agent)}</span>
+                        {#if r.project}<span class="run-where">{r.project}</span>{/if}
+                        <span class="run-doing" dir="auto">{r.doing || words.doingNothing}</span>
+                      </span>
+                      <span class="run-time num">{s ? elapsedSaid(t.now - s.opened) : r.seen ? since(r.seen, t.now) : ''}</span>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+              {#if lanes.length > 0 && t.dayStart !== undefined}
+                <div class="lanes">
+                  <Swimlanes {lanes} start={t.dayStart} end={Math.max(t.now + 3_600_000, t.dayStart + 6 * 3_600_000)} now={t.now} subject="Agent runs" />
+                </div>
+              {/if}
+              {#if agentsSaid}<p class="reading">{agentsSaid}</p>{/if}
+            </Tile>
+          {/if}
+
+          {#if sinceShown}
+            <Tile class="t-since" icon="activity" title={words.since} href="/audit" hrefLabel={words.activity}>
+              <div class="figure-row">
+                <span class="figure num">{t.since.total.toLocaleString('en-GB')}{t.since.capped ? '+' : ''}</span>
+                {#if sinceMeta}<span class="figure-meta">{sinceMeta}</span>{/if}
+              </div>
+              <Stacked parts={sinceParts} height={10} summary={sinceSummary} />
+              <ul class="legend">
+                {#each sinceTop as row, i (row.key)}
+                  <li>
+                    <a class="legend-row" href={at(row.href)}>
+                      <span class="swatch" data-tone={rampAt(i)}></span>
+                      <Icon name={sinceIcon(row, (l) => listIcons.get(l)) as IconName} size="m" />
+                      <span class="legend-n num">{row.count}</span>
+                      <span class="legend-label">{row.label}</span>
+                    </a>
                   </li>
                 {/each}
               </ul>
-            {/if}
-            {#if lanes.length > 0 && t.dayStart !== undefined}
-              <div class="lanes">
-                <Swimlanes {lanes} start={t.dayStart} end={Math.max(t.now + 3_600_000, t.dayStart + 6 * 3_600_000)} now={t.now} subject="Agent runs" />
-              </div>
-            {/if}
-            {#if agentsSaid}<p class="reading">{agentsSaid}</p>{/if}
-          </Tile>
-        {:else}
-          <p class="none side-none t-agents">{words.workingNone}</p>
-        {/if}
-
-        <Tile class="t-since" icon="activity" title={words.since} href="/audit" hrefLabel={words.activity}>
-          {#if t.since.total > 0}
-            <div class="figure-row">
-              <span class="figure num">{t.since.total.toLocaleString('en-GB')}{t.since.capped ? '+' : ''}</span>
-              {#if sinceMeta}<span class="figure-meta">{sinceMeta}</span>{/if}
-            </div>
-            <Stacked parts={sinceParts} height={10} summary={sinceSummary} />
-            <ul class="legend">
-              {#each sinceTop as row, i (row.key)}
-                <li>
-                  <a class="legend-row" href={at(row.href)}>
-                    <span class="swatch" data-tone={rampAt(i)}></span>
-                    <Icon name={sinceIcon(row, (l) => listIcons.get(l)) as IconName} size="m" />
-                    <span class="legend-n num">{row.count}</span>
-                    <span class="legend-label">{row.label}</span>
-                  </a>
-                </li>
-              {/each}
-            </ul>
-            <p class="reading">{sinceReading(t.since.rows, t.since.total, t.since.byAgents ?? 0, t.since.byYou ?? 0)}</p>
-          {:else}
-            <p class="reading quiet">{words.sinceNone}</p>
+              <p class="reading">{sinceReading(t.since.rows, t.since.total, t.since.byAgents ?? 0, t.since.byYou ?? 0)}</p>
+            </Tile>
           {/if}
-        </Tile>
 
-        {#if money && lead && cashTile}
-          <Tile class="t-cash" icon="money" title={words.cash} href="/p/money" hrefLabel={words.money}>
-            <div class="figure-row cash-row">
-              <span class="figure num">{lead.amount}</span>
-              {#if forecast}
-                <span class="trend"><Sparkline values={forecast.values} mark="low" tone={forecast.crossed ? 'danger' : 'ink'} summary={cashSummary(forecast)} /></span>
-              {/if}
-            </div>
-            <p class="figure-sub">{money.cash.length > 1 ? currencyName(lead.currency) : words.cashNow}</p>
-            {#if minor.length > 0}
-              <div class="minor">
-                {#each minor as m, i (i)}
-                  <div class="minor-one"><span class="minor-fig num">{m.amount}</span><span class="minor-label">{m.label}</span></div>
-                {/each}
-              </div>
-            {/if}
-            {#if forecast && cashSaid}
-              <p class="reading">
-                {#if cashSaid.needs && cashSaid.text.includes(cashSaid.needs)}
-                  {cashSaid.text.slice(0, cashSaid.text.indexOf(cashSaid.needs))}<span class="needs-said">{cashSaid.needs}</span>{cashSaid.text.slice(cashSaid.text.indexOf(cashSaid.needs) + cashSaid.needs.length)}
-                {:else}
-                  {cashSaid.text}
+          {#if money && lead && cashTile}
+            <Tile class="t-cash" icon="money" title={words.cash} href="/p/money" hrefLabel={words.money}>
+              <div class="figure-row cash-row">
+                <span class="figure num">{lead.amount}</span>
+                {#if forecast}
+                  <span class="trend"><Sparkline values={forecast.values} mark="low" tone={forecast.crossed ? 'danger' : 'ink'} summary={cashSummary(forecast)} /></span>
                 {/if}
-              </p>
-            {:else if bookParts.length > 0}
-              {@const share = shareReading(bookParts)}
-              <Stacked parts={bookParts} subject={words.cashNow} format={bookSaid} />
-              {#if share}<p class="reading">{share}</p>{/if}
-            {/if}
-          </Tile>
-        {:else if money}
-          <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile. -->
-          <div class="t-cash">
-            <Section title={words.cash}>
-              {#snippet aside()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
-              {#if money.cash.length === 0}
-                <p class="none">{words.cashNone}</p>
-              {:else}
+              </div>
+              <p class="figure-sub">{money.cash.length > 1 ? currencyName(lead.currency) : words.cashNow}</p>
+              {#if minor.length > 0}
+                <div class="minor">
+                  {#each minor as m, i (i)}
+                    <div class="minor-one"><span class="minor-fig num">{m.amount}</span><span class="minor-label">{m.label}</span></div>
+                  {/each}
+                </div>
+              {/if}
+              {#if forecast && cashSaid}
+                <p class="reading">
+                  {#if cashSaid.needs && cashSaid.text.includes(cashSaid.needs)}
+                    {cashSaid.text.slice(0, cashSaid.text.indexOf(cashSaid.needs))}<span class="needs-said">{cashSaid.needs}</span>{cashSaid.text.slice(cashSaid.text.indexOf(cashSaid.needs) + cashSaid.needs.length)}
+                  {:else}
+                    {cashSaid.text}
+                  {/if}
+                </p>
+              {:else if bookParts.length > 0}
+                {@const share = shareReading(bookParts)}
+                <Stacked parts={bookParts} subject={words.cashNow} format={bookSaid} />
+                {#if share}<p class="reading">{share}</p>{/if}
+              {/if}
+            </Tile>
+          {:else if money && money.cash.length > 0}
+            <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile. -->
+            <div class="t-cash">
+              <Section title={words.cash}>
+                {#snippet aside()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
                 <ul class="ledger ledger-lead rows">
                   {#each [...money.cash.map((c) => ({ label: currencyName(c.currency), amount: c.amount })), ...money.books.map((b) => ({ label: b.label ?? words.cashNow, amount: b.amount }))] as c, i (i)}
                     <li>
@@ -780,11 +780,11 @@
                     </li>
                   {/each}
                 </ul>
-              {/if}
-            </Section>
-          </div>
-        {/if}
-      </div>
+              </Section>
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -857,23 +857,34 @@
   }
 
   /* ── the grid ────────────────────────────────────────────────────────────────
-     The strip across the top; the list on the ground at the left and three tiles at the right, 12 apart. Every track
-     may shrink to nothing, so no tile or row can push the page wider than the window. */
+     Two columns and no fixed cells: on the left what needs you, the two weeks and the days coming up; on the right
+     whichever tiles have something to say, stacked. A tile that is not drawn leaves no hole, and with no tile at all the
+     left column takes the width. Every track may shrink to nothing, so nothing can push the page wider than the window. */
   .today {
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-auto-rows: auto;
-    gap: var(--inset);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: start;
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
-  /* THE LEAD TILE: white, the day and the sentence at its head, and what needs you under them. It runs the height of
-     the two tiles beside it. */
-  .t-needs {
-    grid-column: 1 / span 7;
-    grid-row: 1 / span 2;
+  .today[data-alone] {
+    grid-template-columns: minmax(0, 1fr);
+    max-inline-size: 56rem;
+  }
+
+  .t-main,
+  .t-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
     min-inline-size: 0;
-    padding: var(--sp-4) 12px 12px;
+  }
+
+  /* THE LEAD TILE: white, the day and the sentence at its head with room round them, and what needs you under them. */
+  .t-needs {
+    min-inline-size: 0;
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
     background: var(--bg);
     border-radius: var(--r-lg);
   }
@@ -882,74 +893,29 @@
     padding-inline: var(--sp-2);
   }
 
-  .t-side {
-    display: contents;
+  .t-needs > :global(.section) {
+    margin-block-start: var(--sp-2);
   }
 
-  .today :global(.t-agents) {
-    grid-column: 8 / -1;
-    grid-row: 1;
-  }
-
-  .today :global(.t-since) {
-    grid-column: 8 / -1;
-    grid-row: 2;
-  }
-
-  /* THE ROW UNDER THEM: cash, and the days coming up with what falls on them. */
-  .today :global(.t-cash) {
-    grid-column: 1 / span 5;
-    grid-row: 3 / span 2;
-    min-inline-size: 0;
-  }
-
-  .t-week {
-    grid-column: 6 / -1;
-    grid-row: 3;
+  .t-week,
+  .t-coming {
     min-inline-size: 0;
   }
 
   .t-coming {
-    grid-column: 6 / -1;
-    grid-row: 4;
     display: flex;
     flex-direction: column;
-    gap: var(--inset);
-    min-inline-size: 0;
+    gap: var(--sp-5);
   }
 
-  /* BETWEEN A LAPTOP AND A PHONE THE TILES SIT UNDER WHAT NEEDS YOU, side by side where they fit. */
+  /* BETWEEN A LAPTOP AND A PHONE: one column, what needs you first, then the tiles, then the days. */
   @media (width < 1180px) {
     .today {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .t-needs,
-    .t-week,
-    .t-coming,
-    .today :global(.t-agents),
-    .today :global(.t-since),
-    .today :global(.t-cash) {
-      grid-column: auto;
-      grid-row: auto;
-    }
-
-    .t-side {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-      gap: var(--inset);
-      align-items: start;
-    }
-  }
-
-  /* ON A PHONE the order is what needs you, the agents, what changed and cash, and then the days. */
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-2) var(--gutter) var(--sp-8);
-    }
-
-    .today {
-      gap: var(--sp-4);
+    .t-main {
+      display: contents;
     }
 
     .t-needs {
@@ -958,6 +924,9 @@
 
     .t-side {
       order: 2;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+      align-items: start;
     }
 
     .t-week {
@@ -967,13 +936,29 @@
     .t-coming {
       order: 4;
     }
+  }
+
+  /* ON A PHONE the lead tile's head is the title row's, so a tile with nothing under it is not drawn. */
+  @media (width < 900px) {
+    .page {
+      padding: var(--sp-2) var(--gutter) var(--sp-8);
+    }
+
+    .today,
+    .t-coming {
+      gap: var(--sp-4);
+    }
+
+    .t-needs[data-quiet] {
+      display: none;
+    }
 
     /* STRETCHED, NOT `start`: the column is the tile's width. At `start` a tile took its own widest line, and one
        with a long heading stood past the phone's edge. */
     .t-side {
       display: flex;
       align-items: stretch;
-      gap: var(--inset);
+      gap: var(--sp-4);
     }
 
     .lanes {
@@ -1073,20 +1058,10 @@
     rotate: 90deg;
   }
 
-  .none {
-    margin: 0;
-    padding-block: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
-  }
-
-  .side-none {
-    padding-inline: var(--sp-1);
-  }
-
-  /* THE KEYS, ONE QUIET LINE IN THE HEADING'S ASIDE: shown only where there is a keyboard to press them with. */
+  /* THE KEYS, ONE QUIET LINE IN THE HEADING'S ASIDE, AND ONLY WHILE THE KEYBOARD IS IN THE TILE: a focus a key put there
+     shows them, a click or a tap never does. Under a thumb or on a phone there is no keyboard to press them with. */
   .hints {
-    display: inline-flex;
+    display: none;
     align-items: center;
     gap: var(--sp-1);
     color: var(--dim);
@@ -1094,12 +1069,16 @@
     white-space: nowrap;
   }
 
+  .t-needs:has(:focus-visible) .hints {
+    display: inline-flex;
+  }
+
   .hint {
     margin-inline: 2px var(--sp-2);
   }
 
   @media (pointer: coarse), (width < 900px) {
-    .hints {
+    .t-needs:has(:focus-visible) .hints {
       display: none;
     }
   }
@@ -1216,10 +1195,6 @@
     font-size: var(--t-base);
     line-height: 20px;
     text-wrap: pretty;
-  }
-
-  .reading.quiet {
-    color: var(--ink2);
   }
 
   .needs-said {

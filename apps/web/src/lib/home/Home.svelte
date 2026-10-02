@@ -1,15 +1,15 @@
 <!--
-  Overview, which was Home. Four questions, answered without a filter: WHAT NEEDS YOU, WHO IS WORKING, WHAT IS COMING,
-  and WHAT HAPPENED WHILE YOU WERE NOT LOOKING.
+  Today, declared: the page every record opens on (`routes/+page.svelte`), and `/?overview` too, which was a second Home.
 
-  NOT THE LANDING ANY MORE. Every record opens on Today (`routes/+page.svelte`), and this page, the use case's own Home
-  with its figures and tables, is kept at `/?overview` and reached from More.
+  ONE PAGE, THROUGH THE ONE READER. Home draws the speaking use case's `home-<id>` page, else the record's `home` page,
+  else Today's body (`todayHome` in `default-home.ts`), built from what the record holds and drawn by the record with
+  `previewPage`. All three go through `PageView` with `mode: 'home'`, so a question is answered where it is shown, a
+  task is ticked where it is drawn, and a line is captured without leaving. Today was a screen of its own; it is kept at
+  `/?classic` (`Today.svelte`) until this one does all it did.
 
-  ONE PAGE, THROUGH THE ONE READER. Home draws the speaking use case's `home-<id>` page,
-  else the record's `home` page, else the house page `DEFAULT_HOME` (`lib/home/default-home.ts`), which the record draws
-  with `previewPage`. All three go through `PageView` with `mode: 'home'`, so a question is answered where it is shown,
-  a row is ticked where it is drawn, and a line is captured without leaving. Home drew the house page a second way, as
-  its own list of questions and its own feed, and a use case's page a third way through a wrapper; both are gone.
+  CALM BEFORE RICH (DIRECTION §35). One line under the title, worked out from the blocks drawn (`sentenceOf`), with the
+  phrase that needs the reader in red. A block with nothing in it is not drawn, and a rail with nothing in it gives its
+  width back to the main column.
 
   THE READ MARK is one value per person, written with MAX() only, and it advances when the person LEAVES the screen,
   never when it opens. The predecessor shipped it the other way round and found its own bug: For You had never once
@@ -19,7 +19,7 @@
   without a reload and without blanking it (`listen`).
 -->
 <script lang="ts">
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -27,14 +27,15 @@
   import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
   import type { Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
+  import { may } from '$lib/record/may.ts';
+  import { TASKS } from '$lib/work/list.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
-  import Count from '$lib/ui/Count.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import PageView from '$lib/page/PageView.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
-  import { countsOf, defaultHome, homeBlocks, leadSaid, quiet, type HomeVoice } from '$lib/home/default-home.ts';
+  import { drawsAny, homeDrawn, railed, todayHome, type Holds, type HomeVoice } from '$lib/home/default-home.ts';
   import { words } from '$lib/home/words.ts';
   import { untrack } from 'svelte';
   import { typing } from '$lib/a11y/keys.svelte.ts';
@@ -46,21 +47,21 @@
   /**
    * THE DAY WHERE THE PERSON IS, on a live record: Home read Wednesday at two in the morning of Thursday,
    * because it named the day in UTC. The record's own `tz` is not read, because every host provisions `UTC` and nobody
-   * sets it, so it cannot be told from a zone somebody chose. A quiet line over the title now, not the title itself.
+   * sets it, so it cannot be told from a zone somebody chose. A quiet line over the title, not the title itself.
    */
   const today = $derived(new Date(data.now).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }));
 
-  /* THE TITLE IS THE VOICE'S WORD FOR HOME WHEN A USE CASE SAYS ONE, else the record's own name: a date is not a name. */
+  /* THE TITLE IS THE VOICE'S WORD FOR HOME WHEN A USE CASE SAYS ONE, else Today. */
   const title = $derived.by(() => {
     const voiced = said('home');
-    return voiced !== VOICE_LINES.home ? voiced : data.index.name.trim() || voiced;
+    return voiced !== VOICE_LINES.home ? voiced : copy.today;
   });
 
-  /* THE CALM SENTENCE IS THE VOICE'S when a use case words it, and otherwise Home's own. */
+  /* THE CALM LINE IS THE VOICE'S when a use case words it, and otherwise Home's own. */
   const nothing = $derived(said('nothing_needs_you') !== VOICE_LINES.nothing_needs_you ? said('nothing_needs_you') : words.nothingNow);
 
-  /* THE HOUSE PAGE'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after
-     the first read asks it again in its own words. */
+  /* TODAY'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after the first
+     read asks it again in its own words. */
   const voice = $derived<HomeVoice>({
     rightNow: said('right_now'),
     needsYou: said('needs_you'),
@@ -72,31 +73,40 @@
     nothingDue: said('nothing_due'),
   });
 
+  /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell: a block over a list the record does not keep is not asked for. */
+  const holds = $derived<Holds>({
+    tasks: data.lists.some((l) => l.id === TASKS),
+    adds: data.lists.some((l) => l.id === TASKS) && may(data, 'append', TASKS),
+    money: data.pages.includes('money'),
+  });
+
   /**
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
    * asking for `home-<use case>` anyway logged a refusal on every Home load. `boot` names every page, so the use case's
-   * page is asked for when it is there, then the house one when that is, and otherwise the record draws `DEFAULT_HOME`.
+   * page is asked for when it is there, then the record's `home` when that is, and otherwise Today's body is drawn.
    */
   const declares = $derived(homeSlugOf(homePage(), data.pages));
 
-  /** The record's answer for Home's page, `null` while it is out or when this host cannot draw the house page. */
+  /** The record's answer for Home's page, `null` while it is out or when this host cannot draw Today's body. */
   let got = $state<Opened | null>(null);
-  /** Whether the first read has come back, so a host that cannot draw the house page is told from one still reading. */
+  /** Whether the first read has come back, so a host that cannot draw Today's body is told from one still reading. */
   let settled = $state(false);
   /** A read of Home's own is out: `listen` waits for it rather than asking again on top of it. */
   let reading = false;
 
   /** Home's page, from whichever of the three sources the record holds. */
-  async function readBody(slug: string | null, spoken: HomeVoice): Promise<Opened | null> {
+  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds): Promise<Opened | null> {
     if (slug !== null) {
       const m = await import('$lib/record/page-live.ts');
       return m.pageReader(apiBase()).read(slug);
     }
-    /* THE HOUSE PAGE IS DRAWN BY THE RECORD, never installed: `previewPage` answers the body as `page` answers an
-       installed one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. */
+    /* TODAY'S BODY IS DRAWN BY THE RECORD, never installed: `previewPage` answers the body as `page` answers an installed
+       one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. */
+    const body = todayHome(held, spoken);
     const m = await import('../../routes/decide/[id]/proposed.ts');
-    const drawn = await m.drawnOf(defaultHome(spoken), apiBase());
-    if (drawn.from === 'live') return { from: 'live', page: { page: { page: 'home', title: '' }, blocks: drawn.blocks }, now: drawn.now };
+    const drawn = await m.drawnOf(body, apiBase());
+    if (drawn.from === 'live')
+      return { from: 'live', page: { page: { page: body.page, title: body.title, layout: body.layout }, blocks: drawn.blocks }, now: drawn.now };
     if (drawn.from === 'refused') return { from: 'refused', fix: drawn.fix };
     return null;
   }
@@ -106,11 +116,12 @@
     if (data.refused) return;
     const slug = declares;
     const spoken = voice;
+    const held = holds;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = untrack(opened);
     let ok = false;
     reading = true;
-    void readBody(slug, spoken)
+    void readBody(slug, spoken, held)
       .then((out) => {
         if (slug !== declares) return;
         got = out;
@@ -124,14 +135,18 @@
       });
   });
 
-  /* A LANDED WRITE, AND A NEW VERSION OF THE RECORD, READ THE PAGE AGAIN without blanking it: a captured row appears,
+  /* A LANDED WRITE, AND A NEW VERSION OF THE RECORD, READ THE PAGE AGAIN without blanking it: a captured task appears,
      an answered question goes, and a conflict is answered over the rows the record holds now. */
   async function reread() {
     if (data.refused) return;
     const slug = declares;
     reading = true;
     try {
-      const out = await readBody(slug, untrack(() => voice));
+      const out = await readBody(
+        slug,
+        untrack(() => voice),
+        untrack(() => holds),
+      );
       if (slug === declares && out?.from === 'live') got = out;
     } catch {
       /* The page as it was read stays; the next version asks again. */
@@ -145,20 +160,28 @@
   listen(reread, () => reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   const live = $derived(got?.from === 'live' ? got : null);
-  const blocks = $derived(live ? homeBlocks(live.page.blocks, live.now, voice) : []);
-  /* THE LEAD LINE IS BUILT FROM THE PAGE'S OWN COUNTS, so it can never disagree with the blocks under it. It is the
-     title row's sentence, with what needs the reader in red. */
-  const lead = $derived(live ? leadSaid(countsOf(live.page.blocks)) : null);
-  /* NOTHING PINNED, WAITING, DUE OR WORKING: one calm sentence, and only what changed under it. A host that cannot draw
-     the house page at all is calm too, rather than blank. */
-  const calm = $derived((live !== null && quiet(live.page.blocks)) || (settled && got === null));
+  /* THE PAGE AS HOME DRAWS IT: its line lifted into the head, each row once, and nothing drawn that holds nothing. */
+  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice) : null);
 
-  /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. */
-  const drawn = $derived.by((): Opened | null => {
-    if (!got || got.from !== 'live') return got;
-    return { ...got, page: { ...got.page, blocks: calm ? blocks.filter((b) => b.kind === 'feed') : blocks } };
+  /* THE ONE LINE, worked out from the blocks drawn, else the page's own line, else the calm one once the page is read. */
+  const lead = $derived.by(() => {
+    if (!shaped) return null;
+    if (shaped.sentence) return shaped.sentence;
+    return { text: shaped.lead ?? nothing, needs: '' };
   });
-  const slug = $derived(live?.page.page.page ?? declares ?? 'home');
+
+  /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. A rail with
+     nothing beside it, or nothing in it, is one column. */
+  const drawn = $derived.by((): Opened | null => {
+    if (!got || got.from !== 'live' || !shaped) return got;
+    if (railed(shaped.blocks)) return { ...got, page: { page: got.page.page, blocks: shaped.blocks } };
+    const { layout: _rail, ...flat } = got.page.page;
+    return { ...got, page: { page: flat, blocks: shaped.blocks } };
+  });
+  const slug = $derived(live?.page.page.page ?? declares ?? 'today');
+
+  /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
+  const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.open === 0);
@@ -171,7 +194,7 @@
    * shown nothing to mark read. `pagehide` covers a closed tab, and the effect's end covers leaving for another screen.
    * A mark that did not land leaves the record's where it was, so the same lines come back rather than being lost.
    */
-  const feeds = $derived(blocks.some((b) => b.kind === 'feed' && b.source === 'activity'));
+  const feeds = $derived((live?.page.blocks ?? []).some((b) => b.kind === 'feed' && b.source === 'activity'));
   let stamped = false;
   function stamp() {
     if (stamped || data.refused || !feeds) return;
@@ -199,18 +222,7 @@
 
 <!-- `display: contents`, so the sticky head still sticks to the panel. -->
 <div class="home-head">
-  <PageHead {title} kicker={today} sentence={!calm && lead ? lead.text : undefined} needs={lead?.needs || undefined}>
-    {#snippet actions()}
-      <!-- NOTHING AT ALL WHEN THERE IS NOTHING TO DECIDE: a count of nothing, as a link to a page
-           whose empty state is the same answer, is noise. `/decide` stays in the rail and on `g d`.
-           A glass pill in the toolbar, its count the one red square, because each one waits on the reader. -->
-      {#if data.open > 0}
-        <Button weight="glass" href="/decide">
-          <span>{copy.decide}</span><Count n={data.open} label={`${data.open} ${copy.toDecide}`} />
-        </Button>
-      {/if}
-    {/snippet}
-  </PageHead>
+  <PageHead {title} kicker={today} sentence={lead?.text} needs={lead?.needs || undefined} />
 </div>
 
 <div class="page">
@@ -254,12 +266,12 @@
           {/if}
         {/snippet}
       </Empty>
-    {:else if calm}
-      <!-- ONE CALM SENTENCE AND ONE LINE ON WHAT FILLS THIS PAGE, never what a business is made of. -->
+    {:else if settled && got === null}
+      <!-- A HOST THAT CANNOT DRAW THE PAGE: the calm line, and what fills it, rather than a blank. -->
       <Empty kind="cleared" title={nothing} body={said('fills_with')} />
     {/if}
 
-    {#if drawn !== null || !settled}
+    {#if (drawn !== null && !calm) || !settled}
       <div class="body">
         <PageView {slug} got={drawn} mode="home" {reread} />
       </div>
@@ -276,8 +288,7 @@
 
   /* ── the page ─────────────────────────────────────────────────────────── */
 
-  /* ONE COLUMN, the page's own: its blocks carry their spans and its rail, and Home adds no column of its own beside it.
-     The same inset as Today's, under the title row and its sentence. */
+  /* ONE COLUMN, the page's own: its blocks carry their spans and its rail, and Home adds no column of its own beside it. */
   .page {
     display: flex;
     flex-direction: column;
@@ -291,7 +302,7 @@
     min-inline-size: 0;
   }
 
-  /* A QUESTION WRAPS TO TWO LINES AND NO MORE on Home, so five of them fit above the fold; its own card on Decide says
+  /* A QUESTION WRAPS TO TWO LINES AND NO MORE on Home, so three of them fit above the fold; its own card on Decide says
      it whole. */
   .body :global(.queue-question) {
     display: -webkit-box;
@@ -317,7 +328,7 @@
     }
   }
 
-  /* ON A PHONE THE FIGURES ARE TWO BY TWO, rather than a stack of four rows pushing what needs you off the screen. */
+  /* ON A PHONE THE FIGURES ARE TWO BY TWO, rather than a stack of rows pushing what needs you off the screen. */
   @media (width < 640px) {
     .body :global(.grid:has(> .cell:nth-child(2))) {
       grid-template-columns: repeat(2, minmax(0, 1fr));

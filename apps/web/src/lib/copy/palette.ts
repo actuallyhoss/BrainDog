@@ -23,7 +23,7 @@ export const palette = {
   searchNone: (q: string) => `Nothing matches “${q}”`,
   /* THE NEXT STEP, NOT A WAY OUT: what to change about the words, and the one
      other place a thing that is not in a list may have been. */
-  searchNoneNext: 'Check the spelling or try fewer words. A row that was archived or changed still shows in History.',
+  searchNoneNext: 'Check the spelling or try fewer words. Anything archived or changed still shows in History.',
   searchClear: 'Clear the search',
   searchInHistory: 'Open History',
   searchWhere: 'Every list, every decision, and every page, by the words in them.',
@@ -39,7 +39,7 @@ export const palette = {
   noMatches: 'Nothing matches',
   commands: 'Actions',
   destinations: 'Go to',
-  records: 'Rows',
+  records: 'In your lists',
   /* THE LINE UNDER AN ID SOMEBODY TYPED, AND IT SAID `spoken id`. That is this product's internal
      name for the convention, written down in `19 §2` and in the copy's own notes, and the palette
      is the one surface where the reader has just proved they know the convention by using it. The
@@ -56,7 +56,7 @@ export const palette = {
   slashFound: 'What Slash found',
   slashNothing: 'Nothing in the record answers that.',
   slashFold: 'What Slash read',
-  slashFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 row' : `${rows.toLocaleString('en')} rows`}, ${predicate}`,
+  slashFoldLine: (register: string, rows: number, predicate: string) => `${register}: ${rows === 1 ? '1 item' : `${rows.toLocaleString('en')} items`}, ${predicate}`,
   slashAll: 'all',
   slashGrantRefused: 'grant: refused',
   /* A PREDICATE IN WORDS, one phrase per test of `34 §1.1`. `empty` and `present` take no operand. */

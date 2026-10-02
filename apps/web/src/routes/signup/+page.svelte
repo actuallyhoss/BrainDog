@@ -1,11 +1,19 @@
 <!--
-  Sign-up, for a stranger: a record of their own, paid for, in four steps.
+  Sign-up, for a stranger: a record of their own, free or paid for, in three or four steps.
 
   ONE: an email and a name for the record, the name checked as it is typed, and Cloudflare Turnstile when the host asks
-  for it. TWO: "Check your mail". THREE: the link from the mail proves the address, signs the person in, and asks them
-  to pay for the name on Stripe's page. FOUR: Stripe sends them back with `#paid=`, the page waits for the record the
-  payment made to be listed, opens it, and lands on its `/start`, whose first ask is a passkey. `#cancelled` is step
-  three again, with a sentence that nothing was charged.
+  for it. TWO: "Check your mail". THREE: the link from the mail proves the address and signs the person in.
+
+  ON FREE, WHICH IS NO `?plan=` (DIRECTION §35, "Free leads"), the record is made there and then: checkout with
+  `plan: 'free'` makes it and answers its `/start`, the page opens it and goes there, with no Stripe and no wait. A
+  name taken since is the host's sentence over the name to try again, and a way to pay for one instead; a person who
+  already has their free record is told which, with only the way to pay.
+
+  ON `?plan=cloud` OR `?plan=plus`, step three asks them to pay for the name on Stripe's page on that plan. FOUR: Stripe
+  sends them back with `#paid=`, the page waits for the record the payment made to be listed, opens it, and lands on
+  its `/start`, whose first ask is a passkey. `#cancelled` is step three again, with a sentence that nothing was charged.
+
+  THE PLAN OUTLIVES THE MAIL in `localStorage` (`keepPlan`), because the link opens a new tab with nothing of this one.
 
   WHILE BILLING IS OFF THE PAGE ASKS NOTHING. `/auth/signup/name` says whether sign-up is open, because it is the one
   door a stranger can ask; closed, the page says so and points at sign-in.
@@ -25,15 +33,20 @@
     arrivalOf,
     billing,
     checkName,
+    checkout,
     HELD_KEY,
     heldOf,
     hold,
+    keepPlan,
     madeFor,
     openOwned,
+    planKept,
+    planOf,
     startSignup,
     verifySignup,
     zone,
     type Held,
+    type Plan,
   } from '$lib/signup.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -46,10 +59,25 @@
   import { drew } from '$lib/ui/screen.svelte.ts';
   import NoRecord from '../start/NoRecord.svelte';
   import NameField from './NameField.svelte';
+  import { freeWords } from './words.ts';
 
-  type Step = 'loading' | 'unreachable' | 'closed' | 'ask' | 'sent' | 'verifying' | 'link-failed' | 'pay' | 'waiting' | 'slow';
+  type Step =
+    | 'loading'
+    | 'unreachable'
+    | 'closed'
+    | 'ask'
+    | 'sent'
+    | 'verifying'
+    | 'link-failed'
+    | 'making'
+    | 'make-failed'
+    | 'pay'
+    | 'waiting'
+    | 'slow';
 
   let step = $state<Step>('loading');
+  /* THE PLAN THE SITE'S BUTTON ASKED FOR, Free when it asked for none. */
+  let plan = $state<Plan>('free');
   /* WHAT THIS TAB KEPT ACROSS THE ROUND TRIP TO STRIPE, or what the mailed proof said was typed at the start. */
   let held = $state<Held | null>(null);
   let cancelled = $state(false);
@@ -60,6 +88,8 @@
   let person = $state('');
   let busy = $state(false);
   let said = $state<string | null>(null);
+  /* A FREE RECORD REFUSED FOR ITS PLAN, not its name: the person has theirs, so the name is not offered again. */
+  let paidOnly = $state(false);
   let sentTo = $state('');
 
   /* ── Turnstile ───────────────────────────────────────────────────────────── */
@@ -129,14 +159,32 @@
     /* THE FRAGMENT IS WIPED AS IT IS READ, so the proof never sits in the tab's history or a copied address. */
     const arrived = arrivalOf(location.hash, () => history.replaceState(history.state, '', location.pathname + location.search));
     const kept = heldOf(globalThis.sessionStorage);
-    if (arrived?.kind === 'verify') void verify(arrived.token);
-    else if (arrived?.kind === 'paid') void waitForRecord(kept);
+    /* THIS TAB'S PLAN FIRST, then the one kept across the mail; a link opened anywhere else is Free. */
+    const lasting = kept?.plan ?? planKept(localStore());
+    if (arrived?.kind === 'verify') {
+      plan = lasting ?? 'free';
+      void verify(arrived.token);
+    } else if (arrived?.kind === 'paid') void waitForRecord(kept);
     else if (arrived?.kind === 'cancelled') {
-      held = kept;
+      /* BACK FROM STRIPE UNPAID: they were paying, so a plan nobody kept is Cloud, the checkout's own default. */
+      plan = lasting === 'plus' ? 'plus' : 'cloud';
+      held = kept ? { ...kept, plan } : null;
       cancelled = true;
       step = 'pay';
-    } else void ask();
+    } else {
+      plan = planOf(location.search);
+      void ask();
+    }
   });
+
+  /** `localStorage`, or `null` where reading it throws (storage blocked). */
+  function localStore(): Storage | null {
+    try {
+      return globalThis.localStorage ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   async function ask(): Promise<void> {
     step = 'loading';
@@ -170,7 +218,8 @@
     if (out.ok) {
       sentTo = email.trim();
       /* KEPT NOW AS WELL AS IN THE PROOF, so a proof opened in this tab still finds the name if the mail was slow. */
-      hold(globalThis.sessionStorage, { slug, name: person.trim() || null, tz: zone() });
+      hold(globalThis.sessionStorage, { slug, name: person.trim() || null, tz: zone(), plan });
+      keepPlan(localStore(), plan);
       step = 'sent';
       await tick();
       document.getElementById('sent-h')?.focus();
@@ -194,7 +243,7 @@
     void ask();
   }
 
-  /* ── step three: the proof, then the payment ─────────────────────────────── */
+  /* ── step three: the proof, then the record on Free or the payment ───────── */
 
   async function verify(token: string): Promise<void> {
     step = 'verifying';
@@ -203,8 +252,61 @@
       step = 'link-failed';
       return;
     }
-    held = { slug: out.value.slug, name: out.value.name, tz: out.value.tz };
+    held = { slug: out.value.slug, name: out.value.name, tz: out.value.tz, plan };
     hold(globalThis.sessionStorage, held);
+    if (plan === 'free') void makeFree(held);
+    else step = 'pay';
+  }
+
+  /** Storage the made record no longer needs, in this tab and across the mail. */
+  function forget(): void {
+    try {
+      globalThis.sessionStorage?.removeItem(HELD_KEY);
+    } catch {
+      /* Storage off: nothing was kept, so nothing is left behind. */
+    }
+    keepPlan(localStore(), null);
+  }
+
+  /**
+   * A free record, made there and then: the host answers its `/start`, the session moves to it, and the page goes there.
+   *
+   * NO WAIT FOR A LIST, as `#paid` has: the record exists when the answer comes back. A refusal is the host's sentence
+   * over the name, which can be changed and made again; an open that fails still goes, because the address names it.
+   */
+  async function makeFree(asked: Held): Promise<void> {
+    step = 'making';
+    busy = true;
+    said = null;
+    const out = await checkout({ ...asked, plan: 'free' });
+    if (out.ok) {
+      await openOwned(asked.slug);
+      forget();
+      location.assign(at(out.value));
+      return;
+    }
+    busy = false;
+    slug = asked.slug;
+    paidOnly = out.kind === 'refused' && out.at === 'plan';
+    said = out.kind === 'refused' ? (out.fix ?? freeWords.makeFailed) : out.kind === 'locked' ? copy.signupLocked(Math.ceil(out.retryAfter / 60)) : copy.unreachableWhy;
+    step = 'make-failed';
+  }
+
+  function makeAgain(e: SubmitEvent): void {
+    e.preventDefault();
+    if (busy || !free || slug === '' || held === null) return;
+    held = { ...held, slug };
+    hold(globalThis.sessionStorage, held);
+    void makeFree(held);
+  }
+
+  /* A SECOND RECORD IS ON A PAID PLAN: the payment step, on Cloud, with the name as it stands. */
+  function payInstead(): void {
+    plan = 'cloud';
+    held = held ? { ...held, slug: slug || held.slug, plan } : null;
+    if (held) hold(globalThis.sessionStorage, held);
+    keepPlan(localStore(), plan);
+    said = null;
     step = 'pay';
   }
 
@@ -225,11 +327,7 @@
         if (found) {
           const opened = await openOwned(found.slug);
           if (opened.ok) {
-            try {
-              globalThis.sessionStorage?.removeItem(HELD_KEY);
-            } catch {
-              /* Storage off: nothing was kept, so nothing is left behind. */
-            }
+            forget();
             location.assign(at('/start', `${BASE}/${found.slug}/`));
             return;
           }
@@ -244,6 +342,10 @@
 
   /** Each step's glyph, in `words.steps` order: the mail, the link, the payment, the passkey, the sentence, the Home. */
   const STEP_ICONS: readonly IconName[] = ['inbox', 'link', 'money', 'key', 'edit', 'home'];
+
+  /* ON FREE THE THIRD STEP IS THE RECORD BEING MADE, not Stripe's page, and the reading line says no card. */
+  const steps = $derived(plan === 'free' ? words.steps.map((s, i) => (i === 2 ? freeWords.step : s)) : words.steps);
+  const icons = $derived(plan === 'free' ? STEP_ICONS.map((g, i) => (i === 2 ? 'plus' : g)) : STEP_ICONS);
 
   /**
    * THE STEP THIS SCREEN IS, counted from 0, or null where the rail is not drawn. Waiting for the host's first answer is
@@ -260,6 +362,8 @@
       case 'sent':
       case 'link-failed':
         return 1;
+      case 'making':
+      case 'make-failed':
       case 'pay':
         return 2;
       default:
@@ -277,11 +381,11 @@
 
 {#snippet next()}
   {#if stepNow !== null}
-    <Tile icon="arrow" title={words.nextTitle} meta={words.stepOf(stepNow + 1, words.steps.length)}>
+    <Tile icon="arrow" title={words.nextTitle} meta={words.stepOf(stepNow + 1, steps.length)}>
       <ol class="steps">
-        {#each words.steps as s, i (i)}
+        {#each steps as s, i (i)}
           <li class="step" aria-current={i === stepNow ? 'step' : undefined}>
-            <IconWell name={i < stepNow ? 'check' : (STEP_ICONS[i] ?? 'task')} size="l" tone={i < stepNow ? 'earn' : i === stepNow ? 'ink' : undefined} />
+            <IconWell name={i < stepNow ? 'check' : (icons[i] ?? 'task')} size="l" tone={i < stepNow ? 'earn' : i === stepNow ? 'ink' : undefined} />
             <span class="step-text">
               <span class="step-title" class:now={i === stepNow}>{s.title}</span>
               <span class="step-line">{s.line}</span>
@@ -294,7 +398,7 @@
           </li>
         {/each}
       </ol>
-      <p class="reading">{words.payNote}</p>
+      <p class="reading">{plan === 'free' ? freeWords.note : words.payNote}</p>
     </Tile>
   {/if}
 {/snippet}
@@ -367,6 +471,25 @@
       <h1 class="title">{copy.signupLinkFailed}</h1>
       <p class="lede">{copy.signupLinkFailedWhy}</p>
       <div class="go"><Button weight="primary" onclick={again}>{copy.signupStartAgain}</Button></div>
+    {:else if step === 'making'}
+      <h1 class="title">{freeWords.making}</h1>
+      <p class="lede" role="status">{freeWords.makingWhy}</p>
+    {:else if step === 'make-failed'}
+      <h1 class="title">{copy.signupTitle}</h1>
+      {#if said}<p class="lede" role="alert">{said}</p>{/if}
+      {#if paidOnly}
+        <div class="go"><Button weight="primary" onclick={payInstead}>{freeWords.payInstead}</Button></div>
+      {:else}
+        <form class="form" onsubmit={makeAgain}>
+          <NameField bind:value={slug} bind:free id="make-name" />
+          <div class="go sticky">
+            <Button weight="primary" type="submit" disabled={busy || !free || slug === ''} aria-busy={busy}>
+              {busy ? freeWords.makingNow : slug === '' ? freeWords.makeRecord : freeWords.makeFor(slug)}
+            </Button>
+          </div>
+        </form>
+        <p class="aside"><button class="link plain" type="button" onclick={payInstead}>{freeWords.payInstead}</button></p>
+      {/if}
     {:else if step === 'pay'}
       <NoRecord title={held ? copy.signupPayFor(held.slug) : copy.noRecordTitle} {held} note={cancelled ? copy.signupCancelled : null} />
     {:else if step === 'waiting' || step === 'slow'}
@@ -485,6 +608,16 @@
     min-block-size: var(--tap);
     color: var(--link);
     font-weight: 500;
+  }
+
+  /* THE WAY TO PAY INSTEAD IS A BUTTON DRAWN AS THE LINK BESIDE IT: it changes the step, it goes nowhere. */
+  .link.plain {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
   }
 
   /* A FOCUSED FIELD SCROLLS CLEAR OF THE KEYBOARD, with room under it for the Send button riding `--kb` below. */

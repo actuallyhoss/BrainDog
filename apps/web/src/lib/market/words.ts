@@ -39,7 +39,7 @@ export const words = {
   addsLists: 'Lists',
   addsPages: 'Pages',
   addsRules: 'Rules',
-  addsExamples: 'Example rows',
+  addsExamples: 'Examples',
   addsModules: 'Needs first',
   addsNothing: 'Nothing of its own',
   addsFigures: 'Figures',
@@ -50,10 +50,10 @@ export const words = {
     const name = { d: 'day', w: 'week', m: 'month', y: 'year' }[unit];
     return `over ${n} ${n === 1 ? name : `${name}s`}`;
   },
-  ruleWritten: (list: string): string => `When a row in ${list} is written, it acts on it`,
+  ruleWritten: (list: string): string => `When something in ${list} is written, it acts on it`,
   ruleScheduled: 'Runs on a schedule',
   ruleOther: 'Runs when something happens in the record',
-  examples: (n: number): string => (n === 0 ? 'No example rows' : n === 1 ? '1 example row' : `${n} example rows`),
+  examples: (n: number): string => (n === 0 ? 'No examples' : n === 1 ? '1 example' : `${n} examples`),
   bump: { major: 'Takes something away', minor: 'Adds something', patch: 'Changes details' },
   first: 'First version',
   /* A DAY, NEVER ISO: "2 Sep" this year, "2 Sep 2025" before it. A version is dated to the day, so a

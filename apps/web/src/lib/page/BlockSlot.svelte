@@ -17,6 +17,7 @@
 -->
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
+  import { tick } from 'svelte';
   import { at as inApp } from '../at.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { inline, text } from 'braindog-render';
@@ -45,6 +46,8 @@
   import { panelOf } from './panels/panel-of.ts';
   import type { Writes } from './page-writes.ts';
   import AddStep from './AddStep.svelte';
+  import { foldOf } from './home.ts';
+  import { words } from './words.ts';
 
   let {
     block,
@@ -55,6 +58,8 @@
     arranging = false,
     now,
     level = 2,
+    fold = false,
+    rows = null,
   }: {
     block: LiveBlock;
     /** The block's declared index, which its id, its heading's id and its held rows are keyed by. */
@@ -71,13 +76,48 @@
     now: number;
     /** The block name's heading level: 2 under a page's title, 3 under a preview's own heading. */
     level?: 2 | 3;
+    /** Whether a long list folds in place under "N more", as it does on a home (`home.ts` `foldOf`). */
+    fold?: boolean;
+    /**
+     * The row cursor a home walks, handed to the renderer (`braindog-render`'s `cursor.ts`): the key of the row it is on
+     * in this block, or `null`, and the call a primitive makes when Tab or a click lands in one of its rows. `null`
+     * where nothing walks rows.
+     */
+    rows?: { cursor: string | null; onrowfocus: (row: string) => void } | null;
   } = $props();
 
   /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is marked. `now` is the clock the
      rows were read against, so `{{ago:}}` agrees with the dates beside it. No `hole` is handed over, so a value the
      record cannot answer is marked and not pressable: nobody can supply a declared figure from this screen. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
-  const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency()));
+  /* THE PAGE'S HEADLINE LINE DROPS A WHOLE AMOUNT'S `.00`: "Cash is £33,850", the way a person says it. */
+  const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency(), block.kind === 'note' && block.lead === true));
+
+  /* ── the fold ──────────────────────────────────────────────────────────────
+     A LONG LIST ON A HOME SHOWS ITS FIRST ROWS AND FOLDS THE REST in place, one press away, as Today folds what needs
+     you; nothing is cut and nobody is sent to another screen for the ninth row. Once opened it stays open. */
+  let open = $state(false);
+  const folded = $derived(fold ? foldOf(block.kind, block.rows.length, open) : null);
+
+  /* THE ROWS OF A LIST OR A TABLE as drawn: the renderer's rows, a plain list's items, and a table's body rows. */
+  const ROWS = '[data-row], .list > li.item, .rowgroup > [role="row"]';
+
+  /**
+   * "N more" pressed. The button goes once the list is open, so the focus is handed to the first row that opened rather
+   * than dropped to the page: `from` is how many rows were shown before, in the drawing just above the button.
+   */
+  async function unfold(e: MouseEvent, from: number) {
+    const above = (e.currentTarget as HTMLElement).previousElementSibling;
+    open = true;
+    await tick();
+    const all = above ? [...above.querySelectorAll<HTMLElement>(ROWS)] : [];
+    const row = all.filter((el) => !all.some((o) => o !== el && o.contains(el)))[from];
+    /* A TABLE IS A GRID, whose stops are its cells, so the row's first cell takes the focus there. */
+    const to = row?.getAttribute('role') === 'row' ? (row.querySelector<HTMLElement>('[role="gridcell"], [role="cell"]') ?? row) : row;
+    if (!to) return;
+    if (!to.hasAttribute('tabindex')) to.tabIndex = -1;
+    to.focus();
+  }
 
   /* A GLYPH NAMED IN TEXT IS DRAWN BY THE HOST, because the renderer ships no glyph art (05 §3): the path for a name this
      build draws, or nothing, and the renderer then keeps its named, empty slot. A name in the set that has not arrived
@@ -238,7 +278,9 @@
   {/each}
 {:else if block.kind === 'table' && !block.answer}
   <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
-  <Table columns={block.columns} rows={writes ? writes.arrivedTable(i, block.rows, block) : block.rows} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
+  {@const all = writes ? writes.arrivedTable(i, block.rows, block) : block.rows}
+  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} />
+  {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <div class="queue">
@@ -254,8 +296,11 @@
       <!-- `w` IS A CONSTANT so each callback below keeps the narrowing it was built under. -->
       {@const w = writes}
       {@const shown = w ? w.keptSegment(i, segment, block) : segment}
+      {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : null}
       <Block
-        block={shown}
+        cursor={rows?.cursor ?? null}
+        onrowfocus={rows?.onrowfocus}
+        block={more ? { ...shown, rows: shown.rows.slice(0, more.shown) } : shown}
         {opts}
         onmove={w ? (row, to) => w.moveCard(block, row, to, i, shown.rows) : undefined}
         ontick={w ? (row, done) => w.tickTask(block, row, done, i, shown.rows) : undefined}
@@ -264,6 +309,7 @@
         oninput={w && typable ? w.typeInto : undefined}
         onpath={w ? (row, done) => w.onpath(block, row, done, i, shown.rows) : undefined}
       />
+      {#if more}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, more.shown)}>{words.more(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}
       <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that field is
            written. -->
@@ -299,7 +345,8 @@
   EXCEPT WHERE THE BLOCK ALREADY SAID IT, BETTER. A `queue` ends in its own count of what is left and that count is a
   door, so this line under it would be the same fact twice, and the second telling the one with nowhere to press.
 -->
-{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown}
+<!-- WHILE A LIST IS FOLDED, its "N more" is the line under it; the slice it is of is said once it is open. -->
+{#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded}
   {@const to = openHref(block)}
   <p class="block-slice" role="status">
     {block.source === 'forecast.runway'
@@ -394,6 +441,27 @@
   }
 
   .block-slice > a:hover {
+    color: var(--ink);
+    text-decoration-color: currentColor;
+  }
+
+  /* "N MORE" IS THE SLICE LINE'S QUIET LINK, pressed rather than followed: the second ink, a hairline under it. */
+  .block-more {
+    display: block;
+    margin: 0;
+    padding: var(--sp-2) 0 0;
+    border: 0;
+    background: none;
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    text-decoration: underline;
+    text-decoration-color: var(--edge);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .block-more:hover {
     color: var(--ink);
     text-decoration-color: currentColor;
   }

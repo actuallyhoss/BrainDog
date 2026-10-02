@@ -237,6 +237,9 @@
   }
   const lists = $derived<List[]>(isLive ? [...(shell.index?.registers ?? [])] : []);
   const listNamed = $derived(new Map(lists.map((l) => [l.id, l])));
+  /** One of a list, in its own noun: `Invoices` gives "Invoice", the detail under an address typed as `invoices/12`.
+      Its letters as the list spells them, so `HSBC accounts` is "HSBC account" and not "Hsbc account". */
+  const oneOf = (name: string) => name.replace(/ies$/u, 'y').replace(/([^sS])s$/u, '$1').replace(/^./u, (c) => c.toUpperCase());
   /* NOT THE RAIL'S LISTS, which leave out an empty one, and none at all for a caller the record would refuse the press,
      or where no record answered. */
   const addLists = $derived(isLive ? offered(shell) : []);
@@ -490,7 +493,7 @@
     const spoken = SPOKEN.exec(text.toUpperCase());
     const qualified = QUALIFIED.exec(text);
     if (spoken) out.push({ id: 'spoken', title: text.toUpperCase(), detail: copy.openById, href: `/${text.toUpperCase()}`, group: copy.records, icon: 'arrow' });
-    if (qualified) out.push({ id: 'qualified', title: text, detail: `${listNamed.get(qualified[1]!)?.name ?? listName(qualified[1]!)} row`, href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
+    if (qualified) out.push({ id: 'qualified', title: text, detail: oneOf(listNamed.get(qualified[1]!)?.name ?? listName(qualified[1]!)), href: `/r/${qualified[1]}/${qualified[2]}`, group: copy.records, icon: 'arrow' });
 
     // Strict-prefix aliases outrank fuzzy matching. It is the only verified mechanism found that
     // keeps a growing action index from rotting (19 §7).
@@ -547,7 +550,7 @@
         if (starts(r.name))
           /* The count, not a definition of the word "register". A row that explains the app's own
              vocabulary is a row nobody needed, and it was doing it in every search. */
-          out.push({ id: `r-${r.id}`, title: r.name, detail: `${r.count} rows`, href: `/r/${r.id}`, group: copy.pages, icon: r.icon, complete: r.name });
+          out.push({ id: `r-${r.id}`, title: r.name, detail: r.count === 1 ? '1 item' : `${r.count.toLocaleString('en')} items`, href: `/r/${r.id}`, group: copy.pages, icon: r.icon, complete: r.name });
     }
 
     /**
@@ -1339,6 +1342,12 @@
   /* THE CURSOR ROW IS THE WASH, and the pointer moves the cursor, so hover and the cursor are one state. */
   .p-row[data-cursor] {
     background: var(--hover-wash);
+  }
+
+  /* AND THE QUIET LINE STEPS UP ONE INK ON IT: `--dim` is measured against the ground, and over the wash in the dark
+     scheme it falls under 4.5:1. */
+  .p-row[data-cursor] :global(.result-line) {
+    color: var(--ink2);
   }
 
   /* THE KEY CAP HINT, on the cursor row at desktop width with a fine pointer, where the keyboard is. */

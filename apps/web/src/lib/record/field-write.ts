@@ -305,7 +305,7 @@ export const valueWords = {
   save: 'Add',
   saving: 'Adding',
   cancel: 'Cancel',
-  ownerNote: 'Every row of the list can hold it from now on.',
+  ownerNote: 'Everything in the list can hold it from now on.',
   memberNote: 'The owner is asked first, on Decide.',
   empty: 'Type the value to add.',
   held: (said: string, field: string) => `${field} already has ${said}. Pick it from the list.`,

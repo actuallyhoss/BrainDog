@@ -13,7 +13,7 @@ import type { Verb } from './flow.ts';
 
 /** The headings a template's chips sit under, in the order a run gets the values: the trigger's first, then each step's. */
 export const GROUP_WORDS = {
-  row: 'From the row',
+  row: 'From the item',
   arrival: 'From what arrived',
   earlier: 'From earlier steps',
 } as const;

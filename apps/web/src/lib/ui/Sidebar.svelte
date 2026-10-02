@@ -35,7 +35,7 @@
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
-  import { OVERVIEW, isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
+  import { isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
@@ -187,8 +187,7 @@
    */
   let moreAsked = $state(false);
   const inMore = $derived(
-    path === OVERVIEW ||
-      more.some((i) => isHere(i, path)) ||
+    more.some((i) => isHere(i, path)) ||
       groups.some(([, list]) => list.some((e) => under(e.href))) ||
       tools.some((t) => under(t.href)) ||
       path.startsWith('/r/') ||
@@ -371,21 +370,17 @@
       {/if}
 
       <div class="more-body" data-shut={moreShut ? '' : undefined} inert={moreShut || undefined} aria-hidden={moreShut || undefined}>
-        <ul class="group">
-          <!-- THE PAGE THE RECORD OPENED ON BEFORE TODAY, kept and reachable, not the landing. -->
-          <li>
-            <a class="item tap" href={at(OVERVIEW)} data-nav data-label={copy.overview} aria-current={path === OVERVIEW ? 'page' : undefined}>
-              <IconWell name="observe" tone={path === OVERVIEW ? 'ink' : undefined} /><span class="item-name">{copy.overview}</span>
-            </a>
-          </li>
-          {#each more as item (item.key)}
-            <li>
-              <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={isHere(item, path) ? 'page' : undefined}>
-                <IconWell name={item.icon as IconName} tone={isHere(item, path) ? 'ink' : undefined} /><span class="item-name">{item.label}</span>
-              </a>
-            </li>
-          {/each}
-        </ul>
+        {#if more.length > 0}
+          <ul class="group">
+            {#each more as item (item.key)}
+              <li>
+                <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={isHere(item, path) ? 'page' : undefined}>
+                  <IconWell name={item.icon as IconName} tone={isHere(item, path) ? 'ink' : undefined} /><span class="item-name">{item.label}</span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        {/if}
 
         <!-- EACH SECTION'S OTHER PAGES UNDER ITS OWN NAME, in the reader's order. A section of one is a row and not a
              folder; the fold's text is the section's name, so it is announced "Projects, collapsed, button". -->

@@ -10,8 +10,6 @@
  */
 
 export const home = {
-  toDecide: 'to decide',
-
   /* home */
   /* THE LINES A USE CASE'S VOICE MAY REPLACE reach Home through `lib/voice.ts`, which reads each one as the house
      line, so that file is the only one naming them. They are Home's words all the same, so they live here. */

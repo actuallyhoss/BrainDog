@@ -50,6 +50,7 @@
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
   import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
+  import { openPaletteWith } from '$lib/palette/open.svelte.ts';
   import { words } from './words.ts';
 
   let {
@@ -91,6 +92,8 @@
     toasts,
     state: { get: () => held, set: (next) => (held = next) },
     arrivals: liveArrivals(),
+    /* A QUESTION TYPED INTO A CAPTURE IS ASKED in the palette, where search and Slash answer it. */
+    ask: openPaletteWith,
   });
 
   /* THE WRITE MODULE IS FETCHED ONCE A WRITABLE PAGE HAS DRAWN, so its first tick is drawn the moment it is pressed. */

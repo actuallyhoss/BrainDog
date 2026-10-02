@@ -19,19 +19,19 @@ export type Examples = { untouched: number; touched: number; registers: Record<s
 /** The offer as Home draws it, or `null` when there is nothing to clear. */
 export type Offer = { title: string; body: string; button: string; confirm: string; keep: string; loud: boolean };
 
-const rows = (n: number): string => (n === 1 ? 'one example row' : `${n} example rows`);
+const many = (n: number): string => (n === 1 ? 'one example' : `${n} examples`);
 
 export const words = {
-  title: 'Example rows',
+  title: 'Examples',
   fresh: (n: number) =>
-    `Setting up added ${rows(n)} so each page has something to show. They are marked as examples. Clear them when you are ready to use your own.`,
+    `Setting up added ${many(n)} so each page has something to show. They are marked as examples. Clear them when you are ready to use your own.`,
   beside: (n: number) =>
-    `Your own rows are here now, beside ${rows(n)} setting up added. They show on Home, Money and the Dashboard until you clear them.`,
+    `Your own things are here now, beside ${many(n)} setting up added. They show on Home, Money and the Dashboard until you clear them.`,
   touched: (n: number) => (n === 1 ? ' One example you changed stays.' : ` ${n} examples you changed stay.`),
   button: 'Clear the examples',
-  confirm: (n: number) => (n === 1 ? 'Delete the example row' : `Delete ${n} example rows`),
+  confirm: (n: number) => (n === 1 ? 'Delete the example' : `Delete ${n} examples`),
   keep: 'Keep them',
-  cleared: (n: number) => (n === 1 ? 'Cleared one example row.' : `Cleared ${n} example rows.`),
+  cleared: (n: number) => (n === 1 ? 'Cleared one example.' : `Cleared ${n} examples.`),
   kept: (n: number) => (n === 1 ? ' One you changed was kept.' : ` ${n} you changed were kept.`),
 } as const;
 

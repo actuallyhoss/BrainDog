@@ -64,8 +64,8 @@ export const decide = {
      reads; the toast stands over the question it answers, so the option alone is the whole sentence. */
   decisionRecorded: (option: string) => `${option} is recorded as the decision.`,
   parkedUntil: (on: string) => `Parked until ${on}.`,
-  changedSince: 'A row this would change has changed since it was proposed. Nothing was written.',
-  fileIt: 'File it as a row',
+  changedSince: 'Something this would change has changed since it was proposed. Nothing was written.',
+  fileIt: 'File it in a list',
   /* `Archive this` AND IT WAS `Archive the arrival`. An `arrival` is what the record calls a thing
      that came in through an ingest, and the inbox is the one screen where the reader is looking at
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
@@ -81,10 +81,10 @@ export const decide = {
   /* Inbox and page-row writes (lane D) */
   inboxFileInto: 'File it in',
   inboxFiled: (row: string) => `Filed as ${row}. It has left the inbox.`,
-  inboxArchived: 'Archived. The email is kept, and it has left the inbox.',
+  inboxArchived: 'Archived. It is kept, and it has left the inbox.',
   inboxNoLists: 'This record has no lists to file it in yet.',
   /* Decide and page writes (lane B) */
-  decideConflict: 'A row this would change has changed since it was proposed. Nothing was written, and the question has been read again.',
+  decideConflict: 'Something this would change has changed since it was proposed. Nothing was written, and the question has been read again.',
   /* DECIDE AND THE INBOX AS QUEUES: the cursor, a selection, and what a
      proposal would put on the screen. No sentence here assumes what kind of record it is. */
   proposalWillAppear: 'What will appear',
@@ -118,7 +118,7 @@ export const decide = {
   proposalCallsNothing: 'Nothing outside this record',
   proposalMaySend: 'May send',
   proposalSource: (name: string) => `The source of ${name}`,
-  decideRows: (n: number, list: string) => `Changes ${n} ${n === 1 ? 'row' : 'rows'} in ${list}`,
+  decideRows: (n: number, list: string) => `Changes ${n === 1 ? 'one item' : `${n} items`} in ${list}`,
   decideGroup: 'Group',
   decideGroupNone: 'One list',
   decideGroupList: 'By what it is about',
@@ -172,7 +172,7 @@ export const decide = {
   arrangeKeepsVoice: (name: string) => `${name} keeps its voice and Home`,
   arrangeTurnsOn: (names: readonly string[]) => `Turns on ${list([...names])}`,
   arrangeTurnsOff: (names: readonly string[]) => `Turns off ${list([...names])}`,
-  arrangeListsLeave: (lists: readonly string[]) => `${list([...lists])} ${lists.length === 1 ? 'leaves' : 'leave'} the sidebar. The rows are kept.`,
+  arrangeListsLeave: (lists: readonly string[]) => `${list([...lists])} ${lists.length === 1 ? 'leaves' : 'leave'} the sidebar. What is in ${lists.length === 1 ? 'it' : 'them'} is kept.`,
   arrangeListsReturn: (lists: readonly string[]) => `${list([...lists])} ${lists.length === 1 ? 'comes' : 'come'} back to the sidebar.`,
   arrangeNew: (kind: string) => `New ${kind.toLowerCase()}`,
   arrangeChanged: (kind: string) => `Changed ${kind.toLowerCase()}`,
@@ -180,7 +180,7 @@ export const decide = {
   /** What an arrangement changes that is already here, apart from what it adds. */
   arrangeChanges: 'Changes',
   arrangeRetires: 'Takes away',
-  arrangeRetiredRows: (name: string, rows: number) => `${name}, whose ${rows} ${rows === 1 ? 'row stays' : 'rows stay'}`,
+  arrangeRetiredRows: (name: string, rows: number) => `${name}, whose ${rows} ${rows === 1 ? 'item stays' : 'items stay'}`,
   /* WHAT AN UPDATE LEAVES AS THE OWNER CHANGED IT, said because the update does not rewrite it: an edit that carried the
      older version's window keeps that window. */
   arrangeKept: 'Kept',
@@ -196,19 +196,19 @@ export const decide = {
      its rows hold it". A deleted row is a reason of its own, because the choice going would make its restore refused. */
   arrangeStays: (name: string, field: string, values: readonly string[], rows: number, holding: number | null = null, binned = 0) => {
     const it = values.length === 1 ? 'it' : 'one of them';
-    const deleted = binned === 1 ? 'a deleted row holds' : `${binned} deleted rows hold`;
+    const deleted = binned === 1 ? 'a deleted item holds' : `${binned} deleted items hold`;
     const why =
       holding === null
-        ? `it holds ${rows} ${rows === 1 ? 'row' : 'rows'} that may use ${values.length === 1 ? 'it' : 'them'}`
+        ? `it holds ${rows} ${rows === 1 ? 'item' : 'items'} that may use ${values.length === 1 ? 'it' : 'them'}`
         : holding === 0 && binned > 0
-          ? `${deleted} ${it}, and ${binned === 1 ? 'the row' : 'those rows'} could not be restored without ${values.length === 1 ? 'it' : 'them'}`
+          ? `${deleted} ${it}, and ${binned === 1 ? 'that item' : 'those items'} could not be restored without ${values.length === 1 ? 'it' : 'them'}`
           : `${
               holding >= rows
                 ? rows === 1
-                  ? `its one row holds ${it}`
-                  : `all ${rows} of its rows hold ${it}`
-                : `${holding} of its ${rows} rows ${holding === 1 ? 'holds' : 'hold'} ${it}`
-            }${binned === 0 ? '' : `, and ${binned === 1 ? '1 deleted row does' : `${binned} deleted rows do`} too`}`;
+                  ? `its one item holds ${it}`
+                  : `all ${rows} of its items hold ${it}`
+                : `${holding} of its ${rows} items ${holding === 1 ? 'holds' : 'hold'} ${it}`
+            }${binned === 0 ? '' : `, and ${binned === 1 ? '1 deleted item does' : `${binned} deleted items do`} too`}`;
     return `${name} keeps ${values.length === 1 ? `the choice ${values[0]}` : `${values.length} choices, ${list([...values])},`} for ${field}, which this update takes off, because ${why}.`;
   },
   /* WHAT A PACK LAYS ON A LIST ANOTHER PACK OWNS: Personal's roles on People. Named apart from what it adds, because the
@@ -224,13 +224,13 @@ export const decide = {
     kind.charAt(0).toUpperCase() + kind.slice(1),
   arrangeShowsNow: 'Shows now',
   arrangeWillShow: 'Will show',
-  arrangeExamples: (n: number) => `With ${n} example ${n === 1 ? 'row' : 'rows'} to start from`,
+  arrangeExamples: (n: number) => `With ${n} ${n === 1 ? 'example' : 'examples'} to start from`,
   /** The rows a plan adds, list by list, each under the row it belongs with when it names one. */
-  arrangeRows: 'Adds these rows',
+  arrangeRows: 'Adds these',
   arrangeRowUnder: (row: string, under: string) => `${row}, for “${under}”`,
-  arrangeRowsNote: 'Nothing is added until you accept. Each row can be changed or deleted afterwards like any other.',
-  arrangeCountRows: (n: number) => `${n} new ${n === 1 ? 'row' : 'rows'}`,
-  arrangeDidRows: (n: number) => `Added ${n} ${n === 1 ? 'row' : 'rows'}`,
+  arrangeRowsNote: 'Nothing is added until you accept. Each one can be changed or deleted afterwards like any other.',
+  arrangeCountRows: (n: number) => `${n} new ${n === 1 ? 'item' : 'items'}`,
+  arrangeDidRows: (n: number) => `Added ${n} ${n === 1 ? 'item' : 'items'}`,
   arrangeWords: 'Words',
   arrangeCalled: (now: string, next: string) => `${now} will be called “${next}”`,
   arrangeReads: (now: string, next: string) => `“${now}” will read “${next}”`,

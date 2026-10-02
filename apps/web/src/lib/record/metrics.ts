@@ -610,6 +610,10 @@ const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}/gu;
  * changed, because a verb that agrees by an `s` of its own cannot be told from a noun by reading it.
  *
  * AND A NUMBER IS READ WHOLE. `2.1 day(s)` was counted from the `1` after the point, and said "2.1 day".
+ *
+ * A FIGURE'S CHANGE IS ONE MORE HOLE, `{{cash-now.change}}`, which the record answers as a signed percent against the
+ * figure's remembered value a window ago (`+8%`, `−8%`) and leaves out when it has no such point, so these same two
+ * rules drop its clause: an unread change takes the clause with it, and `0%` is nought.
  */
 export function leadOf(template: string, said: (path: string) => string | null): string {
   const kept = template.split(/,\s+/u).filter((clause) => {

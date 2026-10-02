@@ -143,6 +143,8 @@ test('ON A RECORD THAT HOLDS TASKS, WORK OPENS THE WORK SCREEN, and its old page
   assert.equal(work.href, '/?work');
   assert.ok(isHere(work, placeOf('/', new URLSearchParams('work'))));
   assert.ok(!isHere(flat.main[0]!, placeOf('/', new URLSearchParams('work'))), 'Today is not marked on the Work screen');
+  /* The old front doors draw Today, so Today is the place marked on them. */
+  for (const old of ['overview', 'classic']) assert.ok(isHere(flat.main[0]!, placeOf('/', new URLSearchParams(old))), `/?${old} is Today`);
   /* The declared Work page is kept, under its own name, beside the Board. */
   assert.deepEqual(flat.pages.map((p) => [p.title, p.href]), [['Work page', '/p/work'], ['Board', '/p/work-board']]);
 });

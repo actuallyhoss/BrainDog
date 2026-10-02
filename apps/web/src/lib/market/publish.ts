@@ -48,7 +48,7 @@ export const publishWords = {
   needsNoMore: (name: string): string => `No longer needs ${name}`,
   callsNew: (host: string): string => `Calls out to ${host}, which it did not before`,
   callsNoMore: (host: string): string => `No longer calls out to ${host}`,
-  examples: (from: number, to: number): string => `${to} example ${to === 1 ? 'row' : 'rows'}, where it had ${from}`,
+  examples: (from: number, to: number): string => `${to} ${to === 1 ? 'example' : 'examples'}, where it had ${from}`,
   words: 'Its words, labels or skills changed',
 } as const;
 

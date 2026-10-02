@@ -1118,7 +1118,21 @@ test('CASH NOW SAYS WHAT IT ADDS UP AND HOW OLD ITS OLDEST BALANCE IS, not its t
 });
 
 test('AN ACCOUNT BALANCE OLDER THAN A WEEK SAYS IT IS OUT OF DATE, beside its day, with the watch glyph', () => {
-  const cards = page('money')!.blocks.find((b) => b.kind === 'cards')!;
+  /* Read by hand, as a book's page declares it: page.money draws no account cards since money-core 3.3.0, and `stale:` is the cards' rule. */
+  const cards = readBlock({
+    kind: 'cards',
+    heading: 'Accounts',
+    span: 8,
+    source: 'register.accounts',
+    columns: [
+      { field: 'name', as: 'title' },
+      { field: 'balance', as: 'figure' },
+      { field: 'kind', label: 'Type', as: 'fact' },
+      { field: 'as_of', label: 'As of', as: 'when' },
+    ],
+    order: [{ field: 'seq', dir: 'asc' }],
+    stale: { field: 'as_of', after: '7d' },
+  } as never);
   assert.deepEqual(cards.refusals, []);
   const [segment] = toSegments(cards);
   assert.equal(segment?.type, 'block');

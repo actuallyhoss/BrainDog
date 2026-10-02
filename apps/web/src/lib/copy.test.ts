@@ -179,7 +179,7 @@ test('SIGN-IN NAMES ANOTHER WAY IN ONLY WHEN ONE IS DRAWN', () => {
 test('UNINSTALL IS UNDONE RATHER THAN ASKED, and says what installing it again brings back', () => {
   /* The kernel keeps an uninstalled add-on's settings and schedules for thirty days (`pack_removed`), so the toast's Undo
      is a real way back and the question it replaced is gone. */
-  assert.equal(copy.uninstalled('Money'), 'Money is uninstalled. Its rows stay, and installing it again within 30 days brings back its settings and schedules.');
+  assert.equal(copy.uninstalled('Money'), 'Money is uninstalled. What it held stays, and installing it again within 30 days brings back its settings and schedules.');
   assert.equal(copy.reinstalled('Money'), 'Money is back, with its settings and schedules.');
   for (const s of [copy.uninstalled('Money'), copy.reinstalled('Money'), copy.reinstallApprove('Money')]) assert.doesNotMatch(s, /—|Are you sure/u);
 });
@@ -231,4 +231,32 @@ test('THE DISPLAY MENU AND A LANDED WRITE ARE EACH ONE WORD, TYPED ONCE', () => 
  */
 test('THE RECORD’S OWN TAGS ARE NOT KEYS OF `copy`', () => {
   for (const tag of [EXAMPLE, FORMED]) assert.deepEqual(keysHolding(tag), [], `\`${tag}\` is the record's word, not a sentence`);
+});
+
+/**
+ * THE PERSON'S WORDS, NOT THE STORAGE'S (DIRECTION §35). "Rows", "list item" and "entity" are how the record is
+ * stored, and a reader never asked for any of them: they keep invoices, tasks and people. Every sentence this file
+ * builds is rendered with a few shapes of argument, as `access.test.ts` does, and none may say one of those words.
+ *
+ * NOTHING IS HELD ANY MORE. `account.ts` and the feed and Slash lines were excused while their tests still pinned the
+ * old words; they say "items", or the list's own noun, now, so a new sentence that says "row" fails here.
+ */
+test('NO SENTENCE SAYS "ROW", "LIST ITEM" OR "ENTITY"', () => {
+  const SHAPES: unknown[][] = [['x', 1, 'y'], [['x', 'y'], 'z', 1], ['x', ['y', 'z'], 1], [1, 'x', ['y']], [{ name: 'x' }, 'y', 2], ['x', 2, 'y']];
+  const said = (v: unknown): string[] => {
+    if (typeof v === 'string') return [v];
+    if (typeof v === 'function')
+      return SHAPES.flatMap((args) => {
+        try {
+          return [String((v as (...a: unknown[]) => unknown)(...args))];
+        } catch {
+          return [];
+        }
+      });
+    if (v && typeof v === 'object') return Object.values(v as Record<string, unknown>).flatMap(said);
+    return [];
+  };
+  for (const [key, value] of Object.entries(copy)) {
+    for (const line of said(value)) assert.doesNotMatch(line, /\brows?\b|\blist items?\b|\bentit(y|ies)\b/iu, `copy.${key} says "${line.slice(0, 80)}"`);
+  }
 });

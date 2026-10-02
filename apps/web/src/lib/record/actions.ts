@@ -219,7 +219,7 @@ export const words = {
   binding: (noun: string) => `The limit this record is nearest is its ${noun}.`,
   hours: (n: number) => (n === 1 ? '1 hour' : `${n.toLocaleString('en-GB', { maximumFractionDigits: n < 10 ? 1 : 0 })} hours`),
   /* The plan, what it allows, and what else the month holds. */
-  planName: { hosted: 'Cloud', plus: 'Cloud Plus' } as Record<string, string>,
+  planName: { free: 'Free', hosted: 'Cloud', plus: 'Cloud Plus' } as Record<string, string>,
   planLine: (plan: string, runs: string, requests: string, bytes: string, hours: string) =>
     `On ${plan}: ${runs} runs, ${requests} requests, ${bytes} fetched and ${hours} of run time a month.`,
   slashLine: (left: number, included: number, packs: number) =>

@@ -89,10 +89,11 @@ export const BINDINGS: Binding[] = [
   { id: 'commit', scope: 'document', key: '⌘↵', label: 'Commit the primary action of whatever is open', bare: false },
   { id: 'close', scope: 'document', key: 'Esc', label: 'Close the topmost layer, one per press', bare: false },
   { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, not Slash', bare: true },
-  { id: 'menu', scope: 'document', key: '⇧F10', label: 'The row or block menu', bare: false },
+  { id: 'menu', scope: 'document', key: '⇧F10', label: 'The menu of what has focus', bare: false },
 
-  /* TODAY (`lib/home/Today.svelte`): the Needs you list worked from the keyboard. They stand down while a box has the
-     caret, while anything is open over the page, and after `g`. */
+  /* A HOME (`lib/page`, PageBody in PageView mode=home: the declared Today, or any declared page a person opens on, and
+     `lib/home/Today.svelte` at `/?classic`): what needs you, worked from the keyboard. They stand down while a box has
+     the caret, while anything is open over the page, and after `g`. */
   { id: 'today-move', scope: 'today', key: 'j  k', label: 'The next or the previous thing that needs you', bare: true },
   { id: 'today-tick', scope: 'today', key: 'x', label: 'Mark it done, with an undo', bare: true },
   { id: 'today-open', scope: 'today', key: '↵', label: 'Open it', bare: false },
@@ -113,16 +114,16 @@ export const BINDINGS: Binding[] = [
   { id: 'work-find', scope: 'workscreen', key: '/', label: 'Search the tasks', bare: true },
   { id: 'work-leave', scope: 'workscreen', key: 'Esc', label: 'Cancel, or leave the box', bare: false },
 
-  { id: 'row-down', scope: 'grid', key: 'j  ↓', label: 'Row down, keeping the column', bare: true },
-  { id: 'row-up', scope: 'grid', key: 'k  ↑', label: 'Row up, keeping the column', bare: true },
+  { id: 'row-down', scope: 'grid', key: 'j  ↓', label: 'Down one, keeping the column', bare: true },
+  { id: 'row-up', scope: 'grid', key: 'k  ↑', label: 'Up one, keeping the column', bare: true },
   { id: 'col', scope: 'grid', key: '←  →', label: 'Move between columns', bare: false },
-  { id: 'ends', scope: 'grid', key: 'Home  End', label: 'Row ends', bare: false },
+  { id: 'ends', scope: 'grid', key: 'Home  End', label: 'First and last column', bare: false },
   { id: 'register-ends', scope: 'grid', key: '⌘Home  ⌘End', label: 'Top and bottom of the list', bare: false },
-  { id: 'open', scope: 'grid', key: '↵', label: 'Open the row', bare: false },
+  { id: 'open', scope: 'grid', key: '↵', label: 'Open', bare: false },
   { id: 'peek', scope: 'grid', key: 'p', label: 'Peek, with the list still visible', bare: true },
   { id: 'select', scope: 'grid', key: 'x  ⇧x  ⌘a', label: 'Select, extend, all loaded', bare: true },
   { id: 'edit', scope: 'grid', key: 'e  F2', label: 'Edit the focused cell in place', bare: true },
-  { id: 'new', scope: 'grid', key: 'n', label: 'New row', bare: true },
+  { id: 'new', scope: 'grid', key: 'n', label: 'New item', bare: true },
   { id: 'display', scope: 'grid', key: 'v', label: 'Display options', bare: true },
   { id: 'copy-id', scope: 'grid', key: 'y  ⇧Y', label: 'Copy the id, or the link', bare: true },
   { id: 'related', scope: 'grid', key: 'o', label: 'Open the linked list', bare: true },
@@ -186,7 +187,7 @@ export const BINDINGS: Binding[] = [
   { id: 'inbox-clear', scope: 'inbox', key: 'Esc', label: 'Clear the selection', bare: false },
 
   { id: 'palette-move', scope: 'palette', key: '↑  ↓', label: 'Move', bare: false },
-  { id: 'palette-run', scope: 'palette', key: '↵', label: 'Run the row', bare: false },
+  { id: 'palette-run', scope: 'palette', key: '↵', label: 'Run the one picked', bare: false },
   { id: 'palette-complete', scope: 'palette', key: '⇥', label: 'Complete the query, and nothing else', bare: false },
 
   { id: 'nav-move', scope: 'nav', key: '⌥↑  ⌥↓', label: 'Move the focused item', bare: false },

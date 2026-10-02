@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { draw, saidPlainly, toSegments } from './blocks.ts';
-import { page, pages, readBlock } from './fixtures/readers.ts';
+import { page, readBlock } from './fixtures/readers.ts';
 import { KINDS } from 'braindog-render';
 import type { BlockResult } from './api.ts';
 import type { PageBlock } from './schema.ts';
@@ -25,11 +25,33 @@ import './fixtures/fill.ts';
  * `drop` rather than passing `undefined`: under `exactOptionalPropertyTypes` an optional property
  * set to `undefined` is not the same as an absent one, and it is the absent one being tested.
  */
+/**
+ * WHAT MOVED AS A TABLE, READ BY HAND. Money-core 3.3.0 draws it as a calm list (`timeline`) and the page holds no
+ * plain register table any more, so the table this file's `where:`, `seq` and misspelt-column cases mean is declared
+ * here as the page declared it before, and the record reads it on its own (`readBlock`).
+ */
+const WHAT_MOVED = {
+  kind: 'table',
+  heading: 'What moved',
+  span: 12,
+  source: 'register.transactions',
+  where: 'state is not void',
+  columns: [
+    { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+    { field: 'account', label: 'Account', width: 'minmax(10ch,16ch)' },
+    { field: 'category', label: 'For', width: 'minmax(8ch,14ch)' },
+    { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'out' } },
+    { field: 'on', label: 'Date', width: '13ch', align: 'end' },
+  ],
+  order: [{ field: 'on', dir: 'desc' }],
+  limit: 10,
+  empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
+};
+let movedRead: BlockResult | undefined;
+
 const bound = (over: Partial<BlockResult> = {}, drop: (keyof BlockResult)[] = []): BlockResult => {
-  // A table bound to a REGISTER: the money page's first one is the cash walk, which is bound to the
-  // forecast and carries no register at all.
-  const block = page('money')?.blocks.find((b) => b.kind === 'table' && b.register);
-  assert.ok(block, 'the money page has no register-bound table to build on');
+  const block = (movedRead ??= readBlock(WHAT_MOVED as unknown as PageBlock));
+  assert.ok(block.register, 'What moved names no list to build on');
   const merged = { ...block, ...over } as Record<string, unknown>;
   for (const key of drop) delete merged[key as string];
   return merged as BlockResult;
@@ -119,12 +141,15 @@ test('a block that HAS something to draw refuses nothing', () => {
      answers disagreeing is exactly the defect worth catching. */
   let asked = 0;
   for (const block of page('money')?.blocks ?? []) {
+    /* A block whose `when:` is false is not on the page, and holds nothing on purpose: Add an account, once there is one. */
+    if (block.drawn === false) continue;
     const { refusal } = draw(block);
     if (refusal) continue;
     asked += 1;
     /* Every key a block can carry its content in: a table has rows, a chips or bar block has
        entries, a stat has its read metrics, a forecast has a walk, a series has its bars, a queue its questions, a
-       capture the list it writes into, and everything else has the fenced text it was written with. */
+       capture the list it writes into, a kind drawn from the record's own answer (a calendar) the rows in that answer,
+       and everything else has the fenced text it was written with. */
     const held = block as unknown as Record<string, unknown>;
     const many = (key: string) => Array.isArray(held[key]) && (held[key] as unknown[]).length > 0;
     const drawn =
@@ -134,6 +159,7 @@ test('a block that HAS something to draw refuses nothing', () => {
       many('readings') ||
       many('queue') ||
       (held.kind === 'capture' && typeof held.register === 'string' && held.register !== '') ||
+      ((held.answer as { rows?: unknown[] } | undefined)?.rows?.length ?? 0) > 0 ||
       ((held.walk as { steps?: unknown[] } | undefined)?.steps?.length ?? 0) > 0 ||
       ((held.bars as { keys?: unknown[] } | undefined)?.keys?.length ?? 0) > 0 ||
       ((held.parts as { groups?: unknown[] } | undefined)?.groups?.length ?? 0) > 0 ||
@@ -161,31 +187,14 @@ test('the seeded pages refuse nothing at all, so no page ships a broken declarat
  * makes a documented feature that does not exist look like a register that is empty.
  */
 /**
- * The money page's first list-bound table as the record reads it, declared with `over` on top.
+ * What moved, as a table the record reads, declared with `over` on top.
  *
  * THE RECORD READS THE DECLARATION, AND IT CANNOT BE WRITTEN TO HERE. This changed the sample's `PAGES` and read the
  * page back, which reached the browser's page expander; now the fixture's `page` asks a kernel seeded once and
  * never written to, so the change reached nothing. The record's `block`, which reads one declaration without a page
  * around it (`readBlock` in `fixtures/readers.ts`), is handed the changed declaration instead.
  */
-/* A REAL, ALWAYS-DRAWN REGISTER, NOT `deadlines`' OWN AND NOT ONE GATED BEHIND A `when:`. Money's "Coming up" table
-   reads the virtual `deadlines` source, which `blockOf` names a `.register` too (so a reader can say what it is bound
-   to), and "Being chased" is `register.obligations` but only when something is being chased, which the sample is
-   not, so it is never evaluated far enough to refuse anything. Money-core 3.1.0 put both ahead of "What moved", the
-   plain `register.transactions` table this file's `where:`, `seq` and misspelt-column cases mean. */
-const registerTable = (b: BlockResult): boolean =>
-  b.kind === 'table' &&
-  typeof (b as { source?: unknown }).source === 'string' &&
-  (b as { source: string }).source.startsWith('register.') &&
-  (b as { when?: unknown }).when === undefined;
-
-const declared = (over: Record<string, unknown>): BlockResult => {
-  const base = page('money')?.blocks.find(registerTable);
-  assert.ok(base);
-  const decl = pages().money?.blocks.find((b) => b.heading === base.heading);
-  assert.ok(decl);
-  return readBlock({ ...decl, ...over } as PageBlock);
-};
+const declared = (over: Record<string, unknown>): BlockResult => readBlock({ ...WHAT_MOVED, ...over } as unknown as PageBlock);
 
 test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE PAGE', () => {
   // `06-PAGES` §1.1 types `where` as a predicate and §1's worked example writes it as a tree;
@@ -196,8 +205,6 @@ test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE 
   /* THE RECORD READS THE TREE (`where: Predicate | string`), where the browser refused it for not being a
      sentence. So a tree over values the list holds draws its rows, and one naming a value it does not hold is refused
      on its own block in the record's words, the page around it drawn. */
-  const base = page('money')?.blocks.find(registerTable);
-  assert.ok(base);
   const read = declared({ where: { all: [{ field: 'state', in: ['cleared'] }] } });
   assert.deepEqual(read.refusals, [], 'a tree the documentation shows was refused');
   assert.ok(read.rows.length > 0, 'the tree matched nothing, so this asks nothing');
@@ -206,7 +213,7 @@ test('A `where:` WRITTEN AS THE PREDICATE TREE THE DOCS SHOW DOES NOT BLANK THE 
   assert.match(block.refusals[0] ?? '', /nowhere/);
   assert.equal(draw(block).refusal?.kind, 'error');
   // And the rest of the page survived.
-  const others = (page('money')?.blocks ?? []).filter((b) => b.heading !== base.heading);
+  const others = (page('money')?.blocks ?? []).filter((b) => b.heading !== WHAT_MOVED.heading);
   assert.ok(others.length > 3);
   assert.ok(others.some((b) => b.rows.length > 0 || b.metrics?.length), 'one bad block blanked the page');
 });

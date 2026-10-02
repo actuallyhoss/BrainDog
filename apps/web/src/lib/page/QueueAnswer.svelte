@@ -163,7 +163,8 @@
   });
 </script>
 
-<div class="qa">
+<!-- A ROW OF THE PAGE, by the question's id, so a home's cursor walks to it and Enter opens it on Decide. -->
+<div class="qa" data-row="q:{question.id}" data-open={at(`/decide/${encodeURIComponent(question.id)}`)}>
   {#if phase === 'answered' && chosen}
     <p class="qa-done" role="status" tabindex="-1" bind:this={done}>
       <Face name={copy.feedYou} you size="s" /><span class="qa-done-words">{queueWords.answered(chosen.label, since(answeredAt, Date.now()))}</span>

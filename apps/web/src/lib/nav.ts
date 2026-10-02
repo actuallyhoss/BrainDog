@@ -232,22 +232,23 @@ export function flatNav<T extends { title: string; href: string; icon: string; r
 /** What the Work screen's row says on a record whose sections do not name Work. */
 const WORK_WORD = 'Work';
 
-/** The page the record opened on before Today, kept under More at a word in the query (`routes/+page.svelte`). */
+/**
+ * The old Overview address, which draws Today now and is in no nav. KEPT ONLY FOR `settings/[area]/areas/Pages.svelte`,
+ * which still imports it: a missing export fails that module as it loads. Delete it in the same change that drops it there.
+ */
 export const OVERVIEW = '/?overview';
 
 /**
- * THE WORK SCREEN, at a word in the query for the Overview's reason: every top-level folder is a word no record may be
- * named (`APP_WORDS` in `lib/at.ts`, and the Directory's own list), and a record somebody already called "work" must
- * still open.
+ * THE WORK SCREEN, at a word in the query: every top-level folder is a word no record may be named (`APP_WORDS` in
+ * `lib/at.ts`, and the Directory's own list), and a record somebody already called "work" must still open.
  */
 export const WORK = '/?work';
 
 /**
- * Where the reader is, for the rows to compare against: the address inside the record, with the Overview and the Work
- * screen as places of their own.
+ * Where the reader is, for the rows to compare against: the address inside the record, with the Work screen as a place
+ * of its own. `/?overview` and `/?classic` draw Today, so they count as Today.
  */
-export const placeOf = (path: string, search: URLSearchParams): string =>
-  path === '/' && search.has('overview') ? OVERVIEW : path === '/' && search.has('work') ? WORK : path;
+export const placeOf = (path: string, search: URLSearchParams): string => (path === '/' && search.has('work') ? WORK : path);
 
 /** Whether `path`, read inside the record, is on this row: one of its addresses or one under it, or exactly `/` for Today. */
 export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): boolean {

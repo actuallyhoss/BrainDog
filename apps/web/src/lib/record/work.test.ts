@@ -13,7 +13,7 @@ import { NOW, TODAY, installSeed } from '@braindog/seed';
 
 import './fixtures/fill.ts';
 import { REGISTERS, columnHeading } from './api.ts';
-import { page } from './fixtures/readers.ts';
+import { page, readBlock } from './fixtures/readers.ts';
 import { TASKS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
 import { relabelAll } from '../voice.ts';
@@ -96,7 +96,18 @@ for (const slug of ['work', 'work-board'])
   });
 
 test('A COUNT BY WEEK IS DRAWN AS COUNTS, never in the home currency', () => {
-  const series = page('work')!.blocks.find((b) => b.kind === 'series')!;
+  /* READ BY HAND, as Work drew it before its page went calm: the week counts are a figure a page may chart, whichever
+     page does, and the Work page is not the only place that holds one. */
+  const series = readBlock({
+    kind: 'series',
+    heading: 'Done, and due ahead',
+    span: 7,
+    series: [{ metric: 'tasks-done-by-week', then: 'tasks-due-by-week', label: 'Done, then due' }],
+    back: 8,
+    ahead: 4,
+    empty: 'Nothing was finished or is due in these weeks.',
+  } as never);
+  assert.deepEqual(series.refusals, []);
   const text = JSON.stringify(toSegments(series));
   assert.doesNotMatch(text, /£|GBP/u, text.slice(0, 300));
 });
@@ -134,8 +145,10 @@ test('A TASK MADE DONE WITH NO DAY IS DATED TODAY BY BOTH ENGINES, and shows fir
   const record = k.page('work');
   assert.ok(record.ok);
   const said = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => String(r.fields.what));
-  assert.equal(said(record.value.blocks.find((b) => b.heading === 'Done lately')!.rows)[0], title);
-  assert.equal(said(page('work')!.blocks.find((b) => b.heading === 'Done lately')!.entries)[0], title);
+  /* FOUND BY WHAT IT IS, the tasks done most recently, rather than by a heading the page has reworded twice. */
+  const done = (b: { kind: string; heading?: string | undefined }) => b.kind === 'todo' && /^Done\b/u.test(b.heading ?? '');
+  assert.equal(said(record.value.blocks.find(done)!.rows)[0], title);
+  assert.equal(said(page('work')!.blocks.find(done)!.entries)[0], title);
 });
 
 test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were finished', () => {
@@ -150,11 +163,12 @@ test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were fini
 
 test('A TASK COLUMN IS HEADED BY WHAT ONE ROW IS CALLED, in both engines, and a team whose tasks are Tickets reads Ticket', async () => {
   const k = await kernel;
-  const record = k.page('work');
+  /* THE BOARD'S PAGE, whose Everything open is the tasks table: Work draws its tasks as lists since it went calm. */
+  const record = k.page('work-board');
   assert.ok(record.ok);
   const heads = () => ({
     record: record.value.blocks.filter((b) => b.kind === 'table').map((b) => columnHeading('tasks', (b as { columns: { field: string; label?: string }[] }).columns[0]!)),
-    demo: page('work')!.blocks.filter((b) => b.kind === 'table').map((b) => b.columns[0]!.label),
+    demo: page('work-board')!.blocks.filter((b) => b.kind === 'table').map((b) => b.columns[0]!.label),
   });
   const plain = heads();
   assert.deepEqual(plain.record, plain.demo);
@@ -170,7 +184,20 @@ test('A TASK COLUMN IS HEADED BY WHAT ONE ROW IS CALLED, in both engines, and a 
 });
 
 test('OPEN WORK BY PROJECT DRAWS NO BAR FOR TASKS WITH NO SIZE, so unsized work is not "No project 0 d"', () => {
-  const bar = page('work')!.blocks.find((b) => b.heading === 'Open work by project')!;
+  /* READ BY HAND, as Work declared it before its page went calm: the bar is about the record's rule for a size nobody
+     gave, which holds over any page that draws one. */
+  const bar = readBlock({
+    kind: 'bar',
+    heading: 'Open work by project',
+    span: 5,
+    source: 'register.tasks',
+    where: 'state is not done or dropped',
+    columns: [{ field: 'thing' }, { field: 'effort' }],
+    limit: 6,
+    unset: 'No project',
+    empty: 'No open work has a size yet.',
+  } as never);
+  assert.deepEqual(bar.refusals, []);
   const said = (b: typeof bar) => JSON.stringify(toSegments(b));
   assert.match(said(bar), /No project/u, 'the sample sizes its tasks on no project');
   /* THE TASKS ON NO PROJECT LOSE THEIR SIZE: that row goes, and the sized ones stay. */

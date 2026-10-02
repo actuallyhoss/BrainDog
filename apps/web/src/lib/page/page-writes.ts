@@ -26,7 +26,9 @@ import type { Declared, Kept } from '../record/page-write.ts';
 import type { InputsWriter } from '../record/inputs-write.ts';
 import type { Drop } from '../record/roadmap-write.ts';
 import type { toasts } from '../ui/toast.svelte.ts';
-import { UNDO_MS } from '../data/optimistic.ts';
+import { optimist, UNDO_MS } from '../data/optimistic.ts';
+import { isQuestion } from '../work/capture.ts';
+import { words } from './words.ts';
 
 /** The page write module, loaded on the first gesture. */
 type PageWrite = typeof import('../record/page-write.ts');
@@ -91,6 +93,8 @@ export type WritesDeps = {
   state: { get(): Held; set(next: Held): void };
   /** Marks the rows that arrived since a block was last drawn, so they are tinted for a moment. Absent, none are. */
   arrivals?: Seen;
+  /** Opens the palette with a line a capture was asked, which is a question and not a row. Absent, every line is a row. */
+  ask?: (line: string) => void;
 };
 
 /** The writes one page makes, over what the page hands in. */
@@ -326,12 +330,23 @@ export function pageWrites(deps: WritesDeps) {
   async function captureLine(register: string, text: string, inherited: Record<string, string>) {
     const now = deps.now();
     if (now === null) return;
+    const typed = text.trim();
+    /* A QUESTION IS ASKED, NOT FILED: "what is due this week" goes to the palette, where search and Slash answer it,
+       as Today's ask bar sends it. Only where the host can open one; elsewhere the line is a row as it always was. */
+    if (deps.ask && isQuestion(typed)) return deps.ask(typed);
     /* THE LINE IS ON THE LIST BEFORE IT IS WRITTEN, at the head of every checklist over the list it goes to, and it goes
        once the page has read the row back, or at once if the record refuses it (`lib/data/optimistic.ts`). */
-    const line: Row = { cells: [text.trim()], done: false };
+    let line: Row = { cells: [typed], done: false };
     typedLine(register, line, true);
-    const [{ captureRow }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('../record/rows-write.ts')]);
-    const row = captureRow(register, text, inherited, now);
+    const [{ captureRow, readLine }, { rowWriter }] = await Promise.all([import('./capture.ts'), import('../record/rows-write.ts')]);
+    /* THE LIGHT SYNTAX, READ: "Chase Halden tomorrow #kiln" is drawn and written as "Chase Halden", due tomorrow. */
+    const read = readLine(register, typed, now);
+    if (read.text !== typed) {
+      typedLine(register, line, false);
+      line = { cells: [read.text], done: false };
+      typedLine(register, line, true);
+    }
+    const row = captureRow(register, read.text, inherited, now, read.parsed);
     /* NO ROW IS A LIST WHOSE TITLE LEFT BETWEEN THE READ AND THE PRESS, because the page hands a capture a write only
        when the list declares one. It is the race it is, read again. */
     if (!row) {
@@ -339,14 +354,20 @@ export function pageWrites(deps: WritesDeps) {
       toasts.push(copy.writeRaced, { intent: 'warn' });
       return void (await deps.reread());
     }
-    const out = await rowWriter(deps.base()).create(register, row.fields);
-    if (!out.ok) {
-      typedLine(register, line, false);
-      return void toasts.push(out.fix, { intent: 'warn' });
-    }
-    toasts.push(row.filled.length > 0 ? copy.markAddedFilled(row.filled) : copy.writeMarkAdded, { intent: 'good' });
+    const writer = rowWriter(deps.base());
+    const drawn = line;
+    /* THROUGH THE ONE OPTIMISTIC RUNNER, so the receipt names the row and offers it back for six seconds, as a tick's
+       does: Undo archives the row it wrote, at the version it landed with, and reads the page again. */
+    const out = await optimist(toasts).run<{ seq: number; version: number }>({
+      apply: () => {},
+      revert: () => typedLine(register, drawn, false),
+      send: () => writer.create(register, row.fields).then((w) => (w.ok ? { ok: true as const, value: w.entry } : { ok: false as const, fix: w.fix })),
+      said: words.added(read.text, REGISTERS[register]?.name ?? register, read.said, row.filled),
+      undo: (landed) => () => void writer.archive(register, landed.seq, landed.version).then(() => deps.reread()),
+    });
+    if (!out.ok) return;
     await deps.reread();
-    typedLine(register, line, false);
+    typedLine(register, drawn, false);
   }
 
   /** A captured line drawn on the lists over `register`, or taken off them. */

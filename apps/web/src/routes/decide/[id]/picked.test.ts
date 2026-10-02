@@ -16,7 +16,7 @@ test('A ROWSET THAT ADDS SEVERAL ROWS is drawn a row each, by name and the line 
   assert.deepEqual(pickableOf('rowset', servers), [
     { n: 0, title: 'fenwick', detail: 'fenwick-mcp' },
     { n: 1, title: 'docs', detail: 'https://docs.example/mcp' },
-    { n: 2, title: 'Row 3', detail: '' },
+    { n: 2, title: 'Item 3', detail: '' },
   ]);
 });
 

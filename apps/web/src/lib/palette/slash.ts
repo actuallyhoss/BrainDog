@@ -165,7 +165,7 @@ export function drawReading(r: Reading): Drawn {
  * are the palette's and nobody else's, so moving them into its Slash block later changes an import and nothing else.
  */
 export const slashWords = {
-  proposing: 'Slash is writing a proposal about these rows.',
+  proposing: 'Slash is writing a proposal about what it found.',
   proposed: 'What Slash proposes',
   /* `23 §8`'s footer: receded, small, and naming the model on every output. */
   drawnBy: (model: string) => `Drawn by ${model}`,

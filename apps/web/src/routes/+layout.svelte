@@ -61,7 +61,7 @@
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
-  import { OVERVIEW, WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
+  import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { TASKS } from '$lib/work/list.ts';
   import type { Working } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -146,9 +146,10 @@
   /** The same order the rail draws, one nav and not two shapes. */
   /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
   /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`). */
+  /* UNDER THE NAMES THIS PERSON GAVE THEIR PAGES (`nav.labels`), in the rail, the top bar and the More sheet alike. */
   const railNav = $derived.by(() => {
     const placed = new Set(data.index.registers.flatMap((r) => (r.views ?? []).map((v) => v.href)));
-    return data.nav.filter((n) => !n.cut && !placed.has(n.href));
+    return navPrefs.relabel(data.nav.filter((n) => !n.cut && !placed.has(n.href)));
   });
   /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a row under More once anything has arrived. A shell no record answered
      has no `counts`, and is read from the two numbers it does carry. */
@@ -171,6 +172,15 @@
 
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
   $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
+  /* THE PAGE THIS PERSON OPENS ON (`home.page`): once per tab, and only when the tab opened on the bare front door, so
+     the Today item still opens Today. */
+  let homed = false;
+  $effect(() => {
+    if (homed) return;
+    homed = true;
+    const home = navPrefs.home;
+    if (home !== null && home !== '/' && here(page.url.pathname) === '/' && page.url.search === '') void goto(at(home), { replaceState: true });
+  });
   /* A PAGE HIDDEN FROM THE RAIL IS HIDDEN FROM THE TOP BAR AND THE MORE SHEET TOO: one nav, not two. */
   const grouped = $derived(arrange(railNav.filter((e) => !navPrefs.hidden.includes(e.href)), navPrefs.order));
   const hiddenCount = $derived(railNav.filter((e) => navPrefs.hidden.includes(e.href)).length);
@@ -192,7 +202,7 @@
   /* THE PERSON READING, by the name the record told them, for the top bar's face. */
   const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim());
 
-  /* WHERE THE READER IS, for the sheet's rows: the Overview is a place of its own, so Today is not marked on it too. */
+  /* WHERE THE READER IS, for the sheet's rows: the Work screen is a place of its own, so Today is not marked on it too. */
   const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
 
   /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the rows of the flat list, in the order drawn. */
@@ -670,30 +680,27 @@
       {/each}
     </ul>
 
-    <!-- AND WHAT IS UNDER MORE ON THE RAIL: the page the record opened on before Today, the sections that did not fit, and
-         a section's other pages. A project's own page is on the Projects page, not here. -->
-    <h3 class="more-section">{copy.otherPages}</h3>
-    <ul class="more-list">
-      <li>
-        <a class="more-row" href={at(OVERVIEW)} aria-current={place === OVERVIEW ? 'page' : undefined}>
-          <Icon name="observe" size="m" /><span class="more-name">{copy.overview}</span>
-        </a>
-      </li>
-      {#each flat.more as item (item.key)}
-        <li>
-          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
-            <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
-          </a>
-        </li>
-      {/each}
-      {#each flat.pages as entry (entry.href)}
-        <li>
-          <a class="more-row" href={at(entry.href)} aria-current={current(entry.href) ? 'page' : undefined}>
-            <Icon name={entry.icon} size="m" /><span class="more-name">{entry.title}</span>
-          </a>
-        </li>
-      {/each}
-    </ul>
+    <!-- AND WHAT IS UNDER MORE ON THE RAIL: the sections that did not fit, and a section's other pages, with no heading
+         over nothing. A project's own page is on the Projects page, not here. -->
+    {#if flat.more.length + flat.pages.length > 0}
+      <h3 class="more-section">{copy.otherPages}</h3>
+      <ul class="more-list">
+        {#each flat.more as item (item.key)}
+          <li>
+            <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
+              <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
+            </a>
+          </li>
+        {/each}
+        {#each flat.pages as entry (entry.href)}
+          <li>
+            <a class="more-row" href={at(entry.href)} aria-current={current(entry.href) ? 'page' : undefined}>
+              <Icon name={entry.icon} size="m" /><span class="more-name">{entry.title}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
     <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
          in them, so on a young record this section would be a title over nothing. It is the record's

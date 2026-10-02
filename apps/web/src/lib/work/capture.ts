@@ -158,20 +158,43 @@ export function captureSaid(c: Capture, ctx: CaptureContext): string[] {
   return out;
 }
 
-const ASKING = new Set(
-  'who what when where why how which whose whom is are am was were do does did can could should would will shall has have had may might must'.split(' '),
-);
+/* THE WORDS A QUESTION OPENS WITH, by how sure each is alone. `who` and `why` ask whatever follows; the others ask only
+   with the word after them, since "When back, call mum", "When I'm home, call mum" and "Do expenses" are things to do. */
+const ASKS = new Set(['who', 'whom', 'whose', 'why']);
+const WH = new Set(['what', 'when', 'where', 'which', 'how']);
+const AUX = new Set('is are am was were do does did can could should would will shall has have had may might must'.split(' '));
+const BE = new Set(['is', 'are', 'am', 'was', 'were']);
+/* WHO OR WHAT IS ASKED ABOUT: after a verb above, a person or "there" makes it a question ("Have I paid"). */
+const SUBJECT = new Set(['i', 'you', 'we', 'they', 'he', 'she', 'it', 'there']);
+/* AND AFTER A FORM OF "BE", a thing pointed at too ("Is the rent paid"); "Have the car serviced" stays a task. */
+const POINTED = new Set(['this', 'that', 'these', 'those', 'the', 'my', 'our', 'your', 'his', 'her', 'its', 'their']);
+const HOW = new Set(['much', 'many', 'long', 'far', 'often', 'old', 'soon']);
+/* THE TWO THAT ARE ALSO THINGS TO DO WITH "IT" AFTER THEM: "Do it today", "Have it fixed". */
+const DOING = new Set(['do', 'have']);
 
 /**
- * Whether a typed line is a question rather than a thing to do: it ends with a question mark, or opens with a word a
- * question opens with. "What is due this week" asks; "Chase Halden on the invoice" is a task.
+ * Whether a typed line is a question rather than a thing to do: it ends with a question mark, or opens the way a
+ * question does, with a question word and the word a question puts after it. "What is due this week" and "Have I paid
+ * rent" ask; "Chase Halden on the invoice", "Do expenses" and "Have the car serviced" are tasks. A line that is not
+ * sure is a task, since a task is undone with one press and a question sent away is not filed at all.
  */
 export function isQuestion(typed: string): boolean {
   const t = typed.trim();
   if (t === '') return false;
   if (t.endsWith('?')) return true;
-  const first = t.split(/\s+/)[0]!.toLowerCase().replace(/[^a-z']/g, '');
-  return ASKING.has(first);
+  const [first = '', next = ''] = t
+    .toLowerCase()
+    .replace(/\u2019/g, "'")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.replace(/[^a-z']/g, ''));
+  /* "WHAT'S DUE", "WHO'S IN": a question word with its verb joined on. */
+  const [stem = '', joined] = first.split("'");
+  if (joined !== undefined) return ASKS.has(stem) || WH.has(stem);
+  if (ASKS.has(first)) return true;
+  if (WH.has(first)) return AUX.has(next) || (first === 'how' && HOW.has(next));
+  if (AUX.has(first)) return (SUBJECT.has(next) && !(DOING.has(first) && next === 'it')) || (BE.has(first) && POINTED.has(next));
+  return false;
 }
 
 /**

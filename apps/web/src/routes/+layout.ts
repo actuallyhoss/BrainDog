@@ -10,7 +10,7 @@
  * and the account's list of records are the only calls the shell waits on, and each is kept for the
  * tab once it has answered, so a navigation costs nothing here.
  */
-import { redirect } from '@sveltejs/kit';
+import { redirect, type LoadEvent } from '@sveltejs/kit';
 
 import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
@@ -48,7 +48,7 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
       () => ((modelHere = null), false),
     );
 
-export async function load({ url, fetch }): Promise<Shell & { slash: boolean }> {
+export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Promise<Shell & { slash: boolean }> {
   const [live, { readRecordsForSwitcher }, voice] = await Promise.all([
     import('$lib/record/boot-live.ts'),
     import('$lib/record/switcher.ts'),

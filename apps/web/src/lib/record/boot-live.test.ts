@@ -313,11 +313,11 @@ test('a live boot is kept for the tab until it is forgotten', async () => {
   forget();
 });
 
-test('A RECORD SETTING ITSELF UP IS ONE LINE: the use case and how many example rows', () => {
+test('A RECORD SETTING ITSELF UP IS ONE LINE: the use case and how many example items', () => {
   const at = (over: Record<string, unknown>) => newsOf([line({ kind: 'setup', note: null, field: null, from: null, register: null, seq: null, title: null, ...over })] as never, null)[0]?.text;
-  assert.equal(at({ target: 'pack:usecase-personal', target_kind: 'pack', to: 40 }), 'Set up Personal with 40 example rows');
-  assert.equal(at({ target: null, target_kind: null, to: 1 }), 'Added 1 example row');
-  assert.equal(at({ target: null, target_kind: null, to: 0 }), 'Linked the example rows to each other');
+  assert.equal(at({ target: 'pack:usecase-personal', target_kind: 'pack', to: 40 }), 'Set up Personal with 40 example items');
+  assert.equal(at({ target: null, target_kind: null, to: 1 }), 'Added 1 example item');
+  assert.equal(at({ target: null, target_kind: null, to: 0 }), 'Linked the examples to each other');
 });
 
 test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail and at its page, and holds its list there even with no rows in it yet', () => {
@@ -353,12 +353,12 @@ test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day i
   ];
   const items = newsOf(bulk as never, 'p_1');
   assert.equal(items.length, 1);
-  assert.deepEqual(items[0], { at: at(0), by: 'you', text: 'Added 52 rows and asked 8 questions at once, and more before these', href: '/audit?by=you&on=2026-09-15' });
+  assert.deepEqual(items[0], { at: at(0), by: 'you', text: 'Added 52 items and asked 8 questions at once, and more before these', href: '/audit?by=you&on=2026-09-15' });
 
   /* The same run with an hour-old line of its own after it: grouped, not "more before these", and the old line kept. */
   const older = line({ rowid: 1, ts: '2026-09-15T07:00:00.000Z', kind: 'create', register: 'tasks', seq: 99, title: 'By hand' });
   const mixed = newsOf([...bulk.slice(0, 20), older] as never, 'p_1');
-  assert.deepEqual(mixed.map((m) => m.text), ['Added 12 rows and asked 8 questions at once', 'Added By hand']);
+  assert.deepEqual(mixed.map((m) => m.text), ['Added 12 items and asked 8 questions at once', 'Added By hand']);
 
   /* Nine writes a second apart are not bulk; nor are ten a minute apart. */
   assert.equal(newsOf(bulk.slice(0, 9) as never, 'p_1').length, 9);
@@ -374,7 +374,7 @@ test("ONE WRITE'S LINES ARE ONE LINE from three, led by the note they share: cle
     line({ rowid: 20 - i, kind: 'delete', batch: 'b1', note: 'Cleared the examples', register: 'tasks', seq: i + 1, title }),
   );
   const items = newsOf([...cleared, line({ rowid: 5, ts: '2026-09-15T08:00:00.000Z', title: 'Older' , register: 'tasks', seq: 9 })] as never, 'p_1');
-  assert.deepEqual(items.map((i) => i.text), ['Cleared the examples: removed 3 rows', 'Added Older']);
+  assert.deepEqual(items.map((i) => i.text), ['Cleared the examples: removed 3 items', 'Added Older']);
   assert.equal(items[0]!.href, '/audit?by=you&on=2026-09-15');
   /* Two lines of one write keep their own lines. */
   assert.equal(newsOf(cleared.slice(0, 2) as never, 'p_1').length, 2);

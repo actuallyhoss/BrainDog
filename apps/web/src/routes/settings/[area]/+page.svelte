@@ -42,6 +42,7 @@
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
   import Navigation from './areas/Navigation.svelte';
+  import Pages from './areas/Pages.svelte';
   import Notifications from './areas/Notifications.svelte';
   import Backups from './areas/Backups.svelte';
   import Billing from './areas/Billing.svelte';
@@ -86,7 +87,8 @@
     { id: 'agents', label: 'Agents', icon: 'session', group: 'sharing', line: 'Machines and agents that work here' },
     { id: 'ingest', label: 'Ingest', icon: 'inbox', group: 'sharing', line: 'Mail and sources that feed this record' },
     { id: 'keyboard', label: 'Keyboard', icon: 'keyboard', group: 'you', line: 'Character keys and shortcuts' },
-    { id: 'navigation', label: 'Navigation', icon: 'rows', group: 'you', line: 'Navigation placement and hidden pages' },
+    { id: 'navigation', label: 'Navigation', icon: 'rows', group: 'you', line: 'Where it sits, its order and hidden pages' },
+    { id: 'pages', label: 'Pages', icon: 'doc', group: 'you', line: 'Every page, and the one that opens first' },
     { id: 'notifications', label: 'Notifications', icon: 'bell', group: 'you', line: 'When BrainDog interrupts you' },
     { id: 'backups', label: 'Backups', icon: 'archive', group: 'record', line: 'Copies of this record to restore from' },
     { id: 'billing', label: 'Billing', icon: 'money', group: 'record', line: 'What this record costs' },
@@ -243,6 +245,8 @@
       <Keyboard {shell} {area} />
     {:else if area === 'navigation'}
       <Navigation {shell} {area} />
+    {:else if area === 'pages'}
+      <Pages {shell} {area} />
     {:else if area === 'people'}
       <People {shell} {area} />
     {:else if area === 'recovery'}

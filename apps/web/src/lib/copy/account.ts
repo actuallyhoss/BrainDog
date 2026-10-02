@@ -27,7 +27,7 @@ export const account = {
   hiddenPages: 'Hidden from your nav',
   hiddenPagesHint: 'A hidden page stays in the record, in search and in the palette. Show it again and it returns to the place it had.',
   hiddenNone: 'Nothing is hidden',
-  hiddenNoneWhy: 'Right-click a page in the nav, or press Shift+F10 on it, and choose Hide.',
+  hiddenNoneWhy: 'Hide a page from Settings, under Navigation or Pages.',
   perPerson: 'Kept for you on this record, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
   recordOpenSignIn: 'Sign in again to open another record.',
@@ -48,13 +48,13 @@ export const account = {
    */
   levelMeans: {
     owner: 'Can change everything, and invite people',
-    decide: 'Can change rows, and answer questions',
-    write: 'Can add and change rows',
+    decide: 'Can change items, and answer questions',
+    write: 'Can add and change items',
     /* `20 §1`: `append` is *"`create`, `propose` and `log` — and no read … an appender sees nothing,
        **not even what it filed**"*. "Not the rest" said the opposite — that they can read their own
        submissions — which is wrong in the PERMISSIVE direction, on the control that decides who can
        see somebody's business. */
-    append: 'Can add rows, and read nothing',
+    append: 'Can add items, and read nothing',
     read: 'Can read, cannot change',
   } as Record<string, string>,
   auditHolds: 'Every change to this record shows up here, with who made it and when.',
@@ -79,7 +79,7 @@ export const account = {
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and
      the two disagreeing about what the record is called. */
   deleteWhat: (record: string): string =>
-    `Deleting ${record} removes every list, page and row in it. It cannot be undone.`,
+    `Deleting ${record} removes every list and page, and everything they hold. It cannot be undone.`,
   deleteRecord: (record: string): string => `Delete ${record}`,
   holdingPen: 'Not placed. Nothing moved.',
 
@@ -246,9 +246,9 @@ export const account = {
   /* `03 §1`: the three layers are addressable independently, and the governance layer alone IS a
      pack. A product whose only exit is all-or-nothing has three exits it is not offering. */
   takeAway: 'Part of it',
-  takeAwayWhat: 'The way you work and the rows you have written are separate things, and either can leave on its own.',
+  takeAwayWhat: 'The way you work and what you have written are separate things, and either can leave on its own.',
   exportPack: 'Export the way you work',
-  exportRows: 'Export the rows only',
+  exportRows: 'Export your items only',
 
   /* identity — `33 §10`: login is account-level, so this lives outside the record */
   you: 'You',
@@ -270,8 +270,8 @@ export const account = {
   identityCancel: 'Cancel',
   identityClose: 'Close',
   identityNameSaved: (name: string) => `You are ${name} in every record you belong to.`,
-  identityPeopleRow: 'Rename your People row too',
-  identityPeopleRowDone: 'Your People row has the new name too.',
+  identityPeopleRow: 'Rename yourself in People too',
+  identityPeopleRowDone: 'You have the new name in People too.',
   identitySignInWays: 'How you sign in',
   identityPasskeysWay: 'Passkeys',
   identityPasskeys: (n: number) => (n === 0 ? 'None yet' : n === 1 ? 'One passkey' : `${n} passkeys`),
@@ -318,7 +318,7 @@ export const account = {
     login: 'sign in as you, for ninety days',
     runner: 'do work for you on this machine, for ninety days',
     export: 'take one copy of this record, once, in the next ten minutes',
-    import: 'load rows into this record, once, in the next ten minutes',
+    import: 'load items into this record, once, in the next ten minutes',
     pack: 'install one add-on, once, in the next ten minutes',
     token: 'make one more key, once, in the next ten minutes',
     vault: 'open the keys of one project, for thirty days',
@@ -346,7 +346,7 @@ export const account = {
   keyCan: {
     read: 'can read, and change nothing',
     propose: 'can read and suggest, and change nothing itself',
-    write: 'can read and change rows',
+    write: 'can read and change items',
   } as Record<string, string>,
   endsWhen: (when: string) => `ends ${when}`,
   /* A REPORT KEY IN THE TOKENS LIST (`record/device.ts` `reportKeyOf`): its name and the one thing it can do. */
@@ -360,7 +360,7 @@ export const account = {
   connectInboxHint: 'May read the inbox: the bank texts and other arrivals no rule has filed yet. It cannot file or archive them.',
 
   /* ingest — `25 §9` draws this screen */
-  sources: 'Where rows come in from',
+  sources: 'Where new items come in from',
   sourcesHow: 'Each of these fetches on its own schedule. Everything they add is logged.',
   /* `25 §9`'s own blockquote, and it outranks the screen it is on. */
   staleShows: 'A figure fed by one of these shows a gap and says it is stale rather than holding yesterday’s number.',
@@ -395,10 +395,10 @@ export const account = {
   /* IT POINTED AT A SCREEN THAT DOES NOT EXIST. "Change the rule that raises it" is a route this
      product has not got: there is no rules screen, no link, and nothing in the nav that reaches
      one. Advice a reader cannot follow is worse than no advice, because they go looking. What is
-     true is that a rule raised it and the rule is named on the row itself. */
+     true is that a rule raised it and the rule is named on the notification itself. */
   /* "THERE IS NO SWITCH HERE" STOPPED BEING TRUE WHEN THE DEVICE ROW BELOW LANDED ON THE SAME SCREEN. What still has no
      switch is muting one kind of interruption, which is what this sentence was always about. */
-  muteAtSource: 'There is no switch that mutes one of these. Each is raised by a rule, and the rule is named on the row.',
+  muteAtSource: 'There is no switch that mutes one of these. Each is raised by a rule, and the rule is named on it.',
 
   /* notifications on this device: Web Push, drawn only where the host has a key.
      THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */
@@ -492,7 +492,7 @@ export const account = {
      `deleteWhat` carries "It cannot be undone" one line above this, in the section whose own comment
      condemns *"three lines, two of them the same sentence"*, so this one does not say it twice. */
   deleteCosts:
-    'The name is given up for good, and no record here can use it again. One final copy is kept for 30 days and then deleted, and it cannot be opened from here, so export a copy first if you want the rows.',
+    'The name is given up for good, and no record here can use it again. One final copy is kept for 30 days and then deleted, and it cannot be opened from here, so export a copy first if you want to keep what is in it.',
   typeSlug: (slug: string) => `Type ${slug} to confirm`,
 
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
@@ -501,7 +501,7 @@ export const account = {
   /* A COPY OF NOTHING SAYS SO, rather than "0 B": render's `bytes(0)` is pinned, so the line is chosen here. */
   snapshotEmpty: 'Empty',
   download: 'Download',
-  rowsAndSize: (rows: number, size: string) => `${rows === 1 ? '1 row' : `${rows.toLocaleString('en')} rows`} · ${size}`,
+  rowsAndSize: (rows: number, size: string) => `${rows === 1 ? '1 item' : `${rows.toLocaleString('en')} items`} · ${size}`,
   snapshotNow: 'Back up now',
   theKey: 'The key',
   /* `49 §8` asks for exactly this line. */
@@ -673,7 +673,7 @@ export const account = {
   eraseWhichPerson: 'Person on this record',
   eraseNobody: 'Not on this record',
   eraseNow: 'Erase for good',
-  erasedRows: (rows: number) => `Erased. ${rows} ${rows === 1 ? "row no longer holds" : "rows no longer hold"} them, and the log keeps only that it happened.`,
+  erasedRows: (rows: number) => `Erased. ${rows} ${rows === 1 ? "item no longer holds" : "items no longer hold"} them, and the log keeps only that it happened.`,
   recordDeleted: (record: string) => `${record} is deleted. You can close this tab.`,
   /* Lane G: inviting somebody with a link the owner sends, and opening that link */
   inviteEmailLabel: 'Their email',
@@ -706,8 +706,8 @@ export const account = {
   inviteCheckMail: 'Check your mail',
   inviteMailSent: (email: string) => `A link to finish accepting is on its way to ${email}. Open it to prove the address is yours. It works once, within a day.`,
   inviteFromMail: 'You opened the link from your mail. Accept to join the record.',
-  /* A key taken out of service from the vault screen: the bytes go, the row stays. */
-  keyRevoked: (label: string) => label + ' is out of service. Its row stays, because what it opened is a fact.',
+  /* A key taken out of service from the vault screen: the bytes go, its line on the screen stays. */
+  keyRevoked: (label: string) => label + ' is out of service. It stays listed, because what it opened is a fact.',
 
   /* ── Billing, Sessions, Recovery and the lapse banner ─────────────────────────────────────────────────────────────
      BILLING SAYS ONE SENTENCE A RECORD, and the sentence says what happens next: nothing for a paid one, Stripe's retry
@@ -715,8 +715,13 @@ export const account = {
      that export never stops. The plan's price is the Worker's own string (`GET /account/billing`), never written here. */
   billingYours: 'Records you own',
   billingPlan: (plan: string, price: string) => (price ? `${plan}, ${price}` : plan),
-  billingPlanHosted: 'Hosted',
+  billingPlanHosted: 'Cloud',
   billingPlanPlus: 'Cloud Plus',
+  /* FREE, the plan a record made without paying is on (DIRECTION §35): named, then one calm offer of the paid plan. */
+  billingPlanFree: 'Free',
+  billingFreeOffer: (plan: string, price: string) =>
+    `Everything in the app, for one person. When you need more Slash, more automations or colleagues, ${plan} is ${price}.`,
+  billingUpgrade: (plan: string) => `Upgrade to ${plan}`,
   billingPaidThrough: (day: string) => `Paid through ${day}.`,
   billingPaid: 'Paid and up to date.',
   billingPastDue: 'The last payment did not go through. Stripe will try again; update the card.',
@@ -817,18 +822,18 @@ export const account = {
   inviteThisRecord: 'This record',
   inviteEverything: (does: string) => `everything (${does})`,
   inviteListGives: (list: string, does: string) => `${list} (${does})`,
-  inviteDoes: { owner: 'owns it', decide: 'decides', write: 'edits rows', append: 'adds rows', read: 'reads' },
-  /* One list's grant narrowed to the rows where one field holds one value, picked in the exception picker and
+  inviteDoes: { owner: 'owns it', decide: 'decides', write: 'edits items', append: 'adds items', read: 'reads' },
+  /* One list's grant narrowed to the items where one field holds one value, picked in the exception picker and
      said back under the exception on the person's card. */
-  exceptionOnly: 'Only rows where',
-  exceptionEveryRow: 'Every row',
+  exceptionOnly: 'Only items where',
+  exceptionEveryRow: 'Every item',
   exceptionIs: 'Is',
   exceptionYes: 'Yes',
   exceptionNo: 'No',
-  exceptionOnlySaid: (field: string, value: string) => `Only rows where ${field} is ${value}.`,
-  exceptionOnlyWords: (words: string) => `Only rows where ${words}.`,
-  exceptionOnlyOther: 'Only the rows a rule set elsewhere picks.',
-  exceptionOnlyUnread: 'A rule BrainDog cannot read, so no rows of this list.',
+  exceptionOnlySaid: (field: string, value: string) => `Only items where ${field} is ${value}.`,
+  exceptionOnlyWords: (words: string) => `Only items where ${words}.`,
+  exceptionOnlyOther: 'Only the items a rule set elsewhere picks.',
+  exceptionOnlyUnread: 'A rule BrainDog cannot read, so nothing in this list.',
   exceptionAddedOnly: (name: string, list: string, level: string, field: string, value: string) =>
     `${name} is set to ${level} on ${list}, only where ${field} is ${value}.`,
   /* Closing your account, from Settings > Identity. The records keep their own history, and the Directory's

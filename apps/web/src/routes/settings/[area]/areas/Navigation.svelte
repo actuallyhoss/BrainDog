@@ -1,6 +1,6 @@
 <!--
-  Settings > Navigation: the shape of the navigation, the pages hidden from it, the switch that lets the record offer
-  anything, and the holding pen itself.
+  Settings > Navigation: the shape of the navigation, the order of its pages, the pages hidden from it, the switch that
+  lets the record offer anything, and the holding pen itself.
 
   EVERY SETTING HERE IS THE PERSON'S OWN ON A RECORD (`nav-prefs.svelte.ts`): the shape is `nav.shape`, the switch is
   `pen.suggest`, and every "Not this one" is appended to `pen.dismissed`, so a choice made on the laptop holds on the
@@ -19,6 +19,7 @@
   import type { Rehearsed } from '../../../decide/[id]/proposed.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { navPrefs, type Saved } from '$lib/nav-prefs.svelte.ts';
+  import { arrange } from '$lib/nav.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -32,8 +33,20 @@
 
   let { shell }: AreaProps = $props();
 
-  /* THIS AREA'S OWN WORDS: the group the switch sits in, so the row inside can carry the switch's own name. */
-  const words = { offers: 'Suggestions' };
+  /* THIS AREA'S OWN WORDS: the group the switch sits in, so the row inside can carry the switch's own name, and the
+     order of the pages, which says what a press does in the person's own page names. */
+  const words = {
+    offers: 'Suggestions',
+    yours: 'Your pages',
+    yoursHint: 'Move a page up or down under its heading, or hide it. Nothing is deleted.',
+    up: (title: string) => `Move ${title} up`,
+    down: (title: string) => `Move ${title} down`,
+    hide: 'Hide',
+    hideOne: (title: string) => `Hide ${title}`,
+    hidden: (title: string) => `${title} is hidden from your nav.`,
+    none: 'No pages in your nav yet',
+    noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages you make.',
+  };
 
   /* THE MOST LISTS WHOSE ICON IS READ FOR AN OFFER, one `schema` read each, the record's own cap on the pen. */
   const ICON_LISTS_MOST = 24;
@@ -44,8 +57,45 @@
     else if (done !== undefined) toasts.push(done);
   };
 
+  /**
+   * THE PAGES OF THE NAV, IN THE ORDER IT DRAWS THEM, under the names this person gave them.
+   *
+   * THE RAIL'S OWN SET (`+layout.svelte`): a page the budget cut is drawn by its strip of tabs and not the rail, and a
+   * saved view is drawn under its list. A page one row made is left to its list's page, as the flat nav leaves it, so
+   * moving it here would move nothing anybody sees. Arranged with the hidden ones in, so the order kept places a hidden
+   * page where it was when it is shown again; drawn without them, since they have their own section below.
+   */
+  const views = $derived(new Set(shell.index.registers.flatMap((r) => r.views.map((v) => v.href))));
+  const arranged = $derived(arrange(navPrefs.relabel(shell.nav.filter((e) => !e.cut && !e.row && !views.has(e.href))), navPrefs.order));
+  const shown = $derived(
+    arranged.flatMap(([section, list]) => {
+      const seen = list.filter((e) => !navPrefs.isHidden(e.href));
+      return seen.length > 0 ? [[section, seen] as const] : [];
+    }),
+  );
+  const shownCount = $derived(shown.reduce((n, [, list]) => n + list.length, 0));
+  /* WHETHER A PRESS WOULD MOVE ANYTHING, so the arrow at a heading's edge is not offered. */
+  const edge = (href: string, step: -1 | 1): boolean => {
+    const list = shown.find(([, l]) => l.some((e) => e.href === href))?.[1] ?? [];
+    const at = list.findIndex((e) => e.href === href);
+    return step === -1 ? at <= 0 : at >= list.length - 1;
+  };
+
+  function move(href: string, step: -1 | 1) {
+    void navPrefs.move(arranged, href, step)?.then((saved) => said(saved));
+  }
+
+  function hidePage(p: { href: string; title: string }) {
+    void navPrefs.hide(p.href).then((saved) => {
+      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
+      else toasts.push(words.hidden(p.title), { undo: () => void navPrefs.show(p.href) });
+    });
+  }
+
   /* THE PAGES THIS PERSON HID FROM THEIR NAV, by the name the rail gave them, and the way back. */
-  const hiddenPages = $derived(navPrefs.hidden.map((href) => ({ href, title: shell.nav.find((e) => e.href === href)?.title ?? href })));
+  const hiddenPages = $derived(
+    navPrefs.hidden.map((href) => ({ href, title: navPrefs.labelOf(href, shell.nav.find((e) => e.href === href)?.title ?? href) })),
+  );
   function showAgain(p: { href: string; title: string }) {
     void navPrefs.show(p.href).then((saved) => {
       if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
@@ -273,6 +323,42 @@
   </div>
   <p class="hint">{copy.navShapeOnPhone}</p>
   <p class="hint wide-only">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
+</Section>
+
+<!--
+  THE ORDER OF THE NAV, which `nav.order` has kept since the rail's own menu lost Move up and Hide. Each heading's pages
+  in the order drawn, an arrow up and down that moves one a place inside its heading, and Hide. The arrows are there on
+  hover and on focus under a pointer, and always under a thumb.
+-->
+<Section title={words.yours} count={shownCount}>
+  <p class="hint">{words.yoursHint}</p>
+  {#if shown.length === 0}
+    <Empty kind="cleared" title={words.none} body={words.noneWhy} />
+  {:else}
+    {#each shown as [section, list] (section)}
+      <p class="order-head">{section}</p>
+      <ul class="ledger ledger-lead order">
+        {#each list as p (p.href)}
+          <li class="order-row">
+            <div class="line">
+              <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
+              <span class="line-main"><span class="line-title">{p.title}</span></span>
+              <span class="line-amount"></span>
+              <span class="line-when order-acts">
+                <button type="button" class="step" aria-label={words.up(p.title)} disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}
+                  ><Icon name="arrow-up" size="s" /></button
+                >
+                <button type="button" class="step" aria-label={words.down(p.title)} disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}
+                  ><Icon name="arrow-down" size="s" /></button
+                >
+                <Button weight="bare" aria-label={words.hideOne(p.title)} onclick={() => hidePage(p)}>{words.hide}</Button>
+              </span>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/each}
+  {/if}
 </Section>
 
 <!-- THE WAY BACK FOR A HIDDEN PAGE, which the rail's "pages hidden" row opens at. -->
@@ -568,6 +654,73 @@
     inline-size: 60%;
     border-radius: 1cqi;
     background: color-mix(in srgb, var(--ink) 20%, transparent);
+  }
+
+  /* ── the order of the nav ── */
+
+  .order-head {
+    margin: 0 0 var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+  }
+
+  .order + .order-head {
+    margin-block-start: var(--sp-4);
+  }
+
+  .order-acts {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+
+  /* AN ARROW IS A SQUARE THE SIZE OF A CONTROL, with its glyph in the quiet ink until it is pointed at. */
+  .step {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--dim);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      opacity var(--d-state) var(--ease-out);
+  }
+
+  .step:hover:not(:disabled) {
+    background: var(--hover-wash);
+    color: var(--ink);
+  }
+
+  .step:disabled {
+    cursor: default;
+    opacity: 0.3;
+  }
+
+  /* UNDER A POINTER THE PRESSES WAIT FOR THE PAGE THEY MOVE, and come with hover or focus, so the list reads as the
+     names of the pages. Under a thumb there is no hover, and they are always there. */
+  @media (pointer: fine) {
+    .order-row .order-acts {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .order-row:hover .order-acts,
+    .order-row:focus-within .order-acts {
+      opacity: 1;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .step {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
   }
 
   .pen-acts {

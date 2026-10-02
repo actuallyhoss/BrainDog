@@ -24,16 +24,17 @@ registerHooks({
   },
 });
 
-const { NavPrefs } = await import('./nav-prefs.svelte.ts');
+const { NavPrefs, moved } = await import('./nav-prefs.svelte.ts');
 type Prefs = import('./nav-prefs.svelte.ts').Prefs;
 
-type Sent = { key: string; value: string[] | string | boolean };
+type Value = string[] | string | boolean | Record<string, string> | null;
+type Sent = { key: string; value: Value };
 
 const recorder = (answer: (s: Sent) => { from: 'kept' } | { from: 'refused'; fix: string } = () => ({ from: 'kept' })) => {
   const sent: Sent[] = [];
   return {
     sent,
-    send: async (key: keyof Prefs, value: string[] | string | boolean) => {
+    send: async (key: keyof Prefs, value: Value) => {
       const s = { key, value };
       sent.push(s);
       return answer(s);
@@ -131,4 +132,91 @@ test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE'S COPY OF IT", () => {
   } finally {
     delete g.document;
   }
+});
+
+/* ── moving, the home page and the names ──────────────────────────────── */
+
+const RAIL = [
+  ['Money', [{ href: '/p/money' }, { href: '/p/bills' }, { href: '/p/tax' }]],
+  ['Work', [{ href: '/p/work' }, { href: '/p/board' }]],
+] as const;
+
+test('A PAGE MOVES ONE PLACE INSIDE ITS HEADING, and never across one', () => {
+  assert.deepEqual(moved(RAIL, '/p/bills', -1), ['/p/bills', '/p/money', '/p/tax', '/p/work', '/p/board']);
+  assert.deepEqual(moved(RAIL, '/p/bills', 1), ['/p/money', '/p/tax', '/p/bills', '/p/work', '/p/board']);
+  assert.equal(moved(RAIL, '/p/tax', 1), null, 'the last page of Money moved into Work');
+  assert.equal(moved(RAIL, '/p/work', -1), null, 'the first page of Work moved into Money');
+  assert.equal(moved(RAIL, '/p/nowhere', 1), null);
+  /* A HIDDEN NEIGHBOUR IS PASSED OVER, so a press always moves the page past one the person can see. */
+  assert.deepEqual(moved(RAIL, '/p/money', 1, (h) => h === '/p/bills'), ['/p/tax', '/p/bills', '/p/money', '/p/work', '/p/board']);
+  assert.equal(moved(RAIL, '/p/bills', 1, (h) => h === '/p/tax'), null);
+});
+
+test('A MOVE KEEPS THE LISTS WHERE THEY WERE, after the pages it names', async () => {
+  const prefs = new NavPrefs({ order: ['/r/clients', '/p/money', '/r/tasks'], hidden: [] });
+  const io = recorder();
+  prefs.adopt({}, 'https://app.example', io.send);
+  assert.equal(prefs.move(RAIL, '/p/money', -1), null, 'a press at the edge sent something');
+  assert.deepEqual(await prefs.move(RAIL, '/p/money', 1), { from: 'kept' });
+  assert.deepEqual(prefs.order, ['/p/bills', '/p/money', '/p/tax', '/p/work', '/p/board', '/r/clients', '/r/tasks']);
+  assert.deepEqual(io.sent, [{ key: 'nav.order', value: prefs.order }]);
+});
+
+test('THE HOME PAGE IS AN ADDRESS, and Today is no choice at all', async () => {
+  const prefs = new NavPrefs({ order: [], hidden: [] });
+  const io = recorder();
+  prefs.adopt({ 'home.page': '/p/money' }, 'https://app.example', io.send);
+  assert.equal(prefs.home, '/p/money');
+  await prefs.setHome('/?work');
+  await prefs.setHome('/');
+  assert.equal(prefs.home, null);
+  assert.deepEqual(io.sent, [
+    { key: 'home.page', value: '/?work' },
+    { key: 'home.page', value: '/' },
+  ]);
+});
+
+test('TODAY PUT BACK ON ONE DEVICE IS TODAY ON THE NEXT, not the page that device last heard of', () => {
+  const g = globalThis as { localStorage?: Storage };
+  const held = new Map<string, string>([['bd_nav_home', JSON.stringify('/p/money')]]);
+  g.localStorage = {
+    getItem: (k: string) => held.get(k) ?? null,
+    setItem: (k: string, v: string) => void held.set(k, v),
+    removeItem: (k: string) => void held.delete(k),
+  } as Storage;
+  try {
+    const prefs = new NavPrefs({ order: [], hidden: [], home: '/p/money' });
+    prefs.adopt({ 'home.page': '/' }, 'https://app.example', recorder().send);
+    assert.equal(prefs.home, null);
+    assert.equal(held.has('bd_nav_home'), false);
+  } finally {
+    delete g.localStorage;
+  }
+});
+
+test('A RECORD THAT DOES NOT KEEP THE HOME PAGE YET PUTS IT BACK, and says why', async () => {
+  const prefs = new NavPrefs({ order: [], hidden: [], home: null });
+  prefs.adopt({}, 'https://app.example', recorder(() => ({ from: 'refused', fix: 'key is one of nav.order.' })).send);
+  assert.deepEqual(await prefs.setHome('/p/money'), { from: 'refused', fix: 'key is one of nav.order.' });
+  assert.equal(prefs.home, null);
+});
+
+test("A NAME IS THE PERSON'S OWN, and the page's own title or nothing takes it away", async () => {
+  const prefs = new NavPrefs({ order: [], hidden: [] });
+  const io = recorder();
+  prefs.adopt({ 'nav.labels': { '/p/money': 'Cash', bad: 'x', '/p/x': 3 } as unknown as Record<string, string> }, 'https://app.example', io.send);
+  assert.deepEqual(prefs.labels, { '/p/money': 'Cash' }, 'a name that is not an address to text was kept');
+  assert.equal(prefs.labelOf('/p/money', 'Money'), 'Cash');
+  assert.equal(prefs.labelOf('/p/tax', 'Tax'), 'Tax');
+  assert.deepEqual(prefs.relabel([{ href: '/p/money', title: 'Money', section: 'A' }]), [{ href: '/p/money', title: 'Cash', section: 'A' }]);
+
+  await prefs.setLabel('/p/tax', '  VAT and tax  ', 'Tax');
+  await prefs.setLabel('/p/money', 'Money', 'Money');
+  await prefs.setLabel('/p/tax', '', 'Tax');
+  assert.deepEqual(prefs.labels, {});
+  assert.deepEqual(io.sent, [
+    { key: 'nav.labels', value: { '/p/money': 'Cash', '/p/tax': 'VAT and tax' } },
+    { key: 'nav.labels', value: { '/p/tax': 'VAT and tax' } },
+    { key: 'nav.labels', value: {} },
+  ]);
 });

@@ -28,6 +28,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
   import { boxesOf, layoutOf, mainSpan, slotOf, splitAreas, sticks, type Run } from './layout.ts';
+  import { emptyHidden, openOf, optionOf, stepRow } from './home.ts';
   import type { Writes } from './page-writes.ts';
 
   let {
@@ -41,7 +42,10 @@
     level = 2,
     headed = false,
   }: {
-    /** `page` is `/p/<slug>`, with its keys; `home` and `preview` are drawn inside another screen, which owns the keys. */
+    /**
+     * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
+     * long one folds, and the keys walk rows across every block. `preview` is drawn inside another screen and is inert.
+     */
     mode: 'page' | 'home' | 'preview';
     /** The page as the record answered it, whose `layout` says whether there is a rail. */
     page: LivePageDecl;
@@ -69,6 +73,12 @@
   const layout = $derived(layoutOf(page));
 
   /**
+   * THE BLOCKS AS THIS MODE DRAWS THEM. On a home a block that holds nothing, and says nothing about it, is not drawn
+   * (`home.ts` `emptyHidden`), at the index it was declared at, so every id and write on the page still finds it.
+   */
+  const drawable = $derived(mode === 'home' ? emptyHidden(blocks) : blocks);
+
+  /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in the declaration.
    *
    * `slot.span` is authoritative whether or not the mode is open: it falls back to the declared span when there is no
@@ -76,8 +86,8 @@
    * every width: the layout you confirmed was not the layout you got.
    */
   const laid = $derived.by(() => {
-    const slots = arrangement?.slots ?? blocks.map((b, i) => slotOf(b, i, layout));
-    return slots.map((slot) => ({ slot, block: blocks[slot.i] })).filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
+    const slots = arrangement?.slots ?? drawable.map((b, i) => slotOf(b, i, layout));
+    return slots.map((slot) => ({ slot, block: drawable[slot.i] })).filter((x): x is { slot: Slot; block: LiveBlock } => Boolean(x.block));
   });
 
   /** Every drawn pair with `at`, its index in `laid`, which is the index the arrangement moves by. */
@@ -193,6 +203,7 @@
   let cursor = $state(-1);
 
   function onkeydown(e: KeyboardEvent) {
+    if (mode === 'home') return homeKey(e);
     if (mode !== 'page') return;
     /* THE ONE TEST FOR WHETHER SOMEBODY IS TYPING, rather than a narrower copy of it: `typing()` covers an open select
        and a contenteditable block as well as a field. */
@@ -270,6 +281,152 @@
   function focusBlock() {
     const slot = reading[cursor]?.slot.i;
     if (slot !== undefined) slotEl(slot)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /* ── the row cursor, on a home ────────────────────────────────────────────
+     A HOME IS WORKED ROW BY ROW, as Today was: `j` and `k` walk every row of every block in the order the page draws
+     them, `x` ticks a task, Enter opens the row, `1` to `9` answer the question under the cursor, and `n` puts the caret
+     in the page's capture. A block is not a stop of its own here: on the page everybody opens first, what is wanted is
+     the next thing, not the next box.
+
+     THE ROWS ARE FOUND IN THE PAGE AS DRAWN: every element that says it is a row (`data-row`, which the renderer's
+     primitives and `QueueAnswer` carry), and a list item of the renderer's lists where a primitive does not say so yet.
+     The cursor is kept by the row's own id and its block, so a page read again keeps it on the same row, and a row that
+     left (a task ticked away) hands it to the row that took its place. */
+  let pageEl = $state<HTMLElement | null>(null);
+  let rowKey = $state<string | null>(null);
+  let rowAt = -1;
+  /* THE RING IS THE KEYS' MARK: a row a pointer pressed in keeps the cursor, so `x` ticks it, but draws no ring that
+     stays after the click. Only `j` and `k` turn it on. */
+  let keyed = false;
+  let goAt = 0;
+  const ROW = '[data-row], .block .list > li.item';
+
+  /** Every row the page draws now, in reading order, each with the key the cursor holds it by. */
+  function rowsNow(): { el: HTMLElement; key: string }[] {
+    if (!pageEl) return [];
+    const all = [...pageEl.querySelectorAll<HTMLElement>(ROW)];
+    const outer = all.filter((el) => !all.some((o) => o !== el && o.contains(el)));
+    const seen = new Map<string, number>();
+    return outer.map((el) => {
+      const slot = el.closest('.block-slot')?.id ?? '';
+      const n = seen.get(slot) ?? 0;
+      seen.set(slot, n + 1);
+      return { el, key: `${slot}|${el.dataset.row ?? `@${n}`}` };
+    });
+  }
+
+  /** Draws the cursor on the row it holds, or on the row that took its place, and takes focus there when asked. */
+  function markRow(focus: boolean) {
+    if (!pageEl) return;
+    for (const el of pageEl.querySelectorAll('[data-row-cursor]')) el.removeAttribute('data-row-cursor');
+    if (rowKey === null) return;
+    const rows = rowsNow();
+    let at = rows.findIndex((r) => r.key === rowKey);
+    if (at < 0 && rowAt >= 0 && rows.length > 0) at = Math.min(rowAt, rows.length - 1);
+    const row = rows[at];
+    if (!row) return void ((rowKey = null), (rowAt = -1));
+    rowKey = row.key;
+    rowAt = at;
+    if (keyed) row.el.setAttribute('data-row-cursor', '');
+    if (!focus) return;
+    if (!row.el.hasAttribute('tabindex')) row.el.tabIndex = -1;
+    row.el.focus({ preventScroll: true });
+    row.el.scrollIntoView({ block: 'nearest' });
+  }
+
+  /* AND AGAIN EACH TIME THE PAGE IS DRAWN AGAIN, since a re-read draws new elements and the mark was on the old ones. */
+  $effect(() => {
+    if (mode !== 'home') return;
+    void drawable;
+    void rowKey;
+    void tick().then(() => markRow(false));
+  });
+
+  /**
+   * THE RENDERER'S HALF OF THE CURSOR: the row id a block's primitive draws the cursor on, when it is that block's, and
+   * the call it makes when one of its rows takes focus. A primitive that does not take them is walked through the page
+   * as drawn, above, so the keys work either way.
+   */
+  const cursorIn = (i: number): string | null => {
+    const lead = `${ids}b-${i + 1}|`;
+    return rowKey?.startsWith(lead) && !rowKey.startsWith(`${lead}@`) ? rowKey.slice(lead.length) : null;
+  };
+  const rowFocus = (i: number) => (row: string) => {
+    const key = `${ids}b-${i + 1}|${row}`;
+    if (key !== rowKey) keyed = false;
+    rowKey = key;
+    rowAt = rowsNow().findIndex((r) => r.key === rowKey);
+  };
+
+  function homeKey(e: KeyboardEvent) {
+    if (e.metaKey || e.ctrlKey || e.altKey || covered() || typing() || arranging) return;
+    if (silenced(e)) return;
+    /* A `g` PRESSED FIRST IS THE SHELL'S, and so is the key after it: `g 1` goes to the first place in the nav. */
+    if (e.key === 'g') {
+      goAt = Date.now();
+      return;
+    }
+    if (Date.now() - goAt < 1000) {
+      goAt = 0;
+      return;
+    }
+    const on = document.activeElement;
+    /* INSIDE A TABLE THE KEYS ARE THE TABLE'S: its grid walks its own rows with the same letters. */
+    if (on instanceof HTMLElement && on.closest('[role="grid"]')) return;
+    const control = on instanceof HTMLElement && on.closest('button, a[href], select, summary') !== null;
+    const rows = rowsNow();
+    const at = rows.findIndex((r) => r.key === rowKey);
+    const under = rows[at]?.el;
+    switch (e.key) {
+      case 'j':
+      case 'k': {
+        const next = rows[stepRow(rows.length, at < 0 && rowAt >= 0 ? Math.min(rowAt, rows.length - 1) : at, e.key === 'j' ? 1 : -1)];
+        if (!next) return;
+        rowKey = next.key;
+        keyed = true;
+        markRow(true);
+        break;
+      }
+      case 'x': {
+        /* THE TASK'S OWN BOX, pressed, so the tick is the one a pointer makes, with its receipt and its Undo. */
+        const box = under?.querySelector<HTMLElement>('[role="checkbox"]');
+        if (!box) return;
+        box.click();
+        break;
+      }
+      case 'Enter': {
+        if (control || !under) return;
+        const to = openOf(under.dataset.open, under.dataset.row);
+        const link = under.querySelector<HTMLAnchorElement>('a[href]');
+        if (to) void goto(inApp(to));
+        else if (link) link.click();
+        else return;
+        break;
+      }
+      case 'n': {
+        const field = pageEl?.querySelector<HTMLInputElement>('.capture-input');
+        if (!field) return;
+        field.focus();
+        break;
+      }
+      case 'Escape':
+        if (rowKey === null) return;
+        rowKey = null;
+        rowAt = -1;
+        markRow(false);
+        if (on instanceof HTMLElement && on.hasAttribute('data-row')) on.blur();
+        break;
+      default: {
+        /* THE OPTION BY ITS NUMBER, pressed, so the answer is the one the card's own button sends. */
+        const n = optionOf(e.key);
+        const option = n === null ? null : under?.querySelectorAll<HTMLElement>('.queue-act')[n];
+        if (!option) return;
+        option.click();
+      }
+    }
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   async function copyBlockLink(slotIndex: number) {
@@ -363,7 +520,18 @@
           </div>
         {/if}
       {/if}
-      <BlockSlot {block} i={slot.i} {ids} {writes} param={page.param} {arranging} {now} {level} />
+      <BlockSlot
+        {block}
+        i={slot.i}
+        {ids}
+        {writes}
+        param={page.param}
+        {arranging}
+        {now}
+        {level}
+        fold={mode === 'home'}
+        rows={mode === 'home' ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
+      />
     </div>
   {/if}
 {/snippet}
@@ -387,7 +555,7 @@
 <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only in the mode where they
      are reorderable; announcing "list, 5 items" to somebody reading a page is describing the furniture. ON A PAGE WITH A
      RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
-<div class="page" data-mode={mode} data-headed={headed ? '' : undefined} role={arranging && !layout ? 'list' : undefined}>
+<div class="page" data-mode={mode} data-headed={headed ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
@@ -605,6 +773,7 @@
     outline: 2px solid var(--focus-in);
     outline-offset: 2px;
   }
+
 
   /* ── arranging ────────────────────────────────────────────────────────────
      The tile is marked rather than lifted. A card that grows a shadow the moment a mode opens tells you the mode

@@ -110,7 +110,7 @@ test('a rule with no trigger of its own starts on its list and runs inside the w
   const out = proposedOf('change', { to: { id: 'rule.flag', kind: 'rule', body: { rule: 'flag', register: 'invoices', then: [{ tag: 'new' }] } } });
   assert.deepEqual(out?.appears[0]?.title, 'Flag');
   assert.deepEqual(out?.appears[0]?.lines, [
-    { label: 'Starts', value: 'When a row in invoices is added or changed' },
+    { label: 'Starts', value: 'When an item in invoices is added or changed' },
     { label: 'How it runs', value: words.inline },
     { label: 'Step 1', value: 'Tag it: new' },
   ]);

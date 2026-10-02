@@ -1,6 +1,10 @@
 /**
- * Signing up, from the browser's side: the three `/auth/signup/*` calls, the billing calls a new record is paid through,
- * and what the address says when somebody arrives from their mail or from Stripe.
+ * Signing up, from the browser's side: the three `/auth/signup/*` calls, the billing calls a new record is made or paid
+ * through, and what the address says when somebody arrives from their mail or from Stripe.
+ *
+ * FREE LEADS (DIRECTION §35). The site's buttons open `/signup` with no plan, and no plan is Free: checkout with
+ * `plan: 'free'` makes the record there and then and answers its `/start`. `?plan=cloud` and `?plan=plus` are the
+ * site's pricing buttons, and those go to Stripe's page as before.
  *
  * PLAIN TYPESCRIPT, like `auth.ts` beside it, so a test can load it in Node with a fake `fetch` and no browser. The page
  * (`routes/signup/+page.svelte`) and the no-record state on `/start` (`routes/start/NoRecord.svelte`) hold the runes.
@@ -15,10 +19,13 @@
 /** The world the calls reach, so a test needs no socket. */
 export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> };
 
-/** An answer, or the one thing the screen needs to say instead. `fix` is the host's sentence when it sent one. */
+/**
+ * An answer, or the one thing the screen needs to say instead. `fix` is the host's sentence when it sent one, and `at`
+ * the field it was about, so a free record refused for its plan is not offered the name to try again.
+ */
 export type Asked<T> =
   | { ok: true; value: T }
-  | { ok: false; kind: 'refused'; fix: string | null }
+  | { ok: false; kind: 'refused'; fix: string | null; at?: string }
   | { ok: false; kind: 'locked'; retryAfter: number }
   | { ok: false; kind: 'unreachable' };
 
@@ -31,17 +38,61 @@ export type Verified = { person: string; email: string; slug: string; name: stri
 /** One record the person owns, as `/account/billing` lists it. */
 export type Owned = { record: string; slug: string; state: string };
 
-/** What `/account/billing` answers that this page reads: the records, whether billing is open, and the price of a record. */
-export type Billing = { records: Owned[]; open: boolean; price: string | null };
+/**
+ * What `/account/billing` answers that this page reads: the records, whether billing is open, the price of a record on
+ * the first plan sold, and each sold plan's price by its id, so a page paying for Cloud Plus names Cloud Plus's.
+ */
+export type Billing = { records: Owned[]; open: boolean; price: string | null; prices: Partial<Record<Plan, string>> };
 
 /** Where somebody arrived from: their mail with a proof, Stripe with a payment, Stripe without one, or nowhere. */
 export type Arrival = { kind: 'verify'; token: string } | { kind: 'paid' } | { kind: 'cancelled' } | null;
 
-/** What the page keeps across the round trip to Stripe, in this tab only: the name asked for, the person's name, the zone. */
-export type Held = { slug: string; name: string | null; tz: string | null };
+/** The plans a new record can start on: Free, which nothing sells, or one paid for on Stripe's page. */
+export type Plan = 'free' | 'cloud' | 'plus';
+
+/**
+ * What the page keeps across the round trip to Stripe, in this tab only: the name asked for, the person's name, the zone,
+ * and the plan. No `plan` is the checkout's own default, Cloud, which is what a record paid for without one is on.
+ */
+export type Held = { slug: string; name: string | null; tz: string | null; plan?: Plan };
 
 /** The key the round trip is kept under, in `sessionStorage`. */
 export const HELD_KEY = 'braindog.signup';
+
+/**
+ * The key the plan is kept under across the mail, in `localStorage`.
+ *
+ * NOT THE TAB'S STORAGE, because the link in the mail opens a new tab, and a person who chose Cloud Plus on the site
+ * would come back to a tab that never heard of it and be made a free record. The plan alone, nothing they typed.
+ */
+export const PLAN_KEY = 'braindog.signup.plan';
+
+const PLANS: readonly Plan[] = ['free', 'cloud', 'plus'];
+const planIn = (v: unknown): Plan | null => (PLANS.includes(v as Plan) ? (v as Plan) : null);
+
+/** The plan the address asks for (`?plan=`), Free when it names none or one this page does not know. */
+export function planOf(search: string): Plan {
+  return planIn(new URLSearchParams(search).get('plan')) ?? 'free';
+}
+
+/** The plan kept across the mail, or `null`. Storage may be off, and then nothing was kept. */
+export function planKept(storage: Pick<Storage, 'getItem'> | null | undefined): Plan | null {
+  try {
+    return planIn(storage?.getItem(PLAN_KEY));
+  } catch {
+    return null;
+  }
+}
+
+/** Keep the plan across the mail, or forget it once the record is made (`null`). */
+export function keepPlan(storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined, plan: Plan | null): void {
+  try {
+    if (plan === null) storage?.removeItem(PLAN_KEY);
+    else storage?.setItem(PLAN_KEY, plan);
+  } catch {
+    /* Storage off: the page falls back to Free after the mail, which is still a record, and Settings upgrades it. */
+  }
+}
 
 /** Fifteen minutes, the lockout's own length, for a 429 that does not say how long. */
 const LOCK_SECONDS = 900;
@@ -76,7 +127,8 @@ async function call(io: Io, path: string, body?: Record<string, unknown>): Promi
   if (res.ok && env?.ok === true) return { ok: true, value: env.value };
   if (env?.ok === false || (res.status >= 400 && res.status < 500)) {
     const refusal = isObj(env?.refusal) ? env.refusal : null;
-    return { ok: false, kind: 'refused', fix: str(refusal?.fix) };
+    const at = str(refusal?.at);
+    return { ok: false, kind: 'refused', fix: str(refusal?.fix), ...(at !== null ? { at } : {}) };
   }
   return { ok: false, kind: 'unreachable' };
 }
@@ -157,20 +209,28 @@ export async function billing(io: Io = live()): Promise<Asked<Billing>> {
     .filter((r) => typeof r.record === 'string' && typeof r.slug === 'string')
     .map((r) => ({ record: r.record as string, slug: r.slug as string, state: typeof r.state === 'string' ? r.state : 'unbilled' }));
   const plans = Array.isArray(v.plans) ? v.plans.filter(isObj) : [];
-  return { ok: true, value: { records, open: v.open === true, price: str(plans[0]?.price) } };
+  const prices: Partial<Record<Plan, string>> = {};
+  for (const p of plans) {
+    const id = planIn(p.id);
+    const price = str(p.price);
+    if (id !== null && price !== null) prices[id] = price;
+  }
+  return { ok: true, value: { records, open: v.open === true, price: str(plans[0]?.price), prices } };
 }
 
 /**
- * A Stripe Checkout page for a new record, as an address to go to.
+ * A new record's next address: Stripe's Checkout page for a paid plan, or, for Free, the record's own `/start`, because
+ * the host makes a free record there and then.
  *
- * ONLY AN `https:` ADDRESS IS GONE TO. The host builds it from Stripe's answer, and a page that followed whatever came
- * back would follow a `javascript:` one as readily.
+ * ONLY AN `https:` ADDRESS IS GONE TO. The host builds it from Stripe's answer or its own name, and a page that followed
+ * whatever came back would follow a `javascript:` one as readily.
  */
 export async function checkout(held: Held, io: Io = live()): Promise<Asked<string>> {
   const out = await call(io, '/account/billing/checkout', {
     slug: held.slug,
     ...(held.name ? { name: held.name } : {}),
     ...(held.tz ? { tz: held.tz } : {}),
+    ...(held.plan ? { plan: held.plan } : {}),
   });
   if (!out.ok) return out;
   const url = isObj(out.value) ? str(out.value.url) : null;
@@ -226,7 +286,8 @@ export function heldOf(storage: Pick<Storage, 'getItem'> | null | undefined): He
     const raw = storage?.getItem(HELD_KEY);
     const v: unknown = raw ? JSON.parse(raw) : null;
     if (!isObj(v) || typeof v.slug !== 'string' || v.slug === '') return null;
-    return { slug: v.slug, name: str(v.name), tz: str(v.tz) };
+    const plan = planIn(v.plan);
+    return { slug: v.slug, name: str(v.name), tz: str(v.tz), ...(plan ? { plan } : {}) };
   } catch {
     return null;
   }

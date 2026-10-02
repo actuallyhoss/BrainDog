@@ -28,9 +28,9 @@ import { learn } from './remote.ts';
 export const retypeWords = {
   open: 'Change type',
   title: (label: string) => `Change ${label}`,
-  subtitle: 'See what happens to every row before anything changes.',
+  subtitle: 'See what happens to everything in the list before anything changes.',
   kind: 'Holds',
-  required: 'Every row must have one',
+  required: 'Every item must have one',
   choices: 'Choices',
   choiceLabel: (value: string) => `Words shown for ${value}`,
   up: (value: string) => `Move ${value} up`,
@@ -42,16 +42,16 @@ export const retypeWords = {
   addChoice: 'Add',
   flow: 'Limit which choice may follow which',
   follows: (value: string) => `After ${value}`,
-  preview: 'Show what happens to the rows',
-  previewing: 'Reading the rows',
-  stale: 'Something changed above. Show what happens to the rows again.',
+  preview: 'Show what this changes',
+  previewing: 'Reading the list',
+  stale: 'Something changed above. Show what this changes again.',
   summary: (converts: number, failing: number, rows: number) =>
     failing === 0
       ? `${said(converts)} of ${said(rows)} change, and every one carries over.`
       : `${said(converts)} carry over. ${said(failing)} ${failing === 1 ? 'does' : 'do'} not, and each needs an answer.`,
-  widens: 'Every value already reads this way, so no row is rewritten.',
-  sample: 'How some rows would read',
-  failing: 'Rows that need an answer',
+  widens: 'Every value already reads this way, so nothing is rewritten.',
+  sample: 'How some would read',
+  failing: 'What needs an answer',
   clear: 'Clear',
   keep: 'Keep as text',
   keepNote: (id: string) => `Kept values go in a new text field, ${id}.`,
@@ -73,9 +73,9 @@ export const retypeWords = {
   changed: 'The list changed while this was being sent. Try again.',
 } as const;
 
-/** A count said in words a person reads: `1 row`, `1,204 rows`. */
+/** A count said in words a person reads: `1 item`, `1,204 items`. */
 function said(n: number): string {
-  return n === 1 ? '1 row' : `${n.toLocaleString('en-GB')} rows`;
+  return n === 1 ? '1 item' : `${n.toLocaleString('en-GB')} items`;
 }
 
 /** One stored field, as the record's own body holds it. */

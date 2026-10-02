@@ -498,7 +498,7 @@
               <input id="flow-register" class="field-input" value={t.written.register} spellcheck="false" oninput={(e) => setWritten({ register: e.currentTarget.value.trim() })} />
             </div>
           {/if}
-          <p class="label" id="flow-ops">When a row is</p>
+          <p class="label" id="flow-ops">When an item is</p>
           <div class="segmented" role="group" aria-labelledby="flow-ops">
             {#each OPS as [op, label] (op)}
               {@const on = (t.written.op ?? []).includes(op)}

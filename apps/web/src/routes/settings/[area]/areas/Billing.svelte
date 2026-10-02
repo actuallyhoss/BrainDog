@@ -1,7 +1,7 @@
 <!--
   Settings > Billing: this month's plan and usage as a tile of meters, then what each record you own costs on the Cloud
   and where its bill stands, or on a self-host the one line that says there is nothing to bill; then where usage and
-  the export are.
+  the export are. A free record says Free and offers the first paid plan once, quietly (DIRECTION §35).
 -->
 <script lang="ts">
   import { page } from '$app/state';
@@ -10,8 +10,8 @@
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
-    billingLine, hostedHere, meterBars, monthDay, paymentPage, planLine, readBilling, shareOf, stateLine, thisRecord, tileWords,
-    type BilledRecord,
+    billingLine, hostedHere, meterBars, monthDay, paymentPage, planLine, planShown, readBilling, shareOf, stateLine, thisRecord, tileWords,
+    upgradeOf, type BilledRecord,
   } from '../../billing.ts';
   import { untrack } from 'svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -66,7 +66,7 @@
   const month = $derived(monthDay(shell.now));
   /* THE ONE THE MONTH TURNS ON, whose own sentence joins the reading line once it is near its limit. */
   const nearest = $derived(meters.find((m) => m.binding) ?? null);
-  const figure = $derived(billed && billed.state !== 'unbilled' ? planLine(billed) : (allowed?.plan ?? null));
+  const figure = $derived(billed && (billed.state !== 'unbilled' || billed.plan === 'free') ? planLine(billed) : (allowed?.plan ?? null));
   const needs = $derived(nearest && nearest.share >= 0.8 ? nearest.said : null);
   const reading = $derived(
     [allowed?.binding ? actionWords.binding(allowed.binding) : `${actionWords.noUsage}.`, allowed?.slash ?? null, allowed?.extra ?? null]
@@ -100,10 +100,11 @@
      Worker counts five an hour a person, so the guard spares the person one of them as well as the double page. */
   let going = $state<string | null>(null);
 
-  async function goPay(kind: 'portal' | 'checkout', r: BilledRecord) {
+  /* `plan` IS A FREE RECORD'S UPGRADE: checkout for the record on that plan. Paying again names none. */
+  async function goPay(kind: 'portal' | 'checkout', r: BilledRecord, plan?: string) {
     if (going !== null) return;
     going = r.record;
-    const out = await paymentPage(kind, r.record);
+    const out = await paymentPage(kind, r.record, undefined, plan);
     if (out.ok) {
       /* LEAVING FOR STRIPE, and `going` stays set, so the button keeps saying so until the page is gone. Stripe's
          own host, so `at()` hands it back unchanged; the argument still starts with `at(`. */
@@ -147,17 +148,28 @@
       <ul class="bills">
         {#each bill.value.records as r (r.record)}
           {@const late = r.state === 'past_due' || r.state === 'lapsed'}
+          {@const upgrade = upgradeOf(r, bill.value)}
           <li class="bill">
             <IconWell name="money" size="l" tone={late ? 'danger' : undefined} />
             <div class="bill-main">
               <div class="bill-head">
                 <span class="bill-name" dir="auto">{nameOf(r)}</span>
-                <span class="bill-plan">{r.state === 'unbilled' ? copy.billingNotBilled : planLine(r)}</span>
+                <span class="bill-plan">{planShown(r)}</span>
               </div>
-              {#if r.state !== 'unbilled'}
+              {#if upgrade}
+                <p class="bill-state">{upgrade.line}</p>
+              {:else if r.state !== 'unbilled'}
                 <p class="bill-state" data-state={r.state}>{stateLine(r, shell.now)}</p>
               {/if}
             </div>
+            <!-- A FREE RECORD'S ONE OFFER, as a quiet button: the page's one ink button stays the person's own act. -->
+            {#if upgrade}
+              <div class="bill-actions">
+                <Button onclick={() => goPay('checkout', r, upgrade.plan.id)} aria-busy={going === r.record} disabled={going !== null}
+                  >{going === r.record ? copy.billingOpening : copy.billingUpgrade(upgrade.plan.name)}</Button
+                >
+              </div>
+            {/if}
             <!-- THE ACTIONS STRIPE CAN TAKE, and only while this host is taking payments: with billing off every
                  billing door refuses, so a button here would be a press that can only fail. A record with no row
                  has no customer at Stripe, so it has nothing to manage either. -->

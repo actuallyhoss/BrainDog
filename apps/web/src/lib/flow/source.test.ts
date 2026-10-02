@@ -95,7 +95,7 @@ test("THE RECORD'S LIST HAS NO BODIES, AND EVERY ROW OF IT IS DRAWN from the sum
   assert.equal(row.body, null);
   assert.equal(row.version, 4);
   assert.deepEqual(row.month, { runs: 12, failures: 1 }, "the record's `failed` is the count of failures");
-  assert.equal(rowTrigger(row), 'When a row in invoices is added or changed');
+  assert.equal(rowTrigger(row), 'When an item in invoices is added or changed');
   assert.equal(rowLine(row, Date.parse('2026-09-22T10:00:00.000Z')), 'Last run 2h ago, failed. invoices has no field called due.');
   assert.equal(rowsOf([LISTED, { ...LISTED, rule: 'clock', enabled: false }])[1]!.enabled, false);
 });

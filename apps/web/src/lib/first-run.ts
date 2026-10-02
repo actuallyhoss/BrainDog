@@ -19,6 +19,34 @@ export const firstRun = {
   whoChips: ["I'm a student", 'I run a few companies', "I'm part of a team", "I'm starting something new"],
   whoChipsLabel: 'Add to your answer',
   whoGo: 'Show my BrainDog',
+  /* WHILE SLASH READS WHAT WAS SAID: the button's own word, and nothing else moves. */
+  whoReading: 'Reading',
+  /* WHERE SIMPLE RULES READ IT BECAUSE THE MONTH'S ASKS ARE SPENT, said once, quietly, so a thin reading is explained. */
+  readByRules: "Slash is out of asks this month, so simple rules read this. Check what was heard, and tell it more.",
+
+  /* POINT AT AN EXPORT: a file from another app, read on this device and shown before anything is saved. */
+  exportPoint: 'Or bring in a file',
+  exportHint: 'A CSV or JSON export from your bank, Notion, Trello, Todoist or a spreadsheet.',
+  exportDrop: 'Drop it here',
+  exportReading: 'Reading your file',
+  exportInto: (n: number, name: string) => `${n === 1 ? 'One goes' : `${n} go`} into ${name}.`,
+  exportOwn: (name: string) => `It becomes ${name}, with a page to read it on.`,
+  exportColumns: 'Where each column goes',
+  exportRest: (more: number, unused: number) =>
+    [more > 0 ? `${more} more ${more === 1 ? 'column goes' : 'columns go'} in too` : '', unused > 0 ? `${unused} ${unused === 1 ? 'column is' : 'columns are'} left in the file` : '']
+      .filter((x) => x !== '')
+      .join(', and ') + '.',
+  exportHeld: (n: number) => `${n === 1 ? 'One waits' : `${n} wait`} on the currency, or do not fit.`,
+  exportMore: (kept: number, more: number) => `The first ${kept} come in; ${more} more stay in the file.`,
+  exportLeave: 'Leave it out',
+  exportNoEntries: 'Nothing in that file reads as a table. Try its CSV or JSON export.',
+  exportNotJson: 'That file is not JSON this can read.',
+  exportTooBig: 'That file is over 10 MB. Export a shorter stretch of it.',
+  /* THE ONE PRESS: the question a list of the file's own is filed under, and what could not come in. */
+  importAsk: (name: string) => `Keep ${name}, brought in from a file?`,
+  importNotMade: (name: string) => `${name} could not be brought in.`,
+  importMissed: (n: number, total: number, name: string) => `${n} of ${total} from your file did not go into ${name}.`,
+
   /* THE SENTENCE ONCE IT IS READ, drawn as one line a press opens again for editing. */
   whoEdit: 'Edit what you said',
 

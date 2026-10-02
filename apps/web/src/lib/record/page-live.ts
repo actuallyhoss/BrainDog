@@ -125,7 +125,7 @@ type Answered = {
   tone?: PageBlock['tone'];
   fold?: boolean;
   icon?: string;
-  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string } }[];
+  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string }; metric?: unknown }[];
   cells?: { metric: string; label?: unknown; trend?: unknown; note?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
@@ -311,7 +311,8 @@ const columnsOf = (b: Answered) => {
     const as = c.as === 'scope' && b.kind === 'cards' ? 'fact' : roleOf(c.as);
     return {
       field: c.field,
-      label: columnHeading(register, { field: c.field, label: str(c.label) }),
+      /* A card's trend column reads a `metric:` and names no field, so with no label of its own it is headed by nothing. */
+      label: columnHeading(register, { field: c.field ?? '', label: str(c.label) }),
       width: c.width ?? 'minmax(12ch,1fr)',
       align: c.align ?? 'start',
       truncate: fieldOf(register, c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
@@ -692,6 +693,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     /* WHAT A BUILT PAGE'S FORMS ARE DRAWN FROM, taken by name and narrowed below, so a record on another
        build that sent one in a shape this cannot read draws the plain form rather than a wrong one. */
     nexts: nexted,
+    /* EACH CARD'S TREND, a run of numbers a card, taken by name and narrowed into its cell below. */
+    trends: trended,
     types: typed,
     home: homeSaid,
     done_now: doneNow,
@@ -1014,6 +1017,17 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
       row.cells[i] = nexts?.[n] ?? null;
     });
   });
+  /* AND EACH CARD'S TREND, `trends`, the record's reading of the column's `metric:` with the card's own fields filled
+     in. Such a column names no field, so `toRows` drew it empty and this writes the run as the words `trendOf` reads,
+     a gap as `-` and never as a zero. A card the record read nothing for draws no line. The record reads the first such
+     column only (`pages.ts` `trendColumn`), so only that one is filled: a second would draw the first one's line. */
+  const trends = kind === 'cards' && Array.isArray(trended) && trended.length === got.length ? trended : null;
+  const trendAt = (b.columns ?? []).findIndex((c) => c.as === 'trend' && typeof c.metric === 'string');
+  if (trendAt >= 0)
+    rows.forEach((row, n) => {
+      const run = trends?.[n];
+      row.cells[trendAt] = Array.isArray(run) ? run.map((v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '-')).join(' ') : null;
+    });
   /* A PATH'S MARKS ARE THE RECORD'S, one a row, and the first open one's place. A path under `first:` SAYS ITS OWN REST
      as "N more" (`blocks.ts` `pathRows`), so `shown` is the whole match and the page's slice line is not drawn under it
      as the same count told twice. */

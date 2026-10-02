@@ -22,6 +22,6 @@ test('A SETUP ROW ON A FEED BLOCK IS SAID AS HOME SAYS IT, the use case and how 
   );
   assert.deepEqual(
     rows.map((r) => r.cells[3]),
-    ['added Learn to swim', 'Set up Personal with 56 example rows', 'Linked the example rows to each other'],
+    ['added Learn to swim', 'Set up Personal with 56 example items', 'Linked the examples to each other'],
   );
 });

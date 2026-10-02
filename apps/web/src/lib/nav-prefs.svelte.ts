@@ -1,6 +1,6 @@
 /**
- * The person's own navigation: the rail's order, the pages hidden from it, its shape, whether the holding pen proposes
- * anything, and what they have dismissed from it.
+ * The person's own navigation: the rail's order, the pages hidden from it, the names they gave its pages, the page the
+ * app opens on, its shape, whether the holding pen proposes anything, and what they have dismissed from it.
  *
  * `19 §3`: nav order, hidden pages, the shape, dismissals and the *Suggest new pages* switch must survive a change of
  * device. On a record they are the person's own, kept by `setPref` and answered on `boot`'s `me.prefs`; this holds them
@@ -22,6 +22,12 @@
 import * as pref from './pref.ts';
 
 const HIDDEN = 'bd_nav_hidden';
+/* THE DEVICE'S COPIES OF THE HOME PAGE AND THE NAMES, for a tab with no record, kept beside the hidden list for its
+   reason: `pref.ts`'s cookie is read before first paint, and neither of these is needed before `boot` answers. */
+const HOME = 'bd_nav_home';
+const LABELS = 'bd_nav_labels';
+/** The longest name a person may give a page in their nav: a rail item, not a sentence. */
+export const LABEL_MOST = 40;
 /* THE DEVICE'S COPY OF WHAT WAS DISMISSED, for a tab with no record to keep it in. */
 const DISMISSED = 'bd_pen_dismissed';
 /**
@@ -40,6 +46,13 @@ export type Prefs = {
   'nav.shape'?: NavShape | 'side';
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
+  /**
+   * THE PAGE THE APP OPENS ON, by its address (`/p/money`, `/?work`). Absent is Today, which is `/`. The record keeps it
+   * once `home.page` is one of its `PREF_KEYS`; until then a record refuses it and the screen says so.
+   */
+  'home.page'?: string;
+  /** THE NAMES THIS PERSON GAVE PAGES IN THEIR NAV, address to name. The page's own title is untouched. */
+  'nav.labels'?: Record<string, string>;
 };
 
 /** What a change came to: kept by the record, kept on this device, or refused with the record's sentence. */
@@ -52,6 +65,38 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
  * chosen now is kept as `side`, and a `rail` read back is read as no choice at all.
  */
 const shapeKept = (v: unknown): NavShape | undefined => (v === 'side' ? 'rail' : v === 'bar' || v === 'menu' ? v : undefined);
+
+/** A name map kept whole: only text keys that are addresses, and text names within the length a nav item takes. */
+const names = (v: unknown): Record<string, string> => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+  const out: Record<string, string> = {};
+  for (const [href, name] of Object.entries(v as Record<string, unknown>))
+    if (href.startsWith('/') && typeof name === 'string' && name.trim() !== '') out[href] = name.trim().slice(0, LABEL_MOST);
+  return out;
+};
+
+/* TODAY'S OWN `/` IS NO CHOICE, read as none: it is what a record keeps when somebody puts Today back (`setHome`). */
+const address = (v: unknown): string | null => (typeof v === 'string' && v.startsWith('/') && v !== '/' ? v : null);
+
+function readKept(key: string): unknown {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(key);
+    return raw === null ? null : JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function keepKept(key: string, value: unknown): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* For `keepList`'s reason: the record's answer replaces it as soon as `boot` arrives. */
+  }
+}
 
 function readList(key: string): string[] {
   try {
@@ -95,7 +140,7 @@ function takeLegacy(): string[] {
 /** The newest `DISMISSED_MOST`, each once, in the order they were dismissed. */
 const capped = (list: readonly string[]): string[] => [...new Set(list)].slice(-DISMISSED_MOST);
 
-type Value = string[] | string | boolean;
+type Value = string[] | string | boolean | Record<string, string> | null;
 type Send = (key: keyof Prefs, value: Value) => Promise<Saved>;
 
 /** The record's `setPref`, through the client. A refusal is the record's own sentence. */
@@ -105,8 +150,10 @@ const sendTo =
     const { createClient } = await import('@braindog/client');
     /* EACH KEY'S SHAPE IS CHECKED BY THE RECORD, which refuses a wrong one in that key's words; the methods below only
        ever send the shape their own key holds. */
+    /* THE KEY IS CAST TO THE RECORD'S OWN, because this file names `home.page` and `nav.labels` before the record's
+       `PREF_KEYS` does; a key it does not take yet comes back as its refusal, which the screen says. */
     const out = await createClient({ base })
-      .setPref(key, value as never)
+      .setPref(key as Parameters<ReturnType<typeof createClient>['setPref']>[0], value as never)
       .catch(() => null);
     if (out?.ok) return { from: 'kept' };
     const fix = out && 'refusal' in out ? out.refusal.fix : 'The record could not be reached, so this was not kept.';
@@ -119,12 +166,50 @@ export type Start = {
   shape?: NavShape | undefined;
   suggest?: boolean | undefined;
   dismissed?: string[];
+  home?: string | null;
+  labels?: Record<string, string>;
 };
 
 const fromDevice = (): Start => {
   const held = pref.read();
-  return { order: held.nav ?? [], hidden: readList(HIDDEN), shape: held.shape, suggest: held.suggestPages, dismissed: readList(DISMISSED) };
+  return {
+    order: held.nav ?? [],
+    hidden: readList(HIDDEN),
+    shape: held.shape,
+    suggest: held.suggestPages,
+    dismissed: readList(DISMISSED),
+    home: address(readKept(HOME)),
+    labels: names(readKept(LABELS)),
+  };
 };
+
+/** One heading of the nav and its pages in the order drawn, as `arrange` answers it. */
+export type Arranged = readonly (readonly [string, readonly { href: string }[]])[];
+
+/**
+ * The whole order after one page moves a place up (`-1`) or down (`1`) inside its own heading, or `null` at the edge.
+ *
+ * WITHIN A HEADING, NEVER ACROSS ONE, for `arrange`'s reason: a heading is what a page declared, and a page moved out of
+ * it would sit under a title that is not its own. `skip` passes over pages the person cannot see in the nav (the hidden
+ * ones), so a press always moves the page past one they can.
+ *
+ * THE ANSWER NAMES EVERY PAGE, in the order drawn, so the arrangement kept is the one the person was looking at.
+ */
+export function moved(groups: Arranged, href: string, step: -1 | 1, skip: (href: string) => boolean = () => false): string[] | null {
+  let next: string[] | null = null;
+  const flat = groups.flatMap(([, list]) => {
+    const hrefs = list.map((e) => e.href);
+    const at = hrefs.indexOf(href);
+    if (at < 0) return hrefs;
+    let to = at + step;
+    while (to >= 0 && to < hrefs.length && skip(hrefs[to]!)) to += step;
+    if (to < 0 || to >= hrefs.length) return hrefs;
+    [hrefs[at], hrefs[to]] = [hrefs[to]!, hrefs[at]!];
+    next = hrefs;
+    return hrefs;
+  });
+  return next === null ? null : flat;
+}
 
 export class NavPrefs {
   order = $state<string[]>([]);
@@ -138,6 +223,10 @@ export class NavPrefs {
   suggest = $state(true);
   /** Every offer this person dismissed from the pen, by its id: terminal on every device (`19 §3`). */
   dismissed = $state<string[]>([]);
+  /** The page the app opens on, by its address; `null` is Today. */
+  home = $state<string | null>(null);
+  /** The names this person gave pages in their nav, address to name. */
+  labels = $state<Record<string, string>>({});
   #send: Send | null = null;
   #adopted = false;
   /* ONE CHANGE AT A TIME, so two quick moves arrive in the order they were made. */
@@ -149,6 +238,8 @@ export class NavPrefs {
     this.shape = start.shape ?? 'bar';
     this.suggest = start.suggest ?? true;
     this.dismissed = start.dismissed ?? [];
+    this.home = start.home ?? null;
+    this.labels = start.labels ?? {};
   }
 
   /**
@@ -184,6 +275,17 @@ export class NavPrefs {
     this.dismissed = capped([...kept, ...legacy]);
     keepList(DISMISSED, this.dismissed);
     if (legacy.length > 0) void this.#commit('pen.dismissed', this.dismissed, () => {});
+
+    /* THE HOME PAGE AND THE NAMES ARE THE RECORD'S WORD ONCE IT HAS ONE, and the device's copy until then: a record that
+       does not keep them yet answers neither, and a choice made on this device should not vanish for it. */
+    if ('home.page' in prefs) {
+      this.home = address(prefs['home.page']);
+      keepKept(HOME, this.home);
+    }
+    if ('nav.labels' in prefs) {
+      this.labels = names(prefs['nav.labels']);
+      keepKept(LABELS, this.labels);
+    }
   }
 
   /** Whether a change is kept by a record rather than by this device. */
@@ -192,6 +294,13 @@ export class NavPrefs {
   }
 
   isHidden = (href: string): boolean => this.hidden.includes(href);
+
+  /** The name a page is drawn under in this person's nav: theirs if they gave it one, else its own title. */
+  labelOf = (href: string, title: string): string => this.labels[href] ?? title;
+
+  /** The nav's pages under the names this person gave them, everything else as it came. */
+  relabel = <T extends { href: string; title: string }>(entries: readonly T[]): T[] =>
+    entries.map((e) => (Object.hasOwn(this.labels, e.href) ? { ...e, title: this.labels[e.href]! } : e));
 
   /** Whether an offer in the pen was dismissed, here or on any other device this person uses. */
   isDismissed = (id: string): boolean => this.dismissed.includes(id);
@@ -203,6 +312,52 @@ export class NavPrefs {
     return this.#commit('nav.order', next, () => {
       this.order = before;
       pref.write({ nav: before });
+    });
+  }
+
+  /**
+   * One page moved a place inside its heading, through `setOrder`, or `null` at the edge. The addresses the drawn nav does
+   * not name (the lists, `/r/<id>`, which `orderLists` ranks among themselves) keep their places after it.
+   */
+  move(groups: Arranged, href: string, step: -1 | 1): Promise<Saved> | null {
+    const next = moved(groups, href, step, this.isHidden);
+    if (next === null) return null;
+    const named = new Set(next);
+    return this.setOrder([...next, ...this.order.filter((h) => !named.has(h))]);
+  }
+
+  /**
+   * The page the app opens on. `null`, or Today's own `/`, is Today, and takes the choice away.
+   *
+   * TODAY IS SENT AS `/`, NOT AS `null`. `null` takes the key off the record, and `boot` then answers nothing for it, so
+   * another device would keep the page it last heard of; `/` is an answer every device reads as Today (`address`).
+   */
+  setHome(href: string | null): Promise<Saved> {
+    const next = address(href);
+    const before = this.home;
+    this.home = next;
+    keepKept(HOME, next);
+    return this.#commit('home.page', next ?? '/', () => {
+      this.home = before;
+      keepKept(HOME, before);
+    });
+  }
+
+  /**
+   * A page's name in this person's nav. `null`, an empty name or the page's own title takes the name away, so a page
+   * renamed back to what it is called carries nothing to keep. The page's own title is not touched: it is the record's.
+   */
+  setLabel(href: string, name: string | null, own?: string): Promise<Saved> {
+    const said = (name ?? '').trim().slice(0, LABEL_MOST);
+    const before = this.labels;
+    const next = { ...before };
+    if (said === '' || said === own) delete next[href];
+    else next[href] = said;
+    this.labels = next;
+    keepKept(LABELS, next);
+    return this.#commit('nav.labels', next, () => {
+      this.labels = before;
+      keepKept(LABELS, before);
     });
   }
 

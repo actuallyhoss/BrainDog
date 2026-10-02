@@ -102,7 +102,7 @@ test('A READING IS DRAWN AS THE PREDICATE, THEN THE ROWS AS ADDRESSES, THEN THE 
       ['Invoice Beta', 'tasks#12', '/r/tasks/12'],
     ],
   );
-  assert.deepEqual(drawn.fold, ['tasks: 2 rows, state is open', 'people: 14 rows, all', copy.slashGrantRefused]);
+  assert.deepEqual(drawn.fold, ['tasks: 2 items, state is open', 'people: 14 items, all', copy.slashGrantRefused]);
   assert.equal(copy.slashGrantRefused, 'grant: refused');
 });
 
@@ -118,7 +118,7 @@ test('A DRAFT THAT DID NOT FIT IS A KEYWORD SEARCH, and the drawing says which o
   assert.equal(keyword.q, 'late invoices');
   /* A PREDICATE IN THE FOLD THAT IS NOT JSON is printed as it came rather than dropped, so the fold never loses a line. */
   const odd = drawReading({ ...READING, read: [{ register: 'tasks', rows: 1, predicate: 'not json' }] });
-  assert.equal(odd.fold[0], 'tasks: 1 row, not json');
+  assert.equal(odd.fold[0], 'tasks: 1 item, not json');
 });
 
 /*

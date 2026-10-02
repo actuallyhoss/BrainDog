@@ -81,6 +81,7 @@ export type BilledRecord = {
   record: string;
   slug: string | null;
   state: 'active' | 'past_due' | 'lapsed' | 'unbilled';
+  /** `free`, `cloud` or `plus`. A free record is `unbilled` and on `free`: nothing is sold for it (DIRECTION §35). */
   plan: string;
   /** The Worker's own words for the price, "$12 a month", so no figure is written twice. */
   price: string;
@@ -89,8 +90,11 @@ export type BilledRecord = {
   deleteOn: number | null;
 };
 
-/** The whole answer: each owned record, and whether this host takes payment at all. */
-export type BillingAnswer = { records: BilledRecord[]; open: boolean };
+/** A plan this host sells, in the Worker's own words: `{ id: 'cloud', name: 'Cloud', price: '$12 a month' }`. */
+export type SoldPlan = { id: string; name: string; price: string };
+
+/** The whole answer: each owned record, whether this host takes payment at all, and the plans it sells. */
+export type BillingAnswer = { records: BilledRecord[]; open: boolean; plans: SoldPlan[] };
 
 /** The one fetch these calls need, so a test hands in its own and nothing here reaches for the page's. */
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -119,10 +123,20 @@ function billedOf(v: unknown): BilledRecord | null {
   };
 }
 
-/** Parse the answer's `value`, or `null` when it is not the shape the Worker sends. */
+/** One sold plan, or nothing when it is not one: a plan with no name or no price is not offered. */
+const soldOf = (v: unknown): SoldPlan | null =>
+  isObj(v) && typeof v.id === 'string' && typeof v.name === 'string' && typeof v.price === 'string' && v.name && v.price
+    ? { id: v.id, name: v.name, price: v.price }
+    : null;
+
+/** Parse the answer's `value`, or `null` when it is not the shape the Worker sends. A host older than `plans` sells none. */
 export function billingOf(v: unknown): BillingAnswer | null {
   if (!isObj(v) || !Array.isArray(v.records)) return null;
-  return { records: v.records.map(billedOf).filter((r): r is BilledRecord => r !== null), open: v.open === true };
+  return {
+    records: v.records.map(billedOf).filter((r): r is BilledRecord => r !== null),
+    open: v.open === true,
+    plans: Array.isArray(v.plans) ? v.plans.map(soldOf).filter((p): p is SoldPlan => p !== null) : [],
+  };
 }
 
 type Refusal = { ok: false; refusal: { code: string; fix: string; detail?: string | undefined } };
@@ -177,8 +191,10 @@ export async function paymentPage(
   kind: 'portal' | 'checkout',
   record: string,
   io: Fetch = (u, i) => globalThis.fetch(u, i),
+  /** The plan to pay for: a free record's upgrade names it, and paying again leaves it to the Worker's default. */
+  plan?: string,
 ): Promise<Said<string>> {
-  const out = await door(io, `/account/billing/${kind}`, { record });
+  const out = await door(io, `/account/billing/${kind}`, { record, ...(plan ? { plan } : {}) });
   if (!out.ok) return out;
   const url = isObj(out.value) && typeof out.value.url === 'string' ? out.value.url : null;
   return url && /^https:\/\//u.test(url) ? { ok: true, value: url } : { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: copy.billingUnread } };
@@ -213,9 +229,27 @@ export function stateLine(r: BilledRecord, now: number): string {
   return r.periodEnd !== null ? copy.billingPaidThrough(dayOf(r.periodEnd, now)) : copy.billingPaid;
 }
 
-/** The plan in the person's words: "Hosted, $12 a month". */
+/** The plan in the person's words: "Cloud, $12 a month", and a free record's "Free" with no price beside it. */
 export function planLine(r: BilledRecord): string {
+  if (r.plan === 'free') return copy.billingPlanFree;
   return copy.billingPlan(r.plan === 'plus' ? copy.billingPlanPlus : copy.billingPlanHosted, r.price);
+}
+
+/** What a record's line says beside its name: its plan, or that it is not billed (a record the operator made). */
+export function planShown(r: BilledRecord): string {
+  return r.plan === 'free' || r.state !== 'unbilled' ? planLine(r) : copy.billingNotBilled;
+}
+
+/**
+ * The paid plan a free record is offered, and the one sentence that offers it, or `null` when there is none.
+ *
+ * ONE OFFER, CALMLY (DIRECTION §35): the first plan the host sells, which is Cloud, said once under the record with its
+ * price in the Worker's words. Nothing is offered while the host takes no payment, because the button could only fail.
+ */
+export function upgradeOf(r: BilledRecord, answer: BillingAnswer): { plan: SoldPlan; line: string } | null {
+  if (r.plan !== 'free' || !answer.open) return null;
+  const plan = answer.plans[0];
+  return plan ? { plan, line: copy.billingFreeOffer(plan.name, plan.price) } : null;
 }
 
 /**

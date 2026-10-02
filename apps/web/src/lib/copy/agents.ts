@@ -26,7 +26,7 @@ export const agents = {
   osNames: { windows: 'Windows', unix: 'macOS or Linux' },
   doorSetupRun: 'Set it up for this record',
   doorKey: 'A key for a script or a server',
-  doorKeyHint: 'For a program with no browser to sign in from. The key can read and change rows for ninety days.',
+  doorKeyHint: 'For a program with no browser to sign in from. The key can read and change your record for ninety days.',
   doorKeyLabel: 'Name the script or server',
   doorKeyGo: 'Make a key',
   doorKeyHeader: 'Send it in this header',
@@ -58,7 +58,7 @@ export const agents = {
   consentScope: {
     read: 'Read your record',
     propose: 'Read your record and propose changes, which wait for you to decide',
-    write: 'Read your record, propose changes, and change rows directly',
+    write: 'Read your record, propose changes, and change things in it directly',
   },
   consentLasts: 'It can reach that record for ninety days. It is listed under Settings, Agents, by its name, and removing it there stops it at once.',
   consentAllow: (app: string) => `Allow ${app}`,

@@ -140,7 +140,7 @@ export const shell = {
    * that sentence would then be false about `settled`, a field many rows have filled in. Three
    * surfaces drew it, so it was three false sentences.
    */
-  nothingMatched: 'No row matched, so there is nothing to add up.',
+  nothingMatched: 'Nothing matched, so there is nothing to add up.',
   /* A series's first column names what each bar is, by the bucket it is cut into. */
   seriesAxis: { day: 'Day', week: 'Week', month: 'Month', quarter: 'Quarter', year: 'Year' } as Record<string, string>,
   reportUnread: 'The report keys could not be read just now.',
@@ -158,7 +158,7 @@ export const shell = {
   noneMatching: (total: number, what: string) => `${total} ${what}, none matching:`,
   clearFilters: 'Clear filters',
   tryAgain: 'Load it again',
-  addOne: 'Add the first row',
+  addOne: 'Add the first one',
   /**
    * A declared value as a person reads it on a control: `saas` is SaaS, `two_yearly` is Two yearly.
    *
@@ -208,15 +208,14 @@ export const shell = {
      their business, and the two labels on it were the two words nobody outside this repository
      uses. `19 §9`: the product speaks the reader's words. The API keeps `seeds` and `touches`, the
      way Slack's says `conversations` and its screens say channel. */
-  diffSeeds: 'Example rows',
-  diffTouches: 'Your rows',
+  diffSeeds: 'Examples',
+  diffTouches: 'What you wrote',
   shareSetup: 'Share this setup',
   /* THE RAIL'S STAR, said in plain words beside its name (`lib/ui/Sidebar.svelte`). */
   slashRail: 'Slash: suggestions to fit this BrainDog to how you use it',
   /* THE FLAT NAV'S OWN ROWS (`flatNav` in `lib/nav.ts`): the screen every record opens on, the page it opened on before,
      and Slash's row under More, named for what it offers rather than by its own name. */
   today: 'Today',
-  overview: 'Overview',
   suggestions: 'Suggestions',
   /* The phone's More sheet, over what the rail keeps under its own More. */
   otherPages: 'Other pages',
@@ -417,7 +416,7 @@ export const shell = {
    * IT SAYS WHERE TO CHANGE IT, because the answer is one press away on the row itself and a sentence reporting a
    * value with nowhere to go is a sentence that makes somebody open a form.
    */
-  captureFilled: (what: readonly string[]) => `Filled in ${list([...what])}. Change any of it on the row.`,
+  captureFilled: (what: readonly string[]) => `Filled in ${list([...what])}. Change any of it where it is.`,
   /* The same fact as the chip on the row, which has the width for it only on a card. The grid wears `Added`. */
   markAddedFilled: (what: readonly string[]) => `Added, with ${list([...what])} filled in`,
   editCancel: 'Cancel',

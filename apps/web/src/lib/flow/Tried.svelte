@@ -54,12 +54,12 @@
 
   const said = {
     matches: (n: number, of: number | null) =>
-      n === 0 ? 'No row matches it now.' : `${n === 1 ? 'One row matches' : `${n.toLocaleString('en')} rows match`} it now${of === null ? '' : `, of ${of.toLocaleString('en')}`}.`,
+      n === 0 ? 'Nothing matches it now.' : `${n === 1 ? 'One item matches' : `${n.toLocaleString('en')} items match`} it now${of === null ? '' : `, of ${of.toLocaleString('en')}`}.`,
     more: (n: number) => `And ${n.toLocaleString('en')} more.`,
-    nothing: 'Nothing, on this row.',
+    nothing: 'Nothing for this one.',
     match: 'Match',
     rest: 'Do not',
-    of: 'Rows of the list it would act on now',
+    of: 'What it would act on now, out of the whole list',
   };
 
   const FROM: Record<Pick['from'], string> = { latest: editWords.fromLatest, row: editWords.fromRow, json: editWords.fromJson };
@@ -69,7 +69,7 @@
   const wordFor = (from: Pick['from']): string => (from === 'latest' ? latestWord : FROM[from]);
 
   /* A PICK THIS TRIGGER DOES NOT OFFER FALLS BACK TO ITS FIRST, so a switch from a change to an arrival does not leave
-     "A row I pick" pressed over a picker that has no rows. */
+     "One I pick" pressed over a picker that has nothing in it. */
   $effect(() => {
     if (choices.length > 0 && !choices.includes(pick.from)) pick = { ...pick, from: choices[0]! };
   });

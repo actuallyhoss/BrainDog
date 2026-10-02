@@ -610,12 +610,13 @@
 <svelte:head><title>{titleOf(said('decide'))}</title></svelte:head>
 <svelte:window {onkeydown} />
 
-<!-- THE COUNT IS WHAT STILL WAITS, and the sentence says it in words with the first question's suggestion. The group
-     control and Select are glass; asking yourself a question is the one ink pill, and only for somebody who may answer:
-     a question a reader could ask and never settle is a question left in everybody else's queue. -->
-<PageHead icon="decide" title={said('decide')} count={waiting.length} sentence={sentence?.text} needs={sentence?.needs || undefined}>
+<!-- THE SENTENCE SAYS HOW MANY WAIT, in words with the first question's suggestion, so the title carries no count. The
+     group control and Select are glass and only drawn when there are two questions to group or pick between, or while
+     picking, so the way out stays; asking yourself a question is the one ink pill, and only for somebody who may
+     answer: a question a reader could ask and never settle is a question left in everybody else's queue. -->
+<PageHead icon="decide" title={said('decide')} sentence={sentence?.text} needs={sentence?.needs || undefined}>
   {#snippet actions()}
-    {#if from === 'live' && open.length > 0}
+    {#if from === 'live' && (open.length > 1 || selecting)}
       <div class="segmented" role="group" aria-label={copy.decideGroup}>
         <button
           type="button"
@@ -829,9 +830,9 @@
 {/snippet}
 
 <!-- THE REST OF THE QUEUE, ON THE GROUND. Ranked, it starts after the open question; grouped, every question is a row
-     under the heading of what it is about. The count is what still waits, the open one included. -->
+     under the heading of what it is about. The keys show once the keyboard is in the queue. -->
 {#snippet waitingList()}
-  <Section title={LEAD.waiting} count={waiting.length}>
+  <Section title={LEAD.waiting}>
     {#snippet aside()}
       {#if waiting.length > 1}<span class="hint" aria-hidden="true"><Kbd keys="j" /><Kbd keys="k" /><span>{LEAD.switch}</span></span>{/if}
     {/snippet}
@@ -987,7 +988,7 @@
   <!-- WHAT WAS PUT OFF, the soonest back first. The queue above leaves a deferred question out until its day comes, so
        without this list a question put off was a question nobody could find until it reappeared. -->
   {#if from === 'live' && views.later.length}
-    <Section title={WORDS.later} count={views.later.length}>
+    <Section title={WORDS.later}>
       <ul class="ledger ledger-lead">
         {#each views.later.slice(0, DOM_CAP) as q (q.id)}
           <li>
@@ -1009,7 +1010,7 @@
   <!-- THE CALLS A PREDICTION WAS MADE ABOUT, and whether it came true, so a decision is judged by what followed and
        not by how sure it sounded. The word carries the outcome; the glyph beside it is never the only sign. -->
   {#if from === 'live' && views.calls.length}
-    <Section title={WORDS.calls} count={views.calls.length}>
+    <Section title={WORDS.calls}>
       <ul class="ledger ledger-lead">
         {#each views.calls as c (c.id)}
           {@const when = dayWord(c.at, now)}
@@ -1132,12 +1133,18 @@
 
   /* ── the hints and the groups ──────────────────────────────────────────── */
 
+  /* THE KEYS SHOW ONCE THE KEYBOARD IS IN THE COLUMN, never standing: a click or a tap never brings them, and `?` lists
+     them all. */
   .hint {
-    display: inline-flex;
+    display: none;
     align-items: center;
     gap: var(--sp-1);
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  .col:has(:focus-visible) .hint {
+    display: inline-flex;
   }
 
   .hint > span {
@@ -1559,8 +1566,10 @@
     font-weight: 400;
   }
 
-  /* A KEY IS PRINTED ONLY WHERE THE KEYS ACT: on the open question until the cursor moves, then on the cursor's row. */
-  .q:not([data-keys]) .q-options :global(.btn-kbd) {
+  /* A KEY IS PRINTED ONLY WHERE THE KEYS ACT: on the open question until the cursor moves, then on the cursor's row.
+     AND ONLY WHEN ASKED FOR: under the pointer, with focus inside, or once the cursor has been walked onto it. */
+  .q:not([data-keys]) .q-options :global(.btn-kbd),
+  .q[data-keys]:not([data-cursor], :hover, :focus-within) .q-options :global(.btn-kbd) {
     display: none;
   }
 
@@ -1652,13 +1661,18 @@
     gap: var(--sp-2) var(--sp-4);
   }
 
-  /* The chords, beside the button they stand for. A phone has no keyboard to press them with. */
+  /* The chords, beside the button they stand for, while the reason is being written. A phone has no keyboard to press
+     them with. */
   .keys {
-    display: inline-flex;
+    display: none;
     align-items: center;
     gap: var(--sp-1);
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  .why:focus-within .keys {
+    display: inline-flex;
   }
 
   .keys :global(.kbd-run + .kbd-run),
@@ -1794,8 +1808,8 @@
 
   /* NO KEY IS PRINTED WHERE THERE IS NO KEYBOARD, and the group control, a desk's nicety, gives way on a phone. */
   @media (width < 900px), (pointer: coarse) {
-    .keys,
-    .hint,
+    .why:focus-within .keys,
+    .col:has(:focus-visible) .hint,
     .q-options :global(.btn-kbd) {
       display: none;
     }

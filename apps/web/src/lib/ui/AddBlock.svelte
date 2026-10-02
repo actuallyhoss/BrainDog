@@ -203,6 +203,9 @@
     <p class="sheet-define"><Define noun="block" /></p>
   {/if}
 
+  <!-- AND THE TILES BEHIND THE SAME GUARD: each is a block drawn as a picture of itself, so a closed sheet held every
+       kind's sample (a code block's `pre` among them) on every page, built for nobody and found by a page's own keys. -->
+  {#if open}
   {#each PURPOSES as purpose}
     {@const group = allTiles.filter((t) => t.spec?.purpose === purpose)}
     {#if group.length}
@@ -250,6 +253,7 @@
       </section>
     {/if}
   {/each}
+  {/if}
 </Sheet>
 
 <style>

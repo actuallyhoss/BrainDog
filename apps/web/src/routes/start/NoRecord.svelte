@@ -43,7 +43,9 @@
         return;
       }
       open = out.value.open;
-      price = out.value.price;
+      /* THE PRICE OF THE PLAN THIS PERSON CHOSE, Cloud Plus's when they came for Cloud Plus; the first sold plan's when
+         they chose none. */
+      price = (held?.plan ? out.value.prices[held.plan] : undefined) ?? out.value.price;
     });
   });
 
@@ -53,7 +55,8 @@
     if (busy || !free || slug === '') return;
     busy = true;
     said = null;
-    const asked: Held = { slug, name: held?.name ?? null, tz: held?.tz ?? zone() };
+    /* THE PAID PLAN CHOSEN GOES WITH IT, or Cloud Plus would be charged as Cloud (no plan is the checkout's Cloud). */
+    const asked: Held = { slug, name: held?.name ?? null, tz: held?.tz ?? zone(), ...(held?.plan && held.plan !== 'free' ? { plan: held.plan } : {}) };
     hold(globalThis.sessionStorage, asked);
     const out = await checkout(asked);
     if (out.ok) {

@@ -641,15 +641,15 @@ export const VERB_LABELS: Record<Verb, string> = {
   untag: 'Take a tag off',
   set: 'Set a field',
   move: 'Move to a state',
-  link: 'Link to a row',
+  link: 'Link to another item',
   note: 'Add a note',
-  create: 'Add rows',
+  create: 'Add items',
   notify: 'Tell you',
   suggest: 'Suggest on Decide',
   ask_person: 'Ask a person',
   ask_slash: 'Ask Slash',
   call: 'Call a service',
-  run: 'Run a call on this row',
+  run: 'Run a call on this item',
   script: 'Run a script',
   wait: 'Wait',
   schedule: 'Come back later',
@@ -691,29 +691,29 @@ export function stepGroups(slash: boolean): readonly { label: string; verbs: rea
 
 /**
  * What each step does, in one line, for the step menu's sheet on a phone, where a label alone ("Come back later",
- * "Run a call on this row") leaves a stranger guessing. Said as the runner does it (`packages/kernel/src/flow.ts`), and
+ * "Run a call on this item") leaves a stranger guessing. Said as the runner does it (`packages/kernel/src/flow.ts`), and
  * the search in the sheet reads these words as well as the label.
  */
 export const STEP_HELP: Record<Verb, string> = {
   if: 'Take one of two ways, depending on a condition.',
   set_var: 'Keep a value under a name, for later steps to use.',
   stop: 'End the run here, and do nothing after.',
-  tag: 'Put a tag on the row.',
-  untag: 'Take a tag off the row.',
-  set: 'Write a value into one field of the row.',
-  move: 'Move the row to another state.',
-  link: 'Point a field of the row at a row in another list.',
-  note: 'Write a note on the row.',
-  create: 'Add new rows to a list.',
+  tag: 'Put a tag on it.',
+  untag: 'Take a tag off it.',
+  set: 'Write a value into one of its fields.',
+  move: 'Move it to another state.',
+  link: 'Point one of its fields at an item in another list.',
+  note: 'Write a note on it.',
+  create: 'Add new items to a list.',
   notify: 'Send you a message.',
   suggest: 'Put a question on Decide for you to answer.',
   ask_person: 'Ask someone on this record and wait for the answer.',
   ask_slash: 'Ask Slash a question and keep its answer.',
   call: 'Fetch from a service you declared, and keep what it answers.',
-  run: 'Send this row to a service you declared.',
+  run: 'Send it to a service you declared.',
   script: 'Start one of your scripts.',
   wait: 'Pause, then carry on with the next step.',
-  schedule: 'Put a reminder on the row for a later day.',
+  schedule: 'Put a reminder on it for a later day.',
 };
 
 /** A new step of one kind, with the arguments it needs present and empty, so the inspector has something to fill. */
@@ -810,14 +810,14 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
   move: [{ path: ['move'], label: 'To the state', kind: 'text', required: true, missing: 'Say which state to move it to.' }],
   link: [
     { path: ['link', 'field'], label: 'Field', kind: 'text', required: true, missing: 'Say which field holds the link.' },
-    { path: ['link', 'to', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the other row is in.' },
-    { path: ['link', 'to', 'by'], label: 'Matched by the field', kind: 'text', required: true, missing: 'Say which field finds the other row.' },
+    { path: ['link', 'to', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the other item is in.' },
+    { path: ['link', 'to', 'by'], label: 'Matched by the field', kind: 'text', required: true, missing: 'Say which field finds the other item.' },
     { path: ['link', 'to', 'value'], label: 'Equal to', kind: 'text', required: true, missing: 'Say what that field has to be.', template: true },
   ],
   note: [{ path: ['note'], label: 'Note', kind: 'long', required: true, missing: 'Write the note.', template: true }],
   create: [
-    { path: ['create', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the rows go in.' },
-    { path: ['create', 'bound'], label: 'At most this many rows', kind: 'number', required: true, missing: 'Say how many rows it may add at most.' },
+    { path: ['create', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the new items go in.' },
+    { path: ['create', 'bound'], label: 'At most this many', kind: 'number', required: true, missing: 'Say how many it may add at most.' },
     { path: ['create', 'fields'], label: 'Fields', kind: 'pairs', template: true, hint: 'title: Chase the invoice' },
   ],
   notify: [{ path: ['notify', 'say'], label: 'Say', kind: 'long', required: true, missing: 'Say what to tell you.', template: true }],
@@ -850,7 +850,7 @@ export const ARGS: Record<Verb, readonly Arg[]> = {
     { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to make.', hint: 'exchange_rate' },
     { path: ['call', 'as'], label: 'Keep the answer as', kind: 'name' },
   ],
-  run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to run on this row.' }],
+  run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to run on this item.' }],
   /* A SCRIPT STEP KEEPS NO ANSWER. `startScript` in `packages/kernel/src/flow.ts` queues a `script.run` job and goes on,
      and `as:` holds that job's id; what the script returns never comes back into the run. The field said "Keep the
      answer as" and its absence said `NAME_IT`, so a person named a value no step would ever see.
@@ -1013,7 +1013,7 @@ export const words = {
     manual: 'A button',
   } as Record<string, string>,
   triggerHelp: {
-    written: 'A row in one list is added, changed or deleted.',
+    written: 'Something in one list is added, changed or deleted.',
     arrival: 'Something arrives at a door: a webhook, an email, a paste.',
     every: 'On a clock, every fifteen minutes or longer.',
     metric: 'A figure crosses a line. It is read every hour.',
@@ -1049,11 +1049,11 @@ export const words = {
     fieldAdd: 'Add a field',
     fieldRemove: 'Take it out',
     aboutHelp: 'Slash reads only the fields picked here. A secret or a file never goes with a question.',
-    aboutNone: 'Nothing to send. Only a run about a row, one a change to a list starts, has fields to go with the question.',
+    aboutNone: 'Nothing to send. Only a run about one item, one a change to a list starts, has fields to go with the question.',
     asRows: 'Edit as conditions',
     asWords: 'Write it in words',
-    relativeDay: 'It names a day relative to today, which rows would fix to one date. Keep it in words.',
-    notRows: 'These words cannot be drawn as rows. Keep them in words.',
+    relativeDay: 'It names a day relative to today, which conditions would fix to one date. Keep it in words.',
+    notRows: 'These words cannot be drawn as conditions. Keep them in words.',
   },
 } as const;
 
@@ -1167,7 +1167,7 @@ export function sayTrigger(t: Trigger): string {
   if ('written' in t) {
     const w = t.written;
     const ops = (w.op ?? []).map((o) => ({ create: 'added', update: 'changed', delete: 'deleted' })[o]);
-    const said = `When a row in ${w.register || 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`;
+    const said = `When an item in ${w.register || 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`;
     const fields = w.fields && w.fields.length > 0 ? `, and only when ${andList(w.fields.map((f) => f.replace(/_/gu, ' ')), 'or')} changes` : '';
     return `${said}${fields}${w.from_rules ? ', including changes other automations make' : ''}`;
   }
@@ -1251,12 +1251,12 @@ function saying(step: Step): string {
     case 'move':
       return aloud(a) === '' ? 'Move it to a state' : `Move it to ${aloud(a)}`;
     case 'link':
-      return at('field') === '' ? 'Link it to a row' : `Link ${at('field')} to the ${at('to', 'register') || 'row'} whose ${at('to', 'by')} is ${at('to', 'value')}`;
+      return at('field') === '' ? 'Link it to another item' : `Link ${at('field')} to the ${at('to', 'register') || 'item'} whose ${at('to', 'by')} is ${at('to', 'value')}`;
     case 'note':
       return withText('Add a note', aloud(a));
     case 'create': {
       const bound = Number(getAt(a, ['bound']));
-      return at('register') === '' ? 'Add rows' : `Add rows to ${at('register')}${bound > 0 ? `, at most ${bound}` : ''}`;
+      return at('register') === '' ? 'Add items' : `Add items to ${at('register')}${bound > 0 ? `, at most ${bound}` : ''}`;
     }
     case 'notify':
       return withText('Tell you', at('say'));
@@ -1271,7 +1271,7 @@ function saying(step: Step): string {
     case 'call':
       return at('ingest') === '' ? 'Call a service' : `Call ${at('ingest')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
     case 'run':
-      return aloud(a) === '' ? 'Run a call on this row' : `Run ${aloud(a)} on this row`;
+      return aloud(a) === '' ? 'Run a call on this item' : `Run ${aloud(a)} on this item`;
     /* THE ID OF ITS QUEUED RUN, NOT "THE ANSWER": the runner queues the script and goes on (`startScript`), and Decide
        had to follow this line with a sentence taking "keeping the answer as" back. Worded as the record's dry run is. */
     case 'script':

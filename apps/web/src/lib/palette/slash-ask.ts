@@ -55,7 +55,7 @@ export function askedLately(asks: readonly SlashAsked[], now: number = Date.now(
 
 export const askWords = {
   title: 'Ask Slash',
-  label: 'Ask a question about what this BrainDog holds. Slash finds the rows that answer it, then says what it makes of them.',
+  label: 'Ask a question about what this BrainDog holds. Slash finds the items that answer it, then says what it makes of them.',
   placeholder: 'Which invoices are late this month?',
   ask: 'Ask Slash',
   asking: 'Asking',

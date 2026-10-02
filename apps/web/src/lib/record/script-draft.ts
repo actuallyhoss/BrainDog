@@ -137,7 +137,7 @@ export const words = {
   badDoor: 'A door is named in lower case letters, digits, hyphens and underscores, starting with a letter.',
   badOrigin: (line: string) => `${line} is not an address it may fetch from. Write one starting https://, with no path.`,
   spent: (fetches: number, ms: number) => `${fetches === 1 ? '1 fetch' : `${fetches.toLocaleString('en-GB')} fetches`}, ${ms.toLocaleString('en-GB')} ms`,
-  create: (list: string) => `Add a row to ${list}`,
+  create: (list: string) => `Add to ${list}`,
   update: (spoken: string) => `Change ${spoken}`,
 };
 

@@ -1,20 +1,15 @@
 <!--
-  Settings > Appearance: the scheme and its contrast, the reading size and density, the record's colour and its look.
+  Settings > Appearance: how BrainDog looks on this device, in one section, and the record's own look under it.
 
-  THE SCHEME IS THREE PICTURES OF THE PRODUCT, not three words. Each is the app in miniature, drawn from the tokens it
-  would wear: the ground and its light, the glass rail with the mark and an ink "here", a title with its sentence, two
-  tiles with a chart and the rows under them. System is both, split on the diagonal. A person choosing how the product
-  looks is shown how it looks.
+  ONE SECTION, FOUR CHOICES AND THE THING THEY CHANGE (DIRECTION §35: calm, few controls per screen). The scheme, the
+  text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
+  person changing how the product reads scrolled past a screen of chrome to find the next choice. They are one column of
+  short choices now, beside a preview that is the app itself in small: drawn from the same tokens every screen reads, so
+  every press changes it the moment it is made, in the scheme, size, row height and colour chosen, with no toast.
 
-  AND IT IS STILL A THREE-WAY CHOICE, not a toggle offering the opposite. The predecessor's had three states and a
-  one-way UI: once a person chose light or dark, only clearing local storage restored "match the system". "Match the
+  AND THE SCHEME IS STILL A THREE-WAY CHOICE, not a toggle offering the opposite. The predecessor's had three states and
+  a one-way UI: once a person chose light or dark, only clearing local storage restored "match the system". "Match the
   system" must stay reachable (19 §4).
-
-  THE PICTURE OF THE SCHEME THE PAGE IS NOT IN IS DRAWN FROM THE ONE IT IS IN. The two palettes are generated behind
-  `html[data-scheme]`, so an element cannot ask for the other scheme's tokens; and a colour literal here would be the
-  one this product forbids. The other picture swaps the current ink and ground (dark from light is an ink ground with
-  near-ink tiles and ground-coloured words), which is the same relationship the generated dark palette has. The one
-  the page is in is drawn from its real tokens, so it is exact, and it changes the moment the choice does.
 
   Density switches on POINTER, never on width: a small laptop window is not a phone. Width may
   change layout; only the pointer may change size (05 §6).
@@ -41,10 +36,11 @@
 
   /* THIS AREA'S OWN WORDS, the ones the copy modules do not already hold. */
   const words = {
-    reading: 'Reading',
-    textLine: 'The size of the words in lists, tables and pages.',
-    densityLine: 'How much room each row of a list takes.',
-    now: (dark: boolean) => (dark ? 'Dark now' : 'Light now'),
+    looks: 'How it looks',
+    hint: 'Kept on this device, so a phone and a desk can each have their own.',
+    /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
+    said: 'Three things need you today,',
+    needs: 'one is late.',
   };
 
   /* A THEME REFUSED AT INSTALL, handed over by the add-on screen's Fix and install. Taken once, so a reload of this
@@ -74,19 +70,6 @@
 
   let accent = $state<string | null>(held.theme ?? null);
   let accentWrong = $state<string | null>(null);
-
-  /* WHICH SCHEME THE PAGE IS IN NOW, which decides which picture is drawn from the real tokens. `system` is the
-     device's answer, and it is followed while the area is open: a laptop that turns dark at sunset turns this too. */
-  const DARK = '(prefers-color-scheme: dark)';
-  let deviceDark = $state(typeof matchMedia === 'function' && matchMedia(DARK).matches);
-  $effect(() => {
-    const mq = matchMedia(DARK);
-    const heard = () => (deviceDark = mq.matches);
-    heard();
-    mq.addEventListener('change', heard);
-    return () => mq.removeEventListener('change', heard);
-  });
-  const inNow = $derived<'light' | 'dark'>(scheme === 'system' ? (deviceDark ? 'dark' : 'light') : scheme);
 
   function pickAccent(hex: string | null) {
     const out = accentApply(hex);
@@ -125,45 +108,21 @@
     ['dark', copy.schemeDark, 'moon'],
   ] as const;
 
-  /* THE SPECIMEN'S ROWS, each with the glyph its kind of row carries in a list. */
+  const TEXTS = [
+    ['sm', copy.textSmall],
+    ['base', copy.textNormal],
+    ['md', copy.textLarge],
+  ] as const;
+
+  const DENSITIES = [
+    ['compact', copy.densityCompact],
+    ['comfortable', copy.densityComfortable],
+    ['roomy', copy.densityRoomy],
+  ] as const;
+
+  /* THE PREVIEW'S ROWS, each with the glyph its kind of row carries in a list. */
   const SPECIMEN = ['doc', 'obligation', 'calendar'] as const;
 </script>
-
-<!--
-  THE APP IN MINIATURE, in one scheme. Every piece is a shape and none is a word, so it is hidden from a screen reader:
-  the button it sits in says which scheme it is. `other` is the scheme the page is not in, drawn from the swapped
-  tokens (the file's head says why).
--->
-{#snippet look(which: 'light' | 'dark', half = false)}
-  <span class="look" data-look={which} data-other={which === inNow ? undefined : ''} data-half={half ? '' : undefined}>
-    <span class="look-rail">
-      <span class="look-mark"></span>
-      <span class="look-item" data-on></span>
-      <span class="look-item"></span>
-      <span class="look-item"></span>
-      <span class="look-item"></span>
-      <span class="look-item look-live"></span>
-    </span>
-    <span class="look-main">
-      <span class="look-title"></span>
-      <span class="look-sentence"><span class="look-words"></span><span class="look-needs"></span></span>
-      <span class="look-tiles">
-        <span class="look-tile">
-          <span class="look-well"></span>
-          <span class="look-bars"><span></span><span></span><span></span><span></span><span class="look-high"></span></span>
-          <span class="look-line"></span>
-        </span>
-        <span class="look-tile">
-          <span class="look-well"></span>
-          <span class="look-ring"></span>
-          <span class="look-line"></span>
-        </span>
-      </span>
-      <span class="look-row"></span>
-      <span class="look-row"></span>
-    </span>
-  </span>
-{/snippet}
 
 <!-- ONE THING ON OR OFF IS A SWITCH at the end of the row that says what it does. It was two segments reading On and
      Off, which is a choice between two things. -->
@@ -188,25 +147,127 @@
   alone, and the People matrix cites that rule and gets it right, which is the tell: the fix
   was known, written down, and applied to one group.
 -->
-<Section title={copy.scheme}>
-  <div class="pictures" role="group" aria-label={copy.scheme}>
-    {#each SCHEMES as [v, label, icon] (v)}
-      <button type="button" class="picture" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}>
-        <span class="picture-shot" aria-hidden="true">
-          {#if v === 'system'}
-            {@render look('light')}
-            {@render look('dark', true)}
-          {:else}
-            {@render look(v)}
-          {/if}
-        </span>
-        <span class="picture-name">
-          <Icon name={icon} size="m" />
-          <span>{label}</span>
-          {#if v === 'system'}<span class="picture-meta">{words.now(deviceDark)}</span>{/if}
-        </span>
-      </button>
-    {/each}
+<Section title={words.looks}>
+  <p class="hint">{words.hint}</p>
+  <div class="looks">
+    <div class="choices">
+      <div class="choice">
+        <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
+        <div class="segmented" role="group" aria-labelledby="choice-scheme">
+          {#each SCHEMES as [v, label, icon] (v)}
+            <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
+              ><Icon name={icon} size="s" />{label}</button
+            >
+          {/each}
+        </div>
+      </div>
+
+      <div class="choice">
+        <span class="choice-name" id="choice-text">{copy.textSize}</span>
+        <div class="segmented" role="group" aria-labelledby="choice-text">
+          {#each TEXTS as [v, label] (v)}
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={text === v}
+              data-on={text === v ? '' : undefined}
+              onclick={() => ((text = v), set('text', v))}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
+            >
+          {/each}
+        </div>
+      </div>
+
+      <div class="choice">
+        <span class="choice-name" id="choice-density">{copy.density}</span>
+        <div class="segmented" role="group" aria-labelledby="choice-density">
+          {#each DENSITIES as [v, label] (v)}
+            <button
+              type="button"
+              class="segment"
+              aria-pressed={density === v}
+              data-on={density === v ? '' : undefined}
+              onclick={() => ((density = v), set('density', v))}
+              ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
+            >
+          {/each}
+        </div>
+      </div>
+
+      <!--
+        THE RECORD'S OWN COLOUR. `@braindog/theme` solves an entire coherent palette from one seed
+        against every floor it defines, and until now nothing called it with anything but the house
+        red, so a bakery and a type foundry looked identical. The swatches are suggestions, not the
+        set: any colour that passes goes in, and one that does not says which floor it missed rather
+        than being quietly approximated.
+      -->
+      <div class="choice">
+        <span class="choice-name" id="choice-accent">{copy.accentTitle}</span>
+        <span class="choice-line">{copy.accentHint}</span>
+        <div class="swatches" role="group" aria-labelledby="choice-accent">
+          {#each ACCENTS as a (a.hex)}
+            <button
+              type="button"
+              class="swatch"
+              aria-pressed={accent === a.hex}
+              data-on={accent === a.hex ? '' : undefined}
+              style="--swatch:{a.hex}"
+              aria-label={a.name}
+              title={a.name}
+              onclick={() => pickAccent(a.hex)}
+            >
+              {#if accent === a.hex}<Icon name="check" size="m" />{/if}
+            </button>
+          {/each}
+          <button
+            type="button"
+            class="swatch swatch-off"
+            aria-pressed={accent === null}
+            data-on={accent === null ? '' : undefined}
+            onclick={() => pickAccent(null)}
+          >
+            {#if accent === null}<Icon name="check" size="s" />{/if}{copy.accentHouse}
+          </button>
+        </div>
+        {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
+      </div>
+    </div>
+
+    <!--
+      THE PREVIEW: the app in small, drawn from the tokens every screen reads, so it is never a picture of a choice but
+      the choice itself. The mark wears the record's colour, the sentence carries its one red phrase, and the rows are a
+      list drawn the way every list is drawn, at the chosen row height and text size. Shapes and sample words, never a
+      control, so it is hidden from a screen reader: the choices beside it say what they are.
+    -->
+    <div class="preview" aria-hidden="true">
+      <p class="preview-name">{copy.densityPreview}</p>
+      <div class="pv">
+        <div class="pv-bar">
+          <span class="pv-mark"></span>
+          <span class="pv-place" data-on></span>
+          <span class="pv-place"></span>
+          <span class="pv-place"></span>
+        </div>
+        <div class="pv-tile">
+          <div class="pv-head">
+            <IconWell name="today" />
+            <span class="pv-title">{copy.today}</span>
+          </div>
+          <p class="pv-said">{words.said} <span class="pv-needs">{words.needs}</span></p>
+          <ul class="ledger ledger-lead pv-rows">
+            {#each copy.densityPreviewRows as row, i (row)}
+              <li>
+                <div class="line">
+                  <span class="line-mark"><IconWell name={SPECIMEN[i % SPECIMEN.length] ?? 'doc'} size="l" /></span>
+                  <span class="line-main"><span class="line-title pv-row">{row}</span></span>
+                  <span class="line-amount"></span>
+                  <span class="line-when"></span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!--
@@ -229,99 +290,7 @@
 </Section>
 
 <!--
-  THE READING SETTINGS, AND WHAT THEY DO, IN ONE PLACE. Text and density change `--text` and `--row-h`, which only lists
-  read, so pressing Roomy here once changed nothing on this screen and a person had to leave to find out what they had
-  chosen. The rows under the two choices are a list drawn the way every list is drawn, on the ground with a well per row,
-  so each press shows its effect where it was made, with no toast.
--->
-<Section title={words.reading}>
-  <StateRow icon="doc" title={copy.textSize} line={words.textLine} />
-  <div class="setting-under">
-    <div class="segmented" role="group" aria-label={copy.textSize}>
-      {#each [['sm', copy.textSmall], ['base', copy.textNormal], ['md', copy.textLarge]] as const as [v, label] (v)}
-        <button
-          type="button"
-          class="segment"
-          aria-pressed={text === v}
-          data-on={text === v ? '' : undefined}
-          onclick={() => ((text = v), set('text', v))}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
-        >
-      {/each}
-    </div>
-  </div>
-
-  <StateRow icon="rows" title={copy.density} line={words.densityLine} />
-  <div class="setting-under">
-    <div class="segmented" role="group" aria-label={copy.density}>
-      {#each [['compact', copy.densityCompact], ['comfortable', copy.densityComfortable], ['roomy', copy.densityRoomy]] as const as [v, label] (v)}
-        <button
-          type="button"
-          class="segment"
-          aria-pressed={density === v}
-          data-on={density === v ? '' : undefined}
-          onclick={() => ((density = v), set('density', v))}
-          ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
-        >
-      {/each}
-    </div>
-  </div>
-
-  <div class="specimen" aria-hidden="true">
-    <p class="specimen-title">{copy.densityPreview}</p>
-    <ul class="ledger ledger-lead specimen-rows">
-      {#each copy.densityPreviewRows as row, i (row)}
-        <li>
-          <div class="line">
-            <span class="line-mark"><IconWell name={SPECIMEN[i % SPECIMEN.length] ?? 'doc'} size="l" /></span>
-            <span class="line-main"><span class="line-title specimen-name">{row}</span></span>
-            <span class="line-amount"></span>
-            <span class="line-when"></span>
-          </div>
-        </li>
-      {/each}
-    </ul>
-  </div>
-</Section>
-
-<!--
-  THE RECORD'S OWN COLOUR. `@braindog/theme` solves an entire coherent palette from one seed
-  against every floor it defines, and until now nothing called it with anything but the house
-  red, so a bakery and a type foundry looked identical. The swatches are suggestions, not the
-  set: any colour that passes goes in, and one that does not says which floor it missed rather
-  than being quietly approximated.
--->
-<Section title={copy.accentTitle}>
-  <p class="hint">{copy.accentHint}</p>
-  <div class="swatches" role="group" aria-label={copy.accentTitle}>
-    {#each ACCENTS as a (a.hex)}
-      <button
-        type="button"
-        class="swatch"
-        aria-pressed={accent === a.hex}
-        data-on={accent === a.hex ? '' : undefined}
-        style="--swatch:{a.hex}"
-        aria-label={a.name}
-        title={a.name}
-        onclick={() => pickAccent(a.hex)}
-      >
-        {#if accent === a.hex}<Icon name="check" size="m" />{/if}
-      </button>
-    {/each}
-    <button
-      type="button"
-      class="swatch swatch-off"
-      aria-pressed={accent === null}
-      data-on={accent === null ? '' : undefined}
-      onclick={() => pickAccent(null)}
-    >
-      {#if accent === null}<Icon name="check" size="s" />{/if}{copy.accentHouse}
-    </button>
-  </div>
-  {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
-</Section>
-
-<!--
-  THE RECORD'S LOOK, which is everybody's, under the device's colour, which is this screen's alone (`21 §6`).
+  THE RECORD'S LOOK, which is everybody's, under the device's choices, which are this screen's alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
 <Section title={copy.lookTitle}>
@@ -330,9 +299,6 @@
 </Section>
 
 <style>
-  /* A CONTROL UNDER A ROW (`.setting-under`) AND THE FRAME OF A CHOICE SHOWN AS PICTURES (`.pictures`) ARE
-     `settings.css`'s, which every area shares; the drawing inside each frame is this file's. */
-
   /* The hint sits above the control it explains, not beside it: a sentence in a column beside a
      row of swatches is read after the choice has been made. */
   .hint {
@@ -343,276 +309,63 @@
     line-height: var(--lh-body);
   }
 
-  /* ── the picture: one scheme's app, in proportions of the picture's own width (`cqi`) ── */
-
-  /* WHAT A PICTURE IS DRAWN FROM. The scheme the page is in takes its real tokens; the other takes the current ink and
-     ground swapped. Everything drawn in words or marks is a share of the picture's ink, so it holds in all four. */
-  .look {
-    --l-ground: var(--sunk);
-    --l-glow: var(--ground-glow);
-    --l-tile: var(--bg);
-    --l-glass: var(--glass);
-    --l-ink: var(--ink);
-    --l-lift: 0 0.4cqi 1.6cqi color-mix(in srgb, var(--l-ink) 10%, transparent);
-
-    position: absolute;
-    inset: 0;
+  /* ONE COLUMN ON A PHONE, THE PREVIEW FIRST: a person sees what they are changing before the choices that change it.
+     From 1100px up the choices stand beside it, and the preview stays in view while they are pressed. */
+  .looks {
     display: grid;
-    grid-template-columns: 23cqi minmax(0, 1fr);
-    gap: 4cqi;
-    padding: 4cqi;
-    background: radial-gradient(90cqi 40cqi at 50% -12cqi, var(--l-glow), transparent), var(--l-ground);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
+    margin-block-end: var(--sp-4);
   }
 
-  /* DARK, DRAWN FROM A LIGHT PAGE: the ink is the ground, the tiles a step off it, the words the page's own ground. */
-  .look[data-other][data-look='dark'] {
-    --l-ground: var(--ink);
-    --l-glow: color-mix(in srgb, var(--bg) 9%, transparent);
-    --l-tile: color-mix(in srgb, var(--ink) 93%, var(--bg));
-    --l-glass: color-mix(in srgb, var(--ink) 89%, var(--bg));
-    --l-ink: var(--bg);
+  .preview {
+    order: -1;
   }
 
-  /* LIGHT, DRAWN FROM A DARK PAGE: the ink is the tile, the ground a step under it, the words the page's own ground. */
-  .look[data-other][data-look='light'] {
-    --l-ground: color-mix(in srgb, var(--ink) 92%, var(--bg));
-    --l-glow: color-mix(in srgb, var(--ink) 90%, transparent);
-    --l-tile: var(--ink);
-    --l-glass: color-mix(in srgb, var(--ink) 97%, var(--bg));
-    --l-ink: var(--bg);
+  @media (width >= 1100px) {
+    .looks {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+      align-items: start;
+    }
+
+    .preview {
+      order: 0;
+      position: sticky;
+      inset-block-start: var(--sp-6);
+    }
   }
 
-  /* IN DARK A TILE IS TOLD FROM THE GROUND BY ITS FILL ALONE, so the dark picture's tiles carry no lift. */
-  .look[data-look='dark'] {
-    --l-lift: 0 0 0 0 transparent;
-  }
-
-  /* SYSTEM IS BOTH: the dark picture over the light one, cut on the diagonal. */
-  .look[data-half] {
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
-  }
-
-  .look[data-half]:dir(rtl) {
-    clip-path: polygon(0 0, 100% 100%, 0 100%);
-  }
-
-  /* The rail: a glass card with the mark, five places and the one that is here. */
-  .look-rail {
+  .choices {
     display: flex;
     flex-direction: column;
-    gap: 2.2cqi;
-    padding: 3cqi 2.2cqi;
-    border-radius: 3.4cqi;
-    background: var(--l-glass);
-    box-shadow:
-      0 0 0 0.4cqi color-mix(in srgb, var(--l-ink) 7%, transparent),
-      var(--l-lift);
-  }
-
-  .look-mark {
-    inline-size: 5.4cqi;
-    block-size: 3.8cqi;
-    margin-block-end: 1.4cqi;
-    border-radius: 1cqi;
-    background: var(--accent);
-  }
-
-  .look-item {
-    display: flex;
-    align-items: center;
-    gap: 1.6cqi;
-    padding: 0.7cqi;
-    margin: -0.7cqi;
-    border-radius: 1.4cqi;
-  }
-
-  .look-item::before {
-    content: '';
-    flex: none;
-    inline-size: 3.6cqi;
-    block-size: 3.6cqi;
-    border-radius: 1.1cqi;
-    background: color-mix(in srgb, var(--l-ink) 14%, transparent);
-  }
-
-  .look-item::after {
-    content: '';
-    flex: 1;
-    max-inline-size: 9cqi;
-    block-size: 1.3cqi;
-    border-radius: 1cqi;
-    background: color-mix(in srgb, var(--l-ink) 22%, transparent);
-  }
-
-  /* "HERE": the ink well and the white row, as the real rail draws it. */
-  .look-item[data-on] {
-    background: color-mix(in srgb, var(--l-tile) 70%, transparent);
-  }
-
-  .look-item[data-on]::before,
-  .look-item[data-on]::after {
-    background: var(--l-ink);
-  }
-
-  /* An agent at work: its face ringed in `live`. */
-  .look-live {
-    margin-block-start: auto;
-  }
-
-  .look-live::before {
-    border-radius: 50%;
-    background: transparent;
-    box-shadow: inset 0 0 0 0.6cqi var(--live);
-  }
-
-  .look-main {
-    display: flex;
-    flex-direction: column;
-    gap: 2.2cqi;
+    gap: var(--sp-5);
     min-inline-size: 0;
-    padding-block-start: 0.8cqi;
   }
 
-  .look-title {
-    inline-size: 26cqi;
-    block-size: 3.4cqi;
-    border-radius: 1cqi;
-    background: var(--l-ink);
-  }
-
-  /* The sentence, and its phrase that needs him in red. */
-  .look-sentence {
-    display: flex;
-    gap: 1cqi;
-    block-size: 1.6cqi;
-  }
-
-  .look-words,
-  .look-needs {
-    border-radius: 1cqi;
-  }
-
-  .look-words {
-    inline-size: 34cqi;
-    background: color-mix(in srgb, var(--l-ink) 26%, transparent);
-  }
-
-  .look-needs {
-    inline-size: 10cqi;
-    background: var(--danger);
-  }
-
-  .look-tiles {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 2.4cqi;
-    margin-block-start: 0.6cqi;
-  }
-
-  .look-tile {
+  .choice {
     display: flex;
     flex-direction: column;
-    gap: 1.8cqi;
-    padding: 2.4cqi;
-    border-radius: 3cqi;
-    background: var(--l-tile);
-    box-shadow: var(--l-lift);
+    align-items: start;
+    gap: var(--sp-2);
   }
 
-  .look-well {
-    inline-size: 4cqi;
-    block-size: 4cqi;
-    border-radius: 1.2cqi;
-    background: color-mix(in srgb, var(--l-ink) 8%, transparent);
+  .choice-name {
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
   }
 
-  /* A trend in greys with one ink highlight. */
-  .look-bars {
-    display: flex;
-    align-items: end;
-    gap: 1cqi;
-    block-size: 8cqi;
+  .choice-line {
+    margin-block-start: calc(var(--sp-1) * -1);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
-  .look-bars > span {
-    flex: 1;
-    border-radius: 0.6cqi 0.6cqi 0 0;
-    background: color-mix(in srgb, var(--l-ink) 24%, transparent);
-  }
+  /* ── the segments ── */
 
-  .look-bars > span:nth-child(1) {
-    block-size: 45%;
-  }
-
-  .look-bars > span:nth-child(2) {
-    block-size: 70%;
-  }
-
-  .look-bars > span:nth-child(3) {
-    block-size: 55%;
-  }
-
-  .look-bars > span:nth-child(4) {
-    block-size: 80%;
-  }
-
-  .look-bars > .look-high {
-    block-size: 100%;
-    background: var(--l-ink);
-  }
-
-  /* Progress as a ring, three quarters round in ink over its grey track. */
-  .look-ring {
-    box-sizing: border-box;
-    inline-size: 8cqi;
-    block-size: 8cqi;
-    border: 1.4cqi solid color-mix(in srgb, var(--l-ink) 14%, transparent);
-    border-block-start-color: var(--l-ink);
-    border-inline-end-color: var(--l-ink);
-    border-block-end-color: var(--l-ink);
-    border-radius: 50%;
-  }
-
-  .look-line {
-    inline-size: 80%;
-    block-size: 1.2cqi;
-    border-radius: 1cqi;
-    background: color-mix(in srgb, var(--l-ink) 18%, transparent);
-  }
-
-  /* Rows on the ground: a well and a title, with a hairline between them and no box. */
-  .look-row {
-    display: flex;
-    align-items: center;
-    gap: 1.8cqi;
-    padding-block: 1.2cqi;
-  }
-
-  .look-row + .look-row {
-    border-block-start: 0.3cqi solid color-mix(in srgb, var(--l-ink) 10%, transparent);
-  }
-
-  .look-row::before {
-    content: '';
-    flex: none;
-    inline-size: 3.4cqi;
-    block-size: 3.4cqi;
-    border-radius: 1cqi;
-    background: color-mix(in srgb, var(--l-ink) 12%, transparent);
-  }
-
-  .look-row::after {
-    content: '';
-    inline-size: 30cqi;
-    block-size: 1.4cqi;
-    border-radius: 1cqi;
-    background: color-mix(in srgb, var(--l-ink) 30%, transparent);
-  }
-
-  /* ── reading ── */
-
-  /* THE SEGMENTS CARRY A PICTURE OF THEIR EFFECT before their word: "Aa" at three sizes, three lines at three
-     spacings. A segment is 44 on BOTH axes under a thumb (`controls.css`), and the picture sits on the word's line. */
+  /* THE SEGMENTS CARRY A PICTURE OF THEIR EFFECT before their word: a glyph for the scheme, "Aa" at three sizes, three
+     lines at three spacings. A segment is 44 on BOTH axes under a thumb (`controls.css`), and the picture sits on the
+     word's line. */
   .segment {
     display: inline-flex;
     align-items: center;
@@ -621,14 +374,21 @@
     min-inline-size: var(--ctl-h);
   }
 
-  .aa {
+  .segment :global(svg),
+  .aa,
+  .spacing {
     color: var(--dim);
-    font-weight: 600;
-    line-height: 1;
   }
 
-  .segment[data-on] .aa {
+  .segment[data-on] :global(svg),
+  .segment[data-on] .aa,
+  .segment[data-on] .spacing {
     color: var(--ink);
+  }
+
+  .aa {
+    font-weight: 600;
+    line-height: 1;
   }
 
   .aa[data-size='sm'] {
@@ -647,11 +407,6 @@
     display: inline-grid;
     align-content: center;
     inline-size: 14px;
-    color: var(--dim);
-  }
-
-  .segment[data-on] .spacing {
-    color: var(--ink);
   }
 
   .spacing > span {
@@ -672,31 +427,6 @@
     row-gap: 5px;
   }
 
-  /* THE SPECIMEN: a list as every list is drawn, at the chosen row height and the chosen body step, under its own small
-     label, starting where the rows above it start their titles. */
-  .specimen {
-    margin-block-start: var(--sp-2);
-    padding-inline-start: calc(var(--well) + var(--sp-3));
-    max-inline-size: calc(var(--measure) + var(--sp-9));
-  }
-
-  .specimen-title {
-    margin: 0 0 var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  .specimen-rows {
-    max-inline-size: 36rem;
-  }
-
-  .specimen-name {
-    color: var(--ink2);
-    font-size: var(--text);
-    transition: font-size var(--d-state) var(--ease-out);
-  }
-
   /* ── the record's colour ── */
 
   .swatches {
@@ -708,7 +438,7 @@
 
   /* A SWATCH IS THE COLOUR, round, and the tick is drawn ON it rather than beside it: a selected state that lives
      outside the thing selected is a state people read as belonging to the next one. Chosen, it is ringed in ink a gap
-     away, the same ring the chosen scheme wears. */
+     away. */
   .swatch {
     display: inline-grid;
     place-items: center;
@@ -759,17 +489,102 @@
   /* A refusal a person cannot act on teaches them the control is broken, so the floor it missed is
      printed rather than a shrug. */
   .wrong {
-    margin: var(--sp-3) 0 0;
+    margin: var(--sp-1) 0 0;
     max-inline-size: var(--measure);
     color: var(--danger);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
 
-  /* AT A PHONE'S WIDTH the specimen's rows take the column, one gutter in. */
-  @media (width < 640px) {
-    .specimen {
-      padding-inline-start: 0;
-    }
+  /* ── the preview ── */
+
+  .preview-name {
+    margin: 0 0 var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  /* THE GROUND AND ITS LIGHT, as the app's own ground, with the glass bar and one tile on it. */
+  .pv {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+    border-radius: var(--r-lg);
+    background: radial-gradient(120% 60% at 50% -20%, var(--ground-glow), transparent), var(--sunk);
+    box-shadow: inset 0 0 0 1px var(--line-soft);
+  }
+
+  .pv-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-md);
+    background: var(--glass);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+
+  /* THE MARK WEARS THE RECORD'S COLOUR, which is where a person sees the colour they chose. */
+  .pv-mark {
+    inline-size: 18px;
+    block-size: 14px;
+    border-radius: 4px;
+    background: var(--accent);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .pv-place {
+    inline-size: 36px;
+    block-size: 6px;
+    border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+
+  .pv-place[data-on] {
+    background: var(--ink);
+  }
+
+  .pv-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-4);
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    box-shadow: var(--e1);
+  }
+
+  .pv-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .pv-title {
+    color: var(--ink);
+    font-size: var(--t-group);
+    font-weight: 600;
+  }
+
+  /* THE SENTENCE AND THE ROWS READ `--text`, the size chosen, and the rows `--row-h` through the list they sit in. */
+  .pv-said {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--text);
+    line-height: var(--lh-body);
+    transition: font-size var(--d-state) var(--ease-out);
+  }
+
+  .pv-needs {
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  .pv-row {
+    color: var(--ink2);
+    font-size: var(--text);
+    transition: font-size var(--d-state) var(--ease-out);
   }
 </style>

@@ -8,12 +8,12 @@ test('A NEW RECORD IS OFFERED CLEARING QUIETLY, one with rows of its own beside 
   assert.equal(offerOf({ untouched: 0, touched: 2, registers: {}, others: 40 }), null);
   const fresh = offerOf({ untouched: 7, touched: 0, registers: { things: 1 }, others: 0 })!;
   assert.equal(fresh.loud, false);
-  assert.match(fresh.body, /^Setting up added 7 example rows/u);
+  assert.match(fresh.body, /^Setting up added 7 examples/u);
   assert.equal(fresh.button, 'Clear the examples');
-  assert.equal(fresh.confirm, 'Delete 7 example rows');
+  assert.equal(fresh.confirm, 'Delete 7 examples');
   const imported = offerOf({ untouched: 6, touched: 1, registers: { things: 1 }, others: 219 })!;
   assert.equal(imported.loud, true);
-  assert.equal(imported.body, 'Your own rows are here now, beside 6 example rows setting up added. They show on Home, Money and the Dashboard until you clear them. One example you changed stays.');
+  assert.equal(imported.body, 'Your own things are here now, beside 6 examples setting up added. They show on Home, Money and the Dashboard until you clear them. One example you changed stays.');
   for (const o of [fresh, imported]) assert.doesNotMatch(o.body, /—/u, 'no em dash');
 });
 
@@ -27,7 +27,7 @@ test('reading and clearing go to the record by name, and a refusal is its senten
     },
   };
   assert.equal((await readExamples(client))?.untouched, 3);
-  assert.deepEqual(await clearExamples(client), { ok: true, said: 'Cleared 3 example rows. One you changed was kept.' });
+  assert.deepEqual(await clearExamples(client), { ok: true, said: 'Cleared 3 examples. One you changed was kept.' });
   assert.deepEqual(sent, ['examples', 'clearExamples']);
   const refused: ExamplesClient = { call: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only the owner can.' } }) };
   assert.equal(await readExamples(refused), null);

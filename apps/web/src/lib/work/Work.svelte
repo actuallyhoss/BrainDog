@@ -19,7 +19,9 @@
        the project, the day, the tier and who does it, saved in one write. The list narrows for it and keeps its keys.
     7. THE ROW CARRIES THE VERBS: tick, edit, set the day, move it, delete it, on hover and focus, and in a menu a tap
        opens on a phone. Every write is drawn at once and sent after (`lib/data/optimistic.ts`), with Undo.
-    8. THE KEYBOARD: j k, x, e, d, m, Delete, Enter, n or c, /, Esc. The keys circle in the toolbar prints them.
+    8. THE KEYBOARD: j k, x, e, d, m, Delete, Enter, n or c, /, Esc. The keys circle in the toolbar prints them, and
+       nothing else prints them standing (DIRECTION §35): a row's keys show on the row under the cursor or the pointer,
+       a band's note on hover of its heading, and a count only on a band that is folded shut.
     9. IT LISTENS. The read is asked again when the record's version moves, rows that arrive are tinted, and nothing is
        redrawn from under the caret, the cursor or the scroll.
 
@@ -158,7 +160,6 @@
       show: 'Show them',
       all: 'Show all',
     },
-    strip: { move: 'move', done: 'done', edit: 'edit', due: 'due', lane: 'move', undo: 'undo' },
     panel: {
       editing: 'Editing a task',
       reading: 'A task',
@@ -538,8 +539,7 @@
 
   /** The rows in the order drawn, which is the order j and k walk. */
   const order = $derived(items.flatMap((i) => (i.kind === 'row' ? [i.row.seq] : [])));
-  const openCount = $derived(shape ? rows.filter((r) => r.seq > 0 && !gone.has(r.seq) && !isDone(r.fields, shape!)).length : 0);
-  /** The first heading drawn, which carries the key strip. */
+  /** The first heading drawn, which sits flush with the tools above it. */
   const firstHead = $derived(items.find((i) => i.kind === 'head' || i.kind === 'tiers')?.key ?? null);
 
   /** What a band is called here: Late for the overdue, With agents, and the list's own words for the rest. */
@@ -1147,7 +1147,6 @@
 <div class="work">
   <PageHead
     title={words.title}
-    count={answer ? openCount : undefined}
     sentence={sentence?.text}
     needs={sentence?.needs || undefined}
     led={Boolean(answer && shape && sentence)}
@@ -1270,11 +1269,10 @@
                 {:else}
                   {groupTitle(item.band)}
                 {/if}
-                <span class="n num">{item.n}</span>
+                <!-- A COUNT ONLY WHERE THE ROWS ARE NOT IN SIGHT: a folded band says how many it holds, an open one shows them. -->
+                {#if folded && !shown(item.band)}<span class="n num">{item.n}</span>{/if}
               </h2>
-              {#if item.key === firstHead}
-                {@render strip()}
-              {:else if groupMeta(item.band)}
+              {#if groupMeta(item.band)}
                 <span class="head-meta">{groupMeta(item.band)}</span>
               {/if}
             </div>
@@ -1304,10 +1302,9 @@
                   <Button size="sm" aria-pressed={staleOnly} onclick={() => (staleOnly = !staleOnly)}>{staleOnly ? words.stale.all : words.stale.show}</Button>
                 </span>
               {/if}
-              {#if item.key === firstHead}{@render strip()}{/if}
             </div>
           {:else if item.kind === 'sub'}
-            <h3 class="head sub" data-band={item.band}>{groupTitle(item.band)}<span class="n num">{item.n}</span></h3>
+            <h3 class="head sub" data-band={item.band}>{groupTitle(item.band)}</h3>
           {:else}
             {@const r = item.row}
             {@const seq = r.seq}
@@ -1474,7 +1471,7 @@
     <div class="seg" role="group" aria-label={words.whose}>
       {#each WHOSE as w (w)}
         <button type="button" class="seg-btn tap" aria-pressed={whose === w} onclick={() => (whose = w)}>
-          {words.whoseSaid[w]}<span class="seg-n num">{whoseN[w]}</span>
+          {words.whoseSaid[w]}{#if whose === w}<span class="seg-n num">{whoseN[w]}</span>{/if}
         </button>
       {/each}
     </div>
@@ -1495,17 +1492,6 @@
       <Icon name="plus" size="m" />
     </button>
   {/if}
-{/snippet}
-
-{#snippet strip()}
-  <span class="strip" aria-hidden="true">
-    <span><Kbd keys="j" /><Kbd keys="k" /> {words.strip.move}</span>
-    <span><Kbd keys="x" /> {words.strip.done}</span>
-    <span><Kbd keys="e" /> {words.strip.edit}</span>
-    {#if shape?.due}<span><Kbd keys="d" /> {words.strip.due}</span>{/if}
-    <span><Kbd keys="m" /> {words.strip.lane}</span>
-    <span><Kbd keys="⌘Z" /> {words.strip.undo}</span>
-  </span>
 {/snippet}
 
 <!-- ══ THE DOCKED PANEL: the task open in its edit state ══ -->
@@ -1865,6 +1851,11 @@
     white-space: nowrap;
   }
 
+  /* THE ENTER KEY SHOWS ON THE ADD BUTTON ONLY WHILE THE LINE IS BEING TYPED IN, which is when it is the key to press. */
+  .capture-field:not(:focus-within) .capture-go :global(.btn-kbd) {
+    display: none;
+  }
+
   .capture-go {
     display: inline-flex;
     flex: none;
@@ -1988,8 +1979,7 @@
     font-size: var(--t-sm);
   }
 
-  .legend span,
-  .strip span {
+  .legend span {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -2076,16 +2066,16 @@
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     align-items: start;
-    gap: var(--inset);
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
   .lead-tile {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
     min-inline-size: 0;
-    padding: var(--sp-4) 12px 12px;
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
     background: var(--bg);
     border-radius: var(--r-lg);
   }
@@ -2100,7 +2090,7 @@
   .side {
     display: flex;
     flex-direction: column;
-    gap: var(--inset);
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
@@ -2219,6 +2209,7 @@
     font-weight: 500;
   }
 
+  /* A BAND'S NOTE IS FOR THE READER WHO ASKS: it shows on hover or focus of its heading, never standing. */
   .head-meta {
     margin-inline-start: auto;
     overflow: hidden;
@@ -2226,16 +2217,12 @@
     font-size: var(--t-sm);
     text-overflow: ellipsis;
     white-space: nowrap;
+    opacity: 0;
+    transition: opacity var(--d-state) var(--ease-out);
   }
 
-  .strip {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: var(--sp-1) var(--sp-3);
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
+  .head-row:is(:hover, :focus-within) .head-meta {
+    opacity: 1;
   }
 
   .fold {
@@ -2870,14 +2857,13 @@
     border-block-start: 1px solid var(--line);
   }
 
-  /* BELOW 900PX, A PHONE'S SCREEN: the select is the filter, and the key strip goes with the keyboard it teaches. */
+  /* BELOW 900PX, A PHONE'S SCREEN: the select is the filter. */
   @media (width < 900px) {
     .pick {
       display: block;
     }
 
-    .chips,
-    .strip {
+    .chips {
       display: none;
     }
 
@@ -2928,7 +2914,6 @@
     .verbs,
     .keys-btn,
     .legend,
-    .strip,
     .hint {
       display: none;
     }

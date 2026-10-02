@@ -42,9 +42,9 @@ export function rowsToSend(count: number, unticked: readonly number[]): number[]
 
 export const words = {
   heading: 'What accepting adds',
-  hint: 'Untick a row to leave it out. The rows left out are declined with this decision.',
-  row: (n: number) => `Row ${String(n + 1)}`,
+  hint: 'Untick one to leave it out. What is left out is declined with this decision.',
+  row: (n: number) => `Item ${String(n + 1)}`,
   keep: (title: string) => `Add ${title}`,
   some: (on: number, of: number) => `Accepting adds ${String(on)} of ${String(of)}.`,
-  none: 'Every row is unticked. Tick one to accept, or decline the proposal.',
+  none: 'Nothing is ticked. Tick one to accept, or decline the proposal.',
 };

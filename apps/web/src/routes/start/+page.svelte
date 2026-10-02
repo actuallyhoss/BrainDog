@@ -2,9 +2,14 @@
   The first run: a conversation on the left, and the BrainDog building beside it.
 
   ONE QUESTION, ONE FIELD, FOUR CHIPS, AND IT LISTENS WHILE YOU TYPE. "Who are you?", answered in a sentence, with a chip
-  for each of the four people the product is for. The sentence is read without a model (`lib/start/propose.ts`),
-  in any language, as it is typed: the parts it would make light up beside the field, and each phrase it heard is said
-  under it. One these rules cannot read is kept as the person's note, never refused.
+  for each of the four people the product is for. As it is typed, simple rules read it on this device
+  (`lib/start/propose.ts`, `propose`): the parts it would make light up beside the field, and each phrase heard is said
+  under it. The press asks Slash's model (`proposeFirst`), which reads any language and names things in the person's own
+  words; where a host has none, or the month's asks are spent, the rules' reading is the answer. Nothing is refused.
+
+  OR POINT AT AN EXPORT. A CSV or JSON file from another app, dropped on the screen or picked, is read on this device
+  (`lib/start/export.ts`); the model reads its first entries and says which list it goes into and which column fills
+  what, and the pages below are drawn over the file's own entries. A file no list holds becomes a list of its own.
 
   THEN A CONVERSATION, AND NOTHING WRITTEN. The words come back marked with what each phrase became, then BrainDog's
   reply: what it heard, what it is for, the one question the words cannot answer (the currency, with the ones worth
@@ -44,7 +49,10 @@
   import { landing } from '$lib/record/landing.ts';
   import { INSTALL_ORDER, LEANS_ON } from '$lib/shape.ts';
   import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
-  import { outsideCatalogue, propose, type Proposal } from '$lib/start/propose.ts';
+  import { draftBrief, outsideCatalogue, propose, proposeFirst, type Proposal } from '$lib/start/propose.ts';
+  import { slashAsks } from '$lib/start/ask.ts';
+  import { BYTES_MOST, drawnWith, entriesOf, mapExport, newListDeclarations, ownList, readExport, type Export, type Mapping } from '$lib/start/export.ts';
+  import { listById } from '$lib/start/lists.ts';
   import { titleOf } from '$lib/title.ts';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -77,6 +85,7 @@
   } from './building.ts';
   import { caseOf, changesAsked, draftAsked, keepsCurrency, pagesOf, reminds, words as drawing } from './preview.ts';
   import Currency from './Currency.svelte';
+  import FromFile from './FromFile.svelte';
   import PagesPreview from './PagesPreview.svelte';
   import Part from './Part.svelte';
   import Remind from './Remind.svelte';
@@ -200,13 +209,31 @@
     draft = null;
     drafting = false;
     drafts += 1;
-    if (model && outsideCatalogue(p)) void draftFor(sentence);
+    /* A FILE ALONE, WITH NOTHING SAID, IS NOT A BUSINESS TO DRAFT FOR: its own list is what it makes. */
+    const brief = draftBrief(p, sentence).trim();
+    if (model && outsideCatalogue(p) && brief !== '') void draftFor(brief);
   }
 
-  function read() {
-    if (sentence.trim() === '') return;
-    const p = propose(sentence, { zone, locale });
-    turns = [{ said: sentence.trim(), at: Date.now(), adds: null }];
+  /**
+   * WHETHER SLASH IS READING WHAT WAS SAID. The rules' reading stays beside the field meanwhile, and each press is
+   * numbered, so an answer that lands after the words were edited again is not drawn under them.
+   */
+  let thinking = $state(false);
+  let readings = 0;
+
+  /** The model's reading, or the rules' where there is no model, for the words as they stand. */
+  const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale }, door?.setup ?? null);
+
+  async function read() {
+    if ((sentence.trim() === '' && file === null) || thinking) return;
+    const mine = ++readings;
+    thinking = true;
+    const said = sentence.trim();
+    const p = await readingOf(sentence);
+    if (mine !== readings) return;
+    thinking = false;
+    /* A FILE ALONE IS AN ANSWER TOO, and its name stands where the words would. */
+    turns = [{ said: said === '' ? (file?.file ?? '') : said, at: Date.now(), adds: null }];
     take(p);
     void tick().then(() => heardHeading?.focus());
   }
@@ -219,12 +246,17 @@
    * A LATER TURN IS READ WITH EVERYTHING BEFORE IT, as one sentence, and BrainDog's answer to it is what it added. Focus
    * stays in the field, so a person can keep talking.
    */
-  function more() {
+  async function more() {
     const t = extra.trim();
-    if (t === '' || proposal === null || busy) return;
+    if (t === '' || proposal === null || busy || thinking) return;
     const was = proposal.heard;
-    sentence = joinTurns(sentence, t);
-    const p = propose(sentence, { zone, locale });
+    const joined = joinTurns(sentence, t);
+    const mine = ++readings;
+    thinking = true;
+    const p = await readingOf(joined);
+    if (mine !== readings) return;
+    thinking = false;
+    sentence = joined;
     turns = [...turns, { said: t, at: Date.now(), adds: added(was, p.heard) }];
     extra = '';
     take(p);
@@ -242,6 +274,8 @@
 
   /** Whether this host has a model behind Slash, the same fact the page sheet stands on (`ChangePage.svelte`). */
   const model = $derived(page.data.slash === true);
+  /** The first run's two asks of Slash (`ask.ts`), `null` where no model is behind it and the rules read everything. */
+  const door = $derived(model && typeof location !== 'undefined' ? slashAsks(apiBase()) : null);
   /** What Slash drafted for the sentence, `null` when it drafted nothing or was not asked. */
   let draft = $state.raw<Drafted | null>(null);
   let drafting = $state(false);
@@ -269,6 +303,9 @@
 
   /* THE SENTENCE AGAIN, AS A FIELD. The preview goes with it, so nothing on screen describes words that changed. */
   function edit() {
+    /* AN ANSWER STILL ON ITS WAY IS FOR THE WORDS BEING EDITED, so it is let go. */
+    readings += 1;
+    thinking = false;
     /* WHAT WAS READ STANDS BESIDE THE FIELD until the words are read again as they are typed. */
     live = proposal;
     proposal = null;
@@ -298,6 +335,7 @@
    * it (`LEANS_ON`: Money points at the person an invoice is to), so the record would refuse the one without the other.
    */
   function heldBy(id: string): string | null {
+    if (file !== null && mapping?.module === id) return file.file;
     for (const c of cases) if (c.modules.includes(id)) return c.title;
     for (const m of kept) if (m !== id && (LEANS_ON[m] ?? []).includes(id)) return moduleName(m);
     return null;
@@ -331,6 +369,95 @@
   const ring = $derived(proposal !== null && reminds(cases, modules));
   const pages = $derived(pagesOf(cases, modules));
 
+  /* ── a file they pointed at ─────────────────────────────────────────────── */
+
+  /** The file read, `null` until one is brought in; how it maps, `null` while it is being read. */
+  let file = $state.raw<Export | null>(null);
+  let mapping = $state.raw<Mapping | null>(null);
+  /** Why a file could not be read, said under the field. */
+  let fileWhy = $state<string | null>(null);
+  let picker = $state<HTMLInputElement | undefined>(undefined);
+  let dragging = $state(false);
+  /* EACH FILE IS NUMBERED, so a mapping that lands after another file was brought in is not drawn over it. */
+  let files = 0;
+
+  /**
+   * READ ON THIS DEVICE, THEN MAPPED: the model sees its first entries, the rules map it where there is no model. The
+   * module that keeps the list it goes into is turned on, and stays on while the file is in (`heldBy`).
+   */
+  async function bring(f: File | undefined) {
+    if (!f || busy) return;
+    fileWhy = null;
+    if (f.size > BYTES_MOST) {
+      fileWhy = firstRun.exportTooBig;
+      return;
+    }
+    const got = readExport(f.name, await f.text().catch(() => ''));
+    if ('why' in got) {
+      fileWhy = got.why === 'notJson' ? firstRun.exportNotJson : firstRun.exportNoEntries;
+      return;
+    }
+    const mine = ++files;
+    file = got;
+    mapping = null;
+    const m = await mapExport(got, door?.mapping ?? null, locale);
+    if (mine !== files) return;
+    mapping = m;
+    if (m.module !== null) {
+      onByHand = new Set([...onByHand, m.module]);
+      offByHand = new Set([...offByHand].filter((x) => x !== m.module));
+      if (proposal !== null && !kept.includes(m.module)) kept = [...kept, m.module];
+    }
+  }
+
+  /** Take the file off the build. Its module stays as the person left it. */
+  function leaveFile() {
+    files += 1;
+    file = null;
+    mapping = null;
+    fileWhy = null;
+  }
+
+  function pick(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    void bring(input.files?.[0]);
+    input.value = '';
+  }
+
+  /* A FILE DRAGGED ONTO THE SCREEN is taken anywhere on it; only a drag that carries files says "Drop it here". */
+  const carriesFiles = (e: DragEvent): boolean => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  /* EVERY FILE DRAG IS HELD, busy or not: one let through is the browser opening the file in place of the first run. */
+  function dragover(e: DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    dragging = !busy;
+  }
+  function drop(e: DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    dragging = false;
+    if (!busy) void bring(e.dataTransfer?.files[0]);
+  }
+
+  /** A list of the file's own, while it maps to none this build ships. */
+  const own = $derived(file && mapping && mapping.list === null ? ownList(file, mapping.name, currency, locale) : null);
+  /** The file's entries as their list stores them, in the currency as it stands. */
+  const entries = $derived(file && mapping ? entriesOf(file, mapping, currency, locale, own ?? undefined) : null);
+  /** Each column that fills a field of a list this build ships, with that field's name. */
+  const pairs = $derived(
+    file && mapping && mapping.list !== null
+      ? mapping.fields.map((m) => ({ column: m.column, label: listById(mapping?.list ?? '')?.fields.find((f) => f.id === m.field)?.label ?? m.field }))
+      : [],
+  );
+  /** What the file becomes, in the one line the conversation says it in. */
+  const fileSaid = $derived(
+    mapping === null
+      ? firstRun.exportReading
+      : (mapping.summary ?? (mapping.list === null ? firstRun.exportOwn(mapping.name) : firstRun.exportInto(entries?.fields.length ?? 0, mapping.name))),
+  );
+  /** The rail with the file's own page on it. */
+  const rail = $derived(own ? [...pages, { section: own.name, pages: [own.name] }] : pages);
+
   /* THE DRAFT STANDS ONLY WHILE NO USE CASE IS CHOSEN: choosing one from the chips is choosing its pages instead. */
   const using = $derived(chosen === null ? draft : null);
   const today = dayOf(Date.now());
@@ -341,7 +468,12 @@
    * ASKED AGAIN ONLY WHEN IT CHANGES: a turn that adds a client to People asks for the same pages, and the record is not
    * asked to draw them twice.
    */
-  const asks = $derived(using ? [draftAsked(using), ...changesAsked([], modules, today)] : changesAsked(cases, modules, today));
+  const plain = $derived(using ? [draftAsked(using), ...changesAsked([], modules, today)] : changesAsked(cases, modules, today));
+  const asks = $derived(
+    file && mapping && entries
+      ? drawnWith(plain as Record<string, unknown>[], entries.register, entries.fields, own ? { declarations: newListDeclarations(own, mapping.summary) } : null)
+      : plain,
+  );
   let drawAsked = $state.raw<Record<string, unknown>[]>([]);
   let drawKey = '';
   $effect(() => {
@@ -417,7 +549,7 @@
   let busy = $state(false);
   /** What could not be made, `null` until a press has come back with something refused. */
   let failed = $state<NotMade[] | null>(null);
-  const nothing = $derived(u === null && modules.length === 0 && using === null);
+  const nothing = $derived(u === null && modules.length === 0 && using === null && !(file !== null && mapping !== null));
   const ready = $derived(proposal !== null && !busy && !nothing && !(asksCurrency && currency === null));
 
   async function make() {
@@ -433,6 +565,8 @@
       today: dayOf(Date.now()),
       nav: pref.read().nav ?? [],
       drafted: using,
+      imported: file && mapping ? { file, mapping } : null,
+      locale,
     };
     busy = true;
     failed = null;
@@ -502,7 +636,7 @@
 </script>
 
 <svelte:head><title>{titleOf('Start')}</title></svelte:head>
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} ondragover={dragover} ondrop={drop} ondragleave={(e) => (e.relatedTarget === null ? (dragging = false) : undefined)} />
 
 {#snippet you(at: number)}
   <div class="who"><span class="who-name">{proposal?.name ?? words.you}</span><time class="who-time num" datetime={new Date(at).toISOString()}>{timeOf(at)}</time></div>
@@ -510,6 +644,18 @@
 
 {#snippet dog(at: number)}
   <div class="who"><span class="who-name">{words.dog}</span><time class="who-time num" datetime={new Date(at).toISOString()}>{timeOf(at)}</time></div>
+{/snippet}
+
+{#snippet bringer()}
+  <!-- ONE QUIET CONTROL, AND ITS HINT ONLY ON HOVER OR FOCUS: the screen asks one question, and a file is the other way
+       to answer it. The input is the browser's own picker; a drop anywhere on the screen does the same. -->
+  {#if file === null}
+    <span class="bring">
+      <input class="bring-input" type="file" accept=".csv,.tsv,.json,.txt,text/csv,application/json" tabindex="-1" aria-hidden="true" bind:this={picker} onchange={pick} />
+      <Button weight="quiet" size="sm" disabled={busy} aria-describedby="bring-hint" onclick={() => picker?.click()}>{firstRun.exportPoint}</Button>
+      <span class="bring-hint" id="bring-hint">{firstRun.exportHint}</span>
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet keys()}
@@ -565,7 +711,8 @@
 
       <div class="board">
         <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
-        <Tile lead icon="edit" title={words.talk} actions={keys}>
+        <Tile lead icon="edit" title={words.talk} actions={keys} data-dragging={dragging ? '' : undefined}>
+          {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
           {#if proposal === null}
             <form
               class="prompt"
@@ -604,8 +751,16 @@
               {/if}
               <div class="actions">
                 <!-- THE CAP ONLY WHILE THE KEY WORKS: a disabled pill's cap would promise a key that does nothing. -->
-                <Button weight="primary" type="submit" kbd={sentence.trim() === '' ? undefined : '↵'} disabled={sentence.trim() === ''}>{firstRun.whoGo}</Button>
+                <Button
+                  weight="primary"
+                  type="submit"
+                  kbd={sentence.trim() === '' || thinking ? undefined : '↵'}
+                  disabled={(sentence.trim() === '' && file === null) || thinking}
+                  aria-busy={thinking}>{thinking ? firstRun.whoReading : firstRun.whoGo}</Button
+                >
+                {@render bringer()}
               </div>
+              {#if fileWhy}<p class="nudge" role="status">{fileWhy}</p>{/if}
             </form>
           {:else}
             <ol class="log">
@@ -647,11 +802,14 @@
                               </li>
                             {/each}
                           </ul>
+                        {:else if file !== null}
+                          <p class="quiet">{fileSaid}</p>
                         {:else}
                           <p class="quiet">{firstRun.heardNone}</p>
                           {#if proposal.name && modules.includes(PEOPLE)}<p class="quiet">{firstRun.heardNote}</p>{/if}
                         {/if}
                         {#if proposal.name && !modules.includes(PEOPLE)}<p class="quiet">{firstRun.nameNotKept}</p>{/if}
+                        {#if proposal.fell === 'SLASH_BUDGET_SPENT'}<p class="quiet">{firstRun.readByRules}</p>{/if}
                         {#each missing as m (m.title)}
                           <p class="nudge">{words.missing(m.title, m.missing)}</p>
                         {/each}
@@ -661,12 +819,14 @@
                         <h3 class="reply-h" id="mine-h">{firstRun.mineTitle}</h3>
                         {#if u}
                           <p class="mine-title">{u.title}{#if also.length > 0}<span class="quiet">, {firstRun.and(also.map((a) => a.title))}</span>{/if}</p>
-                          <p class="quiet">{u.summary}</p>
+                          <p class="quiet">{proposal.summary ?? u.summary}</p>
                         {:else if using}
                           <p class="mine-title">{drawing.drafted}</p>
                           <p class="quiet">{using.question}</p>
                         {:else if drafting}
                           <p class="quiet drafting" role="status"><span class="live-dot" aria-hidden="true"></span>{drawing.drafting}</p>
+                        {:else if proposal.summary}
+                          <p class="quiet">{proposal.summary}</p>
                         {/if}
                         {#if !closest}
                           <div class="chips" role="group" aria-label={firstRun.mineFor}>
@@ -723,8 +883,10 @@
             >
               <div class="field more-field">
                 <input class="field-input" id="start-more" type="text" autocomplete="off" aria-label={words.more} placeholder={words.more} disabled={busy} bind:value={extra} onkeydown={moreKey} />
-                <Button weight="quiet" size="sm" type="submit" kbd="↵" disabled={busy || extra.trim() === ''}>{words.moreGo}</Button>
+                <Button weight="quiet" size="sm" type="submit" kbd="↵" disabled={busy || thinking || extra.trim() === ''} aria-busy={thinking}>{thinking ? firstRun.whoReading : words.moreGo}</Button>
               </div>
+              <div class="actions">{@render bringer()}</div>
+              {#if fileWhy}<p class="nudge" role="status">{fileWhy}</p>{/if}
             </form>
 
             {#if failed}
@@ -788,6 +950,20 @@
             {/if}
           </Tile>
 
+          {#if file}
+            <FromFile
+              {file}
+              {mapping}
+              line={fileSaid}
+              {pairs}
+              going={entries?.fields.length ?? 0}
+              held={entries?.skipped ?? 0}
+              reading={mapping === null}
+              {busy}
+              onremove={leaveFile}
+            />
+          {/if}
+
           {#if onParts.length > 0}
             <div class="parts" role="group" aria-label={firstRun.mineKeeps} data-live={proposal === null ? '' : undefined}>
               {#each onParts as p (p.id)}
@@ -808,7 +984,7 @@
 
           {#if proposal}
             <!-- EVERY PAGE IT MAKES, one row a page, each opening as the record would draw it. -->
-            <PagesPreview asked={drawAsked} rail={pages} />
+            <PagesPreview asked={drawAsked} {rail} />
           {/if}
         </div>
       </div>
@@ -1009,6 +1185,66 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  /* ── a file ────────────────────────────────────────────────────────────── */
+
+  /* THE PICKER IS THE BROWSER'S, kept out of sight; the quiet button opens it. */
+  .bring {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .bring-input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* THE HINT ONLY ON HOVER OR FOCUS (§35): the control is one quiet word until a person reaches for it. */
+  .bring-hint {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
+    opacity: 0;
+    transition: opacity 120ms var(--ease-out);
+  }
+
+  .bring:hover .bring-hint,
+  .bring:focus-within .bring-hint {
+    opacity: 1;
+  }
+
+  @media (pointer: coarse) {
+    .bring-hint {
+      display: none;
+    }
+  }
+
+  /* A FILE HELD OVER THE SCREEN: the conversation says where it goes, in the ink, over a quiet wash. */
+  :global(.tile[data-dragging]) {
+    position: relative;
+  }
+
+  .drop {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-raise);
+    display: grid;
+    place-items: center;
+    margin: 0;
+    border: 1px dashed var(--ink2);
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 500;
+    pointer-events: none;
   }
 
   /* ── the conversation ──────────────────────────────────────────────────── */

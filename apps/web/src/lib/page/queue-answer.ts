@@ -31,7 +31,7 @@ export const queueWords = {
    * A row the proposal would change moved after it was filed. Decide's own sentence for this says the question "has
    * been read again", which Decide does and this card does not, so the card says only what happened.
    */
-  moved: 'A row this would change has changed since it was proposed, so nothing was written.',
+  moved: 'Something this would change has changed since it was proposed, so nothing was written.',
   /** A rule that asked, by its name, so a reader knows a person did not. */
   rule: (name: string) => `A rule: ${name}`,
   /** The line a card becomes once it is answered: what was chosen, by whom, and when. */

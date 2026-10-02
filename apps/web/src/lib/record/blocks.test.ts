@@ -6,7 +6,8 @@
  * thirty days, and that was filed as one screen contradicting itself. It is a disagreement on
  * purpose: `bridgeRows` in `blocks.ts` carries the measurements, both of what the renderer does when
  * the minus is taken off and of why a tile stating an amount must not have one. Since money-core
- * 3.0.0 the tile is `Going out, 30 days`, read from the bridge's own walk, so the pair is one sum.
+ * 3.0.0 the tile is `Going out, 30 days`, read from the bridge's own walk, so the pair is one sum; since 3.3.0 the
+ * page draws only the bridge, and the figure is read directly.
  *
  * WHAT THIS FILE ADDS IS THE PAIR, because a sign that is right on its own terms in two places can
  * still drift into two answers, which is what 491e7e05 measured on these very blocks. So the two
@@ -37,7 +38,7 @@ import { bridgePlan, moveOf, signedOf, type Row } from 'braindog-render';
 import { openRecord, type Declaration } from '@braindog/kernel';
 import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
-import { page } from './fixtures/readers.ts';
+import { metric, page } from './fixtures/readers.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';
 import { draw, toSegments } from './blocks.ts';
 import { copy } from '../copy.ts';
@@ -84,29 +85,24 @@ test('THE BRIDGE’S OUT ROW AND THE `Going out, 30 days` TILE ARE ONE MONEY IN 
   );
   assert.equal(moveOf(2, values.length, out), 'down');
 
-  /* THE TILE IS FOUND BY THE FIGURE IT READS AND NOT BY ITS WORDS, because its words are one of the
-     things under test: looking it up by label would make a rename invisible to this test.
+  /* THE FIGURES AND NOT THE TILES, SINCE money-core 3.3.0. The Money page says the thirty days once, as the bridge, and
+     no longer draws `arriving-30d` and `leaving-30d` beside Cash now; a use case's page still does (`founder`), so the
+     two are read here as figures, as `packages/seed/test/money.test.ts` reads them, and held to the bridge's legs.
 
-     SINCE money-core 3.0.0 THE HERO READS THE WALK, and it read one list. `out-30d` summed what Bills and invoices owed
-     inside thirty days while the bridge walked every list that holds a dated amount, so the tile could only be a part of
-     the leg and 491e7e05 kept the two apart in words. The hero's `leaving-30d` walks `CASH_LEGS` over the same thirty
-     days as the bridge (`packages/seed/src/modules/money.ts`), so it is no longer a part of the leg but the leg itself,
-     and the rival-total and the words half of this test move with it: the two must now be the same money exactly, and
-     saying it in the bridge's words is saying the same thing twice rather than two things alike. */
-  const hero = blockOf('money', 'stat');
-  const declared = hero.metrics?.find((m) => m.id === 'leaving-30d');
-  assert.ok(declared, 'the hero no longer draws `leaving-30d`, which is the tile this pair is about');
-  const tile = figure(drawnRows(hero).find((r) => r.cells[0] === declared.label));
-  assert.ok(
-    tile > 0,
-    `a tile labelled ${JSON.stringify(declared.label)} states an amount rather than a term in a sum, and it drew ${declared.value}`,
-  );
-  assert.equal(tile, -out, `the tile says ${tile} leaves where the bridge's own leg says ${-out}, over the one walk and the same thirty days`);
+     SINCE money-core 3.0.0 BOTH READ THE WALK. `out-30d` summed what Bills and invoices owed inside thirty days while
+     the bridge walked every list that holds a dated amount, so a tile over it could only be a part of the leg, and
+     491e7e05 kept the two apart in words. `leaving-30d` walks `CASH_LEGS` over the same thirty days as the bridge
+     (`packages/seed/src/modules/money.ts`), so it is the leg itself: the two must be the same money exactly. */
+  const leaving = metric('leaving-30d');
+  assert.equal(leaving.label, 'Going out, 30 days');
+  const left = signedOf(leaving.value);
+  assert.ok(left > 0, `a figure labelled ${JSON.stringify(leaving.label)} states an amount rather than a term in a sum, and it reads ${leaving.value}`);
+  assert.equal(left, -out, `the figure says ${left} leaves where the bridge's own leg says ${-out}, over the one walk and the same thirty days`);
 
-  /* AND THE OTHER LEG IS THE OTHER TILE, by the same walk: what arrives is said once as a figure and once as a term. */
-  const arriving = hero.metrics?.find((m) => m.id === 'arriving-30d');
-  assert.ok(arriving, 'the hero no longer draws `arriving-30d`');
-  assert.equal(figure(drawnRows(hero).find((r) => r.cells[0] === arriving.label)), values[1], 'the tile and the bridge disagree on what comes in');
+  /* AND THE OTHER LEG IS THE OTHER FIGURE, by the same walk: what arrives is said once as a figure and once as a term. */
+  const arriving = metric('arriving-30d');
+  assert.equal(arriving.label, 'Coming in, 30 days');
+  assert.equal(signedOf(arriving.value), values[1], 'the figure and the bridge disagree on what comes in');
 });
 
 /* ── the heading over a refusal ───────────────────────────────────────────── */
