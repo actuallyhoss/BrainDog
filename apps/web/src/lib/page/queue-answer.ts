@@ -9,7 +9,7 @@
  */
 
 import type { QueueQuestion } from '@braindog/kernel';
-import { showsOf } from 'braindog-render';
+import { day, relative, showsOf } from 'braindog-render';
 
 import { citedWords } from '../cite.ts';
 import { copy } from '../copy.ts';
@@ -36,6 +36,8 @@ export const queueWords = {
   rule: (name: string) => `A rule: ${name}`,
   /** The line a card becomes once it is answered: what was chosen, by whom, and when. */
   answered: (option: string, when: string) => `${option} · you, ${when}`,
+  /** A question put off (`governance.later`): the day it comes back to the reader. */
+  back: (when: string) => `Comes back ${when}`,
 } as const;
 
 /**
@@ -103,6 +105,30 @@ export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
 
 /** A question's own words, and why it is asked, as the card draws them: citations as words, money in the record's currency. */
 export const saidOf = (text: string): string => moneyInText(citedWords(text));
+
+/**
+ * A DAY SAID THE WAY DECIDE SAYS ONE: relative inside a week ("in 3 days", "tomorrow"), then the day and month, and the
+ * year as well once it is another year. "on" leads a date so the line reads whole.
+ */
+function backDay(iso: string, now: number): string {
+  const d = iso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(d)) return '';
+  if (Math.abs(Date.parse(`${d}T12:00:00Z`) - now) / 86_400_000 < 7) return relative(d, now);
+  const said = day(d);
+  const year = String(new Date(now).getUTCFullYear());
+  return `on ${said.endsWith(` ${year}`) ? said.slice(0, -year.length - 1) : said}`;
+}
+
+/**
+ * THE ONE QUIET LINE A QUESTION PUT OFF CARRIES (`governance.later` sends `until` and `until_why`): when it comes back,
+ * and why it was put off, as Decide's classic list said it. `null` on any other question, or a day that does not read.
+ */
+export function laterLine(q: { until?: unknown; until_why?: unknown }, now: number): string | null {
+  const when = typeof q.until === 'string' ? backDay(q.until, now) : '';
+  if (when === '') return null;
+  const why = typeof q.until_why === 'string' ? saidOf(q.until_why.trim()) : '';
+  return why === '' ? queueWords.back(when) : `${queueWords.back(when)} · ${why}`;
+}
 
 /**
  * Whether a question changes something the reader should see whole before accepting it: every kind but `options`, which

@@ -55,7 +55,7 @@
   } = $props();
 
   /* This part's own words. */
-  const words = { allFields: 'All fields' } as const;
+  const words = { allFields: 'Fill in the rest' } as const;
 </script>
 
 {#if rowsAsCards()}

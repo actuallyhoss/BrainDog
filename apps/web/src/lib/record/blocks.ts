@@ -784,6 +784,12 @@ function queueRows(block: BlockResult): string[] {
          "A rule: chase late payments", "Slash", never `rule:cash-stale`. This fence is handed no reader, so a person
          who asked is Someone on this record here; the card names them from the shell's people. */
       ['q', q.id, proposer(q.who).name, since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
+      /* WHAT ACCEPTING IT CHANGES, a line a row, which the record writes only on a lead queue's first question
+         (`does` in `kernel/src/pages.ts`). A string or a list of them, said in the reader's money and with no citation. */
+      ...[(q as { does?: unknown }).does]
+        .flat()
+        .filter((line): line is string => typeof line === 'string' && line.trim() !== '')
+        .map((line) => ['does', q.id, moneyInText(citedWords(line))].map(escapeCell).join(' | ')),
       /* AN OPTION'S SEVENTH CELL IS WHAT IT IS (`showsCell`), written only when it has one, so an option with no visual
          is the six-cell row it always was. */
       ...options.map((o) => {
@@ -1160,6 +1166,7 @@ function formOf(block: BlockResult): string {
   if (block.kind === 'progress' && block.spent) return ' budget';
   if ((block.kind === 'note' || block.kind === 'cards') && block.lead === true) return ' lead';
   if (block.kind === 'steps' && marksOf(block)) return ' path';
+  if (block.kind === 'queue' && keyOf(block, 'lead') === true) return ' lead';
   if (block.kind === 'queue' && keyOf(block, 'tiles') === true) return ' tiles';
   return '';
 }
@@ -1427,8 +1434,8 @@ export function draw(
            refusal is the teacher (`10 §7`), and the schema's verb in the first three words teaches
            the schema rather than the fix. The body below already names both halves in the
            dialect's own words, which is where an author needs them. */
-        title: 'This block has both a source and rows of its own.',
-        body: 'Keep one. `source:` reads a register; `authored:` is written out by hand.',
+        title: 'This part of the page is told to draw two things at once.',
+        body: 'Keep one. `source:` reads what the record holds; `authored:` is written out by hand.',
       },
     };
 
@@ -1471,7 +1478,7 @@ export function draw(
       segments: [],
       refusal: {
         kind: 'error',
-        title: 'This block drew nothing, and the record says why.',
+        title: 'This part of the page drew nothing, and the record says why.',
         lines: block.refusals,
       },
     };

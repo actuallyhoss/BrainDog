@@ -152,7 +152,7 @@ test('A TASK MADE DONE WITH NO DAY IS DATED TODAY BY BOTH ENGINES, and shows fir
 });
 
 test('OPEN DRAWS A LINE ON THE SAMPLE, worked back from the days tasks were finished', () => {
-  const open = page('work')!.blocks.find((b) => b.kind === 'stat')!.metrics!.find((m) => m.label === 'Open')!;
+  const open = readBlock({ kind: 'stat', cells: [{ metric: 'open-tasks', label: 'Open', trend: '8w' }] } as never).metrics!.find((m) => m.label === 'Open')!;
   assert.ok(open.trend && open.trend.length === 56, 'eight weeks, a point a day');
   /* WORK KEPT FOR LATER IS NOT OPEN, on any day. */
   const live = TASKS.filter((t) => t.fields.state !== 'done' && t.fields.state !== 'dropped' && t.fields.state !== 'backlog').length;

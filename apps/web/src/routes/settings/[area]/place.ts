@@ -1,69 +1,180 @@
 /**
- * Settings as a place: the groups its index draws, and the areas a phone is not offered.
+ * Settings as a place, DECLARED: every area this build draws, the index as a page body the one reader draws, and how
+ * a declared index is read back into the groups the chooser beside an open area draws.
  *
- * BELOW 900PX `/settings` IS AN INDEX AND EACH AREA A PAGE OF ITS OWN. The areas sat in one sideways
- * strip that a phone cut at its edge, with nothing there to say more followed. An
- * index of grouped rows shows every area at once, and an area opened from it has a back link to it.
- * From 900px up the same index stands beside the area, as the rail stands beside a page.
+ * THE INDEX IS A PAGE LIKE ANY OTHER (DIRECTION §35, "every page is declared"). It was a hand-written list of rows in
+ * `+page.svelte`, the same for everybody and changed by nobody. It is `SETTINGS_INDEX` now: one `link` block for each
+ * group, each area a row written out (its name, its address and its one line), drawn by `PageView`. A record that
+ * holds a page called `settings` is read in its place, so a person reorders the groups, moves an area from one to
+ * another, renames one or leaves one out by arranging that page, and an agent proposes the same change as any other
+ * page change. Nothing about it is anybody's own record (§27): every record starts from this body.
  *
- * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE. The rows themselves stay in `+page.svelte`'s
- * `AREAS`, which is the registry a unit adding an area writes its row into;
- * this file only says how the index groups what that list holds.
+ * LEFT OUT IS NOT GONE. An area the index does not list still opens at its address, so a link somebody shares still
+ * lands and Delete is never lost with its row.
+ *
+ * ADDRESSES, NOT IDS, ARE WRITTEN HERE: an area's id is its address less `/settings/`, so the rows a person edits are
+ * the links they read, and two of the ids (`people`, `agents`) are spelled like lists the web may not name in a string.
+ *
+ * PLAIN TYPESCRIPT, SO A TEST CAN LOAD IT IN NODE.
  */
 
 import type { IconName } from '../../../lib/ui/icons.ts';
+import type { PageBlock } from '../../../lib/record/schema.ts';
 
-/** The groups of the settings index. */
-export type AreaGroup = 'you' | 'signin' | 'sharing' | 'record';
+/** The page a record declares to reshape its Settings index. */
+export const SETTINGS_PAGE = 'settings';
 
-/** One row of `AREAS`, as the index reads it. */
-export type AreaRow = {
+/** Where every area lives; an area's id is what follows. */
+export const AREA_AT = '/settings/';
+
+/** One area, as the index and the chooser beside an open area draw it. */
+export type Area = {
   readonly id: string;
   readonly label: string;
   readonly icon: IconName;
-  /**
-   * The group the index draws the row in. A row written without one is drawn in the last group
-   * (`LAST`), so an area added in the registry's older shape (`{ id, label, icon }`) is still listed.
-   */
-  readonly group?: AreaGroup;
-  /** One line under the name, saying what the area holds. A row without one draws its name alone. */
-  readonly line?: string;
+  /** One line saying what the area holds, drawn on the index and never beside an open area. */
+  readonly line: string;
 };
 
+/** One group of the index: its heading, its icon, and its areas in the order drawn. */
+export type AreaGroup = { readonly title: string; readonly icon: IconName; readonly areas: readonly Area[] };
+
+const area = (address: string, label: string, icon: IconName, line: string): Area => ({ id: address.slice(AREA_AT.length), label, icon, line });
+
 /**
- * THE GROUPS IN THE ORDER THE INDEX DRAWS THEM, and their headings.
+ * THE AREAS, AND THE GROUPS THEY START IN. A unit adding an area writes its row here, and its arm in `+page.svelte`.
  *
- * WHAT A PERSON CHANGES FOR THEMSELVES COMES FIRST, and what changes the record for everybody comes
- * last, so the one irreversible act (deleting the record) is the last row of the last group rather
- * than a neighbour of the colour scheme.
+ * THE LINE IS WHAT A PERSON SCANNING THE INDEX READS to find the area, so it names what is there and never how it
+ * works, and it stays short enough to be read on a phone whole.
+ *
+ * WHAT A PERSON CHANGES FOR THEMSELVES COMES FIRST, and what changes the record for everybody last, so the one
+ * irreversible act (deleting the record) is the last row of the last group rather than a neighbour of the colour
+ * scheme.
  */
-export const GROUPS: readonly { readonly id: AreaGroup; readonly title: string }[] = [
-  { id: 'you', title: 'You' },
-  { id: 'signin', title: 'Signing in' },
-  { id: 'sharing', title: 'Sharing and access' },
-  { id: 'record', title: 'This record' },
+export const DEFAULT_GROUPS: readonly AreaGroup[] = [
+  {
+    title: 'You',
+    icon: 'sliders-horizontal',
+    areas: [
+      area('/settings/appearance', 'Appearance', 'sun', 'Colour, text size and density'),
+      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
+      area('/settings/navigation', 'Navigation', 'rows', 'Where it sits, its order and hidden pages'),
+      area('/settings/pages', 'Pages', 'doc', 'Every page, and the one that opens first'),
+      area('/settings/notifications', 'Notifications', 'bell', 'When BrainDog interrupts you'),
+    ],
+  },
+  {
+    title: 'Signing in',
+    icon: 'lock',
+    areas: [
+      area('/settings/identity', 'Identity', 'user-check', 'Who you are, and your records'),
+      area('/settings/recovery', 'Recovery', 'key', 'Passkeys, and getting back in'),
+      area('/settings/sessions', 'Sessions', 'monitor', 'Where you are signed in'),
+    ],
+  },
+  {
+    title: 'Sharing and access',
+    icon: 'link',
+    areas: [
+      area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and invites'),
+      area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
+      area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
+    ],
+  },
+  {
+    title: 'This record',
+    icon: 'archive',
+    areas: [
+      area('/settings/backups', 'Backups', 'archive', 'Copies of this record to restore from'),
+      area('/settings/billing', 'Billing', 'money', 'What this record costs'),
+      area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
+      /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`. A person who wants a copy of their data clicks the row
+         labelled Export, scrolls past the file and the keys, and arrived at the one irreversible act in the product.
+         A destructive act reached by somebody looking for a backup is reached by the person least expecting it. */
+      area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good'),
+    ],
+  },
 ];
+
+/** Every area this build draws, by id, whatever a declared index lists. */
+export const AREAS: ReadonlyMap<string, Area> = new Map(DEFAULT_GROUPS.flatMap((g) => g.areas.map((a) => [a.id, a] as const)));
 
 /**
  * THE AREAS A PHONE'S INDEX LEAVES OUT.
  *
- * Keyboard is a table of keys, and a phone has none to press: offering it there is a visible key
- * hint on a screen with no keyboard. Its address still opens, so a link somebody shares still lands.
+ * Keyboard is a table of keys, and a phone has none to press: offering it there is a visible key hint on a screen
+ * with no keyboard. Its address still opens, so a link somebody shares still lands.
  */
 export const ONLY_WIDE: ReadonlySet<string> = new Set(['keyboard']);
 
-/** Where a row that names no group is drawn: the record's own group, last in the index. */
-export const LAST: AreaGroup = 'record';
+/** A page body as `drawnOf` and `setBody` take it. */
+export type IndexBody = { page: string; title: string; blocks: PageBlock[] };
 
 /**
- * The index's groups, each with its areas in the order `AREAS` lists them.
- *
- * A GROUP WITH NO AREA IS NOT DRAWN, so a heading never stands over nothing. EVERY ROW IS DRAWN ONCE:
- * a row's group can only be one of `GROUPS` (the type refuses any other), and a row with none is
- * drawn under `LAST`, so no area the registry holds is ever missing from its index.
+ * THE INDEX, DECLARED: a `link` tile for each group, half the page wide, so the four sit two by two from 900px up and
+ * one under another on a phone. Each row is written out as `[name, address, line]`, the shape a `link` row takes.
  */
-export function grouped<R extends AreaRow>(areas: readonly R[]): { id: AreaGroup; title: string; areas: R[] }[] {
-  return GROUPS.map((g) => ({ id: g.id, title: g.title, areas: areas.filter((a) => (a.group ?? LAST) === g.id) })).filter(
-    (g) => g.areas.length > 0,
-  );
+export function indexBody(groups: readonly AreaGroup[] = DEFAULT_GROUPS): IndexBody {
+  return {
+    page: SETTINGS_PAGE,
+    title: 'Settings',
+    blocks: groups.map((g) => ({
+      kind: 'link',
+      heading: g.title,
+      icon: g.icon,
+      span: 6,
+      authored: g.areas.map((a) => ({ cells: [a.label, `${AREA_AT}${a.id}`, a.line] })),
+    })),
+  };
+}
+
+export const SETTINGS_INDEX: IndexBody = indexBody();
+
+/** A block as the reader answers it, narrowed to what reading an index back needs. */
+export type IndexBlock = { kind: string; heading?: string; icon?: string; drawn?: boolean; authored?: readonly { cells: readonly unknown[] }[] };
+
+/** The area an address names, `/settings/<id>` with the base path or a query in front or behind it, or none. */
+function areaAt(address: unknown): Area | undefined {
+  if (typeof address !== 'string') return undefined;
+  const m = /\/settings\/([a-z-]+)\/?(?:[?#].*)?$/u.exec(address.trim());
+  return m ? AREAS.get(m[1]!) : undefined;
+}
+
+/**
+ * A DECLARED INDEX, READ BACK INTO GROUPS: what the chooser beside an open area draws, so it keeps the order, the
+ * names and the leaving out a person gave the index.
+ *
+ * Only `link` blocks are read, in their order, and only rows whose address is an area this build draws. A row's name
+ * is the person's (a renamed area keeps the name they gave it); its icon is the area's own. An area listed twice is
+ * drawn where it is first listed, a block not drawn is left out, and a group left with no area draws no heading.
+ *
+ * AN INDEX THAT NAMES NO AREA AT ALL IS READ AS THE DEFAULT, because a chooser with nothing in it is a person stranded
+ * in one area with no way to the next, and nothing on the page would say why.
+ */
+export function groupsOf(blocks: readonly IndexBlock[]): readonly AreaGroup[] {
+  const seen = new Set<string>();
+  const groups: AreaGroup[] = [];
+  for (const b of blocks) {
+    if (b.kind !== 'link' || b.drawn === false || !Array.isArray(b.authored)) continue;
+    const areas: Area[] = [];
+    for (const row of b.authored) {
+      const cells = Array.isArray(row?.cells) ? row.cells : [];
+      const known = areaAt(cells[1]);
+      if (!known || seen.has(known.id)) continue;
+      seen.add(known.id);
+      const named = typeof cells[0] === 'string' && cells[0].trim() !== '' ? cells[0].trim() : known.label;
+      const line = typeof cells[2] === 'string' ? cells[2].trim() : known.line;
+      areas.push({ ...known, label: named, line });
+    }
+    if (areas.length === 0) continue;
+    const home = DEFAULT_GROUPS.find((g) => g.title === b.heading);
+    groups.push({ title: b.heading?.trim() || areas[0]!.label, icon: (b.icon as IconName | undefined) ?? home?.icon ?? areas[0]!.icon, areas });
+  }
+  return groups.length > 0 ? groups : DEFAULT_GROUPS;
+}
+
+/** The label an area is drawn under on this index, the person's name for it where they gave one. */
+export function labelIn(groups: readonly AreaGroup[], id: string): string | undefined {
+  for (const g of groups) for (const a of g.areas) if (a.id === id) return a.label;
+  return AREAS.get(id)?.label;
 }

@@ -18,6 +18,7 @@
   import { at as inApp } from '../at.ts';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import type { Row } from 'braindog-render';
   import { registerHref } from '$lib/record/where.ts';
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropInto, nearestInArea, setAreaAt, type Slot } from '$lib/record/arrange.ts';
@@ -30,6 +31,10 @@
   import { boxesOf, layoutOf, mainSpan, slotOf, splitAreas, sticks, type Run } from './layout.ts';
   import { emptyHidden, openOf, optionOf, stepRow } from './home.ts';
   import type { Writes } from './page-writes.ts';
+  import type { Picked } from './picked.svelte.ts';
+  import type { RowHost } from './row-host.svelte.ts';
+  import { rowOfKey } from './row-verbs.ts';
+  import JustChanged from './JustChanged.svelte';
 
   let {
     mode,
@@ -41,6 +46,8 @@
     ids = '',
     level = 2,
     headed = false,
+    host = null,
+    pick = null,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -62,6 +69,13 @@
     level?: 2 | 3;
     /** The page's head rides over the top of the lead tile on a wide screen (`PageHead`'s `over`), so the tile leaves it room. */
     headed?: boolean;
+    /**
+     * The page's hold on one row at a time (`row-host.svelte.ts`): the docked panel, the row menu and Just changed, which
+     * the row keys and the renderer's `onopen` and `onmenu` reach. `null` where rows are only ticked.
+     */
+    host?: RowHost | null;
+    /** The page's choice of questions to answer at once, or `null` where a queue answers one card at a time. */
+    pick?: Picked | null;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -205,6 +219,9 @@
   function onkeydown(e: KeyboardEvent) {
     if (mode === 'home') return homeKey(e);
     if (mode !== 'page') return;
+    /* A PAGE THAT DRAWS ROWS IS WORKED ROW BY ROW, as a home is and as Work was: `j` and `k` walk its rows, and the
+       block keys below are for a page of figures and prose with no row to stop on. */
+    if (host && rowsNow().length > 0) return homeKey(e);
     /* THE ONE TEST FOR WHETHER SOMEBODY IS TYPING, rather than a narrower copy of it: `typing()` covers an open select
        and a contenteditable block as well as a field. */
     if (typing()) return;
@@ -337,7 +354,7 @@
 
   /* AND AGAIN EACH TIME THE PAGE IS DRAWN AGAIN, since a re-read draws new elements and the mark was on the old ones. */
   $effect(() => {
-    if (mode !== 'home') return;
+    if (mode === 'preview') return;
     void drawable;
     void rowKey;
     void tick().then(() => markRow(false));
@@ -359,8 +376,15 @@
     rowAt = rowsNow().findIndex((r) => r.key === rowKey);
   };
 
+  /**
+   * THE ROW KEYS, on a home and on a page that draws rows. On a page at its own address the row under the cursor is the
+   * page's to change as well (`host`): `e` opens it in the docked panel with the caret in its words, Enter opens it
+   * there, `m` opens its menu, and Delete deletes it with an Undo, and `o` and `y` are the block's it sits in. A home
+   * has none of those, and Enter follows the row to its own page as it always did.
+   */
   function homeKey(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey || covered() || typing() || arranging) return;
+    if (host?.menuOpen) return;
     if (silenced(e)) return;
     /* A `g` PRESSED FIRST IS THE SHELL'S, and so is the key after it: `g 1` goes to the first place in the nav. */
     if (e.key === 'g') {
@@ -375,9 +399,14 @@
     /* INSIDE A TABLE THE KEYS ARE THE TABLE'S: its grid walks its own rows with the same letters. */
     if (on instanceof HTMLElement && on.closest('[role="grid"]')) return;
     const control = on instanceof HTMLElement && on.closest('button, a[href], select, summary') !== null;
+    /* FROM A BUTTON IN THE PANEL the page's letters still walk the page, and the panel follows; Esc is the panel's own,
+       and Delete never reaches past it to a row. */
+    const inPanel = on instanceof HTMLElement && on.closest('dialog') !== null;
     const rows = rowsNow();
     const at = rows.findIndex((r) => r.key === rowKey);
     const under = rows[at]?.el;
+    /* THE ROW OF THE RECORD UNDER THE CURSOR, where it is one: a question or a line of an author's fence is not. */
+    const record = host && under ? rowOfKey(under.dataset.row) : null;
     switch (e.key) {
       case 'j':
       case 'k': {
@@ -385,18 +414,56 @@
         if (!next) return;
         rowKey = next.key;
         keyed = true;
-        markRow(true);
+        markRow(!inPanel);
+        host?.follow(rowOfKey(next.el.dataset.row));
         break;
       }
       case 'x': {
-        /* THE TASK'S OWN BOX, pressed, so the tick is the one a pointer makes, with its receipt and its Undo. */
+        /* THE ROW'S OWN BOX, pressed, so the tick is the one a pointer makes, with its receipt and its Undo. On a
+           question it is the box that chooses it for an answer with others. */
         const box = under?.querySelector<HTMLElement>('[role="checkbox"]');
         if (!box) return;
         box.click();
         break;
       }
+      case 'e': {
+        if (!host || !record || !host.open(record, true)) return;
+        break;
+      }
+      case 'm': {
+        if (!host || !record || !host.openMenu(record, under ?? null, 'move')) return;
+        break;
+      }
+      case 'd': {
+        /* THE DAY IT IS DUE, as Work keeps it, on a list that has one. */
+        if (!host || !record || !host.shapeOf(record.register)?.due || !host.openMenu(record, under ?? null, 'due')) return;
+        break;
+      }
+      case 'Delete':
+      case 'Backspace': {
+        if (inPanel || !host || !record || !host.remove(record)) return;
+        break;
+      }
+      case 'o':
+      case 'y': {
+        /* THE BLOCK THE ROW IS IN, on a page: its list, filtered, or a link to it. */
+        if (mode !== 'page') return;
+        const slot = under?.closest('.block-slot')?.id.slice(`${ids}b-`.length);
+        const i = slot ? Number(slot) - 1 : Number.NaN;
+        const held = blocks[i];
+        if (!Number.isInteger(i) || !held) return;
+        if (e.key === 'y') void copyBlockLink(i);
+        else {
+          const to = held.register ? registerHref(held.register, held.where) : null;
+          if (!to) return;
+          void goto(inApp(to));
+        }
+        break;
+      }
       case 'Enter': {
         if (control || !under) return;
+        /* ON A PAGE A ROW OF THE RECORD OPENS BESIDE THE PAGE, in the panel, and the page stays where it was. */
+        if (record && host?.open(record)) break;
         const to = openOf(under.dataset.open, under.dataset.row);
         const link = under.querySelector<HTMLAnchorElement>('a[href]');
         if (to) void goto(inApp(to));
@@ -411,7 +478,17 @@
         break;
       }
       case 'Escape':
-        if (rowKey === null) return;
+        if (inPanel) return;
+        /* THE PANEL FIRST, then the cursor, then the choice of questions. */
+        if (host?.panelOpen) {
+          host.close();
+          break;
+        }
+        if (rowKey === null) {
+          if (!pick || pick.chosen.size === 0) return;
+          pick.clear();
+          break;
+        }
         rowKey = null;
         rowAt = -1;
         markRow(false);
@@ -428,6 +505,29 @@
     e.preventDefault();
     e.stopPropagation();
   }
+
+  /**
+   * THE RENDERER'S TWO ROW VERBS, handed to every block on a page at its own address: a row's title opens it in the
+   * panel, and its quiet trailing control opens its menu there. The cursor goes to the row either way, so the keys
+   * carry on from it. A row the record did not name is left alone.
+   */
+  const verbsFor = (i: number) =>
+    host && mode === 'page' && writes
+      ? {
+          onopen: (row: Row) => {
+            const r = host.rowOf(row);
+            if (!r) return;
+            rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
+            host.open(r);
+          },
+          onmenu: (row: Row, anchor: HTMLElement) => {
+            const r = host.rowOf(row);
+            if (!r) return;
+            rowKey = `${ids}b-${i + 1}|${r.register}#${r.seq}`;
+            host.openMenu(r, anchor);
+          },
+        }
+      : null;
 
   async function copyBlockLink(slotIndex: number) {
     const url = `${route.url.origin}${route.url.pathname}#${ids}b-${slotIndex + 1}`;
@@ -530,9 +630,12 @@
         {now}
         {level}
         fold={mode === 'home'}
-        rows={mode === 'home' ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
+        rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
+        verbs={verbsFor(slot.i)}
+        pick={mode === 'preview' ? null : pick}
       />
     </div>
+    {#if headed && host && mode === 'page' && at === 0}<JustChanged {host} />{/if}
   {/if}
 {/snippet}
 
@@ -556,6 +659,9 @@
      are reorderable; announcing "list, 5 items" to somebody reading a page is describing the furniture. ON A PAGE WITH A
      RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
 <div class="page" data-mode={mode} data-headed={headed ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
+  <!-- JUST CHANGED OPENS THE PAGE, before what it holds; on a page whose head rides over its lead tile it follows that
+       tile instead, or the head would sit over it. -->
+  {#if host && mode === 'page' && !arranging && !headed}<JustChanged {host} />{/if}
   {#if layout}
     <!-- TWO COLUMNS, the main one a twelve-column flow of its own so a block's `span` keeps its meaning inside it, and
          the rail one stack. Each is drawn only while it holds a block, so a page whose every block is in one of them
@@ -611,6 +717,13 @@
     gap: var(--sp-3);
     padding: var(--sp-3) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
+  }
+
+  /* THE ROW CURSOR'S RING, drawn only once a key has moved it: the focus ink, round the row, never the brand's red. */
+  .page :global([data-row-cursor]) {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
   }
 
   /* INSIDE ANOTHER SCREEN THE PAGE TAKES THAT SCREEN'S COLUMN: Home's body and a preview already sit inside a gutter and

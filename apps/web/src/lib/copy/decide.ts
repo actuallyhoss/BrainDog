@@ -65,7 +65,10 @@ export const decide = {
   decisionRecorded: (option: string) => `${option} is recorded as the decision.`,
   parkedUntil: (on: string) => `Parked until ${on}.`,
   changedSince: 'Something this would change has changed since it was proposed. Nothing was written.',
-  fileIt: 'File it in a list',
+  /* THE BUTTON SAYS WHERE IT GOES, and it said `File it in a list`. The picker beside it names the place, so the
+     button is the verb alone; `fileItIn` is the same press with the place said in it, for a button that stands alone. */
+  fileIt: 'File it',
+  fileItIn: (into: string) => `File it in ${into}`,
   /* `Archive this` AND IT WAS `Archive the arrival`. An `arrival` is what the record calls a thing
      that came in through an ingest, and the inbox is the one screen where the reader is looking at
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
@@ -82,7 +85,7 @@ export const decide = {
   inboxFileInto: 'File it in',
   inboxFiled: (row: string) => `Filed as ${row}. It has left the inbox.`,
   inboxArchived: 'Archived. It is kept, and it has left the inbox.',
-  inboxNoLists: 'This record has no lists to file it in yet.',
+  inboxNoLists: 'There is nowhere to file this yet.',
   /* Decide and page writes (lane B) */
   decideConflict: 'Something this would change has changed since it was proposed. Nothing was written, and the question has been read again.',
   /* DECIDE AND THE INBOX AS QUEUES: the cursor, a selection, and what a
@@ -94,7 +97,7 @@ export const decide = {
   proposalNotInSidebar: 'Not in the sidebar, reached by its link',
   proposalShows: 'Shows',
   proposalReads: 'Reads from',
-  proposalFields: 'Fields',
+  proposalFields: 'What it holds',
   proposalComesFrom: 'Comes from',
   proposalEvery: 'How often',
   proposalFilesInto: 'Files into',
@@ -120,7 +123,7 @@ export const decide = {
   proposalSource: (name: string) => `The source of ${name}`,
   decideRows: (n: number, list: string) => `Changes ${n === 1 ? 'one item' : `${n} items`} in ${list}`,
   decideGroup: 'Group',
-  decideGroupNone: 'One list',
+  decideGroupNone: 'Ranked',
   decideGroupList: 'By what it is about',
   decideGroupElse: 'Everything else',
   decideSelected: (n: number) => `${n} selected`,
@@ -131,7 +134,7 @@ export const decide = {
   clearSelection: 'Clear the selection',
   decideDecided: (option: string) => `Decided: ${option}`,
   decideToSend: 'sends it',
-  decideToLeave: 'goes back to the list',
+  decideToLeave: 'goes back',
   decideNext: 'Next question',
   decideOpenInbox: 'Open the inbox',
   inboxOpenDecide: 'Open Decide',

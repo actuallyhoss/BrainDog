@@ -67,7 +67,7 @@ Each run is listed with its state: waiting to start, running, waiting, done, fai
 
 ## Scheduled actions
 
-A scheduled action fetches from, calls or watches a web address on a clock, and writes what it gets to a list. It says when it last ran and when it runs next. When something goes wrong it says what, in a way you can act on:
+A scheduled action fetches from, calls or watches a web address on a clock, and files what it gets in your record. It says when it last ran and when it runs next. When something goes wrong it says what, in a way you can act on:
 
 - the other service did not answer, and it tries again on its own;
 - the service turned the key away, and it is paused until you reconnect the key;

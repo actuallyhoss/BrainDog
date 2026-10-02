@@ -271,6 +271,38 @@ test("any other refusal is the record's own sentence", async () => {
   assert.deepEqual(await pageReader(BASE, io).read('desk'), { from: 'refused', fix: 'This key cannot read pages.' });
 });
 
+/* THE READER'S CHOICE GOES TO THE RECORD, and no choice is no filter: the page is asked for by its slug alone, so a
+   record on a build that does not read `filter` is never handed one it would refuse. */
+test("a page is read narrowed by the reader's choice, and an empty choice asks by slug alone", async () => {
+  const asked: URL[] = [];
+  const { io } = host((method, url) => {
+    if (method === 'page') asked.push(url);
+    return record(method, url);
+  });
+  const reader = pageReader(BASE, io, () => AT);
+  assert.equal((await reader.read('desk', { project: '12' })).from, 'live');
+  assert.deepEqual(JSON.parse(asked[0]!.searchParams.get('filter') ?? 'null'), { project: '12' });
+  assert.equal(asked[0]!.searchParams.get('slug'), 'desk');
+
+  await reader.read('desk', {});
+  await reader.read('desk');
+  assert.equal(asked[1]!.searchParams.has('filter'), false);
+  assert.equal(asked[2]!.searchParams.has('filter'), false);
+
+  /* "No project" is a choice too, the kernel's '' (`filters.ts`), and it goes out as one. */
+  await reader.read('desk', { project: '' });
+  assert.deepEqual(JSON.parse(asked[3]!.searchParams.get('filter') ?? 'null'), { project: '' });
+});
+
+/* WHAT THE PAGE MAY BE NARROWED BY COMES THROUGH WITH THE PAGE, for the strip to read. */
+test("the record's filters reach the page untouched", async () => {
+  const filters = [{ field: 'project', label: 'Project', control: 'chips', chosen: null, values: [{ value: 12, label: 'Kiln', count: 3 }], reads: ['tasks'] }];
+  const { io } = host((method, url) => (method === 'page' ? json(200, { ok: true, value: { ...ANSWER, filters } }) : record(method, url)));
+  const out = await pageReader(BASE, io, () => AT).read('desk');
+  assert.equal(out.from, 'live');
+  if (out.from === 'live') assert.deepEqual(out.page.page.filters, filters);
+});
+
 test('a value is read from what the record sent, and nothing it did not', () => {
   const resolve = resolverOf({ count: 1200, name: 'Kiln', paid: true, note: null });
   assert.equal(resolve('name'), 'Kiln');
@@ -509,6 +541,41 @@ test('A QUEUE THE RECORD ANSWERED becomes questions with the ways to answer them
     blockOf({ kind: 'queue', source: 'governance.open', rows: [], matched: 1, refusals: [], queue: [{ id: 'SG1', who: 'slash' }] }, new Map(), now).cannot,
     liveWords.cannot,
   );
+});
+
+/* A LEAD QUEUE DRAWS ITS FIRST QUESTION WHOLE: the form is written after the kind, and what accepting it changes comes
+   under the question, a line a row, with the citation read as its words and nothing written for a question with none. */
+test('A LEAD QUEUE is written as the lead form, with what accepting its first question changes', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const question = (id: string, does?: unknown) => ({
+    id, who: 'slash', at: '2026-09-16T09:00:00.000Z', kind: 'pattern', question: `Question ${id}?`, why: '', cost: 'call', options: [],
+    ...(does === undefined ? {} : { does }),
+  });
+  const lead = blockOf(
+    {
+      kind: 'queue', source: 'governance.open', lead: true, rows: [], matched: 2, refusals: [],
+      queue: [question('SG1', 'Adds 12 tasks to {{projects#3}}'), question('SG2')],
+    } as never,
+    new Map(),
+    now,
+  );
+  const [drawn] = toSegments(lead);
+  assert.ok(drawn?.type === 'block' && drawn.kind === 'queue');
+  assert.equal((drawn as { form?: string }).form, 'lead');
+  const cells = (drawn as { rows: { cells: string[] }[] }).rows.map((r) => r.cells);
+  assert.deepEqual(cells.map((c) => c[0]), ['q', 'does', 'opt', 'opt', 'q', 'opt', 'opt']);
+  assert.equal(cells[1]?.[1]?.trim(), 'SG1');
+  assert.match(cells[1]?.[2] ?? '', /^\s*Adds 12 tasks to [^{}]+$/u, 'a citation reached the screen as braces');
+
+  /* A LIST OF LINES IS A ROW EACH, and a blank one is left out. */
+  const many = blockOf(
+    { kind: 'queue', source: 'governance.open', lead: true, rows: [], matched: 1, refusals: [], queue: [question('SG1', ['Adds a page', '', 'Renames Work'])] } as never,
+    new Map(),
+    now,
+  );
+  const [again] = toSegments(many);
+  const rows = (again as { rows: { cells: string[] }[] }).rows.map((r) => r.cells);
+  assert.deepEqual(rows.filter((c) => c[0] === 'does').map((c) => c[2]?.trim()), ['Adds a page', 'Renames Work']);
 });
 
 test('a tile over a quantity is drawn as the quantity, and only a currency as money', () => {
@@ -897,4 +964,24 @@ test('A BAR OVER A LIST OF LINKS FINDS THE ROWS IT NAMES, whether the element ar
     ['Northwind Labs | GBP 24,800.00', 'Harbour Studio | GBP 9,100.00'],
     'the money each organisation names, and not the empty line',
   );
+});
+
+test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules' line when it did not", () => {
+  const lead = { kind: 'note', lead: true, body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s)', values: { 'cash-now': { amount: 3_385_000, currency: 'GBP' }, 'cash-accounts': 2 }, rows: [], matched: 0, refusals: [] };
+  /* THE RULES' LINE KEEPS ITS HOLES, which the renderer fills from `values` as it fills the tiles beside it. */
+  const rules = 'Cash is {{cash-now}} across {{cash-accounts}} accounts';
+  assert.equal(blockOf(lead, new Map(), AT).body, rules);
+  const said = blockOf({ ...lead, said: 'GBP 33,850.00 across HSBC and Monzo, steady on last month.' }, new Map(), AT);
+  assert.equal(said.body, 'GBP 33,850.00 across HSBC and Monzo, steady on last month.');
+  assert.equal(Object.hasOwn(said, 'said'), false, 'the line rode through onto the block as a key of its own');
+  /* A LINE THAT IS NOT TEXT, OR IS BLANK, IS NO LINE: the rules say theirs. */
+  assert.equal(blockOf({ ...lead, said: '  ' }, new Map(), AT).body, rules);
+  assert.equal(blockOf({ ...lead, said: 7 }, new Map(), AT).body, rules);
+  /* AND ONLY A LEAD NOTE TAKES IT: a plain note says what it was written to say. */
+  assert.equal(blockOf({ kind: 'note', body: 'Pinned.', said: 'Something else.', rows: [], matched: 0, refusals: [] }, new Map(), AT).body, 'Pinned.');
+});
+
+/* WHAT THIS PATH SAYS FOR ITSELF NAMES NO SYSTEM THING (DIRECTION §35): a part of the page, never a block. */
+test('the sentences a live page says for itself name no block, row or list', () => {
+  for (const line of Object.values(liveWords)) assert.doesNotMatch(line, /\b(blocks?|rows?|lists?|registers?)\b/iu, line);
 });

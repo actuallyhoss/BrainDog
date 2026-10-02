@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { ageDays, evidenceOf, gateSentence, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
+import { ageDays, countSentence, evidenceOf, gateSentence, sentenceOf, shortTitle, waitedOf, waitedWords, waitingSaid } from './lead.ts';
 
 const NOW = Date.parse('2026-09-29T09:40:00Z');
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
@@ -102,7 +102,7 @@ test('a share is read out of the proposer’s own reason, and nothing else is dr
  * call fixes nothing, so the wiring is read as text, the way `page.test.ts` reads the answer buttons.
  */
 test('the queue draws its sentence, its lead and its chart from this module, and draws the open question once', () => {
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('./Classic.svelte', import.meta.url), 'utf8');
   assert.match(page, /from '\.\/lead\.ts'/u);
   assert.match(page, /sentenceOf\(/u);
   assert.match(page, /waitedOf\(/u);
@@ -114,6 +114,15 @@ test('the queue draws its sentence, its lead and its chart from this module, and
   /* THE HOOKS THE KEYS GATE PRESSES. */
   for (const hook of ['id="q-{q.id}"', 'id="opt-{q.id}-{o.key}"', 'class="rec"', 'class="pick"', 'data-picking=', 'data-cursor=', 'data-done='])
     assert.ok(page.includes(hook), `the queue no longer draws ${hook}`);
+});
+
+test('the declared page says the same sentence from a count, a flag and the first suggestion', () => {
+  assert.deepEqual(countSentence(0, false, 'Yes'), null);
+  assert.deepEqual(countSentence(2, false, 'Per seat', 'Claude'), { text: 'Two questions wait on you. Claude suggests “Per seat” for the first.', needs: '' });
+  assert.deepEqual(countSentence(1, true, undefined), { text: 'One question waits on you.', needs: 'One question waits on you' });
+  /* AND THE CLASSIC SCREEN'S SENTENCE IS THIS ONE, over the questions it holds whole. */
+  const waiting = [{ band: 'call' }, { band: 'undo' }] as never[];
+  assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never), countSentence(2, true, 'Per seat'));
 });
 
 test('the gate draws its sentence from this module', () => {

@@ -758,7 +758,7 @@
                     <!-- FILING IS THE PRIMARY, and archiving follows it in words. -->
                     <div class="actions">
                       {@render fileInto('row')}
-                      <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{copy.fileIt}</Button>
+                      <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{target ? copy.fileItIn(listOf(target)) : copy.fileIt}</Button>
                       <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
                     </div>
                   </div>

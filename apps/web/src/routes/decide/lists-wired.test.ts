@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 const screen = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 
 test('every call to whyNotAnswering on both decide screens is handed the shell’s lists', () => {
-  for (const path of ['./+page.svelte', './[id]/+page.svelte']) {
+  for (const path of ['./+page.svelte', './Classic.svelte', './[id]/+page.svelte']) {
     const calls = screen(path).match(/whyNotAnswering\([^)]*\)/gu) ?? [];
     assert.ok(calls.length > 0, `${path} no longer asks whyNotAnswering at all`);
     for (const call of calls) assert.equal(call, 'whyNotAnswering(me.level, me.lists)', `${path} asks without the lists`);

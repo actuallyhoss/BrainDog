@@ -95,6 +95,11 @@ export type WritesDeps = {
   arrivals?: Seen;
   /** Opens the palette with a line a capture was asked, which is a question and not a row. Absent, every line is a row. */
   ask?: (line: string) => void;
+  /**
+   * A write that landed, with what happened to its row in a word or two, so the page's Just changed keeps it for ten
+   * minutes (`row-host.svelte.ts`). Absent, nothing is kept.
+   */
+  touched?: (ref: { register: string; seq: number }, mark: string, title: string) => void;
 };
 
 /** The writes one page makes, over what the page hands in. */
@@ -228,7 +233,7 @@ export function pageWrites(deps: WritesDeps) {
     ref: RowRef | undefined,
     change: Change,
     title: string,
-    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words']) => string; early?: boolean },
+    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words']) => string; early?: boolean; mark?: string },
   ) {
     if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
     /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
@@ -256,6 +261,7 @@ export function pageWrites(deps: WritesDeps) {
     if (out.from === 'written') {
       if (on === deps.slug()) holdRow(m, hold.at, hold.before, ref, { ...hold.what, version: out.version, pending: Boolean(hold.early) });
       const made: RowRef = { ...ref, version: out.version ?? ref.version };
+      if (hold.mark) deps.touched?.(ref, hold.mark, title);
       toasts.push(hold.said(m.words), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold), life: UNDO_MS });
     }
     if (out.from === 'written' || out.from === 'conflict') await deps.reread();
@@ -306,6 +312,7 @@ export function pageWrites(deps: WritesDeps) {
       undone: { to: from },
       said: (w) => w.moved(title, to),
       early: true,
+      mark: words.markMoved(to),
     });
   }
 
@@ -366,6 +373,7 @@ export function pageWrites(deps: WritesDeps) {
       undo: (landed) => () => void writer.archive(register, landed.seq, landed.version).then(() => deps.reread()),
     });
     if (!out.ok) return;
+    deps.touched?.({ register, seq: out.value.seq }, words.markAdded, read.text);
     await deps.reread();
     typedLine(register, drawn, false);
   }
@@ -442,6 +450,7 @@ export function pageWrites(deps: WritesDeps) {
       undone: { done: !done },
       said: (w) => w.ticked(title, done),
       early: true,
+      mark: done ? words.markDone : words.markReopened,
     });
   }
 
@@ -469,6 +478,7 @@ export function pageWrites(deps: WritesDeps) {
       back: () => change.back,
       undone: {},
       said: () => change.said,
+      mark: words.markDated,
     });
   }
 
@@ -496,6 +506,7 @@ export function pageWrites(deps: WritesDeps) {
         back: (_m, _ref, decl) => stone.stoneBackOf(done, decl, held),
         undone: { done: !done },
         said: (w) => w.ticked(title, done),
+        mark: done ? words.markDone : words.markReopened,
       }),
     );
   }

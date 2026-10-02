@@ -100,36 +100,36 @@ export const BINDINGS: Binding[] = [
   { id: 'today-answer', scope: 'today', key: '1–9', label: 'Answer the question with that option', bare: true },
   { id: 'today-new', scope: 'today', key: 'n', label: 'Type a new task', bare: true },
 
-  /* THE WORK SCREEN (`lib/work/Work.svelte`), the owner's old tool's keys: the screen he did 85% of his writing on was
-     worked with them, and a board of seventy rows with no keys is worked one row at a time. They act on the task the
-     cursor is on, and never while a box has the caret. */
+  /* THE WORK PAGE (`lib/work/Work.svelte`, the declared `page.work`), the owner's old tool's keys: the screen he did 85%
+     of his writing on was worked with them, and a board of seventy rows with no keys is worked one row at a time. The
+     page reader takes them now (`lib/page/PageBody.svelte`); they act on the task the cursor is on, and never while a
+     box has the caret. `/` is the palette's, as on every page. */
   { id: 'work-move', scope: 'workscreen', key: 'j  k', label: 'The next or the previous task', bare: true },
   { id: 'work-tick', scope: 'workscreen', key: 'x', label: 'Tick it, or take the tick off', bare: true },
-  { id: 'work-edit', scope: 'workscreen', key: 'e', label: 'Change its words where it is', bare: true },
+  { id: 'work-edit', scope: 'workscreen', key: 'e', label: 'Open it beside the page, with the caret in its words', bare: true },
   { id: 'work-due', scope: 'workscreen', key: 'd', label: 'Set the day it is due', bare: true },
   { id: 'work-lane', scope: 'workscreen', key: 'm', label: 'Move it to another state or project', bare: true },
   { id: 'work-delete', scope: 'workscreen', key: 'Delete', label: 'Delete it, with an undo', bare: false },
-  { id: 'work-open', scope: 'workscreen', key: '↵', label: 'Open it', bare: false },
-  { id: 'work-new', scope: 'workscreen', key: 'n  c', label: 'Type a new task', bare: true },
-  { id: 'work-find', scope: 'workscreen', key: '/', label: 'Search the tasks', bare: true },
+  { id: 'work-open', scope: 'workscreen', key: '↵', label: 'Open it beside the page', bare: false },
+  { id: 'work-new', scope: 'workscreen', key: 'n', label: 'Type a new task', bare: true },
   { id: 'work-leave', scope: 'workscreen', key: 'Esc', label: 'Cancel, or leave the box', bare: false },
 
   { id: 'row-down', scope: 'grid', key: 'j  ↓', label: 'Down one, keeping the column', bare: true },
   { id: 'row-up', scope: 'grid', key: 'k  ↑', label: 'Up one, keeping the column', bare: true },
   { id: 'col', scope: 'grid', key: '←  →', label: 'Move between columns', bare: false },
   { id: 'ends', scope: 'grid', key: 'Home  End', label: 'First and last column', bare: false },
-  { id: 'register-ends', scope: 'grid', key: '⌘Home  ⌘End', label: 'Top and bottom of the list', bare: false },
+  { id: 'register-ends', scope: 'grid', key: '⌘Home  ⌘End', label: 'Top and bottom', bare: false },
   { id: 'open', scope: 'grid', key: '↵', label: 'Open', bare: false },
-  { id: 'peek', scope: 'grid', key: 'p', label: 'Peek, with the list still visible', bare: true },
+  { id: 'peek', scope: 'grid', key: 'p', label: 'Peek, with everything else still in view', bare: true },
   { id: 'select', scope: 'grid', key: 'x  ⇧x  ⌘a', label: 'Select, extend, all loaded', bare: true },
   { id: 'edit', scope: 'grid', key: 'e  F2', label: 'Edit the focused cell in place', bare: true },
-  { id: 'new', scope: 'grid', key: 'n', label: 'New item', bare: true },
+  { id: 'new', scope: 'grid', key: 'n', label: 'Type a new one', bare: true },
   { id: 'display', scope: 'grid', key: 'v', label: 'Display options', bare: true },
   { id: 'copy-id', scope: 'grid', key: 'y  ⇧Y', label: 'Copy the id, or the link', bare: true },
-  { id: 'related', scope: 'grid', key: 'o', label: 'Open the linked list', bare: true },
+  { id: 'related', scope: 'grid', key: 'o', label: 'Open what it links to', bare: true },
   // The only destructive key, and it is not a letter. It is the key whose name is what it does.
   { id: 'delete', scope: 'grid', key: 'Delete', label: 'Delete, with an undo toast', bare: false },
-  { id: 'save-view', scope: 'grid', key: '⌥V  ⌥B', label: 'Save the filter as a view, or bind it as a block', bare: false },
+  { id: 'save-view', scope: 'grid', key: '⌥V  ⌥B', label: 'Save the filter as a view, or put it on a page', bare: false },
 
   /**
    * THE BOARD, WHICH BOUND THREE THINGS AND PRINTED NONE OF THEM.
@@ -154,10 +154,18 @@ export const BINDINGS: Binding[] = [
   { id: 'card-row', scope: 'board', key: '↑  ↓', label: 'Move up and down a column', bare: false },
   { id: 'card-move', scope: 'board', key: '⇧←  ⇧→   ⌥↑  ⌥↓', label: 'Move the focused card to the next column', bare: false },
 
-  { id: 'block-move', scope: 'page', key: 'j  k', label: 'Move between blocks', bare: true },
-  { id: 'block-enter', scope: 'page', key: '↵  Esc', label: 'Enter the block, or leave it', bare: false },
-  { id: 'block-source', scope: 'page', key: 'o', label: 'Open the list behind this, filtered', bare: true },
-  { id: 'block-link', scope: 'page', key: 'y', label: 'Copy a link to the block', bare: true },
+  /* THE PAGE'S KEYS ACT ON THE THING UNDER THE CURSOR, a task, a question or a part of the page, because a declared
+     page draws the person's own tasks and questions and the keys Work taught should mean the same here. */
+  { id: 'block-move', scope: 'page', key: 'j  k', label: 'The next or the previous thing on the page', bare: true },
+  { id: 'block-enter', scope: 'page', key: '↵  Esc', label: 'Open it beside the page, or step back out', bare: false },
+  { id: 'page-tick', scope: 'page', key: 'x', label: 'Tick it, or choose a question to answer with others', bare: true },
+  { id: 'page-edit', scope: 'page', key: 'e', label: 'Open it beside the page, to change it', bare: true },
+  { id: 'page-menu', scope: 'page', key: 'm', label: 'Its day, its state or its project', bare: true },
+  { id: 'page-delete', scope: 'page', key: 'Delete', label: 'Delete it, with an undo', bare: false },
+  { id: 'page-new', scope: 'page', key: 'n', label: 'Type a new one', bare: true },
+  { id: 'page-answer', scope: 'page', key: '1–9', label: 'Answer the question with that option', bare: true },
+  { id: 'block-source', scope: 'page', key: 'o', label: 'Open where this comes from, narrowed to it', bare: true },
+  { id: 'block-link', scope: 'page', key: 'y', label: 'Copy a link to this part of the page', bare: true },
   // Shift, not bare `e`: bare `e` means edit in place inside a grid, and a key's meaning must be a
   // function of the object in focus, not of the page you happen to be on.
   { id: 'block-source-code', scope: 'page', key: '⇧E', label: 'Open the source', bare: false },
@@ -177,11 +185,11 @@ export const BINDINGS: Binding[] = [
   { id: 'decide-approve', scope: 'decide', key: 'a', label: 'Answer with the suggested option, or accept the change', bare: true },
   { id: 'decide-defer', scope: 'decide', key: 'd', label: 'Defer it: a reason and a wake date', bare: true },
   { id: 'decide-select', scope: 'decide', key: 'x', label: 'Select it, to answer several at once', bare: true },
-  { id: 'decide-send', scope: 'decide', key: '⌘↵  Esc', label: 'From inside a reason: send it, or go back to the list', bare: false },
+  { id: 'decide-send', scope: 'decide', key: '⌘↵  Esc', label: 'From inside a reason: send it, or go back', bare: false },
 
   { id: 'inbox-move', scope: 'inbox', key: 'j  k', label: 'The next or the previous email', bare: true },
   { id: 'inbox-open', scope: 'inbox', key: '↵', label: 'Open it or close it', bare: false },
-  { id: 'inbox-file', scope: 'inbox', key: 'e', label: 'File it in the chosen list', bare: true },
+  { id: 'inbox-file', scope: 'inbox', key: 'e', label: 'File it where you chose', bare: true },
   { id: 'inbox-archive', scope: 'inbox', key: 'Delete', label: 'Archive it, with its bytes kept', bare: false },
   { id: 'inbox-select', scope: 'inbox', key: 'x', label: 'Select it, to file or archive several', bare: true },
   { id: 'inbox-clear', scope: 'inbox', key: 'Esc', label: 'Clear the selection', bare: false },

@@ -81,11 +81,11 @@ export const hubWords = {
   /* AN EMPTY TAB SAYS WHAT THE THING IS AND WHAT TO ASK AN AGENT, as the automations list always has.
      The prompts are examples a person reads and replaces, not features the code ships. */
   scheduledNone: 'No scheduled actions yet',
-  scheduledWhy: 'A scheduled action fetches from, calls or watches a web address on a clock, and writes what it gets to a list.',
-  scheduledPrompt: 'read my record, then propose a scheduled action that fetches a figure from api.example.com every hour and writes it to a list',
+  scheduledWhy: 'A scheduled action fetches from, calls or watches a web address on a clock, and files what it gets in your record.',
+  scheduledPrompt: 'read my record, then propose a scheduled action that fetches a figure from api.example.com every hour and files it in my record',
   scheduledAbsent: 'This record does not list its scheduled actions yet',
-  scheduledAbsentHow: 'Updating the host brings the list. You can still make one here and send it to Decide.',
-  scriptsPrompt: 'read my record, then write a script that runs every morning, reads one of my lists and writes a one-line summary to another, and propose it',
+  scheduledAbsentHow: 'Updating the host brings them. You can still make one here and send it to Decide.',
+  scriptsPrompt: 'read my record, then write a script that runs every morning, reads my open tasks and writes a one-line summary to my notes, and propose it',
   scriptsMore: 'Logs, versions and what each script may read, write and fetch are on the scripts screen.',
   scriptsOpen: 'Open the scripts screen',
   runsNone: 'Nothing has run yet',
@@ -93,7 +93,7 @@ export const hubWords = {
   runsPrompt: 'read my record, then propose an automation that runs every morning and tells me what changed yesterday',
   /* THE LIST IS WHAT EACH THING KEEPS TO HAND, and says so, so a quiet list is not read as a quiet record. */
   runsReach: 'The newest runs each automation and script keeps, and the last run of each scheduled action. Open one to see all of its runs.',
-  runsSomeMissing: 'Some runs could not be read just now, so the list below may be missing a few.',
+  runsSomeMissing: 'Some runs could not be read just now, so a few may be missing below.',
   /* ONE SENTENCE PER WAY A RUN ENDS, the time inside it, so a failed run and a finished one read alike but for the word. */
   ended: {
     done: (when: string) => `Ran ${when}.`,
@@ -549,7 +549,7 @@ export const canvasWords = {
   written: 'As written',
   tryTile: 'Try it',
   tryParts: 'What each step would do',
-  matchParts: 'Rows it would act on now',
+  matchParts: 'What it would act on now',
   matching: 'Match',
   notMatching: 'Do not match',
   calls: 'What it reaches',

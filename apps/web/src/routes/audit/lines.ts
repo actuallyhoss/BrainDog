@@ -40,7 +40,7 @@ const count = (n: number): string => n.toLocaleString('en');
 export const historyWords = {
   /* THE ONE LIST TODAY'S COUNT OPENED THE LOG ON (`?list=`), said in the toolbar so the narrowing is never silent. */
   onlyList: (name: string) => `Only ${name}`,
-  everyList: (name: string) => `Show every list, not only ${name}`,
+  everyList: (name: string) => `Show everything, not only ${name}`,
   everyone: 'Everyone',
   everyKind: 'Every kind',
   /* THE SENTENCE UNDER THE TITLE. History, not need: nothing in it is red. */
@@ -48,8 +48,9 @@ export const historyWords = {
   oneAway: 'One thing changed while you were away',
   manyAway: (n: number) => `${count(n)} things changed while you were away`,
   moreAway: (n: number) => `More than ${count(n)} things changed while you were away`,
-  aRow: 'a row',
-  rows: (n: number): string => `${count(n)} rows`,
+  /* WHAT A CHANGE WAS MADE TO, when the record sent no title: an entry in the person's own list, which is named beside it. */
+  aRow: 'an entry',
+  rows: (n: number): string => (n === 1 ? 'one entry' : `${count(n)} entries`),
   times: (n: number): string => `${count(n)} times`,
   between: (from: string, to: string): string => `${from} to ${to}`,
   /* LOWER CASE, because each follows the verb it was done by: "Asked a question". */

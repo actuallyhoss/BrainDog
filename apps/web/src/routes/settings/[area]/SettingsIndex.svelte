@@ -1,39 +1,33 @@
 <!--
-  The settings index: every area as a row, in its group.
+  The chooser beside an open area: every area as a row, in its group.
 
-  ONE INDEX AT BOTH WIDTHS. Below 900px it is the whole of `/settings`, a list of 60px rows with a
-  chevron that each open an area on a page of its own. From 900px up it stands beside the area that
-  is open, as the rail stands beside a page, and the open area's row is the current one. It is the
-  same list in both places, the same groups, rows and order, so a person who learns where an area
-  sits on one screen finds it there on the other.
+  THE INDEX ITSELF IS A DECLARED PAGE NOW (`place.ts` `SETTINGS_INDEX`, drawn by `PageView` at `/settings`). This is
+  what stands beside an area once one is open, as the rail stands beside a page, and the open area's row is the current
+  one. It draws the groups the index declares, in its order, under the names it gives (`place.ts` `groupsOf`), so a
+  person who arranged their index finds the same order here. And it is what `/settings` draws when the record cannot
+  draw the declared page, so the index is never missing.
 
   A LIST ON THE GROUND, NOT A CARD. Each group is a group on the ground: its title at
   `--t-group` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
   at 1440, 36 tall with its glyph in a 28px well and the name at 14/500, and the current row is the rail's "here": the
   wash, an ink well and the name at 600. Never the mark's red.
 
-  WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There the index is all a person sees, and the line
-  is how they tell the areas apart before opening one. Beside an open area the index is as narrow as
-  the rail, where the line could only be drawn cut, and the area it describes is already on screen,
-  so from 900px up a row is its glyph and its name, as a rail row is.
-
-  The rows come from `AREAS` in `+page.svelte`, which is the registry; the groups and the areas a
-  phone is not offered come from `place.ts`.
+  WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There this list is all a person sees, and the line is how they tell
+  the areas apart before opening one. Beside an open area the list is as narrow as the rail, where the line could only
+  be drawn cut, and the area it describes is already on screen, so from 900px up a row is its glyph and its name.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { ONLY_WIDE, grouped, type AreaRow } from './place.ts';
+  import { ONLY_WIDE, type AreaGroup } from './place.ts';
 
-  let { areas, current }: { areas: readonly AreaRow[]; current?: string | undefined } = $props();
-
-  const groups = $derived(grouped(areas));
+  let { groups, current }: { groups: readonly AreaGroup[]; current?: string | undefined } = $props();
 </script>
 
 <nav class="index" aria-label={copy.settings}>
-  {#each groups as g (g.id)}
+  {#each groups as g, i (i)}
     <div class="group">
       <h2 class="group-title">{g.title}</h2>
       <ul class="area-rows">

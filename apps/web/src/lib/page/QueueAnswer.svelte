@@ -42,9 +42,31 @@
   import { may } from '$lib/record/may.ts';
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
-  import { changesSomething, proposer, queueWords, saidOf, waysOf, type Way } from './queue-answer.ts';
+  import { changesSomething, laterLine, proposer, queueWords, saidOf, waysOf, type Way } from './queue-answer.ts';
+  import LeadPreview from './LeadPreview.svelte';
+  import type { Picked } from './picked.svelte.ts';
+  import { words } from './words.ts';
 
-  let { question, onanswered }: { question: QueueQuestion; onanswered: () => void } = $props();
+  let {
+    question,
+    onanswered,
+    pick = null,
+    lead = false,
+  }: {
+    question: QueueQuestion;
+    onanswered: () => void;
+    /** The page's choice of questions to answer at once: the card leads with its box only where a page holds one. */
+    pick?: Picked | null;
+    /** The queue's lead question, drawn whole: what accepting it does, and what it would put on the screen. */
+    lead?: boolean;
+  } = $props();
+
+  /* WHAT THE KERNEL SAYS ACCEPTING THE LEAD DOES, in one short line, and what it was filed as. Read, not trusted: a
+     record on an older build sends neither. */
+  const does = $derived(lead && typeof (question as { does?: unknown }).does === 'string' ? (question as { does: string }).does : '');
+  const filed = $derived(typeof (question as { body_kind?: unknown }).body_kind === 'string' ? (question as { body_kind: string }).body_kind : question.kind);
+  const chosenForAll = $derived(pick?.has(question.id) ?? false);
+  const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
 
   const uid = `qa-${(made += 1)}`;
 
@@ -58,6 +80,8 @@
   const ways = $derived(waysOf(question));
   const when = $derived(since(question.at, Date.now()));
   const band = $derived(question.cost ? queueCost(question.cost) : '');
+  /* A QUESTION PUT OFF SAYS WHEN IT COMES BACK, and why, in one quiet line under itself (`governance.later`). */
+  const later = $derived(laterLine(question, Date.now()));
 
   /**
    * WHERE THE CARD IS. `open` offers the options; `asking` has one chosen and the reason line open under it;
@@ -164,13 +188,30 @@
 </script>
 
 <!-- A ROW OF THE PAGE, by the question's id, so a home's cursor walks to it and Enter opens it on Decide. -->
-<div class="qa" data-row="q:{question.id}" data-open={at(`/decide/${encodeURIComponent(question.id)}`)}>
+<div
+  class="qa"
+  data-row="q:{question.id}"
+  data-open={at(`/decide/${encodeURIComponent(question.id)}`)}
+  data-picking={pick && pick.chosen.size > 0 ? '' : undefined}
+>
   {#if phase === 'answered' && chosen}
     <p class="qa-done" role="status" tabindex="-1" bind:this={done}>
       <Face name={copy.feedYou} you size="s" /><span class="qa-done-words">{queueWords.answered(chosen.label, since(answeredAt, Date.now()))}</span>
     </p>
   {:else}
-    <article class="queue-card" aria-busy={busy}>
+    <article class={lead ? 'queue-card queue-lead' : 'queue-card'} aria-busy={busy} data-selected={chosenForAll ? '' : undefined}>
+      {#if pick && answerable}
+        <!-- THE BOX THE RENDERER'S QUEUE DRAWS FOR A BULK ANSWER, named for the question alone. `x` presses it from the
+             keyboard (`PageBody.svelte`). -->
+        <button
+          type="button"
+          role="checkbox"
+          class="queue-select qa-select tap"
+          aria-checked={chosenForAll}
+          aria-label={words.pick(saidOf(question.question))}
+          onclick={() => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
+        >
+      {/if}
       <!-- The band is last on the by-line, in the register of who asked and when, as the renderer draws it. -->
       <p class="queue-by">
         <Face name={asker.name} kind={asker.kind} size="s" /><span class="queue-who">{asker.name}</span><span class="queue-when">{when}</span
@@ -178,6 +219,8 @@
       </p>
       <h3 class="queue-question" dir="auto">{saidOf(question.question)}</h3>
       {#if question.why}<p class="queue-why" dir="auto">{saidOf(question.why)}</p>{/if}
+      {#if later}<p class="qa-later" dir="auto">{later}</p>{/if}
+      {#if does}<ul class="queue-does"><li class="queue-does-line" dir="auto">{does}</li></ul>{/if}
       {#if changesSomething(question)}
         <a class="qa-see tap" href={at(`/decide/${encodeURIComponent(question.id)}`)}>{queueWords.seeWhole}</a>
       {/if}
@@ -227,8 +270,9 @@
           </div>
         </form>
       {/if}
-      {#if fix}<p class="qa-fix" role="status">{fix}</p>{/if}
+      {#if fix || bulkFix}<p class="qa-fix" role="status">{fix || bulkFix}</p>{/if}
     </article>
+    {#if lead}<LeadPreview id={question.id} kind={filed} />{/if}
   {/if}
 </div>
 
@@ -258,6 +302,37 @@
   .queue-act[data-on] {
     background: var(--selected);
     border-color: var(--ink2);
+  }
+
+  /* THE BULK BOX IS THE RENDERER'S (`kinds/queue.css` `.queue-select`), in its own track at the card's start. It is a
+     secondary control, drawn on hover or focus of its card (DIRECTION §35), and on every card once one is chosen so the
+     choice can be widened; under a thumb, where nothing hovers, it is always there. Its track stays either way, so the
+     card's edge does not move. */
+  @media (hover: hover) and (pointer: fine) {
+    .qa-select {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .queue-card:hover > .qa-select,
+    .queue-card:focus-within > .qa-select,
+    .qa[data-picking] .qa-select,
+    .qa:global([data-row-cursor]) .qa-select,
+    .qa-select[aria-checked='true'] {
+      opacity: 1;
+    }
+  }
+
+  /* A CARD CHOSEN FOR A BULK ANSWER keeps an ink edge, a shape and not a shade. */
+  .queue-card[data-selected] {
+    box-shadow: inset 0 0 0 1.5px var(--ink2);
+  }
+
+  /* QUIET: the day a put-off question comes back is a note under it, in the second ink and the small size. */
+  .qa-later {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .qa-see {

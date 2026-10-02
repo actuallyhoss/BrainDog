@@ -260,3 +260,27 @@ test('NO SENTENCE SAYS "ROW", "LIST ITEM" OR "ENTITY"', () => {
     for (const line of said(value)) assert.doesNotMatch(line, /\brows?\b|\blist items?\b|\bentit(y|ies)\b/iu, `copy.${key} says "${line.slice(0, 80)}"`);
   }
 });
+
+/**
+ * AND NOT "LIST" WHERE A PERSON MEETS THEIR OWN THINGS (DIRECTION §35). The sidebar's heading, the palette's groups,
+ * the inbox's file button and Decide's queue words said "Lists", "Pages and lists", "File it in a list" and "goes back
+ * to the list": the storage's word over the person's invoices and tasks. These name the things or the place instead.
+ */
+test('THE SIDEBAR, THE PALETTE, THE INBOX AND DECIDE DO NOT SAY "LIST"', () => {
+  assert.equal(copy.lists, 'Your things');
+  assert.equal(copy.pages, 'Pages');
+  assert.equal(copy.records, 'In your things');
+  assert.equal(copy.decideGroupNone, 'Ranked');
+  assert.equal(copy.decideToLeave, 'goes back');
+  assert.equal(copy.proposalFields, 'What it holds');
+  assert.equal(copy.fileItIn('Invoices'), 'File it in Invoices', 'the file button names the place it goes');
+  const keys = [
+    'lists', 'pages', 'records', 'searchWhere', 'fileIt', 'inboxNoLists', 'decideGroupNone', 'decideToLeave', 'scopeGrid',
+    'densityPreview', 'sourcesAdd', 'accessScope', 'noRecordLevelMeans', 'addException', 'suggestPagesHint', 'navShapeHint',
+    'inviteChosenLists', 'inviteListsHint', 'inviteAddsOnlyLeavesOut', 'exceptionOnlyUnread', 'pageRowNoState',
+  ] as const;
+  for (const key of keys) assert.doesNotMatch(String(copy[key]), /\blists?\b/iu, `copy.${key} says "${copy[key]}"`);
+  assert.doesNotMatch(copy.reportKeyCan(''), /\blists?\b/iu);
+  assert.doesNotMatch(copy.purposes.list!, /\blists?\b/iu);
+  assert.doesNotMatch(copy.kinds.table!, /\blists?\b/iu);
+});

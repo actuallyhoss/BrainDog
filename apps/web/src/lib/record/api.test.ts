@@ -507,7 +507,7 @@ test('a gauge keeps its currency when nothing matches', async () => {
 test('chips count every matching row, and the counts add to the matched total', () => {
   /* ON THE SEED AS IT IS. This ran inside `withExtra`, whose rows are obligations and never reached the estate's chips,
      which count services; the rule is the same at any size, and the size is the bar's to test above. */
-  const block = page('estate')?.blocks.find((b) => b.kind === 'chips');
+  const block = readBlock({ kind: 'chips', heading: 'What it is made of', span: 7, columns: [{ field: 'kind' }], source: 'register.services' } as never);
   assert.ok(block);
   const counted = toSegments(block)
     .flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []))
@@ -1111,7 +1111,7 @@ test('A SELL ROW ON A LIVE PAGE IS THE FIGURE THE RECORD READ, to the penny, and
 });
 
 test('CASH NOW SAYS WHAT IT ADDS UP AND HOW OLD ITS OLDEST BALANCE IS, not its target', () => {
-  const stat = page('money')!.blocks.find((b) => b.kind === 'stat')!;
+  const stat = readBlock({ kind: 'stat', cells: [{ metric: 'cash-now', label: 'Cash now', note: 'in {{cash-accounts}} account(s), as of {{cash-as-of}}' }] } as never);
   const cash = stat.metrics!.find((m) => m.label === 'Cash now')!;
   assert.match(cash.note, /^in 2 accounts, as of \d{1,2} [A-Z][a-z]{2}$/u);
   assert.equal(metric('cash-as-of').value, cash.note.split('as of ')[1], 'the day is the oldest liquid balance');
@@ -1196,7 +1196,7 @@ test('COMING IN AND GOING OUT SIGN THEIR AMOUNTS AND SAY WHO CHANGED EACH ROW LA
 
 test('EVERY MONTH IS SPLIT BY WHAT IT IS FOR, at monthly shares, and what no category holds is its own row, linked', async () => {
   const { draw } = await import('./blocks.ts');
-  const split = page('money')!.blocks.find((b) => b.kind === 'split' && b.source === 'metric.every-month-by-category')!;
+  const split = readBlock({ kind: 'split', heading: 'Every month', span: 12, source: 'metric.every-month-by-category', limit: 6, unset: 'Uncategorised' } as never);
   assert.deepEqual(split.refusals, []);
   const whole = metric('every-month-out');
   const parts = split.parts!;

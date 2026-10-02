@@ -66,11 +66,11 @@ export const retypeWords = {
   landed: (label: string, n: number) => (n === 0 ? `${label} is changed.` : `${label} is changed, and ${said(n)} were rewritten.`),
   filed: (label: string) => `Changing ${label} is waiting on Decide.`,
   question: (label: string, list: string) => `Change what ${label} holds on ${list}?`,
-  noSchema: 'BrainDog could not read the list just now. Try again.',
+  noSchema: 'BrainDog could not read this just now. Try again.',
   noValues: 'A choice list needs at least one choice.',
   valueTwice: (value: string) => `${value} is in the choices twice.`,
-  pickList: 'Pick the list it links to.',
-  changed: 'The list changed while this was being sent. Try again.',
+  pickList: 'Pick what it links to.',
+  changed: 'Something here changed while this was being sent. Try again.',
 } as const;
 
 /** A count said in words a person reads: `1 item`, `1,204 items`. */

@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
 import {
+  historyWords,
   awaySaid,
   below,
   burstsOf,
@@ -219,7 +220,7 @@ test('a window is whole when the read reaches back past its start', () => {
 
 test('a row is its title, and its list is said apart from it', () => {
   assert.deepEqual(thingOf('services#6', 'Object storage'), { text: 'Object storage', href: '/r/services/6', list: 'Services' });
-  assert.equal(thingOf('services#6', null)?.text, 'a row');
+  assert.equal(thingOf('services#6', null)?.text, 'an entry');
   assert.equal(thingOf('suggestion:SG3', null)?.text, 'a question');
 });
 
@@ -227,6 +228,13 @@ test('a burst over many rows is said as how many rows, with their list', () => {
   const run = [1, 2, 3, 4].map((n) => ev(iso(29, 9, 10 - n), 'rule.bank', 'create', `payments#${n}`, 'From the statement'));
   const [told] = burstsOf(run);
   assert.equal(told!.count, 4);
-  assert.deepEqual(told!.many, { text: '4 rows', href: '/r/payments', list: 'Payments' });
+  assert.deepEqual(told!.many, { text: '4 entries', href: '/r/payments', list: 'Payments' });
   assert.equal(told!.note, 'From the statement');
+});
+
+/* THE LOG SAYS AN ENTRY IN THE PERSON'S OWN LIST, named beside it, and never a row or a list (DIRECTION §35). */
+test('the log names no row and no list in its own words', () => {
+  for (const line of [historyWords.aRow, historyWords.rows(1), historyWords.rows(4), historyWords.everyList('Payments'), historyWords.onlyList('Payments')])
+    assert.doesNotMatch(line, /\b(rows?|lists?|registers?|blocks?)\b/iu, line);
+  assert.equal(historyWords.rows(1), 'one entry');
 });

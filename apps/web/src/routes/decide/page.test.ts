@@ -69,7 +69,7 @@ test('a level with no word for it is still refused in a sentence', () => {
  * A SOURCE READ, BECAUSE THE FOUR TESTS ABOVE PASS AGAINST A SCREEN WITH THE REPAIR TORN OUT.
  *
  * MEASURED, on the checking pass: the line `disabled={!answerable}` was deleted from the option
- * buttons in `+page.svelte` and every one of the four tests above stayed green, because all four ask
+ * buttons in `+page.svelte` (the classic queue, `Classic.svelte` now) and every one of the four tests above stayed green, because all four ask
  * `answering.ts` and none of them asks the screen. The module is the easy half. The half that was
  * actually broken is the WIRING, and there is no DOM harness in this app to press a button in, so
  * this reads the markup the way `first-run.test.ts` reads `RowForm.svelte` for the same reason.
@@ -80,7 +80,7 @@ test('a level with no word for it is still refused in a sentence', () => {
  * two controls, and each is pinned to sit BEFORE the call it is guarding rather than merely to exist
  * somewhere in the function.
  */
-const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
+const page = readFileSync(fileURLToPath(new URL('./Classic.svelte', import.meta.url)), 'utf8');
 
 test('every option button is off for a reader who may not answer, and says why', () => {
   assert.match(

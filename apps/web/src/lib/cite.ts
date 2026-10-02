@@ -37,13 +37,16 @@ export type Segment =
   | { kind: 'words'; text: string }
   | { kind: 'sum'; key: string; minor: number; currency: string | null; n: number; rows: RowLink[] };
 
-/** Words this renderer says for a brace it cannot resolve, and nothing else. */
+/**
+ * Words this renderer says for a brace it cannot resolve, and nothing else. They name the person's own things, by the
+ * name their list goes by ("something in Projects"), and never the system's (DIRECTION §35): no row, no list.
+ */
 export const words = {
-  rowIn: (list: string) => `a row in ${list}`,
+  rowIn: (list: string) => `something in ${list}`,
   notKnown: 'not known yet',
   total: 'the total',
-  sumRows: (n: number) => (n === 1 ? 'the row it adds up' : `the ${integer(n)} rows it adds up`),
-  sumMore: (n: number) => (n === 1 ? 'and one more in the list' : `and ${integer(n)} more in the list`),
+  sumRows: (n: number) => (n === 1 ? 'the one it adds up' : `the ${integer(n)} it adds up`),
+  sumMore: (n: number) => (n === 1 ? 'and one more' : `and ${integer(n)} more`),
 } as const;
 
 const isRow = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

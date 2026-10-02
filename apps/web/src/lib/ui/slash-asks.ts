@@ -140,6 +140,21 @@ const WORK = new Map<string, string>([
 ]);
 
 /**
+ * THE BACKGROUND ASKS THAT ARE NOT PATTERNS, though the ledger writes them as `pattern` calls: each kind of background
+ * work the host spends has its own question (`slashRecordMeter.background` in `packages/host/src/slash-ask.ts`), so it
+ * is named by that rather than all three saying "Pattern drafted for the inbox".
+ */
+const ASKED_AS = new Map<string, string>([
+  ["Slash's page headlines", 'Page headlines written'],
+  ["Slash's skill draft", 'Skill revised'],
+  ["Slash's daily look", 'Daily look written'],
+]);
+
+/** What a piece of background work was, by its question first and then by the ledger's kind. */
+const workOf = (a: SlashAsked): string =>
+  (a.kind === 'pattern' && a.question !== null ? ASKED_AS.get(a.question.trim()) : undefined) ?? WORK.get(a.kind) ?? words.workOther;
+
+/**
  * The ledger's calls in `month` (`YYYY-MM`), by day, newest first.
  *
  * A READ AND ITS PROPOSAL ARE ONE QUESTION ON ONE LINE. Pass 2 is settled after pass 1, so the ledger, newest first,
@@ -165,7 +180,7 @@ export function spentIn(rows: readonly SlashAsked[], month: string, now: number 
     const cost = costOf(a);
     const href = a.filed === null ? null : `/decide/${encodeURIComponent(a.filed)}`;
     const refused = a.status === 'refused' || a.status === 'error';
-    const what = bg ? (WORK.get(a.kind) ?? words.workOther) : a.question?.trim() || words.erased;
+    const what = bg ? workOf(a) : a.question?.trim() || words.erased;
     if (bg) {
       d.background += cost;
       background += cost;

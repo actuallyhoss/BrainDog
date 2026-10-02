@@ -26,7 +26,7 @@ export const palette = {
   searchNoneNext: 'Check the spelling or try fewer words. Anything archived or changed still shows in History.',
   searchClear: 'Clear the search',
   searchInHistory: 'Open History',
-  searchWhere: 'Every list, every decision, and every page, by the words in them.',
+  searchWhere: 'Everything you keep, every decision, and every page, by the words in them.',
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
   showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
   /* `Stopped.` IS THE ASSISTANT'S, NOT THE TRANSPORT'S, whatever its position in this block says.
@@ -39,7 +39,7 @@ export const palette = {
   noMatches: 'Nothing matches',
   commands: 'Actions',
   destinations: 'Go to',
-  records: 'In your lists',
+  records: 'In your things',
   /* THE LINE UNDER AN ID SOMEBODY TYPED, AND IT SAID `spoken id`. That is this product's internal
      name for the convention, written down in `19 §2` and in the copy's own notes, and the palette
      is the one surface where the reader has just proved they know the convention by using it. The

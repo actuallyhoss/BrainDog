@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
 import type { ActionRow } from '../../lib/record/actions.ts';
 import {
+  canvasWords,
   dayKey,
   dayTitle,
   endedReading,
@@ -259,4 +260,11 @@ test('EVERY RUN ON THE RUNS TAB SAYS HOW IT ENDED IN ITS OWN SENTENCE, newest fi
       ['Ran 2h ago.', false],
     ],
   );
+});
+
+/* WHAT ONE AUTOMATION'S PAGE SAYS NAMES THE PERSON'S THINGS, never the system's (DIRECTION §35). */
+test("an automation's page says what it would act on, and never rows", () => {
+  assert.equal(canvasWords.matchParts, 'What it would act on now');
+  for (const w of Object.values(canvasWords))
+    if (typeof w === 'string') assert.doesNotMatch(w, /\b(rows?|lists?|registers?|blocks?)\b/iu, w);
 });

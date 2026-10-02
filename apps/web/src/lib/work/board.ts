@@ -9,6 +9,12 @@
  * THE BANDS ARE THE OWNER'S OLD TOOL'S: what is late or due today first, then the work by
  * how much it matters, then what waits on somebody or sits with an agent, then what was kept for later and what was
  * finished. A task is in exactly one band, and the first rule that takes it wins, so no task is drawn twice.
+ *
+ * HALF OF IT GOES WITH THE SCREEN AS IT WAS. `/?work` draws the declared Work page now (`Work.svelte`), whose bands are
+ * declared and whose project filter the kernel applies, so the bands and their order (`BANDS`, `bandOf`, `bandTitle`,
+ * `byDue`, `byFinished`), the project pick (`ALL`, `NONE`, `inProject`) and the search (`matches`) are read only by
+ * `WorkClassic.svelte` and `work-tiles.ts`, and are deleted with them. `shapeOf`, `projectOf`, `dayIn` and the day
+ * words stay: every page's row panel, row menu and capture line read them (`lib/page`).
  */
 
 import type { FieldDecl, Fields, RegisterDecl } from '../record/schema.ts';

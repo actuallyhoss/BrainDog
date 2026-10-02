@@ -97,19 +97,53 @@ test('the sentence the controls point at is rendered, and before the first of th
   /* AND IN THE SAME BRANCH AS THE CONTROLS THAT NAME IT, which earlier in the source is not the same
      claim. MEASURED on the checking pass for this slot: the paragraph was moved into the `{#if
      settled}` block above, where it is still earlier in the file and never renders for an open
-     question, and all seven tests here stayed green while four disabled controls pointed
+     question, and every test here stayed green while four disabled controls pointed
      `aria-describedby` at an id that does not exist on the screen they are drawn on. Source order is
      what `indexOf` can see; a branch is not, so the paragraph is pinned between the last line of the
-     cost section and the options, and nothing may open a condition over it in that gap. */
-  const opened = page.indexOf('<p class="cost-age">Opened {since(question.opened, now)}.');
-  assert.ok(opened >= 0, 'the cost section no longer reads the way this test assumes');
-  assert.ok(opened < said, 'the sentence is no longer inside the branch that draws an undecided question');
-  const between = page.slice(opened, said);
+     closed question's branch and the options, and nothing may open a condition over it in that gap
+     but the one `{:else}` that is the open question's own branch.
+
+     THE OPTIONS COME STRAIGHT UNDER THE TITLE NOW, so the anchor is no longer the cost tile, which is
+     folded into "What accepting does" under them: it is the closed branch just above. */
+  const closedAt = page.indexOf('<p class="cost-age">{governed.closed(question.id)}');
+  assert.ok(closedAt >= 0, 'the closed branch no longer reads the way this test assumes');
+  assert.ok(closedAt < said, 'the sentence is no longer inside the branch that draws an undecided question');
+  const between = page.slice(closedAt, said);
+  assert.equal(between.match(/\{:else\}/gu)?.length, 1, 'the sentence is not in the open question\'s own branch');
   assert.doesNotMatch(
-    between.replace('{#if !answerable}', ''),
+    between.replace('{#if !answerable}', '').replace('{:else}', ''),
     /\{#if |\{:else|\{#each /u,
-    'a condition opens between the cost section and the sentence, so the sentence and the options are no longer certainly drawn together',
+    'a condition opens between the open branch and the sentence, so the sentence and the options are no longer certainly drawn together',
   );
+});
+
+/**
+ * THE OPTIONS ARE STRAIGHT UNDER THE TITLE, and everything accepting would do is one folded tile under them.
+ *
+ * MEASURED before: up to seven tiles (what an arrangement does, what a proposal puts in place, the rows to tick, the
+ * rows it changes, what it calls, why it was asked and what it costs) stood between the title and the options, so on a
+ * laptop the one thing this screen is for was below the fold. And every option carried a key cap.
+ */
+test('the options come first, and what accepting does is one folded tile after them', () => {
+  const head = page.indexOf('<PageHead icon="decide"');
+  const options = page.indexOf('<section class="options">');
+  const does = page.indexOf('<Tile icon="settings" title={LEAD.does}>');
+  assert.ok(head >= 0 && options > head && does > options, 'the options are not the first thing under the title');
+  /* NO TILE STANDS BETWEEN THE TITLE AND THE OPTIONS but the receipt, which replaces them, and the options' own. */
+  const before = page.slice(head, options).match(/<Tile\b[^>]*>/gu) ?? [];
+  assert.deepEqual(before, ['<Tile>', '<Tile icon="decide" title={copy.theOptions} count={question.options.length}>'], 'a tile is drawn above the options again');
+  /* ONE TILE HOLDS EVERY PART, folded shut. */
+  assert.match(page.slice(does), /^<Tile icon="settings" title=\{LEAD\.does\}>\s*<details class="does"/u, 'what accepting does is not folded');
+  for (const part of ['<Arranged arranged={story} />', '<Proposed proposed={preview} />', '<ul class="picks">', '<Changes {updates} />', '<CallsOut', '{copy.whyAsked}', '{costTitle}']) {
+    const at = page.indexOf(part);
+    assert.ok(at > does, `${part} is not inside the one tile`);
+  }
+  assert.equal(page.match(/<Tile icon="settings"/gu)?.length, 1, 'what accepting does is split across tiles again');
+});
+
+test('no option carries a key cap, and no sentence is typed into the gate', () => {
+  assert.doesNotMatch(page, /<kbd/u, 'an option carries a key cap again');
+  for (const typed of ['>required<', 'You are choosing', '>Cancel<', 'Nobody has decided it.']) assert.ok(!page.includes(typed), `"${typed}" is typed into the markup`);
 });
 
 test('both doors refuse before they open, not only the buttons on them', () => {
@@ -168,7 +202,7 @@ test('nothing a reader was invited to read is hidden from them', () => {
      reader the question exists and nothing about it. */
   assert.match(page, /<p class="card-body"><Cited text=\{because\}/u, 'the option bodies no longer read the way this test assumes');
   const bodyAt = page.indexOf('<p class="card-body"><Cited text={because}');
-  const optionsAt = page.indexOf('{#each question.options as option, i}');
+  const optionsAt = page.indexOf('{#each question.options as option}');
   assert.ok(optionsAt >= 0 && bodyAt > optionsAt, 'the option loop no longer reads the way this test assumes');
   assert.doesNotMatch(page.slice(optionsAt, bodyAt), /answerable/u, 'an option’s body is drawn only for a reader who may answer');
 });

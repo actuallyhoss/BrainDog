@@ -64,7 +64,7 @@
 
   /* AN AGENT WRITES THESE AS READILY AS A PERSON ACCEPTS THEM, so the empty list says what to ask one,
      in the form every other empty state's prompt takes. An example a person reads and replaces. */
-  const agentPrompt = 'read my record, then propose a script that fetches the US dollar in euros from api.example.com every hour and writes it to a list';
+  const agentPrompt = 'read my record, then propose a script that fetches the US dollar in euros from api.example.com every hour and files it in my record';
 
   async function resume(row: Script) {
     if (busy) return;

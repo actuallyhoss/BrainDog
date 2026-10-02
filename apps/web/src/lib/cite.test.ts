@@ -90,3 +90,11 @@ test('A TITLE NEVER CARRIES THE SPOKEN ID the host writes in front of it', () =>
   assert.equal(summaryTitle('Invoice Acme', 'tasks#1'), 'Invoice Acme');
   assert.equal(summaryTitle('tasks#1', 'tasks#1'), '');
 });
+
+/* WHAT A BRACE IS SAID AS NAMES THE PERSON'S OWN THINGS, by the name their list goes by, never a row or a list. */
+test('the words for what a brace cannot resolve say no system word', () => {
+  for (const line of [words.rowIn('Projects'), words.notKnown, words.total, words.sumRows(1), words.sumRows(3), words.sumMore(1), words.sumMore(4)])
+    assert.doesNotMatch(line, /\b(rows?|lists?|registers?|blocks?)\b/iu, line);
+  assert.equal(words.rowIn('Projects'), 'something in Projects');
+  assert.equal(words.sumRows(3), 'the 3 it adds up');
+});

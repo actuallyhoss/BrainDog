@@ -44,8 +44,8 @@
     showAll: () => void;
   } = $props();
 
-  /* This part's own words: the list's own order as one of the choices, and the direction's group. */
-  const words = { rowOrder: 'Row order', direction: 'Direction' } as const;
+  /* This part's own words: the order things were added in as one of the choices, and the direction's group. */
+  const words = { rowOrder: 'Order added', direction: 'Direction' } as const;
 </script>
 
 <Sheet bind:open title={copy.display}>

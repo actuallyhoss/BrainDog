@@ -141,7 +141,7 @@ test('the hint says one rule rather than two that contradict each other', () => 
      and both are true of DIFFERENT rows of a matrix the screen was not drawing. */
   assert.doesNotMatch(copy.accessScope, /Nobody is added to a new list/u);
   assert.match(copy.accessScope, /including ones added later/u, 'the hint no longer says the `*` row covers what comes next');
-  assert.match(copy.accessScope, /one list/u, 'the hint does not mention the exception it is now possible to make');
+  assert.match(copy.accessScope, /one part/u, 'the hint does not mention the exception it is now possible to make');
 });
 
 test('“nothing on the record” has its own sentence, and it is not the bottom rung’s', () => {
@@ -220,13 +220,18 @@ test('every settings area the rail offers has a body written for it', () => {
    *
    * So the guard moved here, where it can say which id is missing. It reads the route as text for
    * the reason the `keys` gate does: the thing being checked is a correspondence between two lists
-   * in one file, and there is no smaller way to hold it.
+   * in two files, and there is no smaller way to hold it.
    */
   const route = readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', '+page.svelte'),
     'utf8',
   );
-  const ids = [...route.matchAll(/\{ id: '([a-z-]+)', label:/g)].map((m) => m[1]!);
+  /* The areas are listed by the declared settings index, beside the route, not in it. */
+  const place = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routes', 'settings', '[area]', 'place.ts'),
+    'utf8',
+  );
+  const ids = [...place.matchAll(/area\('\/settings\/([a-z-]+)'/g)].map((m) => m[1]!);
   assert.ok(ids.length >= 12, `only ${ids.length} areas were found in the rail`);
   for (const id of ids)
     assert.ok(route.includes(`area === '${id}'`), `the rail offers ${id} and no branch draws it`);

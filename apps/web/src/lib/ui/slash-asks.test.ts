@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { SlashStatus } from '@braindog/client';
-import { asksShown, atCap, capOf, capSaid, nearCap, resetsWords } from './slash-asks.ts';
+import type { SlashAsked, SlashStatus } from '@braindog/client';
+import { asksShown, atCap, capOf, capSaid, nearCap, resetsWords, spentIn } from './slash-asks.ts';
 
 const RESETS = '2026-10-01T00:00:00.000Z';
 const on = (used: number, cap = 80, tier: SlashStatus['tier'] = 'a'): SlashStatus => ({ tier, model: 'glm-5.3-flash', asks: { used, cap, resets: RESETS } });
@@ -65,4 +65,25 @@ test('what saving says, with zero named for what it does', () => {
   assert.equal(capSaid(1), 'Slash answers up to 1 ask a month.');
   assert.equal(capSaid(40), 'Slash answers up to 40 asks a month.');
   assert.equal(capSaid(0), 'Slash is off until you raise the limit.');
+});
+
+test('a background pattern call is named by its question, and any other unfiled pattern is a drafted pattern', () => {
+  const NOW = Date.parse('2026-10-02T12:00:00.000Z');
+  const row = (id: string, question: string | null): SlashAsked => ({ id, ts: '2026-10-02T09:00:00.000Z', kind: 'pattern', status: 'ok', code: null, question, model: 'glm-5.3-flash', filed: null });
+  const month = spentIn(
+    [row('a', "Slash's page headlines"), row('b', "Slash's skill draft"), row('c', "Slash's daily look"), row('d', 'What repeats in the inbox'), row('e', null)],
+    '2026-10',
+    NOW,
+  );
+  const lines = month.days.flatMap((d) => d.lines);
+  assert.deepEqual(
+    lines.map((l) => [l.id, l.what, l.background]),
+    [
+      ['a', 'Page headlines written', true],
+      ['b', 'Skill revised', true],
+      ['c', 'Daily look written', true],
+      ['d', 'Pattern drafted for the inbox', true],
+      ['e', 'Pattern drafted for the inbox', true],
+    ],
+  );
 });

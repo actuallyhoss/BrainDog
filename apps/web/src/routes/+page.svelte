@@ -10,8 +10,9 @@
   TODAY AS IT WAS IS KEPT, at `/?classic` (`lib/home/Today.svelte`), until the declared page does everything it did. It
   is loaded when it is asked for, so the front door carries none of it.
 
-  THE WORK SCREEN IS HERE TOO, at `/?work` (`lib/work/Work.svelte`), for the same reason, and the nav's Work row opens it
-  on a record that holds tasks (`WORK` in `lib/nav.ts`).
+  THE WORK PAGE IS HERE TOO, at `/?work`, for the same reason: `lib/work/Work.svelte` draws the declared Work page
+  (`page.work`), and the screen as it was is kept at `/?work&classic` (`lib/work/WorkClassic.svelte`). The nav's Work
+  row opens it on a record that holds tasks (`WORK` in `lib/nav.ts`).
 -->
 <script lang="ts">
   import { page } from '$app/state';

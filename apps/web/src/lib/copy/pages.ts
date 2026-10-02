@@ -55,7 +55,7 @@ export const pages = {
   purposes: {
     say: 'Say something',
     figure: 'Show a figure',
-    list: 'Show a list',
+    list: 'Show several things',
     plan: 'Show a plan',
     media: 'Show media',
   } as Record<string, string>,
@@ -110,7 +110,7 @@ export const pages = {
     timeline: 'what happened, most recent first',
     board: 'cards in columns by state',
     comparison: 'a small table you write yourself',
-    table: 'a list, in full',
+    table: 'every item, in full',
     note: 'a paragraph that matters',
     quote: 'something somebody said',
     code: 'code, exactly as typed',
@@ -227,7 +227,7 @@ export const pages = {
     `The next ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')} payments in and out over ${days} days`,
   pageRowConflict: (title: string) => `${title} was changed somewhere else first. The page has been read again, so try once more.`,
   pageRowUnknown: 'This could not be saved from here, because the page did not say which item it is.',
-  pageRowNoState: 'This could not be saved from here, because its list has no state to mark it done with.',
+  pageRowNoState: 'This could not be marked done from here, because it has no done state.',
   /* A path's own add line (`page/AddStep.svelte`), and what it says when the record did not say where a step goes. */
   pathStepAdd: 'Add a step',
   pathStepNew: 'A new step',

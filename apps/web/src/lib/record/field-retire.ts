@@ -38,7 +38,7 @@ export const retireWords = {
   /* THE KERNEL REFUSES THESE THREE TOO (`retireIn`); said here first, because a sentence under the control beats a round
      trip that files nothing. */
   readBy: (label: string, role: string) => `${label} is what this list uses as its ${role}, so it stays.`,
-  changed: 'The list changed while this was being sent. Try again.',
+  changed: 'Something here changed while this was being sent. Try again.',
 } as const;
 
 /** The keys of a list that name one of its fields, as the kernel's `retireIn` refuses them, and how each is said. */

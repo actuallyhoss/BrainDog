@@ -30,6 +30,8 @@
   import './kinds/styles.ts';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page as route } from '$app/state';
+  import { Filters } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { covered, typing } from '$lib/a11y/keys.svelte.ts';
   import { hueOf, iconFor } from '$lib/record/api.ts';
@@ -51,7 +53,15 @@
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
   import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { may } from '$lib/record/may.ts';
   import { words } from './words.ts';
+  import BatchBar from './BatchBar.svelte';
+  import { filterOf, filterQuery, filtersOf } from './filters.ts';
+  import { Picked } from './picked.svelte.ts';
+  import { RowHost } from './row-host.svelte.ts';
+  import RowPanel from './RowPanel.svelte';
+  import RowVerbMenu from './RowVerbMenu.svelte';
 
   let {
     slug,
@@ -60,6 +70,7 @@
     showSource = false,
     reread = async () => {},
     was = null,
+    select = false,
   }: {
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
@@ -73,6 +84,8 @@
     reread?: () => Promise<void>;
     /** A preview's page as it is now, drawn beside the page as the change would make it. */
     was?: LiveBlock[] | null;
+    /** Whether a home's queues may be chosen several at a time and answered from one bar, as Decide's are. */
+    select?: boolean;
   } = $props();
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
@@ -94,7 +107,44 @@
     arrivals: liveArrivals(),
     /* A QUESTION TYPED INTO A CAPTURE IS ASKED in the palette, where search and Slash answer it. */
     ask: openPaletteWith,
+    /* WHAT THE BLOCKS' OWN WRITES DID IS KEPT IN JUST CHANGED, on a page at its own address. */
+    touched: (ref, mark, title) => {
+      if (mode === 'page') host.note(ref, mark, title);
+    },
   });
+
+  /* ── the rows a page hosts ─────────────────────────────────────────────────
+     A PAGE AT ITS OWN ADDRESS HOSTS ITS ROWS AS WORK DID (`row-host.svelte.ts`): one open in the docked panel, one
+     menu, and Just changed; and its questions, chosen several at a time and answered from one bar (`picked.svelte.ts`).
+     Home and a preview draw neither: Home's keys are its own and a preview writes nothing. */
+  const host = new RowHost({
+    slug: () => slug,
+    base: () => apiBase(),
+    blocks: () => all,
+    now: () => live?.now ?? Date.now(),
+    reread: () => reread(),
+    toasts,
+    may: (register) => may(route.data as unknown as Shell, 'write', register),
+  });
+  const picked = new Picked({ base: () => apiBase(), reread: () => reread(), toasts });
+  $effect.pre(() => {
+    const on = slug;
+    untrack(() => {
+      host.forPage(on);
+      picked.clear();
+    });
+  });
+
+  /* ── the page's filters ────────────────────────────────────────────────────
+     THE RECORD SAYS WHAT A PAGE MAY BE NARROWED BY (`filters`, beside its blocks), and the address holds the choice
+     (`?f.thing=12`), so a filtered page is a link and Back undoes a choice. The route reads the page again with what
+     the address says; this only draws the strip and moves the address. */
+  const filters = $derived(live ? filtersOf(live.page.page) : []);
+  const chosen = $derived(filterOf(route.url.searchParams));
+  function onfilter(field: string, value: string | null) {
+    void goto(`?${filterQuery(route.url.searchParams, field, value)}`, { keepFocus: true, noScroll: true });
+  }
+
 
   /* THE WRITE MODULE IS FETCHED ONCE A WRITABLE PAGE HAS DRAWN, so its first tick is drawn the moment it is pressed. */
   $effect(() => {
@@ -112,6 +162,10 @@
      controls (`Arrange.svelte`) and the blocks being moved (`PageBody.svelte`). */
   const arrangement = new Arrangement();
   const arranging = $derived(arrangement.editing);
+  /** Whether the page hosts its rows and questions now: at its own address, read, and not being arranged. */
+  const hosting = $derived(mode === 'page' && !arranging && !showSource);
+  /** Whether the filter strip is drawn: on a hosted page the record says may be narrowed. */
+  const strip = $derived(hosting && filters.length > 0);
 
   /** Blocks added in this session. They live beside the declared ones and index past them. */
   let extra = $state<PageBlock[]>([]);
@@ -124,6 +178,8 @@
    */
   const led = $derived.by(() => {
     if (!live || arranging || showSource || layoutOf(live.page.page) !== null) return false;
+    /* NOR OVER A FILTER STRIP, which stands between the head and the first tile. */
+    if (mode === 'page' && filtersOf(live.page.page).length > 0) return false;
     const first = live.page.blocks[0];
     return first !== undefined && first.drawn && first.kind === 'note' && first.lead === true;
   });
@@ -136,6 +192,13 @@
    * edit-in-place inside a grid and a key's meaning must be a function of the object in focus rather than of the page
    * you happen to be on. The block keys are the body's (`PageBody.svelte`).
    */
+  /* THE SOURCE LINK KEEPS THE REST OF THE ADDRESS, as ⇧E does, so on /?work it stays on Work. */
+  const srcHref = $derived.by(() => {
+    const q = new URLSearchParams(route.url.searchParams);
+    q.set('src', showSource ? '0' : '1');
+    return `?${q}`;
+  });
+
   function onkeydown(e: KeyboardEvent) {
     if (mode !== 'page') return;
     if (typing()) return;
@@ -144,7 +207,10 @@
     if (covered()) return;
     if (e.shiftKey && e.key.toLowerCase() === 'e') {
       e.preventDefault();
-      void goto(`?src=${showSource ? '0' : '1'}`, { replaceState: true, noScroll: true });
+      /* THE FILTERS IN THE ADDRESS STAY: the source of a narrowed page is the same page, narrowed. */
+      const q = new URLSearchParams(route.url.searchParams);
+      q.set('src', showSource ? '0' : '1');
+      void goto(`?${q}`, { replaceState: true, noScroll: true });
     }
   }
 
@@ -184,6 +250,9 @@
     </Empty>
   </div>
 {:else if mode === 'page'}
+  <!-- THE PAGE GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter it already pads by (`ui/Panel.svelte`'s `--dock-w`,
+       0px while no panel is docked), so a row open beside the page never sits over its head or its tiles. -->
+  <div class="hosted">
   <!-- `define="page"`: the rail says "1 suggested page" on every screen and this is the first place somebody is looking
        at one. -->
   <PageHead
@@ -199,7 +268,7 @@
         <!-- `How this page is built`, not `Source`, which a reader who does not write code reads as an origin or a
              supplier. AUTHORING IS A DESKTOP SURFACE (13 §10): the link is not drawn below 900px. -->
         <span class="source-slot">
-          <Button weight="bare" href="?src={showSource ? '0' : '1'}">
+          <Button weight="bare" href={srcHref}>
             <Icon name="code" size="s" />
             {showSource ? copy.pageBack : copy.pageSource}
           </Button>
@@ -212,16 +281,38 @@
     {/snippet}
   </PageHead>
 
+  {#if strip}
+    <!-- THE RENDERER'S STRIP, one group a field, "All" first, the rest behind one select (`braindog-render` `Filters`). -->
+    <div class="page-filters"><Filters {filters} {chosen} {onfilter} /></div>
+  {/if}
+
   {#if showSource}
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
     <SourceView {slug} title={live.page.page.title} />
   {:else}
-    <PageBody mode="page" page={live.page.page} blocks={all} now={live.now} {writes} {arrangement} headed={led} />
+    <PageBody
+      mode="page"
+      page={live.page.page}
+      blocks={all}
+      now={live.now}
+      {writes}
+      {arrangement}
+      headed={led}
+      host={hosting ? host : null}
+      pick={hosting ? picked : null}
+    />
+    {#if hosting}<BatchBar {picked} />{/if}
+  {/if}
+  </div>
+  {#if hosting}
+    <RowPanel {host} />
+    <RowVerbMenu {host} {reread} />
   {/if}
 {:else if mode === 'home'}
   <!-- HOME'S BODY: the use case's page with its layout, spans and boxes, under Home's own head. Writes stay on, so a
        task is ticked on Home as it is on its page. -->
-  <PageBody mode="home" page={live.page.page} blocks={all} now={live.now} {writes} ids="home-" />
+  <PageBody mode="home" page={live.page.page} blocks={all} now={live.now} {writes} ids="home-" pick={select ? picked : null} />
+  {#if select}<BatchBar {picked} />{/if}
 {:else}
   <!-- A PREVIEW, INERT: the page as it will be drawn, with nothing on it that writes. Its title is a heading under the
        screen's own, and each block's name one step under that. -->
@@ -261,6 +352,18 @@
 {/if}
 
 <style>
+  .hosted {
+    min-inline-size: 0;
+    padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
+    transition: padding-inline-end var(--d-enter) var(--ease-out);
+  }
+
+  /* THE STRIP SITS IN THE PAGE'S OWN GUTTER AND CAP, over the first tile, with the gap a row of tiles keeps. */
+  .page-filters {
+    padding: var(--sp-3) var(--gutter) 0;
+    max-inline-size: var(--page-max);
+  }
+
   /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter and cap, so it sits where the
      page would have. */
   .said {

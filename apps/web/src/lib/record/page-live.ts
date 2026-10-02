@@ -20,7 +20,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 import { COSTS, isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
-import { MISSING, integer, money, quantity, day as fmtDay } from 'braindog-render';
+import { MISSING, integer, money, quantity, since, day as fmtDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { ActionRow, Outcome } from './actions.ts';
@@ -44,6 +44,7 @@ import { linkOf } from './blocks.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
 import { format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
+import { moneyInText } from './money.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type PageBlock, type PageDecl } from './schema.ts';
 import { compile } from './where.ts';
@@ -54,7 +55,7 @@ import type { BlockResult as Answer } from '@braindog/kernel';
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
 export const liveWords = {
-  cannot: 'This block cannot be drawn from the record yet.',
+  cannot: 'This part of the page cannot be drawn from the record yet.',
   changed: 'The page changed while it was being read.',
   /**
    * WHAT A REDUCING FIGURE SAYS WHEN THE FIELD IT ADDS UP IS ONE NOBODY HAS FILLED IN.
@@ -154,6 +155,8 @@ type Answered = {
   refusals?: Said[];
   drawn?: boolean;
   values?: Record<string, unknown>;
+  /** A lead note's line as the model wrote it overnight, sent only while the figures it was written from still hold. */
+  said?: unknown;
   [key: string]: unknown;
 };
 
@@ -171,8 +174,11 @@ type Answered = {
  * The cast is what let it through, and a cast that bridges two types silences every other difference
  * between them at the same time.
  */
-/** `declared_version` is the version the record holds the page at, which arranging it writes against. */
-export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[]; declared_version?: number };
+/**
+ * `declared_version` is the version the record holds the page at, which arranging it writes against. `filters` is
+ * what the page may be narrowed by, as the record answered it; `filtersOf` (`$lib/page/filters.ts`) reads it.
+ */
+export type LivePageDecl = Omit<PageDecl, 'blocks' | 'requires'> & { requires?: readonly string[]; declared_version?: number; filters?: unknown };
 
 type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown };
 
@@ -700,6 +706,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     done_now: doneNow,
     next: nextAt,
     open: openSteps,
+    /* THE MODEL'S LINE FOR A LEAD NOTE, taken by name so it never rides through `rest` onto a block that is not one. */
+    said: modelSaid,
     ...rest
   } = b;
 
@@ -784,6 +792,11 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
      A LEAD WITH NOTHING LEFT TO SAY IS NOT DRAWN, as a note whose `when:` said no is not: "0 essential steps done" is
      the clause the rule exists to take away, and a panel with no sentence in it is a hole in the first screen. */
   if (kind === 'note' && rest.lead === true && body !== undefined) {
+    /* THE MODEL'S LINE COMES FIRST WHEN THE RECORD SENT ONE. It is written nightly from these same figures and checked
+       before it is kept (`packages/record/src/headlines.ts`): every number in it is one the figures hold, and it is sent
+       only while they still hold the values it was written from, so it cannot say what the tiles beside it do not. */
+    const own = typeof modelSaid === 'string' ? modelSaid.trim() : '';
+    if (own !== '') return { ...shell, body: own };
     const lead = leadOf(body, resolverOf(values));
     return lead.trim() === '' ? { ...shell, body: '', drawn: false } : { ...shell, body: lead };
   }
@@ -894,9 +907,32 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   }
   /* WHAT IS WAITING ON A PERSON. `total` is how many are open and `shown` how many came back, so the
      block can say what it left out rather than drawing three of nine as though that were all of it. */
-  if (b.source === 'governance.open') {
+  /* WHAT WAS PUT OFF IS A QUEUE TOO: the same questions, each still open and waiting on its day, so it is read as the
+     open one is and keeps its own source. */
+  if (b.source === 'governance.open' || b.source === 'governance.later') {
     const queue = queueOf(waiting);
     return queue ? { ...shell, queue, shown: queue.length, total: matched } : cannot;
+  }
+  /* WHAT WAS DECIDED IS ROWS NO LIST HOLDS: one line a decision, its cells the declared columns in the words a person
+     reads (the day as an age, the answer by its option's label or the word for accepting or declining), and each a
+     door to the decision on `/decide/<id>`. `latest` is when the newest was decided, which a calm line can say. */
+  if (b.source === 'governance.decided') {
+    const answerWord = (v: unknown): string => (v === 'accept' ? copy.acceptIt : v === 'reject' ? copy.rejectIt : typeof v === 'string' ? v : '');
+    const cell = (f: Record<string, unknown>, field: string): string => {
+      const v = f[field];
+      if (field === 'at') return typeof v === 'string' ? since(v, now) : '';
+      if (field === 'answer_label') return typeof v === 'string' && v !== '' ? moneyInText(v) : answerWord(f.answer);
+      if (field === 'answer') return answerWord(v);
+      return typeof v === 'string' ? moneyInText(v) : v === null || v === undefined ? '' : String(v);
+    };
+    const rows: LiveBlock['rows'] = got.flatMap((r) => {
+      const id = typeof r.id === 'string' ? r.id : '';
+      const f = isObject(r.fields) ? r.fields : {};
+      return id === '' ? [] : [{ key: `decided:${id}`, cells: shell.columns.map((c) => cell(f, c.field)), href: `/decide/${encodeURIComponent(id)}` }];
+    });
+    const first = got[0]?.fields;
+    const latest = isObject(first) && typeof first.at === 'string' ? first.at : null;
+    return { ...shell, rows, shown: rows.length, total: Math.max(rows.length, matched), latest } as LiveBlock;
   }
 
   /* A WALK, A FEED AND A DIFF ARE NOT ROWS OF A REGISTER. The kernel answers each as its own key, and each
@@ -1154,7 +1190,12 @@ const heldOf = (listed: unknown): { address: string; title?: string }[] =>
       })
     : [];
 
-export type PageReader = { read(slug: string): Promise<Opened> };
+/**
+ * A READ OF ONE PAGE, NARROWED BY THE READER'S CHOICE when they made one (`?f.thing=12`, `$lib/page/filters.ts`).
+ * Every block over a list with that field is narrowed by the kernel, and the answer's `filters` carries what may be
+ * chosen next; an empty choice is no choice, and the page is asked for by its slug alone.
+ */
+export type PageReader = { read(slug: string, filter?: Readonly<Record<string, string>>): Promise<Opened> };
 
 /** A page reader for one tab. `base` is the page's own origin; the app never holds a token. */
 export function pageReader(base: string, io?: Fetch, clock: () => number = () => Date.now()): PageReader {
@@ -1192,8 +1233,10 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   }
 
   return {
-    async read(slug) {
-      const out = await client.page(slug);
+    async read(slug, filter) {
+      /* `client.page` drops an empty choice, so the page is asked for by its slug alone. A record that does not read
+         `filter` answers the whole page. */
+      const out = await client.page(slug, filter);
       if (!out.ok) {
         if (!('refusal' in out)) return { from: 'refused', fix: liveWords.changed };
         if (out.refusal.code === 'PAGE_UNKNOWN') {

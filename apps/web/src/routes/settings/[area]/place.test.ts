@@ -1,50 +1,113 @@
 /**
- * The settings index's grouping: every area once, in its group, in the registry's order.
+ * The settings index, declared: the house body every record starts from, and a declared index read back into the
+ * groups the chooser beside an open area draws, in the person's order, under the person's names.
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { GROUPS, LAST, ONLY_WIDE, grouped, type AreaRow } from './place.ts';
+import { AREAS, AREA_AT, DEFAULT_GROUPS, ONLY_WIDE, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, indexBody, labelIn, type IndexBlock } from './place.ts';
 
-const ROWS: AreaRow[] = [
-  { id: 'appearance', label: 'Appearance', icon: 'sun', group: 'you' },
-  { id: 'delete', label: 'Delete this record', icon: 'trash', group: 'record' },
-  { id: 'identity', label: 'Identity', icon: 'people', group: 'signin' },
-  { id: 'keyboard', label: 'Keyboard', icon: 'keyboard', group: 'you' },
-];
+const ids = (groups: ReturnType<typeof groupsOf>) => groups.map((g) => [g.title, g.areas.map((a) => a.id)]);
+const link = (heading: string, rows: string[][], more: Partial<IndexBlock> = {}): IndexBlock => ({
+  kind: 'link',
+  heading,
+  authored: rows.map((cells) => ({ cells })),
+  ...more,
+});
 
-test('each area is drawn once, under its own group, in the order the registry lists it', () => {
-  const groups = grouped(ROWS);
+test('the house index is a page of link tiles, one for each group, each area once with its address and its line', () => {
+  assert.equal(SETTINGS_INDEX.page, SETTINGS_PAGE);
   assert.deepEqual(
-    groups.map((g) => [g.id, g.areas.map((a) => a.id)]),
-    [
-      ['you', ['appearance', 'keyboard']],
-      ['signin', ['identity']],
-      ['record', ['delete']],
-    ],
+    SETTINGS_INDEX.blocks.map((b) => [b.kind, b.heading, typeof b.icon]),
+    DEFAULT_GROUPS.map((g) => ['link', g.title, 'string']),
   );
-  assert.equal(groups.flatMap((g) => g.areas).length, ROWS.length);
+  const rows = SETTINGS_INDEX.blocks.flatMap((b) => b.authored ?? []);
+  assert.equal(rows.length, AREAS.size);
+  for (const r of rows) {
+    assert.equal(r.cells.length, 3);
+    assert.ok(r.cells[1]!.startsWith(AREA_AT), `${r.cells[1]} is not a settings address`);
+    assert.ok(AREAS.has(r.cells[1]!.slice(AREA_AT.length)));
+  }
 });
 
-test('a row that names no group is still drawn, once, in the last group', () => {
-  const about: AreaRow = { id: 'about', label: 'About', icon: 'info' };
-  const groups = grouped([...ROWS, about]);
-  assert.equal(groups.flatMap((g) => g.areas).filter((a) => a.id === 'about').length, 1);
-  assert.equal(groups.find((g) => g.areas.some((a) => a.id === 'about'))?.id, LAST);
+test('the house body read back is the house groups, so the chooser and the index never disagree', () => {
+  assert.deepEqual(ids(groupsOf(SETTINGS_INDEX.blocks as IndexBlock[])), ids(DEFAULT_GROUPS));
 });
 
-test('a group with no area draws no heading', () => {
-  assert.ok(!grouped(ROWS).some((g) => g.id === 'sharing'));
-  assert.deepEqual(grouped([]), []);
+test('the one irreversible act is the last row of the last group', () => {
+  assert.equal(DEFAULT_GROUPS.at(-1)?.areas.at(-1)?.id, 'delete');
 });
 
-test('every group has a heading in sentence case, and the groups follow their declared order', () => {
-  for (const g of GROUPS) assert.match(g.title, /^[A-Z][a-z ]*$/u);
-  const order = grouped(ROWS).map((g) => GROUPS.findIndex((d) => d.id === g.id));
-  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+test('a person reorders, moves, renames and leaves out areas, and the chooser follows', () => {
+  const mine = [
+    link('Mine', [
+      ['Look', '/settings/appearance', 'Colours'],
+      ['Backups', '/settings/backups'],
+    ]),
+    link('Rest', [['Keys', '/settings/keyboard', '']]),
+  ];
+  const groups = groupsOf(mine);
+  assert.deepEqual(ids(groups), [
+    ['Mine', ['appearance', 'backups']],
+    ['Rest', ['keyboard']],
+  ]);
+  assert.equal(labelIn(groups, 'appearance'), 'Look');
+  /* A ROW WITH NO LINE OF ITS OWN KEEPS THE AREA'S; ONE WRITTEN EMPTY IS EMPTY, as it was written. */
+  assert.equal(groups[0]!.areas[1]!.line, AREAS.get('backups')!.line);
+  assert.equal(groups[1]!.areas[0]!.line, '');
+  /* AND ITS ICON IS THE AREA'S, whatever the person named it. */
+  assert.equal(groups[0]!.areas[0]!.icon, AREAS.get('appearance')!.icon);
+  /* LEFT OUT IS NOT GONE: the address still names the area, and its label is its own. */
+  assert.equal(labelIn(groups, 'delete'), 'Delete this record');
+});
+
+test('what is not an area is left out, an area listed twice is drawn once, and a tile not drawn draws nothing', () => {
+  const groups = groupsOf([
+    link('A', [
+      ['Elsewhere', 'https://example.com'],
+      ['Nope', '/settings/banana'],
+      ['Billing', '/settings/billing'],
+      ['Billing again', '/settings/billing'],
+    ]),
+    link('Hidden', [['Export', '/settings/export']], { drawn: false }),
+    { kind: 'note', heading: 'Words' },
+    link('Empty', [['Nope', '/settings/nope']]),
+  ]);
+  assert.deepEqual(ids(groups), [['A', ['billing']]]);
+});
+
+test('an address with the base path in front, or a query behind, still names its area', () => {
+  assert.deepEqual(ids(groupsOf([link('X', [['Pages', '/app/settings/pages?from=rail']])])), [['X', ['pages']]]);
+});
+
+test('an index that names no area at all is read as the house one, so nobody is stranded in one area', () => {
+  assert.deepEqual(ids(groupsOf([])), ids(DEFAULT_GROUPS));
+  assert.deepEqual(ids(groupsOf([link('X', [['Nope', '/r/tasks']])])), ids(DEFAULT_GROUPS));
+});
+
+test('the body is built from whatever groups it is handed, so an arranged index writes back the same way', () => {
+  const body = indexBody([{ title: 'One', icon: 'sun', areas: [AREAS.get('appearance')!] }]);
+  assert.deepEqual(body.blocks.map((b) => b.authored?.map((r) => r.cells[1])), [['/settings/appearance']]);
+});
+
+test('the area for what comes in is named for what it holds, and every name and line is plain words', () => {
+  assert.equal(AREAS.get('ingest')?.label, 'What comes in');
+  for (const a of AREAS.values()) {
+    assert.match(a.label, /^[A-Z]/u);
+    assert.doesNotMatch(`${a.label} ${a.line}`, /\b(rows?|ingest|entit(y|ies)|list items?)\b/iu, a.id);
+  }
 });
 
 test('the keyboard area is the one a phone is not offered', () => {
   assert.deepEqual([...ONLY_WIDE], ['keyboard']);
+});
+
+test('every area this build declares has an arm in the page that draws it', () => {
+  /* AN AREA WITH NO ARM DRAWS AN EMPTY COLUMN IN SILENCE, since an unknown address is a refusal and a known one draws
+     whatever its arm says. The arms are `{#if}` lines in a `.svelte` file, so they are read as text. */
+  const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.ok(AREAS.size >= 12, `only ${AREAS.size} areas are declared`);
+  for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
 });

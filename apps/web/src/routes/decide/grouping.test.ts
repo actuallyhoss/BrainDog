@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
    takes the sweep below down with it. */
 import * as grouping from './grouping.ts';
 
-const SCREEN = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+const SCREEN = readFileSync(new URL('./Classic.svelte', import.meta.url), 'utf8');
 
 test('the address says how the queue is grouped', () => {
   assert.equal(typeof grouping.groupingOf, 'function', 'grouping.ts exports no groupingOf, so the address is never read');

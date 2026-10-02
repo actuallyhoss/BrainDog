@@ -261,7 +261,7 @@
   });
 
   const PICK: Record<Picker, string> = {
-    list: 'Pick a list',
+    list: 'Pick where it goes',
     call: 'Pick a call',
     field: 'Pick a field',
     script: words.inspect.pickScript,

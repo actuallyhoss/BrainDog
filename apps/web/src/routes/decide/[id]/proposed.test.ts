@@ -14,6 +14,7 @@ import '../../../lib/record/fixtures/fill.ts';
 import { sayStep, sayTrigger, words } from '../../../lib/flow/flow.ts';
 import { REGISTERS } from '../../../lib/record/api.ts';
 import type { Fetch } from '../../../lib/record/page-live.ts';
+import { copy } from '../../../lib/copy.ts';
 import { drawnOf, previewOf, proposedOf } from './proposed.ts';
 
 test('a page says where it lands in the sidebar and what it shows', () => {
@@ -47,7 +48,8 @@ test('a module is every declaration it installs, and a look carries its accent',
     },
   });
   assert.deepEqual(out?.appears.map((a) => [a.kind, a.title]), [['List', 'Assignments'], ['Look', 'Calm']]);
-  assert.deepEqual(out?.appears[0]?.lines, [{ label: 'Fields', value: 'Due, Course name' }]);
+  /* THE LABEL IS THE COPY'S WORD, read from it, so rewording it is not a broken preview. */
+  assert.deepEqual(out?.appears[0]?.lines, [{ label: copy.proposalFields, value: 'Due, Course name' }]);
   assert.equal(out?.appears[1]?.accent, 'oklch(0.62 0.12 160)');
 });
 

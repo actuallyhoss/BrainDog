@@ -53,7 +53,7 @@ export const automations = {
   doorsNoAddress: 'This host answered the token without the path the address is built from, so no address is shown. Keep the token: it is the only copy there will be.',
   doorsMade: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
   doorsNoToken: 'This host answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
-  doorsNoRead: 'This host does not list its doors yet, so none can be shown here. Updating it brings the list.',
+  doorsNoRead: 'This host does not list its doors yet, so none can be shown here. Updating it brings them.',
   doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into this record.',
 
   /* ── the automation editor's footer (`routes/automations/[id]`) ── */

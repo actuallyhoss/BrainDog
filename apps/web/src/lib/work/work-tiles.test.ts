@@ -14,11 +14,6 @@ import {
   sentenceOf,
   staleOf,
   statsOf,
-  tierColumns,
-  tierCounts,
-  tierReading,
-  tierTones,
-  whoseCounts,
 } from './work-tiles.ts';
 
 const shape = shapeOf(SEED.tasks as unknown as RegisterDecl);
@@ -38,11 +33,6 @@ test('a task is the agent’s that names one, the reader’s that nobody holds, 
   assert.equal(inWhose({ owner: 3 }, shape, 'yours', mine), false);
   assert.equal(inWhose({ owner: 3 }, shape, 'all', mine), true);
   assert.equal(inWhose({ agent: 'codex' }, shape, 'agents', mine), true);
-});
-
-test('the toolbar counts open work only, and a task another person holds is in All but not in Yours', () => {
-  const rows = [task({}), task({ agent: 'claude' }), task({ owner: 3 }), task({ state: 'done' }), { seq: -1, fields: { what: 'typed', state: 'open' } }];
-  assert.deepEqual(whoseCounts(rows, shape, mine), { yours: 1, agents: 1, all: 3 });
 });
 
 test('an agent’s task waiting on review is drawn with the agents, and says it needs you', () => {
@@ -83,57 +73,6 @@ test('with nothing late, the review is what needs you, and with nothing at all t
     needs: 'Cursor waits on your review',
   });
   assert.equal(sentenceOf({ yours: 0, late: 0, today: 0, reviews: [] }), null);
-});
-
-test('the tiers are red only when the first one says urgent, then ink and greys a step apart', () => {
-  assert.deepEqual(tierTones(['urgent', 'high', 'normal', 'low'], {}), ['danger', 'ink', 'g2', 'g3']);
-  assert.deepEqual(tierTones(['p1', 'p2', 'p3'], { p1: 'First', p2: 'Second', p3: 'Third' }), ['ink', 'g2', 'g3']);
-});
-
-test('open work by tier, yours against the agents’, with the unranked last and only when there are some', () => {
-  const rows = [
-    task({ priority: 'urgent', agent: 'claude', state: 'review' }),
-    task({ priority: 'urgent', agent: 'codex' }),
-    task({ priority: 'urgent' }),
-    task({ priority: 'high' }),
-    task({}),
-    task({ priority: 'low', state: 'done' }),
-  ];
-  const t = tierCounts(rows, shape, mine)!;
-  assert.deepEqual(
-    t.parts.map((p) => [p.value, p.yours, p.agents, p.review, p.tone]),
-    [
-      ['urgent', 1, 2, 1, 'danger'],
-      ['high', 1, 0, 0, 'ink'],
-      ['normal', 0, 0, 0, 'g2'],
-      ['low', 0, 0, 0, 'g3'],
-      [null, 1, 0, 0, 'g4'],
-    ],
-  );
-  assert.equal(t.yours, 3);
-  assert.equal(t.agents, 2);
-  assert.equal(t.people, false);
-  assert.equal(tierReading(t), 'Agents hold 2 of the 3 urgent tasks. One of them waits on your review.');
-  assert.equal(tierCounts(rows, { ...shape, priority: null }, mine), null);
-});
-
-test('the tier reading says who holds the top tier in each case, and falls to the next tier when it is empty', () => {
-  const part = (value: string | null, yours: number, agents: number, review = 0) => ({ value, label: value ?? 'unranked', yours, agents, review, tone: 'ink' as const });
-  const chart = (...parts: ReturnType<typeof part>[]) => ({ parts, people: false, yours: 0, agents: 0 });
-  assert.equal(tierReading(chart(part('urgent', 3, 0))), 'All 3 urgent tasks are yours.');
-  assert.equal(tierReading(chart(part('urgent', 1, 0))), 'The one urgent task is yours.');
-  assert.equal(tierReading(chart(part('urgent', 0, 2, 2))), 'Agents hold all 2 urgent tasks. 2 of them wait on your review.');
-  assert.equal(tierReading(chart(part('urgent', 0, 1, 1))), 'An agent holds the one urgent task. It waits on your review.');
-  assert.equal(tierReading(chart(part('urgent', 0, 0), part('high', 2, 3))), 'Nothing is urgent. The most pressing are 5 high.');
-  assert.equal(tierReading(chart(part('urgent', 0, 0), part(null, 4, 0))), 'Nothing open is ranked yet.');
-});
-
-test('the two waffles take columns so they stand about as tall, and scale past 200 squares', () => {
-  assert.deepEqual(tierColumns(50, 78), { yours: 10, agents: 16, scale: 1 });
-  assert.deepEqual(tierColumns(3, 0), { yours: 3, agents: 1, scale: 1 });
-  const big = tierColumns(1000, 1000);
-  assert.equal(big.scale, 0.1);
-  assert.ok(big.yours * 8 >= 100 && big.agents * 8 >= 100);
 });
 
 test('a task that has not changed in 90 days has not moved, and finished ones never count', () => {

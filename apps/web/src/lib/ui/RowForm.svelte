@@ -47,6 +47,7 @@
     problems = $bindable<string[]>([]),
     taken = $bindable<Fields>({}),
     given = {},
+    values = {},
   }: {
     register: string;
     first?: boolean;
@@ -70,6 +71,13 @@
      * carries it exactly as if it had been chosen and the form does not ask for it.
      */
     given?: Readonly<Record<string, string>> | undefined;
+    /**
+     * WHAT AN EXISTING ROW ALREADY HOLDS, outside the first-row mode, so a panel can draw every declared field of a row
+     * that is there rather than only the five it knew by name. Each value is the text a person would have typed (an
+     * amount as `48.00`, a day as `2026-10-02`), and a yes-or-no field reads `true` as ticked. The first run ignores it:
+     * there is no row yet, only what the choice answered (`given`).
+     */
+    values?: Readonly<Record<string, string>> | undefined;
   } = $props();
 
   /**
@@ -202,12 +210,16 @@
          the row. */
       if (f.type === 'enum' && f.values?.[0]) out[f.id] = firstOf(f);
     }
-    return first ? { ...out, ...given } : out;
+    if (first) return { ...out, ...given };
+    for (const f of fields) if (f.type !== 'bool' && values?.[f.id] !== undefined) out[f.id] = values[f.id]!;
+    return out;
   };
   let typed = $state<Record<string, string>>(seed());
 
   /** `bool` is never missing: unchecked is an answer, and it is the one the record stores. */
-  let ticked = $state<Record<string, boolean>>({});
+  const seedTicked = (): Record<string, boolean> =>
+    first ? {} : Object.fromEntries(fields.filter((f) => f.type === 'bool' && values?.[f.id] !== undefined).map((f) => [f.id, values?.[f.id] === 'true']));
+  let ticked = $state<Record<string, boolean>>(seedTicked());
 
   /**
    * THE CURRENCY THIS LIST'S ROWS ARE IN, one of the currencies a new amount can go in. The field's

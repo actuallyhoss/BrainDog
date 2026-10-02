@@ -132,10 +132,19 @@ test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page 
 
 test('A HOME FOLDS ITS LONG LISTS AND HANDS THE RENDERER THE ROW CURSOR', () => {
   assert.match(BODY, /fold=\{mode === 'home'\}/);
-  assert.match(BODY, /rows=\{mode === 'home' \? \{ cursor: cursorIn\(slot\.i\), onrowfocus: rowFocus\(slot\.i\) \} : null\}/);
+  assert.match(BODY, /rows=\{mode === 'home' \|\| \(mode === 'page' && host\) \? \{ cursor: cursorIn\(slot\.i\), onrowfocus: rowFocus\(slot\.i\) \} : null\}/);
   assert.match(SLOT, /cursor=\{rows\?\.cursor \?\? null\}/);
   assert.match(SLOT, /onrowfocus=\{rows\?\.onrowfocus\}/);
   assert.match(SLOT, /words\.more\(/);
+});
+
+test('A PAGE AT ITS OWN ADDRESS IS WORKED ROW BY ROW TOO, and its rows open beside it, never on a home or a preview', () => {
+  assert.match(BODY, /if \(host && rowsNow\(\)\.length > 0\) return homeKey\(e\);/);
+  assert.match(BODY, /case 'e': \{\n\s+if \(!host \|\| !record \|\| !host\.open\(record, true\)\) return;/);
+  assert.match(BODY, /case 'Delete':\n\s+case 'Backspace': \{\n\s+if \(inPanel \|\| !host/, 'Delete never reaches past the panel to a row');
+  assert.match(BODY, /host && mode === 'page' && writes/, 'the renderer is handed onopen and onmenu only where the page hosts its rows');
+  assert.match(SLOT, /onopen=\{w \? verbs\?\.onopen : undefined\}/);
+  assert.match(SLOT, /onmenu=\{w \? verbs\?\.onmenu : undefined\}/);
 });
 
 test('A QUESTION CARD IS A ROW THE CURSOR REACHES, AND ITS NUMBER KEYS PRESS ITS OPTIONS', () => {

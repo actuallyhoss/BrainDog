@@ -1,7 +1,17 @@
 /**
- * THE TWO LISTS UNDER THE QUEUE: what was put off and when it comes back, and how the calls with a prediction went.
+ * DECIDE, DECLARED, AND THE TWO LISTS UNDER THE QUEUE THAT ARE NOT YET A SOURCE.
  *
- * NO NEW METHOD, BECAUSE THE RECORD ALREADY SAYS BOTH. `governance` hands every suggestion with its
+ * THE PAGE IS A BODY LIKE ANY OTHER (DIRECTION §35, "every page is declared"). `/decide` was a screen of its own, kept
+ * now at `/decide?classic` (`Classic.svelte`) until the declared page does everything it did; `decideHome` is the body
+ * the page draws through `PageView`, as Today's is (`lib/home/default-home.ts`): the line the head says, the first
+ * question drawn whole, the rest to be chosen and answered at once, what was put off and what was decided folded shut
+ * under them. The record draws it with `previewPage` and nothing is installed, so nothing here is anybody's record by
+ * name (§27), and `decideDrawn` is the one place the page is shaped before it is drawn.
+ *
+ * THE CALLS ARE STILL READ HERE. A prediction is no list and no computed source, so how the calls went is the host's to
+ * draw under the page, from `callsOf`, until the record answers it as a block.
+ *
+ * NO NEW METHOD FOR THE OLD LISTS, BECAUSE THE RECORD ALREADY SAYS BOTH. `governance` hands every suggestion with its
  * `defer_until` and `defer_why` once it is asked for `status: 'all'`, and a deferred question is one still open whose
  * day has not come, which is exactly the one the default `open` read leaves out (`kernel/src/govern.ts`,
  * `listGovernance`). A prediction row carries `met`, `scored_at` and `score_at` as the scorer left them.
@@ -10,10 +20,17 @@
  * is an argument rather than a read of `Date.now()`, so a test can say what day it is.
  */
 
-import { day, relative } from 'braindog-render';
+import { day, relative, since } from 'braindog-render';
+import type { QueueQuestion } from '@braindog/kernel';
+import { createClient } from '@braindog/client';
 import { everyGovernance, governancePage, type Governor, type Read } from '../../lib/record/governance.ts';
 import { moneyInText } from '../../lib/record/money.ts';
+import { blockOf, type Fetch, type LiveBlock, type Opened } from '../../lib/record/page-live.ts';
+import type { PageBlock } from '../../lib/record/schema.ts';
+import { emptyHidden, says } from '../../lib/page/home.ts';
 import { copy } from '../../lib/copy.ts';
+import { countSentence, WORDS as LEAD } from './lead.ts';
+import { words } from './words.ts';
 
 type Row = Record<string, unknown>;
 
@@ -121,3 +138,211 @@ export async function readViews(client: Pick<Governor, 'governance'>, now: numbe
   if (!scored.ok) return { from: 'refused', fix: fixOf(scored.out) };
   return { from: 'live', value: { later: laterOf(asked.value, now), calls: callsOf(scored.rows) } };
 }
+
+/** Just the calls, for the declared page, which reads what was put off through its own body. */
+export async function readCalls(client: Pick<Governor, 'governance'>): Promise<Read<Call[]>> {
+  const scored = await governancePage(client, { register: 'prediction' }, null, CALLS_READ);
+  if (!scored.ok) return { from: 'refused', fix: fixOf(scored.out) };
+  return { from: 'live', value: callsOf(scored.rows) };
+}
+
+/** How the calls went, in one line and one picture: of those already checked, how many came true and how many did not. */
+export function callsRead(calls: readonly Call[]): { met: number; missed: number; unread: number; said: string } {
+  const met = calls.filter((c) => c.went === 'met').length;
+  const missed = calls.filter((c) => c.went === 'missed').length;
+  const unread = calls.filter((c) => c.went === 'unread').length;
+  return { met, missed, unread, said: words.callsRead(met, met + missed + unread) };
+}
+
+/* ── the declared page ─────────────────────────────────────────────────── */
+
+/** A page body as `previewPage` takes it. */
+export type DecideBody = { page: string; title: string; blocks: PageBlock[] };
+
+/**
+ * HOW MANY QUESTIONS EACH LIST UNDER THE FIRST ONE DRAWS: the record's ceiling for a queue, so the page holds every
+ * question a person would scroll to, and the queue says how many more past it.
+ */
+export const QUEUE_MOST = 20;
+
+/** How many decisions the folded list draws, the latest first. */
+export const DECIDED_MOST = 10;
+
+/* THE DECIDED LIST'S COLUMNS, as the record names a decision's fields (`kernel/src/pages.ts` `DECIDED`). */
+const DECIDED_COLUMNS = [
+  { field: 'question', label: words.question },
+  { field: 'answer_label', label: words.chosen },
+  { field: 'reason', label: words.why },
+  { field: 'at', label: words.when },
+] as const;
+
+/**
+ * DECIDE'S BODY, in reading order: the page's line, the first question whole (what its agents suggest, why, and what
+ * accepting it does), the rest as cards a person may choose several of and answer from one bar, and then, folded shut,
+ * what was put off and comes back, and what was decided lately. Every block is over the record's own questions
+ * (`governance.*`), so the body is the same for every record and what each one shows is what it holds.
+ */
+export function decideHome(): DecideBody {
+  return {
+    page: 'decide',
+    title: 'Decide',
+    blocks: [
+      /* THE PAGE'S LINE. Its words are the calm one; the head says the line worked out from the queue (`decideDrawn`). */
+      { kind: 'note', lead: true, body: words.nothingWaiting },
+      /* THE FIRST QUESTION, WHOLE. One question, so it is never chosen with others: it is the one being answered. */
+      { kind: 'queue', source: 'governance.open', limit: 1, lead: true },
+      /* THE REST, AFTER IT. The record answers the same ranked queue, and `decideDrawn` leaves out the one drawn above. */
+      { kind: 'queue', heading: words.alsoWaiting, icon: 'ask', source: 'governance.open', limit: QUEUE_MOST + 1 },
+      /* WHAT WAS PUT OFF, SOONEST BACK FIRST, folded: it is not waiting yet, and is one press away. */
+      { kind: 'section', heading: WORDS.later, icon: 'clock', fold: true },
+      { kind: 'queue', source: 'governance.later', limit: QUEUE_MOST },
+      /* WHAT WAS DECIDED, LATEST FIRST, folded: what each got and why, each a door to its decision. */
+      { kind: 'section', heading: LEAD.decided, icon: 'check', fold: true },
+      { kind: 'table', source: 'governance.decided', columns: [...DECIDED_COLUMNS], limit: DECIDED_MOST },
+    ],
+  };
+}
+
+/** Decide's body as every record draws it. */
+export const DECIDE_HOME = decideHome();
+
+const isOpen = (b: LiveBlock): boolean => b.kind === 'queue' && b.source === 'governance.open';
+const isLead = (b: LiveBlock): boolean => isOpen(b) && (b as { lead?: unknown }).lead === true;
+
+/** How many questions a queue holds: every one open, though it draws a few. */
+const asked = (b: LiveBlock): number => Math.max(b.total, b.queue?.length ?? 0);
+
+/** Decide's page as drawn, and the line its head says. */
+export type DecideDrawn = {
+  blocks: LiveBlock[];
+  /** The head's line: how many wait and what the first suggests, or the calm line when nothing does. */
+  sentence: { text: string; needs: string };
+  /** How many questions are open, the record's own count. */
+  open: number;
+  /** Whether the page draws anything at all under its head. */
+  drawsAny: boolean;
+};
+
+/**
+ * THE BLOCKS AS DECIDE DRAWS THEM, at the same indexes, since every write and id on the page is keyed by a block's place.
+ *
+ * THE LINE GOES TO THE HEAD. A `note lead` in plain words is the head's calm line rather than a tile, and while a
+ * question waits the head says `countSentence` instead, from the record's count and the first question's suggestion.
+ *
+ * A QUESTION IS DRAWN ONCE: the rest leave out what the first block drew, and say how many are left past them.
+ *
+ * AND WHAT HOLDS NOTHING IS NOT DRAWN, the page reader's own rule (`emptyHidden`), so a section over nothing goes too.
+ * `who` names whoever asked the first question, or `''` for the reader or nobody, as the classic screen said it.
+ */
+export function decideDrawn(blocks: readonly LiveBlock[], now: number, who: (q: QueueQuestion) => string = () => ''): DecideDrawn {
+  let calm: string | null = null;
+  const drawn = new Set<string>();
+  let first: QueueQuestion | undefined;
+  let open = 0;
+  let undo = false;
+  let decided: string | null = null;
+  const shaped = blocks.map((b, n): LiveBlock => {
+    if (says(b) || !b.drawn) return b;
+    if (n === 0 && b.kind === 'note' && b.lead === true) {
+      const said = typeof b.body === 'string' ? b.body.trim() : '';
+      if (said !== '' && !said.includes('{{')) {
+        calm = said;
+        return { ...b, drawn: false };
+      }
+      return b;
+    }
+    if (b.source === 'governance.decided' && decided === null) {
+      const at = (b as { latest?: unknown }).latest;
+      if (typeof at === 'string' && at !== '') decided = at;
+    }
+    if (!isOpen(b) || !b.queue) return b;
+    open = Math.max(open, asked(b));
+    if (b.queue.some((q) => q.cost === 'undo')) undo = true;
+    const fresh = b.queue.filter((q) => !drawn.has(q.id));
+    for (const q of fresh) drawn.add(q.id);
+    if (isLead(b)) first ??= fresh[0];
+    /* THE FIRST QUESTION'S CARD SAYS NO "N MORE": the rest are drawn just under it, and its door would be this page. */
+    if (isLead(b) && blocks.some((x, m) => m > n && isOpen(x) && x.drawn && !says(x)))
+      return { ...b, queue: fresh, shown: fresh.length, total: fresh.length, ...(fresh.length === 0 ? { drawn: false } : {}) };
+    if (fresh.length === b.queue.length) return b;
+    const gone = b.queue.length - fresh.length;
+    return { ...b, queue: fresh, shown: fresh.length, total: Math.max(fresh.length, b.total - gone), ...(fresh.length === 0 ? { drawn: false } : {}) };
+  });
+  first ??= shaped.find((b) => isOpen(b) && b.drawn && b.queue?.length)?.queue?.[0];
+  const option = first?.options.find((o) => o.recommended)?.label;
+  const waiting = countSentence(open, undo, option, first ? who(first) : '');
+  const quiet = decided ? words.lastDecided(since(decided, now)) : (calm ?? words.nothingWaiting);
+  const out = emptyHidden(shaped);
+  return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn) };
+}
+
+/* ── the record's answer, read as the page draws it ───────────────────── */
+
+type Answered = Parameters<typeof blockOf>[0];
+type Entryish = { id?: unknown; fields?: Record<string, unknown> };
+
+/**
+ * WHAT WAS DECIDED, AS A TABLE DRAWS IT: one line a decision, its cells the declared columns in the words a person
+ * reads, and each a door to the decision on `/decide/<id>`. The day is said as an age ("2 days ago"), and the option by
+ * its own label where the question offered options, else the record's own word for accepting or declining.
+ */
+export function decidedOf(b: Answered, now: number): LiveBlock {
+  /* THE FRAME EVERY BLOCK HAS (heading, columns, count), drawn as a block with no source, which is never a `cannot`. */
+  const { source: _source, ...plain } = b;
+  const shell = blockOf({ ...plain, rows: [] }, new Map(), now);
+  const { cannot: _cannot, ...rest } = shell;
+  const columns = shell.columns;
+  const got = (Array.isArray(b.rows) ? b.rows : []) as Entryish[];
+  const cell = (f: Record<string, unknown>, field: string): string => {
+    const v = f[field];
+    if (field === 'at') return typeof v === 'string' ? since(v, now) : '';
+    if (field === 'answer_label') return typeof v === 'string' && v !== '' ? moneyInText(v) : answerWord(f.answer);
+    if (field === 'answer') return answerWord(v);
+    return typeof v === 'string' ? moneyInText(v) : v === null || v === undefined ? '' : String(v);
+  };
+  const rows = got.flatMap((r) => {
+    const id = typeof r.id === 'string' ? r.id : '';
+    const f = r.fields ?? {};
+    return id === '' ? [] : [{ key: `decided:${id}`, cells: columns.map((c) => cell(f, c.field)), href: `/decide/${encodeURIComponent(id)}` }];
+  });
+  const matched = typeof b.matched === 'number' ? b.matched : rows.length;
+  /* `latest` IS WHEN THE NEWEST WAS DECIDED, which the calm line says once nothing waits. */
+  const latest = typeof got[0]?.fields?.at === 'string' ? got[0].fields.at : null;
+  return { ...rest, source: 'governance.decided', rows, shown: rows.length, total: Math.max(rows.length, matched), latest } as LiveBlock;
+}
+
+/* `accept` and `reject` are what a question with no options of its own was answered with. */
+const answerWord = (v: unknown): string => (v === 'accept' ? copy.acceptIt : v === 'reject' ? copy.rejectIt : typeof v === 'string' ? v : '');
+
+/**
+ * ONE ANSWERED BLOCK AS THE PAGE DRAWS IT. What was put off is a queue like the open one, and is read as one; what was
+ * decided is rows the record's lists do not hold, and is drawn here (`decidedOf`). A block the record refused, or held
+ * back, keeps what it said.
+ */
+export function decideBlockOf(b: Answered, now: number): LiveBlock {
+  const refused = (Array.isArray(b.refusals) && b.refusals.length > 0) || b.drawn === false;
+  if (!refused && b.source === 'governance.later') return { ...blockOf({ ...b, source: 'governance.open' }, new Map(), now), source: 'governance.later' };
+  if (!refused && b.source === 'governance.decided') return decidedOf(b, now);
+  return blockOf(b, new Map(), now);
+}
+
+/**
+ * DECIDE'S PAGE, DRAWN BY THE RECORD and never installed: `previewPage` answers the body as `page` answers an installed
+ * one, each block held to the reader, and writes nothing. `null` from a host older than the method, which leaves the
+ * classic screen as the way in.
+ */
+export async function readDecide(base: string, body: DecideBody = DECIDE_HOME, io?: Fetch): Promise<Opened | null> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<{ read_at?: unknown; blocks?: unknown }>('previewPage', { body });
+  if (!out.ok) {
+    if (!('refusal' in out)) return { from: 'refused', fix: copy.changedSince };
+    return UNSERVED.has(out.refusal.code) ? null : { from: 'refused', fix: out.refusal.fix };
+  }
+  const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
+  const now = Number.isFinite(said) ? said : Date.now();
+  const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as Answered[];
+  return { from: 'live', now, page: { page: { page: body.page, title: body.title }, blocks: blocks.map((b) => decideBlockOf(b, now)) } };
+}
+
+/** A refusal that says the host has no such method, rather than anything about this page. */
+const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'UNREACHABLE', 'UNAUTHORIZED']);

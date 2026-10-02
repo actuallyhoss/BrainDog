@@ -148,7 +148,7 @@ test('a live search finds the record\'s questions and pages too, asked once for 
     [
       ['Decide', [['Renew the studio rent?', '/decide/SG4', 'Open question'], ['Pay the rent early?', '/decide/D2', 'Decided']]],
       [REGISTERS.obligations!.name, [['Rent for the studio', '/r/obligations/9', '']]],
-      ['Pages and lists', [['Rent watch', '/p/rent-watch', 'Views']]],
+      ['Pages', [['Rent watch', '/p/rent-watch', 'Views']]],
     ],
   );
   assert.equal(out.value.total, 4);

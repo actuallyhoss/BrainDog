@@ -63,8 +63,9 @@ export const shell = {
   home: 'Home',
   decide: 'Decide',
   inbox: 'Inbox',
-  /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. */
-  lists: 'Lists',
+  /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. `Your things` AND IT WAS
+     `Lists`: what sits under it is the person's invoices and tasks, and "list" is how the record stores them (§35). */
+  lists: 'Your things',
   packs: 'Add-ons',
   vault: 'Vault',
   settings: 'Settings',
@@ -193,7 +194,7 @@ export const shell = {
 
   /* the palette */
   paletteLabel: 'Search',
-  pages: 'Pages and lists',
+  pages: 'Pages',
   install: 'Install',
   installDiff: 'What this adds',
   /* `04 §3`'s seven sections, in a person's words. Only the ones that say something render: a
@@ -380,7 +381,7 @@ export const shell = {
   scopeDocument: 'Anywhere',
   scopeToday: 'On Today',
   scopeWork: 'On Work',
-  scopeGrid: 'In a list',
+  scopeGrid: 'In a table',
   scopeBoard: 'On a board',
   scopePage: 'On a page',
   scopeGate: 'At the gate',

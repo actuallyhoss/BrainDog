@@ -45,6 +45,8 @@
   import Reporting from './panels/Reporting.svelte';
   import { panelOf } from './panels/panel-of.ts';
   import type { Writes } from './page-writes.ts';
+  import type { Picked } from './picked.svelte.ts';
+  import type { Row } from 'braindog-render';
   import AddStep from './AddStep.svelte';
   import { foldOf } from './home.ts';
   import { words } from './words.ts';
@@ -60,6 +62,8 @@
     level = 2,
     fold = false,
     rows = null,
+    verbs = null,
+    pick = null,
   }: {
     block: LiveBlock;
     /** The block's declared index, which its id, its heading's id and its held rows are keyed by. */
@@ -84,6 +88,14 @@
      * where nothing walks rows.
      */
     rows?: { cursor: string | null; onrowfocus: (row: string) => void } | null;
+    /**
+     * A ROW'S TWO VERBS BEYOND ITS TICK, handed to the renderer: open it in the page's docked panel, and open its menu at
+     * the control pressed. `null` where the page does not host rows (a home, a preview), and the markup is then what
+     * it always was.
+     */
+    verbs?: { onopen: (row: Row) => void; onmenu: (row: Row, anchor: HTMLElement) => void } | null;
+    /** The page's choice of questions to answer at once, which a queue of two or more questions adds to. */
+    pick?: Picked | null;
   } = $props();
 
   /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is marked. `now` is the clock the
@@ -284,7 +296,13 @@
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <div class="queue">
-    {#each block.queue as question (question.id)}<QueueAnswer {question} onanswered={() => {}} />{/each}
+    <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
+    {#each block.queue as question, n (question.id)}<QueueAnswer
+        {question}
+        onanswered={() => {}}
+        pick={block.queue.length > 1 ? pick : null}
+        lead={(block as { lead?: unknown }).lead === true && n === 0}
+      />{/each}
     {#if block.total > block.queue.length}<a class="queue-more" href={inApp('/decide')}>{queueMore(block.total - block.queue.length)}</a>{/if}
   </div>
 {:else}
@@ -308,6 +326,8 @@
         oncapture={w && w.capturable(block) ? w.captureLine : undefined}
         oninput={w && typable ? w.typeInto : undefined}
         onpath={w ? (row, done) => w.onpath(block, row, done, i, shown.rows) : undefined}
+        onopen={w ? verbs?.onopen : undefined}
+        onmenu={w ? verbs?.onmenu : undefined}
       />
       {#if more}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, more.shown)}>{words.more(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}

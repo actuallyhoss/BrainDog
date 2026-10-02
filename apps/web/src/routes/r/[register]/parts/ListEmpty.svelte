@@ -57,7 +57,7 @@
   {kind}
   glyph={kind === 'no-data-yet' ? iconFor(decl.icon, 'rows') : undefined}
   title={kind === 'no-results'
-    ? `${size} rows, none matching:`
+    ? `${size} in ${decl.name}, none matching:`
     : kind === 'cleared'
       ? 'Nothing outstanding.'
       : `Nothing in ${decl.name} yet.`}

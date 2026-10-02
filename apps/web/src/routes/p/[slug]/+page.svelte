@@ -18,10 +18,17 @@
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
+  import { filterOf, sameFilter } from '$lib/page/filters.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
+  /**
+   * WHAT THE READER NARROWED THE PAGE TO, kept in the address (`?f.thing=12`) so a narrowed page is a link, Back
+   * undoes a choice and a reload keeps it. `filtered` is the choice the last read went out with.
+   */
+  const filter = $derived(filterOf(route.url.searchParams));
+  let filtered: Record<string, string> = {};
 
   /**
    * WHERE THE PAGE CAME FROM: the record's `page` answer, the record saying it has no such page, or the
@@ -30,22 +37,6 @@
   let got = $state<Opened | null>(null);
   let reader: ReturnType<typeof pageReader> | null = null;
 
-  async function readLive(asked: string) {
-    const at = opened();
-    got = null;
-    reader ??= pageReader(apiBase());
-    const out = await reader.read(asked);
-    /* An answer for a page somebody has already left draws nothing. */
-    if ((route.params.slug ?? '') !== asked) return closed(true, at);
-    got = out;
-    closed(out.from !== 'refused', at);
-  }
-
-  $effect(() => {
-    const asked = slug;
-    untrack(() => void readLive(asked));
-  });
-
   /* A RE-READ OF THE PAGE'S OWN, after one of its writes landed, counted so the record moving under it does not read
      the page a second time while the first is still out. */
   let own = 0;
@@ -53,13 +44,45 @@
      after the one the tick started, and drawing it last put the row back as it was before the tick. */
   let started = 0;
 
+  async function readLive(asked: string) {
+    const at = opened();
+    got = null;
+    reader ??= pageReader(apiBase());
+    const mine = ++started;
+    const out = await reader.read(asked, filtered);
+    /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made
+       while this was out, has already drawn over. */
+    if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closed(true, at);
+    got = out;
+    closed(out.from !== 'refused', at);
+  }
+
+  $effect(() => {
+    const asked = slug;
+    untrack(() => {
+      /* A new page is read with the choice its address already holds, so the effect below has nothing to read again. */
+      filtered = filter;
+      void readLive(asked);
+    });
+  });
+
+  /* A CHOICE CHANGED ON THE SAME PAGE: read again without blanking it, so the strip stays under the finger. */
+  $effect(() => {
+    const f = filter;
+    untrack(() => {
+      if (sameFilter(f, filtered)) return;
+      filtered = f;
+      void reread();
+    });
+  });
+
   async function reread() {
     const asked = slug;
     if (!reader) return;
     own += 1;
     const mine = ++started;
     try {
-      const out = await reader.read(asked);
+      const out = await reader.read(asked, filtered);
       if (mine === started && (route.params.slug ?? '') === asked && out.from === 'live') got = out;
     } finally {
       own -= 1;

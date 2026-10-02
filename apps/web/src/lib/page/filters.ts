@@ -1,0 +1,73 @@
+/**
+ * A declared page's filters, the host's half: the strip's choices read off the record's answer, the choice kept in the
+ * address (`?f.thing=12`), and the address a choice goes to. The strip itself is the renderer's (`braindog-render`
+ * `Filters`), and narrowing every block is the kernel's (`readPage` with `filter`), so all this does is carry the choice
+ * between the two.
+ *
+ * THE ADDRESS HOLDS THE CHOICE, so a filtered page is a link somebody can send, Back undoes a choice, and a reload keeps
+ * it. One key a field, `f.<field>`, beside whatever else the address says (`?src=1` stays as it was).
+ *
+ * PURE, AND NODE LOADS IT, so `filters.test.ts` holds each rule.
+ */
+
+import type { Filter } from 'braindog-render';
+
+/** What every filter key in the address starts with. */
+const PREFIX = 'f.';
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * A value as the strip and the address spell it: text, and a row's number as its digits. `''` IS A VALUE, the kernel's
+ * "none" (the "No project" choice, `clauseOf` in `kernel/src/pages.ts`), so it is kept and not read as no spelling.
+ */
+const spelt = (v: unknown): string | null => (typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : null);
+
+/**
+ * The fields a page may be narrowed by, as the record answered them beside its blocks (`filters`), read rather than
+ * trusted: a record on another build that sent another shape draws no strip, and a value with no spelling is left out.
+ */
+export function filtersOf(page: unknown): Filter[] {
+  const said = isObject(page) ? page.filters : undefined;
+  if (!Array.isArray(said)) return [];
+  return said.flatMap((f): Filter[] => {
+    if (!isObject(f) || typeof f.field !== 'string' || f.field === '' || !Array.isArray(f.values)) return [];
+    const values = f.values.flatMap((v) => {
+      if (!isObject(v)) return [];
+      const value = spelt(v.value);
+      if (value === null) return [];
+      const label = typeof v.label === 'string' && v.label.trim() !== '' ? v.label : value;
+      if (label === '') return [];
+      return [typeof v.count === 'number' ? { value, label, count: v.count } : { value, label }];
+    });
+    const control = f.control === 'chips' || f.control === 'segmented' ? f.control : undefined;
+    return [{ field: f.field, label: typeof f.label === 'string' && f.label !== '' ? f.label : f.field, values, ...(control ? { control } : {}) }];
+  });
+}
+
+/** What the address narrows the page to now, by field. `?f.thing=` is a choice too: the rows with none. */
+export function filterOf(params: URLSearchParams): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of params) {
+    if (!key.startsWith(PREFIX) || key.length === PREFIX.length) continue;
+    out[key.slice(PREFIX.length)] = value;
+  }
+  return out;
+}
+
+/**
+ * The address's query with `field` set to `value`, or let go when `value` is `null`; everything else is kept. Without
+ * its `?`, which the caller writes in front, so the navigation reads as the query it is (`at-sites.test.ts`).
+ */
+export function filterQuery(params: URLSearchParams, field: string, value: string | null): string {
+  const next = new URLSearchParams(params);
+  if (value === null) next.delete(`${PREFIX}${field}`);
+  else next.set(`${PREFIX}${field}`, value);
+  return next.toString();
+}
+
+/** Whether two choices are the same, so a read of the page is asked again only when the choice changed. */
+export const sameFilter = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>>): boolean => {
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
+};

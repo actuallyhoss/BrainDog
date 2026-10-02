@@ -310,6 +310,7 @@
 <Section title={copy.navShape}>
   <!-- ON A PHONE THE SHAPE IS ONE SENTENCE. A phone always draws the tab bar, so a picker there offers a choice
        the phone would not draw; `wide-only` (`settings.css`) leaves the picker to the screens that use it. -->
+  <!-- ONE HINT A SECTION: the picker's own on the screens that draw it, and the phone's one sentence on a phone. -->
   <div class="wide-only">
     <p class="hint">{copy.navShapeHint}</p>
     <div class="pictures" role="group" aria-label={copy.navShape}>
@@ -321,8 +322,7 @@
       {/each}
     </div>
   </div>
-  <p class="hint">{copy.navShapeOnPhone}</p>
-  <p class="hint wide-only">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
+  <p class="hint phone-only">{copy.navShapeOnPhone}</p>
 </Section>
 
 <!--
@@ -381,7 +381,6 @@
         {/each}
       </ul>
     {/if}
-    <p class="hint">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
   </Section>
 </div>
 
@@ -404,7 +403,6 @@
 
 <Section title={words.offers}>
   <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
-  <p class="hint kept">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
 </Section>
 
 <!--
@@ -467,6 +465,10 @@
   {/if}
 </Section>
 
+<!-- WHERE EVERY CHOICE ABOVE IS KEPT, SAID ONCE FOR THE AREA. It was under three sections, and the page's own footer
+     said the opposite under a fourth. -->
+<p class="kept">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
+
 {#if showing}
   {@const s = showing}
   {@const icon = iconOf(s.item)}
@@ -515,9 +517,18 @@
     line-height: var(--lh-body);
   }
 
-  /* WHERE THE SWITCH IS KEPT, under its row and starting where the row's title starts. */
+  /* WHERE THE AREA'S CHOICES ARE KEPT, once, as the line under every area that keeps its own is drawn. */
   .kept {
-    padding-inline-start: calc(var(--well) + var(--sp-3));
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-xs);
+  }
+
+  /* THE PHONE'S ONE SENTENCE ABOUT THE SHAPE, where the picker is not drawn. */
+  @media (width >= 900px) {
+    .phone-only {
+      display: none;
+    }
   }
 
   /* ── one shape of the navigation, drawn in proportions of the picture's own width (`cqi`) ── */

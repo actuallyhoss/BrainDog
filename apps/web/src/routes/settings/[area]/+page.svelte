@@ -7,27 +7,38 @@
   state, handlers and styles, and what more than one area reads is in `settings-state.svelte.ts`.
 
   TWO ADDRESSES, ONE SCREEN. `/settings/<area>` is this route, and `/settings` draws this same file
-  with no area in the address (its own `+page.svelte` renders it), which is the index. Below 900px
-  the index is a page and each area a page with a back link to it; from 900px up the index stands
-  beside the open area, and `/settings` opens the first one (`SettingsIndex.svelte`, `place.ts`).
+  with no area in the address (its own `+page.svelte` renders it), which is the index.
+
+  THE INDEX IS DECLARED (DIRECTION §35). `/settings` is a page body drawn by the one reader, `PageView`, at every
+  width: a tile for each group, its areas as links (`place.ts` `SETTINGS_INDEX`), or the record's own `settings` page
+  where it holds one, which is how a person reorders, renames and leaves out areas. Once an area is open, the chooser
+  beside it (`SettingsIndex.svelte`) draws the same groups in the same order; below 900px the area is the page, with a
+  back link to the index.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { untrack } from 'svelte';
   import { copy } from '$lib/copy.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
+  import type { Opened } from '$lib/record/page-live.ts';
+  import type { PageBody } from '$lib/record/pages-live.ts';
+  import { may } from '$lib/record/may.ts';
   import { readUsage } from '$lib/record/actions.ts';
   import { readSnapshots } from '$lib/record/settings-write.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import PageView from '$lib/page/PageView.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../billing.ts';
   import { daysLeft, healthSaid, lastCopy, nearest, type CopyState, type UsageState } from './health.ts';
+  import { AREAS, DEFAULT_GROUPS, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, labelIn, type AreaGroup } from './place.ts';
   import { openSettings } from './settings-state.svelte.ts';
   import SettingsIndex from './SettingsIndex.svelte';
   /* THE ROWS EVERY AREA SHARES, scoped under `.settings-place` below; the file says why it is global. */
@@ -65,43 +76,6 @@
      moves between areas, which is how long it lasted as this page's own state. */
   openSettings(() => shell);
 
-  /**
-   * THE AREAS, AND THE ONE REGISTRY OF THEM: a unit adding an area writes its row here.
-   *
-   * A ROW WITH A GLYPH EACH, because the index is a list of places like the app's rail, and the
-   * rail has never had a row without one. A list of bare words is the hardest kind of nav to scan.
-   *
-   * EACH ROW NAMES ITS GROUP AND SAYS WHAT THE AREA HOLDS IN ONE LINE, because the index draws both
-   * (`place.ts` has the groups and their order). The line is what a person scanning the index reads
-   * to find the area, so it names what is there and never how it works. It is drawn on the phone's
-   * index only, on one line beside a chevron, so it stays short enough to be read there whole rather
-   * than cut. The index draws the groups in their own order, so a row's place in this list only
-   * orders it inside its group.
-   */
-  const AREAS = [
-    { id: 'appearance', label: 'Appearance', icon: 'sun', group: 'you', line: 'Colour, text size and density' },
-    { id: 'identity', label: 'Identity', icon: 'people', group: 'signin', line: 'Who you are, and your records' },
-    { id: 'recovery', label: 'Recovery', icon: 'key', group: 'signin', line: 'Passkeys, and getting back in' },
-    { id: 'sessions', label: 'Sessions', icon: 'lock', group: 'signin', line: 'Where you are signed in' },
-    { id: 'people', label: 'People & sharing', icon: 'people', group: 'sharing', line: 'Who can see this record, and invites' },
-    { id: 'agents', label: 'Agents', icon: 'session', group: 'sharing', line: 'Machines and agents that work here' },
-    { id: 'ingest', label: 'Ingest', icon: 'inbox', group: 'sharing', line: 'Mail and sources that feed this record' },
-    { id: 'keyboard', label: 'Keyboard', icon: 'keyboard', group: 'you', line: 'Character keys and shortcuts' },
-    { id: 'navigation', label: 'Navigation', icon: 'rows', group: 'you', line: 'Where it sits, its order and hidden pages' },
-    { id: 'pages', label: 'Pages', icon: 'doc', group: 'you', line: 'Every page, and the one that opens first' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell', group: 'you', line: 'When BrainDog interrupts you' },
-    { id: 'backups', label: 'Backups', icon: 'archive', group: 'record', line: 'Copies of this record to restore from' },
-    { id: 'billing', label: 'Billing', icon: 'money', group: 'record', line: 'What this record costs' },
-    { id: 'export', label: 'Export', icon: 'download', group: 'record', line: 'Take a signed copy of your data' },
-    /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`. A person who wants a copy of their data
-       clicks the row labelled Export with a download icon beside it, scrolls past the file, the
-       signing key and the public key, and arrives at the one irreversible act in the product.
-       `53 §5.9` says there is no rollback after step 2 of it. A destructive act reached by somebody
-       looking for a backup is reached by the person least expecting it, which is the opposite of
-       what the typed slug is there for. */
-    { id: 'delete', label: 'Delete this record', icon: 'trash', group: 'record', line: 'Removes the record for good' },
-  ] as const;
-
   /* NO AREA IS THE INDEX: `/settings` draws this file with nothing in the address. */
   const area = $derived(page.params.area);
 
@@ -112,30 +86,101 @@
    * it: `/settings/banana` gave `<title>Banana · Settings</title>`, an `<h1>Banana</h1>`, and a
    * `no-data-yet` state reading "This area is part of the shell and is not wired in the mock-up" —
    * a page answering a nonexistent address by asserting the feature exists and is merely
-   * unconfigured.
+   * unconfigured. `/r/nope`, `/v/nope` and `/p/nope` refuse it by naming the thing, saying it is not
+   * here, and listing what is, and so does this.
    *
-   * `/r/nope`, `/v/nope` and `/p/nope` all refuse this correctly and helpfully, naming the thing,
-   * saying it is not here, and listing what is. Three route families got it right and the fourth
-   * invented an area. `10 §7`'s fourth rule holds on a URL as much as on a write: the refusal is
-   * the teacher.
+   * EVERY AREA THIS BUILD DRAWS, whatever the index lists: an area somebody left out of their index still opens.
    */
-  const known = $derived(area === undefined ? undefined : AREAS.find((a) => a.id === area));
+  const known = $derived(area === undefined ? undefined : AREAS.get(area));
+
+  /* ── the index, declared ─────────────────────────────────────────────────
+     THE RECORD'S OWN `settings` PAGE WHERE IT HOLDS ONE, else the house body, drawn by the record (`previewPage`) as
+     Home draws Today: each block held to the reader, and nothing written. */
+  const declares = $derived(shell.pages.includes(SETTINGS_PAGE));
+
+  /** The index as the record drew it, `null` while it is out. */
+  let indexGot = $state<Opened | null>(null);
+  /** The record could not draw it (a refused boot, a host without `previewPage`), so the chooser's list stands in. */
+  let indexDown = $state(false);
+  /** The groups the chooser draws: the house order until a declared index is read, then that index's. */
+  let groups = $state<readonly AreaGroup[]>(DEFAULT_GROUPS);
+  let indexAsked = false;
+
+  async function readIndex(): Promise<void> {
+    indexAsked = true;
+    const mark = opened();
+    let out: Opened | null = null;
+    try {
+      if (declares) {
+        const m = await import('$lib/record/page-live.ts');
+        out = await m.pageReader(apiBase()).read(SETTINGS_PAGE);
+      }
+      /* A PAGE THE SHELL NAMED AND THE RECORD NO LONGER HOLDS is the house body again, as one never declared is. */
+      if (out === null || out.from === 'missing') {
+        const m = await import('../../decide/[id]/proposed.ts');
+        const drawn = await m.drawnOf(SETTINGS_INDEX, apiBase());
+        if (drawn.from === 'live')
+          out = { from: 'live', now: drawn.now, page: { page: { page: SETTINGS_INDEX.page, title: SETTINGS_INDEX.title }, blocks: drawn.blocks } };
+      }
+    } catch {
+      out = null;
+    }
+    /* A READ THAT FAILS REFUSES NOTHING: the chooser's own list is the index then, and the screen is drawn. */
+    closed(true, mark);
+    if (out?.from === 'live') {
+      indexGot = out;
+      indexDown = false;
+      groups = groupsOf(out.page.blocks);
+    } else indexDown = true;
+  }
 
   /**
-   * FROM 900PX UP, `/settings` OPENS THE FIRST AREA, because there the index stands beside an area
-   * and an index beside nothing is half a screen of empty page. Below 900px the index is the page,
-   * and this does nothing.
-   *
-   * ASKED ONCE, AS THE INDEX OPENS, and not followed as the window changes: a person who narrows a
-   * window on the index is still on the index, and one who widens it can pick an area from it.
-   * `replaceState`, so Back returns to wherever they came from rather than to an address that
-   * would open the area again.
+   * ASKED ONCE FOR THIS VISIT TO SETTINGS: on the index, always; beside an area, only where the record declares its
+   * own index, since the house order is already in hand. A shell whose record refused `boot` asks nothing.
    */
-  const WIDE = '(width >= 900px)';
-
   $effect(() => {
-    if (area === undefined && matchMedia(WIDE).matches) void goto(at(`/settings/${AREAS[0].id}`), { replaceState: true });
+    if (indexAsked) return;
+    if (shell.refused) {
+      indexDown = true;
+      return;
+    }
+    if (area === undefined || declares) untrack(() => void readIndex());
   });
+
+  /* THIS SCREEN'S OWN WORD: the index's one tool. */
+  const words = { arrange: 'Arrange' } as const;
+
+  /**
+   * ARRANGE: the index made the person's own page, at `/p/settings`, where Edit layout moves and removes its tiles,
+   * How this page is built moves, renames and leaves out its areas, and Change this page asks Slash to. The house body
+   * is written as their page the first time, which is a declared change like any other. Only an owner changes pages
+   * (`setDeclaration` is ADMIN), so nobody else is offered it.
+   */
+  const mayArrange = $derived(!shell.refused && may(shell, 'owner'));
+  let arranging = $state(false);
+
+  async function arrangeIndex(): Promise<void> {
+    if (arranging) return;
+    arranging = true;
+    try {
+      if (!declares) {
+        const m = await import('$lib/record/page-write.ts');
+        const out = await m.setBody(apiBase(), SETTINGS_INDEX as unknown as PageBody);
+        if (out.from !== 'written') {
+          toasts.push(out.fix, { intent: 'warn' });
+          return;
+        }
+        (await import('$lib/record/boot-live.ts')).forget();
+        await invalidateAll();
+      }
+      await goto(at(`/p/${SETTINGS_PAGE}`));
+    } finally {
+      arranging = false;
+    }
+  }
+
+  /** The name the open area is drawn under: the person's, where their index renamed it. */
+  const label = $derived(known ? (labelIn(groups, known.id) ?? known.label) : undefined);
 
   /**
    * The areas whose controls are actually kept — measured, not assumed.
@@ -145,8 +190,11 @@
    * nowhere, so it is written here, next to the sentence it decides. The day another
    * area writes a preference this is the line that has to change, and the sentence going stale is
    * a sentence a reader can see is wrong, which is the failure that produced it.
+   *
+   * NAVIGATION IS NOT HERE: what it keeps is kept for the person on a record and on the device only without one, so it
+   * says which of the two once, itself, and this line under it said the other.
    */
-  const KEEPS = new Set(['appearance', 'keyboard', 'navigation']);
+  const KEEPS = new Set(['appearance', 'keyboard']);
 
   /**
    * THIS SCREEN COMPUTES ITS CONTENT SYNCHRONOUSLY, and says so.
@@ -207,7 +255,7 @@
 
 {#snippet healthLine()}{#each health ?? [] as part}{#if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
-<svelte:head><title>{titleOf(known?.label, copy.settings)}</title></svelte:head>
+<svelte:head><title>{titleOf(label, copy.settings)}</title></svelte:head>
 
 {#if area !== undefined && !known}
   <div class="gone">
@@ -215,29 +263,45 @@
       kind="error"
       heading
       title={copy.noSuch('settings area', area)}
-      body={copy.theseExist('Settings areas', AREAS.map((a) => ({ address: a.id, title: a.label })))}
+      body={copy.theseExist('Settings areas', [...AREAS.values()].map((a) => ({ address: a.id, title: a.label })))}
     >
       {#snippet actions()}<Button href="/settings">{copy.settings}</Button>{/snippet}
     </Empty>
   </div>
 {:else}
 <!-- AN AREA'S HEAD LINKS BACK TO THE INDEX: the kicker at 1440, the back link in the phone's bar. The
-     index's own head is the one word, with nowhere above it to go back to. -->
+     index's own head is the one word, with nowhere above it to go back to, and its one tool. -->
+{#snippet indexTools()}
+  <Button weight="bare" disabled={arranging} aria-busy={arranging} onclick={() => void arrangeIndex()}>
+    <Icon name="edit" size="s" />
+    {words.arrange}
+  </Button>
+{/snippet}
 {#if known}
-  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={known.label} sentence={health ? healthLine : undefined} />
+  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} />
 {:else}
-  <PageHead icon="settings" title={copy.settings} sentence={health ? healthLine : undefined} />
+  <PageHead icon="settings" title={copy.settings} sentence={health ? healthLine : undefined} actions={mayArrange ? indexTools : undefined} />
 {/if}
 
-<!-- `data-area` IS WHAT HIDES THE INDEX ON A PHONE while an area is open: there the area is the page,
+{#if !known}
+  <!-- THE INDEX, DRAWN BY THE ONE READER: Home's body mode, with no head of its own under this one. Where the record
+       cannot draw it, the chooser's list is the index, so nobody is left on a page of nothing. -->
+  <div class="settings-index">
+    {#if indexDown}
+      <div class="settings-place" data-index=""><SettingsIndex {groups} /></div>
+    {:else}
+      <PageView slug={SETTINGS_PAGE} got={indexGot} mode="home" reread={readIndex} />
+    {/if}
+  </div>
+{:else}
+<!-- `data-area` IS WHAT HIDES THE CHOOSER ON A PHONE while an area is open: there the area is the page,
      and the index is one back link away. `settings-place` is also the root every rule in
      `settings.css` is held under. -->
-<div class="settings-place" data-area={known ? '' : undefined}>
+<div class="settings-place" data-area="">
   <div class="chooser">
-    <SettingsIndex areas={AREAS} current={known?.id} />
+    <SettingsIndex {groups} current={known.id} />
   </div>
 
-  {#if known}
   <div class="body">
     {#if area === 'appearance'}
       <Appearance {shell} {area} />
@@ -277,11 +341,23 @@
          own refusal, so no footer here repeats that nothing was saved. -->
     {#if KEEPS.has(known.id)}<p class="mock">{copy.keptOnDevice}</p>{/if}
   </div>
-  {/if}
 </div>
+{/if}
 {/if}
 
 <style>
+  /* THE INDEX IS ONE COLUMN, the page's own, as Home's body is: its tiles carry their spans. */
+  .settings-index {
+    min-inline-size: 0;
+    max-inline-size: var(--page-max);
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  /* THE FALLBACK LIST BRINGS ITS OWN GUTTER (`.settings-place`), so the index does not add a second one round it. */
+  .settings-index:has(> .settings-place) {
+    padding: 0;
+  }
+
   /* The refusal stands alone, with the index gone: there is no area to be in. */
   .gone {
     padding-block: var(--sp-6);
@@ -325,11 +401,26 @@
     .body {
       gap: var(--sp-6);
     }
+
+    /* THE LIST STANDING IN FOR THE INDEX HAS NO AREA BESIDE IT, so it takes the column an area would have. */
+    .settings-place[data-index] {
+      grid-template-columns: minmax(0, 32rem);
+    }
   }
 
   @media (width < 900px) {
     .settings-place {
       padding-block-end: var(--sp-8);
+    }
+
+    .settings-index {
+      padding: var(--sp-2) var(--gutter) var(--sp-8);
+    }
+
+    /* A PHONE IS NOT OFFERED THE KEYBOARD (`place.ts` `ONLY_WIDE`), on the declared index as on the list: its address
+       still opens. The row is the link's own, so it is found by where it goes. */
+    .settings-index :global(.list[data-kind='link'] > .item:has(> a[href$='/settings/keyboard'])) {
+      display: none;
     }
 
     .settings-place[data-area] .chooser {

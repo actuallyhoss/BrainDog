@@ -28,6 +28,14 @@ export const words = {
     `Added “${what}” to ${list}${read.length > 0 ? ` · ${read.join(' · ')}` : ''}${filled.length > 0 ? `, with ${and(filled)} filled in` : ''}.`,
   /** A long block folded in place: what is under the fold, one press away. */
   more: (n: number) => `${n} more`,
+  /* WHAT A ROW WEARS IN JUST CHANGED after a write the page's own blocks made: a word or two, the list's own words. */
+  markDone: 'Done',
+  markReopened: 'Reopened',
+  markMoved: (to: string) => `Moved to ${to}`,
+  markDated: 'New dates',
+  markAdded: 'Added',
+  /* ANSWERING SEVERAL QUESTIONS AT ONCE: the box each card leads with, said with its question. */
+  pick: (question: string) => `Choose “${question}” to answer with others`,
 } as const;
 
 /** "a", "a and b", "a, b and c". */

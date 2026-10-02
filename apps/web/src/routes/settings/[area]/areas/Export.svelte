@@ -82,13 +82,29 @@
     checkLine: 'Checked in this browser against its own manifest and signature. The file is sent nowhere.',
     checkGo: 'Check a file',
     wayTitle: 'The way you work',
-    wayLine: 'Your lists, pages, metrics and rules, without a single row of what you wrote in them.',
-    rowsTitle: 'The rows',
-    rowsLine: 'Every row you have written, without the lists and pages around them.',
+    wayLine: (things: string) => `How ${things} are set up, with your pages, figures and rules, and nothing you wrote in them.`,
+    rowsTitle: 'What you wrote',
+    rowsLine: (things: string) => `Everything you have written in ${things}, without the pages around it.`,
     setupTitle: 'A setup somebody else can install',
-    setupLine: 'Published as an add-on, with your rows left out.',
+    setupLine: 'Published as an add-on, with what you wrote left out.',
     notHereYet: 'Not on this host yet',
+    /** What the record keeps, when it keeps nothing it can name yet. */
+    yourThings: 'your things',
+    /** The rest past the names said, "and 4 more". */
+    more: (n: number) => `${n} more`,
   };
+
+  /**
+   * WHAT THIS RECORD KEEPS, IN ITS OWN NAMES: "Tasks, Clients and Invoices", or the first three and how many more. The
+   * two slices name the person's own things rather than the system's word for them (DIRECTION §35).
+   */
+  const NAMED_MOST = 3;
+  const things = $derived.by(() => {
+    const names = shell.lists.map((l) => l.name.trim()).filter((n) => n !== '');
+    if (names.length === 0) return words.yourThings;
+    const said = names.length > NAMED_MOST ? [...names.slice(0, NAMED_MOST), words.more(names.length - NAMED_MOST)] : names;
+    return new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(said);
+  });
 </script>
 
 <!-- THE ONE ACTION EACH ROW OFFERS, declared here so a row whose action is the owner's is handed
@@ -173,9 +189,9 @@
   <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record, so a
        colleague is shown both rows and handed neither button. `Share this setup` stays for everybody,
        because it is a link to a screen that explains itself. -->
-  <StateRow icon="skill" title={words.wayTitle} line={words.wayLine} action={anOwner ? exportPack : undefined} />
-  <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine} action={anOwner ? exportRows : undefined} />
-  <!-- THE ARRANGEMENT, NOT THE ROWS: a use case somebody else can install. -->
+  <StateRow icon="skill" title={words.wayTitle} line={words.wayLine(things)} action={anOwner ? exportPack : undefined} />
+  <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine(things)} action={anOwner ? exportRows : undefined} />
+  <!-- THE ARRANGEMENT, NOT WHAT IS WRITTEN IN IT: a use case somebody else can install. -->
   <StateRow icon="packs" title={words.setupTitle} line={words.setupLine} action={shareOne} />
 </Section>
 <!--

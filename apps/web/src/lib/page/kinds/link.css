@@ -22,8 +22,10 @@
     overflow-wrap: anywhere;
   }
 
-  /* THE ROW IS THE LINK'S HIT BOX, with the link still the one element in the tab order and the focus ring on it. */
-  .list[data-kind='link'] a.item-title::after {
+  /* THE ROW IS THE LINK'S HIT BOX, with the link still the one element in the tab order and the focus ring on it.
+     `::before`, the pseudo-element a hit box is drawn on everywhere else (`.tap`, `13 §7`), so the target the layout
+     gate measures is the row a thumb presses and not the 23px line of words. */
+  .list[data-kind='link'] a.item-title::before {
     content: '';
     position: absolute;
     inset: 0;

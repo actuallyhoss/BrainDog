@@ -1,6 +1,6 @@
 <!--
-  Settings > Ingest: where rows come in from, the forwarding address for mail, and every other
-  sender's door.
+  Settings > What comes in (`/settings/ingest`): where things come in from, the forwarding address for mail, and
+  every other sender's door.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -175,7 +175,7 @@
     stepMake: 'An address for this record',
     stepForward: 'Point your mail at it',
     stepTest: 'Send one to test it',
-    testLine: 'Forward one message to the address. It arrives in the Inbox as a row, so that is where to look.',
+    testLine: 'Forward one message to the address. It lands in your Inbox, so look there.',
     openInbox: 'Open the Inbox',
   };
 </script>

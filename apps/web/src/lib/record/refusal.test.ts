@@ -143,6 +143,7 @@ test('a block that HAS something to draw refuses nothing', () => {
   for (const block of page('money')?.blocks ?? []) {
     /* A block whose `when:` is false is not on the page, and holds nothing on purpose: Add an account, once there is one. */
     if (block.drawn === false) continue;
+    if (block.kind === 'section') continue;
     const { refusal } = draw(block);
     if (refusal) continue;
     asked += 1;

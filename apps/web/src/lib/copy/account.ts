@@ -34,8 +34,8 @@ export const account = {
 
   /* The chip on a row that has just been acted on. One word, in the past tense, so the row says
      what happened to it where the row is rather than in a toast at the other end of the screen. */
-  densityPreview: 'How a list looks',
-  sourcesAdd: 'New sources arrive the way new lists do: with an add-on, or set up by an agent you connect.',
+  densityPreview: 'How your things look',
+  sourcesAdd: 'A new source comes with an add-on, or is set up by an agent you connect.',
   sourcesAddGo: 'Browse add-ons',
   densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
 
@@ -160,7 +160,7 @@ export const account = {
    * level per person, so there was no matrix for either clause to be about, and the sentence read as
    * a contradiction because on that screen it was one.
    */
-  accessScope: 'A level here covers every list, including ones added later. Give somebody a different level on one list and it replaces it, for that list only.',
+  accessScope: 'A level here covers every part of this record, including ones added later. Give somebody a different level on one part and it replaces it, for that part only.',
   /* THE WHOLE OF THIS AREA AT ONE PERSON. A level, an exception, a removal and an erasure are all
      one person measured against another, so on a record whose only person is you there is nothing
      for any of them to say: five greyed segments, two hints about the greying, and a red erasure
@@ -171,8 +171,8 @@ export const account = {
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
   noRecordLevel: 'No access',
-  noRecordLevelMeans: 'Nothing on this record itself. Only the lists named below, and nothing that is added later.',
-  addException: 'Different on one list',
+  noRecordLevelMeans: 'Nothing on this record itself. Only the parts named below, and nothing that is added later.',
+  addException: 'Different on one part',
   removeException: 'Back to their level',
   suspendedSince: (ago: string) => `stopped ${ago}`,
   /* THE READ MARK, WHICH `20 §6` PUTS ON THE *WORTH BUILDING* SIDE of its table: "who has seen the
@@ -351,7 +351,7 @@ export const account = {
   endsWhen: (when: string) => `ends ${when}`,
   /* A REPORT KEY IN THE TOKENS LIST (`record/device.ts` `reportKeyOf`): its name and the one thing it can do. */
   reportKeyNamed: (name: string | null) => (name ? `Report key for ${name}` : 'A report key'),
-  reportKeyCan: (list: string) => (list ? `can send numbers to ${list}, and nothing else` : 'can do nothing, because it is bound to no list'),
+  reportKeyCan: (list: string) => (list ? `can send numbers to ${list}, and nothing else` : 'can do nothing, because it has nowhere to send numbers'),
 
   /* Connect an agent: a write token for ninety days, its bearer shown once. */
   connectTitle: 'Connect an agent',
@@ -432,7 +432,7 @@ export const account = {
      are all there is and the app cannot even list them. See `restoreCloud`. */
   /* navigation — `29 §4`'s one global switch, which `19 §2` says is why this area exists */
   suggestPages: 'Suggest new pages',
-  suggestPagesHint: 'When a list grows or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you. An offer sits in the list below until you promote it.',
+  suggestPagesHint: 'When something you keep grows, or you keep asking the same question, this record offers a page for it. Nothing is ever placed for you. An offer waits below until you promote it.',
   suggestOff: 'Not offering anything',
   suggestOffWhy: 'Pages you have already placed are untouched. Turn this back on and the record starts offering again.',
   perDevice: 'This setting is remembered on this device.',
@@ -441,7 +441,7 @@ export const account = {
      The labels name the THING and not the setting: somebody choosing between these is picking
      where their navigation lives, so "Sidebar" and "Top bar" are the answer and "Rail" is ours. */
   navShape: 'Where your navigation lives',
-  navShapeHint: 'The sidebar holds a list of any length, in sections you arrange. A top bar holds a few entries in one strip and puts the rest behind More. The menu keeps nothing on screen and opens the whole list when you ask for it.',
+  navShapeHint: 'The sidebar holds as many pages as you like, in sections you arrange. A top bar holds a few in one strip and puts the rest behind More. The menu keeps nothing on screen and opens all of them when you ask.',
   navShapeRail: 'Sidebar',
   navShapeBar: 'Top bar',
   navShapeMenu: 'Menu',
@@ -811,11 +811,11 @@ export const account = {
   accessLetBack: (name: string) => `${name} is back in, with what they held.`,
   inviteReachLabel: 'What the invitation opens',
   inviteWholeRecord: 'The whole record',
-  inviteChosenLists: 'Chosen lists',
+  inviteChosenLists: 'Only some of it',
   inviteListNothing: 'Nothing',
-  inviteListsHint: 'Give each list they need a level. A list left at Nothing stays closed to them.',
+  inviteListsHint: 'Give each part they need a level. A part left at Nothing stays closed to them.',
   inviteAddsOnlyLeavesOut:
-    'Adds only on the whole record leaves out Keys, People and any list kept for owners. Choose lists instead to give one of those.',
+    'Adds only on the whole record leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
   inviteNewLink: 'New link',
   inviteRanOut: (gives: string, on: string) => `${gives} · ran out on ${on}`,
   inviteOpens: (record: string, what: string) => `${record}: ${what}`,
@@ -833,7 +833,7 @@ export const account = {
   exceptionOnlySaid: (field: string, value: string) => `Only items where ${field} is ${value}.`,
   exceptionOnlyWords: (words: string) => `Only items where ${words}.`,
   exceptionOnlyOther: 'Only the items a rule set elsewhere picks.',
-  exceptionOnlyUnread: 'A rule BrainDog cannot read, so nothing in this list.',
+  exceptionOnlyUnread: 'A rule BrainDog cannot read, so nothing here.',
   exceptionAddedOnly: (name: string, list: string, level: string, field: string, value: string) =>
     `${name} is set to ${level} on ${list}, only where ${field} is ${value}.`,
   /* Closing your account, from Settings > Identity. The records keep their own history, and the Directory's

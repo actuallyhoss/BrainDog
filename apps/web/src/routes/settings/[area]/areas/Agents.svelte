@@ -871,6 +871,24 @@
     border-block-start: 1px solid var(--line-soft);
   }
 
+  /* EACH WAY IN'S HINTS ARE THERE WHEN IT IS, under a pointer: on hover, or once anything in it has focus, so the
+     three ways in read as three titles and their lines until one is chosen (DIRECTION §35). The words keep their place,
+     so nothing below moves when they arrive, and a screen reader hears them all the time. Under a thumb there is no
+     hover to ask with, so they are always drawn.
+     THE DOOR'S OWN HINT ONLY (`>`), never the inbox switch's sentence: in a `.setting-row` that sentence is the only
+     words a sighted person reads beside the switch, and a switch drawn bare until hovered says nothing of what it does. */
+  @media (hover: hover) and (pointer: fine) {
+    .door > .hint {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    .door:hover > .hint,
+    .door:focus-within > .hint {
+      opacity: 1;
+    }
+  }
+
   /* EACH WAY IN HEADS WITH ITS WELL, as a tile's heading does: the 28px well, then the title at the row's size. */
   .door-title {
     display: flex;

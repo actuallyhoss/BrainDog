@@ -103,13 +103,20 @@ export function sentenceOf(
   first: Pick<Question, 'options'> | undefined,
   who = '',
 ): { text: string; needs: string } | null {
-  const n = waiting.length;
-  if (n === 0) return null;
+  return countSentence(waiting.length, waiting.some((q) => q.band === 'undo'), suggestedOf(first), who);
+}
+
+/**
+ * THE SAME SENTENCE FROM WHAT A DECLARED QUEUE ANSWERS: how many are open (the record's own count, which may be more
+ * than the questions it sent), whether any of them is hard to undo, and the first one's suggested option by its label.
+ * `sentenceOf` is this over the questions the classic screen holds whole, so the two screens say one sentence.
+ */
+export function countSentence(n: number, undo: boolean, option: string | undefined, who = ''): { text: string; needs: string } | null {
+  if (n <= 0) return null;
   const count = n === 1 ? 'One question waits on you' : `${capital(numberWord(n))} questions wait on you`;
   const over = n > AIM;
-  const urgent = over || waiting.some((q) => q.band === 'undo');
+  const urgent = over || undo;
   const aim = over ? `, ${numberWord(n - AIM)} over the aim of ${numberWord(AIM)}` : '';
-  const option = suggestedOf(first);
   const which = n > 1 ? ' for the first' : '';
   const suggests = option ? (who ? ` ${who} suggests “${option}”${which}.` : ` “${option}” is suggested${which}.`) : '';
   return { text: `${count}${aim}.${suggests}`, needs: urgent ? `${count}${aim}` : '' };
