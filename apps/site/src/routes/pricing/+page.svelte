@@ -11,8 +11,10 @@
    * those figures, so it moves when they do.
    *
    *   plans     the answer: Free, then the plans for pros.
-   *   usage     every allowance as three bars on one scale, Free in ink, and the line that packs and extra usage are
-   *             coming later.
+   *   usage     every allowance, Free's figure first and largest, the plans for pros quieter beside it, and the line
+   *             that packs and extra usage are coming later. NO BARS: on one scale Free drew as a sliver beside
+   *             Cloud Plus, the opposite of what the page says, and on any other scale a bar would be a picture of
+   *             nothing. The figures are the comparison.
    *   every     what every plan includes, and the one place they differ (people).
    *   faq       the questions a person asks before starting.
    *   close     one line and the button.
@@ -21,7 +23,7 @@
    */
   import Icon from '$lib/Icon.svelte';
   import { SIGNUP, site } from '$lib/copy.ts';
-  import { PAID, PLANS, plan } from '$lib/plans.ts';
+  import { PAID, plan } from '$lib/plans.ts';
   import type { IconName } from '$lib/icons.ts';
 
   const p = site.pricing;
@@ -31,11 +33,8 @@
   const word = (n: number): string => (Number.isInteger(n) && n >= 0 && n < WORDS.length ? (WORDS[n] ?? String(n)) : String(n));
   const grouped = (n: number): string => n.toLocaleString('en-US');
 
-  /* THE BARS: each meter on its own scale, the largest plan the whole track, every plan a bar under its name. */
-  const meters = p.usage.map((u) => {
-    const top = Math.max(1, ...PLANS.map((pl) => pl.allowance[u.key]));
-    return { ...u, bars: PLANS.map((pl) => ({ id: pl.id, name: pl.name, n: pl.allowance[u.key], w: (pl.allowance[u.key] / top) * 100 })) };
-  });
+  /* EACH METER: Free's figure, then each plan for pros in the order the page offers them. */
+  const meters = p.usage.map((u) => ({ ...u, free: free.allowance[u.key], paid: PAID.map((pl) => ({ id: pl.id, name: pl.name, n: pl.allowance[u.key] })) }));
 
   /* WHAT FREE'S RUNS COVER: automations that run once a day, every day of a 31-day month. */
   const daily = Math.floor(free.allowance.runs / 31);
@@ -120,20 +119,18 @@
         </header>
         <p class="lede">{p.usageLead}</p>
         <div class="compare" role="table" aria-labelledby="usage-title">
-          <div class="sr" role="row">
-            <span role="columnheader">{p.what}</span>
-            {#each PLANS as pl (pl.id)}<span role="columnheader">{pl.name}</span>{/each}
+          <div class="c-head" role="row">
+            <span role="columnheader"><span class="sr">{p.what}</span></span>
+            <span class="c-free" role="columnheader">{free.name}</span>
+            <span class="c-pros" role="columnheader">{p.prosTitle}</span>
           </div>
           {#each meters as m (m.key)}
             <div class="c-row" role="row">
-              <span class="c-term" role="rowheader" style="--plans:{m.bars.length}"><b>{m.name}</b><span>{m.said}</span></span>
-              {#each m.bars as b (b.id)}
-                <span class="c-bar" class:lead={b.id === 'free'} role="cell">
-                  <span class="c-plan" aria-hidden="true">{b.name}</span>
-                  <span class="track"><span class="fill" style="--w:{b.w}%"></span></span>
-                  <span class="c-n num"><span class="sr">{b.name}: </span>{m.amount(b.n)}</span>
-                </span>
-              {/each}
+              <span class="c-term" role="rowheader"><b>{m.name}</b><span>{m.said}</span></span>
+              <span class="c-free num" role="cell"><span class="c-label" aria-hidden="true">{free.name}</span>{m.amount(m.free)}</span>
+              <span class="c-pros" role="cell">
+                {#each m.paid as pl (pl.id)}<span class="c-paid"><span class="c-plan">{pl.name}</span><span class="num">{m.amount(pl.n)}</span></span>{/each}
+              </span>
             </div>
           {/each}
         </div>
@@ -328,25 +325,39 @@
     grid-row: 2 / span 2;
   }
 
-  /* ── The bars ────────────────────────────────────────────────────────── */
+  /* ── Plan against plan ──────────────────────────────────────────────── */
 
   .compare {
     display: grid;
   }
 
-  /* A METER: its name down the left, beside one bar a plan, the plans in the order the page offers them. */
+  /* A METER: its name down the left, Free's figure in ink beside it, then the plans for pros, quieter, a line each. */
+  .c-head,
   .c-row {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 6px var(--sp-5);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 3fr) minmax(0, 4fr);
+    gap: var(--sp-2) var(--sp-5);
     align-items: center;
-    padding-block: var(--sp-3);
+  }
+
+  .c-head {
+    padding-block-end: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-site-small);
+  }
+
+  .c-head .c-free {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .c-row {
+    padding-block: var(--sp-4);
     border-block-start: 1px solid var(--line);
   }
 
   .c-term {
     display: grid;
-    grid-row: 1 / span var(--plans);
     gap: 2px;
   }
 
@@ -361,49 +372,32 @@
     font-size: var(--t-site-small);
   }
 
-  .c-bar {
-    grid-column: 2;
+  .c-row .c-free {
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+  }
+
+  /* Said in the row only on a phone, where the column heads are not drawn. */
+  .c-label {
+    display: none;
+  }
+
+  .c-pros {
     display: grid;
-    grid-template-columns: 6.5em minmax(0, 1fr) 11em;
-    align-items: center;
+    gap: 2px;
+  }
+
+  .c-paid {
+    display: flex;
+    justify-content: space-between;
     gap: var(--sp-3);
-  }
-
-  .c-plan {
-    color: var(--dim);
-    font-size: var(--t-site-small);
-  }
-
-  .track {
-    display: block;
-    block-size: 10px;
-    background: var(--s1);
-    border-radius: var(--r-pill);
-  }
-
-  .fill {
-    display: block;
-    inline-size: var(--w);
-    min-inline-size: 6px;
-    block-size: 100%;
-    background: var(--dim);
-    border-radius: var(--r-pill);
-  }
-
-  .c-n {
     color: var(--ink2);
     font-size: var(--t-site-small);
   }
 
-  /* FREE IS THE INK BAR, the plan the page leads with; the paid plans are the grey ones beside it. */
-  .c-bar.lead .c-plan,
-  .c-bar.lead .c-n {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .c-bar.lead .fill {
-    background: var(--ink);
+  .c-plan {
+    color: var(--dim);
   }
 
   /* ── On every plan ───────────────────────────────────────────────────── */
@@ -505,17 +499,20 @@
   }
 
   @media (width < 900px) {
+    .c-head {
+      display: none;
+    }
+
     .c-row {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .c-term {
-      grid-row: auto;
-      margin-block-end: var(--sp-1);
-    }
-
-    .c-bar {
-      grid-column: 1;
+    .c-label {
+      display: inline;
+      margin-inline-end: var(--sp-2);
+      color: var(--dim);
+      font-size: var(--t-site-small);
+      font-weight: 400;
     }
 
     .every {
@@ -526,11 +523,6 @@
   @media (width < 640px) {
     .faq {
       grid-template-columns: minmax(0, 1fr);
-    }
-
-    .c-bar {
-      grid-template-columns: 5.5em minmax(0, 1fr) 8.5em;
-      gap: var(--sp-2);
     }
 
     .cta {

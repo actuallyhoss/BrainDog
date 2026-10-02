@@ -102,6 +102,29 @@ test('A BOX RUNS TO THE END OF ITS AREA, blocks before the first section are loo
   assert.deepEqual(boxesOf([]), []);
 });
 
+test('A BLOCK THAT JOINS SHARES THE SURFACE OF THE ONE BEFORE IT, and the two take nothing after them', () => {
+  const runs = boxesOf([
+    { kind: 'queue', heading: 'What needs you' },
+    { kind: 'todo', heading: 'Late' },
+    { kind: 'timeline', joins: true },
+    { kind: 'todo', heading: 'Urgent' },
+    { kind: 'section', heading: 'Boxed', box: true },
+    { kind: 'note', heading: 'Inside' },
+    { kind: 'timeline', heading: 'Also inside', joins: true },
+  ]);
+  assert.deepEqual(
+    runs.map((r) => ({ box: r.box, items: headings(r.items) })),
+    [
+      { box: false, items: ['What needs you'] },
+      { box: true, items: ['Late', undefined] },
+      { box: false, items: ['Urgent'] },
+      { box: true, items: ['Boxed', 'Inside', 'Also inside'] },
+    ],
+  );
+  /* THE FIRST BLOCK HAS NOTHING TO JOIN, so it is loose. */
+  assert.deepEqual(boxesOf([{ kind: 'timeline', joins: true }]).map((r) => r.box), [false]);
+});
+
 test('THE RAIL STAYS IN VIEW ONLY WHEN IT WAS ASKED TO AND FITS', () => {
   // A sticky rail taller than the window hides its own foot: it stays pinned while the main column scrolls, and the
   // blocks at its end cannot be reached until the main column runs out.

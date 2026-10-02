@@ -18,7 +18,7 @@
 
 import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
-import { ruleDone, useCaseName } from '@braindog/seed/usecases/names';
+import { namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
 import type { BlockResult as Answer } from '@braindog/kernel';
@@ -1278,6 +1278,8 @@ export type FeedRow = {
   thing?: string | null;
   /** On a `setup` row, how many example rows the record set itself up with. */
   rows?: number;
+  /** The rows a rule's run folded into this one line, one name a row, newest first (the kernel's `feedRows`). */
+  things?: string[];
 };
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
@@ -1439,19 +1441,36 @@ const FEED_QUESTION = 'a question';
 const ROW_WRITES: ReadonlySet<string> = new Set(['edit', 'state', 'link', 'tag']);
 
 /**
- * WHAT A FEED LINE SAYS WAS DONE, in the person's words: the event's own note, a record setting itself up, a worded
- * rule's write as the row and what was done to it, and otherwise the verb and the thing.
+ * WHAT A FEED LINE SAYS WAS DONE, in the person's words, and whether it is a sentence of its own: the event's own note,
+ * a record setting itself up, a worded rule's write as the row and what was done to it, and otherwise the verb and the
+ * thing.
  *
  * A RULE THE PRODUCT WORDS (`ruleDone`) IS SAID AS ITS ROW: eight lines of "Categorise what cleared changed TALLYARD"
- * read as `Tallyard categorised`, the face beside it already naming the rule. A note the rule wrote is its own words,
- * and a question it asked is the question.
+ * read as `Tallyard categorised`, and a run of them over several rows as one line, `Categorised 6 payments: Tallyard,
+ * Northern Rail and 4 more` (`ruleFolded`). A question a rule asked is what it asked, `Asked whether Ledger Post went
+ * through` (`ruleAsked`), and a note it wrote is its own words.
+ *
+ * `whole` IS A LINE THAT NEEDS NOBODY IN FRONT OF IT. Each of those lines was drawn after the rule's name, so the feed
+ * read "Catch a repeat that did not happen suggested Ledger Post…": a rule's line that says what happened in a sentence
+ * of its own is sent with no `who`, and the group it sits in already says a rule did it.
  */
-function feedWhat(r: FeedRow): string {
-  if (r.kind === 'setup') return setupSaid(r.target, r.rows ?? 0);
+function feedLine(r: FeedRow): { what: string; whole: boolean; counted?: true } {
+  if (r.kind === 'setup') return { what: setupSaid(r.target, r.rows ?? 0), whole: false };
   const thing = r.thing ?? feedThing(r.target);
-  const done = r.by === 'rule' && r.who !== null && (r.note === null || r.note.trim() === '') ? ruleDone(r.who) : null;
-  if (done !== null && thing !== null && r.kind !== null && ROW_WRITES.has(r.kind)) return `${thing} ${done}`;
-  return agentDoing(r.kind, thing, r.note);
+  const rule = r.by === 'rule' && r.who !== null ? r.who : null;
+  const noted = r.note !== null && r.note.trim() !== '';
+  if (rule === null) return { what: agentDoing(r.kind, thing, r.note), whole: false };
+  if (noted) return { what: agentDoing(r.kind, thing, r.note), whole: true };
+  const folded = r.things && r.things.length > 1 ? r.things : null;
+  if (folded) {
+    const said = r.kind !== null && ROW_WRITES.has(r.kind) ? ruleFolded(rule, folded) : null;
+    /* EITHER WAY THE LINE NAMES OR COUNTS EVERY ROW, so no number is drawn in front of it as well. */
+    return said === null ? { what: agentDoing(r.kind, namesSaid(folded), null), whole: false, counted: true } : { what: said, whole: true, counted: true };
+  }
+  const done = ruleDone(rule);
+  if (done !== null && thing !== null && r.kind !== null && ROW_WRITES.has(r.kind)) return { what: `${thing} ${done}`, whole: true };
+  if (r.kind === 'suggest' && r.thing) return { what: ruleAsked(rule, r.thing), whole: true };
+  return { what: agentDoing(r.kind, thing, r.note), whole: false };
 }
 
 /**
@@ -1478,12 +1497,17 @@ const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test
  * was. A reader with no mark yet gets it at the end with no time, which is the renderer's "not looked yet".
  */
 export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Pick<BlockResult, 'rows' | 'shown'> {
-  const rows: TableRow[] = feed.map((r, i) => ({
-    key: `${r.at}-${i}`,
-    cells: [r.by, r.who === null ? '' : feedWho(r.who, me, names), String(r.count), feedWhat(r), whenOf(r.at, now)],
-    href: undefined,
-    tone: undefined,
-  }));
+  const rows: TableRow[] = feed.map((r, i) => {
+    const line = feedLine(r);
+    return {
+      key: `${r.at}-${i}`,
+      /* A LINE THAT SAYS ITS OWN NUMBER IS ONE LINE, so the renderer does not draw "6" in front of "Categorised 6
+         payments" as well (`feedBurst`). */
+      cells: [r.by, r.who === null || line.whole ? '' : feedWho(r.who, me, names), line.counted ? '1' : String(r.count), line.what, whenOf(r.at, now)],
+      href: undefined,
+      tone: undefined,
+    };
+  });
   if (marks) {
     const at = seen === null ? -1 : feed.findIndex((r) => r.at <= seen);
     rows.splice(at === -1 ? rows.length : at, 0, { key: 'seen', cells: ['seen', seen === null ? '' : whenOf(seen, now)], href: undefined, tone: undefined });

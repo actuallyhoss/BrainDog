@@ -196,20 +196,6 @@ export const pages = {
      who does not write code as an origin or a supplier. */
   pageSource: 'How this is built',
   pageBack: 'Back to the page',
-
-  /**
-   * A BLOCK ADMITS THAT IT IS SHOWING A SLICE.
-   *
-   * `limit:` is a reading cap and every page in the seed declares one — 8 on the project money
-   * tables, 12 on "What is coming", 50 on "Who owes you" — and nothing rendered said so. Six blocks
-   * across five pages were cut: `/p/marlow-co`'s Money drew 8 of the client's 12 obligations under a
-   * heading that reads as the whole answer. Invisible at 9 rows and a lie at 400.
-   *
-   * IT SAYS BOTH NUMBERS AND WHERE THE REST ARE. "12 of 38" alone is a fact somebody can do nothing
-   * with; the register, opened at the block's own predicate, is the rung that was missing.
-   */
-  ofWhichDrawn: (drawn: number, total: number) =>
-    `Showing ${drawn.toLocaleString('en')} of ${total.toLocaleString('en')}`,
   openTheRest: (register: string) => `Open ${register} for the rest`,
   /**
    * THE CASH WALK COUNTS MOVEMENTS, AND THERE IS NOWHERE TO OPEN.

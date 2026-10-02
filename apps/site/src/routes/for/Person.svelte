@@ -25,7 +25,7 @@
   import Icon from '$lib/Icon.svelte';
   import { isIconName, type IconName } from '$lib/icons.ts';
   import Page from '$lib/app/Page.svelte';
-  import { questionsIn } from '$lib/app/page.ts';
+  import { leadOf, questionsIn } from '$lib/app/page.ts';
   import { SIGNUP } from '$lib/copy.ts';
   import { cases } from '$lib/copy/cases.ts';
   import { forPages } from '$lib/copy/for.ts';
@@ -80,10 +80,7 @@
   /* THE HOME'S ANSWER, for the opening tile: the figures its Home leads with, and the sentence it opens with. */
   const home = $derived(segmentsOf(example?.pages[0]?.id ?? 'home'));
   const figuresAt = $derived(home.findIndex((s) => s.type === 'block' && s.kind === 'stat'));
-  const opening = $derived.by(() => {
-    const lead = home.find((s) => s.type === 'block' && s.kind === 'note' && s.form === 'lead');
-    return lead?.type === 'block' ? lead.rows.map((r) => r.cells.join(' ')).join(' ').trim() : '';
-  });
+  const opening = $derived(leadOf(example?.pages[0]?.src ?? ''));
 
   /* THE GLYPH ON A TILE'S HEADING says what its drawing is, from the icon set's own idea for it. */
   const KIND_GLYPH: Record<string, IconName> = {

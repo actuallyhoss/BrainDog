@@ -408,6 +408,25 @@ test('A WALK THE RECORD SPLIT BY CURRENCY keeps each walk’s remembered cash, a
   assert.deepEqual(rows.map((r) => r.includes('knobs')), [false, true]);
 });
 
+test('A WALK UNDER A LINE THAT SAYS WHEN IT RUNS OUT writes `headline | under`, so the chart does not say it again', () => {
+  const now = Date.UTC(2026, 8, 16, 12);
+  const step = { day: '2026-10-01', label: 'Rent', delta: -6000, balance: -1000, source: 'bills', spoken: 'bills#1' };
+  const drawn = (more: Record<string, unknown>) =>
+    toSegments(
+      blockOf(
+        {
+          kind: 'forecast', source: 'forecast.runway', heading: 'Cash ahead', horizon: 90, rows: [], matched: 1, refusals: [],
+          walk: { from: 5000, currency: 'GBP', mixed: [], steps: [step], crossed: { ...step }, days: 15, horizon: 90, refusals: [] },
+          ...more,
+        },
+        new Map(),
+        now,
+      ),
+    ).flatMap((s) => (s.type === 'block' && s.kind === 'forecast' ? (s as { rows: { cells: string[] }[] }).rows : []));
+  assert.ok(drawn({ headline: 'under' }).some((r) => r.cells[0]?.trim() === 'headline' && r.cells[1]?.trim() === 'under'));
+  assert.ok(!drawn({}).some((r) => r.cells[0]?.trim() === 'headline'), 'a walk with no line over it left its sentence off');
+});
+
 test('a cash walk, a feed and a diff the record answered are drawn from its answer', () => {
   const now = Date.UTC(2026, 8, 16, 12);
   const step = (day: string, delta: number, balance: number, spoken: string) => ({ day, label: `Movement ${spoken}`, delta, balance, source: spoken.split('#')[0], spoken });
@@ -714,11 +733,37 @@ test('a live feed names its reader as You, anybody else without an id, a pack or
     [
       ['You', 'deleted Tidy the backlog labels'],
       ['Someone on this record', 'suggested a question'],
-      ['Chase late payments', 'suggested Raise the Kiln retainer'],
-      ['Categorise what cleared', 'TALLYARD categorised'],
-      ['Keep balances current', 'The balance of Tax reserve was last set 9 days ago.'],
+      /* A RULE'S LINE THAT SAYS WHAT HAPPENED IN A SENTENCE OF ITS OWN CARRIES NO NAME IN FRONT OF IT: the group says a
+         rule did it, and "Chase late payments suggested Raise the Kiln retainer" read as a log. */
+      ['', 'Asked: Raise the Kiln retainer'],
+      ['', 'TALLYARD categorised'],
+      ['', 'The balance of Tax reserve was last set 9 days ago.'],
       ['BrainDog', 'installed the Team board use case'],
       ['BrainDog', 'installed the polish-log add-on'],
+    ],
+  );
+});
+
+test("A RULE'S RUN OVER SEVERAL ROWS IS ONE LINE THAT COUNTS THEM, and what a rule asked is said by its row", () => {
+  const at = '2026-09-16T11:00:00.000Z';
+  const { rows } = feedTable(
+    [
+      { by: 'rule', who: 'rule:txn-categorise', count: 6, kind: 'edit', target: 'transactions#36', note: null, at, thing: 'TALLYARD', things: ['TALLYARD', 'NORTHERN RAIL', 'TALLYARD', 'KILN STOREFRONT PAYOUT', 'FENWICK CLOUD', 'HALDEN'] },
+      { by: 'rule', who: 'rule:recurring-missed', count: 1, kind: 'suggest', target: 'suggestion:SG10', note: null, at, thing: 'Ledger Post was due 4 days ago, GBP 39.00. Did it go through?' },
+      { by: 'rule', who: 'rule:cash-stale', count: 2, kind: 'edit', target: 'accounts#2', note: null, at, thing: 'Tax reserve', things: ['Tax reserve', 'Current'] },
+    ],
+    false,
+    null,
+    Date.parse(at),
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.cells[1], r.cells[2], r.cells[3]]),
+    [
+      /* THE NUMBER IS IN THE WORDS, so the line does not carry a count in front of it as well. */
+      ['', '1', 'Categorised 6 payments: TALLYARD, NORTHERN RAIL and 4 more'],
+      ['', '1', 'Asked whether Ledger Post went through'],
+      /* A RULE THIS BUILD DOES NOT WORD KEEPS ITS NAME AND ITS VERB, and names the rows. */
+      ['Keep balances current', '1', 'changed Tax reserve and Current'],
     ],
   );
 });

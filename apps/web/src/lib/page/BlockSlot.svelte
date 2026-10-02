@@ -22,6 +22,7 @@
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { inline, text } from 'braindog-render';
   import QueueAnswer from './QueueAnswer.svelte';
+  import { doorOf } from './door.ts';
   import { queueMore } from 'braindog-render';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -332,6 +333,7 @@
         onanswered={() => {}}
         pick={block.queue.length > 1 ? pick : null}
         lead={(block as { lead?: unknown }).lead === true && n === 0}
+        {n}
       />{/each}
     {#if block.total > block.queue.length}<a class="queue-more" href={inApp('/decide')}>{queueMore(block.total - block.queue.length)}</a>{/if}
   </div>
@@ -395,16 +397,26 @@
   EXCEPT WHERE THE BLOCK ALREADY SAID IT, BETTER. A `queue` ends in its own count of what is left and that count is a
   door, so this line under it would be the same fact twice, and the second telling the one with nowhere to press.
 -->
-<!-- WHILE A LIST IS FOLDED, its "N more" is the line under it; the slice it is of is said once it is open. -->
+<!-- WHILE A LIST IS FOLDED, its "N more" is the line under it; the slice it is of is said once it is open.
+     THE CUT IS SAID AS THE FOLD SAYS IT, "20 more", and where the rest has a list to open it is the door there. "Showing
+     1 of 21. Open Tasks for the rest" under one row of Today was a sentence about the page, read before the row. A
+     BLOCK OVER NO LIST OPENS WHERE `o` DOES (`door.ts`), so "12 more" under what changed is Activity and not a count
+     with nowhere to press. A FORECAST KEEPS ITS SENTENCE: its rows are days walked, and "120 more" would not say they
+     are days. -->
 {#if !drawn.refusal && !block.cannot && block.kind !== 'queue' && block.total > block.shown && !folded}
   {@const to = openHref(block)}
-  <p class="block-slice" role="status">
-    {block.source === 'forecast.runway'
-      ? copy.ofWhichWalked(block.shown, block.total, typeof block.walk?.horizon === 'number' ? block.walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180)
-      : copy.ofWhichDrawn(block.shown, block.total)}.{#if to && source}{' '}
-      <a class="tap" href={inApp(to)}>{copy.openTheRest(source)}</a>
-    {/if}
-  </p>
+  {@const door = to && source ? to : block.register ? null : doorOf(block)}
+  {#if block.source === 'forecast.runway'}
+    <p class="block-slice" role="status">
+      {copy.ofWhichWalked(block.shown, block.total, typeof block.walk?.horizon === 'number' ? block.walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180)}.{#if to && source}{' '}
+        <a class="tap" href={inApp(to)}>{copy.openTheRest(source)}</a>
+      {/if}
+    </p>
+  {:else if door}
+    <a class="block-more tap" href={inApp(door)}>{words.more(block.total - block.shown)}</a>
+  {:else}
+    <p class="block-slice" role="status">{words.more(block.total - block.shown)}</p>
+  {/if}
 {/if}
 
 <style>
@@ -545,6 +557,11 @@
     text-decoration-color: var(--edge);
     text-underline-offset: 3px;
     cursor: pointer;
+  }
+
+  /* AS A DOOR, it is as wide as its words, so the row beside it is not a link too. */
+  a.block-more {
+    display: inline-block;
   }
 
   .block-more:hover {

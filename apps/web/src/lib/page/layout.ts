@@ -107,15 +107,30 @@ export type Run<T> = { box: boolean; items: T[] };
  *
  * ONLY `true` BOXES, for the reason only `true` makes a rail sticky. And a page with no boxed section comes back as one
  * loose run, which is the page as it was drawn before boxes existed.
+ *
+ * A BLOCK THAT `joins` IS DRAWN ON THE SURFACE OF THE ONE BEFORE IT, and the two are a box of their own that takes
+ * nothing after them. Nobody declares it: Home sets it on a drawn block (`default-home.ts`, the late money under the
+ * late tasks), so one tile says one thing from two reads. Inside a boxed section it is already on that surface.
  */
-export function boxesOf<T>(blocks: readonly T[], read: (b: T) => { kind?: unknown; box?: unknown } = (b) => b as { kind?: unknown; box?: unknown }): Run<T>[] {
+export function boxesOf<T>(
+  blocks: readonly T[],
+  read: (b: T) => { kind?: unknown; box?: unknown; joins?: unknown } = (b) => b as { kind?: unknown; box?: unknown; joins?: unknown },
+): Run<T>[] {
   const runs: Run<T>[] = [];
+  /* THE RUN TWO JOINED BLOCKS MADE, which ends with them. */
+  let joined: Run<T> | null = null;
   for (const b of blocks) {
-    const { kind, box } = read(b);
+    const { kind, box, joins } = read(b);
     const last = runs.at(-1);
-    if (kind === 'section' && box === true) runs.push({ box: true, items: [b] });
+    if (joins === true && last && (last.box || last === joined)) last.items.push(b);
+    else if (joins === true && last) {
+      const before = last.items.pop()!;
+      if (last.items.length === 0) runs.pop();
+      joined = { box: true, items: [before, b] };
+      runs.push(joined);
+    } else if (kind === 'section' && box === true) runs.push({ box: true, items: [b] });
     else if (kind === 'section' && last?.box) runs.push({ box: false, items: [b] });
-    else if (last) last.items.push(b);
+    else if (last && last !== joined) last.items.push(b);
     else runs.push({ box: false, items: [b] });
   }
   return runs;

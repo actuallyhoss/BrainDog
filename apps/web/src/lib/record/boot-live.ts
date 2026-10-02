@@ -224,7 +224,7 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
       /* AND WHERE THE RECORD NAMED NO CURRENCY, WHAT ITS MONEY IS IN, asked before the shell is built so the first
          screen is drawn in it. A record that named one costs nothing more, and NOR DOES A HOST THAT SENT `money`: it
          read the money itself and folded the one currency into `currency`, so `null` beside it is none, or two. */
-      const record = out.value.record;
+      const record = drawnOf(out.value);
       if (record && homeOf(record.currency) === null && !Object.hasOwn(record, 'money')) {
         const implied = await readImplied(client, out.value).catch(() => null);
         if (implied) IMPLIED.set(out.value, implied);
@@ -243,6 +243,16 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
 }
 
 type Client = ReturnType<typeof createClient>;
+
+/**
+ * Where a `boot` says what currency the record is drawn in: its `record`, else the same two keys beside it.
+ *
+ * A RECORD NOBODY NAMED STILL HAS A CURRENCY. It answers `record: null`, and this file read that as no currency at all,
+ * so every sentence on the gates' record said "£39 GBP". A newer host sends `currency` and `money` at the top as well;
+ * a host older than that, with no name, is read as before, for nothing.
+ */
+const drawnOf = (b: Boot): { currency?: string | null; money?: string[] } | null =>
+  b.record ?? (Object.hasOwn(b, 'currency') ? { currency: b.currency ?? null, ...(b.money ? { money: b.money } : {}) } : null);
 
 /**
  * The currency a record's settings and money imply, for a `boot` that named none.
@@ -682,6 +692,7 @@ export function newsOf(events: readonly EventLine[], me: string | null, names: R
  */
 export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b)): Shell {
   const record = b.record ?? null;
+  const drawn = drawnOf(b);
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';
   /* A PERSON WITH NO RECORD LEVEL WHOM THE RECORD STILL ANSWERED holds exactly the lists `boot` sent. A token
@@ -760,9 +771,9 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
       locale: record?.locale ?? 'en',
       /* THE CURRENCY A PERSON CHOSE, KEPT WHERE EVERY FIGURE ASKS FOR IT (`learnHome`), and never counted from the rows
          this tab holds. Where nobody chose, the setting an older host did not send, else the record's money when it is
-         all one currency (`readImplied`). A refused `boot` has no record, so its shell says none and forgets the last
-         record's. */
-      currency: learnHome(record?.currency ?? null, record ? implied?.setting : null, record ? (implied?.held ?? []) : []),
+         all one currency (`readImplied`). A record with no name says it beside `record` (`drawnOf`); a `boot` that
+         says neither has none, so its shell says none and forgets the last record's. */
+      currency: learnHome(drawn?.currency ?? null, drawn ? implied?.setting : null, drawn ? (implied?.held ?? []) : []),
       /* THE LISTS THAT HOLD SOMETHING, the sample's rule, and an icon from the declaration this build knows.
          A LIST WITH A SAVED VIEW STAYS EVEN AT ZERO ROWS: the rail nests a view under its list and drops it from
          Views by matching against these, so dropping the list here strands the view under the generic heading.

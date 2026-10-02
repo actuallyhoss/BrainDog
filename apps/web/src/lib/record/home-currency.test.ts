@@ -145,6 +145,20 @@ test('readBoot ASKS ONLY WHERE THE RECORD NAMED NO CURRENCY, and the shell over 
   }
 });
 
+test('A RECORD NOBODY NAMED STILL DRAWS ITS SHELL IN ITS HOME CURRENCY, which its boot says beside `record: null`', () => {
+  /* THE GATES' RECORD, AND ANY SELF-HOST BEFORE ITS FIRST RUN: `record` is `null` there, and the shell read that as no
+     currency, so every sentence on Money, Decide and Today said "£39 GBP". */
+  try {
+    assert.equal(layoutOf({ registers: [], now: NOW, record: null, currency: 'GBP', money: ['GBP'] }).index.currency, 'GBP');
+    assert.equal(homeCurrency(), 'GBP');
+    assert.equal(layoutOf({ registers: [], now: NOW, record: null, currency: null, money: ['GBP', 'USD'] }).index.currency, null);
+    /* A HOST OLDER THAN THE FIELD SAYS NOTHING, and nothing is guessed for it. */
+    assert.equal(layoutOf({ registers: [], now: NOW, record: null }, { setting: null, held: ['GBP'] }).index.currency, null);
+  } finally {
+    learnHome(null);
+  }
+});
+
 /**
  * THE TWO ENDS ARE THE KERNEL'S OWN ORDER, held against a record rather than against the fake above: a money field
  * sorts by currency first and an empty value last either way, so the first row each way is the lowest and the highest

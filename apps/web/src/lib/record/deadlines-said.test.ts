@@ -30,15 +30,17 @@ test('TODAY SAYS WHAT FALLS DUE AS DAYS AND SIGNED MONEY, in Overdue and in Comi
   /* TODAY'S OWN BLOCK, as the house page declares it, read by the record and drawn by Home: the rows `blockOf` said by
      hand were said again from the raw fields by the fence, through a register nobody declares, and `String(v)` wrote
      the day as it is stored and the amount as an object. */
-  const declared = DEFAULT_HOME.blocks.find((b) => b.source === 'deadlines');
-  assert.ok(declared, 'Today no longer reads what falls due');
-  const read = readBlock(declared);
-  assert.deepEqual(read.refusals, []);
-  assert.ok(read.entries.length > 1, 'the sample has nothing falling due, so this asks nothing');
+  /* BOTH BLOCKS OF IT, since Late reads what fell due on its own and Coming up the days from today (`default-home.ts`). */
+  const declared = DEFAULT_HOME.blocks.filter((b) => b.source === 'deadlines');
+  assert.equal(declared.length, 2, 'Today no longer reads what is late and what comes up');
+  const reads = declared.map((b) => readBlock(b));
+  for (const read of reads) assert.deepEqual(read.refusals, []);
+  assert.ok(reads.every((read) => read.entries.length > 0), 'the sample has nothing late or coming up, so this asks nothing');
 
-  const { blocks } = homeDrawn([read], NOW);
+  const { blocks } = homeDrawn(reads, NOW);
   const due = blocks.filter((b) => b.drawn && b.source === 'deadlines');
-  assert.equal(due.length, 2, 'Overdue and Coming up are not both drawn');
+  assert.equal(due.length, 2, 'Late and Coming up are not both drawn');
+  const read = reads[0]!;
 
   const day = read.columns.findIndex((c) => c.field === 'day');
   const amount = read.columns.findIndex((c) => c.field === 'amount');

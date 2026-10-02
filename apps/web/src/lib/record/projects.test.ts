@@ -95,16 +95,14 @@ for (const slug of ['portfolio', 'kiln', 'marlow-co', 'portage'])
     });
   });
 
-test('THE OVERVIEW’S QUEUE IS THE PROJECTS SOMEBODY SAID ARE NOT GOING WELL, and each says who changed it last', () => {
+test('THE CARDS IN PLAY SAY WHICH PROJECTS ARE NOT GOING WELL, with no table saying it again, and an agent\'s are named', () => {
+  /* NEEDS YOU WENT IN portfolio 1.11.0: every card in play carries its health and next step, and the line counts them. */
   const overview = page('portfolio')!;
-  const queue = overview.blocks.find((b) => b.heading === 'Needs you')!;
-  assert.deepEqual(queue.entries.map((e) => e.fields.name), ['Kiln', 'Portage']);
-  const said = JSON.stringify(queue.rows);
+  assert.ok(!overview.blocks.some((b) => b.heading === 'Needs you'), 'a table says again what the cards say');
+  const playing = overview.blocks.find((b) => b.heading === 'In play')!;
+  const said = JSON.stringify(playing.rows);
   assert.match(said, /At risk/u);
   assert.match(said, /Off track/u);
-  const changed = queue.rows.map((r) => r.cells.at(-1));
-  assert.ok(String(changed[0]).startsWith('Claude, '), `the agent on Kiln said it is at risk: ${changed[0]}`);
-  assert.ok(String(changed[1]).startsWith('You, '), `nobody but you changed Portage: ${changed[1]}`);
   const held = overview.blocks.find((b) => b.heading === 'With an agent')!;
   assert.deepEqual(held.rows.map((r) => String(r.cells.at(-1)).split(',')[0]), ['Claude', 'Cursor'], 'each project an agent holds names that agent');
   const cards = overview.blocks.find((b) => b.heading === 'In play')!;

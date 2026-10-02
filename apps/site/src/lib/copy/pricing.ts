@@ -191,7 +191,7 @@ export const pricing = {
     usageTitle: 'Compare plans',
     // The month is `nextMonth` in `directory.ts`, UTC; pages, lists and history are no meter in `Allowance`.
     usageLead: 'Allowances reset on the first of each month. Pages, lists and history are never counted.',
-    /* The line under the bars, from Free's own runs: how many automations it can run once a day through a long month. */
+    /* The line under the comparison, from Free's own runs: how many automations it can run once a day through a long month. */
     compareReading: (daily: string) => `On Free, ${daily} can run every day, all month.`,
     automations: (n: number, word: string) => (n === 1 ? 'one automation' : `${word} automations`),
     // Neither is built: `billing.ts` sells the plans alone, and `mayRun` in `directory.ts` holds a record at its allowance.

@@ -288,11 +288,13 @@ test('A RANGE IS WRITTEN label, spent, low and high, each figure the record\'s o
   assert.equal(b.form, 'range');
   /* THE FIGURES ARE THE RECORD'S MINOR UNITS SAID ONCE: 12050 pence is £120.50, and a line with nothing spent says
      nothing rather than nought, which the drawer reads as "Not spent". The page says money as every other cell on it
-     does (`symbolText`), and this record names no home currency, so each figure keeps its code after a no-break space. */
+     does (`symbolText`), and this record names no home currency, so each figure keeps its code after a no-break space.
+     A RANGE IS NOT A LEDGER, so a round figure is said without its ".00", as a sentence says it: only a table keeps its
+     pence (`exactness` in `blocks.ts`). */
   const gbp = (figure: string) => `£${figure}${String.fromCharCode(0xa0)}GBP`;
   assert.deepEqual(cells(b), [
-    ['Fabric', gbp('120.50'), gbp('100.00'), gbp('300.00')],
-    ['Print', '', gbp('40.00'), gbp('80.00')],
+    ['Fabric', gbp('120.50'), gbp('100'), gbp('300')],
+    ['Print', '', gbp('40'), gbp('80')],
   ]);
   const html = toHTML([b]);
   assert.match(html, /£120\.50.GBP spent/u);
@@ -370,7 +372,7 @@ test('INPUTS ARE ONE ROW\'S FIELDS, field, label, type and value, and each row n
 
 /* ── who was in touch ───────────────────────────────────────────────────── */
 
-test('A HEAT WITH people: true IS DRAWN A LINE A PERSON, its rows the day and then who', async () => {
+test('A HEAT WITH who: true IS DRAWN A LINE A PERSON, its rows the day and then who', async () => {
   const CONTACTS = {
     id: 'contacts',
     name: 'Contacts',
@@ -387,7 +389,7 @@ test('A HEAT WITH people: true IS DRAWN A LINE A PERSON, its rows the day and th
       title: 'Circle',
       requires: ['register.contacts'],
       blocks: [
-        { kind: 'heat', heading: 'In touch', people: true, source: 'register.contacts', columns: [{ field: 'in_touch' }, { field: 'name' }], empty: 'Nobody.' },
+        { kind: 'heat', heading: 'In touch', who: true, source: 'register.contacts', columns: [{ field: 'in_touch' }, { field: 'name' }], empty: 'Nobody.' },
       ],
     } as never,
   };
@@ -398,9 +400,9 @@ test('A HEAT WITH people: true IS DRAWN A LINE A PERSON, its rows the day and th
   const read = k.page('circle') as { ok: boolean; value: { blocks: Record<string, unknown>[] } };
   assert.ok(read.ok, JSON.stringify(read));
   const b = fence(named(read.value.blocks.map((x) => blockOf(x as never, new Map(), NOW)), 'In touch'));
-  assert.equal(b.form, 'people');
+  assert.equal(b.form, 'who');
   assert.deepEqual(cells(b).map((c) => c[1]).sort(), ['Ada', 'Bo']);
   const html = toHTML([b], { today: '2026-09-25' } as never);
-  assert.match(html, /data-form="people"/u);
+  assert.match(html, /data-form="who"/u);
   assert.match(html, /class="heat-who">Ada</u);
 });

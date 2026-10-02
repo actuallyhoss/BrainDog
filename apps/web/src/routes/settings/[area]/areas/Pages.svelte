@@ -2,9 +2,14 @@
   Settings > Pages: every page this record declares, what the app opens on, and the add-ons the pages came with.
 
   ONE PLACE TO CHANGE ANY PAGE FROM, without code (DIRECTION §35). A page's own head already offers Edit layout and
-  "Change this page", which a person finds only once they are on the page; here every page is one row, with Open in
-  reach and the rest behind one menu: Edit layout, Change with Slash, a name of their own in the nav, open it first,
-  and Hide. Fewer things on screen: one press is drawn per page, and the menu holds what is done less often.
+  "Change this page", which a person finds only once they are on the page; here every page is one row, the whole row
+  its link, and the rest behind one menu: Edit layout, Change with Slash, a name of their own in the nav, open it
+  first, and Hide. Fewer things on screen: Open and the menu wait for the pointer or the keyboard to reach their row,
+  and under a thumb, where nothing hovers, the menu is always there.
+
+  CALM. What the app opens on is one line at the top. A group whose only page has the group's own name draws no
+  heading over it. The pages a row made (a person's, a project's) are folded into one "N more pages", and the add-ons
+  are one line at the foot with their icons, the door to the screen where each is turned off or on.
 
   WHAT IS A PERSON'S OWN AND WHAT IS THE RECORD'S. The name in the nav, the page it opens on and what is hidden are this
   person's (`nav-prefs.svelte.ts`: `nav.labels`, `home.page`, `nav.hidden`), kept for them on the record and on this
@@ -37,7 +42,6 @@
   import { moduleName } from '@braindog/seed/usecases/names';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
-  import StateRow from './StateRow.svelte';
 
   let { shell }: AreaProps = $props();
 
@@ -48,11 +52,9 @@
 
   /* THIS AREA'S OWN WORDS, each naming the person's own page. */
   const words = {
-    home: 'Home page',
-    homeLine: 'The page you see first when you open BrainDog.',
+    opensOn: 'Opens on',
     homeSet: (name: string) => `BrainDog opens on ${name} now.`,
     pages: 'Your pages',
-    pagesHint: 'Open a page, change how it is laid out, or describe a change and let Slash draft it.',
     other: 'Not in your nav',
     open: 'Open',
     more: (title: string) => `More for ${title}`,
@@ -67,7 +69,7 @@
     opensFirst: 'Opens first',
     isHidden: 'Hidden from your nav',
     called: (own: string) => `Called ${own} on its page`,
-    all: (n: number) => `Show ${n} more`,
+    morePages: (n: number) => (n === 1 ? '1 more page' : `${n} more pages`),
     none: 'No pages yet',
     noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages Slash makes for you.',
     renameTitle: (title: string) => `Rename ${title}`,
@@ -77,12 +79,9 @@
     renamed: (from: string, to: string) => `${from} is ${to} in your nav.`,
     unnamed: (own: string) => `${own} has its own name again.`,
     slashTitle: (title: string) => `Change ${title}`,
-    addons: 'Add-ons',
-    addonsHint: 'Each add-on brings its own lists and pages. Turn one off and its pages go with it.',
-    addonsNone: 'No add-ons yet',
-    addonsWhy: 'Add-ons bring the pages for a part of your work, such as money, clients or a project.',
-    browse: 'All add-ons',
-    off: 'Turned off',
+    addonsOn: (on: number, off: number) =>
+      `${on === 0 ? 'No add-ons on' : on === 1 ? '1 add-on on' : `${on} add-ons on`}${off === 0 ? '' : `, ${off} off`}`,
+    manage: 'Manage',
   };
 
   /** A refusal is the record's own sentence; a change it kept says what it came to. */
@@ -95,7 +94,7 @@
    * One page as this area lists it: where it is, its own title, its glyph, and its slug when it is a declared page
    * (`/p/<slug>`). A thread in the nav is not one, so it has no layout to edit and no page for Slash to change.
    */
-  type Listed = { href: string; slug: string | null; own: string; icon: IconName; inNav: boolean };
+  type Listed = { href: string; slug: string | null; own: string; icon: IconName; inNav: boolean; row: boolean };
 
   const slugOf = (href: string): string => href.replace(/^\/p\//u, '');
   /* A PAGE WITH NO TITLE TO READ IS NAMED BY ITS ADDRESS, in words: `client-portal` is Client portal. */
@@ -113,15 +112,33 @@
   const groups = $derived(
     arrange(inNav, navPrefs.order).map(
       ([section, list]) =>
-        [section, list.map((e): Listed => ({ href: e.href, slug: e.href.startsWith('/p/') ? slugOf(e.href) : null, own: e.title, icon: e.icon, inNav: true }))] as const,
+        [
+          section,
+          list.map((e): Listed => ({ href: e.href, slug: e.href.startsWith('/p/') ? slugOf(e.href) : null, own: e.title, icon: e.icon, inNav: true, row: false })),
+        ] as const,
     ),
   );
+
+  /* A GROUP WHOSE ONLY PAGE HAS THE GROUP'S OWN NAME DRAWS NO HEADING ("Money" over Money says it twice), and such
+     groups side by side are one list, in the nav's order. */
+  const same = (a: string, b: string): boolean => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+  const headed = $derived.by(() => {
+    const out: { head: string | null; list: Listed[] }[] = [];
+    for (const [section, list] of groups) {
+      const only = list.length === 1 ? list[0]! : null;
+      const head = only && (same(only.own, section) || same(navPrefs.labelOf(only.href, only.own), section)) ? null : section;
+      const last = out.at(-1);
+      if (head === null && last && last.head === null) last.list.push(...list);
+      else out.push({ head, list: [...list] });
+    }
+    return out;
+  });
 
   /**
    * EVERY OTHER PAGE THE RECORD DECLARES, by the title the record gives it: one `pages` read, asked once for this visit.
    * A shell no record answered has the slugs `boot` sent and nothing more, so a page is named by its address there.
    */
-  let titled = $state<{ slug: string; title: string }[] | null>(null);
+  let titled = $state<{ slug: string; title: string; row: boolean }[] | null>(null);
   $effect(() => {
     if (!shell.live || titled !== null) return;
     let current = true;
@@ -139,21 +156,25 @@
     };
   });
 
-  async function readPages(): Promise<{ slug: string; title: string }[]> {
+  /* `about` NAMES THE ROW A PAGE WAS MADE FOR (a person, a project), and is `null` on a page somebody wrote. The record's
+     `pages` sends only a slug and a title today, so `others` also asks the nav, whose entries carry it from `boot`. */
+  async function readPages(): Promise<{ slug: string; title: string; row: boolean }[]> {
     const { createClient } = await import('@braindog/client');
     const out = await createClient({ base: apiBase() }).pages();
     if (!out.ok || !Array.isArray(out.value)) return [];
     return out.value.flatMap((p) => {
-      const row = p as { slug?: unknown; title?: unknown };
-      return typeof row.slug === 'string' && row.slug !== '' ? [{ slug: row.slug, title: typeof row.title === 'string' ? row.title : '' }] : [];
+      const page = p as { slug?: unknown; title?: unknown; about?: unknown };
+      return typeof page.slug === 'string' && page.slug !== ''
+        ? [{ slug: page.slug, title: typeof page.title === 'string' ? page.title : '', row: page.about !== null && typeof page.about === 'object' }]
+        : [];
     });
   }
 
   const others = $derived.by((): Listed[] => {
     const drawn = new Set(inNav.map((e) => e.href));
     const known = new Map(shell.nav.map((e) => [e.id, e] as const));
-    const all = titled ?? shell.pages.map((slug) => ({ slug, title: '' }));
-    return all
+    const all = titled ?? shell.pages.map((slug) => ({ slug, title: '', row: known.get(slug)?.row === true }));
+    const listed = all
       .filter((p) => !drawn.has(`/p/${p.slug}`))
       .map((p) => ({
         href: `/p/${p.slug}`,
@@ -161,15 +182,18 @@
         own: p.title || known.get(p.slug)?.title || wordsOf(p.slug),
         icon: known.get(p.slug)?.icon ?? 'doc',
         inNav: false,
+        row: p.row || known.get(p.slug)?.row === true,
       }));
+    /* THE PAGES SOMEBODY WROTE FIRST, and the pages a row made after them, each in the record's order. */
+    return [...listed.filter((p) => !p.row), ...listed.filter((p) => p.row)];
   });
 
-  /* THE OTHER PAGES FOLD PAST EIGHT: a record with a page per project lists them all, and a list that long is read by
-     the person who asked for it. The fold names only what it hides, so the pages drawn and the pages it adds come to
-     the count over the section: never "20" over the section and "Show all 13" under it. */
+  /* THE PAGES A ROW MADE ARE FOLDED, and the written ones past eight: a record with a page per person or project lists
+     them all, and a list that long is read by the person who asked for it. The fold names only what it hides, so the
+     pages drawn and the pages it adds come to the count over the section. */
   const FOLD = 8;
   let unfolded = $state(false);
-  const othersShown = $derived(unfolded ? others : others.slice(0, FOLD));
+  const othersShown = $derived(unfolded ? others : others.filter((p) => !p.row).slice(0, FOLD));
   const total = $derived(inNav.length + others.length);
 
   /* ── the home page ── */
@@ -190,7 +214,6 @@
     return out;
   });
   const homeNow = $derived(navPrefs.home ?? '/');
-  const homeName = $derived(homes.find((h) => h.href === homeNow)?.name ?? copy.today);
 
   function pickHome(href: string) {
     const before = navPrefs.home;
@@ -249,7 +272,7 @@
 
   /* ── add-ons ── */
 
-  type Addon = { id: string; name: string; on: boolean };
+  type Addon = { id: string; name: string; on: boolean; registers: string[] };
   let addons = $state<Addon[] | null>(null);
   $effect(() => {
     if (!shell.live || addons !== null) return;
@@ -271,14 +294,26 @@
     const { createClient } = await import('@braindog/client');
     const out = await createClient({ base: apiBase() }).packs();
     if (!out.ok) return [];
-    return out.value.map((p) => ({ id: p.id, name: moduleName(p.id), on: p.disabled_at === null }));
+    return out.value.map((p) => ({ id: p.id, name: moduleName(p.id), on: p.disabled_at === null, registers: p.registers }));
   }
 
-  const ADDONS_MOST = 6;
+  /* AN ADD-ON WEARS ITS OWN PAGE'S ICON (Money's wallet), else the icon of the first list it holds, else the add-ons'
+     own; one of each, at most five, so the line shows what is on rather than a row of the same box. */
+  const ADDON_ICONS = 5;
+  const addonIcons = $derived.by((): IconName[] => {
+    const pageIcon = new Map(shell.nav.map((e) => [e.title.toLocaleLowerCase(), e.icon] as const));
+    const listIcon = new Map(shell.index.registers.map((r) => [r.id, r.icon] as const));
+    const icons = (addons ?? [])
+      .filter((a) => a.on)
+      .map((a): IconName => pageIcon.get(a.name.toLocaleLowerCase()) ?? a.registers.map((r) => listIcon.get(r)).find((i) => i !== undefined) ?? 'packs');
+    return [...new Set(icons)].slice(0, ADDON_ICONS);
+  });
+  const addonsOn = $derived((addons ?? []).filter((a) => a.on).length);
 </script>
 
-<!-- ONE PAGE: its glyph, the name it carries in this person's nav, one line when something about it is theirs, Open,
-     and the menu that holds the rest. -->
+<!-- ONE PAGE: its glyph, the name it carries in this person's nav, one line when something about it is theirs, and the
+     menu that holds the rest. THE WHOLE ROW IS THE LINK (the title's link reaches over it), so Open is a word that
+     shows where the pointer is and not a second stop for the keyboard. -->
 {#snippet pageRow(p: Listed)}
   {@const title = navPrefs.labelOf(p.href, p.own)}
   {@const hidden = p.inNav && navPrefs.isHidden(p.href)}
@@ -287,7 +322,7 @@
     <div class="line" class:line-tall={first || hidden || title !== p.own}>
       <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
       <span class="line-main">
-        <span class="line-title">{title}</span>
+        <a class="line-title page-link" href={at(p.href)}>{title}</a>
         {#if first}
           <span class="line-detail">{words.opensFirst}</span>
         {:else if hidden}
@@ -297,87 +332,70 @@
         {/if}
       </span>
       <span class="line-amount"></span>
-      <span class="line-when page-acts">
-        <Button weight="quiet" href={p.href}>{words.open}</Button>
-        <Menu label={words.more(title)} align="end">
-          {#snippet trigger()}
-            <span class="page-more"><Icon name="more" size="s" /><span class="vh">{words.more(title)}</span></span>
-          {/snippet}
-          {#if owner && p.slug !== null}
-            <a class="mi wide-only" role="menuitem" href={at(p.href)}>{words.layout}</a>
-            <button type="button" class="mi" role="menuitem" onclick={() => startChange(p)}>{words.slash}</button>
-          {/if}
-          {#if p.inNav}
-            <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}>{words.rename}</button>
-          {/if}
-          <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}>{first ? words.notFirst : words.first}</button>
-          {#if p.inNav}
-            <button type="button" class="mi" role="menuitem" onclick={() => toggleHidden(p, title)}>{hidden ? words.show : words.hide}</button>
-          {/if}
-        </Menu>
+      <span class="line-when line-verbs page-acts">
+        <span class="page-open" aria-hidden="true">{words.open}</span>
+        <span class="page-menu">
+          <Menu label={words.more(title)} align="end">
+            {#snippet trigger()}
+              <span class="page-more"><Icon name="more" size="s" /><span class="vh">{words.more(title)}</span></span>
+            {/snippet}
+            {#if owner && p.slug !== null}
+              <a class="mi wide-only" role="menuitem" href={at(p.href)}>{words.layout}</a>
+              <button type="button" class="mi" role="menuitem" onclick={() => startChange(p)}>{words.slash}</button>
+            {/if}
+            {#if p.inNav}
+              <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}>{words.rename}</button>
+            {/if}
+            <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}>{first ? words.notFirst : words.first}</button>
+            {#if p.inNav}
+              <button type="button" class="mi" role="menuitem" onclick={() => toggleHidden(p, title)}>{hidden ? words.show : words.hide}</button>
+            {/if}
+          </Menu>
+        </span>
       </span>
     </div>
   </li>
 {/snippet}
 
-<!-- WHAT THE APP OPENS ON: one row and one select. -->
-{#snippet homeSelect()}
-  <select class="home-select" aria-label={words.home} value={homeNow} onchange={(e) => pickHome(e.currentTarget.value)}>
-    {#each homes as h (h.href)}<option value={h.href}>{h.name}</option>{/each}
-  </select>
-{/snippet}
-
-<Section title={words.home}>
-  <StateRow icon="home" title={homeName} line={words.homeLine} action={homeSelect} />
-  <p class="hint kept">{navPrefs.kept ? copy.perPerson : copy.perDevice}</p>
-</Section>
-
 <Section title={words.pages} count={total}>
-  <p class="hint">{words.pagesHint}</p>
+  <!-- WHAT THE APP OPENS ON: one line and one select. -->
+  <div class="opens">
+    <IconWell name="home" />
+    <label class="opens-label" for="home-select">{words.opensOn}</label>
+    <select id="home-select" class="home-select" value={homeNow} onchange={(e) => pickHome(e.currentTarget.value)}>
+      {#each homes as h (h.href)}<option value={h.href}>{h.name}</option>{/each}
+    </select>
+  </div>
   {#if total === 0}
     <Empty kind="cleared" title={words.none} body={words.noneWhy} />
   {:else}
-    {#each groups as [section, list] (section)}
-      <p class="group-head">{section}</p>
+    {#each headed as g, n (g.head ?? `-${n}`)}
+      {#if g.head}<p class="group-head">{g.head}</p>{/if}
       <ul class="ledger ledger-lead pages">
-        {#each list as p (p.href)}{@render pageRow(p)}{/each}
+        {#each g.list as p (p.href)}{@render pageRow(p)}{/each}
       </ul>
     {/each}
     {#if others.length > 0}
       <p class="group-head">{words.other}</p>
-      <ul class="ledger ledger-lead pages">
-        {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
-      </ul>
-      {#if !unfolded && others.length > FOLD}
-        <div class="fold"><Button weight="bare" onclick={() => (unfolded = true)}>{words.all(others.length - FOLD)}</Button></div>
+      {#if othersShown.length > 0}
+        <ul class="ledger ledger-lead pages">
+          {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
+        </ul>
+      {/if}
+      {#if others.length > othersShown.length}
+        <div class="fold"><Button weight="bare" onclick={() => (unfolded = true)}>{words.morePages(others.length - othersShown.length)}</Button></div>
       {/if}
     {/if}
   {/if}
-</Section>
-
-<!-- THE ADD-ONS THE PAGES CAME WITH, each opening its own screen, where it is turned off or on. -->
-<Section title={words.addons} count={addons?.length ?? 0}>
-  <p class="hint">{words.addonsHint}</p>
-  {#if addons !== null && addons.length === 0}
-    <Empty kind="cleared" title={words.addonsNone} body={words.addonsWhy} />
-  {:else if addons !== null}
-    <ul class="ledger ledger-lead">
-      {#each addons.slice(0, ADDONS_MOST) as a (a.id)}
-        <li>
-          <div class="line" class:line-tall={!a.on}>
-            <span class="line-mark"><IconWell name="packs" size="l" /></span>
-            <span class="line-main">
-              <span class="line-title">{a.name}</span>
-              {#if !a.on}<span class="line-detail">{words.off}</span>{/if}
-            </span>
-            <span class="line-amount"></span>
-            <span class="line-when"><Button weight="quiet" href={`/packs/${encodeURIComponent(a.id)}`}>{words.open}</Button></span>
-          </div>
-        </li>
-      {/each}
-    </ul>
+  <!-- THE ADD-ONS THE PAGES CAME WITH, as one line: what is on, and the door to where each is turned off or on. -->
+  {#if addons !== null}
+    <p class="addons">
+      {#if addonIcons.length > 0}<span class="addons-icons" aria-hidden="true">{#each addonIcons as icon (icon)}<Icon name={icon} size="s" />{/each}</span>{/if}
+      <span>{words.addonsOn(addonsOn, addons.length - addonsOn)}</span>
+      <span class="addons-dot" aria-hidden="true">·</span>
+      <a class="addons-manage" href={at('/packs')}>{words.manage}</a>
+    </p>
   {/if}
-  <div class="fold"><Button weight="bare" href="/packs">{words.browse}</Button></div>
 </Section>
 
 {#if naming}
@@ -426,30 +444,99 @@
     line-height: var(--lh-body);
   }
 
-  /* WHERE THE CHOICE IS KEPT, under its row and starting where the row's title starts. */
-  .kept {
-    padding-inline-start: calc(var(--well) + var(--sp-3));
+  /* ONE LINE: the home glyph, "Opens on", and the select, a step clear of the pages under it. */
+  .opens {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--row-h);
+    margin-block-end: var(--sp-3);
+    padding-inline: var(--sp-2);
+  }
+
+  .opens-label {
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
   }
 
   .group-head {
     margin: 0 0 var(--sp-1);
+    padding-inline: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-xs);
     font-weight: 500;
   }
 
-  .pages + .group-head {
+  .pages + .group-head,
+  .pages + .pages {
     margin-block-start: var(--sp-4);
   }
 
-  .page-row[data-hidden] .line-title {
+  .page-row[data-hidden] .page-link {
     color: var(--dim);
   }
 
+  /* THE TITLE'S LINK REACHES OVER ITS ROW, so a press anywhere on the row opens the page. */
+  .page-link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .page-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .page-link:focus-visible {
+    /* focus-ok: the link is stretched over its row, so the row's line carries the ring instead
+       (`.line:has(.page-link:focus-visible)` below), where it outlines what a press would open. */
+    outline: none;
+  }
+
+  .line:has(.page-link:focus-visible) {
+    outline: 2px solid var(--focus-in);
+    outline-offset: -2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .page-row > .line:hover {
+      background: var(--hover-wash);
+    }
+
+    .page-row:has(> .line:hover) > .line::after,
+    .page-row:has(> .line:hover) + .page-row > .line::after {
+      opacity: 0;
+    }
+  }
+
   .page-acts {
-    display: flex;
-    align-items: center;
     gap: var(--sp-1);
+  }
+
+  /* AN OPEN MENU KEEPS ITS ROW'S TOOLS IN SIGHT, wherever the pointer went. */
+  .page-row:has(:global([aria-expanded='true'])) .page-acts {
+    opacity: 1;
+  }
+
+  /* OPEN IS A WORD ON THE LINK, and a press on it falls through to the link under it. */
+  .page-open {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h-sm);
+    padding-inline: var(--sp-2);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    pointer-events: none;
+  }
+
+  /* THE MENU SITS OVER THE ROW'S LINK, so its press is its own. */
+  .page-menu {
+    position: relative;
+    z-index: var(--z-raise);
   }
 
   .page-more {
@@ -471,6 +558,37 @@
 
   .fold {
     margin-block-start: var(--sp-2);
+  }
+
+  /* THE ADD-ONS' LINE, at the foot and quiet: their icons, how many are on, and Manage. */
+  .addons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: var(--sp-4) 0 0;
+    padding: var(--sp-3) var(--sp-2) 0;
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+  }
+
+  .addons-icons {
+    display: inline-flex;
+    gap: var(--sp-1);
+    color: var(--ink2);
+  }
+
+  .addons-dot {
+    color: var(--dim);
+  }
+
+  .addons-manage {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   .home-select {
@@ -497,17 +615,32 @@
     font-weight: 500;
   }
 
+  /* UNDER A THUMB THE ROW IS ITS OWN OPEN, so the word is not drawn; the menu is, at a thumb's size. */
+  @media (hover: none) {
+    .page-open {
+      display: none;
+    }
+  }
+
   @media (pointer: coarse) {
     .page-more {
       inline-size: var(--tap);
       block-size: var(--tap);
     }
+
+    .addons-manage {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
   }
 
-  /* AT A PHONE'S WIDTH THE SELECT TAKES WHAT IS LEFT OF THE ROW, and a long page name is cut rather than pushing it off. */
+  /* AT A PHONE'S WIDTH THE SELECT TAKES WHAT IS LEFT OF THE LINE, and a long page name is cut rather than pushing it off. */
   @media (width < 640px) {
     .home-select {
-      max-inline-size: 10rem;
+      flex: 1 1 auto;
+      min-inline-size: 0;
+      max-inline-size: 12rem;
     }
   }
 </style>

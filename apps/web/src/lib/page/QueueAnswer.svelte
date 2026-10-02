@@ -33,7 +33,7 @@
   import { tick } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
-  import { queueCost, since } from 'braindog-render';
+  import { QUEUE_REASONS, queueCost, queueReasoned, since } from 'braindog-render';
   import type { QueueQuestion } from '@braindog/kernel';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
@@ -52,6 +52,7 @@
     onanswered,
     pick = null,
     lead = false,
+    n = 0,
   }: {
     question: QueueQuestion;
     onanswered: () => void;
@@ -59,6 +60,8 @@
     pick?: Picked | null;
     /** The queue's lead question, drawn whole: what accepting it does, and what it would put on the screen. */
     lead?: boolean;
+    /** Where the card sits in its queue, which decides whether it says why in the open (`queueReasoned`). */
+    n?: number;
   } = $props();
 
   /* WHAT THE KERNEL SAYS ACCEPTING THE LEAD DOES, in one short line, and what it was filed as. Read, not trusted: a
@@ -78,6 +81,12 @@
 
   const asker = $derived(proposer(question.who, me?.person ?? null, names));
   const ways = $derived(waysOf(question));
+  /* ONLY THE FIRST CARD SAYS WHY, the question's reason and one under each option, whether or not the block leads with
+     it. Every other card keeps them in a fold under its pills, by the renderer's own rule (`queueReasoned`), so one
+     queue reads the same whichever of the two drew it. */
+  const reasoned = $derived(queueReasoned(n));
+  const reasons = $derived(reasoned ? [] : ways.filter((w) => w.because !== ''));
+  const why = $derived(question.why ? saidOf(question.why) : '');
   const when = $derived(since(question.at, Date.now()));
   /* "YOUR CALL" IS EVERY QUESTION'S BAND THAT IS NOT A HARDER ONE, so on every card it said nothing a card being on
      Decide does not already say: the chip is drawn only for a band that warns (hard to undo, changes the setup, adds
@@ -221,7 +230,7 @@
         >{#if band}<span class="queue-cost" data-cost={question.cost}>{band}</span>{/if}
       </p>
       <h3 class="queue-question" dir="auto">{saidOf(question.question)}</h3>
-      {#if question.why}<p class="queue-why" dir="auto">{saidOf(question.why)}</p>{/if}
+      {#if reasoned && why}<p class="queue-why" dir="auto">{why}</p>{/if}
       {#if later}<p class="qa-later" dir="auto">{later}</p>{/if}
       {#if does}<ul class="queue-does"><li class="queue-does-line" dir="auto">{does}</li></ul>{/if}
       {#if changesSomething(question)}
@@ -251,10 +260,24 @@
               <span class="queue-label">{way.label}</span>
               {#if way.recommended}<span class="queue-rec">{queueWords.suggested}</span>{/if}
             {/if}
-            {#if way.because}<span class="queue-because" dir="auto">{way.because}</span>{/if}
+            {#if reasoned && way.because}<span class="queue-because" dir="auto">{way.because}</span>{/if}
           </li>
         {/each}
       </ul>
+      {#if !reasoned && (why || reasons.length > 0)}
+        <!-- THE REASONS OF EVERY CARD BUT THE FIRST ARE FOLDED, one press away, in the renderer's own fold, word and
+             classes (`kinds/queue.css`): a page of questions is read by its questions and answers, not by a paragraph
+             under every pill. -->
+        <details class="queue-ways queue-reasons">
+          <summary class="queue-ways-toggle">{QUEUE_REASONS}</summary>
+          {#if why}<p class="queue-why" dir="auto">{why}</p>{/if}
+          {#if reasons.length > 0}
+            <ul class="queue-reasons-list">
+              {#each reasons as way (way.key)}<li class="queue-reason" dir="auto"><span class="queue-reason-label">{way.label}</span> {way.because}</li>{/each}
+            </ul>
+          {/if}
+        </details>
+      {/if}
       {#if phase === 'asking' && chosen}
         <form class="qa-reason" onsubmit={submit}>
           <label class="qa-label" for="{uid}-why">{queueWords.why}</label>

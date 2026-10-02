@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { DEFAULT_HOME, homeDrawn, railed, todayHome } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, homeDrawn, railed, todayHome } from './default-home.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 
 const NOW = Date.parse('2026-10-02T09:00:00');
@@ -36,16 +36,20 @@ const shown = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) =
 
 test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks, no line to add without the right, no cash without Money', () => {
   const kinds = (b: { blocks: { kind: string; source?: string }[] }) => b.blocks.map((x) => x.source ?? x.kind);
-  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'register.tasks', 'register.tasks', 'deadlines', 'sessions.live', 'stat', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'sessions.live', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'register.tasks', 'register.tasks', 'deadlines', 'sessions.live', 'activity']);
+  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.live', 'stat', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'sessions.live', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.live', 'deadlines', 'activity']);
+  /* WHAT IS LATE AND WHAT COMES UP ARE TWO READS, so the late ones never use up the next few's rows. */
+  const due = DEFAULT_HOME.blocks.filter((b) => b.source === 'deadlines') as unknown as { where?: string; limit?: number }[];
+  assert.deepEqual(due.map((b) => [b.where, b.limit]), [['day before today', 8], ['day after -1d', COMING_UP_LIMIT]]);
   /* EVERY TILE WEARS A GLYPH, and every block over a source says what it says when it is empty. */
   for (const b of DEFAULT_HOME.blocks) if (b.kind !== 'note') assert.ok(b.icon, `${b.kind} has an icon`);
   for (const b of DEFAULT_HOME.blocks) if (b.source) assert.ok(b.empty, `${b.source} says its empty line`);
-  /* THE QUEUE IS DRAWN AS TILES, and the agents, cash and what changed sit in the rail. */
+  /* THE QUEUE IS DRAWN AS TILES, and the agents, cash, what comes up and what changed sit in the rail, what comes up
+     right under cash so the two columns end near each other. */
   const raw = DEFAULT_HOME.blocks as unknown as { kind: string; tiles?: boolean; area?: string }[];
   assert.equal(raw.find((b) => b.kind === 'queue')?.tiles, true);
-  assert.deepEqual(raw.filter((b) => b.area === 'rail').map((b) => b.kind), ['table', 'stat', 'feed']);
+  assert.deepEqual(raw.filter((b) => b.area === 'rail').map((b) => b.kind), ['table', 'stat', 'timeline', 'feed']);
 });
 
 test('THE PAGE LINE IS LIFTED INTO THE HEAD, and one that fills figures stays the author tile', () => {
@@ -71,7 +75,7 @@ test('A ROW IS DRAWN ONCE: a late urgent task is in the first block, and a deadl
   assert.deepEqual(shown(out.blocks).map((b) => [b.heading ?? '', b.entries.map((e) => e.seq)]), [
     ['', [4, 5]],
     ['', [9]],
-    ['Overdue', [2]],
+    ['Late', [2]],
     ['', [3]],
   ]);
   /* THE LINE COUNTS WHAT IS DRAWN: three tasks and a late bill, the oldest from Tuesday. */
@@ -120,7 +124,7 @@ test('A BLOCK THAT EMPTIES KEEPS ITS PLACE: the reader keys its writes by place,
   assert.deepEqual(after, [
     ['note', '', false],
     ['todo', '', false],
-    ['timeline', 'Overdue', false],
+    ['timeline', 'Late', false],
     ['timeline', '', true],
     ['feed', '', true],
   ]);
@@ -147,14 +151,37 @@ test('HOME HIDES WHAT HOLDS NOTHING BY THE PAGE READER`S RULE, even where an emp
   ]);
 });
 
-test('WHEN EVERY DRAWN DEADLINE IS LATE, OVERDUE KEEPS WHAT STANDS PAST THE LIMIT and the block for later days is not drawn empty', () => {
+test('WHEN EVERY DRAWN DEADLINE IS LATE, LATE KEEPS WHAT STANDS PAST THE LIMIT and the block for later days is not drawn empty', () => {
   const due = block({ kind: 'timeline', source: 'deadlines' }, [
     { row: 'obligations#2', day: '2026-09-29' },
     { row: 'obligations#3', day: '2026-09-30' },
   ]);
   const out = homeDrawn([{ ...due, total: 9 }], NOW);
   assert.deepEqual(out.blocks.map((b) => [b.heading ?? '', b.drawn, b.total]), [
-    ['Overdue', true, 9],
+    ['Late', true, 9],
     ['', false, 0],
+  ]);
+});
+
+test('LATE IS ONE TILE: the late money joins the late tasks before it, under their name, which says "or due today" while one is', () => {
+  const late = (by: string[]) => block({ kind: 'todo', heading: 'Late', source: 'register.tasks', columns: day('by') as never }, by.map((d) => ({ by: d })), by.map((_, n) => n + 4));
+  const money = block({ kind: 'timeline', heading: 'Late', source: 'deadlines' }, [
+    { row: 'tasks#4', day: '2026-09-30' },
+    { row: 'obligations#2', day: '2026-09-29' },
+  ]);
+  const page = (tasks: LiveBlock) => shown(homeDrawn([tasks, money], NOW).blocks).map((b) => [b.heading ?? '', (b as { joins?: boolean }).joins === true, b.entries.map((e) => e.seq)]);
+  assert.deepEqual(page(late(['2026-09-30'])), [
+    ['Late', false, [4]],
+    ['', true, [2]],
+  ]);
+  assert.deepEqual(page(late(['2026-09-30', '2026-10-02'])), [
+    ['Late or due today', false, [4, 5]],
+    ['', true, [2]],
+  ]);
+  /* WITH NO LATE TASKS THE MONEY IS THE TILE, under its own name; and a list with work not yet due is not joined. */
+  assert.deepEqual(page(late([])), [['Late', false, [1, 2]]]);
+  assert.deepEqual(page(late(['2026-09-30', '2026-10-09'])), [
+    ['Late', false, [4, 5]],
+    ['Late', false, [2]],
   ]);
 });

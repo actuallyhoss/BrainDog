@@ -394,6 +394,9 @@ function forecastRows(block: BlockResult): string[] {
         ? [`late |  | ${escapeCell(block.late_name)} | `]
         : []),
     ...(typeof block.under === 'number' ? [`under | ${block.under} |  | `] : []),
+    /* THE PAGE'S OPENING LINE ALREADY SAYS WHEN IT RUNS OUT (`headline: under`, which the record answers only while that
+       line is drawn), so the sentence over the chart is left off and the flag on the crossing stays. */
+    ...(block.headline === 'under' ? ['headline | under |  | '] : []),
   ];
 }
 
@@ -1173,7 +1176,7 @@ function formOf(block: BlockResult): string {
   if (block.kind === 'steps' && marksOf(block)) return ' path';
   if (block.kind === 'queue' && keyOf(block, 'lead') === true) return ' lead';
   if (block.kind === 'queue' && keyOf(block, 'tiles') === true) return ' tiles';
-  if (block.kind === 'heat' && keyOf(block, 'people') === true) return ' people';
+  if (block.kind === 'heat' && keyOf(block, 'who') === true) return ' who';
   return '';
 }
 
@@ -1510,12 +1513,14 @@ export function draw(
      AN `inputs` VALUE IS WHAT ITS BOX OPENS ON AND WHAT `inputs-write.ts` READS BACK, so it keeps the record's own
      spelling too: on a record whose home is pounds the box would open on `£1,200.00`, and `$` is the symbol of more than
      one currency, so what came back could not say which it was in.
-     A TILE'S FIGURE IS A HEADLINE, the second cell of each `stat` row, and says a round amount without its ".00"; every
-     other cell is a table's or a ledger's, where amounts are compared, and keeps its pence. */
+     A TILE'S FIGURE IS A HEADLINE, the second cell of each `stat` row, and says a round amount without its ".00". A
+     TABLE'S CELL IS A LEDGER'S, where amounts are compared down a column, and keeps its pence. EVERY OTHER CELL IS READ
+     AS A SENTENCE, a card, a row, a spec line, a due list or an agenda: Today's Overdue said "−£9,190.00" and a project
+     card "Earned in a year £18,400.00" because every cell that was not a tile was taken for a ledger's. */
   const home = homeCurrency();
   const segments = toSegments(block, kinds).map((s) =>
     s.type === 'block' && s.kind !== 'code' && s.kind !== 'capture' && s.kind !== 'inputs'
-      ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c, j) => symbolText(c, home, s.kind === 'stat' && j === 1 ? 'headline' : 'exact')) })) }
+      ? { ...s, rows: s.rows.map((r) => ({ ...r, cells: r.cells.map((c, j) => symbolText(c, home, exactness(s.kind, j))) })) }
       : s,
   );
   /* A CARD GRID IS BLANK WHEN IT HAS NO ENTRIES, whatever its first row says: that row names the
@@ -1536,6 +1541,10 @@ export function draw(
     refusal: blank ? nothing() : null,
   };
 }
+
+/** How a cell of a block of `kind` says its money: a tile's figure as a headline, a table's to the penny, and the rest as a sentence. */
+const exactness = (kind: string, cell: number): 'headline' | 'exact' | 'sentence' =>
+  kind === 'stat' && cell === 1 ? 'headline' : kind === 'table' || kind === 'comparison' ? 'exact' : 'sentence';
 
 /**
  * A `where:` clause as a person would read it.

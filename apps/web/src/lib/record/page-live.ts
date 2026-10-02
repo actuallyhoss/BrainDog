@@ -573,7 +573,8 @@ function feedOf(v: unknown): FeedRow[] | null {
   const ok = v.every(
     (r) =>
       isObject(r) && FEED_BY.includes(r.by as FeedRow['by']) && Number.isFinite(r.count) && typeof r.at === 'string' &&
-      textOrNull(r.who) && textOrNull(r.kind) && textOrNull(r.target) && textOrNull(r.note) && (r.thing === undefined || textOrNull(r.thing)),
+      textOrNull(r.who) && textOrNull(r.kind) && textOrNull(r.target) && textOrNull(r.note) && (r.thing === undefined || textOrNull(r.thing)) &&
+      (r.things === undefined || (Array.isArray(r.things) && r.things.every((t) => typeof t === 'string'))),
   );
   return ok ? (v as FeedRow[]) : null;
 }

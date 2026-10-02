@@ -10,6 +10,9 @@
   heading, and under a chart the one written line that says what it means (`reads`, by segment). The page's
   opening sentence (`note lead`) is left out, because the title row above the page says it; `leadOf` finds it.
 
+  MONEY IS SAID AS THE APP SAYS IT, `£1,312.40 is left` and never `GBP 1,312.40`: in that line, in the opening
+  sentence, in a note, on a progress row (`inSymbols`) and in what an answer says. The source keeps its codes.
+
   TWELVE COLUMNS AT 900PX AND WIDER, ONE BELOW. `layout` places a segment by its index; one it does not
   place takes its kind's `minSpan` (`page.ts`).
 
@@ -38,7 +41,7 @@
   import type { IconName } from '../icons.ts';
   import Flow from './Flow.svelte';
   import { cases } from '../copy/cases.ts';
-  import { GO, answerOf, goTarget, isLead, spanOf, withoutAnswered } from './page.ts';
+  import { GO, answerOf, goTarget, inSymbols, isLead, said as inWords, spanOf, withoutAnswered } from './page.ts';
   import type { Span } from '../examples/types.ts';
 
   let {
@@ -159,7 +162,7 @@
     if (id === '' || gone.has(id)) return;
     const { question, label } = answerOf(block, id, option);
     const word = option === 'accept' ? w.accepted : option === 'reject' ? w.rejected : w.chose(label);
-    said = { on: src, text: question === '' ? word : `${word}: ${question}` };
+    said = { on: src, text: question === '' ? word : `${word}: ${inWords(question)}` };
     answered = [...answered, id];
     onanswer?.(id, option);
     await tick();
@@ -224,14 +227,14 @@
               <Flow block={seg} />
             {:else}
               <Block
-                block={withoutAnswered(seg, gone)}
+                block={withoutAnswered(inSymbols(seg), gone)}
                 opts={optsFor(at)}
                 onmove={interactive ? keep : undefined}
                 ontick={interactive ? keep : undefined}
                 onact={interactive ? (row, option) => void act(seg, row, option) : undefined}
               />
             {/if}
-            {#if tiles && reading}<p class="cell-reading">{reading}</p>{/if}
+            {#if tiles && reading}<p class="cell-reading">{inWords(reading)}</p>{/if}
           </div>
         {/if}
       {/each}

@@ -6,9 +6,9 @@
   The page is the ground with its light, and the footer is one tile, the last on every page.
 
   NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system, and every page is
-  finished HTML. The one thing scripting adds is closing the phone menu after a tap, on a press of Escape or on a tap
-  outside it; without scripting it is a native disclosure that opens and closes on its own 44px button, and a link
-  inside it loads the next page anyway.
+  finished HTML. Scripting adds two things: a tile rising into place as it scrolls in (`reveal.ts`), and closing the
+  phone menu after a tap, on a press of Escape or on a tap outside it; without scripting it is a native disclosure that
+  opens and closes on its own 44px button, and a link inside it loads the next page anyway.
 -->
 <script lang="ts">
   import '@braindog/skin/tokens.css';
@@ -30,6 +30,7 @@
   import { site } from '$lib/copy.ts';
   import { SIGNIN, SIGNUP, SOURCE } from '$lib/links.ts';
   import { LIVE, type Group } from '$lib/nav.ts';
+  import { reveal } from '$lib/reveal.ts';
 
   let { children } = $props();
 
@@ -58,8 +59,12 @@
 
   const here = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
 
+  /* THE TILES THAT RISE INTO PLACE are found again on every page, the first one included (`reveal.ts`). */
+  let unreveal = (): void => {};
   afterNavigate(() => {
     menuOpen = false;
+    unreveal();
+    unreveal = reveal();
   });
 
   const outside = (event: MouseEvent) => {

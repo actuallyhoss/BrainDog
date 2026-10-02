@@ -20,7 +20,7 @@
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import type { Row } from 'braindog-render';
-  import { registerHref } from '$lib/record/where.ts';
+  import { doorOf } from './door.ts';
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { COLUMNS, dropInto, nearestInArea, setAreaAt, type Slot } from '$lib/record/arrange.ts';
   import type { LiveBlock, LivePageDecl } from '$lib/record/page-live.ts';
@@ -307,7 +307,7 @@
       focusBlock();
     } else if (e.key === 'o') {
       const held = list[cursor]?.block;
-      const to = held?.register ? registerHref(held.register, held.where) : null;
+      const to = held ? doorOf(held) : null;
       if (to) {
         e.preventDefault();
         void goto(inApp(to));
@@ -509,7 +509,7 @@
       }
       case 'o':
       case 'y': {
-        /* THE BLOCK THE ROW IS IN, on a page: its list, filtered, or a link to it. */
+        /* THE BLOCK THE ROW IS IN, on a page: where its rows come from (`door.ts`), or a link to it. */
         if (mode !== 'page') return;
         const slot = under?.closest('.block-slot')?.id.slice(`${ids}b-`.length);
         const i = slot ? Number(slot) - 1 : Number.NaN;
@@ -517,7 +517,7 @@
         if (!Number.isInteger(i) || !held) return;
         if (e.key === 'y') void copyBlockLink(i);
         else {
-          const to = held.register ? registerHref(held.register, held.where) : null;
+          const to = doorOf(held);
           if (!to) return;
           void goto(inApp(to));
         }
@@ -622,14 +622,18 @@
          is named, and ARIA does not let one be a `listitem`, so while arranging every block would carry a role its
          element could not have. `div` and an explicit role say the same thing in both modes and, unlike swapping the
          tag, do not tear the node down and drop focus when the mode changes. -->
+    <!-- A BLOCK IS A LANDMARK ONLY UNDER A NAME OF ITS OWN, its authored heading. One with none was a region named for
+         its kind, so Money's lead and the notes under Heads up were four regions all called "Note", and a landmark
+         list of four alike says nothing about where each one goes. It is still a part of the page under its clipped
+         heading, and while arranging it is still a listitem named by it. -->
     <div
       class="block-slot"
       id="{ids}b-{slot.i + 1}"
-      aria-labelledby="{ids}h-{slot.i + 1}"
+      aria-labelledby={arranging || block.heading ? `${ids}h-${slot.i + 1}` : undefined}
       style="--span:{spans.get(slot.i) ?? slot.span}"
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}
-      role={arranging ? 'listitem' : 'region'}
+      role={arranging ? 'listitem' : block.heading ? 'region' : undefined}
       data-dragging={dragging === at ? '' : undefined}
       data-drop={over && over.at === at && dragging !== at ? over.edge : undefined}
       data-stacked={stacked ? '' : undefined}

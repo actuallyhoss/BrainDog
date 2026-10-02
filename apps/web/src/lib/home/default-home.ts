@@ -53,6 +53,12 @@ const HOUSE: HomeVoice = {
 /** How far ahead "Coming up" looks, in days. */
 export const COMING_UP_DAYS = 14;
 
+/**
+ * How many things "Coming up" draws: the next few, read on their own, so the late ones above never use up its rows.
+ * Past it the count is the door to the rest, as on every other tile.
+ */
+export const COMING_UP_LIMIT = 5;
+
 /** How many questions "What needs you" draws before its count becomes the door to Decide. Tiles are big, so three. */
 export const NEEDS_YOU_LIMIT = 3;
 
@@ -80,17 +86,32 @@ const TILES = { tiles: true } as const;
 
 /**
  * TODAY'S BODY, in the words of the voice that speaks. In reading order: the page's line, the line a task is typed
- * into, the questions waiting on the reader as tiles, the work late or due today, the work handed back, the urgent
- * work, and what falls due in the next two weeks; beside them, the agents at work, cash, and what changed since the
- * reader last looked. The record lints it as it would any body before it draws it.
+ * into, the questions waiting on the reader as tiles, what is late (the tasks late or due today, then the money that
+ * fell due), the work handed back and the urgent work; beside them, the agents at work, cash, the next few things
+ * that fall due, and what changed since the reader last looked. The record lints it as it would any body before it
+ * draws it.
+ *
+ * LATE IS ONE TILE. The tasks and the money that are late are two reads, because a task is ticked where it is shown and
+ * a bill is not, and Home draws them on one surface under one name (`homeDrawn`), the tasks first.
  */
 export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
+  /* WHAT FELL DUE AND WAS NOT DONE, across every list: what the late tasks above leave is the money. */
+  const lateMoney: PageBlock = {
+    kind: 'timeline',
+    heading: voice.overdue,
+    icon: 'clock',
+    source: 'deadlines',
+    where: 'day before today',
+    columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+    limit: 8,
+    empty: words.nothingLate,
+  };
   const work: PageBlock[] = holds.tasks
     ? [
         {
           kind: 'todo',
-          heading: words.lateOrToday,
-          icon: 'calendar',
+          heading: voice.overdue,
+          icon: 'clock',
           source: `register.${TASKS}`,
           where: `${LIVE}, by before +1d`,
           columns: [{ field: 'what' }, { field: 'by' }],
@@ -98,6 +119,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
           limit: 8,
           empty: words.nothingLate,
         },
+        lateMoney,
         /* HANDED BACK TO BE CHECKED: an agent finished its part and a person looks before it is done. */
         {
           kind: 'todo',
@@ -136,18 +158,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: words.addTask, icon: 'plus', register: TASKS } as PageBlock] : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
       { kind: 'queue', heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
-      ...work,
-      /* WHAT FALLS DUE ACROSS EVERY LIST, overdue first and then by day; a task already drawn above is not drawn again. */
-      {
-        kind: 'timeline',
-        heading: voice.comingUp,
-        icon: 'calendar',
-        source: 'deadlines',
-        horizon: COMING_UP_DAYS,
-        columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
-        limit: 8,
-        empty: voice.nothingDue,
-      },
+      ...(holds.tasks ? work : [lateMoney]),
       /* THE RUNS STILL WORKING, one line each with the agent's face; not drawn when none is. */
       {
         kind: 'table',
@@ -168,6 +179,22 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       ...(holds.money
         ? [{ kind: 'stat', heading: words.money, icon: 'wallet', cells: [{ metric: 'cash-now', label: words.cashNow, trend: '12w' }], ...RAIL } as PageBlock]
         : []),
+      /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
+         takes their place; a task already drawn in the main column is not drawn again. IN THE RAIL, UNDER CASH: the
+         main column is what to act on now and the rail what is coming, so Today's two columns end near each other
+         rather than the main one running a tile longer. */
+      {
+        kind: 'timeline',
+        heading: voice.comingUp,
+        icon: 'calendar',
+        source: 'deadlines',
+        where: 'day after -1d',
+        horizon: COMING_UP_DAYS,
+        columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+        limit: COMING_UP_LIMIT,
+        empty: voice.nothingDue,
+        ...RAIL,
+      },
       /* WHAT CHANGED SINCE THE READER'S MARK, which Home stamps when they leave, never when they open it. */
       { kind: 'feed', heading: voice.sinceAway, icon: 'activity', source: 'activity', since: 'seen', first: 8, empty: words.nothingNew, ...RAIL },
     ],
@@ -270,8 +297,10 @@ export type HomeDrawn = {
  * A ROW IS DRAWN ONCE. A task late and urgent is in the first work block that holds it, and a deadline that is a task
  * already drawn is not drawn again in what falls due.
  *
- * WHAT FALLS DUE LEADS WITH WHAT IS ALREADY LATE: the late rows become a block of their own, headed Overdue, drawn
- * just before the rest.
+ * WHAT FALLS DUE LEADS WITH WHAT IS ALREADY LATE: the late rows become a block of their own, headed Late, drawn
+ * just before the rest. WHERE IT FOLLOWS THE LATE TASKS it is the same tile, under their name and with none of its own
+ * (`joins`, which `layout.ts` `boxesOf` draws as one surface), so what is late is said once, the tasks first. The tasks'
+ * name says "or due today" while one of them is only due today, since that one is not late yet.
  *
  * WHAT CHANGED IS ONLY WHAT IS NEW, and A BLOCK WITH NOTHING TO SHOW IS NOT DRAWN: an empty list on the page everybody
  * reads first is noise, and the line at the top already says the quiet half.
@@ -279,13 +308,15 @@ export type HomeDrawn = {
  * NOTHING IS TAKEN OUT OF THE LIST, ONLY MARKED NOT DRAWN, as `lib/page/home.ts` hides a block: the reader keys every
  * write, held tick and id by a block's place in the list, so a block that empties between two reads (the last urgent
  * task ticked) must not move the blocks after it into its place. The lifted line stays at its place, and what falls
- * due is always two blocks, Overdue and the rest, either of them not drawn when it holds nothing.
+ * due is always two blocks, Late and the rest, either of them not drawn when it holds nothing.
  */
 export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE): HomeDrawn {
   const today = dayOf(now);
   let lead: string | null = null;
   const drawn = new Set<string>();
   const shaped: LiveBlock[] = [];
+  /* WHERE EACH LATE PART OF WHAT FALLS DUE LANDED, which may join the late tasks before it. */
+  const lateAt: number[] = [];
   for (const b of blocks) {
     /* A BLOCK ITS `when:` LEFT OUT holds no row anybody saw, so it neither takes a row from the next nor counts. */
     if (says(b) || !b.drawn) {
@@ -316,7 +347,8 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
       const rest = fresh.filter((n) => !late.includes(n));
       const gone = b.entries.length - fresh.length;
       /* THE RECORD ANSWERS WHAT IS LATE FIRST, so a block drawn full of late rows has more late rows past its limit, and
-         Overdue says so; once a row that is not late is drawn, the rest past the limit are the later days'. */
+         Late says so; once a row that is not late is drawn, the rest past the limit are the later days'. */
+      lateAt.push(shaped.length);
       shaped.push(pick(b, late, voice.overdue, rest.length === 0 ? late.length + b.total - b.entries.length : late.length));
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
@@ -324,7 +356,33 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
     shaped.push(newOnly(b));
   }
   /* AND THEN THE READER'S OWN RULE, so a section over nothing goes with its blocks here as it does on the page. */
-  return { blocks: emptyHidden(shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b))), lead, sentence: sentenceFrom(shaped, today) };
+  const out = emptyHidden(shaped.map((b) => (b.drawn && hollow(b) ? { ...b, drawn: false } : b)));
+  for (const at of lateAt) lateTile(out, at, today, voice);
+  return { blocks: out, lead, sentence: sentenceFrom(shaped, today) };
+}
+
+/** Whether a drawn block is a list of tasks whose every row was due today or before. */
+function lateTasks(b: LiveBlock | undefined, today: string): b is LiveBlock {
+  if (!b?.drawn || !isTodo(b) || b.entries.length === 0) return false;
+  return b.entries.every((e) => {
+    const day = dayIn(b, e.fields as Record<string, unknown>);
+    return day !== null && day <= today;
+  });
+}
+
+/**
+ * ONE LATE TILE, in place: the late part of what falls due at `at` joins the late tasks just before it, under their
+ * heading, and their heading says "or due today" while one of them is. Both stay at their places in the list.
+ */
+function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoice): void {
+  const tasks = blocks[at - 1];
+  if (!lateTasks(tasks, today)) return;
+  if (tasks.heading === voice.overdue && tasks.entries.some((e) => dayIn(tasks, e.fields as Record<string, unknown>) === today))
+    blocks[at - 1] = { ...tasks, heading: words.lateOrToday };
+  const money = blocks[at]!;
+  if (!money.drawn) return;
+  const { heading: _named, ...rest } = money;
+  blocks[at] = { ...rest, joins: true } as LiveBlock;
 }
 
 /**

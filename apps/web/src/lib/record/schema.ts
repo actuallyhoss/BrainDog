@@ -365,6 +365,8 @@ export type PageBlock = {
 
   /** A `forecast`'s: the lengths its horizon knob offers, each whole days or `last`. */
   horizons?: readonly (number | 'last')[];
+  /** A `forecast`'s: the page's opening line already says when the money runs out, so the chart leaves its sentence off. */
+  headline?: 'under';
 
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */

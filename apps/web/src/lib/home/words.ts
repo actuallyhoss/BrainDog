@@ -13,11 +13,12 @@ export const words = {
   needsYou: 'What needs you',
   workingNow: 'Working now',
   comingUp: 'Coming up',
-  overdue: 'Overdue',
+  overdue: 'Late',
   sinceAway: 'Since you were away',
 
   /* TODAY'S OWN BLOCKS (`todayHome`), which no use case words its own way: the work that needs you, and money. */
   addTask: 'Add a task',
+  /** The late tile's name while it also holds a task due today, which is not late yet. */
   lateOrToday: 'Late or due today',
   toCheck: 'Handed back to you',
   urgent: 'Urgent',
