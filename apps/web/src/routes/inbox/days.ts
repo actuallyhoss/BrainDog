@@ -81,12 +81,16 @@ export function sentenceOf(tally: Tally | null, oldest: string | null, now: numb
  * THREE PARTS, AND THE MIDDLE ONE IS NOT A WEEK. `filed` is every filing the record holds, a rule's included, so what is
  * left once this week's rules are taken off is "filed earlier", and it is never said as a week's figure. What still
  * waits for a person is the ink part, the one that matters; the rest are greys. `null` from a host with no weekly count.
+ *
+ * AND `null` WHEN IT HAS NOTHING TO SAY: no rule filed anything this week and nothing waits, so the tile would be a 0
+ * over an empty bar beside an inbox that already says it is clear (DIRECTION §35, an unused part is not drawn).
  */
 export function whoFiledOf(tally: Tally | null): { figure: number; parts: { label: string; value: number; tone: string }[]; reading: string } | null {
   if (!tally || tally.ruled === null) return null;
   const ruled = Math.max(0, tally.ruled);
   const earlier = Math.max(0, tally.filed - ruled);
   const waiting = Math.max(0, tally.waiting);
+  if (ruled === 0 && waiting === 0) return null;
   const n = (v: number) => v.toLocaleString('en-GB');
   return {
     figure: ruled,

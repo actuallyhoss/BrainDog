@@ -8,6 +8,11 @@
  * as words instead would be this app deciding, on nobody's behalf, that a link which reads wrong is not a link.
  *
  * AUTHORED ROWS are written as they were typed. A link takes no tone, so an authored row's tone is not written.
+ *
+ * AN AUTHORED ROW'S FOURTH CELL IS ITS GLYPH (`title | url | note | icon`), the way Settings writes its index: each area
+ * with the well the chooser beside an open area draws it with. The four cells go to the renderer as written, which
+ * draws a cell that names a glyph in a well at the row's start (`Links.svelte`, `aria-hidden`, so a screen reader does
+ * not say the glyph's name before the note) and leaves out one that names none. `link.css` sets the well.
  */
 
 import { display } from '../../record/api.ts';
@@ -17,7 +22,7 @@ import { authoredOf, entriesOf, escapeCell, fenced, fieldsOf, listOf } from './d
 export const link: KindDrawer = {
   draw(result, opts) {
     const authored = authoredOf(result);
-    if (authored.length) return fenced('link', authored.map((r) => r.cells.slice(0, 3).map(escapeCell).join(' | ')), opts);
+    if (authored.length) return fenced('link', authored.map((r) => r.cells.slice(0, 4).map(escapeCell).join(' | ')), opts);
     const register = listOf(result);
     const [title = '', url = '', note = ''] = fieldsOf(result);
     if (!register || !title || !url) return fenced('link', [], opts);
@@ -29,3 +34,4 @@ export const link: KindDrawer = {
     return fenced('link', rows, opts);
   },
 };
+

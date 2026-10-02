@@ -174,7 +174,7 @@ test('the head says the record’s count, in red when it is over the aim or one 
   const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, n === 4 ? 'undo' : 'call', n === 0));
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK, () => 'Claude');
   assert.equal(shaped.sentence.text, 'Five questions wait on you, two over the aim of three. Claude suggests “Yes” for the first.');
-  assert.equal(shaped.sentence.needs, 'Five questions wait on you, two over the aim of three');
+  assert.equal(shaped.sentence.needs, 'two over');
   assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q2', 'q3', 'q4', 'q5']);
   assert.equal(shaped.blocks[2]?.total, 4);
   /* THE FIRST CARD COUNTS ONLY ITSELF, so it draws no "4 more" door back to this page over the four drawn under it. */

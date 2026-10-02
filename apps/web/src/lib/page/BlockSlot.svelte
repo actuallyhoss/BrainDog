@@ -35,7 +35,8 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { fileAt, resolverOf, type LiveBlock } from '$lib/record/page-live.ts';
   import { glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
-  import { liveOf } from '../ui/face.ts';
+  import { agentKindOf, liveOf } from '../ui/face.ts';
+  import { AGENT_MARKS, isMarked } from '$lib/ui/agent-marks.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -50,6 +51,7 @@
   import AddStep from './AddStep.svelte';
   import { foldOf } from './home.ts';
   import { words } from './words.ts';
+  import { blockWords } from '$lib/record/block-edit.ts';
 
   let {
     block,
@@ -150,6 +152,12 @@
     /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
     href: inApp,
     icon,
+    /* AN AGENT'S MARK, ON A CARD'S OR A FEED ROW'S FACE: the maker's drawing for the name a cell gives (`Claude`,
+       `Cursor`), from the same set the app's faces draw, or nothing, and the renderer keeps the initial. */
+    agentMark: (name: string) => {
+      const k = agentKindOf(name);
+      return isMarked(k) ? AGENT_MARKS[k] : null;
+    },
     /* A FIGURE IS A DOOR, and the address is the metric's own: `hrefFor` derives it from the same predicate the figure
        is computed over, so a tile and the list it opens cannot disagree. */
     cellHref: (n: number) => block.metrics?.[n]?.href ?? null,
@@ -217,6 +225,16 @@
     writes !== null && block.kind === 'inputs' && may(route.data as unknown as Shell, 'write', block.register),
   );
 
+  /**
+   * THE NAME OF THE LIST A BLOCK'S ROWS LIVE IN, as the record calls it, or `null` where it is no list a person has.
+   * A SOURCE THE RECORD ANSWERS ACROSS ITS LISTS (`deadlines`) IS NOT ONE, and it printed its id as the door's words and
+   * opened a list that does not exist: it gets no door, and no "Open … for the rest".
+   */
+  const lists = $derived((route.data as unknown as Partial<Shell>).lists ?? []);
+  const listNamed = (id: string | undefined): string | null =>
+    id ? (REGISTERS[id]?.name ?? lists.find((l) => l.id === id)?.name ?? null) : null;
+  const source = $derived(listNamed(block.register));
+
   /* The panel the host draws under this block, by the name the section gives it (`panel-of.ts`). */
   const panel = $derived(panelOf(block));
 
@@ -243,30 +261,41 @@
   );
 </script>
 
-<header class="block-bar">
-  <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and where
-       its rows live at the right. A BLOCK WITH NO AUTHORED `heading:` PRINTS ITS KIND'S NAME, never its dialect id: an
-       id is what an agent writes into a declaration, a name is what a person reads. AN AUTHORED ONE IS READ AS TEXT, so
-       `{{icon:rocket}} shipped` draws the rocket rather than its braces. -->
-  {#if block.icon && isGlyph(block.icon)}<IconWell name={block.icon} />{/if}
-  <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
-    >{#if block.heading}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{:else}{copy.kindNames[block.kind] ?? block.kind}{/if}</svelte:element
+{#if block.heading}
+  <!-- A PAGE'S LEAD QUESTION HAS NO VISIBLE BAR outside arranging: the question is the heading a reader sees, and the bar
+       ("Waiting on you") is kept for a screen reader, clipped, not removed, so the region keeps its name in the
+       heading list. While arranging it shows, since that is the label a block is moved by. -->
+  <header class="block-bar" data-quiet={block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging ? '' : undefined}>
+    <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
+         its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
+         rather than its braces. -->
+    {#if block.icon && isGlyph(block.icon)}<IconWell name={block.icon} />{/if}
+    <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name" id="{ids}h-{i + 1}"
+      ><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></svelte:element
+    >
+    {#if source}
+      <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (DIRECTION §35: secondary controls appear on
+           hover or focus). "Tasks" at the top right of every tile on Work was chrome on every tile, said five times. The
+           predicate stays, because without it a reader has no way to know the list is filtered and may take a block of
+           four rows for the whole list; the clause that names the page they are on is dropped. AS A GLYPH, AND THE
+           CLAUSE IS STILL THERE: the tooltip and a screen reader get the whole clause. -->
+      <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} title={whereOf(block) || undefined}>
+        {source}
+        {#if whereOf(block)}
+          <Icon name="filter" size="s" />
+          <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
+        {/if}
+      </a>
+    {/if}
+  </header>
+{:else}
+  <!-- A BLOCK WITH NO AUTHORED `heading:` DRAWS NO HEADING. It printed its kind's name, and where the kind had none its
+       dialect id, so Decide's lead question sat under "queue" and Today's dates under "deadlines": the system's word
+       where the page has nothing to say. The region still has a name, for a screen reader only, in the kind's words. -->
+  <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-unnamed" id="{ids}h-{i + 1}"
+    >{copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? words.unnamed}</svelte:element
   >
-  {#if block.register}
-    <!-- THE LIST'S NAME, not its id. The predicate stays, because without it a reader has no way to know the list is
-         filtered and may take a block of four rows for the whole list; the clause that names the page they are on is
-         dropped. AS A GLYPH, AND THE CLAUSE IS STILL THERE: printed in full it read as a debug line and pushed a
-         two-word heading onto two lines, so the filter glyph says the list is narrowed and the tooltip and a screen
-         reader get the whole clause. -->
-    <a class="block-source tap" href={inApp(openHref(block) ?? `/r/${block.register}`)} title={whereOf(block) || undefined}>
-      {REGISTERS[block.register]?.name ?? block.register}
-      {#if whereOf(block)}
-        <Icon name="filter" size="s" />
-        <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
-      {/if}
-    </a>
-  {/if}
-</header>
+{/if}
 
 <!-- Never hidden and never centred: the page's shape is information, and a page that silently shrinks teaches that
      blocks come and go (19 §6). ONE surface for every kind, so "nothing matched" and "this block is broken" are told
@@ -371,8 +400,8 @@
   <p class="block-slice" role="status">
     {block.source === 'forecast.runway'
       ? copy.ofWhichWalked(block.shown, block.total, typeof block.walk?.horizon === 'number' ? block.walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180)
-      : copy.ofWhichDrawn(block.shown, block.total)}.{#if to}{' '}
-      <a class="tap" href={inApp(to)}>{copy.openTheRest(REGISTERS[block.register!]?.name ?? block.register!)}</a>
+      : copy.ofWhichDrawn(block.shown, block.total)}.{#if to && source}{' '}
+      <a class="tap" href={inApp(to)}>{copy.openTheRest(source)}</a>
     {/if}
   </p>
 {/if}
@@ -415,6 +444,42 @@
 
   .block-source:hover {
     color: var(--ink);
+  }
+
+  /* THE DOOR WAITS FOR THE POINTER OR THE KEYBOARD to reach its tile (DIRECTION §35), and fades rather than folds, so
+     the heading row never moves under the pointer. ON TOUCH THERE IS NO HOVER TO WAIT FOR, so it is not drawn: a
+     phone opens a row by pressing it, and Open the rest under a cut list is still there. */
+  @media (hover: hover) and (pointer: fine) {
+    .block-source {
+      opacity: 0;
+      transition:
+        opacity var(--d-state) var(--ease-out),
+        color var(--d-state) var(--ease-out);
+    }
+
+    :global(.block-slot:is(:hover, :focus-within)) .block-source,
+    .block-source:focus-visible {
+      opacity: 1;
+    }
+  }
+
+  @media not ((hover: hover) and (pointer: fine)) {
+    .block-source {
+      display: none;
+    }
+  }
+
+  /* A BLOCK WITH NO HEADING IS NAMED FOR A SCREEN READER AND DRAWS NOTHING: the region's name, out of sight. */
+  .block-unnamed,
+  .block-bar[data-quiet] {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    min-block-size: 0;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* THE CLAUSE IS FOR A SCREEN READER AND THE TOOLTIP. The glyph says the list is narrowed; the words are kept out of

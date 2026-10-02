@@ -26,6 +26,8 @@ export const words = {
    */
   added: (what: string, list: string, read: readonly string[], filled: readonly string[]) =>
     `Added “${what}” to ${list}${read.length > 0 ? ` · ${read.join(' · ')}` : ''}${filled.length > 0 ? `, with ${and(filled)} filled in` : ''}.`,
+  /** A block with no heading and a kind with no name, said to a screen reader only: the region's name. */
+  unnamed: 'Part of this page',
   /** A long block folded in place: what is under the fold, one press away. */
   more: (n: number) => `${n} more`,
   /* WHAT A ROW WEARS IN JUST CHANGED after a write the page's own blocks made: a word or two, the list's own words. */

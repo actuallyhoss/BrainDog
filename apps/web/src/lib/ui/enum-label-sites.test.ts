@@ -132,9 +132,10 @@ test("A BLOCK'S FILTER LINE SAYS A VALUE BY ITS LABEL, as the rows under it read
   assert.equal(saidPlainly('things', 'lane is parked or retired'), 'status is On hold or Finished');
   /* A label typed back is the same value, so it prints the same word. */
   assert.equal(saidPlainly('things', 'lane is ongoing'), 'status is Ongoing');
-  /* And a record with no labels still reads the value's own words, underscores out. */
+  /* And a record with no labels of its own reads the words the list declares (`portfolio` 1.9.0 says its statuses in
+     sentence case), not the stored value. */
   relabelAll(REGISTERS, {});
-  assert.equal(saidPlainly('things', 'lane is building or earning'), 'status is building or earning');
+  assert.equal(saidPlainly('things', 'lane is building or earning'), 'status is Building or Earning');
 });
 
 test("DECIDE'S DIFF OF A ROWSET SAYS BOTH SIDES BY THE RECORD'S LABELS", async () => {

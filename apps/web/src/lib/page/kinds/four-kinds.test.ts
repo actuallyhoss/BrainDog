@@ -83,6 +83,26 @@ test('A LINK OVER A LIST WRITES THE ADDRESS AS THE RECORD HOLDS IT, and an addre
   assert.match(wrong.segments[0]?.type === 'degraded' ? wrong.segments[0].fix : '', /A link is an https address, a mailto or a path of this BrainDog\./u);
 });
 
+test('AN AUTHORED LINK ROW\'S FOURTH CELL IS ITS GLYPH, handed to the renderer as its own cell, never in the note', () => {
+  const drawn = link.draw(
+    answer('link', {
+      authored: [
+        { cells: ['Appearance', '/settings/appearance', 'Colour, text size and density', 'sun'] },
+        { cells: ['Identity', '/settings/identity', '', 'user-check'] },
+        { cells: ['Plain', '/settings/plain', 'Three cells'] },
+        { cells: ['Long', '/settings/long', 'A line', 'sun', 'extra'] },
+      ],
+    }),
+    OPTS,
+  );
+  assert.deepEqual(cellsOf(drawn), [
+    ['Appearance', '/settings/appearance', 'Colour, text size and density', 'sun'],
+    ['Identity', '/settings/identity', '', 'user-check'],
+    ['Plain', '/settings/plain', 'Three cells'],
+    ['Long', '/settings/long', 'A line', 'sun'],
+  ]);
+});
+
 test('A GALLERY WRITES A PICTURE BY REFERENCE AND ANY OTHER FILE BY ITS NAME, and captions a tile with no caption by its name', () => {
   const file = (mime: string, name: string) => ({ sha256: 'a'.repeat(64), mime, bytes: 10, name });
   const drawn = gallery.draw(

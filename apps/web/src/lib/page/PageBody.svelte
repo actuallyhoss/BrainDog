@@ -87,10 +87,19 @@
   const layout = $derived(layoutOf(page));
 
   /**
-   * THE BLOCKS AS THIS MODE DRAWS THEM. On a home a block that holds nothing, and says nothing about it, is not drawn
-   * (`home.ts` `emptyHidden`), at the index it was declared at, so every id and write on the page still finds it.
+   * THE BLOCKS AS THIS MODE DRAWS THEM. On every page being read, a home or any other, a block that holds nothing and
+   * says nothing about it, or that this build cannot draw, is not drawn (`home.ts` `emptyHidden`, DIRECTION §35: an
+   * empty or unused part is not drawn), at the index it was declared at, so every id and write on the page still finds
+   * it. AUTHORING DRAWS THEM ALL: while the page is arranged, or as a preview of a change, a block that is empty today is
+   * still a block somebody is placing.
+   *
+   * A PAGE AT ITS OWN ADDRESS IS NEVER EMPTIED BY THIS: one whose every block would go keeps them, so a list page with
+   * nothing in it yet still says so, and still offers the first one, rather than drawing a title over nothing.
    */
-  const drawable = $derived(mode === 'home' ? emptyHidden(blocks) : blocks);
+  const quiet = $derived(emptyHidden(blocks));
+  const drawable = $derived(
+    mode === 'preview' || arranging ? blocks : mode === 'page' && !quiet.some((b) => b.drawn) ? blocks : quiet,
+  );
 
   /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in the declaration.

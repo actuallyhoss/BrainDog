@@ -20,7 +20,7 @@ import type { LiveBlock } from '../record/page-live.ts';
  */
 const KEPT = new Set(['note', 'section', 'capture', 'inputs', 'steps', 'quote', 'code', 'tree', 'embed', 'link', 'gallery']);
 
-/** A block the record refused, or this build cannot draw: it draws its own sentence and is never hidden. */
+/** A block the record refused, or this build cannot draw: it draws its own sentence and is never called empty. */
 export const says = (b: LiveBlock): boolean => b.refusals.length > 0 || b.cannot !== undefined;
 
 /**
@@ -54,12 +54,21 @@ export function holdsNothing(b: LiveBlock): boolean {
 /** Whether a block has nothing to draw but its `empty:` line: it holds nothing, and is not a kind whose emptiness is the point. */
 export const bare = (b: LiveBlock): boolean => !says(b) && !KEPT.has(b.kind) && holdsNothing(b);
 
-/** Whether a home leaves the block out: it holds nothing, and its author wrote no `empty:` line to say so. */
-const hidden = (b: LiveBlock): boolean => bare(b) && !(typeof b.empty === 'string' && b.empty.trim() !== '');
+/**
+ * Whether a page being read leaves the block out: it holds nothing and its author wrote no `empty:` line to say so, or
+ * this build cannot draw it from the record yet.
+ *
+ * A BLOCK THIS BUILD CANNOT DRAW IS NOT THE READER'S TO FIX, so outside authoring it is not drawn: "This part of the
+ * page cannot be drawn from the record yet" under "Working now" told a person about our build, not their record. A
+ * block the record REFUSED is still drawn, because its sentence names the fix in the declaration and somebody has to
+ * see it. While a page is arranged every block is drawn, `PageBody` does not ask this then.
+ */
+const hidden = (b: LiveBlock): boolean =>
+  (b.cannot !== undefined && b.refusals.length === 0) || (bare(b) && !(typeof b.empty === 'string' && b.empty.trim() !== ''));
 
 /**
- * THE BLOCKS AS A HOME DRAWS THEM: the same list at the same indexes, a block that holds nothing marked not drawn, as a
- * block whose `when:` said no already is. The indexes stay, because every write and every id on the page is keyed by
+ * THE BLOCKS AS A PAGE IS READ, a home or any other: the same list at the same indexes, a block that holds nothing or
+ * cannot be drawn marked not drawn, as a block whose `when:` said no already is. The indexes stay, because every write and every id on the page is keyed by
  * the block's place in the declaration.
  *
  * A SECTION OVER NOTHING GOES WITH ITS BLOCKS: a heading whose every block, up to the next section, is not drawn

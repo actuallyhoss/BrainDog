@@ -17,7 +17,7 @@ const link = (heading: string, rows: string[][], more: Partial<IndexBlock> = {})
   ...more,
 });
 
-test('the house index is a page of link tiles, one for each group, each area once with its address and its line', () => {
+test('the house index is a page of link tiles, one for each group, each area once with its address, its line and its icon', () => {
   assert.equal(SETTINGS_INDEX.page, SETTINGS_PAGE);
   assert.deepEqual(
     SETTINGS_INDEX.blocks.map((b) => [b.kind, b.heading, typeof b.icon]),
@@ -26,9 +26,11 @@ test('the house index is a page of link tiles, one for each group, each area onc
   const rows = SETTINGS_INDEX.blocks.flatMap((b) => b.authored ?? []);
   assert.equal(rows.length, AREAS.size);
   for (const r of rows) {
-    assert.equal(r.cells.length, 3);
+    assert.equal(r.cells.length, 4);
     assert.ok(r.cells[1]!.startsWith(AREA_AT), `${r.cells[1]} is not a settings address`);
     assert.ok(AREAS.has(r.cells[1]!.slice(AREA_AT.length)));
+    /* THE AREA'S OWN GLYPH RIDES WITH ITS ROW, so the index draws the well the chooser draws. */
+    assert.equal(r.cells[3], AREAS.get(r.cells[1]!.slice(AREA_AT.length))!.icon);
   }
 });
 

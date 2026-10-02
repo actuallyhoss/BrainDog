@@ -164,6 +164,10 @@
      side read as two places. Compared inside the record, as the tab bar compares (`lib/at.ts`). */
   const searching = $derived(here(page.url.pathname) === '/search');
 
+  /* THE KICKER OVER THE TITLE IS DROPPED WHEN IT SAYS THE TITLE AGAIN: Work's section is Work, and "Work" over "Work"
+     is a breadcrumb that names where you already are. The phone's back link keeps it, since that is a way out. */
+  const crumb = $derived(kicker && kicker.trim().toLowerCase() !== title.trim().toLowerCase() ? kicker : undefined);
+
   /* THE SENTENCE AS WORDS, cut round the phrase that needs him, when it holds that phrase. */
   const said = $derived.by(() => {
     if (typeof sentence !== 'string') return null;
@@ -193,18 +197,18 @@
     </button>
   {/if}
 </div>
-{#if kicker}
+{#if crumb}
   <!-- Over the title and scrolling with the page: the row that stays is the title's. -->
   {#if back}
-    <a class="kicker kicker-link tap" href={at(back)} data-led={led ? '' : undefined} data-over={over ? '' : undefined}>{kicker}</a>
+    <a class="kicker kicker-link tap" href={at(back)} data-led={led ? '' : undefined} data-over={over ? '' : undefined}>{crumb}</a>
   {:else}
-    <p class="kicker" data-led={led ? '' : undefined} data-over={over ? '' : undefined}>{kicker}</p>
+    <p class="kicker" data-led={led ? '' : undefined} data-over={over ? '' : undefined}>{crumb}</p>
   {/if}
 {/if}
 <!-- THE HEAD AND ITS SENTENCE ARE ONE WHITE TILE ON A WIDE SCREEN, when the page says a sentence. Under 900px, and on a
      page with no sentence, the wrapper has no box of its own. -->
 <div class="lead-wrap" data-said={sentence ? '' : undefined} data-led={led ? '' : undefined}>
-<header class="head" data-under={under ? '' : undefined} data-kicked={kicker ? '' : undefined} data-said={sentence ? '' : undefined} data-led={led ? '' : undefined} data-over={over ? '' : undefined}>
+<header class="head" data-under={under ? '' : undefined} data-kicked={crumb ? '' : undefined} data-said={sentence ? '' : undefined} data-led={led ? '' : undefined} data-over={over ? '' : undefined}>
   <div class="head-main">
     <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from
          whoever typed it, the glyph beside it is ours. An Arabic title in an English paragraph
@@ -725,6 +729,37 @@
 
     .head[data-under] .count {
       font-size: var(--t-group);
+    }
+
+    /**
+     * THE SENTENCE IS THE HEADLINE ON A PHONE TOO, at `--t-title` in ink, as it is at 40 from 900px up: on a phone it
+     * dropped to body size under a 30px title, so the one line that says what is true today read as a caption to the
+     * page's name. The name steps down to the label over it, as it does on a wide screen, and the bar still says the
+     * name once both have scrolled away.
+     */
+    .head[data-said] .title {
+      color: var(--ink2);
+      font-size: var(--t-md);
+      font-weight: 500;
+      line-height: 1.5;
+      letter-spacing: 0;
+    }
+
+    .head[data-said] .count {
+      font-size: var(--t-md);
+    }
+
+    .head[data-said] + .sentence {
+      color: var(--ink);
+      font-size: var(--t-title);
+      font-weight: 600;
+      line-height: calc(34 / 28);
+      letter-spacing: -0.02em;
+      text-wrap: pretty;
+    }
+
+    .head[data-said] + .sentence :global([data-needs]) {
+      font-weight: 600;
     }
 
     /* The bar carries the way back on a phone, so the kicker's link is not said twice. */

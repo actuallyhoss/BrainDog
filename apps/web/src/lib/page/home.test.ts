@@ -39,12 +39,21 @@ test('AN EMPTY BLOCK WHOSE AUTHOR WROTE WHAT EMPTY MEANS KEEPS ITS SENTENCE, as 
 
 test('A REFUSED BLOCK, A SENTENCE AND A WAY TO ADD THE FIRST THING ARE NEVER HIDDEN', () => {
   const refused = block({ kind: 'todo', source: 'register.tasks', refusals: ['tasks has no field "ownr".'] });
-  const cannot = block({ kind: 'todo', source: 'register.tasks', cannot: 'This block cannot be drawn here.' });
   const note = block({ kind: 'note', body: 'Morning.' });
   const capture = block({ kind: 'capture', register: 'tasks' });
   assert.deepEqual(
-    emptyHidden([refused, cannot, note, capture]).map((b) => b.drawn),
-    [true, true, true, true],
+    emptyHidden([refused, note, capture]).map((b) => b.drawn),
+    [true, true, true],
+  );
+});
+
+test('A BLOCK THIS BUILD CANNOT DRAW IS NOT DRAWN, nor a section over only that, and a refused one that also cannot still is', () => {
+  const cannot = block({ kind: 'todo', source: 'sessions.live', cannot: 'This part of the page cannot be drawn from the record yet.' });
+  assert.equal(emptyHidden([cannot])[0]!.drawn, false);
+  assert.equal(emptyHidden([{ ...cannot, refusals: ['sessions has no field "who".'] }])[0]!.drawn, true, 'a refusal names a fix somebody has to see');
+  assert.deepEqual(
+    emptyHidden([block({ kind: 'section', heading: 'Working now' }), cannot]).map((b) => b.drawn),
+    [false, false],
   );
 });
 
@@ -123,7 +132,8 @@ const SLOT = readFileSync(new URL('./BlockSlot.svelte', import.meta.url), 'utf8'
 const CARD = readFileSync(new URL('./QueueAnswer.svelte', import.meta.url), 'utf8');
 
 test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page at its own address still walks blocks', () => {
-  assert.match(BODY, /mode === 'home' \? emptyHidden\(blocks\) : blocks/);
+  assert.match(BODY, /const quiet = \$derived\(emptyHidden\(blocks\)\);/);
+  assert.match(BODY, /mode === 'preview' \|\| arranging \? blocks : mode === 'page' && !quiet\.some\(\(b\) => b\.drawn\) \? blocks : quiet/, 'every page being read hides its empty blocks; authoring draws them all');
   assert.match(BODY, /if \(mode === 'home'\) return homeKey\(e\);/);
   for (const key of ["case 'j':", "case 'k':", "case 'x':", "case 'Enter':", "case 'n':", 'optionOf(e.key)'])
     assert.ok(BODY.includes(key), `the home keys lost ${key}`);

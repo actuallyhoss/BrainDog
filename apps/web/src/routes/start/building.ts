@@ -39,8 +39,8 @@ export const words = {
   /** BrainDog's reply to a later turn: what it added, or that it added nothing. */
   adds: (items: readonly string[]) => `That adds ${firstRun.and(items)}.`,
   addsNothing: 'I heard nothing new to keep in that. It stays in what you said.',
-  /** The live line under the field while the sentence is typed. */
-  hearing: 'Heard so far',
+  /** The build's line while the model reads what was said. */
+  readingNow: 'Reading what you said',
   /** The build tile, before and after a part waits on an answer. */
   building: 'Your BrainDog, building',
   ready: 'Your BrainDog, ready',

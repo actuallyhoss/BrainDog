@@ -112,7 +112,9 @@ export type IndexBody = { page: string; title: string; blocks: PageBlock[] };
 
 /**
  * THE INDEX, DECLARED: a `link` tile for each group, half the page wide, so the four sit two by two from 900px up and
- * one under another on a phone. Each row is written out as `[name, address, line]`, the shape a `link` row takes.
+ * one under another on a phone. Each row is written out as `[name, address, line, icon]`: the shape a `link` row
+ * takes, and the area's own glyph after it, so the index draws each area with the well the chooser beside an open area
+ * draws it with. A reader that draws three cells leaves the fourth unread.
  */
 export function indexBody(groups: readonly AreaGroup[] = DEFAULT_GROUPS): IndexBody {
   return {
@@ -123,7 +125,7 @@ export function indexBody(groups: readonly AreaGroup[] = DEFAULT_GROUPS): IndexB
       heading: g.title,
       icon: g.icon,
       span: 6,
-      authored: g.areas.map((a) => ({ cells: [a.label, `${AREA_AT}${a.id}`, a.line] })),
+      authored: g.areas.map((a) => ({ cells: [a.label, `${AREA_AT}${a.id}`, a.line, a.icon] })),
     })),
   };
 }

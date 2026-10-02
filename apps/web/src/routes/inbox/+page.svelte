@@ -509,19 +509,19 @@
         >{s.label}{#if s.n}<span class="segment-n num">{s.n}</span>{/if}</button>
       {/each}
     </div>
-    {#if view === 'waiting'}
+    {#if view === 'waiting' && INBOX.length > 0}
+      <!-- WHERE A FILING GOES, AND SELECTING, ONLY WHILE SOMETHING WAITS: over an empty inbox both are controls for
+           nothing. -->
       {@render fileInto('bar')}
-      {#if INBOX.length > 0}
-        <span class="select-toggle">
-          <Button
-            aria-pressed={selecting}
-            onclick={() => {
-              selecting = !selecting;
-              if (!selecting) picked = new Set();
-            }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
-          >
-        </span>
-      {/if}
+      <span class="select-toggle">
+        <Button
+          aria-pressed={selecting}
+          onclick={() => {
+            selecting = !selecting;
+            if (!selecting) picked = new Set();
+          }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
+        >
+      </span>
     {/if}
   {/if}
 {/snippet}

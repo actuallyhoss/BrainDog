@@ -93,8 +93,9 @@ export const suggestedOf = (q: Pick<Question, 'options'> | undefined): string | 
 /**
  * THE SENTENCE UNDER THE TITLE, and the phrase in it that needs him.
  *
- * "Two questions wait on you. claude suggests “Accept” for the first." The count is red only when it is over the aim
- * or a question waiting is one that is hard to undo, which is what "needs you" means here; otherwise nothing is red. The
+ * "Two questions wait on you. claude suggests “Accept” for the first." Red is kept to the words that need him: over the
+ * aim, only "two over" is red, since the count itself is not the trouble; within the aim but with a question that is
+ * hard to undo, the count is; otherwise nothing is red. The
  * suggestion is the first question's own, said with who asked it when that is known, and left out when there is none.
  * NOTHING WAITING IS NOT A SENTENCE: the screen's cleared state already says it, with when the last one was decided.
  */
@@ -115,11 +116,11 @@ export function countSentence(n: number, undo: boolean, option: string | undefin
   if (n <= 0) return null;
   const count = n === 1 ? 'One question waits on you' : `${capital(numberWord(n))} questions wait on you`;
   const over = n > AIM;
-  const urgent = over || undo;
-  const aim = over ? `, ${numberWord(n - AIM)} over the aim of ${numberWord(AIM)}` : '';
+  const past = `${numberWord(n - AIM)} over`;
+  const aim = over ? `, ${past} the aim of ${numberWord(AIM)}` : '';
   const which = n > 1 ? ' for the first' : '';
   const suggests = option ? (who ? ` ${who} suggests “${option}”${which}.` : ` “${option}” is suggested${which}.`) : '';
-  return { text: `${count}${aim}.${suggests}`, needs: urgent ? `${count}${aim}` : '' };
+  return { text: `${count}${aim}.${suggests}`, needs: over ? past : undo ? count : '' };
 }
 
 /**

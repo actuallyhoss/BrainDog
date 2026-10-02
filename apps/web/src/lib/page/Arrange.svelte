@@ -8,8 +8,8 @@
 
   ARRANGING IS A DESKTOP SURFACE. 13 §10: "Authoring: read and approve, do not author. The page builder and pack builder
   are desktop surfaces." A drag-to-reorder mode on a phone is a mode where every gesture competes with the scroll, so
-  the button is absent below 900px rather than disabled: a control that exists and refuses is worse than one that does
-  not.
+  the way in is absent below 900px rather than disabled: a control that exists and refuses is worse than one that does
+  not. The way in is an entry in the head's page menu (`ChangePage.svelte`), handed `entry()` from here.
 -->
 <script lang="ts" module>
   import type { BlockResult } from '$lib/record/api.ts';
@@ -111,6 +111,13 @@
   function beginArrange() {
     arrangement.begin(all.map((b, i) => slotOf(b, i, layout)));
   }
+
+  /**
+   * THE WAY IN, FOR THE HEAD'S PAGE MENU (`ChangePage.svelte`), which holds Edit layout beside Change this page now that
+   * the head draws one "⋯" rather than a row of buttons. `null` where this reader may not arrange or the page is drawn as
+   * its source, so the menu offers nothing that would be refused or has nothing to move.
+   */
+  export const entry = (): (() => void) | null => (mayChange && !showSource && !arranging ? beginArrange : null);
 
   /**
    * THE LIST A NEW BLOCK SHOWS: the page's own first list, or, on a page that shows none, the one the reader chooses.
@@ -290,13 +297,6 @@
   </Button>
   <Button weight="bare" onclick={() => arrangement.cancel()}><Icon name="close" size="s" />{copy.arrangeCancel}</Button>
   <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
-{:else if !showSource && mayChange}
-  <span class="arrange-slot">
-    <Button weight="quiet" onclick={beginArrange}>
-      <Icon name="grid" size="s" />
-      {copy.arrange}
-    </Button>
-  </span>
 {/if}
 
 {#if bindTo && mayChange}
@@ -333,13 +333,6 @@
 </Sheet>
 
 <style>
-  /* AUTHORING IS A DESKTOP SURFACE (13 §10), so the way in is not drawn below 900px. */
-  @media (width < 900px) {
-    .arrange-slot {
-      display: none;
-    }
-  }
-
   /* THE ONE LINE OF CONTEXT the mode carries on a template: quiet, beside the controls it is about. */
   .arrange-every {
     align-self: center;

@@ -79,7 +79,10 @@
   const asker = $derived(proposer(question.who, me?.person ?? null, names));
   const ways = $derived(waysOf(question));
   const when = $derived(since(question.at, Date.now()));
-  const band = $derived(question.cost ? queueCost(question.cost) : '');
+  /* "YOUR CALL" IS EVERY QUESTION'S BAND THAT IS NOT A HARDER ONE, so on every card it said nothing a card being on
+     Decide does not already say: the chip is drawn only for a band that warns (hard to undo, changes the setup, adds
+     to your things). */
+  const band = $derived(question.cost && question.cost !== 'call' ? queueCost(question.cost) : '');
   /* A QUESTION PUT OFF SAYS WHEN IT COMES BACK, and why, in one quiet line under itself (`governance.later`). */
   const later = $derived(laterLine(question, Date.now()));
 
@@ -397,23 +400,8 @@
     overflow-wrap: anywhere;
   }
 
-  /* ON A NARROW SLOT EVERY ANSWER IS A FULL-WIDTH PILL, the suggestion and the reason under it, and Send takes the
-     line's whole width under the field so it is never pushed off the edge. */
+  /* ON A NARROW SLOT Send takes the line's whole width under the field, so it is never pushed off the edge. */
   @container (inline-size < 30rem) {
-    .queue-options {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .queue-act {
-      justify-self: stretch;
-      text-align: center;
-    }
-
-    .queue-rec,
-    .queue-because {
-      grid-column: 1;
-    }
-
     .qa-line > :global(.btn) {
       flex: 1 1 100%;
     }

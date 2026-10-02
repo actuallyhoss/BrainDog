@@ -1097,13 +1097,22 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
  *
  * Formatting is the reader's, as `05 §7.1` rule 3 says: money as money, a count as a count. A value
  * the record did not send is `null`, which the renderer draws as `—`.
+ *
+ * A FIGURE THAT IS A DAY IS WRITTEN AS ONE. The record sends a figure's number and not its shape, so `cash-as-of`, a day
+ * held as whole days since 1970, was written as a count: Money's "Out of date" note read "The oldest balance in Cash
+ * now is from 20,690", and now reads "from 25 Aug". ONLY A DAY: every other shape is a count the sentence names the unit
+ * of itself, and `days` through `format` made Money's lead "runs out in 12 days days" and kept a nought clause `leadOf`
+ * drops.
  */
 export function resolverOf(values: Record<string, unknown> | undefined): (path: string) => string | null {
   return (path) => {
     if (!values || !Object.hasOwn(values, path)) return null;
     const v = values[path];
     if (typeof v === 'string') return v;
-    if (typeof v === 'number') return Number.isInteger(v) ? integer(v) : String(v);
+    if (typeof v === 'number') {
+      if (Object.hasOwn(METRICS, path) && METRICS[path]?.format === 'day') return format('day', v);
+      return Number.isInteger(v) ? integer(v) : String(v);
+    }
     if (typeof v === 'boolean') return v ? 'yes' : 'no';
     /* A FIGURE IN SEVERAL CURRENCIES, one amount a currency, written as a tile writes its parts. */
     if (Array.isArray(v)) {

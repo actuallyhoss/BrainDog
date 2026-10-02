@@ -236,6 +236,20 @@
     min-inline-size: 0;
   }
 
+  /* THE FIRST QUESTION CARRIES NO NAME OVER IT: the head's line just said what waits, and a name above the card would
+     say it twice. Clipped, not removed, so the region keeps its name and a screen reader's list of headings keeps it,
+     as `BlockSlot`'s unnamed heading is; while arranging, every tile shows its own. */
+  .body :global(.block-slot:not([data-arranging]):has(.queue-lead) > .block-bar) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has gone wrong, and this
      reader is doing exactly what they were invited to do. */
   .cannot {

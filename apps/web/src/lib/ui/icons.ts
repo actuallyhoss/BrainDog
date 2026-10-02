@@ -132,6 +132,19 @@ export const PATHS = {
 } as const satisfies Record<AppGlyph, string>;
 
 /**
+ * SET NAMES THE APP DRAWS IN ITS OWN HAND, so they are on screen at first paint rather than once the set arrives.
+ *
+ * A name a screen of the app leads with, in a well, and that only the set held: Settings' Identity and People & sharing
+ * drew empty wells until the set came, and a well inside a page's text is drawn once and never again. Drawn on
+ * `people`'s head and shoulders, with the tick and the plus at its right. Quoted keys, after `PATHS`, so the renderer's
+ * `glyphs.test.ts`, which reads the app's own names off `PATHS`, does not take them for shell glyphs that need the core.
+ */
+export const HAND = {
+  'user-check': '<circle cx="9" cy="8.75" r="3.25"/><path d="M3.25 19.5a5.75 5.75 0 0 1 11.5 0"/><path d="M15.75 11.5l2 2 3.5-4"/>',
+  'user-plus': '<circle cx="9" cy="8.75" r="3.25"/><path d="M3.25 19.5a5.75 5.75 0 0 1 11.5 0"/><path d="M18.5 8.5v6M15.5 11.5h6"/>',
+} as const satisfies Partial<Record<SetGlyph, string>>;
+
+/**
  * A name a declaration may give: the app's own, then `braindog-render/glyphs`' core, then the rest of
  * its set. Before this was widened a page declared with `icon: rocket` drew a document, because the
  * set shipped as data and nothing in the app could name it.
@@ -214,6 +227,10 @@ export function parseShapes(markup: string): Shape[] {
   return out;
 }
 
+/** The markup the app draws `name` with, its shell glyphs first and then the set names it draws by hand. */
+const handOf = (name: string): string | undefined =>
+  Object.hasOwn(PATHS, name) ? PATHS[name as keyof typeof PATHS] : Object.hasOwn(HAND, name) ? HAND[name as keyof typeof HAND] : undefined;
+
 /** The app's own glyphs, read once each, on first draw. */
 const read = new Map<string, readonly Shape[]>();
 
@@ -232,9 +249,10 @@ const lucide = (name: string, set: Readonly<Record<string, string>> | undefined)
  * has refused everything else.
  */
 export const shapesOf = (name: IconName, set: Readonly<Record<string, string>> | undefined): readonly Shape[] | undefined => {
-  if (Object.hasOwn(PATHS, name)) {
+  const own = handOf(name);
+  if (own !== undefined) {
     let shapes = read.get(name);
-    if (!shapes) read.set(name, (shapes = parseShapes(PATHS[name as keyof typeof PATHS])));
+    if (!shapes) read.set(name, (shapes = parseShapes(own)));
     return shapes;
   }
   const d = lucide(name, set);
@@ -269,4 +287,4 @@ function commands(s: Shape): string {
  * (`more`, `drag`) does not survive into one `d`; the dots are still drawn, at the drawer's stroke.
  */
 export const pathOf = (name: IconName, set: Readonly<Record<string, string>> | undefined): string | undefined =>
-  Object.hasOwn(PATHS, name) ? shapesOf(name, set)!.map(commands).join('') : lucide(name, set);
+  handOf(name) !== undefined ? shapesOf(name, set)!.map(commands).join('') : lucide(name, set);

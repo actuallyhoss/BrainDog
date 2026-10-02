@@ -16,6 +16,7 @@
   puts the choice back and says so. The shell reads `navPrefs.home` and `navPrefs.relabel` to draw them.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { page } from '$app/state';
   import { goto, invalidateAll } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
@@ -66,7 +67,7 @@
     opensFirst: 'Opens first',
     isHidden: 'Hidden from your nav',
     called: (own: string) => `Called ${own} on its page`,
-    all: (n: number) => `Show all ${n}`,
+    all: (n: number) => `Show ${n} more`,
     none: 'No pages yet',
     noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages Slash makes for you.',
     renameTitle: (title: string) => `Rename ${title}`,
@@ -124,7 +125,9 @@
   $effect(() => {
     if (!shell.live || titled !== null) return;
     let current = true;
-    const call = opened();
+    /* UNTRACKED, or the effect reads the pending count `opened()` writes, opens the read again on every answer, and
+       Svelte stops it as a loop before the titles land (the pages were then named by their slugs). */
+    const call = untrack(opened);
     void readPages()
       .then((got) => {
         if (current) titled = got;
@@ -162,7 +165,8 @@
   });
 
   /* THE OTHER PAGES FOLD PAST EIGHT: a record with a page per project lists them all, and a list that long is read by
-     the person who asked for it. */
+     the person who asked for it. The fold names only what it hides, so the pages drawn and the pages it adds come to
+     the count over the section: never "20" over the section and "Show all 13" under it. */
   const FOLD = 8;
   let unfolded = $state(false);
   const othersShown = $derived(unfolded ? others : others.slice(0, FOLD));
@@ -250,7 +254,8 @@
   $effect(() => {
     if (!shell.live || addons !== null) return;
     let current = true;
-    const call = opened();
+    /* UNTRACKED for the reason the titles' read gives. */
+    const call = untrack(opened);
     void readAddons()
       .then((got) => {
         if (current) addons = got;
@@ -344,7 +349,7 @@
         {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
       </ul>
       {#if !unfolded && others.length > FOLD}
-        <div class="fold"><Button weight="bare" onclick={() => (unfolded = true)}>{words.all(others.length)}</Button></div>
+        <div class="fold"><Button weight="bare" onclick={() => (unfolded = true)}>{words.all(others.length - FOLD)}</Button></div>
       {/if}
     {/if}
   {/if}

@@ -14,7 +14,7 @@ const NOW = Date.parse('2026-09-29T09:40:00Z');
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
 const opt = (title: string, recommended = false) => ({ key: title.toLowerCase(), title, body: '', recommended });
 
-test('the count is said in words, and red only over the aim or when a question is hard to undo', () => {
+test('the count is said in words; over the aim only “two over” is red, and the count is when one is hard to undo', () => {
   const two = sentenceOf([{ band: 'call' }, { band: 'rows' }], { options: [opt('Accept', true), opt('Not now')] }, 'claude');
   assert.deepEqual(two, { text: 'Two questions wait on you. claude suggests “Accept” for the first.', needs: '' });
 
@@ -23,7 +23,7 @@ test('the count is said in words, and red only over the aim or when a question i
 
   const five = sentenceOf([{}, {}, {}, {}, {}], { options: [opt('Yes'), opt('No')] });
   assert.equal(five?.text, 'Five questions wait on you, two over the aim of three.');
-  assert.equal(five?.needs, 'Five questions wait on you, two over the aim of three');
+  assert.equal(five?.needs, 'two over');
   /* THE RED PHRASE IS INSIDE THE SENTENCE, so PageHead can cut round it. */
   assert.ok(five && five.text.includes(five.needs));
 });

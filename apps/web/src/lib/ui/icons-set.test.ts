@@ -28,7 +28,7 @@ import type { Component } from 'svelte';
 
 import { CORE, loadSet } from 'braindog-render/glyphs';
 import { iconFor } from '../record/api.ts';
-import { PATHS, parseShapes, pathOf, type Shape } from './icons.ts';
+import { HAND, PATHS, parseShapes, pathOf, type Shape } from './icons.ts';
 
 /* THE COMPONENT IS COMPILED HERE, FOR THE SERVER, because `node --test` cannot load a `.svelte` file
    and the claims below are about what `Icon` draws rather than about what a lookup answers. Same
@@ -145,6 +145,17 @@ test('the rail places resolve by their own names', () => {
   for (const name of ['today', 'work', 'projects', 'money', 'activity', 'decide', 'settings', 'search', 'slash', 'plus'])
     assert.equal(iconFor(name, 'doc'), name);
   assert.equal(Object.keys(PATHS).length, 68);
+});
+
+test('the people glyphs Settings leads with draw at mount, in the app\'s hand, without waiting on the set', () => {
+  for (const name of ['user-check', 'user-plus'] as const) {
+    assert.equal(iconFor(name, 'doc'), name);
+    assert.deepEqual(drawnShapes(name), parseShapes(HAND[name]), name);
+    const d = pathOf(name, undefined)!;
+    assert.equal(d[0], 'M', name);
+    assert.doesNotMatch(d, /NaN|undefined|</, name);
+    for (const s of parseShapes(HAND[name])) if (s.tag === 'circle') assert.ok(Number(s.attrs.cx) - Number(s.attrs.r) >= 1, name);
+  }
 });
 
 test('a glyph only the set holds is a name the check accepts before the set has arrived', () => {

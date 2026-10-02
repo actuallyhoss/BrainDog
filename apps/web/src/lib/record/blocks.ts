@@ -595,6 +595,11 @@ function projectRows(block: BlockResult, cells: number, markAt?: (i: number) => 
       /* A LINK READS AS THE ROW IT POINTS AT, as the evaluator named it and the table beside it shows it: a guide's
          step drew `milestones#1` where the table drew the milestone's title. */
       if (REGISTERS[block.register ?? '']?.fields.find((f) => f.id === field)?.type === 'ref' && row.cells[n]) return row.cells[n];
+      /* A LIST NO REGISTER DECLARES WAS SAID BY ITS READER, and only there. What falls due across every list
+         (`page-live.ts`, source `deadlines`) writes each cell by hand, the day as a day and the amount signed, because
+         `display()` has no field to ask about; this saying it again from the raw fields drew Today's Overdue as
+         `2026-07-01` over `[object Object]` while the rows it was handed read `1 Jul 2026` and `−£9,190.00`. */
+      if (!REGISTERS[block.register ?? '']) return row.cells[n] ?? '';
       return display(block.register ?? '', field, entry.fields[field]) ?? '';
     });
     /**

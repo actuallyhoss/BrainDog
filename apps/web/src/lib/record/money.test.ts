@@ -394,6 +394,8 @@ test('A HEADLINE DROPS A FRACTION OF ALL ZEROS, and a sentence keeps its pence',
   assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'EGP 58,185');
   assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,850.50', 'a fraction that is not all zeros is part of the figure');
   assert.equal(symbolText('GBP 33,850.00', 'GBP'), '£33,850.00');
+  assert.equal(symbolText('Cash is GBP 33,850.00', 'USD', true), 'Cash is £33,850', 'a headline carries one mark of currency, never the symbol and the code');
+  assert.equal(symbolText('was EUR 4.00', 'GBP', true), 'was €4');
 });
 
 /**

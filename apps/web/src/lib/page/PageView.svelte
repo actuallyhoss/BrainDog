@@ -42,7 +42,6 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
   import ShareMenu from '$lib/ui/ShareMenu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Arrange, { added } from './Arrange.svelte';
@@ -170,6 +169,9 @@
   /** Blocks added in this session. They live beside the declared ones and index past them. */
   let extra = $state<PageBlock[]>([]);
 
+  /** The arranging controls, whose way in the head's page menu offers. */
+  let arranger = $state<ReturnType<typeof Arrange>>();
+
   /**
    * WHETHER THE PAGE OPENS ON ITS SENTENCE, read as a tile that holds the page's name and tools as well. On a wide screen
    * the head then rides inside that tile, over its top, and the sentence under it is the headline. Not while arranging,
@@ -192,13 +194,6 @@
    * edit-in-place inside a grid and a key's meaning must be a function of the object in focus rather than of the page
    * you happen to be on. The block keys are the body's (`PageBody.svelte`).
    */
-  /* THE SOURCE LINK KEEPS THE REST OF THE ADDRESS, as ⇧E does, so on /?work it stays on Work. */
-  const srcHref = $derived.by(() => {
-    const q = new URLSearchParams(route.url.searchParams);
-    q.set('src', showSource ? '0' : '1');
-    return `?${q}`;
-  });
-
   function onkeydown(e: KeyboardEvent) {
     if (mode !== 'page') return;
     if (typing()) return;
@@ -265,19 +260,13 @@
   >
     {#snippet actions()}
       {#if !arranging}
-        <!-- `How this page is built`, not `Source`, which a reader who does not write code reads as an origin or a
-             supplier. AUTHORING IS A DESKTOP SURFACE (13 §10): the link is not drawn below 900px. -->
-        <span class="source-slot">
-          <Button weight="bare" href={srcHref}>
-            <Icon name="code" size="s" />
-            {showSource ? copy.pageBack : copy.pageSource}
-          </Button>
-        </span>
+        <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
+             four controls in a row over every page, and a reader uses Share far more often than the other three. The
+             menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
         <ShareMenu {slug} />
-        <!-- "Change this page", and below 900px the page menu that holds it and the link above. -->
-        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} />
+        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} />
       {/if}
-      <Arrange {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
+      <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
 
@@ -412,11 +401,6 @@
   @media (width < 900px) {
     .said {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
-    /* THE LINK TO THE SOURCE IS A DESKTOP AFFORDANCE, as Edit layout beside it is (13 §10). */
-    .source-slot {
-      display: none;
     }
 
     /* ONE AT A TIME ON A PHONE: the side the switch has not chosen is not drawn. */

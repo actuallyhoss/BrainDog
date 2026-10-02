@@ -14,9 +14,15 @@
   THEN A CONVERSATION, AND NOTHING WRITTEN. The words come back marked with what each phrase became, then BrainDog's
   reply: what it heard, what it is for, the one question the words cannot answer (the currency, with the ones worth
   offering numbered and one suggested with its reason), and a field to tell it more. Each later turn is read with the
-  first, and BrainDog says what it added. Beside it, the BrainDog builds: a progress bar of its parts, a tile for each
-  part with why it is on and the entries the words filled, and every page it makes, drawn by the record with examples
-  that are marked and never saved (`PagesPreview.svelte`).
+  first, and BrainDog says what it added. Beside it, the BrainDog builds: its parts, each lighting up as a phrase asks
+  for it, and the reading itself, phrase by phrase as it is typed and "Reading" while the model reads; then a tile for
+  each part with why it is on and the entries the words filled, and every page it makes, drawn by the record with
+  examples that are marked and never saved (`PagesPreview.svelte`).
+
+  ONE BUTTON FAMILY, `Button`, in three weights by what each does: the one ink primary, quiet pills for the choices,
+  and bare words for the other way in (a file). The primary sits at the end of the row under the field, where the eye
+  lands when the sentence is done, and it is never drawn disabled before anything is typed: pressed then, it puts the
+  caret in the field.
 
   A BUSINESS NO USE CASE FITS IS DRAFTED FOR, where a model answers. Slash drafts lists,
   figures and pages made for what was said (`slashDraft`), which files nothing; they are drawn over its sample rows, and
@@ -62,7 +68,6 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import { Segments } from '$lib/viz';
   import Entry from '../signin/Entry.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
   import { accept, type NotMade } from './accept.ts';
@@ -225,7 +230,12 @@
   const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale }, door?.setup ?? null);
 
   async function read() {
-    if ((sentence.trim() === '' && file === null) || thinking) return;
+    if (thinking) return;
+    /* NOTHING SAID YET: the press puts the caret where the answer goes, rather than the button sitting greyed out. */
+    if (sentence.trim() === '' && file === null) {
+      field?.focus();
+      return;
+    }
     const mine = ++readings;
     thinking = true;
     const said = sentence.trim();
@@ -652,7 +662,7 @@
   {#if file === null}
     <span class="bring">
       <input class="bring-input" type="file" accept=".csv,.tsv,.json,.txt,text/csv,application/json" tabindex="-1" aria-hidden="true" bind:this={picker} onchange={pick} />
-      <Button weight="quiet" size="sm" disabled={busy} aria-describedby="bring-hint" onclick={() => picker?.click()}>{firstRun.exportPoint}</Button>
+      <Button weight="bare" size="sm" disabled={busy} aria-describedby="bring-hint" onclick={() => picker?.click()}>{firstRun.exportPoint}</Button>
       <span class="bring-hint" id="bring-hint">{firstRun.exportHint}</span>
     </span>
   {/if}
@@ -694,7 +704,7 @@
             <p class="again-h" id="again-h">{firstRun.againMade}</p>
             <p class="again-why">{firstRun.againMore}</p>
           </div>
-          <Button weight="quiet" href="/">{firstRun.againBack}</Button>
+          <Button href="/">{firstRun.againBack}</Button>
         </section>
       {/if}
 
@@ -734,31 +744,17 @@
               <div class="chips" role="group" aria-label={firstRun.whoChipsLabel}>
                 {#each firstRun.whoChips as c (c)}
                   <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
-                  <button type="button" class="chip" onmousedown={(e) => e.preventDefault()} onclick={() => chip(c)}>{c}</button>
+                  <Button size="sm" onmousedown={(e: MouseEvent) => e.preventDefault()} onclick={() => chip(c)}>{c}</Button>
                 {/each}
               </div>
-              <!-- WHAT IT HEARS AS IT IS TYPED, one phrase at a time. Not a live region: a screen reader would be told on
-                   every key. The press says it all in one place. -->
-              {#if live && live.heard.length > 0}
-                <div class="hearing">
-                  <span class="hearing-label">{words.hearing}</span>
-                  <ul class="hearing-list">
-                    {#each live.heard as h, i (i)}
-                      <li class="hearing-item"><q class="phrase">{h.phrase}</q> <span class="became">{h.became}</span></li>
-                    {/each}
-                  </ul>
-                </div>
-              {/if}
-              <div class="actions">
-                <!-- THE CAP ONLY WHILE THE KEY WORKS: a disabled pill's cap would promise a key that does nothing. -->
-                <Button
-                  weight="primary"
-                  type="submit"
-                  kbd={sentence.trim() === '' || thinking ? undefined : '↵'}
-                  disabled={(sentence.trim() === '' && file === null) || thinking}
-                  aria-busy={thinking}>{thinking ? firstRun.whoReading : firstRun.whoGo}</Button
-                >
+              <!-- THE OTHER WAY IN AT THE START OF THE ROW, AND THE PRIMARY AT ITS END, under the field's own edge, where
+                   the eye is when the sentence is done. What it hears as it is typed is drawn beside, in the build. -->
+              <div class="actions go">
                 {@render bringer()}
+                <!-- THE CAP ONLY WHILE THE KEY WORKS: a cap on a press that only moves the caret would promise more. -->
+                <Button weight="primary" type="submit" kbd={sentence.trim() === '' || thinking ? undefined : '↵'} disabled={thinking} aria-busy={thinking}
+                  >{thinking ? firstRun.whoReading : firstRun.whoGo}</Button
+                >
               </div>
               {#if fileWhy}<p class="nudge" role="status">{fileWhy}</p>{/if}
             </form>
@@ -831,7 +827,7 @@
                         {#if !closest}
                           <div class="chips" role="group" aria-label={firstRun.mineFor}>
                             {#each USE_CASES as one (one.usecase)}
-                              <button type="button" class="chip" aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</button>
+                              <Button size="sm" aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
                             {/each}
                           </div>
                         {/if}
@@ -913,24 +909,41 @@
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
           <Tile icon="home" title={waitingOn || onCount === 0 || proposal === null ? words.building : words.ready} count={words.parts(onCount, allParts.length)}>
-            <div class="steps">
-              <Segments
-                total={steps.order.length}
-                done={steps.done}
-                current={steps.current}
-                tone="danger"
-                summary={words.progress(
-                  steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
-                  steps.order.find((p) => p.state === 'waiting')?.name ?? null,
-                  steps.order.filter((p) => !p.on).map((p) => p.name),
-                )}
-              />
-              <ol class="step-names" aria-hidden="true" style:--n={steps.order.length}>
-                {#each steps.order as p (p.id)}
-                  <li data-state={p.state}>{p.name}</li>
+            <!-- EVERY PART IT CAN MAKE, EACH LIGHTING UP AS IT IS HEARD: its own glyph in an ink well once on, red while
+                 it waits on an answer, and the ground's quiet well while off. Read aloud once, as one sentence. -->
+            <p class="sr">
+              {words.progress(
+                steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
+                steps.order.find((p) => p.state === 'waiting')?.name ?? null,
+                steps.order.filter((p) => !p.on).map((p) => p.name),
+              )}
+            </p>
+            <ol class="lights" aria-hidden="true">
+              {#each steps.order as p (p.id)}
+                <li class="light" data-state={p.state} data-arrived={fresh.has(`part:${p.id}`) ? '' : undefined}>
+                  <IconWell name={p.icon} tone={p.state === 'waiting' ? 'danger' : p.on ? 'ink' : undefined} />
+                  <span class="light-name">{p.name}</span>
+                </li>
+              {/each}
+            </ol>
+            <!-- THE READING ITSELF, BUILDING AS IT IS TYPED: each phrase heard and what it became, then "Reading" while the
+                 model reads the whole. Not a live region while typing, or a screen reader would be told on every key; the
+                 press says it all in the conversation. -->
+            {#if thinking}
+              <p class="reading drafting" role="status"><span class="live-dot" aria-hidden="true"></span>{words.readingNow}</p>
+            {:else if proposal === null && live && live.heard.length > 0}
+              <ul class="heard-live">
+                {#each live.heard as h, i (i)}
+                  <li class="heard-one">
+                    <IconWell name={iconOfBecame(h.became)} />
+                    <span class="heard-main">
+                      <q class="phrase">{h.phrase}</q>
+                      <span class="became"><span class="sr">: </span>{h.became}</span>
+                    </span>
+                  </li>
                 {/each}
-              </ol>
-            </div>
+              </ul>
+            {/if}
             <p class="reading">
               {#if onCount === 0 && !steps.current}{words.lightsUp}{:else}{words.onReading(
                   steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
@@ -1117,67 +1130,11 @@
     gap: var(--sp-2);
   }
 
-  /* QUIET PILLS IN THE TILE: the `--s1` fill, no border, the chosen one on the selected fill. */
-  .chip {
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-4);
-    background: var(--s1);
-    border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .chip[aria-pressed='true'] {
+  /* THE CHOICES ARE `Button`'S QUIET PILLS, as every other choice on the screen is; the chosen one on the selected fill. */
+  .chips :global(.btn[aria-pressed='true']) {
     background: var(--selected);
     color: var(--ink);
     font-weight: 600;
-  }
-
-  .chip:disabled {
-    cursor: not-allowed;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .chip:hover:not(:disabled) {
-      background: var(--s2);
-    }
-  }
-
-  .ask .chips :global(.btn[aria-pressed='true']) {
-    background: var(--selected);
-    font-weight: 600;
-  }
-
-  /* WHAT IT HEARS AS IT IS TYPED: a label and the phrases, each quoted with what it became. */
-  .hearing {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-1) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: 18px;
-  }
-
-  .hearing-label {
-    color: var(--ink2);
-    font-weight: 500;
-  }
-
-  .hearing-list {
-    display: contents;
-    list-style: none;
-  }
-
-  .hearing-item {
-    display: inline-flex;
-    gap: var(--sp-1);
-    white-space: nowrap;
   }
 
   .actions {
@@ -1185,6 +1142,16 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+  }
+
+  /* THE ROW UNDER THE FIELD: the other way in at its start, the primary at its end. */
+  .actions.go {
+    justify-content: space-between;
+    padding-block-start: var(--sp-1);
+  }
+
+  .actions.go > :global(.btn[data-weight='primary']) {
+    margin-inline-start: auto;
   }
 
   /* ── a file ────────────────────────────────────────────────────────────── */
@@ -1407,10 +1374,6 @@
     white-space: nowrap;
   }
 
-  .hearing .phrase {
-    font-weight: 500;
-  }
-
   .became {
     color: var(--dim);
     font-size: var(--t-sm);
@@ -1547,45 +1510,60 @@
 
   /* ── the build ─────────────────────────────────────────────────────────── */
 
-  .steps {
+  /* THE PARTS, EACH A WELL OVER ITS NAME, as many to a row as fit: six across the build at 1440, three on a phone. A part
+     that just came on takes the arrival tint for the second and a half the part tiles do. */
+  .lights {
     display: grid;
-    gap: var(--sp-2);
-  }
-
-  /* EACH PART'S NAME UNDER ITS CELL, in the order the cells are drawn, 3 apart as the cells are. 12 is a chart's own
-     label size. */
-  .step-names {
-    display: grid;
-    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-    gap: 3px;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: var(--sp-3) var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .step-names li {
+  .light {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-1);
+    padding-block: var(--sp-1);
+    border-radius: var(--r-md);
+    min-inline-size: 0;
+    transition: background-color 1500ms var(--ease-out);
+  }
+
+  .light[data-arrived] {
+    background: var(--arrived-wash);
+    transition: none;
+  }
+
+  .light-name {
+    max-inline-size: 100%;
     overflow: hidden;
-    color: var(--ink2);
+    color: var(--ink);
     font-size: var(--t-xs);
+    font-weight: 500;
     line-height: 16px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .step-names li[data-state='waiting'] {
+  .light[data-state='waiting'] .light-name {
     color: var(--danger);
-    font-weight: 500;
   }
 
-  .step-names li[data-state='off'] {
+  .light[data-state='off'] .light-name {
     color: var(--dim);
+    font-weight: 400;
   }
 
-  /* A NARROW PHONE DROPS THE CHART'S SECONDARY LABELS and keeps its reading line. */
-  @media (width < 640px) {
-    .step-names {
-      display: none;
-    }
+  /* WHAT IT HEARD SO FAR, one phrase to a line, each with the glyph of what it became. */
+  .heard-live {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-3) 0 0;
+    border-block-start: 1px solid var(--line);
+    list-style: none;
   }
 
   .reading {
@@ -1607,12 +1585,12 @@
 
   /* ── the again note ────────────────────────────────────────────────────── */
 
+  /* THE NOTE SPANS THE FRAME, so its one press sits at the board's own right edge rather than wherever the words end. */
   .again {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--sp-3);
-    max-inline-size: var(--measure);
   }
 
   .again.alone {
@@ -1677,7 +1655,8 @@
     }
 
     .again > :global(.btn) {
-      grid-column: 1 / -1;
+      grid-column: 2 / -1;
+      justify-self: start;
     }
   }
 

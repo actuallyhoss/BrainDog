@@ -52,6 +52,7 @@ test('the tile: rules this week as the figure, what waits in ink, and filed earl
   assert.equal(tile.reading, 'Rules filed 12 this week; 3 still wait for a person.');
   assert.equal(whoFiledOf({ waiting: 0, filed: 5, archived: 0, ruled: 9 })?.parts[1]?.value, 0, 'clamped, never negative');
   assert.equal(whoFiledOf({ waiting: 1, filed: 5, archived: 0, ruled: null }), null, 'an older host has no weekly count to draw');
+  assert.equal(whoFiledOf({ waiting: 0, filed: 5, archived: 1, ruled: 0 }), null, 'nothing filed this week and nothing waiting draws no tile');
 });
 
 test('the page keeps the gates\' hooks and the untrusted-text rule', () => {

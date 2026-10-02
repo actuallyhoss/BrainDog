@@ -194,6 +194,23 @@ export function spokenRow(value: unknown, names?: Names): { label: string; href:
 /** Money when the walk knows its currency, and the bare integer when there is nothing to say. */
 const moneyOr = (minor: number, currency: string | null): string => (currency === null ? integer(minor) : money(minor, currency));
 
+/**
+ * A VALUE NO FIELD DECLARES, said by its shape, because `String(v)` is not a way of saying anything.
+ *
+ * It was `String(value)`, which wrote a signed amount as `[object Object]` and a due day as `2026-07-01` wherever a
+ * list nobody declares (what falls due, across every list) reached a cell. Money carries its own currency and a bare
+ * day is a day, so both are said as they would be under a declaration; any other object has no words, and is
+ * nothing rather than its type's name.
+ */
+function undeclared(value: unknown): string | null {
+  const c = currencyOf(value);
+  const a = c === null ? null : amountOf(value);
+  if (c !== null && a !== null) return money(a, c);
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value)) return fmtDay(value);
+  if (typeof value === 'object') return null;
+  return String(value);
+}
+
 /** What a `duration`'s declared unit is worth in the seconds the record stores. */
 const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
 
@@ -217,7 +234,7 @@ export function display(
      Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
   if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
   const f = decl(register, field);
-  if (!f) return String(value);
+  if (!f) return undeclared(value);
   switch (f.type) {
     case 'money': {
       /* THE VALUE CARRIES ITS OWN CURRENCY. A money field that came back as a bare number is a row

@@ -3,9 +3,14 @@
  * addresses, each its title, the host it goes to under the title, and a note.
  *
  * IT IS A LIST AND KEEPS THE LIST'S RULES (`.list > .item` in `blocks.css`): the title on the first line, the host in
- * the detail line and the note under it. What this sheet adds is what a list of doors needs: the title looks like the
- * link it is, and the whole row is the target, 44px tall under a coarse pointer, since a thumb aims at a row and
- * not at the words in it.
+ * the detail line and the note under it. What this sheet adds is what a list of doors needs: the whole row is the
+ * target, 44px tall under a coarse pointer, since a thumb aims at a row and not at the words in it.
+ *
+ * A ROW, NOT AN UNDERLINED LINE OF TEXT. Settings' index was a column of underlined words, which read as a page from
+ * 2005: the row says it goes somewhere with a chevron at its end (an arrow off the corner where it leaves this
+ * BrainDog), the wash under the pointer, and the title in ink with no underline. A row that carries a glyph (`link.ts`:
+ * the fourth cell, drawn by the renderer as `.link-well`) draws it in a well at the row's start, as every other row
+ * with a glyph does.
  */
 
 @layer components {
@@ -14,11 +19,8 @@
   }
 
   .list[data-kind='link'] a.item-title {
-    color: var(--link);
-    text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
+    color: var(--ink);
+    text-decoration: none;
     overflow-wrap: anywhere;
   }
 
@@ -37,6 +39,80 @@
     }
   }
 
+  /* THE CHEVRON AT THE ROW'S END, in the quiet ink: a door in this BrainDog. One that leaves it is an arrow off the
+     corner. Drawn on the row and not in the words, so a long title wraps short of it. */
+  .list[data-kind='link'] > .item:has(> a.item-title) {
+    padding-inline-end: calc(var(--sp-3) + 16px + var(--sp-3));
+  }
+
+  .list[data-kind='link'] > .item:has(> a.item-title)::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: var(--sp-3);
+    inline-size: 16px;
+    block-size: 16px;
+    translate: 0 -50%;
+    background: var(--dim);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 6.5 15 12l-5.5 5.5'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    pointer-events: none;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .list[data-kind='link'] > .item:has(> a.item-title[rel~='noreferrer'])::after {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 17 17 7M8.5 7H17v8.5'/%3E%3C/svg%3E");
+  }
+
+  .list[data-kind='link'] > .item:has(> a.item-title):hover::after {
+    background: var(--ink);
+  }
+
+  /* The chevron points the reading direction. */
+  .list[data-kind='link'] > .item:has(> a.item-title:not([rel~='noreferrer'])):dir(rtl)::after {
+    scale: -1 1;
+  }
+
+  /* A ROW WITH A GLYPH LEADS WITH ITS WELL (`link.ts`: the row's fourth cell). The renderer draws it as the row's
+     first child, `<span class="link-well" aria-hidden="true">` holding the glyph's svg, and this sheet sets it in a
+     `--well-l` square at the row's start, `--s1` with the glyph in `--ink2`, as `IconWell` draws one. The title, the
+     host and the note step in past it, so the row reads well, label, line, chevron, the way Settings' rows do. */
+  .list[data-kind='link'] > .item:has(> .link-well) {
+    padding-inline-start: calc(var(--sp-3) + var(--well-l) + var(--sp-3));
+  }
+
+  .list[data-kind='link'] .link-well {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: var(--sp-3);
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+    padding: 7px;
+    translate: 0 -50%;
+    border-radius: var(--r-well);
+    background: var(--s1);
+    color: var(--ink2);
+    pointer-events: none;
+  }
+
+  .list[data-kind='link'] .link-well > :is(svg, .glyph, .glyph-inline) {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  /* THE TITLE IS THE ROW'S LABEL, in ink and its own weight, never underlined: the chevron says it goes somewhere. */
+  .list[data-kind='link'] > .item:has(> .link-well) a.item-title {
+    font-weight: 500;
+  }
+
+  .list[data-kind='link'] a.item-title:is(:hover, :focus-visible) {
+    text-decoration: none;
+  }
+
   .link-host {
     color: var(--dim);
     font-size: var(--t-xs);
@@ -44,7 +120,7 @@
   }
 
   .link-note {
-    color: var(--ink2);
+    color: var(--dim);
     font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }

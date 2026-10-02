@@ -301,8 +301,9 @@ export function drawn(text: string, home: string | null): Drawn | null {
  * A sentence with every figure `money()` wrote in it redrawn the same way, as plain text.
  *
  * `headline` IS A FIGURE STANDING ON ITS OWN, a tile's, where a fraction of all zeros is dropped: "£33,850" and
- * "EGP 58,185", because ".00" under a headline is width a phone does not have and says nothing a round figure does not
- * A fraction that is not all zeros is part of the figure and stays.
+ * "EGP 58,185", because ".00" under a headline is width a phone does not have and says nothing a round figure does not.
+ * A fraction that is not all zeros is part of the figure and stays. A headline drops the code after a symbol, too: one
+ * mark of currency is enough there.
  */
 export function symbolText(text: string, home: string | null, headline = false): string {
   return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
@@ -310,7 +311,8 @@ export function symbolText(text: string, home: string | null, headline = false):
     if (!d) return hit;
     const fraction = headline && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;
     /* THE CODE STAYS WITH ITS AMOUNT, so a line of amounts in several currencies breaks between them and never inside one. */
-    return `${d.lead}${d.whole}${fraction}${d.iso ? ` ${d.iso}` : ''}`;
+    /* A HEADLINE CARRIES ONE MARK OF CURRENCY, its symbol: "£33,850" and never "£33,850 GBP". */
+    return `${d.lead}${d.whole}${fraction}${d.iso && !headline ? ` ${d.iso}` : ''}`;
   });
 }
 
