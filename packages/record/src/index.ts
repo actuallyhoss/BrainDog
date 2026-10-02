@@ -114,19 +114,30 @@ import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, drafted
 import { describedGrammar } from './grammar.ts';
 import { skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
 import {
+  askedOn,
+  factsBasis,
   figureText,
+  HEADLINE_ASKS_DAY,
+  HEADLINE_ITEMS_MOST,
+  HEADLINE_LOOK_MS,
   HEADLINE_PAGES_MOST,
+  HEADLINES_ASKED,
   headlineBasis,
   headlineFault,
   headlineKey,
   holesOf,
+  HOME_PAGE,
+  homeBasis,
+  homeRulesLine,
   leadBlockOf,
   linesIn,
   rulesLine,
   storedHeadline,
   type HeadlineFigure,
   type HeadlineInput,
+  type HeadlineItem,
   type HeadlinePage,
+  type HeadlinesAsked,
   type SlashHeadline,
 } from './headlines.ts';
 import {
@@ -167,7 +178,18 @@ export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_R
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
-export { HEADLINE_MOST, HEADLINE_PAGES_MOST, headlineFault, type HeadlineFigure, type HeadlineInput, type HeadlinePage, type SlashHeadline } from './headlines.ts';
+export {
+  HEADLINE_ASKS_DAY,
+  HEADLINE_MOST,
+  HEADLINE_PAGES_MOST,
+  headlineFault,
+  HOME_PAGE,
+  type HeadlineFigure,
+  type HeadlineInput,
+  type HeadlineItem,
+  type HeadlinePage,
+  type SlashHeadline,
+} from './headlines.ts';
 
 /**
  * What proves a caller is the sender an ingest expects, as the record can answer it today.
@@ -2273,14 +2295,105 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { filed, dropped };
   };
 
+  /** The UTC day as `slashTick` names it, which every headline is written and read against. */
+  const slashDay = (): string => new Date(clock.now()).toISOString().slice(0, 10);
+
+  /** The lists a page's blocks read, by their `source: register.<id>`. */
+  const listsRead = (blocks: readonly unknown[]): Set<string> =>
+    new Set(
+      blocks.flatMap((b) => {
+        const source = b !== null && typeof b === 'object' ? (b as { source?: unknown }).source : undefined;
+        return typeof source === 'string' && source.startsWith('register.') ? [source.slice('register.'.length)] : [];
+      }),
+    );
+
+  /** What is pressing across the record, read once for every page an ask covers (`pressingOf`). */
+  type Pressing = {
+    due: { list: string; title: string; when: HeadlineItem['when'] }[];
+    questions: { list: string | null; question: string }[];
+    open: number;
+    working: number;
+  };
+
   /**
-   * THE DAILY LOOK'S HEADLINE STEP: one line a page, written by the model from the page's lead note and its figures, and
-   * kept as Slash's pref `headline.<page>` (`headlines.ts`). The page read sends it on the lead note while the figures
-   * still hash to what it was written from, and the app says it in place of the rules' line.
+   * WHAT IS LATE OR DUE, WHAT WAITS ON THE PERSON AND WHAT IS WORKING, read through the blocks Today draws them with, so
+   * the record's reading is the page's: `deadlines` up to tomorrow, overdue first; `governance.open`, ranked; and
+   * `sessions.live` that are active. A source this record cannot read is nothing pressing, never a refusal.
+   */
+  const pressingRead = (today: string): Pressing => {
+    const drawn = (block: Record<string, unknown>): ReturnType<Kernel['block']> | null => {
+      try {
+        const got = kernel.block(block as never);
+        return got.refusals?.length ? null : got;
+      } catch {
+        return null;
+      }
+    };
+    const due = (drawn({ kind: 'table', source: 'deadlines', horizon: 1, limit: 200 })?.rows ?? []).flatMap((r) => {
+      const title = typeof r.fields.title === 'string' ? r.fields.title.trim() : '';
+      const day = typeof r.fields.day === 'string' ? r.fields.day.slice(0, 10) : '';
+      if (title === '' || day === '') return [];
+      return [{ list: String(r.fields.list), title, when: (day < today ? 'late' : day === today ? 'today' : 'tomorrow') as HeadlineItem['when'] }];
+    });
+    const asked = drawn({ kind: 'queue', source: 'governance.open', limit: 50 });
+    const questions = (asked?.queue ?? []).map((q) => ({ list: q.list ?? null, question: q.question.trim().slice(0, 200) })).filter((q) => q.question !== '');
+    const working = drawn({ kind: 'table', source: 'sessions.live', where: 'state is active', limit: 0 })?.matched ?? 0;
+    return { due, questions, open: asked?.matched ?? 0, working };
+  };
+
+  /** What a page's ask names: the late or due things on its lists, most pressing first, and the first question about them. */
+  const pressingOf = (read: Pressing, lists: ReadonlySet<string>): { items: HeadlineItem[]; question?: string } => {
+    const items: HeadlineItem[] = [];
+    for (const d of read.due) {
+      if (items.length >= HEADLINE_ITEMS_MOST) break;
+      if (lists.has(d.list) && !items.some((i) => i.title === d.title)) items.push({ title: d.title, when: d.when });
+    }
+    const question = read.questions.find((q) => q.list !== null && lists.has(q.list))?.question;
+    return { items, ...(question === undefined ? {} : { question }) };
+  };
+
+  /**
+   * HOME, AS ONE MORE PAGE IN THE ASK: Today read inside the record. How many things need the person (what waits on them
+   * and what is late), the titles of what is late, the first open question, and how many runs are working. A day with
+   * nothing needing them and nothing working is not asked about: the rules' calm line says it.
+   */
+  const homeReading = (read: Pressing): HeadlinePage | null => {
+    const late: HeadlineItem[] = [];
+    for (const d of read.due) if (d.when === 'late' && !late.some((i) => i.title === d.title)) late.push({ title: d.title, when: 'late' });
+    const needs = read.open + late.length;
+    if (needs === 0 && read.working === 0) return null;
+    const question = read.questions[0]?.question;
+    return {
+      page: HOME_PAGE,
+      title: 'Today',
+      rules: homeRulesLine(needs, late.length, read.working),
+      figures: [
+        { id: 'needs-you', value: String(needs) },
+        { id: 'late', value: String(late.length) },
+        { id: 'working', value: String(read.working) },
+      ],
+      ...(late.length > 0 ? { items: late.slice(0, HEADLINE_ITEMS_MOST) } : {}),
+      ...(question === undefined ? {} : { question }),
+    };
+  };
+
+  /** What a page was last asked at, as `HEADLINES_ASKED` keeps it: the figures' basis and the names' together. */
+  const askedAt = (basis: string, facts: string | undefined): string => (facts === undefined ? basis : `${basis}:${facts}`);
+
+  /**
+   * THE HEADLINE STEP: one line a page, written by the model from the page's lead note, its figures and the person's own
+   * things on it, kept as Slash's pref `headline.<page>` (`headlines.ts`), and Home's line beside them as `headline.home`.
+   * The page read sends a line on the lead note while what it was written from still holds, and the app says it in place
+   * of the rules' line.
    *
    * ONE ASK FOR EVERY PAGE, ON THE BACKGROUND ALLOWANCE AND NEVER HIS. Every page in the rail with a lead note that has a
-   * figure goes into the one ask, except a page whose figures have not moved since its line was written: a record whose
-   * money sat still all week spends no ask at all. A meter that cannot count a background ask asks nothing.
+   * figure goes into the one ask, except a page whose figures and names have not moved since its line was written: a
+   * record whose money sat still all week spends no ask at all. A meter that cannot count a background ask asks nothing.
+   *
+   * THE NIGHT ASKS, AND A DAY MAY ASK ONCE MORE. `slashTick` runs this with the daily look and again on a later tick the
+   * same day (`slashHeadlinesAgain`), when a page's basis moved after the night. A page already asked at the basis it has
+   * now is not asked again that day, so a line the check refused is not asked for over and over, and no more than
+   * `HEADLINE_ASKS_DAY` headline asks are made in a day, counted in `HEADLINES_ASKED` whether the model answered or not.
    *
    * A LINE IS KEPT ONLY WHEN IT PASSES `headlineFault`: one line of at most 140 characters, no number the model was not
    * handed, and none of the system's words. A line that fails is said in the look's log and the rules' line stands.
@@ -2290,24 +2403,41 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (!model?.headline) return { said: [], dropped: [] };
     const headline = model.headline.bind(model);
     const prefs = kernel.prefsOf(SLASH);
-    const due: { page: HeadlinePage; basis: string }[] = [];
+    const asked = askedOn(prefs[HEADLINES_ASKED], today);
+    if (asked.asks >= HEADLINE_ASKS_DAY) return { said: [], dropped: [] };
+    const pressing = pressingRead(today);
+    const due: { page: HeadlinePage; basis: string; facts?: string }[] = [];
+    /* A PAGE IS DUE when what it would be written from is not what its line was, and it was not asked at that today. */
+    const owed = (slug: string, basis: string, facts: string | undefined): boolean => {
+      const stored = storedHeadline(prefs[headlineKey(slug)]);
+      if (stored !== null && stored.basis === basis && stored.facts === facts) return false;
+      return asked.bases[slug] !== askedAt(basis, facts);
+    };
+    const home = homeReading(pressing);
+    if (home !== null) {
+      const basis = homeBasis(home, today);
+      if (owed(HOME_PAGE, basis, undefined)) due.push({ page: home, basis });
+    }
     for (const p of kernel.pages()) {
       if (due.length >= HEADLINE_PAGES_MOST) break;
-      if (p.nav === null || p.about !== null) continue;
+      /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
+      if (p.nav === null || p.about !== null || p.slug === HOME_PAGE) continue;
       const read = kernel.page(p.slug);
       if (!read.ok) continue;
       const lead = leadBlockOf(read.value.blocks);
       if (lead === null) continue;
       const basis = headlineBasis(p.slug, lead);
-      if (storedHeadline(prefs[headlineKey(p.slug)])?.basis === basis) continue;
+      const named = pressingOf(pressing, listsRead(read.value.blocks));
+      const facts = factsBasis(named.items, named.question);
+      if (!owed(p.slug, basis, facts)) continue;
       /* HOW FAR EACH FIGURE MOVED, asked of the record in one block over every figure the note names, so the model can say
          "up on last month" from the record's own arithmetic rather than its guess. */
       const holes = holesOf(lead.body);
       let moved: Record<string, JsonValue> = {};
-      const asked = holes.filter((h) => !h.includes('.') && !Object.hasOwn(lead.values, `${h}.change`));
-      if (asked.length > 0)
+      const changing = holes.filter((h) => !h.includes('.') && !Object.hasOwn(lead.values, `${h}.change`));
+      if (changing.length > 0)
         try {
-          moved = (kernel.block({ kind: 'note', body: asked.map((h) => `{{${h}.change}}`).join(' ') } as never).values ?? {}) as Record<string, JsonValue>;
+          moved = (kernel.block({ kind: 'note', body: changing.map((h) => `{{${h}.change}}`).join(' ') } as never).values ?? {}) as Record<string, JsonValue>;
         } catch {
           moved = {};
         }
@@ -2321,10 +2451,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         figures.push({ id, value, ...(change === undefined ? {} : { change }) });
       }
       if (figures.length === 0) continue;
-      due.push({ page: { page: p.slug, title: p.title, rules: rulesLine(lead.body, lead.values), figures }, basis });
+      due.push({
+        page: {
+          page: p.slug,
+          title: p.title,
+          rules: rulesLine(lead.body, lead.values),
+          figures,
+          ...(named.items.length > 0 ? { items: named.items } : {}),
+          ...(named.question === undefined ? {} : { question: named.question }),
+        },
+        basis,
+        ...(facts === undefined ? {} : { facts }),
+      });
     }
     if (due.length === 0) return { said: [], dropped: [] };
     const input: HeadlineInput = { today, pages: due.map((d) => d.page) };
+    /* COUNTED BEFORE THE MODEL IS ASKED, answered or not: the ask awaits the meter and the model, and a tick that comes in
+       meanwhile (the Worker ticks after every request) reads this count and these bases, so it never asks the same again.
+       A model that fails is not asked again at the same basis today; a meter that refuses spends the day's slot too. */
+    const next: HeadlinesAsked = { day: today, asks: asked.asks + 1, bases: { ...asked.bases } };
+    for (const d of due) next.bases[d.page.page] = askedAt(d.basis, d.facts);
+    kernel.setPref(SLASH, HEADLINES_ASKED, next);
     let raw: unknown;
     try {
       const got = await slashAsked('headline', input, (i) => headline(i));
@@ -2344,7 +2491,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         dropped.push(`${fault} Its own line stands.`);
         continue;
       }
-      const kept: SlashHeadline = { text: (text as string).trim(), day: today, basis: d.basis };
+      const kept: SlashHeadline = { text: (text as string).trim(), day: today, basis: d.basis, ...(d.facts === undefined ? {} : { facts: d.facts }) };
       kernel.setPref(SLASH, headlineKey(d.page.page), kept);
       said.push(d.page.page);
     }
@@ -2352,15 +2499,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The line the model wrote for a page's lead note, when the figures it was written from still hold: the lead block's
-   * index and the text, or `null`. Asked of a block AS THIS CALLER IS SHOWN IT, so a lead held from a reader, whose values
-   * are blanked, hashes to something else and carries no line written from figures she cannot read.
+   * THE SAME DAY'S SECOND LOOK at the headlines, on a tick after the daily look: only the headline step, and at most once
+   * every `HEADLINE_LOOK_MS`, since the Worker asks after every request. Kept in memory, so a restart looks once more,
+   * which costs a read and never an ask: the ask is bounded by `HEADLINES_ASKED`.
    */
-  const headlineFor = (slug: string, blocks: readonly unknown[]): { at: number; text: string } | null => {
+  let headlinesLooked = Number.NEGATIVE_INFINITY;
+  const slashHeadlinesAgain = async (today: string): Promise<void> => {
+    if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return;
+    headlinesLooked = clock.now();
+    if (askedOn(kernel.prefsOf(SLASH)[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return;
+    await slashHeadlines(today);
+  };
+
+  /**
+   * The line the model wrote for a page's lead note, when what it was written from still holds: the lead block's index
+   * and the text, or `null`. Asked of a block AS THIS CALLER IS SHOWN IT, so a lead held from a reader, whose values are
+   * blanked, hashes to something else and carries no line written from figures she cannot read.
+   *
+   * A LINE THAT NAMES THINGS (`facts`) IS SENT ONLY TO SOMEBODY WHO READS ALL OF EVERY LIST THE PAGE DOES, and only while the
+   * same things are still late or due: a bill named late is not named once it is paid.
+   */
+  const headlineFor = (slug: string, blocks: readonly unknown[], ctx: CallContext): { at: number; text: string } | null => {
+    if (slug === HOME_PAGE) return null;
     const lead = leadBlockOf(blocks);
     if (lead === null) return null;
     const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(slug)]);
-    return stored !== null && stored.basis === headlineBasis(slug, lead) ? { at: lead.at, text: stored.text } : null;
+    if (stored === null || stored.basis !== headlineBasis(slug, lead)) return null;
+    if (stored.facts !== undefined) {
+      const lists = listsRead(blocks);
+      /* AND READS ALL OF EACH: a grant narrowed to some of a list's things (`wheres`) may not see the title the line names. */
+      if ([...lists].some((l) => readable(ctx, l) !== null || whereFor(ctx.wheres, l) !== undefined)) return null;
+      const named = pressingOf(pressingRead(slashDay()), lists);
+      if (factsBasis(named.items, named.question) !== stored.facts) return null;
+    }
+    return { at: lead.at, text: stored.text };
+  };
+
+  /**
+   * Home's line (`headline.home`), when it was written today from the reading Today holds now, or `null`. Only for
+   * somebody who reads the whole record, since the reading is the whole record's: what waits, what is late, who works.
+   */
+  const homeLineFor = (ctx: CallContext): string | null => {
+    const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(HOME_PAGE)]);
+    const today = slashDay();
+    if (stored === null || stored.day !== today || !wholeRecord(ctx)) return null;
+    const home = homeReading(pressingRead(today));
+    return home !== null && homeBasis(home, today) === stored.basis ? stored.text : null;
   };
 
   /**
@@ -4907,7 +5091,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         model: deps.slashModel?.name ?? null,
         quiet: r.quiet,
         noticed: r.noticed,
-        drafts: r.drafts.map((d) => ({ question: d.question, body_kind: d.body_kind, asked: r.asked.get(d.key) ?? null })),
+        drafts: r.drafts.map((d) => ({ question: d.question, body_kind: d.body_kind, by: d.by, asked: r.asked.get(d.key) ?? null })),
         waiting: r.shown,
         cap: SLASH_OPEN_CAP,
         daily: slashDailyState(),
@@ -5032,7 +5216,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
       const today = new Date(clock.now()).toISOString().slice(0, 10);
-      if (state.last === today) return { ran: false, why: 'today' };
+      if (state.last === today) {
+        /* THE DAY'S LOOK IS DONE, BUT A PAGE WHOSE FIGURES MOVED SINCE MAY BE ASKED ABOUT ONCE MORE (`slashHeadlinesAgain`). */
+        await slashHeadlinesAgain(today).catch(() => {});
+        return { ran: false, why: 'today' };
+      }
       kernel.setPref(SLASH, SLASH_LAST, today);
       const out = await slashFile(undefined, true);
       /* THE SKILL STEP COMES AFTER, so a skill's next version takes a slot on Decide the look's own drafts left, and what
@@ -5199,7 +5387,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const declared = pageDeclaredAt(args.slug);
       const blocks = out.value.blocks.map((b) => heldBlock(ctx, b));
       /* THE MODEL'S LINE ON THE LEAD NOTE, AS `said`, while its figures hold (`slashHeadlines`). */
-      const line = headlineFor(args.slug, blocks);
+      const line = headlineFor(args.slug, blocks, ctx);
       const filters = out.value.filters as PageFilter[] | undefined;
       return ok({
         ...out.value,
@@ -5368,7 +5556,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       });
 
       const decl = b as { page: string };
-      const blocks = written.map((block, i) => {
+      const drawnBlocks = written.map((block, i) => {
         const plan = plans[i]!;
         const cost = costs[i];
         const drawn =
@@ -5388,6 +5576,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         for (const [name, was] of back) text = text.replaceAll(name, was);
         return JSON.parse(text) as typeof drawn;
       });
+      /* TODAY'S BODY IS HOME (`todayHome` in the app, drawn here and never installed), so its lead note carries Home's
+         line as `said`, as `page` carries a page's: written today from the reading Today holds now (`homeLineFor`). */
+      const homeLine = decl.page === 'today' && leadBlockOf(drawnBlocks)?.at === 0 ? homeLineFor(ctx) : null;
+      const blocks = homeLine === null ? drawnBlocks : drawnBlocks.map((d, i) => (i === 0 ? { ...d, said: homeLine } : d));
 
       /* AND WHAT THE DRAWN BLOCKS ANSWER, TOGETHER. Each table is inside `page`'s limit of 500 rows, and 24 of them are
          12,000 rows; a row may be as long as its list lets it be. Rows and a walk's steps are counted, then bytes. */

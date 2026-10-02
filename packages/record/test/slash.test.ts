@@ -127,20 +127,22 @@ test('SLASH READS HOW A RECORD IS USED and says what it noticed in plain sentenc
   assert.equal(seen.model, null);
   assert.equal(seen.quiet, null);
   const said = Object.fromEntries(seen.noticed.map((n) => [`${n.kind}:${n.subject}`, n.text]));
-  assert.equal(said['grows:tasks'], 'Tasks gained 12 rows in the last thirty days, on 3 separate days.');
-  assert.equal(said['grows:logbook'], 'Logbook gained 6 rows in the last thirty days, on 3 separate days.');
+  assert.equal(said['grows:tasks'], 'Tasks grew by 12 in the last thirty days, on 3 separate days.');
+  assert.equal(said['grows:logbook'], 'Logbook grew by 6 in the last thirty days, on 3 separate days.');
   assert.equal(said['agents:agent:claude'], 'An agent made 12 changes in the last thirty days, mostly in Tasks.');
   assert.equal(said['unopened:notes'], undefined, 'a page of a pack already said to be untouched was said again');
   assert.equal(said['untouched:notes'], 'Nothing in Notes has been opened or changed in ninety days.');
   assert.equal(said['unopened:work'], undefined, 'a page opened this quarter was called unopened');
   for (const n of seen.noticed) assert.ok(!n.text.includes('—'), `an em dash in: ${n.text}`);
+  /* THE PERSON'S WORDS, NEVER THE SYSTEM'S (DIRECTION §35): nothing Slash says or asks calls their things rows or lists. */
+  for (const text of [...seen.noticed.map((n) => n.text), ...seen.drafts.map((d) => d.question)]) assert.doesNotMatch(text, /\brows?\b|\blists?\b/iu, text);
 
   assert.deepEqual(
     seen.drafts.map((d) => [d.body_kind, d.question]),
     [
-      ['arrange', 'Give Logbook a page of its own? It gained 6 rows in the last thirty days, and no page shows it yet.'],
+      ['arrange', 'Give Logbook a page of its own? It grew by 6 in the last thirty days, and no page shows it yet.'],
       ['pack', 'Add Watch, so you can see what agents do here? They made 12 changes in the last thirty days.'],
-      ['pack', 'Turn off Notes? Nothing in it has been opened or changed in ninety days. Its rows stay, and you can turn it back on.'],
+      ['pack', 'Turn off Notes? Nothing in it has been opened or changed in ninety days. What it holds stays, and you can turn it back on.'],
     ],
   );
   assert.ok(seen.drafts.every((d) => d.asked === null));
@@ -437,7 +439,7 @@ test('A LIST RENAMED IS RENAMED IN ALL THREE WORDS: its name, one of it, and the
   assert.deepEqual(words, [
     'Call Tickets Issues everywhere? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
     'Call one of them issue? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
-    'Say Issues holds every issue we know about? The line reads "every ticket we know about" now, in the word this list was called before.',
+    'Say Issues holds every issue we know about? The line reads "every ticket we know about" now, in the old word.',
   ]);
   for (const q of words) assert.ok(!q.includes('—'), `an em dash in: ${q}`);
 
@@ -501,12 +503,12 @@ test('THE SKILLS A USE CASE NAMES are offered to the agents once each, as rows o
   await install({ install: 'agents' });
   day(0);
   seen = value<Toned>(await api.slash({}, owner));
-  assert.equal(seen.noticed.find((x) => x.kind === 'skills')?.text, 'Team names skills for agents that your Skills list does not hold: task-triage and standup-digest.');
+  assert.equal(seen.noticed.find((x) => x.kind === 'skills')?.text, 'Team names skills for agents that you do not have in Skills yet: task-triage and standup-digest.');
   assert.deepEqual(
     seen.drafts.filter((d) => d.body_kind === 'rowset').map((d) => d.question),
     [
-      'Give your agents the skill task-triage? Team names it for when a ticket is opened, and your Skills list has none by that name.',
-      'Give your agents the skill standup-digest? Team names it for each morning, and your Skills list has none by that name.',
+      'Give your agents the skill task-triage? Team names it for when a ticket is opened, and Skills has none by that name yet.',
+      'Give your agents the skill standup-digest? Team names it for each morning, and Skills has none by that name yet.',
     ],
   );
 

@@ -1,16 +1,25 @@
 /**
- * The headline line on each page, written by the model overnight and checked before it is kept.
+ * The headline line on each page, and the one on Home, written by the model and checked before it is kept.
  *
  * A PAGE'S LEAD NOTE IS SAID BY RULES (`leadOf` in the app): its holes filled and a clause whose figure is nought taken
  * away. That reads "Cash is GBP 33,850.00 across 2 accounts", which is true and says nothing about what matters. DIRECTION
  * §35 has a model read the figures and say it, so once a day `slashHeadlines` (`index.ts`) asks the model for one line a
  * page, every page at once, on the background allowance and never one of the person's own asks.
  *
+ * THE MODEL IS HANDED THE PERSON'S OWN THINGS, NOT ONLY FIGURES: the titles of what is late or due on the page's lists
+ * (`items`, at most `HEADLINE_ITEMS_MOST`) and the first open question about them, so a line can say "the EDF bill is the
+ * late one" rather than restate a count. Home is one more page in the same ask (`HOME_PAGE`), read from Today inside the
+ * record: how many things need the person, the titles of what is late, and how many runs are working.
+ *
  * NOTHING THE MODEL SAYS IS TRUSTED AS IT CAME. `headlineFault` keeps a line only when it is one short sentence, every
  * number in it is a number the model was handed, and it names none of the system's words, so the line on the page can
  * never say a figure the tiles beside it do not. A line is kept with the `basis` it was written from, a hash of the lead
- * note's figures, and the page read sends it only while the figures still hash the same: once a figure moves, the rules
- * speak again until the next night writes a new one.
+ * note's figures (and `facts`, a hash of the titles it was handed), and the page read sends it only while both still hash
+ * the same: once a figure moves, the rules speak again until a new line is written.
+ *
+ * AND A NEW LINE IS WRITTEN THE SAME DAY, ONCE. A page whose basis moves after the night's ask is asked about again on a
+ * later tick, on the background allowance, and never more than `HEADLINE_ASKS_DAY` headline asks are made in one day
+ * (`HEADLINES_ASKED`), so a busy day costs one extra ask and not one a write.
  */
 
 import type { Json } from '@braindog/kernel';
@@ -25,20 +34,49 @@ export const HEADLINE_PAGES_MOST = 24;
 /** The pref a page's line is kept under, as Slash's own (`pref`, person `slash`). */
 export const headlineKey = (page: string): string => `headline.${page}`;
 
+/** Home's id in the ask and in the pref its line is kept under (`headline.home`). A page declared `home` is not asked as a page. */
+export const HOME_PAGE = 'home';
+
+/** How many late or due things a page's ask names, most pressing first. */
+export const HEADLINE_ITEMS_MOST = 3;
+
+/** At most this many headline asks in one day: the night's, and one more when a page's figures move after it. */
+export const HEADLINE_ASKS_DAY = 2;
+
+/** How often a tick after the day's look reads the pages again for a basis that moved: a read, never an ask. */
+export const HEADLINE_LOOK_MS = 15 * 60_000;
+
+/** Slash's pref counting the day's headline asks, and the basis each page was last asked at that day. Not `headline.`, so no page's slug can be it. */
+export const HEADLINES_ASKED = 'headlines.asked';
+
 /** The words a person never reads about their own things (DIRECTION §35): the system's, not theirs. */
 const SYSTEM_WORDS = /\b(?:rows?|lists?|registers?|blocks?)\b/iu;
 
 /** One figure the model is handed: its path as the note writes it, its value as a person reads it, and how far it moved. */
 export type HeadlineFigure = { id: string; value: string; change?: string };
 
-/** One page the model is asked to say a line for. `rules` is the line the rules say today, filled. */
-export type HeadlinePage = { page: string; title: string; rules: string; figures: HeadlineFigure[] };
+/** One thing late or due on a page's lists, by its own title: late, due today, or due tomorrow. No day, so no number. */
+export type HeadlineItem = { title: string; when: 'late' | 'today' | 'tomorrow' };
+
+/**
+ * One page the model is asked to say a line for. `rules` is the line the rules say today, filled. `items` are the titles
+ * of what is late or due on its lists, most pressing first, and `question` the first open question about them; each is
+ * left out when there is none, so a page with nothing pressing is handed what it always was.
+ */
+export type HeadlinePage = { page: string; title: string; rules: string; figures: HeadlineFigure[]; items?: HeadlineItem[]; question?: string };
 
 /** What `SlashModel.headline` is handed. The host answers `{"lines":{"<page>":"..."}}`. */
 export type HeadlineInput = { today: string; pages: HeadlinePage[] };
 
-/** A line as it is kept: the text, the day it was written, and the hash of the figures it was written from. */
-export type SlashHeadline = { text: string; day: string; basis: string };
+/**
+ * A line as it is kept: the text, the day it was written, and the hash of the figures it was written from. `facts` is the
+ * hash of the titles and the question it was handed, kept only when it was handed some, so a line naming a bill is not
+ * sent once that bill is paid.
+ */
+export type SlashHeadline = { text: string; day: string; basis: string; facts?: string };
+
+/** The day's headline asks as `HEADLINES_ASKED` keeps them: how many, and the basis each page was last asked at. */
+export type HeadlinesAsked = { day: string; asks: number; bases: Record<string, string> };
 
 /** A lead note as a page read answers it: the first one drawn, with its template and the values of its holes. */
 export type LeadBlock = { at: number; body: string; values: Record<string, Json> };
@@ -60,15 +98,10 @@ export function leadBlockOf(blocks: readonly unknown[]): LeadBlock | null {
 export const holesOf = (template: string): string[] => [...new Set([...template.matchAll(/\{\{\s*([^{}\s]+)\s*\}\}/gu)].map((m) => m[1]!))];
 
 /**
- * A short hash of what a line is written from, the same on the night it was written and on any read after while nothing
- * moved. Not a secret and not a check against tampering, only "has this changed": cyrb53, so it needs no async digest
- * and is the same in Node and in the Worker.
+ * A short hash of a text. Not a secret and not a check against tampering, only "has this changed": cyrb53, so it needs no
+ * async digest and is the same in Node and in the Worker.
  */
-export function headlineBasis(page: string, lead: LeadBlock): string {
-  const values = Object.keys(lead.values)
-    .sort()
-    .map((k) => [k, lead.values[k]]);
-  const text = JSON.stringify([page, lead.body, values]);
+function hashOf(text: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i++) {
@@ -80,6 +113,25 @@ export function headlineBasis(page: string, lead: LeadBlock): string {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
+
+/** What a page's line is written from, the same on the day it was written and on any read after while nothing moved. */
+export function headlineBasis(page: string, lead: LeadBlock): string {
+  const values = Object.keys(lead.values)
+    .sort()
+    .map((k) => [k, lead.values[k]]);
+  return hashOf(JSON.stringify([page, lead.body, values]));
+}
+
+/** The titles and the question a page was handed, as one hash, or `undefined` when it was handed none. */
+export const factsBasis = (items: readonly HeadlineItem[], question: string | undefined): string | undefined =>
+  items.length === 0 && question === undefined ? undefined : hashOf(JSON.stringify([items, question ?? null]));
+
+/**
+ * What Home's line is written from: the day, its figures, the titles and the question. The day is in it because "late"
+ * is a word about today, so yesterday's line is never sent this morning.
+ */
+export const homeBasis = (home: HeadlinePage, today: string): string =>
+  hashOf(JSON.stringify([today, home.figures.map((f) => [f.id, f.value]), home.items ?? [], home.question ?? null]));
 
 /** A money in minor units as a person reads it, in the currency's own decimals: `GBP 33,850.00`, `JPY 129,900`. */
 const moneyOf = (amount: number, currency: string): string => {
@@ -149,7 +201,10 @@ export const numbersIn = (text: string): number[] => [
 
 /** Every number the model was handed for one page, which are the only numbers its line may say. */
 export const numbersOf = (page: HeadlinePage): Set<number> =>
-  new Set([page.title, page.rules, ...page.figures.flatMap((f) => [f.value, f.change ?? ''])].flatMap(numbersIn));
+  new Set([page.title, page.rules, ...page.figures.flatMap((f) => [f.value, f.change ?? '']), ...namesOf(page)].flatMap(numbersIn));
+
+/** The person's own names a page was handed: the titles of what is late or due, and the open question. */
+const namesOf = (page: HeadlinePage): string[] => [...(page.items ?? []).map((i) => i.title), ...(page.question === undefined ? [] : [page.question])];
 
 /**
  * Why a line the model wrote is not kept, or `null` for one that is. One line of at most `HEADLINE_MOST`, no hole
@@ -161,7 +216,13 @@ export function headlineFault(text: unknown, page: HeadlinePage): string | null 
   if (line.length > HEADLINE_MOST) return `The line for ${page.title} was longer than ${HEADLINE_MOST} characters.`;
   /* A HOLE, A BREAK OR MARKUP: the lead note's body is drawn as written, so a `**` or a `[link](…)` would be drawn too. */
   if (/[\n\r{}[\]*`<>]/u.test(line)) return `The line for ${page.title} was not one plain sentence.`;
-  if (SYSTEM_WORDS.test(line)) return `The line for ${page.title} used the system's words rather than the person's.`;
+  /* A NAME OF THEIR OWN MAY HOLD ONE OF THOSE WORDS, "Reading list" or "Fix the rows", and saying it is naming their
+     thing: what is checked is the line with the names it was handed taken out. */
+  const own = namesOf(page)
+    .filter((n) => n.trim() !== '')
+    .sort((a, b) => b.length - a.length)
+    .reduce((rest, n) => rest.split(n).join(' '), line);
+  if (SYSTEM_WORDS.test(own)) return `The line for ${page.title} used the system's words rather than the person's.`;
   const handed = numbersOf(page);
   const made = numbersIn(line).find((n) => !handed.has(n));
   if (made !== undefined) return `The line for ${page.title} said ${made}, which none of its figures holds.`;
@@ -171,8 +232,33 @@ export function headlineFault(text: unknown, page: HeadlinePage): string | null 
 /** A kept line as Slash's pref holds it, or `null` for a pref that is not one. */
 export function storedHeadline(raw: unknown): SlashHeadline | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { text, day, basis } = raw as { text?: unknown; day?: unknown; basis?: unknown };
-  return typeof text === 'string' && typeof day === 'string' && typeof basis === 'string' ? { text, day, basis } : null;
+  const { text, day, basis, facts } = raw as { text?: unknown; day?: unknown; basis?: unknown; facts?: unknown };
+  if (typeof text !== 'string' || typeof day !== 'string' || typeof basis !== 'string') return null;
+  return typeof facts === 'string' ? { text, day, basis, facts } : { text, day, basis };
+}
+
+/** The day's headline asks as kept, or a day with none asked yet when the pref is another day's or not one. */
+export function askedOn(raw: unknown, today: string): HeadlinesAsked {
+  const none: HeadlinesAsked = { day: today, asks: 0, bases: {} };
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return none;
+  const { day, asks, bases } = raw as { day?: unknown; asks?: unknown; bases?: unknown };
+  if (day !== today || typeof asks !== 'number' || !Number.isInteger(asks) || asks < 0) return none;
+  const kept: Record<string, string> = {};
+  if (bases !== null && typeof bases === 'object' && !Array.isArray(bases))
+    for (const [page, b] of Object.entries(bases)) if (typeof b === 'string') kept[page] = b;
+  return { day: today, asks, bases: kept };
+}
+
+/**
+ * Home's line as the rules would say it, from the reading Home's ask is handed: how many things need the person, how
+ * many of them are late, and how many runs are working. In digits, as the figures the model may repeat are.
+ */
+export function homeRulesLine(needs: number, late: number, working: number): string {
+  const runs = working === 0 ? 'no agent is working' : working === 1 ? '1 agent is working' : `${working} agents are working`;
+  if (needs === 0) return `Nothing needs you, and ${runs}.`;
+  const head = `${needs} ${needs === 1 ? 'thing needs' : 'things need'} you`;
+  if (late === 0) return `${head}, and ${runs}.`;
+  return `${head}, and ${late === needs ? (needs === 1 ? 'it is late' : 'all are late') : `${late} ${late === 1 ? 'is' : 'are'} late`}.`;
 }
 
 /** The lines the model answered, by page, from `{"lines":{"<page>":"..."}}`; anything else is no lines at all. */

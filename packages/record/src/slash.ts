@@ -459,17 +459,17 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
   /* WHAT GROWS, most first. */
   const growing = usage.lists.filter((l) => l.added30 >= GROWS.rows && l.addedDays30 >= GROWS.days).sort((a, b) => b.added30 - a.added30);
   for (const l of growing) {
-    noticed.push({ kind: 'grows', subject: l.id, text: `${l.name} gained ${plural(l.added30, 'row')} in the last thirty days, on ${l.addedDays30} separate days.` });
+    noticed.push({ kind: 'grows', subject: l.id, text: `${l.name} grew by ${l.added30} in the last thirty days, on ${l.addedDays30} separate days.` });
     /* A LIST THAT GROWS AND NO PAGE SHOWS gets a page of its own, filed beside its pack's pages in the rail. */
     if (!usage.pages.some((p) => p.registers.includes(l.id))) {
       const slug = freeSlug(l.id, usage.pages);
       const section = usage.pages.find((p) => p.pack !== null && p.pack === l.pack)?.title ?? l.name;
       drafts.push({
         key: `page:${l.id}`,
-        question: `Give ${l.name} a page of its own? It gained ${plural(l.added30, 'row')} in the last thirty days, and no page shows it yet.`,
+        question: `Give ${l.name} a page of its own? It grew by ${l.added30} in the last thirty days, and no page shows it yet.`,
         body_kind: 'arrange',
         body: {
-          why: [`${l.name} gained ${plural(l.added30, 'row')} in thirty days, and no page shows it.`],
+          why: [`${l.name} grew by ${l.added30} in thirty days, and no page shows it.`],
           pages: [
             {
               id: `page.${slug}`,
@@ -527,7 +527,7 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       noticed.push({ kind: 'untouched', subject: pack.id, text: `Nothing in ${title} has been opened or changed in ninety days.` });
       drafts.push({
         key: `off:${pack.id}`,
-        question: `Turn off ${title}? Nothing in it has been opened or changed in ninety days. Its rows stay, and you can turn it back on.`,
+        question: `Turn off ${title}? Nothing in it has been opened or changed in ninety days. What it holds stays, and you can turn it back on.`,
         body_kind: 'pack',
         body: { disable: pack.id },
         by: 'rules',
@@ -554,14 +554,14 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       noticed.push({
         kind: 'voice',
         subject: other.p.id,
-        text: `Most of what you added this month went into ${title} (${plural(other.n, 'row')}), while ${packTitle(usage.speaking)} gained ${now}.`,
+        text: `Most of what you added this month went into ${title}: ${other.n}, against ${now} in ${packTitle(usage.speaking)}.`,
       });
       drafts.push({
         key: `voice:${other.p.id}`,
         question: `Let ${title} set the tone? Most of what you added in the last thirty days went there, and BrainDog still speaks as ${packTitle(usage.speaking)}.`,
         body_kind: 'arrange',
         /* THE SETTING IS WHAT MAKES IT A CHANGE; accepting an arrangement led by a use case then writes the voice rule down with it speaking. */
-        body: { usecase: other.p.id.slice('usecase-'.length), settings: [{ pack: other.p.id, values: { speaks: true } }], why: [`${plural(other.n, 'row')} added to ${title} in thirty days, and ${now} to ${packTitle(usage.speaking)}.`] },
+        body: { usecase: other.p.id.slice('usecase-'.length), settings: [{ pack: other.p.id, values: { speaks: true } }], why: [`${other.n} added to ${title} in thirty days, and ${now} to ${packTitle(usage.speaking)}.`] },
         by: 'rules',
       });
     }
@@ -622,7 +622,7 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       if (line !== '' && said !== line && said.length <= HOLDS_MOST)
         drafts.push({
           key: '',
-          question: `Say ${title} holds ${said}? The line reads "${line}" now, in the word this list was called before.`,
+          question: `Say ${title} holds ${said}? The line reads "${line}" now, in the old word.`,
           body_kind: 'settings',
           body: { pack: tone.pack, values: { [holdsSetting]: said } },
           by: 'rules',
@@ -671,12 +671,12 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       noticed.push({
         kind: 'skills',
         subject: missing.map(({ s }) => s.name).join(','),
-        text: `${joinNames(naming)} ${naming.length === 1 ? 'names' : 'name'} ${missing.length === 1 ? 'a skill' : 'skills'} for agents that your Skills list does not hold: ${joinNames(missing.map(({ s }) => s.name))}.`,
+        text: `${joinNames(naming)} ${naming.length === 1 ? 'names' : 'name'} ${missing.length === 1 ? 'a skill' : 'skills'} for agents that you do not have in Skills yet: ${joinNames(missing.map(({ s }) => s.name))}.`,
       });
     for (const { o, s } of missing)
       drafts.push({
         key: '',
-        question: `Give your agents the skill ${s.name}? ${o.title} names it for ${momentOf(s.trigger)}, and your Skills list has none by that name.`,
+        question: `Give your agents the skill ${s.name}? ${o.title} names it for ${momentOf(s.trigger)}, and Skills has none by that name yet.`,
         body_kind: 'rowset',
         body: {
           register: 'skills',
