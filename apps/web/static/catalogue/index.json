@@ -472,8 +472,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.1.0",
       "versions": [
+        {
+          "version": "2.1.0",
+          "checksum": "0b13d0000519094cd85abd29c23b2f3eefe92e51a0accb095b23fc40ef75fc45",
+          "bytes": 27610,
+          "published_at": "2026-10-02T03:16:47.995Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [
+              "Add the three costs of the price check together, and the least price they allow"
+            ],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The desk opens on its one line, how many essential steps are done, before anything else, and the calls waiting on you are drawn only while one is asked, so a desk with nothing to decide shows no empty box saying so."
+        },
         {
           "version": "2.0.0",
           "checksum": "9a164ad10d8dabe292aad311a65fb129f7b5c0c5673cfec0028fc4bf68c57c2c",

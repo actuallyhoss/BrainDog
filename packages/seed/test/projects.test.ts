@@ -12,7 +12,8 @@ import { openRecord, type Kernel, type PageResult } from '@braindog/kernel';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
 
-import { NOW, THINGS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
+import { NOW, PAGES, THINGS, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
+import { PORTFOLIO_REGISTERS } from '../src/modules/portfolio.ts';
 
 function openSqlite(): Sql {
   const db = new DatabaseSync(':memory:');
@@ -234,6 +235,41 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS WHERE EVERY PROJECT IS AS O
   const sample = THINGS.find((t) => t.name === 'Kiln')!;
   assert.deepEqual([kiln.fields.about, kiln.fields.mark, kiln.fields.hue], [sample.about, sample.mark, sample.hue]);
   assert.ok(THINGS.every((t) => typeof t.about === 'string' && t.about !== ''), 'a sample project says nothing about what it is');
+});
+
+test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a capital, and Right now is a third of a row', async () => {
+  /* SINCE portfolio 1.9.0: the title read Overview under a top bar saying Projects, Where they are printed "earning" and
+     "building" as they are stored, and Right now held two numbers across the whole width. */
+  const page = PAGES.portfolio!;
+  assert.equal(page.title, (page.nav as { section?: string } | undefined)?.section);
+  const lane = PORTFOLIO_REGISTERS.things!.fields.find((f) => f.id === 'lane') as unknown as { values: readonly string[]; labels?: Record<string, string> };
+  assert.deepEqual(lane.values.map((v) => lane.labels?.[v]), ['Building', 'Earning', 'Parked', 'Finished']);
+  const row = (page.blocks as { heading?: string; span?: number; when?: unknown }[]).filter((b) => ['Right now', 'Where they are', 'How they are going'].includes(String(b.heading)));
+  assert.deepEqual(row.map((b) => b.span), [4, 4, 4], 'the three do not make one row');
+  assert.ok(row.every((b) => JSON.stringify(b.when) === JSON.stringify({ metric: 'projects-live', gt: 0 })), 'part of the row draws when the rest does not');
+
+  const k = await seeded();
+  assert.equal(block(opened(k, 'portfolio'), 'Right now').drawn !== false, true);
+});
+
+test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be checked, and says the step once', async () => {
+  /* SINCE portfolio 1.9.0. Kiln has open work and none of it handed back, which drew no line at all before. */
+  const k = await seeded();
+  const page = opened(k, 'kiln');
+  const leads = page.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false);
+  assert.equal(leads.length, 1, 'not exactly one line');
+  assert.equal(page.blocks.find((b) => b.drawn !== false), leads[0], 'the line is not the first thing drawn');
+  const kiln = THINGS.find((t) => t.name === 'Kiln')!;
+  assert.equal((leads[0] as { body?: string }).body, `Next on Kiln: ${String(kiln.next)}`);
+  const stands = block(page, 'Where it stands') as { columns?: { field?: string }[] };
+  assert.ok(!(stands.columns ?? []).some((c) => c.field === 'next'), 'Where it stands says the line again');
+
+  /* AND A TASK HANDED BACK IS THE LINE INSTEAD, never both. */
+  const kilnRow = k.get(`things#${THINGS.findIndex((t) => t.name === 'Kiln') + 1}`)!;
+  const made = k.create('tasks', { what: 'Check the specimen proof', thing: kilnRow.id, state: 'review' } as never, { actor: 'p_test' });
+  assert.ok(made.ok, sayOf(made));
+  const back = opened(k, 'kiln').blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false);
+  assert.deepEqual(back.map((b) => (b as { body?: string }).body), ['Work on Kiln has been handed back, and it waits for you to check it.']);
 });
 
 test('A PROJECT PAGE DRAWS ITS FINISHED WORK BY THE WEEK, SAYS ITS MONEY BY THE MONTH, AND KEEPS WHAT IT RUNS ON IN THE RAIL', async () => {

@@ -698,6 +698,22 @@ const DECLARED: Record<string, Version> = {
       "`page.portfolio`'s fold over what each earns, what agents hold and what is coming up is drawn only while one of them has a project, over the new `projects-looked-up`, so a fresh Overview reads no folded heading over nothing -> b20a259181fb4e84",
     ],
   },
+  /** A VERSION AND NOT A RESET: portfolio 1.8.0 is live. */
+  'portfolio@1.9.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-parked metric.projects-past-aim
+      metric.projects-retired metric.projects-with-agent
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '1f1496456a14ea07',
+    history: [
+      "`page.portfolio` is titled Projects, as its place in the top bar is, and Right now is four twelfths beside the two splits and drawn only while `projects-live` has any; `register.things` labels `lane` Building, Earning, Parked and Finished, so the split no longer prints the stored words -> 1f1496456a14ea07",
+    ],
+  },
   /** A VERSION AND NOT A RESET: money-core's last version is on `origin/master`. */
   'money-core@3.4.0': {
     holds: `

@@ -1,8 +1,9 @@
 {
   "pack": "launch-desk",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "title": "Launch desk",
   "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part in its own colour and picture with its next step, the steps on a calendar by the day they are due, the calls waiting on you, a pad beside it, and a price check.",
+  "changes": "The desk opens on its one line, how many essential steps are done, before anything else, and the calls waiting on you are drawn only while one is asked, so a desk with nothing to decide shows no empty box saying so.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -530,11 +531,6 @@
       ],
       "blocks": [
         {
-          "kind": "section",
-          "heading": "Where it stands",
-          "box": true
-        },
-        {
           "kind": "note",
           "lead": true,
           "when": {
@@ -560,6 +556,11 @@
             "is": 1
           },
           "body": "All {{essentials}} essential step(s) are done."
+        },
+        {
+          "kind": "section",
+          "heading": "Where it stands",
+          "box": true
         },
         {
           "kind": "steps",
@@ -593,7 +594,11 @@
           "heading": "Your call",
           "source": "governance.open",
           "limit": 1,
-          "empty": "No call is waiting on you."
+          "empty": "No call is waiting on you.",
+          "when": {
+            "metric": "questions-open",
+            "gt": 0
+          }
         },
         {
           "kind": "table",
@@ -691,7 +696,11 @@
           "heading": "Calls waiting on you",
           "source": "governance.open",
           "tiles": true,
-          "empty": "No call is waiting on you."
+          "empty": "No call is waiting on you.",
+          "when": {
+            "metric": "questions-open",
+            "gt": 0
+          }
         },
         {
           "kind": "section",

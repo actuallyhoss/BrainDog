@@ -759,6 +759,23 @@ const DECLARED: Record<string, Version> = {
       "`setting.voice_lists` reads Your things where it said Lists, the system's word set back over the rail's own heading -> d31dacd4bde48875",
     ],
   },
+  /** A VERSION AND NOT A RESET: founder 1.11.0 is live. */
+  'founder@1.12.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held
+      page.dashboard page.home-founder page.organisation page.project
+      register.datapoints register.organisations
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'ad4775fd7806a018',
+    history: [
+      "`page.project` takes portfolio 1.9.0's template: it opens on a line in every case, the work handed back when there is any and otherwise the project's next step, and Where it stands no longer says that step a second time -> ba3b81dc6ead3aad",
+      "`page.project` gates Waiting on you on `questions-open:{{spoken}}`, so a project with nothing asked about it draws no band -> ad4775fd7806a018",
+    ],
+  },
   'guide@1.5.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
@@ -845,6 +862,28 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.home-team`, `page.cycles` and `page.agent-work` open on one line said from new counts of tickets, `tickets-blocked` among them, every heading wears a glyph, each list is drawn only while it holds a ticket, Home folds how the cycle is going, and `page.project` takes portfolio 1.8.0's template -> af38996e0bebb2b2",
       "`setting.voice_lists` reads Our things where it said Team lists, so the rail's heading names the team's tickets and not how they are stored -> b0282fe5149e1e94",
+    ],
+  },
+  /** A VERSION AND NOT A RESET: team 2.10.0 is live. */
+  'team@2.11.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken
+      page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan setting.label_cycles
+      setting.label_people setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.one_tasks setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'c80737c681cdbce4',
+    history: [
+      "`page.project` takes portfolio 1.9.0's template: it opens on a line in every case, the tickets handed back when there are any and otherwise the project's next step, and Where it stands no longer says that step a second time -> 569689661fd6d260",
+      "`page.project` gates Waiting on you on `questions-open:{{spoken}}`, so a project with nothing asked about it draws no band -> c80737c681cdbce4",
     ],
   },
 };

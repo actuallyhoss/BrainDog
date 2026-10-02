@@ -79,6 +79,11 @@ test('NO TILE SAYS AGAIN A FIGURE THE LINE ABOVE IT SAYS', () => {
 test('A QUEUE OF QUESTIONS IS DRAWN ONLY WHILE ONE IS ASKED, so no page carries a band saying nothing waits', () => {
   for (const [slug, page] of pages)
     for (const b of page.blocks as (Block & { source?: string })[])
-      if (b.kind === 'queue' && b.source === 'governance.open')
-        assert.deepEqual(b.when, { metric: 'questions-open', gt: 0 }, `${slug}: ${b.heading ?? b.kind} draws while nothing is asked`);
+      if (b.kind === 'queue' && b.source === 'governance.open') {
+        /* A QUEUE NARROWED TO ONE THING IS GATED ON THAT THING'S COUNT, `questions-open:<it>`, so a project page with nothing
+           asked about it draws no band while the record has questions elsewhere. */
+        const about = /^about is (.+)$/u.exec((b as { where?: string }).where ?? '')?.[1];
+        const metric = about === undefined ? 'questions-open' : `questions-open:${about}`;
+        assert.deepEqual(b.when, { metric, gt: 0 }, `${slug}: ${b.heading ?? b.kind} draws while nothing is asked`);
+      }
 });

@@ -70,8 +70,10 @@ export const TEAM = {
      Work's page says "No agent holds a ticket." in the short line it now has. 2.8.0 is on `origin/master`.
      2.10.0: calmer (DIRECTION §35). Home, Cycles and Agent work open on one line said from new counts of tickets,
      every heading wears a glyph, each list is drawn only while it holds a ticket, and Home folds how the cycle is
-     going under what needs the team. A project's page takes portfolio 1.8.0's template. 2.9.0 is on `origin/master`. */
-  version: '2.10.0',
+     going under what needs the team. A project's page takes portfolio 1.8.0's template. 2.9.0 is on `origin/master`.
+     2.11.0: a project's page takes portfolio 1.9.0's template, which always opens on a line, the tickets handed back
+     when there are any and otherwise the project's next step, said once. 2.10.0 is live. */
+  version: '2.11.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

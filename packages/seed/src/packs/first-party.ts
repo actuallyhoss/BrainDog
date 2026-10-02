@@ -315,9 +315,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   are added to draw tiles on and blocks are taken away, no list or field, so each step is a minor one. The project
  *   page moves with them, though no pack holds it (`crossPack`): six tiles, then its history, its money and what it
  *   runs on folded shut, its dates drawn once on the plan and its month once on the chart.
+ * - portfolio 1.9.0: the page is called Projects, as the top bar calls it, Right now is a third of the row beside the
+ *   two splits and is drawn only while a project is in play, and a project's status reads Earning, Building, Parked and
+ *   Finished. Words, a span and a `when:` on blocks that are already there, no list, field or figure added or taken
+ *   away, so the step is a minor one: a record holding 1.8.0 is offered it. The project page moves with it, though no
+ *   pack holds it (`crossPack`): it always opens on a line, the work handed back when there is any and otherwise the
+ *   project's next step, which Where it stands no longer says a second time.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.8.0',
+  portfolio: '1.9.0',
   people: '2.4.0',
   'money-core': '3.4.0',
   estate: '2.1.0',

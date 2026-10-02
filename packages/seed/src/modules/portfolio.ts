@@ -160,7 +160,18 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
          the Overview's cards, where a column of bare names said nothing to somebody who had not opened each one. Text
          and optional, so every project already written stays valid and an importer fills it where its source says. */
       { id: 'about', label: 'About', type: 'text', search: true },
-      { id: 'lane', label: 'Status', type: 'enum', values: ['building', 'earning', 'parked', 'retired'], index: true, required: true },
+      /* SAID IN SENTENCE CASE, SINCE portfolio 1.9.0: the split under Where they are printed the stored words, "earning"
+         and "building", where every other label on the page starts with a capital. `retired` reads Finished, as the fold
+         of the parked and finished ones already calls it. */
+      {
+        id: 'lane',
+        label: 'Status',
+        type: 'enum',
+        values: ['building', 'earning', 'parked', 'retired'],
+        labels: { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Finished' },
+        index: true,
+        required: true,
+      },
       /**
        * WHAT IT EARNS, OVER WHICH TWELVE MONTHS, AND WHAT THE TWELVE BEFORE THEM EARNED.
        *
@@ -595,7 +606,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    */
   portfolio: {
     page: 'portfolio',
-    title: 'Overview',
+    /* CALLED WHAT THE NAVIGATION CALLS IT, SINCE portfolio 1.9.0: the title read Overview under a top bar that says
+       Projects, so a person pressed one word and landed on another. */
+    title: 'Projects',
     nav: { section: 'Projects', order: 5 },
     icon: 'thing',
     requires: ['register.things'],
@@ -624,12 +637,17 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* IN PLAY CARRIES ITS TWELVE WEEKS AS A LINE, SINCE portfolio 1.6.0, read from the figure's own nightly series.
 
            TWO FIGURES AND NOT FOUR, SINCE portfolio 1.8.0. Need you is the line above, said once, and Parked is a part of
-           Where they are beside it, so each was read twice. */
+           Where they are beside it, so each was read twice.
+
+           A THIRD OF THE ROW, BESIDE THE TWO SPLITS, SINCE portfolio 1.9.0: the whole width held two numbers and a lot of
+           white. Drawn on `projects-live`, as the two beside it are, so the row is whole whenever any of it is and a
+           fresh record reads the line above rather than two noughts. */
         kind: 'stat',
         lead: true,
         heading: 'Right now',
         icon: 'gauge',
-        span: 12,
+        span: 4,
+        when: { metric: 'projects-live', gt: 0 },
         cells: [
           { metric: 'projects-live', label: 'In play', trend: '12w', note: '{{projects-with-agent}} with an agent' },
           { metric: 'projects-aim-30d', label: 'Aiming within 30 days', note: '{{projects-past-aim}} past their day' },
@@ -642,9 +660,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'split',
         heading: 'Where they are',
         icon: 'chart-pie',
-        /* EIGHT BESIDE HOW THEY ARE GOING, SINCE portfolio 1.8.0: both are drawn on `projects-live`, so the row is whole
-           whenever either is. */
-        span: 8,
+        /* FOUR, BETWEEN RIGHT NOW AND HOW THEY ARE GOING, SINCE portfolio 1.9.0 (eight beside it in 1.8.0): all three are
+           drawn on `projects-live`, so the row is whole whenever any of it is. */
+        span: 4,
         source: 'metric.projects-by-lane',
         when: { metric: 'projects-live', gt: 0 },
         empty: 'No project is written down yet.',
@@ -882,8 +900,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     blocks: [
       /* THE OPENING SENTENCE, SAID FROM THE PROJECT'S FIGURES. A sentence cannot print a figure named for one project
          (`{{project-open:Kiln}}` is not a path the page reads), so each sentence is drawn on its figure's `when:`
-         instead, as the launch desk's are. Work handed back is inside what is open, so the two never draw together; a
-         project with open work and nothing handed back has no sentence, because the figures beside it already say it. */
+         instead, as the launch desk's are.
+
+         EXACTLY ONE OF THE TWO, ON ONE FIGURE, SINCE portfolio 1.9.0. Before it the second said "nothing is open" and a
+         project with open work and nothing handed back, which is most of them, had no sentence at all: Kiln opened on
+         a bare title over a band of tiles. Now work handed back is the line when there is any, and otherwise the line
+         is the project's own next step, the one sentence whoever works on it keeps current. A project with no next step
+         written has neither: the app drops a lead clause whose hole it cannot fill (`leadOf`), so it never reads
+         "Next on Kiln:" over nothing. */
       {
         kind: 'note',
         lead: true,
@@ -895,8 +919,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'project-open:{{name}}', is: 0 },
-        body: 'Nothing is open on {{name}} right now.',
+        when: { metric: 'project-in-review:{{name}}', is: 0 },
+        body: 'Next on {{name}}: {{next}}',
       },
       {
         kind: 'stat',
@@ -924,7 +948,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'governance.open',
         where: 'about is {{spoken}}',
         limit: 3,
-        when: { metric: 'questions-open', gt: 0 },
+        when: { metric: 'questions-open:{{spoken}}', gt: 0 },
         /* ONE TILE A QUESTION, SINCE portfolio 1.6.0, led by what its recommended answer shows, the ways to answer under
            it: a decision about a project is read as its options, not as a line in a list. */
         tiles: true,
@@ -933,7 +957,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* WHERE IT STANDS, as whoever works on it last said: how it is going, what is next, how far along, and the agent
            on it. One card, because it is one project, and no `when:`: the row
            is the page's own, so it is always there. FIVE BESIDE DONE, BY WEEK, SINCE portfolio 1.8.0, both drawn on every
-           project. */
+           project.
+
+           NOT THE NEXT STEP, SINCE portfolio 1.9.0: the line above says it, and the card said the same sentence again
+           straight under it. */
         kind: 'cards',
         heading: 'Where it stands',
         icon: 'target',
@@ -941,7 +968,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         source: 'register.things',
         where: 'name is {{name}}',
         columns: [
-          { field: 'next', label: 'Next step', as: 'title' },
           { field: 'progress', label: 'How far along', as: 'ring' },
           { field: 'health', label: 'Health', as: 'fact' },
           { field: 'aim', label: 'Aiming for', as: 'fact' },

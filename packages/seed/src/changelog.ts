@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.9.0',
+      notes:
+        'The page is called Projects, as the top bar calls it. Right now sits beside where the projects are and how they are going, and statuses read Earning, Building, Parked and Finished. A project page opens on one line: the work handed back for you to check, or else its next step.',
+    },
+    {
       version: '1.8.0',
       notes:
         'The Overview is calmer: one line of what needs you, where the projects are and how they are going, then the projects in play, with what each earns, what agents hold and what is coming up folded away. A project page shows six things and folds its history, money and what it runs on.',

@@ -249,6 +249,22 @@ test('THE DESK OPENS ON A SENTENCE FROM ITS OWN FIGURES, and a different one whe
   sql.close();
 });
 
+test('THE LINE COMES FIRST AND A CALL IS DRAWN ONLY WHILE ONE IS ASKED, since 2.1.0: no box over nothing to decide', async () => {
+  /* THE DESK OPENED ON THE HEADING OF ITS FIRST BOX, so its line sat inside a tile rather than under the title, and
+     both queues drew "No call is waiting on you." on a desk that had nothing to decide. */
+  const { api, sql } = await desked();
+  await launch(api);
+  const calm = await pageOf(api, 'desk');
+  const first = calm.blocks.find((b) => b.drawn !== false)!;
+  assert.deepEqual([first.kind, (first as Decl).lead], ['note', true]);
+  const queues = (page: Page) => page.blocks.filter((b) => b.kind === 'queue').map((b) => [b.heading, b.drawn !== false]);
+  assert.deepEqual(queues(calm), [['Your call', false], ['Calls waiting on you', false]]);
+
+  said(api.kernel.propose({ question: 'Which card stock for the box?', body_kind: 'options', body: { about: 'The box', options: [{ id: 'kraft', label: 'Brown kraft', because: 'Costs least' }, { id: 'white', label: 'Bright white', because: 'Prints sharpest' }] } } as never, 'slash'));
+  assert.deepEqual(queues(await pageOf(api, 'desk')), [['Your call', true], ['Calls waiting on you', true]]);
+  sql.close();
+});
+
 test('THE THREE POINTED COLUMNS: the next open step, the one call waiting, and the last three done', async () => {
   const { api, sql } = await desked();
   await launch(api);
@@ -555,7 +571,7 @@ test('A RECORD ON 1.0.1 TAKES THIS VERSION, and a check it already filled says s
   sql.close();
 });
 
-test('A RECORD ON 1.1.0 TAKES 2.0.0 WITH ITS PARTS AND STEPS KEPT, and a colour and a due day typed after it are drawn', async () => {
+test('A RECORD ON 1.1.0 TAKES THE DESK AS IT SHIPS WITH ITS PARTS AND STEPS KEPT, and a colour and a due day typed after it are drawn', async () => {
   /* The published 1.1.0, as the catalogue serves it, holding a part and a step typed before a part had a colour or a
      step a day. The new fields are added beside the rows, so nothing a person typed is asked about or lost. */
   const { api, sql } = await record();
@@ -566,7 +582,7 @@ test('A RECORD ON 1.1.0 TAKES 2.0.0 WITH ITS PARTS AND STEPS KEPT, and a colour 
   const diff = said<{ diff: Diff }>(await planOf(api, desk())).diff;
   assert.deepEqual(diff.conflicts, []);
   said(await put(api, desk()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'launch-desk')?.version, '2.0.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'launch-desk')?.version, desk().version);
   assert.equal(rowOf(api, box.id).fields.name, 'The box');
 
   said(api.kernel.update('parts', box.id, { hue: 200 } as never, { actor: 'p_1', version: rowOf(api, box.id).version }));

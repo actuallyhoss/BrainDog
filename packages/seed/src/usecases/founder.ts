@@ -164,8 +164,12 @@ export const FOUNDER = {
      1.11.0 BECAUSE THE PAGES ARE CALMER (DIRECTION §35): Home opens on one line of the cash there is where a tile of
      four figures stood, every heading wears a glyph, each list is drawn only while it holds something, the Dashboard
      folds every number and organisation under the numbers it charts, and a project's page takes portfolio 1.8.0's
-     template, six tiles and then its history, money and what it runs on folded shut. 1.10.0 is on `origin/master`. */
-  version: '1.11.0',
+     template, six tiles and then its history, money and what it runs on folded shut. 1.10.0 is on `origin/master`.
+
+     1.12.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.9.0'S TEMPLATE: it always opens on a line, the work handed back
+     when there is any and otherwise the project's next step, and Where it stands no longer says that step again. No
+     block added or taken away. 1.11.0 is live, so the change is a version and not a reset. */
+  version: '1.12.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
