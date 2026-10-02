@@ -41,13 +41,48 @@ let sheet: CSSStyleSheet | null = null;
 const adoptable = (): boolean =>
   typeof document !== 'undefined' && 'adoptedStyleSheets' in document && typeof CSSStyleSheet !== 'undefined';
 
+type Applied = { ok: true } | { ok: false; refusals: string[]; codes: string[] };
+
 /**
- * Put a colour on this page, and remember it.
+ * The record's word for a colour: a swatch's name, or `House`. `undefined` is a colour no swatch wears, which the
+ * record has no word for, so it stays on this device.
+ */
+const nameOf = (accent: string | null): string | undefined =>
+  accent === null ? 'House' : ACCENTS.find((a) => a.hex.toLowerCase() === accent.toLowerCase())?.name;
+
+/**
+ * Put a colour on this page, and remember it: in the cookie for the next first paint, and on the record as the person's
+ * own `look.accent`, so every device they sign in on wears it.
  *
  * `null` PUTS THE HOUSE COLOUR BACK, which is a real answer and not an absence: somebody who tried
- * a green and did not like it wants the product back, not a blank.
+ * a green and did not like it wants the product back, not a blank. It is sent as `House` for the same reason.
+ *
+ * THIS IS THE PERSON'S COLOUR, NOT THE RECORD'S LOOK. The look (`theme/draw.ts`) is the owner's, for everybody; this
+ * sheet is adopted after it, so for this person their own colour wins.
  */
-export function apply(accent: string | null): { ok: true } | { ok: false; refusals: string[]; codes: string[] } {
+export function apply(accent: string | null): Applied {
+  const out = paint(accent);
+  const name = nameOf(accent);
+  if (out.ok && name !== undefined) void pref.keep('look.accent', name);
+  return out;
+}
+
+/**
+ * The record's `look.accent` as `boot` answered it, put on the page and written over the cookie, and nothing sent back.
+ *
+ * A NAME THIS BUILD HAS NO SWATCH FOR IS NO ANSWER, and the device's colour stands: a swatch taken out of
+ * `@braindog/theme` after somebody chose it should leave them in what they had, not throw it away. `undefined` is a
+ * record that holds no accent, or one too old to keep it, and the same.
+ */
+export function adopt(name: unknown): Applied | null {
+  if (name === 'House') return paint(null);
+  const hex = ACCENTS.find((a) => a.name === name)?.hex;
+  return hex === undefined ? null : paint(hex);
+}
+
+/* THE PAGE AND THE COOKIE, AND NOTHING SENT: what `apply`, `adopt` and `restore` share. `restore` must not send, since a
+   colour it drops is an old cookie's, and writing House over the record would undo the person's choice everywhere. */
+function paint(accent: string | null): Applied {
   if (accent === null) {
     if (sheet) sheet.replaceSync('');
     pref.write({ theme: undefined });
@@ -65,7 +100,7 @@ export function apply(accent: string | null): { ok: true } | { ok: false; refusa
 
   sheet ??= new CSSStyleSheet();
   sheet.replaceSync(built.value.css);
-  /* AT THE END, AND THAT IS WHAT MAKES THIS DEVICE'S PICK WIN. The record's installed look (`theme/draw.ts`) is adopted
+  /* AT THE END, AND THAT IS WHAT MAKES THE PERSON'S PICK WIN. The record's installed look (`theme/draw.ts`) is adopted
      at the front of the same list, so whichever arrives first, this sheet is the later one in `@layer theme`. */
   if (!document.adoptedStyleSheets.includes(sheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
@@ -118,14 +153,14 @@ export function restore(): { ok: true } | { ok: false; refusals: string[]; codes
   const held = pref.read().theme;
   if (!held) return { ok: true };
 
-  const out = apply(held);
+  const out = paint(held);
   if (out.ok) return out;
 
   /* HOUSE FIRST, THEN THE SENTENCE, so that the sentence is true in the past tense by the time
-     anybody reads it. `apply(null)` is the same path the House control takes: it empties the sheet
-     if one was ever adopted and takes `theme` out of the cookie without touching the other
-     preferences beside it. */
-  apply(null);
+     anybody reads it. `paint(null)` is the House control's path without the send: it empties the
+     sheet if one was ever adopted and takes `theme` out of the cookie without touching the other
+     preferences beside it, and it leaves the record's `look.accent` alone. */
+  paint(null);
   /* THE AUTHOR'S SENTENCE AND NOT THE READER'S, deliberately: this goes to a console, and the one
      thing a console is read by is somebody who can act on "2.92:1 against s1 in dark". The reader's
      version of the same refusal is `copy.accentRefused`, built from `codes` and `dropped` by

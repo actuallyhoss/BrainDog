@@ -55,6 +55,15 @@ export type Prefs = {
   'nav.labels'?: Record<string, string>;
   /** THE RULES WHOSE NOTICES THIS PERSON MUTED, as `rule:<id>`. Urgent notices always arrive. */
   'notify.muted'?: string[];
+  /**
+   * HOW THE APP LOOKS TO THIS PERSON, on every device they sign in on: the record's `look.*` keys. Absent scheme is the
+   * device's own; size and density are the cookie's words (`pref.ts`); accent is a suggested accent by name, or `House`.
+   */
+  'look.scheme'?: 'light' | 'dark' | 'system';
+  'look.size'?: 'sm' | 'base' | 'md';
+  'look.density'?: 'compact' | 'comfortable' | 'roomy';
+  'look.contrast'?: boolean;
+  'look.accent'?: string;
 };
 
 /** What a change came to: kept by the record, kept on this device, or refused with the record's sentence. */

@@ -113,6 +113,19 @@ test('WHAT WAITS ON DECIDE LEADS THE LIST, the record’s own waiting included, 
   assert.equal(tallyOf(all, extra.waiting.length, extra.cap)?.total, 5);
 });
 
+test('A QUESTION WAITING AFTER A RELOAD SAYS WHO DRAFTED IT, from what the record kept, and the last press still outranks it', () => {
+  const kept: Reading = {
+    ...READING,
+    waiting: [...READING.waiting, { id: 'SG9', question: 'Add a desk for the launch?', by: 'glm-5.3-flash' }, { id: 'SG10', question: 'Turn off Log?', by: 'rules' }, { id: 'SG11', question: 'Add Diary?', by: null }],
+  };
+  const all = suggestedOf(kept);
+  const line = (href: string) => byLine(all.find((s) => s.href === href)?.by);
+  assert.equal(line('/decide/SG9'), 'Drafted by glm-5.3-flash');
+  assert.equal(line('/decide/SG10'), words.byRules);
+  assert.equal(line('/decide/SG11'), null, 'a question filed before the record kept who drafted it was given a drafter');
+  assert.equal(byLine(suggestedOf(kept, [{ id: 'SG9', by: 'included' }]).find((s) => s.href === '/decide/SG9')?.by), 'Drafted by included');
+});
+
 test('THE FOLD NAMES ONLY WHAT IT HOLDS, and is not drawn over nothing', () => {
   const none = { tally: false, noticed: false, answered: false, lately: false, daily: false, describe: false };
   assert.equal(foldOf(none), null);

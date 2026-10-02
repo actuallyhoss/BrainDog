@@ -11,7 +11,7 @@
  * - A READER WHO ASKED FOR MORE CONTRAST KEEPS THE HOUSE'S HIGH-CONTRAST PALETTE. Every rule here is held off
  *   `data-theme='hc'` and off `prefers-contrast: more`: a record's look is a brand, and a brand may not take away the
  *   palette a reader needs to read at all.
- * - A DEVICE'S OWN ACCENT STILL WINS ON THAT DEVICE. `accent.ts` appends its sheet to the end of the adopted list, and
+ * - A PERSON'S OWN ACCENT STILL WINS FOR THEM. `accent.ts` appends its sheet to the end of the adopted list, and
  *   this one is put at the front, so the accent a person picked in Settings is the later of the two.
  * - UNINSTALLING RETURNS THE HOUSE LOOK: `null` empties the sheet.
  *
@@ -20,6 +20,7 @@
  */
 
 import * as pref from '../pref.ts';
+import { follow } from './follow.ts';
 
 /** `Boot.theme` as the record answers it. */
 export type Look = { light: Record<string, string>; dark: Record<string, string> };
@@ -53,8 +54,8 @@ export function lookOf(boot: unknown): Look | null {
  * The row height is the one property a person also sets for themselves, and theirs wins.
  *
  * `data-density` is written on every load (`app.html`), so no selector can tell a person who chose Comfortable from one
- * who chose nothing. The preference can: `row-h` is drawn only while the person has not picked a density on this device,
- * and `redraw` runs when they do.
+ * who chose nothing. The preference can: `row-h` is drawn only while the person has not picked a density (here or on
+ * the record, whose word `follow` writes into the cookie), and `redraw` runs when they do.
  */
 const ROW = 'row-h';
 
@@ -100,11 +101,13 @@ const adoptable = (): boolean =>
  * decides what in it is a look. A host older than the field answers without `theme`, which is the house look.
  */
 export function draw(boot: unknown): void {
+  /* THE PERSON'S OWN LOOK FIRST, from the same answer: their density decides whether the record's row height is drawn. */
+  follow(boot);
   current = lookOf(boot);
   paint();
 }
 
-/** Draw the kept look again: after a person picks a density on this device, whose row height then wins. */
+/** Draw the kept look again: after a person picks a density, whose row height then wins. */
 export function redraw(): void {
   paint();
 }

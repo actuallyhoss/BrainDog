@@ -1,5 +1,9 @@
 <!--
-  Settings > Appearance: how BrainDog looks on this device, in one section, and the record's own look under it.
+  Settings > Appearance: how BrainDog looks to this person, in one section, and the record's own look under it.
+
+  THE PERSON'S LOOK FOLLOWS THEM (`35`). Scheme, text size, density, contrast and accent are kept by the record as their
+  own `look.*` prefs, so every device they sign in on looks the same; the cookie is only the first-paint copy
+  (`pref.ts`). A record too old to keep them leaves them on the device, and the hint says which.
 
   ONE SECTION, FOUR CHOICES AND THE THING THEY CHANGE (DIRECTION §35: calm, few controls per screen). The scheme, the
   text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
@@ -22,7 +26,9 @@
   import Section from '$lib/ui/Section.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { untrack } from 'svelte';
   import { redraw } from '$lib/theme/draw.ts';
+  import { follow } from '$lib/theme/follow.ts';
   import LookEditor from '$lib/theme/LookEditor.svelte';
   import { takeFix } from '$lib/theme/staged.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
@@ -37,7 +43,8 @@
   /* THIS AREA'S OWN WORDS, the ones the copy modules do not already hold. */
   const words = {
     looks: 'How it looks',
-    hint: 'Kept on this device, so a phone and a desk can each have their own.',
+    hint: 'Yours, on every device you sign in on.',
+    hintDevice: 'Kept on this device.',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
     said: 'Three things need you today,',
     needs: 'one is late.',
@@ -51,15 +58,25 @@
      every preference in this product was lost on refresh, and a setting that does not survive a
      reload is a setting somebody changes once and then stops trusting.
 
-     A DENSITY PICKED HERE BEATS THE RECORD'S LOOK on this device, so the look is drawn again without its row height. */
+     A DENSITY PICKED HERE BEATS THE RECORD'S LOOK for this person, so the look is drawn again without its row height. */
   const set = (key: 'scheme' | 'text' | 'density', value: string) => {
     pref.apply(key, value);
     if (key === 'density') redraw();
+    settle();
   };
+
+  /* THE RECORD'S WORD FIRST, when this screen is the first a tab opens: the root layout's `draw` adopts it behind a
+     dynamic import that can land after this runs, and these controls and the hint would then be the cookie's. Once per
+     tab, so it is nothing when the layout got there first. */
+  follow({ me: untrack(() => props.shell.me) });
 
   /* SEEDED FROM WHAT IS REMEMBERED, so the controls show the state the page is already in rather
      than the default the state happens to start at. */
   const held = pref.read();
+  /* WHERE A CHOICE IS KEPT, said in the hint: the record, or this device when there is no record or it refused a key.
+     Read again after each choice settles, so a host that refuses one is not left claiming "every device". */
+  let follows = $state(pref.follows());
+  const settle = () => void pref.settled().then(() => (follows = pref.follows()));
   let scheme = $state<'light' | 'system' | 'dark'>(held.scheme ?? 'system');
   let text = $state<'sm' | 'base' | 'md'>(held.text ?? 'base');
   let density = $state<'compact' | 'comfortable' | 'roomy'>(held.density ?? 'comfortable');
@@ -85,6 +102,7 @@
     }
     accentWrong = null;
     accent = hex;
+    settle();
     toasts.push(hex ? copy.accentSet(ACCENTS.find((a) => a.hex === hex)?.name ?? hex) : copy.accentReset);
   }
 
@@ -93,6 +111,7 @@
   function pickContrast(on: boolean) {
     moreContrast = on;
     pref.contrast(on);
+    settle();
   }
 
   function pickScheme(v: 'light' | 'system' | 'dark') {
@@ -100,6 +119,7 @@
     /* `system` IS AN ANSWER AND NOT AN ABSENCE, so it is written down: removing the attribute
        without recording the choice would make the next visit read a stale `dark` from the cookie. */
     pref.apply('scheme', v === 'system' ? null : v);
+    settle();
   }
 
   const SCHEMES = [
@@ -148,7 +168,7 @@
   was known, written down, and applied to one group.
 -->
 <Section title={words.looks}>
-  <p class="hint">{words.hint}</p>
+  <p class="hint">{follows ? words.hint : words.hintDevice}</p>
   <div class="looks">
     <div class="choices">
       <div class="choice">
@@ -194,7 +214,7 @@
       </div>
 
       <!--
-        THE RECORD'S OWN COLOUR. `@braindog/theme` solves an entire coherent palette from one seed
+        THE PERSON'S OWN COLOUR, over the record's look. `@braindog/theme` solves an entire coherent palette from one seed
         against every floor it defines, and until now nothing called it with anything but the house
         red, so a bakery and a type foundry looked identical. The swatches are suggestions, not the
         set: any colour that passes goes in, and one that does not says which floor it missed rather
@@ -290,7 +310,7 @@
 </Section>
 
 <!--
-  THE RECORD'S LOOK, which is everybody's, under the device's choices, which are this screen's alone (`21 §6`).
+  THE RECORD'S LOOK, which is everybody's, under the person's own choices, which are theirs alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
 <Section title={copy.lookTitle}>

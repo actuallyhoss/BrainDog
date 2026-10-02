@@ -46,7 +46,7 @@ test('the Work page opens on its line, then the capture line over the tasks', ()
      behind its own `when:`, so the page still opens on one line and then the capture. */
   const lines = work.blocks.findIndex((b) => !(b.kind === 'note' && b.lead === true));
   assert.ok(lines >= 1, 'the page opens on its line');
-  for (const b of work.blocks.slice(0, lines)) assert.ok(b.when, 'two lead lines with no when: would both draw');
+  for (const b of work.blocks.slice(0, lines)) assert.ok((b as { when?: unknown }).when, 'two lead lines with no when: would both draw');
   assert.equal(work.blocks[lines]?.kind, 'capture');
   assert.equal(work.blocks[lines]?.register, TASKS);
 });

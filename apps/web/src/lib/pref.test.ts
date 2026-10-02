@@ -184,3 +184,135 @@ test('the contrast palette has a switch, and the accent does not fight it for th
   assert.match(appearance, /pickContrast\(!moreContrast\)/u, 'nothing turns the contrast palette on');
   assert.match(appearance, /role="switch"\s+aria-checked=\{moreContrast\}/u, 'the switch does not say which state it is in');
 });
+
+/**
+ * THE LOOK FOLLOWS THE PERSON, AND THE COOKIE IS ITS FIRST-PAINT COPY (`35`).
+ *
+ * Scheme, text size, density, contrast and accent were cookies only, so a new laptop opened in the house look. The record
+ * keeps them now as `look.*`, `boot` answers them on `me.prefs`, and three things have to hold for that to be a fix and
+ * not a new way to lose a setting: the record's answer beats a stale cookie, a host too old for the keys leaves the
+ * cookie as the whole answer, and a choice goes to both, so the next first paint on this device is already right.
+ */
+
+/** A document with a cookie jar and an `<html>` whose attributes can be read back. */
+function page(initial = '') {
+  const attrs = new Map<string, string>();
+  (globalThis as { document?: unknown }).document = {
+    get cookie() {
+      return initial;
+    },
+    set cookie(next: string) {
+      initial = next.split(';')[0] ?? '';
+    },
+    documentElement: {
+      setAttribute: (name: string, value: string) => void attrs.set(name, value),
+      removeAttribute: (name: string) => void attrs.delete(name),
+    },
+  };
+  return attrs;
+}
+
+/** A record that keeps every look key, and what it was sent, in order. */
+function keeping() {
+  const sent: [string, unknown][] = [];
+  const send: pref.Send = async (key, value) => (sent.push([key, value]), { from: 'kept' });
+  return { sent, send };
+}
+
+const cookie = (p: Record<string, unknown>) => `bd_pref=${encodeURIComponent(JSON.stringify(p))}`;
+
+test("THE RECORD'S ANSWER WINS OVER THE COOKIE, and the cookie is rewritten from it for the next first paint", async () => {
+  const attrs = page(cookie({ scheme: 'dark', text: 'sm', density: 'compact', rail: 'kept' }));
+  const record = keeping();
+  pref.follow(record.send);
+  try {
+    pref.adopt({ 'look.scheme': 'light', 'look.density': 'roomy', 'look.contrast': true, 'nav.order': ['/'] });
+
+    const now = pref.read() as Record<string, unknown>;
+    assert.equal(now.scheme, 'light', 'the stale cookie beat the record');
+    assert.equal(now.density, 'roomy');
+    assert.equal(now.contrast, true);
+    assert.equal(now.text, 'sm', 'a key the record does not answer took the device copy with it');
+    assert.equal(now.rail, 'kept', 'adopting the look lost a setting that has nothing to do with it');
+    assert.equal(attrs.get('data-scheme'), 'light');
+    assert.equal(attrs.get('data-density'), 'roomy');
+    assert.equal(attrs.get('data-theme'), 'hc');
+
+    /* ADOPTING IS READING. Sending the record's own word back to it would be a write on every load. */
+    await pref.settled();
+    assert.deepEqual(record.sent, [], 'adopting the record sent the look back to it');
+
+    /* `system` IS AN ANSWER: the device matches its screen, whatever it last held. */
+    pref.adopt({ 'look.scheme': 'system', 'look.contrast': false });
+    assert.equal(pref.read().scheme, undefined);
+    assert.equal(attrs.has('data-scheme'), false);
+    assert.equal(pref.read().contrast, undefined);
+    assert.equal(attrs.has('data-theme'), false);
+
+    /* AND A WORD THIS BUILD DOES NOT KNOW IS NO ANSWER, so the device's copy stands. */
+    pref.adopt({ 'look.size': 'huge', 'look.density': 7 });
+    assert.equal(pref.read().text, 'sm');
+    assert.equal(pref.read().density, 'roomy');
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('A CHOICE GOES TO BOTH: the cookie at once, and the record in the order the presses were made', async () => {
+  const attrs = page();
+  const record = keeping();
+  pref.follow(record.send);
+  try {
+    pref.apply('scheme', 'dark');
+    pref.apply('text', 'md');
+    pref.apply('density', 'compact');
+    pref.contrast(true);
+    /* MATCH THE SYSTEM IS SENT AS A WORD, not `null`, which would leave another device on the dark it last heard of. */
+    pref.apply('scheme', null);
+
+    assert.deepEqual(pref.read(), { text: 'md', density: 'compact', contrast: true }, 'the cookie did not take the change at once');
+    assert.equal(attrs.get('data-text'), 'md');
+
+    await pref.settled();
+    assert.deepEqual(record.sent, [
+      ['look.scheme', 'dark'],
+      ['look.size', 'md'],
+      ['look.density', 'compact'],
+      ['look.contrast', true],
+      ['look.scheme', 'system'],
+    ]);
+    assert.equal(pref.follows(), true);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('A HOST TOO OLD FOR THE KEYS REFUSES THEM, and the cookie is then the whole of the setting', async () => {
+  page(cookie({ scheme: 'dark' }));
+  const sent: string[] = [];
+  pref.follow(async (key) => (sent.push(key), { from: 'refused', fix: 'key is one of nav.order or nav.hidden.' }));
+  try {
+    /* AN OLDER HOST ANSWERS NO `look.*` AT ALL, so the device's dark stands through the adopt. */
+    pref.adopt({ 'nav.order': ['/p/money'] });
+    assert.equal(pref.read().scheme, 'dark', 'a record with no look answer reset the device to the house scheme');
+
+    pref.apply('density', 'roomy');
+    const kept = await pref.keep('look.size', 'md');
+    assert.equal(kept.from, 'refused');
+    assert.deepEqual(sent, ['look.density', 'look.size'], 'the record was not asked');
+    assert.equal(pref.read().density, 'roomy', 'a refusal took the choice off this device too');
+    /* AND SETTINGS IS NOT TOLD "EVERY DEVICE" by a host that cannot keep it. */
+    assert.equal(pref.follows(), false);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('and with no record listening, a choice stays on the device and nothing is sent', async () => {
+  page();
+  pref.follow(null);
+  pref.apply('scheme', 'dark');
+  assert.deepEqual(await pref.keep('look.scheme', 'dark'), { from: 'device' });
+  assert.equal(pref.read().scheme, 'dark');
+  assert.equal(pref.follows(), false);
+});

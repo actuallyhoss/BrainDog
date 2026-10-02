@@ -303,6 +303,9 @@ export type HomeDrawn = {
  * when Slash wrote it today from the reading Today holds now (`homeLineFor` in the record), and the page reader draws it
  * as the note's words (`blockOf`). Today's lead is always `TODAY_LEAD`, so on Today's own body (`today`) a lead that
  * reads anything else is Slash's. A page the record declares writes its own lead, so there it is never taken for one.
+ *
+ * TODAY KEPT AS `home` (the arrange mode's first Done) IS SUCH A PAGE, so its line is Slash's only when the block still
+ * carries the record's `said`: a lead that merely differs may be the author's own words, and is never signed as Slash's.
  */
 export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
   if (drawn.slash !== undefined) return drawn.slash;

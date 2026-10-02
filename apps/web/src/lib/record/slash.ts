@@ -17,7 +17,12 @@ export type Noticed = { kind: string; subject: string; text: string };
 export type Draft = { question: string; body_kind: string; by?: string; asked: { id: string; status: string } | null };
 /** Whether Slash looks once a day on its own, and the day it last did. */
 export type Daily = { on: boolean; last: string | null };
-export type Reading = { model: string | null; quiet: string | null; noticed: Noticed[]; drafts: Draft[]; waiting: { id: string; question: string }[]; cap: number; daily?: Daily };
+/**
+ * `waiting[].by` is who drafted a question Slash filed, as the record kept it: `rules`, a model's name, or `null` for one
+ * filed before the record kept that. Absent from a host older than it.
+ */
+export type Waiting = { id: string; question: string; by?: string | null };
+export type Reading = { model: string | null; quiet: string | null; noticed: Noticed[]; drafts: Draft[]; waiting: Waiting[]; cap: number; daily?: Daily };
 /** `large`: the included model turned this press away unsent, because the record's reading is past what one ask may spend. */
 export type Asked = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[]; large?: boolean };
 

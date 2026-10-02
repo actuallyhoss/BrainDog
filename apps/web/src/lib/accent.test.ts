@@ -235,3 +235,94 @@ test('and a browser holding no colour at all adopts nothing and says nothing', (
   assert.equal(sheets().length, 0);
   assert.equal(pref.read().theme, undefined);
 });
+
+/**
+ * THE ACCENT FOLLOWS THE PERSON (`35`). The record keeps it as `look.accent`, by the swatch's NAME, since a hex a later
+ * floor refuses is exactly what the cases above are about; the cookie keeps the hex the shell paints from.
+ */
+
+/** A record that keeps every key, and what it was sent. */
+function record(answer: pref.Kept = { from: 'kept' }) {
+  const sent: [string, unknown][] = [];
+  pref.follow(async (key, value) => (sent.push([key, value]), answer));
+  return sent;
+}
+
+const [FIRST, SECOND] = accent.ACCENTS;
+
+test("THE RECORD'S ACCENT WINS OVER THE COOKIE'S, and the cookie is rewritten from it", async () => {
+  const sheets = browser();
+  const sent = record();
+  try {
+    pref.write({ theme: ACCEPTED, scheme: 'dark' });
+    accent.restore();
+    assert.equal(sheets().length, 1, 'the cookie did not paint first');
+
+    accent.adopt(SECOND!.name);
+    assert.equal(pref.read().theme, SECOND!.hex, 'the stale cookie beat the record');
+    assert.equal(pref.read().scheme, 'dark', 'adopting the accent took another preference with it');
+
+    accent.adopt('House');
+    assert.equal(pref.read().theme, undefined, 'House on the record left a colour on this device');
+    assert.equal(sheets()[0]?.text, '', 'House on the record left the colour on the page');
+
+    await pref.settled();
+    assert.deepEqual(sent, [], 'adopting the record sent the accent back to it');
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('and a name this build has no swatch for is no answer: the device keeps its colour', () => {
+  browser();
+  pref.write({ theme: FIRST!.hex });
+  assert.equal(accent.adopt('Chartreuse'), null);
+  assert.equal(accent.adopt(undefined), null);
+  assert.equal(pref.read().theme, FIRST!.hex);
+});
+
+test("A PICK GOES TO BOTH, the record by the swatch's name, House as a word", async () => {
+  browser();
+  const sent = record();
+  try {
+    assert.equal(accent.apply(FIRST!.hex).ok, true);
+    assert.equal(pref.read().theme, FIRST!.hex, 'the cookie did not take the pick');
+    accent.apply(null);
+    assert.equal(pref.read().theme, undefined);
+
+    await pref.settled();
+    assert.deepEqual(sent, [
+      ['look.accent', FIRST!.name],
+      ['look.accent', 'House'],
+    ]);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('A HOST THAT REFUSES THE KEY LEAVES THE PICK ON THE DEVICE, and Settings is told it is the device', async () => {
+  browser();
+  record({ from: 'refused', fix: 'key is one of nav.order or nav.hidden.' });
+  try {
+    accent.apply(SECOND!.hex);
+    await pref.settled();
+    assert.equal(pref.read().theme, SECOND!.hex, 'a refusal took the colour off this device too');
+    assert.equal(pref.follows(), false);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('and a colour restore drops is not written over the record', async () => {
+  /* THE DROPPED HEX IS AN OLD COOKIE'S. Sending House for it would undo, on every device, the colour the person chose. */
+  browser();
+  const sent = record();
+  try {
+    pref.write({ theme: REFUSED });
+    warnings(() => accent.restore());
+    await pref.settled();
+    assert.deepEqual(sent, []);
+  } finally {
+    pref.follow(null);
+  }
+});

@@ -120,9 +120,9 @@ export const account = {
      is the one thing a swatch press can do that they would not expect. AND THEN IT WAS STILL A PARAGRAPH ABOUT THE
      SCREEN: how the other colours follow, and what a press may refuse, which the refusal says in place when it happens
      (`accentRefused`). What is left is the choice itself. */
-  accentHint: 'The colour this record wears.',
+  accentHint: "Yours alone. It wins over the record's look below, which the owner sets for everyone.",
   accentHouse: 'House',
-  accentSet: (name: string) => `${name} is this record's colour.`,
+  accentSet: (name: string) => `${name} is your colour.`,
   accentReset: 'Back to the house colour.',
   /**
    * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.

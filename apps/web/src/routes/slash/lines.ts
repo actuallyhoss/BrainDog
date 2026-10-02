@@ -136,11 +136,14 @@ const idOf = (href: string | null): string | null => (href === null ? null : dec
  * the reading.
  *
  * WHAT WAITS ON DECIDE THAT NO DRAFT MATCHES is listed too, from the record's own `waiting`: a question the model filed,
- * or one whose draft has since changed. It waits on him all the same. Who drafted it is said only when the last press
- * filed it, because the record keeps no note of it.
+ * or one whose draft has since changed. It waits on him all the same. Who drafted it is the last press's word, else the
+ * record's own (`waiting[].by`, kept when it was filed), and nothing where neither says, as for a question filed before
+ * the record kept it.
  */
 export function suggestedOf(reading: Reading, filed: readonly { id: string; by: string }[] = []): Drafted[] {
   const filedBy = new Map(filed.map((f) => [f.id, f.by]));
+  /* THE RECORD'S WORD OUTRANKS A DRAFT'S, since it was kept when the question was filed; only the press is fresher. */
+  for (const w of reading.waiting) if (!filedBy.has(w.id) && typeof w.by === 'string' && w.by.trim() !== '') filedBy.set(w.id, w.by);
   const byId = new Map<string, string | undefined>();
   const byQuestion = new Map<string, string | undefined>();
   for (const d of reading.drafts) {

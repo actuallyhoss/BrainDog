@@ -12,9 +12,14 @@
  * whether bare character keys act. A setting that does not survive a reload is a setting somebody
  * changes once and then stops trusting.
  *
- * IT IS PER DEVICE, NOT PER RECORD. Text size and density are facts about the screen somebody is
- * looking at — a phone and a desk want different answers — so they belong beside the browser rather
- * than in the record, which is also why losing them costs nothing but is annoying every day.
+ * MOST OF IT IS PER DEVICE: the rail's width, the columns, what you have read on this screen.
+ *
+ * THE LOOK FOLLOWS THE PERSON, AND THE COOKIE IS ITS FIRST-PAINT COPY (`35`, "density, theme and accent"). Scheme, text
+ * size, density, high contrast and accent were cookies only, so a new laptop opened in the house colours at the house
+ * size. The record keeps them now as the person's own `look.*` prefs, `boot` answers them on `me.prefs`, and `adopt`
+ * below puts the record's word on the page and back into this cookie. So the cookie still paints first, with no flash,
+ * and the record's answer wins the moment it arrives. A record too old to keep a key refuses it, and the cookie is then
+ * the whole of that setting, as it always was.
  */
 
 export type Pref = {
@@ -256,6 +261,14 @@ export function write(change: Pref): Pref {
  */
 export function apply(key: 'scheme' | 'text' | 'density', value: string | null): void {
   if (typeof document === 'undefined') return;
+  put(key, value);
+  /* `system` IS SENT AS A WORD, NOT AS `null`. `null` takes the key off the record, and another device would then keep
+     the dark it last heard of; `system` is an answer every device reads as "match this screen". */
+  void keep(LOOK_KEYS[key], key === 'scheme' ? (value ?? 'system') : value);
+}
+
+/** The attribute and the cookie, and nothing sent: what `apply` does on this page, and what `adopt` does with the record's word. */
+function put(key: 'scheme' | 'text' | 'density', value: string | null): void {
   if (value === null) document.documentElement.removeAttribute(`data-${key}`);
   else document.documentElement.setAttribute(`data-${key}`, value);
   write({ [key]: value ?? undefined } as Pref);
@@ -274,7 +287,94 @@ export function apply(key: 'scheme' | 'text' | 'density', value: string | null):
  */
 export function contrast(on: boolean): void {
   if (typeof document === 'undefined') return;
+  putContrast(on);
+  void keep('look.contrast', on);
+}
+
+function putContrast(on: boolean): void {
   if (on) document.documentElement.setAttribute('data-theme', 'hc');
   else document.documentElement.removeAttribute('data-theme');
   write({ contrast: on || undefined });
+}
+
+/* ── the look, kept by the record ─────────────────────────────────────────── */
+
+/** The record's key for each look setting this cookie holds the first-paint copy of (`PREF_KEYS` in `@braindog/record`). */
+export const LOOK_KEYS = {
+  scheme: 'look.scheme',
+  text: 'look.size',
+  density: 'look.density',
+  contrast: 'look.contrast',
+  theme: 'look.accent',
+} as const;
+export type LookKey = (typeof LOOK_KEYS)[keyof typeof LOOK_KEYS];
+
+/** What a look change came to: kept by the record, kept on this device only, or refused with the record's sentence. */
+export type Kept = { from: 'kept' } | { from: 'device' } | { from: 'refused'; fix: string };
+/** The record's `setPref`, for one look key. The app's sends to its own record (`theme/follow.ts`); a test's is a fake. */
+export type Send = (key: LookKey, value: string | boolean | null) => Promise<Kept>;
+
+let sender: Send | null = null;
+/* ONE CHANGE AT A TIME, so two quick presses arrive in the order they were made and the last one is what is kept. */
+let queue: Promise<unknown> = Promise.resolve();
+/* THE KEYS THE RECORD REFUSED, which this device then keeps alone. A host older than the `look.*` keys refuses each one. */
+const refused = new Set<LookKey>();
+
+/**
+ * Send look changes to the record from now on, or stop with `null`. Called when `boot` answers with a person in it, so a
+ * tab with no record behind it keeps its look on the device and sends nothing.
+ */
+export function follow(send: Send | null): void {
+  sender = send;
+  if (send === null) refused.clear();
+}
+
+/**
+ * Whether a look chosen now reaches the person's other devices: a record is listening and has refused none of the keys.
+ * Settings says it in one line, so a person is never told "every device" by a host that cannot keep it.
+ */
+export const follows = (): boolean => sender !== null && refused.size === 0;
+
+/** Every change sent so far, settled: for a screen that says where a choice was kept, and for a test. */
+export const settled = (): Promise<unknown> => queue;
+
+/**
+ * One look setting, sent to the record. NOTHING IS PUT BACK ON A REFUSAL, which is where this differs from the nav: the
+ * cookie has already taken the change, and a record that cannot keep a key leaves the device as the place it lives.
+ */
+export function keep(key: LookKey, value: string | boolean | null): Promise<Kept> {
+  const send = sender;
+  if (!send) return Promise.resolve({ from: 'device' });
+  const out = queue.then(() => send(key, value)).catch((): Kept => ({ from: 'device' }));
+  queue = out;
+  return out.then((kept) => {
+    if (kept.from === 'refused') refused.add(key);
+    else if (kept.from === 'kept') refused.delete(key);
+    return kept;
+  });
+}
+
+/**
+ * The record's word for the look, put on the page and written over the cookie: `me.prefs` as `boot` answered it.
+ *
+ * THE RECORD'S ANSWER WINS, AND ONLY WHERE IT HAS ONE. A key the record answers is the person's choice, made on whatever
+ * device they made it on, so it stands over this cookie and the cookie is rewritten from it, ready for the next first
+ * paint. A key it does not answer is either never chosen or a record too old to keep it, and in both the device's copy
+ * stands. A word this build does not know is not an answer.
+ *
+ * NOTHING IS SENT BACK. Adopting is reading; the record learns a look when somebody picks one.
+ *
+ * THE ACCENT IS NOT HERE: `look.accent` is a swatch's name and the cookie holds its colour, so `accent.ts` adopts it.
+ */
+export function adopt(prefs: Record<string, unknown>): void {
+  if (typeof document === 'undefined') return;
+  const scheme = prefs['look.scheme'];
+  if (scheme === 'system') put('scheme', null);
+  else if (SHAPE.scheme!(scheme)) put('scheme', scheme as string);
+  const size = prefs['look.size'];
+  if (SHAPE.text!(size)) put('text', size as string);
+  const density = prefs['look.density'];
+  if (SHAPE.density!(density)) put('density', density as string);
+  const hc = prefs['look.contrast'];
+  if (typeof hc === 'boolean') putContrast(hc);
 }

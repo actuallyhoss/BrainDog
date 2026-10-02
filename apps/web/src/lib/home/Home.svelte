@@ -28,14 +28,13 @@
   import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
   import type { Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
-  import { may } from '$lib/record/may.ts';
-  import { TASKS } from '$lib/work/list.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ClearExamples from '$lib/ui/ClearExamples.svelte';
   import PageView from '$lib/page/PageView.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
+  import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import { drawsAny, homeDrawn, railed, slashLineOf, todayHome, type Holds, type HomeVoice } from '$lib/home/default-home.ts';
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
@@ -63,24 +62,13 @@
   const nothing = $derived(said('nothing_needs_you') !== VOICE_LINES.nothing_needs_you ? said('nothing_needs_you') : words.nothingNow);
 
   /* TODAY'S HEADINGS IN THE VOICE THAT SPEAKS, read before the page is asked for so a voice that lands after the first
-     read asks it again in its own words. */
-  const voice = $derived<HomeVoice>({
-    rightNow: said('right_now'),
-    needsYou: said('needs_you'),
-    sinceAway: said('since_away'),
-    workingNow: said('working_now'),
-    comingUp: said('coming_up'),
-    overdue: said('overdue'),
-    nothingWaiting: said('nothing_waiting'),
-    nothingDue: said('nothing_due'),
-  });
+     read asks it again in its own words. Built by the same helper the arrange mode rebuilds Today's body with, so the
+     body arranged is the body drawn. */
+  const voice = $derived<HomeVoice>(voiceOf(said));
 
-  /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell: a block over a list the record does not keep is not asked for. */
-  const holds = $derived<Holds>({
-    tasks: data.lists.some((l) => l.id === TASKS),
-    adds: data.lists.some((l) => l.id === TASKS) && may(data, 'append', TASKS),
-    money: data.pages.includes('money'),
-  });
+  /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell, by that same mode's helper: a block over a list the record
+     does not keep is not asked for. */
+  const holds = $derived<Holds>(holdsOf(data));
 
   /**
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and

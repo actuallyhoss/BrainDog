@@ -19,7 +19,7 @@ export type LookWay = 'darken' | 'lighten';
 export const theme = {
   lookTitle: "The record's look",
   lookHint:
-    'Every colour this record is drawn in, in light and in dark, for everybody who opens it. A colour you pick for this device above still wins on this device.',
+    'Every colour this record is drawn in, in light and in dark, for everybody who opens it.',
   lookOwn: 'This record has a look of its own.',
   lookHouseNow: 'This record is in the house look.',
   lookEdit: 'Edit the look',

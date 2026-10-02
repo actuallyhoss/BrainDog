@@ -262,3 +262,20 @@ test('THE HEAD SAYS SLASH`S LINE WHEN THE RECORD SENT ONE, red only where it say
   const shape = (o: ReturnType<typeof homeDrawn>) => o.blocks.map((b) => [b.kind, b.drawn, b.entries.length]);
   assert.deepEqual(shape(page('Kiln first.')), shape(page()));
 });
+
+test('TODAY INSTALLED AS `home` SAYS THE MODEL`S LINE WHEN ITS READ CARRIES ONE, and the rules` line when it does not', () => {
+  const tasks = block({ kind: 'todo', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }, { by: '2026-10-02' }], [4, 5]);
+  /* ARRANGED AND KEPT, Today is the record's `home` page, so Home reads it as a declared page (`declares` is `home`, not
+     `null`) and never guesses a line from its lead. The record's `page` read marks the model's line as `said` on the
+     lead note, which the page reader draws as the note's words. */
+  const installed = (lead?: Partial<LiveBlock>) => homeDrawn([block({ kind: 'note', lead: true, body: TODAY_LEAD, ...lead }), tasks], NOW);
+  const head = (out: ReturnType<typeof homeDrawn>) => homeLineOf(out.sentence!, slashLineOf(out, false), NOW);
+  const rules = { text: 'One thing is two days late. One more needs you.', needs: 'two days late', by: 'rules' };
+
+  const line = 'The Kiln invoice is two days late; start there.';
+  assert.deepEqual(head(installed({ body: line, said: line } as Partial<LiveBlock>)), { text: line, needs: 'two days late', by: 'slash' });
+  /* WITH NO LINE ON THE READ, the rules' sentence, red phrase and all. */
+  assert.deepEqual(head(installed()), rules);
+  /* AND A LINE THE RECORD KEPT YESTERDAY is not today's. */
+  assert.deepEqual(head(installed({ said: { text: line, day: '2026-10-01', basis: 'b' } } as Partial<LiveBlock>)), rules);
+});
