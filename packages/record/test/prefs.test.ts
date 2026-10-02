@@ -92,3 +92,48 @@ test('THE HOME PAGE AND THE NAMES A PERSON GIVES PAGES ARE KEPT FOR THEM, and a 
   assert.deepEqual(await prefsOf(api, ada), {});
   sql.close();
 });
+
+test("A RULE A PERSON MUTED LEAVES THEIR NOTICES, its urgent notes still reach them, and nobody else's change", async () => {
+  const { api, sql } = await record();
+  const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string } }).refusal.code);
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_ada' } }).ok,
+  );
+  const rule = (id: string, notify: Record<string, unknown>) => ({
+    id: `rule.${id}`,
+    kind: 'rule' as const,
+    body: { rule: id, register: 'bills', on: 'create', once_per: ['row'], then: [{ notify }] } as never,
+  });
+  const installed = await api.kernel.install([
+    { id: 'register.bills', kind: 'register', body: { id: 'bills', name: 'Bills', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never },
+    rule('installment-due-soon', { say: 'Rent is due soon' }),
+    rule('payment-failed', { say: 'A payment failed', urgent: true }),
+  ]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  assert.ok((await api.create({ register: 'bills', fields: { what: 'Rent' } }, ada)).ok);
+  const notes = async (ctx: CallContext) => {
+    const news = await api.whatsNew(undefined, ctx);
+    assert.ok(news.ok, JSON.stringify(news));
+    return news.value.events.filter((e) => e.kind === 'note').map((e) => e.actor).sort();
+  };
+  assert.deepEqual(await notes(ada), ['rule:installment-due-soon', 'rule:payment-failed']);
+
+  /* BOTH MUTED, and only the plain one goes: what interrupts is never muted. */
+  const muted = await api.setPref({ key: 'notify.muted', value: ['rule:installment-due-soon', 'rule:payment-failed', 'rule:installment-due-soon'] }, ada);
+  assert.ok(muted.ok, JSON.stringify(muted));
+  assert.deepEqual(muted.value, { key: 'notify.muted', value: ['rule:installment-due-soon', 'rule:payment-failed'] }, 'a rule named twice was kept twice');
+  assert.deepEqual(await notes(ada), ['rule:payment-failed']);
+  assert.deepEqual(await notes(agent), ['rule:payment-failed'], "a token read past its person's mutes");
+  assert.deepEqual(await prefsOf(api, bo), {}, "somebody else's notices followed Ada's mutes");
+  assert.deepEqual(await notes(bo), ['rule:installment-due-soon', 'rule:payment-failed'], "Ada's mute hid a rule from Bo");
+
+  /* A MUTED ACTOR IS A RULE BY ITS NAME, and anything else is refused before it is kept. */
+  for (const value of [['installment-due-soon'], ['system'], ['rule:'], ['rule:Due Soon'], 'rule:installment-due-soon', [3]])
+    assert.equal(code(await api.setPref({ key: 'notify.muted', value }, ada)), 'VALUE_MALFORMED', JSON.stringify(value));
+  assert.equal(code(await api.setPref({ key: 'notify.muted', value: [] }, agent)), 'FORBIDDEN');
+
+  /* AND null HEARS IT AGAIN. */
+  await api.setPref({ key: 'notify.muted', value: null }, ada);
+  assert.deepEqual(await notes(ada), ['rule:installment-due-soon', 'rule:payment-failed']);
+  sql.close();
+});

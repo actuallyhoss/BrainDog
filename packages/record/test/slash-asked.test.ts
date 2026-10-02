@@ -630,8 +630,8 @@ test('A DESCRIPTION THAT WOULD REPLACE WHAT EXISTS SAYS SO IN WORDS THE RECORD W
   const out = value<Filed>(await api.slashPropose({ asked: 'A desk for my launch.' }, OWNER));
   assert.deepEqual(out.filed.map((f) => f.question), [
     'Build the launch desk you described? Accepting it replaces your page "home" as it is now.',
-    'Keep your task names tidy? Accepting it lets the rule "tidy" change rows of your list "tasks" on its own.',
-    'Add a column for who owns each step? Accepting it replaces your list "tasks" as it is now.',
+    'Keep your task names tidy? Accepting it lets the rule "tidy" change what is in Tasks on its own.',
+    'Add a column for who owns each step? Accepting it replaces Tasks as it is now.',
   ]);
   /* THE LINE IS WHAT DECIDE DRAWS: the question the kernel keeps for each, where the owner reads it before accepting. */
   for (const f of out.filed) assert.equal(api.kernel.question(f.id), f.question);

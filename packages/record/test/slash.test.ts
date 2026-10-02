@@ -204,6 +204,26 @@ test('A RECORD MADE TODAY STARTED TODAY, not "0 days old"', async () => {
   sql.close();
 });
 
+test('A RECORD BROUGHT IN WITH ITS PAST IS AS OLD AS THE OLDEST DAY ITS ROWS HOLD, not the day they were written', async () => {
+  /* A RECORD THE SEED WROTE, OR ONE BROUGHT IN, WRITES EVERY ROW ON THE DAY IT ARRIVES: months of payments read "This
+     BrainDog started today". A day ahead is a plan and not a past, and an example's day is a pack's invention. */
+  const { api, sql, clock } = await record();
+  value(
+    await api.kernel.install([
+      { id: 'register.payments', kind: 'register', body: { id: 'payments', name: 'Payments', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'on', type: 'day' }] } as never },
+    ]),
+  );
+  const shift = (days: number) => new Date(clock.now() + days * DAY).toISOString().slice(0, 10);
+  value(api.kernel.create('payments', { what: 'Ahead', on: shift(400) }, { actor: 'p_owner' }));
+  value(api.kernel.create('payments', { what: 'Invented', on: shift(-900), tags: ['example'] }, { actor: 'p_owner' }));
+  const young = value<Reading>(await api.slash({}, owner));
+  assert.match(String(young.quiet), /^This BrainDog started today\./u, 'a day ahead or an example’s day made the record old');
+  value(api.kernel.create('payments', { what: 'Rent in March', on: shift(-40) }, { actor: 'p_owner' }));
+  const seen = value<Reading>(await api.slash({}, owner));
+  assert.equal(seen.quiet, null, 'a record holding forty days of its own is still called young');
+  sql.close();
+});
+
 test('A YOUNG RECORD IS WATCHED, NOT ADVISED', async () => {
   const { api, sql, install, day } = await record();
   await install({ install: 'log' });

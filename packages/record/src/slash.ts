@@ -117,9 +117,14 @@ export type PackUse = { id: string; title: string; on: boolean; usecase: boolean
 
 export type Usage = {
   at: string;
-  /** The first write this record holds, and how many days ago that was. */
+  /** The oldest event or row this record holds, and how many days ago that was. */
   firstWrite: string | null;
   ageDays: number;
+  /**
+   * How many days the record's own log goes back, which a line about what happened "in ninety days" is said over: a
+   * record brought in today holding a payment from March is months old, and its log is not. Absent, `ageDays` is.
+   */
+  loggedDays?: number;
   /** Whether pages being opened and lists being read are recorded at all here, in ninety days (two subjects on three days). */
   listening: { pages: boolean; lists: boolean };
   lists: ListUse[];
@@ -166,6 +171,38 @@ const isAgent = (actor: string): boolean => /^S\d+$/u.test(actor) || actor.start
 const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 const instantOf = (ms: number): string => new Date(ms).toISOString();
 
+/**
+ * The oldest day any row says about itself, up to `today`: the earliest value of a day or instant field across the lists
+ * the caller may read, or `null` when none holds one.
+ *
+ * WHAT A ROW SAYS, NOT WHEN IT WAS WRITTEN: a payment from March brought in today is a record kept since March. NOT AN
+ * EXAMPLE'S, which a pack invented (`tags` holding `example`), so a use case installed today with dated examples is still
+ * a record started today. A day ahead of today is a plan and not a past, and is left out.
+ */
+function heldSince(sql: Sql, kernel: Kernel, reads: (list: string) => boolean, today: string): string | null {
+  let oldest: string | null = null;
+  for (const [list, decl] of kernel.registers()) {
+    if (!reads(list)) continue;
+    for (const f of decl.fields) {
+      if (f.type !== 'day' && f.type !== 'instant') continue;
+      const path = `$.${f.id}`;
+      const r = sql.one<{ d: string | null }>(
+        `SELECT min(substr(json_extract(fields, ?), 1, 10)) AS d FROM entry
+          WHERE register = ? AND deleted_at IS NULL AND json_type(fields, ?) = 'text'
+            AND substr(json_extract(fields, ?), 1, 10) <= ? AND coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%'`,
+        path,
+        list,
+        path,
+        path,
+        today,
+      );
+      const d = r?.d ?? null;
+      if (d !== null && /^\d{4}-\d{2}-\d{2}$/u.test(d) && (oldest === null || d < oldest)) oldest = d;
+    }
+  }
+  return oldest === null ? null : `${oldest}T00:00:00.000Z`;
+}
+
 /** A page body's block sources and kinds, to tell whether it shows what agents do. */
 export function pageShowsAgents(body: unknown): boolean {
   const blocks = (body as { blocks?: unknown })?.blocks;
@@ -202,8 +239,19 @@ export function readUsage(
   const day30 = dayOf(nowMs - 30 * DAY_MS);
   const day90 = dayOf(nowMs - QUIET_DAYS * DAY_MS);
 
-  const firstWrite = sql.one<{ ts: string }>('SELECT ts FROM event ORDER BY rowid LIMIT 1')?.ts ?? null;
+  /* THE OLDEST THING THE RECORD HOLDS, NOT THE FIRST LINE ITS LOG WROTE. A record the seed wrote, or one brought in from
+     somewhere else, writes every row on the day it arrives, so a record holding months of payments read "This BrainDog
+     started today". Its age is the earliest of the first event, the first row written and the oldest day a row says
+     about itself (`heldSince`). The first two BY ROWID, as it was, so each is one indexed step however long the log is. */
+  const logged = sql.one<{ ts: string }>('SELECT ts FROM event ORDER BY rowid LIMIT 1')?.ts ?? null;
+  const oldest = [
+    logged,
+    sql.one<{ ts: string }>('SELECT created_at AS ts FROM entry ORDER BY rowid LIMIT 1')?.ts ?? null,
+    heldSince(sql, kernel, reads, dayOf(nowMs)),
+  ].filter((t): t is string => typeof t === 'string' && Number.isFinite(Date.parse(t)));
+  const firstWrite = oldest.length === 0 ? null : oldest.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
   const ageDays = firstWrite === null ? 0 : Math.floor((nowMs - Date.parse(firstWrite)) / DAY_MS);
+  const loggedDays = logged === null || !Number.isFinite(Date.parse(logged)) ? 0 : Math.floor((nowMs - Date.parse(logged)) / DAY_MS);
 
   const alive = (kind: string): boolean => {
     const r = sql.one<{ subjects: number; days: number }>(
@@ -359,6 +407,7 @@ export function readUsage(
     at: instantOf(nowMs),
     firstWrite,
     ageDays,
+    loggedDays,
     listening: { pages: alive('page.render'), lists: alive('register.read') },
     lists,
     pages,
@@ -645,7 +694,9 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
           body: { pack: tone.pack, values: { [awaySetting]: AGENTS_LINE } },
           by: 'rules',
         });
-      } else if (namesAgents && usage.writes.agents90 === 0 && usage.ageDays >= QUIET_DAYS) {
+      } else if (namesAgents && usage.writes.agents90 === 0 && (usage.loggedDays ?? usage.ageDays) >= QUIET_DAYS) {
+        /* OVER THE LOG'S OWN DAYS, NOT THE OLDEST DAY A ROW HOLDS: "No agent has changed anything here in ninety days" is a
+           claim about the log, and a record brought in last week with a payment from March has not been watched that long. */
         const back = away.value !== null && away.default !== null && away.value !== away.default && !/agent/iu.test(away.default);
         const to = back ? away.default! : QUIET_LINE;
         drafts.push({
@@ -924,6 +975,16 @@ function reachesOut(value: unknown, depth = 0): string | null {
 /** How the owner calls each kind a description builds, in the line the record writes about what exists. */
 const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', ingest: 'door', metric: 'figure', page: 'page', rule: 'rule', script: 'script' };
 
+/**
+ * A list a model's header names, AS A PERSON CALLS IT: `checks` is Checks and `card_alerts` Card alerts, which is the name
+ * a list declared with none of its own goes by. Decide drew "read your list "checks"", the system's word for the thing
+ * and the id in quotes; a question names the person's own things. Cut to a length, because the header is the model's.
+ */
+const listNamed = (id: string): string => {
+  const words = id.slice(0, 40).replaceAll('_', ' ').trim();
+  return words === '' ? words : `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+};
+
 /** The strings of a header's list, such as a script's `egress` or `writes`, and nothing else in it. */
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
 
@@ -963,7 +1024,7 @@ function describedScript(d: { id?: unknown; body?: unknown }, n: number): string
     return `Proposal ${n} has ${id}, which a door or a rule would start, and from a description Slash builds a script that runs only on its clock. Ask for it on its own.`;
   const read = strings(body.reads)[0];
   if (read !== undefined && strings(body.egress).length > 0)
-    return `Proposal ${n} has ${id}, which would read your list "${read.slice(0, 40)}" and fetch beyond the record, and Slash never sends a list out from a description. Ask for it on its own.`;
+    return `Proposal ${n} has ${id}, which would read ${listNamed(read)} and fetch beyond the record, and Slash never sends what you keep out from a description. Ask for it on its own.`;
   return null;
 }
 
@@ -982,8 +1043,8 @@ function scriptSays(d: { id?: unknown; body?: unknown }): string {
   const id = String(d.id ?? '');
   const bare = id.slice(id.indexOf('.') + 1).slice(0, 40);
   const hosts = strings(body.egress).map((o) => o.replace(/^https:\/\//iu, '').slice(0, 80));
-  const reads = strings(body.reads).map((r) => `"${r.slice(0, 40)}"`);
-  const writes = strings(body.writes).map((w) => `"${w.slice(0, 40)}"`);
+  const reads = strings(body.reads).map(listNamed);
+  const writes = strings(body.writes).map(listNamed);
   const keys = strings(body.keys).map((k) => `"${k.slice(0, 40)}"`);
   const runs = (body.runs !== null && typeof body.runs === 'object' ? body.runs : {}) as { every?: unknown; door?: unknown; rule?: unknown };
   const when = [
@@ -992,9 +1053,9 @@ function scriptSays(d: { id?: unknown; body?: unknown }): string {
     ...(runs.rule === true ? ['whenever a rule starts it'] : []),
   ];
   const does = [
-    ...(reads.length > 0 ? [`read your ${reads.length === 1 ? 'list' : 'lists'} ${joinNames(reads)}`] : []),
+    ...(reads.length > 0 ? [`read ${joinNames(reads)}`] : []),
     ...(hosts.length > 0 ? [`fetch from ${joinNames(hosts)}`] : []),
-    ...(writes.length > 0 ? [`write to your ${writes.length === 1 ? 'list' : 'lists'} ${joinNames(writes)}`] : []),
+    ...(writes.length > 0 ? [`write to ${joinNames(writes)}`] : []),
   ];
   const sent = keys.length > 0 ? `, sending your ${keys.length === 1 ? 'key' : 'keys'} ${joinNames(keys)} with each request` : '';
   return `Accepting it lets the script "${bare}" ${does.length > 0 ? joinNames(does) : 'run'} ${joinNames(when)} on its own${sent}.`;
@@ -1038,7 +1099,7 @@ function ingestSays(d: { id?: unknown; body?: unknown }): string | null {
   const bare = id.slice(id.indexOf('.') + 1).slice(0, 40);
   const does = [
     `fetch${host === '' ? '' : ` from ${host}`}${typeof every === 'string' ? ` every ${every.slice(0, 16)}` : ''}`,
-    ...(typeof list === 'string' ? [`write what it reads to your list "${list.slice(0, 40)}"`] : []),
+    ...(typeof list === 'string' ? [`write what it reads to ${listNamed(list)}`] : []),
   ];
   const sent = typeof grant === 'string' ? `, sending your key "${grant.slice(0, 40)}" with each request` : '';
   return `Accepting it lets the door "${bare}" ${joinNames(does)} on its own${sent}.`;
@@ -1105,12 +1166,14 @@ function changeBody(
     }
     if (drawn !== undefined) {
       const bare = (id: unknown): string => String(id ?? '').slice(String(id ?? '').indexOf('.') + 1);
-      const replaced = listed.filter((d) => drawn(String(d.id ?? '')) > 0).map((d) => `your ${OWNERS_WORD[String(d.kind)]} "${bare(d.id)}"`);
+      const replaced = listed
+        .filter((d) => drawn(String(d.id ?? '')) > 0)
+        .map((d) => (d.kind === 'register' ? listNamed(bare(d.id)) : `your ${OWNERS_WORD[String(d.kind)]} "${bare(d.id)}"`));
       if (replaced.length > 0) says.push(`Accepting it replaces ${joinNames(replaced)} as ${replaced.length === 1 ? 'it is' : 'they are'} now.`);
       for (const d of listed) {
         const over = d.kind === 'rule' ? (d.body as { register?: unknown } | null)?.register : undefined;
         if (typeof over === 'string' && drawn(`register.${over}`) > 0)
-          says.push(`Accepting it lets the rule "${bare(d.id)}" change rows of your list "${over}" on its own.`);
+          says.push(`Accepting it lets the rule "${bare(d.id)}" change what is in ${listNamed(over)} on its own.`);
       }
     }
   }

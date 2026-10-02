@@ -93,6 +93,12 @@ export type Runway = {
   crossed: Step | null;
   days: number | null;
   horizon: number;
+  /**
+   * How far the walk went, in days, when that is further than `horizon`: a forecast block opens on its `horizon:` and
+   * walks to the longest of its `horizons:`, so the length control can offer every one of them (`pages.ts`). Absent when
+   * the walk is the length it opens on.
+   */
+  reach?: number;
   refusals: Refusal[];
 };
 
@@ -176,7 +182,14 @@ const HORIZON_DEFAULT = 180;
  * function does. Ten years is longer than any cash question a person actually asks and short enough
  * that the loop above stays a loop.
  */
-const HORIZON_CAP = 3650;
+export const HORIZON_CAP = 3650;
+
+/**
+ * How far a walk looks: a whole number of days, `'last'` for the last dated movement (`lastOf`), or `{ last: n }` for
+ * the last dated movement and never fewer than `n` days, which is a block whose length control offers both `last` and a
+ * length that may be the longer of the two (`walkReach` in `pages.ts`).
+ */
+export type Horizon = number | 'last' | { last: number };
 
 /** Which movements a walk reads: one currency's, unconverted, or every one but those in `except`, converted as usual. */
 export type Only = string | { except: readonly string[] };
@@ -205,7 +218,7 @@ type LegRead = { leg: Leg; stopped: Refusal | null; rows: Held[]; unreadable: nu
  * `opening` is what is liquid TODAY and it is a number somebody has to supply: a runway seeded from
  * a balance nobody declared is a forecast that looks like a fact and is a guess.
  *
- * `horizonDays` is a whole number of days, or `'last'`: to the last dated movement (`lastOf`).
+ * `horizonDays` is a whole number of days, `'last'`: to the last dated movement (`lastOf`), or both (`Horizon`).
  *
  * `into` IS A CURRENCY SOMEBODY ASKED TO SEE THE WALK IN, in place of the home one: every movement in another currency is
  * converted at the rate as of its own day, and a pair with no rate is named in `missing`, exactly as a walk into the
@@ -215,7 +228,7 @@ export function runway(
   deps: ForecastDeps,
   opening: number,
   legs: readonly Leg[],
-  horizonDays: number | 'last' = HORIZON_DEFAULT,
+  horizonDays: Horizon = HORIZON_DEFAULT,
   only?: Only,
   into?: string,
 ): Result<Runway> {
@@ -223,10 +236,11 @@ export function runway(
      with nothing checked. A refusal is a value here as everywhere else, so a horizon this walk
      cannot carry is a sentence rather than a walk that quietly stops early or a loop that does not
      end. */
-  if (horizonDays !== 'last' && (!Number.isInteger(horizonDays) || horizonDays < 1 || horizonDays > HORIZON_CAP))
+  const days = typeof horizonDays === 'object' && horizonDays !== null ? horizonDays.last : horizonDays;
+  if (days !== 'last' && (!Number.isInteger(days) || days < 1 || days > HORIZON_CAP))
     return no<Runway>(
       'OUT_OF_BOUNDS',
-      `A horizon is a whole number of days between 1 and ${HORIZON_CAP.toLocaleString('en-GB')}, or last for the last dated movement, and this one is ${JSON.stringify(horizonDays)}.`,
+      `A horizon is a whole number of days between 1 and ${HORIZON_CAP.toLocaleString('en-GB')}, or last for the last dated movement, and this one is ${JSON.stringify(days)}.`,
       { at: 'horizon' },
     );
   /* A CURRENCY TO WALK IN IS A CODE, checked like the horizon. Read as "no currency asked" it would walk in the home
@@ -330,7 +344,13 @@ export function runway(
     }
   }
 
-  const horizon = horizonDays === 'last' ? lastOf(reads, deps.ctx.nowMs, today) : horizonDays;
+  /* A FLOOR UNDER `last` WALKS THE LONGER OF THE TWO, and with nothing dated it walks the floor rather than the default. */
+  const horizon =
+    horizonDays === 'last'
+      ? lastOf(reads, deps.ctx.nowMs, today)
+      : typeof horizonDays === 'number'
+        ? horizonDays
+        : Math.max(horizonDays.last, lastOf(reads, deps.ctx.nowMs, today, horizonDays.last));
   const until = deps.ctx.nowMs + horizon * DAY_MS;
 
   for (const { leg, stopped, rows, unreadable, unreadableEnd, notMoney } of reads) {
@@ -734,9 +754,10 @@ function cyclesWrong(leg: Leg): Refusal | null {
  * every step up to the day the others fix.
  *
  * NOTHING DATED FROM TODAY ON WALKS `HORIZON_DEFAULT`, because a walk of one day over rows that
- * repeat for ever would show nothing and read as an answer. `Runway.horizon` says which it was.
+ * repeat for ever would show nothing and read as an answer. `Runway.horizon` says which it was. A walk
+ * with a floor (`{ last: n }`) walks `none`, its floor, instead.
  */
-function lastOf(reads: readonly LegRead[], nowMs: number, today: string): number {
+function lastOf(reads: readonly LegRead[], nowMs: number, today: string, none: number = HORIZON_DEFAULT): number {
   let furthest: string | null = null;
   for (const { rows } of reads)
     for (const row of rows) {
@@ -744,7 +765,7 @@ function lastOf(reads: readonly LegRead[], nowMs: number, today: string): number
       const day = row.cadence === null ? row.first : row.last;
       if (day !== null && (furthest === null || day > furthest)) furthest = day;
     }
-  if (furthest === null || furthest < today) return HORIZON_DEFAULT;
+  if (furthest === null || furthest < today) return none;
   return Math.min(HORIZON_CAP, Math.max(1, Math.ceil((noon(furthest) - nowMs) / DAY_MS)));
 }
 

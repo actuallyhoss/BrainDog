@@ -34,7 +34,7 @@ import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { runway, type Leg, type Only, type Runway } from './forecast.ts';
+import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
 import { figureLists } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
@@ -485,7 +485,7 @@ export type PageDeps = {
   titleOf: (register: string) => string | null;
   /** The cash walk, when a block names it. */
   /** `only` walks one currency's movements, unconverted, for a walk drawn once per currency. */
-  runway: (opening: number, legs: readonly Leg[], horizon?: number | 'last', only?: Only) => Runway | null;
+  runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, only?: Only) => Runway | null;
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -1515,12 +1515,18 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'forecast.runway') {
     const opened = openingOf(deps, block.opening);
     if (opened.refusal) return { ...base, refusals: also(opened.refusal) };
+    /* THE WALK GOES AS FAR AS THE LONGEST LENGTH THE KNOB OFFERS, and opens on `horizon:`. A walk of `horizon:` days and no
+       further let the renderer offer no length past it, so Money's Cash ahead opened on a whole year to keep the year in
+       reach (visual review 4). Each walk says both (`opensOn`), and every reading of it below is over the whole walk. */
+    const reach = walkReach(block);
+    const opensOn = (w: Runway): Runway =>
+      typeof block.horizon === 'number' && w.horizon > block.horizon ? { ...w, horizon: block.horizon, reach: w.horizon } : w;
     /* MONEY IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS ONE WALK A CURRENCY, never a sentence instead of a walk:
        each walks that currency's part of the opening through that currency's movements, and a crossing day is a day in
        one currency. A converted opening is walked as one, and a movement it cannot convert still says which rate. */
     if (Array.isArray(block.from) && (opened.parts || opened.value !== null)) {
       const home = deps.ctx.fx?.().home ?? null;
-      const whole = opened.parts ? null : deps.runway(opened.value!, block.from, block.horizon);
+      const whole = opened.parts ? null : deps.runway(opened.value!, block.from, reach);
       /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT: the home walk draws everything it can convert,
          and each currency with no rate walks on its own beside it, from nothing, so no movement is left out. */
       const lacking =
@@ -1532,22 +1538,22 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
         lacking.length > 0 ||
         (whole !== null && !opened.converted && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
       if (apart) {
-        const moving = whole ?? deps.runway(0, block.from, block.horizon);
+        const moving = whole ?? deps.runway(0, block.from, reach);
         const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...(moving?.mixed ?? []), ...(moving?.currency ? [moving.currency] : [])])]
           .filter((c) => /^[A-Z]{3}$/u.test(c))
           .sort();
-        const homeWalk = lacking.length ? deps.runway(opened.value!, block.from, block.horizon, { except: lacking }) : null;
+        const homeWalk = lacking.length ? deps.runway(opened.value!, block.from, reach, { except: lacking }) : null;
         const walks = lacking.length
           ? [
               ...(homeWalk ? [{ ...homeWalk, currency: homeWalk.currency ?? home }] : []),
               ...lacking.flatMap((c) => {
-                const one = deps.runway(0, block.from!, block.horizon, c);
+                const one = deps.runway(0, block.from!, reach, c);
                 return one ? [one] : [];
               }),
             ]
           : currencies.flatMap((c) => {
               const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
-              const one = deps.runway(from, block.from!, block.horizon, c);
+              const one = deps.runway(from, block.from!, reach, c);
               return one ? [one] : [];
             });
         if (walks.length > 0) {
@@ -1565,7 +1571,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
             ...base,
             /* EACH WALK'S REMEMBERED CASH IS THE FIGURE AS IT WAS WRITTEN DOWN IN THAT WALK'S CURRENCY, so a walk in pounds
                draws the days its opening figure was pounds, and no walk joins a line in another currency at today. */
-            walks: walks.map((w) => (recorded.past ? { ...w, past: pastIn(recorded.past, w.currency) } : w)),
+            walks: walks.map(opensOn).map((w) => (recorded.past ? { ...w, past: pastIn(recorded.past, w.currency) } : w)),
             walkFx: { home, missing },
             ...fxOf(deps),
             ...late,
@@ -1590,7 +1596,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
        away, not an edit away. `SOURCE_UNKNOWN` at the bottom of this function is the other answer,
        for a word no document publishes at all. Both said `UNIMPLEMENTED` once and a person could not
        tell "wait" from "you made this up". */
-    const walk = deps.runway(opened.value, block.from, block.horizon);
+    const walk = deps.runway(opened.value, block.from, reach);
     if (!walk)
       return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
     /* A BALANCE IN ONE CURRENCY AND MOVEMENTS IN ANOTHER ARE NOT ONE WALK. */
@@ -1612,7 +1618,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     if ('refusal' in sold) return { ...base, refusals: also(sold.refusal) };
     return {
       ...base,
-      walk,
+      walk: opensOn(walk),
       ...(recorded.past ? { past: pastIn(recorded.past, walk.currency) } : {}),
       ...fxOf(deps),
       ...late,
@@ -2217,8 +2223,8 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
   if (block.knobs !== undefined && (!Array.isArray(block.knobs) || block.knobs.some((k) => !(KNOBS as readonly unknown[]).includes(k))))
     return { refusal: { code: 'DECLARATION_INVALID', fix: `knobs is a list of ${KNOBS.join(', ')}.`, at: 'knobs', allowed: [...KNOBS] } };
   /* THE HORIZON KNOB'S CHOICES ARE CHECKED WITH THE KNOBS, because a list the host cannot offer is a control drawn with
-     nothing in it. How far each reaches is not checked here: the host walks no further than `horizon:` whatever a
-     reader picks, so a longer choice draws the walk the block already read. */
+     nothing in it. How far each reaches is not checked here: the walk goes to the longest of them (`walkReach`), and a
+     length past what a walk may carry is left off it rather than refusing the block. */
   if (block.horizons !== undefined && !horizonsOk(block.horizons))
     return {
       refusal: {
@@ -2611,15 +2617,21 @@ const ACTIVITY: Schema = {
   fields: { actor: { type: 'enum', values: FEED_BY }, kind: { type: 'text' }, target: { type: 'text' }, list: { type: 'text' } },
 };
 
+/** Who `@braindog/seed` writes a sample as, which the app names BrainDog (`names.ts`). */
+export const SEED_ACTOR = 'p_seed';
+
 /**
  * The kind of actor behind an event, by `30 §3`'s grammar.
  *
  * A run and a token are agents, and so is `slash`; a rule, an ingest and the record's own work are
  * rules, because nobody chose them at that moment. Anything else is a person.
+ *
+ * THE SAMPLE'S OWN HAND (`SEED_ACTOR`) IS THE RECORD'S WORK TOO. It wrote every row a sample opens with, and its lines sat
+ * under "You" on a record nobody had touched yet, the backup the night run missed among them.
  */
 export function byOf(actor: string): FeedBy {
   if (/^S\d+$/.test(actor) || actor.startsWith('agent:') || actor === 'slash') return 'agent';
-  if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor === 'system') return 'rule';
+  if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor === 'system' || actor === SEED_ACTOR) return 'rule';
   return 'you';
 }
 
@@ -3720,9 +3732,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       const said = pathOf(path);
       if (!said) continue;
       if ('metric' in said) addFigure(said.metric);
-      else if ('change' in said) {
-        if (metric?.(said.change) ?? builtInFigure(said.change)) addFigure(said.change);
-        else if (LIST_ID.test(said.change)) named.add(said.change);
+      else if ('change' in said || 'rowsOf' in said) {
+        const head = 'change' in said ? said.change : said.rowsOf;
+        if (metric?.(head) ?? builtInFigure(head)) addFigure(head);
+        else if (LIST_ID.test(head)) named.add(head);
       } else named.add(said.register);
     }
   }
@@ -3793,6 +3806,7 @@ function pathOf(
 ):
   | { metric: string }
   | { change: string }
+  | { rowsOf: string; part: RowPart }
   | { register: string; seq: number; field: string }
   | { register: string; count: true }
   | { register: string; state: string }
@@ -3804,6 +3818,9 @@ function pathOf(
   /* `<figure>.change` IS HOW FAR A FIGURE MOVED (`changeOf`). A list called `tasks` with a state called `change` would
      say the same words, so the record decides between the two by whether a figure of that name is declared. */
   if (tail === 'change' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head };
+  /* `<figure>.first`, `.names`, `.more` AND `.since` ARE THE ROWS A FIGURE COUNTS (`rowsValue`), decided between a figure
+     and a list's state of that name exactly as `.change` is. */
+  if ((ROW_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: tail as RowPart };
   const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
   if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
   if (!/^[a-z][a-z0-9_]*$/.test(head)) return null;
@@ -3835,7 +3852,20 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
     const decl = deps.metric(parsed.change);
     if (decl) return changeOf(deps, decl);
   }
-  const said = 'change' in parsed ? (LIST_ID.test(parsed.change) ? { register: parsed.change, state: 'change' } : null) : parsed;
+  if ('rowsOf' in parsed) {
+    const decl = deps.metric(parsed.rowsOf);
+    if (decl) return rowsValue(deps, decl, parsed.part);
+  }
+  const said =
+    'change' in parsed
+      ? LIST_ID.test(parsed.change)
+        ? { register: parsed.change, state: 'change' }
+        : null
+      : 'rowsOf' in parsed
+        ? LIST_ID.test(parsed.rowsOf)
+          ? { register: parsed.rowsOf, state: parsed.part }
+          : null
+        : parsed;
   if (!said) return undefined;
   if ('metric' in said) {
     const decl = deps.metric(said.metric);
@@ -3867,6 +3897,82 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
   const listed = deps.list({ register: said.register, where: { field: 'seq', is: said.seq }, limit: 1 });
   const row = listed.ok ? listed.value.rows[0] : undefined;
   return row && Object.hasOwn(row.fields, said.field) ? figure(row.fields[said.field]) : undefined;
+}
+
+/** What a sentence may say about the rows a figure counts: the first one's name, a few names, how many besides, and since when. */
+const ROW_PARTS = ['first', 'names', 'more', 'since'] as const;
+type RowPart = (typeof ROW_PARTS)[number];
+
+/** How many rows `.names` names before it says how many more. */
+const NAMED_MOST = 3;
+
+/**
+ * A few names as a person lists them: `A`, `A and B`, `A, B and C`, and past `NAMED_MOST` `A, B and 4 more`. A row with
+ * no title is counted in the more, so one name over three rows is `A and 2 more` and never `A` alone.
+ */
+function namesSaid(names: readonly string[], total: number): string {
+  if (names.length === 0) return '';
+  if (names.length === total && total <= NAMED_MOST) return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
+  const said = names.slice(0, 2);
+  return `${said.join(', ')} and ${total - said.length} more`;
+}
+
+/** The first day or instant field a predicate compares, which is the line the figure draws (`by before today`). */
+function dayFieldOf(node: Predicate | undefined, schema: Schema): string | null {
+  if (!node) return null;
+  for (const q of ['all', 'any', 'none'] as const)
+    if (q in node) {
+      for (const n of (node as Record<typeof q, Predicate[]>)[q]) {
+        const found = dayFieldOf(n, schema);
+        if (found) return found;
+      }
+      return null;
+    }
+  const leaf = node as { field?: unknown; via?: unknown };
+  if (typeof leaf.field !== 'string' || leaf.via !== undefined || !Object.hasOwn(schema.fields, leaf.field)) return null;
+  const type = schema.fields[leaf.field]!.type;
+  return type === 'day' || type === 'instant' ? leaf.field : null;
+}
+
+/**
+ * `{{tasks-late-yours.first}}`: the rows a counting figure counts, as a sentence names them, so a page's line can say
+ * "Turn auto-renew back on is late" where it said "1 late", and "Kiln and Portage need a push" where it said "2 at risk".
+ *
+ * - `first` is the first row's title, `names` the first few listed as a person lists them (`namesSaid`), `more` how
+ *   many the figure counts besides the first, and `since` the first row's day on the line the figure draws.
+ * - FIRST IS THE ONE FURTHEST PAST THE LINE: rows are ordered by the first day field the figure's `where` compares,
+ *   oldest first, so the task late longest and the person quiet longest lead. A figure that compares no day keeps the
+ *   list's own order.
+ * - Over a list the reader may not open, or a figure that is not a list's rows, this is nothing, and a lead note then
+ *   drops the clause (`leadOf`) as it does any figure it cannot read.
+ */
+function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart): Json | undefined {
+  if (!decl.source.startsWith('register.') || !mayRead(deps, decl)) return undefined;
+  const register = decl.source.slice('register.'.length);
+  const schema = deps.schemaOf(register);
+  const title = deps.titleOf(register);
+  if (!schema || !title) return undefined;
+  const said = predicateOf(decl.where, schema, deps.ctx);
+  if (said.bad.length) return undefined;
+  const by = dayFieldOf(said.predicate, schema);
+  const listed = deps.list({ register, where: said.predicate, limit: NAMED_MOST, ...(by ? { order: [{ field: by, dir: 'asc' as const }] } : {}) });
+  if (!listed.ok || listed.value.rows.length === 0) return undefined;
+  const { rows, matched } = listed.value;
+  if (part === 'more') return Math.max(0, matched - 1);
+  const named = (r: (typeof rows)[number]): string | null => {
+    const n = r.fields[title];
+    return typeof n === 'string' && n.trim() !== '' ? n : null;
+  };
+  /* `first` AND `since` ARE THE SAME ROW, the first with a title, so "Pell & Vine has been quiet since April" is one
+     person's name and that person's day. */
+  const lead = rows.find((r) => named(r) !== null);
+  if (part === 'since') {
+    const day = by === null ? undefined : (lead ?? rows[0]!).fields[by];
+    return typeof day === 'string' && day !== '' ? day : undefined;
+  }
+  const names = rows.flatMap((r) => named(r) ?? []);
+  if (names.length === 0) return undefined;
+  return part === 'first' ? names[0]! : namesSaid(names, matched);
 }
 
 /** How far before the remembered point a figure's change may look for one, past the day its window names. */
@@ -3951,6 +4057,24 @@ function listOf(said: string | null | undefined): string | null {
 function fxOf(deps: PageDeps): { fx?: { home: string | null; rates: Rate[] } } {
   const held = deps.ctx.fx?.();
   return held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {};
+}
+
+/**
+ * How far a forecast block walks: its `horizon:`, or the longest of its `horizons:` when one is longer. `last` is walked
+ * as it says, and a block that names no length walks the record's default.
+ *
+ * `last` AMONG `horizons:` IS A LENGTH TOO, and only the rows know how long: a block opening on 90 days that offers
+ * `last` walked 90, so "To the end" stopped at three months over a plan that runs two years. It walks to the last dated
+ * movement and never short of the longest number (`Horizon`'s `{ last: n }`).
+ */
+function walkReach(block: PageBlock): Horizon | undefined {
+  if (typeof block.horizon !== 'number') return block.horizon;
+  const opens = block.horizon;
+  const longer = Array.isArray(block.horizons)
+    ? block.horizons.filter((h): h is number => typeof h === 'number' && Number.isInteger(h) && h > opens && h <= HORIZON_CAP)
+    : [];
+  const most = longer.length > 0 ? Math.max(...longer) : block.horizon;
+  return Array.isArray(block.horizons) && block.horizons.includes('last') ? { last: most } : most;
 }
 
 /** How many lengths a forecast's horizon knob may offer: more is a list to read, not a choice to make. */

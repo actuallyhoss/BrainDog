@@ -57,6 +57,7 @@ import {
   type OutboxKind,
   carryingOf,
   headline,
+  mutedFor,
   type Decided,
   type GovernRegister,
   type Patch,
@@ -786,14 +787,15 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
  * device, which a cookie or `localStorage` cannot do, and `29 §4` says a dismissal is terminal on every device. The
  * browser may keep a first-paint copy of `nav.shape` and `pen.suggest`, written from these and never read as the truth.
  */
-export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed', 'home.page', 'nav.labels'] as const;
+export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed', 'home.page', 'nav.labels', 'notify.muted'] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
  * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
  * bar across the top or one menu, and `rail` is the side rail as builds before the top bar led wrote it, unasked; `pen.dismissed` is the ids of what the pen offered and the person turned down
  * (`PenItem.id`, and the navigation shape's `shape:<shape>:<reason>`), newest last. `pen.suggest` absent is on.
  * `home.page` is the address the app opens on (absent is Today); `nav.labels` is the person's own name for a page,
- * address by address.
+ * address by address. `notify.muted` is the rules whose notices this person does not want (`rule:installment-due-soon`),
+ * newest last: their notes leave this person's notices, and an urgent one still reaches them (`mutedFor`).
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -803,7 +805,14 @@ export type Prefs = {
   'pen.dismissed'?: string[];
   'home.page'?: string;
   'nav.labels'?: Record<string, string>;
+  'notify.muted'?: string[];
 };
+
+/** How many rules one person may mute: more than any record declares, and few enough that the list stays a list. */
+const MUTED_MOST = 200;
+
+/** What a muted actor is: a rule, by the name its notes are signed with. What the record raises itself is never muted. */
+const MUTED_ACTOR = /^rule:[a-z0-9][a-z0-9_.-]{0,119}$/u;
 
 /**
  * What `boot` answers, and why the record's own instant is on it.
@@ -3751,7 +3760,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Walk the log down from `before`, no lower than `floor`, keeping what the caller may see, until `want` are kept.
    * `next` is where a further walk would start, and `null` once nothing is left above the floor.
    */
-  const walk = (ctx: CallContext, before: number | null, floor: number, want: number, setups = false): { lines: Walked[]; next: number | null } => {
+  const walk = (
+    ctx: CallContext,
+    before: number | null,
+    floor: number,
+    want: number,
+    setups = false,
+    skip?: (e: LogLine) => boolean,
+  ): { lines: Walked[]; next: number | null } => {
     const lines: Walked[] = [];
     /* THE FEED SAYS A RECORD SETTING ITSELF UP AS ONE LINE (`kernel/src/feed.ts`); the log keeps every write. */
     const setup = setups
@@ -3776,6 +3792,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (e.rowid < floor) return done(null);
         walked += 1;
         at = e.rowid;
+        if (skip?.(e)) continue;
         const line = lineOf(ctx, e);
         if (line) keep(line);
         if (lines.length >= want) return done(at);
@@ -4222,9 +4239,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return answer;
   };
 
-  /** What changed since `cursor`, or since the caller's read mark. A token reads its person's mark. */
+  /**
+   * What changed since `cursor`, or since the caller's read mark. A token reads its person's mark.
+   *
+   * LESS WHAT THE PERSON MUTED: a note from a rule in their `notify.muted` is not news to them, and an urgent one is
+   * (`mutedFor`). A token reads its person's mutes as it reads their mark. The log keeps every line.
+   */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
-    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(readerOf(ctx)), NEWS + 1, true);
+    const reader = readerOf(ctx);
+    const said = reader === null ? undefined : (kernel.prefsOf(reader) as Prefs)['notify.muted'];
+    const muted = new Set(Array.isArray(said) ? said : []);
+    const skip = muted.size > 0 ? (e: LogLine) => mutedFor(e, muted) : undefined;
+    const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip);
     const events = lines.slice(0, NEWS);
     return { events: events.map((line) => shown(ctx, line)), upTo: events[0] ? pointAt(ctx, events[0]) : null, sinceCapped: next !== null };
   };
@@ -5955,7 +5981,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * One thing this person arranged for themselves, one key of `PREF_KEYS` at a time: `nav.order`, the rail's order;
      * `nav.hidden`, the pages taken out of it; `nav.shape`, a rail, a bar or a menu; `pen.suggest`, whether the holding
      * pen offers anything; `pen.dismissed`, what it offered and they turned down; `home.page`, the page the app opens on;
-     * `nav.labels`, their own names for pages. `null` takes a key away. `boot` answers them on `me.prefs`.
+     * `nav.labels`, their own names for pages; `notify.muted`, the rules whose notices they do not want. `null` takes a
+     * key away. `boot` answers them on `me.prefs`.
      *
      * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
      * screen, and it is not the record's history. Any level may, since it changes nothing anybody else sees.
@@ -6007,6 +6034,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             at: 'value',
           });
         kept = Object.fromEntries(entries.map(([k, v]) => [k, (v as string).trim()]));
+      } else if (value !== null && key === 'notify.muted') {
+        if (!texts(value, Number.POSITIVE_INFINITY, (s) => MUTED_ACTOR.test(s)))
+          return no('VALUE_MALFORMED', 'notify.muted is a list of rules, each written rule:<its id> such as rule:installment-due-soon, or null to take it away.', {
+            at: 'value',
+          });
+        /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
+        kept = [...new Set(value)].slice(-MUTED_MOST);
       }
       kernel.setPref(ctx.principal.id, key, kept);
       return ok({ key, value: kept });

@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { inQuietHours, jcs, localParts, nextOccurrence, openRecord, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
+import { inQuietHours, jcs, localParts, mutedFor, nextOccurrence, openRecord, URGENT_NOTE, type Declaration, type Kernel, type OutboxKind } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -559,6 +559,36 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
     2,
     'the rate limit swallowed the event as well as the interrupt',
   );
+  sql.close();
+});
+
+test('AN URGENT NOTE SAYS SO ON ITS EVENT, and a person who muted its rule still hears it', async () => {
+  /* A PERSON MUTES ONE RULE'S NOTES FROM SETTINGS (`notify.muted`), and what interrupts is never muted. The outbox rows an
+     interrupt queued drain and go, so the event is the only place left that says which it was. */
+  const { k, sql } = await record(WEEKLY(), false);
+  value(
+    await k.install([
+      RULE_URGENT,
+      { ...RULE_URGENT, id: 'rule.chase', body: { ...(RULE_URGENT.body as object), rule: 'chase', then: [{ notify: { say: 'Chase {{what}}' } }] } as never },
+    ]),
+  );
+  value(k.create('obligations', { what: 'Invoice 41', amount: { amount: 1_000, currency: 'GBP' }, state: 'open' }, { actor: 'p_1' }));
+  const notes = sql
+    .all<{ actor: string; kind: string; field: string | null }>("SELECT actor, kind, field FROM event WHERE kind = 'note' ORDER BY actor")
+    .map(({ actor, kind, field }) => ({ actor, kind, field }));
+  assert.deepEqual(notes, [
+    { actor: 'rule:chase', kind: 'note', field: null },
+    { actor: 'rule:urgent', kind: 'note', field: URGENT_NOTE },
+  ]);
+  const muted = new Set(['rule:chase', 'rule:urgent']);
+  assert.deepEqual(
+    notes.map((n) => mutedFor(n, muted)),
+    [true, false],
+    'a muted rule kept its plain note, or its urgent one was muted',
+  );
+  /* ONLY NOTES: the rule's own writes to a row are the record's history, not a notice. */
+  assert.equal(mutedFor({ kind: 'edit', actor: 'rule:chase', field: 'state' }, muted), false);
+  assert.equal(mutedFor(notes[0]!, new Set()), false);
   sql.close();
 });
 

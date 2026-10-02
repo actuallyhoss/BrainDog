@@ -16,8 +16,11 @@
 const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
-/** How the line names the person's things: a list by its id, a pack by its id. `null` when the record holds none. */
-export type DoesNames = { list?: (id: string) => string | null; pack?: (id: string) => string | null };
+/**
+ * How the line names the person's things: a list by its id, a pack by its id, and a row by where it is (`things#1`), as
+ * its title. `null` when the record holds none.
+ */
+export type DoesNames = { list?: (id: string) => string | null; pack?: (id: string) => string | null; row?: (at: string) => string | null };
 
 /** An id read as words: `usecase-student` is "Usecase student". */
 const spoken = (id: string): string => {
@@ -48,22 +51,32 @@ function declarationName(decl: Record<string, unknown>, names: DoesNames): strin
   return what === undefined ? said : `the ${said} ${what}`;
 }
 
-/** "adds 3 to Tasks", "changes 1 in Tasks and adds 2", for the rows a rowset or an arrangement writes. */
+/**
+ * "adds 3 to Tasks", "changes Kiln and Portage in Projects and adds 2", for the rows a rowset or an arrangement writes.
+ *
+ * THE ROWS IT CHANGES BY NAME, where every one of them has a title the record can find: Decide's lead card read "Changes
+ * 2 in Projects." over a question that was about Kiln and Portage. A row it cannot name keeps the count, so the line
+ * never names some and counts the rest as if that were all.
+ */
 function rowsSaid(rows: readonly unknown[], names: DoesNames, register?: string): string[] {
-  const by = new Map<string, { adds: number; changes: number }>();
+  const by = new Map<string, { adds: number; changes: number; named: (string | null)[] }>();
   for (const r of rows) {
     const row = obj(r);
     const list = register ?? (typeof row.register === 'string' ? row.register : '');
-    const n = by.get(list) ?? { adds: 0, changes: 0 };
-    if (typeof row.at === 'string') n.changes += 1;
-    else n.adds += 1;
+    const n = by.get(list) ?? { adds: 0, changes: 0, named: [] };
+    if (typeof row.at === 'string') {
+      n.changes += 1;
+      n.named.push(names.row?.(row.at) ?? null);
+    } else n.adds += 1;
     by.set(list, n);
   }
   return [...by].map(([list, n]) => {
     const name = list === '' ? 'your things' : (names.list?.(list) ?? spoken(list));
+    const titled = n.named.filter((t): t is string => t !== null);
+    const changed = titled.length === n.changes && n.changes > 0 ? joined([...new Set(titled)]) : String(n.changes);
     if (n.changes === 0) return `adds ${n.adds} to ${name}`;
-    if (n.adds === 0) return `changes ${n.changes} in ${name}`;
-    return `changes ${n.changes} in ${name} and adds ${n.adds}`;
+    if (n.adds === 0) return `changes ${changed} in ${name}`;
+    return `changes ${changed} in ${name} and adds ${n.adds}`;
   });
 }
 

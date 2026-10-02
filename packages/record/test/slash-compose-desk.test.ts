@@ -338,7 +338,7 @@ test('THE SAME DESCRIPTION PRESSED TO FILE PUTS ONE REPAIRED CHANGE IN DECIDE, s
   assert.equal(filed!.by, 'test model');
   /* THE QUESTION IS THE MODEL'S, AND THE RECORD SAYS WHAT THE SCRIPT WILL DO: read and write the checks, on its clock. */
   assert.ok(filed!.question.startsWith(`${QUESTION} `), filed!.question);
-  assert.match(filed!.question, /Accepting it lets the script "cost" read your list "checks".* write to your list "checks" every 1h on its own\./u);
+  assert.match(filed!.question, /Accepting it lets the script "cost" read Checks.* write to Checks every 1h on its own\./u);
   assert.equal(suggestions(sql), 1);
   /* FILED IS NOT INSTALLED: nothing of the desk is on the record until the owner accepts it in Decide. */
   assert.equal(api.kernel.declarations().some((d) => d.id === 'register.parts' || d.id === 'page.desk' || d.id === 'script.cost'), false, 'filing installed the desk');

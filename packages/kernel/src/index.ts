@@ -167,7 +167,7 @@ import { RELATIVE_DAY } from './flow-lint.ts';
 import { capability } from './capabilities.ts';
 import { carryPins } from './pairs.ts';
 import { pruneFirings } from './rules.ts';
-import { runway, type Leg, type Runway } from './forecast.ts';
+import { runway, type Horizon, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
@@ -314,7 +314,7 @@ export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLis
 export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
-export { RAIL_PAGES, REDUCES, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+export { RAIL_PAGES, REDUCES, SEED_ACTOR, byOf, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
 export { ANSWER_KEYS } from './block-keys.ts';
 export {
@@ -323,12 +323,14 @@ export {
   headline,
   inQuietHours,
   localParts,
+  mutedFor,
   nextOccurrence,
   render,
   runDigest,
   sectionsOf,
   sendDigest,
   twoSentences,
+  URGENT_NOTE,
 } from './digest.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
@@ -404,7 +406,7 @@ export type {
 export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
 export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders } from './ingest.ts';
-export type { ForecastDeps, Leg, Runway, Step } from './forecast.ts';
+export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, QueueOption, QueueQuestion } from './pages.ts';
@@ -1117,8 +1119,14 @@ export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {
   return makeKernel(sql, clock, state, opts);
 }
 
-function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOptions) {
-  const mint: Mint = ulids(() => clock.now());
+function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOptions) {
+  /* THE INSTANT `backdate` HOLDS, while a history is being written, and `null` the rest of the time. */
+  let held: number | null = null;
+  /* THE NEWEST INSTANT `backdate` HAS HELD, which no later one may go behind. */
+  let latest = -Infinity;
+  const clock: Clock = { now: () => held ?? given.now() };
+  /* IDS ARE MINTED ON THE CLOCK THAT RUNS, so a backdated write still sorts after everything written before it. */
+  const mint: Mint = ulids(() => given.now());
   /* Bound here because `export`'s own parameter is called `opts` too, and a signer read off the
      wrong one is a file that silently goes out unsigned. */
   const signer = opts.sign;
@@ -4179,7 +4187,9 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       mint,
       { id: entry.id, register: entry.register, fields: entry.fields, deleted: entry.deleted_at !== null },
       decl.fields as readonly Remindable[],
-      clock.now(),
+      /* THE CLOCK THAT RUNS, NOT ONE `backdate` HOLDS: a reminder is armed for what is still to come, and a row written
+         into a sample's past would otherwise arm every one that came due since, all overdue at once. */
+      given.now(),
     );
   }
 
@@ -4638,7 +4648,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
       const shows = showsOf(one.shows);
       return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
     });
-    const does = doesOf(kind, body, { list: (id) => registers.get(id)?.name ?? null, pack: packName });
+    const does = doesOf(kind, body, { list: (id) => registers.get(id)?.name ?? null, pack: packName, row: titleOfRow });
     return {
       id: String(r.id),
       who: String(r.opened_by ?? ''),
@@ -4982,7 +4992,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
         if (kind !== 'notify.push') return void enqueue(sql, mint, clock.now(), kind, payload);
         for (const id of ownersPushSubs(sql)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id } });
       },
-      note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
+      note: (actor, text, urgent) => noteEvent(sql, mint, clock.now(), actor, text, urgent),
       delivers: opts.delivers ?? [],
       /* ONE INTERRUPT AN HOUR, PER RECORD (09 §4). Counted over the outbox rather than over a
          counter somebody has to reset: the row IS the interrupt, so a push that was queued and never
@@ -6125,6 +6135,37 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
     rebuildFts,
 
     /**
+     * Runs `write` with the record's clock reading `atMs`, so what it writes is stamped then: its events, the rows'
+     * `created_at` and `updated_at`, and a question's `opened_at`.
+     *
+     * FOR WRITING A HISTORY IN PROCESS, which is what a sample is. The seed wrote every row, question and rule's work in
+     * one instant, so every line of every feed read "just now" and a question raised last night read as one filed with
+     * the rest. NO ROUTE REACHES IT, as no route reaches a write's `stamp`: a request's context has no clock to hand in.
+     *
+     * NEVER AHEAD OF THE CLOCK, because a write stamped in the future is the hazard the read mark already guards against
+     * (`markRead`), and NEVER BEHIND AN EARLIER `backdate`, because a feed is read in the order the log was written and a
+     * line written later must not say it happened sooner. An instant past either bound is held at it rather than refused,
+     * so a sample written against a clock that reads earlier than its own day still goes in, in order. Ids are still
+     * minted on the running clock (`mint`), so the log's order is the order of the writes. `write` may be async; the
+     * instant is held until it settles.
+     */
+    backdate<T>(atMs: number, write: () => T): T {
+      if (!Number.isFinite(atMs)) throw new Error(`backdate: ${atMs} is not an instant.`);
+      const before = held;
+      held = latest = Math.max(latest, Math.min(atMs, given.now()));
+      let out: T;
+      try {
+        out = write();
+      } catch (e) {
+        held = before;
+        throw e;
+      }
+      if (out instanceof Promise) return out.finally(() => (held = before)) as T;
+      held = before;
+      return out;
+    },
+
+    /**
      * When the record next has something to do. ONE ALARM PER CUSTOMER, which is what an object per
      * customer buys: the alternative is a cron worker fanning out across every tenant, waking
      * records that have nothing to do in order to ask them.
@@ -6239,7 +6280,7 @@ function makeKernel(sql: Sql, clock: Clock, state: SchemaState, opts: RecordOpti
      * What it reads is DECLARED rather than wired: a forecast that knew the word "obligations" would
      * be a forecast that works for one record.
      */
-    runway: (opening: number, legs: readonly Leg[], horizon?: number | 'last', into?: string): Result<Runway> =>
+    runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, into?: string): Result<Runway> =>
       runway(
         { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,

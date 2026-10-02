@@ -214,3 +214,21 @@ test('A WALK SAYS THE PAGE’S LINE SAYS WHEN IT RUNS OUT only while that line i
   assert.equal(forecastOn('said').headline, 'under');
   assert.equal(forecastOn('unsaid').headline, undefined, 'the chart left its sentence off for a line nobody drew');
 });
+
+test('A WALK THAT OFFERS `last` WALKS TO THE LAST DATED MOVEMENT, opens on `horizon:`, and never stops short of a longer length', async () => {
+  const k = await record();
+  /* A PLAN'S LAST PAYMENT IN MARCH: "To the end" over a walk that stopped at 90 days drew three months under its name. */
+  value(k.create('bills', { what: 'Last instalment', amount: { amount: 25_000, currency: 'GBP' }, due: '2027-03-15' }, OWNER));
+  const reachOf = (more: Partial<PageBlock>) => {
+    const read = k.block(walk(more));
+    assert.deepEqual(read.refusals, []);
+    const w = (read as { walk?: { horizon: number; reach?: number; steps: { day: string }[] } }).walk!;
+    return { opens: w.horizon, reach: w.reach ?? null, last: w.steps.at(-1)?.day ?? null };
+  };
+  assert.deepEqual(reachOf({ horizons: [90, 'last'] }), { opens: 90, reach: 179, last: '2027-03-15' });
+  /* A LONGER NUMBER STILL HOLDS, so the year is in reach though the last movement comes sooner. */
+  assert.equal(reachOf({ horizons: [90, 365, 'last'] }).reach, 365);
+  assert.equal(reachOf({ horizons: [90, 180] }).reach, 180);
+  /* AND A WALK THAT OFFERS NOTHING LONGER WALKS WHAT IT OPENS ON. */
+  assert.deepEqual(reachOf({ horizons: [30, 90] }), { opens: 90, reach: null, last: '2026-10-01' });
+});

@@ -261,6 +261,10 @@ test('WHAT ACCEPTING DOES IS ONE LINE IN THE PERSON’S OWN NAMES, read off the 
   const names = { list: (id: string) => (id === 'tasks' ? 'Tasks' : null), pack: (id: string) => (id === 'money' ? 'Money' : null) };
   assert.equal(doesOf('options', OPTIONS, names), 'Records your choice and changes nothing else.');
   assert.equal(doesOf('rowset', { register: 'tasks', rows: [{ at: 'tasks#1', fields: {} }, { what: 'x' }] }, names), 'Changes 1 in Tasks and adds 1.');
+  /* THE ROWS IT CHANGES BY NAME, where the record can name every one; one it cannot keeps the count for all of them. */
+  const titled = { ...names, list: (id: string) => (id === 'things' ? 'Projects' : null), row: (at: string) => ({ 'things#1': 'Kiln', 'things#3': 'Portage' })[at] ?? null };
+  assert.equal(doesOf('rowset', { register: 'things', rows: [{ at: 'things#1', patch: {} }, { at: 'things#3', patch: {} }] }, titled), 'Changes Kiln and Portage in Projects.');
+  assert.equal(doesOf('rowset', { register: 'things', rows: [{ at: 'things#1', patch: {} }, { at: 'things#9', patch: {} }] }, titled), 'Changes 2 in Projects.');
   assert.equal(doesOf('pack', { disable: 'money' }, names), 'Turns off Money.');
   assert.equal(doesOf('pack', { install: 'usecase-student' }, names), 'Adds Usecase student.');
   assert.equal(doesOf('settings', { pack: 'money', values: { voice: 'calm', week: 'mon' } }, names), 'Changes 2 settings of Money.');

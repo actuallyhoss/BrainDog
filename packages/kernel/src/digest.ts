@@ -91,7 +91,8 @@ export type DigestDeps = {
    */
   phones?: () => number;
   outbox: (kind: OutboxKind, payload: unknown) => void;
-  note: (actor: string, text: string) => void;
+  /** Write the `note` event. `urgent` marks it (`URGENT_NOTE`), so a person's mute never hides it (`mutedFor`). */
+  note: (actor: string, text: string, urgent?: boolean) => void;
   /**
    * What this deployment can actually deliver.
    *
@@ -645,17 +646,36 @@ export function quietEnds(ms: number, tz: string, window: QuietWindow): number {
   return nextOccurrence({ at: window.to }, ms, tz) ?? ms + 3_600_000;
 }
 
+/**
+ * What an urgent notice's `note` event carries in `field`, the column a note otherwise leaves empty, as a comment's
+ * resolution carries `resolve` there.
+ *
+ * THE EVENT IS THE ONLY TRACE OF WHICH IT WAS. `notify` routes by `urgent` and the outbox rows it queued drain and go,
+ * so a reader of the log later could not tell an interrupt from a note bound for the digest, and a person's mute
+ * (`mutedFor`) has to: what interrupts is never muted.
+ */
+export const URGENT_NOTE = 'urgent';
+
+/**
+ * Whether one line of the log is a notice this person muted: a `note` from an actor in their `notify.muted`, and never
+ * an urgent one. Only notices are muted, so the rule's own writes to a row still show, and the log keeps every line.
+ */
+export function mutedFor(line: { kind: string; actor: string; field: string | null }, muted: ReadonlySet<string>): boolean {
+  return line.kind === 'note' && line.field !== URGENT_NOTE && muted.has(line.actor);
+}
+
 /** An in-app note, as the event that IS the notification. */
-export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string): void {
+export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string, urgent = false): void {
   /* A DIGEST'S PROSE IS WRITTEN BY SLASH and its note is not a `note` a model may sign. `prose:
      slash` is the one declaration that puts a model's sentences into a digest, and if the actor of
      that note were ever the model rather than the record, this is where it would land. */
   slashMayWrite(actor, 'note');
   sql.exec(
-    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', NULL, NULL, ?)",
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, note) VALUES (?, ?, ?, 'note', NULL, NULL, ?, ?)",
     mint(),
     instant(nowMs),
     actor,
+    urgent ? URGENT_NOTE : null,
     text.slice(0, 280),
   );
 }
@@ -686,7 +706,7 @@ export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: st
 export function notify(deps: DigestDeps, said: Notice): void {
   /* THE EVENT ALWAYS, because it is the record's own memory of the thing having happened, and it is
      what the digest and the unread count are counted over. */
-  deps.note(said.actor, said.say.slice(0, 280));
+  deps.note(said.actor, said.say.slice(0, 280), said.urgent === true);
   if (!said.urgent) return;
 
   /* AT MOST ONE PER HOUR. The check is the caller's because this file holds no SQL — and it is a
