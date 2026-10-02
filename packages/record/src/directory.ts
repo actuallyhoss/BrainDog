@@ -22,7 +22,7 @@
  * `directory.sqlite` in the same process. One `Sql` port, so this file does not know which.
  */
 
-import type { Clock, Result, Sql } from '@braindog/ports';
+import type { Clock, Refusal, Result, Sql } from '@braindog/ports';
 import type { AccountCall, AccountClosed, AuthCall, AuthResult, Suspended, Who } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS dir_record (
   owner      TEXT NOT NULL DEFAULT '',      -- the founding owner. 33 §593: record_dir.owner_person
   created_at TEXT NOT NULL,
   closed_at  TEXT,
-  plan       TEXT NOT NULL DEFAULT 'hosted' -- 'hosted', 'plus' or 'selfhost': the monthly allowance its scheduled actions run under
+  plan       TEXT NOT NULL DEFAULT 'hosted' -- 'free', 'hosted', 'plus' or 'selfhost': the monthly allowance its scheduled actions run under
 );
 
 -- A slug is a name for a record and a record has one live name. A released row stays as a tombstone:
@@ -397,10 +397,16 @@ export type Directory = ReturnType<typeof createDirectory>;
 /* ── plans and usage ─────────────────────────────────────────────────────── */
 
 /**
- * The plans a record can be on. `hosted` is Cloud, the record at $12 a month; `plus` is Cloud Plus, at $29 a month with
- * a larger allowance (`HOSTED_PLANS` in `apps/worker/src/billing.ts`); `selfhost` is counted and never limited.
+ * The plans a record can be on. `free` is Free, one person's record at no charge with a small allowance, which a record
+ * made at sign-up without paying starts on (`FREE_PLAN` in `apps/worker/src/billing.ts`); `hosted` is Cloud, the record
+ * at $12 a month; `plus` is Cloud Plus, at $29 a month with a larger allowance (`HOSTED_PLANS` there); `selfhost` is
+ * counted and never limited.
+ *
+ * FREE IS NOT THE COLUMN'S DEFAULT, on purpose (DIRECTION §35). Every record already in a Directory is `hosted`
+ * and keeps it, and `provision` with no plan still says `hosted`, the plan the operator's own records and the paid
+ * path's have always been made under; a record is put on `free` by the door that makes it free.
  */
-export const PLANS = ['hosted', 'plus', 'selfhost'] as const;
+export const PLANS = ['free', 'hosted', 'plus', 'selfhost'] as const;
 export type Plan = (typeof PLANS)[number];
 
 /** One month's allowance: runs, requests, bytes fetched and run time in milliseconds. Failures are never limited. */
@@ -410,9 +416,11 @@ export type Allowance = { runs: number; requests: number; bytes: number; ms: num
  * What each plan allows a record's scheduled actions in a calendar month, UTC.
  *
  * THE OWNER'S DEFAULTS until he says otherwise: twenty hourly actions are 14,600 runs, so 15,000 is the hosted record's
- * allowance. `null` is no limit.
+ * allowance. Free's is the default taken for him on 2 October (`apps/site/src/lib/plans.ts`): one person's record:
+ * a fifteenth of Cloud's runs and requests, a tenth of its data and script time. `null` is no limit.
  */
 export const ALLOWANCE: Record<Plan, Allowance | null> = {
+  free: { runs: 1_000, requests: 10_000, bytes: 100_000_000, ms: 5 * 3_600_000 },
   hosted: { runs: 15_000, requests: 150_000, bytes: 1_000_000_000, ms: 50 * 3_600_000 },
   plus: { runs: 75_000, requests: 750_000, bytes: 5_000_000_000, ms: 250 * 3_600_000 },
   selfhost: null,
@@ -579,6 +587,13 @@ const SPENT: Record<keyof Allowance, (limit: number) => string> = {
 };
 
 const planOf = (value: string | undefined): Plan => ((PLANS as readonly string[]).includes(value ?? '') ? (value as Plan) : 'hosted');
+
+/**
+ * Free's "one person" (DIRECTION §35), as the owner reads it when an invitation is refused, and as the person holding the
+ * link reads it. Each says why and offers the way on, which is the owner moving the record to Cloud.
+ */
+export const FREE_ONE_PERSON = 'Free is for one person, so nobody else can join this record. Move it to Cloud in Settings to invite colleagues.';
+export const FREE_JOIN_REFUSED = 'This record is on Free, which is for one person, so nobody else can join it. Ask its owner to move it to Cloud, then open this link again.';
 
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.
@@ -916,6 +931,20 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
 
   const mint = ulids(() => clock.now());
   const at = (): string => new Date(clock.now()).toISOString();
+
+  /**
+   * Whether this person may join this record, as its plan has it: `null` is yes. Free is one person (DIRECTION §35), so a
+   * free record takes nobody who is not on it already, and every other plan takes anybody.
+   *
+   * ASKED BY `join` AND BY THE HOST BEFORE AN INVITATION IS SPENT, so a link to a free record is refused before the record
+   * writes its own member row, and the two tables never disagree about who joined.
+   */
+  const joinable = (record: string, person: string): Refusal | null => {
+    const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
+    if (row === undefined || planOf(row.plan) !== 'free') return null;
+    if (sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person)) return null;
+    return { code: 'FORBIDDEN', fix: FREE_JOIN_REFUSED, at: 'plan' };
+  };
 
   const bad = badSlug;
 
@@ -1650,6 +1679,15 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
         person,
       ) !== undefined,
 
+    /** Whether this person may join this record as its plan has it: `null` is yes (`joinable` above). */
+    joinable,
+
+    /** The plan a record is metered under, or `null` for a record this Directory does not hold. */
+    planFor: (record: string): Plan | null => {
+      const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
+      return row === undefined ? null : planOf(row.plan);
+    },
+
     /**
      * Somebody can reach this record.
      *
@@ -1659,6 +1697,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
      */
     join: (record: string, person: string): Result<null> =>
       sql.transactionSync(() => {
+        /* AND A FREE RECORD TAKES NOBODY BUT WHO IS ALREADY ON IT, which is its owner (`joinable`). */
+        const stop = joinable(record, person);
+        if (stop !== null) return { ok: false, refusal: stop } as Result<null>;
         /* AND A CLOSED RECORD TAKES NOBODY. Its name is released and its storage is the platform's
            to delete; adding somebody mints access to a record whose name may already have been
            handed back, and `levelOf` is what the Worker builds a caller's context from. */

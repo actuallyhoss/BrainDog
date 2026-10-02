@@ -62,3 +62,33 @@ test('A TOKEN, A KEY OUTSIDE THE LIST AND A VALUE THAT IS NOT ADDRESSES ARE REFU
   assert.equal(code(await api.setPref({ key: 'nav.hidden', value: ['/p/money'] }, bo)), 'ok');
   sql.close();
 });
+
+test('THE HOME PAGE AND THE NAMES A PERSON GIVES PAGES ARE KEPT FOR THEM, and a wrong shape is refused', async () => {
+  const { api, sql } = await record();
+  const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string } }).refusal.code);
+
+  const home = await api.setPref({ key: 'home.page', value: '/p/money' }, ada);
+  assert.ok(home.ok, JSON.stringify(home));
+  const named = await api.setPref({ key: 'nav.labels', value: { '/p/money': '  Cash  ', '/p/kiln': 'Bake' } }, ada);
+  assert.ok(named.ok, JSON.stringify(named));
+  assert.deepEqual(named.value, { key: 'nav.labels', value: { '/p/money': 'Cash', '/p/kiln': 'Bake' } }, 'a name was kept with its spaces');
+  assert.deepEqual(await prefsOf(api, ada), { 'home.page': '/p/money', 'nav.labels': { '/p/money': 'Cash', '/p/kiln': 'Bake' } });
+  assert.deepEqual(await prefsOf(api, bo), {}, "somebody else opened on Ada's home page");
+
+  assert.equal(code(await api.setPref({ key: 'home.page', value: 'p/money' }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'home.page', value: ['/p/money'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'home.page', value: `/${'x'.repeat(300)}` }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.labels', value: ['/p/money'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.labels', value: { 'p/money': 'Cash' } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.labels', value: { '/p/money': '   ' } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.labels', value: { '/p/money': 'x'.repeat(41) } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.labels', value: { '/p/money': 3 } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'home.page', value: '/p/kiln' }, agent)), 'FORBIDDEN');
+  assert.deepEqual(await prefsOf(api, ada), { 'home.page': '/p/money', 'nav.labels': { '/p/money': 'Cash', '/p/kiln': 'Bake' } }, 'a refused value was kept');
+
+  /* null takes each away, and the app opens on Today again. */
+  await api.setPref({ key: 'home.page', value: null }, ada);
+  await api.setPref({ key: 'nav.labels', value: null }, ada);
+  assert.deepEqual(await prefsOf(api, ada), {});
+  sql.close();
+});

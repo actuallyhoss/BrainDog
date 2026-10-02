@@ -75,7 +75,7 @@ const LOOKS = ['kind', 'heading', 'span', 'area', 'tone', 'lead', 'range', 'tile
  * list and row), and each is rebuilt below with that taken off.
  */
 const FIGURES = [
-  'matched', 'fx', 'walkFx', 'bars', 'measures', 'past', 'lateness', 'late_name', 'sells', 'rings', 'nexts', 'done_now',
+  'matched', 'fx', 'walkFx', 'bars', 'measures', 'past', 'lateness', 'late_name', 'sells', 'rings', 'nexts', 'trends', 'done_now',
   'next', 'open', 'short_now', 'inherited', 'scopes', 'scope_marks', 'window',
 ] as const;
 

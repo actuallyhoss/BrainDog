@@ -745,12 +745,14 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
  * device, which a cookie or `localStorage` cannot do, and `29 §4` says a dismissal is terminal on every device. The
  * browser may keep a first-paint copy of `nav.shape` and `pen.suggest`, written from these and never read as the truth.
  */
-export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed'] as const;
+export const PREF_KEYS = ['nav.order', 'nav.hidden', 'nav.shape', 'pen.suggest', 'pen.dismissed', 'home.page', 'nav.labels'] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
  * What each key holds, key by key. `nav.order` and `nav.hidden` are addresses (`/p/money`); `nav.shape` is a side rail (`side`), a
  * bar across the top or one menu, and `rail` is the side rail as builds before the top bar led wrote it, unasked; `pen.dismissed` is the ids of what the pen offered and the person turned down
  * (`PenItem.id`, and the navigation shape's `shape:<shape>:<reason>`), newest last. `pen.suggest` absent is on.
+ * `home.page` is the address the app opens on (absent is Today); `nav.labels` is the person's own name for a page,
+ * address by address.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -758,6 +760,8 @@ export type Prefs = {
   'nav.shape'?: 'side' | 'rail' | 'bar' | 'menu';
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
+  'home.page'?: string;
+  'nav.labels'?: Record<string, string>;
 };
 
 /**
@@ -5553,8 +5557,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * One thing this person arranged for themselves, one key of `PREF_KEYS` at a time: `nav.order`, the rail's order;
      * `nav.hidden`, the pages taken out of it; `nav.shape`, a rail, a bar or a menu; `pen.suggest`, whether the holding
-     * pen offers anything; `pen.dismissed`, what it offered and they turned down. `null` takes a key away. `boot` answers
-     * them on `me.prefs`.
+     * pen offers anything; `pen.dismissed`, what it offered and they turned down; `home.page`, the page the app opens on;
+     * `nav.labels`, their own names for pages. `null` takes a key away. `boot` answers them on `me.prefs`.
      *
      * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
      * screen, and it is not the record's history. Any level may, since it changes nothing anybody else sees.
@@ -5591,6 +5595,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!texts(value, Number.POSITIVE_INFINITY, (s) => s.trim() !== ''))
           return no('VALUE_MALFORMED', 'pen.dismissed is a list of the ids of what was dismissed, each 1 to 300 characters, or null to take it away.', { at: 'value' });
         kept = [...new Set(value)].slice(-PEN_DISMISSED_MOST);
+      } else if (value !== null && key === 'home.page') {
+        if (typeof value !== 'string' || !value.startsWith('/') || value.length > 300)
+          return no('VALUE_MALFORMED', 'home.page is one address starting with /, or null to take it away.', { at: 'value' });
+        kept = value;
+      } else if (value !== null && key === 'nav.labels') {
+        const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
+        if (
+          !entries ||
+          entries.length > 500 ||
+          !entries.every(([k, v]) => k.startsWith('/') && k.length <= 300 && typeof v === 'string' && v.trim() !== '' && v.length <= 40)
+        )
+          return no('VALUE_MALFORMED', 'nav.labels maps addresses starting with / to names of 1 to 40 characters, at most 500 of them, or null to take it away.', {
+            at: 'value',
+          });
+        kept = Object.fromEntries(entries.map(([k, v]) => [k, (v as string).trim()]));
       }
       kernel.setPref(ctx.principal.id, key, kept);
       return ok({ key, value: kept });
