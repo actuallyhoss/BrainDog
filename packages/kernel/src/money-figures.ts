@@ -29,7 +29,24 @@ import { GOVERNANCE_OPEN } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
-import { clockOf, deltaFrom, evaluateMetric, largestFirst, predicateOf, verdictOf, windowMs, yearBefore, type EvalContext, type FxRead, type Group, type MetricDecl, type Reading } from './metrics.ts';
+import {
+  clockOf,
+  deltaFrom,
+  evaluateMetric,
+  groupNames,
+  largestFirst,
+  predicateOf,
+  scopeCurrency,
+  verdictOf,
+  windowMs,
+  yearBefore,
+  type EvalContext,
+  type FxRead,
+  type Group,
+  type MetricDecl,
+  type Reading,
+  withLabels,
+} from './metrics.ts';
 
 /** The source a figure over the walk ahead names, in place of a list. */
 export const WALK_SOURCE = 'forecast.runway';
@@ -101,13 +118,18 @@ const dayIn = (v: unknown): string => (typeof v === 'string' && /^\d{4}-\d{2}-\d
 /** What one reading of a money figure comes to, before the verdict and the comparison. */
 type Summed = { value: number | null; unit: string | null; parts?: Part[]; fx?: FxRead };
 
-/** Amounts added up by the one currency rule: the home currency, else their one currency, else a part each. */
-function summed(amounts: readonly Amount[], home: string | null, rates: EvalRates, today: string): Summed {
-  const said = across(amounts, home, rates, today, home !== null, 'sum');
+/**
+ * Amounts added up by the one currency rule: the currency somebody chose, else their one currency, else a part each.
+ *
+ * `into` IS THE HOME CURRENCY, OR THE ONE A ROW THE FIGURE IS ABOUT SAYS IT IS KEPT IN (`groupNames`, `scopeCurrency`
+ * in `metrics.ts`): a book that says USD is read in dollars. `home` is only said beside it, as `FxRead` says it.
+ */
+function summed(amounts: readonly Amount[], into: string | null, home: string | null, rates: EvalRates, today: string): Summed {
+  const said = across(amounts, into, rates, today, into !== null, 'sum');
   if (said.kind === 'one') return { value: said.amount, unit: said.currency };
   if (said.kind === 'converted')
-    return { value: said.amount, unit: said.currency, fx: { into: home, home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } };
-  return { value: null, unit: null, parts: said.parts, fx: { into: home, home, asOf: null, forward: false, stale: false, missing: said.missing } };
+    return { value: said.amount, unit: said.currency, fx: { into, home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } };
+  return { value: null, unit: null, parts: said.parts, fx: { into, home, asOf: null, forward: false, stale: false, missing: said.missing } };
 }
 
 type EvalRates = Parameters<typeof across>[2];
@@ -190,12 +212,25 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
   );
   if (rows.length > ROLLED_ACCOUNTS_MOST)
     return no<Reading>('OUT_OF_BOUNDS', `${decl.metric}: ${register} holds more than ${ROLLED_ACCOUNTS_MOST} accounts this figure admits, which is more than one reading adds up. Narrow its where.`, { at: 'where' });
+  const scope = decl.within === undefined ? null : predicateOf(decl.within, accounts, ctx);
   const held = (() => {
-    const scope = decl.within === undefined ? null : predicateOf(decl.within, accounts, ctx);
     const s = compile(scope?.predicate, accounts);
     return Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${s.sql})`, register, ...s.params)?.n ?? 0);
   })();
   const accountsRead = rows.map((r) => ({ id: r.id, fields: JSON.parse(r.fields) as Record<string, unknown> }));
+  /* CASH IN ONE BOOK THAT SAYS IT IS KEPT IN DOLLARS IS DOLLARS (`scopeCurrency`), and each book's part of Cash now by
+     book is read in the currency that book says, with its name beside its key (`groupNames`). */
+  const into = scopeCurrency(sql, accounts, scope?.predicate, ctx) ?? null;
+  const names =
+    decl.group_by === undefined
+      ? null
+      : groupNames(
+          sql,
+          accounts,
+          decl.group_by,
+          accountsRead.map((a) => a.fields[decl.group_by!]).filter((k) => k !== null && k !== undefined && k !== '').map(String),
+          ctx,
+        );
 
   const day = (col: string): string => `substr(json_extract(fields, '${jsonPath(col)}'), 1, 10)`;
 
@@ -286,9 +321,9 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
       slot.rows += 1;
       byKey.set(String(key), slot);
     }
-    const whole = summed(all, home.home, home.rates, on);
+    const whole = summed(all, into ?? home.home, home.home, home.rates, on);
     if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
-    const sums = [...byKey].map(([key, slot]) => ({ key, rows: slot.rows, s: summed(slot.amounts, home.home, home.rates, on) }));
+    const sums = [...byKey].map(([key, slot]) => ({ key, rows: slot.rows, s: summed(slot.amounts, names?.currency(key) ?? into ?? home.home, home.home, home.rates, on) }));
     /* ONE GROUP IN ANOTHER CURRENCY PUTS EVERY GROUP IN PARTS, as `groupsOf` keeps it: bars ranked on raw minor units of
        two currencies are ranked on nothing. */
     const units = new Set(sums.map((g) => g.s.unit).filter((u): u is string => u !== null));
@@ -298,7 +333,8 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
       return { key, value: apart ? null : s.value, rows, state: 'full', ...(parts ? { parts } : {}) };
     });
     groups.sort(largestFirst);
-    return { whole, since, groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) };
+    const kept = groups.slice(0, GROUP_CAP);
+    return { whole, since, groups: names ? withLabels(kept, names) : kept, more: Math.max(0, groups.length - GROUP_CAP) };
   };
 
   const anchor = clockOf(ctx);
@@ -492,8 +528,17 @@ function empty(decl: MetricDecl, why: string, rates: EvalRates, today: string): 
  * the figure it opens from. A caller that asked `readable` of the source alone would hand a member invited to Accounts
  * the sum of the Transactions she cannot open, which is the leak `registersOf` in `pages.ts` already closes for the
  * forecast block's legs. `opening` names a figure, and its lists are the caller's to add through `figure`.
+ *
+ * AND THE LIST ITS PARTS ARE NAMED FROM, when its `group_by` is a ref and `pointsAt` can say where that points. Each part
+ * carries the title of the row its key is (`groupNames` in `metrics.ts`), so Cash now by book hands its reader the
+ * books' names and is a figure over Books as much as over Accounts. Without `pointsAt` nothing more is named, which is
+ * what this answered before the parts had names.
  */
-export function figureLists(decl: Pick<MetricDecl, 'source' | 'value' | 'legs' | 'opening'>, figure?: (id: string) => Pick<MetricDecl, 'source' | 'value' | 'legs'> | null): string[] {
+export function figureLists(
+  decl: Pick<MetricDecl, 'source' | 'value' | 'legs' | 'opening' | 'group_by'>,
+  figure?: (id: string) => Pick<MetricDecl, 'source' | 'value' | 'legs'> | null,
+  pointsAt?: PointsAt,
+): string[] {
   /* THE COUNT OF OPEN QUESTIONS (`built-in-figures.ts`) READS THE WHOLE RECORD, as the queue over the same source does,
      so it names `*`, which only somebody who reads every list may: named by no list, the record's `metric` answered a
      member invited to one list how many questions were waiting on the owner. */
@@ -513,8 +558,13 @@ export function figureLists(decl: Pick<MetricDecl, 'source' | 'value' | 'legs' |
   const opened = decl.source === WALK_SOURCE && typeof decl.opening?.metric === 'string' ? figure?.(decl.opening.metric) : null;
   /* ONE STEP DEEP, as the walk itself reads it: a walk never opens from a walk. */
   if (opened && opened.source !== WALK_SOURCE) add(opened);
+  const named = pointsAt && typeof decl.group_by === 'string' && decl.source.startsWith('register.') ? pointsAt(decl.source.slice('register.'.length), decl.group_by) : null;
+  if (named) out.add(named);
   return [...out];
 }
+
+/** The list a ref field of a list points at, or `null` for a field that is not a ref. */
+export type PointsAt = (register: string, field: string) => string | null;
 
 /** The legs a walk figure declares, or none. */
 const legsOf = (decl: Pick<MetricDecl, 'legs'>): readonly Leg[] => (Array.isArray(decl.legs) ? decl.legs : []);

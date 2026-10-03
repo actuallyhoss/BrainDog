@@ -23,7 +23,7 @@ import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, type Predicate } from 
 
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { instant } from './migrate.ts';
-import { SESSION_BODY } from './migrations/0002_session.ts';
+import { SESSION_BODY } from './migrations/0022_session_client.ts';
 import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
 /* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
@@ -4298,11 +4298,13 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       `${decl.id} reads the setting ${unfilled.key}, and a setting is filled only when its pack is planned and installed with a value for it.`,
       unfilled.at,
     );
-  /* THE KERNEL'S REGISTER HAS ONE WRITER, migration 2. Every agent write resolves to a row of it, so
-     a pack or a person declaring `register.session` would change what an agent is for the whole
-     record. `PROVIDES_CONFLICT` is `30 §6`'s code for an id somebody else already provides, and
-     the somebody here is the kernel, which seats it as `pack_id = 'kernel'`. The kernel's own bytes
-     are let through, because installing them writes only the row the migration wrote. */
+  /* THE KERNEL'S REGISTER HAS ONE WRITER, its migrations (2, and 22 for the app a run is in). Every
+     agent write resolves to a row of it, so a pack or a person declaring `register.session` would
+     change what an agent is for the whole record. `PROVIDES_CONFLICT` is `30 §6`'s code for an id
+     somebody else already provides, and the somebody here is the kernel, which seats it as
+     `pack_id = 'kernel'`. The kernel's newest bytes are let through, because installing them writes only
+     the row migration 22 wrote. Migration 2's are not: over 22's they would seat a register that keeps no
+     app as a newer version. */
   if (decl.id === 'register.session' && (decl.pack !== 'kernel' || jcs(decl.body) !== SESSION_BODY))
     return bad(
       'PROVIDES_CONFLICT',

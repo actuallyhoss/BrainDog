@@ -3,7 +3,7 @@
  *
  * A hint is held to its grammar and dropped when it fails, and the call it came with still goes
  * through: a wrong hint is a run found less well, never a refused write. `_meta.session` over `/mcp` is
- * held to the same grammar, because it is the same seven things said in a body.
+ * held to the same grammar, because it is the same nine things said in a body.
  */
 
 import { test } from 'node:test';
@@ -22,6 +22,8 @@ const GOOD: Record<string, string> = {
   'x-braindog-remote': 'github.com/acme/braindog',
   'x-braindog-cwd': 'C:\\Repos\\braindog',
   'x-braindog-agent': 'claude',
+  'x-braindog-client-name': 'Claude Code',
+  'x-braindog-client-version': '2.1.4',
 };
 
 const KEPT = {
@@ -32,6 +34,8 @@ const KEPT = {
   remote: 'github.com/acme/braindog',
   cwd: 'C:\\Repos\\braindog',
   agent: 'claude',
+  client: 'Claude Code',
+  client_version: '2.1.4',
 };
 
 test('EVERY HINT THAT FITS ITS GRAMMAR IS KEPT, under the field it names', () => {
@@ -59,6 +63,12 @@ test('A HINT THAT FAILS ITS GRAMMAR IS DROPPED, and every other hint is kept', (
     ['x-braindog-cwd', 'C:\\with\ta tab'],
     ['x-braindog-agent', 'gpt'],
     ['x-braindog-agent', 'Claude'],
+    ['x-braindog-client-name', 'x'.repeat(129)],
+    ['x-braindog-client-name', 'Zoë Code'],
+    ['x-braindog-client-name', ''],
+    ['x-braindog-client-version', '2.1.4 beta'],
+    ['x-braindog-client-version', '2/1'],
+    ['x-braindog-client-version', 'x'.repeat(65)],
   ];
   for (const [name, value] of bad) {
     const headers = new Headers(GOOD);
@@ -66,13 +76,24 @@ test('A HINT THAT FAILS ITS GRAMMAR IS DROPPED, and every other hint is kept', (
     const got = sessionOf(headers);
     const key = Object.entries(HINTS).find(([, hint]) => hint.header === name)?.[0] ?? assert.fail(`${name} is no hint`);
     assert.equal(Object.hasOwn(got, key), false, `${name}: ${JSON.stringify(value)} was kept`);
-    assert.equal(Object.keys(got).length, 6, `${name}: another hint was dropped with it`);
+    assert.equal(Object.keys(got).length, Object.keys(KEPT).length - 1, `${name}: another hint was dropped with it`);
   }
+});
+
+test('THE SEVEN KINDS OF AGENT MIGRATION 22 TAKES ARE KEPT, and an app is named as it is, around its spaces', () => {
+  for (const agent of ['claude', 'codex', 'cursor', 'gemini', 'copilot', 'windsurf', 'other'])
+    assert.equal(sessionOf(new Headers({ 'x-braindog-agent': agent })).agent, agent);
+  assert.deepEqual(sessionOf(new Headers({ 'x-braindog-client-name': 'GitHub Copilot', 'x-braindog-client-version': '0.44.0-alpha.1+build.7' })), {
+    client: 'GitHub Copilot',
+    client_version: '0.44.0-alpha.1+build.7',
+  });
+  assert.equal(hintsOf({ client: '  claude-code ' }).client, 'claude-code');
+  assert.deepEqual(hintsOf({ client: '   ' }), {}, 'a name of spaces was kept');
 });
 
 test('_meta.session IS HELD TO THE SAME GRAMMAR, and only its own string keys are read', () => {
   assert.deepEqual(hintsOf(KEPT), KEPT);
-  assert.deepEqual(hintsOf({ ...KEPT, repo: '../etc', agent: 'gpt', cwd: 'C:\\Users\\Zoë', host: 7, doing: 'not a hint' }), {
+  assert.deepEqual(hintsOf({ ...KEPT, repo: '../etc', agent: 'gpt', cwd: 'C:\\Users\\Zoë', host: 7, doing: 'not a hint', client: 7, client_version: 'two point one' }), {
     spoken: 'S12',
     client_id: 'a1b2-c3:d4.e_5',
     remote: 'github.com/acme/braindog',
@@ -122,6 +143,20 @@ test('ATTACH AND sessionsLive THROUGH THE SHARED WIRING: a token is a run, and a
   const person = await post('attach', { source: 'startup' }, { principal: { kind: 'person', id: 'p_1', level: 'owner' } });
   assert.equal(person.status, 403);
   assert.equal(person.body.refusal?.code, 'FORBIDDEN');
+});
+
+test('THE APP AND ITS VERSION REACH THE RUN: read off the headers, put on the context, and kept by the register', async () => {
+  const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(Date.UTC(2026, 9, 2, 12)) });
+  const said = sessionOf(new Headers({ 'x-braindog-client-name': 'gemini-cli-mcp-client', 'x-braindog-client-version': '0.8.1', 'x-braindog-host': 'STUDIO-PC' }));
+  const ctx = withSession<CallContext>({ principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' } }, said);
+  const res = await serveApi(
+    new Request('https://x/api/attach', { method: 'POST', body: JSON.stringify({ source: 'startup', client_id: 'c-1' }) }),
+    handlersFor(api),
+    ctx,
+  );
+  assert.equal(res.status, 200);
+  const run = ((await res.json()) as { value: { session: { fields: Record<string, unknown> } } }).value.session.fields;
+  assert.deepEqual([run.agent, run.client, run.client_version, run.host], ['gemini', 'gemini-cli-mcp-client', '0.8.1', 'STUDIO-PC']);
 });
 
 test('CONTEXT IS A READ+ GET THROUGH THE SHARED WIRING, naming the run the headers point at and opening none', async () => {

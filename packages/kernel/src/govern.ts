@@ -1640,6 +1640,14 @@ function heldTo(deps: GovernDeps, row: { id: string; body_kind: BodyKind; body: 
 /** The decision's sentence when a light question is answered in one press and the chosen option says no reason of its own. */
 const ONE_PRESS_REASON = 'Answered in one press: a light question a rule or Slash asked, and answering it changes nothing else.';
 
+/** The decision's sentence when any other question is answered in one press and nobody wrote one. */
+const NO_REASON = 'Answered in one press, with no reason given.';
+
+/** Whether a decision's reason is one the record wrote for a press, not words a person gave, so a receipt never quotes it as theirs. */
+export function pressedOnly(reason: string): boolean {
+  return reason === ONE_PRESS_REASON || reason === NO_REASON;
+}
+
 /**
  * The sentence a light question is decided with when nobody wrote one, or `null` when this question owes a reason.
  *
@@ -1747,17 +1755,12 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
 
   const { option } = verdict.decide ?? { option: '' };
   let reason = verdict.decide?.reason;
-  /* THE REASON IS NOT OPTIONAL, EXCEPT ON A LIGHT QUESTION. A decision with no sentence is a decision nobody can
-     revisit, and the whole point of writing it down is that somebody will want to. But a question a rule or Slash
-     opened whose band is `call` (`weigh.ts`) changes no row, declaration, access or money when it is answered: the
-     other button tomorrow undoes it. Asking a sentence for that teaches people to type "ok", which is the failure 20 §3
-     warns of, so it is answered in one press. Every other question still refuses without one, and the decision still
-     carries a sentence, because `decision.reason` is what renders wherever it is cited. */
-  if (!reason?.trim()) {
-    const light = oneAnswer(deps, id, row.body_kind, row.body, option);
-    if (light === null) return no<Decided>('REQUIRED_MISSING', 'A decision carries the reason for it.', { at: 'reason' });
-    reason = light;
-  }
+  /* EVERY QUESTION IS ANSWERED IN ONE PRESS (DIRECTION §37), AND EVERY DECISION STILL CARRIES A SENTENCE, because
+     `decision.reason` is what renders wherever it is cited. Demanding one before the press taught people to type "ok",
+     the failure 20 §3 warns of, and cost a round trip on every answer. A light question a rule or Slash opened (band
+     `call`, `weigh.ts`) is decided for its option's own reason; any other says plainly that no reason was given, so
+     nobody later reads a reason into it. A reason is offered after a decline or an edit, and never demanded. */
+  if (!reason?.trim()) reason = oneAnswer(deps, id, row.body_kind, row.body, option) ?? NO_REASON;
   if (!option?.trim()) return no<Decided>('REQUIRED_MISSING', 'A decision names what was chosen.', { at: 'option' });
 
   const body = parse(row.body);

@@ -1,7 +1,7 @@
 /**
  * What an agent says about its run, read off a request and checked.
  *
- * SEVEN HINTS, EACH WITH ITS GRAMMAR (`44 §4.2`). A value that
+ * NINE HINTS, EACH WITH ITS GRAMMAR (`44 §4.2`). A value that
  * fails is dropped, never corrected and never refused: these are hints, and a call whose hint is
  * wrong is still a call the record answers. The kernel writes what reaches it into a row as given,
  * so this is the one place a stranger's text is held to a shape first.
@@ -19,6 +19,9 @@ export type SessionHints = {
   remote?: string | undefined;
   cwd?: string | undefined;
   agent?: string | undefined;
+  /** The app the run is in and its version, as MCP's `clientInfo` names them: `claude-code`, `2.1.4`. */
+  client?: string | undefined;
+  client_version?: string | undefined;
 };
 
 type Key = keyof SessionHints;
@@ -36,8 +39,13 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   repo: { header: 'x-braindog-repo', grammar: /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
   remote: { header: 'x-braindog-remote', grammar: printable(256) },
   cwd: { header: 'x-braindog-cwd', grammar: printable(512) },
-  /* The `agent` field's four values. Anything else would refuse the run the ladder opens. */
-  agent: { header: 'x-braindog-agent', grammar: /^(?:claude|codex|cursor|other)$/ },
+  /* The `agent` field's seven values since migration 22. Anything else would refuse the run the ladder opens. */
+  agent: { header: 'x-braindog-agent', grammar: /^(?:claude|codex|cursor|gemini|copilot|windsurf|other)$/ },
+  /* THE APP'S OWN NAME, which is not an id: `Claude Code` and `GitHub Copilot` have spaces and capitals. Its own header,
+     because `x-braindog-client` was already the run's `client_id`. */
+  client: { header: 'x-braindog-client-name', grammar: printable(128) },
+  /* A version as apps write one: `2.1.4`, `0.44.0-alpha.1`, `1.0.0+build.7`. */
+  client_version: { header: 'x-braindog-client-version', grammar: /^[A-Za-z0-9._+-]{1,64}$/ },
 };
 
 const KEYS = Object.keys(HINTS) as Key[];
@@ -47,9 +55,13 @@ const KEYS = Object.keys(HINTS) as Key[];
  * token rides in a git remote, and the kernel refuses a credential-shaped value in any text it stores,
  * so the run would not open and the write would go in unattributed. Nothing the ladder or the scope
  * resolver reads is in the userinfo: `resolveProject` drops it anyway.
+ *
+ * AN APP'S NAME LOSES THE SPACES AROUND IT, because it is shown to a person as it was sent, and a name that is only
+ * spaces is then no name and is dropped.
  */
 const TIDY: Partial<Record<Key, (value: string) => string>> = {
   remote: (value) => value.replace(/^([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/@]*@/, '$1'),
+  client: (value) => value.trim(),
 };
 const tidy = (key: Key, value: string): string => TIDY[key]?.(value) ?? value;
 

@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { KERNEL_MIGRATION, MIGRATIONS, applyMigrations, assertNumbering, canon, checksum, statements } from '../src/migrate.ts';
-import { openRecord, type Declaration } from '../src/index.ts';
+import { openRecord, type Declaration, type SessionHints, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -32,7 +32,7 @@ const open = async () => {
 test('an empty database becomes a record', async () => {
   const { sql, result } = await open();
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value, { kernel: 21, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] });
+  assert.deepEqual(result.value, { kernel: 22, format: 1, applied: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] });
 
   const tables = sql
     .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -40,7 +40,7 @@ test('an empty database becomes a record', async () => {
     .filter((n) => !n.startsWith('sqlite_') && !n.startsWith('entry_fts_'));
   // Thirty-one in `30-BLUEPRINT` §1, `invitation` from migration 6, `view` from migration 7, `pref` and `pack_removed` from 9.
   // Migration 10 adds a column and no table. Migration 14 adds `push_sub`, and 17 `automation_watch`. Migration 18
-  // rebuilds two tables and adds none. Migrations 19 and 20 each add a column and no table.
+  // rebuilds two tables and adds none. Migrations 19 and 20 each add a column and no table, and 22 a declaration row.
   assert.equal(tables.length, 39, `tables: ${tables.join(', ')}`);
   for (const wanted of ['record', 'declaration', 'migration', 'counter', 'entry', 'event', 'schedule', 'outbox'])
     assert.ok(tables.includes(wanted), `${wanted} is missing`);
@@ -53,9 +53,9 @@ test('applying twice applies nothing twice', async () => {
   const first = await applyMigrations(sql, clock);
   const second = await applyMigrations(sql, clock);
   assert.ok(first.result.ok && second.result.ok);
-  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+  assert.deepEqual(first.result.value.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
   assert.deepEqual(second.result.value.applied, [], 'a second run re-applied a migration');
-  assert.equal(sql.all('SELECT version FROM migration').length, 21);
+  assert.equal(sql.all('SELECT version FROM migration').length, 22);
   sql.close();
 });
 
@@ -85,6 +85,9 @@ const NOTES: Declaration = {
   kind: 'register',
   body: { id: 'notes', name: 'Notes', title: 'body', fields: [{ id: 'body', type: 'text' }] },
 };
+
+/** When migration 22 seats the session register's next version, and so when the version before it was superseded. */
+const SEATED_22 = '2026-10-02T00:00:00.000Z';
 
 /** The session register's index names, which is what migration 2 adds besides its one row. */
 const sessionIndexes = (sql: ReturnType<typeof openSqlite>): string[] =>
@@ -126,7 +129,7 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
 
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+  assert.deepEqual(result.value.applied, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
 
   const after = snapshot(sql);
   assert.deepEqual(after.entry, before.entry, 'a row changed');
@@ -137,8 +140,14 @@ test('A RECORD CREATED BEFORE MIGRATION 2 TAKES IT ON OPEN, and everything it he
     before.declaration,
     'a declaration other than the kernel one changed',
   );
-  const seated = sql.one<{ version: number; pack_id: string }>("SELECT version, pack_id FROM declaration WHERE id = 'register.session'");
-  assert.deepEqual({ ...seated }, { version: 1, pack_id: 'kernel' });
+  /* Migration 2 seats the register and migration 22 its next version, so the kernel holds both and the second is live. */
+  const seated = sql.all<{ version: number; pack_id: string; superseded_at: string | null }>(
+    "SELECT version, pack_id, superseded_at FROM declaration WHERE id = 'register.session' ORDER BY version",
+  );
+  assert.deepEqual(seated.map((r) => ({ ...r })), [
+    { version: 1, pack_id: 'kernel', superseded_at: SEATED_22 },
+    { version: 2, pack_id: 'kernel', superseded_at: null },
+  ]);
   assert.equal(sessionIndexes(sql).length, 8, 'the session indexes were not built');
 
   /* AND THE RECORD OPENS ON IT: the register is live and its first row is spoken S1. */
@@ -170,14 +179,64 @@ test('AND ONE THAT DECLARED A register.session OF ITS OWN KEEPS ITS ROWS, the ke
   const rows = sql.all<{ version: number; pack_id: string | null; superseded_at: string | null }>(
     "SELECT version, pack_id, superseded_at FROM declaration WHERE id = 'register.session' ORDER BY version",
   );
-  assert.equal(rows.length, 2);
+  /* The record's own, then migration 2's, then migration 22's, which is the live one. */
+  assert.equal(rows.length, 3);
   assert.equal(rows[0]?.pack_id, null);
   assert.ok(rows[0]?.superseded_at, 'the record’s own declaration is still active beside the kernel one');
   assert.deepEqual(
-    { version: rows[1]?.version, pack_id: rows[1]?.pack_id, superseded_at: rows[1]?.superseded_at },
-    { version: 2, pack_id: 'kernel', superseded_at: null },
+    rows.slice(1).map((r) => ({ version: r.version, pack_id: r.pack_id, superseded_at: r.superseded_at })),
+    [
+      { version: 2, pack_id: 'kernel', superseded_at: SEATED_22 },
+      { version: 3, pack_id: 'kernel', superseded_at: null },
+    ],
   );
   assert.equal(sql.all("SELECT 1 FROM entry WHERE register = 'session'").length, 1, 'the record’s own session row was lost');
+  sql.close();
+});
+
+/** A token's write, which the ladder signs with the run it opens or finds. */
+const asToken = (token: string, session: SessionHints): WriteContext => ({ actor: 'p_1', principal: { kind: 'token', token }, session });
+
+test('MIGRATION 22 GIVES A RECORD THAT RAN 21 THE NEXT session REGISTER, every run kept as it was, and the next run keeps its app', async () => {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  assert.ok((await k.install([NOTES])).ok);
+  for (const [token, client] of [['t_1', 'c-1'], ['t_2', 'c-2']] as const)
+    assert.ok(k.create('notes', { body: `From ${token}` }, asToken(token, { client_id: client, host: 'mbp', repo: 'braindog' })).ok);
+  /* Migration 22's work taken away: its row, the stamp on the row it superseded, and its line in the ledger. */
+  sql.exec("DELETE FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL");
+  sql.exec("UPDATE declaration SET superseded_at = NULL WHERE id = 'register.session'");
+  sql.exec('DELETE FROM migration WHERE version >= 22');
+  const before = snapshot(sql);
+
+  const { result } = await applyMigrations(sql, fixedClock(NOW));
+  assert.ok(result.ok, fixOf(result));
+  assert.deepEqual(result.value.applied, [22]);
+  const after = snapshot(sql);
+  assert.deepEqual(after.entry, before.entry, 'a run changed');
+  assert.deepEqual(after.event, before.event, 'the history changed');
+  assert.deepEqual(after.counter, before.counter, 'a counter changed');
+  assert.deepEqual(after.schema, before.schema, 'a table or an index changed');
+  assert.deepEqual(
+    sql.all<{ version: number; superseded_at: string | null }>("SELECT version, superseded_at FROM declaration WHERE id = 'register.session' ORDER BY version").map((r) => ({ ...r })),
+    [
+      { version: 1, superseded_at: SEATED_22 },
+      { version: 2, superseded_at: null },
+    ],
+  );
+
+  /* AND THE RECORD OPENS ON IT: a run opened now keeps the app it is in, and the runs from before have none. */
+  const reopened = await openRecord(sql, fixedClock(NOW));
+  assert.ok(reopened.create('notes', { body: 'From Gemini' }, asToken('t_3', { client: 'gemini-cli-mcp-client', client_version: '0.8.1' })).ok);
+  const runs = ['S1', 'S2', 'S3'].map((s) => reopened.get(s) ?? assert.fail(`${s} is not a run`));
+  assert.deepEqual(
+    runs.map((r) => [r.fields.agent, r.fields.client, r.fields.client_version]),
+    [
+      ['other', undefined, undefined],
+      ['other', undefined, undefined],
+      ['gemini', 'gemini-cli-mcp-client', '0.8.1'],
+    ],
+  );
   sql.close();
 });
 
@@ -288,6 +347,7 @@ test('AN APPLIED MIGRATION IS NEVER EDITED, so each checksum is pinned here', as
     '4d783603c20778c92773e360b2bd43de74a08e93b7eebc799da9cdb1089cadc8',
     '71399f1445217c57c48bb0aefa833b650e72cd45965a98249ce841bfd999237d',
     '45ce9ef61c6754bdaba142ec61837fe51bce8bea2ff3115d25a20e328d1333b0',
+    '9bd9a5ee89a287bf610650aaffdce9c91a9b65288b3522f3d6af57d3b6c8b6fa',
   ]);
 });
 
@@ -313,7 +373,7 @@ test('MIGRATION 4 REBUILDS device_grant: every row copied, a seventh reach, and 
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+  assert.deepEqual(result.value.applied, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, code_hash, status, reach, label, tries, scope FROM device_grant') },
     { id: 'fake-poll-id', code_hash: 'fake-hash', status: 'denied', reach: 'runner', label: 'old-box', tries: 5, scope: null },
@@ -347,7 +407,7 @@ test('MIGRATION 13 REBUILDS outbox: every row copied, and infer.ask admitted', a
 
   const { result } = await applyMigrations(sql, clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20, 21]);
+  assert.deepEqual(result.value.applied, [13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
   assert.deepEqual(
     { ...sql.one<Record<string, unknown>>('SELECT id, kind, state, attempts FROM outbox') },
     { id: 'j1', kind: 'script.run', state: 'failed', attempts: 3 },

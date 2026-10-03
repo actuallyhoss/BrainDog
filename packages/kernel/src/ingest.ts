@@ -35,7 +35,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { fixOf, no, ok } from '@braindog/ports';
+import { fixOf, no, ok, refused } from '@braindog/ports';
 import { jsonPath, evaluate, INBOX_RAW, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry, Json } from './index.ts';
@@ -461,6 +461,13 @@ export type IngestDeps = {
    * record that wires the readers gets the specification's entire.
    */
   numbers?: NumberReaders | undefined;
+  /**
+   * The settings of the use case the record speaks in, when the record handed them down (`speakingSettings` in
+   * `declare.ts`): `label_<list>` and `label_<list>__<field>` are what a person renamed a list and its fields to, so a
+   * question an arrival asks names them as every page does ("Add this message to Spending?"). Absent, or a word whose
+   * setting is kept by its hash, is the declaration's own word, which is what the page says until somebody renames it.
+   */
+  words?: (() => Readonly<Record<string, Json>>) | undefined;
 };
 
 /**
@@ -1081,11 +1088,20 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
       store(state, reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', confidence);
 
+      /* THE QUESTION IS SAID IN A PERSON'S WORDS, the reason in the record's. The reason is the inbox's and stays word for
+         word what it was; the question is what Decide draws, and it named the pattern and the list by their ids
+         (`heldAsked`). */
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,
         register,
         rows: [extracted],
-        question: `${reason} Accept it into ${register}, or fix the pattern.`,
+        ...heldAsked(deps, wordsFor(deps, matched, register, arrival.channel), {
+          absent,
+          invalid,
+          soft,
+          tails: pending,
+          waits: ceiling !== 'exact',
+        }),
         ...(pending.length ? { tails: pending } : {}),
       });
       return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, suggestion });
@@ -1136,29 +1152,19 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
        * merchants only started alike, read *"with the same amount, account, on and what"* in front of the person being
        * asked to tell them apart. Only the `on:` fields are equal; the day is within one, and the prefix starts alike.
        */
-      const and = (fields: string[]): string => {
-        const once = fields.filter((field, i) => fields.indexOf(field) === i);
-        return once.length < 2 ? once.join('') : `${once.slice(0, -1).join(', ')} and ${once.at(-1)}`;
-      };
-      /**
-       * A FIELD IS SAID BY ITS LABEL, NOT ITS ID. The person asked to tell two rows apart reads "As of" on the list,
-       * and read `as_of` here. A label opening one capital is lowered mid-sentence and one in capitals is kept; a
-       * field with no label is its id with `_` as a space, the name the list shows for it.
-       */
-      const labels = deps.schemaOf(register)?.fields ?? {};
-      const said = (field: string): string => {
-        const label = labels[field]?.label;
-        if (typeof label !== 'string' || label.trim() === '') return field.replace(/_/g, ' ');
-        return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
-      };
+      /* AND A FIELD IS SAID BY ITS LABEL, NOT ITS ID (`fieldSaid`): the declared one in the inbox's reason, and the one a
+         person renamed it to, where they did, in the question's detail (`wordsFor`). */
+      const schema = deps.schemaOf(register);
+      const words = wordsFor(deps, matched, register, arrival.channel);
       const dedupe = matched.dedupe!;
       const equal = Array.isArray(dedupe) ? dedupe : dedupe.near.on;
-      const listed = and([
-        ...(equal.length ? [`the same ${and(equal.map(said))}`] : []),
-        ...(Array.isArray(dedupe) ? [] : [`${said(dedupe.near.day)} within a day of it`]),
-        ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${said(dedupe.near.prefix.field)} starting the same way`] : []),
-      ]);
-      const reason = `This looks like ${like}, with ${listed}, so ${matched.ingest} held it for a person rather than skip it or file it twice.`;
+      const listedIn = (said: (field: string) => string): string =>
+        listedAnd([
+          ...(equal.length ? [`the same ${listedAnd(equal.map(said))}`] : []),
+          ...(Array.isArray(dedupe) ? [] : [`${said(dedupe.near.day)} within a day of it`]),
+          ...(!Array.isArray(dedupe) && dedupe.near.prefix ? [`${said(dedupe.near.prefix.field)} starting the same way`] : []),
+        ]);
+      const reason = `This looks like ${like}, with ${listedIn((field) => fieldSaid(schema, field))}, so ${matched.ingest} held it for a person rather than skip it or file it twice.`;
       store('review', reason);
       note('match', `ingest:${matched.ingest}`, `inbox_raw:${raw}`, 'inbox_raw', 'needs-review');
       const suggestion = openRowset(deps, at, {
@@ -1166,7 +1172,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
         register,
         rows: [extracted],
         resembles: existing.id,
-        question: `${reason} Accept it if it is a second one, or reject it if ${like} is this one.`,
+        ...nearAsked(words, rowTitle(deps.sql, register, existing.id), listedIn((field) => words.fields([field]))),
       });
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason, confidence: 'needs-review', suggestion });
     }
@@ -1190,11 +1196,17 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
     if (!wrote.ok) {
       const reason = `${register} refused what ${matched.ingest} read: ${fixOf(wrote)}`;
       store('review', reason);
+      /* THE FIELD THE LIST REFUSED IS SAID BY ITS LABEL, and the refusal's own sentence is not, because it names fields
+         and lists by their ids. */
+      const words = wordsFor(deps, matched, register, arrival.channel);
+      const faulted = refused(wrote) && typeof wrote.refusal.at === 'string' ? wrote.refusal.at.replace(/^fields\./, '') : null;
       const suggestion = openRowset(deps, at, {
         ingest: matched.ingest,
         register,
         rows: [extracted],
-        question: `${reason} Fix it here, or fix the pattern.`,
+        question: fit(words, [(source, list) => `${list} would not take ${source} as read. Fix it and add it?`]),
+        context:
+          faulted !== null && Object.hasOwn(deps.schemaOf(register)?.fields ?? {}, faulted) ? `The part it would not take is its ${words.fields([faulted])}.` : '',
       });
       return ok<Arrived>({
         raw,
@@ -1227,16 +1239,58 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
 }
 
 /**
- * The `rowset` an unwritten extraction opens.
+ * The `rowset` an unwritten extraction is asked in: a new one, or the same question already open, which takes its row.
  *
- * OPENED BY THE INGEST, NOT BY `system`. Whoever reads it needs to know which pattern produced it —
- * "accept this, or fix the pattern" is not a question anybody can answer without the pattern's name.
+ * OPENED BY THE INGEST, NOT BY `system`, so the record knows which pattern produced it: the pattern to fix is found
+ * from it, a tail is confirmed for it (`confirmedTail`), and the same question is asked once for it. The question
+ * itself names neither the pattern nor the list by an id (`heldAsked`).
+ *
+ * `context` IS THE QUESTION'S DETAIL, which Decide draws under it as the why (`body.context`, as every other
+ * suggestion's), in the same words: what could not be read, by its label, and never an id.
+ *
+ * THE SAME QUESTION IS ASKED ONCE. Three texts a bank sent with a card nobody had added opened three suggestions, each
+ * "bank-card-used-sms could not read account out of this one", and Decide drew them one under another (SG71 to SG73 on
+ * the owner's record). So while a rowset this pattern opened is still open with the same words, the same list, the
+ * same detail and the same row it looks like, a second is not filed: the arrival's row joins the open one, which Decide
+ * draws as one question with a tick a row, as it draws an agent's seven servers.
+ *
+ * AND ITS ROW JOINS, NEVER GOES. Kept out of every question, the second card's charge was in the inbox alone: accepting
+ * the first added one charge, nothing reads a held arrival again when its pattern is fixed, and filed from the inbox
+ * by hand it is a row with the message's first line for a title and nothing it read. A question already holding as
+ * many rows as one rowset may (`MAX_ROWS` in `govern.ts`) is asked again beside it, rather than grown past what can
+ * be accepted.
  */
 function openRowset(
   deps: IngestDeps,
   at: string,
-  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; resembles?: string; tails?: Tail[] },
+  item: { ingest: string; register: string; rows: Record<string, unknown>[]; question: string; context?: string; resembles?: string; tails?: Tail[] },
 ): string {
+  const context = item.context ?? '';
+  const asked = deps.sql.one<{ id: string; body: string }>(
+    `SELECT s.id, s.body FROM suggestion s JOIN event e ON e.target = 'suggestion:' || s.id AND e.kind = 'suggest'
+      WHERE s.body_kind = 'rowset' AND s.status = 'open' AND s.opened_by = ? AND json_extract(s.body, '$.register') = ?
+        AND coalesce(e.to_v, e.note) = ? AND coalesce(json_extract(s.body, '$.context'), '') = ?
+        AND coalesce(json_extract(s.body, '$.resembles'), '') = ? AND coalesce(json_array_length(s.body, '$.rows'), 0) + ? <= ?
+      ORDER BY s.rowid LIMIT 1`,
+    `ingest:${item.ingest}`,
+    item.register,
+    item.question.slice(0, 280),
+    context,
+    item.resembles ?? '',
+    item.rows.length,
+    ROWS_ASKED_MOST,
+  );
+  const held = asked ? heldBody(asked.body) : null;
+  if (asked && held) {
+    /* A TAIL ONCE, as `confirmedTail` reads one: the digits and the row they were matched to. */
+    const tails = [...held.tails, ...(item.tails ?? []).filter((t) => !held.tails.some((h) => h.digits === t.digits && h.row === t.row))];
+    deps.sql.exec(
+      'UPDATE suggestion SET body = ? WHERE id = ?',
+      JSON.stringify({ ...held.body, rows: [...held.rows, ...item.rows], ...(tails.length ? { tails } : {}) }),
+      asked.id,
+    );
+    return asked.id;
+  }
   const id = `SG${deps.allocate('suggestion')}`;
   deps.sql.exec(
     "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at) VALUES (?, 'rowset', ?, 'open', ?, ?)",
@@ -1245,6 +1299,7 @@ function openRowset(
       register: item.register,
       rows: item.rows,
       ingest: item.ingest,
+      ...(context === '' ? {} : { context }),
       ...(item.resembles === undefined ? {} : { resembles: item.resembles }),
       /* THE TAILS THIS ONE WAITS ON, so accepting it is the confirmation `confirmedTail` reads, with no table beside it. */
       ...(item.tails === undefined ? {} : { tails: item.tails }),
@@ -1261,6 +1316,215 @@ function openRowset(
     item.question.slice(0, 280),
   );
   return id;
+}
+
+/** The most rows one question an arrival opens holds, as many as `govern.ts` lets one `rowset` carry. */
+const ROWS_ASKED_MOST = 200;
+
+/** An open rowset's body as `openRowset` filed it, with its rows and tails, or `null` for one it cannot read. */
+function heldBody(text: string): { body: Record<string, unknown>; rows: unknown[]; tails: Tail[] } | null {
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    if (body === null || typeof body !== 'object' || !Array.isArray(body.rows)) return null;
+    return { body, rows: body.rows, tails: Array.isArray(body.tails) ? (body.tails as Tail[]) : [] };
+  } catch {
+    return null;
+  }
+}
+
+/* ── what a person reads: the question an unwritten extraction asks ───── */
+
+/**
+ * The most a question an arrival opens says, in characters. Decide draws a question as its heading, and a heading of
+ * two hundred characters naming a pattern by its id was the whole of SG71 on the owner's phone.
+ */
+export const QUESTION_MOST = 80;
+
+/** What came, by the channel it came in on, for a question whose pattern names nothing it came from. */
+const CAME_AS: Readonly<Record<Channel, string>> = {
+  email: 'this email',
+  webhook: 'this message',
+  api: 'this message',
+  pull: 'this import',
+  paste: 'what was pasted',
+};
+
+/** A setting's name as a pack may declare one: a longer one is kept by its hash, which a question does not read. */
+const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
+
+/**
+ * The names an arrival's question is put in, as a person calls each thing: where it came from, the list it would go on
+ * and its fields.
+ *
+ * WHERE IT CAME FROM IS THE PATTERN'S `description`, or that of the door it reads at, which is the name the doors list
+ * shows, said with what came: "this message from HSBC texts". A pattern with none is what came alone, "this email",
+ * because its id is a word nobody chose for a person to read. `sources` holds the fullest first, so a question too long
+ * with the description is said without it.
+ */
+type Words = { sources: string[]; list: string; fields: (ids: readonly string[]) => string };
+
+function wordsFor(deps: IngestDeps, matched: IngestDecl, register: string, channel: Channel): Words {
+  const came = CAME_AS[channel] ?? 'this one';
+  const described = (decl: IngestDecl | undefined): string | null => {
+    const said = (decl as { description?: unknown } | undefined)?.description;
+    return typeof said === 'string' && said.trim() !== '' ? said.trim().replace(/\s+/g, ' ') : null;
+  };
+  const door = matched.door === undefined ? undefined : deps.ingests().find((i) => i.ingest === matched.door);
+  /* A PASTE CAME FROM WHOEVER PASTED IT, whatever the pattern that read it is called. */
+  const from = channel === 'paste' ? null : (described(matched) ?? described(door));
+  /* THE FIELDS IN THE LIST'S OWN ORDER, the order its columns are drawn in, and not the declaration's sorted keys. */
+  const schema = deps.schemaOf(register);
+  const order = Object.keys(schema?.fields ?? {});
+  const place = (id: string): number => (order.includes(id) ? order.indexOf(id) : order.length);
+  /* AND EACH IN THE WORDS THE RECORD SPEAKS, a list or a field a person renamed being called what they renamed it. */
+  const settings = deps.words?.() ?? {};
+  const renamed = (key: string): string | null => {
+    const setting = `label_${key.split('.').join('__')}`;
+    const said = SETTING_NAME.test(setting) && Object.hasOwn(settings, setting) ? settings[setting] : undefined;
+    return typeof said === 'string' && said.trim() !== '' ? said.trim().replace(/\s+/g, ' ') : null;
+  };
+  return {
+    sources: from === null ? [came] : [`${came} from ${from}`, came],
+    list: renamed(register) ?? listName(deps.sql, register),
+    fields: (ids) => listedAnd([...ids].sort((a, b) => place(a) - place(b)).map((id) => fieldSaid(schema, id, renamed(`${register}.${id}`)))),
+  };
+}
+
+/** Words joined as a sentence lists them, each once: `a`, `a and b`, `a, b and c`. */
+function listedAnd(words: readonly string[]): string {
+  const once = words.filter((word, i) => words.indexOf(word) === i);
+  return once.length < 2 ? once.join('') : `${once.slice(0, -1).join(', ')} and ${once.at(-1)}`;
+}
+
+/**
+ * A FIELD IS SAID BY ITS LABEL, NOT ITS ID. The person asked to tell two rows apart reads "As of" on the list, and read
+ * `as_of` here. A label opening one capital is lowered mid-sentence and one in capitals is kept; a field with no label
+ * is its id with `_` as a space, the name the list shows for it. `renamed` is the word a person gave it, said the same.
+ */
+function fieldSaid(schema: Schema | null, field: string, renamed: string | null = null): string {
+  const label = renamed ?? schema?.fields[field]?.label;
+  if (typeof label !== 'string' || label.trim() === '') return field.replace(/_/g, ' ');
+  return /^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}
+
+/** A list's declaration as the record holds it now, or `{}`: read from the table, since `IngestDeps` carries no names. */
+function declaredList(sql: Sql, register: string): { name?: unknown; title?: unknown; one?: unknown; fields?: unknown } {
+  const body = sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
+    `register.${register}`,
+  )?.body;
+  try {
+    return body === undefined ? {} : (JSON.parse(body) as { name?: unknown; title?: unknown; one?: unknown; fields?: unknown });
+  } catch {
+    return {};
+  }
+}
+
+/** What a person calls a list: the name its declaration gives it, or its id with `_` as a space. */
+function listName(sql: Sql, register: string): string {
+  const name = declaredList(sql, register).name;
+  if (typeof name === 'string' && name.trim() !== '') return name.trim();
+  const words = register.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The kinds of title a question names a row by. A ref is an id, and money or a list is no name. */
+const TITLED: ReadonlySet<unknown> = new Set(['text', 'url', 'email', 'day']);
+
+/** A row's title, as its list declares it, when that is words a person reads; never a field declared `secret`. */
+function rowTitle(sql: Sql, register: string, row: string): string | null {
+  const list = declaredList(sql, register);
+  const title = typeof list.title === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(list.title) ? list.title : null;
+  const fields = Array.isArray(list.fields) ? (list.fields as { id?: unknown; type?: unknown }[]) : [];
+  if (title === null || !TITLED.has(fields.find((f) => f?.id === title)?.type)) return null;
+  const name = sql.one<{ name: unknown }>(`SELECT json_extract(fields, '${jsonPath(title)}') AS name FROM entry WHERE id = ?`, row)?.name;
+  return typeof name === 'string' && name.trim() !== '' ? name.trim().replace(/\s+/g, ' ') : null;
+}
+
+/** A text's length as a person counts it: in characters, not in UTF-16 units. */
+const lengthOf = (text: string): number => [...text].length;
+
+/** `text` cut to `most` characters, ending `…` where it was cut. */
+function cutTo(text: string, most: number): string {
+  const chars = [...text];
+  return chars.length <= most ? text : `${chars.slice(0, Math.max(0, most - 1)).join('').trimEnd()}…`;
+}
+
+/** One way of saying a question, from where it came from, the list's name and the one name it carries. */
+type Say = (source: string, list: string, name: string) => string;
+
+/**
+ * The question in at most `QUESTION_MOST` characters.
+ *
+ * EACH WAY OF SAYING IT, WITH EACH NAME FOR WHERE IT CAME FROM, fullest first, and the first that fits is the question.
+ * When none does, the first way is said with the shortest source, `name` cut short and then the list's, so a merchant
+ * with a long name is still named rather than the question left long or dropped to "one already there".
+ */
+function fit(words: Words, says: readonly Say[], name = ''): string {
+  for (const say of says)
+    for (const source of words.sources) {
+      const asked = say(source, words.list, name);
+      if (lengthOf(asked) <= QUESTION_MOST) return asked;
+    }
+  const say = says[0]!;
+  const source = words.sources.at(-1)!;
+  const over = (named: string, list: string): number => lengthOf(say(source, list, named)) - QUESTION_MOST;
+  const named = name === '' || over(name, words.list) <= 0 ? name : cutTo(name, Math.max(8, lengthOf(name) - over(name, words.list)));
+  const list = over(named, words.list) <= 0 ? words.list : cutTo(words.list, Math.max(8, lengthOf(words.list) - over(named, words.list)));
+  return cutTo(say(source, list, named), QUESTION_MOST);
+}
+
+/** A sentence's first letter in capitals, for a label phrase that opens one. */
+const opening = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * What an arrival held for a person asks, and the detail under it.
+ *
+ * THE FIRST CAUSE IS THE QUESTION, in the order the reason gives them: a field it could not read, then one it guessed,
+ * then the pattern's own ceiling, and last a printed tail. EVERY CAUSE IS IN THE DETAIL, so a rowset whose acceptance
+ * confirms an account read from its last digits is never accepted by somebody who was not told so.
+ */
+function heldAsked(
+  deps: IngestDeps,
+  words: Words,
+  why: { absent: readonly string[]; invalid: readonly string[]; soft: readonly string[]; tails: readonly Tail[]; waits: boolean },
+): { question: string; context: string } {
+  const missed = [...why.absent, ...why.invalid];
+  const add = (source: string, list: string): string => `Add ${source} to ${list}?`;
+  const was = (fields: readonly string[]): string => (new Set(fields).size === 1 ? 'was' : 'were');
+  const tailed = why.tails[0] === undefined ? null : rowNamed(deps.sql, why.tails[0]);
+  const question = missed.length
+    ? fit(words, [(s, l) => `${add(s, l)} Its ${words.fields(missed)} could not be read.`, (s, l) => `${add(s, l)} Part of it could not be read.`])
+    : why.soft.length
+      ? fit(words, [
+          (s, l) => `${add(s, l)} Its ${words.fields(why.soft)} ${new Set(why.soft).size === 1 ? 'is' : 'are'} a best guess.`,
+          (s, l) => `${add(s, l)} Part of it is a best guess.`,
+        ])
+      : why.waits || tailed === null
+        ? fit(words, [(s, l) => `${add(s, l)} It is held for you to check.`])
+        : fit(words, [(s, l, n) => `${add(s, l)} Its last digits match ${n}.`], tailed);
+  const detail = [
+    why.absent.length ? `${opening(words.fields(why.absent))} ${was(why.absent)} not found in it.` : '',
+    why.invalid.length ? `${opening(words.fields(why.invalid))} ${was(why.invalid)} in it and did not read, so the format may have changed.` : '',
+    !missed.length && why.soft.length ? `${opening(words.fields(why.soft))} ${was(why.soft)} a best guess, not read from it.` : '',
+    !missed.length && why.waits ? 'Everything read this way waits for you before it is added.' : '',
+    ...why.tails.map((t) => `It was matched to ${rowNamed(deps.sql, t)} by its last digits, ${t.digits}.`),
+    why.tails.length ? 'Say yes once and later ones are added straight away.' : '',
+  ];
+  return { question, context: cutTo(detail.filter((sentence) => sentence !== '').join(' '), 280) };
+}
+
+/**
+ * What a near match asks, and the detail under it: the row it looks like, by its title, and what the two share
+ * (`listed`), said as the reason says it with each field in the words the record speaks.
+ */
+function nearAsked(words: Words, title: string | null, listed: string): { question: string; context: string } {
+  const add = (source: string, list: string): string => `Add ${source} to ${list} as a second one?`;
+  const question =
+    title === null
+      ? fit(words, [(s, l) => `${add(s, l)} It looks like one already there.`])
+      : fit(words, [(s, l, n) => `${add(s, l)} It looks like ${n}.`], title);
+  return { question, context: cutTo(`Compared with ${title ?? 'the one already there'}, it has ${listed}. Say no if it is that one.`, 280) };
 }
 
 /* ── 3′: the shape nobody wrote a pattern for ──────────────────────────── */
@@ -1721,16 +1985,7 @@ function confirmedTail(sql: Sql, ingest: string, tail: Tail): boolean {
  * title field declared `secret` is never read into a sentence.
  */
 function rowNamed(sql: Sql, tail: Tail): string {
-  const body = sql.one<{ body: string }>(
-    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
-    `register.${tail.register}`,
-  )?.body;
-  let list: { title?: unknown; one?: unknown; fields?: unknown } = {};
-  try {
-    list = body === undefined ? {} : (JSON.parse(body) as typeof list);
-  } catch {
-    list = {};
-  }
+  const list = declaredList(sql, tail.register);
   const title = typeof list.title === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(list.title) ? list.title : null;
   const fields = Array.isArray(list.fields) ? (list.fields as { id?: unknown; type?: unknown }[]) : [];
   if (title !== null && !fields.some((f) => f?.id === title && f.type === 'secret')) {

@@ -153,16 +153,22 @@ test('A FOLDER MATCHES as Windows writes it, and the longest folder wins', async
   assert.equal(at('C:\\Repos\\other'), 'things#2 by folder');
   assert.equal(at('C:\\Repos\\braindogs'), 'things#2 by folder', 'a longer name is not a folder inside');
   assert.equal(at('/home/sam/studio/src'), 'things#3 by folder');
-  assert.equal(at('/HOME/sam/studio'), null, 'case is ignored on a drive letter only');
+  /* CASE IS IGNORED ON A DRIVE LETTER ONLY, so this is no folder of Studio's; its own name still finds Studio, last. */
+  assert.equal(at('/HOME/sam/studio'), 'things#3 by repo');
   assert.equal(at('D:\\tmp'), null);
   sql.close();
 });
 
-test('A BARE REPO NAME MATCHES LAST, and only a repos entry with no slash', async () => {
+test('A NAME MATCHES LAST: a bare name, or the last name of a remote or folder a project lists', async () => {
   const { k, sql } = await record();
   assert.deepEqual(placed(k, { repo: 'BrainDog' }), { project: 'things#1 by repo', ambiguous: [] });
   assert.deepEqual(placed(k, { repo: 'braindog', cwd: 'D:\\elsewhere' }), { project: 'things#1 by repo', ambiguous: [] });
-  assert.deepEqual(placed(k, { repo: 'site' }), { project: null, ambiguous: [] }, 'Site lists a remote, not a name');
+  assert.deepEqual(placed(k, { repo: 'site' }), { project: 'things#2 by repo', ambiguous: [] }, 'Site’s remote ends in its name');
+  /* THE REMOTE'S OWN NAME, for a project listing another owner's copy, or only the folder Windows wrote. */
+  assert.deepEqual(placed(k, { remote: 'https://github.com/actuallyhoss/BrainDog.git', cwd: '/Users/sam/Developer/braindog' }), {
+    project: 'things#1 by repo',
+    ambiguous: [],
+  });
   assert.deepEqual(placed(k, {}), { project: null, ambiguous: [] });
   sql.close();
 });

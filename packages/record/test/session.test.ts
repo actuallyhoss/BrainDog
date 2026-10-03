@@ -11,11 +11,12 @@ import assert from 'node:assert/strict';
 
 import type { Entry } from '@braindog/kernel';
 
-import { createRecordApi, type Attached, type Boot, type CallContext, type LiveRun } from '../src/index.ts';
+import { createRecordApi, type Attached, type Boot, type CallContext, type Context, type EventLine, type LiveRun, type WhatsNew } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 11, 12);
 const MIN = 60_000;
+const HOUR = 60 * MIN;
 const iso = (ms: number): string => new Date(ms).toISOString();
 
 const TASKS = {
@@ -24,11 +25,26 @@ const TASKS = {
   body: { id: 'tasks', name: 'Tasks', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } as never,
 };
 
+/** A list of tools with the stamp an agent's scan writes each day, as the agents pack declares one. */
+const TOOLS = {
+  id: 'register.tools',
+  kind: 'register' as const,
+  body: {
+    id: 'tools',
+    name: 'Tools',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'seen', label: 'Last seen', type: 'instant' },
+    ],
+  } as never,
+};
+
 async function record() {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
-  assert.ok((await api.kernel.install([TASKS])).ok);
+  assert.ok((await api.kernel.install([TASKS, TOOLS])).ok);
   return { api, sql, clock };
 }
 
@@ -408,7 +424,7 @@ test('A MACHINE AND REPO COLLISION adopts no other token’s run: a propose key 
 
 /* ── reading runs ────────────────────────────────────────────────────────── */
 
-test('sessionsLive DERIVES stale, age_s AND same_repo, leaves finished runs out, and opens no run', async () => {
+test('sessionsLive DERIVES stale, quiet, age_s, ran_s AND same_repo, leaves finished runs out, and opens no run', async () => {
   const { api, sql, clock } = await record();
   value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent(HERE)));
   clock.advance(50 * MIN);
@@ -418,14 +434,104 @@ test('sessionsLive DERIVES stale, age_s AND same_repo, leaves finished runs out,
 
   const live = value<LiveRun[]>(await api.sessionsLive({}, agent({ repo: 'braindog' })));
   assert.deepEqual(
-    live.map((r) => [r.spoken, r.stale, r.age_s, r.same_repo]),
+    live.map((r) => [r.spoken, r.stale, r.quiet, r.age_s, r.ran_s, r.same_repo]),
     [
-      ['S2', false, 0, false],
-      ['S1', true, 3000, true],
+      ['S2', false, false, 0, 0, false],
+      /* Fifty minutes of silence: quiet, and its age stopped where it was last heard from. */
+      ['S1', true, true, 3000, 0, true],
     ],
   );
   assert.deepEqual(runs(sql), [1, 2, 3], 'reading who is live opened a run');
   assert.equal(value<LiveRun[]>(await api.sessionsLive({}, owner)).every((r) => r.same_repo === false), true);
+
+  /* Quiet is thirty minutes, before the ladder's forty-five: told first, guessed past later. */
+  clock.advance(31 * MIN);
+  const later = value<LiveRun[]>(await api.sessionsLive({}, owner)).find((r) => r.spoken === 'S2');
+  assert.deepEqual([later?.state, later?.quiet, later?.stale, later?.ran_s], ['active', true, false, 0]);
+  /* And the briefing says it too, beside the run the caller is. */
+  const ctx = value<Context>(await api.context({}, agent({ ...HERE, client_id: 'c-9' })));
+  assert.deepEqual(ctx.live.same_repo.map((r) => [r.spoken, r.quiet]), [['S1', true]]);
+  sql.close();
+});
+
+/* ── what a run is called ────────────────────────────────────────────────── */
+
+test('ATTACH NAMES A RUN THE RECORD NAMED AGAIN, and what the agent says it is doing names it outright, cut to sixty', async () => {
+  const { api, sql, clock } = await record();
+  /* The start hook, with git too slow to answer: the session and its machine, and nothing of the repository. */
+  const opened = value<Attached>(await api.attach({ source: 'startup', client_id: 'c-1' }, agent({ host: 'dev-pc', agent: 'claude' })));
+  assert.equal(opened.session.fields.doing, 'Claude run');
+
+  /* A compaction comes back with where it is, and the record names the run for it. */
+  clock.advance(5 * MIN);
+  const back = value<Attached>(await api.attach({ source: 'compact', client_id: 'c-1' }, agent(HERE)));
+  assert.equal(back.session.fields.doing, 'Claude in braindog');
+
+  /* The agent says what it is doing, and that is the run's name from then on, at sixty characters at most. */
+  const said = 'Rewrite the briefing so that it leads with the next step, and names each project once';
+  const named = value<Entry>(await api.handoff({ doing: said }, agent({ ...HERE, client_id: 'c-1' })));
+  assert.equal(named.fields.doing, 'Rewrite the briefing so that it leads with the next step…');
+  clock.advance(5 * MIN);
+  const again = value<Attached>(await api.attach({ source: 'resume', client_id: 'c-1' }, agent({ ...HERE, repo: 'site' })));
+  assert.equal(again.session.fields.doing, named.fields.doing, 'a re-attach renamed a run its agent had named');
+  sql.close();
+});
+
+test('A CLIENT THAT NAMES NO AGENT NEVER MAKES A CLAUDE RUN NAMELESS, and one that names its client gives the run its kind', async () => {
+  const { api, sql, clock } = await record();
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent(HERE)));
+  clock.advance(MIN);
+  const back = value<Attached>(await api.attach({ source: 'resume', client_id: 'c-1' }, agent({ ...HERE, agent: 'other' })));
+  assert.equal(back.session.fields.agent, 'claude');
+
+  /* A remote client that says only what it is: MCP's `clientInfo`, as the host hands it on. */
+  const remote = value<Attached>(await api.attach({ source: 'startup', client_id: 'c-2' }, agent({ client: 'claude-ai', client_version: '1.0.0' })));
+  assert.deepEqual([remote.session.fields.agent, remote.session.fields.doing], ['claude', 'Claude run']);
+  sql.close();
+});
+
+test('A CALL THAT NAMES NO RUN IS TOLD THE RUN IT BELONGS TO: context finds the token’s open run, and a write lands in it', async () => {
+  const { api, sql, clock } = await record();
+  value(await api.attach({ source: 'startup', client_id: 'c-1' }, agent(HERE)));
+  clock.advance(MIN);
+  const ctx = value<Context>(await api.context({}, agent({})));
+  assert.equal(ctx.session?.spoken, 'S1');
+  value(await api.create({ register: 'tasks', fields: { what: 'From a scratch folder' } }, agent({ host: 'dev-pc', cwd: '/tmp/scratch' })));
+  assert.deepEqual(runs(sql), [1]);
+  sql.close();
+});
+
+/* ── what changed, and what is bookkeeping ───────────────────────────────── */
+
+test('WHAT CHANGED LEAVES OUT THE RECORD’S BOOKKEEPING: the sweep and a tool’s seen stamp stay in the log, out of recentHistory and whatsNew', async () => {
+  const { api, sql, clock } = await record();
+  const said = agent({ ...HERE, client_id: 'c-1' });
+  const task = value<Entry>(await api.create({ register: 'tasks', fields: { what: 'Ship the brief' } }, said));
+  /* The scan records a tool with the moment it saw it, and stamps it again a day later. */
+  const tool = value<Entry>(await api.create({ register: 'tools', fields: { name: 'fly-prism', seen: iso(clock.now()) } }, said));
+  clock.advance(25 * HOUR);
+  value(await api.update({ register: 'tools', seq: tool.seq!, patch: { seen: iso(clock.now()) } }, said));
+  /* Twelve hours of silence later the hourly row writes the run off. */
+  clock.advance(13 * HOUR);
+  sql.exec(
+    "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES ('01J00000000000000000000001', ?, 'purge', 'sweep', '{}', 'pending', 0)",
+    iso(clock.now()),
+  );
+  assert.equal((await api.kernel.drain()).done, 1);
+  assert.equal((await run(api, 'S1')).state, 'abandoned');
+
+  const quiet = (line: EventLine): boolean => (line.actor === 'system' && line.kind === 'state') || line.field === 'seen';
+  const page = value<{ events: EventLine[] }>(await api.recentHistory({}, owner)).events;
+  assert.deepEqual(page.filter(quiet), [], 'the record’s bookkeeping is a line of what changed');
+  assert.ok(page.some((line) => line.target === `entry:${task.id}`), 'what changed went with it');
+  assert.deepEqual(value<WhatsNew>(await api.whatsNew({}, owner)).events.filter(quiet), []);
+
+  /* Everything is still there for whoever asks, and in the run's own history. */
+  const all = value<{ events: EventLine[] }>(await api.recentHistory({ everything: true }, owner)).events;
+  assert.deepEqual(all.filter(quiet).map((line) => [line.actor, line.kind, line.field]), [['system', 'state', 'state'], ['S1', 'edit', 'seen']]);
+  assert.equal(value<{ events: EventLine[] }>(await api.recentHistory({ everything: 'true' } as never, owner)).events.filter(quiet).length, 2);
+  assert.ok(value<{ note: string | null }[]>(await api.history({ register: 'session', seq: 1 }, owner)).some((e) => e.note === 'Nothing heard from this run in twelve hours.'));
+  assert.equal(refusal(await api.recentHistory({ everything: 'yes' } as never, owner)).at, 'everything');
   sql.close();
 });
 

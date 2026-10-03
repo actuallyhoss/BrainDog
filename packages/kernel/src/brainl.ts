@@ -36,7 +36,7 @@
 import type { Refusal, Sql } from '@braindog/ports';
 
 import { FORMAT_VERSION, execScript } from './migrate.ts';
-import { SEAT_SESSION } from './migrations/0002_session.ts';
+import { SEAT_SESSION } from './migrations/0022_session_client.ts';
 import { RENAME_SLASH } from './migrations/0016_slash.ts';
 
 export type Section = 'header' | 'data' | 'origin' | 'governance' | 'local';
@@ -828,15 +828,11 @@ export function importBrainl(
       rows++;
     }
     /* THE FILE'S DECLARATIONS REPLACED THE TABLE, and a file written before migration 2 carries no
-       kernel `register.session`. This record's ledger says migration 2 has run, so nothing else
-       would ever put the row back. */
-    if (
-      touched.has('declaration') &&
-      !sql.one(
-        "SELECT 1 AS x FROM declaration WHERE id = 'register.session' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0",
-      )
-    )
-      execScript(sql, SEAT_SESSION);
+       kernel `register.session`, and one written before migration 22 carries 2's, without the app a
+       run is in. This record's ledger says both have run, so nothing else would ever put the row
+       right. Migration 22's seat is keyed on its checksum, so it changes nothing when the file
+       already holds it. */
+    if (touched.has('declaration')) execScript(sql, SEAT_SESSION);
 
     /* AND A FILE WRITTEN BEFORE MIGRATION 16 CARRIES THE ASSISTANT'S OLD NAME in the rows it brings, for the same
        reason: this record's ledger says the rename ran, so nothing else would rename them. The declaration bodies need

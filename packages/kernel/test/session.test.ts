@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SESSION_BODY } from '../src/migrations/0002_session.ts';
+import { SESSION_BODY } from '../src/migrations/0022_session_client.ts';
 import {
   KERNEL_WRITTEN,
   isStale,
@@ -93,20 +93,23 @@ test('THE LADDER OPENS A RUN for a token write that names none, and the run sign
   sql.close();
 });
 
-test('A NEW RUN IS NEVER UNTITLED: named from its repo and branch, else its project or agent and the day, until the agent says', async () => {
+test('A NEW RUN IS NEVER UNTITLED: named for its agent and where it works, never a day, until the agent says', async () => {
   const { k, sql } = await record();
   value(k.create('tasks', { what: 'One' }, agent({ host: 'dev-pc', repo: 'braindog', branch: 'master', agent: 'claude' })));
-  assert.equal(k.get('S1')!.fields.doing, 'braindog on master');
+  assert.equal(k.get('S1')!.fields.doing, 'Claude in braindog');
   value(k.create('tasks', { what: 'Two' }, { ...agent({ agent: 'codex' }), principal: { kind: 'token', token: 't_2' } }));
-  assert.equal(k.get('S2')!.fields.doing, 'Codex run, 11 Sep');
-  value(k.create('tasks', { what: 'Three' }, agent({ host: 'dev-pc', repo: 'site', doing: 'Fix the footer' })));
+  assert.equal(k.get('S2')!.fields.doing, 'Codex run');
+  value(k.create('tasks', { what: 'Three' }, { ...agent({ host: 'dev-pc', repo: 'site', doing: 'Fix the footer' }), principal: { kind: 'token', token: 't_3' } }));
   assert.equal(k.get('S3')!.fields.doing, 'Fix the footer', 'what the agent said wins over the starting title');
   value(k.update('session', k.get('S1')!.id, { doing: 'Title the runs' }, agent({ host: 'dev-pc', repo: 'braindog' })));
   assert.equal(k.get('S1')!.fields.doing, 'Title the runs');
 
-  assert.equal(provisionalTitle({ repo: 'braindog' }, null, '2026-09-03T08:00:00.000Z'), 'braindog');
-  assert.equal(provisionalTitle({}, 'Lanternly', '2026-09-03T08:00:00.000Z'), 'Lanternly, 3 Sep');
-  assert.equal(provisionalTitle({ agent: 'other' }, null, '2026-12-25T08:00:00.000Z'), 'Agent run, 25 Dec');
+  assert.equal(provisionalTitle({ repo: 'braindog' }, null), 'Agent in braindog');
+  assert.equal(provisionalTitle({ agent: 'claude', repo: 'braindog' }, 'Lanternly'), 'Claude in Lanternly', 'the project is the place, over the repository');
+  assert.equal(provisionalTitle({ agent: 'other' }, null), 'Agent run');
+  assert.equal(provisionalTitle({ client: 'claude-code' }, 'BrainDog'), 'Claude Code in BrainDog');
+  for (const title of ['Claude in braindog', 'Codex run', 'Agent in braindog', 'Claude in Lanternly', 'Agent run', 'Claude Code in BrainDog'])
+    assert.doesNotMatch(title, /\d/u, `${title} carries a day`);
   sql.close();
 });
 
@@ -201,15 +204,17 @@ test('A REMOTE CLIENT THAT SAYS NOTHING OF WHERE IT IS keeps one run per token: 
   value(k.create('tasks', { what: 'b' }, agent({ agent: 'other' })));
   assert.deepEqual(runs(sql), [1], 'a second write with no whereabouts opened a second run');
 
-  /* Another token is another run, and a caller that says where it is never takes a run that did not. */
+  /* Another token is another run. The same token naming no run joins the one it has, wherever it says it is; a client
+     id the record has not met is a host session of its own. */
   value(k.create('tasks', { what: 'c' }, { ...agent({ agent: 'other' }), principal: { kind: 'token', token: 't_2' } }));
   value(k.create('tasks', { what: 'd' }, agent({ host: 'dev-pc', repo: 'braindog' })));
+  assert.deepEqual(runs(sql), [1, 2], 'a write naming no run opened one beside its token’s open run');
   value(k.create('tasks', { what: 'e' }, agent({ client_id: 'cc-9' })));
-  assert.deepEqual(runs(sql), [1, 2, 3, 4]);
+  assert.deepEqual(runs(sql), [1, 2, 3]);
 
   clock.advance(46 * MIN);
   value(k.create('tasks', { what: 'f' }, agent({ agent: 'other' })));
-  assert.deepEqual(runs(sql), [1, 2, 3, 4, 5], 'a run quiet for 46 minutes was adopted');
+  assert.deepEqual(runs(sql), [1, 2, 3, 4], 'a run quiet for 46 minutes was adopted');
   sql.close();
 });
 
@@ -347,7 +352,8 @@ test('THE TWELVE-HOUR SWEEP abandons quiet runs, leaves a handoff waiting, and n
 test('NOBODY BUT THE KERNEL DECLARES register.session, and the kernel’s own bytes change nothing', async () => {
   const { k, sql } = await record();
   assert.equal(sessionDeclaration().id, 'register.session');
-  assert.equal(jcs(sessionDeclaration().body), SESSION_BODY);
+  assert.equal(jcs(sessionDeclaration().body), SESSION_BODY, 'the kernel’s declaration is not the one its newest migration seats');
+  assert.ok(k.register('session')?.fields.some((f) => f.id === 'client'), 'a new record holds a register that keeps no app');
 
   const mine: Declaration = {
     id: 'register.session',
@@ -362,7 +368,8 @@ test('NOBODY BUT THE KERNEL DECLARES register.session, and the kernel’s own by
 
   const again = value<{ id: string; changed: boolean }[]>(await k.install([sessionDeclaration()]));
   assert.equal(again[0]?.changed, false);
-  assert.equal(sql.all("SELECT 1 FROM declaration WHERE id = 'register.session'").length, 1);
+  assert.equal(sql.all("SELECT 1 FROM declaration WHERE id = 'register.session' AND superseded_at IS NULL").length, 1);
+  assert.ok(k.register('session')?.fields.some((f) => f.id === 'client'));
   assert.equal(k.register('session')?.name, 'Agent runs');
   sql.close();
 });

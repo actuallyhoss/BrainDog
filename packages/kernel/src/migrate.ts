@@ -38,6 +38,7 @@ import jobs0018 from './migrations/0018_jobs.ts';
 import memberWhere0019 from './migrations/0019_member_where.ts';
 import quiet0020 from './migrations/0020_quiet.ts';
 import draftedBy0021 from './migrations/0021_drafted_by.ts';
+import sessionClient0022 from './migrations/0022_session_client.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -64,6 +65,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 19, slug: 'member_where', sql: memberWhere0019 },
   { version: 20, slug: 'quiet', sql: quiet0020 },
   { version: 21, slug: 'drafted_by', sql: draftedBy0021 },
+  { version: 22, slug: 'session_client', sql: sessionClient0022 },
 ];
 
 /**
@@ -93,6 +95,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * hours every record kept before it, so the format is still 1.
  * Migration 21 adds one nullable column to `suggestion`, which an older file imports without and reads as NULL, a
  * question whose drafter nobody kept, so the format is still 1.
+ * Migration 22 adds a row, the next version of migration 2's `register.session`, and no table, column or index; an
+ * older file carries migration 2's body, which an import supersedes the way the migration does, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

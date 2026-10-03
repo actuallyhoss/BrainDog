@@ -263,6 +263,8 @@ export type LiveBrief = {
   repo: string | null;
   project: string | null;
   stale: boolean;
+  /** Open and not heard from in 30 minutes: open is not working. */
+  quiet: boolean;
   age_s: number;
 };
 
@@ -274,10 +276,17 @@ export type LiveRun = {
   state: string | null;
   version: number;
   fields: Record<string, unknown>;
-  /** Not heard from in 45 minutes. */
+  /** Not heard from in 45 minutes, so the record no longer joins a call that names no run to it. */
   stale: boolean;
+  /**
+   * Open, active or idle, and not heard from in 30 minutes: what a person is shown as gone quiet rather than working.
+   * Worked out when read, like `stale`, and never a state of its own.
+   */
+  quiet: boolean;
   /** Seconds since it was last heard from. */
   age_s: number;
+  /** Seconds it has been going: to now while it works, and frozen at the last time it was heard from once it stopped. */
+  ran_s: number;
   /** Its repository is the one the caller said it is in. */
   same_repo: boolean;
 };
@@ -992,8 +1001,12 @@ export function createClient(options: ClientOptions) {
       call<BacklinksAnswer>('backlinks', args as Record<string, unknown>),
     /** What changed since the caller's read mark, or since `cursor`, one the record answered with, when one is given. */
     whatsNew: (cursor?: Cursor) => call<WhatsNew>('whatsNew', cursor === undefined ? {} : { cursor }),
-    /** The record's log, newest first. `cursor` is the one the page above answered with. */
-    recentHistory: (args: { cursor?: Cursor | null; limit?: number } = {}) =>
+    /**
+     * The record's log, newest first. `cursor` is the one the page above answered with. Changes only, unless `everything`
+     * asks for the record's own bookkeeping too: the sweep writing quiet runs off, and an agent's stamps of when it saw
+     * a tool.
+     */
+    recentHistory: (args: { cursor?: Cursor | null; limit?: number; everything?: boolean } = {}) =>
       call<HistoryPage>('recentHistory', args as Record<string, unknown>),
     /**
      * The arrivals in one state, newest first: left out, what waits; `matched` what was filed, `ignored` what was

@@ -29,6 +29,7 @@ import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, ty
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 import { GOVERNANCE_OPEN, readOpenQuestions } from './built-in-figures.ts';
+import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
@@ -180,6 +181,12 @@ export type MetricDecl = {
  */
 export type Group = {
   key: string;
+  /**
+   * WHAT A PERSON CALLS THE PART, where its key is not words: the title of the row a ref points at, an enum's declared
+   * label, Yes or No. Absent where the key is the name already (a grouping by a text field) or nothing names it, and a
+   * reader then says the key (`groupNames`). The key stays as it is, because a link and a filter are made from it.
+   */
+  label?: string;
   value: number | null;
   rows: number;
   state: 'empty' | 'partial' | 'full';
@@ -1116,8 +1123,10 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
    */
   const declared = decl.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null;
   const held = ctx.fx?.() ?? { home: null, rates: [] };
+  /* A FIGURE ABOUT ONE ROW THAT SAYS ITS OWN CURRENCY IS READ IN IT (`scopeCurrency`), and every other in the home one. */
+  const own = isMoneyFigure(schema, decl.value) ? scopeCurrency(sql, schema, scope.predicate, ctx) : null;
   const fx: Across = {
-    into: held.home,
+    into: own ?? held.home,
     home: held.home,
     rates: held.rates,
     /* The local day on a live read in a zone, as the predicate's `today` is (`clockOf`). */
@@ -1253,6 +1262,134 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 export const largestFirst = (a: Group, b: Group): number =>
   (b.value ?? -Infinity) - (a.value ?? -Infinity) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 
+/** A field id or an enum value as a person reads it: `owed_to_me` is "Owed to me". Exported for `pages.ts`, whose filters say values so. */
+export const wordsOf = (id: string): string => {
+  const said = id.replace(/_/gu, ' ').trim();
+  return said === '' ? id : said[0]!.toUpperCase() + said.slice(1);
+};
+
+/** What one row a grouping points at says of itself: its title, and the currency it says it is kept in. */
+export type Pointed = { title: string | null; currency: string | null };
+
+/** How many ids one read of the rows a grouping points at names, so a figure over many links asks a page at a time. */
+const POINTED_READ = 500;
+
+/** A field id as a declaration may name one: the grammar `jsonPath` holds, asked first so a list's body cannot throw. */
+const FIELD_ID = /^[a-z][a-z0-9_]{0,31}$/u;
+
+/**
+ * The kinds of title that are not words: a link, which is the id of another row, an amount or a file, which are kept as
+ * objects, a list and raw JSON. A list titled by one names no part (`Names, never ids`), and the reader says the key.
+ */
+const NOT_A_NAME: ReadonlySet<unknown> = new Set(['ref', 'money', 'quantity', 'file', 'list', 'json', 'secret']);
+
+/**
+ * The rows of `to` that `ids` name, each with its title and the currency it says it is kept in.
+ *
+ * A ROW THAT SAYS WHICH CURRENCY IT IS KEPT IN is one whose list declares a text or enum field called `currency` and
+ * holds a currency code there: money-core's books, a founder's organisations. That is the row's own statement, so a
+ * figure about the row is read in it (`groupsOf`, `scopeCurrency`, `readRolled`) rather than converted into the home
+ * currency: Quartz says USD, and its part of Cash now by book was drawn in pounds Egyptian.
+ *
+ * READ FROM THE DECLARATION, because a context carries no list's title field, and one query a page of ids. A deleted row
+ * still names the rows that point at it, as `titleOfRow` in `index.ts` names one; a title field declared `secret`, or
+ * one that holds no words (`NOT_A_NAME`), is never read into a name.
+ */
+export function pointedRows(sql: Sql, to: string, ids: readonly string[]): Map<string, Pointed> {
+  const out = new Map<string, Pointed>();
+  const asked = [...new Set(ids.filter((id) => typeof id === 'string' && id !== ''))];
+  if (asked.length === 0) return out;
+  const body = sql.one<{ body: string }>(
+    "SELECT body FROM declaration WHERE id = ? AND kind = 'register' AND superseded_at IS NULL AND retired = 0",
+    `register.${to}`,
+  )?.body;
+  let list: { title?: unknown; fields?: unknown } = {};
+  try {
+    list = body === undefined ? {} : (JSON.parse(body) as typeof list);
+  } catch {
+    list = {};
+  }
+  const fields = Array.isArray(list.fields) ? (list.fields as { id?: unknown; type?: unknown; retired?: unknown }[]) : [];
+  const live = (id: string) => fields.find((f) => f?.id === id && f.retired !== true);
+  const title = typeof list.title === 'string' && FIELD_ID.test(list.title) && live(list.title) && !NOT_A_NAME.has(live(list.title)?.type) ? list.title : null;
+  const kept = live('currency');
+  const currency = kept && (kept.type === 'text' || kept.type === 'enum') ? 'currency' : null;
+  if (title === null && currency === null) return out;
+  const said = (v: unknown): string | null =>
+    typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' || typeof v === 'boolean' ? String(v) : null;
+  for (let from = 0; from < asked.length; from += POINTED_READ) {
+    const page = asked.slice(from, from + POINTED_READ);
+    const rows = sql.all<{ id: string; t: unknown; c: unknown }>(
+      `SELECT id, ${title === null ? 'NULL' : `json_extract(fields, '${jsonPath(title)}')`} AS t, ${currency === null ? 'NULL' : `json_extract(fields, '${jsonPath(currency)}')`} AS c
+         FROM entry WHERE register = ? AND id IN (${page.map(() => '?').join(', ')})`,
+      to,
+      ...page,
+    );
+    for (const r of rows) {
+      const code = typeof r.c === 'string' ? r.c.trim().toUpperCase() : '';
+      out.set(String(r.id), { title: said(r.t), currency: isCurrencyCode(code) ? code : null });
+    }
+  }
+  return out;
+}
+
+/** What a grouping's parts are called, and the currency the row behind each part says it is kept in. */
+export type GroupNames = { label: (key: string) => string | undefined; currency: (key: string) => string | null };
+
+/**
+ * The names of a grouping's parts, by the field it groups by.
+ *
+ * AN ENUM BY ITS DECLARED LABEL, A YES OR NO BY THE WORD, A REF BY THE TITLE OF THE ROW IT POINTS AT. Cash now by book
+ * groups by `accounts.book`, a ref, so every key is the ULID the row stores, and every reader that drew one said "Book
+ * #01M3VMPSHV07AM4S51WDTFM5XG" (`loop/research-real-record.md`, Today 1), an agent's `get` included. A grouping by text
+ * is keyed by its words already and carries no label, and so does a key no row answers for.
+ *
+ * A LIST THE CALLER MAY NOT READ NAMES NOTHING (`EvalContext.reads`): its rows' titles are not handed to a member invited
+ * to the rows that point at them, and their currencies do not shape her figure. A page is read for nobody in particular,
+ * so `registersOf` in `pages.ts` names that list among the ones a grouped figure reads, and the record holds the block.
+ */
+export function groupNames(sql: Sql, schema: Schema, by: string, keys: readonly string[], ctx: Pick<EvalContext, 'reads'>): GroupNames {
+  const spec = Object.hasOwn(schema.fields, by) ? schema.fields[by] : undefined;
+  if (spec?.type === 'enum') return { label: (key) => spec.labels?.[key] ?? wordsOf(key), currency: () => null };
+  if (spec?.type === 'bool')
+    return { label: (key) => (key === 'true' || key === '1' ? 'Yes' : key === 'false' || key === '0' ? 'No' : undefined), currency: () => null };
+  const to = spec?.type === 'ref' && typeof spec.to === 'string' && spec.to !== '' ? spec.to : null;
+  if (to === null || (ctx.reads !== undefined && !ctx.reads(to))) return { label: () => undefined, currency: () => null };
+  const pointed = pointedRows(sql, to, keys);
+  return { label: (key) => pointed.get(key)?.title ?? undefined, currency: (key) => pointed.get(key)?.currency ?? null };
+}
+
+/** Each part with its name beside its key, where the grouping names one. */
+export const withLabels = (groups: readonly Group[], names: GroupNames): Group[] =>
+  groups.map((g) => {
+    const label = names.label(g.key);
+    return label === undefined ? g : { ...g, label };
+  });
+
+/**
+ * The currency a figure scoped to one row is read in, when that row says it is kept in one.
+ *
+ * `book-cash:Quartz` IS A QUESTION ABOUT QUARTZ (`fill` in `pages.ts` sets `within` to the clauses its parameter
+ * filled), and Quartz says USD: its page led with its cash in pounds Egyptian, converted. So a scope that pins a ref to
+ * one row, in a top-level clause, is asked what that row says, and a single answer is the figure's currency. Two rows
+ * that disagree, a list the caller may not read and a row that says nothing all leave the home currency as it was.
+ */
+export function scopeCurrency(sql: Sql, schema: Schema, scope: Predicate | undefined, ctx: Pick<EvalContext, 'reads'>): string | null {
+  if (scope === undefined) return null;
+  const found = new Set<string>();
+  for (const leaf of conjuncts(scope)) {
+    const field = typeof leaf.field === 'string' ? leaf.field : null;
+    const spec = field !== null && Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
+    const to = spec?.type === 'ref' && typeof spec.to === 'string' && spec.to !== '' ? spec.to : null;
+    if (to === null || (ctx.reads !== undefined && !ctx.reads(to))) continue;
+    const one = typeof leaf.is === 'string' ? leaf.is : Array.isArray(leaf.in) && leaf.in.length === 1 && typeof leaf.in[0] === 'string' ? leaf.in[0] : null;
+    if (one === null) continue;
+    const said = pointedRows(sql, to, [one]).get(one)?.currency;
+    if (said) found.add(said);
+  }
+  return found.size === 1 ? [...found][0]! : null;
+}
+
 /**
  * A figure read once per group, each part by the same aggregation over the same predicate.
  *
@@ -1285,8 +1422,8 @@ function groupsOf(
   const value = decl.value as Aggregation;
 
   const units = new Map<string, string | null>();
-  const part = (key: string, clause: string, more: (string | number)[]): Result<{ value: number | null; rows: number; parts?: Part[] }> => {
-    const got = one(sql, schema, value, `${where} AND ${clause}`, [...params, ...more], tables, fx);
+  const part = (key: string, clause: string, more: (string | number)[], own: Across | undefined = fx): Result<{ value: number | null; rows: number; parts?: Part[] }> => {
+    const got = one(sql, schema, value, `${where} AND ${clause}`, [...params, ...more], tables, own);
     if (!got.ok) return got;
     units.set(key, got.value.unit);
     return ok({ value: got.value.rows === 0 ? null : got.value.value, rows: got.value.rows, ...(got.value.parts ? { parts: got.value.parts } : {}) });
@@ -1362,15 +1499,21 @@ function groupsOf(
   /* THE LARGEST FIRST, the key breaking a tie, and past fifty the rest are counted rather than drawn
      (`45 §5.8`). Every part is read before the cut, because which fifty are largest is the question. */
   const values = sql.all<{ v: string | number }>(`SELECT DISTINCT ${field} AS v FROM entry WHERE ${where} AND ${field} IS NOT NULL`, ...params);
+  /* EACH PART BY ITS NAME, AND A PART WHOSE ROW SAYS WHICH CURRENCY IT IS KEPT IN IS ADDED UP IN THAT ONE (`groupNames`):
+     what a book in dollars holds is dollars, converted only where its own rows are in another currency. A part in a
+     currency the others are not in puts every part in parts (`inParts`), so no bar is ranked across two currencies. */
+  const names = groupNames(sql, schema, by, values.map((r) => String(r.v)), ctx);
   const groups: Group[] = [];
   for (const { v } of values) {
-    const got = part(String(v), `${field} = ?`, [v]);
+    const key = String(v);
+    const own = money && fx ? names.currency(key) : null;
+    const got = part(key, `${field} = ?`, [v], own === null || !fx ? fx : { ...fx, into: own });
     if (!got.ok) return got;
-    groups.push({ key: String(v), ...got.value, state: 'full' });
+    groups.push({ key, ...got.value, state: 'full' });
   }
   groups.splice(0, groups.length, ...inParts(groups));
   groups.sort(largestFirst);
-  return ok({ groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) });
+  return ok({ groups: withLabels(groups.slice(0, GROUP_CAP), names), more: Math.max(0, groups.length - GROUP_CAP) });
 }
 
 /**
@@ -1792,7 +1935,9 @@ function aggregate(
       const amounts = sql
         .all<{ u: string; v: number; d: string | null }>(`SELECT ${unitExpr} AS u, ${expr} AS v, ${dated} AS d FROM entry WHERE ${where} AND ${expr} IS NOT NULL`, ...params)
         .map((r) => ({ currency: String(r.u), amount: Number(r.v), day: typeof r.d === 'string' ? r.d : null }));
-      const said = across(amounts, fx.into, fx.rates, fx.today, fx.home !== null, kind as Reduce);
+      /* CONVERTED WHEN SOMEBODY CHOSE THE CURRENCY TO ADD UP IN: the record's home currency, or the one a row the figure
+         is about says it is kept in (`groupNames`, `scopeCurrency`). `into` is one of the two or it is `null`. */
+      const said = across(amounts, fx.into, fx.rates, fx.today, fx.into !== null, kind as Reduce);
       if (said.kind === 'one') return ok({ value: said.amount, unit: said.currency, rows, refusals: [] });
       if (said.kind === 'converted')
         return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } });

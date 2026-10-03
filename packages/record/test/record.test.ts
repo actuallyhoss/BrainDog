@@ -1600,6 +1600,58 @@ test('AND A METRIC OVER A REGISTER YOU CANNOT SEE DOES NOT EXIST', async () => {
   sql.close();
 });
 
+test('A FIGURE GROUPED BY A REF NAMES THE ROWS IT POINTS AT, so a member who may not open that list is not answered it', async () => {
+  /* Each part of a figure grouped by a ref is labelled with the title of the row its key is (`groupNames`), so the
+     figure reads the list the ref points at as much as its own. `metric` and `figures` asked of the figure's own lists
+     alone, and a member invited to Accounts was answered Held by book with a part labelled 'Secret Venture', the title
+     of a book on a list she cannot open. */
+  const { api, sql } = await studio();
+  value(
+    await api.kernel.install([
+      { id: 'register.books', kind: 'register', body: { id: 'books', name: 'Books', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } },
+      {
+        id: 'register.accounts',
+        kind: 'register',
+        body: { id: 'accounts', name: 'Accounts', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'balance', type: 'money' }, { id: 'book', type: 'ref', to: 'books' }] },
+      },
+      {
+        id: 'metric.held-by-book',
+        kind: 'metric',
+        body: { metric: 'held-by-book', name: 'Held by book', source: 'register.accounts', value: { sum: 'balance' }, group_by: 'book', format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' },
+      },
+      {
+        id: 'metric.held',
+        kind: 'metric',
+        body: { metric: 'held', name: 'Held', source: 'register.accounts', value: { sum: 'balance' }, format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' },
+      },
+    ] as never),
+  );
+  const book = value<{ id: string }>(await api.create({ register: 'books', fields: { name: 'Secret Venture' } }, owner));
+  value(await api.create({ register: 'accounts', fields: { name: 'Current', balance: { amount: 10_000, currency: 'GBP' }, book: book.id } }, owner));
+  type Read = { groups?: { label?: string }[] };
+  assert.deepEqual(
+    value<Read>(await api.metric({ metric: 'held-by-book' }, owner)).groups?.map((g) => g.label),
+    ['Secret Venture'],
+    'the owner was not answered the part by its book, so the checks below prove nothing',
+  );
+
+  value(await api.invite({ person: 'p_9', registers: { accounts: 'read' } }, owner));
+  const held = api.kernel.access('p_9')!;
+  const scoped: CallContext = {
+    principal: { kind: 'person', id: 'p_9', level: held.level },
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    levels: held.levels,
+  };
+  /* THE SAME ACCOUNTS UNGROUPED ARE HERS, so what holds the grouped figure back is the list its parts are named from. */
+  value(await api.metric({ metric: 'held' }, scoped));
+  const asked = await api.metric({ metric: 'held-by-book' }, scoped);
+  assert.equal(refusal(asked).code, 'METRIC_UNKNOWN');
+  assert.ok(!JSON.stringify(asked).includes('Secret Venture'), 'the title of a book on a list the member cannot open');
+  const listed = value<{ id: string }[]>(await api.figures(scoped)).map((f) => f.id);
+  assert.ok(listed.includes('held') && !listed.includes('held-by-book'), `figures listed what metric holds back: ${listed.join(', ')}`);
+  sql.close();
+});
+
 test('A PROPOSED ROWSET IS HELD TO THE CEILING, in both directions', async () => {
   /* `propose` took no register and `checkBody` only asks whether the named one exists — so a
      `propose` token scoped to one register could put another's rows in the queue an owner reads.
@@ -1791,18 +1843,22 @@ test('THE NUMBERS A LIST HOLDS ARE BLANKED like its rows for a caller who may no
     {
       id: 'page.numbers',
       kind: 'page' as const,
-      body: { page: 'numbers', title: 'Numbers', blocks: [{ kind: 'lines', source: 'register.points', columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }] }] } as never,
+      /* AND A TABLE OVER NOTES, so the caller invited to Notes alone opens the page and is answered the lines block held. */
+      body: { page: 'numbers', title: 'Numbers', blocks: [{ kind: 'lines', source: 'register.points', columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }] }, { kind: 'table', source: 'register.notes', columns: [{ field: 'body' }] }] } as never,
     },
   ]);
   assert.ok(out.ok);
-  value(await api.create({ register: 'points', fields: { name: 'Revenue', value: 4200, at: new Date(NOW).toISOString() } }, owner));
-  type Drawn = { blocks: { measures?: { name: string }[]; refusals?: unknown[] }[] };
-  assert.deepEqual(value<Drawn>(await api.page({ slug: 'numbers' }, owner)).blocks[0]?.measures?.map((m) => m.name), ['Revenue']);
+  /* A LINE IS TWO READINGS OR MORE, and a measure read once is answered as its latest reading (`measureLines`). */
+  for (const [name, amount, at] of [['Revenue', 4000, NOW - 86_400_000], ['Revenue', 4200, NOW], ['Churn', 3, NOW]] as const)
+    value(await api.create({ register: 'points', fields: { name, value: amount, at: new Date(at).toISOString() } }, owner));
+  type Drawn = { blocks: { measures?: { name: string }[]; latest?: { measure: string }[]; refusals?: unknown[] }[] };
+  const [drawn] = value<Drawn>(await api.page({ slug: 'numbers' }, owner)).blocks;
+  assert.deepEqual([drawn?.measures?.map((m) => m.name), drawn?.latest?.map((l) => l.measure)], [['Revenue'], ['Churn']]);
   const asked = await api.page({ slug: 'numbers' }, { ...owner, registers: ['notes'] } as CallContext);
-  if (asked.ok) {
-    const [b] = (asked.value as Drawn).blocks;
-    assert.deepEqual(b?.measures, [], 'a series over a list the caller cannot read was handed over');
-    assert.ok((b?.refusals ?? []).length > 0);
-  }
+  assert.ok(asked.ok, JSON.stringify(asked));
+  const [b] = (asked.value as Drawn).blocks;
+  assert.deepEqual(b?.measures, [], 'a series over a list the caller cannot read was handed over');
+  assert.equal(b?.latest, undefined, 'a reading off a list the caller cannot read was handed over');
+  assert.ok((b?.refusals ?? []).length > 0);
   sql.close();
 });

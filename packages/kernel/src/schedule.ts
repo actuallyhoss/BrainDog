@@ -510,6 +510,10 @@ export const ABANDON_MS = 12 * 3_600_000;
  *
  * `move` is the write path's, so each change is a `state` event by `system` like any other, and a
  * run that comes back later re-attaches through the declared `abandoned` to `active` move.
+ *
+ * AND NO FEED SHOWS IT. A `state` line by `system` on a run is the record's bookkeeping (`bookkeeping`
+ * in `index.ts`): the run's history keeps it, and Activity, Home's feed and an agent's `activity` read
+ * past it. One line per run swept was 154 of the newest 200 Activity lines on the owner's record.
  */
 export function sweepSessions(sql: Sql, nowMs: number, move: (id: string, to: string) => boolean, limit = 100): number {
   const quiet = sql.all<{ id: string }>(

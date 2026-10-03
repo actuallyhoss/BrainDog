@@ -2,9 +2,9 @@
  * Where a row applies, and how a run learns which project it is in.
  *
  * TWO SCOPES AND NO THIRD. A row is global, or it belongs to one row of the register that declares `scopes:`, which is
- * the record's list of projects. A project lists its repositories and folders, and a run started in one of them is in
- * that project; a run started anywhere else is global. `resolveProject` only reads: the ladder writes its answer onto
- * the run.
+ * the record's list of projects. A project lists its repositories and folders, and a run started in one of them, or in
+ * a checkout of the same name on another machine, is in that project; a run started anywhere else is global.
+ * `resolveProject` only reads: the ladder writes its answer onto the run.
  */
 
 import type { Sql } from '@braindog/ports';
@@ -27,7 +27,8 @@ export type Resolved = {
   ambiguous: string[];
 };
 
-type Candidate = { id: string; spoken: string; repos: string[]; folders: string[] };
+/** A project as `matchProject` reads it: its id, its spoken id, and the repositories and folders it lists. */
+export type Candidate = { id: string; spoken: string; repos: readonly string[]; folders: readonly string[] };
 
 const GLOBAL: Resolved = { project: null, ambiguous: [] };
 
@@ -37,7 +38,9 @@ const GLOBAL: Resolved = { project: null, ambiguous: [] };
  *   1. The one active register declaring `scopes:` holds the projects. None, and every run is global.
  *   2. A remote equal to a `repos` entry wins.
  *   3. Then a `folders` entry the working folder is in, and the longest such folder.
- *   4. Then a `repos` entry with no slash equal to the repository's folder name.
+ *   4. Then by name (`matchProject`): the repository the remote names, or the repository's folder,
+ *      against the last name of every place a project lists; and failing those, the nearest folder
+ *      of the working folder's own path that carries one of those names.
  *   5. Two projects matching at the same rung, or with folders of the same length, leave the run
  *      global and are named in `ambiguous`, because picking one would file work under a guess.
  *
@@ -71,7 +74,20 @@ export function resolveProject(
   return matchProject(projects, where);
 }
 
-function matchProject(projects: readonly Candidate[], where: Whereabouts): Resolved {
+/**
+ * Which of `projects` a run in this place is in: by its remote, then the folder it works in, then by name.
+ *
+ * BY NAME LAST, AND BY THE GIT REMOTE FIRST AMONG NAMES, because every run already records its remote
+ * (`github.com/actuallyhoss/BrainDog`) and a remote is the same on every machine. A project that lists its folder as
+ * Windows wrote it, `C:\Repos\braindog`, was matched by nothing a Mac sends: no path compare can find
+ * `/Users/sam/Developer/braindog` under it, and the owner's own repository read "No project here". Its last name,
+ * `braindog`, is the remote's. So the run's repository, as the remote names it and as its folder does, is compared with
+ * the last name of every place a project lists, remotes and folders alike; and when neither is known, or neither
+ * matches, the nearest folder up the working folder's path that carries one of those names, so a run in a subfolder or
+ * a worktree inside the checkout is found too. Case is ignored, as a folder's is on Windows and a remote's is on every
+ * host that serves one.
+ */
+export function matchProject(projects: readonly Candidate[], where: Whereabouts): Resolved {
   const settle = (hits: readonly Candidate[], how: 'remote' | 'folder' | 'repo'): Resolved => {
     const [one] = hits;
     return hits.length === 1 && one
@@ -97,11 +113,16 @@ function matchProject(projects: readonly Candidate[], where: Whereabouts): Resol
     if (hits.length) return settle(hits, 'folder');
   }
 
-  /* CASE IS IGNORED, as it is for a drive-letter folder: the name is a folder's name, and Windows
-     hands back whatever case the folder was created with. */
-  const repo = where.repo?.trim().toLowerCase() ?? '';
-  if (repo) {
-    const hits = projects.filter((p) => p.repos.some((r) => !r.includes('/') && r.trim().toLowerCase() === repo));
+  const named = (name: string): Candidate[] => projects.filter((p) => [...p.repos, ...p.folders].some((place) => lastName(place) === name));
+  for (const name of new Set([remote ? lastName(remote) : '', where.repo?.trim().toLowerCase() ?? ''])) {
+    if (name === '') continue;
+    const hits = named(name);
+    if (hits.length) return settle(hits, 'repo');
+  }
+  /* THE NEAREST FOLDER FIRST, and the drive is never a name: `C:` says which disk, not which work. */
+  const up = cwd.split('/').filter((part) => part !== '' && !/^[a-z]:$/u.test(part)).reverse();
+  for (const part of up) {
+    const hits = named(part.toLowerCase());
     if (hits.length) return settle(hits, 'repo');
   }
 
@@ -109,10 +130,25 @@ function matchProject(projects: readonly Candidate[], where: Whereabouts): Resol
 }
 
 /**
- * A remote as `host/owner/name`: no scheme, no `user@`, no trailing `.git`, and the host lower-cased.
+ * The last name in a place, lower case: a remote's repository with no `.git`, a folder's own name, as either OS writes
+ * it, or a bare name as it is. Empty for a place with no name in it.
+ */
+function lastName(said: string): string {
+  const parts = said
+    .trim()
+    .replace(/[\\/]+$/u, '')
+    .replace(/\.git$/iu, '')
+    .split(/[\\/:]+/u)
+    .filter((part) => part !== '');
+  return (parts.at(-1) ?? '').toLowerCase();
+}
+
+/**
+ * A remote as `host/owner/name`, lower case: no scheme, no `user@`, no trailing `.git`.
  *
  * `git@github.com:acme/braindog` names its path after the colon. Behind a scheme the colon is a port instead, and a
- * port says nothing about which repository it is.
+ * port says nothing about which repository it is. CASE IS IGNORED THROUGHOUT, because GitHub, GitLab and Bitbucket
+ * all answer `Acme/BrainDog` and `acme/braindog` with the same repository.
  */
 function remoteKey(said: string): string {
   let s = said.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
@@ -125,7 +161,7 @@ function remoteKey(said: string): string {
     if (!scheme) rest = [host.slice(colon + 1), ...rest];
     host = host.slice(0, colon);
   }
-  return [host.toLowerCase(), ...rest].filter((part) => part !== '').join('/');
+  return [host, ...rest].filter((part) => part !== '').join('/').toLowerCase();
 }
 
 /** A folder with forward slashes, a lower-case drive letter and no trailing slash. */

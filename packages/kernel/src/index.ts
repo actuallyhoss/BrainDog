@@ -224,7 +224,23 @@ import { slashMayWrite } from './slash.ts';
 import { meet as meetPerson, type MeetArgs, type Met } from './people.ts';
 import { meetsRole, ratesRole, type MeetsFields } from './roles.ts';
 import { builtInFigure } from './built-in-figures.ts';
-import { FINISHED, KERNEL_WRITTEN, REVIVED, SESSION, findSession, opening, owned, provisionalTitle, type Found, type SessionHints } from './session.ts';
+import {
+  FINISHED,
+  KERNEL_WRITTEN,
+  REVIVED,
+  SESSION,
+  clipTitle,
+  findSession,
+  isRunName,
+  learned,
+  opening,
+  owned,
+  provisionalTitle,
+  recordNamed,
+  type Found,
+  type RunRegister,
+  type SessionHints,
+} from './session.ts';
 import {
   deviceApprove,
   deviceList,
@@ -257,7 +273,7 @@ import { extensions } from './api/index.ts';
 export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statements } from './migrate.ts';
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
-export { KERNEL_WRITTEN, STALE_MS, isStale, provisionalTitle, sessionDeclaration } from './session.ts';
+export { KERNEL_WRITTEN, QUIET_MS, STALE_MS, TITLE_MAX, agentOf, clipTitle, isQuiet, isStale, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type VaultGrant, type Waiting } from './device.ts';
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
@@ -299,8 +315,8 @@ import { GROUP_CAP } from './buckets.ts';
 import { ratesFrom } from './fx.ts';
 import { laidOf } from './pack-laid.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
-export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
-export type { MeasureBucket, MeasureSeries, RawReading } from './measures.ts';
+export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measureLines, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
+export type { MeasureBucket, MeasureLatest, MeasureLines, MeasureSeries, RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
 export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
 export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
@@ -314,7 +330,7 @@ export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLis
 export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
-export { RAIL_PAGES, REDUCES, SEED_ACTOR, byOf, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
+export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, byOf, fill, railRoom, readBlock, readPage, resolvePages, slugify } from './pages.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
 export { ANSWER_KEYS } from './block-keys.ts';
 export {
@@ -337,7 +353,7 @@ export { runway } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
-export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS } from './govern.ts';
+export { ARRANGING, BODY_KINDS, GOVERNANCE, OPEN_ARRANGEMENTS, PACK_VERBS, pressedOnly } from './govern.ts';
 export { MET_CAP, PEOPLE } from './people.ts';
 export type { MeetArgs, Met } from './people.ts';
 export type { MeetsFields, RatesFields } from './roles.ts';
@@ -409,7 +425,7 @@ export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, 
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, QueueOption, QueueQuestion } from './pages.ts';
+export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, QueueOption, QueueQuestion } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
@@ -710,6 +726,17 @@ type DeclaredField = RegisterDecl['fields'][number];
 const TAGS: DeclaredField = { id: 'tags', type: 'list', of: 'text' };
 const withTags = (fields: readonly DeclaredField[]): readonly DeclaredField[] =>
   fields.some((f) => f.id === 'tags') ? fields : [...fields, TAGS];
+
+/**
+ * How far an agent's clock may sit from the record's for an `instant` it wrote to still be a stamp of the moment it
+ * wrote (`bookkeeping`): ten minutes, more than a scan of a machine's tools spends between reading its clock and
+ * writing the last of them.
+ */
+const STAMP_MS = 10 * 60_000;
+
+/** How many lines a feed walks past the record's own bookkeeping to fill itself, and how many it reads at a time. */
+const FEED_WALK = 5_000;
+const FEED_BATCH = 500;
 
 /** One line of the log as the record-wide reads scan it: the event, with its values parsed. */
 export type EventLine = {
@@ -3652,6 +3679,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           const { place, project } = locate();
           if (place && project) merged.project = project.spoken;
           else if (place) delete merged.project;
+          /* AND A RUN WRITING ITS OWN ROW NAMES ITSELF AS IT GOES. What it says it is doing is cut to a name's length,
+             and while its name is still the record's own, the name follows what this call tells the record, as it does
+             for a run's other writes (`learnRun`): in this write, and with no line of its own in the history. */
+          if (register === SESSION && current) {
+            if (touched.includes('doing') && typeof merged.doing === 'string') merged.doing = clipTitle(merged.doing);
+            Object.assign(merged, learned({ fields: merged, created_at: current.created_at }, w.session ?? {}, projectNamed(merged.project), runRegister(), touched));
+          }
         }
         w = { ...w, actor: run.actor };
       }
@@ -4034,6 +4068,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (project === null) sql.exec("UPDATE entry SET fields = json_remove(fields, '$.project') WHERE id = ?", found.id);
         else sql.exec("UPDATE entry SET fields = json_set(fields, '$.project', ?) WHERE id = ?", project, found.id);
       }
+      /* AND WHAT THE CALL SAYS OF WHO THE RUN IS, in place for the same reason: the kind of agent a run that said none
+         turns out to be, its client, and the name that follows while the record's own name stands (`learned`). NEVER
+         FROM ANOTHER KEY: a note or a proposal is still signed as a run it names (`signedBy`), and that key's hints
+         would otherwise rename the run and say which app it is. */
+      if (!found.foreign) learnRun(found.id, w.session ?? {});
       return { actor, own: false };
     }
 
@@ -4058,9 +4097,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   function openRun(w: WriteContext, project: string | null, now: string, note: string): Result<Entry> {
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
     const seq = Number(sql.one<{ n: number }>('SELECT next AS n FROM counter WHERE name = ?', `seq:${SESSION}`)?.n ?? 1);
-    const fields = opening(w.session ?? {});
-    /* A RUN IS NEVER UNTITLED: until its agent says what it is doing, it is named from where it opened. */
-    if (typeof fields.doing !== 'string') fields.doing = provisionalTitle(w.session ?? {}, project === null ? null : (titleOfRow(project) ?? project), now);
+    const runs = runRegister();
+    const fields = opening(w.session ?? {}, runs);
+    /* A RUN IS NEVER UNTITLED: until its agent says what it is doing, it is named for the agent and where it opened. A
+       project is named by its title and never by its number, which is no name a person reads. */
+    if (typeof fields.doing !== 'string') {
+      const agent = typeof fields.agent === 'string' ? { agent: fields.agent } : {};
+      fields.doing = provisionalTitle({ ...w.session, ...agent }, project === null ? null : titleOfRow(project), runs.kinds);
+    }
     const opened = writing(SESSION, null, fields, {
       actor: `${prefix}${seq}`,
       note,
@@ -4074,6 +4118,87 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     });
     if (opened.ok && opened.value.seq !== seq) throw new TypeError(`${prefix}${seq} was opened as ${prefix}${String(opened.value.seq)}`);
     return opened;
+  }
+
+  /**
+   * What the live declaration of `session` holds, as the ladder asks it: which fields it keeps, and which kinds of agent
+   * its `agent` field takes. A version of the register that declares `client` keeps the client's name from then on,
+   * and one that lists `gemini` lets a run be one, with nothing here changed.
+   */
+  function runRegister(): RunRegister {
+    const fields = (registers.get(SESSION)?.fields ?? []).filter((f) => !f.retired);
+    return { has: (id) => fields.some((f) => f.id === id), kinds: fields.find((f) => f.id === 'agent')?.values ?? [] };
+  }
+
+  /** The name a run's project is called by, or `null` for a run in none or a project with no name. */
+  function projectNamed(project: unknown): string | null {
+    return typeof project === 'string' && project !== '' ? titleOfRow(project) : null;
+  }
+
+  /**
+   * What a call made as a run says of who the run is, written onto the run in place (`learned` in `session.ts`). In a
+   * transaction only.
+   *
+   * NO VERSION, NO `updated_at` AND NO EVENT, as the heartbeat and the placing beside it, because the record noting who
+   * a run turned out to be is not an edit anybody made. The run's words are indexed again when its name moved, so a
+   * search finds a run by the name it now has.
+   */
+  function learnRun(id: string, hints: SessionHints): void {
+    const run = byId(id);
+    if (!run) return;
+    const said = learned(run, hints, projectNamed(run.fields.project), runRegister());
+    if (Object.keys(said).length === 0) return;
+    for (const [key, value] of Object.entries(said)) sql.exec('UPDATE entry SET fields = json_set(fields, ?, ?) WHERE id = ?', `$.${key}`, value, id);
+    if (said.doing !== undefined) {
+      const now = byId(id);
+      if (now) reproject(now);
+    }
+  }
+
+  /**
+   * A run's first proposal names it, while the name it has is still the record's own: the question is what the run is
+   * about, in the agent's words, where "Claude Code in BrainDog" says only who and where. In place, as `learnRun`
+   * writes. A question from anybody who is not a run, from a run already named, or from a key that named a run another
+   * key opened, changes nothing.
+   */
+  function nameRunBy(suggestion: string, w: WriteContext): void {
+    const by = getGovernance(sql, 'suggestion', suggestion)?.opened_by;
+    if (typeof by !== 'string' || !isRunName(by)) return;
+    const run = bySeq(SESSION, Number(by.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)));
+    const asked = questionOf(sql, suggestion)?.trim();
+    if (!run || !asked || (w.principal?.kind === 'token' && owned(run.fields.token_id, w.principal.token ?? null))) return;
+    if (recordNamed(run, projectNamed(run.fields.project)) === null) return;
+    sql.exec("UPDATE entry SET fields = json_set(fields, '$.doing', ?) WHERE id = ?", clipTitle(asked), run.id);
+    const now = byId(run.id);
+    if (now) reproject(now);
+  }
+
+  /**
+   * Whether a line of the log is the record keeping its own books, which a feed of what changed leaves out and the log
+   * keeps whole: a run's history, `history` and `recentHistory` with `everything` still read every one of them.
+   *
+   *   - THE SWEEP: a run the record wrote off itself, a `state` line by `system` on a row of `session`. 154 of the newest
+   *     200 Activity lines on the owner's record were these, "Nothing heard from this run in twelve hours", one for
+   *     every run the twelve-hour sweep closed, burying the changes somebody made.
+   *   - A STAMP: an agent's run writing when it last saw something, an `edit` of an `instant` field to the moment of the
+   *     write, give or take `STAMP_MS` for the clock of the machine it ran on, over an earlier moment the field already
+   *     held. The tools scan's daily `seen` is one: it says the agent looked again, and changes nothing anybody reads a
+   *     feed for. A run setting a meeting for next week is a change, so is a run filling "Sent" for the first time on
+   *     an invoice it just sent, and an `instant` a person writes is never a stamp.
+   *
+   * BY THE LINE'S SHAPE AND NOT A LIST OF FIELDS, so a pack's own stamp is quiet the day it ships, with nothing here
+   * changed and no pack named.
+   */
+  function bookkeeping(e: Pick<EventLine, 'actor' | 'kind' | 'target' | 'field' | 'ts' | 'to'> & { from?: Json | null }): boolean {
+    const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
+    if (id === null) return false;
+    const listOf = (): string | null => sql.one<{ register: string }>('SELECT register FROM entry WHERE id = ?', id)?.register ?? null;
+    if (e.kind === 'state') return e.actor === 'system' && listOf() === SESSION;
+    if (e.kind !== 'edit' || e.field === null || typeof e.to !== 'string' || typeof e.from !== 'string' || !isRunName(e.actor)) return false;
+    const at = Date.parse(e.to);
+    if (!Number.isFinite(at) || Math.abs(at - Date.parse(e.ts)) > STAMP_MS || !(Date.parse(e.from) < at)) return false;
+    const list = listOf();
+    return list !== null && registers.get(list)?.fields.find((f) => f.id === e.field)?.type === 'instant';
   }
 
   /** Who signs what this context says: a token's run, found or opened with its heartbeat moved, or `actor`. In a transaction only. */
@@ -4698,13 +4823,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        optional and this is the one host that hands it: `additionsOf` reads every installed pack's manifest for
        what it adds to this page's declaration id. */
     adds: (page) => additionsOf(sql.all<{ id: string; manifest: string }>('SELECT id, manifest FROM pack WHERE disabled_at IS NULL ORDER BY id'), page),
-    runway: (opening, legs, horizon, only) => {
+    /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
+       for the book's currency and this host walked the home one, drawn once per currency instead. */
+    runway: (opening, legs, horizon, only, into) => {
       const out = runway(
         { sql, schemaOf: (r) => (registers.has(r) ? schemaOf(r) : null), titleOf: (r) => registers.get(r)?.title ?? null, hydrate: (id) => byId(id), ctx: evalContext() },
         opening,
         legs,
         horizon,
         only,
+        into,
       );
       return out.ok ? out.value : null;
     },
@@ -4877,15 +5005,32 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * NOT THE OWNER'S LINES. Keys, access, shares and members belong to the owner's own screens (the record's
      * `lineOf` holds them to an owner), and a page is read by whoever may open it, so they are left out here.
      * The read mark is a person's, and the kernel does not know who is reading, so it is `null` here and the record's `page` puts the reader's own in.
+     *
+     * NOR THE RECORD'S OWN BOOKKEEPING (`bookkeeping`): the sweep writing runs off and an agent's daily stamps. The walk
+     * reads on past them, a batch at a time and `FEED_WALK` lines at most, so `limit` lines of what changed come back
+     * rather than the sweep's lines standing in their place.
      */
     activity: (limit) => {
-      const lines = sql.all<{ rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null }>(
-        `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event
-          WHERE kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
-            AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
-          ORDER BY rowid DESC LIMIT ?`,
-        limit,
-      );
+      type Raw = { rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null };
+      const lines: Raw[] = [];
+      let before = Number.MAX_SAFE_INTEGER;
+      for (let walked = 0; lines.length < limit && walked < FEED_WALK; ) {
+        const batch = sql.all<Raw>(
+          `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event
+            WHERE rowid < ? AND kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
+              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+            ORDER BY rowid DESC LIMIT ?`,
+          before,
+          FEED_BATCH,
+        );
+        for (const e of batch) {
+          before = Number(e.rowid);
+          walked += 1;
+          if (!bookkeeping({ ...e, from: read(e.from_v), to: read(e.to_v) })) lines.push(e);
+          if (lines.length >= limit) break;
+        }
+        if (batch.length < FEED_BATCH) break;
+      }
       type Line = FeedLine & { ts: string; actor: string; note: string | null; row: Entry | null };
       /* A QUESTION IS NAMED BY WHAT IT ASKS, AS A ROW IS BY ITS TITLE. A feed drew "suggested SG10", the question's
          number, where the line could say what was asked; a decision is the question it answered. Asked once a line,
@@ -5311,6 +5456,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND `43 §4.5`'s `day` for a `map:` field, when one was wired. Absent is the kernel's own four
        formats, unchanged. */
     day: opts.day,
+    /* THE WORDS A PERSON RENAMED A LIST OR A FIELD TO, so a question an arrival leaves for review names them as every
+       page does. Without this line `wordsFor` read none and asked in the declaration's own words. */
+    words: () => speakingSettings(sql),
   });
 
   const pullDeps = (): PullDeps => ({
@@ -5565,6 +5713,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /**
    * The hourly sweep: soft-deleted rows past thirty days, and runs not heard from in twelve hours.
    * The `purge` schedule row and the `purge` method both run this one function.
+   *
+   * A RUN WRITTEN OFF KEEPS ITS LINE IN ITS HISTORY AND IN THE LOG, and no feed shows it (`bookkeeping`): the sweep is
+   * the record keeping its books, and its lines were three quarters of the owner's Activity.
    */
   function sweepRecord(cutoffMs = clock.now() - 30 * 86_400_000, limit?: number) {
     const out = purge(sql, cutoffMs, clock.now(), transaction, mint, limit);
@@ -7189,10 +7340,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      *
      * A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are, and the run is found only once the
      * body has passed, so a refused proposal opens none. A bare name signs as itself. `drafted` is who drafted it,
-     * Slash's rules or a model, kept on `suggestion.drafted_by`.
+     * Slash's rules or a model, kept on `suggestion.drafted_by`. A run's first question names the run while the
+     * record's own name still stands (`nameRunBy`).
      */
     propose: (p: Proposal, w: WriteContext | string, drafted?: string): Result<{ id: string }> =>
-      transaction(() => openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p, drafted)),
+      transaction(() => {
+        const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p, drafted);
+        if (out.ok) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w);
+        return out;
+      }),
 
     /** A suggestion's question, which is its `suggest` event and no column: what a person reads it by. */
     question: (id: string): string | null => questionOf(sql, id),
@@ -8272,6 +8428,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     inScope,
     runFor,
     findRun,
+    /** Whether a line of the log is the record's own bookkeeping, which a feed leaves out and the log keeps. Reads only. */
+    bookkeeping,
     keyState,
     /** A row as a person says it, `S42` or `things#3`, from its id. */
     nameOf,

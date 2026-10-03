@@ -314,10 +314,11 @@ test('A WALK IS BOUNDED BY WHAT IT READS, NOT ONLY BY HOW FAR IT LOOKS: legs and
 });
 
 test('THE BYTES OF THE ANSWER ARE BOUNDED TOO, for rows few enough to pass the row bound and long enough to be heavy', async () => {
-  /* 800 bills whose titles are 4,000 bytes each: four tables of 500 is 2,000 rows, inside the row bound, and 8 MB. */
-  const { sql, wren, preview } = await record(800, 'x'.repeat(4000));
-  const heavy = await preview(Array.from({ length: 4 }, () => ({ kind: 'table', source: 'register.bills', limit: 500 })), wren);
-  assert.equal(heavy.ok, false, 'an answer of 8 MB was sent');
+  /* 1,600 bills whose titles are 4,000 bytes each: eight tables of 500 is 4,000 rows, inside the row bound, and with each
+     title cut at 280 characters still 2.3 MB. */
+  const { sql, wren, preview } = await record(1600, 'x'.repeat(4000));
+  const heavy = await preview(Array.from({ length: 8 }, () => ({ kind: 'table', source: 'register.bills', limit: 500 })), wren);
+  assert.equal(heavy.ok, false, 'an answer of 2.3 MB was sent');
   if (!heavy.ok) {
     assert.equal(heavy.refusal.code, 'OUT_OF_BOUNDS');
     assert.equal(heavy.refusal.at, 'blocks');

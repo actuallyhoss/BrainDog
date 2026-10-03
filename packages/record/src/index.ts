@@ -41,7 +41,10 @@ import {
   ANSWER_KEYS,
   fill,
   GRANT_KINDS,
+  agentOf as kindOf,
+  isQuiet,
   isStale,
+  runAge,
   exponentOf,
   openRecord,
   ulids,
@@ -1036,10 +1039,17 @@ const INBOX_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** One live run: the row, its spoken id, and what is worked out when it is read. */
 export type LiveRun = Entry & {
   spoken: string;
-  /** Not heard from in 45 minutes. A run that crashed never says so, so this is never stored. */
+  /** Not heard from in 45 minutes, so the ladder no longer adopts it. A run that crashed never says so, so this is never stored. */
   stale: boolean;
+  /**
+   * Open, active or idle, and not heard from in 30 minutes: what a person is shown as gone quiet rather than working.
+   * Derived like `stale`, and never a state of its own.
+   */
+  quiet: boolean;
   /** Seconds since it was last heard from. */
   age_s: number;
+  /** Seconds it has been going: to now while it works, and frozen at the last time it was heard from once it stopped. */
+  ran_s: number;
   /** Its repository is the one the caller said it is in: two runs in one working tree overwrite each other. */
   same_repo: boolean;
 };
@@ -1077,6 +1087,8 @@ export type LiveBrief = {
   repo: string | null;
   project: string | null;
   stale: boolean;
+  /** Open and not heard from in 30 minutes: open is not working. */
+  quiet: boolean;
   age_s: number;
 };
 
@@ -3569,8 +3581,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id;
 
-  /** `agent:claude`: a token's name, when its write has no run to sign it (`30 §3`). */
-  const agentOf = (ctx: CallContext): string => `agent:${ctx.session?.agent ?? 'other'}`;
+  /**
+   * `agent:claude`: a token's name, when its write has no run to sign it (`30 §3`). The kind the caller named, or the one
+   * its client's own name says (`clientInfo`), as the ladder reads it for a run (`agentOf` in the kernel).
+   */
+  const agentOf = (ctx: CallContext): string => `agent:${kindOf(ctx.session ?? {}).agent ?? 'other'}`;
 
   /**
    * The lists a writer's refs may name, asked as `list` asks it (`readable`), for the two doors that take a caller's
@@ -3620,9 +3635,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /**
    * The runs that are live now, newest heard from first, with what is worked out when they are read.
    *
-   * STALE IS DERIVED AND NEVER STORED: a run that crashed never says so, so the clock is compared with
-   * `last_seen` here. `same_repo` compares with the caller's own hints, and is `false` for a caller that
-   * sent none.
+   * STALE AND QUIET ARE DERIVED AND NEVER STORED: a run that crashed never says so, so the clock is compared with
+   * `last_seen` here. Quiet is what a person reads, an open run nobody has heard from in half an hour, so "active" on a
+   * run gone silent is never shown as working. `ran_s` is the run's age, which stops when the run does. `same_repo`
+   * compares with the caller's own hints, and is `false` for a caller that sent none.
    *
    * ONLY A RUN SOMEBODY HEARD FROM IS LIVE. The ladder stamps `last_seen` on every run it opens or hears from, and no
    * caller can write it (`packages/seed/src/index.ts:397`), so a row without one was written, not run: runs an import
@@ -3644,7 +3660,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       ...row,
       spoken: `${PREFIX}${String(row.seq)}`,
       stale: isStale(row, now),
+      quiet: isQuiet(row, now),
       age_s: ageOf(row),
+      ran_s: runAge(row, now),
       same_repo: repo !== undefined && row.fields.repo === repo,
     }));
   };
@@ -4284,12 +4302,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *
    * LESS WHAT THE PERSON MUTED: a note from a rule in their `notify.muted` is not news to them, and an urgent one is
    * (`mutedFor`). A token reads its person's mutes as it reads their mark. The log keeps every line.
+   *
+   * AND LESS THE RECORD'S OWN BOOKKEEPING, which is news to nobody: the sweep writing quiet runs off and an agent's
+   * stamp of when it last saw a tool (`kernel.bookkeeping`). Each run's history still holds its lines.
    */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
     const reader = readerOf(ctx);
     const said = reader === null ? undefined : (kernel.prefsOf(reader) as Prefs)['notify.muted'];
     const muted = new Set(Array.isArray(said) ? said : []);
-    const skip = muted.size > 0 ? (e: LogLine) => mutedFor(e, muted) : undefined;
+    const skip = (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip);
     const events = lines.slice(0, NEWS);
     return { events: events.map((line) => shown(ctx, line)), upTo: events[0] ? pointAt(ctx, events[0]) : null, sinceCapped: next !== null };
@@ -4609,6 +4630,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       repo: text(r.fields.repo),
       project: text(r.fields.project),
       stale: r.stale,
+      quiet: r.quiet,
       age_s: r.age_s,
     });
 
@@ -6164,9 +6186,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * Say which run this agent is, and where it stands. A token's call, needing `propose`.
      *
      * THE LADDER DECIDES WHICH RUN, as it does for every token write: the one named, the one holding this
-     * client id, a live one on the same host and repository, or a new one. A run already there is
-     * resumed, and what it is doing and where are refreshed. `next`, `tried` and `notes` are its handoff
-     * and are never touched here, because the start of a run is exactly when they are read.
+     * client id, which is the host session's own (Claude Code's `session_id`), this token's newest open run
+     * when neither is sent, or a new one. A run already there is resumed, and what it is doing and where are
+     * refreshed. `next`, `tried` and `notes` are its handoff and are never touched here, because the start of
+     * a run is exactly when they are read.
+     *
+     * A RUN THE RECORD STILL NAMES FOR ITSELF IS NAMED AGAIN from where it now is, "Claude in BrainDog" where it
+     * read "Claude run, 1 Oct", and what the agent says it is doing names it outright (`learned` in the kernel).
      */
     async attach(
       args: { client_id?: string; doing?: string; source: (typeof SOURCES)[number]; branch?: string; head?: string },
@@ -6202,6 +6228,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          edit with it, moves `last_seen`, and places it again when it came back by its client id. */
       const patch: Patch = {};
       for (const key of POSITION) if (typeof hints[key] === 'string' && hints[key] !== run.fields[key]) patch[key] = hints[key];
+      /* `other` SAYS NOTHING ABOUT WHO THE RUN IS, so it never writes over a kind the run already has: a client that
+         names no agent re-attaching a Claude run left it a nameless one. */
+      if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
       if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
       if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
       const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}` });
@@ -6500,7 +6529,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
         return no(
           'REQUIRED_MISSING',
-          'Say what to do with it: decide with an option and a reason, defer with a date and why, or resolved_as wont-fix or incorrect with a reason.',
+          'Say what to do with it: decide with an option, and a reason if you have one, defer with a date and why, or resolved_as wont-fix or incorrect with a reason.',
           { at: 'decide' },
         );
 
@@ -8186,8 +8215,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * `cursor` is the one the page above answered with, and a page is short only where the walk stopped, never because
      * the caller may see less, so a `cursor` of `null` is the one sign there is nothing further down.
+     *
+     * CHANGES, AND NOT THE RECORD'S BOOKKEEPING, unless `everything` asks for it: the sweep's "Nothing heard from this
+     * run" and an agent's stamps of when it saw a tool were 154 of the newest 200 lines on the owner's record, so an
+     * agent asking what changed, and a person reading Activity, read the sweep. The lines are all still in the log.
+     *
+     * `cursor` IS TAKEN AS GIVEN, a `Cursor` or not, as the MCP surface hands it on, and `cursorOf` is what checks it.
      */
-    async recentHistory(args: { cursor?: Cursor; limit?: number } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
+    async recentHistory(args: { cursor?: unknown; limit?: number; everything?: boolean } | undefined, ctx: CallContext): Promise<Result<HistoryPage>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const cursor = args?.cursor === undefined ? null : await cursorOf(ctx, args.cursor, 'cursor');
@@ -8195,8 +8230,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const asked = args?.limit;
       if (asked !== undefined && !Number.isSafeInteger(asked))
         return no('VALUE_MALFORMED', 'A limit is a whole number of lines.', { at: 'limit' });
+      /* `true` OR ITS WORD, because a query string carries the word and a JSON body the boolean. */
+      const all: unknown = args?.everything;
+      if (all !== undefined && all !== true && all !== false && all !== 'true' && all !== 'false')
+        return no('VALUE_MALFORMED', "everything is true or false. True also returns the runs the sweep closed and agents' last-seen stamps.", { at: 'everything' });
       const limit = Math.min(Math.max(1, asked ?? 50), 200);
-      const { lines, next } = walk(ctx, cursor, 1, limit + 1);
+      const { lines, next } = walk(ctx, cursor, 1, limit + 1, false, all === true || all === 'true' ? undefined : (e) => kernel.bookkeeping(e));
       const events = lines.slice(0, limit);
       const last = events.at(-1);
       /* A FULL PAGE ENDS ON A LINE THE CALLER WAS SHOWN, and its cursor names that line. A page the walk cap cut short

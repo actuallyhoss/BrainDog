@@ -33,16 +33,16 @@ import { BODY_KINDS, type Shows } from './govern.ts';
 import type { Json } from './coerce.ts';
 import type { Part, Rate } from './fx.ts';
 import type { Entry } from './index.ts';
-import { predicateOf, windowMs, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { predicateOf, windowMs, wordsOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
-import { figureLists } from './money-figures.ts';
+import { figureLists, type PointsAt } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
-import { isStale, SESSION_PREFIX, STALE_MS } from './session.ts';
+import { isQuiet, QUIET_MS, SESSION_PREFIX } from './session.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost } from './weigh.ts';
-import { MEASURE_BUCKETS, measureBucket, measureSeries, measureWindow, readableZone, type MeasureSeries, type RawReading } from './measures.ts';
+import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
 import { localDays } from './measures.ts';
 
 export type PageBlock = {
@@ -229,8 +229,12 @@ export type PageDecl = {
 };
 
 export type BlockResult = PageBlock & {
-  /** The rows the block draws, cut to `limit`. */
-  rows: Entry[];
+  /**
+   * The rows the block draws, cut to `limit`, each with every field it holds and a long text cut short (`leanRows`). A
+   * row that says `clipped` holds less than the whole of one of its texts, and a reader that edits it reads it whole
+   * first. A `section` sends none: what it draws of them is `matched`.
+   */
+  rows: PageRow[];
   /**
    * A `bar` or a `split` over rows, and a `forecast`: the record's home currency and dated rates, when it has either. A
    * host that shows a walk in another currency converts each step with these, never with rates of its own.
@@ -322,14 +326,28 @@ export type BlockResult = PageBlock & {
   history?: { at: string; by: string; text: string }[];
   /** A `series` block's buckets and each line's value in them. */
   bars?: Bars;
-  /** A `stat` or `lines` over a register of readings: one series a measure, newest reading first (`measures.ts`). */
+  /**
+   * A `stat` or `lines` over a register of readings: one series a measure (`measures.ts`). A `stat`'s are every measure,
+   * the ones that moved most first; a `lines` block's are only the measures with two points or more in the period to join.
+   */
   measures?: MeasureSeries[];
+  /**
+   * A `lines` block over readings: each measure with one reading in the period, which draws no line, as that reading,
+   * newest first. Never on a `stat`, whose tiles are each a measure's newest reading already.
+   */
+  latest?: MeasureLatest[];
   /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
   past?: { at: string; value: number }[];
   /** Aligned with `rows`, when a column is `changed`: who changed each row last, as a kind of actor and by name, and when. */
   changes?: ({ by: FeedBy; who: string; at: string } | null)[];
   /** Aligned with `rows`, when the block set `working: true`: whether an agent is on each row right now. */
   working_now?: boolean[];
+  /**
+   * On `sessions.live`, aligned with `rows`: whether each run has gone quiet, open and not heard from in thirty minutes
+   * (`isQuiet` in `session.ts`). Open is not working, so a declared page draws a quiet run as gone quiet and not as at
+   * work, from the record's clock rather than one of its own.
+   */
+  quiet?: boolean[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
   lateness?: number | null;
   /** That figure's name as the record declares it, which the late knob is called by, so a use case's words reach it. */
@@ -485,7 +503,12 @@ export type PageDeps = {
   titleOf: (register: string) => string | null;
   /** The cash walk, when a block names it. */
   /** `only` walks one currency's movements, unconverted, for a walk drawn once per currency. */
-  runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, only?: Only) => Runway | null;
+  /**
+   * `into` walks in a currency other than the home one, every movement in another converted into it (`forecast.ts`): a
+   * book's own, when its opening figure is read in it (`scopeCurrency` in `metrics.ts`). A host that does not take it
+   * walks in the home currency, and the walk is then drawn once per currency rather than converted out of the book's.
+   */
+  runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, only?: Only, into?: string) => Runway | null;
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -588,7 +611,8 @@ export type StoredFile = { sha256: string; mime: string; bytes: number; name: st
 export type ListShape = {
   id: string;
   done?: readonly string[] | undefined;
-  fields: readonly { id: string; type: string; deadline?: boolean | undefined; retired?: boolean | undefined }[];
+  /** `to` is the list a ref points at, which names the parts of a figure grouped by it (`pointsBeside`). */
+  fields: readonly { id: string; type: string; to?: string | undefined; deadline?: boolean | undefined; retired?: boolean | undefined }[];
 };
 
 /**
@@ -1025,12 +1049,6 @@ function emptyBoxesShut(blocks: readonly BlockResult[]): BlockResult[] {
 /** The most values one filter offers, most held first. Past this a strip of chips is a list nobody reads. */
 const FILTER_VALUES = 50;
 
-/** A field id the way a person reads it: `next_step` is "Next step". */
-const wordsOf = (id: string): string => {
-  const said = id.replace(/_/gu, ' ').trim();
-  return said === '' ? id : said[0]!.toUpperCase() + said.slice(1);
-};
-
 /** The register a block reads rows of, or `null` for one over a figure, a computed source or nothing. */
 const listRead = (b: PageBlock): string | null =>
   b !== null && typeof b === 'object' && typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
@@ -1305,7 +1323,7 @@ const kitOf = (deps: PageDeps): KindKit => ({
  */
 export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   try {
-    return readBlockAsWritten(deps, renamed(block));
+    return leanRows(deps, readBlockAsWritten(deps, renamed(block)));
   } catch (e) {
     return {
       ...(block !== null && typeof block === 'object' ? shorn(block) : block),
@@ -1349,6 +1367,106 @@ function shorn<T extends { cells?: unknown }>(block: T): T {
   if (!cellsFault(block.cells)) return block;
   const { cells: _refused, ...kept } = block;
   return kept as T;
+}
+
+/* ── lean rows ───────────────────────────────────────────────────────────── */
+
+/**
+ * The characters of one text a page's row carries before it is cut, as many as `list` gives an agent (`packages/mcp`).
+ * Counted in code points, so a cut never splits a character in two.
+ */
+export const ROW_TEXT_MOST = 280;
+
+/** A row as a page answers it: the row, saying `clipped` where a text in it was cut (`leanRows`). */
+export type PageRow = Entry & { clipped?: true };
+
+/** The keys a block answers one to a row, which go with the rows a section does not send. */
+const ALIGNED = ['scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'done_now', 'next', 'short_now', 'changes', 'working_now', 'quiet', 'files'] as const;
+
+/** A text cut at `ROW_TEXT_MOST` code points, or `null` when it is no longer than that. */
+function cutText(text: string): string | null {
+  /* A STRING NO LONGER THAN THE CUT IN UTF-16 UNITS IS NO LONGER IN CODE POINTS, so most texts are not walked at all. */
+  if (text.length <= ROW_TEXT_MOST) return null;
+  let points = 0;
+  let at = 0;
+  for (const ch of text) {
+    if (points === ROW_TEXT_MOST) return text.slice(0, at);
+    points += 1;
+    at += ch.length;
+  }
+  return null;
+}
+
+/** A value with every text in it cut: a text, or a list of texts. Anything else as it is. */
+function cutValue(value: Json): Json {
+  if (typeof value === 'string') return cutText(value) ?? value;
+  if (Array.isArray(value) && value.some((v) => typeof v === 'string' && v.length > ROW_TEXT_MOST))
+    return value.map((v) => (typeof v === 'string' ? (cutText(v) ?? v) : v));
+  return value;
+}
+
+/**
+ * A block's answer as a page sends it: each row's long texts cut, and a section's rows not sent at all.
+ *
+ * THE PROJECTS PAGE ANSWERED 760 KB, AND 723 KB OF IT WAS NOTES NOTHING DREW. "In play", "Parked and finished" and "Not
+ * in play" each shipped every project's whole `note` document, up to 71 KB a row, under columns that never read it, and
+ * the page reads itself again on every write to the record (`loop/research-real-record.md`, Projects). So a text or a
+ * document past `ROW_TEXT_MOST` characters is cut there, as `list` cuts it for an agent, and the row says `clipped`; a
+ * row's own page and `get` still answer it whole, and a block that draws a whole document reads it as a `{{path}}`
+ * value (`valuesOf`), which this leaves alone.
+ *
+ * EVERY OTHER FIELD STAYS, WHICH IS A DECISION AND NOT AN OVERSIGHT. The light fields are what a host does with a row it
+ * did not draw: the docked panel opens a row on every field its list declares and saves only what changed against
+ * them, a tick's Undo puts back the state and the finished day the row held, and a row's tone is read from its state
+ * and its deadline (`apps/web/src/lib/page/row-host.svelte.ts`, `page-writes.ts`, `record/api.ts` `toneOf`). Cut to its
+ * columns, a project opened in the panel showed empty boxes over values it holds, and its Undo cleared a day it never
+ * showed. They are a few hundred bytes a row; the weight was the long texts.
+ *
+ * A SECTION IS DRAWN AS ITS COUNT (`matched`), so it sends no row and nothing aligned to one: "Parked and finished"
+ * read sixteen projects whole for one number. A list the record does not declare (`deadlines`, `actions`, `runs_on`)
+ * has every long string cut, since there is no type to tell its texts by.
+ *
+ * AN `inputs` BLOCK GOES WHOLE. It is a form over the one row it reads, and a box opened on the first 280 characters of
+ * a longer text saves those 280 over the rest when anything in it is typed.
+ */
+function leanRows(deps: PageDeps, read: BlockResult): BlockResult {
+  if (read.kind === 'inputs') return read;
+  if (read.kind === 'section') {
+    if (read.rows.length === 0 && !ALIGNED.some((key) => key in read)) return read;
+    const out: Record<string, unknown> = { ...read, rows: [] };
+    for (const key of ALIGNED) delete out[key];
+    return out as BlockResult;
+  }
+  if (read.rows.length === 0) return read;
+  const texts = new Map<string, ReadonlySet<string> | null>();
+  const textsOf = (register: string): ReadonlySet<string> | null => {
+    if (!texts.has(register)) {
+      const schema = deps.schemaOf(register);
+      texts.set(
+        register,
+        schema === null
+          ? null
+          : new Set(Object.entries(schema.fields).flatMap(([id, f]) => (f.type === 'text' || f.type === 'document' || (f.type === 'list' && f.of === 'text') ? [id] : []))),
+      );
+    }
+    return texts.get(register)!;
+  };
+  let cut = false;
+  const rows = read.rows.map((row): PageRow => {
+    const said = textsOf(row.register);
+    let fields: Entry['fields'] | null = null;
+    for (const [id, value] of Object.entries(row.fields)) {
+      if (said !== null && !said.has(id)) continue;
+      const kept = cutValue(value as Json);
+      if (kept === value) continue;
+      fields ??= { ...row.fields };
+      fields[id] = kept as Entry['fields'][string];
+    }
+    if (fields === null) return row;
+    cut = true;
+    return { ...row, fields, clipped: true };
+  });
+  return cut ? { ...read, rows } : read;
 }
 
 function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
@@ -1521,12 +1639,16 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     const reach = walkReach(block);
     const opensOn = (w: Runway): Runway =>
       typeof block.horizon === 'number' && w.horizon > block.horizon ? { ...w, horizon: block.horizon, reach: w.horizon } : w;
+    /* AN OPENING IN ONE CURRENCY THAT IS NOT THE HOME ONE IS A BOOK'S OWN: Quartz says USD, so its cash is read in dollars
+       (`scopeCurrency` in `metrics.ts`), and its walk is asked for in dollars too, a bill in pounds converted into them.
+       Walked in the home currency, a book's dollars were refused as "movements in EGP", or drawn beside an empty walk. */
+    const home = deps.ctx.fx?.().home ?? null;
+    const into = home !== null && !opened.parts && opened.unit !== null && opened.unit !== home ? opened.unit : undefined;
     /* MONEY IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS ONE WALK A CURRENCY, never a sentence instead of a walk:
        each walks that currency's part of the opening through that currency's movements, and a crossing day is a day in
        one currency. A converted opening is walked as one, and a movement it cannot convert still says which rate. */
     if (Array.isArray(block.from) && (opened.parts || opened.value !== null)) {
-      const home = deps.ctx.fx?.().home ?? null;
-      const whole = opened.parts ? null : deps.runway(opened.value!, block.from, reach);
+      const whole = opened.parts ? null : deps.runway(opened.value!, block.from, reach, undefined, into);
       /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT: the home walk draws everything it can convert,
          and each currency with no rate walks on its own beside it, from nothing, so no movement is left out. */
       const lacking =
@@ -1536,6 +1658,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
       const apart =
         opened.parts !== undefined ||
         lacking.length > 0 ||
+        /* A WALK ASKED FOR IN A BOOK'S CURRENCY THAT CAME BACK IN ANOTHER, from a host that walks in the home one only or
+           for want of a rate, is one walk a currency, each as it is, and never a walk converted out of the book's. */
+        (into !== undefined && whole !== null && whole.currency !== into) ||
         (whole !== null && !opened.converted && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
       if (apart) {
         const moving = whole ?? deps.runway(0, block.from, reach);
@@ -1551,11 +1676,17 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
                 return one ? [one] : [];
               }),
             ]
-          : currencies.flatMap((c) => {
-              const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
-              const one = deps.runway(from, block.from!, reach, c);
-              return one ? [one] : [];
-            });
+          : (() => {
+              const each = currencies.flatMap((c) => {
+                const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
+                const one = deps.runway(from, block.from!, reach, c);
+                return one ? [one] : [];
+              });
+              /* A CURRENCY NOTHING IS HELD IN AND NOTHING MOVES IN IS NO WALK: the home one a book's walk was converted
+                 into, beside the dollars the book keeps. Every walk is kept when every one is empty, as it was. */
+              const held = each.filter((w) => w.from !== 0 || w.steps.length > 0);
+              return held.length > 0 ? held : each;
+            })();
         if (walks.length > 0) {
           const recorded = recordedOf(deps, block);
           if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
@@ -1596,7 +1727,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
        away, not an edit away. `SOURCE_UNKNOWN` at the bottom of this function is the other answer,
        for a word no document publishes at all. Both said `UNIMPLEMENTED` once and a person could not
        tell "wait" from "you made this up". */
-    const walk = deps.runway(opened.value, block.from, reach);
+    const walk = deps.runway(opened.value, block.from, reach, undefined, into);
     if (!walk)
       return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
     /* A BALANCE IN ONE CURRENCY AND MOVEMENTS IN ANOTHER ARE NOT ONE WALK. */
@@ -1689,14 +1820,18 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     const window = measureWindow(deps.ctx.nowMs, block.back, measureBucket(block.bucket), tz);
     const read = deps.readings({ register, where: said.predicate, when: when!, value: val!, ...(name ? { name } : {}), ...(unit ? { unit } : {}), since: window.since });
     if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
-    const measures = measureSeries([...read.value.latest, ...read.value.readings], {
-      nowMs: deps.ctx.nowMs,
-      back: block.back,
-      bucket: block.bucket,
-      tz,
-      fallback: block.heading ?? '',
-    });
-    return { ...base, measures, matched: read.value.readings.length };
+    /* `limit:` IS HOW MANY MEASURES, at most the twelve a block is ever handed, so Today can draw the four that moved. */
+    const most = typeof block.limit === 'number' && Number.isFinite(block.limit) ? Math.min(MEASURES_MOST, Math.max(0, Math.floor(block.limit))) : MEASURES_MOST;
+    const opts = { nowMs: deps.ctx.nowMs, back: block.back, bucket: block.bucket, tz, fallback: block.heading ?? '', most };
+    const all = [...read.value.latest, ...read.value.readings];
+    /* A TILE OF ONE READING IS STILL A FIGURE, AND A LINE OF ONE IS A DOT. So a `stat` draws every measure, the ones that
+       moved first, and a `lines` block draws a line only where there are two points to join, ranked by how much each
+       moved, and hands the measures with one reading back beside them as `latest` (`measures.ts`). */
+    if (block.kind === 'lines') {
+      const { lines, latest } = measureLines(all, opts);
+      return { ...base, measures: lines, latest, matched: read.value.readings.length };
+    }
+    return { ...base, measures: measureSeries(all, opts), matched: read.value.readings.length };
   }
 
   /* WHERE A ROW APPLIES IS THE REGISTER'S SCOPE FIELD, and nothing else can answer it. Both keys that
@@ -1730,7 +1865,15 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A LIMIT OF ZERO DRAWS NOTHING, which is what it says. `Math.max(1, …)` turned it into one row —
      a block declaring it wanted no rows and getting one is a block nobody can write. */
-  const limit = SUMS.has(block.kind) ? READ_WHOLE : block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  /* AND A SECTION ASKS FOR ONE: it draws its count, `matched`, which is the whole match however few rows are read, and
+     sends none of them (`leanRows`). It read fifty projects whole for the one number "Parked and finished" says. */
+  const limit = SUMS.has(block.kind)
+    ? READ_WHOLE
+    : block.kind === 'section' && block.limit !== 0
+      ? 1
+      : block.limit === undefined
+        ? 50
+        : Math.max(0, Math.floor(block.limit));
   if (limit === 0) return { ...base, matched: 0 };
 
   /* A RING OVER A REGISTER IS PROGRESS, one row it counts rather than the rows it matched. IT IS ASKED HERE, AFTER
@@ -2509,7 +2652,7 @@ function changesOf(deps: PageDeps, register: string, rows: readonly Entry[]): ({
  * the reason this is not read off `changes`. Only an agent has a run to be at, so a row last touched
  * by a person or a rule answers `false` before the runs are read at all.
  *
- * THEN TWO CLOCKS AND NOT ONE. The touch itself has to sit inside `STALE_MS`, because an agent that
+ * THEN TWO CLOCKS AND NOT ONE. The touch itself has to sit inside `QUIET_MS`, because an agent that
  * is still running does not mean it is still on the row it wrote three hours ago; and the run the
  * write was signed by has to have been heard from inside the same window, which is the same fact
  * `sessions.live` shows for a run, asked here of a row instead.
@@ -2524,9 +2667,9 @@ function workingOf(deps: PageDeps, register: string, rows: readonly Entry[]): bo
   const live = new Set(
     (deps.sessionsLive?.() ?? [])
       /* ACTIVE AND HEARD FROM, which is narrower than `sessions.live`'s own "not finished": an idle
-         run is a run that has stopped, and a run nobody has heard from in 45 minutes is one whose
-         machine went to sleep mid-task. Neither is somebody working on a row now. */
-      .filter((run) => run.fields.state === 'active' && !isStale(run, now) && run.seq !== null)
+         run is a run that has stopped, and a run nobody has heard from in 30 minutes has gone quiet:
+         its machine went to sleep mid-task. Neither is somebody working on a row now. */
+      .filter((run) => run.fields.state === 'active' && !isQuiet(run, now) && run.seq !== null)
       .map((run) => `${SESSION_PREFIX}${String(run.seq)}`),
   );
   if (live.size === 0) return rows.map(() => false);
@@ -2534,7 +2677,7 @@ function workingOf(deps: PageDeps, register: string, rows: readonly Entry[]): bo
     const events = r.seq === null ? undefined : deps.history?.(register, `${register}#${r.seq}`);
     const last = events?.ok ? events.value.at(-1) : undefined;
     if (!last || byOf(last.actor) !== 'agent') return false;
-    return now - Date.parse(last.ts) < STALE_MS && live.has(last.actor);
+    return now - Date.parse(last.ts) < QUIET_MS && live.has(last.actor);
   });
 }
 
@@ -3161,7 +3304,9 @@ function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   const kept = deps.sessionsLive().filter((r) => evaluate(said.predicate, r.fields, schema));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   const rows = kept.slice(0, limit);
-  return { ...base, rows, matched: kept.length, ...projectsOf(deps, rows) };
+  /* AND WHICH OF THEM HAVE GONE QUIET, read here so a page and the rail agree on the one clock: open is not working, and
+     four runs reading "Working now" that nobody had heard from in hours was the board the owner saw. */
+  return { ...base, rows, matched: kept.length, ...projectsOf(deps, rows), quiet: rows.map((r) => isQuiet(r, deps.ctx.nowMs)) };
 }
 
 /** A spoken id as the ladder writes a run's project: `things#1`. */
@@ -3631,9 +3776,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
   /* A FIGURE NAMES EVERY LIST IT READS, not its source alone (`money-figures.ts` `figureLists`): a rolled cash figure
      reads its moves and its checks, and a walk its legs and the figure it opens from, so a page with one on it is held
      from a member who may not read those lists as it is on Home and in the sell knob (`listsRead`). */
+  const pointsAt = pointsBeside(beside);
   const addFigure = (id: string): void => {
     const d = metric?.(id) ?? builtInFigure(id);
-    if (d) for (const list of listsRead(d, (other) => metric?.(other) ?? null)) named.add(list);
+    if (d) for (const list of listsRead(d, (other) => metric?.(other) ?? null, pointsAt)) named.add(list);
   };
   if (decl.for?.register) named.add(decl.for.register);
   for (const block of decl.blocks ?? []) {
@@ -4097,9 +4243,21 @@ function horizonsOk(said: unknown): boolean {
  * reads each list its legs walk (`money-figures.ts` `figureLists`), so a figure pinned to Home or offered to the sell
  * knob named by its source would hand a member invited to Accounts the sum of Transactions she cannot open.
  */
-const listsRead = (decl: MetricDecl, figure: (id: string) => MetricDecl | null): string[] =>
-  /* The count of open questions names the whole record there (`WHOLE_RECORD`), as the queue over the same source does. */
-  typeof decl.source === 'string' ? figureLists(decl, figure) : [];
+const listsRead = (decl: MetricDecl, figure: (id: string) => MetricDecl | null, pointsAt?: PointsAt): string[] =>
+  /* The count of open questions names the whole record there (`WHOLE_RECORD`), as the queue over the same source does.
+     AND THE LIST A GROUPED FIGURE'S PARTS ARE NAMED FROM (`pointsAt`), so a block drawing Cash now by book, whose parts
+     carry the books' names, is held from a reader who may not open Books as it is from one who may not open Accounts. */
+  typeof decl.source === 'string' ? figureLists(decl, figure, pointsAt) : [];
+
+/** `PointsAt` from the record's lists as `registersOf` is handed them, or `undefined` without them. */
+function pointsBeside(beside: ListsBeside | undefined): PointsAt | undefined {
+  const lists = beside?.lists?.();
+  if (!lists) return undefined;
+  return (register, field) => {
+    const f = lists.find((l) => l.id === register)?.fields.find((x) => x.id === field);
+    return f?.type === 'ref' && typeof f.to === 'string' && f.to !== '' ? f.to : null;
+  };
+}
 
 /**
  * Whether the reader may read every list behind a figure. A host that has not said who is reading (`EvalContext.reads`
@@ -4107,7 +4265,11 @@ const listsRead = (decl: MetricDecl, figure: (id: string) => MetricDecl | null):
  */
 const mayRead = (deps: PageDeps, decl: MetricDecl): boolean => {
   const reads = deps.ctx.reads;
-  return reads === undefined || listsRead(decl, deps.metric).every((list) => reads(list));
+  const pointsAt: PointsAt = (register, field) => {
+    const spec = deps.schemaOf(register)?.fields[field];
+    return spec?.type === 'ref' && typeof spec.to === 'string' && spec.to !== '' ? spec.to : null;
+  };
+  return reads === undefined || listsRead(decl, deps.metric, pointsAt).every((list) => reads(list));
 };
 
 /** How many figures a sell knob with no `sell:` reads at most, so a record with many sellable figures reads a few. */
@@ -4396,5 +4558,5 @@ function acrossLists(block: PageBlock, beside: ListsBeside | undefined): string[
   if (!metrics) return [WHOLE_RECORD];
   const chosen = offers === 'home' ? pinnedOf(metrics) : metrics.filter((d) => d.sellable === true);
   const figure = (id: string): MetricDecl | null => metrics.find((m) => m.metric === id) ?? null;
-  return chosen.flatMap((d) => listsRead(d, figure));
+  return chosen.flatMap((d) => listsRead(d, figure, pointsBeside(beside)));
 }

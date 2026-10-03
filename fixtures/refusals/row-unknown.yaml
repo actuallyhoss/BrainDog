@@ -1,0 +1,10 @@
+code:   ROW_UNKNOWN
+via:    rpc
+raises: packages/mcp/src/index.ts
+at:     spoken
+fix:    There is no tasks#999 that you can read: it may have been deleted, or be in a list you cannot open.
+
+# ONE SENTENCE HERE AND TWO IN THE ANSWER. `missing` in `packages/mcp/src/index.ts` says the row is not there and
+# then why, as two sentences, and a fixture's `fix` is one (`refusal-fixtures`), so the same words are joined.
+# Deleted, never made and in a list the caller cannot open are one answer on purpose, so a hidden row reads like a
+# missing one (10 §3). `history` refuses a row the same way, `governance` by id at `id`, and `try` names the list.

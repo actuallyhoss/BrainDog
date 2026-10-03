@@ -194,16 +194,19 @@ test('SOME ROWS OF A ROWSET: the rows picked are written, the rest declined by t
   sql.close();
 });
 
-test('A DECISION CARRIES ITS REASON, and a gate without one is a gate nobody can revisit', async () => {
+test('A DECISION ALWAYS CARRIES A SENTENCE, and one pressed without a reason says that none was given', async () => {
   const { k, sql } = await record();
   const made = value<{ id: string }>(k.propose(options, 'p_1'));
-  assert.equal(refusal(k.decide(made.id, { decide: { option: 'accept', reason: '  ' } }, 'p_2')).at, 'reason');
   assert.equal(refusal(k.decide(made.id, { decide: { option: '', reason: 'because' } }, 'p_2')).at, 'option');
 
   // And the answer has to be one of the options that were offered.
   assert.equal(refusal(k.decide(made.id, { decide: { option: 'maybe', reason: 'because' } }, 'p_2')).code, 'ENUM_VALUE_UNKNOWN');
   assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open');
   assert.equal(sql.all('SELECT 1 FROM decision').length, 0);
+
+  // A blank reason is one press: the decision is written, and its sentence says nobody gave one.
+  const out = value<{ decision: string }>(k.decide(made.id, { decide: { option: 'accept', reason: '  ' } }, 'p_2'));
+  assert.equal(sql.one<{ reason: string }>('SELECT reason FROM decision WHERE id = ?', out.decision)?.reason, 'Answered in one press, with no reason given.');
   sql.close();
 });
 
@@ -221,10 +224,11 @@ test('A LIGHT QUESTION A RULE OR SLASH ASKED IS ANSWERED IN ONE PRESS, for the o
   sql.close();
 });
 
-test('THE SAME LIGHT QUESTION, OPENED BY A PERSON, STILL OWES ITS REASON', async () => {
+test('THE SAME LIGHT QUESTION, OPENED BY A PERSON, IS ONE PRESS TOO, and is not decided for the option’s own reason', async () => {
   const { k, sql } = await record();
   const made = value<{ id: string }>(k.propose(options, 'p_1'));
-  assert.equal(refusal(k.decide(made.id, { decide: { option: 'accept', reason: '' } }, 'p_2')).at, 'reason');
+  const out = value<{ decision: string }>(k.decide(made.id, { decide: { option: 'accept', reason: '' } }, 'p_2'));
+  assert.equal(sql.one<{ reason: string }>('SELECT reason FROM decision WHERE id = ?', out.decision)?.reason, 'Answered in one press, with no reason given.');
   sql.close();
 });
 

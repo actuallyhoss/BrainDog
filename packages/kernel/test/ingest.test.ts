@@ -725,7 +725,10 @@ test('A REGISTER REFUSING WHAT A PATTERN READ DOWNGRADES IT, and never discards 
     register: 'transactions',
     rows: [{ amount: { amount: 131_624, currency: 'EGP' } }],
     ingest: 'hsbc-sms',
+    context: 'The part it would not take is its merchant.',
   });
+  /* AND IT IS ASKED IN A PERSON'S WORDS: the list by its name, the field by its label, and neither id. */
+  assert.equal(k.question(sg.id), 'Transactions would not take this email as read. Fix it and add it?');
 
   // And the observation the write left behind survives, or the record cannot tell a bad
   // declaration from a bad afternoon.

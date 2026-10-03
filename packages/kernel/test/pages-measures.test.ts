@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { measureSeries, measureWindow, openRecord, type Declaration, type MeasureSeries } from '../src/index.ts';
+import { measureLines, type MeasureLatest } from '../src/measures.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 17, 12);
@@ -44,7 +45,7 @@ const value = <T>(r: unknown): T => {
 };
 
 const COLUMNS = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }];
-type Drawn = { rows: unknown[]; readings?: unknown; matched: number; measures?: MeasureSeries[]; refusals: { code: string }[] };
+type Drawn = { rows: unknown[]; readings?: unknown; matched: number; measures?: MeasureSeries[]; latest?: MeasureLatest[]; refusals: { code: string }[] };
 
 test('a stat over a register answers one series a measure, and one with cells still answers its figures', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
@@ -133,6 +134,72 @@ test('TWENTY THOUSAND READINGS, a year of polls, are answered as a few hundred n
     assert.ok(numbers <= 4 * 2 * 53, `${numbers} numbers`);
     assert.ok(JSON.stringify(drawn).length < 30_000, 'the answer is small');
     assert.ok(ms < 1_500, `${kind} over ${back} days took ${Math.round(ms)}ms`);
-    assert.equal(drawn.measures![0]!.name, 'Installs', 'four measures read at one moment, by name');
+    /* FOUR MEASURES READ AT ONE MOMENT ARE RANKED BY HOW MUCH EACH MOVED, and Sign-ups fell the whole way to nought. */
+    assert.equal(drawn.measures![0]!.name, 'Sign-ups', 'the measure that moved most leads');
+    assert.deepEqual(drawn.latest ?? [], []);
   }
+});
+
+test('A LINE OF ONE POINT IS A DOT: a lines block draws the measures with two points, ranked by how much each moved, and says the rest once', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  value(await k.install([POINTS]));
+  /* Users doubled, Revenue moved by a tenth, Steady did not move; Balance and Churn were read once in the period, and
+     Old once, long before it. */
+  for (const [name, values] of [['Revenue', [100, 110]], ['Users', [10, 20]], ['Steady', [5, 5]]] as const)
+    values.forEach((v, i) => value(k.create('points', { name, value: v, at: new Date(NOW - (3 - i) * DAY).toISOString() }, OWNER)));
+  value(k.create('points', { name: 'Churn', value: 3, unit: '%', at: '2026-09-15T09:00:00.000Z' }, OWNER));
+  value(k.create('points', { name: 'Balance', value: 70, at: '2026-09-17T09:00:00.000Z' }, OWNER));
+  value(k.create('points', { name: 'Old', value: 1, at: '2026-03-01T09:00:00.000Z' }, OWNER));
+
+  const lines = k.block({ kind: 'lines', source: 'register.points', columns: COLUMNS, back: 30 }) as Drawn;
+  assert.deepEqual(lines.refusals, []);
+  assert.deepEqual(
+    lines.measures!.map((m) => m.name),
+    ['Users', 'Revenue', 'Steady'],
+    'a line for each measure with two points, the one that moved most first',
+  );
+  assert.deepEqual(
+    lines.latest,
+    [
+      { measure: 'Balance', value: 70, unit: '', at: '2026-09-17T09:00:00.000Z', day: '2026-09-17' },
+      { measure: 'Churn', value: 3, unit: '%', at: '2026-09-15T09:00:00.000Z', day: '2026-09-15' },
+    ],
+    'one reading in the period is said once, newest first, and a measure quiet all period is neither',
+  );
+  assert.equal(lines.matched, 8);
+
+  /* A TILE OF ONE READING IS STILL A FIGURE, so a stat draws every measure and has no `latest` beside them. */
+  const tiles = k.block({ kind: 'stat', source: 'register.points', columns: COLUMNS, back: 30 }) as Drawn;
+  assert.equal(tiles.latest, undefined);
+  assert.deepEqual(
+    tiles.measures!.map((m) => m.name),
+    ['Users', 'Revenue', 'Steady', 'Balance', 'Churn', 'Old'],
+  );
+
+  /* `limit:` IS HOW MANY MEASURES of each, and never more than the twelve a block is handed. */
+  const two = k.block({ kind: 'lines', source: 'register.points', columns: COLUMNS, back: 30, limit: 2 }) as Drawn;
+  assert.deepEqual(two.measures!.map((m) => m.name), ['Users', 'Revenue']);
+  assert.deepEqual(two.latest!.map((m) => m.measure), ['Balance', 'Churn']);
+  const none = k.block({ kind: 'stat', source: 'register.points', columns: COLUMNS, back: 30, limit: 0 }) as Drawn;
+  assert.deepEqual(none.measures, []);
+});
+
+test('A MEASURE MOVES BY A SHARE, so a doubling outranks EGP 4,000 more on EGP 400,000, and nought to nought does not move', () => {
+  const at = (d: number) => new Date(NOW - d * DAY).toISOString();
+  const readings = [
+    { at: at(2), value: 400_000, name: 'Cash', unit: 'EGP' },
+    { at: at(1), value: 404_000, name: 'Cash', unit: 'EGP' },
+    { at: at(2), value: 40, name: 'Sign-ups' },
+    { at: at(1), value: 80, name: 'Sign-ups' },
+    { at: at(2), value: 0, name: 'Refunds' },
+    { at: at(1), value: 0, name: 'Refunds' },
+    { at: at(2), value: 0, name: 'Trials' },
+    { at: at(1), value: 3, name: 'Trials' },
+    { at: at(1), value: 9, name: 'Once' },
+  ];
+  const { lines, latest } = measureLines(readings, { nowMs: NOW, back: 7, fallback: '' });
+  assert.deepEqual(lines.map((m) => m.name), ['Trials', 'Sign-ups', 'Cash', 'Refunds']);
+  assert.deepEqual(latest.map((m) => [m.measure, m.value]), [['Once', 9]]);
+  /* A STAT KEEPS THE ONE READING AS A TILE, after the measures that moved. */
+  assert.deepEqual(measureSeries(readings, { nowMs: NOW, back: 7, fallback: '' }).map((m) => m.name), ['Trials', 'Sign-ups', 'Cash', 'Refunds', 'Once']);
 });

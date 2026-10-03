@@ -125,15 +125,88 @@ function readingOf(v: unknown, unit: unknown): { value: number; unit: string } |
   return null;
 }
 
+/** A measure with fewer than two points in the period, which draws no line: its newest reading, said once. */
+export type MeasureLatest = {
+  measure: string;
+  /** The reading as a number: money in major units of `unit`, as a series holds it. */
+  value: number;
+  /** A currency code, another unit, or ''. */
+  unit: string;
+  /** The reading's instant, and the record's local day it fell on. */
+  at: string;
+  day: string;
+};
+
+/** What a `lines` block over readings is handed: the lines worth drawing, and the measures that have only a reading. */
+export type MeasureLines = { lines: MeasureSeries[]; latest: MeasureLatest[] };
+
+/** The options both readers take. `fallback` names the measure of a block with no name column, by its heading. */
+type MeasureOpts = { nowMs: number; back?: unknown; bucket?: unknown; tz?: string; fallback: string; most?: number };
+
+/** How many points a measure has in the period, which is what a line needs two of. */
+const pointsIn = (m: MeasureSeries): number => m.now.reduce<number>((n, v) => n + (v === null ? 0 : 1), 0);
+
 /**
- * Every measure the readings hold, each over its period and the period before, newest reading first.
+ * How much a measure moved over the period, from its first point to its last, as a share of the larger of the two.
  *
- * `fallback` names the measure of a block with no name column, which is one measure named by its heading.
+ * A SHARE AND NOT AN AMOUNT, because the measures beside it are in other units: 40 sign-ups more and EGP 4,000 more are
+ * not comparable, a doubling and a tenth more are. Bounded by the larger end, so a measure that starts at nought moves
+ * by one whole share rather than by infinity, and one that stays at nought does not move.
  */
-export function measureSeries(
-  readings: Iterable<RawReading>,
-  opts: { nowMs: number; back?: unknown; bucket?: unknown; tz?: string; fallback: string; most?: number },
-): MeasureSeries[] {
+function movedBy(m: MeasureSeries): number {
+  const points = m.now.filter((v): v is number => v !== null);
+  if (points.length < 2) return 0;
+  const first = points[0]!;
+  const last = points.at(-1)!;
+  const larger = Math.max(Math.abs(first), Math.abs(last));
+  return larger === 0 ? 0 : Math.abs(last - first) / larger;
+}
+
+/** Newest reading first, then by name, which is the order a measure that did not move is kept in. */
+const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms: number }): number => b.ms - a.ms || a.name.localeCompare(b.name);
+
+/**
+ * Every measure the readings hold, each over its period and the period before: those that moved most first, then the
+ * rest newest reading first. What a `stat` over readings draws as tiles, where a single reading is still a figure.
+ *
+ * THE MEASURES THAT MOVED LEAD, because an import that wrote every measure at one instant made "newest first" mean
+ * nothing at all, and the tiles were the first of them alphabetically: "Accounts, Sketchpad", "Active7d", "Ad spend30d"
+ * (`loop/research-real-record.md`, Today 3).
+ */
+export function measureSeries(readings: Iterable<RawReading>, opts: MeasureOpts): MeasureSeries[] {
+  const all = seriesOf(readings, opts);
+  const moved = all.filter((m) => pointsIn(m) >= 2).sort((a, b) => movedBy(b) - movedBy(a) || newestFirst(a, b));
+  const still = all.filter((m) => pointsIn(m) < 2).sort(newestFirst);
+  return [...moved, ...still].slice(0, opts.most ?? MEASURES_MOST).map(({ ms: _ms, ...m }) => m);
+}
+
+/**
+ * What a `lines` block over readings draws: a line for each measure with at least two points in the period, ranked by
+ * how much it moved, and each measure with one point in the period as its latest reading beside them.
+ *
+ * A LINE OF ONE POINT IS A DOT UNDER A CHART'S HEADING. Of 267 measures on a real record, 227 had exactly one reading in
+ * the period, the import's snapshot of one day, and the block drew a wall of twelve one-dot charts chosen by name. So a
+ * measure with one point is said as a number (`latest`), and a measure with none in the period is quiet and drawn as
+ * neither. Both are cut to `most`, the lines by how much they moved, the latest readings newest first.
+ */
+export function measureLines(readings: Iterable<RawReading>, opts: MeasureOpts): MeasureLines {
+  const all = seriesOf(readings, opts);
+  const most = opts.most ?? MEASURES_MOST;
+  const lines = all
+    .filter((m) => pointsIn(m) >= 2)
+    .sort((a, b) => movedBy(b) - movedBy(a) || newestFirst(a, b))
+    .slice(0, most)
+    .map(({ ms: _ms, ...m }) => m);
+  const latest = all
+    .filter((m) => pointsIn(m) === 1 && m.latest !== null)
+    .sort(newestFirst)
+    .slice(0, most)
+    .map((m): MeasureLatest => ({ measure: m.name, value: m.latest!.value, unit: m.unit, at: m.latest!.at, day: m.latest!.day }));
+  return { lines, latest };
+}
+
+/** Every measure the readings hold, each over its period and the period before, in no order, with its newest instant. */
+function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSeries & { ms: number })[] {
   const bucket = measureBucket(opts.bucket);
   const tz = readableZone(opts.tz);
   const { keys, before } = measureWindow(opts.nowMs, opts.back, bucket, tz);
@@ -161,18 +234,14 @@ export function measureSeries(
     if (!held || ms >= held.ms) group.last.set(key, { ms, value: reading.value });
   }
 
-  return [...groups.entries()]
-    .map(([name, g]): MeasureSeries & { ms: number } => ({
-      name,
-      unit: g.unit,
-      bucket,
-      keys,
-      now: keys.map((k) => g.last.get(k)?.value ?? null),
-      was: before.map((k) => g.last.get(k)?.value ?? null),
-      latest: g.latest ? { value: g.latest.value, at: new Date(g.latest.ms).toISOString(), day: g.latest.day } : null,
-      ms: g.latest?.ms ?? 0,
-    }))
-    .sort((a, b) => b.ms - a.ms || a.name.localeCompare(b.name))
-    .slice(0, opts.most ?? MEASURES_MOST)
-    .map(({ ms: _ms, ...m }) => m);
+  return [...groups.entries()].map(([name, g]): MeasureSeries & { ms: number } => ({
+    name,
+    unit: g.unit,
+    bucket,
+    keys,
+    now: keys.map((k) => g.last.get(k)?.value ?? null),
+    was: before.map((k) => g.last.get(k)?.value ?? null),
+    latest: g.latest ? { value: g.latest.value, at: new Date(g.latest.ms).toISOString(), day: g.latest.day } : null,
+    ms: g.latest?.ms ?? 0,
+  }));
 }

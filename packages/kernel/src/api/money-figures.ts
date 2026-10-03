@@ -67,9 +67,17 @@ export function extension(parts: KernelParts) {
     /**
      * Every list `decl` reads, the figure a walk opens from included. A caller asks `readable` of each and answers
      * `METRIC_UNKNOWN` when any one is out of reach, as it did for the source alone.
+     *
+     * AND THE LIST A REF `group_by` POINTS AT, because each part is labelled with the title of the row its key is. Asked
+     * of the figure's own lists alone, a member invited to Accounts was answered a figure grouped by book with a part
+     * labelled by a book's title, a row of Books she cannot open. `pages.ts` asks the same through the page's schema.
      */
     figureLists(decl: MetricDecl): string[] {
-      return figureLists(decl, figure);
+      const pointsAt = (register: string, field: string): string | null => {
+        const f = parts.register(register)?.fields.find((x) => x.id === field);
+        return f?.type === 'ref' && typeof f.to === 'string' && f.to !== '' ? f.to : null;
+      };
+      return figureLists(decl, figure, pointsAt);
     },
   };
 }
