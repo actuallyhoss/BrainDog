@@ -170,17 +170,24 @@ export const BINDINGS: Binding[] = [
   // function of the object in focus, not of the page you happen to be on.
   { id: 'block-source-code', scope: 'page', key: '⇧E', label: 'Open the source', bare: false },
 
-  { id: 'gate-highlight', scope: 'gate', key: '1–9', label: 'Highlight an option. It does not choose it', bare: true },
-  { id: 'gate-open', scope: 'gate', key: '↵', label: 'Open the commit step, focus the empty reason', bare: false },
+  /* ONE PRESS ANSWERS (DIRECTION §37): Enter gives the suggested answer or Accept, Backspace declines and `e` changes
+     what accepting takes, and no reason is asked for first. Enter never sends money or a change that is hard to undo:
+     on the gate it goes to Accept, whose words name the amount, and on the queue it opens the question whole. */
+  { id: 'gate-highlight', scope: 'gate', key: '1–9', label: 'Go to that answer. Enter gives it', bare: true },
+  { id: 'gate-open', scope: 'gate', key: '↵', label: 'Accept, or give the suggested answer. Where money moves, go to Accept', bare: false },
+  { id: 'gate-decline', scope: 'gate', key: '⌫', label: 'Decline', bare: false },
+  { id: 'gate-edit', scope: 'gate', key: 'e', label: 'Choose what accepting adds', bare: true },
   { id: 'gate-commit', scope: 'gate', key: '⌘↵', label: 'Commit, from inside the reason', bare: false },
   { id: 'gate-defer', scope: 'gate', key: 'd', label: 'Defer: a reason and a wake date', bare: true },
-  { id: 'gate-leave', scope: 'gate', key: 'Esc', label: 'Leave. The question stays open', bare: false },
+  { id: 'gate-leave', scope: 'gate', key: 'Esc', label: 'Put the reason or the defer away', bare: false },
   { id: 'gate-next', scope: 'gate', key: 'j  k', label: 'The next or the previous open question', bare: true },
 
   /* THE TWO QUEUES, which bound nothing. A number answers the question under the cursor, as a press on
      its button does; the gate above is where one is examined, and the queue is where one already thought about is cleared. */
   { id: 'decide-move', scope: 'decide', key: 'j  k', label: 'The next or the previous question', bare: true },
-  { id: 'decide-open', scope: 'decide', key: '↵', label: 'Open it, with every option and its reasoning', bare: false },
+  { id: 'decide-open', scope: 'decide', key: '↵', label: 'Accept it, or give the suggested answer. One that costs something opens', bare: false },
+  { id: 'decide-decline', scope: 'decide', key: '⌫', label: 'Decline it', bare: false },
+  { id: 'decide-edit', scope: 'decide', key: 'e', label: 'Open it to change what accepting takes', bare: true },
   { id: 'decide-answer', scope: 'decide', key: '1–9', label: 'Answer with that option', bare: true },
   { id: 'decide-approve', scope: 'decide', key: 'a', label: 'Answer with the suggested option, or accept the change', bare: true },
   { id: 'decide-defer', scope: 'decide', key: 'd', label: 'Defer it: a reason and a wake date', bare: true },

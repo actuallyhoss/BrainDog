@@ -112,7 +112,7 @@
 
   .lapse-glyph {
     flex: none;
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .lapse-actions {

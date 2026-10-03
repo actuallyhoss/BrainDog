@@ -305,7 +305,7 @@
           <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back,
                saved through the same commit as any other cell once the row is left. -->
           <!-- The box only keeps a click inside the cell from opening the row; the picker in it is the control. -->
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <span class="cell-box" onclick={(e) => e.stopPropagation()} onfocusout={leftTheRow}>
             <FileField bind:value={editValue} label={labelOf(f)} />
           </span>

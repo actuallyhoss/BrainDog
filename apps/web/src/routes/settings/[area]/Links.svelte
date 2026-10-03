@@ -118,7 +118,7 @@
 
   .links-refused {
     margin: 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
   }
 

@@ -625,7 +625,7 @@
 
   .trust[data-intent='bad'],
   .refused {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

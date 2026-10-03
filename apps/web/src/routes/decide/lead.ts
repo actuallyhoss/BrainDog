@@ -13,6 +13,7 @@
 
 import { citedWords } from '../../lib/cite.ts';
 import type { Question } from '../../lib/record/schema.ts';
+import { twoWords } from './press.ts';
 
 /** The most questions the queue aims to hold at once; the classic screen's figure says it as "Limit 3". The line never does. */
 export const AIM = 3;
@@ -144,12 +145,16 @@ export function countSentence(n: number, undo: number | boolean, option: string 
 /**
  * THE GATE'S SENTENCE: "Three options; “Per seat” is suggested; opened 2 weeks ago." What a reader needs before the
  * cards, in one line: how many ways there are to answer, which one is suggested, and how long it has been open.
+ *
+ * A CHANGE ANSWERED WITH ACCEPT OR DECLINE SAYS ONLY HOW LONG IT HAS BEEN OPEN. "Two options" over those two buttons
+ * counted the buttons, and the change itself is what the page under it is about.
  */
 export function gateSentence(q: Pick<Question, 'options' | 'opened'>, now: number): string {
   const n = q.options.length;
   const option = suggestedOf(q);
   const days = ageDays(q.opened, now);
   const opened = days < 1 ? 'opened today' : `opened ${waitedWords(days)} ago`;
+  if (twoWords(q)) return `${capital(opened)}.`;
   return `${capital(numberWord(n))} ${n === 1 ? 'option' : 'options'}${option ? `; “${option}” is suggested` : ''}; ${opened}.`;
 }
 

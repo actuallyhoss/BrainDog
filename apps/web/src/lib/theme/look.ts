@@ -26,6 +26,7 @@ import {
   HOUSE_SEED,
   inGamut,
   INKS,
+  INTENT_TEXT,
   INTENTS,
   lchToRgb,
   refusals,
@@ -49,6 +50,9 @@ export type { Role, Scheme };
 
 export const SCHEMES: readonly Scheme[] = ['light', 'dark'];
 
+/** Each meaning as it is read: for red that is its words, `danger-text`, while `danger` is the dot and the badge. */
+const WORDS = INTENTS.map((k) => INTENT_TEXT[k]);
+
 const FILLS = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill'] as const satisfies readonly Role[];
 
 /** Every colour the editor lists, in the order a person meets them: the grounds, the text, the lines, the meanings, the accent. */
@@ -58,6 +62,7 @@ export const ROLES: readonly Role[] = [
   'line',
   'edge',
   ...INTENTS,
+  'danger-text',
   ...FILLS,
   'accent',
   'accent-edge',
@@ -247,10 +252,11 @@ function asks(profile: Profile): { role: Role; floor: number; grounds: readonly 
   return [
     ...INKS.map((ink, i) => ({ role: ink as Role, floor: ink === 'faint' ? 3 : (profile.ink[i] ?? 4.5), grounds: surfaces, text: true })),
     { role: 'accent-text', floor: profile.intentText, grounds: surfaces, text: true },
-    ...INTENTS.map((intent) => ({ role: intent as Role, floor: profile.intentText, grounds: surfaces, text: true })),
+    ...INTENTS.map((intent) => ({ role: INTENT_TEXT[intent] as Role, floor: profile.intentText, grounds: surfaces, text: true })),
     { role: 'edge', floor: profile.edge, grounds: surfaces, text: false },
     { role: 'accent-edge', floor: profile.edge, grounds: surfaces, text: false },
     ...FILLS.map((fill) => ({ role: fill as Role, floor: profile.intentFill, grounds: surfaces, text: false })),
+    { role: 'danger', floor: profile.intentFill, grounds: surfaces, text: false },
     { role: 'focus-in', floor: 3, grounds: surfaces, text: false },
     { role: 'accent', floor: 3, grounds: surfaces, text: false },
     { role: 'accent', floor: 4.5, grounds: label, text: false },
@@ -306,8 +312,8 @@ export function gate(drawn: Drawn, draft: Draft): Pair[] {
         if (worst) out.push({ kind: 'contrast', scheme, more, role: ask.role, ground: worst.ground, verdict: verdictOf(worst.margin), margin: worst.margin, text: ask.text });
       }
       if (more) continue;
-      for (const [i, a] of INTENTS.entries())
-        for (const b of INTENTS.slice(i + 1)) {
+      for (const [i, a] of WORDS.entries())
+        for (const b of WORDS.slice(i + 1)) {
           if (!Object.hasOwn(changed, a) && !Object.hasOwn(changed, b)) continue;
           const apart = Math.abs(greyOf(p[a]) - greyOf(p[b]));
           const margin = apart / GREY_FAILS;

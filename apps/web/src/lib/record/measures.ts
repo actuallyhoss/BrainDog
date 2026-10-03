@@ -17,6 +17,7 @@ import { MEASURE_BACK, measurePeriod, measureSeries, type MeasureSeries } from '
 import { exponentOf, money, quantity } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import type { MeasureLatest } from './api.ts';
 
 /** A stat fence draws six tiles at most (`KINDS.stat.rows`), so a block draws its six most recently reported measures. */
 export const TILES_MOST = 6;
@@ -140,7 +141,7 @@ export function tileRows(measures: readonly Measure[]): string[] {
 
 /**
  * The `lines` fences: one chart a measure, the period as the line and the period before as the dashed one, each under
- * the measure's name as its heading.
+ * the measure's name as its heading. A block hands this only its measures with a line to draw (`linesAndLatest`).
  */
 export function linesText(measures: readonly Measure[]): string {
   return measures
@@ -154,4 +155,41 @@ export function linesText(measures: readonly Measure[]): string {
       return ['```lines | ' + escapeCell(m.name), head, ...rows, '```'].join('\n');
     })
     .join('\n\n');
+}
+
+/** How many points a measure has in its period, which is what a line needs two of: the record's own count. */
+const pointsIn = (m: Measure): number => m.now.filter((v) => v !== null && v !== undefined).length;
+
+/**
+ * WHAT A `lines` BLOCK DRAWS: a line for each measure with two points or more in the period, and each measure with one
+ * as its reading, said once. A measure with none in the period is quiet and drawn as neither.
+ *
+ * THE RECORD SPLITS THEM ITSELF (`measureLines` in the kernel, which answers `measures` and `latest`), and this is the
+ * same split for the measures this tab works out from rows, and for a record on an older kernel, whose `measures` still
+ * holds the measures read once: so both draw one page. 227 of the 261 measures a real record had read that month held
+ * one reading, and the block was a wall of one-dot charts.
+ */
+export function linesAndLatest(measures: readonly Measure[], latest?: readonly MeasureLatest[]): { lines: Measure[]; latest: MeasureLatest[] } {
+  if (latest) return { lines: [...measures], latest: [...latest] };
+  return {
+    lines: measures.filter((m) => pointsIn(m) >= 2),
+    latest: measures.flatMap((m) => (pointsIn(m) === 1 && m.latest ? [{ measure: m.name, value: m.latest.value, unit: m.unit, at: m.latest.at, day: m.latest.day }] : [])),
+  };
+}
+
+/** The words this file says for itself, beside the only code that says them, until `copy.ts` holds them. */
+export const measureWords = {
+  /** The heading over the measures reported once, under the lines of the ones reported more often. */
+  readOnce: 'Reported once',
+} as const;
+
+/**
+ * THE MEASURES READ ONCE, AS ONE QUIET LIST: each measure's name, its reading and the day it was read, a line each, in
+ * the record's order (newest first). A list and not a tile a measure (DIRECTION §37: tiles only for figures and charts,
+ * and fewer things on screen), headed only where lines stand above it, so it is not taken for one of them.
+ */
+export function latestText(latest: readonly MeasureLatest[], underLines: boolean): string {
+  if (latest.length === 0) return '';
+  const rows = latest.slice(0, CHARTS_MOST).map((m) => `${escapeCell(m.measure)} | ${escapeCell(figureOf(m.value, m.unit))} | ${escapeCell(dayLabel(m.day))}`);
+  return [`\`\`\`spec${underLines ? ` | ${escapeCell(measureWords.readOnce)}` : ''}`, ...rows, '```'].join('\n');
 }

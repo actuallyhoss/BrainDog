@@ -380,7 +380,7 @@
     margin: 0;
     padding: 0 var(--sp-2) var(--sp-1) var(--lead);
     list-style: none;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     font-weight: 500;
   }
@@ -394,7 +394,7 @@
   .warn {
     display: inline-flex;
     padding-block-start: 1px;
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* UNDER THE SENTENCE, LINED UP WITH IT, as the faults are: the handle's and the well's columns are left clear. */

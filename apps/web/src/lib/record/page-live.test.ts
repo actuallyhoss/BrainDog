@@ -18,7 +18,7 @@ import { METRICS } from './declared.ts';
 import { feedTable } from './api.ts';
 import { ROWS } from './fixtures/sample.ts';
 import { toSegments } from './blocks.ts';
-import { blockOf, liveWords, pageReader, resolverOf, type Fetch } from './page-live.ts';
+import { blockOf, liveWords, pageReader, resolverOf, tileOf, type Fetch } from './page-live.ts';
 
 const BASE = 'http://record.test';
 const AT = Date.UTC(2026, 8, 15, 12);
@@ -1017,6 +1017,246 @@ test('A BAR OVER A LIST OF LINKS FINDS THE ROWS IT NAMES, whether the element ar
     ['Northwind Labs | GBP 24,800.00', 'Harbour Studio | GBP 9,100.00'],
     'the money each organisation names, and not the empty line',
   );
+});
+
+/**
+ * A FIGURE GROUPED BY A REF IS KEYED BY ULIDS, and the founder's Today drew each one: "Book #01M3VMPSHV07AM4S51WDTFM5XG"
+ * beside the cash in it (`loop/research-real-record.md`). A `metric.` source names no list, so no list was walked to name
+ * the parts, and `display` read the ULID as a row number.
+ */
+test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own label first, and never by its id', async () => {
+  const SAM = '01M3VMPSHV07AM4S51WDTFM5XG';
+  const QUARTZ = '01M3VMPSHV07AM4S51WDTFM5XH';
+  const GONE = '01M3VMPSHV07AM4S51WDTFM5XJ';
+  const bar = (groups: unknown[]) => ({
+    kind: 'bar',
+    heading: 'What you have, by book',
+    source: 'metric.cash-by-book',
+    unset: 'In no book',
+    readings: [{ metric: 'cash-by-book', reading: { value: 120_000_000, unit: 'EGP', rows: 3, held: 3, met: true, refusals: [], groups, more: 0 } }],
+    rows: [],
+    matched: 0,
+    refusals: [],
+  });
+  const read = async (groups: unknown[]) => {
+    const { io, sent } = host((method, url) => {
+      if (method === 'page') return json(200, { ok: true, value: { page: 'today', title: 'Today', blocks: [bar(groups)] } });
+      if (method === 'list' && url.searchParams.get('register') === 'books')
+        return json(200, { ok: true, value: { rows: [{ id: SAM, seq: 1, fields: { name: 'Sam' } }, { id: QUARTZ, seq: 2, fields: { name: 'Quartz' } }], cursor: null } });
+      if (method === 'list') return json(200, { ok: true, value: { rows: [], cursor: null } });
+      return refusal(404, 'ROUTE_UNKNOWN', 'There is no such method.');
+    });
+    const out = await pageReader(BASE, io, () => AT).read('today');
+    assert.equal(out.from, 'live');
+    if (out.from !== 'live') throw new Error('not live');
+    const [block] = out.page.blocks;
+    const cells = toSegments(block!).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[] }[]).map((r) => r.cells[0] ?? '') : []));
+    return { block: block!, cells, sent };
+  };
+
+  const walked = await read([{ key: SAM, value: 108_621_341 }, { key: QUARTZ, value: 12_000_000 }, { key: GONE, value: 938_259 }]);
+  assert.deepEqual(walked.block.parts?.groups.map((g) => g.label), ['Sam', 'Quartz', 'Unnamed book'], 'a book the walk did not reach is the kind alone');
+  assert.deepEqual(walked.cells, ['Sam', 'Quartz', 'Unnamed book']);
+  assert.ok(walked.sent.includes('list'), 'the books were walked to name the parts');
+  for (const cell of walked.cells) assert.doesNotMatch(cell, /[0-9A-HJKMNP-TV-Z]{26}|#/u, `an id was drawn: ${cell}`);
+  assert.deepEqual(walked.block.parts?.groups.map((g) => g.key), [SAM, QUARTZ, GONE], 'the key stays the stored value, which a part’s tone is read by');
+
+  /* THE RECORD'S OWN NAME FOR A PART WINS, and where it named every one nothing is walked for them. */
+  const named = await read([
+    { key: SAM, value: 108_621_341, label: 'Sam (personal)' },
+    { key: QUARTZ, value: 12_000_000, label: 'Quartz' },
+  ]);
+  assert.deepEqual(named.cells.slice(0, 2), ['Sam (personal)', 'Quartz']);
+  assert.ok(!named.sent.includes('list'), 'a list was walked for names the record had already said');
+
+  /* AND DRAWN WHOLE, A BAR'S VALUE IS A HEADLINE IN THE RECORD'S OWN SIGN: E£1,086,213, never EGP 1,086,213.41. */
+  const { draw } = await import('./blocks.ts');
+  const { learnHome } = await import('./api.ts');
+  learnHome('EGP');
+  try {
+    const figures = draw(walked.block).segments.flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells[1]) : []));
+    assert.deepEqual(figures, ['E£1,086,213', 'E£120,000', 'E£9,512']);
+  } finally {
+    learnHome(null);
+  }
+});
+
+test('A BOOK KEPT IN ITS OWN CURRENCY IS A FIGURE IN IT, beside the others, and not a chart of one bar a currency', () => {
+  const SAM = '01M3VMPSHV07AM4S51WDTFM5XG';
+  const QUARTZ = '01M3VMPSHV07AM4S51WDTFM5XH';
+  const block = blockOf(
+    {
+      kind: 'bar',
+      heading: 'What you have, by book',
+      source: 'metric.cash-by-book',
+      readings: [
+        {
+          metric: 'cash-by-book',
+          reading: {
+            value: null,
+            unit: null,
+            rows: 2,
+            held: 2,
+            met: null,
+            refusals: [],
+            more: 0,
+            groups: [
+              { key: SAM, value: null, label: 'Sam', parts: [{ currency: 'EGP', amount: 108_621_341 }] },
+              { key: QUARTZ, value: null, label: 'Quartz', parts: [{ currency: 'USD', amount: 1_200_000 }] },
+            ],
+          },
+        },
+      ],
+      rows: [],
+      matched: 0,
+      refusals: [],
+    } as never,
+    new Map(),
+    AT,
+  );
+  const segments = toSegments(block).filter((s) => s.type === 'block') as { kind: string; rows: { cells: string[] }[] }[];
+  assert.deepEqual(segments.map((s) => s.kind), ['stat'], 'one figure a book, not a chart a currency');
+  assert.deepEqual(segments[0]!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Sam | EGP 1,086,213.41', 'Quartz | USD 12,000.00']);
+
+  /* TWO BOOKS IN POUNDS AND ONE IN DOLLARS: the pounds are a chart under their code, and the dollars one figure after it,
+     never a chart of one bar under "In USD". */
+  const PERSONAL = '01M3VMPSHV07AM4S51WDTFM5XJ';
+  const three = blockOf(
+    {
+      kind: 'bar',
+      heading: 'What you have, by book',
+      source: 'metric.cash-by-book',
+      readings: [
+        {
+          metric: 'cash-by-book',
+          reading: {
+            value: null,
+            unit: null,
+            rows: 3,
+            held: 3,
+            met: null,
+            refusals: [],
+            more: 0,
+            groups: [
+              { key: SAM, value: null, label: 'Sam', parts: [{ currency: 'EGP', amount: 108_621_341 }] },
+              { key: PERSONAL, value: null, label: 'Personal', parts: [{ currency: 'EGP', amount: 938_259 }] },
+              { key: QUARTZ, value: null, label: 'Quartz', parts: [{ currency: 'USD', amount: 1_200_000 }] },
+            ],
+          },
+        },
+      ],
+      rows: [],
+      matched: 0,
+      refusals: [],
+    } as never,
+    new Map(),
+    AT,
+  );
+  const drawn = toSegments(three);
+  assert.deepEqual(
+    drawn.map((s) => (s.type === 'block' ? s.kind : s.type)),
+    ['markdown', 'bar', 'stat'],
+    'the pounds under their code, then the dollars as a figure',
+  );
+  const [, bar, stat] = drawn as { rows: { cells: string[] }[] }[];
+  assert.deepEqual(bar!.rows.map((r) => r.cells[0]), ['Sam', 'Personal']);
+  assert.deepEqual(stat!.rows.map((r) => r.cells.slice(0, 2).join(' | ')), ['Quartz | USD 12,000.00']);
+});
+
+test('A FIGURE OVER A LIST THAT HOLDS NOTHING SAYS SO, and a zero over rows that exist does not', () => {
+  /* "Zero held is not news at all" (`Reading.held` in the kernel): an empty Work drew "Done in 7 days 0". */
+  const reading = (held: number | undefined) => ({ value: 0, unit: null, rows: 0, met: true, refusals: [], ...(held === undefined ? {} : { held }) });
+  assert.equal(tileOf({ metric: 'tasks-done-7d', reading: reading(0) } as never).nothingHeld, true);
+  assert.equal(tileOf({ metric: 'tasks-done-7d', reading: reading(12) } as never).nothingHeld, undefined, 'nothing done out of twelve tasks is the answer');
+  assert.equal(tileOf({ metric: 'tasks-done-7d', reading: reading(undefined) } as never).nothingHeld, undefined, 'a record that did not count says nothing about it');
+});
+
+test('A PART KEYED BY A WORD IS SAID IN THE PERSON’S OWN WORD FOR IT, over the record’s label, which does not know it', async () => {
+  /* THE RECORD LABELS AN ENUM'S PARTS FROM THE DECLARATION, "Off track", and the person renamed that value "Behind". The
+     screen's word is the one every other place on it says, so a split saying the record's would be two names for one. */
+  const { REGISTERS } = await import('./held.ts');
+  const { relabelInto } = await import('../voice.ts');
+  const bare = REGISTERS.things!;
+  relabelInto(REGISTERS, 'things', bare, { 'things.health.off_track': 'Behind' });
+  try {
+    const split = blockOf(
+      {
+        kind: 'split',
+        heading: 'How they are going',
+        source: 'metric.projects-by-health',
+        readings: [
+          {
+            metric: 'projects-by-health',
+            reading: {
+              value: 4,
+              unit: null,
+              rows: 4,
+              held: 4,
+              met: true,
+              refusals: [],
+              more: 0,
+              groups: [
+                { key: 'on_track', value: 3, label: 'On track' },
+                { key: 'off_track', value: 1, label: 'Off track' },
+              ],
+            },
+          },
+        ],
+        rows: [],
+        matched: 0,
+        refusals: [],
+      } as never,
+      new Map(),
+      AT,
+    );
+    const cells = toSegments(split).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[] }[]).map((r) => r.cells[0] ?? '') : []));
+    assert.deepEqual(cells, ['On track', 'Behind']);
+  } finally {
+    REGISTERS.things = bare;
+  }
+});
+
+test('A PART KEYED BY A YES OR NO IS SAID AS ONE, and not as yes twice', () => {
+  /* THE RECORD KEYS A YES OR NO AS TEXT, `1` and `0`, which `display` read as yes whatever it held. */
+  METRICS['cash-by-liquid'] = { ...METRICS['cash-by-book']!, metric: 'cash-by-liquid', group_by: 'liquid', where: undefined } as never;
+  try {
+    const parts = (labelled: boolean) =>
+      blockOf(
+        {
+          kind: 'split',
+          heading: 'Counts as cash',
+          source: 'metric.cash-by-liquid',
+          readings: [
+            {
+              metric: 'cash-by-liquid',
+              reading: {
+                value: 400_000,
+                unit: 'GBP',
+                rows: 3,
+                held: 3,
+                met: true,
+                refusals: [],
+                more: 0,
+                groups: [
+                  { key: '1', value: 300_000, ...(labelled ? { label: 'Yes' } : {}) },
+                  { key: '0', value: 100_000, ...(labelled ? { label: 'No' } : {}) },
+                ],
+              },
+            },
+          ],
+          rows: [],
+          matched: 0,
+          refusals: [],
+        } as never,
+        new Map(),
+        AT,
+      );
+    const cells = (labelled: boolean) => toSegments(parts(labelled)).flatMap((s) => ('rows' in s ? (s.rows as { cells: string[] }[]).map((r) => r.cells[0] ?? '') : []));
+    assert.deepEqual(cells(true), ['Yes', 'No'], 'the record’s word');
+    assert.deepEqual(cells(false), ['yes', 'no'], 'and the value it stands for, on a record that sent none');
+  } finally {
+    delete METRICS['cash-by-liquid'];
+  }
 });
 
 test("A LEAD NOTE SAYS THE MODEL'S LINE WHEN THE RECORD SENT ONE, and the rules' line when it did not", () => {

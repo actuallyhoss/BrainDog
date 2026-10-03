@@ -121,7 +121,7 @@
   }
 
   .part-meta[data-needs] {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

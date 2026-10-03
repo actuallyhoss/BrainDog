@@ -21,6 +21,7 @@ import { REGISTERS } from '../record/held.ts';
 import { tickPatch, type Declared } from '../record/page-write.ts';
 import { inverseOf } from '../record/rows-write.ts';
 import type { Entry } from '../record/schema.ts';
+import { cutIn } from './clipped.ts';
 
 /**
  * The patch that undoes ticking `ref` to `done`, given `held`, the row as the page drew it when the tick was pressed.
@@ -40,10 +41,12 @@ export function tickBackOf(ref: RowRef, done: boolean, decl: Declared | null, he
   if (!held) return tickPatch(ref, !done, decl);
   const state = decl ? decl.state : REGISTERS[ref.register]?.state;
   const finished = decl ? (decl as { finished?: unknown }).finished : REGISTERS[ref.register]?.finished;
-  return inverseOf(held, tick as Entry['fields'], {
+  const back = inverseOf(held, tick as Entry['fields'], {
     ...(typeof state === 'string' ? { state } : {}),
     ...(typeof finished === 'string' ? { finished } : {}),
   });
+  /* NEVER A TEXT THE PAGE CUT SHORT, which put back would be saved over the whole of it (`clipped.ts`). */
+  return cutIn(held, back) ? null : back;
 }
 
 /* ── a stone on a path ───────────────────────────────────────────────────── */
@@ -88,5 +91,7 @@ export function stonePatch(done: boolean, decl: Declared | null): Record<string,
 export function stoneBackOf(done: boolean, decl: Declared | null, held: Entry | undefined): Record<string, unknown> | null {
   const patch = stonePatch(done, decl);
   if (!patch) return null;
-  return held ? inverseOf(held, patch as Entry['fields'], undefined) : stonePatch(!done, decl);
+  if (!held) return stonePatch(!done, decl);
+  const back = inverseOf(held, patch as Entry['fields'], undefined);
+  return cutIn(held, back) ? null : back;
 }

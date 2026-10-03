@@ -33,7 +33,7 @@
   import { goto } from '$app/navigation';
   import { money as moneyText, since } from 'braindog-render';
   import { moneyInText } from '$lib/record/money.ts';
-  import type { QueueQuestion } from '@braindog/kernel';
+  import { QUIET_MS, type QueueQuestion } from '@braindog/kernel';
   import { apiBase, at } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
@@ -353,7 +353,7 @@
   const agentsSaid = $derived(t ? (sessions.length > 0 ? lanesReading(sessions, t.now, words.agent) : t.runs.length > 0 ? words.working(t.runs.length) : '') : '');
   const quiet = (seen: string | null, now: number): boolean => {
     const at = seen ? Date.parse(seen) : Number.NaN;
-    return Number.isFinite(at) && now - at > 45 * 60_000;
+    return Number.isFinite(at) && now - at > QUIET_MS;
   };
 
   /* ── since you were here ───────────────────────────────────────────────────── */
@@ -1198,7 +1198,7 @@
   }
 
   .needs-said {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

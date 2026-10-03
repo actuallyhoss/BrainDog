@@ -48,12 +48,10 @@ export const decide = {
   whyAsked: 'Why this is asked',
   theOptions: 'The options',
   recommended: 'Suggested',
-  yourReason: 'Your reason',
   /* WHY THE COMMIT IS REFUSING, said where the refusal is. A decision is immutable once made, so the
      reason is the whole of what anybody reading it in six weeks will have. */
   reasonRequired: 'A decision is kept for ever and cannot be edited, so it needs a reason. Write why you chose it.',
   reasonHint: 'Why this one, in a sentence somebody can read in six weeks.',
-  reasonNudge: 'That will not mean anything in six weeks. Keep it anyway?',
   commit: 'Record the decision',
   defer: 'Defer the question',
   decidedBy: 'Decided by',

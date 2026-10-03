@@ -38,6 +38,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
+  import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { may } from '$lib/record/may.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -46,6 +47,7 @@
   import LeadPreview from './LeadPreview.svelte';
   import type { Picked } from './picked.svelte.ts';
   import { words } from './words.ts';
+  import { words as decide } from '../../routes/decide/words.ts';
 
   let {
     question,
@@ -94,6 +96,8 @@
   const band = $derived(question.cost && question.cost !== 'call' ? queueCost(question.cost) : '');
   /* A QUESTION PUT OFF SAYS WHEN IT COMES BACK, and why, in one quiet line under itself (`governance.later`). */
   const later = $derived(laterLine(question, Date.now()));
+  /* THE SUGGESTION IS MARKED ONLY WHERE THE CHOICE CAN BE UNDONE: on a hard to undo question no answer is leaned on. */
+  const suggests = $derived(question.cost !== 'undo');
 
   /**
    * WHERE THE CARD IS. `open` offers the options; `asking` has one chosen and the reason line open under it;
@@ -110,6 +114,36 @@
 
   let field = $state<HTMLInputElement | null>(null);
   let done = $state<HTMLParagraphElement | null>(null);
+
+  /* A NOTE, AFTER A WRITTEN DECLINE: offered in the line the card became, opened only by its press, and kept with the
+     question as a comment on it, in Decide's own words. */
+  let note = $state<'shut' | 'open' | 'kept'>('shut');
+  let noteBody = $state('');
+  let noteFix = $state('');
+  let noteBusy = $state(false);
+  let noteField = $state<HTMLInputElement | null>(null);
+
+  async function openNote() {
+    note = 'open';
+    await tick();
+    noteField?.focus();
+  }
+
+  async function sendNote(e: SubmitEvent) {
+    e.preventDefault();
+    const body = noteBody.trim();
+    if (noteBusy) return;
+    if (body === '') return void noteField?.focus();
+    noteBusy = true;
+    noteFix = '';
+    try {
+      const out = await sayComment(apiBase(), { on: `suggestion:${question.id}`, body });
+      if (out.ok) note = 'kept';
+      else noteFix = out.fix;
+    } finally {
+      noteBusy = false;
+    }
+  }
 
   /**
    * The press, and the send from the reason line. `said` is the reason, or nothing when nobody has been asked for one.
@@ -209,7 +243,21 @@
   {#if phase === 'answered' && chosen}
     <p class="qa-done" role="status" tabindex="-1" bind:this={done}>
       <Face name={copy.feedYou} you size="s" /><span class="qa-done-words">{queueWords.answered(chosen.label, since(answeredAt, Date.now()))}</span>
+      {#if chosen.key === 'reject' && note === 'shut'}<button type="button" class="qa-see qa-offer tap" onclick={openNote}>{decide.noteOffer}</button>{/if}
+      {#if note === 'kept'}<span class="qa-done-words">{decide.noteKept}</span>{/if}
     </p>
+    {#if note === 'open'}
+      <form class="qa-reason" onsubmit={sendNote} aria-busy={noteBusy}>
+        <label class="qa-label" for="{uid}-note">{decide.noteLabel}</label>
+        <div class="qa-line">
+          <span class="field field-lg qa-field">
+            <input id="{uid}-note" class="field-input qa-input" type="text" autocomplete="off" enterkeyhint="send" maxlength={COMMENT_MOST} bind:value={noteBody} bind:this={noteField} />
+          </span>
+          <Button type="submit">{decide.noteSend}</Button>
+        </div>
+        {#if noteFix}<p class="qa-fix" role="status">{noteFix}</p>{/if}
+      </form>
+    {/if}
   {:else}
     <article class={lead ? 'queue-card queue-lead' : 'queue-card'} aria-busy={busy} data-selected={chosenForAll ? '' : undefined}>
       {#if pick && answerable}
@@ -237,7 +285,7 @@
       {/if}
       <ul class="queue-options">
         {#each ways as way (way.key)}
-          <li class="queue-option" data-recommended={way.recommended ? '' : undefined}>
+          <li class="queue-option" data-recommended={way.recommended && suggests ? '' : undefined}>
             <!-- WHAT THE OPTION IS, in the renderer's own box and classes: a swatch writes its colour into `--swatch` on
                  its chip and nowhere else (`05 §5`), after `visualOf` held it to the renderer's reading. -->
             {#if way.shows && 'swatch' in way.shows}<span class="queue-visual" data-shows="swatch" aria-hidden="true"
@@ -253,11 +301,11 @@
                 data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
                 aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
                 onclick={() => press(way)}
-                >{way.label}{#if way.recommended}{' '}<span class="queue-rec">{queueWords.suggested}</span>{/if}</button
+                >{way.label}{#if way.recommended && suggests}{' '}<span class="queue-rec">{queueWords.suggested}</span>{/if}</button
               >
             {:else}
               <span class="queue-label">{way.label}</span>
-              {#if way.recommended}<span class="queue-rec">{queueWords.suggested}</span>{/if}
+              {#if way.recommended && suggests}<span class="queue-rec">{queueWords.suggested}</span>{/if}
             {/if}
             {#if reasoned && way.because}<span class="queue-because" dir="auto">{way.because}</span>{/if}
           </li>
@@ -368,6 +416,10 @@
 
   .qa-see {
     justify-self: start;
+    padding: 0;
+    background: none;
+    border: 0;
+    font: inherit;
     color: var(--link);
     font-size: var(--t-sm);
     text-decoration: underline;
@@ -408,7 +460,7 @@
   .qa-fix {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
   }
 

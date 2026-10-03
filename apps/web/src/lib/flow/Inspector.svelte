@@ -462,7 +462,7 @@
   ] as const;
 </script>
 
-<Panel {open} {title} onclose={shut}>
+<Panel {open} {title} shows={flow.selected} onclose={shut}>
   {#snippet verbs()}
     {#if found}
       <!-- WORDS IN INK, NOT RED: a destructive verb is its words, and Undo in the footer takes it back. -->
@@ -837,7 +837,7 @@
     align-items: flex-start;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     font-weight: 500;
   }
@@ -845,7 +845,7 @@
   .fault-glyph {
     display: inline-flex;
     flex: none;
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* A SELECT AND A BOX OF LINES ARE FIELDS: 40 tall and 44 under a thumb, the `--s1` fill with no border,

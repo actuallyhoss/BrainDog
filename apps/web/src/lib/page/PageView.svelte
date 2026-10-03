@@ -448,7 +448,7 @@
   .hosted {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w, 0px) - var(--gutter)));
-    transition: padding-inline-end var(--d-enter) var(--ease-out);
+    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
   /* THE NAME THE NAV ALREADY SAYS, kept for a screen reader and taken off the screen: the tools keep their place at the

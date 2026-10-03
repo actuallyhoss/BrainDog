@@ -227,7 +227,7 @@
 
   /* "2 DAYS LATE", THE ROW'S ONE RED. The words carry it, at 500 so the red is never a hairline of colour. */
   .line-late {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

@@ -340,7 +340,7 @@
 
   .qb-misread {
     margin: var(--sp-1) 0 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
   }
 

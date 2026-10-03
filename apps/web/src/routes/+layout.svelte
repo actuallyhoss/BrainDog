@@ -191,8 +191,11 @@
    * THE FLAT LIST, ONE RULE FOR THE RAIL, THE TOP BAR, THE TAB BAR AND THE SHEET (`flatNav` in `lib/nav.ts`): Today, the
    * sections a day runs through, Activity, Decide while something waits, seven at most, and everything else under More.
    */
-  /* AND WORK OPENS THE WORK SCREEN ON A RECORD THAT HOLDS TASKS (`lib/work/Work.svelte`), empty or not. */
-  const holdsTasks = $derived(data.lists.some((l) => l.id === TASKS));
+  /* AND WORK OPENS THE WORK SCREEN ON A RECORD WHOSE TASKS LIST HOLDS SOMETHING (`lib/work/Work.svelte`). A list with
+     nothing in it is a part the record does not use yet, so it is not drawn (DIRECTION §35): Work with no tasks drew a
+     row of zeros and empty bands. `index.registers` carries each list's count, which `data.lists` does not; the first
+     task brings Work back, and until then the palette and Today's capture line both add one. */
+  const holdsTasks = $derived(data.index.registers.some((r) => r.id === TASKS && r.count > 0));
   const flat = $derived(
     flatNav(grouped, data.open, { today: copy.today, activity: copy.audit, decide: said('decide') }, { work: holdsTasks ? WORK : null }),
   );
@@ -276,6 +279,28 @@
    * it one it owns, and its return value is the teardown, which is its whole public surface.
    */
   $effect(() => watchKeyboard(window));
+
+  /**
+   * THE FREEZE WATCHDOG (`lib/watchdog.ts`): the first block of the page over two seconds is said once, with the path
+   * inside the record and what the screen held, so the next freeze names itself where the last one could not be made
+   * to happen again.
+   *
+   * ASKED FOR AS THE SHELL MOUNTS, as the palette is, so it is never in the first screen's way; it reads the browser's
+   * record from the start of the load, so a block before it arrived is still seen. The words are asked when the freeze
+   * is said, because the screen it is about is the one on show when the page came back.
+   */
+  $effect(() => {
+    let stop: (() => void) | null = null;
+    let gone = false;
+    void import('$lib/watchdog.ts').then((dog) => {
+      if (gone) return;
+      stop = dog.watchFreezes(window, () => ({ route: here(page.url.pathname), rendering: dog.drawingOf(document) }));
+    });
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  });
 
   /**
    * THE RAIL AT ITS NARROW WIDTH, WHICH IS WHAT "COLLAPSED" MEANS TO EVERYBODY WHO SAYS IT.

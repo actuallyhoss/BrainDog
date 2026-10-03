@@ -19,7 +19,7 @@
  */
 
 import { createClient, type ClientOptions } from '@braindog/client';
-import { COSTS, isBucket, isStale, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
+import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
 import { MISSING, integer, money, quantity, since, day as fmtDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -32,9 +32,11 @@ import {
   historyTable,
   markColumns,
   toRows,
+  unnamed,
   walkTable,
   type BlockResult,
   type FeedRow,
+  type MeasureLatest,
   type Metric,
   type Walk,
   type WalkStep,
@@ -92,8 +94,12 @@ type Reading = {
   held?: number;
   met: boolean | null;
   refusals: Said[];
-  /** A grouped figure's parts, and how many past the cap were not drawn. */
-  groups?: { key: string; value: number | null; parts?: Part[] }[];
+  /**
+   * A grouped figure's parts, and how many past the cap were not drawn. `label` is what the record calls a part where its
+   * key is not words: the title of the row a ref points at, an enum's declared label. Unchecked, so it is narrowed where
+   * it is read; a record on an older kernel sends none.
+   */
+  groups?: { key: string; value: number | null; parts?: Part[]; label?: unknown }[];
   more?: number;
   /** Money in several currencies not added up, and how a figure across currencies was read. */
   parts?: Part[];
@@ -272,6 +278,53 @@ function registerOf(b: Answered): string | null {
      drawn, on the first record that had not already opened that list somewhere else. */
   if (b.kind === 'inputs') return typeof b.register === 'string' && b.register !== '' ? b.register : null;
   return b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null;
+}
+
+/**
+ * WHAT A GROUPED FIGURE'S PARTS ARE KEYED BY: the list the figure reads and the field it groups by, from this build's copy
+ * of the figure (`METRICS`). `null` for a block over anything else, and for a figure this build does not declare, whose
+ * parts are named by the record's own `label` or by their keys.
+ */
+function groupedBy(b: Answered): { register: string; field: string } | null {
+  if (typeof b.source !== 'string' || !b.source.startsWith('metric.')) return null;
+  const id = b.source.slice('metric.'.length);
+  const at = id.indexOf(':');
+  const figure = METRICS[at < 0 ? id : id.slice(0, at)];
+  const by = figure?.group_by;
+  if (!figure || typeof by !== 'string' || !figure.source.startsWith('register.')) return null;
+  return { register: figure.source.slice('register.'.length), field: by };
+}
+
+/**
+ * THE LIST A GROUPED FIGURE'S KEYS POINT AT, when it groups by a ref, or `null`. Such a key is the ULID the record stores
+ * the ref as, which is the one string a person must never read: Cash now by book drew "Book #01M3VMPSHV07AM4S51WDTFM5XG".
+ */
+function partsTarget(b: Answered): string | null {
+  const by = groupedBy(b);
+  const f = by ? fieldOf(by.register, by.field) : undefined;
+  return f?.type === 'ref' && typeof f.to === 'string' && f.to !== '' ? f.to : null;
+}
+
+/** The label the record gave a part, when it is words. */
+const labelled = (g: { label?: unknown }): string | null => (typeof g.label === 'string' && g.label.trim() !== '' ? g.label.trim() : null);
+
+/** Whether the record named every part of a grouped figure itself, so no list has to be walked to name them here. */
+const partsNamed = (b: Answered): boolean => (b.readings?.[0]?.reading?.groups ?? []).every((g) => labelled(g) !== null);
+
+/**
+ * A PART'S NAME, NEVER ITS KEY WHEN THE KEY IS AN ID: the record's `label`, else the title of the row the key points at,
+ * else that row said as its kind and number, and a key whose row this reader cannot reach as the kind alone ("Unnamed
+ * book", `unnamed`). A key that is a word (an enum's value, a name) keeps the record's label as it came, and `blocks.ts`
+ * says it as its field says it first, which knows the person's own word for a value.
+ */
+function partName(g: { key: string; label?: unknown }, target: string | null, refs: ReadonlyMap<string, RefMap>): string | undefined {
+  const said = labelled(g);
+  if (said !== null) return said;
+  if (target === null) return undefined;
+  const map = refs.get(target);
+  const seq = map?.seqOf.get(g.key);
+  if (seq === undefined) return unnamed(target, g.key);
+  return map?.titleOf.get(seq) ?? unnamed(target, seq);
 }
 
 /** A string the record did not have to check, or nothing. */
@@ -462,6 +515,12 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
     note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(door ? { href: door } : {}),
+    /* AND IT SAYS SO, so a page being read leaves the tile out: "Earning £0" over projects none of which says what it
+       earns is no figure at all. A page being arranged still draws it, with the sentence. */
+    ...(unsaid ? { unsaid: true } : {}),
+    /* AND A FIGURE OVER A LIST THAT HOLDS NOTHING SAYS THAT TOO, only where the record counted it (`held`): an empty Work
+       drew "Done in 7 days 0" under eight tiles each saying the list held nothing. */
+    ...(r.held === 0 ? { nothingHeld: true } : {}),
   };
 }
 
@@ -649,6 +708,25 @@ function isSeries(v: unknown): v is MeasureSeries {
   );
 }
 
+/**
+ * A `lines` block's measures read once, when the record sent them: a name, a finite number, a unit and the instant and
+ * day it was read. One that is not is left out, and the rest are drawn.
+ */
+function latestOf(v: unknown): MeasureLatest[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (m): m is MeasureLatest =>
+      isObject(m) &&
+      typeof m.measure === 'string' &&
+      typeof m.value === 'number' &&
+      Number.isFinite(m.value) &&
+      typeof m.unit === 'string' &&
+      typeof m.at === 'string' &&
+      typeof m.day === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/u.test(m.day),
+  );
+}
+
 /** One answered block as the page draws it. */
 export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: number, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): LiveBlock {
   const {
@@ -695,6 +773,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     working_now: atWork,
     past: remembered,
     measures: measured,
+    /* THE MEASURES READ ONCE, beside the lines, taken by name and narrowed below so none rides through `rest` unchecked. */
+    latest: readOnce,
     /* A CAPTURE'S LIST AND WHAT A NEW ROW IN IT IS FILLED WITH, taken by name so neither rides through `rest`
        unchecked: `fills` is what a press writes, so a value in it the app did not look at is a value it would store. */
     register: into,
@@ -831,11 +911,17 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
   if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values)) };
-  /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read. */
+  /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
+     it points at, read from the walk `pageReader` made of that list, and never the ULID the key is. */
   if (typeof source === 'string' && source.startsWith('metric.')) {
     const reading = readings?.[0]?.reading;
     if (!reading) return cannot;
-    const groups = (reading.groups ?? []).map((g) => ({ key: String(g.key), value: typeof g.value === 'number' ? g.value : null, ...(Array.isArray(g.parts) ? { parts: g.parts } : {}) }));
+    const target = partsTarget(b);
+    const groups = (reading.groups ?? []).map((g) => {
+      const key = String(g.key);
+      const label = partName({ key, label: g.label }, target, refs);
+      return { key, ...(label === undefined ? {} : { label }), value: typeof g.value === 'number' ? g.value : null, ...(Array.isArray(g.parts) ? { parts: g.parts } : {}) };
+    });
     const parts = { metric: source.slice('metric.'.length), value: reading.value, groups, more: typeof reading.more === 'number' ? reading.more : 0, unit: reading.unit };
     return { ...shell, parts, shown: groups.length, total: groups.length };
   }
@@ -987,8 +1073,12 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
   if (kind === 'stat' || kind === 'lines') {
     if (Array.isArray(measured)) {
       const measures = measured.filter(isSeries);
+      /* A MEASURE READ ONCE IS ITS READING, which a current record answers beside a `lines` block's lines (`latest`), and
+         a `stat` has none of: its tiles are each a measure's newest reading already. */
+      const latest = kind === 'lines' ? latestOf(readOnce) : [];
       /* EVERY MEASURE IS DRAWN, so nothing is cut: `matched` counts readings, which no tile or chart is one of. */
-      return { ...shell, register, measures, shown: measures.length, total: measures.length };
+      const drawn = measures.length + latest.length;
+      return { ...shell, register, measures, ...(latest.length > 0 ? { readOnce: latest } : {}), shown: drawn, total: drawn };
     }
   }
   /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer.
@@ -1088,7 +1178,8 @@ export function blockOf(b: Answered, refs: ReadonlyMap<string, RefMap>, now: num
     ...(spentBy === undefined ? {} : { spentBy }),
     names: namesOf(refs),
     ...(inherited === undefined ? {} : { inherited }),
-    ...(live ? { quiet: got.map((r) => isStale({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
+    /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
+    ...(live ? { quiet: got.map((r) => isQuiet({ fields: r.fields as never, updated_at: r.updated_at ?? r.created_at }, now)) } : {}),
     ...(working ? { working } : {}),
     ...(workingNow ? { working_now: workingNow } : {}),
     ...(scopeCells ? { scopeCells } : {}),
@@ -1286,6 +1377,16 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       for (const b of blocks) {
         const register = b.refusals?.length ? null : registerOf(b);
         if (register) for (const target of targetsOf(register)) wanted.add(target);
+      }
+      /* A FIGURE GROUPED BY A REF NAMES ITS PARTS FROM THE LIST THE REF POINTS AT, which no `register.` source asks
+         for: the figure's own list is learnt, so its field is known to be a ref, and its target walked like any other.
+         Not where the record named every part itself (`label`), which a current kernel does. */
+      for (const b of blocks) {
+        const by = b.refusals?.length || partsNamed(b) ? null : groupedBy(b);
+        if (!by) continue;
+        await learn(client.schema, by.register, asked);
+        const target = partsTarget(b);
+        if (target) wanted.add(target);
       }
       /* WHO IS READING, for a feed that names the reader as You: the shell's own `boot`, kept, so it costs no call. */
       const booted = blocks.some((b) => b.source === 'activity') ? await readBoot(base, io) : null;

@@ -7,6 +7,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
 import {
@@ -16,17 +18,24 @@ import {
   burstsOf,
   busyOf,
   busySaid,
+  changesOf,
   clockOf,
   dayOf,
   dayWord,
   fold,
+  foldKeys,
+  foldOpen,
   hourGroups,
   HOURS,
+  isBookkeeping,
+  keepsBooks,
   keyOf,
   lanesOf,
   lanesSaid,
   LIVE_MS,
   reaches,
+  RUN_FOLD_MIN,
+  runFolds,
   tallyOf,
   tallySaid,
   thingOf,
@@ -237,4 +246,117 @@ test('the log names no row and no list in its own words', () => {
   for (const line of [historyWords.aRow, historyWords.rows(1), historyWords.rows(4), historyWords.everyList('Payments'), historyWords.onlyList('Payments')])
     assert.doesNotMatch(line, /\b(rows?|lists?|registers?|blocks?)\b/iu, line);
   assert.equal(historyWords.rows(1), 'one entry');
+});
+
+/* ── changes, and the record keeping its books ─────────────────────────── */
+
+/**
+ * WHAT THE OWNER'S RECORD HELD ON 2 OCTOBER, in the shapes `readLog` hands the page: the hourly sweep marking a quiet run
+ * abandoned, a run's working folder moving, the daily stamp of when a tool was last seen, and between them the changes.
+ */
+test('the record keeping its books is told from a change to somebody’s things', () => {
+  const sweep = ev(iso(29, 9), 'system', 'state', 'session#712', 'Nothing heard from this run in twelve hours.');
+  const folder = ev(iso(29, 9), 'S729', 'edit', 'session#729', 'cwd set to /Users/sam/Developer/braindog');
+  const runNote = ev(iso(29, 9), 'S729', 'edit', 'session#729', 'next set to Ship the payout retry');
+  const stamp = { ...ev(iso(29, 9), 'S729', 'edit', 'tools#3', 'last seen set to 2 Oct 2026'), field: 'seen' };
+  const stampSaid = ev(iso(29, 9), 'S729', 'edit', 'tools#3', 'last seen from 1 Oct 2026 to 2 Oct 2026');
+  for (const e of [sweep, folder, runNote, stamp, stampSaid]) assert.equal(isBookkeeping(e), true, `${e.target} ${e.note} is drawn as a change`);
+
+  const changes = [
+    ev(iso(29, 9), 'S729', 'edit', 'payouts#4', 'state from failed to retrying'),
+    ev(iso(29, 9), 'you', 'create', 'tasks#9'),
+    /* A FIELD CALLED SOMETHING ELSE IS A CHANGE, even with a stamp's words in its note. */
+    { ...ev(iso(29, 9), 'you', 'edit', 'people#2', 'seen set to Tuesday'), field: 'met' },
+    /* A STATE MOVE ON ANY OTHER LIST, BY ANYBODY, IS A CHANGE: only the runs' own list is the record's books. */
+    ev(iso(29, 9), 'system', 'state', 'obligations#3', 'Renewed for a year'),
+    ev(iso(29, 9), 'you', 'decide', 'suggestion:SG70', 'Kept the setup'),
+    /* A PERSON'S OWN "LAST SEEN" OR "SEEN" IS THEIR CHANGE, in a stamp's words or not: only a run stamps. */
+    ev(iso(29, 9), 'you', 'edit', 'people#2', 'Last seen set to 2 Oct 2026'),
+    ev(iso(29, 9), 'p_ana', 'edit', 'films#4', 'Seen set to Yes'),
+  ];
+  for (const e of changes) assert.equal(isBookkeeping(e), false, `${e.target} ${e.note} is hidden as bookkeeping`);
+
+  const log = [sweep, ...changes, folder, stamp];
+  assert.deepEqual(changesOf(log, false), changes, 'the stream by default is not the changes alone');
+  assert.deepEqual(changesOf(log, true), log, 'Everything leaves something out');
+});
+
+test('the switch is offered on a record that holds agent runs, even with nothing hidden by this page', () => {
+  /* THE RECORD LEAVES ITS SWEEP AND ITS STAMPS OUT OF THE LOG UNLESS ASKED, so the page may hold back nothing of its own
+     and still have something to show: a record with runs keeps books about them. */
+  assert.equal(keepsBooks([{ id: 'tasks', count: 4 }, { id: 'session', count: 732 }]), true);
+  assert.equal(keepsBooks([{ id: 'tasks', count: 4 }, { id: 'session', count: 0 }]), false);
+  assert.equal(keepsBooks([{ id: 'tasks', count: 4 }]), false);
+  assert.equal(keepsBooks(undefined), false);
+});
+
+/**
+ * EVERYTHING IS ASKED OF THE RECORD, NOT ONLY UNHIDDEN HERE: the record leaves its own books out of the log it sends
+ * unless asked, so every read of the log carries the switch, and turning it on or off reads the log again. A source
+ * read, because there is no DOM harness in this app.
+ */
+test('every read of the log carries the switch, and turning it on or off reads the log again', () => {
+  const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
+  assert.match(page, /return read\(apiBase\(\), me, undefined, before, all\);/u, 'the log is read without asking for everything');
+  assert.doesNotMatch(page, /\.readLog\(apiBase\(\), me/u, 'a read of the log goes round the switch');
+  assert.match(page, /const all = everything;\n\s+const n = \+\+asked;/u, 'turning the switch does not read the log again');
+  assert.equal(page.match(/logOf\(/gu)?.length, 4, 'the first read, the page below and the read on a new version do not all carry the switch');
+  /* AND THE FOCUS RING IS NEVER TAKEN OFF a line a fold opened. */
+  assert.doesNotMatch(page, /outline: none/u, 'a focused line has its ring taken off');
+});
+
+test('the words about what is hidden name the person’s own things, in plain words', () => {
+  assert.equal(historyWords.everything, 'Everything');
+  assert.match(historyWords.hidden(14), /^14 entries are BrainDog's own bookkeeping: /u);
+  assert.match(historyWords.hidden(1), /^One entry is /u);
+  assert.equal(historyWords.more(9), '+9 more');
+  for (const line of [historyWords.hidden(1), historyWords.hidden(14), historyWords.onlyBooks, historyWords.more(9), historyWords.showThem(2)]) {
+    assert.doesNotMatch(line, /\u2014|—/u, `an em dash in "${line}"`);
+    assert.doesNotMatch(line, /\b(rows?|lists?|registers?|sessions?|events?)\b/iu, `a system word in "${line}"`);
+  }
+});
+
+/* ── a run's work, folded ───────────────────────────────────────────────── */
+
+test('one run’s lines next to each other fold under its newest as "+N more", and nobody else’s do', () => {
+  const run = [1, 2, 3, 4, 5].map((n) => one(ev(iso(29, 9, 30 - n), 'S42', 'edit', `payouts#${n}`)));
+  const you = one(ev(iso(29, 9, 20), 'you', 'edit', 'tasks#1'));
+  const other = [1, 2, 3].map((n) => one(ev(iso(29, 9, 10 - n), 'S43', 'edit', `tasks#${n}`)));
+  const again = [1, 2].map((n) => one(ev(iso(29, 8, 50 - n), 'S42', 'edit', `payouts#${n}`)));
+  const folds = runFolds([...run, you, ...other, ...again]);
+
+  assert.deepEqual(
+    folds.map((f) => [f.head.e.by, f.rest.length]),
+    [
+      ['S42', 4],
+      ['you', 0],
+      ['S43', 2],
+      /* TWO LINES OF A RUN ARE DRAWN AS THEY ARE: folding them saves nothing. */
+      ['S42', 0],
+      ['S42', 0],
+    ],
+  );
+  assert.equal(RUN_FOLD_MIN, 3);
+  assert.equal(folds[0]!.head, run[0], 'the fold is not headed by the run’s newest line');
+  assert.deepEqual(folds[0]!.rest, run.slice(1), 'the folded lines are not the rest, in their order');
+  assert.equal(new Set(folds.map((f) => f.key)).size, folds.length, 'two folds share a key');
+
+  /* A PERSON'S LINES NEXT TO EACH OTHER ARE NEVER FOLDED: only a run's work is one thing. */
+  const yours = [1, 2, 3, 4].map((n) => one(ev(iso(29, 9, 10 - n), 'you', 'edit', `tasks#${n}`)));
+  assert.ok(runFolds(yours).every((f) => f.rest.length === 0));
+  assert.deepEqual(runFolds([]), []);
+});
+
+test('a fold somebody opened stays open when the run writes its next line on top of it', () => {
+  const run = [1, 2, 3, 4].map((n) => one(ev(iso(29, 9, 30 - n), 'S42', 'edit', `payouts#${n}`)));
+  const [opened] = runFolds(run);
+  assert.ok(opened && opened.rest.length === 3);
+  const kept = new Set(foldKeys(opened));
+  assert.equal(foldOpen(opened, kept), true);
+
+  /* THE RUN WRITES AGAIN: the fold's newest line, and so its key, is the new one. */
+  const [after] = runFolds([one(ev(iso(29, 9, 30), 'S42', 'edit', 'payouts#9')), ...run]);
+  assert.ok(after && after.key !== opened.key, 'this test no longer moves the fold’s key');
+  assert.equal(foldOpen(after, kept), true, 'the fold shut under the reader when the run wrote again');
+  assert.equal(foldOpen(after, new Set()), false, 'a fold nobody opened is open');
 });

@@ -1,9 +1,10 @@
 <!--
   The top bar: the record's name, the flat list the tab bar draws (`flatNav`), search and the person.
 
-  THE DEFAULT SHAPE ON A WIDE SCREEN. It sits straight on the board, with no glass and no panel: the
-  record's name on the left, the places as plain rows with the one you are on filled ink, search as
-  a field on the right and the person's face at the end. The rail stays one choice away in Settings.
+  ONE CHOICE AWAY IN SETTINGS, AND NO LONGER THE DEFAULT: the floating rail card is the shell
+  (DIRECTION 37), and this is the strip for somebody who picked it. It sits straight on the board,
+  with no glass and no panel: the record's name on the left, the places as plain rows with the one
+  you are on in the rail's ink wash, search as a field on the right and the person's face at the end.
 
   IT STATES WHAT IT HIDES. The record's name opens the same sheet the phone opens, which holds every
   section, every list, the utilities and the other records, and the More row says how many places
@@ -78,8 +79,11 @@
 </nav>
 
 <style>
-  /* ON THE BOARD, no panel: the strip is the page's own top line. */
+  /* ON THE BOARD, no panel: the strip is the page's own top line. Its places read at the rail's 14, a step under the
+     page's 15, and the place you are on is the rail's ink wash, so the two shapes say "here" the same way. */
   .topbar {
+    --bar-text: calc(var(--t-sm) + 1px);
+
     display: flex;
     align-items: center;
     gap: var(--sp-4);
@@ -97,14 +101,9 @@
     background: none;
     border-radius: var(--r-md);
     color: var(--ink);
-    font: inherit;
     font-size: var(--t-md);
     font-weight: 600;
     cursor: pointer;
-  }
-
-  .bar-record:hover {
-    background: var(--hover-wash);
   }
 
   .bar-record-name {
@@ -124,7 +123,7 @@
     overflow: hidden;
   }
 
-  /* A PLACE: glyph, name, count. Where you are is the ink pill. */
+  /* A PLACE: glyph, name, count. Where you are is the ink wash, the name at 600. */
   .bar-item {
     display: inline-flex;
     align-items: center;
@@ -136,8 +135,7 @@
     background: none;
     border-radius: var(--r-md);
     color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--bar-text);
     font-weight: 500;
     text-decoration: none;
     cursor: pointer;
@@ -147,14 +145,22 @@
       color var(--d-state) var(--ease-out);
   }
 
-  .bar-item:hover {
-    background: var(--bg);
+  .bar-item[aria-current='page'] {
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
     color: var(--ink);
+    font-weight: 600;
   }
 
-  .bar-item[aria-current='page'] {
-    background: var(--ink);
-    color: var(--on-ink);
+  /* HOVER ONLY WHERE THERE IS ONE, as the rail's is: a lift toward white on the board, never on the place you are on. */
+  @media (hover: hover) and (pointer: fine) {
+    .bar-record:hover {
+      background: var(--hover-wash);
+    }
+
+    .bar-item:hover:not([aria-current='page']) {
+      background: var(--bg);
+      color: var(--ink);
+    }
   }
 
   .bar-more {
@@ -174,25 +180,19 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .bar-item[aria-current='page'] .tally {
-    color: inherit;
-    opacity: 0.7;
-  }
-
-  /* Decide's is the red badge, the one filled count. */
+  /* Decide's is the red square, the one filled count and the one red in the strip, as it is on the rail. */
   .tally[data-waiting] {
     display: inline-grid;
     place-items: center;
     box-sizing: border-box;
     min-inline-size: 20px;
     block-size: 20px;
-    padding: 0 6px;
+    padding: 0 5px;
     background: var(--danger);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     color: var(--on-ink);
     font-weight: 600;
     line-height: 1;
-    opacity: 1;
   }
 
   /* SEARCH, DRAWN AS THE FIELD IT OPENS. A button, so the palette owns the typing. */
@@ -208,8 +208,7 @@
     background: var(--bg);
     border-radius: var(--r-md);
     color: var(--dim);
-    font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--bar-text);
     text-align: start;
     cursor: text;
   }

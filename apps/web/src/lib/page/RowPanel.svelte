@@ -10,16 +10,22 @@
   with the boxes off and no Save.
 
   DELETE IS WORDS, then a confirm, and the row stays in Just changed with Put back for ten minutes.
+
+  A ROW THE PAGE ANSWERED CUT SHORT IS READ WHOLE FIRST. A page sends each long text as its first 280 characters (the
+  kernel's `leanRows`), and a project's note opened on those and saved them, with the edit, over the whole note. The form
+  now opens on the row whole (`host.whole`) and Save is worked out against it; until it is read the body holds the
+  wait, and a row that cannot be read whole says so in place of its form.
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import { at as inApp } from '$lib/at.ts';
   import { currencyFor, readableFields } from '$lib/record/api.ts';
-  import type { Fields } from '$lib/record/schema.ts';
+  import type { Entry, Fields } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Panel from '$lib/ui/Panel.svelte';
   import RowForm from '$lib/ui/RowForm.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import type { RowHost } from './row-host.svelte.ts';
   import { rowPatch, valuesOf } from './row-fields.ts';
   import { keyOf, titleOf, words } from './row-verbs.ts';
@@ -28,6 +34,8 @@
 
   const row = $derived(host.opened);
   const entry = $derived(row ? host.entry(row) : undefined);
+  /* THE ROW WHOLE, OR NOTHING YET: a row cut short is never what the form opens on or what Save is worked out against. */
+  const whole = $derived(entry && !entry.clipped ? entry : undefined);
   const shape = $derived(row ? host.shapeOf(row.register) : null);
   const mayWrite = $derived(row ? host.writable(row) : false);
   const fields = $derived(row ? readableFields(row.register) : []);
@@ -35,33 +43,69 @@
 
   /** What the form opened on, the row's fields as typed text. A new object is a new form (`{#key}` below). */
   let seeded = $state.raw<Record<string, string> | null>(null);
+  /** The row whole that the form opened on, which Save is worked out against while a newer read of it is read whole. */
+  let base = $state.raw<Entry | null>(null);
   /** What the form holds now, in the shapes the record stores (`RowForm`'s `taken`). */
   let taken = $state<Fields>({});
   /** Why Save is off: a required field emptied, or an amount the record would refuse (`RowForm`'s `problems`). */
   let problems = $state<string[]>([]);
   let confirming = $state(false);
+  /** Said in place of the form when the row could not be read whole. */
+  let unread = $state('');
   /** The row the form was loaded from, so a re-read of the same row keeps what is being typed. */
   let loaded = '';
 
-  /* THE FORM IS LOADED WHEN THE PANEL MOVES TO A ROW, and not each time the page is read again. */
+  /* A ROW CUT SHORT IS READ WHOLE, when the panel opens on it and whenever a newer read of it comes back cut. The host
+     keeps what it read, so the same row opens at once the next time. */
+  $effect(() => {
+    const r = row;
+    const cut = entry?.clipped === true;
+    if (!host.panelOpen || !r || !cut) return;
+    untrack(() => {
+      void host.whole(r).then((got) => {
+        if (typeof got === 'string' && host.opened && keyOf(host.opened) === keyOf(r)) unread = got;
+      });
+    });
+  });
+
+  /* THE FORM IS LOADED WHEN THE PANEL MOVES TO A ROW, and not each time the page is read again: from the row whole. */
   $effect(() => {
     const r = row;
     const open = host.panelOpen;
+    const e = whole;
     untrack(() => {
       if (!open || !r) return void (loaded = '');
       const key = keyOf(r);
       if (key === loaded) return;
-      const e = host.entry(r);
       const s = host.shapeOf(r.register);
-      if (!e || !s) return;
+      if (!s) return;
+      if (!e) {
+        /* NOT WHOLE YET: the body waits, and nothing of the last row's form stays under this one's name. A row that has
+           left the page keeps its form while the panel closes over it. */
+        if (!entry) return;
+        loaded = '';
+        seeded = null;
+        base = null;
+        taken = {};
+        problems = [];
+        confirming = false;
+        unread = '';
+        return;
+      }
       loaded = key;
+      base = e;
+      unread = '';
       seeded = valuesOf(e, readableFields(r.register), (f) => currencyFor(r.register, f.id));
       confirming = false;
       if (host.typing) void caret();
     });
   });
 
-  const patch = $derived(entry && shape ? rowPatch(taken, entry, fields, shape.title, currency) : {});
+  /* WHAT SAVE SENDS: what was typed against the row whole as the form opened on it, so a field somebody else changed
+     meanwhile, and nobody touched here, is not sent back as it was. */
+  const patch = $derived(base && shape ? rowPatch(taken, base, fields, shape.title, currency) : {});
+  /* SAVE WAITS WHILE THE NEWEST READ OF THE ROW IS CUT SHORT: its Undo is worked out from that read, whole. */
+  const ready = $derived(whole !== undefined && seeded !== null);
 
   /* WHAT IS TYPED AND NOT SAVED is the host's to know, so the cursor moving keeps the panel where it is. */
   $effect(() => {
@@ -90,7 +134,7 @@
 
   function save(e?: SubmitEvent) {
     e?.preventDefault();
-    if (!row || !entry || !shape || !mayWrite || problems.length > 0) return;
+    if (!row || !entry || !shape || !mayWrite || !ready || problems.length > 0) return;
     const out = patch;
     host.dirty = false;
     loaded = '';
@@ -111,7 +155,7 @@
   }
 </script>
 
-<Panel bind:open={host.panelOpen} title={row ? host.oneOf(row.register) : ''} onclose={closed}>
+<Panel bind:open={host.panelOpen} title={row ? host.oneOf(row.register) : ''} shows={row ? keyOf(row) : null} onclose={closed}>
   {#snippet verbs()}
     {#if row && entry}
       {@const r = row}
@@ -128,7 +172,13 @@
     {/if}
   {/snippet}
 
-  {#if row && entry && shape}
+  {#if row && entry && shape && unread}
+    <p class="p-sure" role="status">{unread}</p>
+  {:else if row && entry && shape && seeded === null}
+    <!-- ONLY BEFORE THE FORM FIRST OPENS: a newer read of the same row that comes back cut keeps the form and what is
+         typed in it, with Save off until that read is whole too. -->
+    <Waiting rows={3} />
+  {:else if row && entry && shape}
     {@const r = row}
     <form class="p-form" novalidate onsubmit={save}>
       <!-- EVERY FIELD THE LIST DECLARES, in `RowForm`'s boxes, and all of them off for a reader who may not write. A new
@@ -152,7 +202,7 @@
             <button type="button" class="p-delete" onclick={() => (confirming = true)}>{words.deleteAsk}</button>
             <span class="p-gap"></span>
             <Button size="sm" kbd="Esc" onclick={() => host.close()}>{words.cancel}</Button>
-            <Button size="sm" weight="primary" type="submit" kbd="↵" disabled={problems.length > 0}>{words.save}</Button>
+            <Button size="sm" weight="primary" type="submit" kbd="↵" disabled={!ready || problems.length > 0}>{words.save}</Button>
           {/if}
         </div>
       {/if}

@@ -392,14 +392,46 @@ test('A CURRENCY ENGLISH WRITES BY ITS CODE IS SAID ONCE, code first, home or no
 
 test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps its pence', () => {
   assert.equal(symbolText('GBP 33,850.00', 'GBP', true), '£33,850');
-  assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'EGP 58,185');
-  assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,850.50', 'a fraction that is not all zeros is part of the figure');
+  assert.equal(symbolText('EGP 58,185.00', 'GBP', true), 'EGP 58,185');
+  assert.equal(symbolText('GBP 33,850.50', 'GBP'), '£33,850.50', 'a fraction that is not all zeros is part of a sentence’s figure');
   assert.equal(symbolText('GBP 33,850.00', 'GBP'), '£33,850');
   assert.equal(symbolText('Bills past their due date: GBP 10,540.00 still to pay.', 'GBP', 'sentence'), 'Bills past their due date: £10,540 still to pay.');
   assert.equal(symbolText('GBP 33,850.00', 'GBP', 'exact'), '£33,850.00');
   assert.equal(symbolText('GBP 0.00', 'GBP', 'exact'), '£0.00');
   assert.equal(symbolText('GBP 0.00', 'GBP'), '£0');
   assert.equal(symbolText('USD 4,800.00', 'GBP', 'exact'), '$4,800.00 USD');
+});
+
+/**
+ * A FIGURE STANDING ON ITS OWN IS WHOLE UNITS, IN THE RECORD'S OWN SIGN (DIRECTION §37). The founder's Today drew
+ * "EGP 1,086,213.41" beside each book: a ledger's figure, piastres and all, in the code a bank statement uses for the
+ * currency he counts in.
+ */
+test('A HEADLINE IS WHOLE UNITS IN THE RECORD’S OWN SIGN: "EGP 1,086,213.41" over Today is "E£1,086,213"', () => {
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'headline'), 'E£1,086,213');
+  assert.equal(symbolText('EGP 1,086,213.50', 'EGP', 'headline'), 'E£1,086,214', 'a half rounds up');
+  assert.equal(symbolText('EGP −999.99', 'EGP', 'headline'), '−E£1,000', 'and carries into the thousands');
+  assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'E£58,185', '`true` is the headline the lead line asks for');
+  assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,851');
+  assert.equal(symbolText('Cash is EGP 1,086,213.41 across 13 accounts', 'EGP', true), 'Cash is E£1,086,213 across 13 accounts');
+  assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', true), { lead: 'E£', whole: '1,086,213', fraction: '', iso: null });
+
+  /* UNDER A HUNDRED THE FRACTION IS MOST OF THE FIGURE, so it stays where it is not all zeros. */
+  assert.equal(symbolText('GBP 4.37', 'GBP', 'headline'), '£4.37');
+  assert.equal(symbolText('GBP 12.00', 'GBP', 'headline'), '£12');
+
+  /* ONLY THE RECORD'S OWN CURRENCY TAKES THE SIGN: any other is said by its code, which already names it. */
+  assert.equal(symbolText('EGP 412,300.00', 'GBP', 'headline'), 'EGP 412,300');
+  assert.equal(symbolText('USD 4,800.70', 'EGP', 'headline'), '$4,801\u00a0USD');
+  /* AND ONLY A SIGN THE FIGURES ARE READ BACK BY: a narrow form that is letters keeps the code, as one with none does. */
+  assert.equal(symbolText('SEK 1,200.00', 'SEK', 'headline'), 'SEK 1,200');
+  assert.equal(symbolText('KWD 1,234.567', 'KWD', 'headline'), 'KWD 1,235');
+  assert.equal(symbolText('JPY 1,299', 'JPY', 'headline'), '¥1,299');
+
+  /* A SENTENCE AND A LEDGER ARE AS THEY WERE. */
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP'), 'EGP 1,086,213.41');
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'exact'), 'EGP 1,086,213.41');
+  assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP ', whole: '58,185', fraction: '.54', iso: null });
 });
 
 test('ANY OTHER CURRENCY KEEPS ITS CODE IN EVERY SETTING, a headline too, and the home one never carries it', () => {

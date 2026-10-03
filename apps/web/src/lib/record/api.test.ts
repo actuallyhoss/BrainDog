@@ -172,6 +172,18 @@ test('a ref that points at nothing reads as its kind and number, never a bare nu
   assert.equal(unnamed('courses', 1), 'Courses #1');
 });
 
+test('A REF STILL HELD AS ITS ULID IS NEVER DRAWN AS ONE, nor a ULID in a field nobody declared', () => {
+  /* Today's cash by book drew "Book #01M3VMPSHV07AM4S51WDTFM5XG": a ref no walk had turned into a number. */
+  const ULID = '01M3VMPSHV07AM4S51WDTFM5XG';
+  assert.equal(unnamed('books', ULID), 'Unnamed book');
+  assert.equal(display('accounts', 'book', ULID), 'Unnamed book');
+  assert.equal(display('accounts', 'book', ULID, undefined, new Map() as never), 'Unnamed book', 'and on a live record that named none');
+  assert.equal(unnamed('club_books', ULID), 'Unnamed club book', 'a list this build does not declare, made singular');
+  assert.equal(unnamed('courses', ULID, 'Course'), 'Unnamed course');
+  assert.equal(unnamed('', ULID), 'Unnamed', 'a part of a figure this build does not declare, and no space after it');
+  assert.equal(display('obligations', 'not_a_field', ULID), null);
+});
+
 test('A RUN’S PROJECT, HELD AS A SPOKEN ID, READS AS THE PROJECT AND OPENS IT', () => {
   const run = ROWS.session?.find((r) => typeof r.fields.project === 'string');
   assert.ok(run, 'the sample needs a run placed in a project');
@@ -1219,7 +1231,8 @@ test('EVERY MONTH IS SPLIT BY WHAT IT IS FOR, at monthly shares, and what no cat
   if (segment?.type !== 'block') return;
   const last = segment.rows.at(-1)!;
   assert.match(String(last.cells[0]), /Uncategorised/u);
-  assert.match(String(last.cells[1]), /123\.45/u);
+  /* A SPLIT'S VALUE IS A HEADLINE, in whole units: the 12,345 pence no part holds are £123. */
+  assert.match(String(last.cells[1]), /£123$/u);
   assert.equal(segment.rows.length, Math.min(parts.groups.length, split.limit ?? 99) + 1);
 });
 

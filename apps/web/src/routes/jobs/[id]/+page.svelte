@@ -542,7 +542,7 @@
   }
 
   .step[data-kind='error'] .say {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .end .glyph {
@@ -555,7 +555,7 @@
   }
 
   .end[data-intent='bad'] .end-word {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .out {
@@ -573,7 +573,7 @@
   }
 
   .out[data-failed] .out-head {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* WHAT A TOOL ANSWERED, AS IT CAME: monospace on the tile's own white, rounded as a field is, scrolling inside
@@ -608,7 +608,7 @@
 
   .stop-fix {
     margin: 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     max-inline-size: var(--measure);
   }

@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import type { LiveBlock } from '../record/page-live.ts';
-import { emptyHidden, foldOf, FOLD_AT, holdsNothing, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
+import type { Entry } from '../record/schema.ts';
+import { emptyHidden, foldOf, FOLD_AT, holdsNothing, leadOf, openOf, optionOf, rowKeys, stepRow, unsaid, wholeKey } from './home.ts';
 
 /** A block as the record answers one, holding nothing unless the case says what. */
 const block = (over: Partial<LiveBlock> & { kind: string }): LiveBlock =>
@@ -82,6 +83,129 @@ test('A BLOCK WHOSE `when:` ALREADY SAID NO STAYS NOT DRAWN, and is not copied',
   assert.equal(emptyHidden([off])[0], off);
 });
 
+/* ── one empty line a page ─────────────────────────────────────────────────── */
+
+/** A row as a block's `matched` holds it: its number and its fields. */
+const entry = (seq: number, fields: Entry['fields']): Entry => ({ seq, fields, version: 1, created: '', by: '' });
+
+test('ONE EMPTY LINE A PAGE, ON ITS LEAD: an empty Work draws the field to add and one sentence, not a tile a list', () => {
+  /* Every block on Work carries an `empty:`, and an empty list drew each of them. */
+  const capture = block({ kind: 'capture', register: 'tasks' });
+  const today = block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' });
+  const late = block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing of yours is late.' });
+  const agent = block({ kind: 'todo', source: 'register.tasks', empty: 'No agent holds a task.' });
+  const pace = block({ kind: 'stat', source: 'figures.work', metrics: [], empty: 'Nothing done yet.' });
+  const out = emptyHidden([capture, today, late, agent, pace]);
+  assert.deepEqual(
+    out.map((b) => b.drawn),
+    [true, true, false, false, false],
+  );
+  assert.equal(leadOf([capture, today, late]), 1, 'the field to type into frames the page and is not its lead');
+});
+
+test('A PAGE WHOSE LEAD HOLDS SOMETHING DRAWS NO EMPTY LINE AT ALL, a sentence or a refusal leading as well', () => {
+  const cash = block({ kind: 'stat', source: 'figures.home', metrics: [{} as never] });
+  const orgs = block({ kind: 'bar', source: 'register.organisations', empty: 'No organisation lists an account yet.' });
+  assert.deepEqual(
+    emptyHidden([cash, orgs]).map((b) => b.drawn),
+    [true, false],
+    'Today said what you have, then that no organisation lists an account',
+  );
+  const lead = block({ kind: 'note', lead: true, body: 'Nothing is late.' } as never);
+  assert.deepEqual(
+    emptyHidden([lead, block({ kind: 'queue', source: 'governance.open', queue: [], empty: 'Nothing is waiting on you.' })]).map((b) => b.drawn),
+    [true, false],
+  );
+  const refused = block({ kind: 'todo', source: 'register.tasks', refusals: ['tasks has no field "ownr".'] });
+  assert.deepEqual(
+    emptyHidden([refused, block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' })]).map((b) => b.drawn),
+    [true, false],
+  );
+});
+
+test('THE LEAD IS THE FIRST BLOCK THAT SAYS ANYTHING, so an empty block with no sentence does not take the line from the next', () => {
+  const runs = block({ kind: 'table', source: 'sessions.live' });
+  const tasks = block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' });
+  assert.deepEqual(
+    emptyHidden([runs, tasks]).map((b) => b.drawn),
+    [false, true],
+  );
+  assert.equal(leadOf([runs]), -1, 'a page that says nothing has no lead');
+});
+
+test('A CHART OVER WHAT NO ROW HAS SAID IS NOT DRAWN, its empty line or not, and a list of the same rows still is', () => {
+  /* No project has a health: "How they are going" was one track, all "Not said yet". */
+  const health = block({ kind: 'split', source: 'metric.projects-by-health', parts: { metric: 'projects-by-health', value: 11, groups: [], more: 0 }, empty: 'No project is in play.' });
+  assert.equal(unsaid(health), true);
+  assert.deepEqual(emptyHidden([health]).map((b) => b.drawn), [false], 'it was the lead and still says nothing');
+  const said = { ...health, parts: { metric: 'projects-by-health', value: 11, groups: [{ key: 'on_track', value: 4 }], more: 0 } };
+  assert.equal(unsaid(said), false);
+  /* A FIGURE THAT READ NO ROW AT ALL is not this: it holds nothing, and as the lead it says its one line. */
+  const none = { ...health, parts: { metric: 'projects-by-health', value: 0, groups: [], more: 0 } };
+  assert.equal(unsaid(none), false);
+  assert.equal(holdsNothing(none), true);
+  assert.deepEqual(emptyHidden([none, block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' })]).map((b) => b.drawn), [true, false]);
+
+  /* No project says what it earns: a bar of nothing over its empty line. */
+  const projects = [entry(1, { name: 'Bake', revenue: null }), entry(2, { name: 'Sketchpad' })];
+  const earns = block({ kind: 'bar', source: 'register.things', register: 'things', columns: [{ field: 'name' }, { field: 'revenue' }] as never, matched: projects, entries: projects, total: 2, empty: 'No project in play says what it earns.' });
+  assert.equal(unsaid(earns), true);
+  assert.equal(unsaid({ ...earns, matched: [entry(1, { name: 'Bake', revenue: { amount: 10_500_000, currency: 'USD' } })] }), false);
+  const list = block({ kind: 'todo', source: 'register.things', register: 'things', columns: [{ field: 'name' }, { field: 'revenue' }] as never, matched: projects, entries: projects, rows: [row('Bake'), row('Sketchpad')], total: 2 });
+  assert.equal(unsaid(list), false, 'a list draws its rows’ names whatever else is empty');
+  assert.deepEqual(emptyHidden([earns, list]).map((b) => b.drawn), [false, true]);
+
+  /* A RANGE IS ITS BANDS: nothing spent yet is "Not spent" on each band, and a range with no band at all says nothing. */
+  const quotes = [entry(1, { name: 'Design', low: { amount: 100_000, currency: 'GBP' }, high: { amount: 200_000, currency: 'GBP' } })];
+  const range = block({ kind: 'progress', range: true, register: 'quotes', columns: [{ field: 'name' }, { field: 'spent' }, { field: 'low' }, { field: 'high' }] as never, matched: quotes, entries: quotes, total: 1 } as never);
+  assert.equal(unsaid(range), false, 'a range nothing is spent on is still every band it was given');
+  assert.equal(unsaid({ ...range, matched: [entry(1, { name: 'Design', spent: { amount: 5_000, currency: 'GBP' } })] }), true);
+});
+
+test('A FIGURE OVER A FIELD NOBODY FILLED IN GOES FROM ITS ROW, and a row of nothing else goes whole', () => {
+  const earning = { id: 'projects-earning', label: 'Earning', value: '£0', note: 'Nothing matched, so there is nothing to add up.', unsaid: true };
+  const live = { id: 'projects-live', label: 'In play', value: '11', note: '' };
+  const [both] = emptyHidden([block({ kind: 'stat', metrics: [live, earning] })]);
+  assert.equal(both!.drawn, true);
+  assert.deepEqual(both!.metrics?.map((m) => m.label), ['In play']);
+  assert.deepEqual(emptyHidden([block({ kind: 'stat', metrics: [earning] })]).map((b) => b.drawn), [false]);
+});
+
+test('A FIGURE OVER A LIST THAT HOLDS NOTHING IS NOT NEWS: an empty Work draws no "Done in 7 days 0"', () => {
+  /* Zero held is not news at all, as the record says it; zero matched over rows that exist is, and stays. */
+  const done = { id: 'tasks-done-7d', label: 'Done in 7 days', value: '0', note: '', nothingHeld: true };
+  const late = { id: 'tasks-late', label: 'Late', value: '0', note: '' };
+  const capture = block({ kind: 'capture', register: 'tasks' });
+  const today = block({ kind: 'todo', source: 'register.tasks', empty: 'Nothing due today.' });
+  const pace = block({ kind: 'stat', metrics: [done], empty: 'Nothing done yet.' });
+  assert.equal(holdsNothing(pace), true);
+  assert.deepEqual(
+    emptyHidden([capture, today, pace]).map((b) => b.drawn),
+    [true, true, false],
+    'the field to add the first task, one sentence, and no tile of zeros',
+  );
+  const [both] = emptyHidden([block({ kind: 'stat', metrics: [done, late] })]);
+  assert.deepEqual(both!.metrics?.map((m) => m.label), ['Late'], 'nothing late out of tasks that exist is still said');
+
+  /* AS THE LEAD IT SAYS ITS ONE LINE, and not its zeros: the tile goes and the sentence takes its place. */
+  const [lead] = emptyHidden([pace, today]);
+  assert.equal(lead!.drawn, true);
+  assert.deepEqual(lead!.metrics, [], 'a lead of nothing but zeros over nothing draws its empty line');
+  /* AND A PAGE AT ITS OWN ADDRESS KEEPS ONE SENTENCE, never the zeros it would otherwise fall back on. */
+  const [kept] = emptyHidden([block({ kind: 'stat', metrics: [done] })], true);
+  assert.equal(kept!.drawn, true);
+  assert.deepEqual(kept!.metrics, []);
+});
+
+test('A PAGE AT ITS OWN ADDRESS SAYS ONE SENTENCE WHERE IT WOULD SAY NOTHING, and a home says nothing', () => {
+  const tasks = block({ kind: 'todo', source: 'register.tasks' });
+  const runs = block({ kind: 'table', source: 'sessions.live' });
+  assert.deepEqual(emptyHidden([block({ kind: 'section', heading: 'Today' }), tasks, runs], true).map((b) => b.drawn), [true, true, false], 'the first block says the list holds nothing yet, under its heading');
+  assert.deepEqual(emptyHidden([tasks, runs]).map((b) => b.drawn), [false, false]);
+  const cannot = block({ kind: 'todo', source: 'sessions.live', cannot: 'This part of the page cannot be drawn from the record yet.' });
+  assert.deepEqual(emptyHidden([cannot, tasks], true).map((b) => b.drawn), [false, true], 'a block this build cannot draw is never the one kept');
+});
+
 /* ── the fold ──────────────────────────────────────────────────────────────── */
 
 test('A LONG LIST FOLDS IN PLACE AFTER ITS FIRST ROWS, and "N more" counts the rest', () => {
@@ -151,8 +275,8 @@ const SLOT = readFileSync(new URL('./BlockSlot.svelte', import.meta.url), 'utf8'
 const CARD = readFileSync(new URL('./QueueAnswer.svelte', import.meta.url), 'utf8');
 
 test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page at its own address still walks blocks', () => {
-  assert.match(BODY, /const quiet = \$derived\(emptyHidden\(blocks\)\);/);
-  assert.match(BODY, /mode === 'preview' \|\| arranging \? blocks : mode === 'page' && !quiet\.some\(\(b\) => b\.drawn\) \? blocks : quiet/, 'every page being read hides its empty blocks; authoring draws them all');
+  assert.match(BODY, /const quiet = \$derived\(emptyHidden\(blocks, mode === 'page'\)\);/, 'a page at its own address keeps one sentence where it would say nothing');
+  assert.match(BODY, /const drawable = \$derived\(mode === 'preview' \|\| arranging \? blocks : quiet\);/, 'every page being read hides its empty blocks; authoring draws them all');
   assert.match(BODY, /if \(mode === 'home'\) return homeKey\(e\);/);
   for (const key of ["case 'j':", "case 'k':", "case 'x':", "case 'Enter':", "case 'n':", 'optionOf(e.key)'])
     assert.ok(BODY.includes(key), `the home keys lost ${key}`);

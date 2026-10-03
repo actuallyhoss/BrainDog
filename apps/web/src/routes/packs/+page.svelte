@@ -28,7 +28,7 @@
   import type { CatalogueEntry, CatalogueIndex, CatalogueUpdate, Trust } from '@braindog/declare/catalogue';
   import { useCase } from '@braindog/seed/usecases';
   import { builtInFile } from '@braindog/seed/usecases/share';
-  import { moduleName, ruleName } from '@braindog/seed/usecases/names';
+  import { moduleName } from '@braindog/seed/usecases/names';
   /* THE MODULES THIS BUILD SHIPS, for their names, blurbs and lists, read off each one's own manifest and document. It
      was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote, then a hand copy with
      stale versions. */
@@ -38,12 +38,11 @@
   import * as pref from '$lib/pref.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
-  import { METRICS } from '$lib/record/declared.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { blocked, choose, packDocument, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
   import { addsOf } from '$lib/market/adds.ts';
-  import { actionOf, listingsOf, type ListingKind } from '$lib/market/listing.ts';
+  import type { ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { words as market } from '$lib/market/words.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -62,6 +61,9 @@
   import { browserStore, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor } from './browse/catalogue.ts';
   import { askOnDecide, diffOf, install, notOwner, planFor, type OfferClient, type Planned } from './browse/[id]/offer.ts';
   import { words } from './words.ts';
+  /* WHAT BRAINDOG ITSELF HAS IMPROVED, read from the one place Decide reads it too, so the Updates tab and the card on
+     Decide never disagree about what waits. */
+  import { declarationName, firstPartyUpdates } from '../decide/improved.ts';
 
   /* ── names ─────────────────────────────────────────────────────────────── */
 
@@ -81,16 +83,7 @@
    * What the plan sheet names: a declaration id (`register.money`, `page.home`, `metric.cash`, `rule.chase`) by the name
    * this record gives it, and anything else as a pack. The sheet puts the id in words when this knows nothing better.
    */
-  const planName = (id: string): string => {
-    const dot = id.indexOf('.');
-    const kind = dot < 0 ? '' : id.slice(0, dot);
-    const bare = id.slice(dot + 1);
-    if (kind === 'register') return listName(bare);
-    if (kind === 'page') return PAGES[bare]?.title ?? bare;
-    if (kind === 'metric') return METRICS[bare]?.name ?? bare;
-    if (kind === 'rule') return ruleName(bare) ?? bare;
-    return nameOf(id);
-  };
+  const planName = (id: string): string => declarationName(id, (page.data.lists ?? []) as { id: string; name: string }[], nameOf);
   const hosted = $derived(hostedHere(page.data as unknown as Shell));
 
   /* ── the record ────────────────────────────────────────────────────────── */
@@ -289,13 +282,7 @@
   });
 
   async function updatesOf(held: readonly PackState[], index: CatalogueIndex | null): Promise<Update[]> {
-    const bundled = listingsOf({ kennel: null, counts: null }).flatMap((l): Update[] => {
-      const a = actionOf(l, held);
-      if (a.kind !== 'update') return [];
-      const built = l.kind === 'usecase' ? builtInFile(l.id) : null;
-      if (l.kind === 'usecase' && !built) return [];
-      return [{ key: l.key, kind: l.kind, id: l.id, title: l.title, from: a.from, to: a.to, source: 'bundled', file: { doc: null, text: built ? JSON.stringify(built) : null }, entry: null, trust: null }];
-    });
+    const bundled = firstPartyUpdates(held).map((u): Update => ({ key: u.key, kind: u.kind, id: u.id, title: u.title, from: u.from, to: u.to, source: 'bundled', file: u.file, entry: null, trust: null }));
     if (!index) return bundled;
     const out = await updatesFor(fetch, index, held);
     unverified = out.refused;

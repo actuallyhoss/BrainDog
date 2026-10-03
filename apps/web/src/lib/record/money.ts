@@ -259,7 +259,8 @@ const written = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): 
  * display alone gave `E£` for EGP, where English writes `EGP`, as it writes `CHF` and `KWD`, and the contract for
  * money on a screen says a currency with no symbol keeps its code first. A
  * currency that does have one is drawn with its narrow form, `$` rather than `CA$`, because the code after every
- * figure that is not in the home currency already says which dollar it is.
+ * figure that is not in the home currency already says which dollar it is. A HEADLINE IS THE ONE EXCEPTION, and only
+ * for the record's own currency (`headlineSignOf`).
  */
 export function symbolOf(currency: string): string | null {
   try {
@@ -269,6 +270,32 @@ export function symbolOf(currency: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * THE SIGN A HEADLINE WRITES THE RECORD'S OWN CURRENCY WITH WHERE ENGLISH HAS NONE: `E£` for the Egyptian pound, as a
+ * price is written in Cairo. A figure standing on its own is read at a glance, and "EGP 1,086,213.41" over the founder's
+ * Today read as a line of a bank statement (DIRECTION §37). Only the record's own currency, since any other is said by
+ * its code anyway, and only a sign the figures are read back by (`£` with at most two capitals before it, as
+ * `braindog-render` parses one), so a narrow form that is letters (`kr`, `R`) keeps the code. `null` where there is none.
+ */
+export function headlineSignOf(currency: string): string | null {
+  try {
+    const narrow = written(currency, 'narrowSymbol');
+    return narrow && /^[A-Z]{0,2}\p{Sc}$/u.test(narrow) ? narrow : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A HEADLINE'S AMOUNT IN WHOLE UNITS, from its digits: "1,086,213" and ".41" are "1,086,213", and a half rounds up. Under a
+ * hundred units the fraction is most of the figure, "£4.37" a cup, so it stays where it is not all zeros.
+ */
+function wholeUnits(whole: string, fraction: string): { whole: string; fraction: string } {
+  const digits = whole.replace(/,/gu, '');
+  if (Number(digits) < 100) return { whole, fraction: /^\.0+$/u.test(fraction) ? '' : fraction };
+  return { whole: /^\.[5-9]/u.test(fraction) ? grouped(String(Number(digits) + 1)) : whole, fraction: '' };
 }
 
 /**
@@ -284,15 +311,20 @@ export type Drawn = { lead: string; whole: string; fraction: string; iso: string
 
 const WRITTEN = /^([A-Z]{3}) (−?)([\d,]+)(\.\d+)?$/u;
 
-export function drawn(text: string, home: string | null): Drawn | null {
+/**
+ * `headline` IS A FIGURE STANDING ON ITS OWN (a tile, the page's one line, a bar's value): the record's own currency is
+ * written by its sign where English has only a code (`headlineSignOf`), and the amount is in whole units (`wholeUnits`).
+ */
+export function drawn(text: string, home: string | null, headline = false): Drawn | null {
   const m = WRITTEN.exec(text);
   if (!m) return null;
   const [, currency, minus, whole, fraction] = m as unknown as [string, string, string, string, string | undefined];
-  const symbol = symbolOf(currency);
+  const symbol = symbolOf(currency) ?? (headline && currency === home ? headlineSignOf(currency) : null);
+  const amount = headline ? wholeUnits(whole, fraction ?? '') : { whole, fraction: fraction ?? '' };
   return {
     lead: symbol === null ? `${currency} ${minus}` : `${minus}${symbol}`,
-    whole,
-    fraction: fraction ?? '',
+    whole: amount.whole,
+    fraction: amount.fraction,
     iso: symbol !== null && currency !== home ? currency : null,
   };
 }
@@ -300,8 +332,8 @@ export function drawn(text: string, home: string | null): Drawn | null {
 /**
  * How a figure is set where it stands: `exact` in a ledger or a table, every minor unit shown, since that is where
  * amounts are compared; `sentence` in words a person reads, a note, a question, a line of the feed, where a fraction
- * of all zeros says nothing ("£39", "−£9,190"); and `headline`, a figure standing on its own in a tile, set as a
- * sentence sets it.
+ * of all zeros says nothing ("£39", "−£9,190"); and `headline`, a figure standing on its own in a tile, a bar or the
+ * page's one line, in whole units and in the record's own sign ("E£1,086,213").
  */
 export type Setting = 'exact' | 'sentence' | 'headline';
 
@@ -312,15 +344,18 @@ export type Setting = 'exact' | 'sentence' | 'headline';
  * its code after the figure in every setting too, "$4,800 USD": two currencies never look alike, a headline's
  * included, since the narrow `$` is the same mark for four dollars. That is the design system's rule (`2.3`).
  *
- * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence or
- * under a headline is width a phone does not have and says nothing a round figure does not. A fraction that is not all
- * zeros is part of the figure and stays. `true` is `headline` and `false` is `sentence`, as the callers that predate
- * the settings pass them; a table cell asks for `exact`.
+ * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence is width
+ * a phone does not have and says nothing a round figure does not. A fraction that is not all zeros is part of the figure
+ * and stays in a sentence. A HEADLINE IS WHOLE UNITS (DIRECTION §37): "EGP 1,086,213.41" over Today is "E£1,086,213",
+ * in the record's own sign and with the piastres gone, and a figure under a hundred keeps a fraction that is most of
+ * it. `true` is `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell
+ * asks for `exact`.
  */
 export function symbolText(text: string, home: string | null, setting: Setting | boolean = 'sentence'): string {
   const exact = setting === 'exact';
+  const headline = setting === 'headline' || setting === true;
   return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
-    const d = drawn(hit, home);
+    const d = drawn(hit, home, headline);
     /* THREE CAPITALS THE RUNTIME DOES NOT LIST AS TENDER ARE NOT MONEY, and their figure is left as it was written. */
     if (!d || !TENDER.has(hit.slice(0, 3))) return hit;
     const fraction = !exact && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;

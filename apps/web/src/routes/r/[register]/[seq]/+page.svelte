@@ -45,7 +45,7 @@
   import Face from '$lib/ui/Face.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
   import { faceWords, liveOf, runOf } from '$lib/ui/face.ts';
-  import { isStale } from '@braindog/kernel';
+  import { isQuiet } from '@braindog/kernel';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -615,7 +615,8 @@
     const mark = project ? names?.marks?.get(project) : undefined;
     return {
       agent: said(f.agent) || null,
-      live: liveOf(f.state, isStale({ fields: f as never, updated_at: row.created }, clock)),
+      /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
+      live: liveOf(f.state, isQuiet({ fields: f as never, updated_at: row.created }, clock)),
       doing: said(f.doing),
       project: project ? (names?.get(project) ?? null) : null,
       mark: mark ? { mark: mark.mark, hue: mark.hue } : null,
@@ -1302,7 +1303,7 @@
   }
 
   .said-late[data-tone='bad'] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .said-late[data-tone='warn'] {
@@ -1385,7 +1386,7 @@
 
   /* A DEADLINE THAT HAS PASSED: the day in red, the words carrying the colour. */
   .prop[data-late] .prop-value {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* The value inside a pill takes the pill's size, whatever it is drawn by. */

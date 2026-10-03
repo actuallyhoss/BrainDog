@@ -49,6 +49,7 @@
   import { draftOf, editable, patchOf, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
   import {
+    arrivedAt,
     chipOn,
     defaultFrom,
     defaultKey,
@@ -915,9 +916,10 @@
   const isDefault = $derived(kept !== null && sameDefault(kept, current));
 
   let opening = $state<string | null>(null);
+  /* A FIRST LOAD ARRIVES FROM A `from` WITH NO ADDRESS, which `arrivedAt` reads without throwing. */
   afterNavigate(({ from, to }) => {
-    if (!to || to.url.search !== '' || from?.url.pathname === to.url.pathname) return;
-    opening = to.params?.register ?? null;
+    const at = arrivedAt(from, to);
+    if (at !== null) opening = at;
   });
   $effect(() => {
     if (opening === null || opening !== id || !decl) return;
@@ -2622,10 +2624,10 @@
      `<style>` block styles only what its own file writes. What is left here is the page's frame. */
 
   /* THE ROOM THE DOCKED PEEK TAKES, less the gutter the head and the list already keep at their end, so the list's
-     edge stands 12 from the panel. It moves with the panel's own 220ms. */
+     edge stands 12 from the panel. It moves with the panel's own slide, over `--d-panel` on the sheet curve. */
   .list-screen {
     padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));
-    transition: padding-inline-end var(--d-move) var(--ease-out);
+    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
   /* DISPLAY IS A 44PX GLASS CIRCLE ON A PHONE, its word kept in the button for a screen reader and a tooltip on it. */

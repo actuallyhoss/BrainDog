@@ -11,7 +11,7 @@
 const Z = 0.7467;
 const W = 6.56;
 const WD = W * Math.sqrt(1 - Z * Z);
-const STOPS = 24;
+const STOPS = 12;
 
 const x = (t) => 1 - Math.exp(-Z * W * t) * (Math.cos(WD * t) + ((Z * W) / WD) * Math.sin(WD * t));
 
@@ -26,4 +26,4 @@ const peak = Math.max(...values);
 if (peak > 1.05) throw new Error(`spring peaks at ${peak.toFixed(4)}; the ceiling is 1.05 (13 §9)`);
 
 console.log(`/* zeta ${Z}, omega ${W}, settle ${settle.toFixed(3)}s, peak ${peak.toFixed(4)} */`);
-console.log(`linear(${values.map((v) => v.toFixed(4)).join(', ')})`);
+console.log(`linear(${values.map((v) => +v.toFixed(2)).join(', ')})`);

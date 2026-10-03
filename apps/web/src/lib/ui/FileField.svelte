@@ -231,7 +231,7 @@
   }
 
   .file-remove {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* THE NATIVE PICKER IS NEVER SEEN: the button above opens it, and the browser's own control is the one on the page
@@ -248,7 +248,7 @@
 
   .file-why {
     margin: 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
   }
 

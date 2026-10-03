@@ -21,6 +21,7 @@ import { REGISTERS } from '../record/held.ts';
 import { movePatch, type Declared } from '../record/page-write.ts';
 import { inverseOf } from '../record/rows-write.ts';
 import type { Entry } from '../record/schema.ts';
+import { cutIn } from './clipped.ts';
 
 /**
  * The patch that undoes moving `ref` from the column `from` to `to` over `field`, given `held`, the row as the page drew it
@@ -36,8 +37,10 @@ import type { Entry } from '../record/schema.ts';
 export function moveBackOf(ref: RowRef, field: string, to: string, from: string, decl: Declared | null, held: Entry | undefined): Record<string, unknown> | null {
   if (!held) return from ? movePatch(ref, field, from, decl) : null;
   const named: { state?: unknown; finished?: unknown } | undefined = decl ?? REGISTERS[ref.register];
-  return inverseOf(held, movePatch(ref, field, to, decl) as Entry['fields'], {
+  const back = inverseOf(held, movePatch(ref, field, to, decl) as Entry['fields'], {
     ...(typeof named?.state === 'string' ? { state: named.state } : {}),
     ...(typeof named?.finished === 'string' ? { finished: named.finished } : {}),
   });
+  /* NEVER A TEXT THE PAGE CUT SHORT, which put back would be saved over the whole of it (`clipped.ts`). */
+  return cutIn(held, back) ? null : back;
 }

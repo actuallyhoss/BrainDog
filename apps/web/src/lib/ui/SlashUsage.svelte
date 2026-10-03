@@ -214,7 +214,7 @@
 
   /* OUT OF ASKS NEEDS HIM: the words carry it, in red at 500 so the colour is never a hairline. */
   .spent-said[data-needs] {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

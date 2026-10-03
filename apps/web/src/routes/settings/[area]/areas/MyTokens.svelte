@@ -199,7 +199,7 @@
   }
 
   .mine-said[data-intent='bad'] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* ROWS ON THE GROUND WITH A HAIRLINE BETWEEN THEM, each led by its key's well, as the owner's Connected

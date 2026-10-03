@@ -15,7 +15,7 @@
  */
 
 import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
-import { isStale, railRoom } from '@braindog/kernel';
+import { isQuiet, railRoom, runAge } from '@braindog/kernel';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
    own manifest said it. */
@@ -321,9 +321,19 @@ export const signsIn = (b: Boot): boolean => (b as Boot & { signIn?: unknown }).
 
 /**
  * One agent at work, as the rail's Working now draws it: the run, the kind of agent, the project it was
- * placed in, what it says it is doing, when the run began, and whether it has gone quiet.
+ * placed in, what it says it is doing, when the run began, whether it has gone quiet, and how long it has gone in
+ * seconds (`ran_s`, the record's `runAge`), which stops at the last time a quiet run was heard from.
  */
-export type Working = { seq: number | null; agent: string; kind: AgentKind; project: string | null; doing: string; since: string | null; quiet: boolean };
+export type Working = {
+  seq: number | null;
+  agent: string;
+  kind: AgentKind;
+  project: string | null;
+  doing: string;
+  since: string | null;
+  quiet: boolean;
+  ran_s?: number;
+};
 
 /** The most runs the rail lists; Today and the run pages hold the rest. */
 const WORKING_SHOWN = 5;
@@ -364,6 +374,7 @@ export async function readWorking(base: string, io?: Fetch, now = Date.now()): P
     const fields = (typeof row.fields === 'object' && row.fields !== null ? row.fields : {}) as Record<string, unknown>;
     const scope = scopes[i];
     const kind = agentKindOf(said(fields.agent));
+    const run = { fields: fields as Parameters<typeof runAge>[0]['fields'], created_at: said(row.created_at), updated_at: said(row.updated_at) };
     return [
       {
         seq: typeof row.seq === 'number' ? row.seq : null,
@@ -374,7 +385,10 @@ export async function readWorking(base: string, io?: Fetch, now = Date.now()): P
         project: (typeof scope === 'string' && scope !== '' ? scope : null) ?? (said(fields.project) || null),
         doing: said(fields.doing),
         since: said(row.created_at) || null,
-        quiet: isStale({ fields: fields as Parameters<typeof isStale>[0]['fields'], updated_at: said(row.updated_at) }, now),
+        /* GONE QUIET AS THE RECORD SAYS IT (`isQuiet`): open, and not heard from in 30 minutes. */
+        quiet: isQuiet(run, now),
+        /* AND HOW LONG IT HAS GONE AS THE RECORD COUNTS IT (`runAge`), so a quiet run's age stops where it went quiet. */
+        ran_s: runAge(run, now),
       },
     ];
   });

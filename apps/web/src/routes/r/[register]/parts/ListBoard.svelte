@@ -420,7 +420,7 @@
 
   /* "2 DAYS LATE", THE CARD'S ONE RED, carried by its words at 500. */
   .bcard-due[data-late] {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

@@ -320,7 +320,7 @@
     display: inline-flex;
     flex: none;
     margin-block-start: 1px;
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .row-actions {

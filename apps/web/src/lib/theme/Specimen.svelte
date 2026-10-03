@@ -188,7 +188,7 @@
   }
 
   .spec-intent[data-tone='danger'] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .spec-intent[data-tone='info'] {

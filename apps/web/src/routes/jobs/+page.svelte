@@ -494,7 +494,7 @@
   }
 
   .sheet-fix {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .kinds {

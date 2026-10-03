@@ -1372,7 +1372,7 @@
 
 <!-- ══ THE DOCKED PANEL: the task open in its edit state ══ -->
 {#if shape}
-  <Panel bind:open={panelOpen} title={mayWrite ? words.panel.editing : words.panel.reading} onclose={panelClosed}>
+  <Panel bind:open={panelOpen} title={mayWrite ? words.panel.editing : words.panel.reading} shows={opened} onclose={panelClosed}>
     {#snippet verbs()}
       {#if openRow && opened !== null}
         {@const seq = opened}
@@ -1567,11 +1567,12 @@
 </RowMenu>
 
 <style>
-  /* THE SCREEN GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter the title row and the page already pad by. */
+  /* THE SCREEN GIVES UP WHAT THE DOCKED PANEL TAKES, past the gutter the title row and the page already pad by, and in
+     step with the panel's own slide (`--d-panel` on the sheet curve). */
   .work {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));
-    transition: padding-inline-end var(--d-enter) var(--ease-out);
+    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
   .page {
@@ -2198,7 +2199,7 @@
 
   /* "2 DAYS LATE", THE ROW'S ONE RED, and "waits on your review": what needs him. */
   .when[data-tone='danger'] .when-words {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .when[data-tone='warn'] .when-words {
@@ -2353,7 +2354,7 @@
   }
 
   .p-due[data-late] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .p-field {

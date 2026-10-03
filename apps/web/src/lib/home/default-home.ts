@@ -170,7 +170,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         heading: voice.workingNow,
         icon: 'session',
         source: 'sessions.live',
-        where: 'state is active',
+        where: 'state is active, last_seen is today',
         columns: [
           { field: 'agent', label: 'Agent' },
           { field: 'doing', label: 'Doing' },

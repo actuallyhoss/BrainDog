@@ -14,8 +14,12 @@
  * rather than inventing one, the recommendation lives as a function a caller can test against a
  * fixed case and a settings screen can call on render.
  *
- * WHAT IT NEVER DOES: it never writes `navShape`. That write happens on the click that accepts the
+ * WHAT IT NEVER DOES: it never writes `nav.shape`. That write happens on the click that accepts the
  * suggestion, in the caller, exactly as `settings/navigation` already does for a promoted page.
+ *
+ * AND IT NEVER TALKS SOMEBODY OFF THE DEFAULT INTO THE TOP BAR. The floating rail card is the shell (DIRECTION 37, which
+ * superseded the top bar of §35), so a record that never chose a shape is on the rail, and the bar stays a choice in
+ * Settings rather than an offer. A rail somebody picked can still be told the bar would hold everything.
  */
 
 export type NavShape = 'rail' | 'bar' | 'menu';
@@ -27,7 +31,7 @@ export type NavShapeSignals = {
   sections: number;
   /** Whether this person has reordered the nav by hand (`Pref.nav` is non-empty). */
   handArranged: boolean;
-  /** The shape set today, or `undefined` for the top bar default, which is `Pref.navShape`'s own reading. */
+  /** The shape somebody chose, or `undefined` while nobody has, which is the rail (`NavPrefs.chosen`). */
   current: NavShape | undefined;
   /**
    * The viewport width in CSS pixels, when it is known. Below 900px `19 §3` keeps the tab bar
@@ -58,7 +62,8 @@ const TOP_BAR_SLOTS = 4;
  */
 export function recommendNavShape(signals: NavShapeSignals): NavShapeRecommendation | null {
   const { entries, sections, handArranged, current, viewportWidth } = signals;
-  const effective: NavShape = current ?? 'bar';
+  /* NOBODY CHOSE, SO THE RAIL: what the shell draws for a record that keeps no shape (`nav-prefs.svelte.ts`). */
+  const effective: NavShape = current ?? 'rail';
 
   if (viewportWidth !== undefined && viewportWidth < 900) return null;
 
@@ -96,6 +101,8 @@ export function recommendNavShape(signals: NavShapeSignals): NavShapeRecommendat
   }
 
   if (best === effective) return null;
+  /* The default is the rail card, and the top bar is somebody's choice to make, not ours to offer (the header). */
+  if (current === undefined && best === 'bar') return null;
   return { shape: best, reason };
 }
 
@@ -106,6 +113,8 @@ export function recommendNavShape(signals: NavShapeSignals): NavShapeRecommendat
  * `navEntries` is the same list `Sidebar.svelte` groups by `arrange()`, `section` field and all;
  * `registerCount` is `index.registers.length`, the lists drawn under their own "Lists" section.
  * Both are already computed by `record/api.ts`'s `boot()`, so this reads them rather than the rows.
+ * `navShape` is the shape somebody chose (`navPrefs.chosen`), not the one drawn: the drawn shape is never `undefined`, and
+ * a caller that hands it in tells this a record on the default rail picked the rail.
  */
 export function navShapeSignals(
   navEntries: readonly { section: string }[],

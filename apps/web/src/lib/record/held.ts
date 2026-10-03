@@ -58,14 +58,18 @@ export function seqTitled(register: string, said: string, same: (a: string, b: s
 }
 
 /**
- * The rows a ref into `register` can point at, as a picker offers them: by name, or `<list>#<number>` for a row with none.
+ * The rows a ref into `register` can point at, as a picker offers them: by name, or as its kind and number for a row
+ * with none, "Book #2", as `unnamed` in `api.ts` says it. It said `books#2`, the id an agent passes, which is never what
+ * a person reads (DIRECTION §37).
  *
  * EMPTY UNTIL THE LIST HAS BEEN WALKED, and that is the honest answer. The new-row form offered the sample's rows here,
  * so on a record whose projects are Harbour Lane and Tidewater a new service could only be pointed at Kiln, Marlow & Co,
  * Portage and a fourth project the record never held, and the number sent was a real row of the record's.
  */
-export const refOptions = (register: string): { value: number; label: string }[] =>
-  [...(TITLES.get(register) ?? [])].map(([seq, title]) => ({ value: seq, label: title || `${register}#${seq}` }));
+export const refOptions = (register: string): { value: number; label: string }[] => {
+  const kind = REGISTERS[register]?.one ?? register.replace(/_/g, ' ');
+  return [...(TITLES.get(register) ?? [])].map(([seq, title]) => ({ value: seq, label: title || `${kind.charAt(0).toUpperCase()}${kind.slice(1)} #${seq}` }));
+};
 
 /**
  * Each list's rows as this tab holds them past the screen that read them, by list: none, in a shipped build.

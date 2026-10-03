@@ -458,7 +458,7 @@
   }
 
   .standing[data-needs] :global(.chip) {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .standing-by {

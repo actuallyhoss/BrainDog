@@ -398,6 +398,24 @@ export function defaultParams(d: ListDefault, decl: RegisterDecl | undefined): {
   return { params, hidden: d.hidden.filter((h) => fields.has(h) && h !== decl?.title) };
 }
 
+/** Where a navigation came from or went to, as much of SvelteKit's `NavigationTarget` as `arrivedAt` reads. */
+type Navigated = { url: URL | null; params?: Readonly<Record<string, string | undefined>> | null } | null;
+
+/**
+ * THE LIST A NAVIGATION ARRIVES AT, whose default then applies: the list a bare address names, reached from another
+ * address or as the tab's first load. `null` for a move inside the list, and for an address that already asks for
+ * something.
+ *
+ * A FIRST LOAD CAME FROM NOWHERE, AND SVELTEKIT SAYS SO WITH A `from` WHOSE `url` IS `null`. The app is a static shell,
+ * so its router starts on `type: 'enter'` from a state that has no address yet, and `from` is that state rather than
+ * `null`. `from?.url.pathname` read a property of that `null`, so a list opened at its own address threw inside
+ * `afterNavigate` and never drew.
+ */
+export function arrivedAt(from: Navigated, to: Navigated): string | null {
+  if (!to?.url || to.url.search !== '' || from?.url?.pathname === to.url.pathname) return null;
+  return to.params?.register ?? null;
+}
+
 /** Whether a row is in one of the list's finished states ("Paid", "Done"). */
 export const isDone = (decl: RegisterDecl | undefined, e: Entry): boolean =>
   Boolean(decl?.state && decl.done?.includes(String(e.fields[decl.state] ?? '')));

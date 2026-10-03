@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formOf, step } from './panel.ts';
+import { EXIT_MOST, FLICK, FLICK_MIN, FLICK_WINDOW, LET_GO, Pull, STALL, formOf, letGo, settled, step, unstall } from './panel.ts';
+
+/** Every promise the code under test has settled, handled. */
+const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 test('a narrow window gets a bottom sheet, and a wide one the docked panel', () => {
   assert.equal(formOf(true), 'sheet');
@@ -27,4 +30,186 @@ test('closing closes whichever form is open, and a closed panel stays closed', (
   assert.equal(step({ open: false, form: 'docked' }, { open: true, modal: false }), 'close');
   assert.equal(step({ open: false, form: 'sheet' }, { open: true, modal: true }), 'close');
   assert.equal(step({ open: false, form: 'sheet' }, { open: false, modal: false }), null);
+});
+
+/* ── letting a bottom sheet go ───────────────────────────────────────────── */
+
+/** A sheet as tall as a phone sheet with a short form in it. */
+const TALL = 420;
+
+test('A SHEET DRAWN PAST A THIRD OF ITS HEIGHT CLOSES, and one short of it goes back', () => {
+  assert.equal(letGo(TALL * LET_GO + 1, TALL, 0), true, 'a slow pull past a third left the sheet open');
+  assert.equal(letGo(TALL * LET_GO - 1, TALL, 0), false, 'a slow pull short of a third closed the sheet');
+  /* The third is of THIS sheet: the same pull closes a short sheet and not a tall one. */
+  assert.equal(letGo(120, 300, 0), true);
+  assert.equal(letGo(120, 600, 0), false, 'the threshold did not follow the height of the sheet');
+});
+
+test('a flick closes it from anywhere, but a tap that jitters is not a flick', () => {
+  assert.equal(letGo(FLICK_MIN, TALL, FLICK), true, 'a throw short of a third left the sheet open');
+  assert.equal(letGo(FLICK_MIN, TALL, FLICK - 0.01), false, 'a drag slower than a flick closed the sheet');
+  assert.equal(letGo(FLICK_MIN - 1, TALL, FLICK * 4), false, 'a few pixels of jitter at speed closed the sheet');
+});
+
+test('A PULL FOLLOWS THE FINGER DOWN AND NEVER ABOVE WHERE THE SHEET RESTS', () => {
+  const pull = new Pull();
+  assert.equal(pull.held, false);
+  assert.equal(pull.move(500, 0), 0, 'a move with nothing grabbed drew the sheet');
+
+  pull.grab(400, 0);
+  assert.equal(pull.held, true);
+  assert.equal(pull.move(460, 16), 60);
+  assert.equal(pull.move(380, 32), 0, 'the sheet was drawn up past where it rests');
+});
+
+test('a pull let go past a third closes, however slowly it was drawn', () => {
+  const pull = new Pull();
+  pull.grab(400, 0);
+  for (let t = 16, y = 400; y < 560; t += 16, y += 4) pull.move(y, t);
+  assert.equal(pull.drop(560, 656, TALL), true, 'a slow pull of 160 on a 420 sheet went back');
+  assert.equal(pull.held, false, 'the pull was still held after the release');
+});
+
+test('A THROW CLOSES THE SHEET, measured over the end of the pull and not the whole of it', () => {
+  const pull = new Pull();
+  pull.grab(400, 0);
+  /* Slowly for a second, and then 40px in the last 50ms: 0.8 a millisecond at the moment it is let go. */
+  pull.move(420, 1000);
+  pull.move(440, 1025);
+  assert.equal(pull.drop(460, 1050, TALL), true, 'a throw at the end of a slow pull was read as a slow pull');
+});
+
+test('a pull that stops before it is let go is somebody keeping the sheet', () => {
+  const pull = new Pull();
+  pull.grab(400, 0);
+  pull.move(440, 30);
+  pull.move(480, 60);
+  /* Fast, and then still for longer than the window looks back. */
+  assert.equal(pull.drop(480, 60 + FLICK_WINDOW + 50, TALL), false, 'a pull that had stopped was taken for a flick');
+});
+
+test('a cancelled pointer goes back unless it was already past a third', () => {
+  const fast = new Pull();
+  fast.grab(400, 0);
+  fast.move(440, 20);
+  assert.equal(fast.drop(460, 40, TALL, true), false, 'a cancelled pointer was read as a flick');
+
+  const far = new Pull();
+  far.grab(400, 0);
+  far.move(600, 400);
+  assert.equal(far.drop(600, 400, TALL, true), true, 'a sheet drawn past a third went back because the pointer was cancelled');
+});
+
+test('a release with nothing grabbed closes nothing', () => {
+  assert.equal(new Pull().drop(900, 10, TALL), false);
+});
+
+/* ── an opening that never starts ────────────────────────────────────────── */
+
+/** An opening whose first frame comes when the test says, or never. */
+function opening() {
+  let begin = () => {};
+  const a = {
+    ready: new Promise<unknown>((resolve) => (begin = () => resolve(undefined))),
+    playState: 'running',
+    finished: 0,
+    finish() {
+      this.finished++;
+      this.playState = 'finished';
+    },
+  };
+  return { el: { getAnimations: () => [a] }, a, begin: () => begin() };
+}
+
+test('AN OPENING STILL WAITING FOR ITS FIRST FRAME IS FINISHED, so a stall shows the panel in place', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { el, a } = opening();
+  unstall(el);
+
+  t.mock.timers.tick(STALL - 1);
+  assert.equal(a.finished, 0, 'an opening was cut short before it had been given its time');
+  t.mock.timers.tick(1);
+  assert.equal(a.finished, 1, 'an opening that never began left the panel out of sight');
+});
+
+test('and one that began on time is left to play', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { el, a, begin } = opening();
+  unstall(el);
+
+  begin();
+  await settle();
+  t.mock.timers.tick(STALL * 2);
+  assert.equal(a.finished, 0, 'a slide that had started was cut to its end');
+
+  /* Nothing moving is nothing to do, and no browser support is the same. */
+  unstall({ getAnimations: () => [] });
+  unstall({});
+});
+
+/* ── an exit, to its end ─────────────────────────────────────────────────── */
+
+/** An element with these exits running, each one a promise the test settles by hand. */
+function moving(count: number) {
+  const ends: { resolve: () => void; reject: () => void }[] = [];
+  const animations = Array.from({ length: count }, () => ({
+    finished: new Promise<unknown>((resolve, reject) => ends.push({ resolve: () => resolve(undefined), reject })),
+  }));
+  return { el: { getAnimations: () => animations }, ends };
+}
+
+test('AN ELEMENT WITH NOTHING MOVING IS DONE AT ONCE, so an exit nobody started cannot strand it', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let done = 0;
+  settled({ getAnimations: () => [] }, () => done++);
+  assert.equal(done, 1, 'an element with no exit running waited for one');
+
+  /* A browser with no Web Animations at all is the same answer. */
+  settled({}, () => done++);
+  assert.equal(done, 2);
+
+  t.mock.timers.tick(EXIT_MOST * 2);
+  assert.equal(done, 2, 'the fallback fired as well, so the element was let go twice');
+});
+
+test('an exit is waited for to its end, every part of it, and once', async () => {
+  const { el, ends } = moving(2);
+  let done = 0;
+  settled(el, () => done++);
+
+  ends[0]!.resolve();
+  await settle();
+  assert.equal(done, 0, 'the element was let go before the second half of its exit had finished');
+
+  ends[1]!.resolve();
+  await settle();
+  assert.equal(done, 1, 'the element was never let go after its exit finished');
+});
+
+test('a cancelled exit counts as over, and one that never reports is let go after the longest wait', async (t) => {
+  const cancelled = moving(1);
+  let gone = 0;
+  settled(cancelled.el, () => gone++);
+  cancelled.ends[0]!.reject();
+  await settle();
+  assert.equal(gone, 1, 'a cancelled exit left the element on the page');
+
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const stuck = moving(1);
+  let freed = 0;
+  settled(stuck.el, () => freed++);
+  t.mock.timers.tick(EXIT_MOST - 1);
+  assert.equal(freed, 0);
+  t.mock.timers.tick(1);
+  assert.equal(freed, 1, 'an exit that never reported kept the element on the page for good');
+});
+
+test('AN EXIT CALLED OFF NEVER LETS THE ELEMENT GO, which is a menu opened again on its way out', async () => {
+  const { el, ends } = moving(1);
+  let done = 0;
+  const off = settled(el, () => done++);
+  off();
+  ends[0]!.resolve();
+  await settle();
+  assert.equal(done, 0, 'an exit that was taken back still took the element off the page');
 });

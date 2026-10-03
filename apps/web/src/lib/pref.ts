@@ -65,7 +65,8 @@ export type Pref = {
   /**
    * WHERE THE NAVIGATION LIVES: the rail, a top bar, or nothing but a button.
    *
-   * `undefined` IS THE RAIL, which `19 §3` makes the default in bold and keeps there. The three
+   * `undefined` IS THE RAIL, the floating glass card, which `19 §3` makes the default in bold and
+   * DIRECTION 37 made the default again after a spell of the top bar leading (§35). The three
    * shapes are that section's own table: the rail, sectioned and arrangeable; a top bar, one
    * horizontal strip of spine then declared entries, overflowing into More and SAYING HOW MANY it
    * has put there; and the menu, no persistent nav at all, one button opening the whole sectioned
@@ -84,6 +85,11 @@ export type Pref = {
    *
    * IT WAS `navShape` UNTIL THE TOP BAR BECAME THE DEFAULT. Every boot wrote the rail into that key whether or not
    * anybody chose it, so the old copy is left behind rather than read as a choice.
+   *
+   * AND THIS ONE CARRIES THE SAME SCAR, the other way round: every boot of the builds that led with the top bar wrote
+   * `bar` here, chosen or not. So beside a record that keeps no shape a `bar` is read as nobody's choice and the rail is
+   * drawn (`deviceChose` in `nav-prefs.svelte.ts`), and the copy is written from a choice only now, never from the
+   * default, so the next change of default meets an empty key instead of a cookie full of the old one.
    */
   shape?: 'rail' | 'bar' | 'menu' | undefined;
   /** Whether bare letters act inside a focused grid. */

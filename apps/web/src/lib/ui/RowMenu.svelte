@@ -19,11 +19,17 @@
   scrim, as a popover in the top layer, in 48px rows at 16px with a Cancel row. A panel pinned to a
   row's rect is a panel under the finger that long-pressed the row.
 
+  IT OPENS AND CLOSES AS `Menu.svelte` DOES: a pop from .96 at the row in 120ms, a close to .985
+  as it fades in 90ms, and as a sheet up from below the screen and back down it. The menu stays on
+  the page, inert, until its close has played, where it was opened, even when its caller forgets
+  the row's rect the moment it closes.
+
   "HAND TO" IS THIS MENU'S OWN ITEM, last before Cancel, on a row of a list that says who holds its rows and
   for somebody who may change it, at every width. The sheet it opens lives outside the menu, since the menu closes on
   the press, and its code is fetched on the first press, so the rail that also uses this menu carries none of it.
 -->
 <script lang="ts">
+  import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
@@ -31,6 +37,7 @@
   import { may } from '../record/may.ts';
   import type { Entry, RegisterDecl } from '../record/schema.ts';
   import Icon from './Icon.svelte';
+  import { settled } from './panel.ts';
 
   type Handed = { register: string; row: Entry; decl: RegisterDecl; onhanded?: ((entry: Entry) => void) | undefined };
 
@@ -66,10 +73,54 @@
 
   const words = { cancel: 'Cancel' };
 
-  /* The action sheet's query, `Menu.svelte`'s own: read once as the menu opens, and written onto the
-     panel as its `popover` attribute, which is what the sheet's rules key on. */
+  /* The action sheet's query, `Menu.svelte`'s own: read once as the menu opens, written onto the
+     panel as its `popover` attribute, which is what the sheet's rules key on, and held through the
+     close, so a sheet goes down as a sheet. */
   const SHEET = '(width < 640px), (pointer: coarse)';
-  const sheet = $derived(open && matchMedia(SHEET).matches);
+  let sheet = $state(false);
+
+  /**
+   * ON THE PAGE FROM THE OPENING TO THE END OF ITS CLOSE, `Menu.svelte`'s lifecycle and its
+   * reasons: `leaving` is the close while it plays, and `exits` says which close is the latest, so
+   * a menu opened again on its way out is not taken away by the close before.
+   */
+  let shown = $state(false);
+  let leaving = $state(false);
+  let exits = 0;
+  let stay: (() => void) | null = null;
+
+  /** WHERE IT WAS OPENED, kept for the close: the list page forgets the rect as the menu closes. */
+  let kept = $state.raw<{ x: number; y: number; height: number } | null>(null);
+
+  $effect(() => {
+    const want = open && at !== null;
+    untrack(() => {
+      if (want) {
+        exits++;
+        stay?.();
+        stay = null;
+        if (!shown) sheet = matchMedia(SHEET).matches;
+        kept = at;
+        shown = true;
+        leaving = false;
+        return;
+      }
+      if (!shown || leaving) return;
+      leaving = true;
+      const mine = ++exits;
+      void tick().then(() => {
+        if (mine !== exits) return;
+        const gone = () => {
+          if (mine !== exits) return;
+          stay = null;
+          shown = false;
+          leaving = false;
+        };
+        if (list) stay = settled(list, gone);
+        else gone();
+      });
+    });
+  });
 
   const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
 
@@ -77,11 +128,18 @@
      it, so an effect that only watches `open` runs one tick too early and focuses nothing: the
      menu opened with focus still on `<body>`, so the first arrow press went to the page and Enter
      did nothing at all. Reading `list` here makes the effect wait for it. A sheet goes into the top
-     layer first, because a popover that is not showing cannot take focus. */
+     layer first, because a popover that is not showing cannot take focus.
+
+     AND THE FOCUS WAITS FOR THE PAGE TO CATCH UP. A menu opened again on its way out is the same
+     list, still `inert` when this runs: the effect above has said it is no longer leaving, and the
+     attribute is written after this one. Focus into an inert list goes nowhere, so the second menu
+     of a step (Day of, Move) opened with focus on `<body>`, which is the bug above come back. */
   $effect(() => {
     if (!open || !list) return;
-    if (sheet && typeof list.showPopover === 'function') list.showPopover();
-    items()[0]?.focus();
+    if (sheet && typeof list.showPopover === 'function' && !list.matches(':popover-open')) list.showPopover();
+    void tick().then(() => {
+      if (open && !leaving) items()[0]?.focus();
+    });
   });
 
   /* ONCE PER OPENING. A press on the sheet's scrim can reach both the list's click and the window's,
@@ -141,30 +199,39 @@
     }
   }
 
-  /* Below the row normally; above it when there is not room. 240 is the tallest this menu gets. */
+  /* Below the row normally; above it when there is not room. 240 is the tallest this menu gets. It
+     pops from the edge nearest the row: its top below the row, its bottom above it. */
   const HEIGHT = 240;
   const placed = $derived.by(() => {
-    if (!at) return { left: 0, top: 0 };
-    const below = at.y + at.height + 4;
+    const spot = at ?? kept;
+    if (!spot) return { left: 0, top: 0, from: '0%' };
+    const below = spot.y + spot.height + 4;
     const flip = below + HEIGHT > window.innerHeight;
-    return { left: Math.min(at.x, window.innerWidth - 260), top: flip ? Math.max(8, at.y - HEIGHT) : below };
+    return {
+      left: Math.min(spot.x, window.innerWidth - 260),
+      top: flip ? Math.max(8, spot.y - HEIGHT) : below,
+      from: flip ? '100%' : '0%',
+    };
   });
 </script>
 
 <svelte:window onpointerdown={onPointerDown} onclick={onWindowClick} />
 
-{#if open && at}
+{#if shown}
   <!-- `tabindex="-1"` because the container listens for keys but must never be a tab stop: the
        items are the stops and the roving focus moves between them. The sheet form takes no
-       coordinates: its rules place it against the bottom of the screen. -->
+       coordinates: its rules place it against the bottom of the screen. On its way out it is
+       inert, so nothing in it can be pressed or reached while it goes. -->
   <div
     bind:this={list}
     class="row-menu"
+    data-leaving={leaving ? '' : undefined}
+    inert={leaving}
     role="menu"
     tabindex="-1"
     aria-label={label}
     popover={sheet ? 'manual' : undefined}
-    style={sheet ? undefined : `left:${placed.left}px; top:${placed.top}px`}
+    style={sheet ? undefined : `left:${placed.left}px; top:${placed.top}px; --row-menu-from:${placed.from}`}
     {onkeydown}
     onclick={() => close()}
   >
@@ -195,8 +262,15 @@
 {/if}
 
 <style>
-  /* `Menu.svelte`'s surface: the strong glass at level 2, radius `--r-md`, in 140ms on the arriving curve. */
+  /* `Menu.svelte`'s surface: the strong glass at level 2, radius `--r-md`, and its motion: in from .96
+     over 120ms on the arriving curve, and out to .985 as it fades in 90ms on the leaving one. */
   .row-menu {
+    --row-menu-from: 0%;
+    --row-menu-pop: scale(0.96);
+    --row-menu-gone: scale(0.985);
+    --row-menu-from-opacity: 1;
+    --row-menu-gone-opacity: 1;
+
     position: fixed;
     z-index: var(--z-palette);
     min-inline-size: 252px;
@@ -207,7 +281,26 @@
     border-radius: var(--r-md);
     color: var(--ink);
     box-shadow: var(--glass-edge), var(--e2);
-    animation: row-menu-in var(--d-menu) var(--ease-out);
+    transform-origin: 0% var(--row-menu-from);
+    transition-property: transform, opacity;
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-out);
+  }
+
+  /* No fade on the way in, for `Menu.svelte`'s reason: a menu at .96 of its size is readable. */
+  @starting-style {
+    .row-menu {
+      transform: var(--row-menu-pop);
+      opacity: var(--row-menu-from-opacity);
+    }
+  }
+
+  .row-menu[data-leaving] {
+    transform: var(--row-menu-gone);
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: 90ms;
+    transition-timing-function: var(--ease-in);
   }
 
   /* THE ROW, WHATEVER CLASS THE CALLER GAVE IT, as `Menu.svelte` draws it: 32 tall, an icon, the word, a key cap. */
@@ -226,12 +319,6 @@
 
   .row-menu :global([role='menuitem'] > .kbd-run) {
     margin-inline-start: auto;
-  }
-
-  @keyframes row-menu-in {
-    from {
-      transform: translateY(-4px);
-    }
   }
 
   /* "Hand to" drawn as the caller's items are: the same row, glyph first, the same wash on hover. */
@@ -257,8 +344,12 @@
 
   /* THE ACTION SHEET, `Menu.svelte`'s form: every UA default for a popover is taken back, and from
      640px up, which only a coarse pointer reaches, it is 560px wide in the middle of the bottom edge.
-     A sheet, not glass: a tile's surface at radius `--r-lg`, the third level, over the scrim. */
+     A sheet, not glass: a tile's surface at radius `--r-lg`, the third level, over the scrim, and it
+     moves as one: up from below the screen in 240ms on the sheet curve, back down it in 180ms. */
   .row-menu[popover] {
+    --row-menu-pop: translateY(calc(100% + var(--kb)));
+    --row-menu-gone: translateY(calc(100% + var(--kb)));
+
     inset-block: auto var(--kb);
     inset-inline: 0;
     inline-size: min(100%, 560px);
@@ -279,11 +370,31 @@
     border-end-end-radius: 0;
     color: var(--ink);
     box-shadow: var(--e3);
-    animation: row-menu-rise var(--d-enter) var(--ease-out);
+    transition-duration: 240ms;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .row-menu[popover][data-leaving] {
+    opacity: var(--row-menu-gone-opacity);
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .row-menu[popover]::backdrop {
     background: var(--scrim);
+    transition: opacity 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @starting-style {
+    .row-menu[popover]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  .row-menu[popover][data-leaving]::backdrop {
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: 180ms;
   }
 
   /* 48px rows at 16px, whatever class the caller gave its items. */
@@ -314,23 +425,14 @@
     cursor: pointer;
   }
 
-  @keyframes row-menu-rise {
-    from {
-      transform: translateY(24px);
-    }
-  }
-
-  /* A FADE IN PLACE OF EVERY MOVE. */
+  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .row-menu,
     .row-menu[popover] {
-      animation-name: row-menu-fade;
-    }
-  }
-
-  @keyframes row-menu-fade {
-    from {
-      opacity: 0.6;
+      --row-menu-pop: none;
+      --row-menu-gone: none;
+      --row-menu-from-opacity: 0.6;
+      --row-menu-gone-opacity: 0;
     }
   }
 

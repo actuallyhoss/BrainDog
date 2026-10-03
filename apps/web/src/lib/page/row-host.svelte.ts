@@ -10,16 +10,23 @@
  *
  * JUST CHANGED OUTLIVES A VISIT, as Work's does: it is kept per page in module scope, so leaving for Money and coming
  * back still shows what was just done here. Nothing is kept past the tab.
+ *
+ * A ROW A PAGE ANSWERED CUT SHORT IS READ WHOLE BEFORE IT IS CHANGED (`whole`), and kept beside the rows a write
+ * answered, so every later read of the same version is drawn from it. No way back here puts back a cut (`clipped.ts`).
  */
 
+import { createClient } from '@braindog/client';
 import type { Row } from 'braindog-render';
 
 import { REGISTERS } from '../record/held.ts';
+import type { RecordRow } from '../record/remote.ts';
+import { rowReader, type Fetch } from '../record/row-live.ts';
 import { inverseOf, rowWriter, type Wrote } from '../record/rows-write.ts';
 import type { Entry, Fields } from '../record/schema.ts';
 import { optimist, type Change, type Sent } from '../data/optimistic.ts';
 import type { toasts } from '../ui/toast.svelte.ts';
 import { dayOf, shapeOf, type Shape } from '../work/board.ts';
+import { cutIn, wholeOf } from './clipped.ts';
 import { dueWords, entryIn, finished, keyOf, titleOf, words, type RowAt, type Touch } from './row-verbs.ts';
 
 /** Just changed, per page, for the life of the tab. */
@@ -38,6 +45,8 @@ export type HostDeps = {
   toasts: Pick<typeof toasts, 'push'>;
   /** Whether the reader may change rows of a list, as `boot` said (`may`). */
   may: (register: string) => boolean;
+  /** The record's fetch, which a test hands in over its own kernel. Absent, the browser's. */
+  io?: Fetch;
 };
 
 export class RowHost {
@@ -56,8 +65,13 @@ export class RowHost {
   /** The clock Just changed empties itself by. */
   clock = $state(Date.now());
 
-  /** Rows a write here answered with, newer than the page's read until the read catches up, and the rows deleted here. */
-  #landed = new Map<string, Entry>();
+  /**
+   * Rows a write here answered with, newer than the page's read until the read catches up, the rows deleted here, and
+   * the rows read whole (`whole`). A rune, and replaced on every change, so the panel draws a row the moment it lands.
+   */
+  #landed = $state.raw(new Map<string, Entry>());
+  /** The reads in flight for a row whole, by its key and the version the page read, so a row is asked for once. */
+  #asking = new Map<string, Promise<Entry | string>>();
   #queues = new Map<string, Promise<unknown>>();
   #deps: HostDeps;
   #on = '';
@@ -97,11 +111,60 @@ export class RowHost {
     return one ? one.charAt(0).toUpperCase() + one.slice(1) : words.panel;
   }
 
-  /** The row as last known: a write here newer than the page's read, else the page's read. */
+  /**
+   * The row as last known: a write here newer than the page's read, else the page's read. A copy at the page's own
+   * version wins too where the page's read is cut short, because it is the same row with nothing cut (`whole`).
+   */
   entry(row: RowAt): Entry | undefined {
     const read = entryIn(this.#deps.blocks(), row);
     const landed = this.#landed.get(keyOf(row));
-    return landed && (!read || landed.version > read.version) ? landed : read;
+    if (!landed || !read) return landed ?? read;
+    return landed.version > read.version || (landed.version === read.version && read.clipped && !landed.clipped) ? landed : read;
+  }
+
+  /**
+   * THE ROW WHOLE, for a reader about to change it: the row as last known where nothing in it was cut, else the
+   * record's `get` of it, kept so that this version of the row is drawn whole from then on. A sentence where it cannot
+   * be read, which the panel says in place of its form.
+   *
+   * ONE `get` AND NO WALK, at the version the page read: only the texts that may be cut are taken from it (`wholeOf`).
+   * A row that moved on since is read the way its own page reads it, refs and all.
+   */
+  whole(row: RowAt): Promise<Entry | string> {
+    const e = this.entry(row);
+    if (!e) return Promise.resolve(words.gone);
+    if (!e.clipped) return Promise.resolve(e);
+    const key = `${keyOf(row)}@${e.version}`;
+    let asked = this.#asking.get(key);
+    if (!asked) {
+      asked = this.#readWhole(row, e).finally(() => this.#asking.delete(key));
+      this.#asking.set(key, asked);
+    }
+    return asked;
+  }
+
+  async #readWhole(row: RowAt, cut: Entry): Promise<Entry | string> {
+    const io = this.#deps.io;
+    const on = this.#on;
+    const got = await createClient({ base: this.#deps.base(), ...(io ? { fetch: io } : {}) }).get(row.register, row.seq);
+    if (!got.ok && 'refusal' in got) return words.unread(got.refusal.fix);
+    if (got.ok && got.value === null) return words.gone;
+    let whole = got.ok ? wholeOf(cut, got.value as RecordRow) : null;
+    if (!whole) {
+      /* THE ROW MOVED ON SINCE THE PAGE READ IT, so nothing of that read is the row now. */
+      const again = await rowReader(this.#deps.base(), io).read(row.register, row.seq);
+      if (again.from !== 'live') return words.unread(again.fix);
+      if (!again.entry) return words.gone;
+      whole = again.entry;
+    }
+    /* KEPT ONLY FOR THE PAGE IT WAS ASKED ON: a page opened meanwhile starts from its own read. */
+    if (on === this.#on) this.#land(keyOf(row), whole);
+    return whole;
+  }
+
+  /** Keeps `e` as the row's latest copy. */
+  #land(key: string, e: Entry) {
+    this.#landed = new Map(this.#landed).set(key, e);
   }
 
   /** Whether the reader may change the row: the list is declared here and `boot` lets them write it. */
@@ -199,19 +262,24 @@ export class RowHost {
   #sent = (row: RowAt) => (out: Wrote): Sent<Entry> => {
     if (out.ok) return { ok: true, value: out.entry };
     /* A CONFLICT DRAWS THE ROW AS IT NOW STANDS, so the next try is against its latest version. */
-    if (out.why === 'conflict' && out.entry) this.#landed.set(keyOf(row), out.entry);
+    if (out.why === 'conflict' && out.entry) this.#land(keyOf(row), out.entry);
     return { ok: false, fix: out.fix };
   };
 
   #settle = (row: RowAt) => (e: Entry) => {
-    this.#landed.set(keyOf(row), e);
+    this.#land(keyOf(row), e);
     void this.#deps.reread();
   };
 
   /** One change to one row: drawn in Just changed now, sent in turn, and offered back for six seconds. */
   #change(row: RowAt, patch: Fields, mark: string, said: string | undefined, back = true): Change<Entry> {
     const before = this.entry(row);
-    const writer = rowWriter(this.#deps.base());
+    const writer = rowWriter(this.#deps.base(), this.#deps.io);
+    /* THE WAY BACK IS WHAT THE ROW HELD, AND NEVER A TEXT A PAGE CUT SHORT, which put back would be saved over the
+       whole of it. The menu's verbs change a state, a day or a project and keep their Undo on any row; the panel reads
+       a row whole before it changes one, so its Save keeps its Undo too. */
+    const inverse = back && before ? inverseOf(before, patch, REGISTERS[row.register]) : null;
+    const way = inverse && before && !cutIn(before, inverse) ? inverse : null;
     let was: Touch | undefined;
     return {
       apply: () => {
@@ -221,9 +289,7 @@ export class RowHost {
       send: () => this.#inTurn(keyOf(row), () => writer.update(row.register, row.seq, patch, this.entry(row)?.version).then(this.#sent(row))),
       settle: this.#settle(row),
       ...(said === undefined ? {} : { said }),
-      ...(back && before
-        ? { undo: () => () => void this.#run(this.#change(row, inverseOf(before, patch, REGISTERS[row.register]), words.marks.putBack, undefined, false)) }
-        : {}),
+      ...(way ? { undo: () => () => void this.#run(this.#change(row, way, words.marks.putBack, undefined, false)) } : {}),
     };
   }
 
@@ -249,7 +315,7 @@ export class RowHost {
   }
 
   #removal(row: RowAt, said?: string): Change<Entry> {
-    const writer = rowWriter(this.#deps.base());
+    const writer = rowWriter(this.#deps.base(), this.#deps.io);
     let was: Touch | undefined;
     return {
       apply: () => {
@@ -264,7 +330,7 @@ export class RowHost {
   }
 
   #restoral(row: RowAt, said?: string): Change<Entry> {
-    const writer = rowWriter(this.#deps.base());
+    const writer = rowWriter(this.#deps.base(), this.#deps.io);
     let was: Touch | undefined;
     return {
       apply: () => {

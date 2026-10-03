@@ -43,7 +43,7 @@ import { KINDS, kindSpec, showsOf, type CardRole, type KindSpec } from 'braindog
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { isPictureMime } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { display, homeCurrency, labelOf, walkTable, type BlockResult } from './api.ts';
+import { decl as fieldDecl, display, homeCurrency, labelOf, ROW_ID, unnamed, walkTable, type BlockResult } from './api.ts';
 /* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
 import { proposer } from '../page/queue-answer.ts';
 import { REGISTERS } from './held.ts';
@@ -71,7 +71,7 @@ import { declaredValue, registerHref } from './where.ts';
 import { format, fxNow, windowMs } from './metrics.ts';
 import { METRICS } from './declared.ts';
 import { asMoney, currencyOf, merge, mixedFix, symbolText, total, type Total } from './money.ts';
-import { linesText, measuresOf, tileRows } from './measures.ts';
+import { latestText, linesAndLatest, linesText, measuresOf, tileRows } from './measures.ts';
 
 /**
  * Where a list of links points and the money field each linked row holds, or `null` when the field is not such a list.
@@ -257,6 +257,23 @@ const toneOf = (tones: Readonly<Record<string, string>> | undefined, key: string
 };
 
 /**
+ * WHAT A PART IS CALLED, and never its key when that key is a row's id. A key that is an id (a ref, stored as its row's
+ * ULID) is said by the name the record or the page reader gave it (`label`), and one nobody named as the kind alone
+ * (`unnamed`). A key that is words is said as this screen says its field, because that holds the person's own label for
+ * a value: "Behind" where they renamed Off track, which the record's `label` does not know. The record's label says it
+ * only where this build does not declare the field.
+ */
+function partSaid(register: string, field: string, g: { key: string; label?: string }): string {
+  const named = g.label !== undefined && g.label !== '' ? g.label : null;
+  /* `display` SAYS NO ID: a ref still held as its ULID is `unnamed`, and a ULID in a field it does not know is nothing. */
+  if (ROW_ID.test(g.key)) return named ?? display(register, field, g.key) ?? unnamed(fieldDecl(register, field)?.to ?? field, g.key);
+  /* A YES OR NO IS KEYED AS TEXT, `1` or `0`, which `display` read as yes either way: both parts of a split by "Counts as
+     cash" said yes. The record's word for it, else the value it stands for. */
+  if (fieldDecl(register, field)?.type === 'bool') return named ?? display(register, field, g.key === '1' || g.key === 'true') ?? g.key;
+  return display(register, field, g.key) ?? named ?? g.key;
+}
+
+/**
  * A bar or a split over a grouped figure: each part, labelled as its field labels it, largest first, and what no part
  * holds as the block's `unset:` row.
  *
@@ -272,11 +289,11 @@ function partsRows(block: BlockResult): string[] {
   const said = (v: number) => (currency ? money(Math.round(v), currency) : format(decl?.format, v));
   const limit = block.limit ?? parts.groups.length;
   const rows = parts.groups
-    .filter((g): g is { key: string; value: number } => g.value !== null)
+    .filter((g): g is { key: string; label?: string; value: number } => g.value !== null)
     .slice(0, limit)
     /* A PART THE BLOCK GIVES AN INTENT IS DRAWN IN IT, by the value it groups, so "Off track" reads as trouble in the theme's
        own colour and a part not named stays neutral. Only the four intents: anything else is left off. */
-    .map((g) => `${escapeCell(display(register, field, g.key) ?? g.key)} | ${escapeCell(said(g.value))} | ${toneOf(block.tones, g.key)}`);
+    .map((g) => `${escapeCell(partSaid(register, field, g))} | ${escapeCell(said(g.value))} | ${toneOf(block.tones, g.key)}`);
   const rest = parts.value === null || parts.more > 0 ? 0 : parts.value - parts.groups.reduce((n, g) => n + (g.value ?? 0), 0);
   if (!block.unset || !register || Math.round(rest) < 1) return rows;
   return [...rows, unsetRow(block.unset, registerHref(register, joined(decl?.where, `${field} is empty`)), said(rest))];
@@ -901,22 +918,27 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
   if (parts) {
     const units = [...new Set(parts.groups.flatMap((g) => (g.parts ?? []).map((p) => p.currency)))].sort();
     if (units.length === 0) return null;
+    const inUnit = (unit: string) =>
+      parts.groups.flatMap((g) => {
+        const amount = g.parts?.find((p) => p.currency === unit)?.amount;
+        return amount === undefined ? [] : [{ key: g.key, ...(g.label === undefined ? {} : { label: g.label }), value: amount }];
+      });
+    /* A PART ALONE IN ITS CURRENCY IS A FIGURE, NOT A CHART. A book kept in dollars beside books kept in pounds is read
+       in its own currency, and a chart of one full bar under "In USD" compared it with nothing. So each currency that
+       holds two parts or more is its chart, under its code, and each that holds one is a figure in it after them, which
+       says its own currency and needs no code over it. */
+    const each = units.map(inUnit);
+    const charts = units.flatMap((unit, n) => (each[n]!.length > 1 ? [{ currency: unit, block: { ...block, parts: { ...parts, unit, value: null, groups: each[n]! } } }] : []));
+    const lone = units.flatMap((unit, n) => (each[n]!.length === 1 ? [{ unit, part: each[n]![0]! }] : []));
+    if (units.length > 1 && lone.length > 0) {
+      const register = METRICS[parts.metric]?.source?.startsWith('register.') ? METRICS[parts.metric]!.source.slice('register.'.length) : '';
+      const field = METRICS[parts.metric]?.group_by ?? '';
+      const metrics = lone.map(({ unit, part }) => ({ id: part.key, label: partSaid(register, field, part), value: money(Math.round(part.value), unit), note: '' }));
+      const { parts: _parts, ...figures } = block;
+      return { charts: [...charts, { currency: null, block: { ...figures, kind: 'stat', metrics } }], converted: null };
+    }
     return {
-      charts: units.map((unit) => ({
-        currency: unit,
-        block: {
-          ...block,
-          parts: {
-            ...parts,
-            unit,
-            value: null,
-            groups: parts.groups.flatMap((g) => {
-              const amount = g.parts?.find((p) => p.currency === unit)?.amount;
-              return amount === undefined ? [] : [{ key: g.key, value: amount }];
-            }),
-          },
-        },
-      })),
+      charts: units.map((unit, n) => ({ currency: unit, block: { ...block, parts: { ...parts, unit, value: null, groups: each[n]! } } })),
       converted: null,
     };
   }
@@ -1032,9 +1054,12 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
     const body = (block.body ?? '').trim();
     return body === '' || /^\{\{\w+\}\}$/u.test(body) ? [] : parse(body, { page: true });
   }
-  /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported. */
-  if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length)
-    return parse(linesText(measuresFor(block)), { page: true });
+  /* A LINE A MEASURE, each chart its own fence under the measure's name, from the rows a project reported, and the
+     measures reported once after them as one list of their readings (`linesAndLatest`). */
+  if (block.kind === 'lines' && (block.register || block.measures) && !block.authored?.length) {
+    const { lines, latest } = linesAndLatest(measuresFor(block), block.readOnce);
+    return parse([linesText(lines), latestText(latest, lines.length > 0)].filter(Boolean).join('\n\n'), { page: true });
+  }
   /* A CAPTURE'S HEADING GOES THROUGH TOO, because it is not a caption: it is the field's placeholder and its
      accessible name (`captioned` leaves it off the figure), and without it the field asks "Add to Tasks" where
      its author wrote "What needs doing?". */
@@ -1536,8 +1561,9 @@ export function draw(
       : block.kind === 'section'
         /* AND A SECTION THAT WROTE NO SENTENCE SAYS NOTHING when its list matched nothing: it is a heading over the
            blocks below it, which say their own nothing, and "Nothing matched." above "Nothing is parked or finished."
-           is the same fact twice on a record that has neither. */
-        ? Boolean(block.register) && block.matched.length === 0 && Boolean(block.empty)
+           is the same fact twice on a record that has neither. BY ITS COUNT, `total`, as `sectionRow` draws it: the
+           record sends a section its count and none of its rows, so the rows say nothing about what it matched. */
+        ? Boolean(block.register) && block.total === 0 && Boolean(block.empty)
         : segments.every((s) => s.type === 'block' && s.rows.length === 0);
   return {
     segments,
@@ -1545,9 +1571,13 @@ export function draw(
   };
 }
 
-/** How a cell of a block of `kind` says its money: a tile's figure as a headline, a table's to the penny, and the rest as a sentence. */
+/**
+ * How a cell of a block of `kind` says its money: a tile's figure and a bar's or a split's value as a headline, a table's
+ * to the penny, and the rest as a sentence. A BAR'S VALUE IS A FIGURE STANDING ON ITS OWN, read against the bars beside
+ * it: "EGP 1,086,213.41" beside each book on Today was a ledger's figure in a chart (DIRECTION §37).
+ */
 const exactness = (kind: string, cell: number): 'headline' | 'exact' | 'sentence' =>
-  kind === 'stat' && cell === 1 ? 'headline' : kind === 'table' || kind === 'comparison' ? 'exact' : 'sentence';
+  (kind === 'stat' || kind === 'bar' || kind === 'split') && cell === 1 ? 'headline' : kind === 'table' || kind === 'comparison' ? 'exact' : 'sentence';
 
 /**
  * A `where:` clause as a person would read it.

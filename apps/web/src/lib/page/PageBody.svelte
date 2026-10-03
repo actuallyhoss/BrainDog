@@ -98,13 +98,12 @@
    * it. AUTHORING DRAWS THEM ALL: while the page is arranged, or as a preview of a change, a block that is empty today is
    * still a block somebody is placing.
    *
-   * A PAGE AT ITS OWN ADDRESS IS NEVER EMPTIED BY THIS: one whose every block would go keeps them, so a list page with
-   * nothing in it yet still says so, and still offers the first one, rather than drawing a title over nothing.
+   * A PAGE AT ITS OWN ADDRESS IS NEVER EMPTIED BY THIS: one whose every block would go keeps the first, which says its
+   * one sentence, and still offers the first row, rather than drawing a title over nothing. It kept every block, so an
+   * empty Work was a wall of tiles each saying it held nothing.
    */
-  const quiet = $derived(emptyHidden(blocks));
-  const drawable = $derived(
-    mode === 'preview' || arranging ? blocks : mode === 'page' && !quiet.some((b) => b.drawn) ? blocks : quiet,
-  );
+  const quiet = $derived(emptyHidden(blocks, mode === 'page'));
+  const drawable = $derived(mode === 'preview' || arranging ? blocks : quiet);
 
   /**
    * The blocks in the order and at the widths currently in force, each carrying the index it had in the declaration.
@@ -925,11 +924,13 @@
     }
   }
 
-  /* NOT A TILE: a block inside a boxed tile, a section, which is a group heading on the ground, and the
-     page's sentence (`note lead`), which is the title row's line under the title. */
+  /* NOT A TILE: a block inside a boxed tile, a section, which is a group heading on the ground, the page's
+     sentence (`note lead`), which is the title row's line under the title, and a list, a table or rows, which sit on
+     the ground under their quiet heading so only figures and charts keep a tile (DIRECTION §37, less bento). */
   .box > .block-slot,
   .block-slot:has(> :global(.block[data-kind='section'])),
-  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])) {
+  .block-slot:has(> :global(.block[data-kind='note'][data-form='lead'])),
+  .block-slot:has(> :global(.block:is([data-primitive='list'], [data-primitive='table'], [data-primitive='rows']):not([data-kind='inputs']))) {
     padding: 0;
     background: none;
     border: 0;

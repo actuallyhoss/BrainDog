@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
-import { forget, layoutOf, newsOf, readBoot, refusedShell, signsIn, type Fetch } from './boot-live.ts';
+import { forget, layoutOf, newsOf, readBoot, readWorking, refusedShell, signsIn, type Fetch } from './boot-live.ts';
 import { tabsOf } from '../page/tabs.ts';
 
 const BASE = 'http://record.test';
@@ -596,4 +596,32 @@ test('A ONE-LIST COLLEAGUE KEEPS THEIR LIST IN THE RAIL AT ZERO ROWS, and the sh
   assert.equal(refusedShell(null).me.lists, null);
   /* An owner's empty list still leaves the rail, which is the owner's rule and not this one. */
   assert.deepEqual(layoutOf(BOOT as never).index.registers.map((r) => r.id), ['obligations']);
+});
+
+/**
+ * A RUN'S AGE IS THE RECORD'S (`runAge`), carried beside whether it has gone quiet, so the rail's Working now says how
+ * long a quiet run went and not how long ago it started: counted to the clock, a run that stopped at ten read at noon as
+ * three and a half hours of work.
+ */
+test('A QUIET RUN IS AS OLD AS IT WAS WHEN LAST HEARD FROM, and a run still at work counts to now', async () => {
+  const NOW = Date.parse('2026-10-02T12:00:00.000Z');
+  const run = (seq: number, began: string, seen: string) => ({
+    seq,
+    fields: { agent: 'claude-code', doing: 'Filing the receipts', state: 'active', last_seen: seen },
+    created_at: began,
+    updated_at: seen,
+  });
+  const { io } = host(() =>
+    json(200, {
+      ok: true,
+      value: {
+        blocks: [{ rows: [run(1, '2026-10-02T11:00:00.000Z', '2026-10-02T11:55:00.000Z'), run(2, '2026-10-02T08:30:00.000Z', '2026-10-02T10:00:00.000Z')], scopes: ['Kiln', null] }],
+      },
+    }),
+  );
+  const [busy, quiet] = await readWorking(BASE, io, NOW);
+  assert.equal(busy?.quiet, false);
+  assert.equal(busy?.ran_s, 60 * 60, 'a run still at work stopped counting');
+  assert.equal(quiet?.quiet, true, 'a run not heard from in two hours is not quiet');
+  assert.equal(quiet?.ran_s, 90 * 60, 'a quiet run went on ageing after it was last heard from');
 });

@@ -105,7 +105,8 @@
      rows were read against, so `{{ago:}}` agrees with the dates beside it. No `hole` is handed over, so a value the
      record cannot answer is marked and not pressable: nobody can supply a declared figure from this screen. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
-  /* THE PAGE'S HEADLINE LINE DROPS A WHOLE AMOUNT'S `.00`: "Cash is £33,850", the way a person says it. */
+  /* THE PAGE'S HEADLINE LINE SAYS WHOLE UNITS IN THE RECORD'S OWN SIGN: "Cash is E£1,086,213", the way a person says it,
+     where it said "EGP 1,086,213.41" (`money.ts` `symbolText`, DIRECTION §37). */
   const said = (text: string | null): string | null => (text === null ? null : symbolText(text, homeCurrency(), block.kind === 'note' && block.lead === true));
 
   /* ── the fold ──────────────────────────────────────────────────────────────
@@ -485,6 +486,40 @@
   @media not ((hover: hover) and (pointer: fine)) {
     .block-source {
       display: none;
+    }
+  }
+
+  /* A CHART'S FOLD OF POINTS WAITS FOR ITS CHART (DIRECTION §35, §37). "Points on this chart" stood under every line on
+     a page, one caption a chart, and a page of measures read as a page of the same words. The fold stays where a
+     keyboard and a screen reader reach it, and the pointer's readout says each point on the chart itself, so it fades
+     in while the pointer or the keyboard is on that chart and stays while it is open. It fades rather than folds, so
+     nothing moves under the pointer. A day grid's fold (`heat`) is the same fold under the same names, and waits the
+     same way. */
+  @media (hover: hover) and (pointer: fine) {
+    :global(.block-slot .lines-numbers > .lines-toggle) {
+      opacity: 0;
+      transition: opacity var(--d-state) var(--ease-out);
+    }
+
+    :global(.block-slot .block:is(:hover, :focus-within) .lines-numbers > .lines-toggle),
+    :global(.block-slot .lines-numbers[open] > .lines-toggle) {
+      opacity: 1;
+    }
+  }
+
+  /* ON TOUCH THERE IS NO HOVER TO WAIT FOR, so the fold is kept out of sight, as the source's door above is: a finger
+     reads each point by drawing along the chart (`touch-action: pan-y` on the plot), and a screen reader still finds the
+     fold and opens it, which brings it into view. A phone of measures was a 44px "Points on this chart" under each one. */
+  @media not ((hover: hover) and (pointer: fine)) {
+    :global(.block-slot .lines-numbers:not([open], :focus-within)) {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 

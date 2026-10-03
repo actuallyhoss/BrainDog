@@ -511,7 +511,7 @@
   .wrong {
     margin: var(--sp-1) 0 0;
     max-inline-size: var(--measure);
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
@@ -598,7 +598,7 @@
   }
 
   .pv-needs {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

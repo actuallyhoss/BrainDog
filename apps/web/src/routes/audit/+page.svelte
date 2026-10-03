@@ -46,8 +46,9 @@
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
   import { isEventKind } from '@braindog/kernel';
   import type { AuditEvent, EventKind } from '$lib/record/schema.ts';
+  import type { LogRead } from '$lib/record/news-live.ts';
   import type { Cursor } from '@braindog/client';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
@@ -62,25 +63,33 @@
     burstsOf,
     busyOf,
     busySaid,
+    changesOf,
     clockOf,
     dayOf,
     dayWord,
     fold,
+    foldKeys,
+    foldOpen,
     GROUP_TONES,
     groupWords,
     historyWords,
     hourGroups,
     HOURS,
     isAgent,
+    isBookkeeping,
+    keepsBooks,
     keyOf,
     LANE_SPAN_MS,
     lanesOf,
     lanesSaid,
     listOf,
     reaches,
+    runFolds,
     tallyOf,
     tallySaid,
     thingOf,
+    type RunFold,
+    type Told,
   } from './lines.ts';
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
      `readUnseen` with it: one module both imported and imported lazily is neither split nor shared, only warned about. */
@@ -204,20 +213,38 @@
   const me = $derived(route.data.me.person);
   const names = $derived<ReadonlyMap<string, string>>(new Map(Object.entries(route.data.names ?? {})));
 
+  /**
+   * THE LOG AS THE RECORD SENDS IT, AND ITS OWN BOOKS WITH IT WHILE EVERYTHING IS ON. The record leaves the sweep that
+   * writes runs off and the agents' last-seen stamps out of the log unless it is asked for everything (`recentHistory`),
+   * so those are asked for, not only unhidden here. The ask is `readLog`'s fifth argument; a `readLog` that takes four
+   * sends the log without them, and the switch then shows what this page held back (`changesOf`).
+   */
+  type LogReader = (base: string, me: string | null, io: undefined, before: Cursor | null, everything: boolean) => Promise<LogRead>;
+  async function logOf(before: Cursor | null, all: boolean): Promise<LogRead> {
+    const read: LogReader = (await import('$lib/record/news-live.ts')).readLog;
+    return read(apiBase(), me, undefined, before, all);
+  }
+
+  /* READ AGAIN WHEN EVERYTHING IS TURNED ON OR OFF, since the record answers the two differently. What is drawn stays
+     until the new page lands, so the switch never blanks the log, and only the newest read is kept. */
+  let asked = 0;
   $effect(() => {
     if (!route.data.live) return;
+    const all = everything;
+    const n = ++asked;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
     const at = untrack(opened);
     let ok = false;
-    void import('$lib/record/news-live.ts')
-      .then((m) => m.readLog(apiBase(), me))
+    void logOf(null, all)
       .then((out) => {
+        if (n !== asked) return;
         if (out.from === 'live') {
           live = out;
+          refused = null;
           ok = true;
         } else if (out.from === 'refused') refused = out.fix;
       })
-      .finally(() => closed(ok, at));
+      .finally(() => closed(ok || n !== asked, at));
   });
 
   /**
@@ -253,8 +280,7 @@
     older = true;
     olderFix = null;
     try {
-      const m = await import('$lib/record/news-live.ts');
-      const out = await m.readLog(apiBase(), me, undefined, from);
+      const out = await logOf(from, everything);
       /* UNDER WHAT IS HELD NOW, which a line arriving meanwhile may have added to. */
       if (out.from === 'live' && live)
         live = { events: below(live.events, out.events), names: new Map([...live.names, ...out.names]), cursor: out.cursor };
@@ -280,8 +306,7 @@
       if (!route.data.live || !live) return;
       const at = opened();
       try {
-        const m = await import('$lib/record/news-live.ts');
-        const out = await m.readLog(apiBase(), me);
+        const out = await logOf(null, everything);
         if (out.from !== 'live' || !live) return;
         const f = fold(live.events, out.events);
         live = f.joined
@@ -332,9 +357,27 @@
      people the record has no name for carry the same four words, and seven identical choices each
      filtering to one of seven is a control that lies about what it does. `offeredActors` withholds
      the offer, never the filter: a `?by=` somebody pasted still narrows the log (`19 §5`). */
-  const actors = $derived(offeredActors([...new Set(LOG.map((e) => e.by))], me, names));
-  const kinds = $derived([...new Set(LOG.map((e) => e.kind))]);
-  const perKind = $derived(LOG.reduce((m, e) => m.set(e.kind, (m.get(e.kind) ?? 0) + 1), new Map<EventKind, number>()));
+  /**
+   * CHANGES, AND NOT THE RECORD KEEPING ITS BOOKS, UNLESS ASKED FOR (`isBookkeeping`). On the owner's record 154 of the
+   * newest 200 lines were the hourly sweep marking quiet runs abandoned, so what the agents had changed was buried
+   * under the record noting that they had stopped. The rest are a press away, `Everything`, which is in the address
+   * like every filter here, so "show me what the runs did" can be sent to somebody.
+   *
+   * EVERY CONTROL AND COUNT BELOW READS THE SAME LINES THE STREAM DRAWS, so a choice of who or what never offers
+   * somebody whose every line is hidden, and the title's count is out of what is shown.
+   */
+  const everything = $derived(route.url.searchParams.has('everything'));
+  const kept = $derived(changesOf(LOG, everything));
+  const bookkept = $derived(LOG.filter((e) => isBookkeeping(e)).length);
+  const hiddenNow = $derived(everything ? 0 : bookkept);
+  /* THE SWITCH IS OFFERED WHERE THERE ARE BOOKS TO SHOW: lines this page held back, or a record holding agent runs,
+     whose sweep and stamps the record itself leaves out until asked (`keepsBooks`). On from the shell's own lists, so it
+     is in the toolbar from the first paint rather than arriving with the log. */
+  const offerAll = $derived(everything || bookkept > 0 || keepsBooks(route.data.index?.registers));
+
+  const actors = $derived(offeredActors([...new Set(kept.map((e) => e.by))], me, names));
+  const kinds = $derived([...new Set(kept.map((e) => e.kind))]);
+  const perKind = $derived(kept.reduce((m, e) => m.set(e.kind, (m.get(e.kind) ?? 0) + 1), new Map<EventKind, number>()));
 
   /* A SEGMENTED CONTROL WHERE THE NAMES ARE FEW AND SHORT, as in "Everyone | claude | codex", and a menu
      where they are not: seven names in a strip is a toolbar wider than the title. */
@@ -351,7 +394,7 @@
    * segmented control, because the number of days a log covers grows with use. On the reader's clock, like the bands
    * the stream is drawn in, so the day chosen and the band it draws are one day.
    */
-  const days = $derived([...new Set(LOG.map((e) => dayOf(e.at)))].sort().reverse());
+  const days = $derived([...new Set(kept.map((e) => dayOf(e.at)))].sort().reverse());
   const when = $derived(route.url.searchParams.get('on') ?? '');
   /* A DAY AS A PERSON SAYS IT, from its local noon so no clock change moves it into its neighbour. */
   const daySaid = (d: string): string => dayWord(new Date(`${d}T12:00`).getTime(), clock);
@@ -362,7 +405,7 @@
   const listName = $derived(route.data.lists?.find((l: { id: string; name: string }) => l.id === list)?.name ?? list);
 
   const matched = $derived(
-    LOG.filter(
+    kept.filter(
       (e) =>
         (!who || e.by === who) &&
         (!what || e.kind === what) &&
@@ -380,19 +423,37 @@
   const bands = $derived(hourGroups(told, clock));
 
   /**
+   * A RUN'S WORK IS ITS NEWEST LINE AND "+9 MORE" (`runFolds`), opened in place by a press. Open stays open: a fold that
+   * shut again under the reader would take the line they were reading. The first line it opens takes the focus, so a
+   * keyboard carries on from where the button was.
+   *
+   * KEPT OPEN BY EVERY LINE IT OPENED, not by its newest (`foldOpen`), so a run still at work writing its next line on
+   * top does not shut it.
+   */
+  let unfolded = $state<ReadonlySet<string>>(new Set());
+  async function unfold(f: RunFold) {
+    unfolded = new Set([...unfolded, ...foldKeys(f)]);
+    await tick();
+    const first = f.rest[0]?.key;
+    if (first !== undefined) document.querySelector<HTMLElement>(`[data-unfolded="${CSS.escape(first)}"]`)?.focus();
+  }
+
+  /**
    * THE THREE TILES, and what each counts.
    *
-   * WHO WORKED and BUSY HOURS count every line read, filtered or not: they say how the record has been, and a filter is
-   * a question about part of it. WHAT CHANGED counts the lines the filters match, because its figure is the title's.
+   * WHO WORKED and BUSY HOURS count every change read, filtered or not: they say how the record has been, and a filter
+   * is a question about part of it. The record's own books join them only with Everything on, so a sweep that wrote ten
+   * runs off at three in the morning is not a busy hour. WHAT CHANGED counts the lines the filters match, because its
+   * figure is the title's.
    *
    * EACH SAYS WHEN IT IS PARTIAL. There is no read of a time range yet, so a window the pages read so far do not reach
    * back through is counted over what was read, and the tile's foot says so: a quiet morning the log has not reached is
    * not a quiet morning.
    */
   const more = $derived(live !== null && live.cursor !== null);
-  const lanes = $derived(lanesOf(LOG, clock, me, names));
+  const lanes = $derived(lanesOf(kept, clock, me, names));
   const tally = $derived(tallyOf(matched, me, names));
-  const busy = $derived(busyOf(LOG, clock));
+  const busy = $derived(busyOf(kept, clock));
   const groupParts = $derived(tally.groups.map((g) => ({ label: groupWords[g.group], value: g.count, tone: GROUP_TONES[g.group] })));
   const topKinds = $derived(
     tally.kinds.slice(0, 5).map((k, i) => ({
@@ -450,6 +511,19 @@
       >
     {/if}
 
+    {#if offerAll}
+      <!-- THE RECORD'S OWN BOOKKEEPING, ON OR OFF. A switch and not a filter: it is how much of the log is drawn, and
+           Clear filters leaves it as it is. Drawn only once the log read holds some, as every control here is. -->
+      <button
+        type="button"
+        class="pill everything"
+        role="switch"
+        aria-checked={everything}
+        data-on={everything ? '' : undefined}
+        onclick={() => setParam('everything', everything ? '' : '1')}
+      ><span class="pill-word">{historyWords.everything}</span></button>
+    {/if}
+
     {#if actors.length > 1}
       {#if segmented}
         <div class="segmented" role="group" aria-label={copy.auditWho}>
@@ -499,7 +573,7 @@
           </span>
         {/snippet}
         <button type="button" class="mi" role="menuitem" aria-current={what === '' ? 'true' : undefined} onclick={() => setParam('kind', '')}>
-          <Icon name="filter" size="s" /><span class="mi-name">{historyWords.everyKind}</span><span class="mi-n num">{LOG.length}</span>
+          <Icon name="filter" size="s" /><span class="mi-name">{historyWords.everyKind}</span><span class="mi-n num">{kept.length}</span>
         </button>
         {#each kinds as k (k)}
           <button type="button" class="mi" role="menuitem" aria-current={what === k ? 'true' : undefined} onclick={() => setParam('kind', k)}>
@@ -517,18 +591,74 @@
     {/if}
 
     {#if who || what || when || list}
-      <Button weight="bare" href="/audit"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+      <Button weight="bare" href={everything ? '/audit?everything=1' : '/audit'}><Icon name="close" size="s" />{copy.clearFilters}</Button>
     {/if}
   </div>
+{/snippet}
+
+{#snippet entry(t: Told, first?: string)}
+  {@const e = t.e}
+  {@const by = actorSaid(e.by, me, names)}
+  {@const declared = e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
+  {@const thing = t.many ?? (declared === null && e.target ? thingFor(e.target) : null)}
+  {@const note = declared === null ? t.note : ''}
+  <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE; a row that came into being wears
+       the green of done. Nothing here is red: a log is history, not need. -->
+  {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : e.kind === 'create' ? 'earn' : undefined}
+  <!-- THE FIRST LINE A FOLD OPENS takes the focus from "+9 more", which is gone once pressed; `-1`, so it is never a stop
+       of its own in the tab order. It wears the ring every focused thing wears, as the page's row cursor does. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <li data-arrived={fresh.has(keyOf(e)) ? '' : undefined} data-unfolded={first} tabindex={first === undefined ? undefined : -1}>
+    <div class="line line-tall act">
+      <IconWell name={kindOf(e.kind).icon} size="l" {tone} />
+      <span class="line-main">
+        <!-- THE TARGET IS A LINK, AND THE WHOLE ROW IS ITS TARGET. Its hit box (`.tap`'s `::before`) is
+             placed against the row, so a press anywhere on the line opens what it names; the words stay
+             the link's name, and a keyboard reaches it in one stop (WCAG 2.1.1). A line about no row (a
+             nightly backup) or about a person (an access line) is not a link at all, rather than an
+             anchor that goes nowhere. -->
+        <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. `declaredOf` makes "Added domain to Projects" of the
+             line's target and note, and that sentence is the whole line, so the note is not said twice. -->
+        {#if declared !== null}<span class="line-title">{declared}</span>
+        {:else}<span class="line-title"
+            ><span class="verb">{kindOf(e.kind).word}</span>{#if thing}{' '}{#if thing.href}<a class="target tap" href={at(thing.href)}
+                  ><bdi class="target-name">{thing.text}</bdi></a
+                >{:else}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span
+          >{/if}
+        <span class="line-detail">
+          <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
+          <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
+          <span class="detail-text"
+            >{by.name}{#if note}<span class="note" title={note}> · {note}</span>{/if}{#if thing?.list}<span class="where-inline">
+                · {thing.list}</span
+              >{/if}</span
+          >
+        </span>
+      </span>
+      <span class="where">{thing?.list ?? ''}</span>
+      <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
+           its newest; no version where the record sent none (a member held to named lists is sent `0`). -->
+      <span class="line-when">
+        <time
+          datetime={e.at}
+          title={t.count > 1
+            ? historyWords.between(stampOf(t.from), stampOf(e.at))
+            : e.version > 0
+              ? `${stampOf(e.at)} · v${e.version.toLocaleString('en')}`
+              : stampOf(e.at)}>{clockOf(e.at)}</time
+        >
+      </span>
+    </div>
+  </li>
 {/snippet}
 
 <PageHead
   icon="history"
   title={copy.audit}
   count={matched.length}
-  total={LOG.length}
+  total={kept.length}
   sentence={lead}
-  actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list ? tools : undefined}
+  actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? tools : undefined}
 />
 
 <div class="page">
@@ -579,17 +709,22 @@
     {/if}
 
     <div class="feed">
-      {#if !refused && matched.length === 0 && (!route.data.live || live)}
+      {#if !refused && LOG.length > 0 && kept.length === 0 && (!route.data.live || live)}
+        <!-- NOTHING BUT BOOKKEEPING IN WHAT WAS READ: the record has been keeping its books and nobody changed anything. -->
+        <Empty kind="cleared" title={historyWords.onlyBooks} body={historyWords.hidden(bookkept)}>
+          {#snippet actions()}<Button onclick={() => setParam('everything', '1')}>{historyWords.showThem(bookkept)}</Button>{/snippet}
+        </Empty>
+      {:else if !refused && matched.length === 0 && (!route.data.live || live)}
         <Empty
           kind={LOG.length === 0 ? 'no-data-yet' : 'no-results'}
-          title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(LOG.length, 'entries')}
+          title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(kept.length, 'entries')}
           query={LOG.length === 0
             ? undefined
             : [who ? actorSaid(who, me, names).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
           body={LOG.length === 0 ? copy.auditHolds : undefined}
         >
           {#snippet actions()}
-            {#if who || what || when || list}<Button href="/audit">{copy.clearFilters}</Button>{/if}
+            {#if who || what || when || list}<Button href={everything ? '/audit?everything=1' : '/audit'}>{copy.clearFilters}</Button>{/if}
           {/snippet}
         </Empty>
       {/if}
@@ -597,61 +732,30 @@
       {#each bands as band (band.key)}
         <Section title={band.title} count={band.lines.length}>
           <ul class="ledger">
-            {#each band.lines as t (t.key)}
-              {@const e = t.e}
-              {@const by = actorSaid(e.by, me, names)}
-              {@const declared = e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
-              {@const thing = t.many ?? (declared === null && e.target ? thingFor(e.target) : null)}
-              {@const note = declared === null ? t.note : ''}
-              <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE; a row that came into being wears
-                   the green of done. Nothing here is red: a log is history, not need. -->
-              {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : e.kind === 'create' ? 'earn' : undefined}
-              <li data-arrived={fresh.has(keyOf(e)) ? '' : undefined}>
-                <div class="line line-tall act">
-                  <IconWell name={kindOf(e.kind).icon} size="l" {tone} />
-                  <span class="line-main">
-                    <!-- THE TARGET IS A LINK, AND THE WHOLE ROW IS ITS TARGET. Its hit box (`.tap`'s `::before`) is
-                         placed against the row, so a press anywhere on the line opens what it names; the words stay
-                         the link's name, and a keyboard reaches it in one stop (WCAG 2.1.1). A line about no row (a
-                         nightly backup) or about a person (an access line) is not a link at all, rather than an
-                         anchor that goes nowhere. -->
-                    <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. `declaredOf` makes "Added domain to Projects" of the
-                         line's target and note, and that sentence is the whole line, so the note is not said twice. -->
-                    {#if declared !== null}<span class="line-title">{declared}</span>
-                    {:else}<span class="line-title"
-                        ><span class="verb">{kindOf(e.kind).word}</span>{#if thing}{' '}{#if thing.href}<a class="target tap" href={at(thing.href)}
-                              ><bdi class="target-name">{thing.text}</bdi></a
-                            >{:else}<bdi class="target-name">{thing.text}</bdi>{/if}{/if}</span
-                      >{/if}
-                    <span class="line-detail">
-                      <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
-                      <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
-                      <span class="detail-text"
-                        >{by.name}{#if note}<span class="note" title={note}> · {note}</span>{/if}{#if thing?.list}<span class="where-inline">
-                            · {thing.list}</span
-                          >{/if}</span
-                      >
-                    </span>
-                  </span>
-                  <span class="where">{thing?.list ?? ''}</span>
-                  <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
-                       its newest; no version where the record sent none (a member held to named lists is sent `0`). -->
-                  <span class="line-when">
-                    <time
-                      datetime={e.at}
-                      title={t.count > 1
-                        ? historyWords.between(stampOf(t.from), stampOf(e.at))
-                        : e.version > 0
-                          ? `${stampOf(e.at)} · v${e.version.toLocaleString('en')}`
-                          : stampOf(e.at)}>{clockOf(e.at)}</time
-                    >
-                  </span>
-                </div>
-              </li>
+            <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
+            {#each runFolds(band.lines) as f (f.key)}
+              {@render entry(f.head)}
+              {#if f.rest.length > 0}
+                {#if foldOpen(f, unfolded)}
+                  {#each f.rest as t, i (t.key)}{@render entry(t, i === 0 ? t.key : undefined)}{/each}
+                {:else}
+                  <li class="fold-row">
+                    <button type="button" class="fold tap" aria-expanded="false" onclick={() => void unfold(f)}>{historyWords.more(f.rest.length)}</button>
+                  </li>
+                {/if}
+              {/if}
             {/each}
           </ul>
         </Section>
       {/each}
+
+      <!-- WHAT THE STREAM LEAVES OUT, said once at its foot, and the press that shows it: the same switch as the toolbar's. -->
+      {#if hiddenNow > 0 && matched.length > 0}
+        <p class="foot hidden-line">
+          {historyWords.hidden(hiddenNow)}
+          <button type="button" class="show-all tap" onclick={() => setParam('everything', '1')}>{historyWords.showThem(hiddenNow)}</button>
+        </p>
+      {/if}
 
       <CapLine shown={shown.length} total={matched.length} />
       {#if route.data.live && live && live.cursor !== null}
@@ -753,6 +857,60 @@
 
   .older {
     display: flex;
+  }
+
+  /* ── a run folded, and what the stream leaves out ────────────────────── */
+
+  /* "+9 MORE" SITS WHERE THE LINES IT HOLDS WILL BE, in from the well so it reads as the line above it continued, in the
+     second ink. Pressing it puts them there; nothing above it moves. */
+  .fold-row {
+    display: flex;
+    padding-inline-start: calc(var(--well-l) + var(--sp-3) + var(--sp-2));
+  }
+
+  .fold {
+    position: relative;
+    min-block-size: var(--ctl-h-sm);
+    padding: 0 var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-pill);
+    color: var(--ink2);
+    font: inherit;
+    font-size: var(--t-sm);
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .fold:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+  }
+
+  .hidden-line {
+    max-inline-size: var(--measure);
+    line-height: var(--lh-body);
+  }
+
+  /* SAID AS A LINK IN THE SENTENCE, because it is part of it; a button, because it changes the view and goes nowhere. */
+  .show-all {
+    position: relative;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  /* THE SWITCH IS A PILL LIKE THE MENUS BESIDE IT, and when it is on it takes the chosen pill's lifted fill. */
+  .everything {
+    border: 0;
+    cursor: pointer;
   }
 
   /* ── the toolbar ─────────────────────────────────────────────────────── */

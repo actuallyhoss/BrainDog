@@ -355,7 +355,7 @@
   }
 
   .bad {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* A FIELD HAS NO BORDER NOW (`controls.css`), so the one that is wrong is ringed inside its own edge, beside the line

@@ -171,11 +171,12 @@ test('AND A SECTION OVER THE SAME 301 ROWS IS REFUSED BY NEITHER, because it add
   const blocks = await record();
   const section = of(blocks, 'Everything');
 
-  /* THE RECORD READS ITS DEFAULT PAGE OF ROWS and does not refuse: a heading over 301 rows has
-     nothing to be wrong about, and a section in the refusing set would have refused it. */
+  /* THE RECORD DOES NOT REFUSE IT: a heading over 301 rows has nothing to be wrong about, and a section in the refusing
+     set would have refused it. AND IT SENDS ITS COUNT AND NO ROWS, which it draws none of: a page whose sections each
+     carried their rows' whole notes answered 760 KB and froze the browser (`loop/research-real-record.md`). */
   assert.deepEqual(section.refusals ?? [], []);
   assert.equal(section.matched, ROWS_HELD);
-  assert.equal((section.rows ?? []).length, 50, 'a section reads the default page rather than the whole register');
+  assert.equal((section.rows ?? []).length, 0, 'a section sent rows it draws only the count of');
 
   /* AND THE APP DRAWS THE WHOLE MATCH AS ITS COUNT, so no slice line is drawn over a heading that
      draws no row of its own. */

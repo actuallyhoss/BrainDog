@@ -70,12 +70,26 @@ export type Prefs = {
 export type Saved = { from: 'kept' } | { from: 'device' } | { from: 'refused'; fix: string };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+/** Where the navigation lives when nobody said: the floating rail card (DIRECTION 37), which superseded the top bar. */
+const SHAPE_DEFAULT: NavShape = 'rail';
+
 /**
  * THE RECORD'S WORD FOR THE SIDE RAIL IS `side`, AND ITS `rail` IS NOBODY'S CHOICE. Builds before the top bar led copied
  * the device's shape to the record on first load, so a record holds `rail` whether or not anybody picked it. A rail
- * chosen now is kept as `side`, and a `rail` read back is read as no choice at all.
+ * chosen now is kept as `side`, and a `rail` read back is read as no choice at all, which draws the default: the rail
+ * again, so a record that kept one by accident and a record that kept nothing draw the same card.
  */
 const shapeKept = (v: unknown): NavShape | undefined => (v === 'side' ? 'rail' : v === 'bar' || v === 'menu' ? v : undefined);
+
+/**
+ * THE DEVICE'S COPY OF THE SHAPE, AS A CHOICE OR AS NOTHING, for a record that keeps no shape of its own.
+ *
+ * ITS `bar` IS THE TOP BAR'S OLD DEFAULT, NOT A CHOICE. Every boot of the builds that led with the top bar wrote the shape
+ * they drew into the cookie, `bar` included when nobody had chosen one, so a `bar` here is most often that copy. A top bar
+ * somebody chose on a record is kept by the record (`setShape`), and its word stands over this.
+ */
+const deviceChose = (held: NavShape | undefined): NavShape | undefined => (held === 'bar' ? undefined : held);
 
 /** A name map kept whole: only text keys that are addresses, and text names within the length a nav item takes. */
 const names = (v: unknown): Record<string, string> => {
@@ -225,8 +239,11 @@ export function moved(groups: Arranged, href: string, step: -1 | 1, skip: (href:
 export class NavPrefs {
   order = $state<string[]>([]);
   hidden = $state<string[]>([]);
-  /** Where the navigation lives. The top bar unless somebody said otherwise. */
-  shape = $state<NavShape>('bar');
+  /**
+   * The shape somebody chose, on a record or on this device, or `undefined` while nobody has. The design agent's
+   * recommendation reads this one (`design/nav-shape.ts`), so it can tell a rail somebody picked from the default.
+   */
+  chosen = $state<NavShape | undefined>(undefined);
   /**
    * Whether the holding pen proposes anything, `29 §4`'s one global switch. On unless somebody said otherwise, which is
    * the record's own reading of `pen.suggest` absent.
@@ -243,10 +260,15 @@ export class NavPrefs {
   /* ONE CHANGE AT A TIME, so two quick moves arrive in the order they were made. */
   #queue: Promise<unknown> = Promise.resolve();
 
+  /** Where the navigation lives: the shape somebody chose, else the rail card. */
+  get shape(): NavShape {
+    return this.chosen ?? SHAPE_DEFAULT;
+  }
+
   constructor(start: Start = fromDevice()) {
     this.order = start.order ?? [];
     this.hidden = start.hidden ?? [];
-    this.shape = start.shape ?? 'bar';
+    this.chosen = start.shape;
     this.suggest = start.suggest ?? true;
     this.dismissed = start.dismissed ?? [];
     this.home = start.home ?? null;
@@ -260,7 +282,8 @@ export class NavPrefs {
    * A SHAPE OR A SWITCH THE RECORD HAS NEVER HEARD OF IS THIS DEVICE'S, AND STAYS HERE. Reading `boot` writes nothing:
    * it used to send the cookie's copy to the record whenever the record held none, so opening the app with a top bar
    * in one browser's cookie set the top bar for the person everywhere, and a second browser's menu then lost to it. The
-   * record learns a shape or a switch when somebody chooses one (`setShape`, `setSuggest`).
+   * record learns a shape or a switch when somebody chooses one (`setShape`, `setSuggest`). The cookie's `bar` is the
+   * one exception, for `deviceChose`'s reason.
    */
   adopt(prefs: Prefs | undefined, base: string, send: Send = sendTo(base)): void {
     if (prefs === undefined) return;
@@ -276,10 +299,12 @@ export class NavPrefs {
 
     const held = pref.read();
     /* A LEGACY `rail` GOES STRAIGHT TO THE DEFAULT, past the cookie: the cookie's copy was written from that same `rail`. */
-    this.shape = shapeKept(prefs['nav.shape']) ?? (prefs['nav.shape'] === 'rail' ? 'bar' : (held.shape ?? 'bar'));
+    this.chosen = shapeKept(prefs['nav.shape']) ?? (prefs['nav.shape'] === 'rail' ? undefined : deviceChose(held.shape));
     const suggest = prefs['pen.suggest'];
     this.suggest = typeof suggest === 'boolean' ? suggest : (held.suggestPages ?? true);
-    pref.write({ shape: this.shape, suggestPages: this.suggest });
+    /* THE COOKIE IS WRITTEN FROM A CHOICE ONLY, and the default leaves it empty, so the next change of default is not
+       met by a cookie full of the old one's copies, which is what the top bar's `bar` is (`deviceChose`). */
+    pref.write({ shape: this.chosen, suggestPages: this.suggest });
 
     const kept = strings(prefs['pen.dismissed']);
     const legacy = takeLegacy().filter((id) => !kept.includes(id));
@@ -381,15 +406,19 @@ export class NavPrefs {
   }
 
   /**
-   * The shape, set. THE SHELL REDRAWS FROM THIS FIELD, not from the cookie: the control that sets it is inside the thing
-   * it changes, and the shell mounts once for the life of the tab.
+   * The shape, set, or `undefined` for nobody's choice again, which is what an undo hands back to a record that never
+   * chose. THE SHELL REDRAWS FROM THIS FIELD, not from the cookie: the control that sets it is inside the thing it
+   * changes, and the shell mounts once for the life of the tab.
    */
-  setShape(next: NavShape): Promise<Saved> {
-    const before = this.shape;
-    this.shape = next;
+  setShape(next: NavShape | undefined): Promise<Saved> {
+    const before = this.chosen;
+    this.chosen = next;
     pref.write({ shape: next });
-    return this.#commit('nav.shape', next === 'rail' ? 'side' : next, () => {
-      this.shape = before;
+    /* A RAIL GOES AS `side`, the record's word for a rail somebody chose, and NO CHOICE GOES AS `rail`, its word for
+       nobody's (`shapeKept`), which every device reads as the default past its own copy. Not `null`, for `setHome`'s
+       reason: a key taken off the record answers nothing, and another device would keep the shape it last heard of. */
+    return this.#commit('nav.shape', next === undefined ? 'rail' : next === 'rail' ? 'side' : next, () => {
+      this.chosen = before;
       pref.write({ shape: before });
     });
   }

@@ -125,13 +125,17 @@
    * It is made here and not by the record because it reads the screen as well as the record: below 900px the tab bar is
    * drawn whatever is chosen, so it answers nothing there. It is compared with the shape set now, so choosing the
    * recommended shape by hand makes the offer go on its own rather than nag about a choice just made.
+   *
+   * THE SHAPE SOMEBODY CHOSE, NOT THE ONE DRAWN (`navPrefs.chosen`). The drawn shape is the rail for a record that never
+   * chose, and handed in, it said that record had picked the rail by hand: the top bar is offered only to a rail
+   * somebody picked, so it was offered to every record that never chose at all.
    */
   const navRec = $derived(
     recommendNavShape(
       navShapeSignals(
         shell.nav,
         shell.index.registers.length,
-        { nav: navPrefs.order, navShape: navPrefs.shape },
+        { nav: navPrefs.order, navShape: navPrefs.chosen },
         typeof window === 'undefined' ? undefined : window.innerWidth,
       ),
     ),
@@ -204,7 +208,8 @@
   async function keep(o: Offer) {
     if (keeping !== null) return;
     if (o.from === 'shape') {
-      const before = navPrefs.shape;
+      /* WHAT WAS CHOSEN BEFORE, nothing included, so the Undo puts a record that never chose back to no choice. */
+      const before = navPrefs.chosen;
       const saved = await navPrefs.setShape(o.shape);
       if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
       else toasts.push(penWords.kept(navShapeLabel(o.shape)), { undo: () => void navPrefs.setShape(before).then((s) => said(s)) });

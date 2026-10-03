@@ -41,6 +41,13 @@ test('the gate says how many options, which is suggested, and how long it has be
     'Three options; “Per seat” is suggested; opened 2 weeks ago.',
   );
   assert.equal(gateSentence({ options: [opt('Yes'), opt('No')], opened: daysAgo(0.2) }, NOW), 'Two options; opened today.');
+  /* A CHANGE ANSWERED WITH ACCEPT OR DECLINE: how long it has been open, and no count of its two buttons. */
+  const change = [
+    { key: 'accept', title: 'Accept', body: '' },
+    { key: 'reject', title: 'Reject', body: '' },
+  ];
+  assert.equal(gateSentence({ options: change, opened: daysAgo(15) }, NOW), 'Opened 2 weeks ago.');
+  assert.equal(gateSentence({ options: change, opened: daysAgo(0.2) }, NOW), 'Opened today.');
 });
 
 test('an age is said as a person holds it', () => {

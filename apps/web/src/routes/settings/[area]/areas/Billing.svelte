@@ -243,7 +243,7 @@
   }
 
   .reading [data-needs] {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 
@@ -319,7 +319,7 @@
      The sentence says it too, so the colour is never the only sign. */
   .bill-state[data-state='past_due'],
   .bill-state[data-state='lapsed'] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .bill-actions {

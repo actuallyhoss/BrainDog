@@ -106,29 +106,120 @@ test('TWO QUICK MOVES ARRIVE IN THE ORDER THEY WERE MADE', async () => {
   assert.deepEqual(prefs.order, ['/p/b', '/p/a']);
 });
 
-test("THE RECORD'S `rail` IS NOBODY'S CHOICE, and a rail chosen now is kept as `side`", () => {
+test('NOBODY CHOSE, SO THE RAIL CARD: the default shell is the rail, on a record and off one', () => {
+  const fresh = new NavPrefs({ order: [], hidden: [] });
+  assert.equal(fresh.shape, 'rail');
+  assert.equal(fresh.chosen, undefined);
+  fresh.adopt({}, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+  assert.equal(fresh.shape, 'rail', 'a record that keeps no shape drew something other than the rail');
+  assert.equal(fresh.chosen, undefined, 'the default was taken for a choice');
+
+  const offline = new NavPrefs({ order: [], hidden: [] });
+  offline.adopt(undefined, 'https://app.example', recorder(() => assert.fail('the sample sent a preference')).send);
+  assert.equal(offline.shape, 'rail');
+});
+
+test("THE RECORD'S `rail` IS NOBODY'S CHOICE AND DRAWS THE DEFAULT RAIL, and a rail chosen now is kept as `side`", async () => {
   const old = new NavPrefs({ order: [], hidden: [] });
   old.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-  assert.equal(old.shape, 'bar');
+  assert.equal(old.shape, 'rail', "a legacy rail read as the top bar's old default");
+  assert.equal(old.chosen, undefined, 'a rail nobody picked was read as a choice');
 
   const chosen = new NavPrefs({ order: [], hidden: [] });
   chosen.adopt({ 'nav.shape': 'side' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-  assert.equal(chosen.shape, 'rail');
+  assert.deepEqual([chosen.shape, chosen.chosen], ['rail', 'rail']);
+
+  const io = recorder();
+  const picking = new NavPrefs({ order: [], hidden: [] });
+  picking.adopt({ 'nav.shape': 'menu' }, 'https://app.example', io.send);
+  assert.equal(picking.shape, 'menu');
+  await picking.setShape('rail');
+  await picking.setShape('bar');
+  assert.deepEqual(io.sent, [
+    { key: 'nav.shape', value: 'side' },
+    { key: 'nav.shape', value: 'bar' },
+  ]);
 });
 
-test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE'S COPY OF IT", () => {
-  const g = globalThis as { document?: unknown };
-  const railCookie = () => ({ cookie: `bd_pref=${encodeURIComponent(JSON.stringify({ shape: 'rail' }))}` });
-  g.document = railCookie();
-  try {
-    const prefs = new NavPrefs({ order: [], hidden: [] });
-    prefs.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-    assert.equal(prefs.shape, 'bar');
+test('A REFUSED SHAPE PUTS BACK NO CHOICE AT ALL, so the default stays the default', async () => {
+  const prefs = new NavPrefs({ order: [], hidden: [] });
+  prefs.adopt({}, 'https://app.example', recorder(() => ({ from: 'refused', fix: 'Sign in again.' })).send);
+  assert.deepEqual(await prefs.setShape('bar'), { from: 'refused', fix: 'Sign in again.' });
+  assert.deepEqual([prefs.shape, prefs.chosen], ['rail', undefined]);
+});
 
-    g.document = railCookie();
-    const unset = new NavPrefs({ order: [], hidden: [] });
-    unset.adopt({}, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-    assert.equal(unset.shape, 'rail', 'a device with a rail and a record with no shape keeps the rail');
+test("AN UNDO BACK TO NO CHOICE GOES AS THE RECORD'S `rail`, which every device reads as the default again", async () => {
+  const io = recorder();
+  const prefs = new NavPrefs({ order: [], hidden: [] });
+  prefs.adopt({}, 'https://app.example', io.send);
+  const before = prefs.chosen;
+  await prefs.setShape('menu');
+  await prefs.setShape(before);
+  assert.deepEqual([prefs.shape, prefs.chosen], ['rail', undefined], 'the undo left a rail somebody picked');
+  assert.deepEqual(io.sent, [
+    { key: 'nav.shape', value: 'menu' },
+    { key: 'nav.shape', value: 'rail' },
+  ]);
+
+  const other = new NavPrefs({ order: [], hidden: [], shape: 'menu' });
+  other.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
+  assert.deepEqual([other.shape, other.chosen], ['rail', undefined], 'another device kept the menu it last heard of');
+});
+
+test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE, AND THE TOP BAR'S OLD `bar` COPY IS NOBODY'S CHOICE", () => {
+  const g = globalThis as { document?: { cookie: string } };
+  /* A cookie jar that keeps what is written, so the copy left for the next first paint can be read back. */
+  const jar = (shape: string) => {
+    let held = `bd_pref=${encodeURIComponent(JSON.stringify({ shape }))}`;
+    g.document = {
+      get cookie() {
+        return held;
+      },
+      set cookie(next: string) {
+        held = next.split(';')[0] ?? '';
+      },
+    };
+  };
+  const quiet = () => recorder(() => assert.fail('adopting boot sent a preference')).send;
+  const copy = () => JSON.parse(decodeURIComponent(g.document!.cookie.slice('bd_pref='.length))).shape as unknown;
+  try {
+    /* `new NavPrefs()` READS THE DEVICE, as the tab's own copy does before `boot` answers. */
+    jar('menu');
+    const legacy = new NavPrefs();
+    assert.equal(legacy.shape, 'menu', "the cookie's copy did not draw the first paint");
+    legacy.adopt({ 'nav.shape': 'rail' }, 'https://app.example', quiet());
+    assert.equal(legacy.shape, 'rail', "a legacy rail was read as the cookie's menu");
+
+    /* EVERY BOOT OF THE TOP-BAR BUILDS WROTE `bar` into the cookie, chosen or not, and a top bar somebody chose on a
+       record is the record's to say. So a `bar` copy beside a record with no shape is the old default, and goes. */
+    jar('bar');
+    const old = new NavPrefs();
+    assert.equal(old.shape, 'bar', 'the first paint is still the copy, before the record answers');
+    old.adopt({}, 'https://app.example', quiet());
+    assert.deepEqual([old.shape, old.chosen], ['rail', undefined]);
+    assert.equal(copy(), undefined, 'the old default stayed in the cookie for the next first paint');
+
+    jar('bar');
+    const kept = new NavPrefs();
+    kept.adopt({ 'nav.shape': 'bar' }, 'https://app.example', quiet());
+    assert.deepEqual([kept.shape, copy()], ['bar', 'bar'], "a top bar the record keeps lost to the old default's rule");
+
+    /* ANY OTHER SHAPE THE DEVICE HOLDS IS ITS OWN, and stays while the record says nothing. */
+    jar('menu');
+    const device = new NavPrefs();
+    device.adopt({}, 'https://app.example', quiet());
+    assert.deepEqual([device.shape, copy()], ['menu', 'menu'], 'a device with a menu and a record with no shape lost the menu');
+
+    jar('rail');
+    const unset = new NavPrefs();
+    unset.adopt({}, 'https://app.example', quiet());
+    assert.equal(unset.shape, 'rail', 'a device with a rail and a record with no shape lost the rail');
+
+    /* AND WITH NO RECORD THE COOKIE IS THE WHOLE ANSWER, a top bar included: nobody else could have written it. */
+    jar('bar');
+    const sample = new NavPrefs();
+    sample.adopt(undefined, 'https://app.example', quiet());
+    assert.deepEqual([sample.shape, sample.chosen], ['bar', 'bar']);
   } finally {
     delete g.document;
   }

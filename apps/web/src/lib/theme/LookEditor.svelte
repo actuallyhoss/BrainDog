@@ -461,7 +461,7 @@
   .look-wrong {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     line-height: var(--lh-body);
   }
@@ -639,7 +639,7 @@
   }
 
   .verdict[data-verdict='fails'] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .verdict[data-verdict='tight'] {

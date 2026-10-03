@@ -218,6 +218,13 @@ export type Entry = {
   created: string;
   /** Written by an agent, by a rule, or by a person. */
   by: string;
+  /**
+   * A page answered the row with a long text in it cut short: the first `ROW_TEXT_MOST` characters of each text past
+   * that (`leanRows` in the kernel's `pages.ts`). Such a row is drawn as it came and never written back from, because
+   * its cut text saved over the whole one is the rest of that text gone. A reader that changes it reads it whole
+   * first (`lib/page/clipped.ts`).
+   */
+  clipped?: true;
 };
 
 export type PageBlock = {

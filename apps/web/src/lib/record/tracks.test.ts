@@ -112,13 +112,15 @@ test('a project gathers its own runs, most recently seen first', () => {
   assert.deepEqual(seen, [...seen].sort().reverse());
 });
 
-test('a run is working only while it is active and heard from in the last 45 minutes', () => {
+test('a run is working only while it is active and heard from in the last 30 minutes, the record’s `QUIET_MS`', () => {
   const runs = ROWS.session ?? [];
   const s1 = runs[0]!;
   assert.equal(working(s1), true, 'S1 is active and was seen minutes ago');
   assert.equal(working(runs[2]!), false, 'an idle run is not working');
-  const quiet = { ...s1, fields: { ...s1.fields, last_seen: new Date(NOW - 46 * 60_000).toISOString() } };
-  assert.equal(working(quiet), false, 'an active run quiet for 46 minutes is stale');
+  const seen = (minutes: number) => ({ ...s1, fields: { ...s1.fields, last_seen: new Date(NOW - minutes * 60_000).toISOString() } });
+  assert.equal(working(seen(29)), true, 'heard from 29 minutes ago is still at it');
+  assert.equal(working(seen(31)), false, 'an active run silent for 31 minutes has gone quiet, as the record says it');
+  assert.equal(working({ ...s1, fields: { ...s1.fields, last_seen: undefined } } as never), false, 'a run nobody heard from is not working');
 });
 
 test('a job names its run, and the run finds its job', () => {

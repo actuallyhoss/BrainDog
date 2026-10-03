@@ -308,7 +308,7 @@
     display: inline-flex;
     flex: none;
     margin-block-start: 2px;
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .tried-rows,

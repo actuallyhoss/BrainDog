@@ -53,6 +53,10 @@ test("a ref is named by the record's rows once a reader has walked them, and nev
     { value: 1, label: 'Harbour Lane' },
     { value: 2, label: 'Tidewater' },
   ]);
+  /* A ROW WITH NO NAME IS ITS KIND AND NUMBER, never the id an agent passes (`things#3`). */
+  refMapOf('things', [...LIVE, { id: '01JLIVEUNNAMED0000000000C', seq: 3, fields: {}, version: 1, created_at: '2026-09-20T10:00:00Z' }]);
+  assert.deepEqual(held.refOptions('things').at(-1), { value: 3, label: 'Project #3' });
+  refMapOf('things', LIVE);
 });
 
 test("a page looked up by its slug is called what the record's `boot` calls it, not what the sample called it", async () => {

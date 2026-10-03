@@ -217,7 +217,7 @@
   /* WHAT STOPS IT: the danger well and the danger ink on its title. The rows stay ink, so a long refusal is read at full
      contrast rather than as a block of red. */
   .plan-stops .plan-title {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* THE ROWS UNDER A HEADING, set in from its edge by the well and its gap, a hairline between two. */

@@ -188,7 +188,7 @@
 
   /* A KIND THAT WRITES, IN RED: an agent job's line reads as a warning rather than an ordinary fact. */
   .appear-lines dd[data-intent='bad'] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .swatch {

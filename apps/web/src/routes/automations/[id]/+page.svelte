@@ -129,6 +129,8 @@
   let paging = $state(false);
   let runOpen = $state<RunRow | null>(null);
   let runSheet = $state(false);
+  /** The run's sheet body, the way to the sheet's own dialog once it closes (`runGone`). */
+  let runBody = $state<HTMLElement>();
   let retrying = $state(false);
 
   /* THE VERSIONS, read when the tab or a run of an older version first needs them. */
@@ -176,6 +178,7 @@
     startedAs = '';
     runs = [];
     older = null;
+    runSheet = false;
     runOpen = null;
     versions = null;
     tab = 'steps';
@@ -448,6 +451,22 @@
     if (row && r.version !== null && r.version !== row.version) void loadVersions();
   }
 
+  /**
+   * THE RUN IS PUT AWAY ONCE ITS SHEET HAS GONE, and not as it starts to go.
+   *
+   * `onclose` comes from the dialog's `close` event, the moment the sheet begins its 180ms way out. The sheet was drawn
+   * inside `{#if runOpen}`, so clearing the run there took the sheet away one frame into its close, and it vanished
+   * rather than going back the way it came. It stays drawn now, and the run it shows goes when the close has played,
+   * unless the sheet has opened again on another run in the meantime.
+   */
+  function runGone() {
+    const sheet = runBody?.closest('dialog');
+    if (!sheet) return void (runOpen = null);
+    void Promise.allSettled(sheet.getAnimations().map((a) => a.finished)).then(() => {
+      if (!sheet.open) runOpen = null;
+    });
+  }
+
   /** The body a run ran under: the live one, or an older version's once the versions are read, else none. */
   function bodyOfRun(r: RunRow) {
     if (!row) return null;
@@ -462,8 +481,8 @@
     retrying = false;
     if (!out.ok) return void toasts.push(out.refusal.fix, { intent: 'warn' });
     toasts.push(editWords.retried);
+    /* The sheet closes, and the run goes with it once the close has played (`runGone`). */
     runSheet = false;
-    runOpen = null;
     await reread();
   }
 
@@ -808,10 +827,15 @@
 
   <Inspector {flow} />
 
-  {#if runOpen && row}
-    {@const shownRun = runOpen}
-    <Sheet bind:open={runSheet} title={editWords.runSheet} subtitle={since(shownRun.started, now)} onclose={() => (runOpen = null)}>
-      <RunView run={shownRun} rule={row.id} body={bodyOfRun(shownRun)} {now} {retrying} onretry={owner ? () => void retry(shownRun) : undefined} />
+  <!-- DRAWN WHILE THERE IS AN AUTOMATION, open or not, so a close plays out whole (`runGone`). -->
+  {#if row}
+    <Sheet bind:open={runSheet} title={editWords.runSheet} subtitle={runOpen ? since(runOpen.started, now) : undefined} onclose={runGone}>
+      {#if runOpen}
+        {@const shownRun = runOpen}
+        <div bind:this={runBody}>
+          <RunView run={shownRun} rule={row.id} body={bodyOfRun(shownRun)} {now} {retrying} onretry={owner ? () => void retry(shownRun) : undefined} />
+        </div>
+      {/if}
     </Sheet>
   {/if}
 
@@ -827,11 +851,12 @@
 {/if}
 
 <style>
-  /* THE SCREEN GIVES UP WHAT THE DOCKED INSPECTOR TAKES, past the gutter the title row and the page already pad by. */
+  /* THE SCREEN GIVES UP WHAT THE DOCKED INSPECTOR TAKES, past the gutter the title row and the page already pad by, and
+     in step with the inspector's own slide (`--d-panel` on the sheet curve). */
   .screen {
     min-inline-size: 0;
     padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));
-    transition: padding-inline-end var(--d-enter) var(--ease-out);
+    transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
   .page {
@@ -923,7 +948,7 @@
     gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
     padding-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     font-weight: 500;
   }
@@ -933,7 +958,7 @@
     display: inline-flex;
     flex: none;
     margin-block-start: 1px;
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* THE CALLS' OWN TERM IS THE TILE'S HEADING ALREADY, so it is kept for a screen reader and not drawn twice. */
@@ -989,7 +1014,7 @@
   }
 
   .said[data-tone='bad'] {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

@@ -690,7 +690,7 @@
   }
 
   .identity-bad {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .rename-actions {

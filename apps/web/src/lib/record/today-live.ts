@@ -13,10 +13,11 @@
  */
 
 import { createClient, type Boot, type Cursor, type EventLine } from '@braindog/client';
-import type { QueueQuestion } from '@braindog/kernel';
+import { QUIET_MS, type QueueQuestion } from '@braindog/kernel';
 import { money } from 'braindog-render';
 
 import type { Fetch } from './boot-live.ts';
+import { unnamed } from './api.ts';
 import { moneyInText } from './money.ts';
 import { TASKS } from '../work/list.ts';
 
@@ -54,7 +55,7 @@ export type DayRow = {
 
 /**
  * One run an agent had open today, as a span on the day: from when it opened to when it was last heard from, and
- * whether it is working now (open, and heard from inside the last 45 minutes, the record's own `STALE_MS`).
+ * whether it is working now (open, and heard from inside the last 30 minutes, the record's own `QUIET_MS`).
  */
 export type SessionRow = {
   seq: number | null;
@@ -238,8 +239,8 @@ export function comingOf(
 
 /* ── the runs of the day ────────────────────────────────────────────────── */
 
-/** The record's own `STALE_MS`: a run not heard from in 45 minutes has gone quiet. */
-export const QUIET_AFTER = 45 * 60_000;
+/** The record's own `QUIET_MS`: a run not heard from in 30 minutes has gone quiet. */
+export const QUIET_AFTER = QUIET_MS;
 
 /**
  * The runs heard from since `dayStart`, as spans: from when each opened (or midnight, for one opened before it) to
@@ -429,12 +430,24 @@ function dayPlus(day: string, n: number): string {
   return `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}-${String(at.getUTCDate()).padStart(2, '0')}`;
 }
 
-type Reading = { value: number | null; unit: string | null; held?: number; rows?: number; parts?: { currency: string; amount: number }[]; groups?: { key: string; value: number | null; parts?: { currency: string; amount: number }[] }[] };
+type Reading = {
+  value: number | null;
+  unit: string | null;
+  held?: number;
+  rows?: number;
+  parts?: { currency: string; amount: number }[];
+  /** A part's `label` is the record's name for it where its key is a row's id, as each book is to Cash now by book. */
+  groups?: { key: string; value: number | null; parts?: { currency: string; amount: number }[]; label?: unknown }[];
+};
 
-/** One figure, or one line a currency when it is held in several that were not added up. */
+/**
+ * One figure, or one line a currency when it is held in several that were not added up. EACH IS A HEADLINE, the figure
+ * Today opens on, so it is said in whole units and the record's own sign (`money.ts` `symbolText`): "E£1,086,213".
+ */
 export function cashOf(r: Pick<Reading, 'value' | 'unit' | 'parts'>, label: string | null): CashLine[] {
-  if (r.parts && r.parts.length > 0) return r.parts.map((p) => ({ label, amount: moneyInText(money(p.amount, p.currency)), value: p.amount, currency: p.currency }));
-  if (typeof r.value === 'number' && r.unit) return [{ label, amount: moneyInText(money(Math.round(r.value), r.unit)), value: Math.round(r.value), currency: r.unit }];
+  const said = (minor: number, currency: string) => moneyInText(money(minor, currency), undefined, 'headline');
+  if (r.parts && r.parts.length > 0) return r.parts.map((p) => ({ label, amount: said(p.amount, p.currency), value: p.amount, currency: p.currency }));
+  if (typeof r.value === 'number' && r.unit) return [{ label, amount: said(Math.round(r.value), r.unit), value: Math.round(r.value), currency: r.unit }];
   return [];
 }
 
@@ -562,7 +575,14 @@ async function moneyFor(client: Client, held: ReadonlySet<string>, books: number
   ]);
   const cash = now.ok ? cashOf(now.value as Reading, null) : [];
   const groups = byBook?.ok ? ((byBook.value as Reading).groups ?? []) : [];
-  const bookLines = groups.flatMap((g) => cashOf({ value: g.value, unit: (byBook!.ok ? (byBook!.value as Reading).unit : null), parts: g.parts ?? [] }, bookNames.get(g.key) || 'In no book'));
+  /* EACH BOOK BY ITS NAME: the record's own `label` for the part, else the book's row read here, and never its id. A part
+     is accounts that name a book, so one whose book has no name is an unnamed book, not money in none. */
+  const bookLines = groups.flatMap((g) =>
+    cashOf(
+      { value: g.value, unit: byBook!.ok ? (byBook!.value as Reading).unit : null, parts: g.parts ?? [] },
+      (typeof g.label === 'string' && g.label.trim()) || bookNames.get(g.key) || unnamed('books', g.key),
+    ),
+  );
   return {
     cash,
     books: bookLines,
@@ -604,9 +624,13 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
   const since = sinceOf(events, lists);
   const capped = b.whatsNew?.sinceCapped ?? false;
   const who = sinceWho(events, b.me?.person ?? null);
-  /* THE MACHINE THE RUNS ARE ON: the live runs `boot` sent say it, and failing those, the day's runs that still work. */
+  /* THE MACHINE THE RUNS ARE ON: the live runs `boot` sent say it, and failing those, the day's runs that still work. A
+     run gone quiet (`quiet`, the record's 30 minutes) is not one of them, as a stale one is not. */
   const live = b.sessions ?? [];
-  const host = live.length > 0 ? hostOf(live.filter((r) => !r.stale).map((r) => (typeof r.fields.host === 'string' ? r.fields.host : null))) : hostOf((sessions ?? []).filter((s) => s.working).map((s) => s.host));
+  const host =
+    live.length > 0
+      ? hostOf(live.filter((r) => !r.stale && r.quiet !== true).map((r) => (typeof r.fields.host === 'string' ? r.fields.host : null)))
+      : hostOf((sessions ?? []).filter((s) => s.working).map((s) => s.host));
   return {
     ok: true,
     value: {

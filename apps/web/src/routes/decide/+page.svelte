@@ -7,8 +7,17 @@
   are shown, and what was put off and what was decided are folded shut under them. How the calls went is the one part
   the record does not answer as a block yet, so it is drawn here, under the page.
 
-  CALM. No group control, no Select and no key hints in the head: a card's box shows on hover or focus, and the keys
-  are the page reader's (`j`, `k`, `x`, Enter). A part that holds nothing is not drawn.
+  CALM. No group control, no Select and no key hints in the head: a card's box shows on hover or focus. `j` and `k` are
+  the page reader's and move the cursor; on the question it is on, Enter accepts, Backspace declines and `e` opens it to
+  change what accepting takes (DIRECTION §37, `press.ts`). Nothing moves or fades when a key lands. A part that holds
+  nothing is not drawn.
+
+  ONE PRESS ANSWERS, AND THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, his pick, drawn by the skin for every queue
+  (`kinds/queue.css`) and not drawn at all on a card that is hard to undo. Enter answers only a card that costs nothing;
+  one that costs something opens whole on its own page, where Accept names the amount.
+
+  BRAINDOG'S OWN PAGE UPDATES ARE ONE CARD under the questions, for the owner (`Improved.svelte`): "BrainDog improved 4
+  of your pages", what changes, and Accept. It reads what waits from the same place Add-ons does (`improved.ts`).
 
   THE OLD SCREEN IS KEPT, at `/decide?classic` (`Classic.svelte`), until this page does everything it did, and it is
   what a host too old to draw a body is shown. It is loaded only when it is asked for.
@@ -28,7 +37,12 @@
   import { said } from '$lib/voice.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import type { Opened } from '$lib/record/page-live.ts';
-  import { typing } from '$lib/a11y/keys.svelte.ts';
+  import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { goto } from '$app/navigation';
+  import { choose, type PackState } from '$lib/record/packs.ts';
+  import { hostedHere } from '../settings/billing.ts';
+  import { keyAct } from './press.ts';
+  import type { Improved } from './improved.ts';
   import { proposer } from '$lib/page/queue-answer.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
   import PageView from '$lib/page/PageView.svelte';
@@ -115,11 +129,113 @@
      goes, and one asked elsewhere arrives. */
   async function reread() {
     try {
-      await read();
+      await Promise.all([read(), readImproved()]);
     } catch {
       /* The page as it was read stays; the next version asks again. */
     }
   }
+
+  /* ── what BrainDog itself has improved ───────────────────────────────────── */
+
+  /**
+   * BRAINDOG'S OWN PAGE UPDATES, read for the owner once the page has drawn, so no question waits on them: the packs the
+   * record holds, and what this build ships newer (`improved.ts`). The module is loaded only then, because the seed's
+   * modules and use cases are a weight the questions do not need.
+   */
+  let improved = $state.raw<{ updates: Improved[]; held: PackState[]; nameOf: (id: string) => string } | null>(null);
+
+  async function readImproved() {
+    if (!me.owner) return;
+    client ??= createClient({ base: apiBase() });
+    const [mod, { first }] = await Promise.all([import('./improved.ts'), choose(client)]);
+    if (!first.ok) return;
+    const lists = (route.data.lists ?? []) as { id: string; name: string }[];
+    improved = { updates: mod.firstPartyUpdates(first.value), held: first.value, nameOf: (id) => mod.declarationName(id, lists, mod.packName) };
+  }
+
+  let improvedAsked = false;
+  $effect(() => {
+    if (!live || improvedAsked) return;
+    improvedAsked = true;
+    untrack(() => void readImproved().catch(() => undefined));
+  });
+
+  const improving = $derived(improved?.updates.length ?? 0);
+
+  /* ── Decide's own keys ───────────────────────────────────────────────────── */
+
+  /**
+   * ON THE QUESTION THE CURSOR IS ON, Enter accepts, Backspace declines and `e` opens it to change what accepting takes
+   * (DIRECTION §37). `j` and `k` stay the page reader's, and so does every other key.
+   *
+   * THE CARD'S OWN BUTTON IS PRESSED, so a key gives the answer a pointer gives: the same write, the same line the card
+   * becomes, the same reason line where the record still asks for one. Taken before the page reader's Enter, which opens
+   * the question, and only when there is a button to press.
+   *
+   * ENTER ANSWERS ONLY A QUESTION THAT WEIGHS NOTHING, a card with no cost on it: with its suggested answer, or Accept. A
+   * card that is hard to undo, changes the setup or adds things may move money this page cannot see, so Enter opens it
+   * whole on its own page, where Accept names the amount and a key never accepts money (`press.ts` `acceptKey`).
+   */
+  let goAt = 0;
+
+  /**
+   * The question under the cursor: the card holding the focus, or the one the cursor's ring is on.
+   *
+   * NOT THE RING'S WHILE A CONTROL ELSEWHERE HOLDS THE FOCUS. The ring stays on the last card `j` reached, so with the
+   * focus moved on to Ask, a fold or BrainDog's own card, Backspace declined a question the reader was no longer on.
+   */
+  function questionUnder(): HTMLElement | null {
+    const on = document.activeElement;
+    const held = on instanceof HTMLElement ? on.closest<HTMLElement>('.qa[data-row^="q:"]') : null;
+    if (held) return held;
+    if (on instanceof HTMLElement && on.closest('button, a[href], summary, select, dialog') !== null) return null;
+    return document.querySelector<HTMLElement>('#main .qa[data-row^="q:"][data-row-cursor]');
+  }
+
+  /** The record's two answers on a card, by the ids the card gives its buttons, or nothing on a question of options. */
+  function twoOn(card: HTMLElement): { accept: HTMLElement; reject: HTMLElement } | null {
+    const acts = [...card.querySelectorAll<HTMLElement>('.queue-act')];
+    const accept = acts.find((b) => b.id.endsWith('-opt-accept'));
+    const reject = acts.find((b) => b.id.endsWith('-opt-reject'));
+    return acts.length === 2 && accept && reject ? { accept, reject } : null;
+  }
+
+  function onkey(e: KeyboardEvent) {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if (covered() || typing() || silenced(e)) return;
+    /* A `g` PRESSED FIRST IS THE SHELL'S, and so is the key after it: `g` then `e` is not an edit. */
+    if (e.key === 'g') return void (goAt = Date.now());
+    const act = keyAct(e.key);
+    if (act === null || Date.now() - goAt < 1000) return;
+    const card = questionUnder();
+    if (!card) return;
+    if (act === 'edit') {
+      const id = card.dataset.row?.slice('q:'.length);
+      if (!id || !answerable) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void goto(at(`/decide/${encodeURIComponent(id)}?edit`));
+      return;
+    }
+    let press: HTMLElement | null | undefined;
+    if (act === 'accept') {
+      /* ENTER ON A CONTROL IS THAT CONTROL'S: on an answer it gives that answer, on a link or a fold it opens it. */
+      const on = document.activeElement;
+      if (on instanceof HTMLElement && on !== card && on.closest('button, a[href], summary, select') !== null) return;
+      if (card.querySelector('.queue-cost') !== null) return;
+      press = card.querySelector<HTMLElement>('.queue-option[data-recommended] > .queue-act') ?? twoOn(card)?.accept;
+    } else press = twoOn(card)?.reject;
+    if (!press || (press instanceof HTMLButtonElement && press.disabled)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    press.click();
+  }
+
+  $effect(() => {
+    if (classic) return;
+    window.addEventListener('keydown', onkey, { capture: true });
+    return () => window.removeEventListener('keydown', onkey, { capture: true });
+  });
   listen(reread, () => classic || reading || typing() || document.querySelector('main [aria-busy="true"]') !== null);
 
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
@@ -129,6 +245,10 @@
   const drawn = $derived<Opened | null>(got && got.from === 'live' && shaped ? { ...got, page: { page: got.page.page, blocks: shaped.blocks } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);
+  /* THE HEAD'S LINE IS THE RECORD'S, and there is none with no question waiting: the head is then the page's name, and
+     BrainDog's own card under it says what waits in its own heading. Said in the head as well, the same sentence stood
+     twice, one over the other. */
+  const headLine = $derived(cleared ? undefined : shaped?.sentence.text);
   const now = $derived(live?.now ?? 0);
   const went = $derived(callsRead(calls));
   const checked = $derived(went.met + went.missed + went.unread);
@@ -159,8 +279,8 @@
        ink pill, and only for somebody who may answer. -->
   <!-- THE NAME IS THE NAV'S OWN ITEM, so over the line it is kept for a screen reader and not drawn; with no line it is
        the page's only heading and stays. `display: contents`, so the sticky head still sticks. -->
-  <div class="decide-head" data-named={!cleared && shaped?.sentence.text ? '' : undefined}>
-    <PageHead icon="decide" title={said('decide')} sentence={cleared ? undefined : shaped?.sentence.text} needs={shaped?.sentence.needs || undefined}>
+  <div class="decide-head" data-named={headLine ? '' : undefined}>
+    <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
       {#snippet actions()}
         {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
       {/snippet}
@@ -176,15 +296,27 @@
     {/if}
 
     {#if cleared}
-      <Empty kind="cleared" title={said('no_questions')}>
-        {#snippet actions()}
-          {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
-        {/snippet}
-      </Empty>
+      {#if improving === 0}
+        <Empty kind="cleared" title={said('no_questions')}>
+          {#snippet actions()}
+            {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
+          {/snippet}
+        </Empty>
+      {/if}
     {:else}
       <div class="body">
         <PageView slug="decide" got={drawn} mode="home" select {reread} />
       </div>
+    {/if}
+
+    <!-- BRAINDOG'S OWN PAGE UPDATES, one card under the questions, for the owner. Loaded only when something waits. -->
+    {#if improved && improving > 0}
+      {@const held = improved}
+      {#await import('./Improved.svelte') then loaded}
+        <Tile>
+          <loaded.default updates={held.updates} held={held.held} nameOf={held.nameOf} hosted={hostedHere(shell)} ondone={() => void reread()} />
+        </Tile>
+      {/await}
     {/if}
 
     <!-- HOW THE CALLS WENT: the share that came true, one line saying it, and each call folded under it, so a decision is
@@ -273,6 +405,24 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* NOTHING MOVES OR FADES WHEN A KEY LANDS ON A CARD (DIRECTION §37). Who asked and when are always there on Decide,
+     where they are half of what is decided, so `j` and `k` move the ring and nothing else: a by-line that waited for
+     the cursor took a line's room as it came, and the card under it moved. The box for answering several at once
+     appears without a fade. */
+  .page :global(.queue-card > .queue-by) {
+    display: flex;
+    transition: none;
+  }
+
+  .page :global(.queue-card > .queue-by > *) {
+    opacity: 1;
+    transition: none;
+  }
+
+  .page :global(.qa-select) {
+    transition: none;
   }
 
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has gone wrong, and this

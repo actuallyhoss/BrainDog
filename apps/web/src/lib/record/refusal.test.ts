@@ -121,8 +121,9 @@ test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
       );
       continue;
     }
+    /* AN EMPTY ANSWER COUNTS NOTHING TOO: a section is drawn by its count, which the record sends without the rows. */
     const { refusal } = draw(
-      bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']),
+      bound({ kind, rows: [], entries: [], matched: [], shown: 0, total: 0, refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']),
     );
     assert.ok(refusal, `${kind} drew nothing and said nothing`);
     assert.equal(refusal.kind, 'no-results', `${kind} reported an empty answer as a fault`);

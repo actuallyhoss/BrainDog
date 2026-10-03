@@ -141,6 +141,10 @@ export const words = {
   deleteSure: 'Delete it? It stays in Just changed, with Put back, for ten minutes.',
   deleteYes: 'Delete',
   keep: 'Keep it',
+  /** In the panel in place of its form, when the record no longer holds the row it was opened on. */
+  gone: 'This is no longer in your record.',
+  /** In the panel in place of its form, after the record's own sentence, when a row cut short could not be read whole. */
+  unread: (fix: string) => `${fix} Close this and open it again to change it.`,
   menu: (t: string) => `What to do with ${t}`,
   edit: 'Edit',
   /** The menu's verb on a finished row; its mark in Just changed is the past tense, `marks.reopened`. */

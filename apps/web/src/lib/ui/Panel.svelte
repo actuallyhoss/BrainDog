@@ -9,8 +9,9 @@
 
   BELOW 900PX IT IS A BOTTOM SHEET: the same element opened with `showModal()`, over the scrim, holding the overlay lock
   as `Sheet.svelte` does. The form is read from the window while the panel is open, and a panel open when the window
-  crosses 900px reopens in the other form rather than closing (`panel.ts`). The styles key on `:modal`, so the markup and
-  the form cannot disagree.
+  crosses 900px reopens in the other form rather than closing (`panel.ts`). The form it opened in is written on the
+  element as `data-form`, and the styles key on that rather than on `:modal`, because a closing panel is no longer modal
+  and still has its close to play in the shape it opened in.
 
   THE CONTENT NARROWS BESIDE IT, NEVER UNDER IT. While a docked panel is open the root carries `--dock-w`, the inline
   space the panel takes from the window's end edge: its width, its inset from the window, and the 12 between it and the
@@ -20,29 +21,48 @@
       padding-inline-end: max(var(--gutter), var(--dock-w));
 
   It is written by CSS alone (`:root:has(...)`), so there is no script to forget and nothing to clean up on a route
-  change: the root loses it the moment the element closes or goes.
+  change: the root loses it the moment the element closes or goes. The shell is to give the panel a track of its own,
+  and the panel slides into it by transform, so nothing about it moves but the panel.
+
+  IT MOVES THE SAME WAY OUT AS IN, AND FASTER. In from past the end edge, `translateX(100% + 16px)`, over 240ms on the
+  sheet curve, with no fade; out along the same path in 180ms. The sheet rises from below the screen and goes back down
+  it. `@starting-style` draws the first frame and `display` and `overlay` are held for the close, so `[open]` still
+  drops the moment it closes. Reduced motion fades instead of moving.
+
+  SWITCHING WHAT IT SHOWS IS A FADE, 160ms with a 2px settle, so a press on another row reads as the panel answering it.
+  Not from a key: `j` and `k` walk the list with the panel following, and nothing moves on a key (`SYSTEM.md` §8).
 
   ESC CLOSES IT. The sheet form has the `<dialog>`'s own cancel; the docked form is not modal and gets none, so a press
   of Esc anywhere inside the panel closes it. Esc in the list beside it is the page's to decide.
 
+  THE SHEET PULLS DOWN BY ITS HEAD, and past a third of its height, or on a flick, it closes (`Pull` in `panel.ts`).
+
   `onclose` FIRES ONCE PER CLOSE, from the element's own `close` event, for the reason `Sheet.svelte` gives.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
-  import { NARROW, formOf, step } from './panel.ts';
+  import { NARROW, Pull, formOf, step, unstall } from './panel.ts';
 
   let {
     open = $bindable(false),
     title,
+    shows,
     onclose,
     verbs,
     children,
   }: {
     open?: boolean | undefined;
     title: string;
+    /**
+     * What the panel shows, as a key: a row's key, a node's. A new one while the panel is open is a switch, and fades
+     * in. Compared as it is, so a string or a number and not an object built again on each read. Absent, the title
+     * stands for it.
+     */
+    shows?: unknown;
     onclose?: (() => void) | undefined;
     /** The panel's verbs, drawn at the head's end: buttons, a menu. */
     verbs?: Snippet | undefined;
@@ -90,6 +110,10 @@
       release();
       if (todo === 'close') return;
     }
+    /* THE FORM GOES ON THE ELEMENT BEFORE IT OPENS, so its first frame is drawn in it, and it stays through the close.
+       A sheet let go on its way down is put back where it rests, while it is still out of sight. */
+    el.dataset.form = form;
+    el.style.translate = '';
     if (form === 'sheet') {
       el.showModal();
       overlays.open();
@@ -101,9 +125,47 @@
       el.show();
       if (back instanceof HTMLElement && back !== document.body) back.focus({ preventScroll: true });
     }
+    /* Not on a reopen, which moves nothing: there is no opening to stall. */
+    if (todo !== 'reopen') unstall(el);
   });
 
   $effect(() => () => release());
+
+  /* ── switching what it shows ─────────────────────────────────────────── */
+
+  /** Nothing shown yet, which is how an opening is told from a switch. */
+  const NOTHING = Symbol('nothing');
+  let showing: unknown = NOTHING;
+  /** Which of the two switch fades the body wears. Two, so each switch starts the fade again. */
+  let swap = $state<'a' | 'b' | null>(null);
+  /** Whether the last press was a key. A switch from the keyboard is not drawn. */
+  let byKey = false;
+
+  $effect(() => {
+    if (!open) return;
+    const key = () => (byKey = true);
+    const point = () => (byKey = false);
+    window.addEventListener('keydown', key, true);
+    window.addEventListener('pointerdown', point, true);
+    return () => {
+      window.removeEventListener('keydown', key, true);
+      window.removeEventListener('pointerdown', point, true);
+    };
+  });
+
+  $effect(() => {
+    const now = shows === undefined ? title : shows;
+    const on = open;
+    untrack(() => {
+      if (!on) {
+        showing = NOTHING;
+        swap = null;
+        return;
+      }
+      if (showing !== NOTHING && now !== showing && !byKey) swap = swap === 'a' ? 'b' : 'a';
+      showing = now;
+    });
+  });
 
   function close() {
     open = false;
@@ -133,6 +195,41 @@
     const r = el.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) close();
   }
+
+  /* ── the pull, in the sheet form ─────────────────────────────────────── */
+
+  /**
+   * THE HEAD PULLS, EXCEPT WHERE IT HOLDS SOMETHING TO PRESS. Pointer capture sends the release to the element that
+   * captured it, so a pull that began on the close circle or a verb would swallow its click; a press there is left to
+   * the control. `translate` is written on the element as the finger moves, which composes with the slide's
+   * `transform` and restyles nothing inside it.
+   */
+  const PRESSABLE = 'button, a, input, select, textarea, [role="menu"], [tabindex]';
+  const pull = new Pull();
+
+  function grab(e: PointerEvent) {
+    const head = e.currentTarget as HTMLElement;
+    if (!el || el.dataset.form !== 'sheet' || !e.isPrimary || e.button !== 0) return;
+    /* Asked of the head and not past it: the page around the panel can be a focusable grid. */
+    const pressed = e.target instanceof Element ? e.target.closest(PRESSABLE) : null;
+    if (pressed && head.contains(pressed)) return;
+    pull.grab(e.clientY, e.timeStamp);
+    head.setPointerCapture(e.pointerId);
+    el.dataset.pull = '';
+  }
+
+  function drag(e: PointerEvent) {
+    if (el && pull.held) el.style.translate = `0 ${pull.move(e.clientY, e.timeStamp)}px`;
+  }
+
+  function drop(e: PointerEvent) {
+    if (!el || !pull.held) return;
+    const away = pull.drop(e.clientY, e.timeStamp, el.offsetHeight, e.type === 'pointercancel');
+    delete el.dataset.pull;
+    /* Let go short of it, the sheet goes back on the same curve; past it, it closes from where the finger left it. */
+    if (away) close();
+    else el.style.translate = '';
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -145,7 +242,8 @@
   oncancel={(e) => (e.preventDefault(), close())}
   onclose={closed}
 >
-  <header class="dock-head">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <header class="dock-head" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onpointercancel={drop}>
     <button type="button" class="dock-close tap" onclick={close} aria-label={copy.close} title={copy.close}>
       <Icon name="close" size="m" />
     </button>
@@ -155,7 +253,7 @@
 
   <!-- A scrolling box a keyboard can reach, for the reason `Sheet.svelte` gives. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="dock-body" data-surface="tile" tabindex="0">{@render children()}</div>
+  <div class="dock-body" data-surface="tile" data-swap={swap} tabindex="0">{@render children()}</div>
 </dialog>
 
 <style>
@@ -179,7 +277,15 @@
 
   /* DOCKED. Every UA default a `<dialog>` brings (centred, `fit-content`, a border, `Canvas`) is taken back here. */
   .dock {
-    --dock-from: 24px;
+    /* THE MOTION: in over 240ms on the sheet curve, out along the same path in 180ms, from wherever `--dock-off` puts
+       it out of sight. Both opacities are 1, so it slides and does not fade, until reduced motion fades it in from a
+       state that is still readable and out to nothing. */
+    --dock-curve: cubic-bezier(0.32, 0.72, 0, 1);
+    --dock-in: 240ms;
+    --dock-out: 180ms;
+    --dock-off: translateX(calc(100% + 16px));
+    --dock-from-opacity: 1;
+    --dock-gone-opacity: 1;
 
     position: fixed;
     inset-block: var(--inset);
@@ -200,26 +306,43 @@
     color: var(--ink);
     /* LEVEL 2, the chrome's: the glass hairline pair and the floating shadow. */
     box-shadow: var(--glass-edge), var(--e2);
+    transform: var(--dock-off);
+    opacity: var(--dock-gone-opacity);
+    /* LONGHANDS, so a browser that does not know `allow-discrete` drops that one line and keeps the slide. `display` and
+       `overlay` are held to the end of the close, which is what keeps a closed panel on screen while it goes. */
+    transition-property: transform, translate, opacity, display, overlay;
+    transition-duration: var(--dock-out);
+    transition-timing-function: var(--dock-curve);
+    transition-behavior: allow-discrete;
   }
 
+  /* Closed, and on its way out: nothing on it can be pressed. */
   .dock:not([open]) {
     display: none;
+    pointer-events: none;
   }
 
-  /* IT SLIDES IN OVER 220MS on the arriving curve, from a start somebody could still read if the first frame
-     stalls, which is `Sheet.svelte`'s reason for never starting at `opacity: 0`. */
   .dock[open] {
-    animation: dock-in var(--d-enter) var(--ease-out);
+    transform: none;
+    opacity: 1;
+    transition-duration: var(--dock-in);
+  }
+
+  /* THE FIRST FRAME OF AN OPENING, which is where the close ends. */
+  @starting-style {
+    .dock[open] {
+      transform: var(--dock-off);
+      opacity: var(--dock-from-opacity);
+    }
   }
 
   :global([dir='rtl']) .dock {
-    --dock-from: -24px;
+    --dock-off: translateX(calc(-100% - 16px));
   }
 
-  @keyframes dock-in {
-    from {
-      transform: translateX(var(--dock-from));
-    }
+  /* A sheet being pulled follows the finger, with nothing easing behind it. */
+  .dock:global([data-pull]) {
+    transition-property: none;
   }
 
   /* THE GLASS HEAD: the close circle, the title, the verbs. Glass never holds glass, so nothing in it is glass. */
@@ -281,6 +404,8 @@
   /* THE BODY IS A TILE'S SURFACE, and it is what scrolls. `min-block-size: 0` so a flex child can be shorter than its
      content. Twenty in from each edge, a tile's padding. */
   .dock-body {
+    --dock-settle: 2px;
+
     flex: 1 1 auto;
     min-block-size: 0;
     padding: calc(var(--sp-4) + var(--sp-1));
@@ -289,8 +414,35 @@
     background: var(--bg);
   }
 
-  /* BELOW 900PX, THE BOTTOM SHEET: against the bottom of the screen, above the keyboard, as tall as what it holds. */
-  .dock:modal {
+  /* A SWITCH: what the panel shows fades in and settles 2px, over 160ms. `backwards`, never `both`, because the body
+     can hold glass and a fill that outlives the fade would cut that glass off from what is behind it. */
+  .dock-body[data-swap='a'] {
+    animation: dock-swap-a 160ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  }
+
+  .dock-body[data-swap='b'] {
+    animation: dock-swap-b 160ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  }
+
+  @keyframes dock-swap-a {
+    from {
+      opacity: 0;
+      transform: translateY(var(--dock-settle));
+    }
+  }
+
+  @keyframes dock-swap-b {
+    from {
+      opacity: 0;
+      transform: translateY(var(--dock-settle));
+    }
+  }
+
+  /* BELOW 900PX, THE BOTTOM SHEET: against the bottom of the screen, above the keyboard, as tall as what it holds. It
+     rises from below the screen and goes back down it. */
+  .dock:global([data-form='sheet']) {
+    --dock-off: translateY(calc(100% + var(--kb)));
+
     inset-block: auto var(--kb);
     inset-inline: 0;
     inline-size: 100%;
@@ -300,34 +452,66 @@
     border-end-start-radius: 0;
     border-end-end-radius: 0;
     box-shadow: var(--e3);
-    animation: dock-rise var(--d-enter) var(--ease-out);
   }
 
-  .dock:modal::backdrop {
+  /* The scrim comes and goes with the sheet. Only the sheet form, which is modal, draws one. */
+  .dock::backdrop {
     background: var(--scrim);
+    opacity: 0;
+    transition-property: opacity, display, overlay;
+    transition-duration: var(--dock-out);
+    transition-timing-function: var(--dock-curve);
+    transition-behavior: allow-discrete;
   }
 
-  .dock:modal .dock-body {
+  .dock[open]::backdrop {
+    opacity: 1;
+    transition-duration: var(--dock-in);
+  }
+
+  @starting-style {
+    .dock[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  /* THE HANDLE: a short pill in the head's top padding, which reads as "this pulls". The head is what takes the pull,
+     and `touch-action: none` keeps a pull on it from scrolling or zooming the page underneath. */
+  .dock:global([data-form='sheet']) .dock-head {
+    position: relative;
+    padding-block-start: var(--sp-5);
+    touch-action: none;
+  }
+
+  .dock:global([data-form='sheet']) .dock-head::before {
+    content: '';
+    position: absolute;
+    inset-block-start: var(--sp-2);
+    inset-inline: 0;
+    inline-size: var(--sp-6);
+    block-size: var(--sp-1);
+    margin-inline: auto;
+    background: var(--line);
+    border-radius: var(--r-pill);
+  }
+
+  .dock:global([data-form='sheet']) .dock-body {
     padding-block-end: calc(var(--sp-4) + max(0px, calc(env(safe-area-inset-bottom) - var(--kb))));
   }
 
-  @keyframes dock-rise {
-    from {
-      transform: translateY(24px);
-    }
-  }
-
-  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
+  /* A FADE IN PLACE OF EVERY MOVE: the panel and the sheet fade where they stand, and a switch fades without settling.
+     The a11y layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
-    .dock[open],
-    .dock:modal {
-      animation-name: dock-fade;
+    .dock,
+    :global([dir='rtl']) .dock,
+    .dock:global([data-form='sheet']) {
+      --dock-off: none;
+      --dock-from-opacity: 0.6;
+      --dock-gone-opacity: 0;
     }
-  }
 
-  @keyframes dock-fade {
-    from {
-      opacity: 0.6;
+    .dock-body {
+      --dock-settle: 0px;
     }
   }
 

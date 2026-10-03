@@ -17,20 +17,23 @@
   the same palette. It is a button and not an input: the palette owns the typing.
 
   WORKING NOW IS WHO IS AT IT, read as Today reads it (`readWorking` in `record/boot-live.ts`), and absent when nobody is.
-  Each run is a face in a `--live` ring, the project's name and how long the run has been open. The ring is whole while
+  Each run is a face in a `--live` ring, the project's name and how long the run has gone. The ring is whole while
   the run is heard from and faint once it has gone quiet: no run reports its steps, so the arc has no progress to draw
   and does not pretend to.
 
   NO CHORD HINTS IN THE ROWS. `g h`, `g d` and `g 1`–`g 9` still work, and the `?` sheet is where they are said.
 
-  EVERY ROW WEARS A GLYPH IN A WELL, declared rather than guessed, and a list with nothing declared gets the glyph for a
-  list. The chosen row's well is ink.
+  EVERY ROW WEARS A GLYPH, declared rather than guessed, and a list with nothing declared gets the glyph for a list. The
+  glyphs sit bare on the glass, with no well round each: the card is the one box, and the rows are a list without boxes.
+  The row you are on is an ink wash with its glyph and name in ink, never a filled pill, and the only red on the card is
+  the count of what waits on you.
 
   THE GLASS IS ON A PSEUDO-ELEMENT, NOT ON THE `nav`. A `backdrop-filter` makes its element the box every fixed
-  descendant is placed against, and the narrow rail's flyout and the switcher's menu both escape the card.
+  descendant is placed against, and the narrow rail's flyout and the switcher's menu both escape the card. It is also
+  what moves when the card narrows or widens: the pseudo-element is scaled, never the card's width (`morphs` below).
 -->
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
@@ -40,7 +43,6 @@
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import Icon, { type IconName } from './Icon.svelte';
-  import IconWell from './IconWell.svelte';
   import AgentMark from './AgentMark.svelte';
   import { isMarked } from './agent-marks.ts';
   import Kbd from './Kbd.svelte';
@@ -51,6 +53,12 @@
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
   import type { Shell, Working } from '../record/boot-live.ts';
   import type { SpineKey } from '../spine.ts';
+
+  /**
+   * One run at work, and how long it has gone in seconds when the read says (`ran_s`, the record's `runAge`): to the
+   * clock while it works, and frozen where it was last heard from once it has gone quiet.
+   */
+  type Run = Working & { ran_s?: number };
 
   let {
     main,
@@ -87,7 +95,7 @@
     spine?: readonly SpineKey[] | undefined;
     inbox?: number | undefined;
     /** The agents at work now (`readWorking`); the group is not drawn while this is empty. */
-    working?: readonly Working[] | undefined;
+    working?: readonly Run[] | undefined;
     /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
     icons?: boolean | undefined;
     ontoggle?: (() => void) | undefined;
@@ -222,7 +230,7 @@
     if (scroller && foldAt) scroller.scrollTop += foldAt.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
   }
 
-  /* HOW LONG EACH RUN HAS BEEN OPEN, short: "8 min", "1 h 08", "2 d". The clock moves once a minute while anybody works. */
+  /* HOW LONG EACH RUN HAS GONE, short: "8 min", "1 h 08", "2 d". The clock moves once a minute while anybody works. */
   let now = $state(Date.now());
   $effect(() => {
     if (working.length === 0) return;
@@ -230,20 +238,81 @@
     const t = setInterval(() => (now = Date.now()), 60_000);
     return () => clearInterval(t);
   });
-  function lasted(since: string | null): string {
-    const from = since === null ? Number.NaN : Date.parse(since);
-    if (!Number.isFinite(from)) return '';
-    const min = Math.max(1, Math.floor((now - from) / 60_000));
+  /**
+   * A RUN'S AGE IS THE RECORD'S `runAge`, AND IT STOPS WHEN THE RUN DOES. A run at work is as old as the clock says, which
+   * is the minute tick above; a run gone quiet is as old as it was when last heard from, the `ran_s` its read carries.
+   * Counted to the clock, a run quiet since Monday read as three days of work.
+   */
+  function age(w: Run): string {
+    const from = w.since === null ? Number.NaN : Date.parse(w.since);
+    const seconds = w.quiet && w.ran_s !== undefined ? w.ran_s : (now - from) / 1000;
+    if (!Number.isFinite(seconds)) return '';
+    const min = Math.max(1, Math.floor(seconds / 60));
     if (min < 60) return `${min} min`;
     if (min < 24 * 60) return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
     return `${Math.floor(min / (24 * 60))} d`;
   }
   const runName = (w: Working): string => w.project ?? (w.doing || words.agent(w.agent));
+
+  /**
+   * THE WIDTH CHANGES ON TRANSFORM AND OPACITY ALONE.
+   *
+   * The card takes its new width in one frame, because the shell's column is `auto` and a width that animated would lay
+   * the whole window out sixty times a second. What moves is the glass: its `::before` is scaled from the width the card
+   * had to the one it has, along the inline axis from the card's start, and lands on its own box at scale 1, so the last
+   * frame is the card itself. The words fade back as it widens, and go at once as it narrows: a word half gone over a
+   * card already narrow reads as a fault.
+   *
+   * IN SCRIPT AND NOT IN THE STYLESHEET, because the rail's styles ride in the entry stylesheet every visit loads, and
+   * because the two widths, the direction and the timing tokens are only known once the card has drawn. MEASURED, NOT
+   * ASSUMED: the widths are read off the card before and after, so whatever moves either one moves this with it.
+   * Nothing runs on the first draw, for a reader who asked for less motion, or where an animation cannot reach `::before`.
+   */
+  const WORDS = '.item-name, .tally, .pen-action, .record-name, .ask-words, .ask-key, .me-name, .me-face, .sub, .fold-mark';
+  let card = $state<HTMLElement>();
+  let drawn: boolean | undefined;
+  let morphs: Animation[] = [];
+  const moves = (): boolean =>
+    typeof matchMedia === 'function' &&
+    !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    typeof KeyframeEffect === 'function' &&
+    'pseudoElement' in KeyframeEffect.prototype;
+  /* A duration token in milliseconds, whichever unit it is written in. */
+  const ms = (style: CSSStyleDeclaration, token: string, fallback: number): number => {
+    const raw = style.getPropertyValue(token).trim();
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? (raw.endsWith('ms') ? n : n * 1000) : fallback;
+  };
+  $effect.pre(() => {
+    const narrow = icons;
+    const el = untrack(() => card);
+    if (drawn === undefined || drawn === narrow || el === undefined) return void (drawn = narrow);
+    drawn = narrow;
+    /* A MORPH STILL RUNNING ENDS HERE, so the next one starts from the card and not from its middle. */
+    for (const a of morphs.splice(0)) a.cancel();
+    if (!moves()) return;
+    const was = el.getBoundingClientRect().width;
+    void tick().then(() => {
+      const width = el.getBoundingClientRect().width;
+      if (!(was > 0 && width > 0) || Math.abs(was - width) < 1) return;
+      const style = getComputedStyle(el);
+      const timing = { duration: ms(style, '--d-move', 220), easing: style.getPropertyValue('--ease-out').trim() || 'ease-out' };
+      /* AN ORIGIN HAS NO LOGICAL FORM, so a right-to-left card scales from its right, which is its start. */
+      const origin = style.direction === 'rtl' ? '100% 50%' : '0 50%';
+      try {
+        morphs.push(el.animate({ scale: [`${was / width} 1`, '1 1'], transformOrigin: [origin, origin] }, { ...timing, pseudoElement: '::before' }));
+        if (!narrow) for (const w of el.querySelectorAll(WORDS)) morphs.push(w.animate({ opacity: [0, 1] }, timing));
+      } catch {
+        /* A timing a browser cannot read is a width that changes in one frame, which is what it did before. */
+      }
+    });
+  });
 </script>
 
 <nav
   class="rail"
   aria-label="Record"
+  bind:this={card}
   data-icons={icons ? '' : undefined}
   onpointerover={(e) => flyAt(e.target)}
   onpointerleave={() => (fly = null)}
@@ -313,7 +382,7 @@
       {#each main as item (item.key)}
         <li>
           <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={isHere(item, path) ? 'page' : undefined}>
-            <IconWell name={item.icon as IconName} tone={isHere(item, path) ? 'ink' : undefined} /><span class="item-name">{item.label}</span>
+            <span class="glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
             {#if item.count}<span
                 class="tally num"
                 data-waiting={item.key === 'decide' ? '' : undefined}
@@ -332,7 +401,7 @@
         <ul class="group">
           {#each working as w, i (w.seq ?? `run-${i}`)}
             {@const name = runName(w)}
-            {@const took = lasted(w.since)}
+            {@const took = age(w)}
             <li>
               <svelte:element
                 this={w.seq === null ? 'div' : 'a'}
@@ -360,7 +429,7 @@
       {:else}
         <h2 class="section" bind:this={foldAt}>
           <button type="button" class="fold item tap" aria-expanded={!moreShut} onclick={() => void toggleMore()}>
-            <span class="more-glyph"><Icon name="more" size="l" /></span>
+            <span class="glyph"><Icon name="more" size="l" /></span>
             <span class="item-name">{copy.more}</span>
             <span class="fold-mark" aria-hidden="true" data-shut={moreShut ? '' : undefined}>
               <Icon name="chevronDown" size="s" />
@@ -375,7 +444,7 @@
             {#each more as item (item.key)}
               <li>
                 <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={isHere(item, path) ? 'page' : undefined}>
-                  <IconWell name={item.icon as IconName} tone={isHere(item, path) ? 'ink' : undefined} /><span class="item-name">{item.label}</span>
+                  <span class="glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
                 </a>
               </li>
             {/each}
@@ -387,7 +456,7 @@
         {#snippet page(entry: NavEntry)}
           <li>
             <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={path === entry.href ? 'page' : undefined}>
-              <IconWell name={entry.icon} tone={path === entry.href ? 'ink' : undefined} /><span class="item-name">{entry.title}</span>
+              <span class="glyph"><Icon name={entry.icon} size="l" /></span><span class="item-name">{entry.title}</span>
             </a>
           </li>
         {/snippet}
@@ -418,7 +487,7 @@
           {#each listsShown as r}
             <li>
               <a class="item tap" href={at(`/r/${r.id}`)} data-nav data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
-                <IconWell name={r.icon} tone={under(`/r/${r.id}`) ? 'ink' : undefined} />
+                <span class="glyph"><Icon name={r.icon} size="l" /></span>
                 <span class="item-name">{r.name}</span>
                 <span class="tally num">{r.count}</span>
               </a>
@@ -433,14 +502,14 @@
           {#if listsFold}
             <li>
               <button type="button" class="item tap" aria-expanded={listsAll} onclick={() => (listsAll = !listsAll)}>
-                <IconWell name="more" />
+                <span class="glyph"><Icon name="more" size="l" /></span>
                 <span class="item-name">{listsAll ? words.fewerLists : words.moreLists(listsHidden)}</span>
               </button>
             </li>
           {/if}
           <li>
             <a class="item tap" href={at('/r/_new?make')} data-label={words.newList} aria-current={path === '/r/_new' ? 'page' : undefined}>
-              <IconWell name="plus" tone={path === '/r/_new' ? 'ink' : undefined} /><span class="item-name">{words.newList}</span>
+              <span class="glyph"><Icon name="plus" size="l" /></span><span class="item-name">{words.newList}</span>
             </a>
           </li>
         </ul>
@@ -450,7 +519,7 @@
           {#each tools as t (t.href)}
             <li>
               <a class="item tap" href={at(t.href)} data-label={t.label} title={t.title} aria-current={under(t.href) ? 'page' : undefined}>
-                <IconWell name={t.icon} tone={under(t.href) ? 'ink' : undefined} /><span class="item-name">{t.label}</span>
+                <span class="glyph"><Icon name={t.icon} size="l" /></span><span class="item-name">{t.label}</span>
                 {#if t.count}<span class="tally num">{t.count}</span>{/if}
               </a>
             </li>
@@ -460,7 +529,7 @@
         {#if hidden > 0}
           <!-- THE WAY BACK, WHERE THE PAGE WAS. A page hidden from the nav is findable from the nav. -->
           <a class="item pen tap" href={at('/settings/navigation#hidden')} data-label={copy.hiddenCount(hidden)} data-hidden-row>
-            <IconWell name="eye" />
+            <span class="glyph"><Icon name="eye" size="l" /></span>
             <span class="item-name">{copy.hiddenCount(hidden)}</span>
             <span class="pen-action">{copy.showHidden}</span>
           </a>
@@ -469,7 +538,7 @@
         {#if pen.length}
           <!-- A holding pen: an update that adds a page lands hidden and nothing moves until somebody keeps it. -->
           <a class="item pen tap" href={at('/settings/navigation')} data-label={words.suggested(pen.length)}>
-            <IconWell name="alert" />
+            <span class="glyph"><Icon name="alert" size="l" /></span>
             <span class="item-name">{words.suggested(pen.length)}</span>
             <span class="pen-action">{copy.review}</span>
           </a>
@@ -493,23 +562,29 @@
 </nav>
 
 <style>
-  /* The kinds of row in the rail that are buttons rather than links, reset to the row's shape. */
+  /* The kinds of row in the rail that are buttons rather than links, reset to the row's shape. A control already takes
+     the body face (`base.css`), so no rule here restates it. */
   button.item {
     inline-size: 100%;
     background: none;
     border: 0;
-    font: inherit;
     text-align: start;
     cursor: pointer;
   }
 
   /**
    * THE CARD: glass, 216 wide, radius 22, padding 10, floating on the ground at level 2. The shell places it 12 in from
-   * the window on three sides (`.rail-slot`).
+   * the window on three sides (`.rail-slot`). Its glass is the only glass on it: a row, the ask field and the place you
+   * are on are washes laid on the card, never glass on glass.
+   *
+   * ITS OWN RADII, NOT THE REFERENCE'S: 22 for the card and 12 for a row (`--r-lg`, `--r-md`, `loop/design/SYSTEM.md`),
+   * concentric across the card's 10 of padding. DIRECTION 37 keeps the reference's measurements out, as §34 did.
    */
   .rail {
-    --rail-icons: calc(var(--tap) + var(--sp-2) * 2);
     --fly-x: calc(var(--inset) + var(--rail));
+    /* THE CHROME READS A STEP UNDER THE PAGE IT FRAMES: 14 beside the 15 body, one over the meta step, so the names on
+       the card stay calm while the reading text grows. */
+    --rail-text: calc(var(--t-sm) + 1px);
 
     position: relative;
     isolation: isolate;
@@ -553,13 +628,11 @@
     padding: 0 var(--sp-2);
     border-radius: var(--r-md);
     color: var(--ink);
-    font-family: var(--font-ui);
     font-size: var(--t-row);
     font-weight: 600;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  :global(.menu-trigger:hover) .record,
   :global(.menu-trigger[aria-expanded='true']) .record {
     background: var(--hover-wash);
   }
@@ -576,7 +649,7 @@
     padding: 0 var(--sp-3);
     border-radius: var(--r-md);
     color: var(--ink2);
-    font-size: var(--t-base);
+    font-size: var(--rail-text);
     text-decoration: none;
     cursor: pointer;
   }
@@ -587,7 +660,6 @@
     }
   }
 
-  .mi:hover,
   .mi:focus-visible {
     background: var(--hover-wash);
     color: var(--ink);
@@ -611,7 +683,6 @@
     background: var(--ink);
     border-radius: var(--r-sm);
     color: var(--on-ink);
-    font-family: var(--font-ui);
     font-size: var(--t-xs);
     font-weight: 600;
     line-height: 1;
@@ -668,7 +739,6 @@
       background var(--d-state) var(--ease-out);
   }
 
-  .rail:hover .width,
   .rail:focus-within .width {
     opacity: 1;
   }
@@ -677,11 +747,6 @@
     .width {
       opacity: 1;
     }
-  }
-
-  .width:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
   }
 
   /* ONE GLYPH THAT TURNS: it points at the wall the rail is about to fold against. */
@@ -705,15 +770,9 @@
     border: 0;
     border-radius: var(--r-md);
     color: var(--dim);
-    font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--rail-text);
     text-align: start;
     cursor: text;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .ask:hover {
-    background: var(--selected);
   }
 
   .ask :global(.icon) {
@@ -734,6 +793,7 @@
     flex: none;
   }
 
+  /* A LIST WITHOUT BOXES: rows 2 apart on the glass, and the space between groups says where one ends. */
   .group {
     display: flex;
     flex-direction: column;
@@ -759,10 +819,6 @@
     scrollbar-color: transparent transparent;
   }
 
-  .scroll:hover {
-    scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
-  }
-
   /* AN AUTHOR RULE, because `hidden` is a user-agent one and loses to any `display` written here. */
   .more-body[data-shut],
   .group[data-shut] {
@@ -780,12 +836,11 @@
     font: inherit;
   }
 
-  /* A group heading on the card: 13/500 in `--dim`, as Working now's is. */
+  /* A QUIET HEADING OVER A GROUP: 13/500 in `--dim`, as Working now's is, and no rule under it. */
   .sub {
     margin: var(--sp-4) 0 var(--sp-1);
     padding-inline: 10px;
     color: var(--dim);
-    font-family: var(--font-ui);
     font-size: var(--t-sm);
     font-weight: 500;
     letter-spacing: 0;
@@ -800,12 +855,7 @@
     background: none;
     border: 0;
     color: inherit;
-    font: inherit;
     cursor: pointer;
-  }
-
-  .sub .fold:hover {
-    color: var(--ink);
   }
 
   .tools {
@@ -825,7 +875,7 @@
     transform: rotate(-90deg);
   }
 
-  /* A PLACE: 36 tall, an 18px glyph in a 26px well, the name 14/500, and a count at the end in `--dim`. */
+  /* A PLACE: 36 tall, an 18px glyph, the name 14/500, and a count at the end in `--dim`. */
   .item {
     display: flex;
     align-items: center;
@@ -834,53 +884,44 @@
     padding: 0 10px 0 5px;
     border-radius: var(--r-md);
     color: var(--ink2);
-    font-size: var(--t-base);
+    font-size: var(--rail-text);
     font-weight: 500;
     text-decoration: none;
     transition:
       background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
+      color var(--d-state) var(--ease-out),
+      scale var(--d-release) var(--ease-out);
   }
 
-  /* THE RAIL'S WELL IS 26, TWO UNDER A TILE'S, and on glass its rest fill is the wash rather than
-     `tile-2`, which would read as a white chip on the card. The chosen well is `IconWell`'s own ink. */
-  .item :global(.well) {
-    inline-size: 26px;
-    block-size: 26px;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
-  }
-
-  .item :global(.well:not([data-tone])) {
-    background: var(--hover-wash);
-  }
-
-  /* More's own glyph needs no well: it is the foot of the card, not a place. */
-  .more-glyph {
+  /* THE GLYPH, BARE ON THE GLASS: 18 in a 26 slot, so every name starts on one line whatever its glyph's own width. It
+     takes its row's ink, so the glyph and the name are always one colour, at rest, under the pointer and here. */
+  .glyph {
     display: grid;
     place-items: center;
     flex: none;
     inline-size: 26px;
     block-size: 26px;
-    color: var(--ink2);
   }
 
-  .more-glyph :global(.icon) {
+  .glyph :global(.icon) {
     inline-size: 18px;
     block-size: 18px;
   }
 
-  .item:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  /* "HERE" IS AN INK WELL, THE NAME AT 600 AND A WHITE ROW, never the mark's red. */
+  /* "HERE" IS AN INK WASH, ink at 8%, with the glyph and the name in ink at 600: the white 8% the design system gives the
+     chosen rail row in the dark (SYSTEM §13), and a soft grey on the light card. Never a filled pill, never the red. */
   .item[aria-current='page'] {
-    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
     color: var(--ink);
     font-weight: 600;
+  }
+
+  /* THE PRESS: a scale of .97 in 70ms, let go in the release time, so a finger sees the row take it as a click does. */
+  .item:active,
+  a.run:active {
+    scale: 0.97;
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-push);
   }
 
   .item-name {
@@ -891,7 +932,7 @@
     white-space: nowrap;
   }
 
-  /* Indented to where a well would end, so a saved view reads as belonging to the list above it. */
+  /* Indented to where a glyph would end, so a saved view reads as belonging to the list above it. */
   .item.view {
     padding-inline-start: calc(5px + 26px + 10px);
     color: var(--ink2);
@@ -906,7 +947,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* THE ONE FILLED BADGE: Decide's count as the red square, because it is the count that needs him. */
+  /* THE ONE FILLED BADGE AND THE ONE RED ON THE CARD: Decide's count as the red square, because it is what needs him. */
   .tally[data-waiting] {
     display: inline-grid;
     place-items: center;
@@ -942,14 +983,12 @@
     padding: 0 10px 0 4px;
     border-radius: var(--r-md);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--rail-text);
     font-weight: 500;
     text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  a.run:hover {
-    background: var(--hover-wash);
+    transition:
+      background var(--d-state) var(--ease-out),
+      scale var(--d-release) var(--ease-out);
   }
 
   /* A 22px disc inside a 2px `--live` ring: whole while the run is heard from, faint once it has gone quiet. */
@@ -1022,7 +1061,7 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--rail-text);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1039,15 +1078,57 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .me-more:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
   .sep {
     margin: var(--sp-3) var(--sp-2) var(--sp-2);
     border: 0;
     border-block-start: 1px solid var(--line);
+  }
+
+  /**
+   * HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it, so a row a thumb
+   * pressed would stay lit after it left; `controls.css` guards its own the same way.
+   */
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger:hover) .record {
+      background: var(--hover-wash);
+    }
+
+    .mi:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+
+    .rail:hover .width {
+      opacity: 1;
+    }
+
+    .width:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+
+    .scroll:hover {
+      scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
+    }
+
+    .sub .fold:hover {
+      color: var(--ink);
+    }
+
+    /* The place you are on keeps its wash under the pointer, so pointing never reads as moving. */
+    .item:hover:not([aria-current='page']) {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
+
+    a.run:hover {
+      background: var(--hover-wash);
+    }
+
+    .me-more:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
   }
 
   /* ── The narrow rail ──────────────────────────────────────────────────── */
@@ -1080,12 +1161,14 @@
     border-radius: var(--r-pill);
   }
 
-  /* CLIPPED, NEVER REMOVED: the name is the row's accessible name at both widths, and the flyout is a copy for the eye. */
+  /* CLIPPED, NEVER REMOVED: the name is the row's accessible name at both widths, and the flyout is a copy for the eye.
+     A count other than Decide's goes the same way, so it stays in its row's name without a dot on every list. */
   .rail[data-icons] .item-name,
   .rail[data-icons] .pen-action,
   .rail[data-icons] .record-name,
   .rail[data-icons] .ask-words,
   .rail[data-icons] .me-name,
+  .rail[data-icons] .item .tally:not([data-waiting]),
   .sub[data-clip] {
     position: absolute;
     inline-size: 1px;
@@ -1102,8 +1185,9 @@
     display: none;
   }
 
-  /* A COUNT BECOMES A DOT ON THE CORNER OF THE GLYPH at this width; the figure stays in the row's name. */
-  .rail[data-icons] .item .tally {
+  /* WHAT WAITS ON YOU IS THE ONE COUNT LEFT TO SEE AT THIS WIDTH: a red dot on the corner of its glyph, the figure still
+     in the row's name. */
+  .rail[data-icons] .item .tally[data-waiting] {
     position: absolute;
     inset-block-start: var(--sp-1);
     inset-inline-end: var(--sp-1);
@@ -1111,15 +1195,10 @@
     min-inline-size: 0;
     block-size: var(--dot);
     padding: 0;
-    background: var(--dim);
     border-radius: var(--r-pill);
     overflow: hidden;
     text-indent: 100%;
     white-space: nowrap;
-  }
-
-  .rail[data-icons] .item .tally[data-waiting] {
-    background: var(--danger);
   }
 
   .rail[data-icons] .view {
@@ -1143,10 +1222,16 @@
     translate: 0 -50%;
   }
 
-  /* FORCED COLOURS DROP THE GLASS AND ITS SHADOWS, so the floating surface keeps an edge to be told from the ground by. */
+  /* FORCED COLOURS DROP THE GLASS AND ITS SHADOWS, so the floating surface keeps an edge to be told from the ground by,
+     and the washes with them, so the place you are on keeps an edge of its own where the focus ring is not drawing one. */
   @media (forced-colors: active) {
     .rail::before {
       border: 1px solid CanvasText;
+    }
+
+    .item[aria-current='page']:not(:focus-visible) {
+      outline: 1px solid CanvasText;
+      outline-offset: -1px;
     }
   }
 </style>

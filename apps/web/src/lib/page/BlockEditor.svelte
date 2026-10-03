@@ -507,7 +507,7 @@
   }
 
   .help[data-bad] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .field[data-bad] {

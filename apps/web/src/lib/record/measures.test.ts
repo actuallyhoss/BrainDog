@@ -107,10 +107,39 @@ test('a live stat and a live lines block over a register draw tiles and charts, 
   assert.equal(tiles!.rows[0]!.cells[0], 'Revenue');
   assert.equal(tiles!.rows[0]!.ref, undefined, 'a tile is a measure, not one row to open');
 
-  const lines = blockOf(answered('lines', 'register.datapoints', FIELDS, rows, { back: 7 }) as never, new Map(), NOW);
+  /* A LINE IS TWO POINTS IN THE PERIOD, as the record counts them (`measureLines`): one on the 17th and one before the
+     period is a reading said once, in a list and not as a chart. */
+  const once = blockOf(answered('lines', 'register.datapoints', FIELDS, rows, { back: 7 }) as never, new Map(), NOW);
+  const [said] = toSegments(once).filter((s): s is Block => s.type === 'block');
+  assert.equal(said!.kind, 'spec');
+  assert.deepEqual(said!.rows.map((r) => r.cells.join(' | ')), ['Revenue | GBP 4,200.00 | 17 Sep']);
+  assert.equal(said!.heading, undefined, 'a list with no lines over it needs no heading of its own');
+
+  const lines = blockOf(answered('lines', 'register.datapoints', FIELDS, [...rows, { id: 'c', fields: { name: 'Revenue', value: 4100, unit: 'GBP', at: day(15) } }], { back: 7 }) as never, new Map(), NOW);
   const charts = toSegments(lines).filter((s): s is Block => s.type === 'block');
   assert.equal(charts.length, 1);
   assert.equal(charts[0]!.kind, 'lines');
+});
+
+test('A RECORD THAT SENDS THE MEASURES READ ONCE BESIDE ITS LINES DRAWS THEM AS ONE LIST, under the lines and named', () => {
+  REGISTERS.datapoints = DATAPOINTS;
+  const keys = ['2026-08-31', '2026-09-07', '2026-09-14'];
+  const series = { name: 'Users', unit: '', bucket: 'week', keys, now: [100, null, 140], was: [80, 90, 95], latest: { value: 140, at: day(16), day: '2026-09-16' } };
+  const latest = [
+    { measure: 'Aov, Crumb.gg', value: 24.1, unit: 'GBP', at: day(16), day: '2026-09-16' },
+    { measure: 'Accounts, Sketchpad', value: 4, unit: '', at: day(15), day: '2026-09-15' },
+    { measure: 'broken', value: 'four' },
+  ];
+  const block = blockOf(answered('lines', 'register.datapoints', FIELDS, [], { measures: [series], latest }) as never, new Map(), NOW);
+  assert.equal(block.readOnce?.length, 2, 'a reading in a shape this cannot read is left off');
+  assert.equal(block.total, 3);
+  const drawn = toSegments(block).filter((s): s is Block => s.type === 'block');
+  assert.deepEqual(drawn.map((b) => [b.kind, b.heading]), [['lines', 'Users'], ['spec', 'Reported once']]);
+  assert.deepEqual(drawn[1]!.rows.map((r) => r.cells.join(' | ')), ['Aov, Crumb.gg | GBP 24.10 | 16 Sep', 'Accounts, Sketchpad | 4 | 15 Sep']);
+
+  /* AND A STAT TAKES NONE: its tiles are each a measure's newest reading already. */
+  const stat = blockOf(answered('stat', 'register.datapoints', FIELDS, [], { measures: [series], latest }) as never, new Map(), NOW);
+  assert.equal(stat.readOnce, undefined);
 });
 
 test('a live block the record answered with series draws them, and never its own copy of the rows', () => {

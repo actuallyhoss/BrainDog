@@ -1375,7 +1375,7 @@
 
   /* PAST TWO WEEKS THE AGE IS LATE, and its words carry the red at 500 so it is never a hairline of colour. */
   .q-age[data-stale] {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 

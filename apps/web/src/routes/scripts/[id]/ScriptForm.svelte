@@ -366,7 +366,7 @@
   }
 
   .help.wrong {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   /* A FIELD WITH A FAULT IN IT: a red edge drawn inside it, since a field has no border to colour. */

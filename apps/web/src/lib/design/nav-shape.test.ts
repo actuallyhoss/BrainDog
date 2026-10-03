@@ -40,6 +40,17 @@ test('already on the shape that suits the record recommends nothing', () => {
   assert.equal(recommendNavShape({ ...base, entries: 0, current: 'menu' }), null);
 });
 
+test('A RECORD THAT NEVER CHOSE IS ON THE RAIL CARD, so the studio is told nothing it already has', () => {
+  assert.equal(recommendNavShape({ ...base, entries: 18, sections: 6 }), null);
+  assert.equal(recommendNavShape({ ...base, entries: 1, handArranged: true }), null, 'a hand-arranged nav was offered the rail it is on');
+});
+
+test('AND IS NEVER TALKED INTO THE TOP BAR, which stays a choice; a rail somebody picked can still hear it', () => {
+  for (const entries of [2, 3, 4]) assert.equal(recommendNavShape({ ...base, entries, sections: 1 }), null, `${entries} entries`);
+  assert.equal(recommendNavShape({ ...base, entries: 4, sections: 1, current: 'rail' })?.shape, 'bar');
+  assert.equal(recommendNavShape({ ...base, entries: 3, sections: 1, current: 'menu' })?.shape, 'bar');
+});
+
 test('a hand-arranged nav is never told to hide behind a menu, even at one entry', () => {
   const rec = recommendNavShape({ ...base, entries: 1, handArranged: true, current: 'menu' });
   assert.equal(rec?.shape, 'rail');

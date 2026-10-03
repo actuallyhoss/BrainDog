@@ -21,6 +21,7 @@
  * printed as a key.
  */
 
+import { sessionDeclaration } from '@braindog/kernel';
 import { useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
@@ -29,6 +30,7 @@ import { PAGES } from '../../lib/record/held.ts';
 import { moneyInText } from '../../lib/record/money.ts';
 import { actor, humanize, listName, type ActorKind } from '../../lib/record/names.ts';
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
+import { runOf } from '../../lib/ui/face.ts';
 import { listed } from '../../lib/viz/shared.ts';
 
 const count = (n: number): string => n.toLocaleString('en');
@@ -74,7 +76,64 @@ export const historyWords = {
   quietWeek: 'Nothing changed in the last 7 days.',
   evenWeek: 'Changes are spread evenly across the day.',
   stripRead: (n: number): string => `Counted over the ${count(n)} newest entries read so far`,
+  /* THE SWITCH THAT SHOWS THE RECORD'S OWN BOOKKEEPING beside the changes, and the line saying what it is hiding. */
+  everything: 'Everything',
+  hidden: (n: number): string =>
+    `${n === 1 ? 'One entry is' : `${count(n)} entries are`} BrainDog's own bookkeeping: agent runs starting and stopping, their working folders, and when a tool was last seen.`,
+  showThem: (n: number): string => (n === 1 ? 'Show it' : 'Show them'),
+  onlyBooks: 'Nothing changed, apart from BrainDog keeping its own books.',
+  /* A RUN'S WORK, FOLDED UNDER ITS NEWEST LINE. */
+  more: (n: number): string => `+${count(n)} more`,
 } as const;
+
+/* ── the record's own bookkeeping ──────────────────────────────────────── */
+
+/**
+ * THE LIST THE KERNEL KEEPS ITS AGENT RUNS IN, read off the kernel's own declaration rather than typed here, so this
+ * file and the record never disagree about which list it is.
+ */
+const RUNS = String(sessionDeclaration().body.id);
+
+/** The fields that only stamp when something was last seen: a tool's `seen`, a run's `last_seen`. */
+const STAMPS: ReadonlySet<string> = new Set(['seen', 'last_seen']);
+
+/**
+ * A STAMP SAID IN WORDS, for a log that names no field. `noteOf` (`history-live.ts`) says a field's change as its label
+ * or its id in words, then "set to", "from" or "cleared", so a line whose whole note is a last-seen stamp reads this way.
+ */
+const STAMP_SAID = /^(?:last seen|seen) (?:set to |from |cleared$)/u;
+
+/**
+ * WHETHER A LINE IS THE RECORD KEEPING ITS BOOKS rather than a change to somebody's things: the hourly sweep that marks
+ * quiet runs abandoned, a run's working folder moving, a run's own state and last-seen time, and the daily stamp of
+ * when a tool was last seen. Measured on the owner's record: 154 of the newest 200 lines were the sweep alone, so the
+ * changes an agent made were buried under the record noting that its runs had stopped.
+ *
+ * GENERIC, as every rule here is (DIRECTION §27): the runs are the kernel's own list on every record, and a stamp is
+ * told by its field, which the line carries (`field`), or by the words `noteOf` says it in where it does not.
+ *
+ * A STAMP IS A RUN'S, as the record's own rule has it (`bookkeeping` in the kernel): a person who fills "Last seen" on
+ * somebody in People, or ticks "Seen" on a film, changed their own things, and hiding it hid their work from them.
+ */
+export function isBookkeeping(e: Pick<AuditEvent, 'by' | 'kind' | 'target' | 'note'> & { field?: string | null | undefined }): boolean {
+  if (listOf(e.target) === RUNS) return true;
+  if (e.kind !== 'edit' || runOf(e.by) === null) return false;
+  if (typeof e.field === 'string') return STAMPS.has(e.field);
+  return STAMP_SAID.test(e.note.trim().toLowerCase());
+}
+
+/** The changes alone, or everything when `all` is set: what the stream draws. */
+export const changesOf = <T extends Pick<AuditEvent, 'by' | 'kind' | 'target' | 'note'>>(events: readonly T[], all: boolean): T[] =>
+  all ? [...events] : events.filter((e) => !isBookkeeping(e));
+
+/**
+ * WHETHER THE RECORD KEEPS BOOKS AT ALL, from the lists the shell holds: it does once it holds an agent run, which the
+ * sweep and the stamps are about. The switch is offered on that and not only on what this page held back, because the
+ * record leaves the sweep and the stamps out of the log it sends unless it is asked for everything, so a page can hide
+ * nothing of its own and still have something to show.
+ */
+export const keepsBooks = (lists: readonly { id: string; count?: number }[] | undefined): boolean =>
+  (lists ?? []).some((l) => l.id === RUNS && (l.count ?? 0) > 0);
 
 /* ── who counts as what ────────────────────────────────────────────────── */
 
@@ -322,6 +381,43 @@ export function burstsOf(events: readonly AuditEvent[]): Told[] {
   }
   return out;
 }
+
+/* ── one run's work, folded ────────────────────────────────────────────── */
+
+/** Fewer lines than this by one run, side by side, are drawn as they are: folding two lines saves nothing. */
+export const RUN_FOLD_MIN = 3;
+
+/** One run's lines next to each other, drawn as its newest and folded under it as "+9 more"; a line alone has no rest. */
+export type RunFold = { key: string; head: Told; rest: Told[] };
+
+/**
+ * A RUN'S WORK IS ONE THING TO READ. An agent that fixes a payout writes a line a field, so one stretch of its work was
+ * a column of lines with the same face down the stream; the newest says who and what, and the rest wait one press away.
+ * Only lines of one run next to each other fold, in the order they were drawn, so nothing moves out of its place in
+ * time, and a person's lines, a rule's and Slash's are never folded under anybody.
+ */
+export function runFolds(told: readonly Told[]): RunFold[] {
+  const runs: Told[][] = [];
+  for (const t of told) {
+    const run = runOf(t.e.by);
+    const last = runs.at(-1);
+    if (run !== null && last && runOf(last[0]!.e.by) === run) last.push(t);
+    else runs.push([t]);
+  }
+  return runs.flatMap((lines): RunFold[] =>
+    lines.length >= RUN_FOLD_MIN ? [{ key: lines[0]!.key, head: lines[0]!, rest: lines.slice(1) }] : lines.map((t) => ({ key: t.key, head: t, rest: [] })),
+  );
+}
+
+/** Every line a fold holds, which is what a press on "+9 more" keeps as opened. */
+export const foldKeys = (f: RunFold): string[] => [f.head.key, ...f.rest.map((t) => t.key)];
+
+/**
+ * WHETHER A FOLD SOMEBODY OPENED IS STILL OPEN: by any line it held when it was opened, and not by its newest. A run
+ * still at work puts its next line on top of the fold, which is then the fold's newest and its key, and a fold kept by
+ * that key shut under the reader the moment the run wrote again.
+ */
+export const foldOpen = (f: RunFold, opened: ReadonlySet<string>): boolean => foldKeys(f).some((k) => opened.has(k));
 
 /* ── one line's identity, and the page read again ──────────────────────── */
 

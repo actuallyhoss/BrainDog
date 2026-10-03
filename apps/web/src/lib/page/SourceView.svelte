@@ -413,7 +413,7 @@
   }
 
   .source-fault {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .source-said {

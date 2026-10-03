@@ -571,7 +571,7 @@
 
   .bad {
     margin: 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
     line-height: 18px;
   }

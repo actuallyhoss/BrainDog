@@ -1,33 +1,27 @@
 <!--
-  The gate. One question, its options, one decider, a mandatory reason.
+  The gate. One question, its answers, and what accepting it does, examined whole.
 
-  DELIBERATELY SLOWER THAN EVERY PRECEDENT, and every part of that is on purpose:
+  ONE PRESS ANSWERS (DIRECTION §37). Each answer is a button that says what it does, and pressing it is the decision:
+  no reason box opens first and no second press commits it. The walk of 2 October found the queue making a round trip
+  and then asking "Why?" before an answer landed (`loop/research-ux-walk.md` #3), and two of the owner's decisions
+  carried the reasons "f" and "y", which agents later read back as the why. So the reason is offered, never demanded:
+  after a decline or an edit the receipt offers a one-line note, kept with the question. Where the record itself still
+  keeps a reason for a question (`govern.ts`), it says so on the press and one line opens under the answers, with the
+  choice kept.
 
-    1–9   HIGHLIGHT an option. It does not choose it.
-    ↵     opens the commit step, and focus moves to the EMPTY, REQUIRED reason field.
-    ⌘↵    commits — only from inside the reason, only with content.
-    d     defers: also a reason, plus a wake date.
-    Esc   leaves. The question stays open. Leaving costs nothing.
+  THE SUGGESTION IS AN OUTLINE WITH A SMALL DOT, his pick, and it is drawn only where the choice can be taken back and
+  no money moves (`press.ts`). A pre-selected answer reads as an endorsement, so where the other button tomorrow cannot
+  undo it, nothing is marked. When money moves, Accept names the amount.
 
-  NO SINGLE KEYSTROKE EVER COMMITS A DECISION. Linear binds 1 accept / 3 decline, which is correct
-  for triaging an issue and wrong for an immutable row with a named decider.
+  THE KEYS: `j` and `k` go to the next and the last open question, Enter accepts, `e` edits what accepting takes (the
+  rows to tick, where Space ticks and Enter is done), Backspace declines, `1` to `9` reach an answer's button, `d` puts
+  the question off, and Esc steps back. Enter gives the suggested answer, or Accept, and nothing on a question that is
+  hard to undo or that moves money: those are answered by a press on their own button, which a key puts the focus on.
+  Nothing moves or fades on a key.
 
-  And THE RECOMMENDATION IS DISPLAYED, NEVER PRE-SELECTED. If it were highlighted on open, three
-  keystrokes would rubber-stamp the machine's answer with a reason typed under its influence (19 §4).
-
-  THIS IS NO LONGER THE ONLY WAY TO ANSWER, AND IT IS BETTER FOR IT. `/decide` used to print a
-  question's options as a sentence inside the card's own link, so every answer in the queue came
-  through here: open the question, choose, write prose, commit. The cards press now. One press
-  picks an answer, the reason that sends it is asked for after it, and the way back is on the row.
-
-  So the two screens are two different acts rather than one act and its detour. The card answers a
-  question you have already thought about. THIS screen is where one gets EXAMINED: the cost of
-  deciding late, the body of every option, the recommendation beside the reasoning it came from, the
-  defer with its wake date, and a commit that takes a named decider and a written reason and cannot
-  be edited afterwards. Everything below is unchanged, and the reason is still required, because
-  that is the ceremony somebody came here for. What both screens now share is one sentence for what
-  a decision would write: `record/answer.ts`, so the two cannot drift into telling different stories
-  about one act.
+  THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, with what accepting changes open under them. A card
+  whose only content was an Accept button was the walk's #29; the cards are for a question's own options, each with
+  what it is and why.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -50,17 +44,20 @@
   import { updatesOf, words as changeWords } from './changes.ts';
   import { pickableOf, rowsToSend, words as pickWords } from './picked.ts';
   import { answerFor, type Answer } from '$lib/record/answer.ts';
-  import { everyGovernance, plainOf, readOne, words as governed, type One } from '$lib/record/governance.ts';
+  import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
+  import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { visualOf, type Visual } from '$lib/page/queue-answer.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
+  import { acceptKey, declineKey, keyAct, labelOf, movesOf, notedAfter, suggestionShown, twoWords } from '../press.ts';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
   import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
-  import { untrack } from 'svelte';
+  import { pressedOnly } from '@braindog/kernel';
+  import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -127,24 +124,16 @@
   const now = $derived(from === 'live' ? Date.now() : 0);
 
   /**
-   * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED EITHER.
+   * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN ONCE NEVER ASKED.
    *
-   * `/decide` WAS REPAIRED AND THIS WAS NOT, AND IT IS THE DEEPER DEAD END OF THE TWO. A reader gets
-   * here from the card link on that same queue. The queue answers in one press, so its dead end cost
-   * a press, a paragraph and a second press. This screen is deliberately slower than the queue, and
-   * every part of that slowness is spent by somebody who is going to be refused: `Choose this` opens
-   * a REQUIRED reason box, the commit stays off while the box is empty, "required" is said twice
-   * above it, and the reason is the whole ceremony somebody came here for. Then the record answers.
+   * A reader gets here from the card link on the queue. Before the repair, a colleague at `read` pressed an answer,
+   * typed the reason the screen then demanded, and only after all of it met the record's refusal. Counted from this
+   * file for a three-option question: four controls inside the decision (three answers and `Defer`), none of them off,
+   * and no word on the page about access, with the keyboard a second way in that asked nothing either.
    *
-   * COUNTED FROM THIS FILE for a three-option question, before: four controls inside the
-   * decision, being three `Choose this` buttons and `Defer`, NOT ONE of them disabled, and no word
-   * anywhere on the page about access. Two ways in and neither asked: the buttons, and the keyboard,
-   * where `Enter` on a highlighted option calls `choose` and `d` calls `defer`.
-   *
-   * SO THE SENTENCE IS THE RECORD'S OWN, MOVED IN FRONT OF THE OPTIONS, and the module it comes from
-   * is the one the queue already reads. `answering.ts` exists so that this screen is not a fourth
-   * spelling of one rule, and a colleague who reads the hint here, reads it on the queue, or presses
-   * through to the refusal meets the same words three times over.
+   * SO THE SENTENCE IS THE RECORD'S OWN, MOVED IN FRONT OF THE OPTIONS, and the module it comes from is the one the
+   * queue reads. `answering.ts` exists so that this screen is not a fourth spelling of one rule, and a colleague who
+   * reads the hint here, on the queue, or in the toast a key gives them meets the same words.
    */
   const me = $derived((page.data as unknown as Shell).me);
   const answerable = $derived(mayAnswer(me.level, me.owner));
@@ -193,19 +182,35 @@
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. */
   const updates = $derived(question && live ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers)) : []);
 
-  /** Sent and waiting, and what the record refused, in its own sentence. */
-  let sending = $state(false);
+  /** The answer on its way, so a second press waits for the first; and what the record refused, in its own sentence. */
+  let sending = $state<string | null>(null);
   let fix = $state('');
-
-  /** Highlighted, not chosen. The two are different states and the interface says so. */
-  let highlighted = $state<string | null>(null);
-  let committing = $state<string | null>(null);
 
   /* A PROPOSAL THAT ADDS SEVERAL ROWS, one tick each: Accept takes the ticked ones and declines the rest. */
   const pickable = $derived(from === 'live' && live?.about ? pickableOf(live.about.kind, live.about.body) : []);
   let unticked = $state<number[]>([]);
   const picked = $derived(rowsToSend(pickable.length, unticked));
-  const noneTicked = $derived(committing === 'accept' && pickable.length > 0 && picked === null);
+  /* A PRESS ON ACCEPT WITH NOTHING TICKED is a decline in disguise, so it is said and nothing is sent. */
+  let noneTicked = $state(false);
+
+  /* THE RECORD'S TWO ANSWERS, Accept and Decline, which are buttons and not cards (`press.ts` `twoWords`). */
+  const two = $derived(question ? twoWords(question) : false);
+  /* THE MONEY ACCEPTING WOULD WRITE, in each currency it is in, for the rows that are ticked: the button names it. */
+  const moves = $derived(question && live ? movesOf(live.rowset, live.registers, picked) : []);
+  /* AND THE SUGGESTION, only where the choice can be taken back and no money moves; the first one an agent marked. */
+  const suggestedKey = $derived(
+    question && suggestionShown(question.band, moves.length > 0) ? question.options.find((o) => o.recommended === true)?.key : undefined,
+  );
+
+  /**
+   * WHEN THE RECORD STILL KEEPS A REASON FOR A QUESTION, it answers the press with `wants: 'reason'` (`decide-write.ts`),
+   * and one line opens under the answers with the choice kept: the reason is the record's to ask for, once, and never
+   * this screen's to demand before the press.
+   */
+  let asked = $state<string | null>(null);
+  let reason = $state('');
+  let field = $state<HTMLInputElement>();
+
   /**
    * Deferring is a DECISION about when, and it takes a reason like every other one.
    *
@@ -217,26 +222,35 @@
    */
   let deferring = $state(false);
   let wake = $state('');
-  let reason = $state('');
-  let field = $state<HTMLTextAreaElement>();
+  let parkWhy = $state('');
+  let parkField = $state<HTMLTextAreaElement>();
 
-  const short = $derived(reason.trim().length > 0 && reason.trim().length < 25);
 
+  /**
+   * ONE PRESS IS THE ANSWER: the option goes to the record at once, alone, and what comes back is the decision.
+   *
+   * A READER WHO MAY NOT ANSWER IS TOLD SO BEFORE ANYTHING IS SENT. The buttons are off for them, but off is not
+   * closed: Enter and Backspace arrive here with no button in the way, and an answer that went out and came back
+   * refused is the dead end this screen was repaired for. The words are the standing hint's, so the toast and the
+   * sentence agree.
+   */
   function choose(key: string) {
-    /* A READER WHO MAY NOT ANSWER IS TOLD BEFORE THE REASON BOX OPENS, AND NOT AFTER THE PARAGRAPH.
-       The buttons below are off, but off is not closed: `Enter` on a highlighted option arrives here
-       with no button in the way, and a required reason box that opens for somebody whose access
-       cannot reach the commit is the dead end this screen is being repaired for, with one more
-       keystroke in it. The words are the standing hint's, so the toast and the sentence agree. */
     if (!answerable) {
       toasts.push(whyNot, { intent: 'warn' });
       return;
     }
-    committing = key;
+    if (sending !== null || !question) return;
     deferring = false;
-    reason = '';
     fix = '';
-    queueMicrotask(() => field?.focus());
+    noneTicked = key === 'accept' && pickable.length > 0 && picked === null;
+    if (noneTicked) return;
+    /* WITH THE RECORD'S ONE LINE OPEN, another answer changes the choice and keeps the words already typed. */
+    if (asked !== null) {
+      asked = key;
+      void tick().then(() => field?.focus());
+      return;
+    }
+    void send(key);
   }
 
   function defer() {
@@ -250,13 +264,23 @@
       return;
     }
     deferring = true;
-    committing = null;
-    reason = '';
+    asked = null;
+    parkWhy = '';
     fix = '';
     /* Seeded a fortnight out — 21 A5, seeds not blanks. A date picker opened on nothing makes the
        person do arithmetic before they can say the thing they already know. */
     wake = new Date(now + 14 * 86_400_000).toISOString().slice(0, 10);
-    queueMicrotask(() => field?.focus());
+    queueMicrotask(() => parkField?.focus());
+  }
+
+  /**
+   * `e` EDITS WHAT ACCEPTING TAKES, which on this screen is the rows to tick: the fold is open whenever there are rows,
+   * so the key puts the focus on the first of them. A question with nothing to change has nothing for `e` to do.
+   */
+  function edit(): boolean {
+    if (!picking) return false;
+    void tick().then(() => document.querySelector<HTMLInputElement>('.picks input')?.focus());
+    return true;
   }
 
   function onkeydown(e: KeyboardEvent) {
@@ -264,9 +288,6 @@
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
        buttons left the page behind it holding its own keyboard. */
     if (covered()) return;
-    /* AND A COMMITTED QUESTION IS AS INERT AS A DECIDED ONE. The guard tested the record and not
-       this session, so after a commit the number keys still moved a highlight behind the settled
-       block and the commit chord was one field away from firing twice. */
     /* THE NEXT AND THE PREVIOUS OPEN QUESTION, from anywhere on the gate but a field, decided or not. */
     if ((e.key === 'j' || e.key === 'k') && !e.metaKey && !e.ctrlKey && !e.altKey && !typing() && !silenced(e)) {
       const to = e.key === 'j' ? nextId : prevId;
@@ -276,43 +297,63 @@
       }
       return;
     }
+    /* A DECIDED QUESTION, AND ONE DECIDED HERE, TAKE NO ANSWER KEYS: the receipt is the end of it. */
     if (!question || question.decided || committed || (from === 'live' && live?.closed)) return;
-    /* THE COMMIT CHORD KEEPS THE NARROW TEST, AND THE BARE KEYS BELOW DO NOT. This const is read
-       two ways: below it gates Mod+Enter, where it must be TRUE, and further down it silences bare
-       keys, where it must be FALSE. Widening it would widen both, and the direction that matters is
-       that the one keystroke here writing an immutable row should fire from fewer places rather than
-       more. So the chord keeps this event-target test and the bare keys use `typing()`. */
     const inField = e.target instanceof HTMLElement && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
 
-    /* ONLY FROM INSIDE THE REASON FIELD, and only with content — 19 §4's own row. This branch ran
-       before the bare key test below it, so the one keystroke in this product that writes an
-       immutable row with a named decider on it fired from anywhere on the page: with focus on
-       Cancel, or aimed at another application. A gate this file's header calls "deliberately slower
-       than every precedent" had a commit chord that was faster than everything. */
+    /* THE CHORD SENDS WHAT IS BEING TYPED, the reason the record asked for or why it can wait, and only from its field. */
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       if (!inField) return;
       e.preventDefault();
-      if (committing && reason.trim()) commit();
+      if (deferring && parkWhy.trim()) void deferIt();
+      else if (asked && reason.trim()) void send(asked, reason);
       return;
     }
-    /* AND THE ONE TEST FOR TYPING, not a narrower copy. This read the event target for INPUT and
-       TEXTAREA only, so a bare number key moved the highlight while somebody was inside an open
-       select or a contenteditable block. */
+    /* ENTER ON A ROW TO TICK IS "DONE": what `e` opened is finished. It accepts what is ticked where a key may accept,
+       and otherwise puts the focus on Accept, whose words name the amount, so the press that sends money is the
+       reader's own on the button. Space ticks, as on any box. */
+    const onPick = e.target instanceof HTMLInputElement && e.target.type === 'checkbox' && e.target.closest('.picks') !== null;
+    if (onPick && e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !silenced(e)) {
+      e.preventDefault();
+      if (acceptKey(question, moves.length > 0) === 'accept') choose('accept');
+      else document.getElementById('opt-accept')?.focus();
+      return;
+    }
+    /* AND THE ONE TEST FOR TYPING, not a narrower copy. */
     if (typing()) return;
     if (silenced(e)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+    /* `1` TO `9` REACH AN ANSWER, and Enter on it then gives it: a number puts the focus there and sends nothing. */
     const n = Number(e.key);
-    if (n >= 1 && n <= question.options.length) {
+    if (Number.isInteger(n) && n >= 1 && n <= question.options.length) {
       e.preventDefault();
-      highlighted = question.options[n - 1]!.key;
+      document.getElementById(`opt-${question.options[n - 1]!.key}`)?.focus();
       return;
     }
-    if (e.key === 'Enter' && highlighted) {
+    const act = keyAct(e.key);
+    /* ENTER ON A CONTROL IS THAT CONTROL'S: on an answer's button it presses that answer, as a pointer would, and on a
+       link or a fold it opens it. Backspace has no meaning on a button, so it declines from anywhere but a field. */
+    const onControl = e.target instanceof Element && e.target.closest('button, a[href], summary, input, select, textarea') !== null;
+    if ((act === 'accept' && !onControl) || act === 'decline') {
+      const key = act === 'accept' ? acceptKey(question, moves.length > 0) : declineKey(question);
+      /* NOTHING ENTER MAY GIVE ON ITS OWN, on a question that is hard to undo, moves money or suggests nothing: the focus
+         goes to the first answer (Accept, whose words name the amount), so the next Enter is a press on that button. */
+      if (key === null && act === 'accept') {
+        e.preventDefault();
+        document.getElementById(`opt-${question.options[0]?.key ?? ''}`)?.focus();
+        return;
+      }
+      if (key === null) return;
       e.preventDefault();
-      choose(highlighted);
+      choose(key);
       return;
     }
-    if (e.key === 'd' && !committing && !deferring) {
+    if (act === 'edit') {
+      if (edit()) e.preventDefault();
+      return;
+    }
+    if (e.key === 'd' && !deferring) {
       e.preventDefault();
       defer();
       return;
@@ -322,51 +363,54 @@
       deferring = false;
       return;
     }
-    if (e.key === 'Escape' && committing) {
+    if (e.key === 'Escape' && asked) {
       e.preventDefault();
-      committing = null;
+      asked = null;
+      document.getElementById(`opt-${question.options[0]?.key ?? ''}`)?.focus();
     }
   }
 
   /**
-   * THE ANSWER IS BUILT BY `record/answer.ts`, NOT TYPED HERE. `/decide` answers the same question with
-   * one press on the card; this screen assembled its own copy of the words out of `question.options.find(…)`
-   * and a template literal, which is two spellings of one act sitting a refactor away from disagreeing.
-   * `answerFor` is what refuses a key the question does not offer rather than printing `undefined` into
-   * the middle of a receipt, which is what the old `?? committing` fallback did with a blank question id
-   * beside it.
-   */
-  /**
-   * AND COMMITTING CHANGED NOTHING BUT A BOOLEAN, on the central act of this product.
+   * THE ANSWER IS BUILT BY `record/answer.ts`, NOT TYPED HERE, so the queue and this screen say one act one way, and a
+   * key this question does not offer is refused rather than printed into a receipt.
    *
-   * `committed = true` pushed the toast and stopped there. The reason field stayed filled, the
-   * button stayed live behind `disabled={!reason.trim()}`, and one line appeared under it saying
-   * nothing is saved yet, so pressing again gave a second identical receipt for one immutable row
-   * with a person's name on it. Somebody who watched the toast fade had no way to tell whether the
-   * first press had landed, and the shape of a dead control is the shape a person retries.
-   *
-   * THE ANSWER IS KEPT NOW, NOT A FLAG SAYING ONE HAPPENED, because the settled block below needs
-   * the four facts a receipt is made of: who, when, which option, and the reason as it was written
-   * at the press. `/decide` already answers this same act correctly, with an answered state and a
-   * way back, and two screens must not answer one act two ways.
+   * THE ANSWER IS KEPT ONCE IT IS IN, NOT A FLAG SAYING ONE HAPPENED, because the receipt below needs the facts a
+   * receipt is made of: who, when, which answer, and the reason when there is one. A pressed button that stayed live
+   * behind a toast was a button people pressed again.
    */
   let committed = $state<Answer | null>(null);
-  async function commit() {
-    const a = committing ? answerFor(question, committing, new Date(now).toISOString()) : null;
-    if (!a) return;
-    const said: Answer = { ...a, reason };
-    /* IT IS SENT, with the reason `decide` requires, and only a yes settles it. */
-    if (from !== 'live' || !client || sending) return;
-    sending = true;
+  /* A NOTE IS OFFERED ONCE THE ANSWER IS IN, after a decline or an edit (`press.ts` `notedAfter`). */
+  let noteOffered = $state(false);
+  let note = $state('');
+  let noting = $state(false);
+  let noted = $state(false);
+  let noteFix = $state('');
+  let noteOpen = $state(false);
+  /* THE THREAD UNDER THE QUESTION IS READ AGAIN once a note is kept in it, so the note is there to be seen. */
+  let threadRead = $state(0);
+
+  async function send(key: string, said?: string) {
+    const a = answerFor(question, key, new Date(now).toISOString());
+    if (!a || from !== 'live' || !client || sending !== null) return;
+    sending = key;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
-    const out = await answerQuestion(apiBase(), a.question, a.option, reason, undefined, a.option === 'accept' && picked ? picked : undefined);
-    sending = false;
-    /* AN ARRANGEMENT THAT DID NOT ALL LAND. The record reopened the question, so the options come back under what was
+    const rows = a.option === 'accept' && picked ? picked : undefined;
+    const out = await answerQuestion(apiBase(), a.question, a.option, said, undefined, rows);
+    sending = null;
+    /* THE RECORD KEEPS A REASON FOR THIS ONE: the line opens under the answers, focused, with the choice kept. */
+    if (out.from === 'refused' && out.wants === 'reason' && said === undefined) {
+      asked = key;
+      reason = '';
+      await tick();
+      field?.focus();
+      return;
+    }
+    /* AN ARRANGEMENT THAT DID NOT ALL LAND. The record reopened the question, so the answers come back under what was
        done and what was not, and the rail reads again for what did land. */
     if (accepting && out.from === 'refused') {
       part = partialOf(accepting.kind, accepting.body, out.fix) ?? { why: out.fix, done: [], left: [] };
-      committing = null;
+      asked = null;
       fix = '';
       toasts.push(part.done.length ? copy.arrangePartial : copy.arrangeNotApplied, { intent: 'warn' });
       await invalidateAll();
@@ -375,19 +419,55 @@
     if (await unsent(out, a.question)) return;
     fix = '';
     part = null;
-    committed = said;
-    toasts.push(copy.decisionRecorded(a.title), { intent: 'good' });
+    asked = null;
+    const shown = question ? labelOf({ key: a.option, title: a.title }, question, []) : a.title;
+    committed = { ...a, title: shown, reason: said?.trim() ?? '' };
+    noteOffered = notedAfter(a.option, rows !== undefined);
+    toasts.push(copy.decisionRecorded(shown), { intent: 'good' });
     if (accepting && out.from === 'written' && had) {
       applied = appliedLines(out.applied ?? {}, accepting.body);
       await invalidateAll();
       const added = [...sidebarNow()].filter(([href]) => !had.has(href)).map(([, title]) => title);
       if (added.length) applied = appliedLines(out.applied ?? {}, accepting.body, added);
     } else void invalidateAll();
+    /* THE WAY ON TAKES THE FOCUS, so `j` and Enter carry on to the next question. A note, when one is offered, is the
+       button beside it, one step back: offered, and never in the way. */
+    setTimeout(() => document.getElementById('way-on')?.focus());
+  }
+
+  /** The reason the record asked for, sent with the answer it was asked for. A blank line is not sent. */
+  function sendReason(e: SubmitEvent) {
+    e.preventDefault();
+    if (!asked) return;
+    if (reason.trim() === '') return void field?.focus();
+    void send(asked, reason);
+  }
+
+  /** The note's one line, opened on the reader's own press and focused. */
+  function openNote() {
+    noteOpen = true;
+    void tick().then(() => document.getElementById('note-field')?.focus());
+  }
+
+  /** A note kept with the question, on its thread, where everybody who reads the question reads it. */
+  async function keepNote(e: SubmitEvent) {
+    e.preventDefault();
+    if (!question || noting || note.trim() === '') return;
+    noting = true;
+    noteFix = '';
+    const out = await sayComment(apiBase(), { on: `suggestion:${question.id}`, body: note.trim() });
+    noting = false;
+    if (!out.ok) {
+      noteFix = out.fix;
+      return;
+    }
+    noted = true;
+    threadRead += 1;
     setTimeout(() => document.getElementById('way-on')?.focus());
   }
 
   /**
-   * A WRITE THAT DID NOT LAND, said under the control and as a warning. A conflict is a row the
+   * A WRITE THAT DID NOT LAND, said under the answers and as a warning. A conflict is a row the
    * proposal changes that moved since it was filed, so the question is read again before it is
    * answered again. True when there is nothing more to do.
    */
@@ -401,10 +481,10 @@
 
   /** Parking it: sent to `decide` with the day and the why. */
   async function deferIt() {
-    if (from !== 'live' || !client || !question || sending) return;
-    sending = true;
-    const out = await parkQuestion(apiBase(), question.id, wake, reason);
-    sending = false;
+    if (from !== 'live' || !client || !question || sending !== null) return;
+    sending = 'defer';
+    const out = await parkQuestion(apiBase(), question.id, wake, parkWhy);
+    sending = null;
     if (await unsent(out, question.id)) return;
     fix = '';
     deferring = false;
@@ -433,8 +513,11 @@
         ? {
             by: question.decided.by,
             at: question.decided.at,
-            title:
-              question.options.find((o) => o.key === question.decided?.option)?.title ?? question.decided.option,
+            title: labelOf(
+              { key: question.decided.option, title: question.options.find((o) => o.key === question.decided?.option)?.title ?? question.decided.option },
+              question,
+              [],
+            ),
             reason: question.decided.reason,
           }
         : null),
@@ -475,6 +558,15 @@
     if (from === 'live') drew('ready');
   });
 
+  /* `e` ON THE QUEUE LANDS HERE WITH `?edit`, and puts the focus on what accepting takes, once per question. */
+  let editOpened = '';
+  $effect(() => {
+    const id = question?.id;
+    if (!id || editOpened === id || !page.url.searchParams.has('edit') || !picking) return;
+    editOpened = id;
+    untrack(() => edit());
+  });
+
   /* `d` ON THE QUEUE LANDS HERE WITH `?defer`, and opens the defer step it asked for, once per question. */
   let deferOpened = '';
   $effect(() => {
@@ -485,10 +577,9 @@
     untrack(() => defer());
   });
 
-  /* AND AN OPTION PRESSED IN A `queue` BLOCK LANDS HERE HIGHLIGHTED, once per question. That does not
-     break the rule at the top of this file: what is marked is the reader's own press on the page they
-     came from, not the machine's recommendation, and highlighted is still not chosen. The reason is
-     typed here and nothing is written without it. An option this question does not offer is ignored. */
+  /* AND AN ANSWER NAMED ON THE WAY IN, `?option=`, LANDS HERE FOCUSED, once per question: the reader's own press on the
+     page they came from, which Enter on that button then gives. Focused is still not chosen, and an option this
+     question does not offer is ignored. */
   let cameWith = '';
   $effect(() => {
     const id = question?.id;
@@ -496,7 +587,7 @@
     if (!id || cameWith === id || !want) return;
     if (question.decided || (from === 'live' && live?.closed)) return;
     cameWith = id;
-    if (question.options.some((o) => o.key === want)) highlighted = want;
+    if (question.options.some((o) => o.key === want)) void tick().then(() => document.getElementById(`opt-${want}`)?.focus());
   });
 </script>
 
@@ -528,12 +619,11 @@
   </div>
 {:else if !question}
   <div class="page">
-    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has
-         the sentence for it. Nothing failed, so there is no request id to quote (`50 §13 D11`), and
-         no filter ran, so "nothing matched" is about something that did not happen. It names the
-         thing, says it is not here, and lists what is — `10 §7`'s fourth rule: the refusal is the
-         teacher. -->
-    <Empty kind="error" heading title={copy.noSuch('question', String(page.params.id))} body={onwardWords.left(waiting)}>
+    <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL. Nothing failed, so there is no request id to
+         quote (`50 §13 D11`), and no filter ran, so "nothing matched" is about something that did not happen. It says
+         the question is not here and lists what is (`10 §7`'s fourth rule: the refusal is the teacher), and it does not
+         read the address back: the handle in it is the record's, not a name anybody gave the question. -->
+    <Empty kind="error" heading title={gate.notHere} body={onwardWords.left(waiting)}>
       {#snippet actions()}{@render onward()}{/snippet}
     </Empty>
   </div>
@@ -562,8 +652,39 @@
             </span>
           </p>
           <p class="settled-choice">{settled.title}</p>
-          <p class="settled-reason">“{settled.reason}”</p>
+          <!-- THE REASON WHEN THERE IS ONE. An answer given by its press alone is a whole answer, and a pair of quotation
+               marks round nothing read as a reason that failed to load. Nor is the sentence the record wrote for a press
+               (`pressedOnly`) quoted on a reloaded receipt, as though the person had written it. -->
+          {#if settled.reason.trim() !== '' && !pressedOnly(settled.reason)}<p class="settled-reason">“{settled.reason}”</p>{/if}
           <p class="settled-note">{copy.immutable}</p>
+          <!-- A NOTE, OFFERED AND NEVER ASKED FOR, after a decline or an edit, which are the answers somebody later asks
+               about (`press.ts` `notedAfter`). One line, kept on the question's thread below, where everybody who reads
+               the question reads it. The way on keeps the focus, so `j` still goes to the next question. -->
+          {#if committed && noteOffered}
+            {#if noted}
+              <p class="note-kept" role="status">{gate.noteKept}</p>
+            {:else if noteOpen}
+              <form class="line-form" onsubmit={keepNote}>
+                <label class="line-label" for="note-field">{gate.noteLabel}</label>
+                <div class="line-row">
+                  <input
+                    id="note-field"
+                    class="line-field"
+                    bind:value={note}
+                    maxlength={COMMENT_MOST}
+                    autocomplete="off"
+                    spellcheck="true"
+                  />
+                  <Button type="submit" disabled={noting || note.trim() === ''}>{gate.noteSend}</Button>
+                </div>
+                {#if noteFix}<p class="commit-fix" role="status" data-intent="bad">{noteFix}</p>{/if}
+              </form>
+            {:else}
+              <p class="note-offer">
+                <Button weight="bare" size="sm" onclick={openNote}>{gate.noteOffer}</Button>
+              </p>
+            {/if}
+          {/if}
           {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
           {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
           <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision: the sample's
@@ -573,8 +694,9 @@
         </div>
       </Tile>
     {:else if from === 'live' && live?.closed}
-      <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again. -->
-      <p class="cost-age">{governed.closed(question.id)} {onwardWords.left(waiting)}</p>
+      <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again, and the line says so
+           without the question's handle: its title is the heading above. -->
+      <p class="cost-age">{gate.closedNow} {onwardWords.left(waiting)}</p>
       {@render onward()}
     {:else}
       <!-- THE OPTIONS COME STRAIGHT UNDER THE TITLE: they are what this screen is for. Everything accepting would do is
@@ -588,75 +710,106 @@
         <p class="cannot" id="cannot-decide">{whyNot}</p>
       {/if}
 
-      <Tile icon="decide" title={copy.theOptions} count={question.options.length}>
+      <!-- ONE ANSWER'S BUTTON, drawn by the cards of a question's own options and by the record's two answers alike, so the
+           one rule for who may press it is written once. It says what it does (`press.ts` `labelOf`): an option's own name,
+           Decline for the record's Reject, and the amount on Accept when money moves.
+
+           OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the answers that says why. `aria-describedby`
+           rather than a title, so the reason is read out with the control and not only seen beside it, which is the shape
+           `/decide` and `/settings/people` both use.
+
+           THE SUGGESTED ONE IS AN OUTLINE WITH A SMALL DOT, never the filled primary: shown, and not chosen for anybody. Only
+           the first one an agent marked, only where the choice can be taken back, and never where money moves. -->
+      {#snippet answer(option: { key: string; title: string }, q: { options: readonly { key: string; title: string }[] })}
+        {@const marked = suggestedKey === option.key}
+        <Button
+          id="opt-{option.key}"
+          data-answer={option.key}
+          data-suggested={marked ? '' : undefined}
+          data-on={asked === option.key ? '' : undefined}
+          aria-pressed={asked === null ? undefined : asked === option.key}
+          disabled={!answerable}
+          aria-describedby={answerable ? undefined : 'cannot-decide'}
+          onclick={() => choose(option.key)}
+        >
+          {#if marked}<span class="dot" aria-hidden="true"></span>{/if}{labelOf(option, q, moves)}{#if marked}<span class="sr">, {gate.suggested}</span>{/if}
+        </Button>
+      {/snippet}
+
+      <!-- A COUNT ONLY OVER A QUESTION'S OWN OPTIONS: over Accept and Decline it would count the buttons. -->
+      <Tile icon="decide" title={copy.theOptions} count={two ? undefined : question.options.length}>
         <section class="options">
-          <div class="cards" data-cells={question.options.length}>
-            {#each question.options as option}
-              <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list, since a filed question
-                   keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
-                   `questionOf` made of it. -->
-              {@const because = reasonIn(about?.body, option.key) ?? option.body}
-              {@const shows = visuals.get(option.key)}
-              <article class="card" data-on={highlighted === option.key ? '' : undefined}>
-                <!-- WHAT THE OPTION IS LEADS IT, inside its own well and nowhere else: a swatch writes its colour into
-                     `--swatch` on its chip alone, hidden from a screen reader because the option's name says what it is. -->
-                {#if shows && 'swatch' in shows}
-                  <span class="card-visual" data-shows="swatch" aria-hidden="true">
-                    {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
-                  </span>
-                {:else if shows}
-                  <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
-                {/if}
-                <!-- NO KEY CAP: `1` to `9` still highlight an option, and the keys are said in the ? sheet, not on every card. -->
-                <header class="card-head">
-                  <h3 class="card-title">{option.title}</h3>
-                  <!-- Shown, never pre-selected. -->
-                  {#if option.recommended}<span class="card-rec">{copy.recommended}</span>{/if}
-                </header>
-                <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name: a rule's own options
-                     carry no `because`, and a blank paragraph reads as a reason that failed to load. -->
-                {#if because.trim() !== ''}
-                  <p class="card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></p>
-                {/if}
-                <!-- OFF FOR A READER WHO MAY NOT ANSWER, pointing at the sentence above the options
-                     that says why. `aria-describedby` rather than a title, so the reason is read out
-                     with the control and not only seen beside it, which is the shape `/decide` and
-                     `/settings/people` both use. The card around it is untouched: the title, the
-                     recommendation and the body are what this reader came for.
-                     THE BUTTON SAYS THE OPTION'S OWN NAME ("Per seat", not "Choose Per seat"), and the
-                     Suggested one is drawn as the primary until another is highlighted: shown, and
-                     still not chosen, because pressing it only opens the reason. ONLY THE FIRST SUGGESTED ONE: a body
-                     from an agent may mark two, and a screen has one primary. -->
-                <Button
-                  weight={highlighted === option.key || (highlighted === null && option.recommended === true && question.options.find((o) => o.recommended)?.key === option.key)
-                    ? 'primary'
-                    : 'quiet'}
-                  disabled={!answerable}
-                  aria-describedby={answerable ? undefined : 'cannot-decide'}
-                  onclick={() => choose(option.key)}
-                >
-                  {option.title}
-                </Button>
-              </article>
-            {/each}
-          </div>
+          {#if two}
+            <!-- THE RECORD'S TWO ANSWERS ARE TWO BUTTONS, Accept and Decline, side by side, with what accepting changes
+                 open in the tile under them. Two cards whose only content was a button was the walk's #29. -->
+            <div class="two">
+              {#each question.options as option (option.key)}{@render answer(option, question)}{/each}
+            </div>
+          {:else}
+            <div class="cards" data-cells={question.options.length}>
+              {#each question.options as option}
+                <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list, since a filed question
+                     keeps no titles or values for a reader who may not read them; where the body holds no reason, the words
+                     `questionOf` made of it. -->
+                {@const because = reasonIn(about?.body, option.key) ?? option.body}
+                {@const shows = visuals.get(option.key)}
+                <article class="card">
+                  <!-- WHAT THE OPTION IS LEADS IT, inside its own well and nowhere else: a swatch writes its colour into
+                       `--swatch` on its chip alone, hidden from a screen reader because the option's name says what it is. -->
+                  {#if shows && 'swatch' in shows}
+                    <span class="card-visual" data-shows="swatch" aria-hidden="true">
+                      {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                    </span>
+                  {:else if shows}
+                    <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+                  {/if}
+                  <!-- THE OPTION'S NAME IS ITS BUTTON, so the name is said once and pressing it is the answer. No key cap:
+                       `1` to `9` reach an answer, and the keys are said in the ? sheet, not on every card. -->
+                  {@render answer(option, question)}
+                  <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name: a rule's own options
+                       carry no `because`, and a blank paragraph reads as a reason that failed to load. -->
+                  {#if because.trim() !== ''}
+                    <p class="card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></p>
+                  {/if}
+                </article>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- THE ONE LINE THE RECORD ASKS FOR, only when it answers the press with `wants: 'reason'`, with the answer
+               kept: what was pressed is said, and the line is the one thing left to do. -->
+          {#if asked}
+            <form class="line-form" onsubmit={sendReason}>
+              <label class="line-label" for="asked-why">{gate.reasonAsked}</label>
+              <div class="line-row">
+                <input
+                  id="asked-why"
+                  class="line-field"
+                  bind:this={field}
+                  bind:value={reason}
+                  autocomplete="off"
+                  spellcheck="true"
+                />
+                <Button type="submit" weight="primary" disabled={sending !== null}>{gate.send}</Button>
+              </div>
+            </form>
+          {/if}
+          {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
+          {#if fix && !deferring}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
         </section>
       </Tile>
 
       {#if deferring}
         <Tile>
           <section class="commit">
-            <h2 class="commit-title">
-              {copy.deferTitle}
-              <span class="commit-required">{copy.required}</span>
-            </h2>
+            <h2 class="commit-title">{copy.deferTitle}</h2>
             <!-- A FIELD WITH ITS LABEL ABOVE IT. "What has to happen first" was grey words beside the Defer button and
                  a placeholder inside this box, so it read as loose text on the queue and vanished once anybody typed. -->
             <label class="commit-label" for="defer-why">{copy.deferHint}</label>
             <textarea
               id="defer-why"
-              bind:this={field}
-              bind:value={reason}
+              bind:this={parkField}
+              bind:value={parkWhy}
               class="commit-field"
               rows="2"
               spellcheck="true"
@@ -666,7 +819,7 @@
               <input class="commit-date" type="date" bind:value={wake} />
             </label>
             <div class="commit-actions">
-              <Button weight="primary" disabled={!reason.trim() || !wake || sending} onclick={deferIt}>
+              <Button weight="primary" disabled={!parkWhy.trim() || !wake || sending !== null} onclick={deferIt}>
                 {copy.deferAction}
               </Button>
               <Button weight="bare" onclick={() => (deferring = false)}>{copy.arrangeCancel}</Button>
@@ -674,60 +827,9 @@
             {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
           </section>
         </Tile>
-      {:else if committing}
-        <Tile>
-          <section class="commit">
-            <h2 class="commit-title">
-              {copy.yourReason}
-              <span class="commit-required">{gate.required}</span>
-            </h2>
-            <p class="commit-choice">
-              {gate.choosing} <strong>{question.options.find((o) => o.key === committing)?.title}</strong>.
-            </p>
-            <textarea
-              bind:this={field}
-              bind:value={reason}
-              class="commit-field"
-              rows="3"
-              placeholder={copy.reasonHint}
-              spellcheck="true"
-            ></textarea>
-            <!-- Nudged once, never blocked: a person who means it should be able to keep it (20 §3). -->
-            {#if short}<p class="commit-nudge">{copy.reasonNudge}</p>{/if}
-            <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED. The only cue was the small word "required"
-                 above the box, and 23 §8's rule is that a control which refuses without a reason is
-                 the thing this product does not ship. It is announced too: `aria-describedby` points
-                 at the sentence, so somebody who cannot see the greying is told the same fact. -->
-            {#if !reason.trim()}<p class="commit-why" id="commit-why">{copy.reasonRequired}</p>{/if}
-            <div class="commit-actions">
-              <Button
-                weight="primary"
-                disabled={!reason.trim() || sending || noneTicked}
-                aria-describedby={reason.trim() ? undefined : 'commit-why'}
-                onclick={commit}
-              >
-                {copy.commit}
-              </Button>
-              <Button weight="bare" onclick={() => (committing = null)}>{gate.cancel}</Button>
-              <!-- ONE WARNING AT A TIME. `commit-why` above already says "kept for ever and cannot be
-                   edited"; this said the same thing in different words six lines below it, so an empty
-                   reason produced the same caution twice and neither read as the reason the button was
-                   off. It belongs where it is the only thing left to say: the button is live, and the
-                   next press is the irreversible one. -->
-              {#if reason.trim()}<span class="commit-note">{copy.immutable}</span>{/if}
-            </div>
-            {#if noneTicked}<p class="commit-fix" role="status" data-intent="bad">{pickWords.none}</p>{/if}
-            {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
-            <!-- THE LINE THAT SAID "Nothing you do here is saved yet." UNDER A STILL-LIVE BUTTON is
-                 gone: this panel is replaced by the settled block the moment the press lands, and the
-                 chip on that block carries the same fact where it is the whole of the news. -->
-          </section>
-        </Tile>
       {:else}
         <div class="third">
-          <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped.
-               It had no handler, so the one control that stops a gate being cleared by dismissing
-               things did nothing — while `d` on the keyboard opened the same flow correctly. -->
+          <!-- The third verb, kept: a queue with only yes and no is a queue that gets rubber-stamped. -->
           <Button disabled={!answerable} aria-describedby={answerable ? undefined : 'cannot-decide'} onclick={defer}>{copy.defer}</Button>
         </div>
       {/if}
@@ -739,7 +841,7 @@
          open it, because what is left out is declined with the decision. -->
     {#if (story && !settled) || (preview && !settled) || picking || updates.length || calling || costed}
       <Tile icon="settings" title={LEAD.does}>
-        <details class="does" open={picking}>
+        <details class="does" open={picking || two}>
           <summary class="does-line">{doesSaid}</summary>
           <div class="does-parts">
             {#if story && !settled}
@@ -776,7 +878,10 @@
                           type="checkbox"
                           checked={!unticked.includes(row.n)}
                           aria-label={pickWords.keep(row.title)}
-                          onchange={(e) => (unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n])}
+                          onchange={(e) => {
+                            unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
+                            noneTicked = false;
+                          }}
                         />
                         <span class="pick-title">{row.title}</span>
                         {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
@@ -842,11 +947,13 @@
          decision, and an option is part of the question. A Reads colleague may comment here too. -->
     {#if from === 'live'}
       <div class="thread">
-        <Thread
-          on="suggestion:{question.id}"
-          me={String(page.data.me?.person ?? '') || null}
-          people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
-        />
+        {#key threadRead}
+          <Thread
+            on="suggestion:{question.id}"
+            me={String(page.data.me?.person ?? '') || null}
+            people={new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))}
+          />
+        {/key}
       </div>
     {/if}
   </div>
@@ -1023,8 +1130,8 @@
   }
 
   /* THE OPTIONS ARE WELLS OF TILE-2 SIDE BY SIDE IN THEIR TILE, told how many there are: `auto-fit` with three
-     items in a wide column once generated seven tracks, four of them empty (05 §4). The highlighted one takes an ink
-     ring, a shape and not a shade; its button is the page's one primary. */
+     items in a wide column once generated seven tracks, four of them empty (05 §4). Nothing on a card moves or fades
+     when a key reaches it: the focus ring is the only change. */
   .cards {
     display: grid;
     grid-template-columns: repeat(var(--cells, 3), minmax(0, 1fr));
@@ -1047,20 +1154,23 @@
     padding: var(--sp-4);
     background: var(--s1);
     border-radius: var(--r-md);
-    transition: box-shadow var(--d-state) var(--ease-out);
   }
 
-  .card[data-on] {
-    box-shadow: inset 0 0 0 2px var(--ink);
+  /* AN ANSWER IS A PILL that wraps inside itself rather than pushing its card sideways at 390. */
+  .options :global(.btn) {
+    justify-content: flex-start;
+    max-inline-size: 100%;
+    white-space: normal;
+    text-align: start;
+    overflow-wrap: anywhere;
   }
 
   .card > :global(.btn) {
     align-self: start;
-    margin-block-start: auto;
   }
 
   /* A QUIET PILL ON A TILE-2 WELL IS THE TILE'S WHITE, or it would be the well's own grey and no pill at all. */
-  .cards .card > :global(.btn[data-weight='quiet']) {
+  .cards .card > :global(.btn[data-weight='quiet']:not([data-suggested])) {
     background: var(--bg);
   }
 
@@ -1068,6 +1178,49 @@
     .cards .card > :global(.btn[data-weight='quiet']:hover:not(:disabled)) {
       background: var(--s2);
     }
+  }
+
+  /* THE RECORD'S TWO ANSWERS, side by side at the start of the tile, and stacked full width under a thumb. */
+  .two {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+
+  /* THE SUGGESTED ANSWER IS AN OUTLINE WITH A SMALL DOT (DIRECTION §37, his pick): an ink ring and no fill, so it is
+     said and not pre-pressed, and the dot before its words. A screen reader hears "Suggested" after the name. Off for a
+     reader who may not answer, the ring goes quiet with the words. */
+  .options :global(.btn.tap[data-suggested]) {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+
+  .options :global(.btn.tap[data-suggested]:disabled) {
+    box-shadow: inset 0 0 0 1.5px var(--line);
+  }
+
+  /* THE ANSWER THE RECORD'S ONE LINE IS FOR, while it is open: the selected ground and an ink edge, a shape and not a
+     shade. */
+  .options :global(.btn.tap[data-on]) {
+    background: var(--selected);
+    box-shadow: inset 0 0 0 1.5px var(--ink2);
+  }
+
+  .dot {
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: var(--r-pill);
+    background: currentColor;
+  }
+
+  .sr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* THE OPTION'S VISUAL, THE TILE'S SHAPE AT THE CARD'S SIZE: swatches share the card's width in one band, a figure
@@ -1097,28 +1250,6 @@
     font-size: var(--t-xl);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-  }
-
-  .card-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .card-title {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-row);
-    font-weight: 600;
-    line-height: 20px;
-  }
-
-  /* The suggestion as a word in the quiet ink, not a green chip. */
-  .card-rec {
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
   }
 
   .card-body {
@@ -1180,18 +1311,6 @@
     line-height: 1.4;
   }
 
-  .commit-required {
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 400;
-  }
-
-  .commit-choice {
-    margin: var(--sp-1) 0 var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-ui);
-  }
-
   .commit-field {
     inline-size: 100%;
     min-block-size: 40px;
@@ -1207,20 +1326,8 @@
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
 
-  .commit-why {
-    margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
   .commit-fix {
     margin: var(--sp-2) 0 0;
-    font-size: var(--t-ui);
-  }
-
-  .commit-nudge {
-    margin: var(--sp-2) 0 0;
-    color: var(--warn);
     font-size: var(--t-ui);
   }
 
@@ -1232,8 +1339,51 @@
     margin-block-start: var(--sp-4);
   }
 
-  .commit-note {
-    color: var(--dim);
+  /* ── one line: the reason the record asks for, and a note after a decline or an edit ── */
+
+  .line-form {
+    display: grid;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
+    margin-block-start: var(--sp-4);
+  }
+
+  .line-label {
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .line-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* A FIELD IS 40 ON TILE-2, radius 12, no border: the fill is its edge. Kept clear of the sticky bar when focused. */
+  .line-field {
+    flex: 1 1 18ch;
+    min-inline-size: 0;
+    min-block-size: 40px;
+    padding: 0 var(--sp-3);
+    background: var(--s1);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-ui);
+    scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
+  }
+
+  .note-offer {
+    margin: var(--sp-3) 0 0;
+    margin-inline-start: calc(-1 * var(--sp-3));
+  }
+
+  .note-kept {
+    margin: var(--sp-3) 0 0;
+    color: var(--ink2);
     font-size: var(--t-sm);
   }
 
@@ -1316,6 +1466,13 @@
        reason field above the fold. Decisions get made from a phone (19 §3). */
     .cards {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (pointer: coarse) and (width < 600px) {
+    .two {
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 </style>

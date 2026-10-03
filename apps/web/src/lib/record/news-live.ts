@@ -139,10 +139,13 @@ function targetOf(e: EventLine): string | undefined {
  *
  * `names` IS WHAT EACH TARGET IS CALLED, as the record resolved it: a row's title, or a question from its governance
  * row. History read those from the sample's rows and questions, which say nothing about a live record.
+ *
+ * `everything` ASKS FOR THE RECORD'S OWN BOOKKEEPING TOO, which it leaves out of the log otherwise: the sweep writing
+ * quiet runs off, and an agent's stamps of when it saw a tool. History's switch asks for it; nothing else does.
  */
-export async function readLog(base: string, me: string | null, io?: Fetch, before: Cursor | null = null): Promise<LogRead> {
+export async function readLog(base: string, me: string | null, io?: Fetch, before: Cursor | null = null, everything = false): Promise<LogRead> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const out = await client.recentHistory({ limit: LOG_PAGE, ...(before === null ? {} : { cursor: before }) });
+  const out = await client.recentHistory({ limit: LOG_PAGE, ...(before === null ? {} : { cursor: before }), ...(everything ? { everything: true } : {}) });
   if (!out.ok) return { from: 'refused', fix: refusalOf(out).fix };
   const names = new Map<string, string>();
   const events: AuditEvent[] = [];

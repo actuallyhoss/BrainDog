@@ -1051,7 +1051,7 @@
   }
 
   .needs {
-    color: var(--danger);
+    color: var(--danger-text);
     font-weight: 500;
   }
 
@@ -1443,7 +1443,7 @@
   }
 
   .ask[data-open] .ask-word {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .ask-meta {
@@ -1548,7 +1548,7 @@
   }
 
   .light[data-state='waiting'] .light-name {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .light[data-state='off'] .light-name {

@@ -1166,7 +1166,7 @@
   }
 
   .code-said[data-intent='bad'] .code-glyph {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   .row-actions {

@@ -181,7 +181,7 @@ export const runSeq = (run: string): number | null => {
 export const runHue = (seq: number): number => (((seq % HUES) + HUES) % HUES) * (360 / HUES);
 
 /**
- * Where a run is, from its `state` and whether it has gone quiet (`isStale` in `@braindog/kernel`, which the caller
+ * Where a run is, from its `state` and whether it has gone quiet (`isQuiet` in `@braindog/kernel`, which the caller
  * asks against the record's clock).
  *
  * ONLY AN ACTIVE RUN HAS A RING. An idle run, a handoff waiting for a pickup and a finished one have all stopped

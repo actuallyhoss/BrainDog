@@ -29,9 +29,15 @@
   bottom of the screen over a scrim, in 48px rows at 16px, with a Cancel row at its foot. The items,
   the keys and the roles are the same in both forms; only the placing differs.
 
-  WITH A MOUSE IT IS GLASS: the strong glass at level 2, radius `--r-md`, arriving in 140ms, and every row
-  in it 32 tall with an icon, the word and a key cap, whatever class the caller drew its items with. Under a thumb it is
-  a sheet and not glass: a tile's surface over the scrim.
+  WITH A MOUSE IT IS GLASS: the strong glass at level 2, radius `--r-md`, and every row in it 32 tall with an icon,
+  the word and a key cap, whatever class the caller drew its items with. Under a thumb it is a sheet and not glass: a
+  tile's surface over the scrim.
+
+  IT OPENS AND CLOSES, AND THE CLOSE IS SHORTER. With a mouse it pops from .96 of its size at the corner it hangs from,
+  in 120ms, and closes to .985 as it fades, in 90ms. The action sheet rises from below the screen on the sheet curve
+  and goes back down it, as `Sheet.svelte` does. It used to vanish the moment it closed, because the list was in an
+  `{#if open}`: the list now stays on the page, inert, until its close has played (`settled` in `panel.ts`), and an
+  opening on the way out takes the same list back. Reduced motion fades instead.
 
   THE SHEET IS A POPOVER IN THE TOP LAYER, which is the one place a fixed panel is placed against
   the screen whatever it sits inside. A menu lives in toolbars and bars that have their own stacking
@@ -39,7 +45,9 @@
   order, under the tab bar.
 -->
 <script lang="ts">
+  import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
+  import { settled } from './panel.ts';
 
   let {
     label,
@@ -65,15 +73,61 @@
   /**
    * WHEN THE MENU IS AN ACTION SHEET: below 640px, or under a coarse pointer at any width (design
    * 6.3). Read once each time the menu opens, so a menu never changes form while it is open, and
-   * written onto the panel as its `popover` attribute, which is what the sheet's rules key on.
+   * written onto the panel as its `popover` attribute, which is what the sheet's rules key on. Held
+   * through the close too, so a sheet goes down as a sheet.
    */
   const SHEET = '(width < 640px), (pointer: coarse)';
-  const sheet = $derived(open && matchMedia(SHEET).matches);
+  let sheet = $state(false);
+
+  /**
+   * WHETHER THE LIST IS ON THE PAGE, which is longer than it is open: from the opening to the end of
+   * its close. `leaving` is the close, while it plays.
+   */
+  let shown = $state(false);
+  let leaving = $state(false);
+  /**
+   * WHICH CLOSE IS THE LATEST, so only that one takes the list away. Opening counts one too: a close
+   * that was playing when the menu opened again, or one that was still waiting for its first frame,
+   * finds a newer number and leaves the list where it is.
+   */
+  let exits = 0;
+  let stay: (() => void) | null = null;
+
+  $effect(() => {
+    const want = open;
+    untrack(() => {
+      if (want) {
+        exits++;
+        stay?.();
+        stay = null;
+        if (!shown) sheet = matchMedia(SHEET).matches;
+        shown = true;
+        leaving = false;
+        return;
+      }
+      if (!shown || leaving) return;
+      leaving = true;
+      const mine = ++exits;
+      /* After the list wears `data-leaving`, so the close it starts is the one waited for. */
+      void tick().then(() => {
+        if (mine !== exits) return;
+        const gone = () => {
+          if (mine !== exits) return;
+          stay = null;
+          shown = false;
+          leaving = false;
+        };
+        if (list) stay = settled(list, gone);
+        else gone();
+      });
+    });
+  });
 
   /* INTO THE TOP LAYER ONCE THE PANEL EXISTS. `list` is bound when the `{#if}` renders it, so this
-     runs once per opening. A browser without popovers draws the same panel fixed in place. */
+     runs once per opening; a list taken back on its way out is still in the top layer. A browser
+     without popovers draws the same panel fixed in place. */
   $effect(() => {
-    if (sheet && list && typeof list.showPopover === 'function') list.showPopover();
+    if (open && sheet && list && typeof list.showPopover === 'function' && !list.matches(':popover-open')) list.showPopover();
   });
 
   const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? [])];
@@ -108,6 +162,15 @@
    * ONE PASS. The side is chosen from the panel's natural height and the room on each side, and
    * the cap is applied afterwards, so nothing is measured against a box this function has already
    * changed.
+   *
+   * MEASURED WITHOUT ITS SCALE. The panel pops from .96 of its size and is still at that size when
+   * this runs, so `getBoundingClientRect` on it would read a box 4% short and the clamp would leave
+   * that much of a wide menu past the edge. `offset*` is the box the layout gave it, which no
+   * transform touches, and the trigger's rect is where that box starts.
+   *
+   * AND IT SAYS WHICH EDGE THE PANEL POPS FROM: the top, or the bottom when it opens above its
+   * trigger, so it grows out of the control it belongs to either way. This runs before the first
+   * frame is drawn, so the pop starts from the right corner.
    */
   function place() {
     /* An action sheet is placed by its own rule, against the screen, and has no trigger to clear. */
@@ -115,10 +178,13 @@
     list.style.setProperty('--menu-shift', '0px');
     list.style.setProperty('--menu-lift', '0px');
     list.style.setProperty('--menu-room', 'none');
+    list.style.setProperty('--menu-from', '0%');
 
     const view = document.documentElement;
-    const box = list.getBoundingClientRect();
     const anchor = root?.getBoundingClientRect();
+    const left = (anchor?.left ?? 0) + list.offsetLeft;
+    const top = (anchor?.top ?? 0) + list.offsetTop;
+    const box = { left, top, right: left + list.offsetWidth, height: list.offsetHeight };
 
     const past = Math.max(0, box.right - (view.clientWidth - GUTTER));
     const before = Math.max(0, GUTTER - box.left);
@@ -132,6 +198,7 @@
       const height = Math.min(box.height, above);
       list.style.setProperty('--menu-lift', `${-Math.round(height + (anchor?.height ?? 0) + 12)}px`);
       list.style.setProperty('--menu-room', `${Math.round(above)}px`);
+      list.style.setProperty('--menu-from', '100%');
     } else if (box.height > below) {
       list.style.setProperty('--menu-room', `${Math.round(Math.max(below, 0))}px`);
     }
@@ -253,13 +320,16 @@
     {@render trigger()}
   </button>
 
-  {#if open}
+  {#if shown}
     <!-- `tabindex="-1"` because the container listens for keys but must never be a tab stop: the
-         items are the stops, and the roving focus moves between them. -->
+         items are the stops, and the roving focus moves between them. On its way out it is inert,
+         so nothing in it can be pressed or reached while it goes. -->
     <div
       bind:this={list}
       class="menu"
       data-align={align}
+      data-leaving={leaving ? '' : undefined}
+      inert={leaving}
       role="menu"
       tabindex="-1"
       aria-label={label}
@@ -293,14 +363,25 @@
   }
 
   /* GLASS, AND THE STRONG ONE: a menu opens over busy content, and legibility is the whole of its job. Level
-     2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it arrives in 140ms on the
-     arriving curve. */
+     2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it pops in over 120ms on
+     the arriving curve. */
   .menu {
-    /* The three the clamp writes, declared here so the panel is correct before `place()` has run
-       and so the names exist in a stylesheet rather than only in TypeScript. */
+    /* The four the clamp writes, declared here so the panel is correct before `place()` has run
+       and so the names exist in a stylesheet rather than only in TypeScript. `--menu-from` is the
+       edge it pops from, the top unless it opened above its trigger. */
     --menu-shift: 0px;
     --menu-lift: 0px;
     --menu-room: none;
+    --menu-from: 0%;
+    /* THE MOTION: where an opening starts (`--menu-pop`) and where a close ends (`--menu-gone`), and
+       the opacity at each end. An opening does not fade until reduced motion fades it in from a
+       state that is still readable; a close on the glass form always fades, and the action sheet's
+       only under reduced motion. */
+    --menu-pop: scale(0.96);
+    --menu-gone: scale(0.985);
+    --menu-from-opacity: 1;
+    --menu-gone-opacity: 1;
+    --menu-x: 0%;
 
     position: absolute;
     inset-block-start: calc(100% + 6px);
@@ -315,8 +396,8 @@
        nothing, and this is the one property that makes a capped one usable rather than cut. */
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* `translate` and not `transform`, because `menu-in` below already owns `transform` and the
-       two properties compose instead of overwriting each other. */
+    /* `translate` and not `transform`, because the pop below owns `transform` and the two
+       properties compose instead of overwriting each other. */
     translate: var(--menu-shift) var(--menu-lift);
     /* EIGHT AND NOT FOUR, because the box scrolls. The focus ring is a 2px outline at an offset, so
        it reaches past an item, and at 4px of padding `overflow-y: auto` clipped it off the first and
@@ -328,7 +409,29 @@
     border-radius: var(--r-md);
     color: var(--ink);
     box-shadow: var(--glass-edge), var(--e2);
-    animation: menu-in var(--d-menu) var(--ease-out);
+    /* AT ITS ANCHOR: the corner of the trigger it hangs from, at the start or the end. */
+    transform-origin: var(--menu-x) var(--menu-from);
+    transition-property: transform, opacity;
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-out);
+  }
+
+  /* THE FIRST FRAME OF AN OPENING. No fade on the way in: a menu at .96 of its size is readable, and
+     a stalled first frame of one is still a menu (`Sheet.svelte` measured why that matters). */
+  @starting-style {
+    .menu {
+      transform: var(--menu-pop);
+      opacity: var(--menu-from-opacity);
+    }
+  }
+
+  /* THE CLOSE: to .985 as it fades, in 90ms on the leaving curve. Nothing on it can be pressed. */
+  .menu[data-leaving] {
+    transform: var(--menu-gone);
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: 90ms;
+    transition-timing-function: var(--ease-in);
   }
 
   .menu[data-align='start'] {
@@ -336,7 +439,17 @@
   }
 
   .menu[data-align='end'] {
+    --menu-x: 100%;
+
     inset-inline-end: 0;
+  }
+
+  :global([dir='rtl']) .menu[data-align='start'] {
+    --menu-x: 100%;
+  }
+
+  :global([dir='rtl']) .menu[data-align='end'] {
+    --menu-x: 0%;
   }
 
   /**
@@ -361,14 +474,6 @@
     margin-inline-start: auto;
   }
 
-  /* No `opacity: 0` in a start state, see Sheet.svelte. A stalled animation must leave something
-     readable behind, and a menu 4px too high is readable. */
-  @keyframes menu-in {
-    from {
-      transform: translateY(-4px);
-    }
-  }
-
   /* Hidden in the popover form; the sheet's rule below draws it. It is only rendered for a sheet. */
   .menu-cancel {
     display: none;
@@ -383,9 +488,15 @@
    * taken back here. From 640px up, which only a coarse pointer reaches, it is a 560px sheet in the
    * middle of the bottom edge rather than one as wide as a tablet.
    *
-   * A SHEET, NOT GLASS: a tile's surface at radius `--r-lg`, the third level, over the scrim.
+   * A SHEET, NOT GLASS: a tile's surface at radius `--r-lg`, the third level, over the scrim. It
+   * moves as `Sheet.svelte`'s phone sheet does: up from below the screen in 240ms on the sheet
+   * curve, and back down it in 180ms. It stays in the top layer while it goes, so its scrim fades
+   * with it.
    */
   .menu[popover] {
+    --menu-pop: translateY(calc(100% + var(--kb)));
+    --menu-gone: translateY(calc(100% + var(--kb)));
+
     position: fixed;
     inset-block: auto var(--kb);
     inset-inline: 0;
@@ -406,11 +517,32 @@
     border-end-end-radius: 0;
     color: var(--ink);
     box-shadow: var(--e3);
-    animation: menu-rise var(--d-enter) var(--ease-out);
+    transition-duration: 240ms;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* Down the way it came, without fading, unless reduced motion asks for the fade. */
+  .menu[popover][data-leaving] {
+    opacity: var(--menu-gone-opacity);
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .menu[popover]::backdrop {
     background: var(--scrim);
+    transition: opacity 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @starting-style {
+    .menu[popover]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  .menu[popover][data-leaving]::backdrop {
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: 180ms;
   }
 
   /* 48px ROWS AT 16px, whatever class the caller gave its items: a row sized for a mouse is a miss
@@ -443,23 +575,15 @@
     cursor: pointer;
   }
 
-  @keyframes menu-rise {
-    from {
-      transform: translateY(24px);
-    }
-  }
-
-  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
+  /* A FADE IN PLACE OF EVERY MOVE: the pop, the rise and both closes. The a11y layer shortens the
+     duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .menu,
     .menu[popover] {
-      animation-name: menu-fade;
-    }
-  }
-
-  @keyframes menu-fade {
-    from {
-      opacity: 0.6;
+      --menu-pop: none;
+      --menu-gone: none;
+      --menu-from-opacity: 0.6;
+      --menu-gone-opacity: 0;
     }
   }
 

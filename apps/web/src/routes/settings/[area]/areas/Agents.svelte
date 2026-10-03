@@ -39,7 +39,7 @@
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { TONES, relative, since } from 'braindog-render';
-  import { STALE_MS } from '@braindog/kernel';
+  import { isQuiet } from '@braindog/kernel';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
   import { untrack } from 'svelte';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
@@ -78,8 +78,9 @@
   /**
    * Each run's state as its face draws it, from the run's own `state` and when it was last heard from.
    *
-   * THE KERNEL'S OWN QUIET, `STALE_MS`: a run not heard from in 45 minutes is quiet, worked out when read, as the run's
-   * own page works it out (`r/[register]/[seq]`), so a face here and the face there never disagree about one run.
+   * THE KERNEL'S OWN QUIET, `isQuiet`: an open run not heard from in 30 minutes has gone quiet, worked out when read, as
+   * the record works it out for its live runs, so a face here and the board of runs never disagree about one run. The
+   * 45 minutes of `isStale` is when the record stops joining a call to a run, which is not what a person is shown.
    */
   function livenessOf(rows: readonly unknown[], nowMs: number): Map<number, RunLive> {
     const out = new Map<number, RunLive>();
@@ -88,9 +89,10 @@
       const r = row as { seq?: unknown; fields?: unknown; updated_at?: unknown; created?: unknown };
       if (typeof r.seq !== 'number' || typeof r.fields !== 'object' || r.fields === null) continue;
       const f = r.fields as Record<string, unknown>;
-      const seen =
-        typeof f.last_seen === 'string' ? f.last_seen : typeof r.updated_at === 'string' ? r.updated_at : typeof r.created === 'string' ? r.created : null;
-      out.set(r.seq, liveOf(f.state, seen === null || Date.parse(seen) < nowMs - STALE_MS));
+      /* `last_seen` FIRST, which `isQuiet` reads itself, then when the row last changed; a row that says neither is
+         judged as heard from long ago, so it is never shown at work. */
+      const changed = typeof r.updated_at === 'string' ? r.updated_at : typeof r.created === 'string' ? r.created : new Date(0).toISOString();
+      out.set(r.seq, liveOf(f.state, isQuiet({ fields: f as never, updated_at: changed }, nowMs)));
     }
     return out;
   }

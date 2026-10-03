@@ -487,7 +487,7 @@
      sentence, which is why there is one. */
   .row-why {
     margin-block: var(--sp-1) 0;
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--t-sm);
   }
 

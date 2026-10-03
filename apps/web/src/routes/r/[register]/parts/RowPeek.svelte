@@ -42,7 +42,9 @@
   } = $props();
 </script>
 
-<Panel open={seq !== null} title={(entry ? display(register, title, entry.fields[title], now, names) : null) ?? ''} onclose={() => peek(null)}>
+<!-- WHAT IT SHOWS IS THE ROW, by its number and not by its title (`Panel` `shows`): a title still on its way read as a
+     switch, and a peek moved between two rows that share one did not. -->
+<Panel open={seq !== null} title={(entry ? display(register, title, entry.fields[title], now, names) : null) ?? ''} shows={seq} onclose={() => peek(null)}>
   {#snippet verbs()}
     <Button weight="primary" size="sm" href="/r/{register}/{seq}" kbd="↵"><Icon name="external" size="s" />{copy.openRow}</Button>
   {/snippet}

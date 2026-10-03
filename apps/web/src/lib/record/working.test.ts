@@ -3,7 +3,7 @@
  *
  * `workingNowAt` takes the ledger and the runs as arguments precisely so a test can hand it rows
  * nobody wrote and runs nobody opened, rather than waiting for the sample's own frozen clock to line
- * up with a write that happened to land in the last 45 minutes — which, at the sample's fixed `NOW`,
+ * up with a write that happened to land in the last 30 minutes — which, at the sample's fixed `NOW`,
  * none of the seed's agent-authored rows do (checked below, against the real ledger).
  */
 
@@ -45,7 +45,7 @@ test('THE SAME AGENT, WRITTEN THREE HOURS AGO, DOES NOT LIGHT — EVEN IF IT IS 
 
 test('THE SAME AGENT, WRITTEN JUST NOW, DOES NOT LIGHT WHEN ITS OWN RUN HAS GONE QUIET', () => {
   const audit = [{ by: 'claude', at: new Date(NOW - 1 * 60_000).toISOString(), target: 'tasks#9' }];
-  const runs = [run('claude', 'active', 50)]; // past STALE_MS (45m)
+  const runs = [run('claude', 'active', 31)]; // past QUIET_MS (30m)
   assert.equal(workingNowAt('tasks', 9, NOW, audit, runs), false);
 });
 

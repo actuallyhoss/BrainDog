@@ -20,12 +20,14 @@ import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, 
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
-import { STALE_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
+import { QUIET_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
 import { amountOf, currencyOf } from './money.ts';
 import { isGlyph, type IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
+/* No cycle: `voice.ts` reads the copy and two word lists, never this file. */
+import { singularOf } from '../voice.ts';
 import { PAGES, REGISTERS, ROWS, TITLES } from './held.ts';
 /* Type only, and there is no cycle: `remote.ts` reads the declaration and the sample, never this file. */
 import type { Names } from './remote.ts';
@@ -187,12 +189,26 @@ export function readableFields(register: string): FieldDecl[] {
  * declare.
  */
 export function unnamed(register: string, seq: number | string, label?: string): string {
-  const kind = REGISTERS[register]?.one ?? label ?? register.replace(/_/g, ' ');
+  const said = REGISTERS[register]?.one ?? label;
+  /* A NUMBER IS A ROW SOMEBODY CAN OPEN, AND ANYTHING ELSE IS AN ID, WHICH IS NEVER SAID (DIRECTION §37). A ref is
+     stored as its target row's ULID, so a ref this screen could not walk to reached here as one, and the founder's
+     Today drew "Book #01M3VMPSHV07AM4S51WDTFM5XG" for each part of the cash by book. It is the kind alone, named as a
+     row nobody named. A list this build does not declare is said by its id made singular, `courses` as a course. */
+  if (!/^[1-9]\d*$/u.test(String(seq))) {
+    const one = (said ?? singularOf(register.replace(/_/g, ' '))).trim();
+    /* AND A KIND NOBODY SAID, a figure's part whose list this build does not know, is Unnamed and nothing after it. */
+    if (one === '') return 'Unnamed';
+    return `Unnamed ${/^[A-Z][a-z]/u.test(one) ? one.charAt(0).toLowerCase() + one.slice(1) : one}`;
+  }
+  const kind = said ?? register.replace(/_/g, ' ');
   return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} #${seq}`;
 }
 
 /** A spoken id as a person writes it and a tool call passes it: `things#1`. */
 const SPOKEN_ID = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
+
+/** A row's id as the record mints it (`packages/kernel/src/ids.ts`): twenty-six letters of Crockford's alphabet. */
+export const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
 
 /**
  * WHAT A SPOKEN ID HELD AS TEXT READS AS, AND WHERE IT OPENS. A run holds its project as `things#1` and
@@ -229,6 +245,8 @@ function undeclared(value: unknown): string | null {
   const a = c === null ? null : amountOf(value);
   if (c !== null && a !== null) return money(a, c);
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value)) return fmtDay(value);
+  /* AN ID IS NOT WORDS: a ULID in a field no declaration types is a ref this build cannot name, and is not drawn. */
+  if (typeof value === 'string' && ROW_ID.test(value)) return null;
   if (typeof value === 'object') return null;
   return String(value);
 }
@@ -977,11 +995,12 @@ export const runsIn = (runs: readonly Entry[], project: string): Entry[] =>
 export const runName = (run: Entry): string => `${REGISTERS.session?.seq_prefix ?? 'S'}${run.seq}`;
 
 /**
- * Whether a run is working now: active, and heard from within the kernel's 45 minutes. Worked out on
- * read, as the kernel does, because a run that crashed never says so.
+ * Whether a run is working now: active, and heard from within the kernel's 30 minutes (`QUIET_MS`, its `isQuiet`), past
+ * which it has gone quiet. Worked out on read, as the kernel does, because a run that crashed never says so. A run never
+ * heard from is not working.
  */
 export const workingAt = (run: Entry, now: number): boolean =>
-  run.fields.state === 'active' && now - Date.parse(String(run.fields.last_seen)) < STALE_MS;
+  run.fields.state === 'active' && now - Date.parse(String(run.fields.last_seen)) < QUIET_MS;
 
 /* ── what points AT this row ──────────────────────────────────────────────
    A `ref` declares `to:` and nothing declares the other direction, so the record could say "this
@@ -1016,6 +1035,16 @@ export type Metric = {
   tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
   /** Where the figure came from, so pressing it opens the rows behind it. */
   href?: string | undefined;
+  /**
+   * A figure that adds up a field no row in its list has filled in: its zero is no answer, and a page being read does not
+   * draw it (`lib/page/home.ts` `unsaid`).
+   */
+  unsaid?: boolean | undefined;
+  /**
+   * A figure over a list that holds no row in its scope (`held: 0`): "zero held is not news at all", as the record says
+   * it, so a page being read does not draw it, and a row of nothing else holds nothing (`lib/page/home.ts`).
+   */
+  nothingHeld?: boolean | undefined;
 };
 
 /* ── the third state of a figure ──────────────────────────────────────────
@@ -1201,8 +1230,8 @@ export type BlockResult = PageBlock & {
   stale_at: string;
   register?: string | undefined;
   /**
-   * On `sessions.live`, whether each run in `entries` has not been heard from within the kernel's
-   * `STALE_MS`. A card grid draws such a run dimmed.
+   * On `sessions.live`, whether each run in `entries` has gone quiet: open, and not heard from within the kernel's
+   * `QUIET_MS` (`isQuiet`). A card grid draws such a run dimmed.
    */
   quiet?: boolean[] | undefined;
   metrics?: Metric[] | undefined;
@@ -1236,6 +1265,12 @@ export type BlockResult = PageBlock & {
   bars?: Bars;
   /** A `stat` or `lines` over readings: one series a measure, as the record's `measureSeries` works them out. */
   measures?: MeasureSeries[];
+  /**
+   * A `lines` block over readings: each measure with one reading in the period, which draws no line, as that reading,
+   * newest first. The record answers it as `latest` beside `measures`, which then holds only the measures with a line
+   * to draw; it is kept under its own name here because `latest` on a block already says when a decision was made.
+   */
+  readOnce?: MeasureLatest[];
   /** A forecast's `recorded:` series over the ninety days before today, oldest first. */
   past?: readonly { at: string; value: number }[];
   /** A forecast's `late:` figure, read: how many days late money has come in on average, or `null` when nothing was paid. */
@@ -1372,11 +1407,21 @@ export function walkTable(
   };
 }
 
-/** A grouped figure's whole and its parts, as a `bar` or a `split` draws them. */
+/**
+ * A measure with one reading in its period, said once rather than drawn as a line of one point: the kernel's
+ * `MeasureLatest` (`packages/kernel/src/measures.ts`), which its index does not export, as the page reader narrows it.
+ * `value` is in major units of `unit`, as a series holds it, and `day` is the record's local day it was read on.
+ */
+export type MeasureLatest = { measure: string; value: number; unit: string; at: string; day: string };
+
+/**
+ * A grouped figure's whole and its parts, as a `bar` or a `split` draws them. A part's `label` is its name where its key
+ * is not one a person reads (a ref's ULID), as the record or the page reader named it.
+ */
 export type Parts = {
   metric: string;
   value: number | null;
-  groups: { key: string; value: number | null; parts?: Part[] }[];
+  groups: { key: string; label?: string; value: number | null; parts?: Part[] }[];
   more: number;
   /** The currency the parts are in, which is the home one once converted; absent when the figure says its format's. */
   unit?: string | null;
@@ -1608,8 +1653,8 @@ function lastTouchIn(audit: readonly { by: string; at: string; target?: string |
  *
  * NOT WHO CHANGED THE ROW LAST, WHETHER THAT ACTOR IS STILL AT IT: only an agent has a run to be at,
  * so a row last touched by `you` or a rule answers `false` before the runs are even read. Then two
- * clocks, not one — the touch itself has to sit inside the kernel's 45-minute staleness window
- * (`STALE_MS`), because an agent that is still running does not mean it is still on the row it wrote
+ * clocks, not one — the touch itself has to sit inside the kernel's 30 minutes before a run goes quiet
+ * (`QUIET_MS`), because an agent that is still running does not mean it is still on the row it wrote
  * three hours ago, and the run that agent is named on has to be heard from inside that same window
  * (`workingAt`) — the same fact `sessions.live` shows for a run, asked here of a row instead.
  *
@@ -1625,7 +1670,7 @@ export function workingNowAt(
 ): boolean {
   const touch = lastTouchIn(audit, register, seq);
   if (!touch || !LIVE_AGENTS.has(touch.by)) return false;
-  if (now - Date.parse(touch.at) >= STALE_MS) return false;
+  if (now - Date.parse(touch.at) >= QUIET_MS) return false;
   return runs.some((run) => run.fields.agent === touch.by && workingAt(run, now));
 }
 

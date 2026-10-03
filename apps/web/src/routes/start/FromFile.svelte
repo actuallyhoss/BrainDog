@@ -117,6 +117,6 @@
   }
 
   .file-quiet[data-needs] {
-    color: var(--danger);
+    color: var(--danger-text);
   }
 </style>

@@ -6,7 +6,8 @@
   between the two is a place learnt twice. Decide moves up beside Today while something waits on it, with its count.
   Search is the 44px button in each screen's head bar (`PageHead.svelte`) and the first row of More, never a tab.
 
-  A GLASS BAR FLOATING OVER THE WORK, 22px glyphs over their words, every target 44 or more.
+  A GLASS BAR FLOATING OVER THE WORK, 12 above the home indicator: equal-width tabs, 22px glyphs over 11px words, every
+  target 44 or more. The tab you are on is the rail's ink wash, and the only red is the count of what waits on you.
 
   Safe-area insets are paid exactly once, on the fixed elements only. Paying twice is a real, easy bug.
 -->
@@ -38,7 +39,7 @@
     <a class="tab tap" href={at(tab.href)} aria-current={isHere(tab, path) ? 'page' : undefined}>
       <span class="badge-slot">
         <Icon name={tab.icon as IconName} size="l" />
-        {#if tab.count}<span class="badge" aria-label={`${tab.count} ${copy.openQuestions}`}>{tab.count}</span>{/if}
+        {#if tab.count && tab.key === 'decide'}<span class="badge" aria-label={`${tab.count} ${copy.openQuestions}`}>{tab.count}</span>{/if}
       </span>
       <span class="tab-name">{tab.label}</span>
     </a>
@@ -53,6 +54,9 @@
    * A GLASS BAR FLOATING 12 FROM THE BOTTOM AND 12 IN FROM EACH SIDE: radius 22, level 2, the glass on a
    * pseudo-element for the rail's reason. The home indicator is paid once, in the offset, and `--tabbar` (the bar and
    * the indicator) is what the shell and the toasts clear, with the `--inset` above it added where they do.
+   *
+   * EQUAL TABS, AND SIX OF THEM FIT THE NARROWEST PHONE: 320, less the two insets and the bar's own 4 each side, is 288,
+   * and 288 over six is 48 across, so every tab clears 44 on both axes before a word is shortened.
    */
   .tabs {
     position: fixed;
@@ -87,7 +91,8 @@
     display: none;
   }
 
-  /* A 22px glyph over its word, and a target at least 44 tall: the bar's height less its own padding. */
+  /* A 22px glyph over its word, and a target at least 44 tall: the bar's height less its own padding. The word is 11, a
+     step under the smallest on the scale, because it is a caption under a glyph and six of them share a 320 phone. */
   .tab {
     display: flex;
     flex-direction: column;
@@ -96,14 +101,14 @@
     gap: 2px;
     min-inline-size: 0;
     min-block-size: max(var(--tap), calc(var(--tab-h) - var(--sp-2)));
-    padding: var(--sp-1);
+    padding: var(--sp-1) 2px;
     border: 0;
     border-radius: calc(var(--r-lg) - var(--sp-1));
     background: none;
     color: var(--dim);
-    font: inherit;
-    font-size: var(--t-xs);
+    font-size: calc(var(--t-xs) - 1px);
     font-weight: 500;
+    line-height: 1.2;
     text-decoration: none;
     transition:
       background var(--d-state) var(--ease-out),
@@ -115,9 +120,9 @@
     block-size: 22px;
   }
 
-  /* HERE IS A SHAPE AS WELL AS A SHADE: the rail's white row under an ink glyph and word, and no accent. */
+  /* HERE IS A SHAPE AS WELL AS A SHADE: the rail's ink wash under an ink glyph and word, never a filled pill or an accent. */
   .tab[aria-current='page'] {
-    background: color-mix(in srgb, var(--bg) 70%, transparent);
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
     color: var(--ink);
     font-weight: 600;
   }

@@ -14,14 +14,18 @@
   title, which is where a peeked row showed "#12". A person reads a name there; the id lives in the
   row's Details and in "Copy link".
 
-  It slides in over 220ms on the arriving curve and closes at once. Opening is something you watch;
-  closing is something you have already decided about.
+  IT GOES THE WAY IT CAME, AND FASTER. The drawer comes in from past the window's end edge and the
+  phone sheet up from below the screen, over 240ms on the sheet curve, and each goes back along the
+  same path in 180ms, with the scrim fading under it. It used to vanish on close, which read as the
+  product dropping it. `@starting-style` draws the first frame and `display` and `overlay` are held
+  for the close, so `[open]` still drops the moment it closes. Reduced motion fades instead.
 -->
 <script lang="ts">
   import { copy } from '../copy.ts';
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import Icon from './Icon.svelte';
+  import { NARROW, Pull, unstall } from './panel.ts';
 
   let {
     open = $bindable(false),
@@ -62,6 +66,8 @@
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
+      /* A sheet pulled away last time is put back where it rests, while it is still out of sight. */
+      el.style.translate = '';
       el.showModal();
       overlays.open();
       held = true;
@@ -81,6 +87,8 @@
        * control somebody arrived wanting.
        */
       el.querySelector<HTMLElement>('.sheet-body input, .sheet-body select, .sheet-body textarea')?.focus();
+      /* The slide starts past the edge, so one that waits too long for its first frame is ended in place. */
+      unstall(el);
     } else if (!open && el.open) {
       el.close();
       overlays.close();
@@ -151,51 +159,65 @@
    * THE GRAB HANDLE PULLS, BECAUSE A HANDLE THAT DOES NOT MOVE IS A DRAWING OF ONE.
    *
    * A phone sheet shows a handle at its top edge, and the first thing a thumb does with it is pull
-   * it down. So a pull moves the sheet with the finger, and letting go past `LET_GO` closes it
-   * through the same `close()` Escape and the backdrop use; short of it, the sheet goes back.
+   * it down. So a pull moves the sheet with the finger, and letting go past a third of its height,
+   * or on a flick, closes it through the same `close()` Escape and the backdrop use; short of it,
+   * the sheet goes back on the curve it came in on (`Pull` in `panel.ts` decides which). It used to
+   * take a fixed 80px and no flick, so a tall sheet barely moved before it shut and a quick throw
+   * did nothing at all.
    *
-   * ONLY THE HANDLE'S STRIP TAKES THE PULL, not the head. Pointer capture sends the release to the
-   * element that captured it, so a head that captured would swallow the click of its own Close
-   * button. The strip holds nothing a person presses, and it is hidden from 900px up, where the
-   * sheet is a drawer with no handle to pull.
+   * THE HANDLE'S STRIP AND THE HEAD TAKE THE PULL, EXCEPT WHERE THE HEAD HOLDS SOMETHING TO PRESS.
+   * Pointer capture sends the release to the element that captured it, so a pull that began on
+   * Close would swallow its click; a press there is left to the button. Only below 900px: from there
+   * up the sheet is a drawer with no handle to pull.
+   *
+   * `translate` IS WRITTEN ON THE ELEMENT AS THE FINGER MOVES, not a custom property through
+   * Svelte: a property the whole sheet inherits restyles every row in it on every move, and
+   * `translate` composes with the slide's `transform` and restyles nothing else.
    */
-  const LET_GO = 80;
-  let pulled = $state(0);
-  let from: number | null = null;
+  const PRESSABLE = 'button, a, input, select, textarea';
+  const pull = new Pull();
 
   function grab(e: PointerEvent) {
-    from = e.clientY;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const from = e.currentTarget as HTMLElement;
+    if (!el || !e.isPrimary || e.button !== 0 || !matchMedia(NARROW).matches) return;
+    /* Asked of the strip or the head and not past it, since the page around the sheet can hold a control. */
+    const pressed = e.target instanceof Element ? e.target.closest(PRESSABLE) : null;
+    if (pressed && from.contains(pressed)) return;
+    pull.grab(e.clientY, e.timeStamp);
+    from.setPointerCapture(e.pointerId);
+    el.dataset.pull = '';
   }
 
-  function pull(e: PointerEvent) {
-    if (from !== null) pulled = Math.max(0, e.clientY - from);
+  function drag(e: PointerEvent) {
+    if (el && pull.held) el.style.translate = `0 ${pull.move(e.clientY, e.timeStamp)}px`;
   }
 
-  function drop() {
-    if (from === null) return;
-    from = null;
-    if (pulled > LET_GO) close();
-    pulled = 0;
+  function drop(e: PointerEvent) {
+    if (!el || !pull.held) return;
+    const away = pull.drop(e.clientY, e.timeStamp, el.offsetHeight, e.type === 'pointercancel');
+    delete el.dataset.pull;
+    /* Past it, the sheet closes from where the finger left it, and is put back as it next opens. */
+    if (away) close();
+    else el.style.translate = '';
   }
 </script>
 
 <dialog
   bind:this={el}
   class="sheet"
-  style="--pulled: {pulled}px"
   onclick={onbackdrop}
   oncancel={(e) => (e.preventDefault(), close())}
   onclose={closed}
 >
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="sheet-grab" aria-hidden="true" onpointerdown={grab} onpointermove={pull} onpointerup={drop} onpointercancel={drop}>
+  <div class="sheet-grab" aria-hidden="true" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onpointercancel={drop}>
     <span class="sheet-grab-bar"></span>
   </div>
 
   <!-- ONE LINE: the title and its Close, centred on each other. A title that does not fit ends in
        an ellipsis rather than pushing Close down to a second row. -->
-  <header class="sheet-head">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <header class="sheet-head" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onpointercancel={drop}>
     <h2 class="sheet-title">{title}</h2>
     <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close} title={copy.close}>
       <Icon name="close" size="m" />
@@ -220,6 +242,16 @@
      does, rather than hanging off the edge with a rule down its side: a sheet is a tile's surface at radius
      `--r-lg` and the third level of depth, and a tile has no border. */
   .sheet {
+    /* THE MOTION: in over 240ms on the sheet curve, out along the same path in 180ms, from wherever `--sheet-off` puts
+       it out of sight. Both opacities are 1, so it slides and does not fade, until reduced motion fades it in from a
+       state that is still readable and out to nothing. */
+    --sheet-curve: cubic-bezier(0.32, 0.72, 0, 1);
+    --sheet-in: 240ms;
+    --sheet-out: 180ms;
+    --sheet-off: translateX(calc(100% + 16px));
+    --sheet-from-opacity: 1;
+    --sheet-gone-opacity: 1;
+
     position: fixed;
     inset-block: var(--inset);
     inset-inline-end: var(--inset);
@@ -250,47 +282,72 @@
     border-radius: var(--r-lg);
     color: var(--ink);
     box-shadow: var(--e3);
+    transform: var(--sheet-off);
+    opacity: var(--sheet-gone-opacity);
+    /* LONGHANDS, so a browser that does not know `allow-discrete` drops that one line and keeps the slide. `display` and
+       `overlay` are held to the end of the close, which keeps a closed sheet on screen and on top while it goes. */
+    transition-property: transform, translate, opacity, display, overlay;
+    transition-duration: var(--sheet-out);
+    transition-timing-function: var(--sheet-curve);
+    transition-behavior: allow-discrete;
   }
 
+  /* Closed, and on its way out: nothing on it can be pressed. */
   .sheet:not([open]) {
     display: none;
+    pointer-events: none;
   }
 
-  /* THE SAME `--scrim` THE PALETTE AND THE MENUS USE, with no blur: a blur behind a sheet is glass, and a sheet is not
-     chrome. */
-  .sheet::backdrop {
-    background: var(--scrim);
-  }
-
-  /* THE ARRIVING CURVE, OVER 220MS, with no overshoot: a spring squeezed into a fifth of a second is a
+  /* THE SHEET CURVE, OVER 240MS, with no overshoot: a spring squeezed into a quarter of a second is a
      flick at the end of every open, which is motion performing rather than answering. */
   .sheet[open] {
-    animation: slide-in var(--d-enter) var(--ease-out);
+    transform: none;
+    opacity: 1;
+    transition-duration: var(--sheet-in);
   }
 
-  /* NO `opacity: 0` IN THE START STATE, and this is a failure-mode decision rather than a taste one.
+  /* THE FIRST FRAME OF AN OPENING, which is where the close ends.
 
-     Measured: `getAnimations()` on this dialog reported `playState: running` with an unresolved
-     start time for up to 900ms after `showModal()`. A CSS animation stays pending until its first
-     rendered frame, and a dialog entering the top layer with forty rows of content inside it can
-     wait a while for one. With `opacity: 0` in the `from`, that pause is a second of nothing where
-     the reader asked for a panel.
-
-     A stalled slide is a panel 24px from where it belongs. A stalled fade is no panel. Whatever the
-     start state is, it has to be a state somebody could read. */
-  @keyframes slide-in {
-    from {
-      transform: translateX(var(--sheet-from));
+     NO FADE ON THE WAY IN, and a slide that stalls is ended rather than left (`unstall` in
+     `panel.ts`): measured, an opening here waited up to 900ms for its first frame, and a sheet held
+     at its start for that long is no sheet. */
+  @starting-style {
+    .sheet[open] {
+      transform: var(--sheet-off);
+      opacity: var(--sheet-from-opacity);
     }
   }
 
   /* THE SLIDE COMES FROM THE END EDGE, which is the left one in a right-to-left page. */
-  .sheet {
-    --sheet-from: 24px;
+  :global([dir='rtl']) .sheet {
+    --sheet-off: translateX(calc(-100% - 16px));
   }
 
-  :global([dir='rtl']) .sheet {
-    --sheet-from: -24px;
+  /* A sheet being pulled follows the finger, with nothing easing behind it. */
+  .sheet:global([data-pull]) {
+    transition-property: none;
+  }
+
+  /* THE SAME `--scrim` THE PALETTE AND THE MENUS USE, with no blur: a blur behind a sheet is glass, and a sheet is not
+     chrome. It comes and goes with the sheet. */
+  .sheet::backdrop {
+    background: var(--scrim);
+    opacity: 0;
+    transition-property: opacity, display, overlay;
+    transition-duration: var(--sheet-out);
+    transition-timing-function: var(--sheet-curve);
+    transition-behavior: allow-discrete;
+  }
+
+  .sheet[open]::backdrop {
+    opacity: 1;
+    transition-duration: var(--sheet-in);
+  }
+
+  @starting-style {
+    .sheet[open]::backdrop {
+      opacity: 0;
+    }
   }
 
   /* THE HANDLE IS A PHONE'S, so the drawer from 900px up has none; the rule below 900px shows it. */
@@ -411,9 +468,6 @@
        * top edge, which is where a submit button belongs.
        */
       inset-block-end: var(--kb);
-      /* THE PULL. `--pulled` is how far the handle has been drawn down, written on the element as
-         it moves, and `translate` composes with the `rise` animation's `transform`. */
-      translate: 0 var(--pulled);
       border-end-start-radius: 0;
       border-end-end-radius: 0;
       /* THE HOME INDICATOR IS NOT UNDER THE KEYBOARD, so the inset is not paid twice. With the
@@ -431,6 +485,13 @@
        * right in both directions and costs a few pixels on the side away from the notch.
        */
       padding-inline: max(env(safe-area-inset-left), env(safe-area-inset-right));
+    }
+
+    /* UP FROM BELOW THE SCREEN, and back down it: past its own height and the keyboard it sits on,
+       in either direction of writing. */
+    .sheet,
+    :global([dir='rtl']) .sheet {
+      --sheet-off: translateY(calc(100% + var(--kb)));
     }
 
     /* A 24px strip across the top, so a thumb finds it, holding a short pill a person reads as
@@ -451,9 +512,11 @@
       border-radius: var(--r-pill);
     }
 
-    /* The handle's strip is the head's top padding on a phone, so it is not paid twice. */
+    /* The handle's strip is the head's top padding on a phone, so it is not paid twice. The head
+       pulls too, so a pull on it does not scroll the page either. */
     .sheet-head {
       padding-block-start: 0;
+      touch-action: none;
     }
 
     /* THE FOOTER'S BUTTONS SHARE ITS WIDTH ON A PHONE, so the one primary is a full-width target
@@ -462,28 +525,16 @@
     .sheet-foot > :global(.btn) {
       flex: 1 1 auto;
     }
-
-    .sheet[open] {
-      animation: rise var(--d-enter) var(--ease-out);
-    }
-
-    @keyframes rise {
-      from {
-        transform: translateY(24px);
-      }
-    }
   }
 
-  /* A FADE IN PLACE OF EVERY MOVE. The a11y layer shortens the duration; this takes the move away. */
+  /* A FADE IN PLACE OF EVERY MOVE: the drawer and the phone sheet fade where they stand. The a11y
+     layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
-    .sheet[open] {
-      animation-name: sheet-fade;
-    }
-  }
-
-  @keyframes sheet-fade {
-    from {
-      opacity: 0.6;
+    .sheet,
+    :global([dir='rtl']) .sheet {
+      --sheet-off: none;
+      --sheet-from-opacity: 0.6;
+      --sheet-gone-opacity: 0;
     }
   }
 
