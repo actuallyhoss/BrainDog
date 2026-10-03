@@ -13,6 +13,8 @@
  * on a record with Money and on one without.
  */
 
+import { RUNS_WORKING } from '../packs/agents.ts';
+
 /** Money in minor units, as every example writes it. */
 const gbp = (amount: number) => ({ amount, currency: 'GBP' });
 
@@ -43,8 +45,10 @@ export const BUSINESS = {
      1.3.0 BECAUSE IT GAINS A VOICE, three of Home's lines said as a business says them, each a new setting a
      person can change at /packs.
      1.4.0: calmer (DIRECTION §35). Home opens on one line of what needs your call, every heading wears a glyph, and
-     the questions are drawn only while one is asked. */
-  version: '1.4.0',
+     the questions are drawn only while one is asked.
+     1.5.0: Working now reads the runs active and heard from today (`RUNS_WORKING`, DIRECTION §37), where every run
+     the end hook never closed was listed as working beside the one typing now. A clause narrowed, so a minor step. */
+  version: '1.5.0',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
@@ -102,12 +106,13 @@ export const BUSINESS = {
           },
           { kind: 'queue', heading: 'Needs your call', icon: 'ask', span: 12, source: 'governance.open', limit: 5, when: { metric: 'questions-open', gt: 0 } },
           {
+            /* THE RUNS STILL WORKING, active and heard from today since 1.5.0, which hides this block when none is. */
             kind: 'table',
             heading: 'Working now',
             icon: 'session',
             span: 12,
             source: 'sessions.live',
-            where: 'state is active',
+            where: RUNS_WORKING,
             columns: [
               { field: 'agent', label: 'Agent' },
               { field: 'doing', label: 'Doing' },

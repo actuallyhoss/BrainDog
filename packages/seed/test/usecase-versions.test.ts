@@ -1052,6 +1052,62 @@ const DECLARED: Record<string, Version> = {
       "Every list the guide holds declares one of it beside its name, `setting.one_milestones` and `setting.one_steps` among them, with the words the record already shows as defaults, so Settings > Words can rename any of them -> 8a53a1f76198266d",
     ],
   },
+  /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD (DIRECTION §37, "Stop the harm"): each use case's last version is
+     on `origin/master`, so these are versions and not resets. */
+  'founder@1.16.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.organisations-held metric.organisations-with-accounts page.dashboard page.home-founder
+      page.organisation page.project register.datapoints register.organisations setting.label_accounts
+      setting.label_books setting.label_categories setting.label_datapoints setting.label_installments
+      setting.label_obligations setting.label_organisations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_organisations setting.one_people
+      setting.one_recurring setting.one_services setting.one_tasks setting.one_things setting.one_tracks
+      setting.one_transactions setting.one_updates setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '1499caf8ce71395c',
+    history: [
+      "`page.home-founder` says only what is true of the record: What you have, by organisation draws while `organisations-with-accounts` counts one, Bring your money in only while no account counts as cash, Lapsing only within 30 days of today over `lapsing-30d`, Numbers this week over 7 days and six lines at most over `datapoints-7d`, its way to start held to `datapoints-reported`, and Working now only the runs heard from today; `page.dashboard` stops saying Home's cash and balances again and draws each number once, as a line -> 1499caf8ce71395c",
+    ],
+  },
+  'business@1.5.0': {
+    holds: `
+      page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
+      setting.voice_nothing_due
+    `,
+    declares: '82cf7743f0bca3cd',
+    history: [
+      "`page.home-business`'s Working now reads the runs active and heard from today, where every run the end hook never closed was listed as working beside the one typing now -> 82cf7743f0bca3cd",
+    ],
+  },
+  'team@2.15.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '6bbd0be501cf8727',
+    history: [
+      "`page.agent-work`'s Working now reads the runs active and heard from today, where a run that stopped a minute ago or waits for a pickup was drawn as working, and its empty line no longer tells a team whose agents stopped to connect one -> b0ee0005f6b6172a",
+      "`page.agent-work`'s Working now says in plainer words that agents connected in Settings show there while they work -> 6bbd0be501cf8727",
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

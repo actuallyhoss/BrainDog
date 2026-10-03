@@ -1055,6 +1055,61 @@ const DECLARED: Record<string, Version> = {
       'Raised a major step because a rule now moves a live `services` row past its renewal day to lapsing and one asks before each renewal, four types join, every target becomes a setting with no default, and Services leads with what a month costs -> 04aad1e9a082907a',
     ],
   },
+  /* THE PAGES THAT SAY ONLY WHAT IS TRUE OF THE RECORD (DIRECTION §37, "Stop the harm"): each module's last version is
+     on `origin/master`, so these are versions and not resets. Each is current once `FIRST_PARTY_VERSIONS` names it. */
+  'portfolio@1.13.0': {
+    holds: `
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane
+      metric.projects-earning metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said
+      metric.projects-live metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play
+      metric.projects-on-track metric.projects-parked metric.projects-past-aim metric.projects-retired
+      metric.projects-with-agent page.portfolio register.things rule.project-past-aim
+    `,
+    declares: '7a5e7599478b0e69',
+    history: [
+      "`page.portfolio` says what is empty in its line alone: with nothing in play a third line says so and how to start, where the second said every project in play was on track, In play is drawn only while it holds one (`projects-live`), no other block says it is empty, and Parked and finished reads one project for the count it draws -> 6bebd4ed6f6dbaaf",
+      "`page.portfolio`'s line for nothing in play comes first of the three, so the nightly line is never written for the one saying nothing needs you across 0 projects and drawn over it -> 7a5e7599478b0e69",
+    ],
+  },
+  'money-core@3.8.0': {
+    holds: `
+      metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held
+      metric.cash-accounts metric.cash-as-of metric.cash-by-account metric.cash-by-book metric.cash-now metric.chasing
+      metric.days-late-in metric.due-30d metric.due-items-30d metric.every-month-by-category metric.every-month-in
+      metric.every-month-out metric.in-30d metric.in-by-month metric.in-due-by-month metric.installments-due-30d
+      metric.installments-left metric.late-in metric.leaving-30d metric.net-by-month metric.out-30d metric.out-by-month
+      metric.out-due-by-month metric.overdue metric.owed-by-you metric.owed-to-you metric.project-in-by-month
+      metric.project-in-month metric.project-kept-month metric.project-out-by-month metric.project-out-month
+      metric.project-owed metric.received-30d metric.runway-days metric.spent-30d metric.spent-by-category-month
+      metric.txn-uncategorised page.money page.money-book register.accounts register.balances register.books
+      register.categories register.fx register.installments register.obligations register.recurring register.snapshots
+      register.transactions rule.cash-stale rule.installment-due-soon rule.invoice-chased rule.invoice-late
+      rule.recurring-ended rule.recurring-missed rule.recurring-stopped rule.txn-categorise setting.home_currency
+      setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you
+      setting.most_owed_to_you setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category
+    `,
+    declares: '91711ddc6ac8fb8f',
+    history: [
+      "`page.money`'s Accounts is drawn only while there is cash to cut, where a record whose accounts all stood at nought drew a track of its own saying so, and `page.money-book`'s Where this month's money went only while something left the book this month, over the new `book-spent-month` -> 91711ddc6ac8fb8f",
+    ],
+  },
+  'work@1.14.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-open metric.tasks-after-week-yours
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
+      register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
+    `,
+    declares: '76e5fcf955e52544',
+    history: [
+      "`page.work` and `page.work-board` say an empty list in one line, Nothing is open right now, where every band said it in its own words and a list with nothing in it read eight tiles of white, and no band says it is empty -> 0e72d1cbeb5b5970",
+      'Nothing is open right now comes first of the lines on `page.work` and `page.work-board`, so the nightly line is never written for the counts at nought and drawn over it -> 76e5fcf955e52544',
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

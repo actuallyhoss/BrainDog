@@ -706,6 +706,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
    *
    * EVEN ROWS, SINCE work 1.12.0 (the visual review of October 2nd): Today the whole width, then Late and This week side
    * by side, half each, and Done lately wears a glyph a folded heading draws.
+   *
+   * ONE SENTENCE FOR AN EMPTY LIST, SINCE work 1.14.0 (DIRECTION §37): with nothing open the page is its line and the
+   * capture line, and only a line says what is empty. Every band said it in its own words ("Nothing due today.",
+   * "Nothing waits on you."), so a record whose list held nothing, or whose project strip narrowed a band to nothing,
+   * read eight tiles of white saying so. A band with nothing in it is not drawn now, under its figure or under the strip.
    */
   work: {
     page: 'work',
@@ -721,6 +726,21 @@ export const WORK_PAGES: Record<string, SeedPage> = {
        (`without` in `packs/first-party.ts`). */
     filters: [{ field: 'thing', control: 'chips' }],
     blocks: [
+      {
+        /* THE ONE SENTENCE WHEN NOTHING IS OPEN, SINCE work 1.14.0: the counts under it say nothing then, since a clause
+           whose figure is nought is left out, so the page opened on the capture line with no line over it. Work kept for
+           later and work finished are folded below, and are not open.
+
+           FIRST OF THE LINES, because the record draws the counts too when nothing is late, and the nightly line is
+           written for the first line a page draws (`leadBlockOf` in `packages/record/src/headlines.ts`): asked of the
+           counts at nought, the model would say "nothing is open" in its own words, drawn over this sentence saying it
+           again. This one has no figure, so no line is asked of it. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'open-tasks', is: 0 },
+        body: 'Nothing is open right now',
+      },
       {
         /* THE PAGE'S ONE LINE, drawn in the title's tile. A clause whose figure is nought is left out by the writer
            (`leadOf`), so a quiet week says only what there is; a record with nothing open says nothing at all. Late is
@@ -765,7 +785,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: TIER_THEN_DUE,
         limit: 12,
         when: { metric: 'tasks-today-yours', gt: 0 },
-        empty: 'Nothing due today.',
       },
       {
         /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
@@ -784,7 +803,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: TIER_THEN_DUE,
         limit: 12,
         when: { metric: 'tasks-late-yours', gt: 0 },
-        empty: 'Nothing of yours is late.',
       },
       {
         kind: 'todo',
@@ -797,7 +815,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: TIER_THEN_DUE,
         limit: 12,
         when: { metric: 'tasks-week-yours', gt: 0 },
-        empty: 'Nothing else this week.',
       },
       {
         /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
@@ -813,7 +830,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         limit: 8,
         working: true,
         when: { metric: 'tasks-with-agents', gt: 0 },
-        empty: 'No agent holds a task.',
       },
       {
         /* WHAT WAITS ON A PERSON, with the note as the reason it waits and, under it, when the task falls due and who
@@ -830,7 +846,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         when: { metric: 'tasks-waiting', gt: 0 },
-        empty: 'Nothing waits on you.',
       },
       {
         /* WHAT IS FURTHER OFF, FOLDED SHUT: yours after this week, yours with no day, and what is kept for later. A
@@ -854,7 +869,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         when: { metric: 'tasks-after-week-yours', gt: 0 },
-        empty: 'Nothing after this week.',
       },
       {
         /* The project is its detail, because there is no day to show. */
@@ -868,7 +882,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         when: { metric: 'tasks-undated-yours', gt: 0 },
-        empty: 'Everything has a day.',
       },
       {
         kind: 'todo',
@@ -881,7 +894,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         when: { metric: 'tasks-later', gt: 0 },
-        empty: 'Nothing kept for later.',
       },
       {
         /* WHAT WAS FINISHED, FOLDED SHUT, SINCE work 1.11.0: how fast work moves and what moved, a tap away. Above the
@@ -918,12 +930,16 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'done_on', dir: 'desc' }],
         limit: 8,
         when: { metric: 'tasks-done-7d', gt: 0 },
-        empty: 'Nothing done this week.',
       },
     ],
   },
 
-  /** THE BOARD AND THE LIST, for moving work along and seeing all of it. */
+  /**
+   * THE BOARD AND THE LIST, for moving work along and seeing all of it.
+   *
+   * AND THE SAME ONE SENTENCE FOR AN EMPTY LIST AS WORK'S, SINCE work 1.14.0: the line says nothing is open, and the
+   * board and the list say nothing of their own, since a block with nothing in it is not drawn.
+   */
   'work-board': {
     page: 'work-board',
     title: 'Board',
@@ -932,6 +948,15 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     requires: ['register.tasks'],
     pack: 'work',
     blocks: [
+      {
+        /* WITH NOTHING OPEN, SINCE work 1.14.0, the counts under it have no clause left to say. First, as on Work, so the
+           nightly line is never asked of the counts at nought and drawn over this one. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'open-tasks', is: 0 },
+        body: 'Nothing is open right now',
+      },
       {
         /* THE BOARD'S ONE LINE, since work 1.10.0: how much is on it, and the two columns that need somebody. */
         kind: 'note',
@@ -954,7 +979,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
            doing", and until now it answered it only in a strip beside the board: a card being worked
            on looked exactly like one nobody had opened in a week. */
         working: true,
-        empty: 'Nothing open.',
       },
       {
         kind: 'table',
@@ -974,7 +998,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         when: { metric: 'open-tasks', gt: 0 },
-        empty: 'Nothing open.',
         limit: 50,
       },
     ],

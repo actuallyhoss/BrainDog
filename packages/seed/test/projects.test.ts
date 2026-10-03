@@ -167,6 +167,33 @@ test('AN AGENT PROPOSES PARKING A PROJECT, NOTHING CHANGES UNTIL A PERSON ACCEPT
   assert.deepEqual([parked.changes?.[at]?.by, parked.changes?.[at]?.who], ['you', 'p_1'], 'the change is the person’s who accepted it');
 });
 
+/**
+ * A PAGE WITH NOTHING IN PLAY SAYS SO IN ITS LINE, SINCE portfolio 1.13.0, and Parked and finished counts what it folds
+ * without reading it. "Every project in play is on track" was the line over a page with none, while In play said its own
+ * empty line under it; and the section read every parked project whole, notes and all, for the one number it draws.
+ */
+test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and Parked and finished is a count', async () => {
+  const k = await seeded();
+  for (const [n, t] of THINGS.entries()) if (inPlay(t)) assert.ok(k.update('things', `things#${n + 1}`, { lane: 'parked' }, { actor: 'p_1' }).ok);
+  const overview = opened(k, 'portfolio');
+  const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true) as { body?: string; drawn?: boolean }[];
+  assert.equal(leads[0]!.drawn !== false, true, 'a page with nothing in play does not say so');
+  assert.equal(leads[0]!.body, 'No project is in play. Add one, or set a parked one building.');
+  /* THE ONE SAYING NOTHING NEEDS YOU IS SAID OF THE PROJECTS IN PLAY ALONE, so the writer leaves its one clause out over
+     none. The record still draws it, so it comes after the line with no figure: the nightly line is written for the
+     first line a page draws (`leadBlockOf` in `packages/record/src/headlines.ts`), and asked of "across 0 projects" the
+     model's line would be drawn over this one saying the same. */
+  assert.match(String(leads[2]!.body), /^[^,]*\{\{projects-live\}\}[^,]*$/u, 'the line over the projects in play says something with nothing in play');
+  const first = leads.find((b) => b.drawn !== false);
+  assert.doesNotMatch(String(first?.body), /\{\{/u, `the nightly line is asked of a line of noughts: ${first?.body}`);
+  assert.equal(block(overview, 'In play').drawn, false, 'In play is drawn over nothing');
+
+  const parked = block(overview, 'Parked and finished');
+  assert.equal(parked.matched, THINGS.length, 'the count is not every project parked or finished');
+  assert.ok(parked.rows.length <= 1, `the section read ${parked.rows.length} projects to say one number`);
+  assert.equal(block(overview, 'Not in play').rows.length, THINGS.length, 'the projects themselves are the table under it');
+});
+
 test('A PROJECT PAST THE DAY IT AIMED FOR IS ASKED ABOUT ON DECIDE, once, and nothing is written', async () => {
   const k = await seeded();
   const seq = THINGS.findIndex((t) => t.name === 'Kiln') + 1;
@@ -224,11 +251,12 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY AR
   const k = await seeded();
   const overview = opened(k, 'portfolio');
 
-  /* EXACTLY ONE OPENING SENTENCE DRAWS, the one its figure says: two projects on the sample are at risk or off track. */
+  /* EXACTLY ONE OPENING SENTENCE DRAWS, the one its figure says: two projects on the sample are at risk or off track.
+     THE FIRST, SINCE portfolio 1.13.0, is the page with nothing in play, which the sample is not. */
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
-  assert.equal(leads.length, 2, 'the Overview declares its two opening sentences');
-  assert.deepEqual(leads.map((b) => b.drawn !== false), [true, false], 'one sentence and not both, or neither');
-  assert.match(String((leads[0] as { body?: string }).body), /^\{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
+  assert.equal(leads.length, 3, 'the Overview declares its three opening sentences');
+  assert.deepEqual(leads.map((b) => b.drawn !== false), [false, true, false], 'one sentence and not two, or none');
+  assert.match(String((leads[1] as { body?: string }).body), /^\{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
 
   /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
      (portfolio 1.11.0). */

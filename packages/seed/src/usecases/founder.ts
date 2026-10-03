@@ -20,24 +20,46 @@
  */
 import { DUE_THIS_WEEK } from '../modules/money.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
+import { RUNS_WORKING } from '../packs/agents.ts';
 import { counted } from './counted.ts';
 
 /** The lists a founder's record holds once its five modules and this pack are in, services among them. */
 const HOLDS = ['things', 'people', 'accounts', 'obligations', 'transactions', 'services', 'tasks', 'tracks', 'runs', 'updates', 'organisations', 'datapoints'];
 
 /**
- * THE NUMBERS BLOCKS, ONCE, for the dashboard, an organisation and a project: which field is which, the example left
- * out, and thirty days against the thirty before. The record works the series out (`measures.ts` in the kernel), so a
- * year of hourly polls draws as fast as a week of them.
+ * WHICH FIELD OF A NUMBER IS WHICH, BY PLACE: when, the value, the measure, its unit, and the project it is about. The
+ * record reads the first four into one series a measure (`measures.ts` in the kernel).
+ *
+ * THE PROJECT IS THE FIFTH, SINCE 1.16.0, the field the lines are to be grouped by, so that a chart is labelled by the
+ * measure and the project comes from its own row: a measure two projects both send is to be two lines and not one, and
+ * an import that glued the project onto the measure's name ("Aov, Crumb.gg") is no longer the only place the project is
+ * said. The record reads the first four and passes over a fifth (`readBlockAsWritten` in `packages/kernel/src/pages.ts`),
+ * so until it groups by it the column changes nothing a record draws, and no version has to move when it does: today
+ * two projects sending Sign-ups still draw one line between them.
  */
-const numbers = (where: string | null, empty: string, line: string) => {
-  const said = ['source is not example', ...(where ? [where] : [])].join(', ');
-  const columns = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }];
-  return [
-    { kind: 'stat', heading: 'The numbers', icon: 'hash', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty },
-    { kind: 'lines', heading: 'Thirty days against the thirty before', icon: 'chart-line', span: 12, source: 'register.datapoints', columns, where: said, back: 30, empty: line },
-  ];
-};
+const NUMBER_COLUMNS = [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }, { field: 'thing' }];
+
+/**
+ * THE NUMBERS, ONCE, for the dashboard, an organisation and a project: the example left out, and thirty days against
+ * the thirty before. The record works the series out, so a year of hourly polls draws as fast as a week of them.
+ *
+ * A LINE A MEASURE AND NO TILE BESIDE IT, SINCE 1.16.0. A `stat` over the same readings drew a tile a measure above the
+ * line a measure, so every number was said twice on one page: twelve tiles over twelve charts on a Dashboard. The
+ * record draws a line for a measure read twice or more in the window and hands back each measure read only once as
+ * its latest reading, for a small table under the lines (`measureLines` in `packages/kernel/src/measures.ts`). No
+ * empty line: a page with no number has nothing here, and where a project sends them is the section under it.
+ */
+const numbers = (where: string | null, when?: Record<string, unknown>): Record<string, unknown> => ({
+  kind: 'lines',
+  heading: 'Numbers, 30 days',
+  icon: 'chart-line',
+  span: 12,
+  source: 'register.datapoints',
+  columns: NUMBER_COLUMNS,
+  where: ['source is not example', ...(where ? [where] : [])].join(', '),
+  back: 30,
+  ...(when ? { when } : {}),
+});
 
 /**
  * WHERE A BUTTON ON A DECLARED PAGE OPENS THE NEW-ACTION SHEET. A path of this
@@ -83,11 +105,19 @@ const WHAT_YOU_HAVE: Record<string, unknown>[] = [
 ];
 
 /**
- * THE NUMBERS OF THE WEEK, one line a measure over thirty days against the thirty before, once a project has sent one.
+ * THE NUMBERS OF THE WEEK, one line a measure over this week against the week before, once a project has sent one
+ * this week.
  *
- * UNTIL THEN, THE WAYS TO START, in place of an empty chart: a door a project posts its numbers to, a number the record
- * asks for on a schedule, and the packs that already read one. Both halves are held to the same figure
- * (`datapoints-30d`, which leaves the example out), so exactly one of them draws.
+ * A WEEK, SINCE 1.16.0, AND IT SAID A WEEK OVER THIRTY DAYS. At most six lines, the ones that moved most, each
+ * declared with the project it is about (`NUMBER_COLUMNS`, which no record reads yet), and a measure read only once in
+ * the week is not a line: the record hands it back as its latest reading, for the small table under the lines. An
+ * import that wrote two hundred measures once each, on one morning, drew twelve one-dot charts here in the alphabet's
+ * order; the Dashboard keeps every number for thirty days.
+ *
+ * UNTIL A PROJECT HAS EVER SENT ONE, THE WAYS TO START, in place of an empty chart: a door a project posts its numbers
+ * to, a number the record asks for on a schedule, and the packs that already read one. Gated on every number ever
+ * reported (`datapoints-reported`), so a record whose projects went quiet this week reads nothing here rather than an
+ * offer to start what it already does. Both figures leave the example out.
  */
 const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
   {
@@ -96,18 +126,18 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
     icon: 'chart-line',
     span: 12,
     source: 'register.datapoints',
-    columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }],
+    columns: NUMBER_COLUMNS,
     where: 'source is not example',
-    back: 30,
-    when: { metric: 'datapoints-30d', gte: 1 },
-    empty: 'Each measure draws a line once a project reports it.',
+    back: 7,
+    limit: 6,
+    when: { metric: 'datapoints-7d', gte: 1 },
   },
   {
     kind: 'link',
-    heading: 'Numbers this week',
+    heading: 'Bring your numbers in',
     icon: 'send',
     span: 12,
-    when: { metric: 'datapoints-30d', lt: 1 },
+    when: { metric: 'datapoints-reported', lt: 1 },
     authored: [
       { cells: ['Send numbers from a project', SEND_NUMBERS, 'A project posts each number to its own address here'] },
       { cells: ['Watch a number', WATCH_NUMBER, 'BrainDog asks an address for one number on a schedule'] },
@@ -115,6 +145,13 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
     ],
   },
 ];
+
+/**
+ * A SERVICE LAPSING WITHIN THIRTY DAYS, EITHER SIDE OF TODAY, SINCE 1.16.0: one whose renewal passed in the last month
+ * and can still be saved, or that lapses in the next. `state is lapsing` alone listed every domain somebody chose to
+ * let go, renewing in a year's time, on the page read every morning. The Services page still counts them all.
+ */
+const LAPSING_SOON = 'state is lapsing, renews after -31d, renews before +31d';
 
 export const FOUNDER = {
   usecase: 'founder',
@@ -177,8 +214,15 @@ export const FOUNDER = {
 
      1.14.0 BECAUSE THE PROJECT PAGE TAKES PORTFOLIO 1.12.0'S TEMPLATE: its line is the next step alone, Where it stands is
      headed by how it is going with the agent last, and what is handed back is a to-do with no Changed by. No block added
-     or taken away, so a minor step. 1.13.0 is live. */
-  version: '1.15.0',
+     or taken away, so a minor step. 1.13.0 is live.
+
+     1.16.0 BECAUSE EVERY PAGE SAYS ONLY WHAT IS TRUE OF THIS RECORD (DIRECTION §37, "Stop the harm"). Home draws What you
+     have, by organisation only while an organisation lists an account, Bring your money in only while no account counts
+     as cash, Lapsing only within thirty days of today, and Numbers this week over a week, six lines at most, each
+     declared with the project it is about; Working now reads the runs heard from today. The Dashboard stops saying Home's cash and its
+     organisations' balances again, and every numbers block is a line a measure with no tile beside it. Four counts are
+     added to draw on, so a minor step. 1.15.0 is live. */
+  version: '1.16.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -293,6 +337,12 @@ export const FOUNDER = {
       counted('datapoints-held', 'Numbers', 'register.datapoints'),
       counted('organisations-held', 'Organisations', 'register.organisations'),
       counted('due-this-week', 'Due this week', 'register.obligations', 'state is open or part, due before +8d'),
+      /* AND SINCE 1.16.0: the week Numbers this week draws, every number a project ever sent, the organisations whose
+         money there is to add up, and what Lapsing lists, each over its block's own clauses. */
+      counted('datapoints-7d', 'Numbers reported, 7 days', 'register.datapoints', 'at after -7d, source is not example'),
+      counted('datapoints-reported', 'Numbers reported', 'register.datapoints', 'source is not example'),
+      counted('organisations-with-accounts', 'Organisations that list an account', 'register.organisations', 'accounts is set'),
+      counted('lapsing-30d', 'Lapsing within 30 days', 'register.services', LAPSING_SOON),
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: the money across every organisation and
            the numbers the projects sent, in place of the house figures. No `nav`, because Home is on the rail
@@ -310,38 +360,44 @@ export const FOUNDER = {
         blocks: [
           ...WHAT_YOU_HAVE,
           {
-            /* EACH ORGANISATION'S MONEY, the accounts it lists added up, beside the one way in for a bank or a payments
-               feed. Browse is searched for "money" because every pack that brings money in says so in its summary, and
-               this file names no provider (`tools/gates/shell-words.mjs`). */
+            /* EACH ORGANISATION'S MONEY, the accounts it lists added up. ONLY WHILE ONE LISTS AN ACCOUNT, SINCE 1.16.0, and
+               only the ones that do: it said "No organisation lists an account yet" over a record with no organisation
+               at all. The whole width since the box beside it is drawn on another figure, so neither leaves a hole. */
             kind: 'bar',
             heading: 'What you have, by organisation',
             icon: 'building-2',
-            span: 8,
+            span: 12,
             source: 'register.organisations',
+            where: 'accounts is set',
             columns: [{ field: 'name' }, { field: 'accounts' }],
-            empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
+            when: { metric: 'organisations-with-accounts', gt: 0 },
           },
           {
+            /* THE ONE WAY IN FOR A BANK OR A PAYMENTS FEED, ONLY WHILE NO ACCOUNT COUNTS AS CASH, SINCE 1.16.0: it was
+               drawn on a record holding thirteen accounts and its bank's own add-on. Browse is searched for "money"
+               because every pack that brings money in says so in its summary, and this file names no provider
+               (`tools/gates/shell-words.mjs`). */
             kind: 'link',
             heading: 'Bring your money in',
             icon: 'plug',
-            span: 4,
+            span: 12,
+            when: { metric: 'cash-accounts', lt: 1 },
             authored: [{ cells: ['Connect a bank or a payments feed', BROWSE_MONEY, 'Balances and payments arrive on their own'] }],
           },
           ...NUMBERS_THIS_WEEK,
           /* ONLY WHILE SOMETHING IS DUE, SINCE 1.11.0, over the table's own clauses. */
           { ...DUE_THIS_WEEK, when: { metric: 'due-this-week', gt: 0 } },
           {
-            /* THE SET ESTATE'S OWN `lapsing` TILE COUNTS, `state is lapsing` and nothing else, so the number on
-               the Services page and the rows here are one set. Soonest renewal first, since that is the one
-               that goes first. */
+            /* WHAT IS LAPSING NOW (`LAPSING_SOON`), SINCE 1.16.0, and it was every service Estate's own `lapsing` tile
+               counts. Soonest renewal first, since that is the one that goes first. Drawn only while it lists one, so it
+               says nothing of its own when nothing is. */
             kind: 'table',
             heading: 'Lapsing',
             icon: 'clock-alert',
             span: 12,
             source: 'register.services',
-            where: 'state is lapsing',
-            when: { metric: 'lapsing', gt: 0 },
+            where: LAPSING_SOON,
+            when: { metric: 'lapsing-30d', gt: 0 },
             columns: [
               { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)' },
               { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
@@ -349,16 +405,16 @@ export const FOUNDER = {
             ],
             order: [{ field: 'renews', dir: 'asc' }],
             limit: 6,
-            empty: 'Nothing is lapsing.',
           },
           {
-            /* THE RUNS STILL WORKING, as the house Home draws them, which hides this block when none is. */
+            /* THE RUNS STILL WORKING, active and heard from today since 1.16.0 (`RUNS_WORKING`), which hides this block
+               when none is. */
             kind: 'table',
             heading: 'Working now',
             icon: 'session',
             span: 12,
             source: 'sessions.live',
-            where: 'state is active',
+            where: RUNS_WORKING,
             columns: [
               { field: 'agent', label: 'Agent' },
               { field: 'doing', label: 'Doing' },
@@ -371,18 +427,20 @@ export const FOUNDER = {
       {
         /* `Dashboard` AND NOT `Overview`, which is what this use case's voice calls Home: two rail items with one name.
 
-           THE WHOLE PORTFOLIO ON ONE PAGE: the money across every organisation, each organisation's balance, then every
-           number a project reported as a tile and as a line over thirty days against the thirty before. A `stat` and a
-           `lines` over Datapoints name which field is which (when, value, measure and unit) and draw one tile and one
-           chart a measure, so a measure a project starts sending tomorrow is on this page tomorrow without an edit. */
+           THE WHOLE PORTFOLIO ON ONE PAGE: every number a project reported, as a line over thirty days against the thirty
+           before, with every number and organisation folded under them. A `lines` block over Datapoints names which field
+           is which and draws one chart a measure, so a measure a project starts sending tomorrow is on this page
+           tomorrow without an edit.
+
+           NOT HOME AGAIN, SINCE 1.16.0. It opened on Cash now, how long it lasts and the month's money in and out, which
+           are Home's line and Money's, kept each organisation's balance in a rail beside what Home draws as What you
+           have, by organisation, and drew a tile a measure over the chart of the same measure. What is left is what only
+           this page says: thirty days of every number, and where each came from. */
         page: 'dashboard',
         title: 'Dashboard',
         nav: { section: 'Dashboard', order: 10 },
         icon: 'observe',
-        /* EACH ORGANISATION'S BALANCE IN THE RAIL, SINCE 1.8.0, beside the numbers, which want the width for their tiles
-           and their lines. At a phone's width the rail comes after the main column. */
-        layout: { rail: 4 },
-        requires: ['register.datapoints', 'register.organisations', 'register.accounts', 'register.obligations'],
+        requires: ['register.datapoints', 'register.organisations'],
         blocks: [
           /* THE OPENING SENTENCE, SAID FROM THE NUMBERS OF THE LAST THIRTY DAYS (`datapoints-30d`, which leaves the
              example out). Both are held to the one figure, so exactly one of them draws. */
@@ -400,39 +458,12 @@ export const FOUNDER = {
             when: { metric: 'datapoints-30d', lt: 1 },
             body: "No project has reported a number in the last thirty days. A project's page has the key it sends them with.",
           },
+          /* ON THE FIGURE THE LINE SAYS, so the chart is drawn exactly while the sentence over it counts something. The
+             example number shows under Latest numbers and is left out here. */
+          numbers(null, { metric: 'datapoints-30d', gte: 1 }),
           {
-            kind: 'stat',
-            heading: 'Across your organisations',
-            icon: 'wallet',
-            lead: true,
-            span: 12,
-            /* THE MONEY THERE IS AND HOW LONG IT LASTS, AND NOT WHO OWES WHOM, since 1.7.0: the same tiles as Money's
-               own page, whose thirty-day figures walk every list that moves money, so no tile here reads one list
-               under words that promise all of them. */
-            cells: [
-              { metric: 'cash-now', label: 'Cash now', trend: '30d' },
-              { metric: 'runway-days', label: 'Lasts until' },
-              { metric: 'arriving-30d', label: 'Coming in, 30 days' },
-              { metric: 'leaving-30d', label: 'Going out, 30 days' },
-            ],
-          },
-          {
-            kind: 'bar',
-            heading: 'Balance by organisation',
-            icon: 'building-2',
-            span: 12,
-            area: 'rail',
-            source: 'register.organisations',
-            when: { metric: 'organisations-held', gt: 0 },
-            columns: [{ field: 'name' }, { field: 'accounts' }],
-            empty: 'No organisation lists an account yet. Open one and add the accounts it holds.',
-          },
-          /* WORDED FOR A FIRST DAY WITH AN EXAMPLE BESIDE THEM: the example number shows under Latest numbers and is left out
-             here, so "no project has reported a number" read as wrong beside it. */
-          ...numbers(null, 'When a project reports a number, it shows here. Examples are left out.', 'Each measure draws a line once a project reports it.'),
-          {
-            /* EVERY NUMBER AND EVERY ORGANISATION, FOLDED SHUT, SINCE 1.11.0: the tiles and lines above draw the same
-               numbers, and these are looked up. */
+            /* EVERY NUMBER AND EVERY ORGANISATION, FOLDED SHUT, SINCE 1.11.0: the lines above draw the same numbers, and
+               these are looked up. */
             kind: 'section',
             heading: 'Every number and organisation',
             icon: 'layout-list',
@@ -495,7 +526,7 @@ export const FOUNDER = {
             columns: [{ field: 'name' }, { field: 'accounts' }],
             empty: '{{name}} lists no account yet. Add the accounts it holds and its balance shows here.',
           },
-          ...numbers('organisation is {{name}}', 'When a number is reported for {{name}}, it shows here. Examples are left out.', 'Each measure draws a line once it is reported for {{name}}.'),
+          numbers('organisation is {{name}}'),
           {
             /* THE PROJECTS IT RUNS, as the organisation lists them: a project cannot name its organisation (a use case
                adds no field to another pack's list), so the organisation's own list is the one answer. */
@@ -546,7 +577,7 @@ export const FOUNDER = {
         requires: [...(projectTemplate(HOLDS).requires as string[]), 'register.datapoints'],
         blocks: [
           ...(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
-          ...numbers('thing is {{name}}', 'When a number is reported for {{name}}, it shows here. Examples are left out.', 'Each measure draws a line once it is reported for {{name}}.'),
+          numbers('thing is {{name}}'),
           /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: "Runs on" in
              the rail draws the scheduled actions alone (`BlockSlot.svelte`). */
           { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },

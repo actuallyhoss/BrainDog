@@ -21,6 +21,11 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.13.0',
+      notes:
+        'Projects says in its first line when nothing is in play and how to start, and no part of the page says it is empty. Parked and finished counts what is folded under it without loading every project.',
+    },
+    {
       version: '1.12.0',
       notes:
         'Projects opens on which projects need a push and which are on track, by name. The cards drop their Health and How far along labels, and the bar of how they are going shows once more than four are in play. A project page opens on its next step, leads Where it stands with how it is going, and lists what is handed back as a to-do.',
@@ -72,6 +77,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.8.0',
+      notes: "Accounts shows only when there is cash to split, and a book's Where this month's money went only when something left the book this month.",
+    },
+    {
       version: '3.7.0',
       notes: 'Cash ahead opens on the next three months. Six months, a year and two years are still a press away.',
     },
@@ -119,6 +128,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   work: [
     {
+      version: '1.14.0',
+      notes: 'An empty Work page says Nothing is open right now, under the line to capture a task, instead of a tile for every band saying it is empty.',
+    },
+    {
       version: '1.13.0',
       notes: 'Work opens on the task that has been late longest, by name, and how many more are late with it.',
     },
@@ -146,6 +159,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.5.0',
+      notes: 'Agents shows the runs: who is working now, where the stopped runs left off and what they added. A run quiet since yesterday is no longer listed as working. Questions are on Decide, and lessons and skills on their own pages.',
+    },
     {
       version: '1.4.0',
       notes: 'Agents opens on one line of who is working and what waits on you, shows where runs left off, and folds how the brain grew, its lessons and its skills until you open them.',

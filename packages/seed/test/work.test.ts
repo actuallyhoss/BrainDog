@@ -101,11 +101,12 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   /* THE PAGE'S LINE, THEN THE CAPTURE LINE, so a task is written down before anything else is read, then the Work
      screen's bands of what is still to do top to bottom, and what is further off and what was finished folded shut. The
      line has no heading: it is the sentence in the page's title, two of them on one figure since work 1.13.0, of which one
-     is drawn. SINCE work 1.12.0 Today is the whole width over Late and This week, which share a row. */
+     is drawn, and a third since work 1.14.0 for a list with nothing open. SINCE work 1.12.0 Today is the whole width over
+     Late and This week, which share a row. */
   assert.deepEqual(
     headings,
     [
-      undefined, undefined, 'What needs doing?', 'Today', 'Late', 'This week', 'With an agent', 'Waiting on you',
+      undefined, undefined, undefined, 'What needs doing?', 'Today', 'Late', 'This week', 'With an agent', 'Waiting on you',
       'Not this week', 'After this week', 'No due day', 'Later',
       'Done lately', 'How fast it moves', 'Done recently',
     ],
@@ -255,6 +256,19 @@ test('WORK INSTALLS ALONE: a homework list with no Projects and no People, its p
     fresh.blocks.filter((b) => b.drawn !== false && b.kind !== 'note' && b.kind !== 'section' && b.heading !== 'After this week' && b.heading !== 'No due day' && b.heading !== 'Later').map((b) => b.heading),
     ['What needs doing?'],
   );
+  /* AND ONE SENTENCE, SINCE work 1.14.0: the line says nothing is open, and no band says it is empty. */
+  const lines = fresh.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false) as { body?: string }[];
+  assert.ok(lines.some((b) => b.body === 'Nothing is open right now'), lines.map((b) => b.body).join(' / '));
+  const empties = (PAGES.work!.blocks as { lead?: boolean; empty?: string; heading?: string }[]).filter((b) => !b.lead && b.empty !== undefined);
+  assert.deepEqual(empties.map((b) => b.heading), [], 'a band of Work draws its own empty line');
+  /* FIRST OF THE LINES THE RECORD DRAWS, on Work and on the Board, since the counts are drawn too with nothing late. The
+     nightly line is written for the first line a page draws (`leadBlockOf` in `packages/record/src/headlines.ts`), and
+     asked of the counts at nought the model would say nothing is open in its own words, over this sentence saying it
+     again. */
+  for (const slug of ['work', 'work-board']) {
+    const first = opened(k, slug).blocks.find((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false) as { body?: string } | undefined;
+    assert.equal(first?.body, 'Nothing is open right now', `${slug}'s nightly line is asked of ${first?.body}`);
+  }
 
   assert.ok(k.create('tasks', { what: 'Problem set 3', state: 'open', by: TODAY }, { actor: 'p_1' }).ok);
   const overview = opened(k, 'work');
@@ -347,7 +361,11 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is the Late band’s
     }
     /* THE LINE NAMES THE LATE BAND'S FIRST TASK AND COUNTS THE REST OF IT, or says nothing late when the band is empty. */
     const late = block(page, 'Late');
-    const lead = page.blocks[0] as { body?: string; drawn?: boolean; values?: Record<string, unknown> };
+    /* FOUND BY WHAT IT SAYS, since work 1.14.0 put the line for nothing open first. */
+    const lead = page.blocks.find((b) => b.kind === 'note' && /tasks-late-yours\.first/u.test(String((b as { body?: string }).body))) as
+      | { body?: string; drawn?: boolean; values?: Record<string, unknown> }
+      | undefined;
+    assert.ok(lead, 'Work has no line naming the late task');
     assert.match(String(lead.body), /^\{\{tasks-late-yours\.first\}\} is late, and \{\{tasks-late-yours\.more\}\} more task\(s\) are too$/u);
     const count = late.matched ?? late.rows.length;
     assert.equal(lead.drawn !== false, count > 0);

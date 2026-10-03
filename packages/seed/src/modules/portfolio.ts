@@ -622,6 +622,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
    *
    * EACH THING ONCE, SINCE portfolio 1.11.0: the line, one track of how they are going, and the cards, with Needs you and
    * Where they are gone (the visual review of October 2nd).
+   *
+   * ONLY THE LINE SAYS WHAT IS EMPTY, AND THE PARKED ARE A COUNT, SINCE portfolio 1.13.0 (DIRECTION §37). With nothing in
+   * play the line says so and how to start, where it said every project in play was on track over a page with none,
+   * and In play is drawn only while it holds one. Parked and finished is a heading that counts what is folded under
+   * it, and it read every one of those projects whole, its notes included, to say one number.
    */
   portfolio: {
     page: 'portfolio',
@@ -636,7 +641,21 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       /* THE OPENING SENTENCE, SAID FROM THE FIGURES, SINCE portfolio 1.6.0: the line under the page's title, and the one
          thing read before any tile. Two notes on the one figure, so exactly one of them draws: how many projects somebody
          said are not going well, or that none is. Words from the figures only: which project is sliding and why is an agent's reading, and it
-         arrives as a question in Decide, not as a sentence a page makes up. */
+         arrives as a question in Decide, not as a sentence a page makes up. SINCE portfolio 1.13.0 a third, put first,
+         speaks when nothing is in play, and the one saying nothing needs you then has no clause left to say, so a page
+         still reads one line. */
+      {
+        /* THE ONE THING TO DO ON A PAGE WITH NOTHING IN PLAY, SINCE portfolio 1.13.0, which was In play's own empty line:
+           a line is the one place a page says it is empty. FIRST OF THE THREE, because the record draws the one saying
+           nothing needs you too over none in play, and the nightly line is written for the first line a page draws
+           (`leadBlockOf` in `packages/record/src/headlines.ts`): asked of "across 0 projects", the model's line would
+           be drawn over this one saying the same. This one has no figure, so no line is asked of it. */
+        kind: 'note',
+        lead: true,
+        span: 12,
+        when: { metric: 'projects-live', is: 0 },
+        body: 'No project is in play. Add one, or set a parked one building.',
+      },
       {
         kind: 'note',
         lead: true,
@@ -649,11 +668,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         body: '{{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track',
       },
       {
+        /* SAID OF THE PROJECTS IN PLAY, SINCE portfolio 1.13.0, so with none in play the clause has no figure left and the
+           first note speaks instead: "Every project in play is on track" was true of an empty list. */
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'projects-need-you', is: 0 },
-        body: 'Nothing needs you. Every project in play is on track, or nobody has said otherwise.',
+        body: 'Nothing needs you across {{projects-live}} project(s) in play',
       },
       /* NO RIGHT NOW TILE, SINCE portfolio 1.10.0. It held In play and what aims to land within thirty days in a third of
          the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
@@ -677,7 +698,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            three equal thirds, which says nothing the line and the cards under it do not; a bar earns its row when there
            are too many cards to read at a glance. */
         when: { metric: 'projects-live', gt: 4 },
-        empty: 'No project is in play.',
       },
       /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and
          the cards under it say both on every project in play, while the line counts them: Kiln's next step was on the
@@ -715,9 +735,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'name', dir: 'asc' }],
         limit: 12,
-        /* NO `when:`, BECAUSE ITS EMPTY LINE IS WHAT A FRESH RECORD READS: the one thing to do on an Overview with no
-           project is to add one. */
-        empty: 'No project is in play. Add one, or set a parked one building.',
+        /* DRAWN ONLY WHILE ONE IS IN PLAY, SINCE portfolio 1.13.0: its empty line, the one thing to do on a page with no
+           project, is the line's now. */
+        when: { metric: 'projects-live', gt: 0 },
       },
       {
         /* WHAT EACH EARNS, WHAT AGENTS HOLD AND WHAT IS COMING UP ARE FOLDED SHUT, SINCE portfolio 1.8.0: the page a
@@ -749,7 +769,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'revenue', dir: 'desc' }],
         limit: 8,
         when: { metric: 'projects-earning-said', gt: 0 },
-        empty: 'No project in play says what it earns. Put a year on one and it draws here.',
       },
       /* NO EARNING TILE, SINCE portfolio 1.8.0. Its year was the sum of the split above, said a second time beside it;
          what each project earns is read off the split, and the year before is on each project's row. */
@@ -770,7 +789,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'name', dir: 'asc' }],
         limit: 12,
         when: { metric: 'projects-with-agent', gt: 0 },
-        empty: 'No agent holds a project. An agent takes one by setting itself as its agent.',
       },
       {
         kind: 'table',
@@ -787,9 +805,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'aim', dir: 'asc' }],
         limit: 8,
         when: { metric: 'projects-aiming', gt: 0 },
-        empty: 'No project in play has a day it is aiming for.',
       },
       {
+        /* A COUNT, SINCE portfolio 1.13.0: the heading says how many are folded under it, which the record answers with
+           the whole match whatever it reads (`matched`), so one project is read where it read up to fifty, each with
+           its notes. The projects themselves are the table under it. */
         kind: 'section',
         heading: 'Parked and finished',
         icon: 'thing',
@@ -797,6 +817,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         fold: true,
         source: 'register.things',
         where: 'lane is parked or retired',
+        limit: 1,
         when: { metric: 'projects-not-in-play', gt: 0 },
       },
       {
@@ -815,7 +836,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         order: [{ field: 'name', dir: 'asc' }],
         limit: 20,
         when: { metric: 'projects-not-in-play', gt: 0 },
-        empty: 'Nothing is parked or finished.',
       },
     ],
   },

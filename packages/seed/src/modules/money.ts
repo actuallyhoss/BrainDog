@@ -1101,7 +1101,9 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
    * headline is what it was until a second book is there.
    *
    * `currency` IS THE ONE THE BOOK IS KEPT IN, as its owner says it, written as the three letters `fx` holds. It is a
-   * statement about the book, and no figure converts by it: a figure is added up in the record's home currency.
+   * statement about the book, and a figure about the book is read in it: a figure over one book, or each book's part
+   * of a figure grouped by book, is added up in the book's currency, and every other figure in the record's home
+   * currency.
    */
   books: {
     id: 'books',
@@ -1407,6 +1409,24 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
     where: 'liquid is true, book is {{it}}',
     value: ROLLED,
     format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * HOW MANY PAYMENTS LEFT ONE BOOK THIS MONTH, SINCE money-core 3.8.0, read once per book as `book-cash` is: what a
+   * book's Where this month's money went is drawn on, over its own clauses, so a book with nothing spent this month
+   * draws no split with no parts in it. A count and not a sum, because a sum over two currencies is two amounts and the
+   * question is only whether there is anything to cut.
+   */
+  'book-spent-month': {
+    metric: 'book-spent-month',
+    name: 'Paid out of one book this month',
+    source: 'register.transactions',
+    where: 'state is cleared, transfer is false, direction is out, on at least bom, book is {{it}}',
+    value: { count: 'id' },
+    format: 'int',
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
@@ -2211,6 +2231,13 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
    * ONE HEADS UP, SINCE money-core 3.5.0 (the visual review of October 2nd): an old balance, money late coming in and
    * money late going out are three lines of one tile under Accounts, each drawn only while it is true, where they were
    * three tiles a line tall.
+   *
+   * NO SPLIT THAT HOLDS NOTHING, SINCE money-core 3.8.0 (DIRECTION §37). An imported record on money-core 3.1.0 drew
+   * thirteen account cards, six of them empty accounts that are not cash and sit in no book ("Welcome to Column N.A.").
+   * Accounts on this page have been the parts of Cash now since 3.3.0, so such an account is never one: what is not
+   * cash is left out, and a part at nought cuts no length of the track (`splitPlan` in `packages/render/src/split.ts`).
+   * A split is drawn only while it has a part to cut, here and on a book's page, so a month with nothing spent and a
+   * record whose accounts all stand at nought draw no empty track.
    */
   money: {
     page: 'money',
@@ -2344,8 +2371,10 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'metric.cash-by-account',
         limit: 6,
-        when: { metric: 'cash-accounts', gt: 0 },
-        empty: 'No account counts as cash yet.',
+        /* ONLY WHILE THERE IS CASH TO CUT, SINCE money-core 3.8.0. An account at nought, or overdrawn, cuts no length of
+           a track, so a record whose every account was empty drew "Every part is zero" in a tile of its own. An account
+           that does not count as cash was never a part; every account is on the accounts list. */
+        when: { metric: 'cash-now', gt: 0 },
       },
       {
         /* WHAT NEEDS A LOOK, AS ONE TILE OF THREE LINES, SINCE money-core 3.5.0: a balance more than a week old, money
@@ -2639,7 +2668,9 @@ export const MONEY_PAGES: Record<string, SeedPage> = {
         columns: [{ field: 'category' }, { field: 'amount' }],
         limit: 6,
         unset: 'Uncategorised',
-        empty: 'Nothing has gone out of {{name}} this month.',
+        /* ONLY WHILE SOMETHING LEFT THE BOOK THIS MONTH, SINCE money-core 3.8.0, over the split's own clauses: a book whose
+           last payment was last month drew a track with no parts under this heading. */
+        when: { metric: 'book-spent-month:{{name}}', gt: 0 },
       },
       {
         kind: 'timeline',

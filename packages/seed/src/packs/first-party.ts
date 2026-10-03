@@ -351,13 +351,19 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   added, nothing taken away, so each step is a minor one. The project page moves with them, though no pack holds it
  *   (`crossPack`): its line is the next step alone, Where it stands is headed by how it is going with the agent last,
  *   and what is handed back is a to-do with no Changed by.
+ * - portfolio 1.13.0, money-core 3.8.0 and work 1.14.0: each page says only what is true of the record (DIRECTION §37).
+ *   Projects says an empty page in its line, with a third line for nothing in play, draws In play only while one is,
+ *   lets no other block say it is empty, and reads one project for Parked and finished's count. Money draws Accounts
+ *   only while there is cash to cut and a book's month only while something left it (`book-spent-month` added). Work
+ *   says an empty list in one line and no band says it is empty. A figure added and empty lines taken away, no list or
+ *   field, so each step is a minor one.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.12.0',
+  portfolio: '1.13.0',
   people: '2.7.0',
-  'money-core': '3.7.0',
+  'money-core': '3.8.0',
   estate: '2.1.0',
-  work: '1.13.0',
+  work: '1.14.0',
 };
 
 type Body = Record<string, unknown>;

@@ -174,11 +174,13 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
      counted nothing. */
   const drawnBlocks = blocks.filter((b) => (b as { drawn?: boolean }).drawn !== false);
   /* SINCE FOUNDER 1.11.0 THE LINE LEADS, and Due this week and Lapsing are drawn only while they hold something: on a
-     new record neither does, so neither is drawn. */
-  assert.deepEqual(drawnBlocks.map((b) => b.heading), [undefined, 'What you have, by organisation', 'Bring your money in', 'Numbers this week', 'Working now']);
+     new record neither does, so neither is drawn. SINCE FOUNDER 1.16.0 each organisation's money waits for one to list
+     an account, the way in for money for a record with no cash, and the week's numbers for one, so a new record reads
+     its line, how to bring its numbers in, and who is working. */
+  assert.deepEqual(drawnBlocks.map((b) => b.heading), [undefined, 'Bring your numbers in', 'Working now']);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const hidden = blocks.filter((b) => (b as { drawn?: boolean }).drawn === false).map((b) => b.heading);
-  assert.ok(hidden.includes('Due this week') && hidden.includes('Lapsing'), hidden.join(', '));
+  for (const heading of ['Due this week', 'Lapsing', 'What you have, by organisation', 'Bring your money in', 'Numbers this week']) assert.ok(hidden.includes(heading), hidden.join(', '));
   founder.sql.close();
 });
 

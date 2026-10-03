@@ -488,9 +488,17 @@ test('NO PAGE LABELS THE THIRTY-DAY FIGURES MORE WIDELY THAN THEY READ, wherever
      the money there is and no longer with who owes whom. */
   /* NONE ON `/p/money` SINCE money-core 3.3.0: the thirty days are the bridge's there, beside the calendar of them. */
   assert.equal(cells.filter((c) => c.where === 'money-core /money').length, 0, 'the Money page says the thirty days twice again');
-  /* AND ON THE FOUNDER'S DASHBOARD ALONE SINCE founder 1.11.0, whose Overview opens on a line of the cash there is. */
-  const founder = cells.filter((c) => c.where.startsWith('founder ') && (c.metric === 'arriving-30d' || c.metric === 'leaving-30d'));
-  assert.equal(founder.length, 2, 'the founder dashboard is not in the sweep');
+  /* AND NONE ON THE FOUNDER'S DASHBOARD SINCE founder 1.16.0 (DIRECTION §37), which drew the walk's two under the cash
+     Home's line had just said: the money is Home's and Money's, and the Dashboard is the numbers. */
+  assert.equal(cells.filter((c) => c.where.startsWith('founder ')).length, 0, "the founder's Dashboard says Home's money again");
+
+  /* SO NO PAGE DECLARES ONE TODAY, and the sweep is driven over a page made up for the purpose, wearing the bridge's
+     words over the figure that reads one predicate, which it has to find and the loop under it has to refuse. */
+  const declared = cells.length;
+  walk('made-up', [{ page: 'made-up', blocks: [{ cells: [{ metric: 'out-30d', label: 'Going out, 30 days' }] }] }]);
+  const made = cells.splice(declared);
+  assert.equal(made.length, 1, 'the sweep does not find a cell over out-30d');
+  assert.notEqual(made[0]!.label, nameOf(made[0]!.metric), 'the made-up label is the wrong one, so the loop under it would refuse it');
   for (const c of cells) assert.equal(c.label, nameOf(c.metric), `${c.where} labels ${c.metric} "${c.label}" where the figure is called "${nameOf(c.metric)}"`);
 
   /* AND THE CEILING ON `out-30d` IS WORDED FOR THE SAME FIGURE, because a person reading "Most going
@@ -897,6 +905,54 @@ test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an a
   const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks;
   assert.equal(blocks.find((b) => b.heading === 'Heads up')?.drawn, false, 'an empty Heads up box is drawn');
   assert.notEqual(blocks.find((b) => b.heading === 'Coming and going')?.drawn, false, 'the fold after it is hidden with it');
+});
+
+/**
+ * A SPLIT IS DRAWN ONLY WHILE IT HAS A PART TO CUT, SINCE money-core 3.8.0 (DIRECTION §37). An account at nought is no
+ * part of Cash now by account, so a record whose cash all stood at nought drew Accounts as a tile saying every part was
+ * zero; and a book whose last payment was last month drew Where this month's money went as a track with nothing in it.
+ */
+test("A SPLIT IS DRAWN ONLY WHILE IT HAS A PART TO CUT, on Money's Accounts and on a book's month", async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
+  const drawn = (slug: string, heading: string): boolean => {
+    const out = k.page(slug);
+    assert.ok(out.ok, sayOf(out));
+    const block = (out.value as { blocks: readonly { heading?: string; drawn?: boolean; refusals: readonly unknown[] }[] }).blocks.find((b) => b.heading === heading);
+    assert.ok(block, `${slug} draws no block headed ${heading}`);
+    assert.deepEqual(block.refusals, [], `${heading} is refused`);
+    return block.drawn !== false;
+  };
+  const made = (register: string, fields: Record<string, unknown>): string => {
+    const out = k.create(register, fields as never, { actor: 'p_test' });
+    assert.ok(out.ok, sayOf(out));
+    return (out.value as { id: string }).id;
+  };
+
+  const studio = made('books', { name: 'Studio' });
+  const current = made('accounts', { name: 'Studio current', kind: 'bank', balance: { amount: 0, currency: 'GBP' }, as_of: day(0), liquid: true, book: studio });
+  assert.equal(reading(k, 'cash-accounts'), 1, 'the account counts as cash');
+  assert.equal(drawn('money', 'Accounts'), false, 'one account at nought is cut into a track with no part');
+  assert.ok(k.update('accounts', current, { balance: { amount: 250_000, currency: 'GBP' } }, { actor: 'p_test' }).ok);
+  assert.equal(drawn('money', 'Accounts'), true, 'an account holding money is not cut into its track');
+
+  /* THE BOOK'S MONTH, held to the split's own clauses: last month's payment is not this month's. */
+  const month = "Where this month's money went";
+  const paid = (on: string) => made('transactions', { what: 'Studio rent', on, direction: 'out', amount: { amount: 40_000, currency: 'GBP' }, account: current, state: 'cleared', book: studio });
+  /* READ A BOOK AT A TIME, as `book-cash` is: the page fills `{{it}}` with the book's name, and so does this. */
+  const spent = (): number | null => {
+    const decl = METRICS['book-spent-month'] as { where: string };
+    const out = k.metric({ ...decl, where: decl.where.replace('{{it}}', 'Studio') } as never);
+    assert.ok(out.ok, sayOf(out));
+    return out.value.value;
+  };
+  assert.equal(drawn('studio', month), false, 'a book with nothing paid out of it draws a month with no part');
+  paid(day(-5));
+  assert.equal(spent(), 0, "last month's payment is counted in this month");
+  assert.equal(drawn('studio', month), false, "last month's payment is drawn as this month's");
+  paid(day(0));
+  assert.equal(spent(), 1);
+  assert.equal(drawn('studio', month), true, 'a payment this month is not drawn on its book');
 });
 
 test('MONEY INSTALLS AND DRAWS WITH PEOPLE OFF, because who a row is with is a link and not a need', async () => {

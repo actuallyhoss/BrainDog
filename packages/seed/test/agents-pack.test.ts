@@ -11,7 +11,8 @@ import { normalise, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
-import { AGENTS_PACK, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
+import { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
+import { RUNS_WORKING } from '../src/packs/agents.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -44,10 +45,10 @@ const names = (rows: { fields: Record<string, unknown> }[], field = 'name') => r
 /* ── it installs ─────────────────────────────────────────────────────────── */
 
 test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () => {
-  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.4.0', requires: ['register.things'] });
+  assert.deepEqual(AGENTS_PACK.manifest, { id: 'agents', version: '1.5.0', requires: ['register.things'] });
   const pack = value<Pack>(await normalise(agentsPackDocument()));
   assert.equal(pack.manifest.pack, 'agents');
-  assert.equal(pack.manifest.version, '1.4.0');
+  assert.equal(pack.manifest.version, '1.5.0');
   assert.deepEqual([...pack.manifest.provides].sort(), PROVIDES);
 });
 
@@ -72,7 +73,7 @@ const PROVIDES = [
 test('THE SEED INSTALLS IT THROUGH THE PACK PATH, and the record says so', async () => {
   const { k, sql } = await seeded();
   /* It asks for a list (`register.things`), not a pack, so the `pack` row's `requires` names no pack. */
-  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.4.0', requires: {} });
+  assert.deepEqual({ ...k.packs().find((p) => p.id === 'agents') }, { id: 'agents', version: '1.5.0', requires: {} });
   assert.deepEqual([...k.packClaims('agents')].sort(), PROVIDES);
   for (const id of Object.keys(AGENTS_REGISTERS)) assert.equal(k.count(id), ROWS[id]?.length, `${id} lost rows`);
   assert.equal(k.get('LN7')?.fields.supersedes, k.get('LN6')?.id, 'a learning names the one it replaces by its row');
@@ -212,7 +213,7 @@ const headed = (blocks: Drawn[], heading: string): Drawn => {
   return found;
 };
 
-test('/p/agents: the runs working now, the newest seen first, then what was learned and the skills in use', async () => {
+test('/p/agents: the runs working now, the newest seen first, then where the stopped ones left off and what they added', async () => {
   const { k, sql } = await seeded();
   const blocks = opened(k, 'agents');
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.heading}: ${JSON.stringify(b.refusals)}`);
@@ -223,15 +224,40 @@ test('/p/agents: the runs working now, the newest seen first, then what was lear
   const left = RUNS.filter((r) => (r.state === 'idle' || r.state === 'handoff') && r.next).sort(seen);
   assert.ok(left.length > 0, 'the seed has no run that left a next step');
   assert.deepEqual(headed(blocks, 'Where they left off').rows.map((r) => r.fields.next), left.map((r) => r.next), 'a run that left no next step is listed, or a working one is');
-
   assert.ok(blocks.some((b) => b.kind === 'agents'), 'the page lost what the brain learned');
-  const growth = headed(blocks, 'Growth') as Drawn & { bars?: { states: string[]; values: unknown[][] } };
-  assert.equal(growth.bars?.values.length, 3, 'the growth chart lost a line');
-  assert.equal(growth.bars?.states.at(-1), 'partial', 'this week is not marked unfinished');
 
-  const learnings = headed(blocks, 'Learnings');
-  assert.equal(learnings.matched, ROWS.learnings!.filter((r) => (r.state ?? 'active') === 'active').length, 'a superseded learning is counted');
-  assert.ok(!headed(blocks, 'Skills').rows.some((r) => r.fields.state === 'retired'), 'a retired skill is listed');
+  /* THE RUNS AND NOTHING ELSE, SINCE 1.5.0: Decide's questions are Decide's, and what the brain holds is four lists with
+     pages of their own. */
+  const headings = blocks.map((b) => b.heading);
+  for (const gone of ['Waiting on you', 'What the brain holds', 'Growth', 'Learnings', 'Skills'])
+    assert.ok(!headings.includes(gone), `${gone} is still on the agents page`);
+  assert.ok(!blocks.some((b) => b.kind === 'queue'), 'the agents page draws a queue of the questions Decide holds');
+  /* AND NO PART SAYS IT IS EMPTY: the line is the one place the page says what is quiet. */
+  const said = (AGENTS_PAGES.agents!.blocks as { lead?: boolean; empty?: string; heading?: string }[]).filter((b) => !b.lead && b.empty !== undefined);
+  assert.deepEqual(said.map((b) => b.heading), [], 'a block on the agents page draws its own empty line');
+  sql.close();
+});
+
+/**
+ * A RUN THAT HAS GONE QUIET SINCE YESTERDAY IS NOT WORKING NOW, SINCE 1.5.0. `state is active` alone kept every run the
+ * end hook never closed: the owner's record read four of them under Working now, each named for the day before. The
+ * line counts the same runs the cards draw, so the two cannot disagree.
+ */
+test('WORKING NOW IS THE RUNS ACTIVE AND HEARD FROM TODAY, and the line counts the same runs', async () => {
+  const { k, sql } = await seeded();
+  /* PLANTED AS THE SEED PLANTS A RUN, with the field only the record writes stamped (`openRun` in `src/index.ts`): an
+     active run last heard from a day and two hours ago. */
+  const yesterday = new Date(NOW - 26 * 3_600_000).toISOString();
+  value(k.create('session', { doing: 'Left open since yesterday', agent: 'claude', state: 'active' } as never, { actor: 'p_seed', stamp: { last_seen: yesterday } }));
+
+  const doing = headed(opened(k, 'agents'), 'Working now').rows.map((r) => String(r.fields.doing));
+  assert.ok(!doing.includes('Left open since yesterday'), `a run quiet since yesterday is working now: ${doing.join(', ')}`);
+  assert.deepEqual([...doing].sort(), RUNS.filter((r) => r.state === 'active').map((r) => String(r.doing)).sort(), 'a run heard from today is not working now');
+  const read = k.metric(k.metricDecl('agents-working')!);
+  assert.ok(read.ok, JSON.stringify(read));
+  assert.equal(read.value.value, doing.length, 'the line counts a run the cards do not draw');
+  /* ONE CLAUSE FOR EVERY PAGE THAT DRAWS WORKING RUNS, the figure included. */
+  assert.equal((AGENTS_PAGES.agents!.blocks as { heading?: string; where?: string }[]).find((b) => b.heading === 'Working now')?.where, RUNS_WORKING);
   sql.close();
 });
 
