@@ -223,8 +223,10 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
          answer three times, correctly. */
       /* `undefined` IS THE RAIL, the default again (`19 §3`, and DIRECTION 37's floating rail card), so the first value
          is "unset" rather than `'rail'`. A `'rail'` beside it would draw the rail twice, and this case is red on any two
-         values that agree, so the top bar is the second value now. */
-      values: [{}, { shape: 'bar' }, { shape: 'menu' }],
+         values that agree. A device's own `'bar'` is not a value here either: older builds wrote it into the cookie on
+         every boot, so `deviceChose` (nav-prefs.svelte.ts) reads it as nobody's choice and draws the rail. A top bar
+         somebody chose lives on the record, and the `nav.shape` case below draws it. */
+      values: [{}, { shape: 'menu' }],
       probe: () =>
         [
           document.querySelectorAll('nav.rail').length,

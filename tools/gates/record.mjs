@@ -142,7 +142,7 @@ async function connect(port, key) {
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   const key = open ? undefined : randomBytes(32).toString('base64url');
   const running = await start({
@@ -180,6 +180,22 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        not reached", which is a finding on any route outside `MAY_REFUSE` (`lib.mjs`). `routes.mjs` samples this key. */
     const saved = running.api.kernel.saveView(VIEW, { actor: 'p_seed' });
     if (!saved.ok) throw new Error(`the gate's record could not save its view: ${saved.refusal?.fix ?? 'no reason given'}`);
+    /* A QUEUE OF ITS OWN, ASKED FOR BY `queue.mjs` ALONE, SO IT HAS ONE TO PRESS. The seeded Agents page stopped drawing
+       one at agents 1.5.0, since it repeated Decide, and every other seeded queue is filtered to a list the seed's
+       questions are not about. No other gate's record holds it, so their sweeps measure the seed as it ships. */
+    const queued = !queuePage ? { ok: true } : await running.api.kernel.install([
+      {
+        id: 'page.questions',
+        kind: 'page',
+        body: {
+          page: 'questions',
+          title: 'Questions',
+          requires: ['register.session'],
+          blocks: [{ kind: 'queue', heading: 'Waiting on you', icon: 'ask', span: 12, source: 'governance.open', limit: 3, empty: 'Nothing is waiting on you.' }],
+        },
+      },
+    ]);
+    if (!queued.ok) throw new Error(`the gate's record could not take its queue page: ${queued.refusal?.fix ?? 'no reason given'}`);
     if (variant === 'busy') await decideRenewals(running.api.kernel);
     if (variant === 'connected') await connect(running.server.address().port, key);
   } catch (e) {

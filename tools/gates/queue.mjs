@@ -9,8 +9,9 @@
  * `packages/render/src/queue.ts`, the parity between the two drawers, the row that reads the
  * evaluator's own `more | n | /decide`. NOTHING had ever driven it in a real browser, which is
  * exactly the seam every other gate in this directory exists to close for its own primitive. The
- * seeded Agents page (`packages/seed/src/packs/agents.ts`) opens with a `governance.open` queue, so
- * this gate drives `/p/agents` and nothing else.
+ * gate's record (`record.mjs`) installs a page of its own, `/p/questions`, holding one unfiltered `governance.open`
+ * queue headed "Waiting on you", so this gate drives that and nothing else. It drove the seeded Agents page until
+ * agents 1.5.0 took its queue away, because it repeated Decide.
  *
  * THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. `QueueAnswer.svelte` never sends a pressed
  * option to `/decide/[id]`, and since DIRECTION §37 the record takes a decision without a reason,
@@ -158,7 +159,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
   let browser = null;
   try {
     /* THE RECORD FIRST, the seed's own `governance.open` rows and nothing invented here. */
-    record = await startRecord();
+    record = await startRecord(0, { queuePage: true });
 
     server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x');
@@ -213,8 +214,8 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
     const waitingOnYou = () => page.getByRole('region', { name: 'Waiting on you', exact: true });
 
     try {
-      const first = await open('/p/agents');
-      const unmeasuredFirst = ready.check('queue /p/agents', '/p/agents', first);
+      const first = await open('/p/questions');
+      const unmeasuredFirst = ready.check('queue /p/questions', '/p/questions', first);
       if (unmeasuredFirst) findings.push(unmeasuredFirst);
 
       /* CHEAP, WHILE THE PAGE IS OPEN ANYWAY: the empty sentence never sits beside cards that are
@@ -318,8 +319,8 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
       }
 
       /* ── TWO: PRESS THE COUNT OF WHAT IS LEFT, AND LAND ON DECIDE ── */
-      const second = await open('/p/agents');
-      const unmeasuredSecond = ready.check('queue /p/agents (2)', '/p/agents', second);
+      const second = await open('/p/questions');
+      const unmeasuredSecond = ready.check('queue /p/questions (2)', '/p/questions', second);
       if (unmeasuredSecond) findings.push(unmeasuredSecond);
 
       const more = waitingOnYou().locator('.queue-more');

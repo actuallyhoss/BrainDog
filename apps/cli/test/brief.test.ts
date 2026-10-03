@@ -116,9 +116,9 @@ test('A FILE NAMED .local IS A FILE, NOT A MACHINE, and a path on Windows is its
   const step = (next: string) => nextLine(attached({ ...full(), handoff: { ...full().handoff!, next } }), undefined)!;
   assert.ok(step('Copy .env.local to the worker, then read ~/.claude/settings.local.json and config.local.yaml.').startsWith('Next     Copy .env.local to the worker, then read ~/.claude/settings.local.json and config.local.yaml. (S45'));
   assert.ok(step('Deploy from Maras-MacBook-Pro.local.').startsWith('Next     Deploy from MacBook. (S45'));
-  const waiting = [{ id: 'SG9', question: 'Change tools#999 to how fenwick is set up in C:\\Users\\sam\\.claude.json, or in .\\brain.ps1?' }];
+  const waiting = [{ id: 'SG9', question: 'Change tools#999 to how fenwick is set up in C:\\Users\\sam\\.claude.json, or in .\\setup.ps1?' }];
   const line = briefing(attached({ ...full(), waiting }), AT, undefined).split('\n').find((l) => l.startsWith('Waiting'))!;
-  assert.equal(line, 'Waiting  1 on the owner: Change tools#999 to how fenwick is set up in .claude.json, or in brain.ps1?');
+  assert.equal(line, 'Waiting  1 on the owner: Change tools#999 to how fenwick is set up in .claude.json, or in setup.ps1?');
 });
 
 test('A QUESTION THAT FITS IS SAID WHOLE, one that is only ids still waits, and the record’s count of them all is the count', () => {

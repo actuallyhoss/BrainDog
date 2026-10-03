@@ -303,9 +303,9 @@ test('A LIST OR A FIELD A PERSON RENAMED IS ASKED BY ITS NEW WORD, as the record
   assert.equal(out.value.reason, 'bank-card-used could not read account out of this one.', 'the inbox keeps its sentence word for word');
 
   /* A WORD NOBODY TYPED, OR ONE LEFT BLANK, IS THE DECLARATION'S. */
-  const plain = arriveThrough({ ...deps, words: () => ({ label_transactions: '  ' }) }, { channel: 'email', headers: {}, body: said('Nile Books', '9999', '12.00'), sha256: 'w2' }, k.transaction);
-  assert.ok(plain.ok && plain.value.suggestion, JSON.stringify(plain));
-  assert.equal(k.question(plain.value.suggestion), 'Add this email to Transactions? Its account could not be read.');
+  const blank = arriveThrough({ ...deps, words: () => ({ label_transactions: '  ' }) }, { channel: 'email', headers: {}, body: said('Nile Books', '9999', '12.00'), sha256: 'w2' }, k.transaction);
+  assert.ok(blank.ok && blank.value.suggestion, JSON.stringify(blank));
+  assert.equal(k.question(blank.value.suggestion), 'Add this email to Transactions? Its account could not be read.');
 
   /* A NEAR MATCH SAYS WHAT THE TWO SHARE IN THE RENAMED WORDS TOO, and its reason keeps the declared ones. */
   const near: IngestDeps = { ...deps, ingests: () => [CARD({ on_conflict: 'review' }).body as never], words: () => ({ label_transactions: 'Spending', label_transactions__merchant: 'Shop' }) };

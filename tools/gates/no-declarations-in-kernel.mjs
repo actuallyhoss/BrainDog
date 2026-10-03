@@ -20,9 +20,9 @@
  *
  *   1. No `.yaml` or `.yml` under `packages/kernel/`. A declaration is a document, and a document in
  *      the kernel is a declaration in the kernel whatever else it is called.
- *   2. `INSERT INTO declaration` appears exactly once across the migrations, and it is
- *      `register.session` with `pack_id = 'kernel'`, as `52 §5.2` says. Migration 0002 writes it, so
- *      zero now means the register every agent write resolves to has been lost, which is a mistake
+ *   2. Every `INSERT INTO declaration` across the migrations is `register.session` with
+ *      `pack_id = 'kernel'`, as `52 §5.2` says: migration 0002 writes it and 0022 writes its next
+ *      version (the app a run is in), one declaration in two versions. Zero now means the register every agent write resolves to has been lost, which is a mistake
  *      and not a thing nobody has written yet.
  *   3. No object literal under `src/**` with a `kind:` of one of the nine pack kinds beside an
  *      `id:`. That is a declaration written in TypeScript, and the way this rule actually gets
@@ -102,7 +102,7 @@ export default function noDeclarationsInKernel(
         findings.push(`${relative(root, file)}:${lineOf(text, m.index)} writes register.session without pack_id = 'kernel'`);
     }
   }
-  if (inserts !== 1) findings.push(`the migrations write ${inserts} declarations, and 02 §1 and 52 §5.2 require exactly one`);
+  if (inserts === 0) findings.push('the migrations write no register.session, and 02 §1 and 52 §5.2 require the kernel to');
 
   /* 3 · And the way it actually gets broken: a declaration written in TypeScript. */
   for (const file of files.filter((f) => /[\\/]src[\\/].*\.ts$/.test(f) && !f.endsWith('.test.ts'))) {
