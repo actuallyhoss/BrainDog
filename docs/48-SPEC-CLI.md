@@ -51,7 +51,7 @@ of four codes (§4.4).
 | `tools scan` | `--host <host>` · `--dry-run` | reads `<top-level>/.mcp.json` and `~/.claude.json` (`mcpServers`, and `projects[<path>].mcpServers`) and writes neither; `GET /api/context` and `/api/get`; `POST /api/create` for a new server, `POST /api/update` of `hosts` and `seen` for a matching row, `POST /api/propose` with a rowset for one that differs; each key through `keys put` | one line per server recorded, proposed or skipped, and one sentence when keys were recorded by name only for want of a vault grant, which the start hook says once per host until a grant is kept; never a value | 0 · 1 · 3 |
 | `tools write` | `--scope user\|project` · `--dry-run` · `--host <host>` | `GET /api/context` and `/api/get`; reads the entry already in `~/.claude.json` or `<top-level>/.mcp.json`; with `--scope`, `claude mcp remove` and `claude mcp add-json <name> <json> --scope <scope>`, only for an entry that is absent, still what `~/.braindog/tools-lock.json` says was written, or still the command the scan read | each entry it would add or replace, as `+ <name> at <scope> scope: <json>` or `~ …`, a line for each need an entry cannot carry, then what was applied; no entry holds a value. A stdio tool's key is wrapped in `keys exec`, and an HTTP tool's header key is named by a `headersHelper` that runs `keys headers` (§5.16) | 0 · 1 · 3 |
 | `session show\|next\|tried\|note\|end` | `show` takes no argument; `next`, `tried` and `note` take one line of text in quotes; `end` takes `--state idle\|handoff\|done` (`idle` by default) · `--next <text>` · `--host <host>`. No verb names a run, because the session file for this folder does and a token that named one would be refused | `GET /api/context` for every verb, then for all but `show` `POST /api/handoff` with one of `{ next }`, `{ tried }`, `{ note }` or `{ state, next?, branch?, head? }`, as the run the session headers name | `show`: the run and its state, the last handoff left here with the last three things tried, and who else is live in this repository. The rest: one line naming the run. A folder with no session file, a `--state` outside the three, and a missing or unquoted line are one sentence each, before any request | 0 · 1 · 3 |
-| `context` | `--host <host>` | `GET /api/context`, one call, and it opens no run | the briefing, at most 40 lines and 3,000 characters, as the start hook prints it, but with a first line that names the run and where it stands rather than an event it did not have | 0 · 1 · 3 |
+| `context` | `--host <host>` | `GET /api/context`, one call, and it opens no run | the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters, as the start hook prints it, but with a first line that names the run and where it stands rather than an event it did not have | 0 · 1 · 3 |
 | `automations list` | `--host <host>` | `GET /api/context`, then `GET /api/automations` with no `rule`: READ+, held by the record to the lists the caller reads | `Automations on this BrainDog:` and one line each: the bare id, the name when one was given, what starts it and whether as a run or inside the write, `Turned off.`, the pack and project, the next clock time, the last run's state, time and sentence, the runs still open, and this month's counts. `No automation you can read is set up on this BrainDog.` when the list is empty. Under `--json` the value is the record's `AutomationRow[]` unchanged | 0 · 1 · 3 |
 | `automations show <id>` | `<id>` = `chase` or `rule.chase` · `--host <host>` | `GET /api/automations { rule }` | the id, name and version; what starts it and whether it is on; this month's counts and the runs open; then the last ten runs, newest first, each with its state, start time, actor and how it began, and under it each step as `<n> <kind>: <state>` with the step's answer cut to 120 characters. An inline rule says it has no runs to show because it happens inside the write. The value is the record's `Automation`, body and runs whole. An unknown id is the record's `DECLARATION_UNKNOWN` sentence | 0 · 1 · 3 |
 | `automations run <id>` · `automations cancel <run>` | `--host <host>` | `POST /api/automationRun { rule }` or `POST /api/cancelRun { run }`. Both are ADMIN, and the record's `admin()` refuses every token before it reads the arguments, so from this command both answer `NEEDS_BROWSER_SESSION` with `Open this from the app; a token cannot start an automation.` or `... cannot stop a run.` They are built rather than left out, as `page push` is, so they work unchanged the day a proven session that is not a cookie can reach an ADMIN door | `<id> started as <run>. The next drain takes it.` or `<run> is cancelled. A run stopped while it waits never resumes.`; the value is the record's `{ run }` or `{ run, state }` | 0 · 1 · 3 |
@@ -61,7 +61,7 @@ of four codes (§4.4).
 | `page push <file>` | `--host <host>` | reads the file with `parseDog`, then `POST /api/setDeclaration { body }` with the body exactly as read. ADMIN, and the record's `admin()` refuses every token before it reads the arguments (ADR-060), so from this command it answers `Open this from the app; a token cannot change what this record is.` A file the parser refuses is never sent | `<page> pushed to <host>.`; the value is `{ page, host }`. A parse failure prints `<file>, line <n>: <sentence>` | 0 · 1 · 3 |
 | `page check <file>` | none | nothing on the network. Reads the file with `parseDog`, then the kernel's `validateDeclaration` on `page.<page>` with no installed state, so a `requires` naming a list nobody installed is not asked about | `<page> reads as a page. Nothing was sent.`; the value is `{ page, blocks }`. A parse failure prints `<file>, line <n>: <sentence>`; a declaration the kernel refuses prints the kernel's sentence | 0 · 1 |
 | `mcp` | `--agent claude\|codex\|cursor\|other` · `--host <host>` | reads one JSON-RPC message per line on stdin and answers it with `handle` from `@braindog/mcp/rpc`; a tool call is `GET` or `POST /api/<method>` with the bearer and the session headers, inside a 20-second budget | JSON-RPC on stdout and nothing else; one line on stderr when it cannot start. A host that does not answer is a tool error carrying the unreachable sentence of the agent path's §1.7 | 0 once stdin closes and every call in flight is answered · 1 when it cannot start |
-| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the briefing, at most 40 lines and 3,000 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
+| `hook start` · `hook end` | none; Claude Code runs it with its event on stdin (`session_id`, `cwd`, `source`) | `start`: `POST /api/attach { source, client_id, branch, head }` with the session headers, inside 8 seconds, then writes the session file, then on `startup` or `resume` runs `skills sync` and `tools scan` in what is left of the 8 seconds. `end`: `POST /api/meet { name, email or handle, where }` for each author of the commits since the run began, at most 10, then `POST /api/handoff { state: 'idle', branch, head }`, all as the run the session file names | `start`: the card: Next, Waiting, Learned and More, each left out when empty, plus an Also line only when another run is working in the repository; three items a slot, 1,500 characters; or one line when the machine is not signed in, the host does not answer, or the host refuses. `end`: nothing | 0, always, because a non-zero exit is how a hook stops a session |
 | `install` | `--apply` · `--config-dir <folder>` (repeatable) | nothing on the network; reads `<profile>/settings.json`, where the profile is each `--config-dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude` | each entry it would add, as `+ hooks.<Event>: <json>`, then the `claude mcp add-json` line that registers `mcp`. With `--apply` it writes them, after copying the file to `settings.json.bak`, or the first free `.bak<n>` | 0 · 1 when a settings file is not JSON or not the settings shape, and then nothing is written |
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
@@ -142,9 +142,10 @@ the entries are:
 + hooks.SessionEnd: {"hooks":[{"type":"command","command":"powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\src\\braindog\\apps\\cli\\hooks\\braindog-hook.ps1\" end","timeout":15}]}
 ```
 
-- **Start.** It attaches to the run, writes the session file, and prints the briefing, which Claude Code adds
-  to the model's context. `compact` and `clear` send the same `session_id`, so they re-attach to the same run
-  and reprint the briefing the model just lost. With no token it prints one line naming `BRAINDOG_TOKEN` and
+- **Start.** It attaches to the run, writes the session file, and prints the card, which Claude Code adds
+  to the model's context. `compact` and `clear` send the same `session_id`, so they re-attach to the same run.
+  `startup` and `clear` print the whole card; `compact` prints only its Next line, the one thing the model just
+  lost; a `resume` of the same session within an hour of a hook last hearing from it prints nothing. With no token it prints one line naming `BRAINDOG_TOKEN` and
   the hosts file, and `braindog login <host>`. A host that does not answer within 8 seconds is one line
   too.
 - **End.** First it meets the people in this session's commits: the authors of `git log` since the run's first
@@ -158,16 +159,17 @@ the entries are:
   off, done or abandoned has no declared move to `idle`, so the record refuses the call and the run stays as it
   was. When another session in the same folder has rewritten the session file since, its client id differs,
   and the hook leaves that run alone.
-- **The briefing**, in this order, each part left out when the record has no such register or nothing in it:
-  who the run is and where; the last handoff, what it already tried, and whether HEAD has moved since; other
-  runs live in this repository, followed by "Two sessions in one working tree overwrite each other. Coordinate
-  or stop."; the questions waiting on the owner, followed by "Do not decide for them."; the open rows of every
-  scoped register; the people on the project; learnings; keys, by label only; skills; and `context.next` last.
-  Over 40 lines or 3,000 characters, the rows go first, from the bottom, and one line says how many.
+- **The card**, five slots in this order, each left out when it is empty, at most three items a slot and 1,500
+  characters in all, clipped at a word: who the run is and where (`BrainDog · run S731 · project BrainDog ·
+  Claude Code on MacBook`, the device named as a person names it, never a hostname); Next, the last handoff's
+  step with its age and author, and "check before acting" when it is older than a day or another run left it;
+  Waiting, the questions on the owner, merged when they read the same once ids and case are ignored; Learned,
+  the two newest learnings for this project; and More, counts of dead ends and learnings, keys by name, and
+  `call context`. An Also line follows Next only when another run is working in the repository, and the
+  caller's own run is never in it. Keys and skills are counts, never lists.
 - **Skills sync and tools scan.** On `startup` and `resume` only, and only when the record has a skills or tools
   register, `start` runs `skills sync` and then `tools scan` after it attaches, each on its own client within 3
-  seconds and inside what is left of the 8. Their lines go before `context.next` while the briefing's caps
-  allow. A failure is one fixed line, and the hook still exits 0. The scan's sentence about keys kept by name for want of a
+  seconds and inside what is left of the 8. What they did is one count in the card's More. A failure is one fixed line, and the hook still exits 0. The scan's sentence about keys kept by name for want of a
   vault grant is said once per host rather than in every briefing, and said again only after a grant has been kept
   and there is none again. A `compact` or a `clear` runs neither, and a
   record with neither register costs no request and no file read.
@@ -897,13 +899,12 @@ imports of §1 point down the order; `release.yml` builds and publishes through 
 hand first (31 §6).
 
 **The agent path's tests**, which run today with `node --test` in `apps/cli`. `stdio.test.ts` and `http.test.ts`
-cover `mcp`. `brief.test.ts` covers the briefing with no host:
+cover `mcp`. `brief.test.ts` covers the card with no host:
 - the owner's order;
 - the two-sessions warning, word for word;
 - no value, where a key carries a sentinel both in a field other than its label and in its sealed-state
   projection;
-- 40 lines and 3,000 characters under thirty full registers, still keeping the warning, the questions and the
-  next step;
+- five slots and 1,500 characters under thirty full registers, still keeping the next step and the questions;
 - a record with people, keys, skills and learnings switched off;
 - a tie between two projects.
 

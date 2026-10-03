@@ -191,10 +191,42 @@ test('INITIALIZE, THEN A TOOL CALL: no session is minted, and one a client sends
   );
   assert.equal(call.status, 200);
   assert.equal(call.headers.get('mcp-session-id'), null);
-  const result = (await read(call)).wire?.result as { content: { text: string }[] };
-  assert.deepEqual(JSON.parse(result.content[0]!.text), { registers: [{ id: 'obligations', name: 'Obligations' }], version: 41 });
+  /* THE WHOLE ANSWER IS `structuredContent`, and the text beside it is the brief one a model reads first. */
+  const result = (await read(call)).wire?.result as { content: { text: string }[]; structuredContent: unknown };
+  assert.deepEqual(result.structuredContent, { registers: [{ id: 'obligations', name: 'Obligations' }], version: 41 });
+  assert.match(result.content[0]!.text, /^This record · 1 list\b/u);
   assert.deepEqual(calls.map((c) => c.method), ['boot', 'version']);
   assert.ok(calls.every((c) => c.ctx === ctx), 'the tools were not handed the host\'s context');
+});
+
+test('THE APP A CLIENT SAYS IT IS REACHES THE HOST WITH EVERY CALL, with or without the session it says it is in', async () => {
+  /* A 2026-07-28 CLIENT NAMES ITSELF ON EVERY REQUEST, in `_meta`, since there is no initialize to remember it from. A
+     run is said as the app it is ("Claude Code on MacBook"), so the host is handed `client` and `client_version` even
+     when the caller sends no `_meta.session`, and beside that session's own keys when it does, which win. */
+  const { surface } = stub();
+  const handed: unknown[] = [];
+  const session = (c: Ctx, said: unknown): Ctx => (handed.push(said), c);
+  const clientInfo = { name: 'claude-code', version: '2.1.0' };
+  const call = (meta: Record<string, unknown>) =>
+    serveMcp(
+      post(rpc('tools/call', { name: 'record_index', arguments: {}, _meta: { 'io.modelcontextprotocol/protocolVersion': VERSIONS[0], ...meta } }), {
+        'mcp-protocol-version': VERSIONS[0],
+        'mcp-method': 'tools/call',
+        'mcp-name': 'record_index',
+      }),
+      surface,
+      ctx,
+      { session },
+    );
+  assert.equal((await call({ 'io.modelcontextprotocol/clientInfo': clientInfo })).status, 200);
+  assert.equal((await call({ 'io.modelcontextprotocol/clientInfo': clientInfo, session: { project: 'Kiln', client: 'mine' } })).status, 200);
+  assert.equal((await call({ session: { project: 'Kiln' } })).status, 200);
+  assert.equal((await call({})).status, 200);
+  assert.deepEqual(handed, [
+    { client: 'claude-code', client_version: '2.1.0' },
+    { client: 'mine', client_version: '2.1.0', project: 'Kiln' },
+    { project: 'Kiln' },
+  ]);
 });
 
 test('A METHOD THIS SERVER DOES NOT HAVE IS 404 WITH -32601, as the 2026-07-28 binding asks; a bad argument is still a 200', async () => {

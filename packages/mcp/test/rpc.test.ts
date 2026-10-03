@@ -25,8 +25,14 @@ const error = (reply: Reply | null) => {
   assert.ok(reply && 'error' in reply, JSON.stringify(reply));
   return reply.error;
 };
-type ToolResult = { content: { type: string; text: string }[]; isError?: boolean };
-const said = (reply: Reply | null) => JSON.parse(result<ToolResult>(reply).content[0]!.text) as Record<string, unknown>;
+type ToolResult = { content: { type: string; text: string }[]; isError?: boolean; structuredContent?: Record<string, unknown> };
+/** The JSON beside a tool result's text, which is the whole answer: a value, or the refusal. */
+const said = (reply: Reply | null) => {
+  const r = result<ToolResult>(reply);
+  assert.ok(r.structuredContent, `no structuredContent beside ${JSON.stringify(r.content)}`);
+  return r.structuredContent;
+};
+const textOf = (reply: Reply | null) => result<ToolResult>(reply).content[0]!.text;
 
 /* ── the handshake ─────────────────────────────────────────────────────── */
 
@@ -50,7 +56,11 @@ test('AN OLDER CLIENT IS ANSWERED WITH THE NEWEST VERSION AT OR BELOW ITS OWN, n
   const { surface } = stub();
   const version = async (asked: string) =>
     result<{ protocolVersion: string }>(await handle(req('initialize', { protocolVersion: asked }), surface, ctx)).protocolVersion;
-  assert.equal(await version('2025-11-25'), '2025-06-18');
+  /* 2025-11-25 IS SPOKEN AS ITSELF. It was answered 2025-06-18, and over HTTP every later request that said its own
+     revision was refused as one this server does not speak. */
+  assert.equal(await version('2025-11-25'), '2025-11-25');
+  assert.equal(await version('2026-01-15'), '2025-11-25');
+  assert.equal(await version('2025-10-01'), '2025-06-18');
   assert.equal(await version('2025-06-01'), '2025-03-26');
   assert.equal(await version('2027-01-01'), '2026-07-28');
 
@@ -69,7 +79,7 @@ test('server/discover IS ANSWERED, with the versions, the capabilities, who this
     resultType: 'complete',
     supportedVersions: [...VERSIONS],
     capabilities: { tools: {}, resources: {}, prompts: {} },
-    _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'braindog', version: '0.0.0' } },
+    _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'braindog', title: 'BrainDog', version: '0.0.0' } },
     instructions: INSTRUCTIONS,
     ttlMs: 3_600_000,
     cacheScope: 'public',
@@ -84,37 +94,58 @@ test('ping answers, and prompts are an empty list for now', async () => {
   assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
 });
 
-test('tools/list is the sixteen, with the instructions again and the read-only ones marked', async () => {
+type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean };
+
+test('tools/list is the sixteen, each with its title and every hint said, and no second copy of the instructions', async () => {
   const { surface, calls } = stub();
-  const r = result<{ tools: { name: string; inputSchema: { type: string }; annotations?: { readOnlyHint: boolean } }[]; instructions: string; ttlMs: number }>(
+  const r = result<{ tools: { name: string; title: string; inputSchema: { type: string }; annotations: Hints }[]; instructions?: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
   assert.equal(r.tools.length, 16);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
-  assert.equal(r.instructions, INSTRUCTIONS);
+  assert.equal(r.instructions, undefined, 'the instructions went out a second time');
   assert.equal(r.ttlMs, 3_600_000);
   for (const t of r.tools) {
     assert.equal(t.inputSchema.type, 'object', t.name);
-    assert.equal(t.annotations?.readOnlyHint === true, !TOOLS.find((x) => x.name === t.name)?.writes, `${t.name} says the wrong thing about writing`);
+    assert.equal(t.title, TOOLS.find((x) => x.name === t.name)?.title, `${t.name} has no title a host can show`);
+    /* NONE REACHES PAST THE RECORD, and a missing hint is read as the worst. */
+    assert.equal(t.annotations.openWorldHint, false, `${t.name} says it reaches the world`);
   }
+  const hints = Object.fromEntries(r.tools.map((t) => [t.name, t.annotations]));
+  for (const name of ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'])
+    assert.equal(hints[name]?.readOnlyHint, true, `${name} reads and does not say so`);
+  /* THE ADDITIVE WRITES TAKE NOTHING AWAY, so a host need not ask a person before each one as it would a delete. */
+  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff']) {
+    assert.equal(hints[name]?.readOnlyHint, undefined, name);
+    assert.equal(hints[name]?.destructiveHint, false, `${name} adds and is marked as if it overwrote`);
+  }
+  /* AND `update` OVERWRITES A VALUE, which undo does not make safe (OpenAI's review rule). */
+  assert.equal(hints.update?.destructiveHint, true);
   assert.equal(calls.length, 0, 'the tool list read the record, and it must always arrive');
 });
 
 /* ── every tool reaches its method ─────────────────────────────────────── */
 
+/**
+ * EACH TOOL'S METHODS, IN ORDER, WITH THE READS ITS WORDS ASK BESIDE IT. `context` asks `boot` for whom the questions
+ * wait on and the Home page; `history` the schema and the row, for the head line's name and words; `governance` `boot`
+ * for the person's name. A `list` whose page came back empty asks nothing more, and is said by the list's id, so one
+ * `list` is one request to a host (`apps/cli/test/hooks.test.ts` counts them).
+ */
 const EACH: [tool: string, args: Record<string, unknown>, methods: string[], first?: unknown][] = [
   ['record_index', {}, ['boot', 'version']],
-  ['context', {}, ['context'], {}],
+  ['context', {}, ['context', 'boot'], {}],
   ['schema', { register: 'obligations' }, ['schema'], { register: 'obligations' }],
   ['get', { spoken: 'obligations#41' }, ['get'], { register: 'obligations', seq: 41 }],
   ['list', { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }, ['list'], { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }],
   ['search', { q: 'invoice' }, ['search'], { q: 'invoice' }],
-  ['history', { spoken: 'obligations#41' }, ['history'], { register: 'obligations', seq: 41 }],
+  ['history', { spoken: 'obligations#41' }, ['history', 'schema', 'get'], { register: 'obligations', seq: 41 }],
   ['activity', { limit: 5 }, ['recentHistory'], { limit: 5 }],
   /* NO `money` ROW: the tool that read seven of one pack's figures by id left the core, and those figures are
-     `braindog:metric/<id>` like every other pack's (`money-out.test.ts`). */
-  ['governance', { status: 'all' }, ['governance'], { status: 'all' }],
-  ['propose', { question: 'Keep it?', body_kind: 'options', body: {} }, ['propose'], { question: 'Keep it?', body_kind: 'options', body: {} }],
+     `braindog:metric/<id>` like every other pack's (`money-out.test.ts`). ONE MORE IS ASKED THAN A PAGE SHOWS, so a
+     page that is the last says so by carrying no cursor. */
+  ['governance', { status: 'all' }, ['governance', 'boot'], { status: 'all', limit: 21 }],
+  ['propose', { question: 'Keep it?', body_kind: 'options', body: {} }, ['propose', 'boot'], { question: 'Keep it?', body_kind: 'options', body: {} }],
   ['create', { register: 'obligations', fields: { what: 'a' } }, ['create'], { register: 'obligations', fields: { what: 'a' } }],
   ['update', { spoken: 'obligations#41', patch: { what: 'b' }, version: 3 }, ['update'], { register: 'obligations', seq: 41, patch: { what: 'b' }, version: 3 }],
   ['log', { spoken: 'obligations#41', note: 'Chased.' }, ['update'], { register: 'obligations', seq: 41, patch: {}, note: 'Chased.' }],
@@ -136,10 +167,28 @@ test('EVERY TOOL REACHES THE RIGHT METHOD, with the context the transport handed
   }
 });
 
-test('a result is the value as compact JSON', async () => {
-  const { surface } = stub();
-  const r = result<ToolResult>(await handle(req('tools/call', { name: 'get', arguments: { spoken: 'obligations#41' } }), surface, ctx));
-  assert.deepEqual(r.content, [{ type: 'text', text: '{"seq":41}' }]);
+const OBLIGATIONS = { id: 'obligations', name: 'Obligations', title: 'what', state: 'state', fields: [{ id: 'what', type: 'text' }, { id: 'amount', type: 'money' }, { id: 'state', type: 'enum', values: ['open', 'paid'] }] };
+const ROW = { id: '01M3VMPS0000000000000000AA', register: 'obligations', seq: 41, version: 3, state: 'open', fields: { what: 'Renew the domain', amount: { amount: 145000, currency: 'EGP' }, state: 'open' } };
+
+test('A RESULT IS PLAIN LINES, with the whole JSON beside it as structuredContent', async () => {
+  const { surface } = stub({ get: async () => ({ ok: true, value: ROW }), schema: async () => ({ ok: true, value: OBLIGATIONS }) });
+  const reply = await handle(req('tools/call', { name: 'get', arguments: { spoken: 'obligations#41' } }), surface, ctx);
+  const r = result<ToolResult>(reply);
+  assert.equal(r.content.length, 1);
+  assert.equal(r.content[0]!.type, 'text');
+  /* THE LINES NAME THE THING AND SAY MONEY AS A PERSON READS IT, and never the row's own id. */
+  assert.equal(textOf(reply).split('\n')[0], 'Renew the domain (obligations#41) · open · version 3');
+  assert.match(textOf(reply), /^Amount: EGP 1,450\.00$/mu);
+  assert.doesNotMatch(textOf(reply), /01M3VMPS/);
+  /* AND THE JSON IS THE ROW AS EVERY TOOL ANSWERS ONE, minor units and all. */
+  assert.deepEqual(said(reply), { spoken: 'obligations#41', version: 3, state: 'open', fields: ROW.fields });
+});
+
+test('AND format full PUTS THE JSON IN THE TEXT TOO, compact', async () => {
+  const { surface } = stub({ get: async () => ({ ok: true, value: ROW }), schema: async () => ({ ok: true, value: OBLIGATIONS }) });
+  const reply = await handle(req('tools/call', { name: 'get', arguments: { spoken: 'obligations#41', format: 'full' } }), surface, ctx);
+  assert.deepEqual(JSON.parse(textOf(reply)), said(reply));
+  assert.doesNotMatch(textOf(reply), /\n/);
 });
 
 test('AN UNKNOWN TOOL, OR A NAME OFF Object.prototype, IS A REFUSAL and runs nothing', async () => {
@@ -150,7 +199,12 @@ test('AN UNKNOWN TOOL, OR A NAME OFF Object.prototype, IS A REFUSAL and runs not
     const refusal = said(reply);
     assert.equal(refusal.code, 'ROUTE_UNKNOWN', name);
     assert.ok((refusal.allowed as string[]).includes('context'), name);
+    assert.match(textOf(reply), /^Refused, ROUTE_UNKNOWN: There is no tool called/u, name);
   }
+  /* A NAME ONE LETTER FROM A TOOL IS ANSWERED WITH THE CALL IT MEANT, as the refusal's `try`. */
+  const near = await handle(req('tools/call', { name: 'lists', arguments: { register: 'obligations' } }), surface, ctx);
+  assert.equal(said(near).try, 'list {"register":"obligations"}');
+  assert.match(textOf(near), /^Try: list \{"register":"obligations"\}$/mu);
   assert.equal(calls.length, 0);
 });
 
@@ -163,9 +217,19 @@ test('a refusal is an error result carrying the refusal whole, so the model can 
   const reply = await handle(req('tools/call', { name: 'list', arguments: { register: 'invoices' } }), surface, ctx);
   assert.equal(result<ToolResult>(reply).isError, true);
   assert.deepEqual(said(reply), { code: 'REGISTER_UNKNOWN', fix: 'There is no register called invoices.', at: 'register', allowed: ['obligations'] });
+  assert.equal(textOf(reply), 'Refused, REGISTER_UNKNOWN at register: There is no register called invoices.\nAllowed: obligations');
 });
 
-test('a conflict carries the current row and who changed it, in words without a dash', async () => {
+test('A REFUSAL THAT HAS A FIX CARRIES THE CORRECTED CALL, as try, named from what it allowed', async () => {
+  /* `Obligations` is what `boot` names the list whose id is `obligations`, so "obligation" is one the agent meant. */
+  const { surface } = stub({
+    list: async () => ({ ok: false, refusal: { code: 'REGISTER_UNKNOWN', fix: 'There is no register called obligation.', at: 'register', allowed: ['obligations'] } }),
+  });
+  const reply = await handle(req('tools/call', { name: 'list', arguments: { register: 'obligation', limit: 5 } }), surface, ctx);
+  assert.equal(said(reply).try, 'list {"register":"obligations","limit":5}');
+});
+
+test('a conflict carries the current row and who changed it, in words without a dash, and the call to send next', async () => {
   const { surface } = stub({ update: async () => ({ ok: false, conflict: { version: 5, current: { what: 'b' }, actor: 'person:sam' } }) });
   const reply = await handle(req('tools/call', { name: 'update', arguments: { spoken: 'obligations#1', patch: { what: 'c' }, version: 4 } }), surface, ctx);
   assert.equal(result<ToolResult>(reply).isError, true);
@@ -173,8 +237,11 @@ test('a conflict carries the current row and who changed it, in words without a 
   assert.equal(conflict.code, 'VERSION_STALE');
   assert.deepEqual(conflict.current, { what: 'b' });
   assert.equal(conflict.version, 5);
-  assert.match(String(conflict.fix), /^person:sam changed this row/);
+  /* WHO, IN WORDS: the founding owner's own grant signs as `person:<id>`, and a line says the person. */
+  assert.match(String(conflict.fix), /^Sam changed it after you read it/);
   assert.doesNotMatch(String(conflict.fix), /—/);
+  assert.equal(conflict.try, 'update {"spoken":"obligations#1","patch":{"what":"c"},"version":5}');
+  assert.match(textOf(reply), /^Not saved, VERSION_STALE: Sam changed it after you read it, and it is at version 5 now\./u);
 });
 
 test('A THROW IS -32603 AND A REFERENCE, and no exception text crosses the wire', async (t) => {

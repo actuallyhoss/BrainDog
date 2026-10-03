@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { hookStart } from '../src/hooks.ts';
-import { connect, render, skillPath, skills, syncSkills, type AgentIo } from '../src/skills.ts';
+import { connect, describedIn, render, skillPath, skills, syncSkills, thisMachine, type AgentIo } from '../src/skills.ts';
 
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-5e2a'].join('.');
@@ -83,6 +83,13 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean }
       if (method === 'create') {
         const r: Row = { seq: rows.length + 1, scope: o.project ? 'project' : 'global', state: 'active', version: 1, fields: { rev: 1, ...(args.fields as Record<string, unknown>) } };
         rows.push(r);
+        return answer({ ok: true, value: entry(r) });
+      }
+      if (method === 'update') {
+        const r = rows.find((x) => x.seq === args.seq);
+        if (!r) return missing();
+        Object.assign(r.fields, args.patch as Record<string, unknown>);
+        r.version++;
         return answer({ ok: true, value: entry(r) });
       }
       if (method === 'propose') return answer({ ok: true, value: { id: `SG${String(++proposals)}` } });
@@ -181,9 +188,10 @@ test('ROW 3, EDITED SINCE THE LOCK AND UNCHANGED IN THE RECORD: the file is kept
   assert.deepEqual(await h.sync(), [`Skill kiln-release was edited in ${path}; kept it and proposed it as version 2 (SG1).`]);
   assert.equal(readFileSync(path, 'utf8'), edited, 'the edit is never overwritten');
   const [asked] = h.proposals();
-  assert.equal(asked?.args.question, 'Take the edit to kiln-release made on test-machine as version 2?');
+  /* The skill and "this Mac" in the question; the file and the machine's own name only in the details. */
+  assert.equal(asked?.args.question, `Take ${thisMachine()}'s edit to kiln-release as version 2?`);
   assert.equal(asked?.args.body_kind, 'rowset');
-  assert.deepEqual(asked?.args.body, { register: 'skills', rows: [{ at: 'skills#1', version: 1, patch: { body: edited, rev: 2 } }] });
+  assert.deepEqual(asked?.args.body, { register: 'skills', rows: [{ at: 'skills#1', version: 1, patch: { body: edited, rev: 2 } }], details: { file: path, machine: 'test-machine' } });
 
   assert.deepEqual(await h.sync(), [], 'the same edit is not proposed twice');
   assert.equal(h.proposals().length, 1);
@@ -203,7 +211,7 @@ test('ROW 4, EDITED HERE AND CHANGED IN THE RECORD: the file is kept and propose
   h.bump(row, '# Release\n\nThe record moved on.\n');
   assert.deepEqual(await h.sync(), ['Skill kiln-release changed here and in the record; kept yours and asked (SG1).']);
   assert.equal(readFileSync(path, 'utf8'), edited);
-  assert.deepEqual(h.proposals()[0]?.args.body, { register: 'skills', rows: [{ at: 'skills#1', version: 2, patch: { body: edited, rev: 3 } }] });
+  assert.deepEqual(h.proposals()[0]?.args.body, { register: 'skills', rows: [{ at: 'skills#1', version: 2, patch: { body: edited, rev: 3 } }], details: { file: path, machine: 'test-machine' } });
   assert.deepEqual(await h.sync(), []);
 });
 
@@ -227,6 +235,72 @@ test('ROW 5, A FILE WITH NO LOCK AND NO ROW: registered as managed:false where t
 
   assert.deepEqual(await h.sync(), [], 'a registered file is not registered again');
   assert.equal(h.seen.filter((s) => s.method === 'create').length, 2);
+});
+
+test('A FOLDED OR LITERAL DESCRIPTION IS READ WHOLE, so no trigger is stored as ">" or "|"', async (t) => {
+  /* MEASURED ON THE OWNER'S RECORD: six skills written with `description: >` were registered with the trigger ">". */
+  const cases: [string, string | undefined][] = [
+    ['description: >\n  Code review focused on over-engineering.\n  Finds what to delete.', 'Code review focused on over-engineering. Finds what to delete.'],
+    ['description: |\n  Line one.\n\n  Line two.\n', 'Line one. Line two.'],
+    ['description: >-\n  Folded, chomped.\nname: tidy', 'Folded, chomped.'],
+    ['description: |2+ # kept\n   Indented by two.', 'Indented by two.'],
+    ['description: "Quoted \\"inside\\" it"', 'Quoted "inside" it'],
+    ["description: 'It''s single'", "It's single"],
+    ['description: "Runs onto\n  the next line"', 'Runs onto the next line'],
+    ['description: Plain that runs\n  onto the next line # a comment', 'Plain that runs onto the next line'],
+    ['description: For C# projects', 'For C# projects'],
+    ['name: tidy\ndescription:\n  Starts below its key.', 'Starts below its key.'],
+    ['name: tidy', undefined],
+    ['description: >\nname: tidy', undefined],
+  ];
+  for (const [front, said] of cases) assert.equal(describedIn(front), said, front);
+
+  const h = await setup(t);
+  const skill = join(h.configDir, 'skills', 'ponytail-review', 'SKILL.md');
+  mkdirSync(dirname(skill), { recursive: true });
+  writeFileSync(skill, '---\nname: ponytail-review\ndescription: >\n  Code review focused on over-engineering.\n  Finds what to delete.\n---\n\n# Review\n');
+  assert.deepEqual(await h.sync(), [`Skill ponytail-review in ${skill} was registered as skills#1, index only.`]);
+  assert.equal(h.rows[0]?.fields.trigger, 'Code review focused on over-engineering. Finds what to delete.');
+});
+
+test('A TRIGGER ALREADY STORED AS ">" IS READ AGAIN FROM ITS FILE and written back once, and a dry run only says it would be', async (t) => {
+  const h = await setup(t);
+  const file = h.global('ponytail');
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, '---\nname: ponytail\ndescription: >\n  Forces the laziest solution\n  that actually works.\n---\n\nBody.\n');
+  h.add({ name: 'ponytail', trigger: '>', body: readFileSync(file, 'utf8'), managed: false });
+
+  assert.deepEqual(await h.sync({ dryRun: true }), [`Skill ponytail would take its description from ${file} again.`]);
+  assert.deepEqual(h.seen.filter((s) => s.method === 'update'), []);
+  assert.deepEqual(await h.sync(), [`Skill ponytail took its description from ${file} again.`]);
+  assert.deepEqual(
+    h.seen.filter((s) => s.method === 'update').map((s) => s.args),
+    [{ register: 'skills', seq: 1, patch: { trigger: 'Forces the laziest solution that actually works.' }, version: 1 }],
+  );
+  assert.deepEqual(await h.sync(), [], 'a trigger read again is not read a third time');
+  /* A file that says no better, or no file, leaves the row as it is. */
+  h.add({ name: 'gone', trigger: '|', body: 'Body.\n', managed: false });
+  assert.deepEqual(await h.sync(), []);
+});
+
+test('AN EDIT PROPOSED IN THE SAME SYNC AS A TRIGGER WRITTEN BACK carries the version the write left, and no file is written saying ">"', async (t) => {
+  const h = await setup(t);
+  const row = h.add(RELEASE);
+  const path = h.global('kiln-release');
+  await h.sync();
+  /* The old reader's ">" on the row, and an edit to the file since the lock. */
+  row.fields.trigger = '>';
+  const edited = `${readFileSync(path, 'utf8')}\nRun the smoke test first.\n`;
+  writeFileSync(path, edited);
+
+  assert.deepEqual(await h.sync(), [`Skill kiln-release took its description from ${path} again.`, `Skill kiln-release was edited in ${path}; kept it and proposed it as version 2 (SG1).`]);
+  assert.equal(row.fields.trigger, RELEASE.trigger);
+  assert.deepEqual((h.proposals()[0]?.args.body as { rows: { version: number }[] }).rows.map((r) => r.version), [2], 'the proposal named the version from before the write');
+
+  /* A managed row still saying ">" with no file to read it from is written with its body's first line instead. */
+  h.add({ name: 'kiln-glaze', trigger: '>', body: '# Glaze\n\nFire it twice.\n' });
+  await h.sync();
+  assert.match(readFileSync(h.global('kiln-glaze'), 'utf8'), /^---\nname: kiln-glaze\ndescription: "Glaze"\n---\n/u);
 });
 
 test('ROW 5 BY LOCATION: a run in a project registers the repository file at project scope and leaves the global folder alone', async (t) => {
@@ -356,17 +430,17 @@ test('braindog skills sync --dry-run prints what it would do and says it was a d
 
 /* ── the start hook ────────────────────────────────────────────────────── */
 
-test('THE START HOOK SYNCS SKILLS on startup, with the lines before the next step, and not on a compaction', async (t) => {
+test('THE START HOOK SYNCS SKILLS on startup, says so as one count on the card, and not on a compaction', async (t) => {
   const h = await setup(t);
   h.add(RELEASE);
   const written: string[] = [];
   const hook = (source: string) =>
-    hookStart({ env: h.env, stdin: JSON.stringify({ cwd: h.cwd, session_id: 'claude-run-1', source }), cwd: h.cwd, home: h.home, write: (text) => void written.push(text) });
+    hookStart({ env: h.env, stdin: JSON.stringify({ cwd: h.cwd, session_id: 'claude-run-1', source }), cwd: h.cwd, home: h.home, device: 'MacBook', write: (text) => void written.push(text) });
 
   await hook('startup');
   const lines = (written[0] ?? '').split('\n');
-  assert.equal(lines.at(-1), CONTEXT.next);
-  assert.equal(lines.at(-2), `BrainDog: Skill kiln-release written to ${h.global('kiln-release')}.`);
+  /* A count, not the sync's lines: they carry file paths, and are not what an agent starts from. */
+  assert.deepEqual(lines, ['BrainDog · run S7 · no project · Claude Code on MacBook', 'More     1 skill · skills sync: 1 change · call context']);
   assert.ok(existsSync(h.global('kiln-release')));
   assert.deepEqual(h.seen.map((s) => s.method), ['attach', 'get']);
   assert.equal(h.seen[1]?.authorization, `Bearer ${TOKEN}`);

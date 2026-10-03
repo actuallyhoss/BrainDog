@@ -887,7 +887,7 @@ function planSkills(skills: string, options: Options): Plan {
 
 /**
  * BrainDog's Agent Skill in one profile, at `skills/braindog/SKILL.md`: what the record is to an agent, how it
- * connects and the rules it keeps, so a session that has the server also knows how to use it.
+ * connects, and to call context first, so a session that has the server also knows how to use it.
  * OFFERED LIKE EVERYTHING ELSE HERE: the dry run says it would place the file and `--apply` places it, in the same
  * all-or-none write as the profile's settings. A profile already holding this text is no line at all, and one holding
  * an older text gets this one, its copy kept beside it as every file this command changes is.
@@ -898,7 +898,7 @@ function planAgentSkill(file: string, options: Options): Plan {
   if (had && readFileSync(file, 'utf8') === text) return { lines: [], write: null };
   const lines = [
     `${options.apply ? 'Placed' : 'braindog install would place'} BrainDog's Agent Skill in ${dirname(dirname(dirname(file)))}:`,
-    `${PLACES_SKILL}${had ? ', in place of an older copy' : ''}: what BrainDog is to an agent, how it connects, and the rules it keeps.`,
+    `${PLACES_SKILL}${had ? ', in place of an older copy' : ''}: what BrainDog is to an agent, how it connects, and to call context first.`,
   ];
   return { lines, write: { file, had, value: text } };
 }

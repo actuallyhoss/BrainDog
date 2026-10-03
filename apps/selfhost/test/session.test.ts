@@ -176,6 +176,31 @@ test('THE SAME THROUGH /mcp: _meta.session names the run, over the headers key b
   }
 });
 
+test('ONE RUN PER HOST SESSION over the socket: the hook’s attach, a command from a scratch folder and a bare tool call are S1', async () => {
+  const s = await stack();
+  try {
+    const token = await s.mint();
+    /* The start hook: the session's own id in the body, the headers saying where it is. */
+    const hook = await s.post(s.bearer(token), 'attach', { source: 'startup', client_id: 'cc-1' }, HERE);
+    assert.equal(hook.status, 200, JSON.stringify(hook.wire));
+    /* The agent runs the command line from its scratch folder, which names no run and no repository. */
+    const loose = await s.post(s.bearer(token), 'create', { register: 'tasks', fields: { what: 'From a scratch folder' } }, { 'x-braindog-cwd': '/tmp/scratch' });
+    assert.equal(loose.status, 200, JSON.stringify(loose.wire));
+    /* And a tool call that says nothing at all of where it is. */
+    const bare = await s.tool(token, 'create', { register: 'tasks', fields: { what: 'From a bare tool call' } });
+    assert.equal(bare.status, 200);
+    assert.notEqual((bare.wire.result as { isError?: boolean }).isError, true, JSON.stringify(bare.wire.result));
+
+    assert.deepEqual(s.runs(), [1], 'a write that named no run opened one of its own');
+    assert.deepEqual([(await s.history('tasks', 1))[0]?.actor, (await s.history('tasks', 2))[0]?.actor], ['S1', 'S1']);
+    /* Named for its agent and where it works, never for the day. */
+    assert.equal((await s.run('S1'))?.fields.doing, 'Claude in braindog');
+    s.clean();
+  } finally {
+    await s.close();
+  }
+});
+
 test('BAD HEADERS ARE DROPPED, and the write they came with still goes in', async () => {
   const s = await stack();
   try {
@@ -257,6 +282,9 @@ test('ATTACH, HANDOFF, sessionsLive, boot AND get S1 THROUGH THE TYPED CLIENT', 
     const live = await client.sessionsLive();
     assert.ok(live.ok);
     assert.deepEqual(live.value.map((r) => [r.spoken, r.stale, r.same_repo]), [['S1', false, true]]);
+    /* Worked out as it is read, over the wire as in the record: heard from just now, so working, and no age yet. */
+    const said = live.value[0] as unknown as { quiet?: unknown; ran_s?: unknown };
+    assert.deepEqual([said.quiet, said.ran_s], [false, 0]);
 
     const boot = await client.boot();
     assert.ok(boot.ok);

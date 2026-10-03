@@ -29,7 +29,7 @@ import type { Brief, Client, Context } from '@braindog/client';
 
 import { hostsPath, readHosts } from './http.ts';
 import { HEADER_NAME, keys } from './keys.ts';
-import { connect, fixOf, isObject, readLock, samePath, sha256, spokenOf, Stopped, valueOf, writeLock, type AgentIo } from './skills.ts';
+import { asking, connect, fixOf, isObject, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -397,22 +397,24 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       if (lock.asked[key] === shape) continue;
       const n = await needsFor(f, prior, allow);
       if (s.dryRun) {
-        lines.push(`Tool ${f.name} in ${f.source} differs from ${row.spoken}; the row would be left and the change proposed${keysSaid(n)}.`);
+        lines.push(`Tool ${f.name} in ${f.source} differs from the record's ${row.spoken}, which would be left as it is and the change proposed${keysSaid(n)}.`);
         continue;
       }
       const patch = { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
+      /* THE OWNER'S QUESTION IN WORDS, 80 CHARACTERS AT MOST. It read "Change tools#8 to how fly-prism is set up
+         in ~/.claude.json on Maras-MacBook-Pro.local?": an id, a path and a network name. Those three are the details. */
       const out = await s.client.call<{ id: string }>('propose', {
-        question: `Change ${row.spoken} to how ${f.name} is set up in ${f.source} on ${machine}?`,
+        question: asking('Update the ', f.name, ` tool to match ${thisMachine()}?`),
         body_kind: 'rowset',
-        body: { register: 'tools', rows: [{ at: row.spoken, version: got.version, patch }] },
+        body: { register: 'tools', rows: [{ at: row.spoken, version: got.version, patch }], details: { source: f.source, machine, row: row.spoken } },
       });
       const made = valueOf(out);
       if (made === null || typeof made.id !== 'string') {
-        lines.push(`Tool ${f.name} in ${f.source} differs from ${row.spoken}, and the change was not proposed: ${fixOf(out)}`);
+        lines.push(`Tool ${f.name} in ${f.source} differs from the record's ${row.spoken}, and the change was not proposed: ${fixOf(out)}`);
         continue;
       }
       lock.asked[key] = shape;
-      lines.push(`Tool ${f.name} in ${f.source} differs from ${row.spoken}, so the row was left and the change was proposed as ${made.id}${keysSaid(n)}.`);
+      lines.push(`Tool ${f.name} in ${f.source} differs from the record's ${row.spoken}, so that was left as it is and the change was proposed as ${made.id}${keysSaid(n)}.`);
     }
     if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun));
   } catch (e) {
@@ -459,12 +461,12 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
     return one
       ? `Tool ${one.name} in ${one.source} would be proposed as a tool everywhere, with its keys by name only.`
       : `${String(asks.length)} tools in ${sources} (${names}) would be proposed together as tools everywhere, with their keys by name only.`;
+  /* IN WORDS, 80 CHARACTERS AT MOST, with where they were found kept in the details. Decide offers the rows one by one,
+     so the question no longer says it can. */
   const out = await client.call<{ id: string }>('propose', {
-    question: one
-      ? `Record the ${one.name} MCP server from ${one.source} on ${machine} as a tool everywhere?`
-      : `Record ${String(asks.length)} MCP servers from ${sources} on ${machine} as tools everywhere: ${names}? Accept them all, or pick which.`,
+    question: one ? asking('Add the ', one.name, ` tool from ${thisMachine()}, for use everywhere?`) : severalAsked(asks.map((a) => a.f.name)),
     body_kind: 'rowset',
-    body: { register: 'tools', rows: asks.map((a) => a.row) },
+    body: { register: 'tools', rows: asks.map((a) => a.row), details: { source: sources, machine } },
   });
   const made = valueOf(out);
   if (made === null || typeof made.id !== 'string')
@@ -473,6 +475,20 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
   return one
     ? `Tool ${one.name} in ${one.source} applies everywhere and this run is in a project, so recording it was proposed as ${made.id}, and its keys were not deposited.`
     : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so recording them was proposed together as ${made.id}, and their keys were not deposited.`;
+}
+
+/**
+ * The one question for several tools, inside 80 characters: as many names as fit, then how many more.
+ * "Add 3 tools from this Mac, for use everywhere: fenwick, lantern and quill?"
+ */
+function severalAsked(names: string[]): string {
+  const lead = `Add ${String(names.length)} tools from ${thisMachine()}, for use everywhere`;
+  for (let shown = names.length; shown >= 1; shown--) {
+    const rest = names.length - shown;
+    const said = rest === 0 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}` : `${names.slice(0, shown).join(', ')} and ${String(rest)} more`;
+    if (`${lead}: ${said}?`.length <= QUESTION) return `${lead}: ${said}?`;
+  }
+  return `${lead}?`;
 }
 
 /* ── write ─────────────────────────────────────────────────────────────── */

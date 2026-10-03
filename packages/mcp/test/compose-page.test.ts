@@ -68,7 +68,7 @@ type Drawn = {
   kind: string;
   heading?: string;
   where?: unknown;
-  refusals: Refusal[];
+  refusals?: Refusal[];
   rows: { fields: Record<string, unknown> }[];
   matched: number;
   nexts?: unknown[];
@@ -366,7 +366,8 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
   for (const slug of ['desk', 'numbers', 'product', 'box']) {
     assert.ok(listed.includes(`braindog:page/${slug}`), `braindog:page/${slug} is not among ${JSON.stringify(listed)}`);
     const page = said<{ blocks: Drawn[] }>(await mcp.read(`braindog:page/${slug}`, agent));
-    page.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `${slug}.blocks[${i}] (${b.kind}) was refused installed`));
+    /* A BLOCK NOTHING REFUSED CARRIES NO `refusals` IN A READ, which leaves out every empty list it can. */
+    page.blocks.forEach((b, i) => assert.deepEqual(b.refusals ?? [], [], `${slug}.blocks[${i}] (${b.kind}) was refused installed`));
   }
   const installed = said<{ layout?: unknown; nav?: unknown }>(await mcp.read('braindog:page/desk', agent));
   assert.deepEqual(installed.layout, { rail: 4, sticky: true });

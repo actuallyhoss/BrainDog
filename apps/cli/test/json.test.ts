@@ -130,7 +130,7 @@ test('context --json PUTS THE BRIEFING IN THE DOCUMENT AND NOT ON STDOUT BESIDE 
   /* The same lines, in the same order, as the readable run printed: the flag moves the output, and
      nothing about the answer itself changes. */
   assert.deepEqual(doc.value.lines, plain.stdout.trimEnd().split('\n'));
-  assert.match(doc.value.lines[0] ?? '', /^BrainDog: S7 in /);
+  assert.match(doc.value.lines[0] ?? '', /^BrainDog · run S7 · /u);
 });
 
 test('a refusal IS AS MACHINE-READABLE AS A SUCCESS: the code, the fix and the at, not a sentence', async (t) => {

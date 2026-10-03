@@ -26,6 +26,7 @@ import { parseArgs } from 'node:util';
 import type { Brief, Client, Context } from '@braindog/client';
 import { refused, type Result } from '@braindog/ports';
 
+import { clip } from './clip.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse, type Answering } from './json.ts';
 import { git } from './position.ts';
@@ -82,7 +83,23 @@ export type AgentIo = {
    * `AgentIo` by hand would otherwise have to carry a sink it does not read.
    */
   answer?: Answering | undefined;
+  /** The name this machine goes by, when a test gives one; otherwise `braindog context` works it out (`deviceName`). */
+  device?: string | undefined;
 };
+
+/**
+ * The machine as a question to the owner names it: "this Mac", "this PC" or "this machine". Never its network name,
+ * which is what `hostname()` answers and what a question once said ("on Maras-MacBook-Pro.local"). The name itself
+ * goes in the proposal's details.
+ */
+export const thisMachine = (platform: string = process.platform): string => (platform === 'darwin' ? 'this Mac' : platform === 'win32' ? 'this PC' : 'this machine');
+
+/**
+ * A question of at most 80 characters with a name inside it, the name cut to make room. The owner reads it on a
+ * phone, where a longer one wraps to a second line.
+ */
+export const QUESTION = 80;
+export const asking = (before: string, name: string, after: string): string => `${before}${clip(name, Math.max(8, QUESTION - before.length - after.length))}${after}`;
 
 export type Connected = { to: Target; client: Client; context: Context; top: string | null };
 
@@ -159,14 +176,65 @@ const oneLine = (text: string, max: number): string => {
  */
 export function render(kind: Kind, name: string, trigger: string, body: string): string {
   if (kind !== 'skill' || body.startsWith('---')) return body;
-  return `---\nname: ${name}\ndescription: ${JSON.stringify(oneLine(trigger, 400))}\n---\n\n${body}`;
+  /* A trigger the old reader stored as ">" is no description; the body's first line says more than that does. */
+  const said = BLOCK.test(trigger.trim()) ? triggerOf(body, kind) : trigger;
+  return `---\nname: ${name}\ndescription: ${JSON.stringify(oneLine(said, 400))}\n---\n\n${body}`;
+}
+
+/* A YAML block scalar's header: `>` folds the lines below it and `|` keeps them, each with an optional chomping sign
+   and indent, in either order. On its own, as a trigger, it is what the old reader stored. */
+const BLOCK = /^[>|](?:[1-9][+-]?|[+-][1-9]?)?$/u;
+
+const FRONT = /^---\r?\n([\s\S]*?)\r?\n---/u;
+
+/* A comment ends a plain YAML value where `#` follows a space, so "for C# projects" keeps its `#`. */
+const uncommented = (line: string): string => line.replace(/(^|\s)#.*$/u, '').trim();
+
+const joined = (parts: string[]): string | undefined => parts.filter(Boolean).join(' ').replace(/\s+/gu, ' ').trim() || undefined;
+
+/**
+ * A skill's `description`, as one line, from the frontmatter between its `---` lines: a plain or quoted value on the
+ * key's line or running onto the indented lines below it, or a folded (`>`) or literal (`|`) block. `undefined` when
+ * there is none.
+ *
+ * IT WAS READ AS THE REST OF THE KEY'S LINE, so `description: >` with its text on the lines below was stored as the
+ * trigger ">". Six of the owner's skills named themselves ">" that way, in `context`, the briefing and the Agents page.
+ * Both kinds of block come out as one line, because a trigger is one sentence either way.
+ */
+export function describedIn(frontmatter: string): string | undefined {
+  const lines = frontmatter.split(/\r?\n/u);
+  const at = lines.findIndex((l) => /^description\s*:(?:\s|$)/u.test(l));
+  if (at < 0) return undefined;
+  const first = lines[at]!.replace(/^description\s*:/u, '').trim();
+  /* The value goes on while the lines below are indented or empty, and stops at the next key. */
+  const below: string[] = [];
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() !== '' && !/^\s/u.test(line)) break;
+    below.push(line.trim());
+  }
+  if (BLOCK.test(uncommented(first))) return joined(below);
+  const quote = first[0];
+  if (quote === '"' || quote === "'") {
+    const whole = [first, ...below].filter(Boolean).join(' ');
+    const closed = quote === '"' ? /^"((?:[^"\\]|\\.)*)"/su.exec(whole) : /^'((?:[^']|'')*)'/su.exec(whole);
+    if (!closed) return joined([whole.slice(1)]);
+    return joined([quote === '"' ? closed[1]!.replace(/\\(.)/gsu, (_, c: string) => (c === 'n' || c === 't' ? ' ' : c)) : closed[1]!.replaceAll("''", "'")]);
+  }
+  return joined([first, ...below].map(uncommented));
+}
+
+/** A frontmatter description that says something: not missing, and not a block header standing alone. */
+function describedAs(text: string): string | undefined {
+  const head = FRONT.exec(text);
+  const described = head ? describedIn(head[1] ?? '') : undefined;
+  return described !== undefined && !BLOCK.test(described) ? oneLine(described, 380) : undefined;
 }
 
 /** The sentence a file found by hand is registered with: its description, else its first line, else where it is. */
 function triggerOf(text: string, kind: Kind): string {
-  const head = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
-  const described = head ? /^description:\s*(.+)$/m.exec(head[1] ?? '')?.[1] : undefined;
-  if (described) return oneLine(described.replace(/^["']|["']$/g, ''), 380);
+  const described = describedAs(text);
+  if (described) return described;
+  const head = FRONT.exec(text);
   const rest = head ? text.slice(head[0].length) : text;
   const first = rest.split('\n').map((l) => l.replace(/^#+\s*/, '').trim()).find(Boolean);
   return first ? oneLine(first, 380) : `A ${kind} kept by hand.`;
@@ -250,14 +318,41 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     return { kind, text: render(kind, name, trigger, row.fields.body), managed: row.fields.managed !== false, state: typeof row.state === 'string' ? row.state : null };
   };
 
-  const propose = async (row: Brief, name: string, rev: number, text: string): Promise<string> => {
+  /* THE QUESTION NAMES THE SKILL AND "THIS MAC", AND THE DETAILS SAY WHERE. It read "Take the edit to kiln-release made
+     on Maras-MacBook-Pro.local as version 2?"; the file and the machine's own name are kept in the body's details. */
+  const propose = async (row: Brief, name: string, rev: number, text: string, path: string): Promise<string> => {
     const out = await s.client.call<{ id: string }>('propose', {
-      question: `Take the edit to ${name} made on ${machine} as version ${String(rev + 1)}?`,
+      question: asking(`Take ${thisMachine()}'s edit to `, name, ` as version ${String(rev + 1)}?`),
       body_kind: 'rowset',
-      body: { register: 'skills', rows: [{ at: row.spoken, version: row.version, patch: { body: text, rev: rev + 1 } }] },
+      body: { register: 'skills', rows: [{ at: row.spoken, version: row.version, patch: { body: text, rev: rev + 1 } }], details: { file: path, machine } },
     });
     const made = valueOf(out);
     return made !== null && typeof made.id === 'string' ? made.id : `refused: ${fixOf(out)}`;
+  };
+
+  /**
+   * A trigger stored as a block header alone (">", "|-") read again from the skill's own file, and the sentence it
+   * holds written back, with the version the row is at after it; `null` when there is no such file or it says nothing
+   * better.
+   *
+   * THE OLD READER'S ROWS STAY WRONG UNTIL SOMETHING READS THEM AGAIN, and the sync is what registered them. The file is
+   * the one the lock names, or where the skill's name puts it on this machine.
+   */
+  const reread = async (row: Brief, name: string, base: string, held: string | undefined): Promise<{ trigger: string; version: number } | null> => {
+    const seq = Number(row.spoken.slice(row.spoken.indexOf('#') + 1));
+    if (!row.spoken.startsWith('skills#') || !Number.isInteger(seq)) return null;
+    const path = [held, skillPath(base, 'skill', name), skillPath(base, 'command', name)].find((p): p is string => typeof p === 'string' && existsSync(p));
+    if (path === undefined) return null;
+    const described = describedAs(readFileSync(path, 'utf8'));
+    if (described === undefined) return null;
+    if (s.dryRun) {
+      lines.push(`Skill ${name} would take its description from ${where(path)} again.`);
+      return { trigger: described, version: row.version };
+    }
+    const written = valueOf(await s.client.update({ register: 'skills', seq, patch: { trigger: described }, version: row.version }));
+    if (written === null) return null;
+    lines.push(`Skill ${name} took its description from ${where(path)} again.`);
+    return { trigger: described, version: isObject(written) && typeof written.version === 'number' ? written.version : row.version + 1 };
   };
 
   const write = (path: string, text: string, spoken: string, rev: number) => {
@@ -270,13 +365,20 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     const listed = [...reg.rows, ...reg.inherited];
     const listedSpoken = new Set(listed.map((r) => r.spoken));
 
-    for (const row of listed) {
+    for (const listedRow of listed) {
+      let row = listedRow;
       const base = row.scope === 'project' ? projectBase : s.configDir;
       const name = typeof row.name === 'string' ? row.name : '';
-      const trigger = typeof row.trigger === 'string' ? row.trigger : '';
+      let trigger = typeof row.trigger === 'string' ? row.trigger : '';
       const rev = typeof row.rev === 'number' ? row.rev : 1;
       if (base === null) continue;
       const locked = Object.entries(lock).find(([path, e]) => e.spoken === row.spoken && inside(path, base));
+      /* READ AGAIN BEFORE ANYTHING IS RENDERED FROM IT, so a file written below never says ">" either, and an edit
+         proposed below is compared against the version the write-back left. */
+      if (BLOCK.test(trigger.trim())) {
+        const again = await reread(row, name, base, locked?.[0]);
+        if (again !== null) [trigger, row] = [again.trigger, { ...row, version: again.version }];
+      }
 
       if (locked !== undefined && existsSync(locked[0])) {
         const [path, entry] = locked;
@@ -304,7 +406,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
           lines.push(`Skill ${name} was edited in ${where(path)}; it would be kept and proposed as version ${String(rev + 1)}.`);
           continue;
         }
-        const asked = await propose(row, name, rev, text);
+        const asked = await propose(row, name, rev, text, path);
         if (!asked.startsWith('refused')) lock[path] = { ...entry, proposed_sha: now };
         lines.push(
           both
@@ -339,7 +441,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         lines.push(`Skill ${name} in ${where(path)} differs from the record; it would be kept and proposed as version ${String(rev + 1)}.`);
         continue;
       }
-      const asked = await propose(row, name, rev, text);
+      const asked = await propose(row, name, rev, text, path);
       lock[path] = { spoken: row.spoken, version: rev, sha256: sha256(got.text), ...(asked.startsWith('refused') ? {} : { proposed_sha: now }) };
       lines.push(`Skill ${name} in ${where(path)} differs from the record; kept it and proposed it as version ${String(rev + 1)} (${asked}).`);
     }

@@ -5,7 +5,7 @@
  * THE WHOLE AGENT PATH IS BUILT: `mcp`, the stdio server Claude Code launches, `hook` and `install`,
  * the session hooks, `login` and `logout`, the device grant and its other half, `keys` and `run`, the
  * key doors, `skills` and `tools`, the sync and the scan, and `session` and `context`, the handoff and
- * the briefing from a shell. There is no longer a list of commands that name themselves and do nothing:
+ * the card from a shell. There is no longer a list of commands that name themselves and do nothing:
  * a word this command does not know is a typo, and it says so.
  *
  * `setup` IS THE ONE LINE A NEW MACHINE NEEDS (`setup.ts`): it runs `login`, `install`, the MCP registration,
@@ -30,7 +30,7 @@ import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
 import { exportFile, importFile } from './brainfile.ts';
-import { hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
+import { heldFor, hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
@@ -39,7 +39,7 @@ import { lapseWarning, login } from './login.ts';
 import { logout } from './logout.ts';
 import { openSessions, openSessionsLine } from './open-sessions.ts';
 import { page as pageCommand } from './page.ts';
-import { AGENTS, isAgent, positionOf, sessionHeaders } from './position.ts';
+import { AGENTS, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
 import { context } from './context.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
@@ -55,6 +55,14 @@ import { verify } from './verify.ts';
 /* Synchronous, so the line is out before `exit`: a write to a pipe on Windows is asynchronous, and
    `process.exit` does not wait for it. */
 const say = (line: string) => writeFileSync(2, `${line}\n`);
+
+/**
+ * The session headers a command in this folder sends to a host: where it stands, and the run the folder's session file
+ * names only while that run is the caller's (`heldFor`), read per request because the start hook may write the file
+ * after the command began. The host session's id and `CLAUDECODE` come from this process's environment.
+ */
+const headersHere = async (cwd: string, host: string): Promise<Record<string, string>> =>
+  sessionHeaders(await positionOf(cwd), undefined, heldFor(readSession(sessionPath(process.env, cwd)), host, process.env), { env: process.env });
 
 /**
  * The folder the two hook shims are in, which is what `install` and `setup` write into Claude Code's settings.
@@ -155,7 +163,7 @@ const usage = () =>
     'braindog session show|next <text>|tried <text>|note <text>|end [--state idle|handoff|done] [--next <text>]',
     '  Address the run this folder is in: read where it stands, leave a next step, a thing tried or a note, or end it.',
     'braindog context [--host <host>]',
-    '  Print the briefing again: this run and where it stands, the last handoff, who else is live, what waits on the owner, and what applies here.',
+    '  Print the card again: this run and where it stands, the next step, what waits on a person, what was learned here, and what else there is to ask for.',
     'braindog page pull <slug> [--host <host>] [--out <file>]',
     "  Fetch a page's declaration and write it as <page>.dog: one page, one file, in the source view's dialect.",
     'braindog page push <file> [--host <host>]',
@@ -285,20 +293,25 @@ async function mcp(args: string[]): Promise<void> {
   /* Started now and awaited by the first request, so git runs while the client is still saying hello. */
   const where = positionOf(process.cwd());
   /* READ PER REQUEST, because Claude Code may start this server before the start hook has written the
-     file, and a compaction or a clear can name a different run. A file for another host names a run
-     there, so it is not sent here. */
+     file, and a clear or a resume inside the window moves it to another session and run. A file for another
+     host names a run there, and a file another window's session wrote or no hook has heard from in twelve
+     hours names a run that is not this one's (`heldFor`), so neither is sent. This process's parent is the
+     window that started it, and the session id in its environment is the one it had then. */
   const file = sessionPath(process.env, process.cwd());
-  const headers = async () => {
-    const held = readSession(file);
-    return sessionHeaders(await where, agent, held?.host === to.key ? held : undefined);
-  };
+  const server = { parent: process.ppid, since: Date.now() };
+  /* WHAT THE CLIENT SAID IT IS IN ITS HELLO, sent with every request after it, so the record can say which app makes
+     the run and which version of it, beside the `--agent` the server was registered with. */
+  let hello: ClientInfo = {};
+  const headers = async () => sessionHeaders(await where, agent, heldFor(readSession(file), to.key, process.env, Date.now(), server), { env: process.env, client: hello });
   const surface = await surfaceOver((ctx) => clientFor(to, headers, ctx.signal));
 
   /* A closed stdout means nobody is left to read the answers. */
   process.stdout.on('error', () => process.exit(0));
   const ms = budgetOf(process.env);
   /* `to.base` IS THE HOST'S ORIGIN, where it serves the app, so a filed `propose` carries its `decide` link there. */
-  await serveStdio(surface, () => ({ signal: AbortSignal.timeout(ms) }), process.stdin, process.stdout, to.base);
+  await serveStdio(surface, () => ({ signal: AbortSignal.timeout(ms) }), process.stdin, process.stdout, to.base, (said) => {
+    hello = said;
+  });
   /* Every reply is flushed by now. LEFT TO END ON ITS OWN, and ended after a second if an idle keep-alive
      socket to the host holds it open, for the reason `hook` gives: `process.exit` straight after the last
      reply aborted Node 24 on Windows with a libuv assertion when the client closed standard input. */
@@ -354,11 +367,8 @@ async function keysCommand(args: string[]): Promise<void> {
     say: json ? json.say : say,
     answer: json?.answer,
     spawn: spawnInherit,
-    /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
-    headers: async (host) => {
-      const held = readSession(sessionPath(process.env, cwd));
-      return sessionHeaders(await positionOf(cwd), undefined, held?.host === host ? held : undefined);
-    },
+    /* The run the session file names, sent only to the host that wrote it and only while it is the caller's, as `mcp` does. */
+    headers: (host: string) => headersHere(cwd, host),
   });
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
@@ -383,11 +393,8 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
     out: json ? json.out : (line: string) => writeFileSync(1, `${line}\n`),
     say: json ? json.say : say,
     answer: json?.answer,
-    /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
-    headers: async (host: string) => {
-      const held = readSession(sessionPath(process.env, cwd));
-      return sessionHeaders(await positionOf(cwd), undefined, held?.host === host ? held : undefined);
-    },
+    /* The run the session file names, sent only to the host that wrote it and only while it is the caller's, as `mcp` does. */
+    headers: (host: string) => headersHere(cwd, host),
   };
   const cli = fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/');
   /* `import.ts`, `usecase.ts` AND `catalogue.ts` (`pack`, `kennel`) ARE LOADED HERE, NOT AT THE TOP OF THE
@@ -449,11 +456,8 @@ async function setupCommand(args: string[]): Promise<void> {
     signal: stopping.signal,
     cli: fileURLToPath(new URL('./main.ts', import.meta.url)).replaceAll('\\', '/'),
     scripts: hookScripts(),
-    /* The run the session file names, sent only to the host that wrote it, as `mcp` does. */
-    headers: async (host: string) => {
-      const held = readSession(sessionPath(process.env, cwd));
-      return sessionHeaders(await positionOf(cwd), undefined, held?.host === host ? held : undefined);
-    },
+    /* The run the session file names, sent only to the host that wrote it and only while it is the caller's, as `mcp` does. */
+    headers: (host: string) => headersHere(cwd, host),
   });
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -511,8 +515,9 @@ async function hook(args: string[]): Promise<void> {
   /*
    * THE LAPSE GOES ABOVE WHATEVER THE START HOOK SAYS, while there is still time to act on it. The login is a ninety-day
    * bearer that does not slide (`lapseWarning`), and past it the server has nothing to reach, so the first word anyone
-   * had was this hook's line on the morning after. First, not last, because the briefing's last line is its next step and `withLines` keeps
-   * it there; and it rides the one write `hookStart` makes, the failure line's included.
+   * had was this hook's line on the morning after. First, because the card's own first line says which run this is and
+   * the lines after it follow in a fixed order; and it rides the one write `hookStart` makes, the failure line's
+   * included, so a quiet resume that writes nothing says nothing of it either.
    */
   const lapse = which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null;
   const write = (text: string) => writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);
@@ -606,7 +611,7 @@ function install(args: string[]): void {
  *
  * THE SIX ARE EXCLUDED BECAUSE THEY HAVE NO ANSWER TO PUT IN AN ENVELOPE, not because the work was
  * skipped. `mcp` is a transport and its stdout is the JSON-RPC protocol; `keys exec` and `run` hand
- * stdout to a child process; `hook start` and `hook end` print a briefing to Claude Code, which reads
+ * stdout to a child process; `hook start` and `hook end` print a card to Claude Code, which reads
  * text; `init` and `serve` pass a spawned self-host's streams straight through. Each of the six is
  * left to refuse the flag in its own words, which is the answer a caller deserves rather than an
  * empty document.

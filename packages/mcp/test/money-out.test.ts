@@ -38,7 +38,7 @@ test('NO `money` TOOL: sixteen tools, and a call by that name is refused like an
   const { surface, calls } = stub();
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'money', arguments: {} } }, surface, { who: 'agent' })) as Reply;
   assert.ok('result' in reply, JSON.stringify(reply));
-  const said = JSON.parse((reply.result as { content: { text: string }[] }).content[0]!.text) as { code: string; allowed: string[] };
+  const said = (reply.result as { structuredContent: unknown }).structuredContent as { code: string; allowed: string[] };
   assert.equal(said.code, 'ROUTE_UNKNOWN');
   assert.equal(said.allowed.includes('money'), false);
   assert.deepEqual(calls, [], 'a name that is not a tool read the record');

@@ -16,10 +16,19 @@ import { refused, type Result } from '@braindog/ports';
 import { INSTRUCTIONS } from './instructions.ts';
 
 export { INSTRUCTIONS };
-import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Tool } from './index.ts';
+import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Said, type Tool } from './index.ts';
+import { refusalBrief } from './brief.ts';
 
-/** Newest first. `initialize` answers with one of these, as `negotiate` picks it. */
-export const VERSIONS = ['2026-07-28', '2025-06-18', '2025-03-26'] as const;
+/**
+ * Newest first. `initialize` answers with one of these, as `negotiate` picks it.
+ *
+ * 2025-11-25 IS SPOKEN AND ANSWERED AS ITSELF. It was missing, so a client of that revision was answered 2025-06-18,
+ * and over HTTP every later request that said `MCP-Protocol-Version: 2025-11-25` was refused -32022 as a version this
+ * server does not speak. Nothing it asks of a server is beyond this one: tools that refuse a bad argument as a tool
+ * error the model can read rather than a protocol error, a 403 for any `Origin`, no batches, and a `title` beside
+ * every name, all of which `http.ts` and this file already do.
+ */
+export const VERSIONS = ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26'] as const;
 
 export const METHODS = [
   'initialize',
@@ -56,45 +65,48 @@ const fail: (id: Id | null, n: number, message: string, data?: unknown) => Reply
 });
 
 const JSON_TYPE = 'application/json';
-/* Compact, never pretty-printed: every byte of a result is read by a model, and whitespace is tokens. */
-const text = (value: unknown) => ({ type: 'text', text: JSON.stringify(value ?? null) });
 
 /**
- * A `Result` as a tool result.
+ * A tool's answer as a tool result: the text an agent reads, and the JSON beside it as `structuredContent`.
  *
- * A value is its JSON. A refusal is `isError` with the refusal itself as the text, because its code,
- * its sentence and `allowed` are what the model reads to correct the call. A conflict carries the
- * current row and who changed it, so the retry needs no second read.
+ * THE TEXT IS PLAIN LABELLED LINES, AND THE JSON IS THE WHOLE ANSWER. Every read answered one block of compact JSON,
+ * so a model read raw row ids, person ids and nulls it could not use and a person should never be shown, and on the
+ * owner's record the default reads ran to 13 and 18 KB. The lines are what a model reads first and relays; the JSON is
+ * for a client that renders it, and in the text too when the call asks `format: "full"` (`index.ts`, `answer`).
+ *
+ * A REFUSAL IS `isError` WITH ITS SENTENCE, ITS ALLOWED VALUES AND ITS `try` in the text, and the refusal whole beside
+ * it, because those are what the model reads to correct the call. A conflict carries the current row and who changed
+ * it, so the retry needs no second read.
  */
-const render = (r: Result<unknown>) => {
-  if (r.ok) return { content: [text(r.value)] };
-  if (refused(r)) return { isError: true, content: [text(r.refusal)] };
-  const { version, current, actor } = r.conflict;
-  return {
-    isError: true,
-    content: [
-      text({
-        code: 'VERSION_STALE',
-        fix: `${actor} changed this row after you read it. current is the row at version ${version}; re-apply your change to it and send that version.`,
-        version,
-        actor,
-        current,
-      }),
-    ],
-  };
-};
+const render = (said: Said) => ({
+  ...(said.result.ok ? {} : { isError: true }),
+  content: [{ type: 'text', text: said.text }],
+  structuredContent: said.structured,
+});
 
-/* `annotations` only on the tools that read, since writing is the default a client assumes. */
-const listed = (t: Tool) => ({
+/**
+ * A tool as `tools/list` lists it: its name, the title a host shows a person, what it does, its arguments, and what it
+ * may do to the record.
+ *
+ * EVERY HINT IS SAID, BECAUSE A MISSING ONE IS READ AS THE WORST. The specification's defaults for a tool that says
+ * nothing are destructive and open to the world, so every write here inherited both: Claude prompts for a destructive
+ * tool every time, and ChatGPT treats any tool lacking `readOnlyHint` as a write and shows the person its raw JSON.
+ * Reads are read-only; `create`, `propose`, `log`, `meet`, `triage` and `handoff` add and take nothing away; `update`
+ * overwrites a value and says so, by OpenAI's rule that being able to undo a change does not make it safe. And none
+ * reaches past the record, so `openWorldHint` is false on all sixteen.
+ */
+export const listedTool = (t: Tool) => ({
   name: t.name,
+  title: t.title,
   description: t.description,
   inputSchema: t.input,
-  ...(t.writes ? {} : { annotations: { readOnlyHint: true } }),
+  annotations: t.writes ? { destructiveHint: t.destructive === true, openWorldHint: false } : { readOnlyHint: true, openWorldHint: false },
 });
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-const SERVER = { name: 'braindog', version: '0.0.0' };
+/* THE TITLE IS WHAT A HOST SHOWS A PERSON for the server, since 2025-06-18, where `name` is the handle it keys on. */
+const SERVER = { name: 'braindog', title: 'BrainDog', version: '0.0.0' };
 const CAPABILITIES = { tools: {}, resources: {}, prompts: {} };
 
 /**
@@ -116,14 +128,14 @@ export const MRTR = false;
  * client collected from the person in its own window is not the person's decision on this record; the record's answer is
  * the one they give in the app, at the `decide` link the first answer carried (`44-SPEC-MCP` §5.7 step 3).
  */
-const DECIDES_NOT: Result<never> = {
+const DECIDES_NOT = {
   ok: false,
   refusal: {
     code: 'LEVEL_REQUIRED',
     fix: "Deciding is a person's act and no token holds it; the suggestion waits in the Decide queue of the app.",
     at: 'inputResponses',
   },
-};
+} as const satisfies Result<never>;
 
 /**
  * The version an `initialize` is answered with, or `null` for none.
@@ -211,9 +223,11 @@ async function dispatch<C>(
     case 'ping':
       return answer(id, {});
 
-    /* The instructions again, because a client that skipped `initialize` still reads this. */
+    /* THE INSTRUCTIONS ARE NOT SENT AGAIN HERE. They went out in `initialize`, or in `server/discover` for a client of the
+       stateless revision, and a session that asked for both carried the whole text twice; Claude Code puts the
+       instructions in every session's system prompt on its own. Once a connection is the specification's place for them. */
     case 'tools/list':
-      return answer(id, { tools: TOOLS.map(listed), instructions: INSTRUCTIONS, ttlMs: HOUR, cacheScope: 'private' });
+      return answer(id, { tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
 
     case 'tools/call': {
       const args = params.arguments ?? {};
@@ -223,8 +237,8 @@ async function dispatch<C>(
       /* THE REVISION SENDS `inputResponses` ON A RETRY OF THE ORIGINAL REQUEST, and a client may put it in the request's
          params or among the tool's arguments, so both places are read. */
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
-        return answer(id, render(DECIDES_NOT));
-      return answer(id, render(await mcp.call(params.name, args, ctx)));
+        return answer(id, render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
+      return answer(id, render(await mcp.answer(params.name, args, ctx)));
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */

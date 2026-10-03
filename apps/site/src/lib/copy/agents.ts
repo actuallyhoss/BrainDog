@@ -145,7 +145,7 @@ export const agents = {
        */
       skill: {
         title: 'The Agent Skill',
-        said: 'One file that tells an agent when to reach for BrainDog, where to connect, which tools do what, and the house rules: propose changes, deposit keys, log what it learned.',
+        said: 'One file that tells an agent when to reach for BrainDog, how to connect, and to call context first. The house rules come from the server itself.',
         where: 'The terminal setup puts it in place for you. By hand, save it as skills/braindog/SKILL.md in your agent’s settings folder, such as .claude in your home folder.',
         open: 'Read the skill',
       },

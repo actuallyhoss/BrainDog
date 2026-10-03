@@ -39,11 +39,19 @@ type Wire = {
 let n = 0;
 const rpc = (method: string, params?: Record<string, unknown>) => ({ jsonrpc: '2.0', id: ++n, method, ...(params === undefined ? {} : { params }) });
 
-/** A tool result as the model reads it: whether it is a refusal, and the value its text carries. */
+/** A tool result: whether it is a refusal, and the whole value, which is `structuredContent` beside the brief text. */
 const said = (r: { wire: Wire }) => {
-  const result = r.wire.result as { content: { text: string }[]; isError?: boolean };
-  return { isError: result.isError === true, value: JSON.parse(result.content[0]!.text) as unknown };
+  const result = r.wire.result as { content: { text: string }[]; isError?: boolean; structuredContent?: unknown };
+  return { isError: result.isError === true, value: result.structuredContent, text: result.content[0]!.text };
 };
+
+/** A value with its nulls taken out, all the way down, as a tool answers one: a null says nothing a missing key does not. */
+const noNulls = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(noNulls)
+    : value !== null && typeof value === 'object'
+      ? Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => [k, noNulls(v)]))
+      : value;
 
 /** The status line and headers of an answer to a request whose body is announced and never sent. */
 const head = (port: number, lines: string[]) =>
@@ -257,6 +265,8 @@ test('INITIALIZE, THEN A TOOL CALL, IN ONE SESSION: nothing is minted for it, an
     const out = said(listed);
     assert.equal(out.isError, false);
     assert.deepEqual((out.value as { rows: { fields: { what: string } }[] }).rows.map((row) => row.fields.what), ['Invoice 41']);
+    /* AND THE TEXT A MODEL READS NAMES THE ROW BY ITS WORDS AND ITS HANDLE. */
+    assert.match(out.text, /^Invoice 41 \(obligations#1\)/mu, out.text);
 
     /* AND THE TOKEN'S LISTING SAYS WHERE IT WAS LAST USED. */
     assert.equal(s.lastSurface(s.owner, 'write'), 'mcp');
@@ -293,7 +303,7 @@ test('AN AGENT REACHES THE SAME THINGS THROUGH /mcp AS THROUGH /api, AT THE SAME
       const readMcp = said(await s.tool(bearer, 'list', { register: 'obligations' }));
       assert.equal(readApi.status, 200, `${who} could not read through /api`);
       assert.equal(readMcp.isError, false, `${who} could not read through /mcp`);
-      assert.deepEqual(readMcp.value, readApi.wire.value, `${who} read differently through the two`);
+      assert.deepEqual(readMcp.value, noNulls(readApi.wire.value), `${who} read differently through the two`);
     }
 
     /* A WRITE TOKEN OF THE OWNER WRITES THROUGH BOTH, into the one record. */

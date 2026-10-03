@@ -79,16 +79,15 @@ const CALLS: Record<string, Record<string, unknown>> = {
   triage: { arrival: 'arr_1', ignore: true },
 };
 
-type ToolResult = { isError?: boolean; content: { text: string }[] };
+type ToolResult = { isError?: boolean; content: { text: string }[]; structuredContent: Record<string, unknown> };
 
-/** One `tools/call` over the wire, and the refusal code it carried, or `''` where it answered. */
+/** One `tools/call` over the wire, and the refusal code it carried, or `''` where it answered. The refusal is whole in `structuredContent`. */
 async function called<C>(name: string, surface: McpSurface<C>, ctx: C): Promise<string> {
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: CALLS[name] ?? {} } }, surface, ctx)) as Reply;
   assert.ok('result' in reply, `${name}: ${JSON.stringify(reply)}`);
   const out = reply.result as ToolResult;
   if (out.isError !== true) return '';
-  const said = JSON.parse(out.content[0]!.text) as { code: string };
-  return said.code;
+  return (out.structuredContent as { code: string }).code;
 }
 
 test('EVERY ADVERTISED TOOL REACHES A METHOD, asked over the wire rather than read off the array', async (t) => {
@@ -189,9 +188,13 @@ test('AND THE REFUSAL FOR A NAME THAT IS NOT A TOOL LISTS EVERY TOOL, so the sec
   const { sql, api } = await record();
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'money_overview', arguments: {} } }, api, owner)) as Reply;
   assert.ok('result' in reply);
-  const said = JSON.parse((reply.result as ToolResult).content[0]!.text) as { code: string; fix: string; allowed: string[] };
+  const result = reply.result as ToolResult;
+  const said = result.structuredContent as { code: string; fix: string; allowed: string[] };
   assert.equal(said.code, 'ROUTE_UNKNOWN');
   assert.deepEqual(said.allowed, TOOLS.map((t) => t.name));
   assert.match(said.fix, /money_overview/);
+  /* AND THE TEXT A MODEL READS SAYS THE SAME, every tool by name on its Allowed line. */
+  assert.match(result.content[0]!.text, /^Refused, ROUTE_UNKNOWN\b/u);
+  assert.ok(TOOLS.every((t) => result.content[0]!.text.includes(t.name)), result.content[0]!.text);
   sql.close();
 });

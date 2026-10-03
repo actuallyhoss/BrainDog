@@ -1,9 +1,10 @@
 /**
  * `braindog session show|next|tried|note|end`: the handoff from a shell.
  *
- * NO VERB NAMES A RUN. Each one addresses the run the session file for this folder names, which is how
- * every other command names one: the session headers carry it, and `handoff` refuses a token that names
- * a run explicitly. A folder with no session file is told so before anything is sent.
+ * NO VERB NAMES A RUN. Each one addresses the caller's own run: inside Claude Code the one its session opened, and
+ * elsewhere the one the session file for this folder names, unless no hook has heard from that one in twelve hours
+ * (`ownRun` in `hooks.ts`). The session headers carry it, and `handoff` refuses a token that names a run explicitly.
+ * A folder with no session file, outside a host session that says its id, is told so before anything is sent.
  *
  * `end` DEFAULTS TO IDLE, and says handoff or done only when asked. A run left at handoff waits to be
  * picked up and a run left idle does not, so one word cannot stand for all three.
@@ -20,8 +21,8 @@ import { refused } from '@braindog/ports';
 import { ago } from './brief.ts';
 /* `clip` AND NOT `oneLine`: this file has its own `oneLine`, the verb that sends a next step, a tried or a note. */
 import { clip } from './clip.ts';
-import { readSession, sessionPath } from './hooks.ts';
-import { positionOf } from './position.ts';
+import { asCaller, readSession, sessionPath } from './hooks.ts';
+import { hostSessionOf, positionOf } from './position.ts';
 import { refuse } from './json.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
 
@@ -76,8 +77,11 @@ const ENDED: Record<State, (spoken: string) => string> = {
 /** A printed line ends in a full stop, whoever wrote the words inside it. */
 const stopped = (text: string): string => (/[.!?]$/.test(text) ? text : `${text}.`);
 
-/** Whether this folder has a session file at all, read before anything is sent. */
-const openHere = (io: AgentIo): boolean => readSession(sessionPath(io.env, io.cwd)) !== null;
+/**
+ * Whether there is a run to address, read before anything is sent: a session file for this folder, or a host session
+ * that says its id, which names its run from any folder, a subfolder of the one it started in included.
+ */
+const openHere = (io: AgentIo): boolean => hostSessionOf(io.env) !== null || readSession(sessionPath(io.env, io.cwd)) !== null;
 
 /** The handoff, the one line when it lands, and the exit code. */
 async function send(at: Connected, args: Parameters<Client['handoff']>[0], io: AgentIo, line: string, value: Record<string, unknown>): Promise<number> {
@@ -119,7 +123,7 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
     io.say(NO_SESSION);
     return REFUSED;
   }
-  const at = await connect(values.host, io);
+  const at = await connect(values.host, asCaller(io).io);
   if (typeof at === 'number') return at;
   const c = at.context;
   if (c.session === null) {
@@ -144,7 +148,9 @@ async function show(rest: string[], io: AgentIo): Promise<number> {
   const others = c.live.same_repo.filter((r) => r.spoken !== own);
   if (others.length === 0) io.out('Nobody else is live in this repository.');
   else {
-    const named = others.slice(0, PER_LINE).map((r) => `${clip(r.spoken, 40)} ${typeof r.state === 'string' ? clip(r.state, 40) : 'unknown'}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
+    /* OPEN IS NOT WORKING: a run not heard from in thirty minutes is said to have gone quiet, as the record works it out. */
+    const stateOf = (r: (typeof others)[number]) => (r.quiet === true ? 'gone quiet' : typeof r.state === 'string' ? clip(r.state, 40) : 'unknown');
+    const named = others.slice(0, PER_LINE).map((r) => `${clip(r.spoken, 40)} ${stateOf(r)}${r.doing ? ` "${clip(r.doing, 60)}"` : ''}, seen ${ago(r.age_s)}`);
     io.out(`Also live here: ${named.join('; ')}.`);
   }
   /* The same three facts the lines carry, unclipped: a caller that has to clip them can, and one that
@@ -183,7 +189,7 @@ async function oneLine(verb: Line, rest: string[], io: AgentIo): Promise<number>
     io.say(NO_SESSION);
     return REFUSED;
   }
-  const at = await connect(values.host, io);
+  const at = await connect(values.host, asCaller(io).io);
   if (typeof at === 'number') return at;
   if (at.context.session === null) {
     io.say(NO_RUN);
@@ -230,7 +236,7 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
     io.say(NO_SESSION);
     return REFUSED;
   }
-  const at = await connect(values.host, io);
+  const at = await connect(values.host, asCaller(io).io);
   if (typeof at === 'number') return at;
   if (at.context.session === null) {
     io.say(NO_RUN);

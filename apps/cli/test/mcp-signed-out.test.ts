@@ -30,7 +30,11 @@ const TOKEN = 'rec_01TESTTESTTESTTESTTESTTEST.stub-bearer-never-printed-9e2a';
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-mcp-signed-out-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
 
-type Reply = { id: number; result?: { isError?: boolean; content: { text: string }[]; protocolVersion?: string; tools?: unknown[] }; error?: unknown };
+type Reply = {
+  id: number;
+  result?: { isError?: boolean; content: { text: string }[]; structuredContent?: { code?: string; fix?: string }; protocolVersion?: string; tools?: unknown[] };
+  error?: unknown;
+};
 
 /**
  * The server, sent every line at once with its input then closed, and what it said on each stream.
@@ -74,7 +78,8 @@ async function run(config: string) {
   return { ...ran, by, calls };
 }
 
-const refusal = (reply: Reply | undefined) => JSON.parse(reply?.result?.content[0]?.text ?? '{}') as { code?: string; fix?: string };
+/** The refusal whole, which is `structuredContent`, and the text a model reads first, which says its fix too. */
+const refusal = (reply: Reply | undefined) => ({ ...reply?.result?.structuredContent, text: reply?.result?.content[0]?.text ?? '' });
 
 test('with no host at all, the server answers the handshake and every call says how to sign in', async () => {
   const config = join(scratch, 'empty');
@@ -91,6 +96,7 @@ test('with no host at all, the server answers the handshake and every call says 
     const said = refusal(by.get(10 + i));
     assert.equal(said.code, 'UNAUTHORIZED', name);
     assert.ok(said.fix?.includes(`${SIGN_IN} https://brain.dog/app/<slug>`), `${name}: ${said.fix}`);
+    assert.ok(said.text.includes(`${SIGN_IN} https://brain.dog/app/<slug>`), `${name}: the text says ${said.text}`);
   }
   /* ONE LINE ON STDERR, the reason, for whoever reads the server's log. */
   assert.match(err.trim(), /^No BrainDog host is set\./);
@@ -114,6 +120,7 @@ test('with a login past its expiry, every call names the host, the day it lapsed
     assert.equal(said.code, 'UNAUTHORIZED', name);
     assert.ok(said.fix?.includes('2020-01-01'), `${name}: ${said.fix}`);
     assert.ok(said.fix?.includes(`${SIGN_IN} https://a.example`), `${name}: ${said.fix}`);
+    assert.ok(said.text.includes(`${SIGN_IN} https://a.example`), `${name}: the text says ${said.text}`);
   }
   assert.ok(!JSON.stringify(replies).includes(TOKEN) && !err.includes(TOKEN), 'the expired token was printed');
 });

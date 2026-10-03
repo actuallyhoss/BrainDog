@@ -48,21 +48,28 @@ async function money() {
   return { sql, api, declared };
 }
 
-/** A tool called over the wire, as a client that reads no resources calls it, answered as the text the model reads. */
-async function called(api: unknown, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
+/**
+ * A tool called over the wire, as a client that reads no resources calls it: the text the model reads, and the whole
+ * answer beside it in `structuredContent`, which is where a value is read now that the text is brief.
+ */
+async function called(api: unknown, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string; structured: unknown }> {
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, api as never, owner)) as Reply;
   assert.ok('result' in reply, JSON.stringify(reply));
-  const result = reply.result as { isError?: boolean; content: { text: string }[] };
-  return { isError: result.isError === true, text: result.content.map((c) => c.text).join('') };
+  const result = reply.result as { isError?: boolean; content: { text: string }[]; structuredContent?: unknown };
+  return { isError: result.isError === true, text: result.content.map((c) => c.text).join(''), structured: result.structuredContent };
 }
 
 test('A TOOLS-ONLY AGENT READS A FIGURE: get of its id answers the reading, one amount per currency and no sum', async () => {
   const { sql, api } = await money();
   const got = await called(api, 'get', { spoken: 'cash-now' });
   assert.equal(got.isError, false, got.text);
-  const figure = JSON.parse(got.text) as { value?: unknown; parts?: { currency?: string; amount?: number }[] };
+  const figure = got.structured as { value?: unknown; parts?: { currency?: string; amount?: number }[] };
   assert.deepEqual(figure.parts, [{ currency: 'EGP', amount: 5_200_000 }, { currency: 'USD', amount: 340_050 }], got.text);
-  assert.equal(figure.value, null, 'two currencies were added into one number');
+  /* A VALUE THAT IS NULL IS LEFT OUT OF THE ANSWER, and two currencies are still never one number. */
+  assert.equal(figure.value ?? null, null, 'two currencies were added into one number');
+  /* AND THE TEXT SAYS EACH AMOUNT IN ITS OWN CURRENCY, with its own decimals. */
+  assert.match(got.text, /EGP 52,000\.00/u, got.text);
+  assert.match(got.text, /USD 3,400\.50/u, got.text);
   sql.close();
 });
 
@@ -83,7 +90,7 @@ test('record_index NAMES THE FIGURES IT CAN, and each one it names is one get an
   assert.ok(api.kernel.create('books', { name: 'Kiln', currency: 'GBP' }, { actor: 'p_1' }).ok);
   const index = await called(api, 'record_index', {});
   assert.equal(index.isError, false, index.text);
-  const figures = (JSON.parse(index.text) as { figures?: unknown }).figures;
+  const figures = (index.structured as { figures?: unknown }).figures;
   assert.ok(Array.isArray(figures) && figures.length > 0, `record_index names no figure: ${index.text.slice(0, 200)}`);
   for (const id of figures as string[]) {
     const spoken = id.replace(':<value>', ':Kiln');
@@ -105,17 +112,16 @@ test('record_index NAMES THE FIGURES IT CAN, and each one it names is one get an
  */
 test('record_index names every figure money-core declares, and resources/list every one that reads without a parameter', async () => {
   const { sql, api, declared } = await money();
-  const named = (JSON.parse((await called(api, 'record_index', {})).text) as { figures: string[] }).figures;
+  const named = ((await called(api, 'record_index', {})).structured as { figures: string[] }).figures;
   assert.deepEqual([...named].map((id) => id.split(':')[0]).sort(), [...declared].sort(), `${named.length} of ${declared.length} named`);
   assert.ok(named.includes('late-in'));
   assert.ok(named.includes('project-owed:<value>'), `the template is not named with its slot: ${named.filter((id) => id.startsWith('project'))}`);
   const offered = (await tools(api as never).resources(owner)).map((r) => r.uri).filter((u) => u.startsWith('braindog:metric/'));
   /* `book-cash` (money-core 3.1.0) is a template too, `book is {{it}}`, so it is left out of `resources/list` the same
-     way `project-owed` and the two project walks are: an address is offered only if reading it answers bare. */
-  assert.deepEqual(
-    offered.map((u) => u.slice('braindog:metric/'.length)).sort(),
-    declared.filter((id) => !['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'project-in-month', 'project-out-month', 'project-kept-month'].includes(id)).sort(),
-  );
+     way `project-owed` and the two project walks are: an address is offered only if reading it answers bare. So is
+     `book-spent-month`, which money-core declared after it, over the same slot. */
+  const templates = ['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month'];
+  assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => !templates.includes(id)).sort());
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();
 });

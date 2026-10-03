@@ -51,9 +51,9 @@ const hostile = (): Context => ({
   handoff: { from: 'S5', age_s: 7_200, next: SAID, tried: [SAID], head: 'abc1234' },
   live: {
     same_repo: [
-      { spoken: 'S9', state: 'active', doing: SAID, agent: 'claude', repo: 'kiln', project: null, stale: false, age_s: 120 },
-      { spoken: 'S7', state: 'active', doing: 'this', agent: 'claude', repo: 'kiln', project: null, stale: false, age_s: 3 },
-      { spoken: 'S8', state: SAID, doing: null, agent: 'claude', repo: 'kiln', project: null, stale: false, age_s: 60 },
+      { spoken: 'S9', state: 'active', doing: SAID, agent: 'claude', repo: 'kiln', project: null, stale: false, quiet: false, age_s: 120 },
+      { spoken: 'S7', state: 'active', doing: 'this', agent: 'claude', repo: 'kiln', project: null, stale: false, quiet: false, age_s: 3 },
+      { spoken: 'S8', state: SAID, doing: null, agent: 'claude', repo: 'kiln', project: null, stale: false, quiet: false, age_s: 60 },
     ],
     elsewhere: [],
   },
@@ -110,7 +110,7 @@ function clean(lines: string[], expected: number): void {
 }
 
 test('the start hook briefing: a DEL and a C1 CSI in the handoff, a live run, a question and the next step never reach the model', () => {
-  clean(briefingOf('BrainDog: S7 resumed.', hostile(), undefined).split('\n'), 5);
+  clean(briefingOf('BrainDog: S7 resumed.', hostile(), undefined).split('\n'), 3);
 });
 
 test('braindog context: the headline scrubs a state the record sent, through the same clip as every other line', () => {

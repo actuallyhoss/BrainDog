@@ -74,8 +74,9 @@ const call = async (surface: McpSurface<CallContext>, ctx: CallContext, name: st
   const message = { jsonrpc: '2.0', id: ++n, method: 'tools/call', params: { name, arguments: args } };
   const reply = (await handle(message, surface, { ...ctx })) as Reply;
   assert.ok('result' in reply, JSON.stringify(reply));
-  const out = reply.result as { isError?: boolean; content: { text: string }[] };
-  return { error: out.isError === true, value: JSON.parse(out.content[0]!.text) as Record<string, unknown> };
+  /* THE WHOLE ANSWER IS `structuredContent`; the text beside it is the brief one, and it is named from the same reads. */
+  const out = reply.result as { isError?: boolean; content: { text: string }[]; structuredContent: Record<string, unknown> };
+  return { error: out.isError === true, value: out.structuredContent, text: out.content[0]!.text };
 };
 const rowsOf = (said: { error: boolean; value: Record<string, unknown> }): Row[] => {
   assert.ok(!said.error, JSON.stringify(said.value));
@@ -97,9 +98,20 @@ test('a list of 127 learnings, each superseding the last, reads each register it
   }
   asked.splice(0);
 
-  const rows = rowsOf(await call(surface, owner, 'list', { register: 'learnings', limit: 500 }));
-  const cost = [...asked];
+  /* A HUNDRED A PAGE AT MOST NOW, so the 127 come in two pages, each read by the cursor the one before it ended on, and
+     each page is held to the bound below on its own. */
+  const rows: Row[] = [];
+  const costs: string[][] = [];
+  let cursor: string | undefined;
+  do {
+    asked.splice(0);
+    const page = await call(surface, owner, 'list', { register: 'learnings', limit: 500, ...(cursor === undefined ? {} : { cursor }) });
+    rows.push(...rowsOf(page));
+    costs.push([...asked]);
+    cursor = typeof page.value.cursor === 'string' ? page.value.cursor : undefined;
+  } while (cursor !== undefined && costs.length < 5);
   assert.equal(rows.length, 127);
+  assert.equal(costs.length, 2, `the 127 came in ${String(costs.length)} pages`);
 
   /* EVERY REF IS NAMED, and named as the row it points at: each added learning supersedes the one made before it. */
   const added = rows.filter((r) => /^Lesson \d+ of the names test\.$/.test(String(r.fields.lesson)));
@@ -112,9 +124,11 @@ test('a list of 127 learnings, each superseding the last, reads each register it
   assert.ok(seeded.some((r) => typeof r.fields.project === 'string' && /^things#\d+$/.test(r.fields.project)), 'no seeded learning named its project');
 
   /* MEASURED BEFORE: 126 (`list`, two `schema`, 123 `get`). The bound is the `list`, the `schema` of `learnings` and
-     of `things`, two reads of the 119 learnings ids at 64 a read, and one of the seeded projects. */
-  assert.ok(!cost.includes('get'), `a ref was named by a get of its own: ${String(cost.filter((m) => m === 'get').length)} of them`);
-  assert.ok(cost.length <= 1 + 2 + 2 + 1, `the list asked the surface ${String(cost.length)} times: ${cost.join(' ')}`);
+     of `things`, two reads of the learnings ids at 64 a read, and one of the seeded projects, on each page. */
+  for (const cost of costs) {
+    assert.ok(!cost.includes('get'), `a ref was named by a get of its own: ${String(cost.filter((m) => m === 'get').length)} of them`);
+    assert.ok(cost.length <= 1 + 2 + 2 + 1, `the list asked the surface ${String(cost.length)} times: ${cost.join(' ')}`);
+  }
 });
 
 test('a caller whose level on a register does not read it is told the row id, though the owner was just told the name', async () => {
@@ -128,9 +142,14 @@ test('a caller whose level on a register does not read it is told the row id, th
   const appends = { ...owner, levels: { things: 'append' } } as CallContext;
   const held = { ...owner, registers: ['tasks'] } as CallContext;
   for (const [who, ctx] of [['a token that only appends to things', appends], ['a token held to tasks', held]] as const) {
-    const things = thingsOf(rowsOf(await call(surface, ctx, 'list', { register: 'tasks', limit: 500 })));
+    const said = await call(surface, ctx, 'list', { register: 'tasks', limit: 500 });
+    const things = thingsOf(rowsOf(said));
     assert.equal(things.length, owned.length, `${who} read a different page`);
     assert.ok(things.every((t) => typeof t === 'string' && ROW_ID.test(t)), `${who} was told ${JSON.stringify([...new Set(things)])}`);
+    /* AND THE TEXT SAYS NEITHER THE NAME NOR THE ID: a row id is nothing a person can read, so a ref the caller may not
+       name is left off the line, and no project is named on it either. */
+    assert.doesNotMatch(said.text, /[0-9A-HJKMNP-TV-Z]{26}/u, `${who} was shown a row id: ${said.text}`);
+    assert.doesNotMatch(said.text, /things#\d+/u, `${who} was shown a project: ${said.text}`);
   }
 });
 

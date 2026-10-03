@@ -33,7 +33,9 @@ const agent: CallContext = {
 } as CallContext;
 
 type Row = { spoken: string; fields: Record<string, unknown> };
-type Briefing = { session: { spoken: string } | null; project: { spoken: string } | null; teach?: string[] };
+/* A KEY THAT IS EMPTY IS LEFT OUT, as every answer now leaves a null out: no run yet is no `session`, and no project
+   no `project`. */
+type Briefing = { session?: { spoken: string }; project?: { spoken: string }; teach?: string[]; card?: string };
 
 async function seeded() {
   const api = await createRecordApi({ sql: openSqlite(), clock: fixedClock(Date.UTC(2026, 8, 22, 9)) });
@@ -63,7 +65,8 @@ test('context teaches where a note about nothing goes, what a lane is, and how t
 
   /* BEFORE THE FIRST WRITE THERE IS NO SESSION ROW, so the sentence says what opens one rather than
      naming an id that does not exist yet. */
-  assert.equal(first.session, null);
+  assert.equal(first.session, undefined);
+  assert.match(first.card ?? '', /^BrainDog · no run yet · project Kiln/u, 'the card does not say where the caller stands');
   const note = lines.find((l) => /\blog\b/.test(l) && /session/.test(l));
   assert.ok(note, `nothing says where a note about nothing goes: ${JSON.stringify(lines)}`);
   assert.match(note!, /handoff/);
@@ -115,7 +118,7 @@ test("outside any project, the project sentence names no row, so copying it read
   const mcp = await seeded();
   const nowhere = { ...agent, session: { client_id: 'teaching', cwd: '/tmp/no-project-here' } } as CallContext;
   const answer = (await mcp.call('context', {}, nowhere)) as { ok: true; value: Briefing };
-  assert.equal(answer.value.project, null, 'the seed now places /tmp in a project');
+  assert.equal(answer.value.project, undefined, 'the seed now places /tmp in a project');
   const project = answer.value.teach!.find((l) => /project/.test(l) && /"field":"thing"/.test(l));
   assert.ok(project, `nothing says how to read one project: ${JSON.stringify(answer.value.teach)}`);
   const copied = await mcp.call('list', { register: 'tasks', where: whereIn(project!), limit: 500 }, nowhere);

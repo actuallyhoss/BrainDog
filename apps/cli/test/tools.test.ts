@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { hostKey, hostsPath, saveHosts } from '../src/http.ts';
-import { connect, type AgentIo } from '../src/skills.ts';
+import { connect, thisMachine, type AgentIo } from '../src/skills.ts';
 import { depositor, looksLikeKey, renderEntry, scanTools, tools, writeTools, type ClaudeRunner } from '../src/tools.ts';
 
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-7b3c'].join('.');
@@ -338,9 +338,11 @@ test('A GLOBAL SERVER FOUND FROM A PROJECT RUN is proposed with names only, once
   assert.deepEqual(await h.scan(), ['Tool fenwick in ~/.claude.json applies everywhere and this run is in a project, so recording it was proposed as SG1, and its keys were not deposited.']);
   assert.deepEqual(h.of('vault/deposit'), []);
   assert.deepEqual(h.of('create'), []);
-  const body = h.of('propose')[0]?.args.body as { register: string; rows: { fields?: unknown; needs?: unknown }[] };
-  assert.equal(body.register, 'tools');
-  assert.deepEqual((body.rows[0] as Record<string, unknown>).needs, ['FENWICK_TOKEN']);
+  const asked = h.of('propose')[0]?.args as { question: string; body: { register: string; rows: { fields?: unknown; needs?: unknown }[]; details: unknown } };
+  assert.equal(asked.question, `Add the fenwick tool from ${thisMachine()}, for use everywhere?`);
+  assert.equal(asked.body.register, 'tools');
+  assert.deepEqual((asked.body.rows[0] as Record<string, unknown>).needs, ['FENWICK_TOKEN']);
+  assert.deepEqual(asked.body.details, { source: '~/.claude.json', machine: 'test-machine' });
   assert.deepEqual(await h.scan(), [], 'the same server is not proposed twice');
   assert.equal(h.of('propose').length, 1);
   nowhere(h, [token]);
@@ -355,9 +357,10 @@ test('SEVERAL GLOBAL SERVERS FOUND FROM A PROJECT RUN are one question with a ro
   assert.deepEqual(await h.scan({ dryRun: true }), ['3 tools in ~/.claude.json (fenwick, lantern, quill) would be proposed together as tools everywhere, with their keys by name only.']);
   assert.deepEqual(await h.scan(), ['3 tools in ~/.claude.json apply everywhere and this run is in a project, so recording them was proposed together as SG1, and their keys were not deposited.']);
   assert.equal(h.of('propose').length, 1);
-  const asked = h.of('propose')[0]!.args as { question: string; body: { rows: { name: string }[] } };
-  assert.match(asked.question, /^Record 3 MCP servers from ~\/\.claude\.json on .+ as tools everywhere: fenwick, lantern, quill\? Accept them all, or pick which\.$/);
+  const asked = h.of('propose')[0]!.args as { question: string; body: { rows: { name: string }[]; details: unknown } };
+  assert.equal(asked.question, `Add 3 tools from ${thisMachine()}, for use everywhere: fenwick, lantern and quill?`);
   assert.deepEqual(asked.body.rows.map((r) => r.name), ['fenwick', 'lantern', 'quill']);
+  assert.deepEqual(asked.body.details, { source: '~/.claude.json', machine: 'test-machine' });
   assert.deepEqual(await h.scan(), [], 'the set is not asked again');
 
   servers.kestrel = { command: 'kestrel-mcp' };
@@ -372,10 +375,14 @@ test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once p
   h.add({ name: 'kiln-deploy', transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp@1'], needs: ['KILN_API_TOKEN=credentials#7'], hosts: ['test-machine'], seen: new Date(NOW).toISOString() }, 'project');
   h.mcp({ 'kiln-deploy': { command: 'npx', args: ['-y', 'kiln-mcp@2'], env: { KILN_API_TOKEN: token } } });
 
-  assert.deepEqual(await h.scan(), ['Tool kiln-deploy in .mcp.json differs from tools#1, so the row was left and the change was proposed as SG1.']);
+  assert.deepEqual(await h.scan(), ["Tool kiln-deploy in .mcp.json differs from the record's tools#1, so that was left as it is and the change was proposed as SG1."]);
+  /* THE QUESTION IN WORDS. It read "Change tools#8 to how fly-prism is set up in ~/.claude.json on
+     Maras-MacBook-Pro.local?"; the file, the machine and the handle are now the details. */
+  assert.equal(h.of('propose')[0]?.args.question, `Update the kiln-deploy tool to match ${thisMachine()}?`);
   assert.deepEqual(h.of('propose')[0]?.args.body, {
     register: 'tools',
     rows: [{ at: 'tools#1', version: 1, patch: { transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp@2'], endpoint: null, needs: ['KILN_API_TOKEN=credentials#7'] } }],
+    details: { source: '.mcp.json', machine: 'test-machine', row: 'tools#1' },
   });
   assert.deepEqual(h.of('update'), []);
   assert.deepEqual(h.of('vault/deposit'), []);
@@ -383,6 +390,27 @@ test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once p
   assert.deepEqual(await h.scan(), []);
   assert.equal(h.of('propose').length, 1);
   nowhere(h, [token]);
+});
+
+test('EVERY QUESTION THE SCAN ASKS IS WORDS: 80 characters at most, and no id, path or machine name in it', async (t) => {
+  const h = await setup(t, { project: true, grant: true });
+  /* Sixty-four characters, the longest name a tool may have. */
+  const long = `kiln-${'x'.repeat(59)}`;
+  h.add({ name: long, transport: 'stdio', command: 'npx', args: ['old'], needs: [], hosts: ['test-machine'], seen: new Date(NOW).toISOString() }, 'project');
+  h.mcp({ [long]: { command: 'npx', args: ['new'] } });
+  const servers: Record<string, unknown> = {};
+  for (let i = 0; i < 9; i++) servers[`server-number-${String(i)}`] = { command: `s${String(i)}-mcp` };
+  writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: servers }));
+
+  await h.scan();
+  const questions = h.of('propose').map((p) => String(p.args.question));
+  assert.equal(questions.length, 2, questions.join('\n'));
+  for (const q of questions) {
+    assert.ok(q.length <= 80, `${String(q.length)} characters: ${q}`);
+    assert.doesNotMatch(q, /#\d|~|\.json|test-machine|\/|\\/u, q);
+  }
+  assert.match(questions[0]!, /^Update the kiln-x+\.\.\. tool to match this (?:Mac|PC|machine)\?$/u);
+  assert.match(questions[1]!, /^Add 9 tools from this (?:Mac|PC|machine), for use everywhere: server-number-0(?:, [^?]+)? and \d more\?$/u);
 });
 
 test('A ROW THAT MATCHES only has this machine added to hosts and seen moved on, and then is left alone', async (t) => {

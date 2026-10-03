@@ -17,7 +17,8 @@
  *   5. Over the cap: 413, on `Content-Length` and again on the bytes as they arrive.
  *   6. Not JSON: 400, -32700.
  *   7. The headers that mirror the body, against the body: 400, -32022 or -32020.
- *   8. `handle`, with the context carrying `params._meta.session`. A notification is 202 with no body.
+ *   8. `handle`, with the context carrying `params._meta.session` and the client's own name and version, which the
+ *      2026-07-28 revision sends on every request. A notification is 202 with no body.
  *
  * `no-store` ON EVERY ANSWER: the URL does not name the record, so a cache keyed on it would hand one
  * caller's answer to another.
@@ -169,6 +170,29 @@ function disagrees(message: Record<string, unknown>, headers: Headers): Failure 
 }
 
 /**
+ * What a request's `_meta` says about who is calling, for the host's `session`: its `session` hints as sent, and the
+ * client's name and version beside them, or `null` for a request that says neither.
+ *
+ * THE CLIENT NAMES ITSELF ON EVERY REQUEST since the 2026-07-28 revision (`io.modelcontextprotocol/clientInfo`), which
+ * names the app without guessing: a run that knew only `agent: claude` could not tell Claude Code from claude.ai, and
+ * the owner's Agents page drew 447 of 500 runs as "other". A `session` that is not an object is handed on as it came,
+ * as it always was, and the host's grammar drops it; the client's two words are added only beside an object.
+ */
+function saidOf(meta: Record<string, unknown>): unknown {
+  const info = meta['io.modelcontextprotocol/clientInfo'];
+  const client = isObject(info)
+    ? {
+        ...(typeof info.name === 'string' && info.name !== '' ? { client: info.name } : {}),
+        ...(typeof info.version === 'string' && info.version !== '' ? { client_version: info.version } : {}),
+      }
+    : {};
+  const hinted = Object.hasOwn(meta, 'session');
+  if (!hinted && Object.keys(client).length === 0) return null;
+  if (!hinted) return client;
+  return isObject(meta.session) ? { ...client, ...meta.session } : Object.keys(client).length === 0 ? meta.session : client;
+}
+
+/**
  * The HTTP status a reply travels under. A result is 200. A message the transport could not accept is 400;
  * a method this server does not have is 404, as the 2026-07-28 binding asks; a throw is 500. A refusal of
  * the call itself is 200, because it is a result the model reads.
@@ -194,11 +218,13 @@ export async function serveMcp<C>(
   options: {
     maxBodyBytes?: number;
     /**
-     * The context with `params._meta.session` on it, for a client that says where it is in the body.
+     * The context with what the client says about itself on it: `params._meta.session`, where it is, and the app it is,
+     * from `_meta['io.modelcontextprotocol/clientInfo']`.
      *
      * THE HOST'S, because checking a hint is the host's: this package holds no grammar and never looks
-     * inside `ctx`. It is called only when the body carries `_meta.session`, and what it is handed is
-     * exactly what the caller sent.
+     * inside `ctx`. What it is handed is what the caller sent, `_meta.session`'s keys as they came and the client's
+     * name and version as `client` and `client_version` beside them, which a run records (`packages/kernel/src/
+     * session.ts`). It is called whenever the body carries either.
      */
     session?: (ctx: C, said: unknown) => C;
     /** Where this host serves the app, such as `https://brain.dog`. It is handed to `handle`, and the tools read it only to put a `decide` link on a filed question. Left out, that link is left out. */
@@ -225,7 +251,8 @@ export async function serveMcp<C>(
   }
 
   const meta = isObject(message) && isObject(message.params) && isObject(message.params._meta) ? message.params._meta : {};
-  const who = options.session && Object.hasOwn(meta, 'session') ? options.session(ctx, meta.session) : ctx;
+  const said = saidOf(meta);
+  const who = options.session && said !== null ? options.session(ctx, said) : ctx;
 
   const reply = await handle(message, surface, who, options.origin);
   return reply === null ? bare(202) : json(statusOf(reply), reply);

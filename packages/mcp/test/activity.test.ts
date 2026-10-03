@@ -65,7 +65,7 @@ test('activity IS A TOOL, so an agent picking up after another session can find 
 
   const out = await mcp.call('activity', {}, owner);
   assert.ok(out.ok, `activity refused: ${JSON.stringify(out)}`);
-  const { events } = out.value as { events: Line[] };
+  const { rows: events } = out.value as { rows: Line[] };
 
   /* NEWEST FIRST, which is what "what changed while I was away" means. */
   assert.deepEqual(
@@ -78,10 +78,41 @@ test('activity IS A TOOL, so an agent picking up after another session can find 
   assert.equal(events[0]?.seq, undefined);
   assert.equal(events[0]?.title, 'Chase the invoice');
   assert.equal(events[0]?.actor, 'p_1');
-  /* AND NO CURSOR, because the tool takes none: an answer that offered one would be teaching an
-     argument the next call is refused for. */
-  assert.deepEqual(Object.keys(out.value as object), ['events']);
+  /* IN THE ONE ENVELOPE, `{ rows, cursor }`, and with no cursor on a page that is the last: the tool takes one now, so
+     an answer that offers one is offering the call that reads the page below. */
+  assert.deepEqual(Object.keys(out.value as object), ['rows']);
   sql.close();
+});
+
+test('activity PAGES ON A CURSOR, wrapped so it carries no row id, and the next page starts where this one ended', async () => {
+  const { mcp, sql } = await record();
+  for (let i = 0; i < 5; i++) assert.ok((await mcp.call('create', { register: 'notes', fields: { what: `Note ${String(i)}` } }, owner)).ok);
+  const first = await mcp.call('activity', { limit: 2 }, owner);
+  assert.ok(first.ok);
+  const page = first.value as { rows: Record<string, unknown>[]; cursor?: string };
+  assert.equal(page.rows.length, 2);
+  assert.ok(typeof page.cursor === 'string', 'a page short of the log offered no way on');
+  assert.doesNotMatch(page.cursor, /[0-9A-HJKMNP-TV-Z]{26}/u, 'the cursor carried a raw id');
+  const next = await mcp.call('activity', { limit: 2, cursor: page.cursor }, owner);
+  assert.ok(next.ok, JSON.stringify(next));
+  const below = (next.value as { rows: Record<string, unknown>[] }).rows;
+  assert.equal(below.length, 2);
+  assert.deepEqual(new Set([...page.rows, ...below].map((e) => e.id)).size, 4, 'the second page repeated a line of the first');
+  sql.close();
+});
+
+test('activity LEAVES THE RECORD KEEPING ITS BOOKS OUT, and everything: true asks it back of the record', async () => {
+  const seen: unknown[] = [];
+  const { surface } = stub({
+    recentHistory: async (args: unknown) => {
+      seen.push(args);
+      return { ok: true, value: { events: [], cursor: null } };
+    },
+  });
+  assert.ok((await tools(surface).call('activity', {}, { who: 'agent' })).ok);
+  assert.ok((await tools(surface).call('activity', { everything: true, limit: 500 }, { who: 'agent' })).ok);
+  /* TWENTY BY DEFAULT AND A HUNDRED AT MOST, where the record's own are fifty and two hundred. */
+  assert.deepEqual(seen, [{ limit: 20 }, { limit: 100, everything: true }]);
 });
 
 test('activity TAKES A LIMIT, and a bad one is the record\'s own refusal rather than a silent default', async () => {
@@ -90,7 +121,7 @@ test('activity TAKES A LIMIT, and a bad one is the record\'s own refusal rather 
 
   const short = await mcp.call('activity', { limit: 2 }, owner);
   assert.ok(short.ok);
-  assert.equal((short.value as { events: Line[] }).events.length, 2);
+  assert.equal((short.value as { rows: Line[] }).rows.length, 2);
 
   const bad = await mcp.call('activity', { limit: 1.5 }, owner);
   assert.equal(bad.ok, false);
@@ -111,7 +142,7 @@ test('A LINE IS PAID FOR: the address replaces its parts, and an empty field doe
   t.diagnostic(`the log as the record answers it: ${String(before)} bytes; as the tool answers it: ${String(after)} bytes`);
   assert.ok(after < before * 0.7, `the tool relayed ${String(after)} bytes where the record sent ${String(before)}`);
 
-  const { events } = asked.value as { events: Record<string, unknown>[] };
+  const { rows: events } = asked.value as { rows: Record<string, unknown>[] };
   const row = events.find((e) => e.spoken === 'NO1');
   assert.ok(row, 'the write to a row is not addressed');
   assert.equal(row.target, undefined, 'the row id travelled beside the address that replaces it');
@@ -132,9 +163,20 @@ test('A LINE ABOUT NO ROW KEEPS ITS TARGET, which is all it has left', async () 
   const { surface } = stub({ recentHistory: async () => ({ ok: true, value: { events: [line], cursor: null } }) });
   const out = await tools(surface).call('activity', {}, { who: 'agent' });
   assert.ok(out.ok);
-  assert.deepEqual((out.value as { events: unknown[] }).events, [
+  assert.deepEqual((out.value as { rows: unknown[] }).rows, [
     { rowid: 9, id: 'e1', ts: '2026-09-20T12:00:00.000Z', actor: 'p_1', kind: 'declaration', target: 'declaration:register.notes', target_kind: 'declaration' },
   ]);
+});
+
+test('A LINE ABOUT A QUESTION SAYS IT ONCE: its title, which repeated its note word for word, goes', async () => {
+  const asked = 'bank-card-used-sms could not read account out of this one. Accept it into transactions, or fix the pattern.';
+  const line = { id: 'e2', ts: '2026-09-20T12:00:00.000Z', actor: 'ingest:bank-card-used-sms', kind: 'suggest', target: 'suggestion:SG71', target_kind: 'suggestion', note: asked, title: asked };
+  const { surface } = stub({ recentHistory: async () => ({ ok: true, value: { events: [line], cursor: null } }) });
+  const out = await tools(surface).call('activity', {}, { who: 'agent' });
+  assert.ok(out.ok);
+  const [said] = (out.value as { rows: Record<string, unknown>[] }).rows;
+  assert.equal(said?.note, asked);
+  assert.equal(said?.title, undefined, 'the question travelled twice on one line');
 });
 
 /**
@@ -157,15 +199,15 @@ test('A CALLER HELD TO ONE REGISTER SEES ONLY ITS LINES, and the holding is the 
   assert.ok((await mcp.call('create', { register: 'notes', fields: { what: 'A note' } }, owner)).ok);
   assert.ok((await mcp.call('create', { register: 'bills', fields: { what: 'A bill' } }, owner)).ok);
 
-  const whole = (await mcp.call('activity', {}, owner)) as { ok: true; value: { events: Line[] } };
+  const whole = (await mcp.call('activity', {}, owner)) as { ok: true; value: { rows: Line[] } };
   assert.ok(whole.ok);
-  assert.deepEqual(new Set(whole.value.events.map((e) => e.title)), new Set(['A note', 'A bill']));
+  assert.deepEqual(new Set(whole.value.rows.map((e) => e.title)), new Set(['A note', 'A bill']));
 
   /* THE PREMISE FIRST: without the ceiling both are there, so what is missing below is the ceiling's
      doing and not the fixture's. */
-  const held = (await mcp.call('activity', {}, { ...owner, registers: ['notes'] })) as { ok: true; value: { events: Line[] } };
+  const held = (await mcp.call('activity', {}, { ...owner, registers: ['notes'] })) as { ok: true; value: { rows: Line[] } };
   assert.ok(held.ok);
-  assert.deepEqual(held.value.events.map((e) => e.title), ['A note']);
+  assert.deepEqual(held.value.rows.map((e) => e.title), ['A note']);
   sql.close();
 });
 

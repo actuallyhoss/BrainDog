@@ -132,9 +132,11 @@ test('a row is addressed the way a person says it, and made and read and changed
   value(await mcp.call('update', { spoken: 'obligations#1', patch: { state: 'paid' }, version: made.version }, owner));
   assert.equal(value<{ state: string }>(await mcp.call('get', { spoken: 'obligations#1' }, owner)).state, 'paid');
 
-  const events = value<{ kind: string; note: string | null }[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
-  assert.deepEqual(events.map((e) => e.kind), ['create', 'state']);
-  assert.equal(events[0]?.note, 'From the PDF');
+  /* THE ONE ENVELOPE EVERY LIST-LIKE READ SHARES, `{ rows, matched }`, where it answered a bare array. */
+  const events = value<{ rows: { kind: string; note?: string }[]; matched: number }>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
+  assert.deepEqual(events.rows.map((e) => e.kind), ['create', 'state']);
+  assert.equal(events.rows[0]?.note, 'From the PDF');
+  assert.equal(events.matched, 2);
   sql.close();
 });
 
@@ -154,18 +156,20 @@ test('AN AGENT CAN DELETE A ROW, and the tool list is where it finds out how', a
   value(await mcp.call('create', { register: 'obligations', fields: { what: 'Duplicate of 41' } }, owner));
   value(await mcp.call('update', { spoken: 'obligations#1', patch: { deleted_at: true }, note: 'A duplicate.' }, owner));
 
-  /* GONE FROM EVERY READ, and the record says so by answering nothing rather than by refusing:
-     a deleted row is not a row somebody may not see. */
-  assert.equal(value<unknown>(await mcp.call('get', { spoken: 'obligations#1' }, owner)), null);
+  /* GONE FROM EVERY READ. The record answers `null` for a row nobody may read, and the tool says so as a refusal,
+     `ROW_UNKNOWN`, with the call that lists what is there: a bare `null` gave an agent nothing to do next. */
+  const gone = refusal(await mcp.call('get', { spoken: 'obligations#1' }, owner));
+  assert.equal(gone.code, 'ROW_UNKNOWN');
+  assert.equal((gone as { try?: string }).try, 'list {"register":"obligations"}');
   assert.equal(value<{ matched: number }>(await mcp.call('list', { register: 'obligations' }, owner)).matched, 0);
-  /* AND IT HAPPENED, rather than the patch being dropped quietly. `history` answers nothing for a
-     row that is gone, so the log of the whole record is the only place left that carries it, which
+  /* AND IT HAPPENED, rather than the patch being dropped quietly. `history` refuses a row that is
+     gone as `get` does, so the log of the whole record is the only place left that carries it, which
      is a second use for `activity` nobody planned. */
-  assert.deepEqual(value<unknown[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner)), []);
-  const { events } = value<{ events: { spoken: string; kind: string; note?: string }[] }>(await mcp.call('activity', {}, owner));
-  assert.equal(events[0]?.kind, 'delete');
-  assert.equal(events[0]?.spoken, 'obligations#1');
-  assert.equal(events[0]?.note, 'A duplicate.');
+  assert.equal(refusal(await mcp.call('history', { spoken: 'obligations#1' }, owner)).code, 'ROW_UNKNOWN');
+  const { rows } = value<{ rows: { spoken: string; kind: string; note?: string }[] }>(await mcp.call('activity', {}, owner));
+  assert.equal(rows[0]?.kind, 'delete');
+  assert.equal(rows[0]?.spoken, 'obligations#1');
+  assert.equal(rows[0]?.note, 'A duplicate.');
   sql.close();
 });
 
@@ -247,7 +251,7 @@ test('THE LIMITS `list` AND `search` ADVERTISE ARE THE ONES THE RECORD KEEPS, ce
   /* AND SEARCH ANSWERS THE SAME SHAPE AS `list` NOW, for the same reason: a hundred hits is
      character-for-character the answer to a query with exactly a hundred matches, so an agent that asked a
      broad question could not tell a whole answer from a corner of one. */
-  const hits = value<{ rows: unknown[]; matched: number; showing: number }>(await mcp.call('search', { q: 'zebrafish' }, owner));
+  const hits = value<{ rows: unknown[]; matched: number }>(await mcp.call('search', { q: 'zebrafish' }, owner));
   assert.equal(hits.rows.length, found.fallback, `search with no limit answered ${String(hits.rows.length)} hits and promises ${String(found.fallback)}`);
   assert.ok(hits.matched >= hits.rows.length, 'a search answered fewer matches than the rows it handed over');
   const every = value<{ rows: unknown[] }>(await mcp.call('search', { q: 'zebrafish', limit: found.ceiling + 50 }, owner));
@@ -264,8 +268,8 @@ test('a note changes nothing and is still a write, so it lands in the history', 
   const after = value<{ fields: Record<string, unknown> }>(await mcp.call('get', { spoken: 'obligations#1' }, owner));
   assert.deepEqual(after.fields, before.fields, 'a note changed the row');
 
-  const events = value<{ note: string | null }[]>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
-  assert.equal(events.at(-1)?.note, 'Chased on the call.');
+  const events = value<{ rows: { note?: string }[] }>(await mcp.call('history', { spoken: 'obligations#1' }, owner));
+  assert.equal(events.rows.at(-1)?.note, 'Chased on the call.');
   sql.close();
 });
 
@@ -283,7 +287,10 @@ test('AND OVER A REAL RECORD, S1 IS THE RUN', async () => {
   const token: CallContext = { principal: { kind: 'token', id: 't', scope: 'write', person: 'p_1', level: 'owner' }, session: { client_id: 'c-1' } };
   value(await api.attach({ source: 'startup', client_id: 'c-1' }, token));
   assert.equal(value<{ fields: { client_id: string } }>(await mcp.call('get', { spoken: 'S1' }, owner)).fields.client_id, 'c-1');
-  assert.equal(value(await mcp.call('get', { spoken: 'S9' }, owner)), null);
+  /* A RUN THAT IS NOT THERE IS REFUSED AS ONE, and with no list to name, since only the record knows which owns `S`. */
+  const none = refusal(await mcp.call('get', { spoken: 'S9' }, owner));
+  assert.equal(none.code, 'ROW_UNKNOWN');
+  assert.match(none.fix, /^There is no S9 that you can read\./);
   sql.close();
 });
 
@@ -330,11 +337,36 @@ test('an address that is not one says what an address looks like', async () => {
   const { mcp, sql } = await agent();
   for (const spoken of ['41', 'obligations', 'Obligations#41', 'obligations#0', 's42', 'S0', 'S42x', undefined, 42])
     assert.match(refusal(await mcp.call('get', { spoken }, owner)).fix, /register#number.*S42/, String(spoken));
-  /* The tools that change a row, or read its history, take a prefixed id too, and one that names no row says so. */
-  for (const name of ['history', 'update', 'log']) {
-    assert.match(refusal(await mcp.call(name, { spoken: 'obligations', patch: {}, note: 'x' }, owner)).fix, /register#number/, name);
-    assert.match(refusal(await mcp.call(name, { spoken: 'S42', patch: {}, note: 'x' }, owner)).fix, /no row S42/, name);
+  /* The tools that change a row, or read its history, take a prefixed id too, and one that names no row says so. Each is
+     sent only what it takes, since an argument a tool does not take is refused before the address is read. */
+  const own: Record<string, Record<string, unknown>> = { history: {}, update: { patch: {} }, log: { note: 'x' } };
+  for (const [name, rest] of Object.entries(own)) {
+    const bare = refusal(await mcp.call(name, { spoken: 'obligations', ...rest }, owner));
+    assert.match(bare.fix, /register#number/, name);
+    /* AND THE CORRECTED CALL: a list's id said with no number is a list to read. */
+    assert.equal((bare as { try?: string }).try, 'list {"register":"obligations"}', name);
+    const missing = refusal(await mcp.call(name, { spoken: 'S42', ...rest }, owner));
+    assert.equal(missing.code, 'ROW_UNKNOWN', name);
+    assert.match(missing.fix, /no S42 that you can read/, name);
   }
+  /* A ROW THAT IS NOT THERE BY ITS NUMBER IS REFUSED BY history AS BY get, and pointed at its list, or at the list it
+     most likely meant when it names one nobody has. */
+  for (const name of ['get', 'history']) {
+    const gone = refusal(await mcp.call(name, { spoken: 'obligations#99' }, owner));
+    assert.equal(gone.code, 'ROW_UNKNOWN', name);
+    assert.equal((gone as { try?: string }).try, 'list {"register":"obligations"}', name);
+    const typo = refusal(await mcp.call(name, { spoken: 'obligation#99' }, owner));
+    assert.equal(typo.code, 'ROW_UNKNOWN', name);
+    assert.equal((typo as { try?: string }).try, `${name} {"spoken":"obligations#99"}`, name);
+  }
+  /* AN ARGUMENT A TOOL DOES NOT TAKE IS REFUSED, never dropped: `fields` on update changed nothing and answered "Changed". */
+  const stray = refusal(await mcp.call('update', { spoken: 'obligations#1', fields: { what: 'x' } }, owner));
+  assert.equal(stray.code, 'FIELD_UNKNOWN');
+  assert.equal((stray as { at?: string }).at, 'fields');
+  assert.equal((stray as { try?: string }).try, 'update {"spoken":"obligations#1","patch":{"what":"x"}}');
+  /* A CAPITAL IN THE LIST, OR A PREFIX IN LOWER CASE, IS THE CALL WITH IT PUT RIGHT. */
+  assert.equal((refusal(await mcp.call('get', { spoken: 'Obligations#41' }, owner)) as { try?: string }).try, 'get {"spoken":"obligations#41"}');
+  assert.equal((refusal(await mcp.call('get', { spoken: 's42' }, owner)) as { try?: string }).try, 'get {"spoken":"S42"}');
   sql.close();
 });
 
@@ -369,7 +401,7 @@ test('A PREFIXED ID IS WRITTEN TO, as context names it: update, log and history 
   value(await api.attach({ source: 'startup', client_id: 'c-1' }, token));
   const run = value<{ version: number }>(await mcp.call('get', { spoken: 'S1' }, owner));
   value(await mcp.call('log', { spoken: 'S1', note: 'Looked at from the app.' }, owner));
-  assert.ok(value<unknown[]>(await mcp.call('history', { spoken: 'S1' }, owner)).length >= 2);
+  assert.ok(value<{ rows: unknown[] }>(await mcp.call('history', { spoken: 'S1' }, owner)).rows.length >= 2);
   const moved = await mcp.call('update', { spoken: 'S1', patch: { doing: 'Checking the gates' }, version: run.version + 1 }, token);
   /* Answered as context names it, and the other spelling is still taken. */
   const said = value<{ spoken: string; version: number }>(moved);
@@ -395,11 +427,31 @@ test('GOVERNANCE LISTS EACH QUESTION WITHOUT ITS BODY, and one by id is whole', 
       owner,
     ),
   );
-  const listed = value<Record<string, unknown>[]>(await mcp.call('governance', {}, owner));
-  assert.equal(listed[0]?.question, 'File this?');
-  assert.equal(listed[0]?.body, undefined);
-  assert.ok(!Object.values(listed[0] ?? {}).includes(null), 'an empty field cost tokens');
+  /* IN THE ONE ENVELOPE, with how many wait in all: it answered a bare array with no total and no way on. */
+  const listed = value<{ rows: Record<string, unknown>[]; matched: number; cursor?: string }>(await mcp.call('governance', {}, owner));
+  assert.equal(listed.rows[0]?.question, 'File this?');
+  assert.equal(listed.rows[0]?.body, undefined);
+  assert.ok(!Object.values(listed.rows[0] ?? {}).includes(null), 'an empty field cost tokens');
+  assert.equal(listed.matched, 1);
+  assert.equal(listed.cursor, undefined, 'the last page offered a way on');
   assert.ok(value<{ body: unknown }>(await mcp.call('governance', { id: asked.id }, owner)).body);
+  /* AND ONE THAT IS NOT THERE IS REFUSED, `ROW_UNKNOWN`, never the bare `null` the record answers for it. */
+  assert.equal(refusal(await mcp.call('governance', { id: 'SG999' }, owner)).code, 'ROW_UNKNOWN');
+  sql.close();
+});
+
+test('GOVERNANCE PAGES ON A CURSOR, the id of the last question shown, until a page carries none', async () => {
+  const { mcp, sql } = await agent();
+  const options = { options: [{ id: 'a', label: 'Yes', because: 'one' }, { id: 'b', label: 'No', because: 'two' }] };
+  for (let i = 1; i <= 5; i += 1) value(await mcp.call('propose', { question: `Question ${String(i)}?`, body_kind: 'options', body: options }, owner));
+  const first = value<{ rows: { id: string }[]; matched: number; cursor?: string }>(await mcp.call('governance', { limit: 3 }, owner));
+  assert.equal(first.rows.length, 3);
+  assert.equal(first.matched, 5);
+  assert.equal(first.cursor, first.rows.at(-1)?.id);
+  const second = value<{ rows: { id: string }[]; cursor?: string }>(await mcp.call('governance', { limit: 3, cursor: first.cursor }, owner));
+  assert.equal(second.rows.length, 2);
+  assert.equal(second.cursor, undefined);
+  assert.equal(new Set([...first.rows, ...second.rows].map((r) => r.id)).size, 5, 'a question was answered twice, or not at all');
   sql.close();
 });
 
@@ -584,12 +636,13 @@ test('search finds a row by any of its searchable fields, and the words are pref
   ]);
   value(await mcp.call('create', { register: 'people', fields: { name: 'Halden Studio' } }, owner));
 
-  const found = value<{ rows: { spoken: string; title: string }[]; matched: number; showing: number }>(await mcp.call('search', { q: 'hal' }, owner));
+  const found = value<{ rows: { spoken: string; title: string; register: string }[]; matched: number }>(await mcp.call('search', { q: 'hal' }, owner));
   assert.equal(found.rows.length, 1);
   assert.equal(found.rows[0]?.spoken, 'people#1');
   assert.equal(found.rows[0]?.title, 'Halden Studio', 'a hit that does not say what it is makes the agent fetch it to find out');
+  /* AND WHICH LIST IT IS IN: "braindog" matched a run, a tool, a project and a skill on the owner's record, alike. */
+  assert.equal(found.rows[0]?.register, 'people');
   assert.equal(found.matched, 1, 'a search that handed over every row it matched still has to say how many that was');
-  assert.equal(found.showing, 1);
   sql.close();
 });
 

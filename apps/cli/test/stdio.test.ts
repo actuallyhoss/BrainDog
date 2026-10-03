@@ -42,9 +42,10 @@ type Seen = { method: string; query: URLSearchParams; headers: IncomingHttpHeade
    agent sees it (`packages/mcp/src/index.ts` `SHAPED`, `listed`), which is what a row without them was
    never a stand-in for: `compact` reads `isEntry`, and a row missing `id`, `register` or `version` fails
    that check and is handed to `listed` unchanged, so `spoken` and `version` are read off fields that were
-   never there. `COMPACTED_ROWS` below is what the tool actually answers for this one. */
+   never there. `COMPACTED_ROWS` below is what the tool actually answers for this one, in `structuredContent`, and
+   with no `cursor`, since a null says nothing a missing key does not. */
 const ROWS = { rows: [{ id: 'obligations#1', register: 'obligations', seq: 1, version: 1, fields: { what: 'Rent' } }], matched: 1, cursor: null };
-const COMPACTED_ROWS = { rows: [{ spoken: 'obligations#1', version: 1, fields: { what: 'Rent' } }], matched: 1, cursor: null };
+const COMPACTED_ROWS = { rows: [{ spoken: 'obligations#1', version: 1, fields: { what: 'Rent' } }], matched: 1 };
 
 /**
  * `list` answers at once, after 300 ms for `late`, or never for `hangs`.
@@ -195,7 +196,8 @@ function launch(extra: Record<string, string>, options: { args?: string[]; confi
   };
 }
 
-const said = (reply: Rpc) => JSON.parse(reply.result.content[0].text) as Record<string, unknown>;
+/** The whole answer, which is `structuredContent`; the text beside it is the brief one a model reads first. */
+const said = (reply: Rpc) => reply.result.structuredContent as Record<string, unknown>;
 
 /* ── the protocol ──────────────────────────────────────────────────────── */
 
@@ -226,14 +228,21 @@ test('initialize and tools/list answer without touching the host, and the list i
    * through the pipe left the names assertion green: sixteen tools arrived, correctly named, and
    * not one of them was callable, because a model chooses a tool by its description and fills it in
    * from its schema. So each tool is compared whole against the declaration it was built from, and
-   * the read-only annotation with it, since that is what a client shows a person before it runs
-   * something. This goes red when the server adds a field to a listed tool, and that is right: a
-   * field that does not survive serialisation is a field the client never sees.
+   * its title and hints with it, since that is what a client shows a person before it runs
+   * something: a read is read-only, a write says whether it can lose anything, and none reaches
+   * outside the record. This goes red when the server adds a field to a listed tool, and that is
+   * right: a field that does not survive serialisation is a field the client never sees.
    */
   for (const tool of TOOLS)
     assert.deepEqual(
       served.get(tool.name),
-      { name: tool.name, description: tool.description, inputSchema: tool.input, ...(tool.writes ? {} : { annotations: { readOnlyHint: true } }) },
+      {
+        name: tool.name,
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.input,
+        annotations: tool.writes ? { destructiveHint: tool.destructive === true, openWorldHint: false } : { readOnlyHint: true, openWorldHint: false },
+      },
       `${tool.name} did not survive the pipe as it was declared`,
     );
 
@@ -397,6 +406,8 @@ test('A LIST CALL goes to /api/list with the bearer and the session headers, and
   const reply = await s.ask('tools/call', { name: 'list', arguments: { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 } });
   assert.notEqual(reply.result.isError, true, reply.result.content[0].text);
   assert.deepEqual(said(reply), COMPACTED_ROWS);
+  /* AND THE TEXT IS THE BRIEF ONE, the row by its words and its handle, read from the same answer. */
+  assert.match(reply.result.content[0].text, /^Rent \(obligations#1\)$/mu, reply.result.content[0].text);
 
   const hit = host.seen.find((x) => x.method === 'list');
   assert.ok(hit, 'the host was never asked');

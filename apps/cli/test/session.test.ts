@@ -11,7 +11,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { sessionDeclaration } from '@braindog/kernel';
 
-import { sessionPath, writeSession } from '../src/hooks.ts';
+import { readSession, sessionPath, writeSession } from '../src/hooks.ts';
 import { machine } from '../src/json.ts';
 import { session, STATES } from '../src/session.ts';
 import type { AgentIo } from '../src/skills.ts';
@@ -31,11 +31,11 @@ const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-7b3
 const printed: string[] = [];
 
 type After = { after: (fn: () => void | Promise<void>) => void };
-type Seen = { method: string; args: Record<string, unknown>; authorization: string | undefined };
+type Seen = { method: string; args: Record<string, unknown>; authorization: string | undefined; headers: IncomingHttpHeaders };
 type Answer = { ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string; at?: string } } | 'cut';
 
-const LIVE_OTHER = { spoken: 'S9', state: 'active', doing: 'the gates', agent: 'claude', repo: 'kiln', project: null, stale: false, age_s: 120 };
-const LIVE_SELF = { spoken: 'S7', state: 'active', doing: 'this', agent: 'claude', repo: 'kiln', project: null, stale: false, age_s: 3 };
+const LIVE_OTHER = { spoken: 'S9', state: 'active', doing: 'the gates', agent: 'claude', repo: 'kiln', project: null, stale: false, quiet: false, age_s: 120 };
+const LIVE_SELF = { spoken: 'S7', state: 'active', doing: 'this', agent: 'claude', repo: 'kiln', project: null, stale: false, quiet: false, age_s: 3 };
 
 /** Where a run stands, as `context` answers it. Each test bends one field of this. */
 const CONTEXT = {
@@ -69,7 +69,7 @@ async function stub(t: After, o: { context?: unknown; handoff?: Answer } = {}) {
           args[k] = v;
         }
       }
-      seen.push({ method, args, authorization: req.headers.authorization });
+      seen.push({ method, args, authorization: req.headers.authorization, headers: req.headers });
       const answer = (value: unknown) => {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify(value));
@@ -106,11 +106,14 @@ async function gone(): Promise<string> {
   return base;
 }
 
-/** A folder of its own, its config folder, and the `AgentIo` a command is given. */
-function setup(t: After, base: string, o: { file?: boolean } = {}) {
+/**
+ * A folder of its own, its config folder, and the `AgentIo` a command is given. With `remember`, its headers are what
+ * `main.ts` makes them, from the session file for the folder; `env` adds variables, such as Claude Code's own.
+ */
+function setup(t: After, base: string, o: { file?: boolean; remember?: boolean; env?: Record<string, string> } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'braindog-session-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const env = { XDG_CONFIG_HOME: join(dir, 'config'), APPDATA: join(dir, 'config'), BRAINDOG_HOST: base, BRAINDOG_TOKEN: TOKEN, BRAINDOG_TIMEOUT_MS: '4000' };
+  const env: Record<string, string | undefined> = { XDG_CONFIG_HOME: join(dir, 'config'), APPDATA: join(dir, 'config'), BRAINDOG_HOST: base, BRAINDOG_TOKEN: TOKEN, BRAINDOG_TIMEOUT_MS: '4000', ...o.env };
   const out: string[] = [];
   const said: string[] = [];
   if (o.file !== false) writeSession(sessionPath(env, dir), { host: base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: '2026-09-15T00:00:00Z' });
@@ -123,7 +126,10 @@ function setup(t: After, base: string, o: { file?: boolean } = {}) {
     home: dir,
     out: (l) => void (out.push(l), printed.push(l), m.out(l)),
     say: m.say,
-    headers: async () => ({}),
+    headers: async (to: string) => {
+      const held = o.remember ? readSession(sessionPath(env, dir)) : null;
+      return held === null || held.host !== to ? {} : { 'x-braindog-session': held.spoken, ...(held.client_id === undefined ? {} : { 'x-braindog-client': held.client_id }) };
+    },
     answer: m.answer,
   };
   return { dir, env, io, out, said, envelope: m.envelope };
@@ -150,6 +156,12 @@ test('SHOW PRINTS THE RUN, ITS STATE, THE LAST HANDOFF AND WHO ELSE IS LIVE HERE
   assert.deepEqual(h.said, []);
   assert.deepEqual(host.seen.map((s) => s.method), ['context']);
   assert.equal(host.seen[0]?.authorization, `Bearer ${TOKEN}`);
+
+  /* Open is not working: a run nobody has heard from in thirty minutes is said to have gone quiet. */
+  const quiet = await stub(t, { context: { ...CONTEXT, live: { same_repo: [{ ...LIVE_OTHER, quiet: true, age_s: 2_400 }, LIVE_SELF], elsewhere: [] } } });
+  const later = setup(t, quiet.base);
+  assert.equal(await session(['show'], later.io), 0, later.said.join('\n'));
+  assert.equal(later.out.at(-1), 'Also live here: S9 gone quiet "the gates", seen 40 minutes ago.');
 });
 
 test('show says so when there is no project, no handoff and nobody else here', async (t) => {
@@ -181,6 +193,27 @@ test('NEXT, TRIED AND NOTE EACH REACH handoff UNDER THEIR OWN FIELD, and none of
     assert.deepEqual(h.out, [line], h.said.join('\n'));
     assert.deepEqual(h.said, [], verb);
   }
+});
+
+test('EACH VERB ADDRESSES THE CALLER’S OWN RUN: its Claude Code session’s, never another session’s file, and no file twelve hours quiet', async (t) => {
+  const host = await stub(t);
+  const run = (h: ReturnType<typeof setup>) => session(['next', 'Run the gates'], h.io);
+  const named = (s: Seen) => [s.method, s.headers['x-braindog-session'], s.headers['x-braindog-client']];
+
+  /* Inside Claude Code: the session's own id, whatever the folder remembers. */
+  const inside = setup(t, host.base, { remember: true, env: { CLAUDE_CODE_SESSION_ID: 'claude-run-mine' } });
+  assert.equal(await run(inside), 0, inside.said.join('\n'));
+  assert.deepEqual(host.seen.splice(0).map(named), [['context', undefined, 'claude-run-mine'], ['handoff', undefined, 'claude-run-mine']]);
+
+  /* Elsewhere: the folder's run while a hook heard from it in the last twelve hours, and none after. */
+  const fresh = setup(t, host.base, { remember: true });
+  writeSession(sessionPath(fresh.env, fresh.dir), { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: new Date(Date.now() - 3_600_000).toISOString() });
+  assert.equal(await run(fresh), 0, fresh.said.join('\n'));
+  assert.deepEqual(host.seen.splice(0).map(named), [['context', 'S7', 'claude-run-1'], ['handoff', 'S7', 'claude-run-1']]);
+
+  const stale = setup(t, host.base, { remember: true });
+  assert.equal(await run(stale), 0, stale.said.join('\n'));
+  assert.deepEqual(host.seen.splice(0).map(named), [['context', undefined, undefined], ['handoff', undefined, undefined]]);
 });
 
 /* ── end ───────────────────────────────────────────────────────────────── */
@@ -268,6 +301,20 @@ test('WITH NO SESSION FILE FOR THIS FOLDER NOTHING IS SENT, and the sentence say
     assert.deepEqual(h.out, [], args.join(' '));
   }
   assert.deepEqual(host.seen, []);
+});
+
+test('INSIDE A HOST SESSION THAT SAYS ITS ID, a folder with no session file still reaches the session’s own run', async (t) => {
+  const host = await stub(t);
+  /* A subfolder of the one the session started in has no file of its own, and the session's id names the run anyway. */
+  const h = setup(t, host.base, { file: false, env: { CLAUDE_CODE_SESSION_ID: 'claude-run-mine' } });
+  assert.equal(await session(['next', 'Run the gates'], h.io), 0, h.said.join('\n'));
+  assert.deepEqual(
+    host.seen.map((s) => [s.method, s.headers['x-braindog-session'], s.headers['x-braindog-client']]),
+    [
+      ['context', undefined, 'claude-run-mine'],
+      ['handoff', undefined, 'claude-run-mine'],
+    ],
+  );
 });
 
 test('a run the host does not know is one sentence, not a 401', async (t) => {
