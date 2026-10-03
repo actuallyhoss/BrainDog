@@ -204,6 +204,8 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
     };
     const onQuestion = onTodayRow(() => document.querySelector('[data-row-cursor] .queue-act') !== null);
     const onTask = onTodayRow(() => document.querySelector('[data-row-cursor] [role="checkbox"]') !== null);
+    /* AND ON `/decide`, THE CURSOR ON A QUESTION'S CARD, which is what Decide's own keys act on (`questionUnder`). */
+    const onCard = onTodayRow(() => document.querySelector('.qa[data-row^="q:"][data-row-cursor]') !== null);
 
     /**
      * THE WRITES A TICK OR AN ANSWER SENDS, HELD. One record serves every recipe in this run, in the registry's order,
@@ -239,6 +241,23 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       );
       await page.reload({ waitUntil: 'networkidle' });
       await page.waitForTimeout(200);
+    };
+
+    /**
+     * NOR DOES IT HOLD A QUESTION WITH ROWS TO TICK, which is the only thing `e` edits on the gate: a proposal that adds
+     * two or more (`picked.ts`). Its one rowset, SG4, changes two rows that exist, and a change is taken whole. So SG4's
+     * read is handed to the screen as a proposal that adds two, in the record's own shape, as `arrivals` hands the Inbox
+     * its two; nothing is written, and `e` puts the focus on the first tick.
+     */
+    const toTick = async (page) => {
+      await page.route(/\/api\/governance\?.*\bid=SG4(?:&|$)/u, async (route) => {
+        const res = await route.fetch();
+        const said = await res.json();
+        if (said?.ok === true && said.value?.body) said.value.body.rows = [{ name: 'Specimen site' }, { name: 'Licence generator' }];
+        await route.fulfill({ response: res, json: said });
+      });
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('.picks input').first().waitFor({ timeout: 4000 });
     };
 
     const focusFirstCell = async (page) => {
@@ -419,6 +438,7 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       /* The gate is a question, and a question has an address. There is no `/gate` route. SG5 is the
          seeded record's Kiln licensing question (the sample's SG31): open, with three options. */
       'gate-highlight': { route: '/decide/SG5', press: ['2'] },
+      'gate-edit': { route: '/decide/SG4', setup: toTick, press: ['e'] },
       'gate-defer': { route: '/decide/SG5', press: ['d'] },
       /* SG5 is not the last open question, so `j` has a next one to go to. */
       'gate-next': { route: '/decide/SG5', press: ['j'] },
@@ -426,8 +446,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       /* THE QUEUES, on the classic screen at `/decide?classic`: 1-9, a, d and x on the `#q-` cards are its keys, and
          the declared page at `/decide` walks with the page reader's (j, k, x, Enter). The cursor starts on nothing,
          so a first `j` is the change for `decide-move`; every other key is pressed with the cursor already placed by
-         `setup`, or the `j` would be what changed the page. */
+         `setup`, or the `j` would be what changed the page. `e` is the declared page's own (`+page.svelte` `onkey`),
+         pressed there on a card, and the change is the question opening at `?edit`. */
       'decide-move': { route: '/decide?classic', press: ['j'] },
+      'decide-edit': { route: '/decide', setup: onCard, press: ['e'] },
       'decide-answer': { route: '/decide?classic', setup: onFirst, press: ['1'] },
       'decide-approve': { route: '/decide?classic', setup: onSuggested, press: ['a'] },
       'decide-defer': { route: '/decide?classic', setup: onFirst, press: ['d'] },

@@ -464,7 +464,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
      * THE THREE OF THEM ARE OUT HERE NOW, AND THAT IS THE SUMMARY'S DOING. `SEEDED` was declared inside
      * the per-app loop and the two matrices were spelt inline in the `for` headers, so the only place
      * that knew how many schemes and widths a run covered was the loop running them. The breakdown below
-     * has to say `dark and light, at 1440 and 390`, and a summary that recomputed those from the budget
+     * has to say `dark and light, at 1512 and 390`, and a summary that recomputed those from the budget
      * would print the full matrix for a seeded run that drove a quarter of it.
      */
     const SEEDED = Boolean(process.env.BRAINDOG_GATE_SEED);

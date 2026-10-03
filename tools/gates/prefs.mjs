@@ -221,8 +221,10 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       /* 1440 BY 900, WHICH IS THIS GATE'S VIEWPORT AND IS WHY THIS CASE CAN BE MEASURED AT ALL. The
          tab bar stays below 900px whatever the shape says, so the same three values there are one
          answer three times, correctly. */
-      /* `undefined` IS THE TOP BAR, the default, so the first value is "unset" rather than `'bar'`. */
-      values: [{}, { shape: 'rail' }, { shape: 'menu' }],
+      /* `undefined` IS THE RAIL, the default again (`19 §3`, and DIRECTION 37's floating rail card), so the first value
+         is "unset" rather than `'rail'`. A `'rail'` beside it would draw the rail twice, and this case is red on any two
+         values that agree, so the top bar is the second value now. */
+      values: [{}, { shape: 'bar' }, { shape: 'menu' }],
       probe: () =>
         [
           document.querySelectorAll('nav.rail').length,
@@ -308,12 +310,17 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
        * `nav.shape`: the record's word draws the shell, AND IT STANDS OVER THE COOKIE. The third value carries a top bar in
        * the cookie and a menu in the record, so a build that still read the cookie as the truth comes back with the top
        * bar twice and goes red.
+       *
+       * `bar` AND NOT `side` IN THE MIDDLE. `side` is the record's word for the rail, which was the one shape the unset load
+       * did not draw while the top bar was the default. With the rail the default again, a record that keeps nothing draws
+       * the rail too, and the two loads would be one answer twice. `bar` is the one word left that draws neither the rail nor
+       * the menu. The record's `side` still reads as the rail, which `nav-prefs.svelte.test.ts` holds.
        */
       name: 'nav.shape',
       record: true,
       what: "which navigation the shell draws when the record keeps the shape, over the cookie's copy (contracts §7.3)",
       route: '/',
-      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'side' } }, { shape: 'rail', '@record': { 'nav.shape': 'menu' } }],
+      values: [{ '@record': {} }, { '@record': { 'nav.shape': 'bar' } }, { shape: 'bar', '@record': { 'nav.shape': 'menu' } }],
       probe: () =>
         [
           document.querySelectorAll('nav.rail').length,

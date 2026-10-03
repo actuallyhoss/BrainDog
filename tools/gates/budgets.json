@@ -24,10 +24,14 @@
   },
   "layout": {
     "//": "13 §8, 22 §10. The widths a page is drawn at, and what counts as overflowing.",
+    "//floorWidths": "Real sizes, on top of both sides of every breakpoint. 320 is the narrowest phone still in use, 360 and 390 the phones most people hold (390 is the phone `a11y` audits and every batch is looked at on), 768 a common tablet. 1512 and 1728 are the two widths DIRECTION 37 judges every batch at, the default scaling of a 14-inch and a 16-inch MacBook Pro, and both are past the widest breakpoint, so without them the sweep never drew the desktop at the size it is read. `layout.mjs` runs no acts at either, and its variant pass takes them in place of the breakpoint desktop it used to add rather than beside it.",
     "floorWidths": [
       320,
       360,
-      768
+      390,
+      768,
+      1512,
+      1728
     ],
     "viewportHeightPx": 900,
     "//widthTolerancePx": "52 §4 records 0. One pixel is the recorded deviation, and it is sub-pixel rounding rather than a widened budget: `scrollWidth` is an integer rounded up from a fractional layout, so a page laid out to exactly the viewport reports one more than it. At 0 the gate is red on every route for a rounding mode.",
@@ -39,8 +43,9 @@
   },
   "a11y": {
     "//": "13 §9. Both schemes at both ends, because half of a contrast failure is invisible in one.",
+    "//widths": "1512 replaced 1440 on October 2nd: it is the narrower of the two widths DIRECTION 37 judges every batch at, where the desktop is tightest at the owner's own scale. 390 is the phone. Two and not three, because every width here is both schemes over every route and state scenario, and `layout` already draws 1728.",
     "widths": [
-      1440,
+      1512,
       390
     ],
     "port": 5186

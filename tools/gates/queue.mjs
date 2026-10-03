@@ -13,12 +13,13 @@
  * this gate drives `/p/agents` and nothing else.
  *
  * THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. `QueueAnswer.svelte` never sends a pressed
- * option to `/decide/[id]`: the card opens a reason line under itself, focused, and Enter sends it;
- * the card then becomes one line naming what was chosen, `.qa-done` and not `.queue-card`, so it
- * never breaks the ranking. So a run of this gate presses whatever a card offers, and checks three
- * things: the reason line opened with the focus, the press answered the question in place (the card
- * settled to `.qa-done` rather than the reason line timing out), and the page's own URL never moved,
- * because a question is answered where it is shown.
+ * option to `/decide/[id]`, and since DIRECTION §37 the record takes a decision without a reason,
+ * so one press is one request: the card becomes one line naming what was chosen, `.qa-done` and not
+ * `.queue-card`, so it never breaks the ranking. An older record still asks for a reason, and there
+ * the card opens one line under itself, focused, and Enter sends it. So a run of this gate presses
+ * whatever a card offers, and checks that the press answered the question in place (the card settled
+ * to `.qa-done`), that a reason line, where one opens, opened with the focus, and that the page's own
+ * URL never moved, because a question is answered where it is shown.
  *
  * THE SECOND BEHAVIOUR IS THE LAST LINE OF A QUEUE THAT HOLDS MORE THAN IT DRAWS: `queueMore(n)`,
  * an `<a class="queue-more">` where the evaluator supplied an address and a bare `<p>` where it did
@@ -300,8 +301,8 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
             const pressedLabel = (await press.innerText()).trim();
             const from = page.url();
             await press.click();
-            /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. The record wants a reason, so the card opens one line
-               under itself, focused; Enter sends it, and the card becomes one line naming what was chosen. */
+            /* THE PRESS IS THE ANSWER, WHERE IT IS SHOWN. The card becomes one line naming what was chosen. An older
+               record that still wants a reason opens one line under the card first, focused, and Enter sends it. */
             const why = card.locator('.qa-reason input');
             const done = block.locator('.qa-done', { hasText: pressedLabel });
             await Promise.race([why.waitFor({ timeout: budget('ready').settleTimeoutMs }), done.waitFor({ timeout: budget('ready').settleTimeoutMs })]).catch(() => {});
@@ -355,7 +356,7 @@ export default async function queue(root = join(import.meta.dirname, '..', '..')
     if (blind) findings.push(blind);
 
     if (findings.length === 0) {
-      console.log('queue: pressed a queue option and had it answered in place (the reason line focused, then the card settling to one line naming the choice), the count of what is left to /decide, and the cards arrived dearest first.');
+      console.log('queue: pressed a queue option and had it answered in place (the card settling to one line naming the choice), the count of what is left to /decide, and the cards arrived dearest first.');
     } else {
       console.error('\n  the queue block, driven in a real browser:');
       for (const f of findings) console.error(`      ${f}`);

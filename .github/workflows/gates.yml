@@ -6,8 +6,9 @@ name: gates
 # went stale twice. The "nineteen minutes" below is the argument as it was first made, on the PC.
 #
 # MEASURED ON THE HOSTED RUNNER (28 September and 1 October), nearly all of a run is two gates
-# driving a headless browser over a built app: `layout` is about 1450 page-runs (every route, at
-# both sides of every breakpoint the stylesheets declare, plus three floor widths) and took 21 to 27
+# driving a headless browser over a built app: `layout` was about 1450 page-runs (every route, at
+# both sides of every breakpoint the stylesheets declare, plus the floor widths; about 1,800 since
+# the floor became six widths on 2 October, 1512 and 1728 among them) and took 21 to 27
 # minutes; `a11y` is about 370 axe audits (every route, two schemes, two widths, plus the site) and
 # took 11. `self-test`, `keys`, `typecheck` and `prefs` are a minute or three each, and the rest are
 # seconds. Back to back in one job that is past the 35-minute ceiling, so from 2 October the run is

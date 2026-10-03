@@ -17,7 +17,9 @@
  * gets tested tomorrow without anybody editing this file.
  *
  * A floor of real sizes goes on top, because the narrowest phone still in use is narrower than any
- * breakpoint anyone writes.
+ * breakpoint anyone writes, and the laptop a person reads on is wider than all of them. Past the
+ * widest breakpoint every width is the one desktop layout, only wider, and the floor is the only thing
+ * that draws it at the size the owner judges it at (1512 and 1728, DIRECTION 37).
  *
  * WHAT COUNTS AS AN OVERFLOW is deliberately narrow, or a gate cries wolf and gets deleted. A table
  * wider than the viewport is CORRECT: it lives in `.table-region`, which scrolls, which is the
@@ -61,7 +63,7 @@ export const needs = ['web-build'];
  * runner it alone ran into `gates.yml`'s ceiling. Every width is one browser context and none of them
  * reads another, so `run.mjs` may hand this gate `{ part, of }` and each part sweeps every `of`th width,
  * the floor and the breakpoints dealt alternately so neither part is all phones. The variant pass has
- * its own four widths and is not cut, so it rides with part 1 alone and is never run twice.
+ * its own widths and is not cut, so it rides with part 1 alone and is never run twice.
  */
 export const slices = 2;
 
@@ -177,8 +179,13 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
    *
    * ONLY AT THE FLOOR WIDTHS, AND ONLY WHERE THERE IS AN ACT. The target-size rule turns on the
    * pointer and the pointer is emulated below 640, so a state opened at 1180px would be measured
-   * against a rule that does not apply there. Three widths and two acts is six extra page-runs on
+   * against a rule that does not apply there. Three widths and two acts was six extra page-runs on
    * a sweep of five hundred and seventy-two.
+   *
+   * AND NOT AT THE FLOOR'S TWO LAPTOP WIDTHS, which joined it so every screen is drawn at the size the
+   * owner reads it. Both are past the widest breakpoint under a fine pointer, which is the 1180px
+   * argument again with more room, so the acts keep to the phones and the tablet: four widths and
+   * eight page-runs on a sweep of about eighteen hundred.
    *
    * AN ACT THAT DOES NOT TAKE IS A FINDING AND NOT A SKIP. A `catch` here would give exactly the
    * green this block exists to stop being: the gate would report the state measured and have
@@ -205,7 +212,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     ],
   };
 
-  /** The narrowest phone still in the wild, one bigger phone, one common tablet. */
+  /** The narrowest phone still in the wild, two bigger phones, one common tablet, and the owner's two laptop widths. */
   const FLOOR = L.floorWidths;
 
   const TYPES = {
@@ -296,6 +303,10 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     /* One pixel either side of each. `width < 900px` is on at 899 and off at 900, and those are two
        different layouts that both have to hold. */
     const widths = [...new Set([...FLOOR, ...bps.flatMap((b) => [b - 1, b])])].sort((a, b) => a - b);
+    /* A DESKTOP IS A WIDTH AT OR PAST THE WIDEST BREAKPOINT, where no stylesheet changes its mind again and every
+       width draws the one layout, only wider. The floor's two laptop widths are there, so the acts and the variant
+       pass below ask this rather than reading the floor as a list of phones, which it no longer is. */
+    const desktop = (w) => bps.length > 0 && w >= bps[bps.length - 1];
     /* THIS PART'S WIDTHS AND NO OTHER, dealt in turn so each width is in exactly one part. Whole, it is all of them. */
     widths.splice(0, Infinity, ...widths.filter((_, i) => i % of === part - 1));
 
@@ -559,9 +570,10 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
         process.stdout.write(out.length ? '!' : '.');
         for (const o of out) findings.push(`${route} @${width}  ${o}`);
 
-        /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` is the phone
-           set; above it the pointer is fine and a 34px control is the density this product means. */
-        if (FLOOR.includes(width))
+        /* AND THEN THE STATES, at the widths where the rule they break applies. `FLOOR` short of its
+           desktops is the phones and the tablet; above them the pointer is fine and a 34px control is the
+           density this product means. */
+        if (FLOOR.includes(width) && !desktop(width))
           for (const act of ACTS[route] ?? []) {
             try {
               await act.run(page);
@@ -594,10 +606,14 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
      * from the first by one constant.
      */
     /* The floor and a desktop. `FLOOR` is the gate's own. A numeric literal here would be the
-       thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for. */
-    const variantWidths = [...FLOOR, bps[bps.length - 1] ?? 1_200];
+       thing `lib.mjs` forbids, and the narrowest phone is the width its preamble argues for.
+
+       THE FLOOR CARRIES ITS OWN DESKTOPS NOW, the owner's two laptop widths, so the widest breakpoint is
+       added only when no floor width reaches it. Added anyway, every variant route would be drawn at three
+       widths past the last breakpoint, where all three draw the one layout. */
+    const variantWidths = FLOOR.some(desktop) ? [...FLOOR] : [...FLOOR, bps[bps.length - 1] ?? 1_200];
     /* AND ONE OF THEM UNDER THE SEED. The seeded heading is 2000px wide, so the narrowest width proves
-       what four of them prove, and the other three are three browser contexts on every `pnpm gates`. */
+       what every one of them proves, and the rest are browser contexts on every `pnpm gates`. */
     if (process.env.BRAINDOG_GATE_SEED) variantWidths.length = 1;
 
     /* THE VARIANTS ONCE, IN THE FIRST PART, because they do not depend on the width list above. */
