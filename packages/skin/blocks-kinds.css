@@ -7,6 +7,11 @@
  *
  * THE ORDER IS THE ORDER THE RULES HAD IN `blocks.css`, before `blocks-charts.css`, so what one kind's rule overrides of
  * another's is unchanged. Each sheet opens its own `@layer components` block, as `blocks.css` does.
+ *
+ * EVERY SHEET KEEPS `blocks.css`'S MOTIF (DIRECTION §37): a kind that is rows (a feed, a queue of questions, a board's
+ * lanes, cards, inputs, a section's heading) draws its hairlines in `--rule`, which reads on the ground and on a tile,
+ * and `--line` is left to what only ever sits inside a tile (a figure's rows, a chart's grid). No word a person reads is
+ * set under `--t-sm`; `--t-xs` is kept for marks, initials in a face and key caps.
  */
 
 @import './kinds/panel.css';

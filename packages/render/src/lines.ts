@@ -62,6 +62,13 @@ export type LinesPlan = {
   against: string;
   /** No value anywhere: the chart is a sentence. */
   empty: boolean;
+  /**
+   * ONE VALUE ANYWHERE, AND NOTHING TO SET IT AGAINST: the measure is a figure, and not a chart of one dot. `value` is
+   * the reading as printed, `label` the point it was read at, and `line` the line it is on, which `was` says is the
+   * period before and `alone` says is the chart's one current line, the one its heading names. `null` whenever there is
+   * a line to draw.
+   */
+  single: { value: string; label: string; line: string; was: boolean; alone: boolean } | null;
   /** The chart's accessible name: each line's first and last value and its highest. */
   sentence: string;
 };
@@ -184,6 +191,21 @@ export function linesPlan(rows: readonly (readonly string[])[]): LinesPlan {
     })
     .join('; ');
 
+  /* ONE READING IS A FIGURE. 227 of the 261 measures a real record had read that month held exactly one point, its import's,
+     and a page of them drew each as a dot in an empty box over a fold of that one point. */
+  const lone = every.length === 1 ? values.findIndex((v) => v.some((x) => x !== null)) : -1;
+  const at1 = lone < 0 ? -1 : values[lone]!.findIndex((x) => x !== null);
+  const single =
+    lone < 0 || at1 < 0
+      ? null
+      : {
+          value: (body[at1]?.[lone + 1] ?? '').trim(),
+          label: (body[at1]?.[0] ?? '').trim(),
+          line: named[lone]!.label,
+          was: named[lone]!.was,
+          alone: named.filter((l) => !l.was).length === 1,
+        };
+
   return {
     axis: (head[0] ?? '').trim(),
     lines,
@@ -197,8 +219,20 @@ export function linesPlan(rows: readonly (readonly string[])[]): LinesPlan {
     trend,
     against: compared >= 0 ? named[compared]!.label : '',
     empty: every.length === 0,
+    single,
     sentence,
   };
+}
+
+/**
+ * WHAT A FIGURE OF ONE READING SAYS BESIDE ITS VALUE: when it was read, and that it is the only reading, which is why
+ * there is no line. The line is named where the figure does not say which it is: under no heading, in the period before,
+ * or on a chart of two lines or more, where "Revenue and costs" over a lone £5 read as the revenue it was not.
+ */
+export function linesOnly(single: NonNullable<LinesPlan['single']>, headed: boolean): string {
+  const which = single.was || !single.alone || !headed ? `${single.line}, ` : '';
+  const said = `${which}${single.label ? `${single.label}, ` : ''}${LINES_ONLY}`;
+  return `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
 }
 
 /** The point a pointer at `fraction` along the chart is nearest, or -1 when there are none. */
@@ -214,3 +248,5 @@ export const LINES_NOTHING = 'no values';
 /** NOT "The numbers", which is what a page of tiles is headed: a chart's fold holds the points it was drawn from. */
 export const LINES_NUMBERS = 'Points on this chart';
 export const LINES_AGAINST = 'against';
+/** Beside a figure of one reading: why it is a figure and not a line. */
+export const LINES_ONLY = 'the only reading';

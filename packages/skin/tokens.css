@@ -93,21 +93,15 @@
     /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
        among three of them. Raising the scale is not a fix for a hard-to-read screen — the fault is
        in what it says and how it is arranged (13 §7). */
-    /* THE MARK IS NOT A STEP ON THE READING SCALE, and that is why nothing on the scale fitted it.
-       `IdentityMark` draws a coloured glyph beside a name at 9px so it reads as a mark rather than
-       as a second word, and it is `aria-hidden`, so nobody reads it as text at all. The scale
-       floors at `--t-xs` deliberately (see the note below it), and growing a step under that for
-       one decorative glyph would invite the rest of the app through the same gap. It is authored
-       here and not beside `--mark-l` and `--mark-c`, because those are solved per theme and live
-       in a generated file: a size is a constant, not a palette output. */
-    --mark-t: 9px;
-
     --t-xs: 12px;
+    /* THE FLOOR FOR WORDS. Nothing a person reads is set under 13; `--t-xs` is for a chart's axis and a mark. */
     --t-sm: 13px;
-    /* 2026-09-16, one notch down. Every reference for a dense record sets
-       its chrome at 13 to 14 and ranks with weight and ink; 15 made a ledger read like a landing
-       page. Long prose still reaches 16 through `--t-md`. */
-    --t-base: 14px;
+    /* 15, AND IT WAS 14 (DIRECTION §36: "larger, steadier type", read on a laptop at arm's length). At 14 under a
+       1.5 leading a page of rows read as a dense tool. A ledger keeps its density through weight, ink and the row's
+       height, not through a smaller face. The reader's three Text steps are `--t-sm`, this and `--t-md`, and they
+       stay three different sizes, which `tools/gates/prefs.mjs` asserts; `--t-md` is also the floor a stat figure
+       fits down to (`kinds/stat.css`). */
+    --t-base: 15px;
     --t-md: 16px;
     --t-lg: 20px;
     --t-xl: 24px;
@@ -124,9 +118,10 @@
     --text: var(--t-base);
 
     --lh-tight: 1.22;
-    --lh-body: 1.5;
+    /* About 1.55 for running text at 15, which gives a two-line row title and a paragraph room between lines. */
+    --lh-body: 1.55;
 
-    /* The chrome reads at the body size, not below it. 14 is the body step, and the chrome is body;
+    /* The chrome reads at the body size, not below it. 15 is the body step, and the chrome is body;
        the reader who wants more sets Text to Large.
 
        AND `--text` IS THE BODY STEP, WHICH IS THE WHOLE POINT OF IT. This read `var(--t-base)` — a
@@ -175,35 +170,9 @@
     --r-lg: 22px;
     --r-pill: 999px;
 
-    /**
-     * THE RESTING LEVEL OF THE ELEVATION LADDER, and it was `none`.
-     *
-     * IT USED TO SAY "NO ELEVATION. Not a soft shadow, not an inset highlight, nothing", and argued
-     * that a border is honest and shadows are how a flat medium fakes depth. It closed by inviting
-     * "a component that wants elevation" to come and change the line. Sixteen of them had already
-     * asked: `blocks.css` five times, `rows.css`, `RowCards`, `Second`, `/decide` twice,
-     * `/decide/<id>` twice, `/packs`, `/r/<register>/<seq>`, `/settings/<area>` and `/start` all
-     * write `box-shadow: var(--raise)`, and every one of them resolved to nothing.
-     *
-     * AND IT WAS NOT THE PRODUCT'S DECISION TO MAKE. `05 §6` lists the elevation ladder among the
-     * rules a theme is checked against: *"three levels, fixed geometry, alphas per scheme; a theme
-     * has no `shadow` or `elevation` key"*. `28 §1` gives the generator the job. `39 §13 D9` names
-     * it. `28 §4.4` check I refuses a theme whose ladder is not monotonic in both schemes, and
-     * `packages/theme/src/checks.ts:287` implements that refusal. `css.ts:26-28` emits `--e1`,
-     * `--e2` and `--e3` into all twelve scheme blocks of `house.css` and `alpha.css`.
-     *
-     * So the ladder is generated per scheme, validated, shipped, and painted at two of its three
-     * levels: `--e2` on menus, row menus and toasts, `--e3` on sheets and the palette. Level one,
-     * the level a resting card is meant to sit at, was declared, checked, and then overwritten
-     * here with `none`. A generator that computes a value nobody paints is the same defect as a
-     * flag nothing reads, and this one had a paragraph over it explaining that it was on purpose.
-     *
-     * It is `var(--e1)` and not a literal so the value stays the theme's: a record that declares
-     * its own theme gets its own alphas, in both schemes, and forced-colors still deletes all
-     * three, which is why `28 §2` requires the border underneath and every one of those sixteen
-     * rules already has one.
-     */
-    --raise: var(--e1);
+    /* THE ELEVATION LADDER IS THE THEME'S (`--e1` to `--e3`, generated per scheme and checked monotonic in both by
+       `packages/theme`). A resting tile names `--e1` itself; the alias that used to stand for it here (`--raise`) had
+       no reader left, and a token nobody paints is the same defect as a flag nothing reads. */
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
@@ -236,14 +205,21 @@
     --tab-h: 56px;
     --tabbar: calc(var(--tab-h) + env(safe-area-inset-bottom));
     --measure: 72ch;
-    /* THE PAGE GUTTER, ONE VALUE FOR THE HEAD AND THE CONTENT UNDER IT . The head
-       padded 24 and every page padded 32, so no title on any screen shared a left edge with the list
-       it named. A width query and not a pointer query, because this is layout, not target size. */
-    --gutter: var(--sp-6);
+    /* THE PAGE GUTTER, ONE VALUE FOR THE HEAD AND THE CONTENT UNDER IT. The head padded 24 and every page padded 32,
+       so no title on any screen shared a left edge with the list it named.
+
+       FLUID, AND IT WAS 32 WITH A STEP TO 16 UNDER 900px. A page fills the window (DIRECTION §36, "use the whole
+       screen"), so the gutter is what keeps it off the edges, and it grows with the window instead of jumping: 16 on
+       a phone, about 22 at 900, 36 at the owner's 1,512 and 40 from 1,667 up. No width query, so it adds no width
+       the layout gate has to draw either side of. */
+    --gutter: clamp(16px, 2.4vw, 40px);
     --sticky: 52px;
     /* The rail CARD, 216 wide; the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
        docked panel, and the gap between tiles; the panel is 440. */
     --rail: 216px;
+    /* THE NARROW RAIL, one tap and the card's padding either side: 60. Here and not on the rail, so the toasts that
+       centre beside it (`Toasts.svelte`) read the same value the rail does rather than working it out again. */
+    --rail-icons: calc(var(--tap) + var(--sp-2) * 2);
     --inset: 12px;
     --panel-w: 440px;
     --kb: 0px;
@@ -331,7 +307,8 @@
      * `blocks.css:1030` hit the same wall on the selected row and answered it correctly, by
      * dropping the colour and keeping the glyph. Fourteen would have taken that chip to 3.98, so
      * the wash holds at the strength the product already shipped and the chip's own text colour is
-     * the thing that has to move.
+     * the thing that has to move. IT HAS: `bad`'s `--tone` is red's words now, `--danger-text` (`blocks.css`), at
+     * 4.90:1 on that wash over `--bg`.
      *
      * `--tone-wash` IS BELOW, ON `[data-intent]`, AND IT CANNOT LIVE UP HERE. A custom property's
      * `var()`s are substituted where the property is DECLARED, so a `--tone-wash` written on
@@ -368,7 +345,7 @@
     --glass-edge: inset 0 0 0 0.5px var(--glass-rim), 0 0 0 0.5px var(--glass-hair);
 
     /**
-     * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT, WHAT IS A LINK, AND THE ONE CHART SERIES.
+     * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT AND WHAT IS A LINK.
      *
      * Each of these was the accent, and each for a reason that sounded right on its own: a checked
      * switch is "on", the rail's item is "here", a link is "go". Together they put the brand's red
@@ -385,18 +362,12 @@
      * checked switch, the tick in a checked box and the dot in a checked radio all read as the page
      * showing through.
      *
-     * `--series-1` IS THE INFO HUE AND NOT INK, because a line drawn in ink reads as text on a chart
-     * that already carries text. Chart CSS names this token and never `--info`, so the day the
-     * primary series changes it changes here (contracts §8.3, §11 X40).
-     *
      * They sit on `:root` for the reason `--hover-wash` does: every one resolves its `var()`s against
      * the palette on `html`, which is the element `:root` is.
      */
     --on: var(--ink);
     --on-ink: var(--bg);
     --link: var(--ink);
-    --series-1: var(--info);
-    --accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
     /* A divider between rows of one list, softer than a boundary. */
     /* A hairline that reads on the ground as well as on a tile: `--line` is tuned for the tile and all but
        vanishes on the ground (1.05:1). Rows and group headings draw their rule with this. */
@@ -406,34 +377,9 @@
     --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
     --warn-wash: color-mix(in srgb, var(--warn) 12%, transparent);
 
-    /* A GROUND TINTED TOWARDS THE ACCENT, which is the accent as a SURFACE rather than as a
-       control. Two places write it: brain.dog's closing band and the recommended plan card. Two
-       copies of one value is exactly the drift the four washes above were just written to stop,
-       and this one is not a wash: it mixes into an opaque surface rather than into transparency,
-       so what is behind it is part of the value and cannot be left to the call site. */
-    --accent-ground: color-mix(in srgb, var(--accent) 7%, var(--bg));
-
-    /* Open and close are not symmetric. Opening is something you watch; closing is something you
-       have already decided about (13 §9). Ceiling 300ms — nothing is longer. */
-    /**
-     * THE TOP OF THE TYPE SCALE HAD NO LINE HEIGHT AND NO TRACKING, WHICH IS WHY NOTHING USED IT.
-     *
-     * `--t-3xl` is 34px and appears in the whole app zero times. `--t-2xl` appears three times,
-     * two of them on `/start`, a screen a person sees once. So the largest type on every screen
-     * somebody actually works in is 24px, four occurrences, and the product reads like a settings
-     * pane: a wall of one size with a little bold in it.
-     *
-     * The reason is mechanical rather than editorial. The ladder stopped at `--lh-tight`, which is
-     * sized for a heading around 20px; a 34px line at that leading with `-0.014em` of tracking
-     * looks loose and slightly wrong, and the fix for one heading is a pair of hand-tuned numbers
-     * nobody wants to write. A step with no leading and no tracking is a step nobody takes.
-     *
-     * These are the two numbers that make the top of the scale usable. They are set the way a
-     * display size wants them: leading just over one, and enough negative tracking that the
-     * letters close up as they get bigger.
-     */
-    --lh-3xl: 1.05;
-    --tr-tight: -0.028em;
+    /* A leading and a tracking for the top of the type scale (`--lh-3xl`, `--tr-tight`) stood here, and so did a tint
+       of the accent as a ground (`--accent-ground`), an accent wash, a size for the identity mark and a name for the
+       first chart series. Nothing named any of them, so they went. */
 
     /**
      * THE PRESS, WHICH FOUR CONTROLS IN THE WHOLE APP HAD.
@@ -452,26 +398,49 @@
     --press-dim: 0.62;
     --ease-push: cubic-bezier(0.4, 0, 1, 1);
 
-    /* The design system's timings: 90ms for a hover fill and a row's state, 140ms for menus, tooltips and anything leaving,
-       220ms for the panel sliding in, a sheet and the title collapsing. Motion here answers, it does not perform. */
-    --d-press: 120ms;
-    --d-release: 160ms;
-    --d-state: 90ms;
-    --d-move: 220ms;
-    --d-enter: 220ms;
-    --d-exit: 140ms;
-    --d-menu: 140ms;
+    /**
+     * MOTION IS ONE SCALE, and every step of it is under 300ms (DIRECTION §37: fluid, and never in the way). Motion
+     * here answers, it does not perform.
+     *
+     *   press 70 · exit 90 · enter 110 · menu and swap 120 · rows 180 · a page's cross-fade 200 · panel and sheet 240
+     *
+     * One step is one token: `--d-menu` is a menu, a popover and a swap (what a panel or a segment shows, changing
+     * in place), and `--d-panel` is the docked panel and a sheet.
+     *
+     * OPEN AND CLOSE ARE NOT SYMMETRIC IN TIME. Opening is something you watch; closing is something you have
+     * already decided about (13 §9), so whatever leaves is quicker than it arrived: a menu opens in 120 and closes
+     * in 90, and the panel goes out faster than its 240 in. A dialog plays the same path both ways.
+     *
+     * The curves: arriving is swift-out (`--ease-out`), leaving accelerates away (`--ease-in`), a cross-fade is
+     * `--ease-fade`, and the panel and a sheet ride `--ease-sheet`. A press dips on `--ease-push`.
+     *
+     * THE OLDER NAMES STAY, ON THE SCALE, so nothing that already names one changes meaning: `--d-state` is a
+     * hover fill or a row's state (the exit's 90), `--d-release` a press letting go (120), and `--d-move` what
+     * travels with the panel, the page title collapsing included (240). They are written as the step they are, so
+     * `a11y.css` stills the whole scale by stilling its seven steps.
+     */
+    --d-press: 70ms;
+    --d-exit: 90ms;
+    --d-enter: 110ms;
+    --d-menu: 120ms;
+    --d-rows: 180ms;
+    --d-page: 200ms;
+    --d-panel: 240ms;
+    --d-state: var(--d-exit);
+    --d-release: var(--d-menu);
+    --d-move: var(--d-panel);
 
-    /* zeta 0.7467, omega 6.56, settle 1.214s, peak 1.0292 — scripts/spring.mjs.
-       The last stop is forced to exactly 1: a spring that settles at 0.998 leaves a one-pixel gap
+    /* A SPRING, as `linear()`: the step response of zeta 0.7467 and omega 6.56, which peaks at 1.03 and settles by
+       1.214s, sampled at twelve even stops to two places (it was twenty-four to four, and no frame at 300ms or less
+       can show the difference). The last stop is exactly 1: a spring that settles at 0.998 leaves a one-pixel gap
        on every panel forever. */
-    --ease-spring: linear(
-      0, 0.0503, 0.1684, 0.3158, 0.4672, 0.6068, 0.7265, 0.8232, 0.8972, 0.9509, 0.9875, 1.0104,
-      1.0232, 1.0286, 1.0292, 1.0268, 1.0229, 1.0185, 1.0141, 1.0102, 1.0069, 1.0043, 1.0024, 1
-    );
-    /* The design system's easing: a swift-out curve for anything arriving, and its own curve for leaving. */
+    --ease-spring: linear(0, 0.18, 0.49, 0.76, 0.92, 1, 1.03, 1.03, 1.02, 1.01, 1, 1);
+    /* A swift-out curve for anything arriving, a curve that accelerates away for anything leaving, the even curve of
+       a cross-fade, and the sheet curve the panel and a sheet slide on. Platform conventions, not anyone's identity. */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in: cubic-bezier(0.4, 0, 1, 0.5);
+    --ease-fade: cubic-bezier(0.2, 0, 0, 1);
+    --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 
     /* The mark is GENERATED now, and this note is where it went.
        Not a role and not an identity accent: the one colour in the product that belongs to the
@@ -500,9 +469,9 @@
      custom property resolves its own `var()`s where it is declared, and `:root` has no `--tone`. */
   [data-intent] { --tone-wash: color-mix(in srgb, var(--tone) 12%, transparent); }
 
-  /* The reader's Text setting picks the body step. Three, not a slider. */
+  /* The reader's Text setting picks the body step. Three, not a slider: Normal is `--text` as `:root` sets it, so only
+     Small and Large are written. */
   html[data-text='sm'] { --text: var(--t-sm); }
-  html[data-text='base'] { --text: var(--t-base); }
   html[data-text='md'] { --text: var(--t-md); }
 
 
@@ -512,13 +481,9 @@
     :root { --ctl-h: 44px; }
   }
 
-  @media (width < 900px) {
-    :root { --gutter: var(--sp-4); }
-  }
-
-  /* Comfortable is the design system's 44, and the other two keep a step of 8 either side of it. */
+  /* Comfortable is the design system's 44, which is `--row-h` as `:root` sets it, and the other two keep a step of 8
+     either side of it. */
   html[data-density='compact'] { --row-h: 36px; }
-  html[data-density='comfortable'] { --row-h: 44px; }
   html[data-density='roomy'] { --row-h: 52px; }
 
   html[data-scheme='dark'] { color-scheme: dark; }
@@ -541,6 +506,7 @@
   @property --earn { syntax: '<color>'; inherits: true; initial-value: #0a0; }
   @property --warn { syntax: '<color>'; inherits: true; initial-value: #a80; }
   @property --danger { syntax: '<color>'; inherits: true; initial-value: #c00; }
+  @property --danger-text { syntax: '<color>'; inherits: true; initial-value: #c00; }
   @property --info { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --live { syntax: '<color>'; inherits: true; initial-value: #06c; }

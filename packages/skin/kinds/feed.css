@@ -60,7 +60,7 @@
        follows the density setting with every other line. */
     min-block-size: calc(var(--row-h) - var(--sp-2));
     padding-block: var(--sp-1);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     font-size: var(--t-ui);
   }
 
@@ -190,7 +190,7 @@
 
   .feed-when {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     white-space: nowrap;
   }
 
@@ -198,7 +198,7 @@
   .feed-seen {
     padding-block: var(--sp-3) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   .feed-empty {

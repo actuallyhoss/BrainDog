@@ -22,7 +22,18 @@ import {
   separation,
   type Deficiency,
 } from './color.ts';
-import { HUE_FLOOR, hueGap, INKS, INTENTS, SURFACES, type Built, type Palette, type Role, type Scheme } from './build.ts';
+import {
+  HUE_FLOOR,
+  hueGap,
+  INKS,
+  INTENT_TEXT,
+  INTENTS,
+  SURFACES,
+  type Built,
+  type Palette,
+  type Role,
+  type Scheme,
+} from './build.ts';
 
 export type Finding = {
   check: string;
@@ -145,8 +156,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      control, which is the same SC 1.4.11 requirement at the same floor as `edge`. It was drawn at
      the call site as a mix of the accent and `sunk` and measured 1.33:1 against `s3` in dark. */
   out.push(...pairsAgainstSurfaces(built.id, p, ['edge', 'accent-edge'], floors.edge, 'D', scheme));
-  /* `live-fill` IS A MARK LIKE THE FOUR: the ring's arc and the running bar, at the same floor. */
-  const fills = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill', 'live-fill'];
+  /* `live-fill` IS A MARK LIKE THE FOUR: the ring's arc and the running bar, at the same floor. So is `danger`, red as
+     a mark (a late dot, a badge), whose words are `danger-text` and are held as text in G. */
+  const fills = ['earn-fill', 'warn-fill', 'danger-fill', 'info-fill', 'live-fill', 'danger'];
   out.push(...pairsAgainstSurfaces(built.id, p, fills, floors.intentFill, 'D', scheme));
 
   /* E · the focus ring against both neighbours, and the two tones nine apart */
@@ -174,14 +186,16 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
      not a warning because the house theme itself sits in it (39 D6). */
   /* THE WORD AND THE ROLE, where this held the word and the hex. A reader is shown "good and bad"
      and a theme file has no `good` in it, so the finding needs both: the word for the sentence and
-     the role for the address. Reading the hex through the role at the point of use costs nothing. */
+     the role for the address. Reading the hex through the role at the point of use costs nothing.
+
+     EACH INTENT AS IT IS READ (`INTENT_TEXT`), which for red is its words, `danger-text`. */
   const intents: [string, Role][] = [
-    ['good', 'earn'],
-    ['warn', 'warn'],
-    ['bad', 'danger'],
+    ['good', INTENT_TEXT.earn],
+    ['warn', INTENT_TEXT.warn],
+    ['bad', INTENT_TEXT.danger],
     // `info` has a generated role of its own here, and the seed file says why: the accent is the
     // mark, the mark is red, and `danger` is anchored at 27.
-    ['info', 'info'],
+    ['info', INTENT_TEXT.info],
   ];
   let worstF = Infinity;
   for (let i = 0; i < intents.length; i++)
@@ -224,8 +238,9 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   out.push({ check: 'F', scheme, level: 'pass', measured: r2(worstF) });
 
   /* G · intent as text x every surface, and `live`, which is read as text too (the "now" line, a suggestion line) and
-     is held to the same floor without being one of the four words check F keeps apart. */
-  out.push(...pairsAgainstSurfaces(built.id, p, [...INTENTS, 'live'], floors.intentText, 'G', scheme));
+     is held to the same floor without being one of the four words check F keeps apart. Red's words are `danger-text`;
+     red as a mark is D's. */
+  out.push(...pairsAgainstSurfaces(built.id, p, [...INTENTS.map((k) => INTENT_TEXT[k]), 'live'], floors.intentText, 'G', scheme));
 
   /* H · the surface ladder is monotonic in RELATIVE LUMINANCE, not in L*.
 
@@ -423,11 +438,11 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
   }
 
   /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to
-     be confused with: body ink, and `danger` — which in a theme whose accent is a red mark is the
-     same hue as the link by construction. */
+     be confused with: body ink, and red words (`danger-text`) — which in a theme whose accent is a
+     red mark are the same hue as the link by construction. */
   for (const [what, against] of [
     ['body text', p.ink],
-    ['an overdue figure', p.danger],
+    ['an overdue figure', p['danger-text']],
   ] as const) {
     const dL = Math.abs(rgbToCielab(rgb(p['accent-text'])).L - rgbToCielab(rgb(against)).L);
     if (dL < 8)
@@ -437,7 +452,7 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
         level: 'refuse',
         code: 'CONTRAST_FLOOR',
         measured: r2(dL),
-        /* THE LINK, because the link is what moves. `ink` and `danger` are what a link is measured
+        /* THE LINK, because the link is what moves. `ink` and `danger-text` are what a link is measured
            against and neither is free to shift to make room for it (39 §6.3). */
         at: at('accent-text'),
         fix: `theme: a link and ${what} are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,

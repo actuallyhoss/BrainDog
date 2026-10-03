@@ -53,7 +53,7 @@
     gap: var(--sp-3);
     min-inline-size: 0;
     padding: var(--sp-4) 0;
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .cards-item:has(.cards-title a):hover .cards-title {
@@ -156,7 +156,7 @@
   .cards-when {
     flex: none;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     white-space: nowrap;
   }
 

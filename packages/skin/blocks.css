@@ -8,10 +8,13 @@
  * THE ONE RULE OF THIS FILE: no colour is written here. Every value is a semantic role a theme maps
  * (13 §2.1), and the four intents reach the DOM only through the one mapping block below.
  *
- * The motif, stated once so it stays consistent: ON A DECLARED PAGE EVERY BLOCK IS A
- * TILE, opaque, and nothing inside it is another tile. The tile is `PageBody`'s; what is drawn in it
- * is here. Rows sit on the tile with a hairline between them and a rounded wash under the pointer;
- * a field, a key cap and a chart's track are the second surface (`--s1`) cut into it. Content is
+ * The motif, stated once so it stays consistent (DIRECTION §37, "less bento"): ROWS SIT ON THE GROUND,
+ * AND ONLY A FIGURE OR A CHART IS A TILE. A list, a table and a run of rows are drawn straight on the page,
+ * grouped under quiet headings, with a `--rule` hairline between rows and a rounded wash under the
+ * pointer. `--rule` and not `--line`, because `--line` is tuned for a tile and all but vanishes on the
+ * ground, and `--rule` reads on both, so a list draws the same wherever a host puts it. Which blocks are
+ * tiles is `PageBody`'s; what is drawn in them is here. A tile is opaque and nothing inside it is another
+ * tile; a field, a key cap and a chart's track are the second surface (`--s1`) cut into it. Content is
  * never glass: translucency behind a column of small tabular digits is a legibility cost with no
  * information gain (13 §2.1).
  *
@@ -89,7 +92,10 @@
      the brand's own strength and at its hue (OKLCH h 26 against the logo's 27), so a project off track read as the
      product's mark. Three tenths of the warn fill turn it toward brick (h 34) before the edge grey takes half of what
      is left: about 0.09 of chroma against the logo's 0.22, in both schemes. The red itself is kept for what needs the
-     person now: an error, the count on Decide, the words in a headline. */
+     person now: an error, the count on Decide, the words in a headline.
+
+     `bad`'S `--tone` IS RED'S WORDS, `--danger-text`, A STEP DEEPER THAN THE MARK, because `--tone` colours words: a
+     chip's, a figure's, a panel's glyph. As a stroke or a bar the deeper red is still 5:1 on every light surface. */
   [data-intent='good'] {
     --tone: var(--earn);
     --tone-fill: color-mix(in oklab, var(--earn-fill) 45%, var(--edge));
@@ -99,7 +105,7 @@
     --tone-fill: color-mix(in oklab, var(--warn-fill) 50%, var(--edge));
   }
   [data-intent='bad'] {
-    --tone: var(--danger);
+    --tone: var(--danger-text);
     --tone-fill: color-mix(in oklab, color-mix(in oklab, var(--danger-fill) 70%, var(--warn-fill)) 50%, var(--edge));
   }
   [data-intent='info'] {
@@ -225,7 +231,7 @@
     background: var(--hold-wash);
     border-radius: var(--r-pill);
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
     line-height: var(--lh-tight);
     vertical-align: middle;
@@ -251,10 +257,10 @@
 
   /* ── rows: spec, params ─────────────────────────────────────────────────── */
 
-  /* ROWS ON THE TILE, like the ledger and the table: a hairline between each and the rounded wash under
-     the pointer. EVERY LIST OF ROWS HANGS A STEP INTO THE TILE'S PADDING (these, `.list` and `.table-region`), so
-     its words start on the heading's edge and its wash has room round them. The overflow stays clipped so a value that
-     will not wrap cannot widen the page. */
+  /* ROWS ON THE GROUND, like the ledger and the table: a `--rule` hairline between each and the rounded wash under
+     the pointer. EVERY LIST OF ROWS HANGS A STEP INTO WHAT IS ROUND IT (these, `.list` and `.table-region`), a tile's
+     padding or the page's gutter, so its words start on the heading's edge and its wash has room round them. The
+     overflow stays clipped so a value that will not wrap cannot widen the page. */
   .rows {
     margin-inline: calc(-1 * var(--sp-3));
     overflow: hidden;
@@ -268,7 +274,7 @@
     padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--t-ui);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .row:last-child {
@@ -304,15 +310,10 @@
     .row {
       grid-template-columns: minmax(0, 1fr) minmax(0, auto);
       gap: var(--sp-1) var(--sp-3);
-      align-items: baseline;
     }
 
     .row-label {
       grid-column: 1 / -1;
-    }
-
-    .row-note {
-      text-align: end;
     }
   }
 
@@ -447,7 +448,7 @@
     padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--t-ui);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   /* A ROW WITH A LINE UNDER ITS TITLE IS THE TALL ROW (44 with one line, 56 with two). */
@@ -678,17 +679,18 @@
     border: 0;
     border-radius: 0;
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
 
-  /* A GROUPED TIMELINE SAYS EACH DAY ONCE, as a small heading over its rows (`render/src/timeline.ts`), and the rows
+  /* A GROUPED TIMELINE SAYS EACH DAY ONCE, as a quiet heading over its rows (`render/src/timeline.ts`), and the rows
      under it leave their date blank. So the 11ch date track goes too, and the titles start on the list's own edge, as
-     a list with no marker does: an empty column down every row is space spent on nothing. */
+     a list with no marker does: an empty column down every row is space spent on nothing. The heading, the dates and
+     every other word a person reads in a block are 13 at least (`--t-sm`, the floor in `tokens.css`). */
   .list > .item-day {
     padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -731,7 +733,7 @@
     inset-block: 0;
     inset-inline-start: calc(var(--sp-3) + 1.75rem - 1px);
     inline-size: 2px;
-    background: var(--line);
+    background: var(--rule);
   }
 
   /* THE LINE STARTS AND ENDS AT A STONE'S MIDDLE, which is half a line under the row's padding and
@@ -784,7 +786,7 @@
     border-radius: var(--r-pill);
     background: var(--bg);
     color: var(--ink);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
   }
 
@@ -821,7 +823,7 @@
     }
 
     .table-cards li + li .table-card {
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--rule);
     }
 
     .table-card {
@@ -890,7 +892,7 @@
     .table-card-mark[data-truncate='middle'] {
       color: var(--dim);
       font-family: var(--font-id);
-      font-size: var(--t-xs);
+      font-size: var(--t-sm);
     }
 
     /* The figure's column name, for a screen reader only. `Table` says why beside the markup. */
@@ -1048,7 +1050,7 @@
     grid-template-columns: var(--cols);
     align-items: center;
     min-block-size: var(--tr-h);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   /* THE HEADER IS A QUIET LINE OF NAMES, NOT A BAND. A column header is a word you read once and
@@ -1061,7 +1063,6 @@
      its rows, so nothing ever scrolled under the header: `sticky` was inert and its fill was the band. */
   .th-row {
     min-block-size: 32px;
-    border-block-end-color: var(--line);
   }
 
   /* THE CONTAINING BLOCK FOR THE COLUMN'S HIDDEN NAME. `.th-name` is absolutely positioned, and its
@@ -1191,7 +1192,7 @@
   .td[data-truncate='middle'] {
     color: var(--dim);
     font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* A figure NEVER truncates. A truncated figure is not shortened, it is wrong (13 §4.2). */
@@ -1363,7 +1364,7 @@
     border-radius: 3px;
     background: var(--s1);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     letter-spacing: 0;
   }
 
@@ -1381,7 +1382,8 @@
    * title and section titles, so its `#` is a section title's size at most and never the display face: `h1` is a
    * section title (`--t-md` semibold), `h2` the body step, and `h3` and `h4` the label step in the quiet ink. It had
    * margins and nothing else, so a note's `#` took the skin's heading size and face and sat larger than the page it
-   * was written on.
+   * was written on. (`h1` read `--t-row`, which is the body's 15 now that the body is 15, so `#` and `##` had become
+   * one size.)
    */
   .document > :is(h1, h2, h3, h4) {
     margin-block: var(--sp-5) var(--sp-2);
@@ -1392,7 +1394,7 @@
   }
 
   .document > h1 {
-    font-size: var(--t-row);
+    font-size: var(--t-md);
   }
 
   .document > h2 {
@@ -1433,7 +1435,7 @@
   .document hr {
     margin-block: var(--sp-5);
     border: 0;
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* A ROW THAT ARRIVED WHILE THE READER LOOKED: an agent's task, a colleague's row, a line captured on another tab.

@@ -182,6 +182,10 @@ const SHAPES: Record<string, string> = {
     '```progress | Savings\nHoliday | £1,200.00 | £3,000.00 | by 1 Mar 2027\nNew laptop | £900.00 | £900.00\nSomeday |  | \n```',
   'a progress budget with one over and a tone': '```progress budget\nGroceries | £212.40 | £300.00 | this month\nEating out | £140.00 | £120.00\nTransport | £10.00 | £100.00 |  | info\n```',
   'lines of one plain column with no numbers': '```lines | Users\nDay | Users\n1 Sep | \n```',
+  /* ONE READING IS A FIGURE, under its measure's name and under none. */
+  'lines of one reading': '```lines | Aov, Crumb.gg\nDay | Aov, Crumb.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n```',
+  'lines of one reading under no heading': '```lines\nDay | Signups\n28 Sep | 14\n```',
+  'lines of one reading on the second of two lines': '```lines | Revenue and costs\nDay | Revenue | Costs\n1 Sep |  | \n2 Sep |  | £5\n```',
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'a forecast with a past, stems, knobs and a crossing':
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',

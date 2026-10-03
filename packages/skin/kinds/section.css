@@ -17,7 +17,7 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .box .sec {

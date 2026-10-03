@@ -44,12 +44,28 @@ export const INKS = ['ink', 'ink2', 'dim', 'faint'] as const;
  */
 export const INTENTS = ['earn', 'warn', 'danger', 'info'] as const;
 
+/**
+ * The role each intent is READ in, as words. Three are read in their own name; red is not.
+ *
+ * 2026-10-02, RED HAS TWO JOBS A STEP APART. As a mark (a late dot, the count on Decide, a badge) it is the mark's own
+ * red, `danger`, which a mark needs only 3:1 for and which measures 4.12:1 on the light ground. As words (a late date,
+ * the phrase that needs him) it owes 4.5:1, and one red cannot be both the logo's colour and that. So the words have a
+ * role of their own, `danger-text`, a step deeper, and everything that measures an intent as text (the search below,
+ * checks F, G and K) reads it through this map.
+ */
+export const INTENT_TEXT = { earn: 'earn', warn: 'warn', danger: 'danger-text', info: 'info' } as const satisfies Record<
+  (typeof INTENTS)[number],
+  string
+>;
+
 export type Role =
   | (typeof SURFACES)[number]
   | (typeof INKS)[number]
   | 'line'
   | 'edge'
   | (typeof INTENTS)[number]
+  /* Red as words. `danger` is red as a mark (`INTENT_TEXT` says why there are two). */
+  | 'danger-text'
   | 'earn-fill'
   | 'warn-fill'
   | 'danger-fill'
@@ -173,7 +189,14 @@ export type Profile = {
  */
 export const HOUSE_NEUTRAL_HUE = 260;
 
-export type AimRole =(typeof INKS)[number] | 'line' | (typeof INTENTS)[number] | 'live' | 'live-fill' | 'arrive';
+export type AimRole =
+  | (typeof INKS)[number]
+  | 'line'
+  | (typeof INTENTS)[number]
+  | 'danger-text'
+  | 'live'
+  | 'live-fill'
+  | 'arrive';
 
 /**
  * The design system's colours, as the generator reads them: every colour it names, in OKLCH, measured off its hex.
@@ -186,15 +209,25 @@ export type AimRole =(typeof INKS)[number] | 'line' | (typeof INTENTS)[number] |
  *
  * `faint` aims at `dim`. The design system has no fourth ink ("ink-3 is the lowest text ink"), and `faint` never carries a word
  * here (css-rules' `faint-on-text`), so it is `dim`'s colour held to its own floor.
+ *
+ * 2026-10-02, TWO LIGHT AIMS MOVED, BECAUSE THE DESIGN SYSTEM'S OWN SENTENCE WAS NOT TRUE OF THEM. It says ink-3 "clears
+ * 4.5:1 on `tile` and `ground`", and #6A707B is 4.20:1 on the ground; its red #D92426 is 4.19:1 there. The floor caught
+ * both and shipped each at exactly 4.5, which is legal and is also meta text and late dates set at the very edge of AA,
+ * on the surface the lists now sit on. So ink-3 aims one step darker in its own hue, #5F6570, 4.95:1, and lands there
+ * rather than on its floor. The red splits (`INTENT_TEXT`): its words aim at #C21F22, 5.04:1, and its mark at the house
+ * mark itself, #DB2527, which is the seed (`HOUSE_SEED.accent`). #D92426 and #DB2527 were two reds a hair apart,
+ * a badge beside the logo that did not quite match it, and the logo keeps its value (SYSTEM 13), so a badge, a late
+ * dot and the mark are one colour now. Dark's red already clears 4.5:1 as words, so its two roles are one value.
  */
 const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
   light: {
     ink: { L: 0.1858, C: 0.0113 }, //    #101318
     ink2: { L: 0.43, C: 0.0198 }, //     #4A505B
-    dim: { L: 0.5438, C: 0.0186 }, //    #6A707B
-    faint: { L: 0.5438, C: 0.0186 },
+    dim: { L: 0.5054, C: 0.019 }, //     #5F6570
+    faint: { L: 0.5054, C: 0.019 },
     line: { L: 0.9259, C: 0.0085 }, //  #E3E7EC
-    danger: { L: 0.5704, C: 0.2136, H: 27 }, //    #D92426
+    danger: { L: 0.575, C: 0.215, H: 27 }, //       #DB2527, the mark
+    'danger-text': { L: 0.5246, C: 0.1963, H: 26.7 }, // #C21F22
     earn: { L: 0.5123, C: 0.1182, H: 155.4 }, //   #157A48
     warn: { L: 0.5198, C: 0.133, H: 52.4 }, //     #A24E00
     live: { L: 0.5131, C: 0.204, H: 276.5 }, //    #4F4FD8
@@ -208,6 +241,7 @@ const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
     faint: { L: 0.6611, C: 0.0182 },
     line: { L: 0.2916, C: 0.0202 }, //   #262C36
     danger: { L: 0.6876, C: 0.2015, H: 25.7 }, //  #FF5A55
+    'danger-text': { L: 0.6876, C: 0.2015, H: 25.7 },
     earn: { L: 0.735, C: 0.1362, H: 159.3 }, //    #4CC38A
     warn: { L: 0.7698, C: 0.1376, H: 64.7 }, //    #F0A04B
     live: { L: 0.6934, C: 0.1655, H: 282 }, //     #8E8CFF
@@ -244,7 +278,8 @@ export const HOUSE_PROFILE: Profile = {
      stays where check F puts it: with `danger` held at 4.5:1, every lighter warn text measured on
      that day came within 10 of `danger` to a deuteranope (5.7 at 4.5:1, 9.8 at 6:1), so the 7:1
      brown is the lightest warn text the four-intent floor allows, and the tab badge, which is drawn
-     in the text role (`TabBar.svelte`), keeps it. */
+     in the text role (`TabBar.svelte`), keeps it. 2026-10-02: red's words sit a step deeper now, 5:1
+     (`danger-text`), and the same walk lands the warn text on #522400, 11:1 on the ground. */
   fillLOf: { warn: { light: 0.62 } },
   /**
    * DARKER AND COOLER THAN THE DEFAULT LADDER. The default puts dark `bg` at L 0.241, a warm
@@ -263,18 +298,25 @@ export const HOUSE_PROFILE: Profile = {
    * inside it: `s1`, `s2` and `s3` step DOWN from `bg` in light, toward the ground and never onto it, and UP from `bg`
    * in dark. They step away from the tile in both schemes, which is what check H now asks.
    *
-   * `s2` AND `s3` KEEP THEIR STEPS, AND THE STEPS ARE SMALL BECAUSE TWO FLOORS MEET THERE. In dark, `s3` is the
-   * lightest surface, so it is where the accent fill (check R, 3:1) and ink-3 (check A, 4.5:1) are both measured. At
-   * L 0.275 the brand red still clears 3:1 and the design system's ink-3 still clears AA, so it is the ceiling, and `s2` is
-   * halfway. In light they share the gap between tile-2 and the ground.
+   * `s3` IS THE CEILING, BECAUSE TWO FLOORS MEET THERE. In dark, `s3` is the lightest surface, so it is where the
+   * accent fill (check R, 3:1) and ink-3 (check A, 4.5:1) are both measured. At L 0.275 the brand red clears 3:1 by
+   * 0.04 and the design system's ink-3 clears AA by 0.29, so nothing above it can be lighter. In light `s2` and `s3`
+   * share the gap between tile-2 and the ground.
+   *
+   * 2026-10-02, SO THE DARK LADDER WIDENS DOWNWARD. Under that ceiling the design system's rungs put `s1`, `s2` and
+   * `s3` within 0.016 of each other, under one delta-E a step, so a quiet button's hover and a focused row drew
+   * nothing in dark, and its ground sat 3.6 delta-E under a tile. The ground and the tile come down, `s1` to `s3`
+   * step 0.02 apart, and every rung keeps the design system's lean, chroma about 0.07 of its lightness. Ground to tile
+   * is 4.1 delta-E now, tile to well 2.5 and each step above it 1.6, and glass over the ground stands 4.75 off it,
+   * with ink-3 on it at 5.69:1. The inks and every intent are solved on `s3`, which did not move, so none of them did.
    */
   ladder: {
     dark: {
-      sunk: { L: 0.1675, C: 0.0116 }, // #0C0F14
-      bg: { L: 0.2168, C: 0.0151 }, //   #161A21
-      s1: { L: 0.2593, C: 0.0185 }, //   #1F242D
-      s2: { L: 0.2672, C: 0.019 },
-      s3: { L: 0.275, C: 0.0195 },
+      sunk: { L: 0.145, C: 0.0103 }, // #080A0E
+      bg: { L: 0.2, C: 0.0142 }, //     #12161D
+      s1: { L: 0.235, C: 0.0167 }, //   #191E26
+      s2: { L: 0.255, C: 0.0181 }, //   #1E232C
+      s3: { L: 0.275, C: 0.0195 }, //   #222831
     },
     light: {
       sunk: { L: 0.9419, C: 0.0063 }, // #E9ECF0
@@ -745,10 +787,16 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
      are delta-E 4.0 apart to a deuteranope in light and 8.1 in dark, and its green and amber 9.9 to a protanope in
      dark, against check F's floor of 10. So the aimed intents are walked AWAY FROM THE GROUND along lightness, which
      only ever adds contrast, in steps of 0.01, cheapest move first by the profile's own weights (`danger` the
-     dearest), until the aimed set clears the floor among itself. The unaimed ones are then searched around it. */
-  const aimed = INTENTS.filter((k) => aims[k]);
+     dearest), until the aimed set clears the floor among itself. The unaimed ones are then searched around it.
+
+     THE SEARCH IS OVER THE WORDS (`INTENT_TEXT`), so red enters it at its words' aim and `chosen.danger` below is
+     `danger-text`. Red as a mark is placed after it, at step 5b. */
+  const aimed = INTENTS.filter((k) => aims[INTENT_TEXT[k]]);
   const start = Object.fromEntries(
-    aimed.map((k) => [k, place(k, profile.intentText, () => candidate(want[k], profile.chromaLadder[0]!, INTENT_HUE[k]))]),
+    aimed.map((k) => [
+      k,
+      place(INTENT_TEXT[k], profile.intentText, () => candidate(want[k], profile.chromaLadder[0]!, INTENT_HUE[k])),
+    ]),
   ) as Partial<Record<(typeof INTENTS)[number], Lch>>;
   const moved = (k: (typeof INTENTS)[number], step: number): Lch => {
     const s = start[k]!;
@@ -774,16 +822,22 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
         `Move the accent hue, or widen the profile's chroma ladder.`,
     );
 
+  /* 5b · RED AS A MARK: a late dot, the count on Decide, a badge. Held to the mark floor (`intentFill`) and not the
+     words' one, because nobody reads a dot, and that is what lets it be the mark's own colour in the light scheme,
+     where the words cannot be. Unaimed, it is the words' red, which clears both floors. */
+  const dangerMark = hex(place('danger', profile.intentFill, () => rgbToLch(rgb(chosen.danger))));
+
   /* 6 · the accent AS TEXT — solved last, because it has to keep clear of two colours rather than
      one, and the second is not known until the intents are.
 
      Check K's rule is that hue alone may never encode meaning, so a link has to differ from body
-     ink in LIGHTNESS. In this theme it has to differ from `danger` too, and for a stronger reason:
-     the accent and `danger` are the same hue by design, and solving both against the same ground at
-     similar contrast targets put them on the same value — a link and an overdue figure rendering to
-     one colour, in the scheme where the product is read most. So the search walks upward until the
-     candidate is 8 L* clear of both. Falling back to the top of the range rather than refusing:
-     an unreadable link is a floor, and this is a collision. */
+     ink in LIGHTNESS. In this theme it has to differ from red words too (`danger-text`, which is
+     `chosen.danger` here), and for a stronger reason: the accent and the red are the same hue by
+     design, and solving both against the same ground at similar contrast targets put them on the
+     same value — a link and an overdue figure rendering to one colour, in the scheme where the
+     product is read most. So the search walks upward until the candidate is 8 L* clear of both.
+     Falling back to the top of the range rather than refusing: an unreadable link is a floor, and
+     this is a collision. */
   const accentText = (() => {
     const AC = Math.min(acc.C, 0.16);
     const clear = (c: string, of: string) =>
@@ -831,7 +885,8 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
     edge,
     earn: chosen.earn,
     warn: chosen.warn,
-    danger: chosen.danger,
+    danger: dangerMark,
+    'danger-text': chosen.danger,
     info: chosen.info,
     'earn-fill': fill('earn'),
     'warn-fill': fill('warn'),
@@ -941,8 +996,19 @@ function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
 /**
  * The design system's depth, three levels and no more: the ground (none), tiles (`--e1`), and chrome and floating things
  * (`--e2`). `--e3` is the sheet, which the design system puts at level 2 too, so it is `--e2`'s value under the name the sheets
- * already read. In dark a tile has no shadow and is told from the ground by its fill, which is a shadow of no alpha
- * rather than `none`, so check I can still read the level.
+ * already read.
+ *
+ * 2026-10-02, A DARK TILE CATCHES THE TOP LIGHT. It was a shadow of no alpha: no shadow reads on a near-black ground, so
+ * a tile was told from the ground by its fill alone. Now it carries the ground's one soft light from above
+ * (`--ground-glow`) on its own top edge, a 1px highlight of white at 0.05 inside its box, so it moves nothing and follows
+ * the corners.
+ *
+ * AND THE SHADOW OF NO ALPHA STAYS, FIRST. A browser eases one shadow list into another only when each pair is inset on
+ * both sides or on neither; one mixed pair and the whole change jumps. The highlight alone is inset and `--e2` is a
+ * drop, so a card that lifts to `--e2` on hover or when chosen (`StepMenu`, `FlowCard`, an automation's trigger) jumped in
+ * dark where it eases in light. With the empty drop first, it eases into `--e2`'s drop, and the highlight fades against
+ * the transparent shadow the browser pads the shorter list with. Check I reads the first shadow's alpha, 0, under
+ * chrome's 0.6, so it still reads two levels.
  *
  * `--glass-edge` IS NOT IN HERE. It is the hairline pair around glass and belongs to glass rather than to a level: a
  * sheet is a tile at level 2 and has no glass edge. Chrome writes `var(--glass-edge), var(--e2)`.
@@ -950,7 +1016,7 @@ function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
 function elevationOf(scheme: Scheme): [string, string, string] {
   if (scheme === 'dark') {
     const two = `0 16px 40px -12px ${paint('black', 0.6)}`;
-    return [`0 0 0 0 ${paint('black', 0)}`, two, two];
+    return [`0 0 0 0 ${paint('black', 0)}, inset 0 1px 0 ${paint('white', 0.05)}`, two, two];
   }
   const two = `0 2px 4px ${paint(SHADE, 0.04)}, 0 16px 40px -16px ${paint(SHADE, 0.22)}`;
   return [`0 1px 1px ${paint(SHADE, 0.03)}, 0 8px 24px -12px ${paint(SHADE, 0.12)}`, two, two];

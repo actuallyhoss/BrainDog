@@ -75,6 +75,7 @@
      * carries one red and not two, and the words beside it still say what is wrong.
      */
     --danger: var(--accent-text);
+    --danger-text: var(--accent-text);
     --danger-fill: var(--accent);
   }
 

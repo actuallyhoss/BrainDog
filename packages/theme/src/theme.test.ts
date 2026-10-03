@@ -16,6 +16,7 @@ import {
   simulate,
   solveL,
   toHex,
+  type Rgb,
 } from './color.ts';
 import { ALPHA, ALPHA_SEED, HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts';
 import { ACCENTS, recordTheme } from './record.ts';
@@ -23,6 +24,7 @@ import {
   BRAND_RED,
   hueGap,
   INKS,
+  INTENT_TEXT,
   INTENTS,
   SURFACES,
   build,
@@ -221,10 +223,11 @@ test('the accent is in the brand red family, and is not the alarm', () => {
 
 test('the four intent words stay separable with a red accent beside them', () => {
   // The accent is NOT one of the four — it is chrome, and never a row's verdict — so what has to
-  // hold is that the four words are separable among themselves, `info` included.
+  // hold is that the four words are separable among themselves, `info` included. Words, so red is
+  // read as `danger-text` (`INTENT_TEXT`).
   for (const scheme of ['dark', 'light'] as const) {
     const p = HOUSE.schemes[scheme];
-    const four = INTENTS.map((k) => p[k]);
+    const four = INTENTS.map((k) => p[INTENT_TEXT[k]]);
     for (let i = 0; i < four.length; i++)
       for (let j = i + 1; j < four.length; j++)
         for (const d of ['protan', 'deutan', 'tritan'] as const) {
@@ -340,7 +343,7 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
 
 /* ── the shape of the result, and not only its refusals ─────────────────── */
 
-test('EVERY CHECK REPORTS, PASS OR FAIL: 114 rows per scheme, counted here and nowhere quoted', () => {
+test('EVERY CHECK REPORTS, PASS OR FAIL: 119 rows per scheme, counted here and nowhere quoted', () => {
   /**
    * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
    *
@@ -351,23 +354,26 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 114 rows per scheme, counted here and n
    *
    * SO THE NUMBER IS COUNTED RATHER THAN COPIED. 90 was never implemented and therefore has no
    * authority; the arithmetic below is the eighteen checks as they are written, and it lands on
-   * 114. The table is spelled out per letter so that a change to any one check has to be argued for
+   * 119. The table is spelled out per letter so that a change to any one check has to be argued for
    * here, in the same commit, instead of quietly moving a total.
    *
    * 104 UNTIL 2026-09-29, when the design system's `live` arrived: `live-fill` is a mark and joins the four fills in D, and
    * `live` is read as text and joins the four intents in G. Five surfaces each, ten rows.
+   *
+   * 114 UNTIL 2026-10-02, when red split in two (`INTENT_TEXT`): its words became `danger-text`, which takes `danger`'s
+   * place in F, G and K, and `danger` became red as a mark, which joins the fills in D. Five surfaces, five rows.
    */
   const PER_CHECK: Record<string, number> = {
     A: 15, // three inks that are not `faint`, each on five surfaces
     B: 5, //  `accent-text` on five surfaces
     C: 5, //  `faint` on five surfaces
-    D: 35, // `edge` and `accent-edge` and five `-fill` roles (the four intents' and `live-fill`), each on five surfaces
+    D: 40, // `edge`, `accent-edge`, five `-fill` roles (the four intents' and `live-fill`) and `danger`, each on five surfaces
     E: 6, //  the two ring tones against each other, then `focus-in` on five surfaces
     F: 1, //  one summary row carrying the worst separation over the six intent pairs
-    G: 25, // four intents and `live` as text, each on five surfaces
+    G: 25, // the four intents as words (red's are `danger-text`) and `live`, each on five surfaces
     H: 4, //  four rungs of the five-surface ladder
     J: 1, //  one row for the palette: the most chroma any role gave up to the gamut
-    K: 2, //  a link against body ink, and against `danger`
+    K: 2, //  a link against body ink, and against red words, `danger-text`
     M: 1, //  `line` against `edge`
     N: 4, //  the APCA advisory, one row per ink
     O: 1, //  one row for the palette: every value is shaped like a colour
@@ -376,7 +382,7 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 114 rows per scheme, counted here and n
     R: 5, //  the accent fill against the five surfaces it can be painted on
   };
   const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
-  assert.equal(PER_SCHEME, 114, 'the per-letter table no longer sums to the number the checks report');
+  assert.equal(PER_SCHEME, 119, 'the per-letter table no longer sums to the number the checks report');
 
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['dark', 'light'] as const) {
@@ -389,7 +395,7 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 114 rows per scheme, counted here and n
     }
 
   /* AND THE WHOLE VALIDATOR IS THE TWO SCHEMES PLUS THREE. `checkElevation` answers once per
-     scheme and `checkForcedColors` once for the document, so `validate` is 114 + 114 + 2 + 1. */
+     scheme and `checkForcedColors` once for the document, so `validate` is 119 + 119 + 2 + 1. */
   const whole = validate(HOUSE, toCSS(HOUSE, HIGH_CONTRAST) + FORCED);
   assert.equal(whole.length, PER_SCHEME * 2 + 3, `validate returned ${whole.length} results`);
 
@@ -431,7 +437,7 @@ test('CHECK F KNOWS THE HUE FLOOR, which only the generator knew', () => {
     ...built,
     schemes: {
       ...built.schemes,
-      dark: { ...built.schemes.dark, info: built.schemes.dark.danger },
+      dark: { ...built.schemes.dark, info: built.schemes.dark['danger-text'] },
     },
   };
   const found = refusals(checkScheme(twinned, 'dark')).filter((f) => f.check === 'F');
@@ -512,14 +518,16 @@ test('A CONTRAST FLOOR POINTS AT THE ROLE THAT MOVES, not at the ground it sits 
 });
 
 test('AN INSEPARABLE PAIR POINTS AT THE FIRST OF IT, because one `at` cannot hold two', () => {
+  /* Check F reads the four intents as words, so red is `danger-text`, and the address is that role: the one a theme
+     author would move to tell the words apart. */
   const built = build({ ...HOUSE.seed }, HOUSE_PROFILE, 'twins');
   const twinned: Built = {
     ...built,
-    schemes: { ...built.schemes, dark: { ...built.schemes.dark, info: built.schemes.dark.danger } },
+    schemes: { ...built.schemes, dark: { ...built.schemes.dark, info: built.schemes.dark['danger-text'] } },
   };
   const found = refusals(checkScheme(twinned, 'dark')).filter((f) => f.check === 'F');
   assert.ok(found.length > 0, 'two intents of one hue passed the separability check');
-  assert.deepEqual([...new Set(found.map((f) => f.at))], ['theme.twins.roles.dark.danger']);
+  assert.deepEqual([...new Set(found.map((f) => f.at))], ['theme.twins.roles.dark.danger-text']);
 });
 
 test('A LADDER THAT TURNS BACK POINTS AT THE RUNG IT TURNS AT', () => {
@@ -741,10 +749,39 @@ test('THE COLOUR GRAMMAR REFUSES WHAT ITS OWN SENTENCE SAYS IT REFUSES', () => {
 /* ── the design system's colours, as the generator lands them ─────────────── */
 
 test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
-  /* Every exact value here is one no floor had to move. What is not here moved, and says why below. */
+  /* Every exact value here is one no floor had to move. What is not here moved, and says why below.
+
+     2026-10-02: light's ink-3 and red words aim where AA has room, and red's mark aims at the house mark (`SYSTEM_AIM`),
+     so all three land exactly. Dark's ground, tile and the steps inside a tile are the product's own ladder now, widened
+     under the design system's ceiling (`HOUSE_PROFILE.ladder`), and are pinned here as that. */
   const exact: Record<'light' | 'dark', Partial<Record<keyof Palette, string>>> = {
-    light: { sunk: '#E9ECF0', bg: '#FFFFFF', s1: '#F2F4F7', ink: '#101318', ink2: '#4A505B', line: '#E3E7EC', earn: '#157A48', live: '#4F4FD8' },
-    dark: { sunk: '#0C0F14', bg: '#161A21', s1: '#1F242D', ink: '#F1F3F6', ink2: '#B4BAC4', dim: '#8C939E', line: '#262C36', danger: '#FF5A55', live: '#8E8CFF' },
+    light: {
+      sunk: '#E9ECF0',
+      bg: '#FFFFFF',
+      s1: '#F2F4F7',
+      ink: '#101318',
+      ink2: '#4A505B',
+      dim: '#5F6570',
+      line: '#E3E7EC',
+      earn: '#157A48',
+      'danger-text': '#C21F22',
+      danger: '#DB2527',
+      live: '#4F4FD8',
+    },
+    dark: {
+      sunk: '#080A0E',
+      bg: '#12161D',
+      s1: '#191E26',
+      s2: '#1E232C',
+      s3: '#222831',
+      ink: '#F1F3F6',
+      ink2: '#B4BAC4',
+      dim: '#8C939E',
+      line: '#262C36',
+      'danger-text': '#FF5A55',
+      danger: '#FF5A55',
+      live: '#8E8CFF',
+    },
   };
   for (const scheme of ['light', 'dark'] as const)
     for (const [role, hex] of Object.entries(exact[scheme]))
@@ -752,18 +789,35 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
 });
 
 test('AND WHERE IT CANNOT, THE ROLE SITS ON ITS FLOOR RATHER THAN UNDER IT', () => {
-  /* The design system's ink-3 and red are 4.20:1 and 4.19:1 on its own light ground, so each is darkened to 4.5 and no further. */
-  const sunk = fromHex(HOUSE.schemes.light.sunk);
-  for (const role of ['dim', 'danger'] as const) {
-    const c = contrast(fromHex(HOUSE.schemes.light[role]), sunk);
-    assert.ok(c >= 4.5 && c < 4.6, `light ${role} is ${c.toFixed(2)}:1 on the ground, not on its floor`);
+  /* High contrast starts from the same colours under higher floors, so its light ink-3 and its red mark are each
+     darkened to their own floor on the ground, 9.5 and 4.5, and no further. */
+  const sunk = fromHex(HIGH_CONTRAST.schemes.light.sunk);
+  for (const [role, floor] of [
+    ['dim', HIGH_CONTRAST_PROFILE.ink[2]],
+    ['danger', HIGH_CONTRAST_PROFILE.intentFill],
+  ] as const) {
+    const c = contrast(fromHex(HIGH_CONTRAST.schemes.light[role]), sunk);
+    assert.ok(c >= floor && c < floor + 0.1, `high-contrast light ${role} is ${c.toFixed(2)}:1 on the ground, not on its floor of ${floor}`);
   }
-  /* The design system's amber and red are delta-E 4.0 apart to a deuteranope in light, so the amber text walks darker until the
-     four intents clear check F; the red, the dearest to move, holds. */
-  const four = INTENTS.map((k) => fromHex(HOUSE.schemes.light[k]));
+  /* The design system's amber and red words cannot be told apart by a deuteranope in light, so the amber text walks
+     darker until the four words clear check F; the red, the dearest to move, holds at its aim. */
+  const four = INTENTS.map((k) => fromHex(HOUSE.schemes.light[INTENT_TEXT[k]]));
   for (let i = 0; i < 4; i++)
     for (let j = i + 1; j < 4; j++)
       for (const d of ['protan', 'deutan', 'tritan'] as const) assert.ok(separation(four[i]!, four[j]!, d) >= 10);
+  assert.ok(rgbToLch(fromHex(HOUSE.schemes.light.warn)).L < 0.5198, 'the light amber text did not walk away from red');
+});
+
+test('RED HAS TWO JOBS, AND EACH IS ONE VALUE', () => {
+  /* As words (a late date, the phrase that needs him) red owes 4.5:1 and is `danger-text`; as a mark (a late dot, the
+     count on Decide, a badge) it owes 3:1 and is `danger`. Checks G and D hold the floors. What is held here is the
+     identity: in light the words sit 5:1 on the ground, a step deeper than the mark, and the mark IS the logo, which
+     `theme.mjs` paints from the light accent, where a badge and the logo used to be two reds a hair apart. In dark
+     the words already clear AA in the mark's own red, so the two jobs share it. */
+  const light = HOUSE.schemes.light;
+  assert.ok(contrast(fromHex(light['danger-text']), fromHex(light.sunk)) >= 5, 'light red words are back at the edge of AA');
+  assert.equal(light.danger, light.accent, 'a badge is not the logo’s red');
+  assert.equal(HOUSE.schemes.dark.danger, HOUSE.schemes.dark['danger-text'], 'dark red has two values for one red');
 });
 
 /** A generated `rgb(r g b / a)` or hex, painted over an opaque hex. */
@@ -811,8 +865,41 @@ test('THE DESIGN SYSTEM CHROME: glass in the house, opaque in high contrast', ()
     assert.equal(HIGH_CONTRAST.chrome[scheme]['glass-strong'], HIGH_CONTRAST.schemes[scheme].bg);
   }
   const css = toCSS(HOUSE, HIGH_CONTRAST);
-  for (const name of ['glass', 'glass-strong', 'glass-rim', 'glass-hair', 'glass-sat', 'ground-glow', 'live', 'live-fill', 'hover-wash', 'selected', 'arrived-wash'])
+  for (const name of ['glass', 'glass-strong', 'glass-rim', 'glass-hair', 'glass-sat', 'ground-glow', 'live', 'live-fill', 'hover-wash', 'selected', 'arrived-wash', 'danger-text'])
     assert.equal(css.split(`--${name}:`).length - 1, 12, `--${name} is not in every scheme block`);
+});
+
+test('THE DARK LADDER: TILES, WELLS AND CHROME STAND APART FROM THE GROUND', () => {
+  /* 2026-10-02. Under the ceiling at `s3` the design system's dark rungs put tile-2, `s2` and `s3` under one delta-E
+     apart, so a hover inside a tile drew nothing, and a tile sat 3.6 over the ground. The ladder widened downward
+     instead (`HOUSE_PROFILE.ladder`), and these are the distances that made it worth doing. */
+  const p = HOUSE.schemes.dark;
+  const apart = (a: Rgb, b: Rgb) => deltaE2000(rgbToCielab(a), rgbToCielab(b));
+  const dE = (a: string, b: string) => apart(fromHex(a), fromHex(b));
+  assert.ok(dE(p.sunk, p.bg) >= 4, `a tile is ${dE(p.sunk, p.bg).toFixed(2)} from the ground`);
+  for (const [a, b] of [['bg', 's1'], ['s1', 's2'], ['s2', 's3']] as const)
+    assert.ok(dE(p[a], p[b]) >= 1.5, `${b} is ${dE(p[a], p[b]).toFixed(2)} from ${a}, which a hover cannot show`);
+  /* Evenly: the two steps above tile-2 are one step, to within a code value. */
+  const L = (hex: string) => rgbToLch(fromHex(hex)).L;
+  assert.ok(Math.abs(L(p.s2) - L(p.s1) - (L(p.s3) - L(p.s2))) < 0.003, 's1, s2 and s3 do not step evenly');
+  /* The chrome is glass over the ground, and it reads as a thing on it. */
+  const glass = over(HOUSE.chrome.dark.glass, p.sunk);
+  assert.ok(apart(glass, fromHex(p.sunk)) >= 4, `glass on the ground is ${apart(glass, fromHex(p.sunk)).toFixed(2)} from it`);
+  /* And a tile catches the top light, at a level the chrome's shadow is still above (check I). */
+  assert.equal(HOUSE.elevation.dark[0], '0 0 0 0 rgb(0 0 0 / 0), inset 0 1px 0 rgb(255 255 255 / 0.05)');
+  assert.deepEqual(refusals(checkElevation(HOUSE)), []);
+});
+
+test('A TILE EASES INTO THE CHROME’S LEVEL, in both schemes', () => {
+  /* A card lifts from `--e1` to `--e2` on hover or when chosen, and a browser eases one shadow list into another only
+     where each pair is inset on both sides or on neither. One mixed pair and the lift jumps, which the dark tile's
+     highlight did on its own (`elevationOf`). */
+  const inset = (list: string) => list.split(', ').map((shadow) => shadow.startsWith('inset '));
+  for (const scheme of ['light', 'dark'] as const) {
+    const [one, two] = [inset(HOUSE.elevation[scheme][0]), inset(HOUSE.elevation[scheme][1])];
+    for (let i = 0; i < Math.min(one.length, two.length); i++)
+      assert.equal(one[i], two[i], `${scheme} --e1 and --e2 differ at shadow ${i + 1}, so a card lifting between them jumps`);
+  }
 });
 
 test('CHECK H AND CHECK I HOLD THE DESIGN SYSTEM’S SHAPE, and still refuse the wrong one', () => {

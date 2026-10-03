@@ -82,6 +82,7 @@ test('every role that is not the accent is byte-identical to the house palette',
     'line',
     'edge',
     ...INTENTS,
+    'danger-text',
     'earn-fill',
     'warn-fill',
     'danger-fill',
@@ -183,7 +184,7 @@ test('the derived seed is stable, and a link still clears check K', () => {
      alone may never encode meaning. It is the floor the accent's own hue is most able to break. */
   for (const scheme of SCHEMES) {
     const p = ALPHA.schemes[scheme];
-    for (const against of [p.ink, p.danger]) {
+    for (const against of [p.ink, p['danger-text']]) {
       const dL = Math.abs(rgbToCielab(fromHex(p['accent-text'])).L - rgbToCielab(fromHex(against)).L);
       assert.ok(dL >= 8, `a link is ${dL.toFixed(1)} L* from ${against} in ${scheme}`);
     }

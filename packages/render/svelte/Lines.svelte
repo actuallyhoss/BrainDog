@@ -6,10 +6,12 @@
   A POINTER OVER THE CHART READS THE POINT UNDER IT: the day and each line's value, beside a hairline.
   It is a convenience and never the only way in, because the fold under the chart holds every number
   for a keyboard and a screen reader, which is why the readout is `aria-hidden`.
+
+  ONE READING IS A FIGURE (`plan.single`): its value and when it was read, and no chart of one dot.
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesNearest, linesPlan } from '../src/lines.ts';
+  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -29,69 +31,75 @@
   };
 </script>
 
-<div class="prop lines">
-  {#if plan.now}
-    <p class="lines-lead">
-      <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {plan.against}, <span class="num">{plan.then}</span></span>{/if}
-    </p>
-  {/if}
-  <ul class="lines-legend">
-    {#each plan.lines as l}
-      <li class="lines-key" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">{l.label}</span></li>
-    {/each}
-  </ul>
-  {#if plan.empty}
-    <p class="lines-empty">{LINES_NONE}</p>
-  {:else}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="lines-plot" onpointermove={track} onpointerdown={track} onpointerleave={() => (scrub = null)} onpointercancel={() => (scrub = null)}>
-      {#if plan.top}<span class="lines-top num" aria-hidden="true">{plan.top}</span>{/if}
-      {#if plan.bottom}<span class="lines-bottom num" aria-hidden="true">{plan.bottom}</span>{/if}
-      <svg class="lines-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}>
-        {#each was as l}
-          {#if l.d}<path class="lines-line" data-was="" data-step={l.step} d={l.d} vector-effect="non-scaling-stroke"></path>{/if}
-        {/each}
-        {#each current as l}
-          {#if l.d}<path class="lines-line" data-step={l.step} d={l.d} vector-effect="non-scaling-stroke"></path>{/if}
-          {#if l.end}<path class="lines-end" data-step={l.step} d={l.end} vector-effect="non-scaling-stroke"></path>{/if}
-        {/each}
-      </svg>
-      {#if point}
-        <!-- THE READOUT TURNS AT THE MIDDLE, to whichever side has more room. At 0.6 a readout of 11rem or more beside a
-             point just past the middle of a half-width slot ran off the plot's end; a narrow slot does not flip at all,
-             because the host's stylesheet slides it inside the plot instead. -->
-        <span class="lines-rule" style="--at:{point.at}" aria-hidden="true"></span>
-        <div class="lines-readout" style="--at:{point.at}" data-flip={Number(point.at) > 0.5 ? '' : undefined} aria-hidden="true">
-          <span class="lines-readout-day">{point.label}</span>
-          {#each plan.lines as l, k}
-            <span class="lines-readout-value" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch"></span><span class="lines-readout-name">{l.label}</span><span class="num">{point.values[k]}</span></span>
+{#if plan.single}
+  <div class="prop lines" data-single="">
+    <p class="lines-lead"><span class="lines-now num">{plan.single.value}</span><span class="lines-against">{linesOnly(plan.single, Boolean(block.heading))}</span></p>
+  </div>
+{:else}
+  <div class="prop lines">
+    {#if plan.now}
+      <p class="lines-lead">
+        <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {plan.against}, <span class="num">{plan.then}</span></span>{/if}
+      </p>
+    {/if}
+    <ul class="lines-legend">
+      {#each plan.lines as l}
+        <li class="lines-key" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">{l.label}</span></li>
+      {/each}
+    </ul>
+    {#if plan.empty}
+      <p class="lines-empty">{LINES_NONE}</p>
+    {:else}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="lines-plot" onpointermove={track} onpointerdown={track} onpointerleave={() => (scrub = null)} onpointercancel={() => (scrub = null)}>
+        {#if plan.top}<span class="lines-top num" aria-hidden="true">{plan.top}</span>{/if}
+        {#if plan.bottom}<span class="lines-bottom num" aria-hidden="true">{plan.bottom}</span>{/if}
+        <svg class="lines-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}>
+          {#each was as l}
+            {#if l.d}<path class="lines-line" data-was="" data-step={l.step} d={l.d} vector-effect="non-scaling-stroke"></path>{/if}
           {/each}
-        </div>
-      {/if}
-    </div>
-    <ol class="lines-ticks" aria-hidden="true">
-      {#each plan.ticks as t}<li class="lines-tick" style="--at:{t.at}" data-minor={t.minor ? '' : undefined}>{t.label}</li>{/each}
-    </ol>
-  {/if}
-  {#if plan.points.length}
-    <details class="lines-numbers">
-      <summary class="lines-toggle">{LINES_NUMBERS}</summary>
-      <table class="lines-table">
-        <thead>
-          <tr>
-            <th scope="col">{plan.axis}</th>
-            {#each plan.lines as l}<th scope="col">{l.label}</th>{/each}
-          </tr>
-        </thead>
-        <tbody>
-          {#each plan.points as p}
+          {#each current as l}
+            {#if l.d}<path class="lines-line" data-step={l.step} d={l.d} vector-effect="non-scaling-stroke"></path>{/if}
+            {#if l.end}<path class="lines-end" data-step={l.step} d={l.end} vector-effect="non-scaling-stroke"></path>{/if}
+          {/each}
+        </svg>
+        {#if point}
+          <!-- THE READOUT TURNS AT THE MIDDLE, to whichever side has more room. At 0.6 a readout of 11rem or more beside a
+               point just past the middle of a half-width slot ran off the plot's end; a narrow slot does not flip at all,
+               because the host's stylesheet slides it inside the plot instead. -->
+          <span class="lines-rule" style="--at:{point.at}" aria-hidden="true"></span>
+          <div class="lines-readout" style="--at:{point.at}" data-flip={Number(point.at) > 0.5 ? '' : undefined} aria-hidden="true">
+            <span class="lines-readout-day">{point.label}</span>
+            {#each plan.lines as l, k}
+              <span class="lines-readout-value" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch"></span><span class="lines-readout-name">{l.label}</span><span class="num">{point.values[k]}</span></span>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <ol class="lines-ticks" aria-hidden="true">
+        {#each plan.ticks as t}<li class="lines-tick" style="--at:{t.at}" data-minor={t.minor ? '' : undefined}>{t.label}</li>{/each}
+      </ol>
+    {/if}
+    {#if plan.points.length}
+      <details class="lines-numbers">
+        <summary class="lines-toggle">{LINES_NUMBERS}</summary>
+        <table class="lines-table">
+          <thead>
             <tr>
-              <th scope="row">{p.label}</th>
-              {#each p.values as v}<td class="num">{v}</td>{/each}
+              <th scope="col">{plan.axis}</th>
+              {#each plan.lines as l}<th scope="col">{l.label}</th>{/each}
             </tr>
-          {/each}
-        </tbody>
-      </table>
-    </details>
-  {/if}
-</div>
+          </thead>
+          <tbody>
+            {#each plan.points as p}
+              <tr>
+                <th scope="row">{p.label}</th>
+                {#each p.values as v}<td class="num">{v}</td>{/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </details>
+    {/if}
+  </div>
+{/if}

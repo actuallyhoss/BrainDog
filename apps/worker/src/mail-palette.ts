@@ -8,14 +8,14 @@ export const MAIL_PALETTE = {
     "s3": "#ECEFF2",
     "ink": "#101318",
     "ink2": "#4A505B",
-    "dim": "#656B76",
+    "dim": "#5F6570",
     "line": "#E3E7EC",
     "accent": "#DB2527"
   },
   "dark": {
-    "sunk": "#0C0F14",
-    "bg": "#161A21",
-    "s1": "#1F242D",
+    "sunk": "#080A0E",
+    "bg": "#12161D",
+    "s1": "#191E26",
     "s3": "#222831",
     "ink": "#F1F3F6",
     "ink2": "#B4BAC4",

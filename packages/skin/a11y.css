@@ -44,21 +44,24 @@
   .tap::before {
     content: '';
     position: absolute;
-    inset: min(0px, calc((100% - var(--tap)) / 2)) min(0px, calc((100% - var(--tap)) / 2));
+    inset: min(0px, calc((100% - var(--tap)) / 2));
   }
 
   /* Reduced motion is a PROMISE, not a preference: durations collapse and the state simply
-     changes. Replace, never delete — every state must still change something. */
+     changes. Replace, never delete: every state must still change something.
+
+     THE SEVEN STEPS OF THE SCALE, and the older names follow them (`--d-state`, `--d-release` and `--d-move`
+     are written in `tokens.css` as the step they are), so a delay or a duration written with any of them
+     collapses too. No curve is touched: at 1ms none of them can be seen. */
   @media (prefers-reduced-motion: reduce) {
     :root {
       --d-press: 1ms;
-      --d-release: 1ms;
-      --d-state: 1ms;
-      --d-move: 1ms;
-      --d-enter: 1ms;
       --d-exit: 1ms;
+      --d-enter: 1ms;
       --d-menu: 1ms;
-      --ease-spring: linear(0, 1);
+      --d-rows: 1ms;
+      --d-page: 1ms;
+      --d-panel: 1ms;
     }
 
     *,
@@ -68,6 +71,48 @@
       animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
       scroll-behavior: auto !important;
+    }
+
+    /* A VIEW TRANSITION'S PARTS ARE PSEUDO-ELEMENTS OF THE ROOT, and `*` matches none of them, so a page's
+       cross-fade and anything that morphs between two screens kept its whole animation. Without one the new
+       screen is simply there. */
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
+    }
+  }
+
+  /* ── glass that cannot, or should not, be seen through ────────────────────
+     EVERY GLASS SURFACE IS PAINTED FROM FOUR TOKENS: `--glass` or `--glass-strong` for its fill, `--glass-blur` for
+     what is behind it and `--glass-edge` for its hairlines. So the a11y layer answers for all of them here, on the
+     tokens, and no component has to remember; a layer above the theme wins over the palette's own values. */
+
+  /* NO BACKDROP FILTER AT ALL, and a translucent fill with nothing blurred behind it lays the page's words under the
+     chrome's, so the chrome is solid. (Before the media query below, which sets the same two: `css-rules` reads a rule
+     under `@supports` as a bare one.) The build adds the `-webkit-` spelling to this query, so a Safari that knows
+     only the prefixed property keeps its glass. */
+  @supports not (backdrop-filter: none) {
+    :root {
+      --glass: var(--bg);
+      --glass-strong: var(--bg);
+    }
+  }
+
+  /* ASKED FOR LESS TRANSPARENCY, glass is the tile's own opaque surface, with nothing blurred behind it. */
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --glass: var(--bg);
+      --glass-strong: var(--bg);
+      --glass-blur: none;
+    }
+  }
+
+  /* ASKED FOR MORE CONTRAST, the palette already makes glass opaque, and its edge becomes a 1px ink outline round it,
+     in place of the two half-pixel hairlines: a glass control is then as plainly a control as a filled one. */
+  @media (prefers-contrast: more) {
+    :root {
+      --glass-edge: 0 0 0 1px var(--ink);
     }
   }
 

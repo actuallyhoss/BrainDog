@@ -42,7 +42,7 @@ import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, seriesPlan } from './series.ts';
-import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesPlan } from './lines.ts';
+import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { figureLike } from './figure.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
@@ -1181,6 +1181,11 @@ function range(b: Block, o: RenderOptions): string {
  */
 function lines(b: Block, o: RenderOptions): string {
   const plan = linesPlan(b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))));
+  /* ONE READING IS A FIGURE, its value and when it was read, with no chart of one dot and no fold of one point. */
+  if (plan.single)
+    return `<div class="prop lines" data-single=""><p class="lines-lead"><span class="lines-now num">${escape(plan.single.value)}</span><span class="lines-against">${escape(
+      linesOnly(plan.single, Boolean(b.heading)),
+    )}</span></p></div>`;
   const lead = plan.now
     ? `<p class="lines-lead"><span class="lines-now num">${escape(plan.now)}</span>${
         plan.change

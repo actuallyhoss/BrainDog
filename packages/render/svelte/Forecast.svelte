@@ -227,7 +227,9 @@
   /* ── the chart full screen ─────── */
 
   let full = $state<HTMLDialogElement>();
-  /* WHAT THE DIALOG HOLDS IS DRAWN ONLY WHILE IT IS OPEN, so the chart is not in the page twice behind a closed one. */
+  /* WHAT THE DIALOG HOLDS IS DRAWN ONLY WHILE IT IS OPEN, so the chart is not in the page twice behind a closed one. It
+     goes once the close has ENDED, not when it starts: dropped on `close`, the sheet went out as its head alone, and
+     `blocks-charts.css` cut that short rather than show it. Not if the dialog was opened again while it went. */
   let enlarged = $state(false);
   const openFull = () => {
     enlarged = true;
@@ -510,7 +512,12 @@
         aria-label={title}
         onclick={outside}
         onkeydown={within}
-        onclose={() => (enlarged = false)}
+        onclose={(e) => {
+          const d = e.currentTarget as HTMLDialogElement;
+          void Promise.allSettled(d.getAnimations().map((a) => a.finished)).then(() => {
+            if (!d.open) enlarged = false;
+          });
+        }}
       >
         {@render handle()}
         <div class="forecast-sheet-head">

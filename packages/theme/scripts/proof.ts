@@ -10,7 +10,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { HOUSE, HIGH_CONTRAST } from '../src/index.ts';
-import { INKS, INTENTS, SURFACES, type Built, type Scheme, parseColour } from '../src/build.ts';
+import { INKS, INTENT_TEXT, INTENTS, SURFACES, type Built, type Scheme, parseColour } from '../src/build.ts';
 import { contrast, separation, toHex, rgbToLch } from '../src/color.ts';
 import { validate, refusals, warnings } from '../src/checks.ts';
 import { toCSS, forcedColors } from '../src/css.ts';
@@ -29,7 +29,8 @@ function matrix(built: Built, scheme: Scheme) {
   const p = built.schemes[scheme];
   console.log(`\n  ${scheme.toUpperCase()} — ink on surface (AA body text needs 4.50)\n`);
   console.log('  ' + pad('', 13) + SURFACES.map((s) => pad(s, 8)).join(''));
-  for (const role of [...INKS, 'accent-text', 'edge', ...INTENTS] as const) {
+  /* The intents as words, which is how this table reads them: red's are `danger-text` (`INTENT_TEXT`). */
+  for (const role of [...INKS, 'accent-text', 'edge', ...INTENTS.map((k) => INTENT_TEXT[k])]) {
     const row = SURFACES.map((s) => pad(num(contrast(parseColour(p[role]), parseColour(p[s]))).trim(), 8)).join('');
     console.log('  ' + pad(role, 13) + row);
   }
@@ -50,7 +51,8 @@ function separability(built: Built, scheme: Scheme) {
   const set: [string, string][] = [
     ['good', p.earn],
     ['warn', p.warn],
-    ['bad', p.danger],
+    /* RED'S WORDS, which is what check F measures; `p.danger` is red as a mark. */
+    ['bad', p[INTENT_TEXT.danger]],
     /* `p.info`, NOT `p.accent`. Check F measures the four INTENTS; this printed the accent under the
        word `info` and called it the same table, so the artefact that exists to make the gate
        checkable by a person could print a passing figure for a pair the gate refuses. */

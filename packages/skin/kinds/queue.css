@@ -30,7 +30,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--sp-2) var(--sp-3);
     padding-block: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .queue-card > * {
@@ -48,7 +48,7 @@
      hairline and its air back. An answered line between two boxes counts as a box, so the rhythm holds round it. */
   :has(> .queue-card) ~ * > .queue-card:first-child {
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* And the cursor's band takes the hairlines it would cross, as it does between bare cards (above). */
@@ -84,7 +84,7 @@
     gap: var(--sp-2);
     align-items: baseline;
     margin: 0;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     color: var(--dim);
   }
 
@@ -159,7 +159,7 @@
     border-radius: var(--r-pill);
     background: var(--s1);
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     white-space: nowrap;
   }
 
@@ -270,10 +270,9 @@
      wraps inside its pill rather than pushing the card sideways at 390. */
   .queue-act {
     justify-self: start;
-    /* "SUGGESTED" IS ITS OWN PART OF THE PILL, which never wraps (below): the option's words are one part and give way
-       inside themselves, the mark keeps its one line at their end, on their first line's baseline. A flex pill does
-       not centre a line in its height as a button does, so the padding puts a one-line pill's words in its middle and
-       a longer one grows from there. */
+    /* THE PILL IS A ROW OF PARTS: the suggestion's dot and the number key at its start (below), then the option's
+       words, which give way inside themselves. A flex pill does not centre a line in its height as a button does, so
+       the padding puts a one-line pill's words in its middle and a longer one grows from there. */
     display: inline-flex;
     align-items: baseline;
     column-gap: var(--sp-2);
@@ -294,20 +293,41 @@
     background: var(--hold-wash);
   }
 
-  /* THE SUGGESTED OPTION IS THE PRIMARY, drawn as every primary button is (`Button.svelte`'s `primary`: an ink fill with
-     the ground's letters), and the "Suggested" word stays beside it so the suggestion is said and not only shaded. It
-     is still not pressed for anybody: the fill says which one, and the press is the reader's. NOT WHILE IT IS THE ONE
-     BEING ANSWERED (`data-on`): `QueueAnswer.svelte` draws that on the selected ground, and ground-coloured letters on
-     it would vanish. */
-  .queue-option[data-recommended] > .queue-act:not([data-on]) {
-    background: var(--ink);
+  /* THE SUGGESTED ANSWER IS AN OUTLINE WITH A SMALL DOT (DIRECTION §37, his pick), and not the primary's ink fill: it
+     is said and not pressed for anybody, so it reads as one answer among the others and never as one already chosen.
+     The dot says it to the eye and the word is kept for a screen reader (below). NOT WHILE IT IS THE ONE BEING
+     ANSWERED (`data-on`): `QueueAnswer.svelte` draws that on the selected ground, which says so.
+
+     AND NOTHING IS MARKED WHERE THE CHOICE IS HARD TO TAKE BACK (`data-cost='undo'`, as `press.ts` `suggestionShown`
+     reads it). A marked answer on a card the other button cannot undo tomorrow reads as an endorsement, so there its
+     pill is drawn as every other answer is, and its word goes with the mark, for the eye and a screen reader alike. */
+  .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-option[data-recommended] > .queue-act:not([data-on]) {
+    background: transparent;
     border-color: var(--ink);
-    color: var(--bg);
+    box-shadow: inset 0 0 0 0.5px var(--ink);
+    color: var(--ink);
   }
 
-  .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
+  /* Its hover is the wash a bare control takes (`Button.svelte`'s `bare`), and only where there is one: a phone keeps
+     `:hover` on the last thing tapped. */
+  @media (hover: hover) and (pointer: fine) {
+    .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
+      background: var(--hover-wash);
+    }
+  }
+
+  .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-option[data-recommended] > .queue-act:not([data-on])::before {
+    content: '';
+    flex: none;
+    align-self: center;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-pill);
+    background: currentColor;
+  }
+
+  .queue-card:has(.queue-cost[data-cost='undo']) .queue-rec {
+    display: none;
   }
 
   /* THE NUMBER KEY THAT ANSWERS, a cap at the start of the option's pill, drawn only on the question the cursor is on
@@ -329,59 +349,27 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* On the ink pill the cap takes the pill's own letters, so it is still read and not lost on the fill. */
-  .queue-option[data-recommended] > .queue-act:not([data-on]) > .queue-key {
-    border-color: currentColor;
-    color: inherit;
-  }
-
   .queue-label {
     color: var(--ink);
     font-weight: 500;
   }
 
-  /* THE WORD BESIDE THE PRIMARY. What an agent suggests is worth saying and is not worth pre-pressing, so the option's
-     pill is filled (above) and this quiet label names why, rather than the option reading as already chosen. It is
-     drawn as it is here only beside an option that cannot be pressed (`.queue-label`); beside a pill it is the pill's
-     own mark (below). */
+  /* THE WORD BESIDE THE SUGGESTED ANSWER. What an agent suggests is worth saying and is not worth pre-pressing, so this
+     quiet label names it rather than the option reading as already chosen. It is drawn as it is here only beside an
+     option that cannot be pressed (`.queue-label`); beside a pill the pill's dot says it (above). */
   .queue-rec {
     justify-self: start;
     padding-inline: var(--sp-2);
     border-radius: var(--r-pill);
     background: var(--s1);
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
-  /* "SUGGESTED" IS A SMALL MARK INSIDE ITS PILL, and adds no line. Under its button it was a line of its own between
-     every suggested answer and the next, which gave each question with a suggestion a stutter the others did not
-     have. Inside the pill, after the option's words, in the pill's own letters a step quieter: the word where the
-     host draws it in the button, and a dot where it draws it after the button, whose word is then kept for a screen
-     reader alone. Not while the option is the one being answered: its pill is the selected ground then, and says so. */
-  .queue-act > .queue-rec {
-    flex: none;
-    margin-inline-start: 0;
-    padding: 0;
-    white-space: nowrap;
-    background: none;
-    color: inherit;
-    opacity: 0.72;
-    font-weight: 400;
-  }
-
-  .queue-option[data-recommended] > .queue-act:not([data-on], :has(> .queue-rec))::after {
-    content: '';
-    display: inline-block;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    flex: none;
-    align-self: center;
-    border-radius: var(--r-pill);
-    background: currentColor;
-    opacity: 0.72;
-    vertical-align: middle;
-  }
-
+  /* BESIDE A PILL "SUGGESTED" IS FOR A SCREEN READER ALONE, and adds no line: the dot says it to the eye. The word is
+     kept in the page and clipped, inside the button after its words (so the button's name says it) or after the button
+     where an older host still draws it there. */
+  .queue-act > .queue-rec,
   .queue-option[data-recommended] > .queue-act ~ .queue-rec {
     position: absolute;
     inline-size: 1px;
@@ -394,7 +382,7 @@
   .queue-because {
     max-inline-size: var(--measure);
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* `queue lead`: THE FIRST QUESTION, READ WHOLE. One step larger than the cards under it and nothing louder: no well,
@@ -431,15 +419,12 @@
     }
   }
 
-  /* The line above its ways already says which one is recommended, so the option's own pill would say it a second time
-     on the one card read whole, as a word or as the stand-in dot. The option keeps `data-recommended`, and with it the
-     ink fill where it can be pressed. */
-  .queue-lead .queue-rec {
+  /* WHERE THE LINE ABOVE ITS WAYS SAYS WHICH ONE IS SUGGESTED (`.queue-suggested`, the renderer's lead), the word in the
+     option's pill would say it a second time, to a screen reader too, so it goes; the pill keeps its outline and its
+     dot, as every suggested answer does. Decide's answerable lead draws no such line, so there the word stays for a
+     screen reader: hidden on every lead, the dot was the only thing that said it. */
+  .queue-lead:has(> .queue-suggested) .queue-rec {
     display: none;
-  }
-
-  .queue-lead .queue-option[data-recommended] > .queue-act:not([data-on])::after {
-    content: none;
   }
 
   .queue-does {
@@ -448,7 +433,7 @@
     max-inline-size: var(--measure);
     margin: 0;
     padding: 0 0 0 var(--sp-3);
-    border-inline-start: 2px solid var(--line);
+    border-inline-start: 2px solid var(--rule);
     list-style: none;
     color: var(--ink2);
     font-size: var(--t-sm);

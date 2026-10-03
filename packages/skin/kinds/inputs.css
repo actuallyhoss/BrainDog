@@ -24,7 +24,7 @@
     gap: var(--sp-3);
     align-items: center;
     padding: var(--sp-2) var(--sp-3);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     cursor: text;
   }
 

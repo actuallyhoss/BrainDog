@@ -30,7 +30,7 @@
     border-radius: var(--r-md);
     color: var(--dim);
     font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -44,7 +44,7 @@
     border: 0;
     border-radius: var(--r-pill);
     color: var(--ink);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     cursor: pointer;
   }
 

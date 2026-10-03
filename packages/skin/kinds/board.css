@@ -25,7 +25,7 @@
   /* A hairline between lanes. Four stacks of cards with nothing between them is four stacks, not four columns: the eye
      has to infer the boundary from where the cards happen to end, which is exactly what fails when one is empty. */
   .board-col + .board-col {
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--rule);
   }
 
   .board-head {
@@ -41,7 +41,7 @@
 
   .board-count {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 400;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
@@ -102,7 +102,7 @@
     background: var(--hold-wash);
     border-radius: var(--r-sm);
     color: var(--ink2);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
     font-weight: 500;
     line-height: 1.35;
     white-space: nowrap;
@@ -110,7 +110,7 @@
 
   .board-col .card-detail {
     color: var(--dim);
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   /* THE TOUCH PATH, A CARD'S LANES AS A NATIVE SELECT (`p/Grid.svelte`), drawn quiet because a pointer that can drag
@@ -128,7 +128,7 @@
     border-radius: var(--r-sm);
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-xs);
+    font-size: var(--t-sm);
   }
 
   @media (pointer: coarse) {
@@ -182,7 +182,7 @@
       gap: var(--sp-1);
       padding: var(--sp-2) 0;
       background: none;
-      border-block-end: 1px solid var(--line);
+      border-block-end: 1px solid var(--rule);
       border-radius: 0;
     }
 

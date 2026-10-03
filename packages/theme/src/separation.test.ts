@@ -8,7 +8,7 @@
  * chroma half. This file holds the distance, so it cannot shrink without a red line naming the pair.
  *
  * Two pairs, because the accent appears two ways: `--accent` as a fill beside the `--danger-fill` chip,
- * and `--accent-text` as a colour beside `--danger` text. Each is read in both schemes of the house and
+ * and `--accent-text` as a colour beside red words, `--danger-text`. Each is read in both schemes of the house and
  * alpha themes, as a reader with normal vision sees it and as each of the three dichromats does
  * (Brettel 1997, the simulation check F already uses).
  *
@@ -43,10 +43,13 @@ const VISIONS: Vision[] = ['normal', 'protan', 'deutan', 'tritan'];
 const SCHEMES: Scheme[] = ['light', 'dark'];
 const THEMES: Built[] = [HOUSE, ALPHA];
 
-/** The accent as a fill beside the danger chip, and the accent as text beside danger text. */
+/**
+ * The accent as a fill beside the danger chip, and the accent as text beside red words. `danger` itself is red as a
+ * mark, and in light it is the mark, so the accent beside it is the logo beside a badge: one red on purpose.
+ */
 const PAIRS: [Role, Role][] = [
   ['accent', 'danger-fill'],
-  ['accent-text', 'danger'],
+  ['accent-text', 'danger-text'],
 ];
 
 /**

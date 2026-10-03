@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { changeSaid, linesNearest, linesPlan } from './lines.ts';
+import { changeSaid, linesNearest, linesOnly, linesPlan } from './lines.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 import { KINDS } from './kinds.ts';
@@ -56,4 +56,28 @@ test('a lines fence parses as its own kind and draws its numbers in a fold', () 
   assert.match(html, /<details class="lines-numbers">/u);
   assert.match(html, /class="lines-change num" data-trend="up">\+33.3%/u);
   assert.match(html, /role="img" aria-label="Day: Revenue, 1 Sep 10 to 2 Sep 12/u);
+});
+
+test('ONE READING IS A FIGURE, its value and when it was read, and not a chart of one dot over a fold of one point', () => {
+  const plan = linesPlan(rows('Day | Aov, Crumb.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n29 Sep |  | '));
+  assert.deepEqual(plan.single, { value: '£24.10', label: '28 Sep', line: 'Aov, Crumb.gg', was: false, alone: true });
+  assert.equal(linesOnly(plan.single!, true), '28 Sep, the only reading');
+  assert.equal(linesOnly(plan.single!, false), 'Aov, Crumb.gg, 28 Sep, the only reading', 'a figure under no heading names its measure');
+  const html = toHTML(parse('```lines | Aov\nDay | Aov | was: Before\n27 Sep |  | \n28 Sep | £24.10 | \n```'));
+  assert.match(
+    html,
+    /<div class="prop lines" data-single=""><p class="lines-lead"><span class="lines-now num">£24.10<\/span><span class="lines-against">28 Sep, the only reading<\/span><\/p><\/div>/u,
+  );
+  assert.doesNotMatch(html, /<svg|lines-numbers|lines-legend|Points on this chart/u, 'no chart, no fold of one point, no key to one line');
+
+  /* TWO READINGS ARE A LINE, and so is one reading beside the period before. */
+  assert.equal(linesPlan(rows('Day | Users\n1 Sep | 7\n2 Sep | 9')).single, null);
+  assert.equal(linesPlan(rows('Day | Users | was: Before\n1 Sep | 7 | 5')).single, null);
+  /* A READING ONLY IN THE PERIOD BEFORE SAYS WHICH LINE IT IS ON, and nothing at all is still a sentence. */
+  assert.equal(linesOnly(linesPlan(rows('Day | Users | was: Previous 30 days\n1 Sep |  | 5')).single!, true), 'Previous 30 days, 1 Sep, the only reading');
+  assert.equal(linesPlan(rows('Day | Users\n1 Sep | ')).single, null);
+  /* AND ON A CHART OF TWO LINES, where the heading names both and the figure would be read as the first. */
+  const costs = linesPlan(rows('Day | Revenue | Costs\n1 Sep |  | \n2 Sep |  | £5'));
+  assert.equal(linesOnly(costs.single!, true), 'Costs, 2 Sep, the only reading');
+  assert.match(toHTML(parse('```lines | Revenue and costs\nDay | Revenue | Costs\n2 Sep |  | £5\n```')), /<span class="lines-against">Costs, 2 Sep, the only reading<\/span>/u);
 });
