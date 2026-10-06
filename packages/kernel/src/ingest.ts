@@ -1357,9 +1357,11 @@ const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
  * and its fields.
  *
  * WHERE IT CAME FROM IS THE PATTERN'S `description`, or that of the door it reads at, which is the name the doors list
- * shows, said with what came: "this message from HSBC texts". A pattern with none is what came alone, "this email",
- * because its id is a word nobody chose for a person to read. `sources` holds the fullest first, so a question too long
- * with the description is said without it.
+ * shows, said with what came: "this message from HSBC texts". With neither, it is the title of the add-on that declared
+ * the pattern, or the door: no shipped pattern carries a description, so every question a bank's alert opened said
+ * "this email" and never whose. A pattern with none of the three is what came alone, "this email", because its id is a
+ * word nobody chose for a person to read. `sources` holds the fullest first, so a question too long with the name is
+ * said without it.
  */
 type Words = { sources: string[]; list: string; fields: (ids: readonly string[]) => string };
 
@@ -1371,7 +1373,7 @@ function wordsFor(deps: IngestDeps, matched: IngestDecl, register: string, chann
   };
   const door = matched.door === undefined ? undefined : deps.ingests().find((i) => i.ingest === matched.door);
   /* A PASTE CAME FROM WHOEVER PASTED IT, whatever the pattern that read it is called. */
-  const from = channel === 'paste' ? null : (described(matched) ?? described(door));
+  const from = channel === 'paste' ? null : (described(matched) ?? described(door) ?? packTitle(deps.sql, matched) ?? packTitle(deps.sql, door));
   /* THE FIELDS IN THE LIST'S OWN ORDER, the order its columns are drawn in, and not the declaration's sorted keys. */
   const schema = deps.schemaOf(register);
   const order = Object.keys(schema?.fields ?? {});
@@ -1388,6 +1390,28 @@ function wordsFor(deps: IngestDeps, matched: IngestDecl, register: string, chann
     list: renamed(register) ?? listName(deps.sql, register),
     fields: (ids) => listedAnd([...ids].sort((a, b) => place(a) - place(b)).map((id) => fieldSaid(schema, id, renamed(`${register}.${id}`)))),
   };
+}
+
+/**
+ * The title of the add-on that declared a pattern, as the add-ons list shows it, or `null`. The pack is the body's own
+ * `pack`, else the declaration row's, and a pack with no title, or one switched off, names nothing: its id is a slug.
+ */
+function packTitle(sql: Sql, decl: IngestDecl | undefined): string | null {
+  if (decl === undefined) return null;
+  const said = (decl as { pack?: unknown }).pack;
+  const pack =
+    typeof said === 'string' && said !== ''
+      ? said
+      : (sql.one<{ pack: string | null }>('SELECT pack_id AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL', `ingest.${decl.ingest}`)?.pack ?? null);
+  if (pack === null) return null;
+  const manifest = sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ? AND disabled_at IS NULL', pack)?.manifest;
+  if (manifest === undefined) return null;
+  try {
+    const title = (JSON.parse(manifest) as { title?: unknown } | null)?.title;
+    return typeof title === 'string' && title.trim() !== '' ? title.trim().replace(/\s+/g, ' ') : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Words joined as a sentence lists them, each once: `a`, `a and b`, `a, b and c`. */

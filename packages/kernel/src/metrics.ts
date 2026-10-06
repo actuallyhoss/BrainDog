@@ -759,7 +759,7 @@ export function predicateOf(
  *
  * Exported for `money-figures.ts`, so a rolled figure and a walk name today exactly as every other figure does.
  */
-export function clockOf(ctx: EvalContext): number {
+export function clockOf(ctx: Pick<EvalContext, 'asOfMs' | 'nowMs' | 'tz'>): number {
   if (ctx.asOfMs !== undefined) return ctx.asOfMs;
   return ctx.tz === undefined ? ctx.nowMs : Date.parse(`${localDate(ctx.nowMs, ctx.tz)}T12:00:00Z`);
 }

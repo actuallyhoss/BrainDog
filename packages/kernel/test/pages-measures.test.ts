@@ -203,3 +203,73 @@ test('A MEASURE MOVES BY A SHARE, so a doubling outranks EGP 4,000 more on EGP 4
   /* A STAT KEEPS THE ONE READING AS A TILE, after the measures that moved. */
   assert.deepEqual(measureSeries(readings, { nowMs: NOW, back: 7, fallback: '' }).map((m) => m.name), ['Trials', 'Sign-ups', 'Cash', 'Refunds', 'Once']);
 });
+
+test('TWO PROJECTS’ MEASURES OF ONE NAME ARE TWO MEASURES, each named for its project, and the newest before the period is each one’s', async () => {
+  /* MEASURED ON THE OWNER'S RECORD: two shops' "AOV" drawn as one line through both shops' numbers, so the importer glued
+     the project onto the name to tell them apart ("Aov, Crumb.gg"). The project is the list's pointer to the projects. */
+  const PROJECTS: Declaration = {
+    id: 'register.things',
+    kind: 'register',
+    body: { id: 'things', name: 'Projects', title: 'name', scopes: { repos: 'repos' }, fields: [{ id: 'name', type: 'text', required: true }, { id: 'repos', type: 'list', of: 'text' }] } as never,
+  };
+  const NUMBERS: Declaration = {
+    id: 'register.numbers',
+    kind: 'register',
+    body: {
+      id: 'numbers',
+      name: 'Numbers',
+      title: 'name',
+      fields: [
+        { id: 'name', type: 'text', required: true, index: true },
+        { id: 'value', type: 'decimal', required: true },
+        { id: 'unit', type: 'text' },
+        { id: 'thing', type: 'ref', to: 'things', index: true },
+        { id: 'at', type: 'instant', index: true },
+      ],
+    } as never,
+  };
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  value(await k.install([PROJECTS, NUMBERS]));
+  const bake = value<{ id: string }>(k.create('things', { name: 'Bake' }, OWNER)).id;
+  const kiln = value<{ id: string }>(k.create('things', { name: 'Kiln' }, OWNER)).id;
+  value(k.create('numbers', { name: 'AOV', value: 40, thing: bake, at: '2026-09-15T08:00:00.000Z' }, OWNER));
+  value(k.create('numbers', { name: 'AOV', value: 44, thing: bake, at: '2026-09-17T08:00:00.000Z' }, OWNER));
+  value(k.create('numbers', { name: 'AOV', value: 900, thing: kiln, at: '2026-09-16T08:00:00.000Z' }, OWNER));
+  value(k.create('numbers', { name: 'AOV', value: 910, thing: kiln, at: '2026-09-17T09:00:00.000Z' }, OWNER));
+  /* Before the period: one quiet reading each, and only the newest of each project's is kept. */
+  value(k.create('numbers', { name: 'Stock', value: 5, thing: bake, at: '2026-05-01T08:00:00.000Z' }, OWNER));
+  value(k.create('numbers', { name: 'Stock', value: 70, thing: kiln, at: '2026-04-01T08:00:00.000Z' }, OWNER));
+  value(k.create('numbers', { name: 'Stock', value: 1, at: '2026-03-01T08:00:00.000Z' }, OWNER));
+
+  const tiles = k.block({ kind: 'stat', source: 'register.numbers', columns: COLUMNS, back: 7 }) as Drawn;
+  assert.deepEqual(tiles.refusals, []);
+  const said = tiles.measures!.map((m) => [m.name, m.of ?? null, m.latest?.value ?? null]);
+  assert.deepEqual(
+    said.filter(([name]) => name === 'AOV').sort(),
+    [['AOV', 'Bake', 44], ['AOV', 'Kiln', 910]],
+    'two projects’ measures were one line',
+  );
+  assert.deepEqual(said.filter(([name]) => name === 'Stock').sort(), [['Stock', null, 1], ['Stock', 'Bake', 5], ['Stock', 'Kiln', 70]]);
+  const kilnAov = tiles.measures!.find((m) => m.name === 'AOV' && m.of === 'Kiln')!;
+  assert.deepEqual(kilnAov.now.slice(-2), [900, 910], 'the other project’s readings were drawn on this one’s line');
+  /* NAMES, NEVER IDS: the project is said by its title. */
+  assert.doesNotMatch(JSON.stringify(tiles.measures), new RegExp(`${bake}|${kiln}`));
+
+  /* A `lines` block keeps the one-reading measures beside it, each with its project. */
+  value(k.create('numbers', { name: 'Orders', value: 3, thing: bake, at: '2026-09-16T08:00:00.000Z' }, OWNER));
+  value(k.create('numbers', { name: 'Orders', value: 8, thing: kiln, at: '2026-09-17T08:00:00.000Z' }, OWNER));
+  const lines = k.block({ kind: 'lines', source: 'register.numbers', columns: COLUMNS, back: 7, where: 'name is Orders' }) as Drawn;
+  assert.deepEqual(lines.refusals, []);
+  assert.deepEqual(lines.measures, []);
+  assert.deepEqual(lines.latest?.map((m) => [m.measure, m.of ?? null, m.value]), [['Orders', 'Kiln', 8], ['Orders', 'Bake', 3]]);
+
+  /* A LIST THAT NAMES NO PROJECT is grouped by name alone, as it was. */
+  const plain = measureSeries(
+    [
+      { at: '2026-09-16T08:00:00.000Z', value: 1, name: 'AOV' },
+      { at: '2026-09-17T08:00:00.000Z', value: 2, name: 'AOV' },
+    ],
+    { nowMs: NOW, back: 7, fallback: '' },
+  );
+  assert.deepEqual(plain.map((m) => [m.name, m.of]), [['AOV', undefined]]);
+});

@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Arrived, type Declaration, type Json, type Kernel } from '../src/index.ts';
+import { jcs, openRecord, type Arrived, type Declaration, type Json, type Kernel } from '../src/index.ts';
 import { QUESTION_MOST, arrive as arriveThrough, type IngestDeps } from '../src/ingest.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -148,6 +148,37 @@ test('WHERE IT CAME FROM IS THE PATTERN’S DESCRIPTION, and a description too l
   const fell = asked(long.k, long.sql, arrive(long.k, said('Halden Coffee', '9999'), 'd2'));
   assert.equal(fell.question, 'Add this email to Transactions? Its account could not be read.');
   long.sql.close();
+});
+
+test('WITH NO DESCRIPTION, WHERE IT CAME FROM IS THE ADD-ON THAT DECLARED THE PATTERN, by its title and never its id', async () => {
+  /* NO SHIPPED PATTERN CARRIES A DESCRIPTION, so every question a bank's alert opened said "this email" and never whose. */
+  const withPack = async (title: string | undefined, over: Record<string, unknown> = { pack: 'card-alerts' }, on = true) => {
+    const sql = openSqlite();
+    const k = await openRecord(sql, fixedClock(NOW), { literals });
+    k.rememberPack({
+      id: 'card-alerts',
+      version: '1.0.0',
+      source: 'local',
+      ref: null,
+      manifest: jcs({ pack: 'card-alerts', version: '1.0.0', ...(title === undefined ? {} : { title }) }),
+      checksum: 'not-a-real-checksum',
+    });
+    const installed = await k.install([ACCOUNTS, TRANSACTIONS, CARD(over)]);
+    assert.ok(installed.ok, JSON.stringify(installed));
+    if (!on) sql.exec("UPDATE pack SET disabled_at = '2026-09-01T00:00:00.000Z' WHERE id = 'card-alerts'");
+    assert.ok(k.create('accounts', { name: 'Cairo savings', last4: '6518' }, OWNER).ok);
+    const question = asked(k, sql, arrive(k, said('Halden Coffee', '9999'), 'p1')).question;
+    sql.close();
+    return question;
+  };
+  const titled = await withPack('Card alerts');
+  assert.equal(titled, 'Add this email from Card alerts to Transactions? Its account could not be read.');
+  inWords(titled);
+  /* A DESCRIPTION STILL WINS, the name somebody chose for this one pattern. */
+  assert.equal(await withPack('Card alerts', { pack: 'card-alerts', description: 'HSBC' }), 'Add this email from HSBC to Transactions? Its account could not be read.');
+  /* An add-on with no title, or one switched off, names nothing: its id is a slug nobody chose for a person to read. */
+  assert.equal(await withPack(undefined), 'Add this email to Transactions? Its account could not be read.');
+  assert.equal(await withPack('Card alerts', { pack: 'card-alerts' }, false), 'Add this email to Transactions? Its account could not be read.');
 });
 
 test('THE SAME QUESTION IS ASKED ONCE while it is open, and the arrival asked it again joins it as a second row', async () => {

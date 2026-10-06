@@ -27,11 +27,19 @@ export const MEASURE_BACK = { least: 2, most: 366, fallback: 30 } as const;
 /** The most measures one block is handed. A page of charts is a page someone scrolls, not a wall. */
 export const MEASURES_MOST = 12;
 
-/** One reading as the record holds it: the fields a block named, unconverted. */
-export type RawReading = { at: unknown; value: unknown; name?: unknown; unit?: unknown };
+/**
+ * One reading as the record holds it: the fields a block named, unconverted, and `of`, the name of the project it was
+ * reported for when its list says (`readings` in `index.ts`).
+ */
+export type RawReading = { at: unknown; value: unknown; name?: unknown; unit?: unknown; of?: unknown };
 
 export type MeasureSeries = {
   name: string;
+  /**
+   * The project the measure was reported for, by its name, when the readings say. Two projects' "Orders" are two
+   * measures, each drawn under its own project, and never one line through both projects' numbers.
+   */
+  of?: string;
   /** A currency code, another unit, or ''. */
   unit: string;
   bucket: MeasureBucket;
@@ -128,6 +136,8 @@ function readingOf(v: unknown, unit: unknown): { value: number; unit: string } |
 /** A measure with fewer than two points in the period, which draws no line: its newest reading, said once. */
 export type MeasureLatest = {
   measure: string;
+  /** The project it was reported for, by its name, as `MeasureSeries.of`. */
+  of?: string;
   /** The reading as a number: money in major units of `unit`, as a series holds it. */
   value: number;
   /** A currency code, another unit, or ''. */
@@ -162,8 +172,9 @@ function movedBy(m: MeasureSeries): number {
   return larger === 0 ? 0 : Math.abs(last - first) / larger;
 }
 
-/** Newest reading first, then by name, which is the order a measure that did not move is kept in. */
-const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms: number }): number => b.ms - a.ms || a.name.localeCompare(b.name);
+/** Newest reading first, then by name and project, which is the order a measure that did not move is kept in. */
+const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms: number }): number =>
+  b.ms - a.ms || a.name.localeCompare(b.name) || (a.of ?? '').localeCompare(b.of ?? '');
 
 /**
  * Every measure the readings hold, each over its period and the period before: those that moved most first, then the
@@ -201,7 +212,7 @@ export function measureLines(readings: Iterable<RawReading>, opts: MeasureOpts):
     .filter((m) => pointsIn(m) === 1 && m.latest !== null)
     .sort(newestFirst)
     .slice(0, most)
-    .map((m): MeasureLatest => ({ measure: m.name, value: m.latest!.value, unit: m.unit, at: m.latest!.at, day: m.latest!.day }));
+    .map((m): MeasureLatest => ({ measure: m.name, ...(m.of !== undefined ? { of: m.of } : {}), value: m.latest!.value, unit: m.unit, at: m.latest!.at, day: m.latest!.day }));
   return { lines, latest };
 }
 
@@ -213,7 +224,10 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
   const dayOf = localDays(tz);
   const inWindow = new Set([...before, ...keys]);
 
-  type Group = { unit: string; last: Map<string, { ms: number; value: number }>; latest: { ms: number; value: number; day: string } | null };
+  type Group = { name: string; of: string | null; unit: string; last: Map<string, { ms: number; value: number }>; latest: { ms: number; value: number; day: string } | null };
+  /* ONE GROUP A MEASURE AND PROJECT. By name alone, two projects' "Orders" were one line through both projects' numbers,
+     whichever reported last that day standing for the day, and the importer glued the project onto the name to tell them
+     apart ("Aov, Crumb.gg"). */
   const groups = new Map<string, Group>();
   for (const r of readings) {
     if (typeof r.at !== 'string') continue;
@@ -223,8 +237,10 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
     const reading = readingOf(r.value, r.unit);
     if (reading === null) continue;
     const said = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : opts.fallback;
-    let group = groups.get(said);
-    if (!group) groups.set(said, (group = { unit: reading.unit, last: new Map(), latest: null }));
+    const of = typeof r.of === 'string' && r.of.trim() !== '' ? r.of.trim() : null;
+    const id = JSON.stringify([said, of]);
+    let group = groups.get(id);
+    if (!group) groups.set(id, (group = { name: said, of, unit: reading.unit, last: new Map(), latest: null }));
     if (!group.unit && reading.unit) group.unit = reading.unit;
     const day = dated ? r.at : dayOf(ms);
     if (!group.latest || ms >= group.latest.ms) group.latest = { ms, value: reading.value, day };
@@ -234,8 +250,9 @@ function seriesOf(readings: Iterable<RawReading>, opts: MeasureOpts): (MeasureSe
     if (!held || ms >= held.ms) group.last.set(key, { ms, value: reading.value });
   }
 
-  return [...groups.entries()].map(([name, g]): MeasureSeries & { ms: number } => ({
-    name,
+  return [...groups.values()].map((g): MeasureSeries & { ms: number } => ({
+    name: g.name,
+    ...(g.of !== null ? { of: g.of } : {}),
     unit: g.unit,
     bucket,
     keys,

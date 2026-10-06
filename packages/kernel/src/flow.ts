@@ -1092,8 +1092,9 @@ function sideOf(deps: FlowDeps, id: string, crosses: unknown): { value: number; 
   if (!found) return null;
   /* THE TARGET AS IT STANDS, a setting's value in place of the number written beside it, and no line at all for a
      setting nobody has typed (`declare.ts` `liveTarget`): the reading then has no verdict, and the side is kept. */
-  const decl = liveTarget(deps.sql, JSON.parse(found.body) as MetricDecl);
-  const read = evaluateMetric(deps.sql, decl, deps.rules().ctx);
+  const ctx = deps.rules().ctx;
+  const decl = liveTarget(deps.sql, JSON.parse(found.body) as MetricDecl, ctx);
+  const read = evaluateMetric(deps.sql, decl, ctx);
   if (!read.ok || read.value.value === null) return null;
   /* A MONEY FIGURE ADDED UP OUT OF THE CURRENCY IT DECLARES CARRIES ITS TARGET CONVERTED (`targetIn`), and that is the
      line its value is read against, as the page reads `met`. With no rate to convert it, `met` is `null` and the

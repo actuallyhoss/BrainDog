@@ -2846,7 +2846,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        AND A TOKEN'S IS ITS PERSON'S. This looked the mark up by `principal.id`, which for a token is the token's
        own id and no member row has it, so a person's agent drew every line as unread however far the person had
        read, while `whatsNew` for the same token read the person's mark. Both now ask `readerOf`. */
-    if (!beyond && b.source === 'activity' && 'seen' in b) return { ...b, seen: markOf(readerOf(ctx)) };
+    if (!beyond && b.source === 'activity') {
+      const heard = unmuted(ctx, b);
+      return 'seen' in heard ? { ...heard, seen: markOf(readerOf(ctx)) } : heard;
+    }
     if (!beyond) return b;
     return shellOf(b, beyond, log !== null);
   };
@@ -4297,6 +4300,41 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return answer;
   };
 
+  /** The rules whose notices this reader muted (`notify.muted`). A token reads its person's, as it reads their mark. */
+  const mutesOf = (ctx: CallContext): ReadonlySet<string> => {
+    const reader = readerOf(ctx);
+    const said = reader === null ? undefined : (kernel.prefsOf(reader) as Prefs)['notify.muted'];
+    return new Set(Array.isArray(said) ? said : []);
+  };
+
+  /**
+   * An activity block less the notices its reader muted, by the rule `newsFor` reads the log with (`mutedFor`).
+   *
+   * MUTING A RULE LEFT TODAY AS IT WAS. `notify.muted` filtered `whatsNew` alone, and Today's "since you were away" is a
+   * feed over `activity`, which the kernel draws for no reader in particular, so a rule turned off in Settings went on
+   * filling the page the setting said it would leave. The kernel's lines are folded by then (`feedRows`): a line of
+   * notes from one rule is dropped whole, and `matched` loses its count. AN URGENT ONE STAYS, as it does in `newsFor`:
+   * the line does not carry the event's `field`, so the newest note it folds is read back from the log, by its rule, its
+   * instant and its words, and the line is kept when that note interrupted. A rule's notes are urgent or not by its declaration,
+   * so the newest says it for the line. The tail a `first:` folds into one line a kind (`who: null`) is not a rule's and
+   * stays as counted.
+   */
+  const unmuted = <B extends { feed?: { kind: string | null; who: string | null; at: string; note: string | null; count: number }[]; matched: number }>(ctx: CallContext, b: B): B => {
+    if (!Array.isArray(b.feed) || b.feed.length === 0) return b;
+    const muted = mutesOf(ctx);
+    if (muted.size === 0) return b;
+    let dropped = 0;
+    const feed = b.feed.filter((row) => {
+      if (row.kind !== 'note' || row.who === null || !muted.has(row.who)) return true;
+      const field =
+        sql.one<{ field: string | null }>("SELECT field FROM event WHERE kind = 'note' AND actor = ? AND ts = ? AND note IS ? ORDER BY rowid DESC LIMIT 1", row.who, row.at, row.note)?.field ?? null;
+      if (!mutedFor({ kind: 'note', actor: row.who, field }, muted)) return true;
+      dropped += row.count;
+      return false;
+    });
+    return dropped === 0 ? b : { ...b, feed, matched: Math.max(0, b.matched - dropped) };
+  };
+
   /**
    * What changed since `cursor`, or since the caller's read mark. A token reads its person's mark.
    *
@@ -4308,8 +4346,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
     const reader = readerOf(ctx);
-    const said = reader === null ? undefined : (kernel.prefsOf(reader) as Prefs)['notify.muted'];
-    const muted = new Set(Array.isArray(said) ? said : []);
+    const muted = mutesOf(ctx);
     const skip = (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip);
     const events = lines.slice(0, NEWS);
@@ -5581,8 +5618,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!('draw' in plans[i]!) || block === null || typeof block !== 'object') return null;
         const w = block as { source?: unknown; horizon?: unknown; from?: unknown; opening?: unknown };
         if (w.source !== 'forecast.runway') return null;
-        /* `'last'` WALKS TO THE LAST DATED ROW, as far as the page's own ceiling, so it is costed at that ceiling. */
-        const horizon = typeof w.horizon === 'number' ? w.horizon : w.horizon === 'last' ? PAGE_HORIZON_MOST : WALK_HORIZON_DEFAULT;
+        /* `'last'` WALKS TO THE LAST DATED ROW, as far as the page's own ceiling, so it is costed at that ceiling, and a
+           length past the ceiling at the ceiling. The longer lengths a knob offers (`horizons:`) are not costed here:
+           a preview never walks them, since `previewed` leaves out each one past this ceiling before the block is drawn. */
+        const horizon =
+          typeof w.horizon === 'number' && Number.isFinite(w.horizon) ? Math.min(w.horizon, PAGE_HORIZON_MOST) : w.horizon === 'last' ? PAGE_HORIZON_MOST : WALK_HORIZON_DEFAULT;
         if (horizon > PREVIEW_HORIZON_MOST)
           return {
             code: 'OUT_OF_BOUNDS',
@@ -5643,6 +5683,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return null;
       });
 
+      /* A KNOB'S LONGER LENGTHS ARE OFFERED IN A PREVIEW ONLY AS FAR AS A PREVIEW WALKS. The kernel walked to the longest
+         of `horizons:` (`walkReach` in `packages/kernel/src/pages.ts`), so a body opening on 30 days and offering 3,650,
+         or `last`, walked that far under a guard that read 30 (`loop/research-audit-11-13.md` item 1). Refusing such a
+         block refused Money's own Cash ahead, which offers two years, in every "As it will look". So the lengths past
+         `PREVIEW_HORIZON_MOST`, and `last`, are left off the drawn block, and the walk reaches no further whatever the
+         kernel does with the rest; the renderer offers a length only as far as the walk reaches, so nothing on screen
+         changes. Installed, the page offers them all. A list the kernel refuses (more than eight lengths, or one that is
+         not whole days or `last`, `horizonsOk`) is left as written, so the preview refuses it as the page would. */
+      const previewed = (block: unknown): unknown => {
+        const w = block as { source?: unknown; horizons?: unknown };
+        if (w.source !== 'forecast.runway' || !Array.isArray(w.horizons) || w.horizons.length > 8) return block;
+        const said = w.horizons as unknown[];
+        if (!said.every((h) => h === 'last' || (typeof h === 'number' && Number.isInteger(h) && h >= 1))) return block;
+        const near = said.filter((h) => typeof h === 'number' && h <= PREVIEW_HORIZON_MOST);
+        if (near.length === said.length) return block;
+        const { horizons: _far, ...rest } = block as Record<string, unknown>;
+        return near.length > 0 ? { ...rest, horizons: near } : rest;
+      };
+
       const decl = b as { page: string };
       const drawnBlocks = written.map((block, i) => {
         const plan = plans[i]!;
@@ -5656,7 +5715,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [plan.refused] })
                 : cost
                   ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [cost] })
-                  : heldBlock(ctx, kernel.block(block as never));
+                  : heldBlock(ctx, kernel.block(previewed(block) as never));
         /* HER NAMES BACK, in place of the ones nobody declared, so the drawing says the figure she wrote. */
         const back = renamed[i]!.back;
         if (back.size === 0) return drawn;

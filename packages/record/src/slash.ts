@@ -26,7 +26,7 @@ import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel, Tried } from '@braindog/kernel';
 import { coerce } from '@braindog/kernel';
-import { labelSetting, voiceSetting } from '@braindog/declare';
+import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
 import type { HeadlineInput } from './headlines.ts';
 
@@ -52,14 +52,54 @@ const LABEL_MOST = 40;
 const HOLDS_MOST = 280;
 
 /**
- * One of a list, from its name: Issues, issue.
+ * One of a list, from its name and in its case, or `null` where its ending does not say: Issues, Issue; HSBC cards,
+ * HSBC card; Deliveries, Delivery; Boxes, Box; APIs, API; Series, nothing.
  *
- * THE RULE THE APP ALREADY APPLIES, from `apps/web/src/lib/voice.ts`. A list renamed with no singular given is already
- * SHOWN in the singular this makes, so drafting it writes down the word the reader is seeing rather than guessing a new
- * one. It is deliberately two cases and no more: anything it cannot turn comes back as the name in lower case, which is
- * the right answer for a list whose name is already singular and is left undrafted below when it says nothing new.
+ * ONLY THE LAST WORD TURNS, AND ONLY WHERE ENGLISH SAYS HOW. The rule this replaced lowercased the whole name and cut a
+ * final s or turned ies into y, so "HSBC cards" was drafted as "hsbc card", Boxes as "boxe" and Series as "sery", on a
+ * card that set it without saying so. What it cannot turn with confidence (a name already one, a word whose plural is
+ * irregular, a mass noun) comes back `null`, and the card leaves the singular out rather than guess: the person still
+ * types one in Settings › Words. `inSentence` then sets its case.
  */
-const singularOf = (name: string): string => name.toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
+const singularOf = (name: string): string | null => {
+  const m = /^(.*?)(\p{L}+)$/u.exec(name.trim());
+  if (!m) return null;
+  const [, head = '', last = ''] = m;
+  const low = last.toLowerCase();
+  const turned = ((): string | null => {
+    /* AN ACRONYM'S PLURAL IS ITS LETTERS AND A SMALL s: APIs, IDs, URLs. */
+    if (/^\p{Lu}{2,}s$/u.test(last)) return last.slice(0, -1);
+    if (low.length < 4 || !low.endsWith('s') || /(?:ss|us|is)$/u.test(low) || NOT_PLURAL.has(low)) return null;
+    if (low.endsWith('ies')) return /[^aeiou]ies$/u.test(low) ? `${last.slice(0, -3)}${/\p{Lu}/u.test(last.at(-1)!) ? 'Y' : 'y'}` : null;
+    if (/(?:sses|xes|ches|shes)$/u.test(low)) return last.slice(0, -2);
+    if (/(?:zzes|oes)$/u.test(low)) return null;
+    return last.slice(0, -1);
+  })();
+  return turned === null ? null : `${head}${turned}`;
+};
+
+/**
+ * Words ending in s that `singularOf` must not cut: one already (Series, News, Canvas), a field rather than a count
+ * (Analytics, Savings), or a plural it would turn wrong (Movies to movy, Caches to cach, Statuses to statuse, Shelves to
+ * shelve, Analyses to analyse).
+ */
+const NOT_PLURAL: ReadonlySet<string> = new Set([
+  'series', 'species', 'news', 'means', 'lens', 'thanks', 'canvas', 'atlas', 'alias', 'bias', 'chaos', 'christmas', 'gas',
+  'analytics', 'logistics', 'economics', 'mathematics', 'physics', 'ethics', 'politics', 'athletics', 'aerobics',
+  'movies', 'cookies', 'calories', 'zombies', 'rookies', 'selfies', 'smoothies', 'brownies', 'goalies', 'hippies', 'pies', 'ties', 'lies',
+  'caches', 'niches', 'headaches', 'avalanches', 'cliches', 'moustaches', 'mustaches', 'quiches',
+  'buses', 'statuses', 'bonuses', 'campuses', 'viruses', 'censuses', 'surpluses', 'choruses',
+  'knives', 'wives', 'lives', 'halves', 'shelves', 'wolves', 'calves', 'loaves', 'thieves', 'scarves', 'hooves', 'elves', 'selves',
+  'analyses', 'crises', 'theses', 'hypotheses', 'diagnoses', 'synopses', 'lenses', 'oases', 'premises',
+  'clothes', 'goods', 'savings', 'earnings', 'belongings', 'headquarters', 'whereabouts', 'outskirts',
+]);
+
+/**
+ * A name as it reads inside a sentence: each word that is only capitalised (Issues, Client) in lower case, and every
+ * other word as it was typed (HSBC, iPhone), so "every HSBC card we know about" keeps the bank's name and Issues still
+ * reads "every issue". The words a list carries by default are written that way (`MODULE_WORDS`: "task", "person").
+ */
+const inSentence = (name: string): string => name.replace(/\p{L}+/gu, (w) => (/^\p{Lu}\p{Ll}*$/u.test(w) ? w.toLowerCase() : w));
 
 /** One word of a line, matched whole and in any case, so renaming a list does not rewrite the middle of another word. */
 const wordIn = (word: string): RegExp => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}\\b`, 'giu');
@@ -498,6 +538,18 @@ export function noticeUsage(usage: Usage, offered: readonly Offered[], partial =
   return partial ? { noticed: read.noticed.filter((n) => !OF_THE_WHOLE.has(n.kind)), drafts: [], quiet: read.quiet } : read;
 }
 
+/**
+ * Whether the speaking use case named this list itself: one of its own lists, or a module's it relabelled. Only those
+ * are offered a page's title as their name.
+ *
+ * EVERY LIST A USE CASE HOLDS DECLARES ITS WORDS NOW (`declare` `useCasePack`), so a module's list it never renamed has
+ * a `label_<list>` setting too, starting from the module's own name. Read as a word the use case chose, that armed the
+ * card for every module list, and a page called Renewals over Services asked "Call Services Renewals everywhere?". A
+ * module's list whose setting starts from the module's own word (`MODULE_WORDS`) is one it left alone.
+ */
+const relabelled = (list: ListUse, held: ToneSetting, tone: Tone): boolean =>
+  list.pack === tone.pack || !Object.hasOwn(MODULE_WORDS, list.id) || held.default !== MODULE_WORDS[list.id]!.name;
+
 function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noticed[]; drafts: SlashDraft[]; quiet: string | null } {
   const nowMs = Date.parse(usage.at);
   const noticed: Noticed[] = [];
@@ -627,8 +679,8 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
       if (!list || worded.has(list.id)) continue;
       const setting = labelSetting(list.id);
       const held = tone.settings[setting];
-      if (!held) continue;
-      const word = held.value ?? list.name;
+      if (!held || !relabelled(list, held, tone)) continue;
+      const word = held.value ?? held.default ?? list.name;
       const title = p.title.trim();
       if (title.length > LABEL_MOST || title.toLowerCase() === word.toLowerCase()) continue;
       worded.add(list.id);
@@ -645,25 +697,35 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
        */
       const oneSetting = labelSetting(`${list.id}:one`);
       const oneHeld = tone.settings[oneSetting];
-      const one = singularOf(title);
-      /* ONE QUESTION FOR ONE RENAME: the singular rides on the name's own card, since every list now declares it, and two
-         cards on Decide for one word was the busy screen §35 asks against. */
+      const turned = singularOf(title);
+      const one = turned === null ? null : inSentence(turned);
+      const oneNow = oneHeld ? (oneHeld.value ?? oneHeld.default) : null;
+      /* ONE QUESTION FOR ONE RENAME: the singular rides on the name's own card, since every list declares it, and two
+         cards on Decide for one word was the busy screen §35 asks against. AND THE QUESTION SAYS SO. It set the singular
+         without a word about it, so accepting "Call Tickets Issues everywhere?" also changed every "New ticket" button.
+         The singular is named beside the name, in quotes as the name is, or left out of both the question and the change
+         where it cannot be made with confidence (`singularOf`). */
       const values: Record<string, string> = { [setting]: title };
-      if (oneHeld && one !== '' && one !== (oneHeld.value ?? oneHeld.default ?? '').toLowerCase()) values[oneSetting] = one;
+      const naming = oneHeld !== undefined && one !== null && one.toLowerCase() !== (oneNow ?? '').toLowerCase();
+      if (naming) values[oneSetting] = one;
       drafts.push({
         key: '',
-        question: `Call ${word} ${title} everywhere? ${seen}`,
+        question: naming ? `Call ${word} "${title}" everywhere, and one of them "${one}"? ${seen}` : `Call ${word} "${title}" everywhere? ${seen}`,
         body_kind: 'settings',
         body: { pack: tone.pack, values },
         by: 'rules',
       });
 
       /* WHAT IT HOLDS, IN THE NEW WORD. Only the old word is swapped, so the sentence stays the one its author wrote; a
-         line that never named the old word has nothing here to draft and is left alone. */
+         line that never named the old word has nothing here to draft and is left alone. The old singular is the one
+         the list carries now, or the one its old name makes; a line naming it with no new singular to put in its place
+         is left alone too, rather than read "every issue" beside "one ticket". */
       const holdsSetting = labelSetting(`${list.id}:holds`);
       const holdsHeld = tone.settings[holdsSetting];
       const line = holdsHeld ? (holdsHeld.value ?? holdsHeld.default ?? '') : '';
-      const said = line.replace(wordIn(word), title.toLowerCase()).replace(wordIn(singularOf(word)), one);
+      const was = oneNow ?? singularOf(word);
+      const named = line.replace(wordIn(word), inSentence(title));
+      const said = was === null ? named : one === null ? (wordIn(was).test(named) ? line : named) : named.replace(wordIn(was), one);
       if (line !== '' && said !== line && said.length <= HOLDS_MOST)
         drafts.push({
           key: '',

@@ -70,9 +70,10 @@ const USAGE: Usage = {
   tone: {
     pack: 'usecase-study',
     settings: {
-      [labelSetting('tasks')]: { title: null, default: 'Tasks', value: null },
-      [labelSetting('tasks:one')]: { title: null, default: 'task', value: null },
-      [labelSetting('tasks:holds')]: { title: null, default: 'every task we know about', value: null },
+      /* STUDY RELABELS WORK'S TASKS ITSELF, so the page title is offered as their name (`relabelled` in `slash.ts`). */
+      [labelSetting('tasks')]: { title: null, default: 'Assignments', value: null },
+      [labelSetting('tasks:one')]: { title: null, default: 'assignment', value: null },
+      [labelSetting('tasks:holds')]: { title: null, default: 'every assignment we know about', value: null },
       [voiceSetting('since_away')]: { title: null, default: 'Since you last looked', value: null },
     },
   },

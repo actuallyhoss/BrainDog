@@ -124,7 +124,7 @@ import {
   type Shaped,
 } from './brief.ts';
 import { briefed, handlesIn } from './briefing.ts';
-import { actorWords, bare, callOf, clip, closest, cursorIn, cursorOut, grouped, runnerOf } from './words.ts';
+import { actorWords, bare, callOf, clip, closest, counted, cursorIn, cursorOut, grouped, runnerOf } from './words.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -1010,6 +1010,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * and `id` is the primary key, so the kernel's `observe` leaves a scan of any of its own columns out.
    */
   const NAMES_PER_READ = 64;
+  /* THE LISTS, AND THE ROW IDS, ONE ANSWER'S SENTENCES ARE NAMED FROM: a read each, so a sentence naming many costs few. */
+  const LISTS_NAMED = 4;
+  const IDS_NAMED = 6;
   const namesIn = async (rows: Entry[], ctx: C, turn: Turn): Promise<Map<string, string>> => {
     const wanted = new Map<string | null, Set<string>>();
     for (const row of rows)
@@ -1436,27 +1439,83 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
-   * The page Home draws, of the pages the caller may open: a use case's own `home-<id>`, else the record's `home`.
+   * The page Home draws for this caller, of the pages it may open: a use case's own `home-<id>`, else the record's `home`.
    *
    * THE APP'S RULE (`homeSlugOf` in `apps/web/src/lib/voice.ts`), read off the pages the caller may open, so "read the
    * Home page" lands where the person's Home does. On the owner's record that is `home-founder`, and the instructions'
    * "Read the Home page" was `PAGE_UNKNOWN` there for every agent.
+   *
+   * AND OF TWO USE CASES, THE ONE THIS AGENT'S PROJECT BELONGS TO. This took the first `home-<id>` the record listed, so on
+   * a record set up for a founder and a student an agent in the thesis folder was sent to the founder's money. Which use
+   * case a project belongs to is the one whose Home reads the list the project is kept in (its `requires`, or a block's
+   * `source`); where that is none or several, the use case that speaks, which is the one the person's own Home draws
+   * (`speakingPack`, read off `arrangement`'s `voice`); and the first only where neither says. `project` is the project's
+   * spoken id, `null` for none, and `undefined` to ask `context` for it. One use case, the common record, asks nothing.
    */
-  const homeIn = (pages: readonly { slug: string; title: string }[]): { slug: string; title: string } | null =>
-    pages.find((p) => HOME_OF_A_USE_CASE.test(p.slug)) ?? pages.find((p) => p.slug === 'home') ?? null;
+  const homeIn = async (
+    pages: readonly { slug: string; title: string }[],
+    ctx: C,
+    project?: string | null,
+  ): Promise<{ slug: string; title: string } | null> => {
+    const homes = pages.filter((p) => HOME_OF_A_USE_CASE.test(p.slug));
+    if (homes.length <= 1) return homes[0] ?? pages.find((p) => p.slug === 'home') ?? null;
+    const arranged = surface.arrangement?.bind(surface);
+    if (!arranged) return homes[0]!;
+    let about = project;
+    if (about === undefined) {
+      const c = surface.context ? await surface.context({}, ctx) : null;
+      about = c?.ok && isObject(c.value) && isObject(c.value.project) && typeof c.value.project.spoken === 'string' ? c.value.project.spoken : null;
+    }
+    let among = homes;
+    const list = about === null ? null : await listOfRow(about, ctx);
+    if (list !== null) {
+      const reads = await Promise.all(
+        homes.map(async (h) => {
+          const d = await arranged({ page: h.slug }, ctx);
+          return d.ok && isObject(d.value) && JSON.stringify(d.value.body ?? null).includes(JSON.stringify(`register.${list}`));
+        }),
+      );
+      const own = homes.filter((_, i) => reads[i]);
+      if (own.length === 1) return own[0]!;
+      if (own.length > 1) among = own;
+    }
+    const overview = await arranged({}, ctx);
+    const voice = overview.ok && isObject(overview.value) && isObject(overview.value.voice) ? overview.value.voice.pack : null;
+    const speaking = typeof voice === 'string' ? among.find((h) => h.slug === `home-${voice.replace(/^usecase-/u, '')}`) : undefined;
+    return speaking ?? among[0]!;
+  };
+
+  /** The list a row is kept in, by its spoken id: `things#3` says it, and a prefixed `P3` is read to learn it. */
+  const listOfRow = async (spoken: string, ctx: C): Promise<string | null> => {
+    const at = parse(spoken);
+    if (at) return at.register;
+    const prefix = /^([A-Z]{1,4})[1-9][0-9]*$/u.exec(spoken)?.[1];
+    if (prefix === undefined) return null;
+    const known = [...prefixes].find(([, p]) => p === prefix)?.[0];
+    if (known !== undefined) return known;
+    const got = await surface.get({ spoken }, ctx);
+    return got.ok && isEntry(got.value) ? got.value.register : null;
+  };
 
   /**
-   * The words of the rows a handful of questions name by handle, `tools#8`, one read of each list they are in, so the
-   * card can say the thing and not its number. A list the caller cannot read keeps its handles.
+   * The words of the rows a handful of sentences name, by handle, `tools#8`, one read of each list they are in, and by
+   * row id, one read each, so an answer can say the thing beside its handle and never its number alone. A list the
+   * caller cannot read keeps its handles, and a row id nobody here may read is said as one that cannot be opened.
+   *
+   * A ROW ID IS KEPT AS ITS WORDS WITH ITS HANDLE, `Kiln (things#1)`, because a sentence that named a row by its id
+   * gave the agent no handle to act on either (`plainOf`).
    */
   const handlesNamed = async (handles: readonly string[], ctx: C, turn: Turn): Promise<void> => {
     const by = new Map<string, number[]>();
+    const ids: string[] = [];
     for (const h of handles) {
+      if (turn.titles.has(h)) continue;
       const at = parse(h);
-      if (at && !turn.titles.has(h)) by.set(at.register, [...(by.get(at.register) ?? []), at.seq]);
+      if (at) by.set(at.register, [...(by.get(at.register) ?? []), at.seq]);
+      else if (ROW_ID.test(h) && ids.length < IDS_NAMED) ids.push(h);
     }
-    await Promise.all(
-      [...by].slice(0, 3).map(async ([register, seqs]) => {
+    await Promise.all([
+      ...[...by].slice(0, LISTS_NAMED).map(async ([register, seqs]) => {
         if (!decls.has(register)) await learnPrefix(register, ctx);
         const got = await surface.list({ register, where: { field: 'seq', in: seqs.slice(0, NAMES_PER_READ) }, limit: Math.min(seqs.length, NAMES_PER_READ) }, ctx);
         if (!got.ok) return;
@@ -1466,7 +1525,15 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           if (words) turn.titles.set(`${register}#${String(row.seq)}`, words);
         }
       }),
-    );
+      ...ids.map(async (id) => {
+        const got = await surface.get({ spoken: id }, ctx);
+        if (!got.ok || !isEntry(got.value) || got.value.seq === null) return;
+        const spoken = await addressOf(got.value.register, got.value.seq, ctx);
+        const words = titleOf(got.value.fields, decls.get(got.value.register));
+        const one = decls.get(got.value.register)?.one;
+        turn.titles.set(id, words ? `${clip(words, 40)} (${spoken})` : typeof one === 'string' && one !== '' ? `Untitled ${one} (${spoken})` : spoken);
+      }),
+    ]);
   };
 
   /**
@@ -1482,7 +1549,20 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const session = isObject(c.session) && typeof c.session.spoken === 'string' ? c.session.spoken : null;
     const from = isObject(c.handoff) && typeof c.handoff.from === 'string' ? c.handoff.from : null;
     const asked = (Array.isArray(c.waiting) ? c.waiting : []).filter(isObject);
-    const handles = asked.flatMap((w) => (typeof w.question === 'string' ? handlesIn(w.question) : []));
+    /* EVERY SENTENCE THE CARD SAYS THAT NAMES A ROW: the questions, the step left and its dead ends, the folders' other
+       projects, and the learnings. Only the questions' were read, so a step that said "finish tasks#41" was said with
+       the bare handle beside a card that named everything else. */
+    const step = isObject(c.handoff) ? c.handoff : {};
+    const learned = (Array.isArray(c.registers) ? c.registers : []).filter(isObject).flatMap((r) => [
+      ...(Array.isArray(r.rows) ? r.rows : []),
+      ...(Array.isArray(r.inherited) ? r.inherited : []),
+    ]);
+    const handles = [
+      ...asked.flatMap((w) => (typeof w.question === 'string' ? handlesIn(w.question) : [])),
+      ...[step.next, ...(Array.isArray(step.tried) ? step.tried : [])].flatMap((t) => (typeof t === 'string' ? handlesIn(t) : [])),
+      ...(Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : []),
+      ...learned.flatMap((r) => (isObject(r) ? Object.values(r).flatMap((v) => (typeof v === 'string' && v.includes('#') ? handlesIn(v) : [])) : [])),
+    ];
     const [boot, runs] = await Promise.all([
       bootOf(ctx, turn),
       runsOf([session, from].filter((s): s is string => s !== null), ctx),
@@ -1498,7 +1578,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       mine: session === null ? undefined : runs.get(session),
       left: from === null ? undefined : runs.get(from),
       waiting: typeof counts.decide === 'number' ? counts.decide : undefined,
-      home: homeIn(pagesIn(shell)),
+      home: await homeIn(pagesIn(shell), ctx, isObject(c.project) && typeof c.project.spoken === 'string' ? c.project.spoken : null),
     });
   };
 
@@ -1818,6 +1898,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           };
         }
         const value = bare(one.value) as Record<string, unknown>;
+        if (turn.text) await handlesNamed(questionHandles([value]), ctx, turn);
         return { result: { ok: true, value }, say: (look) => governanceBrief(args, value, look), names: { people: true, runs: actorsIn([value]) } };
       }
       const limit = limitOf(args.limit, GOVERNANCE_PAGE, GOVERNANCE_MOST);
@@ -1840,6 +1921,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         if (typeof counts.decide === 'number') page = { ...page, matched: Math.max(counts.decide, page.rows.length) };
       }
       const value = { rows: page.rows, ...(page.matched === undefined ? {} : { matched: page.matched }), ...(page.cursor === undefined ? {} : { cursor: page.cursor }) };
+      /* THE ROWS THE QUESTIONS NAME, read so each is said in words beside its handle (`plainOf`): "Are people#3 and
+         people#9 the same person" is the kernel's own sentence, and the agent relaying it had two numbers to pass on. */
+      if (turn.text) await handlesNamed(questionHandles(value.rows), ctx, turn);
       return { result: { ok: true, value }, say: (look) => governanceBrief(args, value, look), names: { people: true, runs: actorsIn(value.rows) } };
     },
 
@@ -1967,7 +2051,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const { spoken, version, updated_at, deleted_at } = row;
       const value = { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) };
       const words = titleOf(entry.fields, decls.get(entry.register));
-      return { result: { ok: true, value }, say: () => loggedBrief(String(spoken), words, version, deleted_at !== undefined) };
+      return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
     },
 
     /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
@@ -1986,7 +2070,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const out = await surface.meet(args, ctx);
       if (!out.ok || !isObject(out.value)) return { result: out };
       const value = bare(out.value) as Record<string, unknown>;
-      return { result: { ok: true, value }, say: (look) => metBrief(value, typeof args.name === 'string' ? args.name : '', look) };
+      /* THE PERSON'S WORDS, AND THE QUESTION A LIKELY DUPLICATE OPENED, read for an answer said in words: the person was
+         said by handle when `name` was not sent, and the duplicate as "SG7". The question names both rows, by handle. */
+      const merge = typeof value.merge === 'string' && value.merge !== '' ? value.merge : null;
+      if (turn.text) {
+        const asked = merge === null ? null : await surface.governance({ register: 'suggestion', id: merge } as never, ctx);
+        const question = asked?.ok && isObject(asked.value) && typeof asked.value.question === 'string' ? asked.value.question : null;
+        if (merge !== null && question !== null) turn.titles.set(merge, question);
+        await handlesNamed([...(typeof value.person === 'string' ? [value.person] : []), ...(question === null ? [] : handlesIn(question))], ctx, turn);
+      }
+      return { result: { ok: true, value }, say: (look) => metBrief(value, typeof args.name === 'string' ? args.name : '', look), names: { people: merge !== null } };
     },
 
     /**
@@ -2167,11 +2260,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const current = isObject(result.conflict.current) ? result.conflict.current : null;
       const register = current && typeof current.spoken === 'string' ? registerOf(current.spoken, sent) : undefined;
       const stale = staleOf(result.conflict, look, callOf(name, { ...sent, version: result.conflict.version }));
-      return { result, text: full ? JSON.stringify(stale) : conflictBrief(result.conflict, register, look), structured: stale };
+      const fitted = fittedJson(stale);
+      return { result, text: capped(full ? JSON.stringify(fitted) : conflictBrief(result.conflict, register, look)), structured: fitted };
     }
     const value = result.ok ? result.value : undefined;
     /* THE LOOK'S OWN READS, a `boot` for the people and one of the runs, are made only for an answer said in words. */
-    if (full || !done.say) return said(result, JSON.stringify(value));
+    if (full || !done.say) return said(result);
     return said(result, done.say(await lookOf(ctx, turn, done.names)));
   };
 
@@ -2201,7 +2295,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     let slug = asked;
     if (asked === 'home') {
       const pages = await surface.pages(ctx);
-      const home = homeIn(pages.ok && Array.isArray(pages.value) ? pages.value : []);
+      const home = await homeIn(pages.ok && Array.isArray(pages.value) ? pages.value : [], ctx);
       if (home === null)
         return {
           ok: false,
@@ -2392,11 +2486,19 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
 /** One tool's answer as a transport sends it: the result, the text an agent reads, and the JSON beside it. */
 export type Said = { result: Result<unknown>; text: string; structured: Record<string, unknown> };
 
-/** A result and its text, with the JSON a client reads beside the text: a value, or the refusal whole. */
-function said(result: Result<unknown>, text: string): Said {
-  if (result.ok) return { result, text: capped(text), structured: objectOf(result.value) };
-  if (refused(result)) return { result, text: capped(text), structured: result.refusal as unknown as Record<string, unknown> };
-  return { result, text: capped(text), structured: { code: 'VERSION_STALE' } };
+/**
+ * A result and its text, with the JSON a client reads beside the text: a value, or the refusal whole, each held to one
+ * answer's size (`fittedJson`).
+ *
+ * `text` UNDEFINED IS THE JSON ITSELF, what `format: "full"` and a tool with no brief answer: the value as it came where
+ * it fits, and the fitted JSON with its `cut` where it does not, so the text is JSON a client can parse and never the
+ * first forty thousand characters of a longer one.
+ */
+function said(result: Result<unknown>, text?: string): Said {
+  const whole = result.ok ? objectOf(result.value) : refused(result) ? (result.refusal as unknown as Record<string, unknown>) : { code: 'VERSION_STALE' };
+  const structured = fittedJson(whole);
+  const json = (): string => (structured !== whole ? JSON.stringify(structured) : JSON.stringify(result.ok ? result.value : whole));
+  return { result, text: capped(text ?? json()), structured };
 }
 
 /**
@@ -2470,6 +2572,96 @@ function capped(text: string, most = ANSWER_MOST): string {
   return `${end > most / 2 ? cut.slice(0, end) : cut}\nCut at ${grouped(most)} characters, the most one answer carries. Narrow the call or ask fewer.`;
 }
 
+/** The most characters one text of a JSON answer keeps once its lists are cut and it still does not fit. */
+const JSON_TEXT_MOST = 2_000;
+
+/**
+ * The JSON an answer carries as `structuredContent`, held to `ANSWER_MOST` as its text is, with a `cut` that says what
+ * went: each list cut by path and how many it kept of how many, and how many long texts were shortened.
+ *
+ * THE TEXT WAS CAPPED AND THE JSON BESIDE IT NEVER WAS. A client that renders `structuredContent`, or hands it to its
+ * model, read the whole answer however large: a `history` of a busy row, a `context` with every key, a figure with a
+ * thousand groups, each past the ten thousand tokens no host shows a model whole. `list`, `activity` and `governance`
+ * already read a page again with fewer rows (`fitted`), and a page resource answers a line a block; this is the floor
+ * under every other answer.
+ *
+ * THE LARGEST LIST IS CUT FIRST, from its end, by the share it is over, until the answer fits; then any text longer than
+ * two thousand characters is shortened. A list keeps its first entry, because an empty list reads as "there are none".
+ * A `cursor` beside a cut `rows` goes too, since it points past the rows that were dropped and following it would skip
+ * them. An answer that still does not fit, one object with thousands of keys, is answered as its keys and the sentence.
+ */
+export function fittedJson(value: Record<string, unknown>, most = ANSWER_MOST): Record<string, unknown> {
+  const size = (v: unknown): number => JSON.stringify(v)?.length ?? 0;
+  if (size(value) <= most) return value;
+  /* ROOM FOR THE SENTENCE, which names each list it cut. */
+  const room = most - 600;
+  const out = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  const cuts = new Map<string, { kept: number; of: number }>();
+  let now = size(out);
+  for (let tries = 0; tries < 64 && now > room; tries += 1) {
+    const big = largestList(out);
+    if (big === null) break;
+    const keep = Math.min(big.list.length - 1, Math.max(1, Math.floor((big.list.length * Math.max(0, big.bytes - (now - room))) / big.bytes)));
+    (big.holder as Record<string | number, unknown>)[big.key] = big.list.slice(0, keep);
+    cuts.set(big.path, { kept: keep, of: cuts.get(big.path)?.of ?? big.list.length });
+    now = size(out);
+  }
+  let texts = 0;
+  for (let longest = JSON_TEXT_MOST; now > room && longest >= 250; longest = Math.floor(longest / 2)) {
+    /* EACH PASS CUTS EVERY TEXT THE LAST ONE DID AND MORE, so the count is the last pass's. */
+    texts = Math.max(texts, shortened(out, longest));
+    now = size(out);
+  }
+  /* FOUR LISTS BY PATH AT MOST, so the sentence stays inside the room kept for it and the JSON in `full` still parses. */
+  const parts = [...cuts].slice(0, 4).map(([path, c]) => `${path} ${grouped(c.kept)} of ${grouped(c.of)}`);
+  if (cuts.size > 4) parts.push(`${counted(cuts.size - 4, 'more list')} cut`);
+  if (texts > 0) parts.push(`${counted(texts, 'long text')} shortened`);
+  const dropped = cuts.has('rows') && typeof out.cursor === 'string';
+  if (dropped) delete out.cursor;
+  const said = `Cut at ${grouped(most)} characters, the most one answer carries${parts.length > 0 ? `: ${parts.join(', ')}` : ''}.${
+    dropped ? ' The cursor went with what was cut, so ask again with a smaller limit.' : ''
+  } Narrow the call or ask fewer.`;
+  const before = typeof out.cut === 'string' ? `${out.cut} ` : '';
+  if (now <= room) return { ...out, cut: `${before}${said}` };
+  return {
+    cut: `This answer is ${grouped(size(value))} characters, past the ${grouped(most)} one answer carries, and nothing in it could be cut to fit. Narrow the call.`,
+    keys: Object.keys(value).slice(0, 200),
+  };
+}
+
+/** The largest list in a JSON value with more than one entry, four levels down at most: where it is, and its size. */
+function largestList(root: Record<string, unknown>): { holder: object; key: string | number; path: string; list: unknown[]; bytes: number } | null {
+  let best: { holder: object; key: string | number; path: string; list: unknown[]; bytes: number } | null = null;
+  const walk = (holder: object, key: string | number, value: unknown, path: string, depth: number): void => {
+    if (Array.isArray(value)) {
+      if (value.length > 1) {
+        const bytes = JSON.stringify(value).length;
+        if (best === null || bytes > best.bytes) best = { holder, key, path, list: value, bytes };
+      }
+      if (depth < 4) value.forEach((v, i) => walk(value, i, v, `${path}[${String(i)}]`, depth + 1));
+      return;
+    }
+    if (isObject(value) && depth < 4) for (const [k, v] of Object.entries(value)) walk(value, k, v, path === '' ? k : `${path}.${k}`, depth + 1);
+  };
+  for (const [k, v] of Object.entries(root)) walk(root, k, v, k, 1);
+  return best;
+}
+
+/** Every text in a JSON value longer than `most`, cut to it with three dots where it was cut; how many were cut. */
+function shortened(value: unknown, most: number): number {
+  let n = 0;
+  const walk = (holder: Record<string | number, unknown>, key: string | number): void => {
+    const v = holder[key];
+    if (typeof v === 'string' && v.length > most) {
+      holder[key] = `${v.slice(0, most - 3)}...`;
+      n += 1;
+    } else if (Array.isArray(v)) v.forEach((_, i) => walk(v as unknown as Record<number, unknown>, i));
+    else if (isObject(v)) for (const k of Object.keys(v)) walk(v, k);
+  };
+  if (isObject(value)) for (const k of Object.keys(value)) walk(value, k);
+  return n;
+}
+
 /** One block of a page, its rows cut until it fits one answer, and the block saying how many it holds. */
 function blockFitted(block: Record<string, unknown>): Record<string, unknown> {
   const whole = bare(block) as Record<string, unknown>;
@@ -2477,6 +2669,11 @@ function blockFitted(block: Record<string, unknown>): Record<string, unknown> {
   let rows = whole.rows;
   while (rows.length > 1 && JSON.stringify({ ...whole, rows }).length > ANSWER_MOST) rows = rows.slice(0, Math.floor(rows.length * 0.7));
   return { ...whole, rows, cut: `${grouped(whole.rows.length - rows.length)} more than one answer carries. The page in BrainDog shows them all.` };
+}
+
+/** The handles and row ids the questions on a page name, in their words and their reasons. */
+function questionHandles(rows: readonly unknown[]): string[] {
+  return rows.flatMap((r) => (isObject(r) ? [r.question, r.reason].flatMap((t) => (typeof t === 'string' ? handlesIn(t) : [])) : []));
 }
 
 /** Whether any line of a page is signed by a person, which is when the people are read to name them. */

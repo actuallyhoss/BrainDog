@@ -496,3 +496,29 @@ test('A RUN A PERSON MADE IS SHARED with any key that names it, and a run a key 
   assert.equal(refusal(k.create('tasks', { what: 'Not mine' }, other)).code, 'FORBIDDEN');
   sql.close();
 });
+
+test('A NOTE AND A QUESTION ARE NEVER SIGNED AS ANOTHER KEY’S RUN: naming it is refused, and the key’s own run still signs', async () => {
+  const { k, sql } = await record();
+  const task = value<Entry>(k.create('tasks', { what: 'Mine' }, agent({ client_id: 'cc-1' })));
+  const options = { question: 'Keep it?', body_kind: 'options' as const, body: { options: [{ id: 'y', label: 'Yes', because: 'It helps.' }, { id: 'n', label: 'No', because: 'It does not.' }] } };
+  const other = (session: SessionHints): WriteContext => ({ actor: 'p_other', principal: { kind: 'token', token: 't_2' }, session });
+  const notes = () => Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE kind = 'note'")?.n);
+
+  for (const said of [{ spoken: 'S1' }, { client_id: 'cc-1' }]) {
+    const noted = refusal(k.log('tasks', task.seq!, other(said), 'Signed as S1?'));
+    assert.deepEqual([noted.code, noted.at], ['FORBIDDEN', 'session']);
+    const asked = refusal(k.propose(options, other(said)));
+    assert.deepEqual([asked.code, asked.at], ['FORBIDDEN', 'session']);
+  }
+  assert.equal(notes(), 0);
+  assert.equal(Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM suggestion')?.n), 0);
+  assert.deepEqual(runs(sql), [1], 'a refused key opened a run');
+
+  /* Its own run signs as it did, and a run a person made is still any key's to name. */
+  value(k.log('tasks', task.seq!, other({ client_id: 'cc-2' }), 'Mine now'));
+  assert.equal(events(sql, task.id).at(-1)?.actor, 'S2');
+  value(k.create('session', { doing: 'For whoever picks it up' }, { actor: 'p_owner' }));
+  value(k.log('tasks', task.seq!, other({ spoken: 'S3' }), 'Picked up'));
+  assert.equal(events(sql, task.id).at(-1)?.actor, 'S3');
+  sql.close();
+});

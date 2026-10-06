@@ -187,9 +187,14 @@ export const HORIZON_CAP = 3650;
 /**
  * How far a walk looks: a whole number of days, `'last'` for the last dated movement (`lastOf`), or `{ last: n }` for
  * the last dated movement and never fewer than `n` days, which is a block whose length control offers both `last` and a
- * length that may be the longer of the two (`walkReach` in `pages.ts`).
+ * length that may be the longer of the two (`walkReach` in `pages.ts`). `most` stops it there however far the last
+ * movement is, for a walk nobody asked to go to the end (`WALK_UNASKED` in `pages.ts`); it is never less than `last`.
  */
-export type Horizon = number | 'last' | { last: number };
+export type Horizon = number | 'last' | { last: number; most?: number };
+
+/** Where a `{ last, most }` walk stops at the furthest: `most` when it is a length no shorter than `last`, else `HORIZON_CAP`. */
+const ceilingOf = (h: { last: number; most?: number }): number =>
+  typeof h.most === 'number' && Number.isInteger(h.most) && h.most >= h.last && h.most <= HORIZON_CAP ? h.most : HORIZON_CAP;
 
 /** Which movements a walk reads: one currency's, unconverted, or every one but those in `except`, converted as usual. */
 export type Only = string | { except: readonly string[] };
@@ -350,7 +355,7 @@ export function runway(
       ? lastOf(reads, deps.ctx.nowMs, today)
       : typeof horizonDays === 'number'
         ? horizonDays
-        : Math.max(horizonDays.last, lastOf(reads, deps.ctx.nowMs, today, horizonDays.last));
+        : Math.min(ceilingOf(horizonDays), Math.max(horizonDays.last, lastOf(reads, deps.ctx.nowMs, today, horizonDays.last)));
   const until = deps.ctx.nowMs + horizon * DAY_MS;
 
   for (const { leg, stopped, rows, unreadable, unreadableEnd, notMoney } of reads) {

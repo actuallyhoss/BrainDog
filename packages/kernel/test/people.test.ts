@@ -277,3 +277,16 @@ test('AND WHAT IT IS TOLD IS CHECKED: who, where, and a handle as provider:name'
   assert.deepEqual(counts(sql), before);
   sql.close();
 });
+
+test('A KEY MEETS SOMEBODY AS ITS OWN RUN: naming a run another key opened is refused, and nothing is written', async () => {
+  const { k, sql } = await record();
+  value<Met>(k.meet({ email: 'ada@example.com', name: 'Ada', where: 'commit 4464966 in braindog' }, AGENT));
+  const before = counts(sql);
+  const other: WriteContext = { actor: 'p_owner', principal: { kind: 'token', token: 't_2' }, session: { spoken: 'S1' } };
+  const out = k.meet({ email: 'grace@example.com', name: 'Grace', where: 'commit 9f00aa1 in braindog' }, other);
+  assert.equal(out.ok, false, 'another key met somebody as S1');
+  if (!out.ok && 'refusal' in out) assert.deepEqual([out.refusal.code, out.refusal.at], ['FORBIDDEN', 'session']);
+  else assert.fail('refused without a refusal');
+  assert.deepEqual(counts(sql), before);
+  sql.close();
+});

@@ -122,7 +122,7 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { costOf, costRank } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { readBlock, readPage, registersOf, registersOfBlock, resolvePages, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult, type QueueQuestion } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult, type QueueQuestion } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -317,6 +317,7 @@ import { laidOf } from './pack-laid.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measureLines, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
 export type { MeasureBucket, MeasureLatest, MeasureLines, MeasureSeries, RawReading } from './measures.ts';
+import type { RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
 export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
 export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
@@ -1137,6 +1138,12 @@ function requiresOf(manifest: string): Record<string, string> {
   if (packs === null || typeof packs !== 'object' || Array.isArray(packs)) return {};
   return Object.fromEntries(Object.entries(packs).filter((e): e is [string, string] => typeof e[1] === 'string'));
 }
+
+/**
+ * The most open questions a queue ranks, the oldest kept. Far past what anybody answers, and few enough that reading
+ * each one's band off its body is a few milliseconds on a page load.
+ */
+const OPEN_RANKED = 2_000;
 
 export async function openRecord(sql: Sql, clock: Clock, opts: RecordOptions = {}): Promise<Kernel> {
   const { state } = await applyMigrations(sql, clock);
@@ -4070,8 +4077,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }
       /* AND WHAT THE CALL SAYS OF WHO THE RUN IS, in place for the same reason: the kind of agent a run that said none
          turns out to be, its client, and the name that follows while the record's own name stands (`learned`). NEVER
-         FROM ANOTHER KEY: a note or a proposal is still signed as a run it names (`signedBy`), and that key's hints
-         would otherwise rename the run and say which app it is. */
+         FROM ANOTHER KEY: a note or a proposal naming that run is refused (`foreignRun`), and that key's hints would
+         otherwise rename the run and say which app it is. */
       if (!found.foreign) learnRun(found.id, w.session ?? {});
       return { actor, own: false };
     }
@@ -4201,9 +4208,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return list !== null && registers.get(list)?.fields.find((f) => f.id === e.field)?.type === 'instant';
   }
 
-  /** Who signs what this context says: a token's run, found or opened with its heartbeat moved, or `actor`. In a transaction only. */
+  /**
+   * Who signs what this context says: a token's run, found or opened with its heartbeat moved, or `actor`. In a
+   * transaction only.
+   *
+   * NEVER ANOTHER KEY'S RUN. A token naming a run another key opened, or holding its client id, signed a note and a
+   * question as that run, which a write already refused (`notYours`). The callers refuse first (`foreignRun`); a caller
+   * that did not is signed by its own name, never by the run it named.
+   */
   function signedBy(w: WriteContext): string {
-    return w.principal?.kind === 'token' ? attribute(w, locateRun(w), null, instant(clock.now())).actor : w.actor;
+    if (w.principal?.kind !== 'token') return w.actor;
+    const at = locateRun(w);
+    return at.found?.foreign ? w.actor : attribute(w, at, null, instant(clock.now())).actor;
+  }
+
+  /** The refusal for a token whose call names a run another key opened, or `null` when it names its own or none. */
+  function foreignRun<T>(w: WriteContext): Result<T> | null {
+    if (w.principal?.kind !== 'token') return null;
+    const found = locateRun(w).found;
+    return found?.foreign ? notYours<T>(`${registers.get(SESSION)?.seq_prefix ?? 'S'}${found.seq}`) : null;
   }
 
   /**
@@ -4801,7 +4824,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       );
       /* A DECLARED FIGURE FIRST, and the record's own figures after (`built-in-figures.ts`), so a page can gate on
          how many questions are waiting without a pack declaring the count. */
-      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl) : builtInFigure(id);
+      return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl, evalContext()) : builtInFigure(id);
     },
     read: (decl) => evaluateMetric(sql, decl, evalContext()),
     list: (q) => {
@@ -4846,15 +4869,31 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const c = compile(q.where, schema);
       if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
       const at = fieldSqlIn(schema, q.when);
-      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit`;
+      /* AND THE PROJECT EACH WAS REPORTED FOR, when the list says: its scope field, else its one field pointing at the
+         projects (the list declaring `scopes:`). Two projects' "Orders" are two measures (`measures.ts`), and the newest
+         reading before the period is each one's, not whichever project reported last. Read by the list's declaration,
+         never by a field's id, so any list of readings that points at its projects is grouped the same way. */
+      const projects = [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null;
+      const fields = registers.get(q.register)?.fields ?? [];
+      const aims = (f: (typeof fields)[number] | undefined) => f !== undefined && !f.retired && f.type === 'ref' && 'to' in f && f.to === projects;
+      const scoped = scopeFieldOf(fields);
+      const pointing = fields.filter(aims);
+      const thing = projects === null ? undefined : aims(scoped) ? scoped : pointing.length === 1 ? pointing[0] : undefined;
+      const cols = `${at} AS at, ${fieldSqlIn(schema, q.value)} AS value, ${q.name ? fieldSqlIn(schema, q.name) : 'NULL'} AS name, ${q.unit ? fieldSqlIn(schema, q.unit) : 'NULL'} AS unit, ${thing ? fieldSqlIn(schema, thing.id) : 'NULL'} AS thing`;
       const from = `FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`;
-      const readings = sql.all<{ at: unknown; value: unknown; name: unknown; unit: unknown }>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since);
-      const latest = sql.all<{ at: unknown; value: unknown; name: unknown; unit: unknown }>(
-        `SELECT at, value, name, unit FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name)`,
-        q.register,
-        ...c.params,
-        q.since,
-      );
+      type Read = { at: unknown; value: unknown; name: unknown; unit: unknown; thing: unknown };
+      const titles = new Map<string, string | null>();
+      /* THE PROJECT BY ITS NAME, never its id: a reading of a project with no title is of no project a person can name. */
+      const named = ({ thing: of, ...r }: Read): RawReading => {
+        if (typeof of !== 'string' || of === '') return r;
+        if (!titles.has(of)) titles.set(of, titleOfRow(of));
+        const title = titles.get(of);
+        return title ? { ...r, of: title } : r;
+      };
+      const readings = sql.all<Read>(`SELECT ${cols} ${from} AND ${at} >= ?`, q.register, ...c.params, q.since).map(named);
+      const latest = sql
+        .all<Read>(`SELECT at, value, name, unit, thing FROM (SELECT ${cols}, max(${at}) AS newest ${from} AND ${at} < ? GROUP BY name, thing)`, q.register, ...c.params, q.since)
+        .map(named);
       return ok({ readings, latest });
     },
     points: (series, from, to) =>
@@ -4871,10 +4910,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     home: () => homeCurrency(sql),
     /* EVERY LIST AND EVERY LIVE FIGURE, declarations only, which `deadlines`, `figures.home` and a sell knob choose from. */
     lists: () => [...registers.values()],
-    metrics: () =>
-      sql
+    metrics: () => {
+      const ctx = evalContext();
+      return sql
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
-        .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl)),
+        .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl, ctx));
+    },
     inScope: (register, project, opts) => inScope(register, project, opts),
     stepsOf: (register) =>
       [...registers.values()].flatMap((r) => {
@@ -4918,21 +4959,51 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * RANKED BY WHAT IT WOULD COST TO GET EACH ONE WRONG (`weigh.ts`), which is `19 §6`'s fourth
      * countermeasure against the decision gate becoming a rubber stamp. The band is computed here
      * rather than stored, so it needs no migration and no proposer can assert it about their own
-     * question. Within a band the OLDEST comes first, and that is the opposite of the SQL underneath:
-     * `listGovernance` reads newest first because a queue nobody has answered is read from the top,
-     * and once there is a rank, the one worth meeting is the expensive question that has been sitting
-     * rather than the expensive question that arrived a minute ago. Each question is read by
-     * `questionFrom`, which says why its options are the body's own.
+     * question. Within a band the OLDEST comes first: once there is a rank, the one worth meeting is
+     * the expensive question that has been sitting rather than the expensive question that arrived a
+     * minute ago. Each question is read by `questionFrom`, which says why its options are the body's own.
      */
-    openQuestions: (limit) => {
+    openQuestions: (limit, keep) => {
       const nowMs = clock.now();
-      const said = listGovernance({ sql, nowMs }, 'suggestion', { status: 'open', limit });
-      const questions = (said.ok ? said.value : []).map(questionFrom);
+      const now = instant(nowMs);
+      /* EVERY OPEN QUESTION IS RANKED, NOT THE NEWEST FEW. The band is read off each body here, which is cheap, and only
+         the ones drawn are read whole (`questionFrom`, which reads each one's question). Ranked over the newest twenty, the expensive
+         question that had waited a month never reached the top, and the counts beside it were counts of twenty.
+         BOUNDED at `OPEN_RANKED`, the oldest kept, since within a band the oldest leads. */
+      const lean = sql
+        .all<{ id: string; body_kind: string; body: string; opened_by: string | null; opened_at: string | null }>(
+          `SELECT id, body_kind, body, opened_by, opened_at FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)
+           ORDER BY opened_at ASC, rowid ASC LIMIT ?`,
+          now,
+          OPEN_RANKED,
+        )
+        .map((r) => {
+          const body = parsedBody(r.body);
+          return {
+            r,
+            at: String(r.opened_at ?? ''),
+            facts: { who: String(r.opened_by ?? ''), kind: String(r.body_kind ?? ''), cost: costOf(String(r.body_kind ?? ''), body), about: typeof body.about === 'string' && body.about !== '' ? body.about : null },
+          };
+        });
+      const kept = keep ? lean.filter((q) => keep(q.facts)) : lean;
       /* A STABLE SORT, and `opened_at` is the tie-break the band needs: two questions in one band
          come back in the order they were asked, oldest first. `id` settles a tie on the instant,
          because two proposals written in the same millisecond must not swap places between reads. */
-      questions.sort((a, b) => costRank(a.cost) - costRank(b.cost) || a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
-      return { questions, open: countOpenQuestions({ sql, nowMs }) };
+      kept.sort((a, b) => costRank(a.facts.cost) - costRank(b.facts.cost) || a.at.localeCompare(b.at) || a.r.id.localeCompare(b.r.id));
+      const questions = kept.slice(0, Math.max(0, Math.floor(limit))).map((q) => questionFrom(q.r));
+      const open = countOpenQuestions({ sql, nowMs });
+      /* THE COUNTS ARE OF EVERY QUESTION THE FILTER ADMITS. With none, how many waited past two weeks is the record's own
+         count, read in SQL over every open question, bound or no bound; how many are hard to undo is read off the bodies. */
+      const staleBefore = instant(nowMs - STALE_DAYS * 86_400_000);
+      const stale = keep
+        ? kept.filter((q) => staleAt(q.at, nowMs)).length
+        : (sql.one<{ n: number }>(
+            "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?) AND opened_at < ?",
+            now,
+            staleBefore,
+          )?.n ?? 0);
+      const hardToUndo = kept.filter((q) => q.facts.cost === 'undo').length;
+      return { questions, open, matched: keep ? kept.length : open, stale, hardToUndo };
     },
     /*
      * THE QUESTIONS PUT OFF, for a page's Later: still open, with a day to come back that has not come, soonest back
@@ -6338,7 +6409,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        list them, and the record's door made up for it with a second `list` and a refusal of its own
        (`test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
     metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean } = {}): Result<Reading> =>
-      evaluateMetric(sql, liveTarget(sql, decl), o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads }),
+      evaluateMetric(sql, liveTarget(sql, decl, evalContext()), o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads }),
 
     /* ── pages ──────────────────────────────────────────────────── */
 
@@ -6378,7 +6449,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * the other four and says what happened in the third — a page that fails whole is a page nobody
      * can use to find out what is wrong with it.
      */
-    page: (slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> => readPage(pageDeps(), slug, filter),
+    /* `walk` IS A LENGTH A READER PICKED on a forecast's horizon knob, which a forecast offering it walks in full (`walkReach`
+       in `pages.ts`); without it a walk reaches past what it opens on to `WALK_UNASKED` at most. */
+    page: (slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: number | 'last' } = {}): Result<PageResult> =>
+      readPage(opts.walk === undefined ? pageDeps() : { ...pageDeps(), walk: opts.walk }, slug, filter),
 
     /** One metric document by its id, so a caller can fill a parameter and read it. */
     metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),
@@ -6731,7 +6805,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ),
 
     /** One block, without a page around it — what a `draw` tool hands an agent. */
-    block: (decl: PageBlock): BlockResult => readBlock(pageDeps(), decl),
+    block: (decl: PageBlock, opts: { walk?: number | 'last' } = {}): BlockResult =>
+      readBlock(opts.walk === undefined ? pageDeps() : { ...pageDeps(), walk: opts.walk }, decl),
 
     /* ── the vault: what a key opens, never the key ───────────────────── */
 
@@ -7170,6 +7245,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const found = bySeq(register, seq);
       if (!found) return no<{ id: string }>('OUT_OF_BOUNDS', `There is no ${register} #${seq}.`, { at: 'seq' });
       return transaction(() => {
+        const theirs = foreignRun<{ id: string }>(w);
+        if (theirs) return theirs;
         appendEvent({
           kind: 'note',
           target: found.id,
@@ -7345,6 +7422,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     propose: (p: Proposal, w: WriteContext | string, drafted?: string): Result<{ id: string }> =>
       transaction(() => {
+        const theirs = typeof w === 'string' ? null : foreignRun<{ id: string }>(w);
+        if (theirs) return theirs;
         const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), p, drafted);
         if (out.ok) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w);
         return out;
@@ -7387,6 +7466,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(w.principal === undefined ? {} : { principal: w.principal }),
         ...(w.session === undefined ? {} : { session: w.session }),
       };
+      /* A KEY MEETS SOMEBODY AS ITS OWN RUN, never as one another key opened, as its writes and notes do (`foreignRun`). */
+      const theirs = foreignRun<Met>(as);
+      if (theirs) return theirs;
       /* THE LIST DECLARING meets:, or `people` on a record older than the key (`roles.ts`). */
       const role = meetsRole(registers.values());
       const list = role === null ? undefined : { ...role, declaredFields: registers.get(role.register)?.fields ?? [] };

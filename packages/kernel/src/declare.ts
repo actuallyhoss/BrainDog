@@ -42,7 +42,7 @@ import { MAP_TYPES } from './map.ts';
 /* THE LIST `arrive` ANSWERS BY, so a value this file lets through is one the kernel has an answer for. */
 import { ON_CONFLICTS } from './ingest.ts';
 import { STRIP_MOST } from './ingest.ts';
-import { HOME_CURRENCY_SETTING, homeFrom } from './fx.ts';
+import { HOME_CURRENCY_SETTING, convertMinor, homeFrom, rateFor } from './fx.ts';
 import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList } from './roles.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
@@ -60,7 +60,7 @@ import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
-import { isMoneyFormat, windowMs } from './metrics.ts';
+import { clockOf, isMoneyFormat, windowMs, type EvalContext } from './metrics.ts';
 import { WALKS, WALK_SOURCE, isRolled, rolledFault, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 
@@ -5936,9 +5936,14 @@ function settingsOf(manifest: Record<string, unknown>): {
  * A TARGET THAT NAMES A SETTING IS READ LIVE (`{ lte: 250000, setting: 'most_out_30d' }`). A placeholder is filled once, when
  * a pack is installed, so a target a person changes later would wait for a reinstall; a named setting is read each time the
  * figure is, from the pack that declares the figure. The number in the target is the one used when that setting cannot be
- * read: no pack row, no such setting, or a value of the wrong kind. A money setting counts only in the figure's own currency.
+ * read: no pack row, no such setting, or a value of the wrong kind. A money setting counts in the figure's own currency or
+ * the home one, and one typed in another (the home currency before it changed) is converted at the day's rate (`ctx`).
  */
-export function liveTarget<T extends { metric: string; format?: unknown; target?: unknown }>(sql: Sql, decl: T): T {
+export function liveTarget<T extends { metric: string; format?: unknown; target?: unknown }>(
+  sql: Sql,
+  decl: T,
+  ctx?: Pick<EvalContext, 'asOfMs' | 'nowMs' | 'tz' | 'fx'>,
+): T {
   const target = decl.target as Record<string, unknown> | undefined;
   if (!target || typeof target.setting !== 'string') return decl;
   const owner = sql.one<{ pack: string | null }>(
@@ -5962,12 +5967,27 @@ export function liveTarget<T extends { metric: string; format?: unknown; target?
   if (said?.type === 'number' && typeof value === 'number' && Number.isFinite(value)) bound = value;
   if (said?.type === 'money' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
     const money = value as { amount?: unknown; currency?: unknown };
+    const home = homeCurrency(sql);
     if (typeof money.amount === 'number' && money.currency === currency) bound = money.amount;
     /* OR IN THE HOME CURRENCY, which is what a person whose money is in pounds types a limit in. The target carries its
        currency, and the figure, added up in that currency, is held to it as it is (`metrics.ts` `targetFor`). */
-    else if (typeof money.amount === 'number' && typeof money.currency === 'string' && money.currency === homeCurrency(sql)) {
+    else if (typeof money.amount === 'number' && typeof money.currency === 'string' && money.currency === home) {
       bound = money.amount;
       typedIn = money.currency;
+    } else if (typeof money.amount === 'number' && homeFrom(money.currency) !== null) {
+      const was = homeFrom(money.currency)!;
+      /* OR IN THE HOME CURRENCY AS IT WAS, a ceiling typed in pounds before the record moved to dollars: converted at the
+         day's rate into the currency the figure is held in, the one it declares or else the home one. It was dropped, and
+         the figure was held to the number written beside the setting instead, whatever the person had typed. With no
+         rate, or no currency to hold it in, that number still stands, since a sum in one currency is never read as
+         another's. */
+      const into = currency ?? home;
+      const fx = ctx?.fx?.();
+      const day = ctx ? new Date(clockOf(ctx)).toISOString().slice(0, 10) : null;
+      const rate = into !== null && fx && day !== null ? rateFor(fx.rates, was, into, day) : null;
+      if (into === null || rate === null) return decl;
+      bound = convertMinor(money.amount, was, into, rate.rate);
+      if (into !== currency) typedIn = into;
     }
   }
   if (bound === null) return decl;

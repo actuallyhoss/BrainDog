@@ -430,7 +430,7 @@ test('THE WORDS FOLLOW USE: a page the owner keeps opening lends its list its na
   const labels = seen.drafts.filter((d) => d.body_kind === 'settings');
   assert.deepEqual(
     labels.map((d) => d.question),
-    ['Call Tickets Issues everywhere? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.'],
+    ['Call Tickets "Issues" everywhere, and one of them "issue"? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.'],
     'a list the use case declares no label for was offered one',
   );
 
@@ -488,7 +488,7 @@ test('A LIST RENAMED IS RENAMED IN ALL THREE WORDS: its name, one of it, and the
   const seen = value<Toned>(await api.slash({}, owner));
   const words = seen.drafts.filter((d) => d.body_kind === 'settings').map((d) => d.question);
   assert.deepEqual(words, [
-    'Call Tickets Issues everywhere? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
+    'Call Tickets "Issues" everywhere, and one of them "issue"? You opened the Issues page, which shows Tickets, 6 times on 5 separate days in the last thirty days.',
     'Say Issues holds every issue we know about? The line reads "every ticket we know about" now, in the old word.',
   ]);
   for (const q of words) assert.ok(!q.includes('—'), `an em dash in: ${q}`);

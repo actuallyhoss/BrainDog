@@ -316,6 +316,13 @@ export type BlockResult = PageBlock & {
   /** A `queue` block's questions, in the record's own order, cut to `limit`. `matched` is how many are open. */
   queue?: QueueQuestion[];
   /**
+   * A `queue` over `governance.open`'s: of the `matched` questions, how many have waited past `STALE_DAYS` (`stale`) and
+   * how many would be hard to undo (`hardToUndo`, cost `undo`). Counted over every question that matched, never over the
+   * ones drawn, so a screen saying "two of them for over two weeks" is saying it of the record and not of the first
+   * twenty. One key and not two beside `matched`, because a block already says `stale:` of a card's day.
+   */
+  waiting?: { stale: number; hardToUndo: number };
+  /**
    * A `capture` block's: what a row added through it is filled with, by field, in the stored form. Each is an
    * equality its `where:` pinned (`captureFills`), so a line under "Later" adds a task that is kept for later.
    */
@@ -447,6 +454,15 @@ export type QueueQuestion = {
   until_why?: string;
 };
 
+/** What a queue's `where:` reads of an open question: who asked, what kind and band it is, and what it is about. */
+export type OpenFacts = { who: string; kind: string; cost: Cost; about: string | null };
+
+/**
+ * How many days an open question waits before it is said to have waited too long: two weeks. The record counts them
+ * (`stale` on a queue) and a screen says how many, so the number is the record's and not each screen's.
+ */
+export const STALE_DAYS = 14;
+
 /** One answered question, as `governance.decided` reads it: what was asked, what was chosen, why, by whom and when. */
 export type DecidedQuestion = {
   id: string;
@@ -509,6 +525,11 @@ export type PageDeps = {
    * walks in the home currency, and the walk is then drawn once per currency rather than converted out of the book's.
    */
   runway: (opening: number, legs: readonly Leg[], horizon?: Horizon, only?: Only, into?: string) => Runway | null;
+  /**
+   * The length a reader picked on a forecast's horizon knob, in days or `last`, when it is longer than the walk reaches
+   * unasked (`walkReach`). A forecast walks it only when its own `horizons:` offers it. Absent, nothing was asked.
+   */
+  walk?: number | 'last';
   ctx: EvalContext;
   /*
    * OPTIONAL, so a host that has not wired one of these gets `NOT_IN_THIS_BUILD` on the block that
@@ -535,8 +556,18 @@ export type PageDeps = {
   keyOpened?: (grant: string) => { actor: string; ts: string } | null;
   /** The fields a list marks its rows by, its `identity:` (`{ mark, accent }`), or `null` when it declares none. */
   identityOf?: (register: string) => { mark?: string; accent?: string } | null;
-  /** The open questions, oldest first as the record holds them, and how many are open in all. */
-  openQuestions?: (limit: number) => { questions: QueueQuestion[]; open: number };
+  /**
+   * The open questions, dearest first and the oldest first within a band, cut to `limit`, and how many are open in all.
+   *
+   * `keep` IS THE BLOCK'S `where:`, over what the record knows of a question before it reads it whole, so the cut is
+   * made after the filter and over every open question rather than the newest few. A host that takes it answers
+   * `matched`, `stale` and `hardToUndo` over what `keep` admitted (every open question without one); a host that does
+   * not leaves them out, and the queue counts what it was handed.
+   */
+  openQuestions?: (
+    limit: number,
+    keep?: (q: OpenFacts) => boolean,
+  ) => { questions: QueueQuestion[]; open: number; matched?: number; stale?: number; hardToUndo?: number };
   /** The questions put off whose day has not come, soonest back first, and how many there are. */
   laterQuestions?: (limit: number) => { questions: QueueQuestion[]; later: number };
   /** The answered questions, latest first, and how many there are. */
@@ -1633,10 +1664,11 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (block.source === 'forecast.runway') {
     const opened = openingOf(deps, block.opening);
     if (opened.refusal) return { ...base, refusals: also(opened.refusal) };
-    /* THE WALK GOES AS FAR AS THE LONGEST LENGTH THE KNOB OFFERS, and opens on `horizon:`. A walk of `horizon:` days and no
-       further let the renderer offer no length past it, so Money's Cash ahead opened on a whole year to keep the year in
-       reach (visual review 4). Each walk says both (`opensOn`), and every reading of it below is over the whole walk. */
-    const reach = walkReach(block);
+    /* THE WALK GOES PAST `horizon:` TO THE LENGTHS THE KNOB OFFERS, within two years and a day unless a reader asked
+       for a longer one (`walkReach`), and opens on `horizon:`. A walk of `horizon:` days and no further let the renderer
+       offer no length past it, so Money's Cash ahead opened on a whole year to keep the year in reach (visual review 4).
+       Each walk says both (`opensOn`), and every reading of it below is over the whole walk. */
+    const reach = walkReach(block, deps.walk);
     const opensOn = (w: Runway): Runway =>
       typeof block.horizon === 'number' && w.horizon > block.horizon ? { ...w, horizon: block.horizon, reach: w.horizon } : w;
     /* AN OPENING IN ONE CURRENCY THAT IS NOT THE HOME ONE IS A BOOK'S OWN: Quartz says USD, so its cash is read in dollars
@@ -2366,8 +2398,9 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
   if (block.knobs !== undefined && (!Array.isArray(block.knobs) || block.knobs.some((k) => !(KNOBS as readonly unknown[]).includes(k))))
     return { refusal: { code: 'DECLARATION_INVALID', fix: `knobs is a list of ${KNOBS.join(', ')}.`, at: 'knobs', allowed: [...KNOBS] } };
   /* THE HORIZON KNOB'S CHOICES ARE CHECKED WITH THE KNOBS, because a list the host cannot offer is a control drawn with
-     nothing in it. How far each reaches is not checked here: the walk goes to the longest of them (`walkReach`), and a
-     length past what a walk may carry is left off it rather than refusing the block. */
+     nothing in it. How far each reaches is not checked here: the walk goes to the longest of them within `WALK_UNASKED`,
+     and further only when a reader asks (`walkReach`), and a length past what a walk may carry is left off it rather
+     than refusing the block. */
   if (block.horizons !== undefined && !horizonsOk(block.horizons))
     return {
       refusal: {
@@ -3086,16 +3119,26 @@ function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (.
   const said = predicateOf(block.where, OPEN, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
-  /* READ MORE THAN WILL BE DRAWN, because a predicate over who asked can leave a page short otherwise, and
-     ask for the ceiling's worth at most: the count of what is open comes back with them either way. */
-  const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING));
+  const admits = (q: OpenFacts): boolean => evaluate(said.predicate, { ...q, list: listOf(q.about) }, OPEN);
+  /* THE FILTER GOES TO THE RECORD, which ranks every open question it admits and cuts after. Filtered here over the
+     newest twenty, an expensive question asked a month ago never reached a page with a `where:`, nor its count. */
+  const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING), said.predicate === undefined ? undefined : admits);
+  /* AND AGAIN HERE, for a host that takes no filter: what it was handed is filtered as it always was. */
   const kept = read.questions
     .map((q) => ({ ...q, list: listOf(q.about) }))
-    .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
-  /* NO PREDICATE MEANS THE RECORD'S OWN COUNT, which is every open question rather than the page the read
-     answered with. With one, the count is of what this page could see, and it says so by being smaller. */
-  const matched = said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length;
-  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };
+    .filter((q) => admits({ who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null }));
+  /* THE RECORD'S OWN COUNT when it answered one, over everything the filter admitted. A host that answers none: with no
+     predicate, every open question; with one, what this page could see, and it says so by being smaller. */
+  const matched = read.matched ?? (said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length);
+  const stale = read.stale ?? kept.filter((q) => staleAt(q.at, deps.ctx.nowMs)).length;
+  const hardToUndo = read.hardToUndo ?? kept.filter((q) => q.cost === 'undo').length;
+  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched, waiting: { stale, hardToUndo } };
+}
+
+/** Whether a question opened at `at` has waited past `STALE_DAYS` by `nowMs`. An instant that cannot be read has not. */
+export function staleAt(at: string, nowMs: number): boolean {
+  const ms = Date.parse(at);
+  return Number.isFinite(ms) && nowMs - ms > STALE_DAYS * 86_400_000;
 }
 
 /**
@@ -4206,21 +4249,42 @@ function fxOf(deps: PageDeps): { fx?: { home: string | null; rates: Rate[] } } {
 }
 
 /**
- * How far a forecast block walks: its `horizon:`, or the longest of its `horizons:` when one is longer. `last` is walked
- * as it says, and a block that names no length walks the record's default.
+ * How far a forecast walks unasked when it offers longer lengths than it opens on: two years and a day. It is the
+ * longest length the shipped Cash ahead offers (money-core 3.9.0, `packages/seed`), so every choice on Money's knob is
+ * a press away without asking, and a block offering five years or ten, or `last` over a long plan, walks two at most.
+ * A walk opening on longer than this walks what it opens on.
+ */
+export const WALK_UNASKED = 731;
+
+/**
+ * How far a forecast block walks: its `horizon:`, and the longer of its `horizons:` that fall within `WALK_UNASKED`, or
+ * one of its `horizons:` a reader asked for (`asked`, `PageDeps.walk`). `last` is walked as it says, and a block that
+ * names no length walks the record's default.
+ *
+ * NOT THE LONGEST LENGTH THE KNOB OFFERS, UNASKED. Every page load walked it: Money's Cash ahead opened on 90 days and
+ * offered five years, so each load walked 1,825 days for a chart that opened on three months, five times the work it
+ * did before, and a block offering ten years walked ten whatever it opened on. So a walk reaches past what it opens on
+ * only as far as `WALK_UNASKED`, and a longer length is walked when a reader picks it, which the host asks for with
+ * `walk`. A length the block does not offer is not walked whoever asks, so `horizons:` stays the bound on the work, and
+ * one the walk reaches unasked is walked as it would be unasked, so asking never shortens what the knob offers.
  *
  * `last` AMONG `horizons:` IS A LENGTH TOO, and only the rows know how long: a block opening on 90 days that offers
  * `last` walked 90, so "To the end" stopped at three months over a plan that runs two years. It walks to the last dated
- * movement and never short of the longest number (`Horizon`'s `{ last: n }`).
+ * movement and never short of the longest number within reach (`Horizon`'s `{ last: n }`), and unasked no further than
+ * `WALK_UNASKED` (`most`).
  */
-function walkReach(block: PageBlock): Horizon | undefined {
+function walkReach(block: PageBlock, asked?: number | 'last'): Horizon | undefined {
   if (typeof block.horizon !== 'number') return block.horizon;
   const opens = block.horizon;
-  const longer = Array.isArray(block.horizons)
-    ? block.horizons.filter((h): h is number => typeof h === 'number' && Number.isInteger(h) && h > opens && h <= HORIZON_CAP)
-    : [];
-  const most = longer.length > 0 ? Math.max(...longer) : block.horizon;
-  return Array.isArray(block.horizons) && block.horizons.includes('last') ? { last: most } : most;
+  const offered = Array.isArray(block.horizons) ? block.horizons : [];
+  const longer = offered.filter((h): h is number => typeof h === 'number' && Number.isInteger(h) && h > opens && h <= HORIZON_CAP);
+  const toEnd = offered.includes('last');
+  /* ASKED, AND OFFERED: walked in full, to `HORIZON_CAP` at most, as the block declared it. */
+  if (asked === 'last' && toEnd) return { last: Math.max(opens, ...longer) };
+  const cap = Math.max(opens, WALK_UNASKED);
+  if (typeof asked === 'number' && asked > cap && longer.includes(asked)) return toEnd ? { last: asked } : asked;
+  const most = Math.max(opens, ...longer.filter((h) => h <= cap));
+  return toEnd ? { last: most, most: cap } : most;
 }
 
 /** How many lengths a forecast's horizon knob may offer: more is a list to read, not a choice to make. */

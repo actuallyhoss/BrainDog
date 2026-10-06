@@ -19,7 +19,7 @@
  * a brief answer for. A handle travels only beside a name: `Kiln (things#1)`, `Claude Code (S42)`.
  */
 
-import { callOf, clip, counted, day, gist, grouped, isCurrency, money, moneyIn, oneLine, runnerOf, ULID, when } from './words.ts';
+import { callOf, clip, counted, day, deviceOf, gist, grouped, isCurrency, money, moneyIn, oneLine, runnerOf, ULID, when } from './words.ts';
 
 /** One field as a register declares it, the keys a line reads and nothing else. */
 export type Field = {
@@ -80,12 +80,11 @@ const labelOf = (f: Field | undefined, id: string): string => {
   return said.slice(0, 1).toUpperCase() + said.slice(1);
 };
 
-/** What a ref says: the row's words and its handle, the handle alone, or that it cannot be opened. */
+/** What a ref says: the row's words and its handle, an untitled one of its list beside it, or that it cannot be opened. */
 function refSaid(value: unknown, look: Look): string | null {
   if (typeof value !== 'string' || value === '') return null;
   if (ULID.test(value)) return 'one you cannot open';
-  const words = look.title(value);
-  return words ? `${clip(words, 48)} (${value})` : value;
+  return namedIn(look.title(value) ?? '', value, look, 48);
 }
 
 /**
@@ -163,6 +162,75 @@ export function titleOf(fields: Record<string, unknown> | undefined, decl: Decl 
 /** `Words (handle)`, or the handle alone for a row with no words. */
 export const named = (words: string, spoken: string, room = 80): string => (words ? `${clip(words, room)} (${spoken})` : spoken);
 
+/** A row's handle as a sentence names it, `tools#8`: the list's id, a hash and the row's number. */
+const HANDLE = /\b[a-z][a-z0-9_]*#[1-9][0-9]*\b/gu;
+
+/** What the list a handle names calls one of its rows, `task` for `tasks#3`, where the answer read its declaration. */
+function oneOf(spoken: string, look: Look): string | undefined {
+  const list = /^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(spoken)?.[1];
+  const one = list === undefined ? undefined : look.decl(list)?.one;
+  return typeof one === 'string' && one.trim() !== '' ? one.trim() : undefined;
+}
+
+/**
+ * `Words (handle)`, and for a row with no words, `Untitled task (tasks#3)`: what its list calls one, beside its handle.
+ *
+ * NEVER A HANDLE ALONE WHERE THE LIST HAS A WORD FOR ONE. A task nobody titled was the line `tasks#3 · open`, a number
+ * an agent then read out as though it were the task's name. A prefixed handle (`S42`, `LN8`) names no list, and a list
+ * that declares no word for one keeps the handle alone.
+ */
+export function namedIn(words: string, spoken: string, look: Look, room = 80): string {
+  if (words) return named(words, spoken, room);
+  const one = oneOf(spoken, look);
+  return one ? `Untitled ${one} (${spoken})` : spoken;
+}
+
+/**
+ * Somebody's sentence with what a person should never be read taken out of it: a machine's own name becomes the kind of
+ * machine it is, a file's path becomes the file's name, a person's id becomes their name, and a row's handle or id
+ * becomes its words with the handle beside them, where this answer read them.
+ *
+ * THE QUESTIONS ARE WRITTEN BY THE RECORD'S OWN AUTOMATIONS, and one on the owner's record read "Change tools#8 to how
+ * fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?", the machine's name, a path in his home
+ * folder and a handle where its name was known. Where they are written is not this package; where they are read is.
+ *
+ * THE HANDLE STAYS BESIDE THE WORDS. The kernel asks "Are people#3 and people#9 the same person, Ann Lee?" when two
+ * people may be one, and said in words alone that was "Are Ann Lee and Ann Lee the same person", which no agent can
+ * answer or pass on. A handle whose words were not read is said as the list's word for one beside it ("the tool
+ * tools#8"); a row id is its words and handle, or "an entry you cannot open", never the 26 characters.
+ */
+export function plainOf(said: string, look: Look, handles = true): string {
+  let out = oneLine(said)
+    .replace(/(?<![\w./\\-])[A-Za-z0-9][A-Za-z0-9-]*\.local(?![\w-]|\.\w)/gu, (host) => deviceOf(host) ?? 'this machine')
+    .replace(/\b(?:DESKTOP|LAPTOP)-[A-Z0-9]{4,}\b/gu, (host) => deviceOf(host) ?? 'this machine')
+    .replace(/(?<=^|[\s("'])(?:~|\.{1,2})?\/[^\s,;)"']+/gu, (path) => path.replace(/\/+$/u, '').split('/').at(-1) || 'a folder');
+  if (handles)
+    out = out.replace(HANDLE, (handle) => {
+      const words = look.title(handle);
+      if (words) return named(words, handle, 40);
+      const one = oneOf(handle, look);
+      return one ? `the ${one} ${handle}` : handle;
+    });
+  /* AFTER THE HANDLES, because a row id's words carry its handle, which the pass above would name a second time. */
+  return out
+    .replace(new RegExp(ULID.source, 'gu'), (id) => look.title(id) ?? 'an entry you cannot open')
+    .replace(new RegExp(PERSON.source, 'gu'), (id) => look.actor(id));
+}
+
+/**
+ * A person's id in a sentence, `p_` and its tail, which `Look.actor` says as their name. A token's id is the same.
+ *
+ * A TAIL WITH A DIGIT OR A CAPITAL, as a minted id (`p_` and a ULID) and `p_1` have. A learning is an agent's sentence and
+ * names code: `t_paid` and `p_value` are a column and a variable, and were said "An agent key" and "Someone on this record".
+ */
+const PERSON = /\b[pt]_(?=[a-z]*[0-9A-Z])[0-9A-Za-z]+\b/u;
+
+/** The handles and row ids a sentence names, `tools#8` and `01M3...`, so a tool can read their words before it is said. */
+export const handlesIn = (said: string): string[] => {
+  const line = oneLine(said);
+  return [...new Set([...(line.match(HANDLE) ?? []), ...(line.match(new RegExp(ULID.source, 'gu')) ?? [])])];
+};
+
 /** A row of an answer as the tools shape one: `compact` and `listed` in `index.ts`. */
 export type Shaped = { spoken: string; version?: number; state?: string; fields?: Record<string, unknown>; deleted_at?: string; clipped?: boolean };
 
@@ -176,7 +244,7 @@ export type Shaped = { spoken: string; version?: number; state?: string; fields?
 export function rowLine(row: Shaped, register: string, look: Look): string {
   const decl = look.decl(register);
   const fields = row.fields ?? {};
-  const head = named(titleOf(fields, decl), row.spoken);
+  const head = namedIn(titleOf(fields, decl), row.spoken, look);
   if (register === RUNS) return runLine(row, head, look);
   const byId = new Map((decl?.fields ?? []).map((f) => [f.id, f]));
   /* `amount` IS AN AMOUNT'S OWN LABEL, said only where the line carries two (below). */
@@ -237,7 +305,7 @@ export function rowWhole(row: Shaped, register: string, look: Look): string[] {
   const byId = new Map((decl?.fields ?? []).map((f) => [f.id, f]));
   const state = row.state ?? (decl?.state === undefined ? undefined : fields[decl.state]);
   const top = [
-    named(titleOf(fields, decl), row.spoken, 160),
+    namedIn(titleOf(fields, decl), row.spoken, look, 160),
     typeof state === 'string' ? (said(byId.get(decl?.state ?? ''), state, look) ?? state) : null,
     register === RUNS ? runnerOf(fields) : null,
     row.version === undefined ? null : `version ${String(row.version)}`,
@@ -343,7 +411,7 @@ export function searchBrief(args: Record<string, unknown>, page: Page, look: Loo
   const lines = page.rows.map((hit) => {
     if (!isObject(hit) || typeof hit.spoken !== 'string') return clip(JSON.stringify(hit), 120);
     const list = typeof hit.register === 'string' ? (look.decl(hit.register)?.name ?? hit.register) : null;
-    return [named(typeof hit.title === 'string' ? hit.title : '', hit.spoken), list].filter(Boolean).join(' · ');
+    return [namedIn(typeof hit.title === 'string' ? hit.title : '', hit.spoken, look), list].filter(Boolean).join(' · ');
   });
   const left = (page.matched ?? 0) - page.rows.length;
   const more =
@@ -399,15 +467,19 @@ export function eventSaid(e: Record<string, unknown>, decl: Decl | undefined, lo
 
 /** What a log line is about, in words, or `null` for the row a history is already about. */
 function targetSaid(e: Record<string, unknown>, look: Look): string | null {
-  if (typeof e.spoken === 'string') return named(typeof e.title === 'string' ? e.title : (look.title(e.spoken) ?? ''), e.spoken, 60);
+  if (typeof e.spoken === 'string') return namedIn(typeof e.title === 'string' ? e.title : (look.title(e.spoken) ?? ''), e.spoken, look, 60);
   const target = typeof e.target === 'string' ? e.target : '';
   const kind = typeof e.target_kind === 'string' ? e.target_kind : target.split(':')[0] ?? '';
   const after = target.slice(target.indexOf(':') + 1);
-  if ((kind === 'suggestion' || kind === 'decision' || kind === 'prediction') && /^[A-Z]{1,3}\d+$/u.test(after)) return after;
+  /* A QUESTION'S HANDLE BESIDE WHAT IT IS, as a row's is beside its words: `SG7` alone named nothing a person knows. */
+  if ((kind === 'suggestion' || kind === 'decision' || kind === 'prediction') && /^[A-Z]{1,3}\d+$/u.test(after))
+    return `${kind === 'suggestion' ? 'a question' : `a ${kind}`} (${after})`;
   if (kind === 'inbox_raw') return 'an arrival';
   if (kind === 'declaration') {
     const [what, id] = after.split('.');
-    return id ? `the ${id} ${what === 'register' ? 'list' : what === 'metric' ? 'figure' : what === 'rule' ? 'automation' : (what ?? 'declaration')}` : null;
+    /* A LIST BY ITS NAME where the answer read its declaration, `the Tasks list`, and by its id where it did not. */
+    const name = what === 'register' && id !== undefined ? (look.decl(id)?.name ?? id) : id;
+    return id ? `the ${name} ${what === 'register' ? 'list' : what === 'metric' ? 'figure' : what === 'rule' ? 'automation' : (what ?? 'declaration')}` : null;
   }
   if (kind === 'member' || kind === 'person') return look.actor(after);
   if (kind.startsWith('grant') || kind === 'credential') return 'a key';
@@ -431,7 +503,7 @@ const HISTORY_SHOWN = 20;
 export function historyBrief(spoken: string, register: string | undefined, rowWords: string, page: Page, look: Look): string {
   const decl = register === undefined ? undefined : look.decl(register);
   const events = page.rows.filter(isObject);
-  const head = `${named(rowWords, spoken)} · ${counted(events.length, 'change')}`;
+  const head = `${namedIn(rowWords, spoken, look)} · ${counted(events.length, 'change')}`;
   const lines = events.map((e) => eventLine(e, decl, look, false));
   if (lines.length <= HISTORY_SHOWN) return [head, ...lines].join('\n');
   const folded = lines.length - HISTORY_SHOWN;
@@ -492,14 +564,14 @@ export function governanceBrief(args: Record<string, unknown>, value: unknown, l
     register === 'suggestion'
       ? alike(rows).map(({ first, also }) => {
           const id = String(first.id ?? '');
-          const asked = typeof first.question === 'string' ? clip(first.question, 100) : '';
+          const asked = typeof first.question === 'string' ? clip(plainOf(first.question, look), 100) : '';
           const like = also.length === 0 ? '' : `, and ${also.length === 1 ? also[0]! : `${String(also.length)} more`} like it`;
           return [`${asked} (${id}${like})`, typeof first.opened_at === 'string' ? when(first.opened_at, look.now) : null, typeof first.opened_by === 'string' ? look.actor(first.opened_by) : null]
             .filter(Boolean)
             .join(' · ');
         })
       : rows.map((r) => {
-          const asked = typeof r.question === 'string' ? clip(r.question, 90) : '';
+          const asked = typeof r.question === 'string' ? clip(plainOf(r.question, look), 90) : '';
           const by = typeof r.decided_by === 'string' ? look.actor(r.decided_by) : null;
           const at = typeof r.ts === 'string' ? when(r.ts, look.now) : null;
           const why = typeof r.reason === 'string' && r.reason.trim().length > 2 ? clip(r.reason, 60) : null;
@@ -512,7 +584,7 @@ export function governanceBrief(args: Record<string, unknown>, value: unknown, l
 /** One question or decision, whole: what it asks, where it stands, its options, and where the person answers it. */
 function governanceOne(row: Record<string, unknown>, look: Look): string {
   const id = String(row.id ?? '');
-  const lines = [`${typeof row.question === 'string' ? clip(row.question, 200) : id} (${id})`];
+  const lines = [`${typeof row.question === 'string' ? clip(plainOf(row.question, look), 200) : 'A question'} (${id})`];
   const status = typeof row.status === 'string' ? row.status : typeof row.answer === 'string' ? `decided ${row.answer}` : null;
   const by = typeof row.opened_by === 'string' ? `asked by ${look.actor(row.opened_by)}` : typeof row.decided_by === 'string' ? `by ${look.actor(row.decided_by)}` : null;
   const at = typeof row.opened_at === 'string' ? when(row.opened_at, look.now) : typeof row.ts === 'string' ? when(row.ts, look.now) : null;
@@ -530,7 +602,7 @@ function governanceOne(row: Record<string, unknown>, look: Look): string {
     const list = typeof body.register === 'string' ? (look.decl(body.register)?.name ?? body.register) : 'one list';
     lines.push(`Changes ${counted(body.rows.length, 'entry', 'entries')} in ${list}.`);
   }
-  if (typeof row.reason === 'string' && row.reason.trim() !== '') lines.push(`Why: ${clip(row.reason, 200)}`);
+  if (typeof row.reason === 'string' && row.reason.trim() !== '') lines.push(`Why: ${clip(plainOf(row.reason, look), 200)}`);
   if (row.status === 'open') lines.push(`${sentence(look.decider)} decides in BrainDog.`);
   return lines.filter((l) => l !== '').join('\n');
 }
@@ -659,13 +731,13 @@ export function conflictBrief(conflict: { version: number; actor: string; curren
  */
 export function wroteBrief(verb: 'Added' | 'Changed', row: Shaped, register: string, look: Look): string {
   const version = row.version === undefined ? null : `version ${String(row.version)}`;
-  if (row.deleted_at !== undefined) return [`Deleted ${named(titleOf(row.fields, look.decl(register)), row.spoken)}`, version].filter(Boolean).join(' · ');
+  if (row.deleted_at !== undefined) return [`Deleted ${namedIn(titleOf(row.fields, look.decl(register)), row.spoken, look)}`, version].filter(Boolean).join(' · ');
   return [`${verb}: ${rowLine(row, register, look)}`, version].filter(Boolean).join(' · ');
 }
 
 /** `log`: where the note went, and the version it left the entry at. */
-export function loggedBrief(spoken: string, words: string, version: unknown, deleted: boolean): string {
-  return [`Noted on ${named(words, spoken)}`, typeof version === 'number' ? `version ${String(version)}` : null, deleted ? 'it was deleted, and the note is kept with it' : null]
+export function loggedBrief(spoken: string, words: string, version: unknown, deleted: boolean, look?: Look): string {
+  return [`Noted on ${look ? namedIn(words, spoken, look) : named(words, spoken)}`, typeof version === 'number' ? `version ${String(version)}` : null, deleted ? 'it was deleted, and the note is kept with it' : null]
     .filter(Boolean)
     .join(' · ');
 }
@@ -689,11 +761,14 @@ export function handoffBrief(run: Shaped): string {
 export function metBrief(met: Record<string, unknown>, name: string, look: Look): string {
   const person = typeof met.person === 'string' ? met.person : '';
   const words = look.title(person) ?? name;
+  /* `merge` IS THE QUESTION THE KERNEL FILED when the person may be one already met (`nearMatch`), `SG7`, and not a row:
+     it was said "maybe the same person as SG7". The question names both, so it is said whole, in words. */
   const merge = typeof met.merge === 'string' && met.merge !== '' ? met.merge : null;
+  const asked = merge === null ? undefined : look.title(merge);
   return [
-    `${met.created === true ? 'Added' : 'Matched'} ${named(words, person)}`,
+    `${met.created === true ? 'Added' : 'Matched'} ${namedIn(words, person, look)}`,
     met.linked === true ? 'linked to your project' : null,
-    merge ? `maybe the same person as ${named(look.title(merge) ?? '', merge)}` : null,
+    merge ? (asked ? `asked ${look.decider}: ${clip(plainOf(asked, look), 160)} (${merge})` : `maybe someone already met; asked ${look.decider} (${merge})`) : null,
   ]
     .filter(Boolean)
     .join(' · ');

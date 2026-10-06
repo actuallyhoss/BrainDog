@@ -232,3 +232,36 @@ test('A WALK THAT OFFERS `last` WALKS TO THE LAST DATED MOVEMENT, opens on `hori
   /* AND A WALK THAT OFFERS NOTHING LONGER WALKS WHAT IT OPENS ON. */
   assert.deepEqual(reachOf({ horizons: [30, 90] }), { opens: 90, reach: null, last: '2026-10-01' });
 });
+
+test('A WALK REACHES A YEAR AND A DAY PAST WHAT IT OPENS ON UNASKED, and a longer length it offers when a reader picks it', async () => {
+  const k = await record();
+  /* A PLAN RUNNING THREE YEARS: walked to the five years Money offered, each load walked 1,825 days for a chart opening on 90. */
+  value(k.create('bills', { what: 'Last instalment', amount: { amount: 25_000, currency: 'GBP' }, due: '2029-09-01' }, OWNER));
+  const reachOf = (more: Partial<PageBlock>, walkTo?: number | 'last') => {
+    const read = k.block(walk(more), walkTo === undefined ? {} : { walk: walkTo });
+    assert.deepEqual(read.refusals, []);
+    const w = (read as { walk?: { horizon: number; reach?: number } }).walk!;
+    return { opens: w.horizon, reach: w.reach ?? null };
+  };
+  /* Unasked, the five years and the end are walked as far as two years and a day, and Money's two years in full. */
+  assert.deepEqual(reachOf({ horizons: [90, 365, 730, 1825] }), { opens: 90, reach: 730 });
+  assert.deepEqual(reachOf({ horizons: [90, 1825] }), { opens: 90, reach: null }, 'a length past two years was walked unasked');
+  assert.deepEqual(reachOf({ horizons: [90, 365, 'last'] }), { opens: 90, reach: 731 });
+  /* Asked, and offered: walked in full. */
+  assert.deepEqual(reachOf({ horizons: [90, 365, 1825] }, 1825), { opens: 90, reach: 1825 });
+  assert.ok((reachOf({ horizons: [90, 365, 'last'] }, 'last').reach ?? 0) > 1_000, 'To the end stopped at two years when asked for');
+  /* Asked, and not offered: the block's own lengths are the bound on the work, whoever asks. */
+  assert.deepEqual(reachOf({ horizons: [90, 365] }, 3650), { opens: 90, reach: 365 });
+  assert.deepEqual(reachOf({ horizons: [90, 365] }, 'last'), { opens: 90, reach: 365 });
+  /* Asked for a length the walk reaches anyway: walked as it is unasked, so the longer ones stay on the knob. */
+  assert.deepEqual(reachOf({ horizons: [90, 365, 730] }, 365), { opens: 90, reach: 730 });
+  /* A walk opening past the year walks what it opens on. */
+  assert.deepEqual(reachOf({ horizon: 730, horizons: [730, 1825] }), { opens: 730, reach: null });
+  /* And a page passes the asked length to its forecasts. */
+  const page: Declaration = { id: 'page.ahead', kind: 'page', body: { page: 'ahead', title: 'Ahead', blocks: [{ ...walk({ horizons: [90, 1825] }), heading: 'Cash ahead' }] } as never };
+  value(await k.install([page]));
+  const forecastOf = (walkTo?: number) =>
+    value<{ blocks: { kind: string; walk?: { reach?: number } }[] }>(k.page('ahead', undefined, walkTo === undefined ? {} : { walk: walkTo })).blocks.find((b) => b.kind === 'forecast')!;
+  assert.equal(forecastOf().walk?.reach, undefined);
+  assert.equal(forecastOf(1825).walk?.reach, 1825);
+});

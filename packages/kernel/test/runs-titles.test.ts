@@ -205,10 +205,16 @@ test('ANOTHER KEY NAMES NOTHING OF A RUN IT DID NOT OPEN: its question and its h
   const before = k.get('S1')!;
   assert.deepEqual([before.fields.agent, before.fields.doing], ['other', 'Agent run']);
 
-  /* A second key, naming the first key's run as a stale folder file would, and saying it is Claude in BrainDog. */
+  /* A second key, naming the first key's run as a stale folder file would, and saying it is Claude in BrainDog. Its
+     question and its note are refused as its writes are, rather than signed as S1 (`foreignRun`). */
   clock.advance(MIN);
-  value(k.propose({ ...options, question: 'Keep the address field on invoices?' }, as({ spoken: 'S1', ...BRAINDOG }, 't_2')));
-  value(k.log('things', 1, as({ spoken: 'S1', client: 'claude-code', client_version: '2.1.4' }, 't_2'), 'Looked at it'));
+  const asked = k.propose({ ...options, question: 'Keep the address field on invoices?' }, as({ spoken: 'S1', ...BRAINDOG }, 't_2'));
+  const noted = k.log('things', 1, as({ spoken: 'S1', client: 'claude-code', client_version: '2.1.4' }, 't_2'), 'Looked at it');
+  for (const out of [asked, noted]) {
+    assert.equal(out.ok, false, 'another key was signed as S1');
+    if (!out.ok && 'refusal' in out) assert.deepEqual([out.refusal.code, out.refusal.at], ['FORBIDDEN', 'session']);
+    else assert.fail('refused without a refusal');
+  }
   const after = k.get('S1')!;
   assert.deepEqual([after.fields.agent, after.fields.doing, after.fields.client], ['other', 'Agent run', undefined], 'another key renamed the run');
   sql.close();

@@ -21,8 +21,8 @@
  * PURE, as `brief.ts` is: the tools in `index.ts` read the record, and this decides what is said.
  */
 
-import { named, rowLine, titleOf, type Decl, type Look, type Shaped } from './brief.ts';
-import { agentOf, ago, callOf, clip, counted, deviceOf, gist, grouped, oneLine, runnerOf } from './words.ts';
+import { handlesIn, namedIn, plainOf, rowLine, titleOf, type Decl, type Look, type Shaped } from './brief.ts';
+import { agentOf, ago, callOf, clip, counted, gist, grouped, runnerOf } from './words.ts';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
@@ -71,30 +71,8 @@ const spokenList = (items: readonly string[]): string => (items.length <= 1 ? it
 /** A slot: its label padded to the column, and its line cut at a word. The padding is added after the cut, which closes up spaces. */
 const slot = (label: string, body: string): string => `${label.padEnd(LABEL)}${clip(body, LINE_MOST - LABEL)}`;
 
-/**
- * Somebody's sentence with what a person should never be read taken out of it: a machine's own name becomes the kind of
- * machine it is, and a file's path becomes the file's name. A handle is turned into the words of its row where this
- * answer read them.
- *
- * THE QUESTIONS ARE WRITTEN BY THE RECORD'S OWN AUTOMATIONS, and one on the owner's record read "Change tools#8 to how
- * fly-prism is set up in ~/.claude.json on Maras-MacBook-Pro.local?", the machine's name, a path in his home
- * folder and a handle where its name was known. Where they are written is not this package; where they are read is.
- */
-export function plainOf(said: string, look: Look, handles = true): string {
-  let out = oneLine(said)
-    .replace(/(?<![\w./\\-])[A-Za-z0-9][A-Za-z0-9-]*\.local(?![\w-]|\.\w)/gu, (host) => deviceOf(host) ?? 'this machine')
-    .replace(/\b(?:DESKTOP|LAPTOP)-[A-Z0-9]{4,}\b/gu, (host) => deviceOf(host) ?? 'this machine')
-    .replace(/(?<=^|[\s("'])(?:~|\.{1,2})?\/[^\s,;)"']+/gu, (path) => path.replace(/\/+$/u, '').split('/').at(-1) || 'a folder');
-  if (handles)
-    out = out.replace(/\b[a-z][a-z0-9_]*#[1-9][0-9]*\b/gu, (handle) => {
-      const words = look.title(handle);
-      return words ? clip(words, 40) : handle;
-    });
-  return out;
-}
-
-/** The handles a question names, `tools#8`, so the tool can read their words before the card is said. */
-export const handlesIn = (said: string): string[] => [...new Set(oneLine(said).match(/\b[a-z][a-z0-9_]*#[1-9][0-9]*\b/gu) ?? [])];
+/* `plainOf` AND `handlesIn` ARE `brief.ts`'s, where every other answer says a question too, and named here for the callers that read them here. */
+export { handlesIn, plainOf };
 
 /** The number in a handle, for telling the newest of a list's rows: `LN12` is newer than `LN9`. */
 const seqOf = (spoken: unknown): number => Number(/(\d+)$/u.exec(String(spoken ?? ''))?.[1] ?? 0);
@@ -320,7 +298,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     card.push(slot('Waiting', `${grouped(distinct)} on ${look.decider}: ${shown.join(' · ')}${rest > 0 ? ` · ${grouped(rest)} more` : ''}`));
   }
 
-  if (shownLessons.length > 0) card.push(slot('Learned', shownLessons.map((l) => clip(plainOf(l.words, look, false), 130)).join(' · ')));
+  if (shownLessons.length > 0) card.push(slot('Learned', shownLessons.map((l) => clip(plainOf(l.words, look), 130)).join(' · ')));
 
   const more: string[] = [];
   if (tried.length > 0) more.push(counted(tried.length, 'dead end'));
@@ -353,7 +331,7 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   }
   const ambiguous = Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : [];
   if (ambiguous.length > 0)
-    lines.push(`This folder matches ${ambiguous.slice(0, 3).map((a) => named(look.title(a) ?? '', a, 40)).join(', ')}, so you work in no project until one is set.`);
+    lines.push(`This folder matches ${ambiguous.slice(0, 3).map((a) => namedIn(look.title(a) ?? '', a, look, 40)).join(', ')}, so you work in no project until one is set.`);
   for (const g of groups) {
     if (g.kind !== 'work') continue;
     const rows = [...g.rows, ...g.inherited];

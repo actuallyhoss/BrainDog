@@ -327,3 +327,41 @@ test('THE BYTES OF THE ANSWER ARE BOUNDED TOO, for rows few enough to pass the r
   }
   sql.close();
 });
+
+test('A PREVIEW WALKS NO FURTHER THAN ITS CEILING WHATEVER LENGTHS THE KNOB OFFERS, and Money\'s Cash ahead is still drawn', async () => {
+  /* THE KERNEL WALKED TO THE LONGEST OF `horizons:` (`walkReach`), so a body opening on 30 days and offering 3,650 or
+     `last` walked that far under a guard that read 30 (`loop/research-audit-11-13.md` item 1). Refusing the block for
+     what it offers refused Money's own Cash ahead, which opens on 90 and offers two years, in every preview of Money. The
+     lengths past the ceiling are left off the drawn block instead, so the walk is cut and the block still drawn. */
+  const { sql, preview } = await record(5);
+  const knob = (horizon: number, horizons: unknown[]) => ({ ...walk(horizon), knobs: ['horizon'], horizons });
+  const reach = (b: Block): number => {
+    const w = b.walk as { horizon?: number; reach?: number } | undefined;
+    assert.ok(w, JSON.stringify(b).slice(0, 300));
+    return w.reach ?? w.horizon ?? Number.NaN;
+  };
+  for (const horizons of [[30, 3650], [30, 'last'], [90, 180, 365, 730], ['last'], [3650]]) {
+    const b = value(await preview([knob(30, horizons)])).blocks[0]!;
+    assert.deepEqual(b.refusals, [], JSON.stringify(horizons));
+    assert.ok(reach(b) <= PREVIEW_HORIZON_MOST, `${JSON.stringify(horizons)} walked ${reach(b)} days`);
+    /* CUT BEFORE THE KERNEL SEES IT, so the bound holds however `walkReach` chooses. */
+    assert.ok(!((b.horizons as unknown[] | undefined) ?? []).some((h) => h === 'last' || (h as number) > PREVIEW_HORIZON_MOST), JSON.stringify(b.horizons));
+  }
+  /* MONEY'S CASH AHEAD, as the seed ships it: drawn, its knob offering what a preview walks. */
+  const money = value(await preview([knob(90, [90, 180, 365, 730])])).blocks[0]!;
+  assert.deepEqual(money.refusals, []);
+  assert.deepEqual(money.horizons, [90, 180, 365]);
+
+  /* A LIST THE KERNEL REFUSES IS REFUSED STILL, not trimmed into one it takes. */
+  const bad = value(await preview([knob(30, [30, 9000, 0])])).blocks[0]!;
+  assert.equal(bad.refusals[0]?.at, 'horizons', JSON.stringify(bad.refusals));
+  const many = value(await preview([knob(30, [1, 2, 3, 4, 5, 6, 7, 8, 3650])])).blocks[0]!;
+  assert.equal(many.refusals[0]?.at, 'horizons', JSON.stringify(many.refusals));
+
+  /* THE OPENING IS STILL COSTED: `last`, or a number past the page's own ceiling, at that ceiling. */
+  const opensLast = value(await preview([{ ...walk(30), horizon: 'last' }])).blocks[0]!;
+  assert.equal(opensLast.refusals[0]?.at, 'horizon');
+  assert.match(opensLast.refusals[0]!.fix, /asks for 3,650\./u);
+  assert.match(value(await preview([walk(90000)])).blocks[0]!.refusals[0]!.fix, /asks for 3,650\./u);
+  sql.close();
+});
