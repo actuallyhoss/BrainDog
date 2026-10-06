@@ -19,6 +19,7 @@ import { backgroundMeter, BACKGROUND_JOBS_MONTH, serveModelJobs, UNDERSTAND_ASKS
 import { slashRecordMeter } from '../src/slash-ask.ts';
 import { SLASH_HEADLINE_INSTRUCTIONS } from '../src/slash.ts';
 import {
+  addressesTheirs,
   keysWritten,
   mentionsKept,
   NOTES_EVERY_MS,
@@ -291,12 +292,29 @@ const PROJECTS = {
   } as never,
 };
 
+const ORGS = {
+  id: 'register.orgs',
+  kind: 'register' as const,
+  body: {
+    id: 'orgs',
+    name: 'Organisations',
+    title: 'name',
+    org: { name: 'name', keys: 'keys' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'keys', type: 'list', of: 'text' },
+    ],
+  } as never,
+};
+
 const BAKE_NOTE = 'Ahmed runs our deliveries every weekend. I read an interview with Adam Mosseri about creators. Jo Okonkwo drew the new menu. Lina once mentioned a cafe.';
 
 async function record() {
   let now = T0 - 3_600_000;
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: { now: () => now } });
+  /* AN OWNER WHO SIGNS IN AS ada@kiln.example: their notes are "your note", and their address is never offered. */
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'bake', name: 'Bake', tz: 'UTC', locale: 'en', owner: { id: 'p_owner', email: 'ada@kiln.example', name: 'Ada' } }).ok);
   const installed = await api.kernel.install([PROJECTS, PEOPLE]);
   assert.ok(installed.ok, JSON.stringify(installed));
   const bake = await api.create({ register: 'projects', fields: { name: 'Bake', note: BAKE_NOTE } }, OWNER);
@@ -309,6 +327,8 @@ async function record() {
     list: (q) => api.kernel.list(q),
     meetsList: () => api.kernel.meetsList(),
     history: (id) => api.kernel.history(id),
+    members: () => api.kernel.members(),
+    orgsList: () => api.kernel.orgsList(),
     propose: (p, w, d) => {
       const out = api.kernel.propose(p, w, d);
       if (out.ok) filed.push({ question: p.question, body: p.body });
@@ -503,7 +523,7 @@ test('AN ADDRESS OR A LOGIN IS READ ONLY AS THE NOTE SPELLS IT, after the servic
 test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT: one question each, saying what kind and never the thing', async () => {
   const r = await record();
   const store = openSqlite();
-  const quill = await r.api.create({ register: 'people', fields: { name: 'Quill', handles: ['discord:quillart'], note: 'Art for Bake. Git: quill.pixels@gmail.com, GitHub @quillpx' } }, OWNER);
+  const quill = await r.api.create({ register: 'people', fields: { name: 'Quill', handles: ['discord:quillart'], note: 'Art for Bake. Her email is quill.pixels@gmail.com, GitHub @quillpx' } }, OWNER);
   assert.ok(quill.ok && !('asked' in quill.value), JSON.stringify(quill));
   /* A KEY ANOTHER PERSON HOLDS IS NOT OFFERED, and neither is anything in a note an agent wrote. */
   assert.ok((await r.api.create({ register: 'people', fields: { name: 'Sam Reyes', note: 'Copies jo@okonkwo.example on every invoice.' } }, OWNER)).ok);
@@ -513,7 +533,7 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.deepEqual(out, { ran: true, asked: 2 });
   assert.deepEqual(
     r.filed.map((f) => f.question),
-    ['Add an address and a GitHub login to Quill? Your note on Quill says so.', 'Link Jo Okonkwo to Bake? Your note on Bake says so.'],
+    ['Add an address at gmail.com and a GitHub login to Quill? Your note on Quill says so.', 'Link Jo Okonkwo to Bake? Your note on Bake says so.'],
   );
   for (const f of r.filed) assert.ok(!f.question.includes('@') && !f.question.includes('—'), f.question);
   /* THE KERNEL'S OWN SHAPE FOR AN OFFER: the row as a person says it, and the keys, so a later meeting brings it up to date. */
@@ -550,10 +570,60 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.deepEqual(r.api.kernel.get(quill.value.id)?.fields.handles, ['discord:quillart', 'github:quillpx']);
 });
 
+test('AN ADDRESS IS THEIRS ONLY WHEN THE NOTE SAYS SO: their word or their own name just before it, and nothing that makes it someone else\'s', () => {
+  const theirs = (text: string) => [...addressesTheirs(text, 'Ann Lee')];
+  assert.deepEqual(theirs('Her email is ann@kiln.example.'), ['email:ann@kiln.example']);
+  assert.deepEqual(theirs('Reach Ann at ann@kiln.example'), ['email:ann@kiln.example']);
+  assert.deepEqual(theirs("Ann's work address: ann@kiln.example"), ['email:ann@kiln.example']);
+  assert.deepEqual(theirs('Their emails are ann@kiln.example and ann.lee@gmail.com'), ['email:ann@kiln.example', 'email:annlee@gmail.com']);
+  /* SOMEONE ELSE'S, OR ONLY PASSED THROUGH THEM. */
+  assert.deepEqual(theirs('Ask her manager mgr@kiln.example about quotes.'), []);
+  assert.deepEqual(theirs('Cc admin@brain.dog on every invoice.'), []);
+  assert.deepEqual(theirs('Forward her mail to ops@kiln.example'), []);
+  assert.deepEqual(theirs('Ann, mgr@kiln.example (her manager)'), []);
+  assert.deepEqual(theirs('Ann works with Bob, bob@kiln.example'), []);
+  assert.deepEqual(theirs('My email is ada@kiln.example, tell her.'), []);
+  assert.deepEqual(theirs("They cc'd mgr@kiln.example on it."), []);
+  assert.deepEqual(theirs('She works with tom@kiln.example'), []);
+  assert.deepEqual(theirs('Ann introduced tom@kiln.example'), []);
+  assert.deepEqual(theirs('Tell him to email bob@kiln.example'), []);
+  assert.deepEqual(theirs('Send her invoices to billing@kiln.example'), []);
+  assert.deepEqual(theirs('She can be reached at ann@kiln.example'), ['email:ann@kiln.example']);
+  /* AND AN ADDRESS NOBODY IS SAID TO OWN IS NOBODY'S. */
+  assert.deepEqual(theirs('Git: ann@kiln.example'), []);
+  assert.deepEqual(theirs('Her email is ann@kiln.example. Cc ann@kiln.example on quotes.'), []);
+});
+
+test("NEVER THE OWNER'S ADDRESS, AN ORGANISATION'S KEY OR A SHARED INBOX, and only from the owner's own notes", async () => {
+  const r = await record();
+  const store = openSqlite();
+  assert.ok((await r.api.kernel.install([ORGS])).ok);
+  assert.ok((await r.api.create({ register: 'orgs', fields: { name: 'Kiln', keys: ['email:studio@kiln.example'] } }, OWNER)).ok);
+  const ann = await r.api.create({
+    register: 'people',
+    fields: {
+      name: 'Ann Lee',
+      note: [
+        'Met Ann at the fair. Her email is ann@kiln.example.',
+        'Cc her manager mgr@kiln.example on quotes. Ask Bob at bob@kiln.example.',
+        'Her other address is ada@kiln.example. Her old address is studio@kiln.example. Her address is also accounts@kiln.example.',
+      ].join(' '),
+    },
+  }, OWNER);
+  assert.ok(ann.ok && !('asked' in ann.value), JSON.stringify(ann));
+  /* A NOTE SOMEONE ELSE ON THE RECORD WROTE IS THEIRS, not the owner's, and is not offered from. */
+  assert.ok(r.api.kernel.create('people', { name: 'Cleo', note: 'Her email is cleo@kiln.example' }, { actor: 'p_member' }).ok);
+
+  assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0, log: () => {} }), { ran: true, asked: 2 });
+  assert.equal(r.filed[0]!.question, 'Add an address at kiln.example to Ann Lee? Your note on Ann Lee says so.');
+  assert.deepEqual(r.filed[0]!.body.offer, { keys: ['email:ann@kiln.example'] });
+  assert.ok(!r.filed.some((f) => f.question.includes('Cleo')), 'a member\'s note was offered from');
+});
+
 test(`AT MOST ${OFFERS_PER_PASS} OFFERS A NIGHT, and the rest are offered the nights that follow`, async () => {
   const r = await record();
   const store = openSqlite();
-  for (const name of ['Ana', 'Ben', 'Cy', 'Dee', 'Eli']) assert.ok((await r.api.create({ register: 'people', fields: { name, note: `Writes from ${name.toLowerCase()}@studio.example` } }, OWNER)).ok);
+  for (const name of ['Ana', 'Ben', 'Cy', 'Dee', 'Eli']) assert.ok((await r.api.create({ register: 'people', fields: { name, note: `${name} writes from ${name.toLowerCase()}@studio.example` } }, OWNER)).ok);
   const first = serveOffers(r.kernel, { store, now: () => T0, log: () => {} });
   assert.equal(first.asked, OFFERS_PER_PASS);
   const second = serveOffers(r.kernel, { store, now: () => T0 + NOTES_EVERY_MS + 60_000, log: () => {} });

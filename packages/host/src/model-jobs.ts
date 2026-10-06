@@ -378,10 +378,10 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
 
   /* WHAT A PERSON WROTE WORD FOR WORD IS OFFERED FIRST, AND WITH NO MODEL (`serveOffers`): it costs no ask, so neither a
      host without a model nor a spent month holds it back. Nightly by its own mark, like the notes. */
-  const { registers, list, meetsList, propose, history } = api.kernel;
-  if (deps.store && registers && list && meetsList && propose && history) {
+  const { registers, list, meetsList, propose, history, members, orgsList } = api.kernel;
+  if (deps.store && registers && list && meetsList && propose && history && members && orgsList) {
     try {
-      serveOffers({ registers, list, meetsList, propose, history }, { store: deps.store, now: deps.now, log });
+      serveOffers({ registers, list, meetsList, propose, history, members, orgsList }, { store: deps.store, now: deps.now, log });
     } catch (e) {
       log(`offers: ${said(e)}`);
     }

@@ -25,17 +25,18 @@
  * AND WHAT A PERSON WROTE WORD FOR WORD IS OFFERED WITH NO MODEL AT ALL (`serveOffers`, the same change): an address
  * or a login written in their note on someone, offered to that someone as one question, and a person the record holds
  * named by their full name in a project's note, or a project named in a person's note, offered as a link. Only a note
- * whose words a person wrote, and still only a question: a key another person answers to is never offered.
+ * whose words the owner wrote, and still only a question: a key another person, an organisation or the owner answers to
+ * is never offered, and an address only when the note says it is that person's.
  *
  * STRUCTURAL, AS `slash-answers.ts` IS: the model is handed in, and this file imports neither `@braindog/slash` nor an app.
  */
 
 import {
+  isOrganisationAddress,
   keyOf,
   keysOf,
   kindOfKey,
   looksLikeCredential,
-  SEED_ACTOR,
   sessionDeclaration,
   SLASH,
   type Entry,
@@ -776,8 +777,11 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
 
 /* ── what a person wrote word for word: the offers ─────────────────────────────────────────────────────────────────── */
 
-/** The kernel methods the offers pass calls: the notes pass's, and a row's history, to know whose words a note is. */
-export type OffersKernel = NotesKernel & Pick<Kernel, 'history'>;
+/**
+ * The kernel methods the offers pass calls: the notes pass's, a row's history, to know whose words a note is, the members,
+ * to know who the owner is and the address they sign in with, and the organisations, whose keys are never a person's.
+ */
+export type OffersKernel = NotesKernel & Pick<Kernel, 'history' | 'members' | 'orgsList'>;
 
 export type OffersDeps = { store: UnderstandStore; now: () => number; log: (line: string) => void };
 
@@ -820,19 +824,94 @@ export function keysWritten(text: string): Written[] {
   return [...out.values()];
 }
 
-const RUN_ACTOR = new RegExp(`^${String(sessionDeclaration().body.seq_prefix)}[1-9][0-9]*$`, 'u');
+/** How many words before an address a note may say whose it is: "her work email is" is four. */
+const WHOSE_WORDS = 5;
 
-/** Whether an actor is a person (`30 §3`): not Slash, the system, a seed, a run, an agent's key or something declared. */
-const isPerson = (actor: string): boolean => actor !== SLASH && actor !== 'system' && actor !== SEED_ACTOR && !actor.includes(':') && !RUN_ACTOR.test(actor);
+/** How many words after an address are read for a word that makes it somebody else's: "mgr@kiln.example (her manager)". */
+const AFTER_WORDS = 3;
+
+/** The words that say an address is the person's the note is on, beside their own name. */
+const THEIRS: ReadonlySet<string> = new Set(['her', 'hers', 'his', 'him', 'their', 'theirs', 'them', 'she', 'he', 'they']);
 
 /**
- * Whether the note on a row is a person's own words: the last change to any of its note fields, or the row's making when
- * none came after, was signed by a person. An agent's note may carry what it read in a forged mail, and is not offered from.
+ * The words that say an address is somebody else's, or only passed through the person: a copy, a manager, a request, a
+ * forward, someone close to them, or the owner's own. Any of them near an address and it is not offered, whatever else is said.
  */
-function ownWords(kernel: Pick<Kernel, 'history'>, id: string, fields: readonly string[]): boolean {
+const NOT_THEIRS: ReadonlySet<string> = new Set([
+  'cc', 'ccd', 'cced', 'bcc', 'bccd', 'bcced', 'copy', 'copies', 'copied', 'copying', 'ask', 'asks', 'asked', 'asking', 'forward', 'forwards', 'forwarded',
+  'forwarding', 'fwd', 'fw', 'via', 'through', 'manager', 'managers', 'boss', 'assistant', 'pa', 'secretary', 'colleague',
+  'coworker', 'team', 'partner', 'wife', 'husband', 'mum', 'mom', 'dad', 'mother', 'father', 'sister', 'brother', 'son',
+  'daughter', 'friend', 'client', 'accountant', 'lawyer', 'agent', 'instead', 'not', 'my', 'our', 'your', 'me', 'us',
+]);
+
+/**
+ * The only words a note may say between the person and their address: how an address is said and nothing else. "Her
+ * work email is", "Reach Ann at", "She can be reached at". Any other word between them ("She works with", "Ann
+ * introduced", "Tell him to email", another name) says the address is somebody else's, or says nothing about whose.
+ */
+const ADDRESS_WORDS: ReadonlySet<string> = new Set([
+  'email', 'emails', 'e-mail', 'mail', 'gmail', 'address', 'addresses', 'inbox', 'git', 'github', 'login', 'work', 'personal',
+  'private', 'home', 'main', 'primary', 'best', 'new', 'old', 'current', 'other', 'also', 'now', 'still', 'the', 'a', 'an',
+  'and', 'or', 'is', 'are', 'was', 'at', 'on', 'from', 'by', 'use', 'uses', 'used', 'write', 'writes', 'can', 'be', 'reach',
+  'reached', 'reachable', 'contact',
+]);
+
+/** Where a clause ends, so whose an address is is read in its own sentence. */
+const CLAUSE_END = /[.!?;\n]/u;
+
+/** A note's words, folded, with "Ann's" read as "Ann" and "cc'd" as "ccd". */
+const wordsOf = (text: string): string[] =>
+  text
+    .split(/[^\p{L}\p{N}'’-]+/u)
+    .filter((w) => w !== '')
+    .map((w) => w.toLowerCase().replace(/['’]s?$/u, '').replace(/['’]/gu, ''));
+
+/**
+ * The addresses a note on `name` says are that person's own, as keys: a word for them (her, his, their) or their own name
+ * a few words before the address in the same sentence, with only words that say an address between (`ADDRESS_WORDS`),
+ * and no word near it that makes it somebody else's (cc, a manager, ask, forward, my). "Her email is ann@kiln.example"
+ * and "Reach Ann at ann@kiln.example" are; "cc her manager mgr@kiln.example", "ask Bob at bob@kiln.example", "she works
+ * with tom@kiln.example" and a bare "Git: ann@kiln.example" are not. An address said twice is theirs only when nothing
+ * near either says otherwise.
+ */
+export function addressesTheirs(text: string, name: string): Set<string> {
+  const own = new Set(wordsOf(name).filter((w) => w.length > 1));
+  const said = new Map<string, boolean>();
+  for (const m of text.matchAll(NOTE_ADDRESS)) {
+    const key = keyOf('email', m[0]);
+    if (key === null) continue;
+    const start = m.index ?? 0;
+    /* THE SENTENCE BEFORE IT, other addresses taken out so a list of two is read as one. */
+    const before = text.slice(0, start).replace(NOTE_ADDRESS, ' ');
+    const clause = before.slice(Math.max(...[...before.matchAll(new RegExp(CLAUSE_END, 'gu'))].map((c) => (c.index ?? 0) + 1), 0));
+    const near = wordsOf(clause).slice(-WHOSE_WORDS);
+    const after = wordsOf(text.slice(start + m[0].length).split(CLAUSE_END)[0] ?? '').slice(0, AFTER_WORDS);
+    let theirs = false;
+    if (![...near, ...after].some((w) => NOT_THEIRS.has(w))) {
+      /* NEAREST FIRST: their word or their name, with only words that say an address between. */
+      for (let i = near.length - 1; i >= 0; i--) {
+        const w = near[i]!;
+        if (THEIRS.has(w) || own.has(w)) {
+          theirs = true;
+          break;
+        }
+        if (!ADDRESS_WORDS.has(w)) break;
+      }
+    }
+    said.set(key, (said.get(key) ?? true) && theirs);
+  }
+  return new Set([...said].filter(([, ok]) => ok).map(([k]) => k));
+}
+
+/**
+ * Whether the note on a row is the owner's own words: the last change to any of its note fields, or the row's making when
+ * none came after, was signed by an owner of the record. An agent's note may carry what it read in a forged mail, and a
+ * member's is theirs and not the owner's, so neither is offered from, and "your note" is only ever the owner's.
+ */
+function ownWords(kernel: Pick<Kernel, 'history'>, id: string, fields: readonly string[], owners: ReadonlySet<string>): boolean {
   let by: string | null = null;
   for (const e of kernel.history(id)) if (e.field === null ? e.kind === 'create' : fields.includes(e.field)) by = e.actor;
-  return by !== null && isPerson(by);
+  return by !== null && owners.has(by);
 }
 
 const textOf = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
@@ -856,8 +935,9 @@ const standsIn = (text: string, name: string): boolean =>
  * no model and so on every plan: an address or a login in their note on someone, offered to that someone, and a link
  * between a person and a project when one's note names the other, a person by their full name.
  *
- * ONE QUESTION FOR EACH PERSON OFFERED A KEY, saying what kind of thing and never the thing, and one for each project
- * whose people are offered as a link. A person is in one question a night, since two would update one row twice.
+ * ONE QUESTION FOR EACH PERSON OFFERED A KEY, saying what kind of thing, an address by its domain and never the address
+ * ("Add an address at kiln.example to Ann?"), and one for each project whose people are offered as a link. A person is
+ * in one question a night, since two would update one row twice.
  * `OFFERS_PER_PASS` questions at most; the rest stay where they are, and the watermark with them, until a later night.
  *
  * AN OFFER OF KEYS IS THE KERNEL'S OWN SHAPE, `offer: { keys }` on a row named as a person says it: the kernel brings it
@@ -866,7 +946,9 @@ const standsIn = (text: string, name: string): boolean =>
  * carries the keys alone, a link for the same person waits for a later night, in a question of its own.
  *
  * ONLY WHAT NOBODY ELSE ANSWERS TO: a key another person holds is a question about one person or two, which is the
- * kernel's to ask, and an offer once made is never made again, whatever the answer was.
+ * kernel's to ask, and an offer once made is never made again, whatever the answer was. Never the owner's own keys or
+ * the address they sign in with, never a key an organisation holds or a shared inbox, and an address only when the
+ * note says it is that person's (`addressesTheirs`). Only the owner's notes are read: "your note" is theirs alone.
  */
 export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServed {
   const { store, log } = deps;
@@ -889,25 +971,47 @@ export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServe
   const scoped = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
   const projectList = lists.find((l) => l.kind === 'project');
 
+  /* THE OWNERS, by what they hold on the record: whose notes are "your note", and whose sign-in address is never offered. */
+  const owners = kernel.members().filter((m) => m.level === 'owner');
+  const ownerIds = new Set(owners.map((m) => m.person_id));
+  /* WHAT IS NEVER OFFERED TO A PERSON: the address the owner signs in with, whoever holds it yet, and every key an
+     organisation holds. A yes to the owner's address on someone else would make them "you". The keys on the owner's own
+     row are another person's to everyone else, and `holder` keeps them. */
+  const never = new Set<string>();
+  for (const m of owners) {
+    const key = m.email === null ? null : keyOf('email', m.email);
+    if (key !== null) never.add(key);
+  }
+  const rowsOf = (register: string, each: (row: Entry) => void) => {
+    let cursor: string | null = null;
+    for (let page = 0; page < NOTE_PAGES; page++) {
+      const read = kernel.list({ register, limit: 200, ...(cursor === null ? {} : { cursor }) });
+      if (!read.ok) break;
+      for (const row of read.value.rows) each(row);
+      if (read.value.cursor === null) break;
+      cursor = read.value.cursor;
+    }
+  };
+  const orgs = kernel.orgsList();
+  if (orgs !== null && orgs.fields.keys !== undefined) {
+    const field = orgs.fields.keys;
+    rowsOf(orgs.register, (row) => {
+      for (const k of keysOf({ keys: listOf(row.fields[field]) })) never.add(k);
+    });
+  }
+
   const people: Person[] = [];
   const holder = new Map<string, string>();
-  let cursor: string | null = null;
-  for (let page = 0; page < NOTE_PAGES; page++) {
-    const read = kernel.list({ register: meets.register, limit: 200, ...(cursor === null ? {} : { cursor }) });
-    if (!read.ok) break;
-    for (const row of read.value.rows) {
-      const f = row.fields;
-      const keys = keysOf({ email: textOf(f[at.email]), handles: at.handles === undefined ? [] : listOf(f[at.handles]), keys: at.keys === undefined ? [] : listOf(f[at.keys]) });
-      for (const k of keys) if (!holder.has(k)) holder.set(k, row.id);
-      /* ONE MERGED INTO ANOTHER STILL HOLDS ITS KEYS, and is offered nothing. */
-      if (textOf(f[at.merged_into]) !== undefined) continue;
-      const name = textOf(f[peopleList.title]);
-      if (name === undefined) continue;
-      people.push({ row, name, keys: new Set(keys), projects: at.projects === undefined ? [] : listOf(f[at.projects]) });
-    }
-    if (read.value.cursor === null) break;
-    cursor = read.value.cursor;
-  }
+  rowsOf(meets.register, (row) => {
+    const f = row.fields;
+    const keys = keysOf({ email: textOf(f[at.email]), handles: at.handles === undefined ? [] : listOf(f[at.handles]), keys: at.keys === undefined ? [] : listOf(f[at.keys]) });
+    for (const k of keys) if (!holder.has(k)) holder.set(k, row.id);
+    /* ONE MERGED INTO ANOTHER STILL HOLDS ITS KEYS, and is offered nothing. */
+    if (textOf(f[at.merged_into]) !== undefined) return;
+    const name = textOf(f[peopleList.title]);
+    if (name === undefined) return;
+    people.push({ row, name, keys: new Set(keys), projects: at.projects === undefined ? [] : listOf(f[at.projects]) });
+  });
   const projects = scoped ? titlesOf(kernel, scoped.id, scoped.title) : new Map<string, string>();
   const byId = new Map(people.map((p) => [p.row.id, p]));
 
@@ -932,7 +1036,7 @@ export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServe
       const key = `offer:${list.register}:${row.id}`;
       const hash = fnv(text);
       if (markOf(store, key) === hash) continue;
-      if (!ownWords(kernel, row.id, list.fields)) {
+      if (!ownWords(kernel, row.id, list.fields, ownerIds)) {
         mark(store, key, hash, iso);
         continue;
       }
@@ -963,8 +1067,11 @@ export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServe
     if (note.kind === 'person') {
       const p = byId.get(note.row.id);
       if (!p) continue;
+      const theirs = addressesTheirs(note.text, p.name);
       for (const w of keysWritten(note.text)) {
-        if (p.keys.has(w.key) || (holder.get(w.key) ?? p.row.id) !== p.row.id || offeredBefore(p.row.id, w.key)) continue;
+        if (p.keys.has(w.key) || never.has(w.key) || (holder.get(w.key) ?? p.row.id) !== p.row.id || offeredBefore(p.row.id, w.key)) continue;
+        /* AN ADDRESS ONLY WHEN THE NOTE SAYS IT IS THEIRS, and never a shared inbox, which is an organisation's. */
+        if (kindOfKey(w.key) === 'email' && (!theirs.has(w.key) || isOrganisationAddress(w.said))) continue;
         /* A KEY THE LIST HAS NOWHERE FOR IS NOT OFFERED: an address goes in the address field or with the keys, a login with the handles or the keys. */
         if (kindOfKey(w.key) === 'email' ? at.keys === undefined && at.handles === undefined && textOf(p.row.fields[at.email]) !== undefined : at.handles === undefined && at.keys === undefined) continue;
         const plan = planOf(p);
@@ -1008,11 +1115,19 @@ export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServe
   const taken = new Set<string>();
   for (const plan of plans.values()) {
     if (plan.keys.length === 0) continue;
-    const kinds = new Map<string, number>();
-    for (const w of plan.keys) kinds.set(kindOfKey(w.key), (kinds.get(kindOfKey(w.key)) ?? 0) + 1);
-    const what = namesSaid([...kinds].map(([kind, n]) => {
+    /* AN ADDRESS BY ITS DOMAIN, so the owner can tell which one a yes adds without the address being said: "an address
+       at kiln.example". A login by its kind alone. */
+    const kinds = new Map<string, { kind: string; at?: string; n: number }>();
+    for (const w of plan.keys) {
+      const kind = kindOfKey(w.key);
+      const domain = kind === 'email' ? w.said.slice(w.said.lastIndexOf('@') + 1).toLowerCase() : undefined;
+      const k = domain === undefined ? kind : `${kind}@${domain}`;
+      const had = kinds.get(k);
+      kinds.set(k, { kind, ...(domain === undefined ? {} : { at: domain }), n: (had?.n ?? 0) + 1 });
+    }
+    const what = namesSaid([...kinds.values()].map(({ kind, at: domain, n }) => {
       const [one, many] = KEY_WORDS[kind] ?? ['a login', 'logins'];
-      return n === 1 ? one : `${n} ${many}`;
+      return `${n === 1 ? one : `${n} ${many}`}${domain === undefined ? '' : ` at ${domain}`}`;
     }));
     offers.push({
       register: meets.register,
