@@ -91,6 +91,7 @@ const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
    writes, or the host's own session id, so a process with neither sends neither. */
 const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-session': /^S[1-9][0-9]*$/,
+  'x-braindog-parent': /^S[1-9][0-9]*$/,
   'x-braindog-client': CLIENT_ID,
   'x-braindog-host': /^[A-Za-z0-9._-]{1,128}$/,
   'x-braindog-repo': /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -116,8 +117,14 @@ export function hostSessionOf(env: Env): string | null {
 /** What a client says it is when it says hello: MCP's `initialize` `clientInfo`, as in `claude-code` and `2.1.287`. */
 export type ClientInfo = { name?: string | undefined; version?: string | undefined };
 
-/** What else a call says about who makes it: the process's environment, and the client's own name and version. */
-export type Said = { env?: Env | undefined; client?: ClientInfo | undefined };
+/** The run a subagent works for, by its spoken id, and where that run stands (`parentOf` in `hooks.ts`). */
+export type Parent = { spoken: string; cwd: string | null; repo: string | null; remote: string | null };
+
+/**
+ * What else a call says about who makes it: the process's environment, the client's own name and version, and the run
+ * it works for when it is a subagent.
+ */
+export type Said = { env?: Env | undefined; client?: ClientInfo | undefined; parent?: Parent | null | undefined };
 
 /**
  * The headers a position becomes. A value outside its grammar is dropped, as the host would drop it,
@@ -128,16 +135,23 @@ export type Said = { env?: Env | undefined; client?: ClientInfo | undefined };
  * and otherwise the host session's id from the environment, so the hook's run and every tool call after it are one run
  * rather than one each. Inside Claude Code (`CLAUDECODE`) a caller that names no agent is `claude`. Both come from
  * `said.env` only, never from this process's own, so a caller says which environment it speaks for.
+ *
+ * A SUBAGENT OUTSIDE ANY REPOSITORY SAYS ITS PARENT RUN'S PLACE (`said.parent`): the repository, remote and folder that
+ * run started in, so the record places it in the same project, and the parent's spoken id as `x-braindog-parent` for a
+ * record that reads it. One in a repository of its own says its own place, which is where its work is.
  */
 export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: string | undefined; client_id?: string | undefined }, said: Said = {}): Record<string, string> {
   const env = said.env ?? {};
+  const parent = said.parent ?? null;
+  const from = parent !== null && p.repo === null && (parent.repo !== null || parent.remote !== null || parent.cwd !== null) ? parent : null;
   const values: Record<string, string | null | undefined> = {
     'x-braindog-session': run?.spoken,
+    'x-braindog-parent': parent?.spoken,
     'x-braindog-client': run?.client_id ?? hostSessionOf(env),
     'x-braindog-host': p.host,
-    'x-braindog-repo': p.repo,
-    'x-braindog-remote': p.remote,
-    'x-braindog-cwd': p.cwd,
+    'x-braindog-repo': from ? from.repo : p.repo,
+    'x-braindog-remote': from ? from.remote : p.remote,
+    'x-braindog-cwd': from ? (from.cwd ?? p.cwd) : p.cwd,
     'x-braindog-agent': agent ?? (env.CLAUDECODE ? 'claude' : undefined),
     'x-braindog-client-name': said.client?.name?.trim(),
     'x-braindog-client-version': said.client?.version?.trim(),

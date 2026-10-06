@@ -30,7 +30,7 @@ import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
 import { exportFile, importFile } from './brainfile.ts';
-import { heldFor, hookEnd, hookStart, readSession, sessionPath } from './hooks.ts';
+import { heldHere, hookEnd, hookStart, parentOf } from './hooks.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
@@ -39,6 +39,7 @@ import { lapseWarning, login } from './login.ts';
 import { logout } from './logout.ts';
 import { openSessions, openSessionsLine } from './open-sessions.ts';
 import { page as pageCommand } from './page.ts';
+import { peopleCommand } from './people.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
 import { context } from './context.ts';
 import { session } from './session.ts';
@@ -57,12 +58,13 @@ import { verify } from './verify.ts';
 const say = (line: string) => writeFileSync(2, `${line}\n`);
 
 /**
- * The session headers a command in this folder sends to a host: where it stands, and the run the folder's session file
- * names only while that run is the caller's (`heldFor`), read per request because the start hook may write the file
- * after the command began. The host session's id and `CLAUDECODE` come from this process's environment.
+ * The session headers a command in this folder sends to a host: where it stands, and the run its session's file names
+ * only while that run is the caller's (`heldHere`), read per request because the start hook may write the file after
+ * the command began. The host session's id and `CLAUDECODE` come from this process's environment, and a subagent's
+ * parent run from its window's file (`parentOf`).
  */
 const headersHere = async (cwd: string, host: string): Promise<Record<string, string>> =>
-  sessionHeaders(await positionOf(cwd), undefined, heldFor(readSession(sessionPath(process.env, cwd)), host, process.env), { env: process.env });
+  sessionHeaders(await positionOf(cwd), undefined, heldHere(process.env, cwd, host), { env: process.env, parent: parentOf(process.env, host) });
 
 /**
  * The folder the two hook shims are in, which is what `install` and `setup` write into Claude Code's settings.
@@ -223,6 +225,8 @@ const usage = () =>
     '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
     'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] | --draft-setup | --since <day|last>',
     "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
+    'braindog people harvest [--since <day>] [--dry-run] [--host <host>]',
+    "  Meet everybody who committed to the repositories your projects list and those in this folder, grouped by address, each with the project they worked in. Bots, machines and your own commits are left out. With --dry-run it prints who it would meet and sends nothing.",
     'braindog token create [--name <name>] [--scope <read|propose|write>] [--days <n>] [--inbox] [--host <host>]',
     "  Mint a token for an agent and print it once. It reads unless --scope names more, and with --inbox it may also read the money inbox.",
     "  The owner approves the one mint in the app, with six digits, unless BRAINDOG_TOKEN is the self-host's server key.",
@@ -293,16 +297,16 @@ async function mcp(args: string[]): Promise<void> {
   /* Started now and awaited by the first request, so git runs while the client is still saying hello. */
   const where = positionOf(process.cwd());
   /* READ PER REQUEST, because Claude Code may start this server before the start hook has written the
-     file, and a clear or a resume inside the window moves it to another session and run. A file for another
-     host names a run there, and a file another window's session wrote or no hook has heard from in twelve
-     hours names a run that is not this one's (`heldFor`), so neither is sent. This process's parent is the
-     window that started it, and the session id in its environment is the one it had then. */
-  const file = sessionPath(process.env, process.cwd());
+     file, and a clear or a resume inside the window moves it to another session and run. The session's own file, or
+     the run its window last started, which a clear moves on (`heldHere`); never another window's. This process's
+     parent is the window that started it, and the session id in its environment is the one it had then. */
+  const cwd = process.cwd();
   const server = { parent: process.ppid, since: Date.now() };
   /* WHAT THE CLIENT SAID IT IS IN ITS HELLO, sent with every request after it, so the record can say which app makes
      the run and which version of it, beside the `--agent` the server was registered with. */
   let hello: ClientInfo = {};
-  const headers = async () => sessionHeaders(await where, agent, heldFor(readSession(file), to.key, process.env, Date.now(), server), { env: process.env, client: hello });
+  const headers = async () =>
+    sessionHeaders(await where, agent, heldHere(process.env, cwd, to.key, Date.now(), server), { env: process.env, client: hello, parent: parentOf(process.env, to.key) });
   const surface = await surfaceOver((ctx) => clientFor(to, headers, ctx.signal));
 
   /* A closed stdout means nobody is left to read the answers. */
@@ -377,14 +381,14 @@ async function keysCommand(args: string[]): Promise<void> {
 }
 
 /**
- * `braindog skills|tools|page|usecase|pack|kennel|import|context|session|automations|scripts|verify`, over the real terminal, and
+ * `braindog skills|tools|page|usecase|pack|kennel|import|context|session|automations|scripts|verify|people`, over the real terminal, and
  * the exit code the command decides.
  *
  * `--json` IS DECIDED HERE AND NOWHERE ELSE (`48 §4.5`, `json.ts`). The twelve commands below all take
  * the same `AgentIo`, so swapping where `out` goes is the whole of the flag: not one line in a command
  * body asks whether it was given.
  */
-async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify', args: string[]): Promise<void> {
+async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pack' | 'kennel' | 'import' | 'context' | 'session' | 'automations' | 'scripts' | 'verify' | 'people', args: string[]): Promise<void> {
   const cwd = process.cwd();
   const io = {
     env: process.env,
@@ -402,7 +406,7 @@ async function agentCommand(which: 'skills' | 'tools' | 'page' | 'usecase' | 'pa
      `import { DatabaseSync } from 'node:sqlite'`, and a static import at the top of this file would load
      it, and Node's `ExperimentalWarning`, before every command this CLI runs, not only these four. */
   const code =
-    which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
+    which === 'people' ? await peopleCommand(args, io) : which === 'context' ? await context(args, io) : which === 'session' ? await session(args, io) : which === 'import' ? await (await import('./import.ts')).importCommand(args, io) : which === 'skills' ? await skills(args, io) : which === 'tools' ? await tools(args, { ...io, cli }) : which === 'usecase' ? await (await import('./usecase.ts')).usecase(args, io) : which === 'pack' ? await (await import('./catalogue.ts')).pack(args, io) : which === 'kennel' ? await (await import('./kennel.ts')).kennel(args, io) : which === 'automations' ? await automations(args, io) : which === 'scripts' ? await scripts(args, io) : which === 'verify' ? await verify(args, io) : await pageCommand(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -620,7 +624,7 @@ function install(args: string[]): void {
  * program reads from stdout, and the first prints for a person while its first step may wait for six digits
  * (`setupCommand`, `48 §5.15`, `§5.16`). Both refuse the flag through their own strict `parseArgs`.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -667,7 +671,7 @@ try {
   /* AN ADAPTER IMPORT TAKES TWO WORDS OR AN OPTION OF ITS OWN, and any other `import` is a .brainl put back
      (`isAdapterImport`). Asked of the whole line rather than of a position, because both take `--host <h>` anywhere. */
   else if (command === 'import' && !(await import('./import.ts')).isAdapterImport(args)) await brainfileCommand('import', args);
-  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify') await agentCommand(command, args);
+  else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   else if (command === 'init' || command === 'serve') selfhost(command, rest);

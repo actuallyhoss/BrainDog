@@ -16,7 +16,7 @@ import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { HOOK_MS, heldFor, hookBudget, notSignedIn, readSession, REMEMBER_MS, sessionPath, writeSession, type SessionFile } from '../src/hooks.ts';
+import { HOOK_MS, heldFor, hookBudget, notSignedIn, readSession, REMEMBER_MS, sessionPath, windowPath, writeSession, type SessionFile } from '../src/hooks.ts';
 import { replaceByHand, hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
 import { REPLACE, REPLACE_FILE } from './replace.ts';
@@ -39,7 +39,7 @@ const printed: string[] = [];
 
 /* ── a host ────────────────────────────────────────────────────────────── */
 
-type Seen = { method: string; body: Record<string, unknown>; headers: IncomingHttpHeaders };
+type Seen = { method: string; body: Record<string, unknown>; headers: IncomingHttpHeaders; query: string };
 
 const CONTEXT = {
   session: { spoken: 'S7', state: 'active' },
@@ -60,16 +60,17 @@ const CONTEXT = {
  * the context carries the record's own card, as a host that draws one does. `context` answers the same context,
  * `boot` says the sign-in speaks for Sam, and `list` answers no rows, for the commands and the MCP server.
  */
-async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = false, people = true, card?: string) {
+async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = false, people = true, card?: string, o: { self?: Record<string, unknown>; legacy?: boolean } = {}) {
   const seen: Seen[] = [];
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
-      const method = new URL(req.url ?? '/', 'http://stub').pathname.replace(/^\/api\//, '');
+      const url = new URL(req.url ?? '/', 'http://stub');
+      const method = url.pathname.replace(/^\/api\//, '');
       const raw = Buffer.concat(chunks).toString('utf8');
       const body = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
-      seen.push({ method, body, headers: req.headers });
+      seen.push({ method, body, headers: req.headers, query: decodeURIComponent(url.search) });
       if (hang) return;
       const answer = (value: unknown) => {
         res.writeHead(200, { 'content-type': 'application/json' });
@@ -81,7 +82,12 @@ async function stubHost(t: { after: (fn: () => Promise<void>) => void }, hang = 
       if (method === 'handoff') return answer({ ok: true, value: { ...row, state: body.state } });
       if (method === 'context') return answer({ ok: true, value: CONTEXT });
       if (method === 'boot') return answer({ ok: true, value: { registers: [], now: '2026-10-02T09:00:00Z', me: { kind: 'token', person: 'p_owner', name: 'Sam', level: 'owner' } } });
-      if (method === 'list') return answer({ ok: true, value: { rows: [], matched: 0, cursor: null } });
+      if (method === 'list')
+        return answer({ ok: true, value: { rows: o.self === undefined ? [] : [{ id: 'p_self', seq: 1, version: 3, fields: { self: true, ...o.self } }], matched: 0, cursor: null } });
+      /* A record from before the contract takes four arguments and refuses the first it does not know by name. */
+      const extra = Object.keys(body).find((k) => !['name', 'email', 'handle', 'where'].includes(k));
+      if (method === 'meet' && o.legacy === true && extra !== undefined)
+        return answer({ ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: `${extra} is not something this call takes.`, at: extra } });
       if (method === 'meet')
         return answer(
           people
@@ -167,11 +173,15 @@ test('THE START HOOK ATTACHES, KEEPS THE SESSION FILE, AND PRINTS THE CARD, then
   assert.equal(attach!.headers['x-braindog-client'], 'claude-run-1');
   assert.deepEqual([host.seen[1]!.headers['x-braindog-session'], host.seen[1]!.headers['x-braindog-client']], ['S7', 'claude-run-1']);
 
-  const file = sessionPath(env, cwd);
+  /* THE SESSION'S OWN FILE, and the folder's for a shell there, each saying the same run and where it started. */
+  const file = sessionPath(env, cwd, 'claude-run-1');
   assert.ok(file.startsWith(join(config, 'braindog', 'sessions')), file);
-  const held = readSession(file);
-  assert.deepEqual({ ...held, at: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: undefined });
-  assert.ok(!readFileSync(file, 'utf8').includes('stub-bearer'), 'the session file holds the token');
+  assert.notEqual(file, sessionPath(env, cwd));
+  for (const kept of [file, sessionPath(env, cwd)]) {
+    const held = readSession(kept);
+    assert.deepEqual({ ...held, at: undefined }, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: undefined, cwd });
+    assert.ok(!readFileSync(kept, 'utf8').includes('stub-bearer'), 'the session file holds the token');
+  }
 });
 
 test('COMPACT RE-ATTACHES to the same run by its client id, prints only the Next line, and keeps the commit it started from', async (t) => {
@@ -192,7 +202,7 @@ test('A RESUME WITHIN THE HOUR OF THE SAME SESSION PRINTS NOTHING and still re-a
   const host = await stubHost(t);
   const cwd = folder('kiln');
   const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
-  const file = sessionPath(env, cwd);
+  const file = sessionPath(env, cwd, 'claude-run-1');
   const minutes = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
   const resume = event(cwd, { session_id: 'claude-run-1', source: 'resume' });
 
@@ -206,8 +216,9 @@ test('A RESUME WITHIN THE HOUR OF THE SAME SESSION PRINTS NOTHING and still re-a
   writeSession(file, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: minutes(300), seen: minutes(120) });
   assert.match((await run(['hook', 'start'], env, resume)).stdout, /^BrainDog · run S7 · project Kiln · Claude Code on [^\n]+\nNext {5}Kern/u);
 
-  /* A file another session wrote a minute ago is not this session's card. */
-  writeSession(file, { host: host.base, spoken: 'S7', client_id: 'claude-run-2', head_at_start: null, at: minutes(1) });
+  /* With no file of its own, the folder's, which another session wrote a minute ago, is not this session's card. */
+  rmSync(file);
+  writeSession(sessionPath(env, cwd), { host: host.base, spoken: 'S7', client_id: 'claude-run-2', head_at_start: null, at: minutes(1) });
   assert.match((await run(['hook', 'start'], env, resume)).stdout, /^BrainDog · run S7 /u);
 
   /* Not signed in, within the hour: still nothing, because the session already said so when it started. */
@@ -302,8 +313,8 @@ test('THE END HOOK SETS IDLE, NEVER DONE, on the run the session file names, and
 /* ── the people harvest ────────────────────────────────────────────────── */
 
 /** A repository in a temporary folder with its own identity, so the commits and the owner's address are the test's. */
-function repository(): { dir: string; commit: (author?: string) => string } {
-  const dir = folder('repo');
+function repository(dir = folder('repo')): { dir: string; commit: (author?: string) => string } {
+  mkdirSync(dir, { recursive: true });
   const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', windowsHide: true }).trim();
   git('init', '--quiet');
   git('config', 'user.name', 'Owner');
@@ -339,16 +350,18 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   const host = await stubHost(t);
   const out = await run(['hook', 'end'], signedIn(host.base), end);
   assert.deepEqual([out.code, out.stdout, out.stderr], [0, '', '']);
-  assert.deepEqual(host.seen.map((s) => s.method), [...Array<string>(10).fill('meet'), 'handoff']);
+  /* The owner's own row read once, then the meets, then the handoff. */
+  assert.deepEqual(host.seen.map((s) => s.method), ['list', ...Array<string>(10).fill('meet'), 'handoff']);
   const met = host.seen.filter((s) => s.method === 'meet');
-  /* Newest first: GitHub's private address as a handle, the owner's commit left out, and one person once. */
-  assert.deepEqual(met[0]!.body, { name: 'Ada Lovelace', handle: 'github:ada', where: `commit ${last} in ${name}` });
+  /* Newest first: GitHub's private address as a handle and a key, the owner's commit left out, and one person once. */
+  const source = `commit ${last.slice(0, 7)} in ${name}`;
+  assert.deepEqual(met[0]!.body, { name: 'Ada Lovelace', handle: 'github:ada', where: source, keys: ['github:ada'], kind: 'person', source });
   assert.deepEqual(
     met.slice(1).map((s) => s.body.email),
     [11, 10, 9, 8, 7, 6, 5, 4, 3].map((i) => `person${String(i)}@example.com`),
   );
   for (const s of met) {
-    assert.match(String(s.body.where), new RegExp(`^commit [0-9a-f]{4,40} in ${name}$`));
+    assert.match(String(s.body.source), new RegExp(`^commit [0-9a-f]{7} in ${name}$`));
     assert.equal(s.headers['x-braindog-session'], 'S7');
   }
 
@@ -356,7 +369,7 @@ test('THE END HOOK MEETS THE AUTHORS OF THIS SESSION’S COMMITS before the run 
   const off = await stubHost(t, false, false);
   const quiet = await run(['hook', 'end'], signedIn(off.base), end);
   assert.deepEqual([quiet.code, quiet.stdout, quiet.stderr], [0, '', '']);
-  assert.deepEqual(off.seen.map((s) => s.method), ['meet', 'handoff']);
+  assert.deepEqual(off.seen.map((s) => s.method), ['list', 'meet', 'handoff']);
 
   /* A port nobody listens on: nothing said, and exit 0. */
   const down = await run(['hook', 'end'], signedIn('http://127.0.0.1:9'), end);
@@ -398,14 +411,15 @@ test('A REMEMBERED RUN IS SENT ONLY WHILE IT IS THE CALLER’S: its own host ses
   assert.equal(heldFor(null, held.host, {}, now), undefined);
 
   /* A SERVER KEPT ACROSS A CLEAR still has the id it started with. The file a start hook wrote under the same window is
-     its session's; another window's is not; and from a hook that did not say its window, one written since it started. */
+     its session's; another window's is not; and one from a hook that did not say its window is not either, however
+     recent, because a file written since the server started was as often another window's in the same folder. */
   const stale = { CLAUDE_CODE_SESSION_ID: 'claude-run-old' };
   const cleared: SessionFile = { ...held, spoken: 'S298', client_id: 'claude-run-new', at: new Date(now - 60_000).toISOString(), pid: '4242' };
   assert.equal(heldFor(cleared, held.host, stale, now, { parent: 4242, since: now - 3_600_000 }), cleared);
   assert.equal(heldFor(cleared, held.host, stale, now, { parent: 5151, since: now - 3_600_000 }), undefined);
   assert.equal(heldFor(cleared, held.host, stale, now), undefined, 'a command, which is started for the session it is in, is not a server');
   const { pid: _, ...unsaid } = cleared;
-  assert.equal(heldFor(unsaid, held.host, stale, now, { parent: 5151, since: now - 3_600_000 }), unsaid);
+  assert.equal(heldFor(unsaid, held.host, stale, now, { parent: 5151, since: now - 3_600_000 }), undefined);
   assert.equal(heldFor(unsaid, held.host, stale, now, { parent: 5151, since: now }), undefined);
 });
 
@@ -458,15 +472,106 @@ test('THE MCP SERVER FOLLOWS ITS WINDOW ACROSS A CLEAR: the run its own window�
   /* Every request the call made, as the run and the client it named, once each. */
   const named = () => [...new Set(host.seen.splice(0).map((s) => `${String(s.headers['x-braindog-session'])} ${String(s.headers['x-braindog-client'])}`))];
 
-  /* The clear's start hook, under the window that started this server (its parent, here this test). */
-  writeSession(sessionPath(env, cwd), { host: host.base, spoken: 'S8', client_id: 'claude-run-new', head_at_start: null, at: new Date().toISOString(), pid: String(process.pid) });
+  /* The clear's start hook, under the window that started this server (its parent, here this test): the window's file. */
+  writeSession(windowPath(env, String(process.pid)), { host: host.base, spoken: 'S8', client_id: 'claude-run-new', head_at_start: null, at: new Date().toISOString(), pid: String(process.pid) });
   assert.equal((await run(['mcp', '--agent', 'claude'], env, call, cwd)).code, 0);
   assert.deepEqual(named(), ['S8 claude-run-new']);
+  rmSync(windowPath(env, String(process.pid)));
 
   /* Another window's start hook in the same folder: its run is not this server's, and the server's own id is sent. */
   writeSession(sessionPath(env, cwd), { host: host.base, spoken: 'S9', client_id: 'claude-run-other', head_at_start: null, at: new Date().toISOString(), pid: '1' });
   assert.equal((await run(['mcp', '--agent', 'claude'], env, call, cwd)).code, 0);
   assert.deepEqual(named(), ['undefined claude-run-old']);
+});
+
+test('TWO WINDOWS IN ONE FOLDER EACH KEEP THEIR OWN RUN: the second start hook does not take the first window’s server', async (t) => {
+  const host = await stubHost(t);
+  const cwd = realpathSync(folder('kiln'));
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  const call = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list', arguments: { register: 'tasks' } } })}\n`;
+  const named = () => [...new Set(host.seen.splice(0).map((s) => `${String(s.headers['x-braindog-session'])} ${String(s.headers['x-braindog-client'])}`))];
+  const now = () => new Date().toISOString();
+
+  /* Window A started first, window B a minute later in the same folder, and B's start hook wrote the folder's file. */
+  writeSession(sessionPath(env, cwd, 'claude-run-a'), { host: host.base, spoken: 'S8', client_id: 'claude-run-a', head_at_start: null, at: now(), pid: '1001' });
+  writeSession(sessionPath(env, cwd, 'claude-run-b'), { host: host.base, spoken: 'S9', client_id: 'claude-run-b', head_at_start: null, at: now(), pid: '1002' });
+  writeSession(sessionPath(env, cwd), { host: host.base, spoken: 'S9', client_id: 'claude-run-b', head_at_start: null, at: now(), pid: '1002' });
+
+  assert.equal((await run(['mcp', '--agent', 'claude'], { ...env, CLAUDE_CODE_SESSION_ID: 'claude-run-a' }, call, cwd)).code, 0);
+  assert.deepEqual(named(), ['S8 claude-run-a'], 'window A wrote as window B’s run');
+  assert.equal((await run(['mcp', '--agent', 'claude'], { ...env, CLAUDE_CODE_SESSION_ID: 'claude-run-b' }, call, cwd)).code, 0);
+  assert.deepEqual(named(), ['S9 claude-run-b']);
+  /* A shell in the folder, with no session id, takes the last session started there. */
+  assert.equal((await run(['context'], env, '', cwd)).code, 0);
+  assert.deepEqual(named(), ['S9 claude-run-b']);
+});
+
+test('A SUBAGENT TAKES ITS PARENT RUN’S PLACE when it stands in no repository, and says the parent run; one in a repository keeps its own', async (t) => {
+  const host = await stubHost(t);
+  const scratch = realpathSync(folder('scratch'));
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  writeSession(windowPath(env, '777'), {
+    host: host.base,
+    spoken: 'S5',
+    client_id: 'claude-run-parent',
+    head_at_start: null,
+    at: new Date().toISOString(),
+    pid: '777',
+    cwd: '/work/kiln',
+    repo: 'kiln',
+    remote: 'github.com/acme/kiln',
+  });
+  const place = (s: Seen) => ['x-braindog-parent', 'x-braindog-client', 'x-braindog-repo', 'x-braindog-remote', 'x-braindog-cwd'].map((h) => s.headers[h]);
+  const child = { ...env, CLAUDECODE: '1', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_PID: '777', CLAUDE_CODE_SESSION_ID: 'claude-run-child' };
+
+  assert.equal((await run(['context'], child, '', scratch)).code, 0);
+  assert.deepEqual(host.seen.splice(0).filter((s) => s.method === 'context').map(place), [['S5', 'claude-run-child', 'kiln', 'github.com/acme/kiln', '/work/kiln']]);
+
+  /* Not a subagent, or another window's process: its own place, and no parent. */
+  assert.equal((await run(['context'], { ...child, CLAUDE_CODE_CHILD_SESSION: '' }, '', scratch)).code, 0);
+  assert.equal((await run(['context'], { ...child, CLAUDE_PID: '778' }, '', scratch)).code, 0);
+  for (const s of host.seen.splice(0).filter((x) => x.method === 'context')) assert.deepEqual(place(s), [undefined, 'claude-run-child', undefined, undefined, scratch]);
+
+  /* In a repository of its own, its own place, with the parent still said. */
+  const at = { cwd: '/work/glaze', repo: 'glaze', remote: null, host: 'box', branch: null, head: null };
+  const headers = sessionHeaders(at, 'claude', undefined, { parent: { spoken: 'S5', cwd: '/work/kiln', repo: 'kiln', remote: 'github.com/acme/kiln' } });
+  assert.deepEqual([headers['x-braindog-parent'], headers['x-braindog-repo'], headers['x-braindog-cwd'], headers['x-braindog-remote']], ['S5', 'glaze', '/work/glaze', undefined]);
+});
+
+test('THE END HOOK READS EVERY REPOSITORY THAT MOVED UNDER A FOLDER THAT IS NOT ONE, leaves out the owner by every key on his own row and the machines, and speaks to an older record in its words', async (t) => {
+  const top = realpathSync(folder('developer'));
+  const a = repository(join(top, 'glaze'));
+  const b = repository(join(top, 'studio', 'kiln'));
+  a.commit();
+  b.commit();
+  /* Not searched: a hidden folder and a dependency tree. */
+  repository(join(top, '.cache', 'x')).commit();
+  repository(join(top, 'node_modules', 'y')).commit();
+  const host = await stubHost(t, false, true, undefined, { self: { email: 'sam@avery.example', keys: ['email:sam.avery@example.com', 'github:actuallyhoss'] }, legacy: true });
+  const env = envFor(folder('config'), { BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
+  const start = await run(['hook', 'start'], env, event(top, { session_id: 'claude-run-dev', source: 'startup' }));
+  assert.equal(start.code, 0, start.stderr);
+  assert.deepEqual(Object.keys(readSession(sessionPath(env, top, 'claude-run-dev'))?.heads ?? {}), ['glaze', 'studio/kiln']);
+
+  const grace = a.commit('Grace Hopper <grace@navy.example>');
+  for (const machine of ['Jenkins Schema Sync <jenkins@brightloom.example>', 'Brightloom Repos <repos@brightloom.example>', 'Ubuntu <ubuntu@ip-10-0-0-1>', 'root <root@build.example>', 'runner <runner@gh.example>', 'github-actions <41898282+github-actions[bot]@users.noreply.github.com>'])
+    a.commit(machine);
+  for (const self of ['Sam <sam@avery.example>', 'Sam Avery <sam.avery+work@googlemail.com>', 'Sam <1234+actuallyhoss@users.noreply.github.com>']) a.commit(self);
+  const linus = b.commit('Linus <linus@example.org>');
+  host.seen.splice(0);
+
+  const end = await run(['hook', 'end'], env, JSON.stringify({ session_id: 'claude-run-dev', cwd: top, hook_event_name: 'SessionEnd', reason: 'logout' }));
+  assert.deepEqual([end.code, end.stdout, end.stderr], [0, '', '']);
+  const list = host.seen.find((s) => s.method === 'list');
+  assert.ok(list && /"field":"self"/.test(list.query + JSON.stringify(list.body)), 'the owner’s own row was not asked for');
+  const met = host.seen.filter((s) => s.method === 'meet').map((s) => s.body);
+  /* The first in the contract's words, refused for keys; then in the four words this record takes, for the rest. */
+  assert.deepEqual(met, [
+    { name: 'Grace Hopper', email: 'grace@navy.example', where: `commit ${grace.slice(0, 7)} in glaze`, keys: ['email:grace@navy.example'], kind: 'person', source: `commit ${grace.slice(0, 7)} in glaze` },
+    { name: 'Grace Hopper', email: 'grace@navy.example', where: `commit ${grace.slice(0, 7)} in glaze` },
+    { name: 'Linus', email: 'linus@example.org', where: `commit ${linus.slice(0, 7)} in kiln` },
+  ]);
+  assert.equal(host.seen.at(-1)?.method, 'handoff');
 });
 
 test('THE START HOOK KEEPS THE WINDOW IT RAN UNDER, when Claude Code says it, and nothing that is not a process id', async (t) => {
@@ -476,6 +581,11 @@ test('THE START HOOK KEEPS THE WINDOW IT RAN UNDER, when Claude Code says it, an
   const start = event(cwd, { session_id: 'claude-run-1', source: 'clear' });
   assert.equal((await run(['hook', 'start'], { ...env, CLAUDE_PID: '4242' }, start)).code, 0);
   assert.equal(readSession(sessionPath(env, cwd))?.pid, '4242');
+  /* And the window's own file, which its MCP server follows across a clear and its subagents take their project from. */
+  assert.equal(readSession(windowPath(env, '4242'))?.client_id, 'claude-run-1');
+  /* A subagent's start is never its window's run. */
+  assert.equal((await run(['hook', 'start'], { ...env, CLAUDE_PID: '4343', CLAUDE_CODE_CHILD_SESSION: '1' }, start)).code, 0);
+  assert.equal(existsSync(windowPath(env, '4343')), false);
   assert.equal((await run(['hook', 'start'], { ...env, CLAUDE_PID: 'not-a-pid' }, start)).code, 0);
   assert.equal(readSession(sessionPath(env, cwd))?.pid, undefined);
 });

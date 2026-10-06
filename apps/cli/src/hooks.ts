@@ -13,14 +13,15 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 import type { Client, Context } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
-import { git, hostSessionOf, positionOf, sessionHeaders, type Position } from './position.ts';
+import { authoredIn, childHeads, LOG_FORMAT, meeter, meetingOf, ownKeys, type MeetCall, type Meeting } from './people.ts';
+import { git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
 import { syncSkills, type AgentIo } from './skills.ts';
 import { depositor, scanTools } from './tools.ts';
 
@@ -46,17 +47,37 @@ export const unreachable = (ms: number): string =>
 /* ── the session file ──────────────────────────────────────────────────── */
 
 /**
- * Which run a working folder is, for every process that comes after the start hook.
+ * Which run a session is, for every process that comes after the start hook.
  *
- * KEYED BY THE FOLDER, because Claude Code starts the MCP server in the session's folder and tells it
- * nothing else. It lives beside the hosts file, in the user's own config folder: in the repository it
- * would show in `git status` and could be committed, and a temp folder is emptied and may be shared. It
- * holds ids and a commit, never a token. `at` is when the start hook wrote it, and `seen` when the end hook
- * last heard from the same session, so a resume knows how long the session was away. `pid` is the Claude Code
- * process the start hook ran under (`CLAUDE_PID`), when it said, so the MCP server that process started can tell a
- * session it moved on to from another window's (`heldFor`).
+ * KEYED BY THE FOLDER AND THE SESSION. Claude Code starts the MCP server in the session's folder and gives it the
+ * session's id, so a file per folder and session (`sessionPath(env, cwd, id)`) is the one a second window in the same
+ * folder cannot overwrite: before this, the folder had one file, the second window's start hook replaced it, and the
+ * first window's server wrote as the second window's run. A caller with no session id (a shell) reads the folder's own
+ * file, which every start hook also writes, as the last session started there. And a Claude Code window keeps one file
+ * of its own (`windowPath`), the run it last started, which its MCP server follows across a clear and its subagents
+ * take their project from.
+ *
+ * THE FILES LIVE BESIDE THE HOSTS FILE, in the user's own config folder: in the repository they would show in
+ * `git status` and could be committed, and a temp folder is emptied and may be shared. They hold ids, commits and where
+ * the session stands, never a token. `at` is when the start hook wrote it, and `seen` when the end hook last heard
+ * from the same session, so a resume knows how long the session was away. `pid` is the Claude Code process the start
+ * hook ran under (`CLAUDE_PID`). `cwd`, `repo` and `remote` are where the session started, for a subagent working in a
+ * scratch folder (`parentOf`), and `heads` the HEAD of each repository under a folder that is not one, so the end hook
+ * reads the commits of every one that moved.
  */
-export type SessionFile = { host: string; spoken: string; client_id?: string; head_at_start: string | null; at: string; seen?: string; pid?: string };
+export type SessionFile = {
+  host: string;
+  spoken: string;
+  client_id?: string;
+  head_at_start: string | null;
+  at: string;
+  seen?: string;
+  pid?: string;
+  cwd?: string;
+  repo?: string;
+  remote?: string;
+  heads?: Record<string, string>;
+};
 
 const SPOKEN = /^S[1-9][0-9]*$/;
 const CLIENT = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -66,11 +87,20 @@ const PID = /^[1-9][0-9]{0,9}$/;
 /** The Claude Code process a hook runs under, as its environment says it. */
 export const hostPidOf = (env: Env): string | null => (typeof env.CLAUDE_PID === 'string' && PID.test(env.CLAUDE_PID) ? env.CLAUDE_PID : null);
 
-export function sessionPath(env: Env, cwd: string, platform: string = process.platform): string {
+const hash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 12);
+
+/** The folder's file with no `id`, the last session started there; with one, that session's own in that folder. */
+export function sessionPath(env: Env, cwd: string, id?: string | null, platform: string = process.platform): string {
   const folder = resolve(cwd);
   /* Windows paths ignore case, and Claude Code and a shell do not always agree on a drive letter's. */
   const key = platform === 'win32' ? folder.toLowerCase() : folder;
-  return join(dirname(hostsPath(env, platform)), 'sessions', `${createHash('sha256').update(key).digest('hex').slice(0, 12)}.json`);
+  const name = id === undefined || id === null ? hash(key) : `${hash(key)}-${hash(id)}`;
+  return join(dirname(hostsPath(env, platform)), 'sessions', `${name}.json`);
+}
+
+/** The run a Claude Code window last started, by the window's process id, whatever folder it started in. */
+export function windowPath(env: Env, pid: string, platform: string = process.platform): string {
+  return join(dirname(hostsPath(env, platform)), 'sessions', `window-${pid}.json`);
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -94,7 +124,28 @@ export function readSession(file: string): SessionFile | null {
     at: typeof x.at === 'string' ? x.at : '',
     ...(instant(x.seen) ? { seen: x.seen } : {}),
     ...(typeof x.pid === 'string' && PID.test(x.pid) ? { pid: x.pid } : {}),
+    ...(typeof x.cwd === 'string' && PRINTABLE.test(x.cwd) ? { cwd: x.cwd } : {}),
+    ...(typeof x.repo === 'string' && PRINTABLE.test(x.repo) ? { repo: x.repo } : {}),
+    ...(typeof x.remote === 'string' && PRINTABLE.test(x.remote) ? { remote: x.remote } : {}),
+    ...(isObject(x.heads) ? { heads: headsOf(x.heads) } : {}),
   };
+}
+
+/* A place as a header may carry it, and a folder's HEADs as git writes them under a relative path that stays inside. */
+const PRINTABLE = /^[\x20-\x7e]{1,512}$/;
+const headsOf = (x: Record<string, unknown>): Record<string, string> =>
+  Object.fromEntries(Object.entries(x).filter(([rel, sha]) => typeof sha === 'string' && /^[0-9a-f]{40,64}$/.test(sha) && PRINTABLE.test(rel) && !rel.split('/').includes('..')) as [string, string][]);
+
+/**
+ * The file a caller in a folder remembers: with a session id, that session's own, or the folder's when an older start
+ * hook wrote only that one and it names this session; with none, the folder's.
+ */
+export function rememberedIn(env: Env, cwd: string, id: string | null): SessionFile | null {
+  if (id !== null) {
+    const own = readSession(sessionPath(env, cwd, id));
+    if (own !== null) return own;
+  }
+  return readSession(sessionPath(env, cwd));
 }
 
 /* Written whole and renamed, at 0600 in a folder made at 0700, as the hosts file is. */
@@ -124,10 +175,10 @@ export const withoutRun = (headers: Record<string, string>): Record<string, stri
   Object.fromEntries(Object.entries(headers).filter(([name]) => name !== 'x-braindog-session' && name !== 'x-braindog-client'));
 
 /*
- * THE FOLDER REMEMBERS THE LAST SESSION STARTED IN IT, NOT THE CALLER. Measured on the owner's Mac: a subagent of S729
- * ran `braindog context` in the repository's top folder, whose file still named S297 from three days before, and was
- * told it was S297 and that S729, its own session, was a second one in its working tree. So a remembered run is the
- * caller's only when:
+ * A REMEMBERED RUN IS THE CALLER'S ONLY WHEN THE CALLER CAN SAY SO. Measured on the owner's Mac: a subagent of S729 ran
+ * `braindog context` in the repository's top folder, whose file still named S297 from three days before, and was told
+ * it was S297 and that S729, its own session, was a second one in its working tree. So a remembered run is sent only
+ * when:
  *
  *   1. inside a host session that says its id (`hostSessionOf`), the file was written by that same session. A file
  *      any other session wrote is not sent, and the host session's id is, which the record finds the run by;
@@ -136,10 +187,11 @@ export const withoutRun = (headers: Record<string, string>): Record<string, stri
  *
  * A SERVER OUTLIVES THE SESSION IT WAS STARTED FOR. Claude Code gives a stdio MCP server the session's id once, when it
  * starts it, and keeps the server across `/clear` and a `/resume` picked inside the window, each of which is a session
- * with an id of its own: a new transcript, a `clear` or `resume` start hook, and a new run in the file. Held to rule 1
- * alone, every write the server made after a clear went to the run from before it, while the card named the new one.
- * So for the server (`server`), a file written by a start hook under the same Claude Code process (`pid`) is its
- * session's, whatever the id; and from a hook that did not say its process, one written since the server started is.
+ * with an id of its own. So for the server (`server`), the run its own window's start hook last wrote (`windowPath`,
+ * the same Claude Code process, `pid`) is its session's, whatever the id. There is no rule by time any more: a file
+ * written since the server started was taken for its own, and that was another window's whenever two windows shared a
+ * folder. A server whose window did not say its process keeps its own session's run across a clear, which is the run
+ * before it and never another window's.
  *
  * Whether a run that is sent has ended by its state is the record's to say, so a caller that can ask again does
  * (`context.ts`).
@@ -148,19 +200,44 @@ export const withoutRun = (headers: Record<string, string>): Record<string, stri
 /** A long-lived caller: the process that started it (`process.ppid`), and when it started. */
 export type Server = { parent: number; since: number };
 
-/** The run the folder's session file names, when it is the caller's to send to this host; else `undefined`. */
+/** The run a remembered file names, when it is the caller's to send to this host; else `undefined`. */
 export function heldFor(held: SessionFile | null, host: string, env: Env, now: number = Date.now(), server?: Server): SessionFile | undefined {
   if (held === null || held.host !== host) return undefined;
   const mine = hostSessionOf(env);
-  if (mine !== null) return held.client_id === mine || movedOn(held, server, now) ? held : undefined;
+  if (mine !== null) return held.client_id === mine || (server !== undefined && held.pid === String(server.parent)) ? held : undefined;
   return now - heardAt(held) > REMEMBER_MS ? undefined : held;
 }
 
-/** Whether the file names the session a server's own window moved on to since it was started. */
-function movedOn(held: SessionFile, server: Server | undefined, now: number): boolean {
-  if (server === undefined) return false;
-  if (held.pid !== undefined) return held.pid === String(server.parent);
-  return Date.parse(held.at) >= server.since && now - heardAt(held) <= REMEMBER_MS;
+/**
+ * The run a caller in this folder sends, by the rules above: for a server, the run its window last started when that
+ * window said its process; otherwise the caller's own session's file, or the folder's when it has no session id.
+ */
+export function heldHere(env: Env, cwd: string, host: string, now: number = Date.now(), server?: Server): SessionFile | undefined {
+  if (server !== undefined) {
+    const window = heldFor(readSession(windowPath(env, String(server.parent))), host, env, now, server);
+    if (window !== undefined && window.pid === String(server.parent)) return window;
+  }
+  return heldFor(rememberedIn(env, cwd, hostSessionOf(env)), host, env, now, server);
+}
+
+/** Whether this process is a subagent Claude Code started inside another session, as its environment says. */
+export const isChild = (env: Env): boolean => typeof env.CLAUDE_CODE_CHILD_SESSION === 'string' && env.CLAUDE_CODE_CHILD_SESSION !== '' && env.CLAUDE_CODE_CHILD_SESSION !== '0';
+
+/**
+ * The run a subagent works for, and where that run stands: the run its window last started, when this process is a
+ * subagent (`isChild`) of a window that said its process, the run is another session's, and a hook heard from it in the
+ * last twelve hours. `null` anywhere else.
+ *
+ * A SUBAGENT TAKES ITS PARENT RUN'S PROJECT. 416 of 743 runs were workflow subagents started in scratch folders, which
+ * nothing could place; sent with the parent's place (`sessionHeaders`), each is placed where the work is.
+ */
+export function parentOf(env: Env, host: string, now: number = Date.now()): Parent | null {
+  const pid = hostPidOf(env);
+  if (!isChild(env) || pid === null) return null;
+  const held = readSession(windowPath(env, pid));
+  if (held === null || held.host !== host || held.pid !== pid || now - heardAt(held) > REMEMBER_MS) return null;
+  if (held.client_id !== undefined && held.client_id === hostSessionOf(env)) return null;
+  return { spoken: held.spoken, cwd: held.cwd ?? null, repo: held.repo ?? null, remote: held.remote ?? null };
 }
 
 /**
@@ -180,7 +257,7 @@ export function ownRun(headers: Record<string, string>, env: Env, held: SessionF
  * run, for the commands that read or write as the caller's run: `context` and `session`.
  */
 export function asCaller(io: AgentIo, now: number = Date.now()): { io: AgentIo; remembered: () => boolean } {
-  const held = readSession(sessionPath(io.env, io.cwd));
+  const held = rememberedIn(io.env, io.cwd, hostSessionOf(io.env));
   let remembered = false;
   const headers = async (host: string) => {
     const sent = ownRun(await io.headers(host), io.env, held !== null && held.host === host ? held : null, now);
@@ -343,8 +420,8 @@ export async function movedSince(cwd: string, from: string | null, head: string 
  */
 export async function hookStart(io: Io): Promise<void> {
   const event = eventOf(io.stdin, io.cwd);
-  const file = sessionPath(io.env, event.cwd);
-  const before = readSession(file);
+  const id = event.client_id ?? null;
+  const before = rememberedIn(io.env, event.cwd, id);
   const began = Date.now();
   const soon =
     event.source === 'resume' && before !== null && event.client_id !== undefined && before.client_id === event.client_id && began - heardAt(before) < QUIET_MS;
@@ -354,9 +431,15 @@ export async function hookStart(io: Io): Promise<void> {
   const ms = hookBudget(io.env);
   const signal = AbortSignal.timeout(ms);
   const [at, device] = await Promise.all([positionOf(event.cwd), io.device ?? deviceName(io.env, to.key)]);
+  /* A FOLDER THAT IS NOT A REPOSITORY: the HEAD of each one under it, read beside the attach, so the end hook reads the
+     commits of every one that moved. 28 of the 32 runs in the owner's ~/Developer started there. */
+  const heads = at.repo === null ? childHeads(event.cwd).catch(() => ({})) : Promise.resolve({});
+  /* A subagent says the run it works for, and that run's place when it stands in no repository of its own. */
+  const child = isChild(io.env);
+  const parent = child ? parentOf(io.env, to.key) : null;
   /* NO RUN NAMED, AND THE SESSION'S OWN ID: attaching finds the run by it, so an old run named in a file is never sent. */
   const mine = event.client_id === undefined ? undefined : { client_id: event.client_id };
-  const client = clientFor(to, async () => sessionHeaders(at, 'claude', mine, { env: io.env }), signal);
+  const client = clientFor(to, async () => sessionHeaders(at, 'claude', mine, { env: io.env, parent }), signal);
   const out = await client.attach({
     source: event.source,
     ...(event.client_id === undefined ? {} : { client_id: event.client_id }),
@@ -372,19 +455,29 @@ export async function hookStart(io: Io): Promise<void> {
   const run = out.value;
   /* The window this hook ran under, so the MCP server that window started knows a clear's new run is its own. */
   const pid = hostPidOf(io.env);
-  try {
-    writeSession(file, {
-      host: to.key,
-      spoken: run.spoken,
-      ...(event.client_id === undefined ? {} : { client_id: event.client_id }),
-      /* The same run going on keeps the commit it started from, so what it did is still counted from there. */
-      head_at_start: before && before.host === to.key && before.spoken === run.spoken ? before.head_at_start : at.head,
-      at: new Date().toISOString(),
-      ...(pid === null ? {} : { pid }),
-    });
-  } catch {
-    /* A folder that cannot be written costs the MCP server its attribution, not the session its card. */
-  }
+  /* The same run going on keeps the commits it started from, so what it did is still counted from there. */
+  const same = before !== null && before.host === to.key && before.spoken === run.spoken;
+  const fresh = await heads;
+  const held: SessionFile = {
+    host: to.key,
+    spoken: run.spoken,
+    ...(event.client_id === undefined ? {} : { client_id: event.client_id }),
+    head_at_start: same ? before.head_at_start : at.head,
+    at: new Date().toISOString(),
+    ...(pid === null ? {} : { pid }),
+    ...(at.cwd && PRINTABLE.test(at.cwd) ? { cwd: at.cwd } : {}),
+    ...(at.repo === null ? {} : { repo: at.repo }),
+    ...(at.remote === null ? {} : { remote: at.remote }),
+    ...(same && before.heads !== undefined ? { heads: before.heads } : Object.keys(fresh).length > 0 ? { heads: fresh } : {}),
+  };
+  /* THE SESSION'S OWN FILE, THE FOLDER'S, AND THE WINDOW'S. A subagent's run is never its window's. */
+  const files = [...(id === null ? [] : [sessionPath(io.env, event.cwd, id)]), sessionPath(io.env, event.cwd), ...(pid === null || child ? [] : [windowPath(io.env, pid)])];
+  for (const file of files)
+    try {
+      writeSession(file, held);
+    } catch {
+      /* A folder that cannot be written costs the MCP server its attribution, not the session its card. */
+    }
   /* QUIET ONLY WHEN THE RECORD AGREES it is the run the file remembered, so a resume the record placed elsewhere is told. */
   if (soon && before.host === to.key && before.spoken === run.spoken) return;
 
@@ -462,54 +555,62 @@ async function startWork(io: Io, to: Target, at: Position, context: Context, run
 /** The most authors one session's end sends to `meet`. */
 export const MET_PER_SESSION = 10;
 
-/** One author as `meet` takes them, and the commit they were met in. */
-export type Author = { name?: string; email?: string; handle?: string; commit: string };
-
-/* GitHub's private address names an account and reaches nobody, so it is sent as a handle. */
-const GITHUB_PRIVATE = /^(?:[0-9]+\+)?([^@\s]+)@users\.noreply\.github\.com$/;
+/** A repository the session's commits are read from: its folder, its name, and the commit the session started at. */
+export type MovedRepo = { dir: string; repo: string; from: string };
 
 /**
- * The authors in `git log --format=%an%x1f%ae%x1f%h`, newest commit first, each once, at most ten.
+ * The authors of several logs in `LOG_FORMAT`, each with its repository's name, newest commit first within each, each
+ * author once by key, at most ten, as `meet` takes them.
  *
- * NOBODY TO MEET: a bot, by a name ending in `[bot]` or an address whose name is `[bot]` or noreply; the
- * owner, by the addresses passed in; and an author with no address, because a name alone is what `meet`
- * never joins on.
+ * NOBODY TO MEET: a bot, a CI or machine user, the owner by any of his keys, and an author with no address, because a
+ * name alone is what `meet` never joins on (`authoredIn` in `people.ts`).
  */
-export function authorsOf(log: string, own: readonly string[]): Author[] {
-  const mine = new Set(own.map((a) => a.trim().toLowerCase()));
+export function authorsOf(logs: readonly { log: string; repo: string }[], own: ReadonlySet<string>): Meeting[] {
   const seen = new Set<string>();
-  const out: Author[] = [];
-  for (const line of log.split('\n')) {
-    const [name = '', address = '', commit = ''] = line.split('\x1f').map((s) => s.trim());
-    const email = address.toLowerCase();
-    const local = email.split('@')[0] ?? '';
-    if (!commit || !email.includes('@') || /\[bot\]$/i.test(name) || /\[bot\]$|^no-?reply$/.test(local) || mine.has(email)) continue;
-    const account = GITHUB_PRIVATE.exec(email)?.[1];
-    const key = account === undefined ? email : `github:${account}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ ...(name ? { name } : {}), ...(account === undefined ? { email } : { handle: key }), commit });
-    if (out.length === MET_PER_SESSION) break;
-  }
+  const out: Meeting[] = [];
+  for (const { log, repo } of logs)
+    for (const a of authoredIn(log, own)) {
+      if (seen.has(a.key)) continue;
+      seen.add(a.key);
+      out.push(meetingOf(a, repo));
+      if (out.length === MET_PER_SESSION) return out;
+    }
   return out;
 }
 
 /**
- * Send the authors of the commits made since the run began to `meet`, as the run.
+ * Send the authors of the commits made since the run began, in every repository that moved, to `meet`, as the run.
  *
- * IT ONLY READS THE REPOSITORY, AND IT IS SILENT. Any refusal ends it, People switched off and a host that
- * is down included, except one author's malformed address, which skips that author. None of this is the
- * session's to hear about.
+ * IT ONLY READS THE REPOSITORIES, AND IT IS SILENT. The owner's keys are read once, from his own row and from each
+ * repository's `git config user.email`, and only when a repository moved. Any refusal ends it, People switched off
+ * and a host that is down included, except one author's malformed address, which skips that author. None of this is
+ * the session's to hear about.
  */
-export async function harvest(cwd: string, from: string | null, repo: string | null, meet: Client['meet'], until: number): Promise<void> {
-  if (from === null || repo === null) return;
-  const [log, own] = await Promise.all([git(cwd, 'log', '--format=%an%x1f%ae%x1f%h', `${from}..HEAD`), git(cwd, 'config', 'user.email')]);
-  if (log === null) return;
-  for (const { commit, ...who } of authorsOf(log, own === null ? [] : [own])) {
+export async function harvest(moved: readonly MovedRepo[], list: Client['list'] | null, meet: MeetCall, until: number): Promise<void> {
+  const logs = (await Promise.all(moved.map(async (m) => ({ log: await git(m.dir, 'log', LOG_FORMAT, `${m.from}..HEAD`), repo: m.repo })))).filter(
+    (l): l is { log: string; repo: string } => l.log !== null,
+  );
+  if (logs.length === 0 || Date.now() >= until) return;
+  const own = await ownKeys(list, moved.map((m) => m.dir));
+  const send = meeter(meet);
+  for (const who of authorsOf(logs, own)) {
     if (Date.now() >= until) return;
-    const out = await meet({ ...who, where: `commit ${commit} in ${repo}` });
+    const out = await send(who);
     if (refused(out) && out.refusal.code !== 'VALUE_MALFORMED') return;
   }
+}
+
+/** The repositories a session's commits are read from: its own, or each one under its folder whose HEAD moved. */
+export async function movedRepos(cwd: string, held: SessionFile, repo: string | null): Promise<MovedRepo[]> {
+  const out: MovedRepo[] = [];
+  if (held.head_at_start !== null && repo !== null) out.push({ dir: cwd, repo, from: held.head_at_start });
+  const heads = Object.entries(held.heads ?? {});
+  const now = await Promise.all(heads.map(([rel]) => git(join(cwd, rel), 'rev-parse', 'HEAD')));
+  heads.forEach(([rel, from], i) => {
+    const head = now[i];
+    if (head && head !== from) out.push({ dir: join(cwd, rel), repo: basename(rel), from });
+  });
+  return out;
 }
 
 /**
@@ -524,15 +625,22 @@ export async function hookEnd(io: Io): Promise<void> {
   const event = eventOf(io.stdin, io.cwd);
   const to = reach(io.env);
   if (typeof to === 'string') return;
-  const file = sessionPath(io.env, event.cwd);
-  const held = readSession(file);
+  const id = event.client_id ?? null;
+  const own = id === null ? null : readSession(sessionPath(io.env, event.cwd, id));
+  const file = own !== null && id !== null ? sessionPath(io.env, event.cwd, id) : sessionPath(io.env, event.cwd);
+  const held = own ?? readSession(file);
   if (!held || held.host !== to.key) return;
-  /* Another session in this folder wrote the file since, so the run in it is not this session's to idle. */
+  /* Another session in this folder wrote the folder's file since, so the run in it is not this session's to idle. */
   if (event.client_id !== undefined && held.client_id !== undefined && event.client_id !== held.client_id) return;
   /* WHEN THE SESSION WAS LAST HEARD FROM, so a resume soon after knows its card is still in the conversation. Written
-     before anything is sent, so a host that is slow to answer cannot cost it. */
+     before anything is sent, so a host that is slow to answer cannot cost it. The folder's file too, while it still
+     names this run, for a shell in the folder. */
+  const seen = new Date().toISOString();
   try {
-    writeSession(file, { ...held, seen: new Date().toISOString() });
+    writeSession(file, { ...held, seen });
+    const folder = sessionPath(io.env, event.cwd);
+    const there = folder === file ? null : readSession(folder);
+    if (there !== null && there.spoken === held.spoken && there.host === held.host) writeSession(folder, { ...there, seen });
   } catch {
     /* A folder that cannot be written costs the next resume its quiet, and nothing else. */
   }
@@ -545,7 +653,9 @@ export async function hookEnd(io: Io): Promise<void> {
   /* THE HARVEST GOES FIRST, AND STOPS SENDING AT HALF THE BUDGET. A write brings an idle run back to
      active, so people met after the handoff would undo it; and the handoff, which is what this hook is
      for, keeps time to land. */
-  await harvest(event.cwd, held.head_at_start, at.repo, client.meet, Date.now() + budget / 2);
+  const until = Date.now() + budget / 2;
+  const moved = await movedRepos(event.cwd, held, at.repo);
+  if (moved.length > 0) await harvest(moved, client.list, (args) => client.call('meet', args), until);
   await client.handoff({
     state: 'idle',
     ...(at.branch === null ? {} : { branch: at.branch }),

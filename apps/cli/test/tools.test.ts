@@ -213,7 +213,7 @@ test('SCAN WITH A VAULT GRANT: a key-named env value and a secret header are dep
     docs: { type: 'http', url: 'https://docs.example/mcp', headers: { Authorization: `Bearer ${auth}` } },
   });
 
-  assert.deepEqual(await h.scan(), ['Tool kiln-deploy in .mcp.json was recorded as tools#1, with 1 key deposited.', 'Tool docs in .mcp.json was recorded as tools#2, with 1 key deposited.']);
+  assert.deepEqual(await h.scan(), ['Tool kiln-deploy in .mcp.json was recorded, with 1 key deposited.', 'Tool docs in .mcp.json was recorded, with 1 key deposited.']);
 
   const deposits = h.of('vault/deposit');
   assert.deepEqual(
@@ -268,8 +268,8 @@ test('SCAN WITH NEITHER A VAULT GRANT NOR A LOGIN: the keys are recorded by name
   });
 
   assert.deepEqual(await h.scan(), [
-    'Tool kiln-deploy in .mcp.json was recorded as tools#1.',
-    'Tool docs in .mcp.json was recorded as tools#2.',
+    'Tool kiln-deploy in .mcp.json was recorded.',
+    'Tool docs in .mcp.json was recorded.',
     '2 keys were recorded by name only, because this machine holds no vault grant it could deposit with, and the values were not kept. Run braindog login <host> --vault <project>, then scan again.',
   ]);
   assert.deepEqual(h.of('vault/deposit'), []);
@@ -287,7 +287,7 @@ test('THE NO-GRANT SENTENCE IS SAID ONCE PER HOST, forgotten once a vault grant 
   const deploy = { command: 'npx', env: { KILN_API_TOKEN: token } };
   h.mcp({ 'kiln-deploy': deploy });
 
-  assert.deepEqual(await h.scan({ once: true }), ['Tool kiln-deploy in .mcp.json was recorded as tools#1.', noGrant]);
+  assert.deepEqual(await h.scan({ once: true }), ['Tool kiln-deploy in .mcp.json was recorded.', noGrant]);
   assert.deepEqual(Object.keys(JSON.parse(readFileSync(state, 'utf8')) as object), [key]);
   assert.deepEqual(await h.scan({ once: true }), [], 'the second start hook says nothing');
   assert.deepEqual(await h.scan({ once: true }), []);
@@ -295,12 +295,12 @@ test('THE NO-GRANT SENTENCE IS SAID ONCE PER HOST, forgotten once a vault grant 
   assert.deepEqual(await h.scan(), [noGrant]);
 
   saveHosts(hostsPath(h.env), { default: key, hosts: { [key]: { vault: { [SCOPE]: { value: h.grant, expires: LATER } } } } });
-  assert.deepEqual(await h.scan({ once: true }), ['Tool kiln-deploy is recorded as tools#1, with 1 key deposited.']);
+  assert.deepEqual(await h.scan({ once: true }), ['Tool kiln-deploy is recorded, with 1 key deposited.']);
   assert.deepEqual(JSON.parse(readFileSync(state, 'utf8')), {}, 'a kept grant forgets that it was said');
 
   saveHosts(hostsPath(h.env), { default: key, hosts: { [key]: {} } });
   h.mcp({ 'kiln-deploy': deploy, docs: { type: 'http', url: 'https://docs.example/mcp', headers: { Authorization: `Bearer ${auth}` } } });
-  assert.deepEqual(await h.scan({ once: true }), ['Tool docs in .mcp.json was recorded as tools#2.', noGrant]);
+  assert.deepEqual(await h.scan({ once: true }), ['Tool docs in .mcp.json was recorded.', noGrant]);
   assert.deepEqual(await h.scan({ once: true }), []);
   for (const value of [token, auth, h.grant]) assert.equal(readFileSync(state, 'utf8').includes(value), false);
   nowhere(h, [token, auth]);
@@ -322,7 +322,7 @@ test('~/.claude.json IS ONLY READ: its bytes are the same after a scan, and a pr
 
   assert.deepEqual(await h.scan(), [
     'This folder is in no project in the record, so the 1 server of its project config was not recorded.',
-    'Tool fenwick in ~/.claude.json was recorded as tools#1, with 1 key deposited.',
+    'Tool fenwick in ~/.claude.json was recorded, with 1 key deposited.',
   ]);
   assert.equal(readFileSync(h.claudeJson, 'utf8'), before);
   assert.equal(h.rows[0]?.scope, 'global');
@@ -335,7 +335,7 @@ test('A GLOBAL SERVER FOUND FROM A PROJECT RUN is proposed with names only, once
   const token = fakeValue();
   writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: { fenwick: { command: 'fenwick-mcp', env: { FENWICK_TOKEN: token } } } }));
 
-  assert.deepEqual(await h.scan(), ['Tool fenwick in ~/.claude.json applies everywhere and this run is in a project, so recording it was proposed as SG1, and its keys were not deposited.']);
+  assert.deepEqual(await h.scan(), [`Tool fenwick in ~/.claude.json applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: Add the fenwick tool from ${thisMachine()}, for use everywhere?`]);
   assert.deepEqual(h.of('vault/deposit'), []);
   assert.deepEqual(h.of('create'), []);
   const asked = h.of('propose')[0]?.args as { question: string; body: { register: string; rows: { fields?: unknown; needs?: unknown }[]; details: unknown } };
@@ -355,7 +355,7 @@ test('SEVERAL GLOBAL SERVERS FOUND FROM A PROJECT RUN are one question with a ro
   writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: servers }));
 
   assert.deepEqual(await h.scan({ dryRun: true }), ['3 tools in ~/.claude.json (fenwick, lantern, quill) would be proposed together as tools everywhere, with their keys by name only.']);
-  assert.deepEqual(await h.scan(), ['3 tools in ~/.claude.json apply everywhere and this run is in a project, so recording them was proposed together as SG1, and their keys were not deposited.']);
+  assert.deepEqual(await h.scan(), [`3 tools in ~/.claude.json apply everywhere and this run is in a project, so their keys were not deposited and recording them was asked on Decide in one question: Add 3 tools from ${thisMachine()}, for use everywhere: fenwick, lantern and quill?`]);
   assert.equal(h.of('propose').length, 1);
   const asked = h.of('propose')[0]!.args as { question: string; body: { rows: { name: string }[]; details: unknown } };
   assert.equal(asked.question, `Add 3 tools from ${thisMachine()}, for use everywhere: fenwick, lantern and quill?`);
@@ -365,7 +365,7 @@ test('SEVERAL GLOBAL SERVERS FOUND FROM A PROJECT RUN are one question with a ro
 
   servers.kestrel = { command: 'kestrel-mcp' };
   writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: servers }));
-  assert.deepEqual(await h.scan(), ['Tool kestrel in ~/.claude.json applies everywhere and this run is in a project, so recording it was proposed as SG2, and its keys were not deposited.']);
+  assert.deepEqual(await h.scan(), [`Tool kestrel in ~/.claude.json applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: Add the kestrel tool from ${thisMachine()}, for use everywhere?`]);
   assert.deepEqual(h.of('create'), []);
 });
 
@@ -375,7 +375,7 @@ test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once p
   h.add({ name: 'kiln-deploy', transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp@1'], needs: ['KILN_API_TOKEN=credentials#7'], hosts: ['test-machine'], seen: new Date(NOW).toISOString() }, 'project');
   h.mcp({ 'kiln-deploy': { command: 'npx', args: ['-y', 'kiln-mcp@2'], env: { KILN_API_TOKEN: token } } });
 
-  assert.deepEqual(await h.scan(), ["Tool kiln-deploy in .mcp.json differs from the record's tools#1, so that was left as it is and the change was proposed as SG1."]);
+  assert.deepEqual(await h.scan(), [`Tool kiln-deploy in .mcp.json differs from the one in the record, so that was left as it is, and the change was asked on Decide: Update the kiln-deploy tool to match ${thisMachine()}?`]);
   /* THE QUESTION IN WORDS. It read "Change tools#8 to how fly-prism is set up in ~/.claude.json on
      Maras-MacBook-Pro.local?"; the file, the machine and the handle are now the details. */
   assert.equal(h.of('propose')[0]?.args.question, `Update the kiln-deploy tool to match ${thisMachine()}?`);
@@ -433,7 +433,7 @@ test('A KEY IN A COMMAND OR ARGUMENT keeps the server out of the record; a key-s
 
   assert.deepEqual(await h.scan(), [
     'Tool leaky in .mcp.json carries what looks like a key in its command, arguments or address, so it was not recorded. Move the key into its env and scan again.',
-    'Tool shaped in .mcp.json was recorded as tools#1, with 1 key deposited.',
+    'Tool shaped in .mcp.json was recorded, with 1 key deposited.',
   ]);
   assert.deepEqual(h.rows.map((r) => r.fields.needs), [['SHAPED_SETTING=credentials#1']]);
   assert.equal(h.of('vault/deposit')[0]?.args.value, inEnv);

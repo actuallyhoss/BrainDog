@@ -45,6 +45,7 @@ import { pollPack } from '@braindog/seed/usecases/founder-poll';
 
 import { TOOLS, folderCatalogue, holdsKey, isRef, loadAdapter, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
 import { knownKeys } from './catalogue.ts';
+import { keysOfRow, meeter, metOf, PUBLIC_MAIL, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
 import { readSource } from './usecase.ts';
 
@@ -99,6 +100,12 @@ export type Door = {
   update: (args: { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string }) => Promise<Result<unknown>>;
   governance: (args: { register?: string; status?: string; limit?: number; cursor?: string }) => Promise<Result<unknown>>;
   propose: (args: { question: string; body_kind: 'options' | 'pack' | 'change'; body: Record<string, unknown> }) => Promise<Result<unknown>>;
+  /**
+   * `meet`, which a new person or organisation goes through before it is created (`resolveRole` in `applyPlan`), so the
+   * record matches it by key to who it already knows. OPTIONAL: a door without it creates the row as before, after the
+   * import's own match by key and by the owner's own names.
+   */
+  meet?: (args: Record<string, unknown>) => Promise<Result<unknown>>;
   /**
    * The packs this record holds and at which version: read only when a pack is to be offered (see `offer` in `applyPlan`).
    * OPTIONAL BECAUSE A DOOR WITHOUT IT STILL WORKS. The pack is then proposed unchecked, and a record that cannot take
@@ -247,6 +254,37 @@ const fixOf = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} ($
 /** The field types whose values a dry run puts to the kernel's coercion: see `textRefusal` in `applyPlan`. */
 const TEXTS = new Set(['text', 'document']);
 const unreachable = (r: Result<unknown>) => refused(r) && r.refusal.code === 'UNREACHABLE';
+
+/**
+ * A list playing People's `meets:` or the organisations' `org:`, as its declaration names each part's field. Read off the
+ * record's own schema answer, so the import never decides by a list's name which list holds people.
+ */
+type Role = { kind: 'person' | 'organisation'; name: string; email?: string; keys?: string; handles?: string; self?: string; aliases?: string; domain?: string; merged_into?: string };
+
+function roleOf(decl: Record<string, unknown>): Role | null {
+  const parts = (x: unknown): Record<string, string> | null => (isObj(x) ? (Object.fromEntries(Object.entries(x).filter(([, v]) => typeof v === 'string')) as Record<string, string>) : null);
+  const pick = (p: Record<string, string>, kind: Role['kind']): Role | null => {
+    if (!p.name) return null;
+    const out: Role = { kind, name: p.name };
+    for (const part of ['email', 'keys', 'handles', 'self', 'aliases', 'domain', 'merged_into'] as const) if (p[part]) out[part] = p[part];
+    return out;
+  };
+  const meets = parts(decl.meets);
+  const org = parts(decl.org);
+  return (meets === null ? null : pick(meets, 'person')) ?? (org === null ? null : pick(org, 'organisation'));
+}
+
+/** Every key a person or organisation's fields hold: addresses, keys and handles, and an organisation's own domain. */
+function roleKeys(fields: Record<string, unknown>, role: Role): string[] {
+  const out = new Set(keysOfRow({ email: role.email && fields[role.email], keys: role.keys && fields[role.keys], handles: role.handles && fields[role.handles] }));
+  const domain = role.domain === undefined ? null : fields[role.domain];
+  for (const d of [domain].flat()) if (typeof d === 'string' && d.trim() && !PUBLIC_MAIL.has(d.trim().toLowerCase())) out.add(`domain:${d.trim().toLowerCase()}`);
+  return [...out];
+}
+
+/** Nothing in a field: no value, an empty text, or an empty list. */
+const empty = (v: unknown): boolean => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+
 
 /** JSON with its keys in order, so two values that mean the same compare the same. */
 function stable(v: unknown): string {
@@ -520,6 +558,8 @@ export async function applyPlan(
   const texts = new Map<string, Map<string, FieldDecl>>();
   /** Each closed list's values as the record states them, by list and field: see `own` below. */
   const closed = new Map<string, Map<string, Set<string>>>();
+  /** The lists that play People's `meets:` or the organisations' `org:`, with the field each part names: see `resolveRole`. */
+  const roles = new Map<string, Role>();
   for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
     if (has.ok) answered.add(register);
@@ -533,6 +573,8 @@ export async function applyPlan(
        `known`), so counting it here would send a field the record then refuses. An answer with no `fields` is read as
        saying nothing, and every planned field is sent as it always was. */
     const fields = isObj(has.value) && Array.isArray(has.value.fields) ? has.value.fields : null;
+    const role = isObj(has.value) ? roleOf(has.value) : null;
+    if (role !== null) roles.set(register, role);
     if (fields !== null) {
       declared.set(register, new Set(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && f.retired !== true ? [f.id] : []))));
       texts.set(
@@ -882,6 +924,8 @@ export async function applyPlan(
    * than the sixty runs `imports.jsonl` keeps does not turn it into his.
    */
   const gone = new Set<string>();
+  /** Every live row of a list playing `meets:` or `org:`, which a new person or organisation is matched against. */
+  const known = new Map<string, Row[]>();
   const ours = new Map((o.binned ?? []).map((b) => [b.id, b.version]));
   const read = [...new Set([...registers, ...retiring.map((r) => r.register)])];
   /** Every id tonight's answer holds, live or deleted, which is how a row the run before saw in the bin is accounted for. */
@@ -899,6 +943,7 @@ export async function applyPlan(
         if (key) gone.add(key);
         continue;
       }
+      if (roles.has(register)) (known.get(register) ?? known.set(register, []).get(register)!).push(row);
       if (Array.isArray(row.fields.tags) && row.fields.tags.includes('example')) report.examples++;
       if (register === 'categories' && typeof row.fields.name === 'string') named.set(row.fields.name.toLowerCase(), row);
       const key = keyOf(plan.key, register, row.fields);
@@ -972,6 +1017,125 @@ export async function applyPlan(
     }
   };
 
+  /**
+   * A NEW PERSON OR ORGANISATION GOES THROUGH RESOLUTION BEFORE IT IS CREATED, so an imported "Sam" folds into the
+   * owner's own row and an address the record already knows lands on its person rather than a second one.
+   *
+   *   1. By key, here: a live row of the list holding one of the row's addresses, keys or handles (`keyOfAny`).
+   *   2. By the owner's own names: a person named as the list's `self` row is named, or by one of its aliases.
+   *   3. Through `meet`, when the door has it and the row carries a key: the record matches it, or makes the row, and
+   *      the import fills in the rest. A name alone is never sent, because the record keeps that only as a mention.
+   *
+   * A row found by 1 or 2 is FOLDED: it gains the import's key in its tags and the fields it lacks, and nothing it holds
+   * is changed. `false` when none of the three found or made a row, and the row is created as any other.
+   *
+   * ONE FOLD AT A TIME ON ONE ROW, because two planned rows may fold into the same person and the second must patch the
+   * version the first left.
+   */
+  const folding = new Map<string, Promise<unknown>>();
+  const resolveRole = async (row: PlannedRow, fields: Record<string, unknown>, role: Role, said: Said, tally: Tally): Promise<boolean> => {
+    const keys = roleKeys(fields, role);
+    const name = typeof fields[role.name] === 'string' ? sameName(fields[role.name] as string) : '';
+    const rows = known.get(row.register) ?? [];
+    const live = rows.filter((r) => !(role.merged_into !== undefined && typeof r.fields[role.merged_into] === 'string' && r.fields[role.merged_into] !== ''));
+    const target =
+      live.find((r) => roleKeys(r.fields, role).some((k) => keys.includes(k))) ??
+      (role.self !== undefined && name !== ''
+        ? live.find((r) => r.fields[role.self!] === true && [r.fields[role.name], ...(role.aliases === undefined ? [] : [r.fields[role.aliases]].flat())].some((n) => typeof n === 'string' && sameName(n) === name))
+        : undefined);
+    if (target !== undefined) {
+      const before = folding.get(target.id) ?? Promise.resolve();
+      const turn = before.then(() => fold(row, fields, target, said, tally));
+      folding.set(target.id, turn.catch(() => undefined));
+      return turn;
+    }
+    if (door.meet === undefined || o.dryRun || keys.length === 0) return false;
+    /* THE ADDRESS AS THE EXPORT WROTE IT, since the key folds a Gmail address's dots and the record keeps what it is told. */
+    const address = role.email === undefined ? undefined : [fields[role.email]].flat().find((v): v is string => typeof v === 'string' && v.includes('@'));
+    const email = address?.trim() ?? keys.find((k) => k.startsWith('email:'))?.slice('email:'.length);
+    const handle = keys.find((k) => k.startsWith('github:'));
+    const out = await meetRoleOr({
+      ...(name !== '' ? { name: fields[role.name] as string } : {}),
+      ...(email === undefined ? {} : { email }),
+      ...(handle === undefined ? {} : { handle }),
+      keys,
+      kind: role.kind,
+      source: `import from ${words.source}`,
+    });
+    if (!out.ok) {
+      if (unreachable(out)) {
+        stopped = true;
+        return true;
+      }
+      return false;
+    }
+    const met = metOf(out.value);
+    /* A ROW IN ANOTHER LIST is not this list's to patch by its number: the import makes its own, as before. */
+    if (met === null || met.mention || (met.register !== null && met.register !== row.register)) return false;
+    const there = live.find((r) => (met.id !== null && r.id === met.id) || (met.seq !== null && r.seq === met.seq));
+    if (there !== undefined && !met.created) {
+      const before = folding.get(there.id) ?? Promise.resolve();
+      const turn = before.then(() => fold(row, fields, there, said, tally));
+      folding.set(there.id, turn.catch(() => undefined));
+      return turn;
+    }
+    /* KNOWN TO THE RECORD BUT NOT AMONG THE ROWS READ: only a row it made from this call is the import's to fill whole. */
+    if (!met.created || met.seq === null) return false;
+    /* MADE BY THE RECORD from what `meet` was told: the import's own fields and its key go on it now. */
+    const done = await door.update({ register: row.register, seq: met.seq, patch: { ...fields, tags: [row.key] }, note: `Imported from ${words.source}.` });
+    if (!done.ok) {
+      if (unreachable(done)) stopped = true;
+      else said.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
+      report.outcomes[row.key] = 'refused';
+      return true;
+    }
+    const value = done.value as Row;
+    ids.set(row.key, value.id);
+    existing.set(row.key, value);
+    rows.push(value);
+    tally.added++;
+    report.outcomes[row.key] = 'added';
+    return true;
+  };
+  const meetRole = door.meet === undefined ? null : meeter(door.meet);
+  const meetRoleOr = (m: Meeting): Promise<Result<unknown>> => (meetRole === null ? Promise.resolve(no('NOT_IN_THIS_BUILD', 'This door does not meet.')) : meetRole(m));
+
+  /** A planned person or organisation folded into a row already there: its key and the fields that row lacks. */
+  const fold = async (row: PlannedRow, fields: Record<string, unknown>, target: Row, said: Said, tally: Tally): Promise<boolean> => {
+    const at = (known.get(row.register) ?? []).find((r) => r.id === target.id) ?? target;
+    const tags = Array.isArray(at.fields.tags) ? at.fields.tags.filter((t): t is string => typeof t === 'string') : [];
+    const patch: Record<string, unknown> = {};
+    for (const [field, value] of Object.entries(fields)) if (field !== 'tags' && empty(at.fields[field]) && !empty(value)) patch[field] = value;
+    if (!tags.includes(row.key)) patch.tags = [...tags, row.key];
+    ids.set(row.key, at.id);
+    existing.set(row.key, at);
+    if (Object.keys(patch).length === 0) {
+      tally.unchanged++;
+      report.outcomes[row.key] = 'unchanged';
+      return true;
+    }
+    said.changes.push({ register: row.register, label: row.label, fields: Object.keys(patch) });
+    report.outcomes[row.key] = 'updated';
+    if (o.dryRun) {
+      tally.updated++;
+      return true;
+    }
+    const done = await door.update({ register: row.register, seq: at.seq as number, patch, version: at.version, note: `Imported from ${words.source}, as the person already here.` });
+    if (!done.ok) {
+      if (unreachable(done)) stopped = true;
+      else said.refused.push({ label: row.label, register: row.register, fix: fixOf(done) });
+      report.outcomes[row.key] = 'refused';
+      return true;
+    }
+    const value = done.value as Row;
+    existing.set(row.key, value);
+    const list = known.get(row.register) ?? [];
+    const i = list.findIndex((r) => r.id === value.id);
+    if (i >= 0) list[i] = value;
+    tally.updated++;
+    return true;
+  };
+
   /** The write itself, the same for every row as when rows were sent one at a time. */
   const writeOne = async (row: PlannedRow, known: ReadonlySet<string>, said: Said): Promise<void> => {
     const tally = (report.tally[row.register] ??= { added: 0, updated: 0, unchanged: 0 });
@@ -1023,6 +1187,8 @@ export async function applyPlan(
       return;
     }
 
+    const role = roles.get(row.register);
+    if (!found && role !== undefined && (await resolveRole(row, fields, role, said, tally))) return;
     if (!found) {
       const create = row.register === 'session' ? fields : { ...fields, tags: [row.key] };
       if (o.dryRun) {
@@ -1069,7 +1235,11 @@ export async function applyPlan(
      */
     const differs = (field: string): boolean => stable(found.fields[field] ?? null) !== stable(fields[field] ?? null);
     const patch: Record<string, unknown> = {};
-    for (const [field, value] of Object.entries(fields)) if (!mine.has(field) && differs(field)) patch[field] = value;
+    /* A PERSON OR ORGANISATION ONLY HAS WHAT IT LACKS FILLED, every night, as `meet` treats one: the row may be one this
+       import folded into (`resolveRole`), the owner's own keeps the name he gave it whatever the old tool called him,
+       and a person the record merged from several sources is not taken back to one source's spelling. */
+    const fillOnly = role !== undefined;
+    for (const [field, value] of Object.entries(fields)) if (!mine.has(field) && differs(field) && (!fillOnly || empty(found.fields[field]))) patch[field] = value;
     /**
      * UNLESS THE DAY THOSE FIELDS WERE READ FROM HAS MOVED, and then they are the planner's again.
      *
@@ -2110,6 +2280,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     update: (a) => client.update(a),
     governance: (a) => client.governance(a),
     propose: (a) => client.call('propose', a),
+    meet: (a) => client.call('meet', a),
     packs: () => client.packs(),
   };
   /* THE CATALOGUE THE OFFERS ARE RESOLVED IN: a folder or an address named with `--catalogue`, else the host's own. */

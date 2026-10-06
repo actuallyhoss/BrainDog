@@ -21,7 +21,7 @@ import { refused } from '@braindog/ports';
 import { ago } from './brief.ts';
 /* `clip` AND NOT `oneLine`: this file has its own `oneLine`, the verb that sends a next step, a tried or a note. */
 import { clip } from './clip.ts';
-import { asCaller, readSession, sessionPath } from './hooks.ts';
+import { asCaller, rememberedIn } from './hooks.ts';
 import { hostSessionOf, positionOf } from './position.ts';
 import { refuse } from './json.ts';
 import { connect, fixOf, type AgentIo, type Connected } from './skills.ts';
@@ -81,7 +81,7 @@ const stopped = (text: string): string => (/[.!?]$/.test(text) ? text : `${text}
  * Whether there is a run to address, read before anything is sent: a session file for this folder, or a host session
  * that says its id, which names its run from any folder, a subfolder of the one it started in included.
  */
-const openHere = (io: AgentIo): boolean => hostSessionOf(io.env) !== null || readSession(sessionPath(io.env, io.cwd)) !== null;
+const openHere = (io: AgentIo): boolean => hostSessionOf(io.env) !== null || rememberedIn(io.env, io.cwd, null) !== null;
 
 /** The handoff, the one line when it lands, and the exit code. */
 async function send(at: Connected, args: Parameters<Client['handoff']>[0], io: AgentIo, line: string, value: Record<string, unknown>): Promise<number> {

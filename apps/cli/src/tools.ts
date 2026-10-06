@@ -363,7 +363,7 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         }
         const out = await s.client.create({ register: 'tools', fields: fieldsOf(f, n.needs, machine, now) });
         const spoken = spokenOf(valueOf(out));
-        lines.push(spoken === null ? `Tool ${f.name} in ${f.source} was not recorded: ${fixOf(out)}` : `Tool ${f.name} in ${f.source} was recorded as ${spoken}${keysSaid(n)}.`);
+        lines.push(spoken === null ? `Tool ${f.name} in ${f.source} was not recorded: ${fixOf(out)}` : `Tool ${f.name} in ${f.source} was recorded${keysSaid(n)}.`);
         continue;
       }
 
@@ -387,34 +387,35 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         if (!(now - seen < DAY_MS)) patch.seen = new Date(now).toISOString();
         const n = await needsFor(f, prior, allow);
         if (n.deposited > 0) patch.needs = n.needs;
-        if (n.would > 0) lines.push(`Tool ${f.name} is recorded as ${row.spoken}${keysSaid(n)}.`);
+        if (n.would > 0) lines.push(`Tool ${f.name} is recorded${keysSaid(n)}.`);
         if (s.dryRun || Object.keys(patch).length === 0) continue;
         const out = await s.client.update({ register: 'tools', seq, patch, version: got.version });
-        if (n.deposited > 0) lines.push(valueOf(out) === null ? `Tool ${f.name} could not name its deposited keys on ${row.spoken}: ${fixOf(out)}` : `Tool ${f.name} is recorded as ${row.spoken}${keysSaid(n)}.`);
+        if (n.deposited > 0) lines.push(valueOf(out) === null ? `Tool ${f.name} could not name its deposited keys in the record: ${fixOf(out)}` : `Tool ${f.name} is recorded${keysSaid(n)}.`);
         continue;
       }
 
       if (lock.asked[key] === shape) continue;
       const n = await needsFor(f, prior, allow);
       if (s.dryRun) {
-        lines.push(`Tool ${f.name} in ${f.source} differs from the record's ${row.spoken}, which would be left as it is and the change proposed${keysSaid(n)}.`);
+        lines.push(`Tool ${f.name} in ${f.source} differs from the one in the record, which would be left as it is and the change proposed${keysSaid(n)}.`);
         continue;
       }
       const patch = { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
       /* THE OWNER'S QUESTION IN WORDS, 80 CHARACTERS AT MOST. It read "Change tools#8 to how fly-prism is set up
          in ~/.claude.json on Maras-MacBook-Pro.local?": an id, a path and a network name. Those three are the details. */
+      const question = asking('Update the ', f.name, ` tool to match ${thisMachine()}?`);
       const out = await s.client.call<{ id: string }>('propose', {
-        question: asking('Update the ', f.name, ` tool to match ${thisMachine()}?`),
+        question,
         body_kind: 'rowset',
         body: { register: 'tools', rows: [{ at: row.spoken, version: got.version, patch }], details: { source: f.source, machine, row: row.spoken } },
       });
       const made = valueOf(out);
       if (made === null || typeof made.id !== 'string') {
-        lines.push(`Tool ${f.name} in ${f.source} differs from the record's ${row.spoken}, and the change was not proposed: ${fixOf(out)}`);
+        lines.push(`Tool ${f.name} in ${f.source} differs from the one in the record, and the change was not proposed: ${fixOf(out)}`);
         continue;
       }
       lock.asked[key] = shape;
-      lines.push(`Tool ${f.name} in ${f.source} differs from the record's ${row.spoken}, so that was left as it is and the change was proposed as ${made.id}${keysSaid(n)}.`);
+      lines.push(`Tool ${f.name} in ${f.source} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`);
     }
     if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun));
   } catch (e) {
@@ -463,8 +464,9 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
       : `${String(asks.length)} tools in ${sources} (${names}) would be proposed together as tools everywhere, with their keys by name only.`;
   /* IN WORDS, 80 CHARACTERS AT MOST, with where they were found kept in the details. Decide offers the rows one by one,
      so the question no longer says it can. */
+  const question = one ? asking('Add the ', one.name, ` tool from ${thisMachine()}, for use everywhere?`) : severalAsked(asks.map((a) => a.f.name));
   const out = await client.call<{ id: string }>('propose', {
-    question: one ? asking('Add the ', one.name, ` tool from ${thisMachine()}, for use everywhere?`) : severalAsked(asks.map((a) => a.f.name)),
+    question,
     body_kind: 'rowset',
     body: { register: 'tools', rows: asks.map((a) => a.row), details: { source: sources, machine } },
   });
@@ -473,8 +475,8 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
     return one ? `Tool ${one.name} in ${one.source} was not proposed: ${fixOf(out)}` : `${String(asks.length)} tools in ${sources} were not proposed: ${fixOf(out)}`;
   for (const a of asks) lock.asked[a.key] = a.shape;
   return one
-    ? `Tool ${one.name} in ${one.source} applies everywhere and this run is in a project, so recording it was proposed as ${made.id}, and its keys were not deposited.`
-    : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so recording them was proposed together as ${made.id}, and their keys were not deposited.`;
+    ? `Tool ${one.name} in ${one.source} applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: ${question}`
+    : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so their keys were not deposited and recording them was asked on Decide in one question: ${question}`;
 }
 
 /**
