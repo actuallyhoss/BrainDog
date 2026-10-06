@@ -21,7 +21,7 @@
  * sign-in link is, so it never reaches a server log, a `Referer` or the tab's history.
  */
 
-import { moduleOfList } from '@braindog/seed/packs/modules';
+import { playedBy } from './start/parts.ts';
 
 /** The world the calls reach, so a test needs no socket. */
 export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> };
@@ -173,8 +173,11 @@ function wholeName(typed: string): string | null {
 /** What the first sentence named: the person, and the business or project they run, as `propose` heard them. */
 export type HeardNames = { person: string | null; business: string | null };
 
-/** The module whose list holds what a person runs or builds ("Projects"), the only list a record's name is taken from. */
-const PROJECTS = 'portfolio';
+/**
+ * The list that holds what a person runs or builds ("Projects"), the only list a record's name is taken from: the one the
+ * people's `projects` part links to (`start/parts.ts`), whatever it is called.
+ */
+const projects = (): string | null => playedBy('projects');
 
 /** A name as two sentences would both say it: trimmed, folded to lower case, its spaces as one. */
 const sameName = (v: unknown): string => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').toLowerCase() : '');
@@ -188,7 +191,8 @@ const sameName = (v: unknown): string => (typeof v === 'string' ? v.trim().repla
  * name as one of those is left out too: a project called Fenwick beside a client called Fenwick is the client's work.
  */
 export function namesHeard(p: { name: string | null; rows: readonly { register: string; fields: Record<string, unknown> }[] }): HeardNames {
-  const ours = (r: { register: string }): boolean => moduleOfList(r.register)?.id === PROJECTS;
+  const list = projects();
+  const ours = (r: { register: string }): boolean => list !== null && r.register === list;
   const others = new Set(p.rows.filter((r) => !ours(r)).flatMap((r) => [sameName(r.fields.name), sameName(r.fields.what)].filter((n) => n !== '')));
   const run = p.rows.find((r) => ours(r) && sameName(r.fields.name) !== '' && !others.has(sameName(r.fields.name)));
   return { person: p.name, business: run ? String(run.fields.name).trim() : null };

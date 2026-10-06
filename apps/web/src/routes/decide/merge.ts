@@ -195,6 +195,24 @@ export function mergeOf(
   return null;
 }
 
+/**
+ * THE LIST A MERGE IS ABOUT, READ OFF THE RECORD AND NEVER NAMED HERE (`tools/gates/web-lists.mjs`): the one list its
+ * candidates' handles are in (`people#4`), where the record declares it, or else the one list that declares the people
+ * role (`meets:`), which a cluster asked by names alone is about. `null` where neither says, or two lists do.
+ *
+ * `lists` is the record's declarations (`REGISTERS`), handed in so this file keeps no imports.
+ */
+export function mergeListOf(m: Merge, lists: Readonly<Record<string, object | undefined>>): string | null {
+  const at = new Set(m.candidates.map((c) => /^([a-z][\w-]*)#\d+$/u.exec(c.key)?.[1] ?? ''));
+  const [one] = at;
+  if (at.size === 1 && one !== undefined && one !== '' && lists[one] !== undefined) return one;
+  const people = Object.entries(lists).filter(([, d]) => {
+    const role = (d as { meets?: unknown } | undefined)?.meets;
+    return role !== undefined && role !== null;
+  });
+  return people.length === 1 ? people[0]![0] : null;
+}
+
 /** The name the merged one keeps: the candidate kept, else the first one named. */
 export const keptName = (m: Merge): string => m.candidates.find((c) => c.kept && c.name !== '')?.name ?? m.candidates.find((c) => c.name !== '')?.name ?? '';
 

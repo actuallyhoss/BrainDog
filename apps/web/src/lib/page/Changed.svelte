@@ -34,8 +34,8 @@
       .slice(0, 5),
   );
 
-  /** The run's own page, where the name is pressed: its row in the list of runs. */
-  const runHref = (run: string): string => inApp(`/r/session/${run.slice(1)}`);
+  /** The run's own page, where the name is pressed: its row in the list of runs, record-relative until it is drawn. */
+  const runPath = (run: string): string => `/r/session/${run.slice(1)}`;
 
   const undo = (row: RowAt) => void host.undoBy(row);
 </script>
@@ -48,7 +48,7 @@
         <li class="changed-line">
           <button type="button" class="changed-what" onclick={() => host.open(l.row)}>{l.title}</button>
           <span class="changed-by">
-            {#if l.byline.run && l.byline.said.startsWith(l.byline.name)}<a class="changed-who" href={runHref(l.byline.run)}>{l.byline.name}</a>{l.byline.said.slice(l.byline.name.length)}
+            {#if l.byline.run && l.byline.said.startsWith(l.byline.name)}<a class="changed-who" href={inApp(runPath(l.byline.run))}>{l.byline.name}</a>{l.byline.said.slice(l.byline.name.length)}
             {:else}{l.byline.said}{/if}
           </span>
           {#if l.byline.batch && host.writable(l.row)}
@@ -119,6 +119,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
+  }
+
+  /* UNDER A THUMB THE WORDS ARE A 44px TARGET, though they are one 23px line. The button itself grows and its words stay
+     centred in it; `.tap`'s `::before` would be clipped here by the ellipsis's `overflow`, and so would its hits. */
+  @media (pointer: coarse) {
+    .changed-what {
+      min-block-size: var(--tap);
+    }
   }
 
   .changed-what:hover {

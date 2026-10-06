@@ -9,9 +9,10 @@
  * undo or money moves, the dot stays and only Enter is taken away (`press.ts` `acceptKey`): hiding the suggestion
  * there hid the agent's advice exactly where it matters most (audit 19 M10).
  *
- * NO ADDRESS AND NO ID IN THE WORDS. The question, its why and what accepting does were written by whoever asked, and
- * an agent writes `alex@acme.com`, `tasks#8` or a file path into them as readily as a name (audit 19 M11). Each is
- * read through `spoken` before it is drawn, and a signer that is an address is Someone.
+ * NO ADDRESS AND NO ID IN THE WORDS. The question, its why, what accepting does, each answer and why it is offered,
+ * what a change was and becomes, and why a question was put off were written by whoever asked, and an agent writes
+ * `alex@acme.com`, `tasks#8` or a file path into them as readily as a name (audit 19 M11, audit 21 #4). Each is read
+ * through `spoken` (`spoken.ts`) before it is drawn, and a signer that is an address is Someone.
  *
  * PURE, AND NODE LOADS IT (relative `.ts` imports, no runes), so `card.test.ts` reads every rule here without a DOM.
  *
@@ -32,6 +33,10 @@ import { copy } from '../copy.ts';
 import { nameWords } from '../record/names.ts';
 import { acceptKey, amountSaid, declineKey, labelOf, twoWords } from '../../routes/decide/press.ts';
 import { words as decideWords } from '../../routes/decide/words.ts';
+import { spoken } from './spoken.ts';
+
+/* SAID FROM HERE TOO, where every screen that draws a card already reads its words. */
+export { spoken };
 
 /** THE CARD'S OWN WORDS, beside the only code that says them. No em dash, no word of the system's. */
 export const cardWords = {
@@ -133,74 +138,6 @@ export function nameOrNull(v: unknown): string | null {
   return s;
 }
 
-/* ── words a person reads, with no address or id in them ───────────────────────────────────────────────────────── */
-
-/* A MAIL ADDRESS, and one in brackets after the name it belongs to ("Alex <alex@acme.com>", "Jo (jo@x.io)"), which
-   goes whole rather than reading "Jo (someone)". */
-const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu;
-const BRACKETED = /\s*<[^<>\s]+@[^<>\s]+>|(?<=[\p{L}.])\s*\([^()\s]+@[^()\s]+\)/gu;
-/* A WEB ADDRESS is said as the site it is on; one on a machine or a local network says nothing. */
-const WEB = /\bhttps?:\/\/([^\s/?#]+)[^\s]*/giu;
-const LOCAL = /\b[\w-]+\.(?:local|lan|internal|home)\b(?::\d+)?/giu;
-const IP = /\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/gu;
-/* A FILE PATH: from the root, the home folder or a drive, or three or more parts of a relative one. A date is no path. */
-const ROOTED = /(?<=^|[\s("'\u201C\u2018])(?:(?:~|[A-Za-z]:)[\\/]|[\\/][^\s"'()\u201D\u2019\\/]+[\\/])[^\s"'()\u201D\u2019]*/gu;
-const RELATIVE = /(?<=^|[\s("'\u201C\u2018])[\w.-]*[A-Za-z][\w.-]*(?:\/[\w.-]+){2,}/gu;
-/* AN ID: a ULID, a row's handle (`tasks#8`), a commit's hash (two digits and a letter, so "defaced", "face2face" and
-   "20261001" stay), a question's own (`SG14`), a person's (`p_…`) and a signer's (`agent:claude`, `rule:late`). */
-const IDS = [
-  /\b[0-9A-HJKMNP-TV-Z]{26}\b/gu,
-  /\b[a-z][a-z0-9_-]*#\d+\b/giu,
-  /\b(?=(?:[0-9a-f]*\d){2})(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/gu,
-  /\bSG\d+\b/gu,
-  /\bp_[A-Za-z0-9]+\b/gu,
-  /\b(?:agent|runner|ingest|rule|token):[\w.-]+/gu,
-];
-/* WHERE SOMETHING WAS TAKEN OUT, held until the words around it are read: a character no sentence holds. */
-const GONE = '\u0000';
-/* A WORD LEFT POINTING AT NOTHING once what it named is out: "asked by agent:claude about it" is "asked about it", and
-   "asked about in" at the end is "asked". A word before a gap that the sentence goes on from keeps its place. */
-const LINK = '(?:in|on|at|about|for|to|of|from|with|by|see|as|via)';
-const HUNG = new RegExp(`(?:\\s+|(?<=\\())${LINK}\\s*${GONE}(?=\\s*(?:[,.;:!?…)]|$|${GONE}|\\s${LINK}\\b|\\s(?:and|or|because|so|but)\\b))`, 'giu');
-const DANGLING = new RegExp(`\\s+${LINK}(?=[.!?…:]?$)`, 'iu');
-
-/** Where a path or an id stood, marked: the stop that ended the sentence stays when the path ate it. */
-const gone = (m: string): string => GONE + (/[.,;:!?]$/u.exec(m)?.[0] ?? '');
-
-/**
- * WORDS A PERSON READS, with every address and id taken out: a mail address is someone, a web address its site, and a
- * path, a machine's address, a handle or an id goes with the word it hung from. Slash's braces and money are already
- * words by the time this reads them (`saidOf`).
- */
-export function spoken(text: string): string {
-  let t = text
-    .replaceAll(GONE, '')
-    .replace(BRACKETED, '')
-    .replace(MAIL, (_m, at: number) => (at === 0 ? 'Someone' : 'someone'))
-    .replace(WEB, (m, host: string) => {
-      const site = host.replace(/^www\./iu, '').replace(/:\d+$/u, '');
-      const local = /\.(?:local|lan|internal|home)$/iu.test(site) || /^[\d.]+$/u.test(site) || site === 'localhost';
-      return local ? gone(m) : site + gone(m).slice(GONE.length);
-    })
-    .replace(LOCAL, gone)
-    .replace(IP, gone)
-    .replace(ROOTED, gone)
-    .replace(RELATIVE, (m) => (/^[\d/.-]+$/u.test(m) ? m : gone(m)));
-  t = IDS.reduce((x, re) => x.replace(re, GONE), t);
-  /* A BRACKET LEFT HOLDING NOTHING goes too, the commas between what went with it, so the word before it is read
-     against what follows ("changed in (a.ts, b.ts)" is "changed", not "changed in (, )"). */
-  for (let was = ''; was !== t; ) [was, t] = [t, t.replace(HUNG, GONE).replace(new RegExp(`\\(\\s*(?:${GONE}[\\s,;]*)*\\)`, 'gu'), GONE)];
-  t = t
-    .replaceAll(GONE, '')
-    .replace(/[(\[]\s*[)\]]/gu, '')
-    .replace(/[ \t]{2,}/gu, ' ')
-    .replace(/\s+([,.;:!?…])/gu, '$1')
-    .replace(/([,;:])(?=[,.;:!?])/gu, '')
-    .trim();
-  while (DANGLING.test(t)) t = t.replace(DANGLING, '');
-  return t.replace(/^[,.;:·\s]+/u, '').trim();
-}
-
 /** A field read off the question as the record may send it, untyped until it is checked. */
 const field = (q: QueueQuestion, key: string): unknown => (q as unknown as Record<string, unknown>)[key];
 
@@ -234,6 +171,10 @@ export function movesOf(v: unknown): Moved[] {
 /**
  * A value from before or after a change, in words: money in its currency, a list joined, an empty value said as nothing.
  * `null` for a value that is an id or a handle, which no card says, so the change it belongs to is left to its page.
+ *
+ * SCRUBBED FIRST, THEN TESTED. The kernel sends a field's raw value, so an email edit's before and after are two
+ * addresses, and "see tasks#8" is no whole handle: the words are read through `spoken` before anything is asked of
+ * them, and a value that was nothing but an id or a path, which `spoken` empties, is left to its page too.
  */
 function valueSaid(v: unknown, home: string | null | undefined): string | null {
   if (v === null || v === undefined || v === '') return cardWords.nothing;
@@ -242,9 +183,8 @@ function valueSaid(v: unknown, home: string | null | undefined): string | null {
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   if (typeof v === 'number') return Number.isFinite(v) ? v.toLocaleString('en-GB') : null;
   if (typeof v === 'string') {
-    const s = v.trim();
-    if (ULID.test(s) || /^[a-z][\w-]*#\d+$/u.test(s) || /[\\/]/u.test(s)) return null;
-    const said = saidOf(s);
+    const said = spoken(saidOf(v.trim()));
+    if (said === '' || ULID.test(said) || /^[a-z][\w-]*#\d+$/u.test(said) || /[\\/]/u.test(said)) return null;
     return said.length > 60 ? `${said.slice(0, 59).trimEnd()}…` : said;
   }
   if (Array.isArray(v)) {

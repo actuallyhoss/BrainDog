@@ -93,13 +93,22 @@ async function stack() {
     history: (register: string, seq: number) => read<Event[]>(`/api/history?register=${register}&seq=${seq}`),
     run: (spoken: string) => read<Row | null>(`/api/get?spoken=${spoken}`),
     runs: () => running.sql.all<{ seq: number }>("SELECT seq FROM entry WHERE register = 'session' ORDER BY seq").map((r) => r.seq),
-    async mint(scope: 'read' | 'propose' | 'write' = 'write') {
+    /**
+     * A write token of the owner's. A new agent starts at Ask (DIRECTION §37), so its writes are filed as questions;
+     * `trusted` names the kinds it writes at Do and tell, as `seedLadder` keeps them for a token that wrote before the
+     * ladder, for the tests that are about the run and not the rung.
+     */
+    async mint(scope: 'read' | 'propose' | 'write' = 'write', trusted: string[] = []) {
       const out = await running.api.createToken({ scope }, { principal: { kind: 'person', id: owner, level: 'owner' } });
       assert.ok(out.ok, 'the token was not minted');
-      const token = (out as { value: { bearer: string } }).value.bearer;
+      const { id, bearer: token } = (out as { value: { id: string; bearer: string } }).value;
+      for (const kind of trusted)
+        running.sql.exec("INSERT INTO ladder (agent, kind, rung, accepted_unchanged, since) VALUES (?, ?, 'tell', 0, ?)", id, kind, new Date(NOW).toISOString());
       secrets.push(token);
       return token;
     },
+    /** Who filed each question open on Decide. */
+    asked: () => running.sql.all<{ opened_by: string }>("SELECT opened_by FROM suggestion WHERE status = 'open' ORDER BY rowid").map((r) => r.opened_by),
     /** A tool call as a 2025-06-18 client sends it, with `_meta.session` when given. */
     tool: (token: string, name: string, args: Record<string, unknown>, session?: Record<string, unknown>, headers: Record<string, string> = {}) =>
       http('/mcp', {
@@ -127,7 +136,7 @@ async function stack() {
 test('AN AGENT’S FIRST WRITE THROUGH THE SELF-HOST IS SIGNED S1, and its next from the same client is S1 again', async () => {
   const s = await stack();
   try {
-    const token = await s.mint();
+    const token = await s.mint('write', ['tasks:add']);
     const said = { ...HERE, 'x-braindog-client': 'claude-run-1' };
     assert.equal((await s.post(s.bearer(token), 'create', { register: 'tasks', fields: { what: 'One' } }, said)).status, 200);
     assert.equal((await s.post(s.bearer(token), 'create', { register: 'tasks', fields: { what: 'Two' } }, said)).status, 200);
@@ -150,10 +159,39 @@ test('AN AGENT’S FIRST WRITE THROUGH THE SELF-HOST IS SIGNED S1, and its next 
   }
 });
 
+test('A NEW AGENT’S FIRST WRITE ASKS, and the question is still signed by the run it opens, S1', async () => {
+  const s = await stack();
+  try {
+    /* Nothing seeded: a token minted now starts at Ask for every kind (DIRECTION §37). */
+    const token = await s.mint();
+    const said = { ...HERE, 'x-braindog-client': 'claude-run-1' };
+    const out = await s.post(s.bearer(token), 'create', { register: 'tasks', fields: { what: 'One' } }, said);
+    assert.equal(out.status, 200, JSON.stringify(out.wire));
+    assert.equal((out.wire.value as { asked?: { question: string } }).asked?.question, 'Add One to Tasks?');
+
+    /* NOTHING WAS WRITTEN, and the question waits on Decide, filed by the run its first write opened. */
+    assert.equal(s.running.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM entry WHERE register = 'tasks'")?.n, 0);
+    assert.deepEqual(s.runs(), [1]);
+    assert.deepEqual(s.asked(), ['S1']);
+    const s1 = (await s.run('S1')) ?? assert.fail('S1 is not there');
+    assert.equal(s1.fields.client_id, 'claude-run-1');
+
+    /* THE SAME THROUGH /mcp, from the same client: the same run asks again, and no second run is opened. */
+    const r = await s.tool(token, 'create', { register: 'tasks', fields: { what: 'Two' } }, { client_id: 'claude-run-1' });
+    assert.equal(r.status, 200);
+    assert.notEqual((r.wire.result as { isError?: boolean }).isError, true, JSON.stringify(r.wire.result));
+    assert.deepEqual(s.runs(), [1]);
+    assert.deepEqual(s.asked(), ['S1', 'S1']);
+    s.clean();
+  } finally {
+    await s.close();
+  }
+});
+
 test('THE SAME THROUGH /mcp: _meta.session names the run, over the headers key by key', async () => {
   const s = await stack();
   try {
-    const token = await s.mint();
+    const token = await s.mint('write', ['tasks:add']);
     const meta = { client_id: 'codex-run-1', host: 'studio-pc', repo: 'braindog', agent: 'codex' };
     for (const what of ['One', 'Two']) {
       const r = await s.tool(token, 'create', { register: 'tasks', fields: { what } }, meta);
@@ -179,7 +217,7 @@ test('THE SAME THROUGH /mcp: _meta.session names the run, over the headers key b
 test('ONE RUN PER HOST SESSION over the socket: the hook’s attach, a command from a scratch folder and a bare tool call are S1', async () => {
   const s = await stack();
   try {
-    const token = await s.mint();
+    const token = await s.mint('write', ['tasks:add']);
     /* The start hook: the session's own id in the body, the headers saying where it is. */
     const hook = await s.post(s.bearer(token), 'attach', { source: 'startup', client_id: 'cc-1' }, HERE);
     assert.equal(hook.status, 200, JSON.stringify(hook.wire));
@@ -204,7 +242,7 @@ test('ONE RUN PER HOST SESSION over the socket: the hook’s attach, a command f
 test('BAD HEADERS ARE DROPPED, and the write they came with still goes in', async () => {
   const s = await stack();
   try {
-    const token = await s.mint();
+    const token = await s.mint('write', ['tasks:add']);
     const bad = {
       'x-braindog-session': 'S0',
       'x-braindog-client': 'has space',

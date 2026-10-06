@@ -23,6 +23,8 @@
  */
 
 import type { createClient } from '@braindog/client';
+import type { Diff } from '@braindog/declare';
+import { losses } from '@braindog/seed/packs/quiet';
 import { modulesFor, useCase, type UseCase } from '@braindog/seed/usecases';
 import { moduleName } from '@braindog/seed/usecases/names';
 
@@ -159,6 +161,37 @@ async function addModule(client: Client, id: string, held: readonly PackState[],
   return put.ok ? null : fixOf(put, '');
 }
 
+/** The objects in a list the record answered, and none where it sent no list, so a plan with a part missing reads as empty. */
+const objects = (v: unknown): never[] => (Array.isArray(v) ? v.filter((x) => x !== null && typeof x === 'object') : []) as never[];
+
+/** A plan as the record answered it, with every list `losses` reads there, empty where the answer left one out. */
+const wholeDiff = (d: Body): Diff =>
+  ({
+    ...d,
+    adds: objects(d.adds),
+    retires: objects(d.retires),
+    conflicts: objects(d.conflicts),
+    retypes: objects(d.retypes),
+    newly_required: objects(d.newly_required),
+    misreads: objects(d.misreads),
+    renames: objects(d.renames),
+    dependents: objects(d.dependents),
+    calls_out: objects(d.calls_out),
+    approve: Array.isArray(d.approve) ? d.approve.filter((a) => typeof a === 'string') : [],
+  }) as unknown as Diff;
+
+/** Each declaration of a module's document by its id, `register.people` or `page.relation`: its kind, then its name. */
+function declared(doc: Body | null): Map<string, Body> {
+  const out = new Map<string, Body>();
+  for (const d of Array.isArray(doc?.declarations) ? (doc.declarations as unknown[]) : []) {
+    if (d === null || typeof d !== 'object') continue;
+    const kind = Object.keys(d)[0];
+    const name = kind === undefined ? undefined : (d as Body)[kind];
+    if (kind !== undefined && typeof name === 'string') out.set(`${kind}.${name}`, d as Body);
+  }
+  return out;
+}
+
 /**
  * A MODULE PLANNED AGAIN ONCE EVERY LIST IS IN, and installed when that plan changes anything.
  *
@@ -167,22 +200,40 @@ async function addModule(client: Client, id: string, held: readonly PackState[],
  * Planned again here, with the lists of everything this press put in, it gains it now. Nothing is said when the record
  * refuses it: People works as it went in, and its next update brings the rest.
  *
- * `ours` IS WHETHER THIS PRESS PUT THE MODULE IN. One the record held before is the person's, and may carry what they
- * changed, so its plan goes in only when it asks nothing to be approved and takes nothing away; otherwise it waits for
- * the module's own update, where the person sees it.
+ * `before` IS WHAT THE RECORD HELD BEFORE THIS PRESS, or `null` when this press put the module in. One the record held
+ * before is the person's, and may carry what they changed, so its plan goes in only when it loses nothing, by the same
+ * check BrainDog's own updates go in by (`losses` in `@braindog/seed/packs/quiet`): nothing taken away, nothing the
+ * person took off brought back, nothing of theirs changed or taken over, no service outside. Otherwise it waits for the
+ * module's own update, where the person sees it.
+ *
+ * WHAT THE PERSON TOOK OFF IS WHAT THE MODULE'S COPY HELD BEFORE THIS PRESS AND THE RECORD DOES NOT: the copy cut to the
+ * lists held before is what the record would hold, so a plan that adds one of those adds what somebody took away. What
+ * this press made room for (a block over Money, now that Money is in) is new to that copy, and goes in. A module held at
+ * an older version than this build ships is left to its own update by the same reading, since what its newer copy adds
+ * cannot be told apart from what was taken off.
  */
-async function refreshModule(client: Client, id: string, held: readonly PackState[], names?: Readonly<Record<string, string>>, ours = true): Promise<void> {
+async function refreshModule(client: Client, id: string, held: readonly PackState[], names?: Readonly<Record<string, string>>, before: readonly PackState[] | null = null): Promise<void> {
   if (!held.some((p) => p.id === id && p.disabled_at === null)) return;
   const doc = named(await packDocument(id, held), names);
   if (!doc) return;
   /* A PLAN THAT THROWS IS A REFUSAL TOO, and says nothing: everything this press put in is in already. */
-  const planned = (await client.planPack({ doc, source: { kind: 'local' } }).catch(() => null)) as Wire<{ diff?: { planHash?: unknown; approve?: unknown; adds?: unknown; changes?: unknown; retires?: unknown } }> | null;
+  const planned = (await client.planPack({ doc, source: { kind: 'local' } }).catch(() => null)) as Wire<{ diff?: Body }> | null;
   if (!planned?.ok) return;
   const diff = planned.value.diff;
   const some = (v: unknown): boolean => Array.isArray(v) && v.length > 0;
   if (typeof diff?.planHash !== 'string' || diff.planHash === '' || !(some(diff.adds) || some(diff.changes) || some(diff.retires))) return;
   const approve = Array.isArray(diff.approve) ? (diff.approve as unknown[]).filter((a): a is string => typeof a === 'string') : [];
-  if (!ours && (approve.length > 0 || some(diff.retires))) return;
+  if (before !== null) {
+    const now = declared(doc);
+    const was = declared(await packDocument(id, before).catch(() => null));
+    /* A DECLARATION SAID BY ITS OWN NAME, which a page for one row (`{{name}}`) does not have, and then by its id. */
+    const nameOf = (key: string): string => {
+      const d = now.get(key);
+      const said = typeof d?.name === 'string' ? d.name : typeof d?.title === 'string' ? d.title : '';
+      return said !== '' && !said.includes('{{') ? said : key.slice(key.indexOf('.') + 1);
+    };
+    if (losses(wholeDiff(diff), nameOf, new Set(was.keys())).length > 0) return;
+  }
   await client.installPack({ doc, source: { kind: 'local' }, planHash: diff.planHash, ...(approve.length === 0 ? {} : { approve }) }).catch(() => null);
 }
 
@@ -258,7 +309,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   const peopleOurs = !held.value.some((p) => p.id === PEOPLE);
   const added = states.some((s) => !held.value.some((h) => h.id === s.id));
   if (!off && (peopleOurs || added)) {
-    await refreshModule(client, PEOPLE, states, names, peopleOurs);
+    await refreshModule(client, PEOPLE, states, names, peopleOurs ? null : held.value);
     const now = await packsOf(client);
     if (now.ok) states = now.value;
   }

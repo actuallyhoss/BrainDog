@@ -199,16 +199,27 @@ test('a pin is set as a declaration, Unpin retires the page’s look, and a refu
 });
 
 test("Undo asks the record to put back the look Slash's replaced, and keeping asks it to say who kept it", async () => {
-  /* A CLIENT THAT ROUTES NEITHER YET answers ROUTE_UNKNOWN without asking the record: Undo then retires Slash's look,
-     and keeping, which changes nothing on the page, does nothing. */
   const r = record();
   assert.deepEqual(await undoLook(BASE, 'money', r.io), { ok: true });
   assert.deepEqual(await keepLook(BASE, 'money', r.io), { ok: true });
-  assert.deepEqual(
-    r.sent.map((s) => s.method),
-    ['retireDeclaration'],
-  );
-  assert.deepEqual(r.sent[0]!.body, { id: 'look.money' });
+  assert.deepEqual(r.sent, [
+    { method: 'undoLook', body: { page: 'money' } },
+    { method: 'keepLook', body: { page: 'money' } },
+  ]);
+});
+
+test('a record that routes neither yet: Undo retires Slash\'s look, and keeping does nothing more', async () => {
+  const sent: string[] = [];
+  const io = (async (url: string | URL | Request) => {
+    const method = new URL(String(url)).pathname.split('/').pop() ?? '';
+    sent.push(method);
+    const known = method === 'retireDeclaration';
+    const answer = known ? { ok: true, value: [] } : { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such method.' } };
+    return new Response(JSON.stringify(answer), { status: known ? 200 : 404, headers: { 'content-type': 'application/json' } });
+  }) as never;
+  assert.deepEqual(await undoLook(BASE, 'money', io), { ok: true });
+  assert.deepEqual(await keepLook(BASE, 'money', io), { ok: true });
+  assert.deepEqual(sent, ['undoLook', 'retireDeclaration', 'keepLook']);
 });
 
 /** A clock that runs only when told, and a toast stack of one line. */

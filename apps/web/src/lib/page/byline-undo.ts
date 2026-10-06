@@ -71,7 +71,7 @@ export function isOn(step: Pick<UndoStep, 'title' | 'list' | 'at'>, here: Here):
  * handle for the row a matched step is on. A plan that puts back one row's changes and leaves nothing is this row's
  * when the row has no title to tell it by, since the change the byline names was on it.
  */
-export function mineIn(plan: Pick<UndoPlan, 'steps' | 'skipped'>, here: Here): boolean[] {
+export function mineIn(plan: { readonly steps: readonly UndoStep[]; readonly skipped: readonly unknown[] }, here: Here): boolean[] {
   const steps = plan.steps;
   const rows = new Set(steps.map((s) => s.row));
   if (here.title === '' && steps.length > 0 && plan.skipped.length === 0 && rows.size === 1 && !rows.has(null)) return steps.map(() => true);

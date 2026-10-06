@@ -2354,7 +2354,7 @@
   >
     {#snippet actions()}
       <!-- THE TOOLBAR: glass, 36 high and 6 apart, the view switch first and the one ink primary last. -->
-      {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable} onview={setView} />{/if}
+      {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} onview={setView} />{/if}
       <!-- THE VIEW OVER WHAT IS HANDED TO YOU, on a list that says who holds its rows. -->
       {#if handedToMeHref}<Button weight="glass" href={handedToMeHref}>{copy.handedToMe}</Button>{/if}
       <!-- THE LIST'S FIELDS, opened from its head: add any kind, rename one, or retire one (`ListEditor.svelte`). -->

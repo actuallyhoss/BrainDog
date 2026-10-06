@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { keptName, mergeOf, seenOf, SEEN_MOST, words } from './merge.ts';
+import { keptName, mergeListOf, mergeOf, seenOf, SEEN_MOST, words } from './merge.ts';
 
 const TWO = ['accept', 'reject'];
 
@@ -196,4 +196,13 @@ test('a rowset offered the cluster’s answers without its cluster is read off i
   assert.deepEqual([m.all, m.apart], [{ option: 'merge' }, { option: 'apart' }]);
   assert.deepEqual(m.candidates.map((c) => c.pick?.option ?? null), [null, 'pick:people#4']);
   assert.equal(mergeOf({ kind: 'rowset', body: pair }, ['merge'], held), null, 'a merge with no way to keep them apart');
+});
+
+test('THE LIST A MERGE IS ABOUT IS READ OFF THE RECORD: its handles, else the one list that plays the people role', () => {
+  const lists = { contacts: { meets: { name: 'name' } }, firms: { org: { name: 'name' } } };
+  const at = (...keys: string[]) => ({ candidates: keys.map((key) => ({ key, name: key, seen: [], kept: false, pick: null })), all: { option: 'merge' }, apart: { option: 'apart' } });
+  assert.equal(mergeListOf(at('firms#1', 'firms#4'), lists), 'firms', 'organisations are merged on their own list');
+  assert.equal(mergeListOf(at('Rohan', 'Rohan Mehta'), lists), 'contacts', 'a cluster asked by names is the people list, whatever it is called');
+  assert.equal(mergeListOf(at('firms#1', 'contacts#2'), lists), 'contacts', 'two lists in one merge fall back to the role');
+  assert.equal(mergeListOf(at('Rohan', 'Jo'), { firms: lists.firms }), null, 'a record with no people role names no list');
 });

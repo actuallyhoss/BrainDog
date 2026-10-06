@@ -16,6 +16,7 @@ import { citedWords } from '../cite.ts';
 import { copy } from '../copy.ts';
 import { moneyInText } from '../record/money.ts';
 import { actor, type Actor } from '../record/names.ts';
+import { spoken } from '../decide/spoken.ts';
 import { mergeOf, type Merge } from '../../routes/decide/merge.ts';
 
 /**
@@ -40,6 +41,8 @@ export const queueWords = {
   answered: (option: string, when: string) => `${option} · you, ${when}`,
   /** A question put off (`governance.later`): the day it comes back to the reader. */
   back: (when: string) => `Comes back ${when}`,
+  /** An answer whose whole title was an address or an id, which `spoken` leaves empty: said by its place instead. */
+  nth: (n: number) => `Answer ${n.toLocaleString('en-GB')}`,
   /** Beside a question joined from several: how many things answering it changes. */
   joined: (n: number) => `· ${n.toLocaleString('en-GB')} changes`,
 } as const;
@@ -91,6 +94,9 @@ export type Way = { key: string; label: string; because: string; recommended: bo
  *
  * NO `{{ref:...}}` REACHES THE CARD: a Slash option's words carry citations, read here as their fallback words, and a
  * stored money sentence is drawn in the record's currency, as the renderer's fence is.
+ *
+ * NOR AN ADDRESS OR AN ID. Whoever asked wrote the answers too, and an agent titles one "Merge into rohan@x.com" as
+ * readily as "Merge into Rohan": each label and reason is read through `spoken`, as the question is (audit 21 #4).
  */
 export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
   if (q.options.length === 0)
@@ -98,10 +104,10 @@ export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
       { key: 'accept', label: copy.acceptIt, because: '', recommended: false, shows: null },
       { key: 'reject', label: copy.rejectIt, because: '', recommended: false, shows: null },
     ];
-  return q.options.map((o) => ({
+  return q.options.map((o, i) => ({
     key: o.key,
-    label: saidOf(o.label),
-    because: saidOf(o.because),
+    label: spoken(saidOf(o.label)) || queueWords.nth(i + 1),
+    because: spoken(saidOf(o.because)),
     recommended: o.recommended,
     shows: visualOf(o.shows),
   }));
@@ -126,11 +132,12 @@ function backDay(iso: string, now: number): string {
 /**
  * THE ONE QUIET LINE A QUESTION PUT OFF CARRIES (`governance.later` sends `until` and `until_why`): when it comes back,
  * and why it was put off, as Decide's classic list said it. `null` on any other question, or a day that does not read.
+ * Whoever put it off wrote the reason, so it is read through `spoken` and no address or id in it reaches the card.
  */
 export function laterLine(q: { until?: unknown; until_why?: unknown }, now: number): string | null {
   const when = typeof q.until === 'string' ? backDay(q.until, now) : '';
   if (when === '') return null;
-  const why = typeof q.until_why === 'string' ? saidOf(q.until_why.trim()) : '';
+  const why = typeof q.until_why === 'string' ? spoken(saidOf(q.until_why.trim())) : '';
   return why === '' ? queueWords.back(when) : `${queueWords.back(when)} · ${why}`;
 }
 

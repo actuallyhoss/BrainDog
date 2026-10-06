@@ -13,11 +13,14 @@ import { accept, type Accepting } from './accept.ts';
 
 type Call = { name: string; args: unknown };
 
+/** What a plan of a module the record holds adds and retires, beside its changes. */
+type Again = { adds?: readonly { id: string; summary: string; handed?: true }[]; retires?: readonly { id: string; rows: number; to?: string }[] };
+
 /**
- * A record that holds each module once it is installed; a plan of an installed one changes `changes` things, and asks
- * for `approve` to be approved. `before` is what it held before the press.
+ * A record that holds each module once it is installed; a plan of an installed one changes `changes` things, asks for
+ * `approve` to be approved, and adds and retires what `again` says. `before` is what it held before the press.
  */
-function record(changes: number, before: readonly string[] = [], approve: readonly string[] = []) {
+function record(changes: number, before: readonly string[] = [], approve: readonly string[] = [], again: Again = {}) {
   const calls: Call[] = [];
   const held: { id: string; version: string; disabled_at: null; registers: string[] }[] = before.map((id) => ({ id, version: '1.0.0', disabled_at: null, registers: [id] }));
   const ok = (value: unknown) => ({ ok: true, value });
@@ -26,8 +29,16 @@ function record(changes: number, before: readonly string[] = [], approve: readon
     planPack: async (args: { doc: { pack?: string } }) => {
       calls.push({ name: 'planPack', args });
       const id = args.doc.pack ?? '';
-      const again = held.some((p) => p.id === id);
-      return ok({ diff: { planHash: `${id}-${held.length}`, adds: again ? [] : [{ id: `register.${id}`, summary: '' }], changes: again ? Array.from({ length: changes }, () => ({ id: 'page.relation' })) : [], retires: [], approve: again ? [...approve] : [] } });
+      const was = held.some((p) => p.id === id);
+      return ok({
+        diff: {
+          planHash: `${id}-${held.length}`,
+          adds: was ? [...(again.adds ?? [])] : [{ id: `register.${id}`, summary: '' }],
+          changes: was ? Array.from({ length: changes }, () => ({ id: 'page.relation' })) : [],
+          retires: was ? [...(again.retires ?? [])] : [],
+          approve: was ? [...approve] : [],
+        },
+      });
     },
     installPack: async (args: { doc: { pack?: string } }) => {
       calls.push({ name: 'installPack', args });
@@ -80,4 +91,19 @@ test('A PEOPLE LIST HELD BEFORE IS PLANNED AGAIN ONCE MONEY GOES IN, and goes in
   const full = record(1, ['people', 'money-core']);
   await accept(full.client, asked());
   assert.equal(full.calls.filter((c) => c.name === 'planPack').length, 0);
+});
+
+test('A PEOPLE LIST HELD BEFORE IS NOT CHANGED UNDER THE PERSON: the same losses BrainDog\'s own updates check', async () => {
+  /* SOMETHING THE PERSON TOOK OFF: a figure People's copy held before Money came, which the record no longer holds. */
+  const back = record(1, ['people'], [], { adds: [{ id: 'metric.people-in-touch-30d', summary: '' }] });
+  await accept(back.client, asked());
+  assert.equal(installs(back.calls, 'people'), 0, 'a figure the person took off came back');
+  /* SOMETHING TAKEN AWAY, which was never asked about. */
+  const gone = record(1, ['people'], [], { retires: [{ id: 'page.relation', rows: 0 }] });
+  await accept(gone.client, asked());
+  assert.equal(installs(gone.calls, 'people'), 0, 'a page the person had was taken away');
+  /* WHAT THIS PRESS MADE ROOM FOR is new to People's copy, and goes in; so does a declaration handed to another pack. */
+  const room = record(1, ['people'], [], { adds: [{ id: 'block.organisation-money', summary: '' }], retires: [{ id: 'page.relation', rows: 0, to: 'money-core' }] });
+  await accept(room.client, asked());
+  assert.equal(installs(room.calls, 'people'), 1, 'what Money made room for did not go in');
 });

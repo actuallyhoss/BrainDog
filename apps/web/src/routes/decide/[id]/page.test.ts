@@ -138,7 +138,7 @@ test('the options come first, and what accepting does is one folded tile after t
     before,
     [
       '<Tile>',
-      "<Tile icon={merge ? 'people' : 'decide'} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>",
+      '<Tile icon={optionsIcon} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>',
     ],
     'a tile is drawn above the options again',
   );
@@ -302,7 +302,13 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
   const handler = page.slice(start, page.indexOf('\n  }\n', start));
   assert.match(handler, /if \(typing\(\) \|\| fromInput\(e\.target\)\) return;/u, 'a key from inside a field or a box reaches the gate');
   assert.match(handler, /pressMerge\(merge\.apart, mergeWords\.keptApart\);/u, 'Backspace keeps a merge apart with no Undo');
-  assert.match(handler, /if \(act === 'decline'\) held\(key, gate\.declinedHeld\(question\.title\)\);\n\s+else choose\(key\);/u, 'Backspace declines at once, with no Undo');
+  /* A DECLINE IS HELD FOR ITS UNDO ON EVERY QUESTION (audit 19 M10 took Enter away on a hard one, never the hold), and the
+     line it leaves says the question as the title does, with no address or id in it. */
+  assert.match(
+    handler,
+    /if \(act === 'decline'\) held\(key, gate\.declinedHeld\(spoken\(question\.title\)\)\);\n\s+else choose\(key\);/u,
+    'Backspace declines with no Undo, or says the question with its addresses in',
+  );
 
   /* HELD FOR SIX SECONDS, ON THE LINE IT LEAVES, AND SENT WHEN THE SCREEN GOES rather than dropped. */
   assert.match(page, /toasts\.push\(line, \{ undo: unhold, life: HOLD_MS, intent: 'good' \}\)/u, 'the Undo line does not last as long as the hold');
@@ -315,5 +321,5 @@ test('a merge is the one decision card with Undo, and Backspace is held and neve
   assert.match(page, /if \(holding && holding\.id !== id\) holding\.held\.flush\(\);/u, 'moving on to the next question leaves a held press holding its answers off');
 
   /* AND A QUESTION THAT GATHERED SEVERAL SAYS HOW MANY BESIDE ITS TITLE. */
-  assert.match(page, /title=\{question\.title\} count=\{joined\}/u, 'a joined question’s count is not in its heading');
+  assert.match(page, /title=\{spoken\(question\.title\)\} count=\{joined\}/u, 'a joined question’s count is not in its heading');
 });

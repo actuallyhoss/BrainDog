@@ -16,6 +16,12 @@
  * The page keys its elements by it too (`PageBody.svelte`), so a block the look moves is the same element moving, with
  * what it holds (a fold opened, a length picked) going with it.
  *
+ * A BLOCK THAT CANNOT SLIDE INSIDE THE PAGE FADES IN WHERE IT IS (`redrawn`). Played from its old place at its new
+ * width, a half that took the whole row as a panel docked beside the page stood out past the page's end for the length
+ * of the move, under the panel, and the work scrolled sideways while it went. A block whose old place at its new width
+ * is inside the page still slides, whatever its width did: faded from nothing, a block the reader was just looking at
+ * blinks out and back, and every block on the page did that when a scrollbar came or went and took 15px off them all.
+ *
  * A HEADLINE WRITTEN AGAIN CROSSFADES (`swap`): the block stays where it is and its old words fade out over the new
  * ones fading in, rather than changing in one frame under the reader's eye.
  *
@@ -35,6 +41,8 @@ export type Box = { x: number; y: number; w: number; h: number };
 export type Plan = {
   /** Blocks in both answers whose place changed: where each was, less where it is. */
   moves: { key: string; dx: number; dy: number }[];
+  /** Blocks in both answers that moved and cannot slide there inside the page: drawn anew where they are. */
+  redrawn: string[];
   /** Blocks only in the new answer. */
   enters: string[];
   /** Blocks only in the old answer, with the place each held. */
@@ -65,9 +73,10 @@ export function blockKeys(
   });
 }
 
-/** Which blocks moved, which came and which went, between two measures of the page. */
-export function planOf(before: ReadonlyMap<string, Box>, after: ReadonlyMap<string, Box>): Plan {
+/** Which blocks moved, which came and which went, between two measures of the page `room` wide. */
+export function planOf(before: ReadonlyMap<string, Box>, after: ReadonlyMap<string, Box>, room = Infinity): Plan {
   const moves: Plan['moves'] = [];
+  const redrawn: string[] = [];
   const enters: string[] = [];
   const leaves: Plan['leaves'] = [];
   for (const [key, now] of after) {
@@ -78,10 +87,14 @@ export function planOf(before: ReadonlyMap<string, Box>, after: ReadonlyMap<stri
     }
     const dx = was.x - now.x;
     const dy = was.y - now.y;
-    if (Math.abs(dx) >= STILL || Math.abs(dy) >= STILL) moves.push({ key, dx, dy });
+    if (Math.abs(dx) < STILL && Math.abs(dy) < STILL) continue;
+    /* AT ITS NEW WIDTH FROM ITS OLD PLACE, inside the page or not slid at all. */
+    const fits = was.x > -1 && was.x + now.w < room + 1;
+    if (fits) moves.push({ key, dx, dy });
+    else redrawn.push(key);
   }
   for (const [key, box] of before) if (!after.has(key)) leaves.push({ key, box });
-  return { moves, enters, leaves };
+  return { moves, enters, redrawn, leaves };
 }
 
 /**
@@ -239,7 +252,7 @@ export function recomposer(): {
     }
     return () => {
       const now = measure(page);
-      const plan = planOf(boxes(was), boxes(now));
+      const plan = planOf(boxes(was), boxes(now), page.getBoundingClientRect().width);
       const style = getComputedStyle(page);
       const less = still();
       const ease = (token: string, fallback: string) => style.getPropertyValue(token).trim() || fallback;
@@ -255,6 +268,13 @@ export function recomposer(): {
           for (const { key, dx, dy } of plan.moves) {
             const el = now.get(key)?.el;
             if (el) running.push(el.animate({ transform: [`translate(${dx}px, ${dy}px)`, 'none'] }, move));
+          }
+        /* A BLOCK THAT CANNOT SLIDE INSIDE THE PAGE fades in where it now is, on opacity alone: nothing about it stands
+           anywhere but its place. For a reader who asked for less motion it is simply there, as a moved block is. */
+        if (!less)
+          for (const key of plan.redrawn) {
+            const el = now.get(key)?.el;
+            if (el) running.push(el.animate({ opacity: [0, 1] }, { ...enter, fill: 'backwards' }));
           }
         for (const key of plan.enters) {
           const el = now.get(key)?.el;

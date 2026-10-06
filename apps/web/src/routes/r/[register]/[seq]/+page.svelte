@@ -26,7 +26,7 @@
 <script lang="ts">
   /* A FACT IS DRAWN ON THE BAR PRIMITIVE'S `.prop` ROW (`kinds/proportional.css`): its label, its value and their type. */
   import '@braindog/skin/kinds/proportional.css';
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase, at, at as inApp } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import { listLine } from '$lib/record/tags.ts';
@@ -182,9 +182,6 @@
   let askedFor = '';
   let reader: RowReader | null = null;
 
-  /** A row's address in the app, outside `readRow`, whose `at` is the read's own bracket. */
-  const rowHref = (register: string, n: number): string => at(`/r/${register}/${n}`);
-
   async function readRow(register: string, n: number) {
     const key = `${register}#${n}`;
     askedFor = key;
@@ -215,7 +212,8 @@
     /* A NUMBER MERGED INTO ANOTHER ROW IS NEVER THE ADDRESS: the answer is the kept row, and the page moves to its number,
        in place of this entry in the history, so Back does not land on the folded one again. */
     if (r.from === 'live' && r.folded !== undefined && r.entry && r.entry.seq !== n) {
-      void goto(rowHref(register, r.entry.seq), { replaceState: true });
+      /* `inApp` IS `at` HERE, since the read's own bracket is called `at` inside this function. */
+      void goto(inApp(`/r/${register}/${r.entry.seq}`), { replaceState: true });
       return;
     }
     got = r;
@@ -623,12 +621,13 @@
   const meets = $derived.by(() => (void got, meetsOf(decl)));
   const orgRole = $derived.by(() => (void got, meetsOf(decl) ? null : orgRoleOf(decl)));
   const fieldTo = (field: string | undefined): string | undefined => (field ? decl?.fields.find((f) => f.id === field)?.to : undefined);
-  /** A ref as a name that opens its row, or nothing while the record has not named it: never its number. */
+  /** A ref as a name that opens its row, or nothing while the record has not named it: never its number. The address
+   * stays record-relative and is rendered through `at()` where the line draws it. */
   const namedRef = (to: string | undefined, v: unknown): Named | null => {
     const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/u.test(v) ? Number(v) : NaN;
     if (!to || !Number.isInteger(n) || n < 1) return null;
     const name = names?.get(`${to}#${n}`)?.trim();
-    return name ? { name, href: at(`/r/${to}/${n}`) } : null;
+    return name ? { name, href: `/r/${to}/${n}` } : null;
   };
   /* WHETHER THE ROW IS THE PERSON WHOSE RECORD THIS IS, by the list's own `self` part. */
   const self = $derived(Boolean(meets?.self && row?.fields[meets.self] === true));
@@ -767,7 +766,7 @@
 
   /* AN AMOUNT AS A TILE WRITES ONE: the symbol where the record's currency has one, and no fraction of all zeros. */
   const moneySaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
-  /* A CHART'S VALUES, BY THE FIGURE'S RULE: a bar and a spark point say what they are, where the tile's figure is a headline. */
+  /* A CHART'S VALUES, BY THE FIGURE'S RULE: a bar and a sparkline's point say what they are, where the tile's figure is a headline. */
   const figureSaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), 'figure');
 
   /* EVERY VALUE IN A ROW'S PROSE IS A HOLE UNTIL PAGES READ THEM. The sample's own values answered them off the
@@ -853,7 +852,7 @@
   {#snippet sentenceLine()}{#each sentence as piece, i (i)}{#if piece.kind === 'state'}<span class="lead-word">{stateSaid(decl, stateValue)}</span>{:else if piece.kind === 'late'}<span class="said-late" data-tone={piece.tone} data-needs={piece.tone === 'bad' ? '' : undefined}>{piece.text}</span>{:else}{piece.text}{/if}{/each}{/snippet}
 
   <!-- WHO A PERSON IS, OR WHAT AN ORGANISATION IS, in place of the sentence a row of any other list leads with. -->
-  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link" href={part.href}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
+  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
 
   <!-- A VALUE AS THE PAGE SAYS IT, in a pill and in Details alike. -->
   {#snippet shown(f: FieldDecl, value: unknown)}

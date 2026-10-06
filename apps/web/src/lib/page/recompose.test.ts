@@ -61,7 +61,37 @@ test('a re-read that changed nothing plays nothing', () => {
     ['a', at(0, 0)],
     ['b', at(620, 0)],
   ]);
-  assert.deepEqual(planOf(page, new Map(page)), { moves: [], enters: [], leaves: [] });
+  assert.deepEqual(planOf(page, new Map(page)), { moves: [], enters: [], redrawn: [], leaves: [] });
+});
+
+test('a block that would stand outside the page at its old place is drawn anew and not slid', () => {
+  /* TWO HALVES OF A 1,200 PAGE, and then a panel docks and the page is 680 and they stack, each the whole row. */
+  const before = new Map([
+    ['left', at(0, 0, 594)],
+    ['right', at(606, 0, 594)],
+    ['under', at(0, 60, 1200)],
+  ]);
+  const after = new Map([
+    ['left', at(0, 0, 680)],
+    ['right', at(0, 60, 680)],
+    ['under', at(0, 120, 680)],
+  ]);
+  /* The left half stayed where it was and only widened, which is no move: it is simply drawn at its new width. The right
+     half, slid from 606 at 680 wide, would reach past the page's end; the block under them narrowed but starts on the
+     page's edge, so it still slides down to its new place rather than blinking out and back. */
+  assert.deepEqual(planOf(before, after, 680), { moves: [{ key: 'under', dx: 0, dy: -60 }], enters: [], redrawn: ['right'], leaves: [] });
+  /* A SCROLLBAR CAME AND EVERY BLOCK IS 15 NARROWER as one above them grew: they slide, and none is faded. */
+  assert.deepEqual(planOf(new Map([['b', at(0, 60, 1200)]]), new Map([['b', at(0, 120, 1185)]]), 1185), {
+    moves: [{ key: 'b', dx: 0, dy: -60 }],
+    enters: [],
+    redrawn: [],
+    leaves: [],
+  });
+  /* THE SAME WIDTH, BUT ITS OLD PLACE IS PAST THE PAGE'S END NOW: slid, it would reach under the panel. */
+  const wide = new Map([['b', at(620, 0, 300)]]);
+  assert.deepEqual(planOf(wide, new Map([['b', at(0, 60, 300)]]), 680).redrawn, ['b']);
+  /* AND ONE THE SAME WIDTH THAT STARTS INSIDE THE PAGE STILL SLIDES. */
+  assert.deepEqual(planOf(wide, new Map([['b', at(0, 60, 300)]]), 1200).moves, [{ key: 'b', dx: 620, dy: -60 }]);
 });
 
 test("a block is named by the key the record answered for it, wherever the look moved it", () => {

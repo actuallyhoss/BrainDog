@@ -132,11 +132,19 @@ async function stack(o: { open?: boolean } = {}) {
     mcp,
     tool,
     api,
-    /** An agent token for `person`, minted as the host would for them. What it may do is read from the member table on every call. */
-    async mint(person: string, scope: 'read' | 'propose' | 'write') {
+    /**
+     * An agent token for `person`, minted as the host would for them. What it may do is read from the member table on every call.
+     *
+     * A NEW AGENT STARTS AT ASK (DIRECTION §37), so a write it sends is filed as a question. `trusted` names the kinds it
+     * writes at Do and tell, as `seedLadder` keeps them for a token that wrote before the ladder: these tests are about
+     * the door, not the rung.
+     */
+    async mint(person: string, scope: 'read' | 'propose' | 'write', trusted: string[] = []) {
       const out = await running.api.createToken({ scope }, { principal: { kind: 'person', id: person, level: 'owner' } });
       assert.ok(out.ok, 'the token was not minted');
-      const bearer = (out as { value: { bearer: string } }).value.bearer;
+      const { id, bearer } = (out as { value: { id: string; bearer: string } }).value;
+      for (const kind of trusted)
+        running.sql.exec("INSERT INTO ladder (agent, kind, rung, accepted_unchanged, since) VALUES (?, ?, 'tell', 0, ?)", id, kind, new Date(NOW).toISOString());
       secrets.push(bearer);
       return bearer;
     },
@@ -243,7 +251,7 @@ test('405, 415 AND 413 ON A REAL SOCKET, a chunked body included, and the server
 test('INITIALIZE, THEN A TOOL CALL, IN ONE SESSION: nothing is minted for it, and the call reads the record', async () => {
   const s = await stack();
   try {
-    const bearer = await s.mint(s.owner, 'write');
+    const bearer = await s.mint(s.owner, 'write', ['obligations:add']);
     assert.equal((await s.api(bearer, 'create', { register: 'obligations', fields: { what: 'Invoice 41' } })).status, 200);
 
     const init = await s.mcp(bearer, rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } }));
@@ -284,7 +292,7 @@ test('AN AGENT REACHES THE SAME THINGS THROUGH /mcp AS THROUGH /api, AT THE SAME
     const owner = { principal: { kind: 'person' as const, id: s.owner, level: 'owner' as const } };
     assert.ok((await s.running.api.invite({ person: 'p_bo', email: 'bo@example.com', name: 'Bo', level: 'read' }, owner)).ok, 'Bo was not put on the record');
     const reader = await s.mint(s.owner, 'read');
-    const writer = await s.mint(s.owner, 'write');
+    const writer = await s.mint(s.owner, 'write', ['obligations:add']);
     /* Bo's own write token, and Bo is on the record at read: the person's level is the ceiling. */
     const bo = await s.mint('p_bo', 'write');
 

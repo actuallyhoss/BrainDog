@@ -42,7 +42,8 @@
   const bands = $derived(foldPeople(entries, decl, localDay(now)));
   const org = $derived(orgFieldOf(decl));
   const role = $derived(roleFieldOf(decl));
-  const orgIcon = $derived(iconFor(org ? REGISTERS[org.to]?.icon : undefined, 'people'));
+  /* AN ORGANISATION'S GLYPH IS ITS LIST'S, and where that list declares none, this list's own: a group of its people. */
+  const orgIcon = $derived(iconFor(org ? REGISTERS[org.to]?.icon : undefined, iconFor(decl.icon, 'rows')));
 
   /* THE GROUPS SOMEBODY OPENED, by organisation, for as long as they are on the list. */
   let open = $state<ReadonlySet<number>>(new Set());

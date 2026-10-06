@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { laterLine, queueMergeOf } from './queue-answer.ts';
+import { laterLine, queueMergeOf, waysOf } from './queue-answer.ts';
 
 const now = Date.parse('2026-10-02T09:00:00Z');
 
@@ -19,6 +19,23 @@ test('A QUESTION PUT OFF SAYS WHEN IT COMES BACK, and why, and any other questio
   assert.equal(laterLine({ until: '2026-11-20', until_why: '  ' }, now), 'Comes back on 20 Nov', 'a blank why is no why');
   assert.equal(laterLine({}, now), null, 'an open question carries no day');
   assert.equal(laterLine({ until: 'someday' }, now), null, 'a day that does not read draws no line');
+});
+
+test('AN ANSWER, ITS REASON AND WHY A QUESTION WAS PUT OFF CARRY NO ADDRESS OR ID (audit 21 #4)', () => {
+  const ways = waysOf({
+    options: [
+      { key: 'merge', label: 'Merge into rohan@x.com', because: 'Seen at https://github.com/x/y as 01ARZ3NDEKTSV4RRFFQ69G5FAV', recommended: true },
+      { key: 'pick', label: 'tasks#8', because: '', recommended: false },
+    ],
+  });
+  assert.deepEqual(
+    ways.map((w) => [w.label, w.because]),
+    [
+      ['Merge into someone', 'Seen at github.com'],
+      ['Answer 2', ''],
+    ],
+  );
+  assert.equal(laterLine({ until: '2026-10-05', until_why: 'Waiting on ~/Developer/quotes.pdf from jo@x.io' }, now), 'Comes back in 3d · Waiting from someone');
 });
 
 test("THE RECORD'S OWN WHO-IS-WHO QUESTION IS DRAWN AS A MERGE ON THE QUEUE, and a rowset that is some other change is not", () => {

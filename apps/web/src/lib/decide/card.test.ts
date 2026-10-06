@@ -153,6 +153,42 @@ test('WHAT CHANGES IS SAID FROM WHAT TO WHAT, and an id is never a value', () =>
   assert.deepEqual(shiftsOf(ask(), 'GBP'), [], 'an older record sends none');
 });
 
+test('NO ADDRESS OR ID IN AN ANSWER, ITS REASON OR WHAT A CHANGE WAS AND BECOMES (audit 21 #4)', () => {
+  const card = cardOf(
+    ask({
+      options: [
+        { key: 'merge', label: 'Merge into rohan@x.com', because: 'Same address as tasks#8 in /Users/sam/Developer/braindog', recommended: true },
+        { key: 'apart', label: 'people#4', because: '', recommended: false },
+      ],
+    }),
+    { now, home: 'GBP' },
+  );
+  assert.deepEqual(
+    card.ways.map((w) => [w.label, w.because]),
+    [
+      ['Merge into someone', 'Same address'],
+      ['Answer 2', ''],
+    ],
+    'an answer that was only a handle is said by its place, never left blank',
+  );
+  /* SCRUBBED BEFORE IT IS TESTED: two addresses read alike and are left to the page, and a handle inside words goes. */
+  assert.deepEqual(
+    shiftsOf(
+      ask({
+        changes: [
+          { field: 'email', before: 'old@x.com', after: 'new@y.com' },
+          { field: 'link', before: '01ARZ3NDEKTSV4RRFFQ69G5FAV', after: 'Bake' },
+          { field: 'note', before: 'Ask jo@x.io', after: 'Ask Jo, see tasks#8' },
+        ],
+      }),
+      'GBP',
+    ),
+    [{ what: 'note', before: 'Ask someone', after: 'Ask Jo' }],
+  );
+  const later = cardOf(ask({ until: '2026-10-08', until_why: 'Until alex@acme.com replies on tasks#8' }), { now });
+  assert.equal(later.later, 'Comes back in 2d · Until someone replies');
+});
+
 test("A SLASH PROPOSAL'S ANSWERED LINE READS AS ITS HISTORY", () => {
   const slash = cardOf(ask({ who: 'slash', kind: 'rowset', options: [] }), { now });
   assert.equal(slash.slash, true);

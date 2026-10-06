@@ -207,6 +207,16 @@ export type Pairable = Placed & { readonly kind: string; readonly columns?: numb
 export const PAIR_FROM = 1100;
 
 /**
+ * AND THE WIDTH OF THE WORK COLUMN UNDER WHICH THE PAGE IS ONE COLUMN, whatever the blocks' spans say: what a 900 window
+ * gives the work inside its gutters, where every page is one column anyway (`PageBody.svelte`'s `width < 900px`).
+ *
+ * THE COLUMN AND NOT THE WINDOW, as with `PAIR_FROM`. A 1,280 window with a panel docked leaves the work 650 to 880, the
+ * room of a window under 900, and read off the window the page set its halves 290 to 400 wide beside the panel, where the
+ * same room with no panel stacks them.
+ */
+export const ONE_UNDER = 860;
+
+/**
  * THE KINDS THAT ARE NEVER HALF A ROW, whatever their floor: a heading, a field to type into, the page's own controls,
  * and the pictures whose whole point is their width. Everything else that survives half a row (`floorFor` under six) may
  * sit beside its neighbour.

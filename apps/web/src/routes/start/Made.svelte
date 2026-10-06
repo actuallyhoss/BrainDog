@@ -8,8 +8,8 @@
   THEN THE PASSKEY, for a person who has none (`PasskeyFirst` draws nothing for anybody else), so a first sign-in by
   email is not the only way back in.
 
-  `modules` IS WHAT WAS JUST MADE when this follows Make it mine on the same screen. Arriving at `/start#made` from
-  sign-up, it is read from the record's packs once.
+  `modules` IS WHAT WAS JUST MADE when this follows Make it mine on the same screen, and the lists they bring are what
+  is offered for. Arriving at `/start#made` from sign-up, the lists are read from the record's packs once.
 -->
 <script lang="ts">
   import { onMount, tick } from 'svelte';
@@ -18,7 +18,8 @@
   import * as clipboard from '$lib/clipboard.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { connectLines } from '$lib/record/device.ts';
-  import { madeOffers, modulesOn } from '$lib/start/made.ts';
+  import { madeOffers } from '$lib/start/made.ts';
+  import { listsOfModules, listsOn } from '$lib/start/parts.ts';
   import AgentMark from '$lib/ui/AgentMark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -35,12 +36,12 @@
     void (async () => {
       const out = (await createClient({ base: apiBase() })
         .packs()
-        .catch(() => null)) as { ok: true; value: { id: string; disabled_at: string | null }[] } | { ok: false } | null;
-      read = out?.ok ? modulesOn(out.value) : [];
+        .catch(() => null)) as { ok: true; value: { disabled_at: string | null; registers?: string[] }[] } | { ok: false } | null;
+      read = out?.ok ? listsOn(out.value) : [];
     })();
   });
 
-  const offers = $derived(madeOffers(modules ?? read ?? []));
+  const offers = $derived(madeOffers(modules !== null ? listsOfModules(modules) : (read ?? [])));
 
   function copyAgent() {
     /* THE MCP ADDRESS IS AT THE HOST'S ROOT, under no slug, so the origin of this record's own address. */

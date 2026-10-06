@@ -18,13 +18,13 @@
   let {
     view,
     board,
-    groups = false,
+    groups = null,
     onview,
   }: {
     view: View;
     board: boolean;
-    /** A list of people by organisation, which opens grouped and offers it first. */
-    groups?: boolean;
+    /** A list of people by organisation, which opens grouped and offers it first: the list's own glyph, or null. */
+    groups?: IconName | null;
     onview: (view: View) => void;
   } = $props();
 
@@ -34,12 +34,12 @@
   const views = $derived(
     (
       [
-        ['groups', 'people'],
+        ['groups', groups ?? 'rows'],
         ['table', 'rows'],
         ['board', 'board'],
         ['cards', 'grid'],
       ] as const satisfies readonly (readonly [View, IconName])[]
-    ).filter(([v]) => (v !== 'board' || board) && (v !== 'groups' || groups)),
+    ).filter(([v]) => (v !== 'board' || board) && (v !== 'groups' || groups !== null)),
   );
 </script>
 

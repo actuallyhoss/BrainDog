@@ -1,6 +1,6 @@
 /*
- * `path` (`Path.svelte`): the view switch over its stones. The stones are list items and keep `.list`'s rules in
- * `blocks.css`.
+ * `path` (`Path.svelte`): the stones of a `steps path` list and the view switch over them. The stones are list items
+ * and keep `.list`'s rules in `blocks.css`; what makes them stones is here, since only a declared page draws one.
  *
  * One of the kind sheets `blocks-kinds.css` gathers, loaded with the screens that draw declared pages rather than in
  * the sheet every screen waits on. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
@@ -23,5 +23,97 @@
     .path-view {
       min-block-size: var(--tap);
     }
+  }
+
+  /* `steps path`: A STONE A STEP, the stones in a column of their own and the line drawn through its
+     middle behind them, so the hairlines between rows go and the line is the structure. The column is
+     as wide as the word "Next", so every stone is centred on the same x whether it holds a tick, the
+     word or nothing. A step's number goes too: the stone says where it is. The detail goes under the
+     step's title, as every list item's does. */
+  .list[data-kind='steps'][data-form='path'] > .item {
+    position: relative;
+    grid-template-columns: 3.5rem minmax(min(16ch, 100%), 1fr) auto;
+    border-block-end: 0;
+    counter-increment: none;
+  }
+
+  .list[data-kind='steps'][data-form='path'] .item-title::before {
+    content: none;
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--sp-3) + 1.75rem - 1px);
+    inline-size: 2px;
+    background: var(--rule);
+  }
+
+  /* THE LINE STARTS AND ENDS AT A STONE'S MIDDLE, which is half a line under the row's padding and
+     not half the row: a step's detail takes a second line, and at 50% the first stone sat 3px above
+     where the line began (measured at 390, a row of 60.5px). */
+  .list[data-kind='steps'][data-form='path'] > .item:first-child::before {
+    inset-block-start: calc(var(--sp-2) + 0.5lh);
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item:last-child::before {
+    inset-block-end: auto;
+    block-size: calc(var(--sp-2) + 0.5lh);
+  }
+
+  .list[data-kind='steps'][data-form='path'] > .item:only-child::before {
+    content: none;
+  }
+
+  /* A LATER STONE IS THE LIST'S EMPTY BOX, round; a DONE one is a ticked box, the ink fill every
+     checked control wears (as `todo`'s is), with its step muted; the NEXT one is the word, in ink on
+     the page's ground, with its step at full weight, because finding it without reading every row is
+     what the form is for. Each stone has a ground, so the line passes behind it. */
+  .list[data-form='path'] .item-marker {
+    position: relative;
+    justify-self: center;
+    border-radius: var(--r-pill);
+    background: var(--bg);
+  }
+
+  .list[data-form='path'] > .item[data-mark='done'] > .item-marker {
+    background: var(--on);
+    border-color: var(--on);
+    font-variant-emoji: text;
+  }
+
+  .list[data-form='path'] > .item[data-mark='done'] .item-title {
+    color: var(--dim);
+  }
+
+  .list[data-form='path'] > .item[data-mark='next'] > .item-marker {
+    inline-size: auto;
+    block-size: auto;
+    border: 0;
+  }
+
+  .path-next {
+    display: inline-block;
+    padding: 1px var(--sp-2);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-pill);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+
+  .list[data-form='path'] > .item[data-mark='next'] .item-title {
+    font-weight: 500;
+  }
+
+  /* THE STEPS THE SHORT VIEW LEFT OUT, said as a count under the last stone, dim like the queue's. */
+  .path-more {
+    margin: 0;
+    padding-block: var(--sp-1) 0;
+    padding-inline: calc(var(--sp-3) + 3.5rem + var(--sp-3)) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 }

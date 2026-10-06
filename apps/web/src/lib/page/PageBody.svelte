@@ -29,7 +29,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { boxesOf, layoutOf, mainSpan, PAIR_FROM, paired, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
+  import { boxesOf, layoutOf, mainSpan, ONE_UNDER, PAIR_FROM, paired, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
   import { emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -277,6 +277,9 @@
     return () => watch.disconnect();
   });
   const twoUp = $derived(workWidth !== null && workWidth >= PAIR_FROM && mode !== 'preview' && (!layout || !railShown));
+  /* AND ONE COLUMN IN THE ROOM OF A WINDOW UNDER 900 (`layout.ts` `ONE_UNDER`), beside a docked panel or the rail as much
+     as on a phone. Not in a preview, which is drawn at another screen's width. */
+  const narrow = $derived(workWidth !== null && workWidth < ONE_UNDER && mode !== 'preview');
 
   /**
    * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
@@ -333,6 +336,7 @@
   let saidWas = new Map<string, string>();
   $effect.pre(() => {
     void spans;
+    void narrow;
     const drawnNow = laid.filter((x) => x.block.drawn);
     const shown = new Set(drawnNow.map((x) => keys[x.slot.i]!));
     const said = new Map(drawnNow.filter((x) => x.block.kind === 'note' && isLead(x.block)).map((x) => [keys[x.slot.i]!, x.block.body ?? '']));
@@ -948,7 +952,7 @@
 <!-- A LIST while arranging, and nothing while reading. The blocks become a reorderable list only in the mode where they
      are reorderable; announcing "list, 5 items" to somebody reading a page is describing the furniture. ON A PAGE WITH A
      RAIL EACH COLUMN IS ITS OWN LIST while arranging, named, and the page is neither. -->
-<div class="page" data-mode={mode} data-headed={lifted ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
+<div class="page" data-mode={mode} data-narrow={narrow ? '' : undefined} data-headed={lifted ? '' : undefined} role={arranging && !layout ? 'list' : undefined} bind:this={pageEl}>
   <!-- JUST CHANGED OPENS THE PAGE, before what it holds; on a page whose head rides over its lead tile it follows that
        tile instead, or the head would sit over it. -->
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
@@ -1285,6 +1289,26 @@
     .block-slot {
       grid-column: auto;
     }
+  }
+
+  /* AND IN THE ROOM OF A WINDOW UNDER 900 (`data-narrow`, the work column measured against `ONE_UNDER`), as a phone is:
+     beside a docked panel or the rail, the work is laid out by the room it has and not by the window around it. */
+  .page[data-narrow] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page[data-narrow] :is(.area, .area[data-area='main'], .area[data-area='rail'], .box) {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page[data-narrow] .block-slot {
+    grid-column: auto;
+  }
+
+  /* One column, so the rail is not pinned over the work it now follows, as under 900. */
+  .page[data-narrow] .area[data-area='rail'] {
+    position: static;
   }
 
   /**

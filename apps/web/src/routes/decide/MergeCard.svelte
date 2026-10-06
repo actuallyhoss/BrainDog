@@ -13,7 +13,8 @@
 <script lang="ts">
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { keptName, words, type Merge, type Press } from './merge.ts';
+  import { iconFor, REGISTERS } from '$lib/record/api.ts';
+  import { keptName, mergeListOf, words, type Merge, type Press } from './merge.ts';
 
   let {
     merge,
@@ -34,6 +35,12 @@
   } = $props();
 
   const into = $derived(keptName(merge));
+  /* EACH NAME'S WELL IS ITS LIST'S OWN ICON, as the record declares it: the list is read off the names' handles or the
+     people role (`mergeListOf`), never named here. The one kept is marked as kept. */
+  const listIcon = $derived.by(() => {
+    const list = mergeListOf(merge, REGISTERS);
+    return iconFor(list === null ? undefined : REGISTERS[list]?.icon, 'rows');
+  });
   const off = $derived(!answerable || holding !== null);
   const why = $derived(answerable ? undefined : 'cannot-decide');
 </script>
@@ -44,7 +51,7 @@
     {#each merge.candidates as c (c.key)}
       {@const name = c.name || words.unnamed}
       <li class="name">
-        <IconWell name={c.kept ? 'user-check' : 'people'} />
+        <IconWell name={c.kept ? 'user-check' : listIcon} />
         <span class="name-main">
           <span class="name-title"
             ><span dir="auto">{name}</span>{#if c.kept && merge.candidates.length > 1}<span class="name-kept">{words.kept}</span>{/if}</span
@@ -60,8 +67,8 @@
             data-on={holding === press.option ? '' : undefined}
             disabled={off}
             aria-describedby={why}
-            aria-label={titleOf(press.option) ?? words.pickNamed(name)}
-            onclick={() => onpress(press, words.picked(c.name))}>{titleOf(press.option) ?? words.pick}</Button
+            aria-label={titleOf(press.option) || words.pickNamed(name)}
+            onclick={() => onpress(press, words.picked(c.name))}>{titleOf(press.option) || words.pick}</Button
           >
         {/if}
       </li>

@@ -500,7 +500,7 @@
   /** The person moved on to the record as it is: nothing more is made from here, so the words are forgotten. */
   function openAsIs(): void {
     forget();
-    location.assign(madeAt);
+    location.assign(at(madeAt));
   }
 
   /**
@@ -582,7 +582,7 @@
       again = null;
       forget();
       stage = words.makingOpen;
-      location.assign(madeAt);
+      location.assign(at(madeAt));
       return;
     }
     /* NOTHING ANSWERED: the record is made and may be empty, so it is the whole press again. Otherwise only what is left,

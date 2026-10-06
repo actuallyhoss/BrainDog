@@ -29,7 +29,7 @@
   import { day, queueCost, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
-  import { whoDid } from '$lib/record/api.ts';
+  import { iconFor, REGISTERS, whoDid } from '$lib/record/api.ts';
   import { installWords } from '$lib/record/actions.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import Cited from '$lib/ui/Cited.svelte';
@@ -51,7 +51,7 @@
   import { spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
-  import { mergeOf, words as mergeWords, type Press } from '../merge.ts';
+  import { mergeListOf, mergeOf, words as mergeWords, type Press } from '../merge.ts';
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -191,6 +191,12 @@
           mergeOf(live.about, question.options.map((o) => o.key), live.rowset ? (live.rows[live.rowset.register] ?? []) : []))
       : null,
   );
+  /* THE OPTIONS' TILE WEARS THE MERGED LIST'S OWN ICON, read off the record (`mergeListOf`) and never named here. */
+  const optionsIcon = $derived.by(() => {
+    if (!merge) return 'decide' as const;
+    const list = mergeListOf(merge, REGISTERS);
+    return iconFor(list === null ? undefined : REGISTERS[list]?.icon, 'rows');
+  });
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. A merge's
      patches are the card's names, and drawn as a diff they were the record's handles and a deleted day. */
@@ -839,7 +845,7 @@
       {/snippet}
 
       <!-- A COUNT ONLY OVER A QUESTION'S OWN OPTIONS: over Accept and Decline it would count the buttons. -->
-      <Tile icon={merge ? 'people' : 'decide'} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>
+      <Tile icon={optionsIcon} title={merge ? mergeWords.heading : copy.theOptions} count={two || merge ? undefined : question.options.length}>
         <section class="options">
           {#if merge}
             <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
@@ -847,7 +853,7 @@
               {merge}
               {answerable}
               holding={holding?.key ?? null}
-              titleOf={(key) => question.options.find((o) => o.key === key)?.title}
+              titleOf={(key) => spoken(question.options.find((o) => o.key === key)?.title ?? '')}
               onpress={pressMerge}
             />
           {:else if two}

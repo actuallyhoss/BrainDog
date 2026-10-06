@@ -14,6 +14,7 @@
  * set under `--t-sm`; `--t-xs` is kept for marks, initials in a face and key caps.
  */
 
+@import './kinds/timeline.css';
 @import './kinds/panel.css';
 @import './kinds/stat.css';
 @import './kinds/board.css';
