@@ -225,6 +225,9 @@
   const keys = $derived(blockKeys(blocks));
   const motion = recomposer();
   let drewFor: string | null = null;
+  /* THE PAGE'S OWN ELEMENT, declared before the effects that read it: a `$effect.pre` runs while the component is
+     still being set up, and reading a `let` the script has not reached yet is a TDZ error that blanks the page. */
+  let pageEl = $state<HTMLElement | null>(null);
   let wasArranging = false;
   $effect.pre(() => {
     void spans;
@@ -433,7 +436,6 @@
      feed and its notes, which have no list behind them, so `o` and `y` could not reach a single block of it. A block
      that holds no records (Work's capture line) is still no stop. Enter on a whole block goes into it, as the block
      cursor's Enter does. */
-  let pageEl = $state<HTMLElement | null>(null);
   let rowKey = $state<string | null>(null);
   let rowAt = -1;
   /* THE RING IS THE KEYS' MARK: a row a pointer pressed in keeps the cursor, so `x` ticks it, but draws no ring that
