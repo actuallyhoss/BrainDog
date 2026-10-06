@@ -339,7 +339,23 @@
     /* THE DESIGN SYSTEM'S GLASS AND THE GROUND'S LIGHT. The colours are generated (`--glass`, `--glass-strong`,
        `--glass-rim`, `--glass-hair`, `--ground-glow`, `--glass-sat`); the geometry is here. Chrome is
        `background: var(--glass); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`.
-       `--ground-light` is the only gradient in the product, painted on the ground by `base.css`. */
+       `--ground-light` is the only gradient in the product, painted on the ground by `base.css`.
+
+       SAFARI READS THE SAME TOKEN, IN A BLOCK OF ITS OWN, AND NEVER A LITERAL:
+       `@supports (-webkit-backdrop-filter: none) { .x { -webkit-backdrop-filter: var(--glass-blur); } }`.
+       The block is for the build, not for Safari: lightningcss folds a prefixed and an unprefixed declaration in one
+       rule into one, and the prefixed line Safari needs came out of the bundle (or came out as the other's value).
+       What it reads is this token, because this token already answers for both schemes (`--glass-sat` is 1.6 in
+       light and 1.4 in dark) and for less transparency (`a11y.css` sets it to `none`). The literal
+       `blur(24px) saturate(1.6)` that a dozen blocks wrote gave dark glass light's colour, and only an important
+       rule in `a11y.css` could take it away. WebKit computes this `var()` in both spellings (WebKit 26.5, measured
+       2026-10-06); what went missing was the prefixed line the build folded away, and an older Safari that mishandles
+       the unprefixed one is given the prefixed one here regardless. Chromium does not know the prefixed property
+       (151 answers `false` to the query), so the block is Safari's alone, and were it not, it would set the same value.
+
+       THERE IS NO SECOND, SAFARI-ONLY TOKEN, ON PURPOSE. A `--glass-blur-webkit` would have to be set wherever this one
+       is (both schemes, high contrast, less transparency) to say the same thing, and the day one of them was missed is
+       the day dark Safari wore light's glass again. `glass-motion.test.ts` holds the skin to it. */
     --ground-light: radial-gradient(1200px 520px at 50% -140px, var(--ground-glow), transparent);
     --glass-blur: blur(24px) saturate(var(--glass-sat));
     --glass-edge: inset 0 0 0 0.5px var(--glass-rim), 0 0 0 0.5px var(--glass-hair);
@@ -449,7 +465,6 @@
     --d-release: var(--d-menu);
     --d-move: var(--d-panel);
     /* The panel, a sheet and an action sheet going back the way they came: a step quicker than they arrived (180). */
-    --d-panel-out: var(--d-rows);
     --d-panel-out: var(--d-rows);
 
     /* A SPRING, as `linear()`: the step response of zeta 0.7467 and omega 6.56, which peaks at 1.03 and settles by

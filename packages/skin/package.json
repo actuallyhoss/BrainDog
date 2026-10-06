@@ -30,6 +30,7 @@
     "mark.ts"
   ],
   "scripts": {
+    "test": "node --test *.test.ts",
     "theme": "node scripts/theme.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

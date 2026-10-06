@@ -134,10 +134,10 @@
 
   /* ASKED FOR LESS TRANSPARENCY, glass is the tile's own opaque surface, with nothing blurred behind it.
 
-     AND SAFARI'S LITERAL BLUR GOES WITH IT. Safari drops a `-webkit-backdrop-filter` whose value is a `var()`, so a
-     component that floats over a chart gives Safari the blur in so many words, in an `@supports` block of its own
-     (`blocks-charts.css`), and `--glass-blur: none` cannot reach a literal. Important in this layer, because the
-     a11y layer sits under the components one and only an important declaration here wins over theirs. */
+     SAFARI'S SPELLING GOES WITH IT, AND SO DOES ANY LITERAL. Safari's block reads `--glass-blur` too (`tokens.css`),
+     so `none` reaches it on the token. The rule below is the floor for a host that still writes a blur in so many
+     words, which no token can reach. Important in this layer, because the a11y layer sits under the components one
+     and only an important declaration here wins over theirs. */
   @media (prefers-reduced-transparency: reduce) {
     :root {
       --glass: var(--bg);
