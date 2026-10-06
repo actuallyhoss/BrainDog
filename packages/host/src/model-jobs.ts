@@ -2,7 +2,8 @@
  * The pass that serves the record's model jobs on either host: lease the `infer.draft`, `infer.prose`, `infer.resolve` and
  * `infer.embed` rows, answer each through the Slash engine the host hands in, and ack each in the shape
  * `packages/kernel/src/outbox.ts`'s `ack` reads. Once a night it also reads the notes changed on people, organisations and
- * projects (`understand.ts`, `serveNotes`).
+ * projects and the newest runs' handoffs (`understand.ts`, `serveNotes`), and offers what a person wrote out word for word
+ * in them (`serveOffers`).
  *
  * ONE PASS FOR BOTH HOSTS, AND THE RECORD STAYS THE JUDGE. The Worker calls this from `alarm()` as `#model`, after `#ask`,
  * and the self-host from `poll`, after its asks. The kernel files a draft through its one gate in the ack's transaction and
@@ -36,7 +37,7 @@ import type { CallContext, RecordApi } from '@braindog/record';
 
 import type { DraftSample, ModelJobInference } from './slash-answers.ts';
 import { slashSamplesOf } from './slash.ts';
-import { serveNotes, settleResolve, UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH, type NotesKernel, type UnderstandStore } from './understand.ts';
+import { serveNotes, serveOffers, settleResolve, UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH, type OffersKernel, type UnderstandStore } from './understand.ts';
 
 export { UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH } from './understand.ts';
 
@@ -102,10 +103,10 @@ export type ModelJobEmbeddings = { model: string; dims: number; vectors: Int8Arr
 export type ModelJobEmbed = { embed?: ((texts: readonly string[]) => Promise<Result<ModelJobEmbeddings>>) | undefined };
 
 /**
- * The kernel methods this pass calls, and not the kernel. The notes pass's four are optional, so a host or a test that
- * hands the queue alone still has its jobs served, and the notes are not read.
+ * The kernel methods this pass calls, and not the kernel. The notes pass's and the offers' are optional, so a host or a
+ * test that hands the queue alone still has its jobs served, and the notes are not read.
  */
-export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'> & Partial<NotesKernel>;
+export type ModelJobsKernel = Pick<Kernel, 'leaseOutbox' | 'ackOutbox' | 'tail'> & Partial<OffersKernel>;
 
 /** What the pass reads on the record: its kernel for the queue, and the inbox a draft's samples come from. */
 export type ModelJobsApi = Pick<RecordApi, 'inbox'> & { kernel: ModelJobsKernel };
@@ -373,8 +374,20 @@ async function settle(
  */
 export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Promise<boolean> {
   const { inference, meter } = deps;
-  if (inference === undefined) return false;
   const log = deps.log ?? warn;
+
+  /* WHAT A PERSON WROTE WORD FOR WORD IS OFFERED FIRST, AND WITH NO MODEL (`serveOffers`): it costs no ask, so neither a
+     host without a model nor a spent month holds it back. Nightly by its own mark, like the notes. */
+  const { registers, list, meetsList, propose, history } = api.kernel;
+  if (deps.store && registers && list && meetsList && propose && history) {
+    try {
+      serveOffers({ registers, list, meetsList, propose, history }, { store: deps.store, now: deps.now, log });
+    } catch (e) {
+      log(`offers: ${said(e)}`);
+    }
+  }
+
+  if (inference === undefined) return false;
 
   const now = deps.now();
   const month = monthOf(now, 0);
@@ -414,7 +427,6 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   if (acked > 0 && deps.scheduler) await api.kernel.tail(deps.scheduler);
 
   /* THE NOTES, AFTER THE JOBS AND ON WHAT THE MONTH STILL HAS: the understanding share, held under the work's. */
-  const { registers, list, meetsList, propose } = api.kernel;
   if (inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {
     const work = meter;
     const understand = meter.understand;

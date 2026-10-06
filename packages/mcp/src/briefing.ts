@@ -355,10 +355,14 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   /* ── the card ──────────────────────────────────────────────────────────── */
 
   const runner = Object.keys(mine).length > 0 ? runnerOf(mine) : null;
+  /* THE PROJECT'S NAME IS A ROW'S WORDS, and one named for its folder or its owner's address was said as it was
+     (audit 21, item 15): said as every other row's words are, and a project with none by its list's word and handle. */
+  const projectWords = project && text(project.name) ? nameOnly(String(project.name)) : null;
+  const projectName = project ? (projectWords ? plainOf(projectWords, look, false) : namedIn('', String(project.spoken), look)) : null;
   const head = [
     'BrainDog',
     mineSpoken ? `run ${mineSpoken}` : 'no run yet',
-    project ? `project ${clip(String(project.name ?? project.spoken), 40)}` : 'no project',
+    projectName ? `project ${clip(projectName, 40)}` : 'no project',
     runner,
   ]
     .filter(Boolean)

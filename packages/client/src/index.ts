@@ -1235,8 +1235,11 @@ export function createClient(options: ClientOptions) {
     /* UNDO ON THE SERVER: ADMIN, so a browser session, and no token reaches either. `dry: true` answers the plan in
        names and its `hash`; applying sends that `hash` back, so what goes back is the plan the person read. A change
        somebody made since is skipped and said, never overwritten. */
-    /** Put back one set of changes (`batch`) or what one decision did (`decision`). */
-    undo: (args: ({ batch: string } | { decision: string }) & { dry?: boolean; hash?: string }) =>
+    /**
+     * Put back one set of changes (`batch`) or what one decision did (`decision`). `row` narrows a batch to the part of it
+     * on one row, by its list and number, for a byline's "Only this one".
+     */
+    undo: (args: ({ batch: string; row?: { register: string; seq: number } } | { decision: string }) & { dry?: boolean; hash?: string }) =>
       call<Answer<'undo'>>('undo', args as Record<string, unknown>),
     /** Put back every change one agent run made. */
     undoRun: (args: { run: string; dry?: boolean; hash?: string }) => call<Answer<'undoRun'>>('undoRun', args as Record<string, unknown>),

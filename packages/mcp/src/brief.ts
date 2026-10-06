@@ -185,13 +185,24 @@ export function namedIn(words: string, spoken: string, look: Look, room = 80): s
   return one ? `Untitled ${one} (${spoken})` : spoken;
 }
 
+/** The `@` of an address, or the word a person writes so a scraper misses it: `jo [at] x.io`, `jo (AT) x.io`. */
+const AT = String.raw`(?:@|\s*[\[(]\s*[aA][tT]\s*[\])]\s*)`;
+/** The dot between a domain's parts, or the word written for it: `x [dot] io`. */
+const DOT = String.raw`(?:\.|\s*[\[(]\s*[dD][oO][tT]\s*[\])]\s*)`;
+
 /**
- * A mail address, bare or behind `mailto:`: `jo@kiln.example`, and GitHub's `101+jo@users.noreply.github.com`.
+ * A mail address, bare or behind `mailto:`: `jo@kiln.example`, and GitHub's `101+jo@users.noreply.github.com`; one
+ * written out so a scraper misses it, `jo [at] kiln [dot] example`; and one at a machine rather than a domain,
+ * `jo@localhost` and `jo@10.0.0.1` (audit 21, item 15), which name a person and a machine both.
  *
- * ITS LAST PART IS LETTERS, as every mail domain's is, because a step an agent left reads "Pin node@24.13.0" and
- * `@braindog/mcp@0.3.1`, and both were said "Pin someone" and "@braindog/someone".
+ * A DOMAIN'S LAST PART IS LETTERS, as every mail domain's is, because a step an agent left reads "Pin node@24.13.0" and
+ * `@braindog/mcp@0.3.1`, and both were said "Pin someone" and "@braindog/someone". A machine's number is four parts, so a
+ * version of three is still not one.
  */
-const ADDRESS = /(?:mailto:)?[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(?![\p{L}\p{N}-])/gu;
+const ADDRESS = new RegExp(
+  String.raw`(?:mailto:)?[\p{L}\p{N}._%+-]+${AT}(?:[\p{L}\p{N}-]+(?:${DOT}[\p{L}\p{N}-]+)*${DOT}\p{L}{2,}(?![\p{L}\p{N}-])|localhost(?![\p{L}\p{N}-])|\[?\d{1,3}(?:\.\d{1,3}){3}\]?(?!\p{N}|\.\p{N}))`,
+  'gu',
+);
 
 /** An address in brackets beside a name, `Jo <jo@kiln.example>` or `Jo (jo@kiln.example)`, with the space before it. */
 const BRACKETED = new RegExp(String.raw`\s*[<(\[]\s*${ADDRESS.source}\s*[>)\]]`, 'gu');

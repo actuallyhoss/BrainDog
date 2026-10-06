@@ -121,3 +121,14 @@ test('OPEN WORK IN THE BRIEFING SAYS NO ADDRESS, though a task is worded with on
   assert.match(text, /Reply to someone about node@24\.13\.0/u);
   clean(text, 'the open work');
 });
+
+test('AN ADDRESS AT A MACHINE, OR WRITTEN OUT TO DODGE A SCRAPER, IS STILL AN ADDRESS (audit 21, item 15)', () => {
+  assert.equal(unaddressed('Ask jo@localhost about the build'), 'Ask someone about the build');
+  assert.equal(unaddressed('Mail jo@10.0.0.1.'), 'Mail someone.');
+  assert.equal(unaddressed('Write to jo [at] x.io first'), 'Write to someone first');
+  assert.equal(unaddressed('Write to jo (AT) kiln [dot] example first'), 'Write to someone first');
+  assert.equal(nameOnly('Jo Park <jo@localhost>'), 'Jo Park');
+  assert.equal(nameOnly('jo [at] x.io'), null);
+  for (const step of ['Pin node@24.13.0 before the tests', 'Bump @braindog/mcp@0.3.1', 'Meet at 3@4.5pm', 'Meet (at) noon', 'Due at 10:00 @ the studio'])
+    assert.equal(unaddressed(step), step, 'a version, a time or a word is not an address');
+});

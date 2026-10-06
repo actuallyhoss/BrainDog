@@ -1,0 +1,126 @@
+/**
+ * Who the record's own person is, on a record made before sign-up marked them (`loop/research-understanding-judge.md`,
+ * change 1): once People has the `self` part, the tick marks the person holding the owner's sign-in address, as one
+ * decision Decide shows as done with Undo; with nobody holding it, one question "Which of these is you?" names at most
+ * five people; and a name alone never marks anybody.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import type { Entry } from '@braindog/kernel';
+
+import { createRecordApi, type CallContext } from '../src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+
+const NOW = Date.UTC(2026, 9, 7, 3);
+const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
+
+const PEOPLE = {
+  id: 'register.people',
+  kind: 'register' as const,
+  body: {
+    id: 'people',
+    name: 'People',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'email', type: 'email', index: true },
+      { id: 'keys', type: 'list', of: 'text' },
+      { id: 'self', type: 'bool' },
+      { id: 'met', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'people' },
+    ],
+  } as never,
+};
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+async function record(people: Record<string, unknown>[]) {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  assert.ok(
+    api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'sam@example.com', name: 'Sam Kamal' } }).ok,
+  );
+  value(await api.kernel.install([PEOPLE]));
+  const rows: Entry[] = [];
+  for (const fields of people) rows.push(value<Entry>(api.kernel.create('people', fields as never, { actor: 'p_1' })));
+  return { api, sql, rows };
+}
+
+const selfOf = (api: Awaited<ReturnType<typeof createRecordApi>>, id: string) => api.kernel.get(id)?.fields.self ?? null;
+const steps = (api: Awaited<ReturnType<typeof createRecordApi>>) => (api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] }).steps;
+
+test('THE PERSON HOLDING THE SIGN-IN ADDRESS IS MARKED AS YOU, as one decision with Undo', async () => {
+  const { api, sql, rows } = await record([{ name: 'Ada Vine', email: 'ada@kiln.example' }, { name: 'Sam', keys: ['email:Sam@Example.com', 'github:samdev'] }]);
+  await api.slashTick();
+  assert.equal(selfOf(api, rows[1]!.id), true);
+  assert.equal(selfOf(api, rows[0]!.id), null);
+  assert.ok(steps(api).includes('Sam holds the address you sign in with, so they are marked as you. Undo is on Decide.'), steps(api).join(' / '));
+  /* DONE ON DECIDE: the question is answered, by the record, and its decision puts the mark back. */
+  const asked = sql.one<{ id: string; status: string }>("SELECT id, status FROM suggestion WHERE opened_by = 'system' AND body_kind = 'rowset'");
+  assert.equal(asked?.status, 'resolved');
+  assert.equal(api.kernel.question(asked!.id), 'Mark Sam as you?');
+  const decision = sql.one<{ id: string }>("SELECT id FROM decision WHERE decided_by = 'system' ORDER BY rowid DESC LIMIT 1")!.id;
+  const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
+  value(await api.undo({ decision, hash: plan.hash }, owner));
+  assert.notEqual(selfOf(api, rows[1]!.id), true);
+  /* THE UNDO HOLDS: the next night neither marks them again nor asks anything new; the mark waits on Decide. */
+  api.kernel.setPref('braindog:updates', 'first-party', null);
+  await api.slashTick();
+  assert.notEqual(selfOf(api, rows[1]!.id), true);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system'")?.n, 1);
+  assert.equal(sql.one<{ status: string }>("SELECT status FROM suggestion WHERE opened_by = 'system'")?.status, 'open');
+  sql.close();
+});
+
+test('NOBODY HOLDS THE ADDRESS: ONE QUESTION, AT MOST FIVE PEOPLE BY NAME, AND A NAME ALONE MARKS NOBODY', async () => {
+  const names = ['Ada Vine', 'Sam Lee', 'Sam Kamal', 'Jo Park', 'Kim Ito', 'Lu Wen', 'Mo Sato'];
+  const { api, sql, rows } = await record(names.map((name) => ({ name })));
+  await api.slashTick();
+  /* THE OWNER'S OWN NAME ON A ROW IS NOT PROOF: nobody is marked. */
+  assert.ok(rows.every((r) => selfOf(api, r.id) !== true));
+  const asked = sql.all<{ id: string; body: string }>("SELECT id, body FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'");
+  assert.equal(asked.length, 1);
+  assert.equal(api.kernel.question(asked[0]!.id), 'Which of these is you?');
+  const options = (JSON.parse(asked[0]!.body) as { options: { id: string; label: string }[] }).options;
+  /* FIVE PEOPLE, the one sharing a word with the owner's name first, and a way to say none. */
+  assert.deepEqual(
+    options.map((o) => o.label),
+    ['Sam Kamal', 'Ada Vine', 'Sam Lee', 'Jo Park', 'Kim Ito', 'None of these'],
+  );
+  assert.doesNotMatch(JSON.stringify(options), /[0-9A-HJKMNP-TV-Z]{26}|#\d/u);
+  /* ASKED ONCE: the next night asks nothing more. */
+  api.kernel.setPref('braindog:updates', 'first-party', null);
+  await api.slashTick();
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options'")?.n, 1);
+  /* THE OWNER'S PICK MARKS THAT PERSON. */
+  value(await api.decide({ id: asked[0]!.id, decide: { option: 'p1', reason: 'That is me.' } }, owner));
+  assert.equal(selfOf(api, rows[2]!.id), true);
+  sql.close();
+});
+
+test('SOMEBODY OTHER THAN THE OWNER ANSWERING "Which of these is you?" MARKS NOBODY, and it is asked again', async () => {
+  const { api, sql, rows } = await record(['Ada Vine', 'Sam Kamal'].map((name) => ({ name })));
+  await api.slashTick();
+  const asked = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")!;
+  const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'decide' }, credentialed: true };
+  value(await api.decide({ id: asked.id, decide: { option: 'p1', reason: 'That is me.' } }, member));
+  assert.ok(rows.every((r) => selfOf(api, r.id) !== true));
+  api.kernel.setPref('braindog:updates', 'first-party', null);
+  await api.slashTick();
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system' AND body_kind = 'options' AND status = 'open'")?.n, 1);
+  sql.close();
+});
+
+test('A RECORD WHOSE PERSON IS MARKED ALREADY IS LEFT AS IT IS', async () => {
+  const { api, sql, rows } = await record([{ name: 'Sam', email: 'other@example.com', self: true }, { name: 'Sam Kamal', email: 'sam@example.com' }]);
+  await api.slashTick();
+  assert.equal(selfOf(api, rows[1]!.id), null);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE opened_by = 'system'")?.n, 0);
+  sql.close();
+});

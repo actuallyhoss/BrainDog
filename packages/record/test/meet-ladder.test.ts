@@ -78,7 +78,9 @@ test('WHAT AN AGENT ASSERTS ON SOMEBODY KNOWN ASKS AT ITS RUNG: a mention and on
   const claude = agent('t_claude', 'write');
   value(await api.meet({ name: 'Ada Lovelace', email: 'ada@example.com', source: 'commit 4464966 in braindog' }, claude));
   const before = people(sql)[0]!;
-  const said = { email: 'ada@example.com', handle: 'github:ada', source: 'commit 5a7b1c2 in braindog' };
+  /* NOT A COMMIT: a commit's keys are never carried onto whoever holds one (research-audit-21 M9), so there would be
+     nothing asserted to hold to the ladder. */
+  const said = { email: 'ada@example.com', handle: 'github:ada', source: 'session in braindog' };
   const asked = value<Meeting>(await api.meet(said, claude));
   assert.equal(asked.mention, true);
   assert.equal(asked.created, false);

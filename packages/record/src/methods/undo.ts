@@ -27,7 +27,7 @@
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { BACKFILL_ACTOR, sessionDeclaration, type UndoApplied, type UndoPlan, type UndoScope, type UndoSkip, type UndoStep } from '@braindog/kernel';
+import { BACKFILL_ACTOR, sessionDeclaration, ulids, type UndoApplied, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStep } from '@braindog/kernel';
 
 import { ladder } from '../ladder.ts';
 import { isHandle, spokenOf } from '../question-handles.ts';
@@ -52,12 +52,22 @@ const digest = (text: string): string => {
   return h.toString(16).padStart(16, '0');
 };
 
+/** `row` as an undo takes it, `{ register, seq }` with a positive whole number, or `null` for anything else. */
+const rowOf = (v: unknown): UndoRow | null => {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return null;
+  const { register, seq, ...rest } = v as Record<string, unknown>;
+  if (Object.keys(rest).length > 0 || !said(register) || typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 1) return null;
+  return { register: register.trim(), seq };
+};
+
 /** Two stored values as the walk compares them: absent is `null`. */
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 export function methods(deps: RecordDeps) {
   const { kernel, sql, admin, readable, tail, no, clock } = deps;
   const trust = ladder({ sql, kernel, now: () => clock.now() });
+  /** A batch for one row put back, minted on the record's clock as the record mints every other. */
+  const mint = ulids(() => clock.now());
 
   /** Who signs an undo: the person in the browser. */
   const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
@@ -66,16 +76,22 @@ export function methods(deps: RecordDeps) {
    * The plan, or the undo applied, for one scope. Shared by both methods, which differ only in what they name.
    * `reads` leaves out a list the caller cannot read, which for an owner is none.
    */
-  const run = async (scope: UndoScope, args: { dry?: unknown; hash?: unknown }, ctx: CallContext): Promise<Result<UndoPlan | Undone>> => {
+  const run = async (scope: UndoScope, args: { dry?: unknown; hash?: unknown }, ctx: CallContext, row?: UndoRow): Promise<Result<UndoPlan | Undone>> => {
     if (args.dry !== undefined && typeof args.dry !== 'boolean') return no('VALUE_MALFORMED', 'dry is true to see what would be put back, and false or left out to put it back.', { at: 'dry' });
     const opts = { reads: (register: string) => readable(ctx, register) === null };
     const walk = 'batch' in scope && walked(scope.batch) ? scope.batch : null;
-    if (args.dry === true) return walk === null ? kernel.undoPlan(scope, opts) : ok(walkPlan(walk, opts.reads));
+    /* ONE ROW OF THE CHANGE WHEN `row` NAMES ONE, the kernel's undo and the walk's alike, so Undo on one line of a
+       change that touched many puts back that line's row and leaves the rest (`scope.row`, `onlyRow` in the kernel). */
+    if (walk === null) scope = row === undefined ? scope : { ...scope, row };
+    const only = walk === null || row === undefined ? null : walkRow(walk, row, opts.reads);
+    if (only !== null && !only.ok) return only;
+    const one = only === null ? null : only.value;
+    if (args.dry === true) return walk === null ? kernel.undoPlan(scope, opts) : ok(walkPlan(walk, opts.reads, one));
     if (!said(args.hash))
       return no('REQUIRED_MISSING', 'Undo shows what it will put back before it does. Ask with dry first, then send the hash it answers.', { at: 'hash' });
     const broken = kernel.refused();
     if (broken) return { ok: false, refusal: broken };
-    if (walk !== null) return walkUndo(walk, args.hash, actorOf(ctx), opts.reads);
+    if (walk !== null) return walkUndo(walk, args.hash, actorOf(ctx), opts.reads, one);
     /* THE LADDER DROPS INSIDE THE UNDO'S TRANSACTION: a throw in between takes the undo back with it. */
     const out = kernel.transaction(() => {
       const applied = kernel.undoApply(scope, args.hash as string, actorOf(ctx), opts);
@@ -85,6 +101,17 @@ export function methods(deps: RecordDeps) {
     if (!out.ok) return out;
     const { undone: _marks, ...answer } = out.value;
     return tail({ ok: true, value: answer });
+  };
+
+  /**
+   * The row of the walk's batch one `{ register, seq }` names, as the kernel's `onlyRow` reads one: a row in a list she
+   * cannot read is one this record does not hold, and a row the batch never touched has nothing of it to put back.
+   */
+  const walkRow = (batch: string, row: UndoRow, reads: (register: string) => boolean): Result<string> => {
+    const id = reads(row.register) ? sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', row.register, row.seq)?.id : undefined;
+    if (id === undefined) return no('ROW_UNKNOWN', 'That one is not in this record, so there is nothing of it to undo.', { at: 'row' });
+    if (walkLines(batch, id).length === 0) return no('ROW_UNKNOWN', 'This change did not touch that one, so there is nothing of it to undo here.', { at: 'row' });
+    return ok(id);
   };
 
   /* ── what the nightly walk wrote ─────────────────────────────────── */
@@ -113,13 +140,9 @@ export function methods(deps: RecordDeps) {
    * same slice is read after those links are taken back, and is said as removed, which it is, and never as left. Said
    * in the order the walk wrote them.
    */
-  const walkPlan = (batch: string, reads: (register: string) => boolean): UndoPlan => {
+  const walkPlan = (batch: string, reads: (register: string) => boolean, only: string | null = null): UndoPlan => {
     const already = sql.one('SELECT 1 AS y FROM undone WHERE batch = ?', batch) !== undefined;
-    const lines = sql.all<{ at: number; kind: string; target: string; field: string | null; from_v: string | null; to_v: string | null }>(
-      "SELECT rowid AS at, kind, target, field, from_v, to_v FROM event WHERE batch = ? AND actor = ? AND target LIKE 'entry:%' ORDER BY rowid DESC",
-      batch,
-      BACKFILL_ACTOR,
-    );
+    const lines = walkLines(batch, only);
     const steps: UndoStep[] = [];
     const skipped: UndoSkip[] = [];
     const step = (s: Omit<UndoStep, 'line'>, line: string): void => void steps.push({ ...s, line });
@@ -164,7 +187,10 @@ export function methods(deps: RecordDeps) {
         else leave(row.id, title, 'it has been moved since');
       } else if (line.kind === 'tag' && line.field !== null) {
         const held = Array.isArray(row.fields[line.field]) ? (row.fields[line.field] as unknown[]).map(String) : [];
-        if (held.includes(String(to))) step({ do: 'untag', row: row.id, title }, `Forget a name ${title} was matched by`);
+        /* A REPOSITORY LISTED ON A PROJECT WHEN ITS QUESTION WAS ANSWERED is said by its own last name, never its host. */
+        const repo = kernel.register(row.register)?.scopes?.repos === line.field ? String(to).replace(/[\\/]+$/u, '').replace(/\.git$/iu, '').split(/[\\/:]+/u).at(-1) : undefined;
+        if (held.includes(String(to)))
+          step({ do: 'untag', row: row.id, title }, repo ? `Take the repository ${repo} off ${title}` : `Forget a name ${title} was matched by`);
       } else if (line.kind === 'edit' && line.field !== null) {
         if (!same(row.fields[line.field], to)) {
           leave(row.id, title, 'it has been changed since');
@@ -186,15 +212,71 @@ export function methods(deps: RecordDeps) {
     const say = already
       ? 'This was put back already.'
       : `${n === 0 ? 'Puts nothing back.' : n === 1 ? 'Puts back 1 change.' : `Puts back ${n} changes.`}${m === 0 ? '' : m === 1 ? ' Leaves 1 as it is.' : ` Leaves ${m} as they are.`}`;
-    const hash = digest(JSON.stringify({ batch, already, steps: steps.map((s) => [s.do, s.row, s.line]), skipped: skipped.map((s) => [s.row, s.why]) }));
+    const hash = digest(JSON.stringify({ batch, only, already, steps: steps.map((s) => [s.do, s.row, s.line]), skipped: skipped.map((s) => [s.row, s.why]) }));
     return { say, lines: [...steps.map((s) => s.line), ...skipped.map((s) => s.line)], steps, skipped, notes: 0, hash, already };
   };
 
+  /** The walk's own lines of one batch, newest first, and only those on one row when `only` names it. */
+  const walkLines = (batch: string, only: string | null) =>
+    sql.all<{ at: number; kind: string; target: string; field: string | null; from_v: string | null; to_v: string | null }>(
+      `SELECT rowid AS at, kind, target, field, from_v, to_v FROM event WHERE batch = ? AND actor = ? AND ${only === null ? "target LIKE 'entry:%'" : 'target = ?'} ORDER BY rowid DESC`,
+      batch,
+      BACKFILL_ACTOR,
+      ...(only === null ? [] : [`entry:${only}`]),
+    );
+
+  /**
+   * ONE ROW OF THE WALK'S BATCH PUT BACK, as `undoBackfill` puts back each of its lines, in one transaction and one batch
+   * of its own signed as the walk's, so the rest of the batch stays and can still be put back whole later. The batch
+   * is not marked undone, since most of it is not.
+   */
+  const walkRowUndo = (batch: string, only: string): number =>
+    kernel.transaction(() => {
+      let minted: string | null = null;
+      let undone = 0;
+      const w = (version: number) => ({ actor: BACKFILL_ACTOR, batch: (minted ??= mint()), cascade: false, version });
+      for (const line of walkLines(batch, only)) {
+        const r = kernel.get(only);
+        if (!r) continue;
+        let to: unknown = null;
+        let was: unknown = null;
+        try {
+          to = line.to_v === null ? null : JSON.parse(line.to_v);
+          was = line.from_v === null ? null : JSON.parse(line.from_v);
+        } catch {
+          continue;
+        }
+        let out: { ok: boolean } | null = null;
+        if (line.kind === 'create') {
+          if (!sql.one('SELECT 1 AS y FROM entry WHERE deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0 LIMIT 1', r.id, `"${r.id}"`))
+            out = kernel.write(r.register, r.id, { deleted_at: new Date(clock.now()).toISOString() } as never, w(r.version));
+        } else if (line.kind === 'edit' && r.register === SESSION && (line.field === null || line.field === 'project')) {
+          const since = sql.one('SELECT 1 AS y FROM event WHERE target = ? AND rowid > ? AND (batch IS NULL OR batch <> ?) LIMIT 1', line.target, line.at, batch);
+          const ours = line.field === null ? !since : same(r.fields.project, to);
+          if (ours && said(r.fields.project)) out = kernel.write(r.register, r.id, {}, { ...w(r.version), stamp: { project: null } });
+        } else if (line.kind === 'tag' && line.field !== null) {
+          const held = Array.isArray(r.fields[line.field]) ? (r.fields[line.field] as unknown[]).map(String) : [];
+          if (held.includes(String(to))) out = kernel.write(r.register, r.id, { [line.field]: held.filter((k) => k !== String(to)) } as never, w(r.version));
+        } else if (line.kind === 'edit' && line.field !== null) {
+          if (same(r.fields[line.field], to)) out = kernel.write(r.register, r.id, { [line.field]: was } as never, w(r.version));
+        }
+        if (out?.ok) undone += 1;
+      }
+      return undone;
+    });
+
   /** The walk's batch put back by the kernel's own inverse, once the plan read is still the plan. */
-  const walkUndo = async (batch: string, hash: string, by: string, reads: (register: string) => boolean): Promise<Result<Undone>> => {
-    const plan = walkPlan(batch, reads);
+  const walkUndo = async (batch: string, hash: string, by: string, reads: (register: string) => boolean, only: string | null = null): Promise<Result<Undone>> => {
+    const plan = walkPlan(batch, reads, only);
     if (plan.hash !== hash) return no('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
     if (plan.already) return ok({ batch, put: 0, say: 'Nothing was put back: it was undone already.', lines: [], skipped: [] });
+    if (only !== null) {
+      const put = plan.steps.length === 0 ? 0 : walkRowUndo(batch, only);
+      return tail({
+        ok: true as const,
+        value: { batch, put, say: put === 0 ? 'Nothing was put back: it was changed since.' : put === 1 ? 'Put back 1 change.' : `Put back ${put} changes.`, lines: plan.steps.map((s) => s.line), skipped: plan.skipped },
+      });
+    }
     const out = kernel.undoBackfill(batch, by);
     if (!out.ok) return out;
     const put = out.value.undone;
@@ -215,15 +297,17 @@ export function methods(deps: RecordDeps) {
      * Put back one write and everything it caused (`{ batch }`), or what one decision wrote (`{ decision }`, `D12` or its
      * handle). `{ dry: true }` answers the plan and its hash; `{ hash }` applies it. ADMIN, an owner in a browser.
      */
-    async undo(args: { batch?: unknown; decision?: unknown; dry?: unknown; hash?: unknown } | undefined, ctx: CallContext): Promise<Result<UndoPlan | Undone>> {
+    async undo(args: { batch?: unknown; decision?: unknown; row?: unknown; dry?: unknown; hash?: unknown } | undefined, ctx: CallContext): Promise<Result<UndoPlan | Undone>> {
       const stop = admin(ctx, 'undo a change');
       if (stop) return { ok: false, refusal: stop };
       const a = args ?? {};
       if (said(a.batch) === said(a.decision))
         return no('REQUIRED_MISSING', 'Say what to undo: one change by its batch, or one decision.', { at: said(a.batch) ? 'decision' : 'batch' });
+      const row = a.row === undefined || a.row === null ? undefined : rowOf(a.row);
+      if (row === null) return no('VALUE_MALFORMED', 'Say the one to undo by its list and number: { register: "tasks", seq: 3 }.', { at: 'row' });
       const given = said(a.decision) ? a.decision.trim() : null;
       const decision = given !== null && isHandle(given) ? (spokenOf(sql, given) ?? given) : given;
-      return run(decision === null ? { batch: String(a.batch).trim() } : { decision }, a, ctx);
+      return run(decision === null ? { batch: String(a.batch).trim() } : { decision }, a, ctx, row);
     },
 
     /**

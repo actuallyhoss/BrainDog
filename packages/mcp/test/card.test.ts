@@ -91,6 +91,13 @@ test('AN EMPTY SLOT IS LEFT OUT: a record with nothing to say is the header alon
   assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'Kiln' } }), 'BrainDog · run S6 · project Kiln');
 });
 
+test("THE HEAD SAYS THE PROJECT'S NAME AS A PERSON READS IT, never its folder, an address or a machine (audit 21, item 15)", () => {
+  assert.equal(card({ session: run, project: { spoken: 'things#1', name: '/Users/ada/Code/kiln' } }), 'BrainDog · run S6 · project kiln');
+  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'Kiln <ada@kiln.example>' } }), 'BrainDog · run S6 · project Kiln');
+  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'Kiln on Adas-MacBook-Pro.local' } }), 'BrainDog · run S6 · project Kiln on MacBook');
+  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'ada@kiln.example' } }), 'BrainDog · run S6 · project things#1');
+});
+
 test('THE MACHINE IS SAID AS A PERSON NAMES IT, never by the name it gives itself', () => {
   const said = card({ session: run }, { agent: 'claude', cwd: '/Users/ada/Code/kiln', host: 'Adas-MacBook-Pro.local' });
   assert.equal(said, 'BrainDog · run S6 · no project · Claude Code on MacBook');

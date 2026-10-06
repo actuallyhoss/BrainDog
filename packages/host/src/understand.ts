@@ -19,12 +19,29 @@
  *
  * NOTES ARE UNTRUSTED TEXT (§37): ASK ONLY. A name read from a note never writes a row. The ones that show a
  * relationship go to Decide as one question for each list, with the sentence that showed it, and a public figure is
- * never asked about at all.
+ * never asked about at all. A run's handoff, what its agent said it was doing and its next step, is read the same way
+ * (`loop/research-understanding-judge.md` change 4): a name there is one question, never a row.
+ *
+ * AND WHAT A PERSON WROTE WORD FOR WORD IS OFFERED WITH NO MODEL AT ALL (`serveOffers`, the same change): an address
+ * or a login written in their note on someone, offered to that someone as one question, and a person the record holds
+ * named by their full name in a project's note, or a project named in a person's note, offered as a link. Only a note
+ * whose words a person wrote, and still only a question: a key another person answers to is never offered.
  *
  * STRUCTURAL, AS `slash-answers.ts` IS: the model is handed in, and this file imports neither `@braindog/slash` nor an app.
  */
 
-import { looksLikeCredential, SLASH, type Entry, type Kernel, type OutboxRow } from '@braindog/kernel';
+import {
+  keyOf,
+  keysOf,
+  kindOfKey,
+  looksLikeCredential,
+  SEED_ACTOR,
+  sessionDeclaration,
+  SLASH,
+  type Entry,
+  type Kernel,
+  type OutboxRow,
+} from '@braindog/kernel';
 import { codeOf, fixOf, type Result, type Sql } from '@braindog/ports';
 
 import type { ModelJobMeter } from './model-jobs.ts';
@@ -46,6 +63,15 @@ export const NOTES_PER_PASS = 20;
 
 /** How long after a pass that read its notes the next one may run: a night, with room for the alarm's drift. */
 export const NOTES_EVERY_MS = 20 * 3_600_000;
+
+/**
+ * The most runs one nightly ask reads, newest first, beside the notes. A handoff is about now, so the runs past these on
+ * a night are not read later: the watermark moves past them.
+ */
+export const RUNS_PER_PASS = 10;
+
+/** The most questions one night's offers file. The rest are offered the nights that follow. */
+export const OFFERS_PER_PASS = 3;
 
 /** How long after a pass whose model was not reached the next one tries again. */
 const NOTES_RETRY_MS = 3_600_000;
@@ -89,7 +115,7 @@ export const SLASH_RESOLVE_INSTRUCTIONS = [
 /** What the model is told when it reads the night's changed notes (`ModelJobUnderstand.mentions`). */
 export const SLASH_MENTIONS_INSTRUCTIONS = [
   'You are Slash, reading the notes one person keeps in their BrainDog on the people, organisations and projects in their work.',
-  'You are handed `notes`. Each has an `id`, `about`, the name of the person, organisation or project it is kept on, its `kind`, and its `text`.',
+  'You are handed `notes`. Each has an `id`, `about`, the name of the person, organisation or project it is kept on, its `kind`, and its `text`. A note of kind run is what an agent said it was doing and its next step, and its `about` is the project it ran in.',
   'Find each name in a text that is a person, an organisation or a project, and say which: person, org, public_figure or project. A public figure is someone known to the public whom the person does not deal with, such as a celebrity, a politician or the head of a large company.',
   'For each, copy exactly the one sentence of the text that names it, and say `relation`: true only when that sentence shows that the person, or what the note is about, works with, knows, pays, is paid by or belongs with that name. A name only mentioned, admired, read about or compared with is not a relation.',
   'Use a name only as the text writes it. Never add a name that is not in the text, and never guess an address or a handle.',
@@ -117,7 +143,8 @@ export type NoteShown = { id: string; about: string; kind: NoteKind; text: strin
 /** What one `mentions` ask hands the model. */
 export type MentionsInput = { notes: NoteShown[] };
 
-export type NoteKind = 'person' | 'organisation' | 'project';
+/** What a note is kept on. `run` is an agent run's handoff, which is read for names and never offered from. */
+export type NoteKind = 'person' | 'organisation' | 'project' | 'run';
 
 /** A name the model found in a note, kept only once it passed every check below. */
 export type Mention = { note: string; name: string; type: 'person' | 'org' | 'public_figure' | 'project'; sentence: string; relation: boolean };
@@ -377,8 +404,11 @@ export type NotesServed = { ran: boolean; read: number; asked: number; why?: str
 /** A list the notes pass reads, and what its rows are. */
 type NoteList = { register: string; kind: NoteKind; title: string; name: string; aliases?: string; fields: readonly string[]; plural: string };
 
-/** A note as the pass found it, with what it needs to file a candidate from it. */
-type Found = { key: string; hash: string; register: string; row: string; about: string; kind: NoteKind; text: string; at: string };
+/**
+ * A note as the pass found it, with what it needs to file a candidate from it. A run's `about` is the project it ran in,
+ * `''` for none, and `project` that project's id.
+ */
+type Found = { key: string; hash: string; register: string; row: string; about: string; kind: NoteKind; text: string; at: string; project?: string };
 
 /** A name as two spellings of it are compared: accents, case, punctuation and spacing folded. */
 export const nameKey = (name: string): string =>
@@ -419,6 +449,53 @@ function noteLists(kernel: NotesKernel): NoteList[] {
     if (org !== undefined && org !== null) add(decl.id, 'organisation', typeof org === 'object' ? (org as Record<string, unknown>) : {});
   }
   for (const decl of registers.values()) if (decl.scopes !== undefined) add(decl.id, 'project', (decl.scopes ?? {}) as Record<string, unknown>);
+  /* AND THE RUNS, by the kernel's own list: their handoff, what the agent is doing and its next step. `doing` is the
+     list's title, which `add` would leave out, so the run list is said here and not through it. */
+  const runs = registers.get(String(sessionDeclaration().body.id));
+  if (runs) {
+    const fields = ['doing', 'next'].filter((id) => runs.fields.some((f) => f.id === id && !f.retired && f.type === 'text'));
+    if (fields.length > 0) out.push({ register: runs.id, kind: 'run', title: runs.title, name: runs.title, fields, plural: runs.name });
+  }
+  return out;
+}
+
+/** The scheduler's and the agents' own words, which say nothing about who a run met. */
+const RUN_WORDS: ReadonlySet<string> = new Set(['claude', 'code', 'codex', 'cursor', 'chatgpt', 'gemini', 'copilot', 'windsurf', 'slash', 'braindog', 'agent', 'run']);
+
+/**
+ * Whether a run's handoff may name someone: a capitalised word that is not an agent's and not a project's. A run's first
+ * title is the agent and where it works ("Claude Code in BrainDog"), and reading it would spend a run's place on nothing.
+ */
+function namesSomeone(text: string, known: ReadonlySet<string>): boolean {
+  for (const m of text.matchAll(/\p{Lu}[\p{L}'-]+/gu)) {
+    const k = nameKey(m[0]);
+    if (!RUN_WORDS.has(k) && !known.has(k)) return true;
+  }
+  return false;
+}
+
+/**
+ * Each row of a list by its id, with its title, as far as `NOTE_PAGES` reads. With `spoken`, each is there by its handle
+ * too (`projects#3`, or `P3` where the list has a prefix of its own), which is how a run names the project it is in.
+ */
+function titlesOf(kernel: Pick<Kernel, 'list'>, register: string, title: string, spoken?: { prefix?: string | undefined; ids: Map<string, string> }): Map<string, string> {
+  const out = new Map<string, string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < NOTE_PAGES; page++) {
+    const read = kernel.list({ register, limit: 200, ...(cursor === null ? {} : { cursor }) });
+    if (!read.ok) break;
+    for (const row of read.value.rows) {
+      if (typeof row.fields[title] !== 'string') continue;
+      out.set(row.id, String(row.fields[title]));
+      if (spoken && row.seq !== null) {
+        const handle = spoken.prefix !== undefined && spoken.prefix !== '#' ? `${spoken.prefix}${row.seq}` : `${register}#${row.seq}`;
+        spoken.ids.set(handle, row.id);
+        spoken.ids.set(row.id, row.id);
+      }
+    }
+    if (read.value.cursor === null) break;
+    cursor = read.value.cursor;
+  }
   return out;
 }
 
@@ -503,13 +580,35 @@ function namesSaid(names: readonly string[]): string {
   return shown.length === 1 ? shown[0]! : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`;
 }
 
+/** Where the names in one question were read: notes by what they are kept on, runs by the project each ran in. */
+type Source = { run: boolean; about: string };
+
+/** "your note on Bake", "your notes on Bake and Jo and a run on Fanline", and whether that is more than one. */
+function sourcesSaid(sources: readonly Source[]): { said: string; many: boolean } {
+  const notes = [...new Set(sources.filter((s) => !s.run).map((s) => s.about))];
+  const runs = sources.filter((s) => s.run);
+  const placed = [...new Set(runs.map((s) => s.about).filter((a) => a !== ''))];
+  const parts: string[] = [];
+  if (notes.length === 1) parts.push(`your note on ${notes[0]}`);
+  else if (notes.length > 1) parts.push(`your notes on ${namesSaid(notes)}`);
+  if (runs.length === 1) parts.push(placed.length === 1 ? `a run on ${placed[0]}` : 'a run');
+  else if (runs.length > 1) parts.push(placed.length === 0 ? `${runs.length} runs` : `runs on ${namesSaid(placed)}`);
+  return { said: parts.join(' and '), many: notes.length + runs.length > 1 };
+}
+
+const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
 /**
- * One nightly read of the notes changed since the last: one ask of the understanding share for up to `NOTES_PER_PASS`
- * notes, and one Decide question for each list that gains candidates.
+ * One nightly read of the notes changed since the last, and of the newest runs' handoffs: one ask of the understanding
+ * share for up to `NOTES_PER_PASS` notes and `RUNS_PER_PASS` runs, and one Decide question for each list that gains
+ * candidates.
  *
  * NIGHTLY BY ITS OWN MARK, so the alarm can call it on every pass: it runs when `NOTES_EVERY_MS` has gone since the last
  * pass that read, or `NOTES_RETRY_MS` since one whose model was not reached. A spent month leaves the notes where they
  * are and the mark unmoved, and the first pass of the next month reads them.
+ *
+ * RUNS HAVE A WATERMARK OF THEIR OWN, and their own places in the ask, so seven hundred runs never push a note out: the
+ * newest that may name someone (`namesSomeone`) are read, and the mark moves to the pass.
  */
 export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<NotesServed> {
   const { store, log } = deps;
@@ -519,7 +618,9 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   const next = markOf(store, 'notes.next');
   if (next !== null && next > iso) return { ran: false, read: 0, asked: 0, why: 'not yet' };
 
-  const lists = noteLists(kernel);
+  const all = noteLists(kernel);
+  /* A RUN IS READ FOR NAMES AND NEVER ADDED TO, so with no list to add a name to there is nothing to read. */
+  const lists = all.filter((l) => l.kind !== 'run');
   if (lists.length === 0) {
     mark(store, 'notes.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
     return { ran: true, read: 0, asked: 0 };
@@ -542,8 +643,30 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   /* THE WATERMARK MOVES TO THE LAST NOTE READ, so a backlog longer than a pass is read over the nights that follow. */
   const until = found.length > batch.length ? batch.at(-1)!.at : iso;
 
-  if (batch.length === 0) {
+  const runList = all.find((l) => l.kind === 'run');
+  const runs: Found[] = [];
+  if (runList) {
+    /* THE PROJECTS BY THEIR ROLE, whether or not they keep notes, and by the handle a run names its project with. */
+    const scoped = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
+    const ids = new Map<string, string>();
+    const projects = scoped ? titlesOf(kernel, scoped.id, scoped.title, { prefix: scoped.seq_prefix, ids }) : new Map<string, string>();
+    const known = new Set([...projects.values()].flatMap((name) => nameKey(name).split(' ')));
+    for (const row of changedRows(kernel, runList.register, markOf(store, 'runs.since'))) {
+      if (runs.length >= RUNS_PER_PASS) break;
+      const text = noteText(row, runList);
+      if (text.length < 12 || !namesSomeone(text, known)) continue;
+      const key = `note:${runList.register}:${row.id}`;
+      const hash = fnv(text);
+      if (markOf(store, key) === hash) continue;
+      const project = typeof row.fields.project === 'string' ? ids.get(row.fields.project) : undefined;
+      const about = project === undefined ? '' : projects.get(project)!;
+      runs.push({ key, hash, register: runList.register, row: row.id, about, kind: 'run', text, at: row.updated_at, ...(project === undefined ? {} : { project }) });
+    }
+  }
+
+  if (batch.length === 0 && runs.length === 0) {
     mark(store, 'notes.since', until, iso);
+    mark(store, 'runs.since', iso, iso);
     mark(store, 'notes.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
     return { ran: true, read: 0, asked: 0 };
   }
@@ -553,9 +676,10 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
 
   const notes: NoteShown[] = [];
   const handed = new Map<string, { about: string; text: string; found: Found }>();
-  for (const f of batch) {
+  for (const f of [...batch, ...runs]) {
     const text = scrubbed(f.text);
-    const about = scrubbed(f.about, 120);
+    /* A RUN WITH NO PROJECT IS ABOUT NOTHING NAMED, and is handed as a run. */
+    const about = f.kind === 'run' && f.about === '' ? 'a run' : scrubbed(f.about, 120);
     if (text === null || about === null) continue;
     const id = `n${notes.length + 1}`;
     notes.push({ id, about, kind: f.kind, text });
@@ -563,8 +687,9 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   }
 
   const finish = () => {
-    for (const f of batch) mark(store, f.key, f.hash, iso);
+    for (const f of [...batch, ...runs]) mark(store, f.key, f.hash, iso);
     mark(store, 'notes.since', until, iso);
+    mark(store, 'runs.since', iso, iso);
     mark(store, 'notes.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
   };
   if (notes.length === 0) {
@@ -600,7 +725,7 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   const meetsParts = (meets?.fields ?? {}) as unknown as Record<string, string | undefined>;
   const day = iso.slice(0, 10);
 
-  const byList = new Map<string, { list: NoteList; rows: Record<string, unknown>[]; names: string[]; from: Set<string> }>();
+  const byList = new Map<string, { list: NoteList; rows: Record<string, unknown>[]; names: string[]; from: Map<string, Source> }>();
   const held = new Map<string, Set<string>>();
   for (const m of kept) {
     const list = target(m.type);
@@ -611,28 +736,32 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     const asked = `asked:${list.register}:${k}`;
     if (markOf(store, asked) !== null) continue;
     const note = handed.get(m.note)!;
-    const group = byList.get(list.register) ?? { list, rows: [], names: [], from: new Set<string>() };
+    const run = note.found.kind === 'run';
+    const group = byList.get(list.register) ?? { list, rows: [], names: [], from: new Map<string, Source>() };
     if (group.names.some((n) => nameKey(n) === k)) continue;
     const row: Record<string, unknown> = { [list.name]: m.name };
     if (list.kind === 'person' && meets && list.register === meets.register) {
-      if (meetsParts.met) row[meetsParts.met] = [`${day} · note on ${note.about}: "${m.sentence}"`];
-      /* LINKED TO WHAT THE NOTE IS KEPT ON, when the role has the part for it: the project, or the organisation. */
+      const where = run ? (note.found.about === '' ? 'a run' : `a run on ${note.found.about}`) : `note on ${note.about}`;
+      if (meetsParts.met) row[meetsParts.met] = [`${day} · ${where}: "${m.sentence}"`];
+      /* LINKED TO WHAT THE NOTE IS KEPT ON, when the role has the part for it: the project, the run's project, or the
+         organisation. */
       if (note.found.kind === 'project' && meetsParts.projects) row[meetsParts.projects] = [note.found.row];
+      if (run && note.found.project !== undefined && meetsParts.projects) row[meetsParts.projects] = [note.found.project];
       if (note.found.kind === 'organisation' && meetsParts.org) row[meetsParts.org] = note.found.row;
     }
     group.rows.push(row);
     group.names.push(m.name);
-    group.from.add(note.about);
+    group.from.set(run ? `run:${note.found.row}` : `note:${note.about}`, { run, about: run ? note.found.about : note.about });
     byList.set(list.register, group);
   }
 
   let asked = 0;
   for (const { list, rows, names, from } of byList.values()) {
-    const where = [...from];
+    const { said, many } = sourcesSaid([...from.values()]);
     const question =
       names.length === 1
-        ? `Add ${names[0]} to ${list.plural}? Your note on ${where[0]} names ${list.kind === 'person' ? 'them' : 'it'}.`
-        : `Add ${names.length} names from your notes to ${list.plural}? ${namesSaid(names)}, named in your notes on ${namesSaid(where)}.`;
+        ? `Add ${names[0]} to ${list.plural}? ${capital(said)} ${many ? 'name' : 'names'} ${list.kind === 'person' ? 'them' : 'it'}.`
+        : `Add ${names.length} names to ${list.plural}? ${namesSaid(names)}, named in ${said}.`;
     const put = kernel.propose({ question: question.slice(0, 280), body_kind: 'rowset', body: { register: list.register, rows } }, SLASH, SLASH);
     if (!put.ok) {
       log(`notes: ${fixOf(put)}`);
@@ -643,6 +772,303 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   }
   finish();
   return { ran: true, read: notes.length, asked };
+}
+
+/* ── what a person wrote word for word: the offers ─────────────────────────────────────────────────────────────────── */
+
+/** The kernel methods the offers pass calls: the notes pass's, and a row's history, to know whose words a note is. */
+export type OffersKernel = NotesKernel & Pick<Kernel, 'history'>;
+
+export type OffersDeps = { store: UnderstandStore; now: () => number; log: (line: string) => void };
+
+/** What one offers pass did, for its tests and its log line. */
+export type OffersServed = { ran: boolean; asked: number; why?: string };
+
+/** An address as a note writes it. Its last part is letters, so `node@24.13.0` in a note is not one. */
+const NOTE_ADDRESS = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(?![\p{L}\p{N}-])/gu;
+
+/**
+ * A login as a note writes it, right after the service it is on: `GitHub @quill`, `GitHub: quill`, `github.com/quill`,
+ * `Discord: quill`. A bare `@quill` says no service, and a login is never guessed at, so it is not one.
+ */
+const NOTE_LOGIN = /\b(github|discord)(?:\.com\/|\s*:\s*@?|\s+@)([A-Za-z0-9][A-Za-z0-9._-]*)/giu;
+
+/** What a person reads a key's kind as. */
+const KEY_WORDS: Record<string, [string, string]> = {
+  email: ['an address', 'addresses'],
+  github: ['a GitHub login', 'GitHub logins'],
+  discord: ['a Discord name', 'Discord names'],
+};
+
+/** A key as the note wrote it: the key, and the address as written, which a person reads in their own spelling. */
+type Written = { key: string; said: string };
+
+/** Every address and login the note writes out, each once, as keys. Nothing is read that the words do not spell. */
+export function keysWritten(text: string): Written[] {
+  const out = new Map<string, Written>();
+  for (const m of text.matchAll(NOTE_ADDRESS)) {
+    const key = keyOf('email', m[0]);
+    if (key !== null && !out.has(key)) out.set(key, { key, said: m[0] });
+  }
+  for (const m of text.matchAll(NOTE_LOGIN)) {
+    /* A PATH AFTER IT IS A REPOSITORY, `github.com/lumacraft/app`, whose owner may be a company and not this person. */
+    if (text.charAt((m.index ?? 0) + m[0].length) === '/') continue;
+    const login = m[2]!.replace(/[._-]+$/u, '');
+    const key = login === '' ? null : keyOf(m[1]!.toLowerCase(), login);
+    if (key !== null && !out.has(key)) out.set(key, { key, said: login });
+  }
+  return [...out.values()];
+}
+
+const RUN_ACTOR = new RegExp(`^${String(sessionDeclaration().body.seq_prefix)}[1-9][0-9]*$`, 'u');
+
+/** Whether an actor is a person (`30 §3`): not Slash, the system, a seed, a run, an agent's key or something declared. */
+const isPerson = (actor: string): boolean => actor !== SLASH && actor !== 'system' && actor !== SEED_ACTOR && !actor.includes(':') && !RUN_ACTOR.test(actor);
+
+/**
+ * Whether the note on a row is a person's own words: the last change to any of its note fields, or the row's making when
+ * none came after, was signed by a person. An agent's note may carry what it read in a forged mail, and is not offered from.
+ */
+function ownWords(kernel: Pick<Kernel, 'history'>, id: string, fields: readonly string[]): boolean {
+  let by: string | null = null;
+  for (const e of kernel.history(id)) if (e.field === null ? e.kind === 'create' : fields.includes(e.field)) by = e.actor;
+  return by !== null && isPerson(by);
+}
+
+const textOf = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
+const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+/** A person as the offers pass reads them. */
+type Person = { row: Entry; name: string; keys: Set<string>; projects: string[] };
+
+/**
+ * One question the pass would file: the rows it updates, what it says, the notes it came from, and for an offer of keys
+ * the keys, as the kernel's own offers carry them (`people.ts`, `offerArrival`).
+ */
+type Offer = { register: string; rows: Record<string, unknown>[]; question: string; notes: Set<string>; offered: string[]; keys?: string[] };
+
+/** Whether `name` stands in `text` as whole words, spelled as it is: `Bake` in "Works on Bake." and not in "bake bread". */
+const standsIn = (text: string, name: string): boolean =>
+  new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?![\\p{L}\\p{N}])`, 'u').test(text);
+
+/**
+ * One nightly pass over the notes on people and projects that changed, offering what a person wrote word for word, with
+ * no model and so on every plan: an address or a login in their note on someone, offered to that someone, and a link
+ * between a person and a project when one's note names the other, a person by their full name.
+ *
+ * ONE QUESTION FOR EACH PERSON OFFERED A KEY, saying what kind of thing and never the thing, and one for each project
+ * whose people are offered as a link. A person is in one question a night, since two would update one row twice.
+ * `OFFERS_PER_PASS` questions at most; the rest stay where they are, and the watermark with them, until a later night.
+ *
+ * AN OFFER OF KEYS IS THE KERNEL'S OWN SHAPE, `offer: { keys }` on a row named as a person says it: the kernel brings it
+ * up to the person each time they are met (`reask`), so a commit of theirs never leaves a question nobody can accept,
+ * closes it once what it offered is settled, and never asks about the same key a second time. Since that rewrite
+ * carries the keys alone, a link for the same person waits for a later night, in a question of its own.
+ *
+ * ONLY WHAT NOBODY ELSE ANSWERS TO: a key another person holds is a question about one person or two, which is the
+ * kernel's to ask, and an offer once made is never made again, whatever the answer was.
+ */
+export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServed {
+  const { store, log } = deps;
+  if (!ready(store)) return { ran: false, asked: 0, why: 'no store' };
+  const now = deps.now();
+  const iso = new Date(now).toISOString();
+  const next = markOf(store, 'offers.next');
+  if (next !== null && next > iso) return { ran: false, asked: 0, why: 'not yet' };
+  const later = () => mark(store, 'offers.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
+
+  const meets = kernel.meetsList();
+  const lists = noteLists(kernel);
+  const peopleList = lists.find((l) => l.kind === 'person');
+  if (!meets || !peopleList || peopleList.register !== meets.register) {
+    later();
+    return { ran: true, asked: 0 };
+  }
+  const at = meets.fields;
+  /* THE PROJECTS BY THEIR ROLE, whether or not they keep notes: a person's note may name one that keeps none. */
+  const scoped = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
+  const projectList = lists.find((l) => l.kind === 'project');
+
+  const people: Person[] = [];
+  const holder = new Map<string, string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < NOTE_PAGES; page++) {
+    const read = kernel.list({ register: meets.register, limit: 200, ...(cursor === null ? {} : { cursor }) });
+    if (!read.ok) break;
+    for (const row of read.value.rows) {
+      const f = row.fields;
+      const keys = keysOf({ email: textOf(f[at.email]), handles: at.handles === undefined ? [] : listOf(f[at.handles]), keys: at.keys === undefined ? [] : listOf(f[at.keys]) });
+      for (const k of keys) if (!holder.has(k)) holder.set(k, row.id);
+      /* ONE MERGED INTO ANOTHER STILL HOLDS ITS KEYS, and is offered nothing. */
+      if (textOf(f[at.merged_into]) !== undefined) continue;
+      const name = textOf(f[peopleList.title]);
+      if (name === undefined) continue;
+      people.push({ row, name, keys: new Set(keys), projects: at.projects === undefined ? [] : listOf(f[at.projects]) });
+    }
+    if (read.value.cursor === null) break;
+    cursor = read.value.cursor;
+  }
+  const projects = scoped ? titlesOf(kernel, scoped.id, scoped.title) : new Map<string, string>();
+  const byId = new Map(people.map((p) => [p.row.id, p]));
+
+  /* A FULL NAME, two words or more, held by one person alone: "Jo" names nobody, and two Ann Lees are a question of their own. */
+  const fullNames = new Map<string, Person | null>();
+  for (const p of people) {
+    const k = nameKey(p.name);
+    if (p.name.includes('@') || k.split(' ').length < 2) continue;
+    fullNames.set(k, fullNames.has(k) ? null : p);
+  }
+
+  /* THE NOTES THAT MOVED, oldest first, whose text was not read before, and whose words a person wrote. */
+  const since = markOf(store, 'offers.since');
+  type Moved = { key: string; hash: string; row: Entry; kind: 'person' | 'project'; about: string; text: string };
+  const moved: Moved[] = [];
+  for (const list of [peopleList, projectList]) {
+    if (!list) continue;
+    for (const row of changedRows(kernel, list.register, since)) {
+      const text = noteText(row, list);
+      const about = textOf(row.fields[list.title]);
+      if (text.length < 6 || about === undefined) continue;
+      const key = `offer:${list.register}:${row.id}`;
+      const hash = fnv(text);
+      if (markOf(store, key) === hash) continue;
+      if (!ownWords(kernel, row.id, list.fields)) {
+        mark(store, key, hash, iso);
+        continue;
+      }
+      moved.push({ key, hash, row, kind: list.kind === 'person' ? 'person' : 'project', about, text });
+    }
+  }
+  moved.sort((a, b) => (a.row.updated_at < b.row.updated_at ? -1 : a.row.updated_at > b.row.updated_at ? 1 : 0));
+
+  /* WHAT EACH PERSON IS OFFERED, gathered across the notes before any question is said. */
+  type Plan = { person: Person; keys: Written[]; links: Map<string, Set<string>>; notes: Set<string>; from: Set<string> };
+  const plans = new Map<string, Plan>();
+  const planOf = (p: Person): Plan => {
+    const had = plans.get(p.row.id);
+    if (had) return had;
+    const made: Plan = { person: p, keys: [], links: new Map(), notes: new Set(), from: new Set() };
+    plans.set(p.row.id, made);
+    return made;
+  };
+  const offeredBefore = (who: string, what: string): boolean => markOf(store, `offered:${who}:${what}`) !== null;
+  const link = (p: Person, project: string, note: Moved) => {
+    if (at.projects === undefined || p.projects.includes(project) || offeredBefore(p.row.id, project)) return;
+    const plan = planOf(p);
+    plan.links.set(project, (plan.links.get(project) ?? new Set()).add(note.about));
+    plan.notes.add(note.key);
+    plan.from.add(note.about);
+  };
+  for (const note of moved) {
+    if (note.kind === 'person') {
+      const p = byId.get(note.row.id);
+      if (!p) continue;
+      for (const w of keysWritten(note.text)) {
+        if (p.keys.has(w.key) || (holder.get(w.key) ?? p.row.id) !== p.row.id || offeredBefore(p.row.id, w.key)) continue;
+        /* A KEY THE LIST HAS NOWHERE FOR IS NOT OFFERED: an address goes in the address field or with the keys, a login with the handles or the keys. */
+        if (kindOfKey(w.key) === 'email' ? at.keys === undefined && at.handles === undefined && textOf(p.row.fields[at.email]) !== undefined : at.handles === undefined && at.keys === undefined) continue;
+        const plan = planOf(p);
+        if (plan.keys.some((k) => k.key === w.key)) continue;
+        plan.keys.push(w);
+        plan.notes.add(note.key);
+        plan.from.add(note.about);
+      }
+      for (const [id, name] of projects) if (name.length >= 3 && standsIn(note.text, name)) link(p, id, note);
+    } else {
+      const folded = ` ${nameKey(note.text)} `;
+      for (const [k, p] of fullNames) if (p !== null && folded.includes(` ${k} `)) link(p, note.row.id, note);
+    }
+  }
+
+  /* THE QUESTIONS: one for each person offered a key, then one for each project's links. */
+  const offers: Offer[] = [];
+  const said = (from: ReadonlySet<string>): string => {
+    const notes = [...from];
+    return notes.length === 1 ? `Your note on ${notes[0]} says so.` : `Your notes on ${namesSaid(notes)} say so.`;
+  };
+  const patchOf = (plan: Plan): Record<string, unknown> => {
+    const f = plan.person.row.fields;
+    const patch: Record<string, unknown> = {};
+    const handles = at.handles === undefined ? [] : listOf(f[at.handles]);
+    const keys = at.keys === undefined ? [] : listOf(f[at.keys]);
+    for (const w of plan.keys) {
+      const mail = kindOfKey(w.key) === 'email';
+      if (mail && textOf(f[at.email]) === undefined && patch[at.email] === undefined) patch[at.email] = w.said;
+      else if (mail || at.handles === undefined) (at.keys === undefined ? handles : keys).push(w.key);
+      else handles.push(w.key);
+    }
+    if (at.handles !== undefined && handles.length > listOf(f[at.handles]).length) patch[at.handles] = handles;
+    if (at.keys !== undefined && keys.length > listOf(f[at.keys]).length) patch[at.keys] = keys;
+    return patch;
+  };
+  /* A ROW AS A PERSON SAYS IT, `people#3`, as the kernel's `nameOf` says it, and its id for one with no number. */
+  const prefix = kernel.registers().get(meets.register)?.seq_prefix;
+  const spoken = (row: Entry): string => (row.seq === null ? row.id : prefix && prefix !== '#' ? `${prefix}${row.seq}` : `${meets.register}#${row.seq}`);
+
+  const taken = new Set<string>();
+  for (const plan of plans.values()) {
+    if (plan.keys.length === 0) continue;
+    const kinds = new Map<string, number>();
+    for (const w of plan.keys) kinds.set(kindOfKey(w.key), (kinds.get(kindOfKey(w.key)) ?? 0) + 1);
+    const what = namesSaid([...kinds].map(([kind, n]) => {
+      const [one, many] = KEY_WORDS[kind] ?? ['a login', 'logins'];
+      return n === 1 ? one : `${n} ${many}`;
+    }));
+    offers.push({
+      register: meets.register,
+      rows: [{ at: spoken(plan.person.row), version: plan.person.row.version, patch: patchOf(plan) }],
+      question: `Add ${what} to ${plan.person.name}? ${said(plan.from)}`,
+      notes: plan.notes,
+      offered: plan.keys.map((w) => `${plan.person.row.id}:${w.key}`),
+      keys: plan.keys.map((w) => w.key),
+    });
+    taken.add(plan.person.row.id);
+  }
+  const byProject = new Map<string, Plan[]>();
+  for (const plan of plans.values()) {
+    if (taken.has(plan.person.row.id) || plan.links.size === 0) continue;
+    /* ONE PROJECT A NIGHT FOR A PERSON LINKED TO TWO, the first their notes name; the other is offered the next night. */
+    const [project] = plan.links.keys();
+    byProject.set(project!, [...(byProject.get(project!) ?? []), plan]);
+    taken.add(plan.person.row.id);
+  }
+  for (const [project, group] of byProject) {
+    const from = new Set(group.flatMap((p) => [...p.links.get(project)!]));
+    const notes = new Set(group.flatMap((p) => [...p.notes]));
+    const rows = group.map((plan) => ({ at: spoken(plan.person.row), version: plan.person.row.version, patch: { [at.projects!]: [...plan.person.projects, project] } }));
+    offers.push({
+      register: meets.register,
+      rows,
+      question: `Link ${namesSaid(group.map((p) => p.person.name))} to ${projects.get(project) ?? 'this project'}? ${said(from)}`,
+      notes,
+      offered: group.map((p) => `${p.person.row.id}:${project}`),
+    });
+  }
+
+  /* FILED UP TO THE NIGHT'S SHARE. A note behind a question not filed tonight stays unread, and the watermark stays. */
+  let asked = 0;
+  const waiting = new Set<string>();
+  for (const offer of offers) {
+    if (asked >= OFFERS_PER_PASS) {
+      for (const n of offer.notes) waiting.add(n);
+      continue;
+    }
+    const body = { register: offer.register, rows: offer.rows, ...(offer.keys === undefined ? {} : { offer: { keys: offer.keys } }) };
+    const put = kernel.propose({ question: offer.question.slice(0, 280), body_kind: 'rowset', body }, SLASH, SLASH);
+    if (!put.ok) {
+      log(`offers: ${fixOf(put)}`);
+      continue;
+    }
+    asked++;
+    for (const o of offer.offered) mark(store, `offered:${o}`, put.value.id, iso);
+  }
+  /* A PERSON LINKED TO A SECOND PROJECT, OR OFFERED KEYS AND A LINK, keeps their notes unread too: the rest is offered
+     the night after. */
+  for (const plan of plans.values()) if (plan.links.size > (plan.keys.length === 0 ? 1 : 0)) for (const n of plan.notes) waiting.add(n);
+  for (const note of moved) if (!waiting.has(note.key)) mark(store, note.key, note.hash, iso);
+  if (waiting.size === 0) mark(store, 'offers.since', iso, iso);
+  later();
+  return { ran: true, asked };
 }
 
 /* ── a host's model as the understanding engine ─────────────────────────────────────────────────────────────────────── */
@@ -687,9 +1113,11 @@ export function understandingOver(
       }
       hold.value.release();
       /* A STATUS THE PROVIDER WILL ANSWER AGAIN ON EVERY RUNG (`SlashRefusedError`, a wrong key or model name) costs
-         nothing and is not retried: walking the ladder would spend hours to hear the same 401. */
+         nothing and is not retried: walking the ladder would spend hours to hear the same 401. `PULL_REQUEST_REFUSED`
+         IS BORROWED, as `@braindog/slash`'s `answer.ts` borrows it for the same throw: `30 §6` reads it "a 4xx the
+         declaration did not expect", and a code of Slash's own would be an amendment to the registry, not this file. */
       if (typeof e === 'object' && e !== null && typeof (e as { refused?: unknown }).refused === 'number')
-        return { ok: false, refusal: { code: 'SLASH_REFUSED', fix } };
+        return { ok: false, refusal: { code: 'PULL_REQUEST_REFUSED', fix } };
       return { ok: false, refusal: { code: 'UNREACHABLE', fix } };
     }
   };

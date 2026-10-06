@@ -19,14 +19,19 @@ import { backgroundMeter, BACKGROUND_JOBS_MONTH, serveModelJobs, UNDERSTAND_ASKS
 import { slashRecordMeter } from '../src/slash-ask.ts';
 import { SLASH_HEADLINE_INSTRUCTIONS } from '../src/slash.ts';
 import {
+  keysWritten,
   mentionsKept,
   NOTES_EVERY_MS,
+  OFFERS_PER_PASS,
   RESOLVE_PAIRS_MOST,
   scrubbed,
   serveNotes,
+  serveOffers,
+  SLASH_MENTIONS_INSTRUCTIONS,
   understandingOver,
   type MentionsInput,
   type NotesKernel,
+  type OffersKernel,
   type ResolveInput,
 } from '../src/understand.ts';
 import { createSlash } from '../../slash/src/index.ts';
@@ -227,7 +232,7 @@ test('A STATUS THE PROVIDER WILL GIVE AGAIN IS NOT RETRIED, and costs nothing', 
     record,
   );
   const out = await refused.resolve({ pairs: [] });
-  assert.ok(!out.ok && 'refusal' in out && out.refusal.code === 'SLASH_REFUSED');
+  assert.ok(!out.ok && 'refusal' in out && out.refusal.code === 'PULL_REQUEST_REFUSED');
   assert.equal(backgroundMeter(sql).understand?.spent(MONTH), 0);
 });
 
@@ -256,10 +261,11 @@ const PEOPLE = {
     id: 'people',
     name: 'People',
     title: 'name',
-    meets: { name: 'name', email: 'email', met: 'met', merged_into: 'merged_into', projects: 'projects' },
+    meets: { name: 'name', email: 'email', met: 'met', merged_into: 'merged_into', projects: 'projects', handles: 'handles' },
     fields: [
       { id: 'name', type: 'text', required: true },
       { id: 'email', type: 'email' },
+      { id: 'handles', type: 'list', of: 'text' },
       { id: 'note', type: 'text' },
       { id: 'met', type: 'list', of: 'text' },
       { id: 'merged_into', type: 'ref', to: 'people' },
@@ -296,19 +302,20 @@ async function record() {
   const bake = await api.create({ register: 'projects', fields: { name: 'Bake', note: BAKE_NOTE } }, OWNER);
   assert.ok(bake.ok && !('asked' in bake.value), JSON.stringify(bake));
   const jo = await api.create({ register: 'people', fields: { name: 'Jo Okonkwo', email: 'jo@okonkwo.example', note: 'Illustration, invoices monthly.' } }, OWNER);
-  assert.ok(jo.ok, JSON.stringify(jo));
+  assert.ok(jo.ok && !('asked' in jo.value), JSON.stringify(jo));
   const filed: { question: string; body: Record<string, unknown> }[] = [];
-  const kernel: NotesKernel = {
+  const kernel: NotesKernel & OffersKernel = {
     registers: () => api.kernel.registers(),
     list: (q) => api.kernel.list(q),
     meetsList: () => api.kernel.meetsList(),
+    history: (id) => api.kernel.history(id),
     propose: (p, w, d) => {
       const out = api.kernel.propose(p, w, d);
       if (out.ok) filed.push({ question: p.question, body: p.body });
       return out;
     },
   };
-  return { api, kernel, filed, bake: bake.value, at: (ms: number) => (now = ms) };
+  return { api, kernel, filed, bake: bake.value, jo: jo.value, at: (ms: number) => (now = ms) };
 }
 
 /** What the model says about the Bake note: one relation, one public figure, one already in People, one only mentioned, one invented. */
@@ -462,7 +469,8 @@ test('THE MODEL-JOBS PASS READS THE NOTES ONCE ITS NIGHT HAS COME, on a host tha
   assert.equal(asked.length, 1);
   const open = r.api.kernel.governance('suggestion', {});
   assert.ok(open.ok);
-  assert.equal(open.value.length, 1, 'the one question about Ahmed is on Decide');
+  /* THE ONE QUESTION ABOUT AHMED, AND THE OFFER THE SAME NOTE MAKES WITH NO MODEL: Jo Okonkwo, held, named in full. */
+  assert.equal(open.value.length, 2, 'the question about Ahmed and the link for Jo are on Decide');
   /* AND NOT AGAIN ON THE NEXT ALARM. */
   await serveModelJobs(r.api, deps);
   assert.equal(asked.length, 1);
@@ -476,4 +484,119 @@ test('THE MODEL-JOBS PASS READS THE NOTES ONCE ITS NIGHT HAS COME, on a host tha
   const nothing: MentionsInput[] = [];
   await serveModelJobs(spent.api, { ...deps, inference: { ...deps.inference, mentions: reader(nothing) }, store: openSqlite(), meter: { cap: 30, spent: () => 30, understand: meter().understand } });
   assert.equal(nothing.length, 0);
+});
+
+/* ── what a person wrote word for word: the offers (judge change 4) ───────────────────────────────────────────────── */
+
+test('AN ADDRESS OR A LOGIN IS READ ONLY AS THE NOTE SPELLS IT, after the service it is on, and a repository is not a login', () => {
+  assert.deepEqual(
+    keysWritten('Art for Tidewar. Git: Quill.Pixels@gmail.com, GitHub @quillpx. Discord: quill_px. Pin node@24.13.0, see github.com/tidewar/app, ping @quill'),
+    [
+      { key: 'email:quillpixels@gmail.com', said: 'Quill.Pixels@gmail.com' },
+      { key: 'github:quillpx', said: 'quillpx' },
+      { key: 'discord:quill_px', said: 'quill_px' },
+    ],
+  );
+  assert.deepEqual(keysWritten('The GitHub repo is private.'), []);
+});
+
+test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT: one question each, saying what kind and never the thing', async () => {
+  const r = await record();
+  const store = openSqlite();
+  const quill = await r.api.create({ register: 'people', fields: { name: 'Quill', handles: ['discord:quillart'], note: 'Art for Bake. Git: quill.pixels@gmail.com, GitHub @quillpx' } }, OWNER);
+  assert.ok(quill.ok && !('asked' in quill.value), JSON.stringify(quill));
+  /* A KEY ANOTHER PERSON HOLDS IS NOT OFFERED, and neither is anything in a note an agent wrote. */
+  assert.ok((await r.api.create({ register: 'people', fields: { name: 'Sam Reyes', note: 'Copies jo@okonkwo.example on every invoice.' } }, OWNER)).ok);
+  assert.ok(r.api.kernel.create('people', { name: 'Pyxel', note: 'Pyxel writes from pyxel@reef.example, GitHub: pyxeldev' }, { actor: 'agent:claude' }).ok);
+
+  const out = serveOffers(r.kernel, { store, now: () => T0, log: () => {} });
+  assert.deepEqual(out, { ran: true, asked: 2 });
+  assert.deepEqual(
+    r.filed.map((f) => f.question),
+    ['Add an address and a GitHub login to Quill? Your note on Quill says so.', 'Link Jo Okonkwo to Bake? Your note on Bake says so.'],
+  );
+  for (const f of r.filed) assert.ok(!f.question.includes('@') && !f.question.includes('—'), f.question);
+  /* THE KERNEL'S OWN SHAPE FOR AN OFFER: the row as a person says it, and the keys, so a later meeting brings it up to date. */
+  assert.deepEqual(r.filed[0]!.body, {
+    register: 'people',
+    rows: [{ at: `people#${quill.value.seq}`, version: quill.value.version, patch: { email: 'quill.pixels@gmail.com', handles: ['discord:quillart', 'github:quillpx'] } }],
+    offer: { keys: ['email:quillpixels@gmail.com', 'github:quillpx'] },
+  });
+  assert.deepEqual(r.filed[1]!.body, { register: 'people', rows: [{ at: `people#${r.jo.seq}`, version: r.jo.version, patch: { projects: [r.bake.id] } }] });
+
+  /* NOTHING WAS WRITTEN until the owner says yes, and nothing is offered again. Quill's link to Bake, which the offer's
+     update would not carry, is its own question the night after. */
+  const held = r.api.kernel.get(quill.value.id);
+  assert.equal(held?.fields.email ?? null, null);
+  assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + 60_000, log: () => {} }), { ran: false, asked: 0, why: 'not yet' });
+  assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + NOTES_EVERY_MS + 60_000, log: () => {} }), { ran: true, asked: 1 });
+  assert.equal(r.filed[2]!.question, 'Link Quill to Bake? Your note on Quill says so.');
+  assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + 2 * NOTES_EVERY_MS + 120_000, log: () => {} }), { ran: true, asked: 0 });
+
+  /* MET AGAIN BEFORE THE OWNER ANSWERS, the offer is brought up to Quill as they are now, and still accepted. */
+  assert.ok(r.api.kernel.meet({ name: 'Quill', handle: 'Discord:quillart', where: 'a message in the art channel' }, { actor: 'p_owner' }).ok);
+  assert.notEqual(r.api.kernel.get(quill.value.id)?.version, quill.value.version);
+
+  /* YES WRITES IT: Quill now answers to the address the note gave. */
+  const open = r.api.kernel.governance('suggestion', {});
+  assert.ok(open.ok);
+  const mine = open.value.find((s) => 'offer' in (s.body as object));
+  assert.ok(mine, 'the offer to Quill is on Decide');
+  assert.equal((mine.body as { rows: { version: number }[] }).rows[0]!.version, r.api.kernel.get(quill.value.id)?.version);
+  const said = await r.api.decide({ id: mine.id, decide: { option: 'accept', reason: 'Yes.' } } as never, OWNER);
+  assert.ok(said.ok, JSON.stringify(said));
+  /* THE ADDRESS AS ITS KEY READS IT once the kernel has brought the offer up to date: Gmail's dots are not part of it. */
+  assert.match(String(r.api.kernel.get(quill.value.id)?.fields.email), /^quill\.?pixels@gmail\.com$/u);
+  assert.deepEqual(r.api.kernel.get(quill.value.id)?.fields.handles, ['discord:quillart', 'github:quillpx']);
+});
+
+test(`AT MOST ${OFFERS_PER_PASS} OFFERS A NIGHT, and the rest are offered the nights that follow`, async () => {
+  const r = await record();
+  const store = openSqlite();
+  for (const name of ['Ana', 'Ben', 'Cy', 'Dee', 'Eli']) assert.ok((await r.api.create({ register: 'people', fields: { name, note: `Writes from ${name.toLowerCase()}@studio.example` } }, OWNER)).ok);
+  const first = serveOffers(r.kernel, { store, now: () => T0, log: () => {} });
+  assert.equal(first.asked, OFFERS_PER_PASS);
+  const second = serveOffers(r.kernel, { store, now: () => T0 + NOTES_EVERY_MS + 60_000, log: () => {} });
+  const third = serveOffers(r.kernel, { store, now: () => T0 + 2 * NOTES_EVERY_MS + 120_000, log: () => {} });
+  /* FIVE ADDRESSES AND JO'S LINK TO BAKE: six questions over the nights, each asked once. */
+  assert.equal(first.asked + second.asked + third.asked, 6);
+  assert.equal(new Set(r.filed.map((f) => f.question)).size, 6);
+});
+
+test("A RUN'S HANDOFF IS READ FOR NAMES: one is a question linked to the run's project, never a row, and a run's first title is not read", async () => {
+  const r = await record();
+  const store = openSqlite();
+  assert.ok(r.api.kernel.create('session', { doing: 'Menu proofs', next: 'Send the proofs to Mateo once he signs off.', agent: 'claude', state: 'active' }, { actor: 'p_owner', stamp: { project: 'projects#1' } }).ok);
+  assert.ok(r.api.kernel.create('session', { doing: 'Claude Code in Bake', agent: 'claude', state: 'active' }, { actor: 'p_owner', stamp: { project: 'projects#1' } }).ok);
+  const asked: MentionsInput[] = [];
+  const bake = reader(asked);
+  const mentions = async (input: MentionsInput) => {
+    const said = await bake(input);
+    const run = input.notes.find((n) => n.kind === 'run');
+    const more = run ? [{ note: run.id, name: 'Mateo', type: 'person', sentence: 'Send the proofs to Mateo once he signs off.', relation: true }] : [];
+    return { ok: true as const, value: { mentions: [...(said.value.mentions as unknown[]), ...more] } };
+  };
+  const out = await serveNotes(r.kernel, { mentions, meter: meter().understand!, store, now: () => T0, log: () => {} });
+
+  assert.deepEqual(out, { ran: true, read: 3, asked: 1 });
+  const runs = asked[0]!.notes.filter((n) => n.kind === 'run');
+  assert.deepEqual(runs.map((n) => [n.about, n.text]), [['Bake', 'Menu proofs Send the proofs to Mateo once he signs off.']]);
+  assert.equal(r.filed[0]!.question, 'Add 2 names to People? Ahmed and Mateo, named in your note on Bake and a run on Bake.');
+  assert.deepEqual((r.filed[0]!.body.rows as unknown[])[1], {
+    name: 'Mateo',
+    met: ['2026-10-06 · a run on Bake: "Send the proofs to Mateo once he signs off."'],
+    projects: [r.bake.id],
+  });
+  const people = r.api.kernel.list({ register: 'people' });
+  assert.ok(people.ok);
+  assert.ok(!people.value.rows.some((p) => p.fields.name === 'Mateo'), 'a name in a handoff became a row');
+  assert.match(SLASH_MENTIONS_INSTRUCTIONS, /A note of kind run is what an agent said it was doing and its next step/u);
+});
+
+test('THE OFFERS NEED NO MODEL: a host with none still offers what the notes spell out, and leases nothing', async () => {
+  const r = await record();
+  await serveModelJobs(r.api, { inference: undefined, meter: meter(), now: () => T0, store: openSqlite(), log: () => {} });
+  const open = r.api.kernel.governance('suggestion', {});
+  assert.ok(open.ok);
+  assert.equal(open.value.length, 1, 'the link for Jo is on Decide');
 });

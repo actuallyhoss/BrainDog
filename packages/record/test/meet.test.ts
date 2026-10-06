@@ -106,7 +106,7 @@ test('SOMEBODY NEW IS ADDED, signed by the run that met them and linked to its p
   sql.close();
 });
 
-test('SOMEBODY ALREADY THERE IS MATCHED, and gains the line and the handle and nothing else', async () => {
+test('SOMEBODY ALREADY THERE IS MATCHED, and gains the line and nothing else', async () => {
   const { api, sql } = await record();
   value(await api.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 4464966 in braindog' }, agent()));
   const again = value<Meeting>(
@@ -116,7 +116,8 @@ test('SOMEBODY ALREADY THERE IS MATCHED, and gains the line and the handle and n
 
   const ada = person(sql);
   assert.equal(ada.fields.name, 'Ada Lovelace', 'what a commit said overwrote the name already held');
-  assert.deepEqual(ada.fields.handles, ['github:ada']);
+  /* A COMMIT'S KEYS ARE NOT CARRIED ONTO WHOEVER HOLDS ONE (research-audit-21 M9): anybody who can push signs as anyone. */
+  assert.equal(ada.fields.handles, undefined, 'a handle a commit said was carried onto her');
   assert.equal((ada.fields.met as string[]).length, 2);
   sql.close();
 });

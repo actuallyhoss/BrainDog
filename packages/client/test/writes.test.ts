@@ -85,11 +85,13 @@ test('undo and undoRun are POSTs of their own arguments: a plan asked dry, then 
   const net = recording({ put_back: 1 });
   const c = createClient({ base: 'https://braindog.example', fetch: net.fetch });
   await c.undo({ batch: 'b1', dry: true });
+  await c.undo({ batch: 'b1', row: { register: 'tasks', seq: 3 }, dry: true });
   await c.undo({ decision: 'D4', hash: 'h1' });
   await c.undoRun({ run: 'S12', dry: true });
   await c.undoRun({ run: 'S12', hash: 'h2' });
   assert.deepEqual(net.seen, [
     { path: '/api/undo', method: 'POST', body: { batch: 'b1', dry: true } },
+    { path: '/api/undo', method: 'POST', body: { batch: 'b1', row: { register: 'tasks', seq: 3 }, dry: true } },
     { path: '/api/undo', method: 'POST', body: { decision: 'D4', hash: 'h1' } },
     { path: '/api/undoRun', method: 'POST', body: { run: 'S12', dry: true } },
     { path: '/api/undoRun', method: 'POST', body: { run: 'S12', hash: 'h2' } },

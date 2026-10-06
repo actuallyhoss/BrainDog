@@ -143,7 +143,7 @@ test('PEOPLE STILL NEEDS NO OTHER LIST: its figures read People alone', () => {
 test('MEETING SOMEONE MOVES THEIR LAST IN TOUCH TO TODAY, so the page stays current without anyone typing a day', async () => {
   const k = await seeded();
   const quiet = PEOPLE.find((p) => p.name === 'Ada Vine')!;
-  const met = k.meet({ email: String(quiet.email), where: 'mail about the year-end pack' }, { actor: 'agent:claude' });
+  const met = k.meet({ email: String(quiet.email), where: 'a note about the year-end pack' }, { actor: 'agent:claude' });
   assert.ok(met.ok, sayOf(met));
   const listed = k.list({ register: 'people', limit: 50 });
   assert.ok(listed.ok, sayOf(listed));

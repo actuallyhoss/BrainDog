@@ -31,3 +31,27 @@ export function scrubbed(text: string): string | null {
 
 /** Whether the text holds nothing a model may not read, so it can go as it is. */
 export const clean = (text: string): boolean => scrubbed(text) === text.trim().split(/\s+/u).join(' ');
+
+/** An address in brackets beside a name, `Jo <jo@kiln.example>` or `Jo (jo@kiln.example)`, with the space before it. */
+const BRACKETED = /\s*[<([]\s*[^\s<>"'@()[\]]+@[^\s<>"'@()[\]]+\.[a-z]{2,}\s*[>)\]]/giu;
+
+/**
+ * A name as a person reads it, or `null` where it was only an address, as the MCP's own `nameOnly` reads one
+ * (`packages/mcp/src/brief.ts`): `Jo <jo@kiln.example>` is `Jo`, and `jo@kiln.example` names nobody. The record keeps
+ * an address as somebody's name when it knew no other (research-audit-21 item 11).
+ */
+export function nameOnly(said: string): string | null {
+  const kept = said.replace(BRACKETED, '').trim();
+  return kept === '' || /[^\s<>"'@]+@[^\s<>"'@]+\.[a-z]{2,}/iu.test(kept) ? null : kept;
+}
+
+/**
+ * A row's name said without an address in it: its name when it has one, else each address said as the part before its
+ * `@`, as the kernel names a person it met only by an address. `null` when nothing is left.
+ */
+export function spokenName(said: string): string | null {
+  const name = nameOnly(said);
+  if (name !== null) return name;
+  const plain = said.replace(BRACKETED, '').replace(/([^\s<>"'@]+)@[^\s<>"'@]+\.[a-z]{2,}/giu, '$1').trim();
+  return plain === '' ? null : plain;
+}

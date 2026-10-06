@@ -110,11 +110,15 @@ test('ANSWERING WHICH PROJECT PLACES ONLY THE QUIET RUNS IN THE PLACE ASKED ABOU
   /* THE OWNER'S UNDO TAKES BOTH BACK, said in names. */
   const batch = lines[0]!.batch;
   const plan = value<UndoPlan>(await api.undo({ batch, dry: true }, owner));
-  assert.equal(plan.steps.length, 2);
-  assert.ok(plan.lines.every((l) => l.endsWith('out of Tallow')), plan.lines.join(' / '));
+  /* AND THE REMOTE ASKED ABOUT IS LISTED ON THE PROJECT IN THE SAME BATCH, so later runs there place themselves; the
+     other host's is not. */
+  assert.deepEqual(api.kernel.get(tallow.id)?.fields.repos, ['tallow', 'git@github.com:sam/tallow.git']);
+  assert.equal(plan.steps.length, 3);
+  assert.deepEqual(plan.lines, ['Take Work out of Tallow', 'Take Work out of Tallow', 'Take the repository tallow off Tallow']);
   assert.doesNotMatch(JSON.stringify(plan.lines), /[0-9A-HJKMNP-TV-Z]{26}/u);
   value(await api.undo({ batch, hash: plan.hash }, owner));
   for (const id of mine) assert.equal(api.kernel.get(id)?.fields.project ?? null, null);
+  assert.deepEqual(api.kernel.get(tallow.id)?.fields.repos, ['tallow']);
   sql.close();
 });
 
@@ -123,8 +127,9 @@ test('THE LAST WALK IS KEPT WHERE UNDO FINDS IT', async () => {
   await api.slashTick();
   value(await api.decide({ id: asked(sql, '%runs worked in tallow%')!, decide: { option: 'p1', reason: '' } }, owner));
   const back = value<{ undone: number; said: string }>(await api.understand({ undo: 'last' }, owner));
-  assert.equal(back.undone, 2);
-  assert.equal(back.said, 'Put back 2 changes.');
+  /* THE TWO RUNS AND THE REPOSITORY LISTED ON THE PROJECT. */
+  assert.equal(back.undone, 3);
+  assert.equal(back.said, 'Put back 3 changes.');
   for (const id of mine) assert.equal(api.kernel.get(id)?.fields.project ?? null, null);
   /* AGAIN IS NOTHING. */
   assert.equal(value<{ undone: number }>(await api.understand({ undo: 'last' }, owner)).undone, 0);
