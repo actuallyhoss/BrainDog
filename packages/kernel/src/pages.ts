@@ -238,8 +238,12 @@ export type PageDecl = {
   page: string;
   title: string;
   blocks: PageBlock[];
-  /** `for:` makes it a template: one page per row of the register it names. */
-  for?: { register: string; where?: string };
+  /**
+   * `for:` makes it a template: one page per row of the register it names. `fleeting: true` says its rows are many and
+   * come and go, as runs do, so its pages take an address only after every steadier page has had its pick
+   * (`resolvePages`). A template over the runs' own list is read so without saying it.
+   */
+  for?: { register: string; where?: string; fleeting?: boolean };
   requires?: string[];
   [key: string]: unknown;
 };
@@ -496,6 +500,14 @@ export type QueueQuestion = {
   /** The kinds of change it is (`change-kind.ts`'s keys, `tasks:move:done`), dearest first, as the ladder counts it. */
   kinds?: string[];
 };
+
+/**
+ * WHAT THE DECISION CARD SAYS BESIDE ONE QUESTION, read on its own (`kernel.queueQuestion`): the run that asked and the
+ * app it ran in, who drafted it, the money accepting writes, what changes on the one row it updates, and the kinds of
+ * change it is. The same facts a queue's question carries, so a card drawn outside a page's queue says what the queue's
+ * says.
+ */
+export type QuestionFacts = Pick<QueueQuestion, 'run' | 'drafted_by' | 'money' | 'changes' | 'kinds'>;
 
 /** One name a merge question is about: its handle (`people#4`), its name, where it was seen, and whether it is kept. */
 export type QueueCandidate = { at: string; name: string; seen: string[]; kept?: true };
@@ -861,6 +873,16 @@ function everyRow(deps: PageDeps, register: string, where: Predicate | undefined
   return ok({ rows, matched });
 }
 
+/**
+ * WHEN A PAGE CLAIMS ITS ADDRESS: a page somebody wrote first (0), a template over rows that stay second (1), and a
+ * template over rows that are many and short-lived last (2), which is one over the runs' own list or one whose `for:`
+ * says `fleeting: true`.
+ */
+export function claimRank(decl: PageDecl): 0 | 1 | 2 {
+  if (!decl.for) return 0;
+  return decl.for.register === SESSION || decl.for.fleeting === true ? 2 : 1;
+}
+
 export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal }[] {
   type Resolved = { slug: string; decl: PageDecl; row?: Entry; refusal?: Refusal };
   const taken = new Set<string>();
@@ -898,50 +920,62 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
      and not by `localeCompare`, so every host sorts them alike.
 
      ONLY THE CLAIMING IS SORTED. The pages still come out in the order the record handed them over, which is the
-     order `boot`, `pages` and the rail read them in, because this is about addresses and not about places. */
+     order `boot`, `pages` and the rail read them in, because this is about addresses and not about places.
+
+     AND A TEMPLATE WHOSE ROWS COME AND GO CLAIMS LAST (`claimRank`). By id alone `run` sorts before `skill` and
+     `someone`, so a run whose doing slugged to an active skill's name took `/p/<skill>` and the skill's page moved to
+     `<skill>-4`: a link to a skill moved every time an agent started work under its name. Runs are many and short-lived,
+     so they take what is left, and a run that meets a steadier page's name is the page that is numbered.
+
+     AND AMONG TEMPLATES OF ONE RANK, THE ROW THAT WAS THERE FIRST KEEPS ITS ADDRESS. By template id alone, a project
+     added today named like a skill added last month took `/p/<skill>` from it because `project` sorts before `skill`, and
+     a link somebody had kept for a month opened somebody else's page. So a row's pages claim in the order the rows were
+     written, the template's id breaking a tie between two pages of one row, and a newcomer is the page that is numbered.
+     A numbered address carries its row's number and not a count, so it does not move either. */
   const decls = deps.pages();
   const made: Resolved[][] = decls.map(() => []);
-  const claimOrder = decls
-    .map((decl, at) => ({ decl, at }))
-    .sort((x, y) => {
-      if (!x.decl.for !== !y.decl.for) return x.decl.for ? 1 : -1;
-      return x.decl.page < y.decl.page ? -1 : x.decl.page > y.decl.page ? 1 : x.at - y.at;
-    });
-  for (const { decl, at } of claimOrder) {
+  /** One address to claim: the name it wants, when, and where its page goes once it has one. */
+  type Want = { rank: 0 | 1 | 2; age: string; page: string; at: number; nth: number; name: string; register: string; seq: number | null; put: (slug: string) => void };
+  const wants: Want[] = [];
+  const filled: (() => void)[] = [];
+  decls.forEach((decl, at) => {
     const here = made[at]!;
+    const claims = claimRank(decl);
     if (!decl.for) {
-      here.push({ slug: claim(decl.page, 'page', null), decl });
-      continue;
+      wants.push({ rank: claims, age: '', page: decl.page, at, nth: 0, name: decl.page, register: 'page', seq: null, put: (slug) => here.push({ slug, decl }) });
+      return;
     }
 
     /* A TEMPLATE THAT CANNOT BE EXPANDED IS STILL A PAGE, and it says why. These were `continue`d,
        so a declaration with a typo in its `for.where` was reported as a page that does not exist —
-       to the person who had just written it. */
+       to the person who had just written it. It claims after its rank's rows, by its id: a template that broke has not
+       claimed its own id while it worked, so taking it now would move a row's page that already held it. */
     const refuse = (refusal: Refusal): void => {
-      here.push({ slug: claim(decl.page, 'page', null), decl, refusal });
+      wants.push({ rank: claims, age: '\uffff', page: decl.page, at, nth: 0, name: decl.page, register: 'page', seq: null, put: (slug) => here.push({ slug, decl, refusal }) });
     };
 
-    const schema = deps.schemaOf(decl.for.register);
+    const register = decl.for.register;
+    const schema = deps.schemaOf(register);
     if (!schema) {
-      refuse({ code: 'REGISTER_UNKNOWN', fix: `${decl.page} is a page per row of ${decl.for.register}, and there is no such register.`, at: 'for' });
-      continue;
+      refuse({ code: 'REGISTER_UNKNOWN', fix: `${decl.page} is a page per row of ${register}, and there is no such register.`, at: 'for' });
+      return;
     }
     const said = predicateOf(decl.for.where, schema, deps.ctx);
     if (said.bad.length) {
       refuse(said.bad[0]!);
-      continue;
+      return;
     }
-    const listed = everyRow(deps, decl.for.register, said.predicate);
+    const listed = everyRow(deps, register, said.predicate);
     if (!listed.ok) {
       /* A LIST CANNOT CONFLICT — nothing was written — so the guard is the type system agreeing
          rather than a case anybody expects to see. */
       if (refused(listed)) refuse(listed.refusal);
-      continue;
+      return;
     }
-    const title = deps.titleOf(decl.for.register);
+    const title = deps.titleOf(register);
     if (!title) {
-      refuse({ code: 'REQUIRED_MISSING', fix: `${decl.for.register} names no title field, so its pages have no name.`, at: 'for' });
-      continue;
+      refuse({ code: 'REQUIRED_MISSING', fix: `${register} names no title field, so its pages have no name.`, at: 'for' });
+      return;
     }
 
     /* TWO ROWS OF ONE NAME, IN TWO PLACES, ARE TELLABLE APART BY THE PLACE. A project's skill hides the global one of
@@ -954,7 +988,7 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
        first: editing a part moved its tab (measured on a pack with a page per part). So they come in the list's
        declared order, which is its `steps:` order where it is a list of steps, a row with none after the rest, and
        otherwise, and between equals, the order the rows were written in. */
-    const order = ownSteps(deps, decl.for.register, schema)?.order;
+    const order = ownSteps(deps, register, schema)?.order;
     const rank = (row: Entry): number | string | null => {
       const v = order === undefined ? null : row.fields[order];
       return typeof v === 'number' || typeof v === 'string' ? v : null;
@@ -975,7 +1009,7 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       const base = slugify(String(row.fields[title] ?? ''));
       counts.set(base, (counts.get(base) ?? 0) + 1);
     }
-    const scope = deps.scopeOf?.(decl.for.register) ?? null;
+    const scope = deps.scopeOf?.(register) ?? null;
     let places: Map<string, string> | null = null;
     const placeOf = (row: Entry): string | null => {
       const at = scope ? row.fields[scope.field] : undefined;
@@ -987,19 +1021,30 @@ export function resolvePages(deps: PageDeps): { slug: string; decl: PageDecl; ro
       }
       return places.get(at) || null;
     };
-    const slugs = new Map<Entry, string>();
-    const shared = [...counts.values()].some((n) => n > 1);
-    const everywhereFirst = shared ? [...rows].sort((x, y) => Number(placeOf(x) !== null) - Number(placeOf(y) !== null)) : rows;
-    for (const row of everywhereFirst) {
-      const name = String(row.fields[title] ?? '');
-      const place = (counts.get(slugify(name)) ?? 0) > 1 ? placeOf(row) : null;
-      slugs.set(row, claim(place === null ? name : `${name} ${place}`, decl.for.register, row.seq));
-    }
     /* KEYED BEFORE IT IS FILLED, so every page out of one template answers one key for one block whatever its row
        wrote into the heading, and one look covers them all (`block-keys.ts`). */
     const keyed: PageDecl = Array.isArray(decl.blocks) ? { ...decl, blocks: keyedBlocks(decl.blocks) } : decl;
-    for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fill(keyed, row) as PageDecl, row });
-  }
+    const slugs = new Map<Entry, string>();
+    const shared = [...counts.values()].some((n) => n > 1);
+    const everywhereFirst = shared ? [...rows].sort((x, y) => Number(placeOf(x) !== null) - Number(placeOf(y) !== null)) : rows;
+    everywhereFirst.forEach((row, nth) => {
+      const name = String(row.fields[title] ?? '');
+      const place = (counts.get(slugify(name)) ?? 0) > 1 ? placeOf(row) : null;
+      wants.push({ rank: claims, age: row.created_at, page: decl.page, at, nth, name: place === null ? name : `${name} ${place}`, register, seq: row.seq, put: (slug) => slugs.set(row, slug) });
+    });
+    /* The pages come out in the template's own order once every row has its address. */
+    filled.push(() => {
+      for (const row of rows) here.push({ slug: slugs.get(row)!, decl: fill(keyed, row) as PageDecl, row });
+    });
+  });
+
+  /* A row's age is its `created_at`, which is an ISO stamp and so sorts by code unit; a page written by hand has none and
+     claims by its id alone, and a broken template's own page has the last there is. Between two rows of one moment the template's id decides, then the order the template put
+     its own rows in (a row that applies everywhere before one scoped to a place). */
+  const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+  wants.sort((x, y) => x.rank - y.rank || cmp(x.age, y.age) || cmp(x.page, y.page) || x.at - y.at || x.nth - y.nth);
+  for (const want of wants) want.put(claim(want.name, want.register, want.seq));
+  for (const fillIn of filled) fillIn();
   return made.flat();
 }
 

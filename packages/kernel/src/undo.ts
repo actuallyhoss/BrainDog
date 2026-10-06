@@ -36,6 +36,7 @@
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+import { BACKFILL_ACTOR } from './backfill.ts';
 import { agentOf, kindOfEvent, shapeIn } from './change-kind.ts';
 import type { Json } from './coerce.ts';
 import { jcs } from './declare.ts';
@@ -145,11 +146,16 @@ type Scoped = { keys: string[]; lines: Line[]; decisions: string[]; empty: strin
  *
  * ONE PARAMETER FOR A LIST, through `json_each`, because a Durable Object allows a hundred bound values and a run can
  * have written in more batches than that.
+ *
+ * EVERY KEY IS A BATCH'S OWN, `coalesce(batch, id)`. A key matched a line's id too, so an event id from inside a larger
+ * batch undid that one line, and the ladder's mark, keyed by the real batch, was looked up by the id and never made. A
+ * key given now is read as the batch its line belongs to, and an id matches only the first line of a write given no
+ * batch, which is the one line whose own id is its batch.
  */
 function scoped(sql: Sql, scope: UndoScope): Result<Scoped> {
   const byKeys = (keys: readonly string[]): Line[] =>
     sql.all<Line>(
-      `SELECT ${COLUMNS} FROM event WHERE batch IN (SELECT value FROM json_each(?)) OR id IN (SELECT value FROM json_each(?)) ORDER BY rowid`,
+      `SELECT ${COLUMNS} FROM event WHERE batch IN (SELECT value FROM json_each(?)) OR (batch IS NULL AND id IN (SELECT value FROM json_each(?))) ORDER BY rowid`,
       JSON.stringify(keys),
       JSON.stringify(keys),
     );
@@ -162,7 +168,9 @@ function scoped(sql: Sql, scope: UndoScope): Result<Scoped> {
       .map((r) => r.target.slice('decision:'.length));
 
   if ('batch' in scope) {
-    const key = typeof scope.batch === 'string' ? scope.batch.trim() : '';
+    const given = typeof scope.batch === 'string' ? scope.batch.trim() : '';
+    const key =
+      given === '' ? '' : (sql.one<{ k: string }>('SELECT coalesce(batch, id) AS k FROM event WHERE id = ? OR batch = ? ORDER BY rowid LIMIT 1', given, given)?.k ?? given);
     const lines = key === '' ? [] : byKeys([key]);
     if (lines.length === 0) return no('ROW_UNKNOWN', 'There is no change with that mark in this record, so there is nothing to undo.', { at: 'batch' });
     return ok({ keys: [key], lines, decisions: decisionsOf([key]), empty: 'That change left nothing that can be put back.' });
@@ -363,6 +371,8 @@ type Work = {
   /** The order a removal goes in: the newest made goes first, so a row is never taken from under one that points at it. */
   made: number;
   patch: Patch;
+  /** The record's own fields it puts back, which no patch may name: a run's `project`. */
+  stamp?: Record<string, Json>;
   steps: UndoStep[];
   /** The lines whose change this puts back, for the kinds the ladder is told. */
   from: Line[];
@@ -419,14 +429,111 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
     if (row !== undefined) leftAlone.add(row);
     skipped.push({ ...(row === undefined ? {} : { row }), title, why, line: `Leaves ${named(title)} as it is: ${why}.` });
   };
+  /**
+   * The project a run is placed in, by name. A run holds it as the project's spoken id (`things#3`, or `P3` on a list
+   * with its own prefix), which a person never reads; a value that is no handle is a name as somebody wrote it, and so
+   * is letters and a number no list prefixes its rows with ("Web3"). `null` when it names a project the record no
+   * longer holds, or one with no name.
+   */
+  const placeName = (said: unknown): string | null => {
+    if (typeof said !== 'string' || said.trim() === '') return null;
+    const hashed = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(said);
+    const prefixed = hashed ? null : /^([A-Za-z]+)(\d+)$/.exec(said);
+    const register = hashed
+      ? hashed[1]!
+      : prefixed
+        ? sql.one<{ r: string }>(
+            "SELECT json_extract(body, '$.id') AS r FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_extract(body, '$.seq_prefix') = ? LIMIT 1",
+            prefixed[1]!,
+          )?.r
+        : undefined;
+    if (!hashed && (!prefixed || register === undefined)) {
+      if (!/^[0-9A-HJKMNP-TV-Z]{26}$/.test(said)) return said.trim();
+      const row = nameOfRow(said);
+      return row === null || row.startsWith('an untitled ') ? null : row;
+    }
+    if (register === undefined) return null;
+    const found = sql.one<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND seq = ? AND deleted_at IS NULL', register, Number((hashed ?? prefixed)![2]));
+    const fields = found ? parse(found.fields) : null;
+    const title = isMap(fields) ? titleOf({ fields }, lists(register)) : null;
+    return title === null || title.startsWith('an untitled ') ? null : title;
+  };
+  /**
+   * A run the overnight walk placed, unplaced: the work that does it, or `null` when the run is left as it is (with a
+   * line saying why when somebody has moved it since).
+   *
+   * ITS PLACEMENT IS ONE OF TWO LINES, both signed `rule:backfill`: a `project` edit, from nothing to the project, or,
+   * from before a placement wrote its move as a line, a stamp naming no field. The walk only places a run with no
+   * project, so what it goes back to is nothing. A stamp says nothing of what it set, so it goes back only while it is
+   * the run's last line; a `project` edit, while the run still holds what it set and nobody has placed it since.
+   */
+  const placedBack = (row: Held, evs: readonly Line[]): Work | null => {
+    const placing = evs.filter((e) => e.actor === BACKFILL_ACTOR && e.kind === 'edit' && (e.field === null || e.field === 'project'));
+    const decl = lists(SESSION);
+    const f = decl?.fields.get('project');
+    if (placing.length === 0 || !decl || !f || row.deleted_at !== null) return null;
+    const held = row.fields.project;
+    if (typeof held !== 'string' || held.trim() === '') return null;
+    const last = placing[placing.length - 1]!;
+    const bare = last.field === null;
+    const title = titleOf(row, decl);
+    const label = labelOf(f);
+    const target = `entry:${row.id}`;
+    const since = othersOn(target, last.rowid, bare ? undefined : 'project');
+    if (since.length > 0 || (!bare && !same(held, parse(last.to_v)))) {
+      const who = since.length > 0 ? whoIn(sql, since[since.length - 1]!.actor) : 'someone';
+      skip(row.id, title, bare ? `${who} has changed it since` : `${who} has changed ${label} since`);
+      return null;
+    }
+    const first = placing.find((e) => e.field === 'project');
+    const from = first === undefined || erasedOrWithheld(first.from_v) ? null : parse(first.from_v);
+    /* The walk reads a run whose project is empty or blank as one in none, and so does the line. */
+    const none = from === null || (typeof from === 'string' && from.trim() === '');
+    const back = none ? null : placeName(from);
+    const now = placeName(held);
+    return {
+      id: row.id,
+      register: SESSION,
+      version: row.version,
+      restore: false,
+      remove: false,
+      made: 0,
+      patch: {},
+      stamp: { project: from as Json },
+      steps: [
+        {
+          do: 'set',
+          row: row.id,
+          title,
+          list: decl.name,
+          label,
+          ...(back === null ? {} : { from: back }),
+          ...(now === null ? {} : { to: now }),
+          line:
+            back === null
+              ? `Takes ${named(title)} out of ${now === null ? 'its project' : `the ${now} project`}.`
+              : `Moves ${named(title)} back to the ${back} project${now === null ? '' : ` (now ${now})`}.`,
+        },
+      ],
+      from: placing,
+    };
+  };
 
   for (const [id, evs] of byRow) {
     const row = rows.get(id);
     const madeBy = evs.find((e) => e.kind === 'create');
-    /* A RUN'S OWN ROW IS THE RECORD KEEPING ITS BOOKS: when it was last heard from, what it says it is doing. Its notes
-       are its own too, and so is the one an earlier undo left on it. A list she cannot read is left out without a word. */
-    if (row && (row.register === SESSION || (opts.reads && !opts.reads(row.register)))) {
+    /* A list she cannot read is left out without a word. */
+    if (row && opts.reads && !opts.reads(row.register)) {
       leftAlone.add(id);
+      continue;
+    }
+    /* A RUN'S OWN ROW IS THE RECORD KEEPING ITS BOOKS: when it was last heard from, what it says it is doing. Its notes
+       are its own too, and so is the one an earlier undo left on it. All but the project the overnight walk put it in,
+       which is the walk's guess and nobody's word, and goes back as any edit does. */
+    if (row && row.register === SESSION) {
+      const placed = placedBack(row, evs);
+      if (placed) work.push(placed);
+      else leftAlone.add(id);
       continue;
     }
     notes += evs.filter((e) => e.kind === 'note').length;
@@ -525,6 +632,16 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           lastOp.set(k, e.kind);
           raw.set(k, v);
         }
+        /* SOMEBODY ELSE'S SINCE, OR IN BETWEEN, element by element: a tag a person took off and put back is theirs now,
+           though it reads as it did. A line on the field that names no element (a whole value written over it) makes
+           every element theirs. */
+        const theirs = new Map<string, string>();
+        let wholly: string | null = null;
+        for (const o of othersOn(target, tagged[0]!.rowid, field)) {
+          const said = o.kind === 'tag' ? o.to_v : o.kind === 'untag' ? o.from_v : null;
+          if (said === null || erasedOrWithheld(said)) wholly = o.actor;
+          else theirs.set(JSON.stringify(parse(said)), o.actor);
+        }
         const list = Array.isArray(held) ? [...(held as unknown[])] : [];
         const has = (k: string): boolean => list.some((x) => JSON.stringify(x) === k);
         let changed = false;
@@ -534,6 +651,11 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           if (before === after || has(k) !== after) continue;
           const v = raw.get(k);
           const word = spoken(v, f, nameOfRow) ?? String(v);
+          const by = theirs.get(k) ?? wholly;
+          if (by !== null) {
+            skip(id, title, `${whoIn(sql, by)} has changed ${field === 'tags' ? `the ${word} tag` : `${word} in ${label}`} since`);
+            continue;
+          }
           if (after) {
             list.splice(list.findIndex((x) => JSON.stringify(x) === k), 1);
             step({ do: 'untag', label, to: word, line: field === 'tags' ? `Takes the ${word} tag off ${named(title)}.` : `Takes ${word} off ${label} on ${named(title)}.` }, tagged);
@@ -572,8 +694,10 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
         skip(id, title, `${whoIn(sql, between[between.length - 1]!.actor)} changed ${label} in between`);
         continue;
       }
-      if (!same(held ?? null, to)) {
-        const since = othersOn(target, tail.rowid, field);
+      /* AND SINCE, whether or not the row still holds the `to`: a person who set it away and back again has said it
+         twice, and it is theirs now though it reads the same. */
+      const since = othersOn(target, tail.rowid, field);
+      if (since.length > 0 || !same(held ?? null, to)) {
         skip(id, title, `${since.length > 0 ? whoIn(sql, since[since.length - 1]!.actor) : 'someone'} has changed ${label} since`);
         continue;
       }
@@ -633,10 +757,11 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           ? `Nothing can be put back. ${skipped.length === 1 ? 'One change is' : `${skipped.length} changes are`} left as ${skipped.length === 1 ? 'it is' : 'they are'}.`
           : got.value.empty
       : `Puts back ${count === 1 ? 'one change' : `${count} changes`}.${skipped.length > 0 ? ` Leaves ${skipped.length === 1 ? 'one as it is' : `${skipped.length} as they are`}.` : ''}`;
-  const lineList = [...steps.map((s) => s.line), ...skipped.map((s) => s.line), ...(notes > 0 ? [notes === 1 ? 'The note stays.' : 'The notes stay.'] : [])];
+  const again = count > 0 && skipped.length === 0 && answered(sql, lines).length > 0 ? [ASKED_AGAIN] : [];
+  const lineList = [...steps.map((s) => s.line), ...skipped.map((s) => s.line), ...again, ...(notes > 0 ? [notes === 1 ? 'The note stays.' : 'The notes stay.'] : [])];
   const hash = digest(
     jcs({
-      work: work.map((w) => ({ id: w.id, v: w.version, r: w.restore, x: w.remove, p: w.patch as Json })),
+      work: work.map((w) => ({ id: w.id, v: w.version, r: w.restore, x: w.remove, p: w.patch as Json, ...(w.stamp === undefined ? {} : { s: w.stamp }) })),
       stops: stops.map((s) => [s.id, s.state]),
       skipped: skipped.map((s) => s.line),
     } as unknown as Json),
@@ -741,8 +866,8 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
           if (!back.ok) return back as Result<never>;
           version = versionOf(one.id);
         }
-        if (Object.keys(one.patch).length > 0) {
-          const set = parts.write(one.register, one.id, one.patch, { ...w, version });
+        if (Object.keys(one.patch).length > 0 || one.stamp !== undefined) {
+          const set = parts.write(one.register, one.id, one.patch, { ...w, version, ...(one.stamp === undefined ? {} : { stamp: one.stamp }) });
           if (!set.ok) return set as Result<never>;
           version = versionOf(one.id);
         }
@@ -780,6 +905,9 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
     }
     /* A stopped message belongs to the batches it was matched to; its batch is marked when nothing else of it was. */
     if (stops.length > 0 && kinds.size === 0) for (const k of keys) kinds.set(k, new Set());
+    /* A SECOND UNDO OF THE SAME BATCH, putting back what the first left, adds its kinds to the mark the first made: the
+       ladder reads one line per batch, and a kind put back later is as undone as one put back first. Who made it and
+       the undo that first marked it stay as they were. */
     const undone: UndoneMark[] = [];
     for (const k of keys) {
       const of = kinds.get(k);
@@ -787,13 +915,16 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       const by = makerOf(sql, k, lines);
       const mark: UndoneMark = { batch: k, actor: by, agent: by === null ? null : agentOf(sql, by), kinds: [...of].sort() };
       undone.push(mark);
+      const had = sql.one<{ kinds: string | null }>('SELECT kinds FROM undone WHERE batch = ?', k);
+      const was = had?.kinds ? parse(had.kinds) : [];
+      const all = [...new Set([...(Array.isArray(was) ? was.filter((x): x is string => typeof x === 'string') : []), ...mark.kinds])].sort();
       sql.exec(
-        'INSERT OR IGNORE INTO undone (batch, by_batch, actor, agent, kinds, undone_by, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO undone (batch, by_batch, actor, agent, kinds, undone_by, at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (batch) DO UPDATE SET kinds = excluded.kinds',
         k,
         batch,
         mark.actor,
         mark.agent,
-        JSON.stringify(mark.kinds),
+        JSON.stringify(all),
         actor,
         at,
       );
@@ -818,7 +949,18 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       for (const d of decisions) noteOn(sql, parts.mint(), at, actor, `decision:${d}`, 'decision', note, batch);
     }
 
-    return ok({ batch, put: count, say, lines: [...done.map((s) => s.line), ...skipped.map((s) => s.line)], skipped, undone });
+    /* ── the question a decision answered: asked again when all of it went back, and marked undone when some stayed ── */
+    const asked = count > 0 ? answered(sql, lines) : [];
+    const whole = skipped.length === 0;
+    for (const q of asked) {
+      if (!whole && q.as === 'undone') continue;
+      if (whole) sql.exec("UPDATE suggestion SET status = 'open', resolved_as = NULL, defer_until = NULL, defer_why = NULL WHERE id = ?", q.id);
+      else sql.exec("UPDATE suggestion SET resolved_as = 'undone' WHERE id = ?", q.id);
+      governLine(sql, parts.mint(), at, actor, whole ? 'suggest' : 'resolve', q.id, whole ? 'reopened' : 'undone', batch);
+    }
+    const again = asked.length > 0 && whole ? [ASKED_AGAIN] : [];
+
+    return ok({ batch, put: count, say, lines: [...done.map((s) => s.line), ...skipped.map((s) => s.line), ...again], skipped, undone });
   });
 }
 
@@ -833,6 +975,41 @@ function makerOf(sql: Sql, key: string, lines: readonly Line[]): string | null {
     if (by) return by;
   }
   return lines.find((l) => keyOf(l) === key)?.actor ?? null;
+}
+
+/** What a plan and an undo say of a question that goes back to Decide. */
+const ASKED_AGAIN = 'Puts the question back in Decide.';
+
+/**
+ * The questions the lines' decisions answered and that still read as accepted, or as partly undone by an earlier undo:
+ * the ones an undo of them reopens, each with how it reads now.
+ *
+ * WITHOUT THIS DECIDE SHOWED IT DECIDED. Only `entry:` lines are walked, so the rows an accepted question wrote went
+ * back and the question stayed resolved, and the record said both that it was undone and that it was decided. A second
+ * undo that puts back what the first left reopens it too.
+ */
+function answered(sql: Sql, lines: readonly Line[]): { id: string; as: string }[] {
+  const ids = [
+    ...new Set(lines.filter((l) => l.kind === 'resolve' && l.to_v === 'addressed' && l.target?.startsWith('suggestion:')).map((l) => l.target!.slice('suggestion:'.length))),
+  ];
+  return ids.flatMap((id) => {
+    const q = sql.one<{ r: string }>("SELECT resolved_as AS r FROM suggestion WHERE id = ? AND status = 'resolved' AND resolved_as IN ('addressed', 'undone')", id);
+    return q ? [{ id, as: q.r }] : [];
+  });
+}
+
+/** A question's line in the log, as `govern.ts` writes a reopen (`suggest`, `reopened`) and a verdict (`resolve`). */
+function governLine(sql: Sql, id: string, at: string, actor: string, kind: 'suggest' | 'resolve', suggestion: string, to: string, batch: string): void {
+  sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, ?, ?, ?, 'suggestion', ?, 'Undone.', ?)",
+    id,
+    at,
+    actor,
+    kind,
+    `suggestion:${suggestion}`,
+    to,
+    batch,
+  );
 }
 
 function noteOn(sql: Sql, id: string, at: string, actor: string, target: string, kind: string, note: string, batch: string): void {

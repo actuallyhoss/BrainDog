@@ -62,8 +62,11 @@ test('A ROW’S KEYS ARE WRITTEN WITH IT, follow its edits, and go when it is de
   value(k.update('people', ada.id, { handles: ['github:ada-l'] }, OWNER));
   assert.deepEqual(keys(sql), { 'email:adal@gmail.com': ada.id, 'github:ada-l': ada.id });
 
-  /* A second row carrying a key the first holds does not take it. */
-  const twin = value<Entry>(k.create('people', { name: 'Ada again', handles: ['github:ada-l', 'github:twin'] }, OWNER));
+  /* A second row is not added with a key the first holds (the merge door), and one given it later does not take it. */
+  const made = k.create('people', { name: 'Ada again', handles: ['github:ada-l', 'github:twin'] }, OWNER) as { ok: boolean; refusal?: { code: string } };
+  assert.equal(made.ok ? 'made' : made.refusal?.code, 'ALREADY_KNOWN');
+  const twin = value<Entry>(k.create('people', { name: 'Ada again', handles: ['github:twin'] }, OWNER));
+  value(k.update('people', twin.id, { handles: ['github:ada-l', 'github:twin'] }, OWNER));
   assert.equal(keys(sql)['github:ada-l'], ada.id);
   assert.equal(keys(sql)['github:twin'], twin.id);
 

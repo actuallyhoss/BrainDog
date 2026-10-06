@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { understandBackfill, undoBackfill, tidy, BACKFILL_ACTOR, type BackfillDeps, type BackfillSuggestion } from '../src/backfill.ts';
+import { understandBackfill, undoBackfill, tidy, soundsLikeBusiness, BACKFILL_ACTOR, BACKFILL_SOURCE, type BackfillDeps, type BackfillSuggestion } from '../src/backfill.ts';
 import { ulids } from '../src/ids.ts';
 import { openRecord, type Declaration, type Entry, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
@@ -127,8 +127,8 @@ async function record(): Promise<{ k: Kernel; sql: NodeSql; deps: BackfillDeps; 
 
   const line = (what: string, more: Record<string, unknown> = {}) => value<Entry>(k.create('transactions', { what, amount: gbp(-1_250), ...more }, OWNER)).id;
   for (let i = 0; i < 3; i++) line(`CARD ${i}`, { counterparty_text: 'GEIDEA*BRIDGE ST COFFEE 0423 LONDON GB' });
-  line('AMAZON MKTPLACE 1', { note: 'Payee: Amazon. Bought a dock.' });
-  line('AMAZON MKTPLACE 2', { note: 'Payee: Amazon.' });
+  line('AMAZON MKTPLACE 1', { note: 'Payee: Amazon Ltd. Bought a dock.' });
+  line('AMAZON MKTPLACE 2', { note: 'Payee: Amazon Ltd.' });
   line('Monthly plan', { note: 'Payee: Kestrel.' });
   ids.fenwickLine = line('FENWICK CLOUD');
   ids.haldenLine = line('HALDEN TYPE CO INV 2026-035');
@@ -163,7 +163,7 @@ const lines = (k: Kernel) => value<{ rows: Entry[] }>(k.list({ register: 'transa
 const runs = (k: Kernel) => value<{ rows: Entry[] }>(k.list({ register: 'session', limit: 100 })).rows;
 const kinds = (s: readonly BackfillSuggestion[], kind: BackfillSuggestion['kind']) => s.filter((x) => x.kind === kind);
 
-test('A PAYEE THE BANK OR A NOTE SAID, ON TWO LINES OR MORE, IS MET AS AN ORGANISATION BY ITS BANK KEY AND LINKED', async () => {
+test('A PAYEE THE BANK OR A NOTE SAID AS A BUSINESS, ON TWO LINES OR MORE, IS MET AS AN ORGANISATION BY ITS BANK KEY AND LINKED', async () => {
   const { k, sql, deps } = await record();
   const done = understandBackfill(deps);
 
@@ -172,15 +172,15 @@ test('A PAYEE THE BANK OR A NOTE SAID, ON TWO LINES OR MORE, IS MET AS AN ORGANI
   assert.deepEqual(coffee.fields.keys, ['bank:bridgestcoffee']);
   assert.equal(lines(k).filter((l) => l.fields.party === coffee.id).length, 3);
 
-  const amazon = orgNamed(k, 'Amazon');
-  assert.ok(amazon, '"Payee: Amazon." in a note names it');
+  const amazon = orgNamed(k, 'Amazon Ltd');
+  assert.ok(amazon, '"Payee: Amazon Ltd." in a note names it');
   assert.equal(lines(k).filter((l) => l.fields.party === amazon.id).length, 2);
 
-  /* Every write is the walk's, in one batch, with the key's source said. */
+  /* Every write is the walk's, in one batch, and the key's source is the walk, as the write path stamped it. */
   assert.ok(done.ledger.batch);
   const actors = sql.all<{ actor: string }>('SELECT DISTINCT actor FROM event WHERE batch = ?', done.ledger.batch).map((r) => r.actor);
   assert.deepEqual(actors, [BACKFILL_ACTOR]);
-  assert.equal(sql.one<{ source: string }>("SELECT source FROM entity_key WHERE key = 'bank:bridgestcoffee'")?.source, 'backfill');
+  assert.equal(sql.one<{ source: string }>("SELECT source FROM entity_key WHERE key = 'bank:bridgestcoffee'")?.source, BACKFILL_ACTOR);
   sql.close();
 });
 
@@ -204,7 +204,7 @@ test('NEVER A PERSON, NEVER A TRANSFER, AND A PAYEE ONLY A DESCRIPTION NAMES IS 
   const done = understandBackfill(deps);
 
   const names = value<{ rows: Entry[] }>(k.list({ register: 'organisations', limit: 100 })).rows.map((r) => r.fields.name).sort();
-  assert.deepEqual(names, ['Amazon', 'Bellwether', 'Bridge St Coffee', 'Fenwick Cloud', 'Halden Type Co', 'Kestrel']);
+  assert.deepEqual(names, ['Amazon Ltd', 'Bellwether', 'Bridge St Coffee', 'Fenwick Cloud', 'Halden Type Co', 'Kestrel']);
   for (const l of lines(k).filter((l) => /MARCHETTI|TRANSFER/.test(String(l.fields.what)))) assert.equal(l.fields.party, undefined, String(l.fields.what));
   assert.equal(value<{ rows: Entry[] }>(k.list({ register: 'people', limit: 10 })).rows.length, 1, 'nobody is made');
 
@@ -214,22 +214,22 @@ test('NEVER A PERSON, NEVER A TRANSFER, AND A PAYEE ONLY A DESCRIPTION NAMES IS 
   sql.close();
 });
 
-test('A RUN IS PLACED BY ITS REMOTE, ITS FOLDER OR A BARE NAME ONE PROJECT LISTS, AND TWO PROJECTS ARE A QUESTION', async () => {
+test('A RUN IS PLACED BY ITS REMOTE OR ITS FOLDER, AND A BARE NAME OR TWO PROJECTS ARE A QUESTION', async () => {
   const { k, sql, deps, ids } = await record();
   const done = understandBackfill(deps);
 
   const placed = Object.fromEntries(runs(k).map((r) => [r.seq, r.fields.project ?? null]));
   const spoken = (id: string) => k.nameOf(id);
   assert.equal(placed[1], spoken(ids.quarry!), 'by its remote');
-  assert.equal(placed[2], spoken(ids.lantern!), 'by the bare name Lantern lists');
+  assert.equal(placed[2], null, 'a bare name Lantern lists is only a name');
   assert.equal(placed[3], spoken(ids.brightside!), 'by its folder');
   assert.equal(placed[4], null, 'tallow is two projects’ name');
   assert.equal(placed[9], null, 'a scratch folder is in no project');
-  assert.equal(done.runs.wrote, 6);
+  assert.equal(done.runs.wrote, 2);
 
-  const asked = kinds(done.suggestions, 'run-project');
-  assert.equal(asked.length, 1);
-  assert.equal(asked[0]!.question, '2 runs worked in tallow. Is that Tallow or Tallow Site?');
+  /* One question for each place and guess, counting every run that worked there. */
+  const asked = kinds(done.suggestions, 'run-project').map((s) => s.question).sort();
+  assert.deepEqual(asked, ['2 runs worked in tallow. Is that Tallow or Tallow Site?', '4 runs worked in lantern. Is that Lantern?']);
   sql.close();
 });
 
@@ -394,4 +394,98 @@ test('A PAYEE IS NAMED AS A PERSON WOULD WRITE IT', () => {
   assert.equal(tidy('GEIDEA*BRIDGE ST COFFEE 0423 LONDON GB'), 'Bridge St Coffee');
   assert.equal(tidy('PELL & VINE'), 'Pell & Vine');
   assert.equal(tidy('Fenwick Cloud'), 'Fenwick Cloud');
+  assert.equal(tidy('PAYMOB-SWIFTCAB 7781'), 'Swiftcab');
+  assert.equal(tidy('POS FRESHBAY 0921'), 'Freshbay');
+  assert.equal(tidy('ORCHARD.COM/BILL'), 'Orchard');
+  assert.equal(tidy('PAYPAL EUROPE'), 'Paypal Europe', 'a processor with no dash after it is the payee itself');
+});
+
+test('A PAYEE SAYS IT IS A BUSINESS BY ITS LEGAL FORM, A PROCESSOR, A WEB ADDRESS OR A MERCHANT’S WORD, AND A PLAIN NAME NEVER DOES', () => {
+  for (const said of ['EDGEWALL INC 4155', 'Tarnvale Oy', 'Lantern AI, PBC', 'GEIDEA*BREEZEWAY', 'PAYMOB-SWIFTCAB', 'POS FRESHBAY 0921', 'RIDEWELL *TRIP', 'SOWBELL.COM', 'BELLWETHER COFFEE', 'XO TELECOM EGYPT', 'HARBOUR BANK FEES'])
+    assert.ok(soundsLikeBusiness(said), said);
+  for (const said of ['LAYLA AHMED', 'Layla Ahmed', 'Rhea Albany Okafor', 'Noura S', 'AB OKONKWO', 'AG Smith', 'BREEZEWAY', 'Kestrel'])
+    assert.ok(!soundsLikeBusiness(said), said);
+});
+
+test('A PAYEE THAT COULD BE A PERSON IS A QUESTION AND NEVER AN ORGANISATION, unless the record already holds its key', async () => {
+  const { k, sql, deps } = await record();
+  const line = (what: string, more: Record<string, unknown> = {}) => value<Entry>(k.create('transactions', { what, amount: gbp(-4_000), ...more }, OWNER)).id;
+  for (let i = 0; i < 2; i++) {
+    line('Dinner', { counterparty_text: 'LAYLA AHMED' });
+    line('Logo work', { note: 'Payee: Rhea Albany.' });
+    line('Hosting', { counterparty_text: 'EDGEWALL INC' });
+  }
+  line('Ride', { counterparty_text: 'SWIFTCAB' });
+  line('Ride', { counterparty_text: 'PAYMOB-SWIFTCAB 7781' });
+  /* A name the record already keeps as an organisation, by its key, is that organisation whatever it looks like. */
+  const marlow = value<Entry>(k.create('organisations', { name: 'Marlow Hale', keys: ['bank:marlowhale'] }, OWNER)).id;
+  const toMarlow = line('Retainer', { counterparty_text: 'MARLOW HALE' });
+  const done = understandBackfill(deps);
+
+  for (const name of ['Layla Ahmed', 'Rhea Albany']) assert.equal(orgNamed(k, name), null, name);
+  assert.equal(value<{ rows: Entry[] }>(k.list({ register: 'people', limit: 10 })).rows.length, 1, 'and nobody is made a person either');
+  const asked = kinds(done.suggestions, 'organisation').map((s) => s.kind === 'organisation' && [s.name, s.payments]);
+  assert.deepEqual(asked, [['Lowry St Studios', 2], ['Layla Ahmed', 2], ['Rhea Albany', 2]]);
+  assert.ok(orgNamed(k, 'Edgewall Inc'), 'a legal form says it is a company');
+  assert.ok(orgNamed(k, 'Swiftcab'), 'a processor before the name says it is a merchant');
+  assert.equal(partyOf(k, toMarlow), marlow);
+  sql.close();
+});
+
+test('A BROAD FOLDER, OR A FOLDER THE RUN’S OWN REPOSITORY CONTRADICTS, IS A QUESTION; A FOLDER OF ONE PROJECT PLACES', async () => {
+  const { k, sql, deps, clock, ids } = await record();
+  /* A project listing the whole code folder, as one listing `~/Developer` does, beside one listing a checkout in it. */
+  const project = (fields: Record<string, unknown>) => value<Entry>(k.create('things', fields, OWNER)).id;
+  const workbench = project({ name: 'Workbench', folders: ['/Users/sam/Code'] });
+  const kiln = project({ name: 'Kiln', folders: ['/Users/sam/Code/kiln'] });
+  /* And the same on Windows, where a folder's case is nobody's choice. */
+  project({ name: 'Yard', folders: ['C:\\Repos'] });
+  project({ name: 'Tern', folders: ['C:\\Repos\\tern'] });
+  project({ name: 'Coinfish', repos: ['coinfish'] });
+  clock.set(NOW - 2 * HOUR);
+  const run = (fields: Record<string, unknown>) => value<Entry>(k.create('session', { doing: 'Work', agent: 'claude', state: 'done', ...fields }, { ...OWNER, stamp: { project: '' } })).id;
+  const notes = run({ cwd: '/Users/sam/Code/notes' });
+  const scratch = run({ cwd: 'c:\\repos\\scratch' });
+  const inKiln = run({ cwd: '/Users/sam/Code/kiln/web' });
+  const remote = run({ remote: 'git@github.com:acme/quarry.git', repo: 'quarry', cwd: '/Users/sam/Code/quarry' });
+  const contradicted = run({ repo: 'lantern', cwd: '/Users/sam/Clients/brightside/lantern' });
+  /* A checkout whose repository is called something else, in a folder named for a project. */
+  const game = run({ remote: 'https://github.com/Coin-Fish/Game', repo: 'Game', cwd: '/Users/sam/Code/coinfish' });
+  clock.set(NOW);
+  const done = understandBackfill(deps);
+
+  assert.equal(k.get(notes)?.fields.project, '', 'a folder holding another project’s says nothing about which');
+  assert.equal(k.get(scratch)?.fields.project, '', 'nor on Windows, in whatever case the drive was written');
+  assert.equal(k.get(inKiln)?.fields.project, k.nameOf(kiln), 'a folder of one project, holding none, places');
+  assert.equal(k.get(remote)?.fields.project, k.nameOf(ids.quarry!), 'a remote places whatever folder it is in');
+  assert.equal(k.get(contradicted)?.fields.project, '', 'Brightside’s folder, but Lantern’s repository');
+
+  const asked = kinds(done.suggestions, 'run-project').map((s) => s.question);
+  assert.ok(asked.includes('A run worked in notes. Is that Workbench?'), asked.join(' / '));
+  assert.ok(asked.includes('A run worked in lantern. Is that Brightside or Lantern?'), asked.join(' / '));
+  assert.equal(k.get(game)?.fields.project, '');
+  assert.ok(asked.includes('A run worked in Game. Is that Coinfish?'), 'the broad folder set aside, its own folder’s name is the guess');
+  assert.ok(!asked.some((q) => q.includes('Game') && q.includes('Workbench')), asked.join(' / '));
+  assert.ok(!asked.some((q) => q.includes('Kiln')), 'a placed run is no question');
+  assert.ok(workbench);
+  sql.close();
+});
+
+test('A KEY THE WALK GAVE, AND WHERE IT CAME FROM, GO WITH ITS UNDO', async () => {
+  const { k, sql, deps, ids } = await record();
+  /* An organisation found by its name, that already held a key of its own before the walk gave it one more. */
+  const orchard = value<Entry>(k.create('organisations', { name: 'Orchard Rentals', keys: ['bank:orchardrent'] }, OWNER)).id;
+  value(k.create('transactions', { what: 'ORCHARD RENTALS', amount: gbp(-90_000) }, OWNER));
+  const done = understandBackfill(deps);
+  assert.deepEqual(k.get(orchard)?.fields.keys, ['bank:orchardrent', 'bank:orchardrentals']);
+  const ours = () => sql.all<{ key: string }>('SELECT key FROM entity_key WHERE source = ? ORDER BY key', BACKFILL_ACTOR).map((r) => r.key);
+  assert.ok(ours().includes('bank:bridgestcoffee') && ours().includes('bank:fenwickcloud'), ours().join(', '));
+  assert.equal(BACKFILL_SOURCE, BACKFILL_ACTOR);
+  value(undoBackfill(deps, done.ledger.batch!, 'p_owner'));
+  assert.deepEqual(ours(), [], 'nothing the walk keyed is left behind');
+  assert.equal(sql.one('SELECT 1 AS n FROM entity_key WHERE key = ?', 'bank:fenwickcloud'), undefined);
+  assert.ok(k.get(ids.fenwick!));
+  assert.deepEqual(k.get(orchard)?.fields.keys, ['bank:orchardrent'], 'a key it held before stays');
+  assert.ok(sql.one('SELECT 1 AS n FROM entity_key WHERE key = ? AND row_id = ?', 'bank:orchardrent', orchard));
+  sql.close();
 });

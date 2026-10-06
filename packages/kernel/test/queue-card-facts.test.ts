@@ -161,3 +161,38 @@ test('A QUESTION THAT MOVES MONEY IS HARD TO UNDO, ranked and counted so, and on
   assert.deepEqual((hard.queue ?? []).map((q) => q.question), ['Add the kiln bill?']);
   sql.close();
 });
+
+test('ONE QUESTION READ ON ITS OWN SAYS WHAT THE QUEUE SAYS, and the run and the changes only to a reader of every list', async () => {
+  const { k } = await record();
+  const run: WriteContext = { actor: 'p_owner', principal: { kind: 'token', token: 't_1' }, session: { client: 'claude-code' } };
+  const { id } = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'Raise the glaze test?',
+        title: 'Pricing the kiln work',
+        body_kind: 'rowset',
+        body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { cost: { amount: 1298, currency: 'GBP' } } }] },
+      } as never,
+      run,
+      'slash',
+    ),
+  );
+  const [q] = queued(k);
+  assert.ok(q);
+  const whole = k.queueQuestion(id);
+  assert.ok(whole);
+  assert.deepEqual(whole, { run: q.run, drafted_by: q.drafted_by, money: q.money, changes: q.changes, kinds: q.kinds });
+  assert.equal(whole.drafted_by, 'slash');
+  assert.deepEqual(k.queueQuestion(id, { everyList: true }), whole);
+
+  /* A READER HELD FROM A LIST is told the money, who drafted it and its kinds, and never the run or a row's value now. */
+  const held = k.queueQuestion(id, { everyList: false });
+  assert.ok(held);
+  assert.equal(held.run, undefined);
+  assert.equal(held.changes, undefined);
+  assert.deepEqual(held.money, [{ amount: 1298, currency: 'GBP' }]);
+  assert.equal(held.drafted_by, 'slash');
+  assert.deepEqual(held.kinds, whole.kinds);
+
+  assert.equal(k.queueQuestion('nothing-here'), null);
+});

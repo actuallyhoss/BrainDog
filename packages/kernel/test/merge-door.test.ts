@@ -307,3 +307,37 @@ test('A RESTORED ROW IS NOT A GHOST: one whose key another row took since is ref
   assert.equal(keys(sql)['github:ada'], ada.id);
   sql.close();
 });
+
+test('A ROW IS NOT ADDED AS A SECOND OF SOMEBODY HERE: a create carrying a key a live row holds is refused, naming who', async () => {
+  const { k, sql } = await record();
+  const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', handles: ['github:ada', 'email:ada@work.io'] }, OWNER));
+
+  for (const [fields, plain] of [
+    [{ name: 'Ada L', handles: ['github:ada'] }, 'ada on github'],
+    [{ name: 'A. Lovelace', email: 'ada@work.io' }, 'ada@work.io'],
+  ] as const) {
+    const no = refused(k.create('people', fields, AGENT));
+    assert.equal(no.code, 'ALREADY_KNOWN');
+    assert.equal(no.at, 'email' in fields ? 'email' : 'handles');
+    assert.equal(no.fix, `Ada Lovelace already has ${plain}. Add what you know to them rather than adding them twice.`);
+    assert.ok(!no.fix.includes(ada.id), 'the refusal names a person, never an id');
+  }
+  assert.equal(sql.all("SELECT id FROM entry WHERE register = 'people'").length, 1);
+
+  /* MEET FINDS ADA BY THE KEY AND ADDS NOBODY. */
+  const met = value<Met>(k.meet({ name: 'Ada L', email: 'ada@work.io', where: 'a mail' }, AGENT));
+  assert.equal(sql.all("SELECT id FROM entry WHERE register = 'people' AND deleted_at IS NULL").length, 1);
+  assert.ok(met);
+
+  /* A KEY NOBODY LIVE HOLDS IS FREE: once Ada is gone, a new row may carry it. */
+  value(k.update('people', ada.id, { deleted_at: new Date(NOW).toISOString() } as never, OWNER));
+  value(k.create('people', { name: 'Ada L', handles: ['github:ada'] }, OWNER));
+
+  /* AND AN ACCEPTED ROWSET IS THE OWNER'S OWN WORD. */
+  const twin = value<{ id: string }>(
+    k.propose({ question: 'Add the second Ada?', body_kind: 'rowset', body: { register: 'people', rows: [{ name: 'Ada Again', handles: ['github:ada'] }] } } as never, 'p_owner'),
+  );
+  value(k.decide(twin.id, { decide: { option: 'accept', reason: 'two of them' } }, 'p_owner'));
+  assert.equal(sql.all("SELECT id FROM entry WHERE register = 'people' AND deleted_at IS NULL").length, 2);
+  sql.close();
+});

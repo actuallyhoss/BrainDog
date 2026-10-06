@@ -122,7 +122,7 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { COST_SQL, COSTS, costOf, costRank, type Cost } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -389,7 +389,7 @@ export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
    the CLI harvests from a commit and one the record holds are the same string. */
 export { KEY_KINDS, PUBLIC_MAIL, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
 export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
-export { nameKey } from './entities.ts';
+export { nameKey, noteMention } from './entities.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
@@ -458,7 +458,7 @@ export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, 
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion } from './pages.ts';
+export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
@@ -908,6 +908,9 @@ type Door = {
 /* ── the record ──────────────────────────────────────────────────────────── */
 
 export type Kernel = ReturnType<typeof makeKernel>;
+
+/** Who reads a question's facts (`queueQuestion`): whether they may read every list, which the record works out. */
+export type QuestionReader = { everyList: boolean };
 
 /**
  * What a record is opened with, beyond its storage and its clock.
@@ -4713,6 +4716,29 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (onward.length > 0)
         return { code: 'VALUE_MALFORMED', fix: `${named(into.id)} was itself merged into ${named(onward.at(-1)!)}. Merge into that one.`, at: field! };
     }
+    /* A ROW IS NOT ADDED AS A SECOND OF SOMEBODY ALREADY HERE. A create carrying a key a live row holds made a second
+       person who answered to nothing (`claim` keeps the key where it is), so the record held two of one person and an
+       agent met both. Refused, naming who holds it, in the words the record's own door says it in (`keyHeld` in
+       `packages/record`), which only its create and update pass through: this one holds for every write, a rule's, a
+       flow's or an ingest's too. `meet` finds that row by the key and adds nothing, and an accepted rowset is the owner's
+       own word, so both pass. */
+    if (current === null && !door.decided && !door.merge) {
+      const parts = Object.values(list.fields as Readonly<Record<string, string | undefined>>).filter((f): f is string => typeof f === 'string');
+      const them = list.role === 'meets' ? 'them' : 'it';
+      for (const key of rowKeys(list, merged)) {
+        const held = holderOf(sql, key);
+        if (held === null || held.register !== register) continue;
+        const at = parts.find((f) => merged[f] !== undefined && rowKeys(list, { [f]: merged[f] }).includes(key)) ?? field ?? 'fields';
+        const kind = key.slice(0, key.indexOf(':'));
+        const said = key.slice(key.indexOf(':') + 1);
+        const plain = kind === 'email' || kind === 'domain' ? said : `${said} on ${kind}`;
+        return {
+          code: 'ALREADY_KNOWN',
+          fix: `${titleOfRow(held.id) ?? (list.role === 'meets' ? 'Someone on this list' : 'An organisation on this list')} already has ${plain}. Add what you know to ${them} rather than adding ${them} twice.`,
+          at,
+        };
+      }
+    }
     if (patch.deleted_at === null && current !== null && current.deleted_at !== null && typeof (is ?? was) !== 'string') {
       for (const key of rowKeys(list, merged)) {
         const held = holderOf(sql, key);
@@ -5429,12 +5455,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    *
    * THE MONEY IS EACH VALUE AS WRITTEN, one a row, and never two currencies added: the card says one line a currency.
    * THE CHANGES ARE ONE ROW'S, since a field name alone across several rows would not say which row moves, and a secret or
-   * a file is never said; the queue is drawn only for a reader of the whole record, who may read every value here.
+   * a file is never said.
+   *
+   * THE RUN AND THE CHANGES ONLY TO A READER OF EVERY LIST (`every`): what a run was doing, a row's value now and the
+   * title a link points at may sit on lists a member invited to one of them cannot read. The queue is drawn only for a
+   * reader of the whole record, so it hands `true`; `queueQuestion` hands what its caller says of the reader.
    */
-  const cardFacts = (r: Record<string, unknown>, kind: string, body: Record<string, unknown>): Partial<QueueQuestion> => {
-    const out: Partial<QueueQuestion> = {};
+  const cardFacts = (r: Record<string, unknown>, kind: string, body: Record<string, unknown>, every = true): QuestionFacts => {
+    const out: QuestionFacts = {};
     const by = String(r.opened_by ?? '');
-    if (isRunName(by)) {
+    if (every && isRunName(by)) {
       const run = bySeq(SESSION, Number(by.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)), true);
       if (run) {
         const doing = typeof run.fields.doing === 'string' ? run.fields.doing.trim() : '';
@@ -5455,7 +5485,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const money = writes.flatMap((w) => Object.values(w).flatMap((v) => moneyIn(v) ?? []));
     if (money.length > 0) out.money = money;
     const [only] = rows;
-    if (rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
+    if (!every || rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
     const row = get(only.at, { includeDeleted: true });
     const list = registers.get(register);
     if (!row || row.register !== register || !list) return out;
@@ -8172,6 +8202,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** A suggestion's question, which is its `suggest` event and no column: what a person reads it by. */
     question: (id: string): string | null => questionOf(sql, id),
+
+    /**
+     * WHAT THE DECISION CARD SAYS BESIDE ONE SUGGESTION, open or answered: the facts a page's queue puts on its question
+     * (`cardFacts`), so `/decide/<id>` and an agent's `propose` say what the queue's card says from the one reading of
+     * them, and not from a copy kept beside it. `null` when there is no such suggestion.
+     *
+     * THE RUN AND THE CHANGES ONLY TO A READER OF EVERY LIST. `reader.everyList` is the caller's word for whether this
+     * reader may read every list, which only the record knows; absent, it reads as the record's own reading, as the queue
+     * is drawn. Money, who drafted it and its kinds go to anybody the question reaches, since its body and stamp say them.
+     */
+    queueQuestion: (id: string, reader?: QuestionReader): QuestionFacts | null => {
+      const r = sql.one<Record<string, unknown>>('SELECT id, body_kind, body, opened_by, drafted_by, kind FROM suggestion WHERE id = ?', id);
+      return r ? cardFacts(r, String(r.body_kind ?? ''), parsedBody(r.body), reader?.everyList ?? true) : null;
+    },
 
     /**
      * Answer one.
