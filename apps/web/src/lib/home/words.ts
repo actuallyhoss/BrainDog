@@ -17,7 +17,8 @@ export const words = {
   sinceAway: 'Since you were away',
 
   /* TODAY'S OWN BLOCKS (`todayHome`), which no use case words its own way: the work that needs you, and money. */
-  addTask: 'Add a task',
+  /** One of the tasks list where the record gives it no word of its own; the line it is typed into says the list's own. */
+  task: 'task',
   /** The late tile's name while it also holds a task due today, which is not late yet. */
   lateOrToday: 'Late or due today',
   toCheck: 'Handed back to you',

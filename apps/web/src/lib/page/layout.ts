@@ -13,7 +13,7 @@
  * PURE, SO `node --test` READS IT WITH NO SVELTEKIT. `PageBody.svelte` draws what this answers and decides nothing.
  */
 
-import { COLUMNS, spanOf, type Area, type Slot } from '../record/arrange.ts';
+import { COLUMNS, floorFor, spanOf, type Area, type Slot } from '../record/arrange.ts';
 
 export type { Area };
 
@@ -190,5 +190,56 @@ export function widened(blocks: readonly Placed[], columns: number = COLUMNS): n
     used += span;
   });
   close();
+  return out;
+}
+
+/** What `paired` reads off a block in a flow: its kind, its span in force, whether it is drawn and whether it leads the page. */
+export type Pairable = Placed & { readonly kind: string; readonly columns?: number; readonly lead?: boolean };
+
+/**
+ * THE WIDTH FROM WHICH A FLOW OF FULL-WIDTH BLOCKS IS TWO COLUMNS (DIRECTION §36, §38): a 1,512 or 1,728 laptop drawn
+ * with every list as wide as the window is lines stretched across the screen, not the screen used.
+ */
+export const PAIR_FROM = 1440;
+
+/**
+ * THE KINDS THAT ARE NEVER HALF A ROW, whatever their floor: a heading, a field to type into, the page's own controls,
+ * and the pictures whose whole point is their width. Everything else that survives half a row (`floorFor` under six) may
+ * sit beside its neighbour.
+ */
+const WHOLE_ROW = new Set(['section', 'capture', 'inputs', 'cards', 'gallery', 'heat']);
+
+/**
+ * The span each block of one twelve-column flow is drawn at on a wide screen: two blocks the author left at the whole
+ * row, one after the other, and each happy at half of it, become two halves side by side.
+ *
+ * TWO COLUMNS OF BLOCKS, NOT STARVED LINES. The page is drawn edge to edge (DIRECTION §36), so a list at the whole row
+ * of a 1,728 window is a line nobody reads to its end. Paired, each keeps a measure a person reads, and the screen is
+ * used; the prose inside a block still keeps its own measure (`--measure`).
+ *
+ * IN DECLARED ORDER, NEVER REORDERED: a block that may not be halved (a heading, a table, a forecast, the page's line)
+ * stands on its own row and starts the pairing again after it, so a section's blocks pair under their heading. One left
+ * over keeps the whole row rather than sitting beside a hole. A block the author gave a width of their own keeps it, and
+ * a hidden block takes no place. PURE, so `layout.test.ts` holds the rule.
+ */
+export function paired(blocks: readonly Pairable[], columns: number = COLUMNS): number[] {
+  const out = blocks.map((b) => b.span);
+  const half = columns / 2;
+  let waiting: number | null = null;
+  blocks.forEach((b, n) => {
+    if (!b.drawn) return;
+    const fits = b.span >= columns && b.lead !== true && !WHOLE_ROW.has(b.kind) && floorFor(b.kind, b.columns ?? 0) < half;
+    if (!fits) {
+      waiting = null;
+      return;
+    }
+    if (waiting === null) {
+      waiting = n;
+      return;
+    }
+    out[waiting] = half;
+    out[n] = half;
+    waiting = null;
+  });
   return out;
 }

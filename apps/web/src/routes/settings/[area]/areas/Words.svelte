@@ -30,6 +30,7 @@
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { speaking, withSpeaks } from '$lib/voice.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -47,7 +48,9 @@
     changesOf,
     currencyIn,
     currencyPackOf,
+    listed,
     oneFor,
+    strandedBy,
     undoOf,
     wordsOf,
     type Read,
@@ -66,9 +69,9 @@
     currencyWhy: 'Sums in other currencies are added up in this one, where there is a rate.',
     noMoney: 'Turn on Money in Add-ons to choose one.',
     currencyNow: (code: string) => (code ? `Home currency is now ${code}.` : 'No home currency now.'),
-    lists: 'Your lists',
     called: 'Called',
-    one: 'One is a',
+    /* NO "a" OR "an" BEFORE A WORD NOBODY HAS TYPED YET: "One is a update" and "One is a item" were on this screen. */
+    one: 'One is called',
     says: 'What it says',
     whose: (name: string) => `The words your ${name} setup gave this record. Clear a box to put its word back.`,
     ownerOnly: (name: string) => `The words your ${name} setup gave this record. Only the owner changes them.`,
@@ -76,7 +79,17 @@
     fewer: 'Show fewer',
     save: 'Save',
     saved: 'Saved. Every screen uses your words now.',
-    oneOf: (one: string) => `One is a ${one}`,
+    oneOf: (one: string) => `One is called ${one}`,
+    /* SAID BEFORE THE CURRENCY MOVES, with the limits typed in the old one, by their own names. The record holds them in
+       the new one at the day's rate (`declare.ts` `liveTarget`), and with no home currency it has nothing to hold them in. */
+    stranded: (names: readonly string[], from: string, to: string) => {
+      const one = names.length === 1;
+      return to
+        ? `${one ? 'A limit' : 'Limits'} set in ${from} will be counted in ${to} at the day's rate, where there is one: ${listed(names)}.`
+        : `With no home currency, ${one ? 'this limit stops' : 'these limits stop'} counting: ${listed(names)}.`;
+    },
+    change: (to: string) => (to ? `Change to ${to}` : 'Choose none'),
+    keep: (code: string) => `Keep ${code}`,
   } as const;
 
   /* ── reading ───────────────────────────────────────────────────────────── */
@@ -87,6 +100,8 @@
   /** The pack that keeps the home currency, and the use case the record speaks in; either may be none. */
   let money = $state<PackConfig | null>(null);
   let voice = $state<PackConfig | null>(null);
+  /** Every add-on switched on, with its settings: where the limits a currency change would strand are read. */
+  let packs = $state<Read[]>([]);
 
   async function load(): Promise<void> {
     from = 'waiting';
@@ -112,6 +127,7 @@
     const speaker = speaking(await withSpeaks(held.value, async (id) => read.find((r) => r.state.id === id)?.settings?.values ?? null));
     closed(true, at);
     money = currencyPackOf(read);
+    packs = read;
     voice = read.find((r) => r.state.id === speaker)?.settings ?? null;
     typed = {};
     oneTyped = {};
@@ -146,6 +162,40 @@
   let busy = $state(false);
   let fix = $state('');
 
+  /**
+   * A PICK THAT MOVES A LIMIT TYPED AS MONEY WAITS, and says which. The select shows the pick, the line under it names
+   * each limit typed in the old currency and what becomes of it, and the change is made only once it is confirmed; Keep
+   * puts the select back. A pick that moves no limit is made at once, as before.
+   */
+  let asking = $state<{ to: string; names: string[] } | null>(null);
+  let picker: HTMLSelectElement | undefined = $state();
+
+  function pickCurrency(next: string): void {
+    /* BACK TO THE ONE IT IS, while a pick waited: nothing to change. */
+    if (next === code) {
+      asking = null;
+      return;
+    }
+    const names = strandedBy(packs, code, next);
+    if (names.length === 0) {
+      asking = null;
+      void putCurrency(next, false, picker);
+      return;
+    }
+    asking = { to: next, names };
+  }
+
+  function keepCurrency(): void {
+    if (picker) picker.value = code;
+    asking = null;
+  }
+
+  function confirmCurrency(): void {
+    const to = asking?.to;
+    asking = null;
+    if (to !== undefined) void putCurrency(to, false, picker);
+  }
+
   /** A select is chosen, not typed, so a pick is the change: kept at once, with Undo. */
   async function putCurrency(next: string, undoing = false, select?: HTMLSelectElement): Promise<void> {
     const s = source;
@@ -165,6 +215,7 @@
       return;
     }
     money = out.value;
+    packs = packs.map((p) => (p.settings?.id === out.value.id ? { ...p, settings: out.value } : p));
     if (!undoing) toasts.push(words.currencyNow(next), { undo: () => void putCurrency(was, true) });
     await kept();
   }
@@ -265,13 +316,23 @@
       <div class="pick">
         <IconWell name="money" />
         <label class="pick-label" for="w-currency">{words.currency}</label>
-        <select id="w-currency" value={code} disabled={busy} onchange={(e) => void putCurrency(e.currentTarget.value, false, e.currentTarget)}>
+        <select id="w-currency" bind:this={picker} value={code} disabled={busy} aria-describedby={asking ? 'w-stranded' : undefined} onchange={(e) => pickCurrency(e.currentTarget.value)}>
           <option value="">{copy.currencyNone}</option>
           <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
           <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
         </select>
       </div>
-      <p class="hint">{words.currencyWhy}</p>
+      {#if asking}
+        <div class="stranded" id="w-stranded">
+          <p class="stranded-line">{words.stranded(asking.names, code, asking.to)}</p>
+          <div class="stranded-acts">
+            <Button weight="primary" onclick={confirmCurrency}>{words.change(asking.to)}</Button>
+            <Button weight="bare" onclick={keepCurrency}>{words.keep(code || copy.currencyNone)}</Button>
+          </div>
+        </div>
+      {:else}
+        <p class="hint">{words.currencyWhy}</p>
+      {/if}
     {:else}
       <StateRow icon="money" title={words.currency} line={money || !owner ? code || copy.currencyNone : words.noMoney} />
     {/if}
@@ -283,7 +344,7 @@
     {#if owner}
       <form class="words" bind:this={form} onsubmit={submit} novalidate>
         {#if spoken.lists.length > 0}
-          <Section title={words.lists} count={spoken.lists.length}>
+          <Section title={said('lists')} count={spoken.lists.length}>
             <div class="lists">
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">
@@ -354,7 +415,7 @@
       </form>
     {:else}
       {#if spoken.lists.length > 0}
-        <Section title={words.lists} count={spoken.lists.length}>
+        <Section title={said('lists')} count={spoken.lists.length}>
           {#each spoken.lists as l (l.list)}
             <StateRow icon={iconOf(l.list)} title={l.name?.value ?? nameOf(l.list)} line={l.one ? words.oneOf(l.one.value) : undefined} />
           {/each}
@@ -405,8 +466,30 @@
     line-height: var(--lh-body);
   }
 
-  .pick + .hint {
+  .pick + .hint,
+  .pick + .stranded {
     padding-inline-start: calc(var(--well) + var(--sp-3));
+  }
+
+  /* WHAT A CURRENCY CHANGE DOES TO THE LIMITS, under the select it waits on: one sentence and its two answers, no box. */
+  .stranded {
+    display: grid;
+    gap: var(--sp-3);
+    max-inline-size: calc(var(--measure) + var(--sp-9));
+  }
+
+  .stranded-line {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
+  }
+
+  .stranded-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
   }
 
   .words {
@@ -422,7 +505,7 @@
     max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
-  /* A LIST'S TWO WORDS SIDE BY SIDE after its well, read as one line: "Called Bakes, one is a bake". */
+  /* A LIST'S TWO WORDS SIDE BY SIDE after its well, read as one line: "Called Bakes, one is called bake". */
   .list-words {
     display: grid;
     grid-template-columns: var(--well) repeat(2, minmax(0, 1fr));

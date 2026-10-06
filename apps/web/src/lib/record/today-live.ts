@@ -18,8 +18,10 @@ import { money } from 'braindog-render';
 
 import type { Fetch } from './boot-live.ts';
 import { unnamed } from './api.ts';
+import { REGISTERS } from './held.ts';
 import { moneyInText } from './money.ts';
 import { TASKS } from '../work/list.ts';
+import { singularOf } from '../voice.ts';
 
 /**
  * A task that needs you: past its day, handed back to be checked, due today, or marked urgent.
@@ -158,6 +160,17 @@ export function amountSaid(v: unknown): string | null {
 /* ── what needs you ─────────────────────────────────────────────────────── */
 
 /**
+ * A ROW NOBODY NAMED, AS TODAY SAYS IT: "Untitled task", in the list's own singular as the record words it (a label
+ * the voice gives the list is drawn over its declaration, `relabelAll`). It was `#12`, the row's number alone, which
+ * is a handle and never a name a person reads (DIRECTION §37). A list this build has not learnt says its id made
+ * singular, as `unnamed` does.
+ */
+export function untitled(register: string): string {
+  const one = REGISTERS[register]?.one?.trim() || singularOf(register.replace(/_/g, ' '));
+  return `Untitled ${/^[A-Z][a-z]/u.test(one) ? one.charAt(0).toLowerCase() + one.slice(1) : one}`;
+}
+
+/**
  * The tasks that need you, late first, then today's, then the urgent ones with no day yet come, each once.
  *
  * `due` AND `urgent` ARE TWO READS, because a task is here for either reason and the record answers one predicate a
@@ -180,7 +193,7 @@ export function tasksOf(
     const thing = text(r.fields.thing);
     out.push({
       seq: r.seq,
-      what: text(r.fields.what) || `#${r.seq}`,
+      what: text(r.fields.what).trim() || untitled(TASKS),
       due: by,
       project: projects.get(thing) ?? null,
       why,
@@ -224,7 +237,7 @@ export function comingOf(
     const thing = text(r.fields.thing);
     out.push({
       seq: r.seq,
-      what: text(r.fields.what) || `#${r.seq}`,
+      what: text(r.fields.what).trim() || untitled(TASKS),
       day,
       project: projects.get(thing) ?? null,
       hue: hues.get(thing) ?? null,
@@ -589,7 +602,7 @@ async function moneyFor(client: Client, held: ReadonlySet<string>, books: number
     due: due.flatMap((r) =>
       r.seq === null
         ? []
-        : [{ seq: r.seq, what: text(r.fields.what) || `#${r.seq}`, amount: amountSaid(r.fields.amount), out: r.fields.direction === 'owed_by_me', due: text(r.fields.due).slice(0, 10) || null, late: text(r.fields.due).slice(0, 10) !== '' && text(r.fields.due).slice(0, 10) < today }],
+        : [{ seq: r.seq, what: text(r.fields.what).trim() || untitled('obligations'), amount: amountSaid(r.fields.amount), out: r.fields.direction === 'owed_by_me', due: text(r.fields.due).slice(0, 10) || null, late: text(r.fields.due).slice(0, 10) !== '' && text(r.fields.due).slice(0, 10) < today }],
     ),
   };
 }

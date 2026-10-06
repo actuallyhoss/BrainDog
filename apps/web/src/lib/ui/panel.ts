@@ -1,6 +1,7 @@
 /**
- * What `Panel.svelte` decides, in plain `.ts` so `node --test` can read it without mounting anything, and the two
- * things every overlay in `lib/ui` shares: how a bottom sheet is let go, and when an exit is over.
+ * What `Panel.svelte` decides, in plain `.ts` so `node --test` can read it without mounting anything, and the three
+ * things every overlay in `lib/ui` shares: how a bottom sheet is let go, when a scrim is over the window, and when an
+ * exit is over.
  *
  * THE PANEL HAS TWO FORMS. From 900px up it is docked at the window's end edge, beside the content,
  * which narrows for it: a non-modal `<dialog>` opened with `show()`, so the list behind it keeps its keyboard and its
@@ -11,7 +12,7 @@
  */
 
 /** Below this the panel is a bottom sheet. */
-export const NARROW = '(width < 900px)';
+export const NARROW = '(width < 1280px)';
 
 export type Form = 'docked' | 'sheet';
 
@@ -131,6 +132,55 @@ export function unstall(el: Opening, ms = STALL): void {
     }, ms);
   }
 }
+
+/* ── a scrim over the window ─────────────────────────────────────────────── */
+
+/**
+ * WHETHER ANYTHING HAS LAID A SCRIM OVER THE WHOLE WINDOW, which is when the toast stack holds.
+ *
+ * A toast is `position: fixed` at `--z-toast`, and a sheet is a modal `<dialog>` or a popover in the top layer, which
+ * no `z-index` reaches: a receipt pushed while a phone sheet was up drew under its scrim, dimmed, at the very edge
+ * the sheet stands on, with an Undo that could not be pressed and a countdown running out behind it. So a sheet, a
+ * panel in its sheet form and a menu's action sheet each lay one here while they are on screen, and the stack holds
+ * its toasts, countdown and all, until the last of them has gone.
+ *
+ * A COUNT AND NOT A FLAG, so two layered sheets closing in either order lift the scrim once, at the end. Each laying
+ * is lifted by the function it returns, and only once however often that is called: a close and a destroy can both
+ * reach it.
+ */
+export class Scrims {
+  #laid = 0;
+  #told = new Set<(up: boolean) => void>();
+
+  /** Whether a scrim is over the window now. */
+  get up(): boolean {
+    return this.#laid > 0;
+  }
+
+  /** Lays one; the function it returns lifts it. */
+  lay(): () => void {
+    if (this.#laid++ === 0) this.#tell();
+    let lifted = false;
+    return () => {
+      if (lifted) return;
+      lifted = true;
+      if (--this.#laid === 0) this.#tell();
+    };
+  }
+
+  /** Says whether a scrim is up now, and again each time that changes. Returns a function that stops it. */
+  watch(told: (up: boolean) => void): () => void {
+    this.#told.add(told);
+    told(this.up);
+    return () => void this.#told.delete(told);
+  }
+
+  #tell(): void {
+    for (const told of [...this.#told]) told(this.up);
+  }
+}
+
+export const scrims = new Scrims();
 
 /* ── an exit, to its end ─────────────────────────────────────────────────── */
 

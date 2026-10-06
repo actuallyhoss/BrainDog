@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, homeDrawn, railed, slashLineOf, todayHome } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, type HomeVoice } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 
@@ -278,4 +278,88 @@ test('TODAY INSTALLED AS `home` SAYS THE MODEL`S LINE WHEN ITS READ CARRIES ONE,
   assert.deepEqual(head(installed()), rules);
   /* AND A LINE THE RECORD KEPT YESTERDAY is not today's. */
   assert.deepEqual(head(installed({ said: { text: line, day: '2026-10-01', basis: 'b' } } as Partial<LiveBlock>)), rules);
+});
+
+test('LATE IS COUNTED FROM WHAT THE LATE BLOCK HOLDS, not from the eight it draws, and a late row is counted once', () => {
+  /* TWENTY LATE TASKS, the oldest eight drawn: Today's Late keeps every row before tomorrow. */
+  const days = ['2026-08-01', '2026-08-03', '2026-08-09', '2026-08-25', '2026-09-01', '2026-09-10', '2026-09-20', '2026-09-27'];
+  const lateTasks = (over: Partial<LiveBlock> = {}) =>
+    block({ kind: 'todo', source: 'register.tasks', where: 'state is not done or dropped, by before +1d', columns: day('by') as never, total: 20, ...over }, days.map((by) => ({ by })), days.map((_, n) => n + 1));
+  const out = homeDrawn([lateTasks()], NOW);
+  assert.deepEqual(out.sentence, { text: 'Twenty things are late, the oldest by two months.', needs: 'Twenty things are late' });
+
+  /* AN URGENT TASK PAST LATE'S EIGHT IS ONE OF ITS TWENTY, so it is not counted again, late or as needing you. */
+  const urgent = block({ kind: 'todo', source: 'register.tasks', where: 'state is not done or dropped, priority is urgent', columns: day('by') as never }, [{ by: '2026-09-28' }, { by: '2026-10-09' }], [30, 31]);
+  assert.equal(homeDrawn([lateTasks(), urgent], NOW).sentence?.text, 'Twenty things are late, the oldest by two months. One more needs you.');
+
+  /* WITH ONE DRAWN ROW ONLY DUE TODAY, what stands past the limit is due today too and is not called late. */
+  const today = block(
+    { kind: 'todo', source: 'register.tasks', where: 'by before +1d', columns: day('by') as never, total: 5 },
+    [{ by: '2026-09-30' }, { by: '2026-10-02' }],
+    [1, 2],
+  );
+  assert.equal(homeDrawn([today], NOW).sentence?.text, 'One thing is two days late. Four more need you.');
+
+  /* A LIST WITH NO BOUND OF ITS OWN may hold next month's work past its limit: that needs you, and is not late. */
+  const unbounded = block({ kind: 'todo', source: 'register.tasks', where: 'priority is urgent', columns: day('by') as never, total: 9 }, [{ by: '2026-09-30' }], [1]);
+  assert.equal(homeDrawn([unbounded], NOW).sentence?.text, 'One thing is two days late. Eight more need you.');
+
+  /* LATE MONEY PAST ITS LIMIT is late too, as Late's own total says, and needs you. */
+  const money = block({ kind: 'spec', source: 'deadlines', where: 'day before today', total: 6 }, [
+    { row: 'obligations#2', day: '2026-07-01' },
+    { row: 'obligations#3', day: '2026-09-29' },
+  ]);
+  const paid = homeDrawn([money], NOW);
+  assert.equal(paid.sentence?.text, 'Six things are late, the oldest by three months.');
+  assert.equal(shown(paid.blocks)[0]!.total, 6);
+  /* WHAT FALLS DUE WITH NO BOUND OF ITS OWN reads a fortnight ahead, so what stands past its limit may not have fallen due. */
+  const ahead = homeDrawn([block({ kind: 'spec', source: 'deadlines', total: 12 }, [{ row: 'obligations#2', day: '2026-07-01' }, { row: 'obligations#3', day: '2026-09-29' }])], NOW);
+  assert.equal(ahead.sentence?.text, 'Two things are late, the oldest by three months.');
+
+  /* A DEADLINE THAT IS ONE OF LATE'S UNDRAWN TASKS is not a second late thing. */
+  const due = block({ kind: 'timeline', source: 'deadlines' }, [{ row: 'tasks#15', day: '2026-09-28' }, { row: 'obligations#2', day: '2026-09-29' }]);
+  assert.equal(homeDrawn([lateTasks(), due], NOW).sentence?.text, '21 things are late, the oldest by two months.');
+});
+
+test('THE LINE A TASK IS TYPED INTO IS NAMED BY THE LIST`S OWN SINGULAR, with the article chosen for it', () => {
+  const capture = (one?: string) => todayHome({ tasks: true, adds: true, money: false, ...(one === undefined ? {} : { one }) }).blocks.find((b) => b.kind === 'capture')?.heading;
+  assert.equal(capture(), 'Add a task');
+  assert.equal(capture('job'), 'Add a job');
+  assert.equal(capture('errand'), 'Add an errand');
+  assert.equal(capture('  '), 'Add a task');
+  assert.equal(captureHeading(undefined), 'Add a task');
+});
+
+test('A HOME INSTALLED FROM TODAY KEEPS SPEAKING IN THE VOICE: a heading still in the house words is said the voice`s way', () => {
+  const voice: HomeVoice = {
+    rightNow: 'Right now',
+    needsYou: 'On your desk',
+    sinceAway: 'While you were out',
+    workingNow: 'Working now',
+    comingUp: 'Next up',
+    overdue: 'Overdue',
+    nothingWaiting: 'Your desk is clear.',
+    nothingDue: 'Nothing falls due in the next two weeks.',
+  };
+  /* KEPT BY THE ARRANGE MODE'S FIRST DONE in the house voice, and one heading the author wrote. */
+  const installed = [
+    block({ kind: 'capture', heading: 'Add a task', register: 'tasks' }),
+    block({ kind: 'queue', heading: 'What needs you', source: 'governance.open', empty: 'Nothing is waiting on you.', queue: [{ id: 'SG1' }] as never, total: 1 }),
+    block({ kind: 'todo', heading: 'Late', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }], [4]),
+    block({ kind: 'todo', heading: 'My own list', source: 'register.tasks', columns: day('by') as never }, [{ by: '' }], [9]),
+    block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [{ row: 'obligations#2', day: '2026-10-08' }]),
+  ];
+  const out = homeDrawn(installed, NOW, voice, 'errand');
+  assert.deepEqual(
+    shown(out.blocks).map((b) => b.heading),
+    ['Add an errand', 'On your desk', 'Overdue', 'My own list', 'Next up'],
+  );
+  assert.equal(shown(out.blocks)[1]!.empty, 'Your desk is clear.');
+  /* AND IN THE HOUSE VOICE, NOTHING IS TOUCHED: the very blocks handed in. */
+  const house = homeDrawn(installed, NOW);
+  assert.equal(house.blocks[0], installed[0]);
+  assert.equal(house.blocks[1], installed[1]);
+  /* A CAPTURE LINE THE AUTHOR NAMED, or over another list, keeps its words. */
+  const own = homeDrawn([block({ kind: 'capture', heading: 'Jot it down', register: 'tasks' }), block({ kind: 'capture', heading: 'Add a task', register: 'notes' })], NOW, voice, 'errand');
+  assert.deepEqual(own.blocks.map((b) => b.heading), ['Jot it down', 'Add a task']);
 });

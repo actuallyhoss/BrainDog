@@ -20,6 +20,10 @@
  * below puts the record's word on the page and back into this cookie. So the cookie still paints first, with no flash,
  * and the record's answer wins the moment it arrives. A record too old to keep a key refuses it, and the cookie is then
  * the whole of that setting, as it always was.
+ *
+ * AND THE COOKIE SAYS WHOSE LOOK IT HOLDS (`who`) AND WHAT THE RECORD HAS NOT HEARD YET (`unsent`), because it covers the
+ * whole host while the look is each record's: `theme/follow.ts` puts the house look back for somebody else, and sends
+ * what is owed before it adopts.
  */
 
 export type Pref = {
@@ -171,6 +175,35 @@ export type Pref = {
   railShut?: string[] | undefined;
 };
 
+/** Look changes owed to the record, by the record's key, each with the word that was sent for it. */
+export type Owed = Partial<Record<LookKey, string | boolean | null>>;
+
+/**
+ * WHAT THE COOKIE KEEPS ABOUT THE LOOK BESIDE THE LOOK ITSELF. Not a preference, so not a `Pref` field: nobody chooses
+ * either, no control sets them, and the `prefs` gate and `flags.test.ts` read `Pref` as the set of things a person
+ * picks. They ride in the same cookie because they describe the five look keys in it, and must be written with them.
+ */
+export type Sync = {
+  /**
+   * WHOSE LOOK THE FIVE LOOK KEYS ARE: the person `boot` last answered for (`theme/follow.ts`). A handle and never a
+   * word anybody reads.
+   *
+   * THE COOKIE COVERS THE WHOLE HOST, so a second person signing in on this browser met the last person's look for every
+   * key their own record had never answered. A stamp that is not theirs now puts the house look back before their
+   * record's answer is adopted. The same person in another of their records keeps it, and that record's words are
+   * adopted over it. Absent is a cookie from before the stamp, or one nobody has signed in over.
+   */
+  who?: string | undefined;
+  /**
+   * LOOK CHANGES THE RECORD HAS NOT KEPT YET, by the record's key, each with the word that was sent for it.
+   *
+   * A FAILED SEND USED TO BE FORGOTTEN, and the next boot then adopted the record's older word over the cookie, so a
+   * dark picked on a train was light again after the reload. A change is written here the moment it is made, taken out
+   * once the record keeps or refuses it, and sent again before the next boot's adopt, which leaves these keys alone.
+   */
+  unsent?: Owed | undefined;
+};
+
 const NAME = 'bd_pref';
 /** A year. Long enough that it is never the reason something was forgotten. */
 const YEAR = 60 * 60 * 24 * 365;
@@ -207,6 +240,14 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   nav: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   defined: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
   railShut: (v) => Array.isArray(v) && v.every((x) => typeof x === 'string'),
+  who: (v) => typeof v === 'string',
+  unsent: (v) =>
+    typeof v === 'object' &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.entries(v as Record<string, unknown>).every(
+      ([k, x]) => (Object.values(LOOK_KEYS) as string[]).includes(k) && (x === null || typeof x === 'string' || typeof x === 'boolean'),
+    ),
   columns: (v) =>
     typeof v === 'object' &&
     v !== null &&
@@ -215,7 +256,7 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
 };
 
 /** What the cookie holds now, or `{}` — including when there is no document at all. */
-export function read(): Pref {
+export function read(): Pref & Sync {
   if (typeof document === 'undefined') return {};
   const raw = new RegExp(`(?:^|; )${NAME}=([^;]*)`).exec(document.cookie)?.[1];
   if (!raw) return {};
@@ -228,7 +269,7 @@ export function read(): Pref {
          An unknown key is a setting from a newer build sharing a browser with this one, and
          dropping it would make the two fight over the cookie every time either is opened. */
       if (!Object.hasOwn(SHAPE, key) || SHAPE[key]!(value)) kept[key] = value;
-    return kept as Pref;
+    return kept as Pref & Sync;
   } catch {
     /* A COOKIE THIS BUILD CANNOT READ IS NOT A CRASH. It is a preference from an older version, or
        one somebody edited; the default is the right answer and the next write replaces it. */
@@ -243,7 +284,7 @@ export function read(): Pref {
  * the field it knew about would silently reset every other one — which is the shape of bug that
  * makes people think a product forgets things at random.
  */
-export function write(change: Pref): Pref {
+export function write(change: Pref & Sync): Pref & Sync {
   const next = { ...read(), ...change };
   for (const [key, value] of Object.entries(next)) if (value === undefined) delete (next as Record<string, unknown>)[key];
 
@@ -265,12 +306,12 @@ export function write(change: Pref): Pref {
  * ONE FUNCTION FOR BOTH HALVES, because they were two and the second one was never written. An
  * attribute set without a cookie is a preference that lasts until the next navigation.
  */
-export function apply(key: 'scheme' | 'text' | 'density', value: string | null): void {
-  if (typeof document === 'undefined') return;
+export function apply(key: 'scheme' | 'text' | 'density', value: string | null): Promise<Kept> {
+  if (typeof document === 'undefined') return Promise.resolve({ from: 'device' });
   put(key, value);
   /* `system` IS SENT AS A WORD, NOT AS `null`. `null` takes the key off the record, and another device would then keep
      the dark it last heard of; `system` is an answer every device reads as "match this screen". */
-  void keep(LOOK_KEYS[key], key === 'scheme' ? (value ?? 'system') : value);
+  return keep(LOOK_KEYS[key], key === 'scheme' ? (value ?? 'system') : value);
 }
 
 /** The attribute and the cookie, and nothing sent: what `apply` does on this page, and what `adopt` does with the record's word. */
@@ -291,10 +332,10 @@ function put(key: 'scheme' | 'text' | 'density', value: string | null): void {
  * `theme` LEFT `apply` AT THE SAME TIME, and for the mirror reason: it never had an attribute worth
  * setting. `accent.ts` adopts a stylesheet, and `data-theme` is the high-contrast palette's switch.
  */
-export function contrast(on: boolean): void {
-  if (typeof document === 'undefined') return;
+export function contrast(on: boolean): Promise<Kept> {
+  if (typeof document === 'undefined') return Promise.resolve({ from: 'device' });
   putContrast(on);
-  void keep('look.contrast', on);
+  return keep('look.contrast', on);
 }
 
 function putContrast(on: boolean): void {
@@ -315,9 +356,15 @@ export const LOOK_KEYS = {
 } as const;
 export type LookKey = (typeof LOOK_KEYS)[keyof typeof LOOK_KEYS];
 
-/** What a look change came to: kept by the record, kept on this device only, or refused with the record's sentence. */
-export type Kept = { from: 'kept' } | { from: 'device' } | { from: 'refused'; fix: string };
-/** The record's `setPref`, for one look key. The app's sends to its own record (`theme/follow.ts`); a test's is a fake. */
+/**
+ * What a look change came to: kept by the record; on this device only, with no record listening; `pending`, sent and not
+ * kept, so it is held to send again on the next boot; or refused with the record's sentence.
+ */
+export type Kept = { from: 'kept' } | { from: 'device' } | { from: 'pending' } | { from: 'refused'; fix: string };
+/**
+ * The record's `setPref`, for one look key. The app's sends to its own record (`theme/follow.ts`); a test's is a fake.
+ * `device` from a sender is a send that did not arrive.
+ */
 export type Send = (key: LookKey, value: string | boolean | null) => Promise<Kept>;
 
 let sender: Send | null = null;
@@ -325,6 +372,11 @@ let sender: Send | null = null;
 let queue: Promise<unknown> = Promise.resolve();
 /* THE KEYS THE RECORD REFUSED, which this device then keeps alone. A host older than the `look.*` keys refuses each one. */
 const refused = new Set<LookKey>();
+/* HOW MANY CHANGES EACH KEY HAS HAD IN THIS TAB, so only the newest answer for a key settles what the cookie still owes:
+   a first press kept after a second was made must not mark the second as kept. */
+const made = new Map<LookKey, number>();
+/* THE KEYS ON THEIR WAY TO THE RECORD NOW, so a second `resend` before the first is answered sends nothing twice. */
+const flying = new Map<LookKey, number>();
 
 /**
  * Send look changes to the record from now on, or stop with `null`. Called when `boot` answers with a person in it, so a
@@ -341,23 +393,77 @@ export function follow(send: Send | null): void {
  */
 export const follows = (): boolean => sender !== null && refused.size === 0;
 
+/**
+ * Where a look chosen now is kept, in the three words a screen says it in: `record`, on every device this person opens the
+ * record on; `pending`, a change the record has not received yet, held here and sent again; `device`, this one alone.
+ */
+export const whereKept = (): 'record' | 'pending' | 'device' =>
+  !follows() ? 'device' : Object.keys(unsent()).length > 0 ? 'pending' : 'record';
+
 /** Every change sent so far, settled: for a screen that says where a choice was kept, and for a test. */
 export const settled = (): Promise<unknown> => queue;
+
+/** The look changes this cookie holds that the record has not kept, by the record's key. */
+export const unsent = (): Owed => read().unsent ?? {};
+
+/* WHAT THE COOKIE OWES THE RECORD, one key in or out. Out is written as the key's absence, and an empty list as none. */
+function owe(key: LookKey, value: string | boolean | null | undefined): void {
+  const next: Owed = { ...unsent() };
+  if (value === undefined) delete next[key];
+  else next[key] = value;
+  write({ unsent: Object.keys(next).length > 0 ? next : undefined });
+}
 
 /**
  * One look setting, sent to the record. NOTHING IS PUT BACK ON A REFUSAL, which is where this differs from the nav: the
  * cookie has already taken the change, and a record that cannot keep a key leaves the device as the place it lives.
+ *
+ * OWED UNTIL IT IS KEPT. The change goes into `unsent` before it is sent and leaves it when the record keeps or refuses
+ * it, so a send that fails, or a tab closed before the answer, is sent again on the next boot (`resend`). With no record
+ * listening it stays owed too, and reaches the record the next time this person's `boot` answers here.
  */
 export function keep(key: LookKey, value: string | boolean | null): Promise<Kept> {
+  const n = (made.get(key) ?? 0) + 1;
+  made.set(key, n);
+  owe(key, value);
   const send = sender;
   if (!send) return Promise.resolve({ from: 'device' });
-  const out = queue.then(() => send(key, value)).catch((): Kept => ({ from: 'device' }));
+  flying.set(key, (flying.get(key) ?? 0) + 1);
+  const out = queue
+    .then(() => send(key, value))
+    .catch((): Kept => ({ from: 'device' }))
+    .then((kept): Kept => {
+      flying.set(key, (flying.get(key) ?? 1) - 1);
+      if (kept.from === 'refused') refused.add(key);
+      else if (kept.from === 'kept') refused.delete(key);
+      /* A NEWER CHANGE TO THE SAME KEY SETTLES WHAT IS OWED, by its own answer. */
+      if (made.get(key) === n && kept.from !== 'device' && kept.from !== 'pending') owe(key, undefined);
+      return kept.from === 'device' ? { from: 'pending' } : kept;
+    });
   queue = out;
-  return out.then((kept) => {
-    if (kept.from === 'refused') refused.add(key);
-    else if (kept.from === 'kept') refused.delete(key);
-    return kept;
-  });
+  return out;
+}
+
+/**
+ * Send again what an earlier boot could not, in the order it is held, before the record's answer is adopted. Each goes
+ * through `keep`, so one that fails again stays owed for the boot after.
+ */
+export function resend(): void {
+  if (sender === null) return;
+  for (const [key, value] of Object.entries(unsent()) as [LookKey, string | boolean | null][])
+    if ((flying.get(key) ?? 0) === 0) void keep(key, value);
+}
+
+/**
+ * The look taken off this device: the five keys, their attributes, what is owed and whose they were. For somebody who is
+ * not the person the cookie's look belongs to, before their own record's answer is adopted. The accent's sheet is
+ * `accent.ts`'s, which `theme/follow.ts` puts back to House beside this.
+ */
+export function forget(): void {
+  if (typeof document === 'undefined') return;
+  for (const key of ['scheme', 'text', 'density'] as const) document.documentElement.removeAttribute(`data-${key}`);
+  document.documentElement.removeAttribute('data-theme');
+  write({ scheme: undefined, text: undefined, density: undefined, contrast: undefined, theme: undefined, unsent: undefined, who: undefined });
 }
 
 /**
@@ -368,19 +474,24 @@ export function keep(key: LookKey, value: string | boolean | null): Promise<Kept
  * paint. A key it does not answer is either never chosen or a record too old to keep it, and in both the device's copy
  * stands. A word this build does not know is not an answer.
  *
+ * EXCEPT A KEY THIS DEVICE STILL OWES IT. A change the record never received is newer than anything the record holds
+ * for that key, so the device's copy stands and `resend` carries it over.
+ *
  * NOTHING IS SENT BACK. Adopting is reading; the record learns a look when somebody picks one.
  *
  * THE ACCENT IS NOT HERE: `look.accent` is a swatch's name and the cookie holds its colour, so `accent.ts` adopts it.
  */
 export function adopt(prefs: Record<string, unknown>): void {
   if (typeof document === 'undefined') return;
-  const scheme = prefs['look.scheme'];
+  const owed = unsent();
+  const said = (key: LookKey): unknown => (Object.hasOwn(owed, key) ? undefined : prefs[key]);
+  const scheme = said('look.scheme');
   if (scheme === 'system') put('scheme', null);
   else if (SHAPE.scheme!(scheme)) put('scheme', scheme as string);
-  const size = prefs['look.size'];
+  const size = said('look.size');
   if (SHAPE.text!(size)) put('text', size as string);
-  const density = prefs['look.density'];
+  const density = said('look.density');
   if (SHAPE.density!(density)) put('density', density as string);
-  const hc = prefs['look.contrast'];
+  const hc = said('look.contrast');
   if (typeof hc === 'boolean') putContrast(hc);
 }

@@ -1081,7 +1081,6 @@
     flex-direction: column;
     gap: var(--sp-7);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has
@@ -1706,10 +1705,16 @@
     gap: var(--sp-2) var(--sp-3);
     padding: 6px 6px 6px var(--sp-4);
     background: var(--glass-strong);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-lg);
     box-shadow: var(--glass-edge), var(--e2);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .batch {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   .batch-n {
@@ -1805,8 +1810,13 @@
   :global(.head[data-under]) .segmented {
     background: transparent;
     box-shadow: none;
-    -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .segmented {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   /* NO KEY IS PRINTED WHERE THERE IS NO KEYBOARD, and the group control, a desk's nicety, gives way on a phone. */

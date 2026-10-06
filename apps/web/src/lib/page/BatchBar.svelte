@@ -68,10 +68,16 @@
     gap: var(--sp-2) var(--sp-3);
     padding: 6px 6px 6px var(--sp-4);
     background: var(--glass-strong);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-lg);
     box-shadow: var(--glass-edge), var(--e2);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .batch {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   .batch-n {

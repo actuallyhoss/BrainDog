@@ -34,7 +34,7 @@
   tile's surface over the scrim.
 
   IT OPENS AND CLOSES, AND THE CLOSE IS SHORTER. With a mouse it pops from .96 of its size at the corner it hangs from,
-  in 120ms, and closes to .985 as it fades, in 90ms. The action sheet rises from below the screen on the sheet curve
+  over `--d-menu`, and closes to .985 as it fades, over `--d-exit`. The action sheet rises from below the screen on the sheet curve
   and goes back down it, as `Sheet.svelte` does. It used to vanish the moment it closed, because the list was in an
   `{#if open}`: the list now stays on the page, inert, until its close has played (`settled` in `panel.ts`), and an
   opening on the way out takes the same list back. Reduced motion fades instead.
@@ -42,12 +42,13 @@
   THE SHEET IS A POPOVER IN THE TOP LAYER, which is the one place a fixed panel is placed against
   the screen whatever it sits inside. A menu lives in toolbars and bars that have their own stacking
   order, and a panel fixed to the bottom of the screen inside one of them would be drawn in that
-  order, under the tab bar.
+  order, under the tab bar. And it lays a scrim (`scrims` in `panel.ts`) from its rise to the end of
+  its fall, so a toast waits for it rather than drawing under it.
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
-  import { settled } from './panel.ts';
+  import { scrims, settled } from './panel.ts';
 
   let {
     label,
@@ -92,6 +93,8 @@
    */
   let exits = 0;
   let stay: (() => void) | null = null;
+  /** The action sheet's scrim, from its rise to the end of its fall. */
+  let lift: (() => void) | null = null;
 
   $effect(() => {
     const want = open;
@@ -116,6 +119,8 @@
           stay = null;
           shown = false;
           leaving = false;
+          lift?.();
+          lift = null;
         };
         if (list) stay = settled(list, gone);
         else gone();
@@ -127,7 +132,15 @@
      runs once per opening; a list taken back on its way out is still in the top layer. A browser
      without popovers draws the same panel fixed in place. */
   $effect(() => {
-    if (open && sheet && list && typeof list.showPopover === 'function' && !list.matches(':popover-open')) list.showPopover();
+    if (!open || !sheet || !list) return;
+    if (typeof list.showPopover === 'function' && !list.matches(':popover-open')) list.showPopover();
+    lift ??= scrims.lay();
+  });
+
+  /* A menu that goes with its sheet still up gives the scrim back with it. */
+  $effect(() => () => {
+    lift?.();
+    lift = null;
   });
 
   const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? [])];
@@ -363,8 +376,8 @@
   }
 
   /* GLASS, AND THE STRONG ONE: a menu opens over busy content, and legibility is the whole of its job. Level
-     2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it pops in over 120ms on
-     the arriving curve. */
+     2, the chrome's, is the glass hairline pair and the floating shadow; radius `--r-md`; and it pops in over the
+     menu's step on the arriving curve. */
   .menu {
     /* The four the clamp writes, declared here so the panel is correct before `place()` has run
        and so the names exist in a stylesheet rather than only in TypeScript. `--menu-from` is the
@@ -412,8 +425,15 @@
     /* AT ITS ANCHOR: the corner of the trigger it hangs from, at the start or the end. */
     transform-origin: var(--menu-x) var(--menu-from);
     transition-property: transform, opacity;
-    transition-duration: 120ms;
+    transition-duration: var(--d-menu);
     transition-timing-function: var(--ease-out);
+  }
+
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  @supports (-webkit-backdrop-filter: none) {
+    .menu {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
   }
 
   /* THE FIRST FRAME OF AN OPENING. No fade on the way in: a menu at .96 of its size is readable, and
@@ -425,12 +445,12 @@
     }
   }
 
-  /* THE CLOSE: to .985 as it fades, in 90ms on the leaving curve. Nothing on it can be pressed. */
+  /* THE CLOSE: to .985 as it fades, over the exit's step on the leaving curve. Nothing on it can be pressed. */
   .menu[data-leaving] {
     transform: var(--menu-gone);
     opacity: 0;
     pointer-events: none;
-    transition-duration: 90ms;
+    transition-duration: var(--d-exit);
     transition-timing-function: var(--ease-in);
   }
 
@@ -489,8 +509,8 @@
    * middle of the bottom edge rather than one as wide as a tablet.
    *
    * A SHEET, NOT GLASS: a tile's surface at radius `--r-lg`, the third level, over the scrim. It
-   * moves as `Sheet.svelte`'s phone sheet does: up from below the screen in 240ms on the sheet
-   * curve, and back down it in 180ms. It stays in the top layer while it goes, so its scrim fades
+   * moves as `Sheet.svelte`'s phone sheet does: up from below the screen over `--d-panel` on the
+   * sheet curve, and back down it in `--d-panel-out`. It stays in the top layer while it goes, so its scrim fades
    * with it.
    */
   .menu[popover] {
@@ -509,6 +529,7 @@
     translate: none;
     padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
     background: var(--bg);
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     border: 0;
     border-start-start-radius: var(--r-lg);
@@ -517,20 +538,20 @@
     border-end-end-radius: 0;
     color: var(--ink);
     box-shadow: var(--e3);
-    transition-duration: 240ms;
-    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    transition-duration: var(--d-panel);
+    transition-timing-function: var(--ease-sheet);
   }
 
   /* Down the way it came, without fading, unless reduced motion asks for the fade. */
   .menu[popover][data-leaving] {
     opacity: var(--menu-gone-opacity);
-    transition-duration: 180ms;
-    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    transition-duration: var(--d-panel-out, var(--d-rows));
+    transition-timing-function: var(--ease-sheet);
   }
 
   .menu[popover]::backdrop {
     background: var(--scrim);
-    transition: opacity 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: opacity var(--d-panel) var(--ease-sheet);
   }
 
   @starting-style {
@@ -542,7 +563,7 @@
   .menu[popover][data-leaving]::backdrop {
     opacity: 0;
     pointer-events: none;
-    transition-duration: 180ms;
+    transition-duration: var(--d-panel-out, var(--d-rows));
   }
 
   /* 48px ROWS AT 16px, whatever class the caller gave its items: a row sized for a mouse is a miss

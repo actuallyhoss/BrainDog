@@ -327,7 +327,6 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* THE LIVE DOT IN THE SENTENCE: 6px of the one hue that means alive, still, before the clause it belongs to. */

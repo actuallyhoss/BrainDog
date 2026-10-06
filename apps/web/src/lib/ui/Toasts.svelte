@@ -22,13 +22,22 @@
   leaving one, which is shorter. The stack keeps a toast that has gone for as long as its exit plays, inert and hidden
   from the live region, and then lets it go (`settled` in `panel.ts`); the store is not asked to wait. Reduced motion
   fades. The countdown pauses while the pointer is over the stack or focus is in it (`toast.svelte.ts`).
+
+  IT NEVER DRAWS UNDER A SHEET. A sheet, a palette or a menu's action sheet sits in the top layer over a scrim, which no
+  `z-index` reaches, and a toast pushed under one was a dimmed receipt at the edge the sheet stands on, its Undo out of
+  reach and its countdown running. So while anything is open over the window (the overlay lock, or a scrim laid in
+  `panel.ts`) the stack HOLDS: its toasts drop back out of sight and their countdown stops, and when the last sheet has
+  gone they rise into place with their whole time still to run. `⌘Z` reaches the newest Undo meanwhile, as it always
+  does. Holding rather than raising, because a toast raised over a phone sheet lands on the sheet's own footer, which
+  is where its one primary sits.
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
+  import { overlays } from '../a11y/keys.svelte.ts';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
   import Kbd from './Kbd.svelte';
-  import { settled } from './panel.ts';
+  import { scrims, settled } from './panel.ts';
   import { toasts, type Toast } from './toast.svelte.ts';
 
   /**
@@ -51,6 +60,45 @@
       if (fresh.length > 0) void tick().then(() => fresh.forEach(letGo));
     });
   });
+
+  /* ── held under a sheet ─────────────────────────────────────────────── */
+
+  let scrimmed = $state(false);
+  $effect(() => scrims.watch((up) => (scrimmed = up)));
+
+  /** Whether anything is open over the window, which is when the stack holds. */
+  const covered = $derived(overlays.depth > 0 || scrimmed);
+
+  /**
+   * THE COUNTDOWN HAS THREE REASONS TO WAIT, and `toasts.held` is one flag: the pointer on the stack, focus in it, and a
+   * sheet over it. So each is kept here, and the countdown starts again only when none of them is left. Not on the
+   * first draw, which has nothing to hand back.
+   */
+  let pointed = false;
+  let focused = false;
+  let was = false;
+
+  $effect(() => {
+    const now = covered;
+    untrack(() => {
+      if (now === was) return;
+      was = now;
+      if (now) toasts.hold();
+      else if (!pointed && !focused) toasts.release();
+    });
+  });
+
+  function hold(why: 'pointed' | 'focused') {
+    if (why === 'pointed') pointed = true;
+    else focused = true;
+    toasts.hold();
+  }
+
+  function free(why: 'pointed' | 'focused') {
+    if (why === 'pointed') pointed = false;
+    else focused = false;
+    if (!pointed && !focused && !covered) toasts.release();
+  }
 
   /** Once a toast that has gone has played its exit, it leaves the stack. */
   function letGo(id: number) {
@@ -80,10 +128,11 @@
   role="status"
   aria-live="polite"
   aria-label={copy.toasts}
-  onmouseenter={() => toasts.hold()}
-  onmouseleave={() => toasts.release()}
-  onfocusin={() => toasts.hold()}
-  onfocusout={() => toasts.release()}
+  data-covered={covered ? '' : undefined}
+  onmouseenter={() => hold('pointed')}
+  onmouseleave={() => free('pointed')}
+  onfocusin={() => hold('focused')}
+  onfocusout={() => free('focused')}
 >
   {#each drawn as { toast, gone } (toast.id)}
     {@const said = toast.undo ? parts(toast.text) : null}
@@ -112,8 +161,8 @@
 <style>
   /**
    * THE WORK'S WIDTH, between what the rail takes at the start and what the docked panel takes at the end, with the
-   * toasts centred in it. `--toast-start` is nothing until the shell says it draws a rail; the narrow rail's width is
-   * `Sidebar.svelte`'s `--rail-icons`, read where a root declares it and worked out the same way where none does.
+   * toasts centred in it. `--toast-start` is nothing until the shell says it draws a rail, and then the rail's width as
+   * `Sidebar.svelte` declares it on the root (`--rail-w`), so the stack follows the rail at either width.
    *
    * `--dock-w` WITH ITS FALLBACK, because only `Panel.svelte`'s stylesheet declares it, and a screen that draws no
    * panel has not loaded that sheet. An unset variable throws out the whole `inset-inline`, both edges, and the stack
@@ -135,12 +184,9 @@
     pointer-events: none;
   }
 
+  /* THE RAIL'S WIDTH AS THE RAIL SAYS IT, `--rail-w` (`Sidebar.svelte`), at whichever of its widths it is drawn. */
   :global(:root:has(.shell[data-shape='rail'])) .stack {
-    --toast-start: calc(var(--inset) + var(--rail));
-  }
-
-  :global(:root:has(.shell[data-shape='rail'][data-rail='icons'])) .stack {
-    --toast-start: calc(var(--inset) + var(--rail-icons, calc(var(--tap) + var(--sp-2) * 2)));
+    --toast-start: calc(var(--inset) + var(--rail-w, var(--rail)));
   }
 
   .stack > :global(*) {
@@ -179,6 +225,13 @@
     transition-timing-function: var(--ease-out);
   }
 
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  @supports (-webkit-backdrop-filter: none) {
+    .toast {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+  }
+
   /* No `opacity: 0` in a start state, see Sheet.svelte. A toast that never fades in is still a
      toast; a toast stuck at zero opacity is a report nobody got. Reduced motion fades it in from
      a state that is still readable. */
@@ -191,6 +244,16 @@
 
   /* GONE: it drops back 4px as it fades, in the leaving duration, and nothing on it can be pressed. */
   .toast[data-leaving] {
+    transform: var(--toast-gone);
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: var(--d-exit);
+    transition-timing-function: var(--ease-in);
+  }
+
+  /* HELD UNDER A SHEET: every toast drops back as a leaving one does, and nothing on it can be pressed. When the sheet
+     has gone they rise into place on the arriving step, from where they went. */
+  .stack[data-covered] > .toast {
     transform: var(--toast-gone);
     opacity: 0;
     pointer-events: none;
@@ -224,9 +287,10 @@
     font-weight: 600;
   }
 
-  /* THE UNDO IS THE LOUD THING IN THE TOAST: the word in ink at 600 and its key cap, on the card's own glass rather
-     than a second surface on it. A 44px target on a thumb (`tap`), because it is the only control in the product that
-     gives you your data back, on a countdown. */
+  /* THE UNDO IS THE ONE THING TO PRESS IN THE TOAST, AND IT LOOKS PRESSABLE: the word in ink at 600 and its key cap,
+     on a soft pill of the wash, the quiet control's own fill, so it reads as a control and not as a bold word in a
+     sentence. Never the ink fill: the receipt is not the screen's primary. A 44px target on a thumb (`tap`), because
+     it is the only control in the product that gives you your data back, on a countdown. */
   .undo {
     display: inline-flex;
     align-items: center;
@@ -234,7 +298,7 @@
     flex: none;
     min-block-size: 32px;
     padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: none;
+    background: var(--hover-wash);
     border: 0;
     border-radius: var(--r-pill);
     color: var(--ink);
@@ -242,6 +306,11 @@
     font-weight: 600;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
+  }
+
+  /* A THUMB SEES THE PRESS: the pill deepens to the held wash while it is down, as a quiet button does. */
+  .undo:active {
+    background: var(--hold-wash);
   }
 
   /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH. `a11y.css`'s `.tap::before` grows a small
@@ -263,7 +332,7 @@
   /* HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last thing tapped. */
   @media (hover: hover) and (pointer: fine) {
     .undo:hover {
-      background: var(--hover-wash);
+      background: var(--hold-wash);
     }
 
     .close:hover {

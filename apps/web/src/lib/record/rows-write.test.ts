@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 
 import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
-import { capturedFields, holdInPlace, outbound, rowWriter } from './rows-write.ts';
+import { capturedFields, holdInPlace, outbound, rowSaid, rowWriter } from './rows-write.ts';
+import { TITLES } from './held.ts';
 import type { Fetch } from './row-live.ts';
 import type { Entry } from './schema.ts';
 
@@ -130,10 +131,38 @@ test('a conflict hands back the row as it now stands, and says so', async () => 
   const out = await rowWriter(BASE, io).update('obligations', 2, { what: 'Rent, mine' }, 7);
   assert.equal(out.ok, false);
   if (out.ok || out.why !== 'conflict') return assert.fail(`expected a conflict, got ${JSON.stringify(out)}`);
-  assert.equal(out.fix, copy.writeConflict('obligations#2'));
+  /* NAMED AS IT NOW STANDS, never by its handle. */
+  assert.equal(out.fix, copy.writeConflict('“Rent, moved”'));
+  assert.doesNotMatch(out.fix, /#/u);
   assert.equal(out.entry?.version, 9);
   assert.equal(out.entry?.fields.what, 'Rent, moved');
   assert.equal(out.entry?.fields.party, 3);
+});
+
+test('A WRITE SENTENCE NAMES THE ROW AS A PERSON READS IT: its title now, the name last walked, else "This item", never its id', () => {
+  assert.equal(rowSaid('obligations', 2, row({ fields: { what: '  Rent  ' } })), '“Rent”');
+  /* NO ROW IN HAND: the name this tab walked for that number. */
+  const had = TITLES.get('obligations');
+  TITLES.set('obligations', new Map([[5, 'Insurance']]));
+  try {
+    assert.equal(rowSaid('obligations', 5), '“Insurance”');
+    /* A ROW NOBODY NAMED is "This" and the list's own singular. */
+    assert.equal(rowSaid('obligations', 2, row({ fields: { what: '' } })), 'This item');
+    assert.equal(rowSaid('obligations', 9), 'This item');
+  } finally {
+    if (had === undefined) TITLES.delete('obligations');
+    else TITLES.set('obligations', had);
+  }
+  /* A LIST THIS BUILD DOES NOT DECLARE says its id made singular, and a write with no row yet names the list. */
+  assert.equal(rowSaid('course_notes', 3), 'This course note');
+  assert.equal(rowSaid('obligations', null), 'Bills and invoices');
+  for (const said of [rowSaid('obligations', 2), rowSaid('course_notes', 3), rowSaid('tasks', 9999)]) assert.doesNotMatch(said, /#|_/u);
+});
+
+test('a note the record raced names its row, not its handle', async () => {
+  const { io } = host((url) => refs(url) ?? json(409, { ok: false, conflict: { version: 9, current: row({ version: 9 }), actor: 'p_2' } }));
+  const out = await rowWriter(BASE, io).note('tasks', 9999, 'Rang them.');
+  assert.deepEqual(out, { ok: false, why: 'refused', fix: copy.writeConflict('This task') });
 });
 
 test('a stale refusal with no row reads the row again', async () => {

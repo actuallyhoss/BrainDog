@@ -17,8 +17,8 @@
   stranger will be offered. "Publish to the Kennel" sits beside Download and sends the same file as the signed-in
   person (`lib/market/publish.ts`); its answer is one sentence with a link.
 
-  ONE COLUMN AT `--measure`, at every width: a form read top to bottom, never two ragged
-  columns.
+  ONE COLUMN, read top to bottom, never two ragged columns. The page runs the window's width like every other; the
+  fields keep `--measure` inside it.
 
   THE LOOK: what goes in the file is the title row's sentence, and the way back to the add-ons is the
   head's. The form is groups on the ground, each field's label above it; what changes and what an installer sees are two
@@ -417,7 +417,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: calc(var(--measure) + 2 * var(--gutter));
   }
 
   .note {
@@ -427,8 +426,9 @@
     line-height: 18px;
   }
 
-  /* ONE COLUMN, EVERY FIELD THE SAME WIDTH: the measure the page is capped at. Groups sit 28 apart, so each reads as
-     its own heading and what it heads. */
+  /* ONE COLUMN, EVERY FIELD THE SAME WIDTH: the page runs the whole window and the fields keep the reading measure
+     inside it, so a title box is never 1,600 wide. Groups sit 28 apart, so each reads as its own heading and what it
+     heads. */
   .share-form {
     display: flex;
     flex-direction: column;
@@ -440,6 +440,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+    max-inline-size: var(--measure);
     padding-block-start: var(--sp-2);
   }
 

@@ -31,6 +31,12 @@
   THE GLASS IS ON A PSEUDO-ELEMENT, NOT ON THE `nav`. A `backdrop-filter` makes its element the box every fixed
   descendant is placed against, and the narrow rail's flyout and the switcher's menu both escape the card. It is also
   what moves when the card narrows or widens: the pseudo-element is scaled, never the card's width (`morphs` below).
+
+  THE PAGE BESIDE IT MUST NOT JUMP, SO THE RAIL SAYS ITS WIDTH ON THE ROOT. `--rail-w` is the card's width at whichever
+  width it is drawn, and `--rail-d` and `--rail-ease` are the time and the curve its glass moves on. The shell reads
+  all three: its column is the rail's width, and when the rail narrows or widens it slides the work from where it was
+  to where it is (a FLIP) over the same time on the same curve, so the card's edge and the work's edge travel as one.
+  Written by CSS alone (`:root:has(...)`), as `--dock-w` is, so nothing has to be cleaned up.
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
@@ -277,7 +283,8 @@
     !matchMedia('(prefers-reduced-motion: reduce)').matches &&
     typeof KeyframeEffect === 'function' &&
     'pseudoElement' in KeyframeEffect.prototype;
-  /* A duration token in milliseconds, whichever unit it is written in. */
+  /* A duration token in milliseconds, whichever unit it is written in. The fallback is the panel's step, which is what
+     `--rail-d` names. */
   const ms = (style: CSSStyleDeclaration, token: string, fallback: number): number => {
     const raw = style.getPropertyValue(token).trim();
     const n = Number.parseFloat(raw);
@@ -296,7 +303,8 @@
       const width = el.getBoundingClientRect().width;
       if (!(was > 0 && width > 0) || Math.abs(was - width) < 1) return;
       const style = getComputedStyle(el);
-      const timing = { duration: ms(style, '--d-move', 220), easing: style.getPropertyValue('--ease-out').trim() || 'ease-out' };
+      /* THE SHELL'S FLIP READS THE SAME TWO (`--rail-d`, `--rail-ease`), so the glass and the work move as one. */
+      const timing = { duration: ms(style, '--rail-d', 240), easing: style.getPropertyValue('--rail-ease').trim() || 'ease-out' };
       /* AN ORIGIN HAS NO LOGICAL FORM, so a right-to-left card scales from its right, which is its start. */
       const origin = style.direction === 'rtl' ? '100% 50%' : '0 50%';
       try {
@@ -312,6 +320,7 @@
 <nav
   class="rail"
   aria-label="Record"
+  data-rail-card
   bind:this={card}
   data-icons={icons ? '' : undefined}
   onpointerover={(e) => flyAt(e.target)}
@@ -562,6 +571,21 @@
 </nav>
 
 <style>
+  /**
+   * THE RAIL'S WIDTH, TIME AND CURVE, SAID ON THE ROOT for the shell and the toast stack to read: the card's width at
+   * the width it is drawn, and the step and curve its glass moves on when that changes. `[data-rail-card]` rather than
+   * the card's class, which another stylesheet may also use.
+   */
+  :global(:root) {
+    --rail-w: var(--rail);
+    --rail-d: var(--d-move);
+    --rail-ease: var(--ease-out);
+  }
+
+  :global(:root:has(nav[data-rail-card][data-icons])) {
+    --rail-w: var(--rail-icons);
+  }
+
   /* The kinds of row in the rail that are buttons rather than links, reset to the row's shape. A control already takes
      the body face (`base.css`), so no rule here restates it. */
   button.item {
@@ -581,7 +605,7 @@
    * concentric across the card's 10 of padding. DIRECTION 37 keeps the reference's measurements out, as §34 did.
    */
   .rail {
-    --fly-x: calc(var(--inset) + var(--rail));
+    --fly-x: calc(var(--inset) + var(--rail-w));
     /* THE CHROME READS A STEP UNDER THE PAGE IT FRAMES: 14 beside the 15 body, one over the meta step, so the names on
        the card stay calm while the reading text grows. */
     --rail-text: calc(var(--t-sm) + 1px);
@@ -606,6 +630,13 @@
     box-shadow: var(--glass-edge), var(--e2);
     backdrop-filter: var(--glass-blur);
     pointer-events: none;
+  }
+
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  @supports (-webkit-backdrop-filter: none) {
+    .rail::before {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
   }
 
   .top {
@@ -916,7 +947,7 @@
     font-weight: 600;
   }
 
-  /* THE PRESS: a scale of .97 in 70ms, let go in the release time, so a finger sees the row take it as a click does. */
+  /* THE PRESS: a scale of .97 in the press time, let go in the release time, so a finger sees the row take it as a click does. */
   .item:active,
   a.run:active {
     scale: 0.97;
@@ -1134,8 +1165,6 @@
   /* ── The narrow rail ──────────────────────────────────────────────────── */
 
   .rail[data-icons] {
-    --fly-x: calc(var(--inset) + var(--rail-icons));
-
     inline-size: var(--rail-icons);
     padding-inline: var(--sp-2);
   }
@@ -1220,6 +1249,12 @@
     white-space: nowrap;
     pointer-events: none;
     translate: 0 -50%;
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    .flyout {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
   }
 
   /* FORCED COLOURS DROP THE GLASS AND ITS SHADOWS, so the floating surface keeps an edge to be told from the ground by,

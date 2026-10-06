@@ -105,7 +105,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
-    max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 </style>

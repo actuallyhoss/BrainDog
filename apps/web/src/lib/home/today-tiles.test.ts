@@ -49,6 +49,12 @@ test('THE SENTENCE: the late work first and red, said once, then what else needs
   assert.deepEqual(sentenceOf(0, [], 1, TODAY), { text: 'Nothing needs you, and one agent is working.', needs: '' });
   assert.equal(sentenceOf(12, [], 0, TODAY).text, 'Twelve things need you.');
   assert.equal(sentenceOf(23, [], 0, TODAY).text, '23 things need you.');
+  /* THE WHOLE LATE COUNT, past the days drawn: twenty late with eight drawn is twenty late, the rest the count left. */
+  const eight = ['2026-07-29', '2026-08-01', '2026-08-09', '2026-08-25', '2026-09-01', '2026-09-20', '2026-09-27', '2026-09-28'];
+  assert.deepEqual(sentenceOf(23, eight, 0, TODAY, 20), { text: 'Twenty things are late, the oldest by two months. Three more need you.', needs: 'Twenty things are late' });
+  /* NEVER FEWER THAN THE DAYS DRAWN, and nothing late without a day to say the oldest by. */
+  assert.equal(sentenceOf(3, ['2026-09-20', '2026-09-27'], 0, TODAY, 1).text, 'Two things are late, the oldest by nine days. One more needs you.');
+  assert.equal(sentenceOf(4, [], 0, TODAY, 3).text, 'Four things need you.');
 });
 
 test('HOW LATE, IN WORDS: a day, then days, weeks and months, counted in words to ten', () => {

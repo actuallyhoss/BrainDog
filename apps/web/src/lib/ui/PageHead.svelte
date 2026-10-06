@@ -20,7 +20,7 @@
 
   From 900px up the title row sits on the ground, 44 tall, 12 from the top of the work. Once the page scrolls it stays
   where it is and becomes a compact glass bar over what passes under it: the title steps down to 17, and the bar's glass
-  arrives in 220ms. The row keeps its height, so the page under it never jumps and a page an inch taller than the window
+  arrives over `--d-move`, the step the panel moves on. The row keeps its height, so the page under it never jumps and a page an inch taller than the window
   cannot flicker between the two states.
 
   Toolbar controls are glass pills and circles, 36 high and 6 apart, and the one primary is ink: a quiet
@@ -328,7 +328,7 @@
   }
 
   /* THE COMPACT BAR'S GLASS, 56 tall round the 44px row, reaching 14 past the title and the toolbar at each end. It is
-     there at rest, invisible, and arrives in 220ms: the row itself never changes height. */
+     there at rest, invisible, and arrives over `--d-move`: the row itself never changes height. */
   .head::before {
     content: '';
     position: absolute;
@@ -433,6 +433,7 @@
     background: var(--bg);
     border-color: transparent;
     box-shadow: none;
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 
@@ -441,6 +442,7 @@
   .head[data-under] .head-actions :global(.segmented) {
     background: transparent;
     box-shadow: none;
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 
@@ -618,6 +620,13 @@
       transition: opacity var(--d-move) var(--ease-out);
     }
 
+    /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+    @supports (-webkit-backdrop-filter: none) {
+      .head-bar::before {
+        -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      }
+    }
+
     .head-bar[data-under]::before {
       opacity: 1;
     }
@@ -782,6 +791,13 @@
       background: var(--glass);
       box-shadow: var(--glass-edge);
       backdrop-filter: var(--glass-blur);
+    }
+
+    @supports (-webkit-backdrop-filter: none) {
+      .head[data-under] .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass'])),
+      .head[data-under] .head-actions :global(.segmented) {
+        -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      }
     }
 
     /**

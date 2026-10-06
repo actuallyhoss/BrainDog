@@ -797,7 +797,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max); /* One cap for every list page. */
   }
 
   /* ── the toolbar ──────────────────────────────────────────────────────── */
@@ -823,18 +822,30 @@
 
   .file-into[data-where='bar'] {
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     box-shadow: var(--glass-edge);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .file-into[data-where='bar'] {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the pills in it drop their own. */
   :global(.head[data-under]) .file-into[data-where='bar'],
   :global(.head[data-under]) .series {
     background: transparent;
-    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     box-shadow: none;
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .file-into[data-where='bar'],
+    :global(.head[data-under]) .series {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   .file-label {
@@ -1133,10 +1144,15 @@
     margin-inline: auto;
     padding: 6px 6px 6px var(--sp-4);
     background: var(--glass-strong);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-lg);
     box-shadow: var(--glass-edge), var(--e2);
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    .batch {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   .batch-n {

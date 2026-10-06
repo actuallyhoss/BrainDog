@@ -62,7 +62,7 @@
   import Bars from '$lib/viz/Bars.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
-  import { outcomeOf, runTail, toolsOf, toolsSaid, words as runWords } from '../charts.ts';
+  import { machineOf, outcomeOf, runTail, toolsOf, toolsSaid, words as runWords } from '../charts.ts';
 
   const id = $derived(String(route.params.id ?? ''));
   const base = $derived(apiBase(route.url));
@@ -233,7 +233,7 @@
           <dl class="facts">
             <div class="fact">
               <dt>{words.machine}</dt>
-              <dd>{row.runner ?? words.noMachine}</dd>
+              <dd>{machineOf(row.runner) ?? words.noMachine}</dd>
             </div>
             <div class="fact">
               <dt>{words.started}</dt>
@@ -340,8 +340,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
-    /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), and each line of prose keeps `--measure` below. */
-    max-inline-size: var(--page-max);
+    /* NO CAP: the page runs the window's width to the gutters, and each line of prose keeps `--measure` below. */
   }
 
   /* ── the sentence ── */
@@ -624,11 +623,17 @@
       max-block-size: var(--sticky);
       padding-inline: var(--sp-3);
       background: var(--glass);
-      -webkit-backdrop-filter: var(--glass-blur);
       backdrop-filter: var(--glass-blur);
       border-radius: var(--r-lg);
       box-shadow: var(--glass-edge), var(--e2);
       overflow: hidden;
+    }
+
+    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+    @supports (-webkit-backdrop-filter: none) {
+      .stop-bar {
+        -webkit-backdrop-filter: var(--glass-blur);
+      }
     }
   }
 

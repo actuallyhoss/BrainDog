@@ -101,10 +101,16 @@
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-pill);
     box-shadow: var(--glass-edge);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .tab-row {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the track's edge said
@@ -205,10 +211,15 @@
     flex: 0 0 auto;
     padding: 3px;
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-pill);
     box-shadow: var(--glass-edge);
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    .tab-more {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   .tally {

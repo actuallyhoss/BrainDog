@@ -24,8 +24,10 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
-  import { homePage, said } from '$lib/voice.svelte.ts';
-  import { VOICE_LINES, homeSlugOf } from '$lib/voice.ts';
+  import { heard, homePage, said } from '$lib/voice.svelte.ts';
+  import { VOICE_LINES, homeSlugOf, relabel, singularOf } from '$lib/voice.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { TASKS } from '$lib/work/list.ts';
   import type { Opened } from '$lib/record/page-live.ts';
   import { landing } from '$lib/record/landing.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -66,9 +68,18 @@
      body arranged is the body drawn. */
   const voice = $derived<HomeVoice>(voiceOf(said));
 
+  /* ONE OF THE TASKS LIST AS THE RECORD WORDS IT, which names the line a task is typed into: the word the voice gives
+     the list, else its declared singular, else its name made singular, as a list's own screen says it. Read again when
+     the voice is heard, so a list renamed in Settings › Words renames the line too. */
+  const one = $derived.by(() => {
+    const name = data.lists.find((l) => l.id === TASKS)?.name;
+    const bare = REGISTERS[TASKS] ?? (name ? { id: TASKS, name, one: singularOf(name) } : undefined);
+    return bare ? relabel(bare, heard()).one : undefined;
+  });
+
   /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell, by that same mode's helper: a block over a list the record
      does not keep is not asked for. */
-  const holds = $derived<Holds>(holdsOf(data));
+  const holds = $derived<Holds>({ ...holdsOf(data), ...(one === undefined ? {} : { one }) });
 
   /**
    * ONLY A PAGE THE RECORD HOLDS IS ASKED FOR. A use case may declare no Home page (a reading club shared as a file), and
@@ -151,7 +162,7 @@
 
   const live = $derived(got?.from === 'live' ? got : null);
   /* THE PAGE AS HOME DRAWS IT: its line lifted into the head, each row once, and nothing drawn that holds nothing. */
-  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice) : null);
+  const shaped = $derived(live ? homeDrawn(live.page.blocks, live.now, voice, one) : null);
 
   /* THE ONE LINE, worked out from the blocks drawn, else the page's own line, else the calm one once the page is read. */
   const lead = $derived.by(() => {

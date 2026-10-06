@@ -283,10 +283,13 @@ test('A CHOICE GOES TO BOTH: the cookie at once, and the record in the order the
     /* MATCH THE SYSTEM IS SENT AS A WORD, not `null`, which would leave another device on the dark it last heard of. */
     pref.apply('scheme', null);
 
-    assert.deepEqual(pref.read(), { text: 'md', density: 'compact', contrast: true }, 'the cookie did not take the change at once');
+    const { unsent: owed, ...look } = pref.read();
+    assert.deepEqual(look, { text: 'md', density: 'compact', contrast: true }, 'the cookie did not take the change at once');
     assert.equal(attrs.get('data-text'), 'md');
+    assert.ok(owed && Object.keys(owed).length > 0, 'a change was sent without being held until the record kept it');
 
     await pref.settled();
+    assert.equal(pref.read().unsent, undefined, 'what the record kept is still owed to it');
     assert.deepEqual(record.sent, [
       ['look.scheme', 'dark'],
       ['look.size', 'md'],
@@ -328,4 +331,131 @@ test('and with no record listening, a choice stays on the device and nothing is 
   assert.deepEqual(await pref.keep('look.scheme', 'dark'), { from: 'device' });
   assert.equal(pref.read().scheme, 'dark');
   assert.equal(pref.follows(), false);
+});
+
+/**
+ * A SEND THAT DID NOT ARRIVE IS OWED, NOT FORGOTTEN (the audit of batches 11 to 13, finding 4). It resolved as "device"
+ * and was never sent again, and the next boot then adopted the record's older word over it, so a dark chosen offline was
+ * light again after the reload.
+ */
+
+/** A record that is out of reach for the first `down` sends, then keeps everything, and what reached it. */
+function flaky(down: number) {
+  const sent: [string, unknown][] = [];
+  let left = down;
+  const send: pref.Send = async (key, value) => {
+    if (left-- > 0) throw new Error('offline');
+    sent.push([key, value]);
+    return { from: 'kept' };
+  };
+  return { sent, send };
+}
+
+test('A FAILED SEND STAYS OWED, is sent again on the next boot before adopting, and the record\'s older word does not win', async () => {
+  const attrs = page(cookie({ scheme: 'light' }));
+  const offline = flaky(1);
+  pref.follow(offline.send);
+  try {
+    assert.deepEqual(await pref.apply('scheme', 'dark'), { from: 'pending' }, 'a send that never arrived was reported as kept or as this device only');
+    assert.deepEqual(pref.unsent(), { 'look.scheme': 'dark' });
+    assert.equal(pref.follows(), true, 'a send that failed was taken for a host that cannot keep the key');
+
+    /* THE NEXT BOOT: the record still says light, because it never heard of the dark. */
+    pref.follow(null);
+    const record = keeping();
+    pref.follow(record.send);
+    pref.resend();
+    pref.adopt({ 'look.scheme': 'light', 'look.size': 'md' });
+    assert.equal(pref.read().scheme, 'dark', "the record's older word was adopted over a change it never received");
+    assert.equal(attrs.get('data-scheme'), 'dark');
+    assert.equal(pref.read().text, 'md', 'a key nothing owed was not adopted');
+
+    await pref.settled();
+    assert.deepEqual(record.sent, [['look.scheme', 'dark']]);
+    assert.deepEqual(pref.unsent(), {}, 'what the record kept on the resend is still owed');
+
+    /* AND ONCE KEPT, IT IS NOT SENT AGAIN. */
+    pref.resend();
+    await pref.settled();
+    assert.equal(record.sent.length, 1);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('the newest change to a key decides what is owed, whichever answer comes back first', async () => {
+  page();
+  /* THE FIRST PRESS FAILS AND THE SECOND IS KEPT: nothing is owed, and the failed dark is never sent over the light. */
+  const first = flaky(1);
+  pref.follow(first.send);
+  try {
+    void pref.apply('scheme', 'dark');
+    void pref.apply('scheme', 'light');
+    await pref.settled();
+    assert.deepEqual(pref.unsent(), {});
+    assert.deepEqual(first.sent, [['look.scheme', 'light']]);
+  } finally {
+    pref.follow(null);
+  }
+
+  /* THE FIRST IS KEPT AND THE SECOND FAILS: the second is owed, and the first's answer did not mark it kept. */
+  page();
+  let calls = 0;
+  pref.follow(async () => (++calls === 2 ? Promise.reject(new Error('offline')) : { from: 'kept' }));
+  try {
+    void pref.apply('density', 'compact');
+    void pref.apply('density', 'roomy');
+    await pref.settled();
+    assert.deepEqual(pref.unsent(), { 'look.density': 'roomy' });
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('A REFUSED KEY IS NOT OWED: a host that cannot keep it is not asked again on every boot', async () => {
+  page();
+  pref.follow(async () => ({ from: 'refused', fix: 'key is one of nav.order or nav.hidden.' }));
+  try {
+    await pref.apply('text', 'md');
+    assert.deepEqual(pref.unsent(), {});
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('a choice made with no record listening is owed, and sent once when one is', async () => {
+  page();
+  pref.follow(null);
+  assert.deepEqual(await pref.contrast(true), { from: 'device' });
+  assert.deepEqual(pref.unsent(), { 'look.contrast': true });
+
+  const record = keeping();
+  pref.follow(record.send);
+  try {
+    pref.resend();
+    pref.resend();
+    await pref.settled();
+    assert.deepEqual(record.sent, [['look.contrast', true]], 'an owed change was sent more than once');
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('forget takes the look and whose it was off this device, and nothing else', () => {
+  const attrs = page(
+    cookie({ scheme: 'dark', text: 'md', density: 'roomy', contrast: true, theme: '#123456', who: 'acme/p', unsent: { 'look.size': 'md' }, sidebar: false, nav: ['/'] }),
+  );
+  attrs.set('data-scheme', 'dark');
+  attrs.set('data-theme', 'hc');
+  pref.forget();
+  assert.deepEqual(pref.read(), { sidebar: false, nav: ['/'] });
+  assert.equal(attrs.has('data-scheme'), false);
+  assert.equal(attrs.has('data-theme'), false);
+});
+
+test('an owed list or a stamp of the wrong shape is dropped, and the rest of the cookie kept', () => {
+  page(cookie({ scheme: 'dark', who: 7, unsent: { 'nav.order': ['/'] } }));
+  assert.deepEqual(pref.read(), { scheme: 'dark' });
+  page(cookie({ unsent: { 'look.scheme': 'dark', 'look.contrast': false }, who: 'acme/p' }));
+  assert.deepEqual(pref.read(), { unsent: { 'look.scheme': 'dark', 'look.contrast': false }, who: 'acme/p' });
 });

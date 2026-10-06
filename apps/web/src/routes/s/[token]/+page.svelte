@@ -273,16 +273,15 @@
 </div>
 
 <style>
-  /* THE COLUMN: 12 in from the top of the window under the notch, the page's gutter at the sides (16 on a phone), and
-     clear of a phone's home indicator at the foot. */
+  /* THE WHOLE WINDOW: 12 in from the top under the notch, the page's gutter at the sides (16 on a phone), and clear of
+     a phone's home indicator at the foot. No cap and no centred column: the blocks run on twelve columns to the
+     gutters, and a block of words keeps its own reading measure. */
   .shared {
     display: grid;
     align-content: start;
     gap: var(--sp-6);
     box-sizing: border-box;
     min-block-size: 100dvh;
-    max-inline-size: 1120px;
-    margin-inline: auto;
     padding: calc(var(--inset) + env(safe-area-inset-top)) var(--gutter) calc(var(--sp-5) + env(safe-area-inset-bottom));
   }
 
@@ -305,10 +304,16 @@
     min-block-size: 52px;
     padding-inline: var(--sp-4) var(--sp-3);
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-lg);
     box-shadow: var(--glass-edge), var(--e2);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .bar {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   .brand {

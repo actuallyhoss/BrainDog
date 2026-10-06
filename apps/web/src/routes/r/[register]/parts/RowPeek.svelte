@@ -46,7 +46,7 @@
      switch, and a peek moved between two rows that share one did not. -->
 <Panel open={seq !== null} title={(entry ? display(register, title, entry.fields[title], now, names) : null) ?? ''} shows={seq} onclose={() => peek(null)}>
   {#snippet verbs()}
-    <Button weight="primary" size="sm" href="/r/{register}/{seq}" kbd="↵"><Icon name="external" size="s" />{copy.openRow}</Button>
+    <span class="peek-open"><Button weight="primary" size="sm" href="/r/{register}/{seq}" kbd="↵"><Icon name="external" size="s" />{copy.openRow}</Button></span>
   {/snippet}
   {#if entry}
     <!-- FORMATTED, through the same `display` every other surface goes through.
@@ -70,6 +70,19 @@
 </Panel>
 
 <style>
+  /* ENTER IS PRINTED WHEN ASKED FOR (DIRECTION 35): on Open under the pointer or with keyboard focus. */
+  .peek-open {
+    display: contents;
+  }
+
+  .peek-open :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
+    display: none;
+  }
+
+  .peek-open :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
+    padding-inline-end: var(--sp-3);
+  }
+
   /* LABEL OVER VALUE, one field under another: 13/500 in the quiet ink over the value at the body size, 16 between
      fields. A two-column grid in a 440 panel left the values a third of it. */
   .peek {

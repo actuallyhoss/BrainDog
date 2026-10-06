@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as pref from '../pref.ts';
-import { follow, prefsOf } from './follow.ts';
+import { ACCENTS } from '../accent.ts';
+import { follow, personOf, prefsOf, unstampedOf, whoOf } from './follow.ts';
 
 function page(initial = '') {
   (globalThis as { document?: unknown }).document = {
@@ -52,4 +53,114 @@ test('nobody signed in adopts nothing and sends nothing; a person is adopted onc
   await pref.settled();
   assert.deepEqual(sent, ['look.scheme']);
   pref.follow(null);
+});
+
+/**
+ * THE COOKIE'S LOOK IS STAMPED WITH WHOSE IT IS (the audit of batches 11 to 13, finding 4). `bd_pref` covers the whole
+ * host and each record keeps its own `look.*`, so a second person on the same browser met the first person's look for
+ * every key they had never set, and looks chosen before the record kept them were never sent to it.
+ */
+
+const at = (slug: string, person: string, prefs: Record<string, unknown>) => ({ registers: [], record: { slug }, me: { person, prefs } });
+
+/** A record that keeps every look key, and what it was sent. */
+function keeping() {
+  const sent: [string, unknown][] = [];
+  const send: pref.Send = async (key, value) => (sent.push([key, value]), { from: 'kept' });
+  return { sent, send };
+}
+
+const cookie = (p: Record<string, unknown>) => `bd_pref=${encodeURIComponent(JSON.stringify(p))}`;
+
+test('whoOf names the record and the person, and nothing for an answer with nobody in it', () => {
+  assert.equal(whoOf(at('acme', 'p1', {})), 'acme/p1');
+  /* A RECORD WITH NO NAME IS THE SHELL'S EMPTY SLUG, so Settings handing over `index.slug` names the same person. */
+  assert.equal(whoOf({ me: { person: 'p1' } }), '/p1');
+  assert.equal(whoOf({ record: null, me: { person: 'p1' } }), '/p1');
+  assert.equal(whoOf({ me: { person: null } }), undefined);
+  assert.equal(whoOf(null), undefined);
+  assert.equal(personOf(at('acme', 'p1', {})), 'p1');
+  assert.equal(personOf({ me: { person: '' } }), undefined);
+});
+
+test('THE SAME PERSON IN ANOTHER OF THEIR RECORDS KEEPS THEIR LOOK, and that record\'s words are adopted over it', async () => {
+  page(cookie({ scheme: 'dark', density: 'compact', who: 'eve' }));
+  const record = keeping();
+  try {
+    follow(at('acme', 'eve', {}), record.send);
+    follow(at('north', 'eve', { 'look.density': 'roomy' }), record.send);
+    const now = pref.read();
+    assert.equal(now.scheme, 'dark', 'the scheme was taken off at a switch of record, a flash on every move');
+    assert.equal(now.density, 'roomy', "the second record's own word was not adopted");
+    assert.equal(now.who, 'eve');
+    await pref.settled();
+    assert.deepEqual(record.sent, []);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('SOMEBODY ELSE SIGNING IN STARTS FROM THE HOUSE LOOK and their own record, not the last person\'s', async () => {
+  page(cookie({ scheme: 'dark', density: 'compact', contrast: true, who: 'ann', unsent: { 'look.scheme': 'dark' }, sidebar: false }));
+  const record = keeping();
+  try {
+    follow(at('acme', 'bob', { 'look.size': 'md' }), record.send);
+    const now = pref.read();
+    assert.equal(now.scheme, undefined, "Ann's dark was left on Bob's screen");
+    assert.equal(now.density, undefined);
+    assert.equal(now.contrast, undefined);
+    assert.equal(now.text, 'md', "Bob's own record was not adopted");
+    assert.equal(now.who, 'bob');
+    assert.equal(now.sidebar, false, 'a per-device setting went with the look');
+    await pref.settled();
+    assert.deepEqual(record.sent, [], "what Ann's device owed her record was sent to Bob's");
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('A COOKIE FROM BEFORE THE STAMP IS SENT ONCE, only where the record has no word, then stamped', async () => {
+  const [first] = ACCENTS;
+  page(cookie({ scheme: 'dark', text: 'sm', theme: first!.hex }));
+  const record = keeping();
+  try {
+    follow(at('north', 'cy', { 'look.size': 'md' }), record.send);
+    /* THE RECORD'S WORD FOR THE SIZE WAS CHOSEN SINCE, so it wins and the old size is not sent over it. */
+    assert.equal(pref.read().text, 'md');
+    assert.equal(pref.read().scheme, 'dark');
+    assert.equal(pref.read().who, 'cy');
+    await pref.settled();
+    assert.deepEqual(record.sent, [
+      ['look.scheme', 'dark'],
+      ['look.accent', first!.name],
+    ]);
+    assert.deepEqual(pref.unsent(), {});
+
+    /* ONCE: the kept boot again sends nothing. */
+    follow(at('north', 'cy', { 'look.size': 'md' }), record.send);
+    await pref.settled();
+    assert.equal(record.sent.length, 2);
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('WHAT THE LAST BOOT COULD NOT SEND IS SENT BEFORE ADOPTING, and the record\'s older word does not undo it', async () => {
+  page(cookie({ scheme: 'dark', who: 'di', unsent: { 'look.scheme': 'dark' } }));
+  const record = keeping();
+  try {
+    follow(at('south', 'di', { 'look.scheme': 'light', 'look.density': 'roomy' }), record.send);
+    assert.equal(pref.read().scheme, 'dark', 'the offline choice was undone on reload');
+    assert.equal(pref.read().density, 'roomy');
+    await pref.settled();
+    assert.deepEqual(record.sent, [['look.scheme', 'dark']]);
+    assert.deepEqual(pref.unsent(), {});
+  } finally {
+    pref.follow(null);
+  }
+});
+
+test('unstampedOf leaves out a colour no swatch wears and a contrast left off', () => {
+  assert.deepEqual(unstampedOf({ theme: '#123456', contrast: undefined, density: 'roomy' }, {}), { 'look.density': 'roomy' });
+  assert.deepEqual(unstampedOf({ scheme: 'dark' }, { 'look.scheme': 'light' }), {});
 });

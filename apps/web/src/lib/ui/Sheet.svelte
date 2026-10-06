@@ -15,17 +15,20 @@
   row's Details and in "Copy link".
 
   IT GOES THE WAY IT CAME, AND FASTER. The drawer comes in from past the window's end edge and the
-  phone sheet up from below the screen, over 240ms on the sheet curve, and each goes back along the
-  same path in 180ms, with the scrim fading under it. It used to vanish on close, which read as the
+  phone sheet up from below the screen, over `--d-panel` on `--ease-sheet`, and each goes back along
+  the same path in `--d-panel-out`, with the scrim fading under it. It used to vanish on close, which read as the
   product dropping it. `@starting-style` draws the first frame and `display` and `overlay` are held
   for the close, so `[open]` still drops the moment it closes. Reduced motion fades instead.
+
+  IT LAYS A SCRIM (`scrims` in `panel.ts`) from its opening to the end of its close, so a toast pushed
+  while it is up waits for it rather than drawing under it.
 -->
 <script lang="ts">
   import { copy } from '../copy.ts';
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import Icon from './Icon.svelte';
-  import { NARROW, Pull, unstall } from './panel.ts';
+  import { NARROW, Pull, scrims, settled, unstall } from './panel.ts';
 
   let {
     open = $bindable(false),
@@ -62,6 +65,8 @@
    * of the keyboard broke".
    */
   let held = false;
+  /** This sheet's scrim, lifted once its close has played, or at once when it goes. */
+  let lift: (() => void) | null = null;
 
   $effect(() => {
     if (!el) return;
@@ -71,6 +76,7 @@
       el.showModal();
       overlays.open();
       held = true;
+      lift ??= scrims.lay();
       /**
        * AND THE CARET GOES WHERE THE WORK IS.
        *
@@ -93,6 +99,12 @@
       el.close();
       overlays.close();
       held = false;
+      /* After the close has started, so it is the close that is waited for. */
+      if (lift) {
+        const go = lift;
+        lift = null;
+        settled(el, go);
+      }
     }
   });
 
@@ -104,6 +116,8 @@
       overlays.close();
       held = false;
     }
+    lift?.();
+    lift = null;
   });
 
   /** Ask to be closed. It reports nothing: the element's own `close` event is the one notifier. */
@@ -131,6 +145,17 @@
    */
   function closed() {
     open = false;
+    /* A close the browser made on its own (a `method="dialog"` form) never reached the effect's close, so the lock and
+       the scrim are given back here. On every other close the effect has already given them back. */
+    if (held) {
+      overlays.close();
+      held = false;
+    }
+    if (lift && el) {
+      const go = lift;
+      lift = null;
+      settled(el, go);
+    }
     onclose?.();
   }
 
@@ -242,12 +267,12 @@
      does, rather than hanging off the edge with a rule down its side: a sheet is a tile's surface at radius
      `--r-lg` and the third level of depth, and a tile has no border. */
   .sheet {
-    /* THE MOTION: in over 240ms on the sheet curve, out along the same path in 180ms, from wherever `--sheet-off` puts
-       it out of sight. Both opacities are 1, so it slides and does not fade, until reduced motion fades it in from a
-       state that is still readable and out to nothing. */
-    --sheet-curve: cubic-bezier(0.32, 0.72, 0, 1);
-    --sheet-in: 240ms;
-    --sheet-out: 180ms;
+    /* THE MOTION: in over the panel's step on the sheet curve, out along the same path a step quicker, from wherever
+       `--sheet-off` puts it out of sight, as `Panel.svelte` moves. Both opacities are 1, so it slides and does not
+       fade, until reduced motion fades it in from a state that is still readable and out to nothing. */
+    --sheet-curve: var(--ease-sheet);
+    --sheet-in: var(--d-panel);
+    --sheet-out: var(--d-panel-out, var(--d-rows));
     --sheet-off: translateX(calc(100% + 16px));
     --sheet-from-opacity: 1;
     --sheet-gone-opacity: 1;
@@ -298,8 +323,8 @@
     pointer-events: none;
   }
 
-  /* THE SHEET CURVE, OVER 240MS, with no overshoot: a spring squeezed into a quarter of a second is a
-     flick at the end of every open, which is motion performing rather than answering. */
+  /* THE SHEET CURVE, OVER THE PANEL'S STEP, with no overshoot: a spring squeezed into a quarter of a
+     second is a flick at the end of every open, which is motion performing rather than answering. */
   .sheet[open] {
     transform: none;
     opacity: 1;

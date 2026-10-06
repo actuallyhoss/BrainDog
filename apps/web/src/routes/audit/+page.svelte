@@ -784,7 +784,6 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* ONE COLUMN UNTIL THERE IS ROOM FOR TWO: the tiles over the stream, side by side where they fit. */
@@ -949,6 +948,13 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .pill {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
+  }
+
   /* A MENU WITH A CHOICE MADE IS THE CHOSEN SEGMENT'S SHAPE: the tile's fill, lifted, so a narrowed stream says so. */
   .pill[data-on] {
     background: var(--bg);
@@ -980,6 +986,12 @@
     font-weight: 500;
   }
 
+  @supports (-webkit-backdrop-filter: none) {
+    .on-select {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
+  }
+
   /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the controls in it drop their own. */
   :global(.head[data-under]) .pill,
   :global(.head[data-under]) .on-select,
@@ -987,6 +999,14 @@
     background-color: transparent;
     backdrop-filter: none;
     box-shadow: none;
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .pill,
+    :global(.head[data-under]) .on-select,
+    :global(.head[data-under]) .segmented {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   /* A MENU ROW: an icon, the word, and how many lines of that kind were read, the chosen one ticked. */

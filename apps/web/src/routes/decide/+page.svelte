@@ -384,7 +384,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
     min-inline-size: 0;
   }

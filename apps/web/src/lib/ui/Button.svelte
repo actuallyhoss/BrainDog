@@ -105,8 +105,13 @@
   }
 
   /* A KEY CAP ASKS FOR A LITTLE LESS ROOM AT ITS END, so the cap sits in the curve the way the label sits in the other. */
-  .btn:has(.btn-kbd) {
+  .btn:is(:hover, :focus-visible):has(.btn-kbd) {
     padding-inline-end: var(--sp-2);
+  }
+
+  /* THE CAP SHOWS ON HOVER OR FOCUS ONLY (DIRECTION 35): a key hint is for the person reaching for it, not chrome at rest. */
+  .btn:not(:hover, :focus-visible) > .btn-kbd {
+    display: none;
   }
 
   .btn:active:not(:disabled) {
@@ -138,9 +143,16 @@
      glass, so a caller inside a menu or the palette uses `bare`. */
   .btn[data-weight='glass'] {
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     box-shadow: var(--glass-edge);
+  }
+
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives: a prefixed line
+     beside the one above was folded into it by the build, `var()` and all, and Safari drops that. */
+  @supports (-webkit-backdrop-filter: none) {
+    .btn[data-weight='glass'] {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
   }
 
   .btn[data-weight='glass']:active:not(:disabled) {

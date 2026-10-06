@@ -519,7 +519,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* THE STEPS: the house segmented control, at its own width, its numbers in the quiet ink. */
@@ -806,10 +805,16 @@
       z-index: var(--z-raise);
       padding: 6px;
       background: var(--glass-strong);
-      -webkit-backdrop-filter: var(--glass-blur);
       backdrop-filter: var(--glass-blur);
       border-radius: var(--r-lg);
       box-shadow: var(--glass-edge), var(--e2);
+    }
+
+    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+    @supports (-webkit-backdrop-filter: none) {
+      .bar {
+        -webkit-backdrop-filter: var(--glass-blur);
+      }
     }
 
     .bar-note {

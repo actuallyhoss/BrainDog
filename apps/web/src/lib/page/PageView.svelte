@@ -56,7 +56,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { may } from '$lib/record/may.ts';
   import { words } from './words.ts';
-  import { holdsOf, keptAs, previewedBody, readToArrange, voiceOf, type ToArrange } from './home-arrange.ts';
+  import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, type ToArrange } from './home-arrange.ts';
   import { said } from '$lib/voice.svelte.ts';
   import BatchBar from './BatchBar.svelte';
   import { filterOf, filterQuery, filtersOf } from './filters.ts';
@@ -216,7 +216,7 @@
     if (!on || opening) return;
     opening = true;
     try {
-      const got = await readToArrange(apiBase(), on, () => previewedBody(slug, holdsOf(shell), voiceOf(said)));
+      const got = await readToArrange(apiBase(), on, () => previewedBody(slug, holdsOf(shell)));
       if ('fix' in got) {
         toasts.push(got.fix, { intent: 'warn' });
         return;
@@ -242,8 +242,19 @@
     }
   });
 
-  /** The blocks the page is laid out from: the home's body while it is arranged, else what the record answered. */
-  const laidFrom = $derived<LiveBlock[]>(toArrange ? toArrange.blocks : (live?.page.blocks ?? []));
+  /**
+   * The blocks the page is laid out from: the home's body while it is arranged, else what the record answered.
+   *
+   * AS THIS READER IS DRAWN THEM, wherever the page is read rather than previewed (`home-arrange.ts`): a house heading
+   * in the voice that speaks, so a home kept from Today still says Settings › Words' lines, and no line to add a row to a
+   * list this reader may not add to. Each block stays at its place, so every write still finds it.
+   */
+  const laidFrom = $derived.by<LiveBlock[]>(() => {
+    const blocks = toArrange ? toArrange.blocks : (live?.page.blocks ?? []);
+    if (mode === 'preview') return blocks;
+    /* A SCREEN WHOSE SHELL NAMES NO READER keeps every line, as it drew them before, and the record answers a press. */
+    return heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
+  });
 
   /** Declared, then added. One list, so ordering and spans do not care which is which. */
   const all = $derived<LiveBlock[]>(live ? [...laidFrom, ...extra.map((b) => added(b, laidFrom))] : []);
@@ -467,8 +478,12 @@
      drawn at rest: it comes in while the pointer is anywhere on the page or focus is in it, and stays while its menu is
      open. ONE STEP UNDER THE CHROME (`--z-sheet`, the sticky head's and the tab bar's), over the content: scrolled up
      under the head it goes under the head's glass with the blocks, and never sits over the head's own buttons (Decide's
-     Ask a question) where a press meant for them would land on it. A pointer that cannot hover never meets it by
-     accident; it is reached by focus there. */
+     Ask a question) where a press meant for them would land on it.
+
+     A FINGER CANNOT HOVER, so on a touch screen the ⋯ is not waiting to be found: it is a quiet row of its own at the
+     body's top end, in the flow and always there, which a tap reaches on a phone and on a tablet alike (the arrange
+     mode itself is offered from 900px, `Arrange.svelte`). It was drawn at nought opacity and could not be pressed, so
+     nobody on a tablet could arrange Today or Decide. */
   .home-page {
     position: relative;
     min-inline-size: 0;
@@ -493,10 +508,18 @@
     opacity: 1;
   }
 
-  /* AND ONLY AT REST: while arranging the row holds Add a block, Cancel and Done, which a finger has to reach. */
   @media (hover: none) {
-    .home-page:not([data-arranging]) > .home-tools:not(:focus-within) {
-      pointer-events: none;
+    .home-page > .home-tools {
+      position: static;
+      justify-content: flex-end;
+      margin-block-end: var(--sp-2);
+      padding: 0;
+      opacity: 1;
+    }
+
+    /* A READER THE MENU OFFERS NOTHING keeps no empty row over the page. */
+    .home-page > .home-tools:not(:has(button, a)) {
+      display: none;
     }
   }
 
@@ -516,17 +539,16 @@
     }
   }
 
-  /* THE STRIP SITS IN THE PAGE'S OWN GUTTER AND CAP, over the first tile, with the gap a row of tiles keeps. */
+  /* THE STRIP SITS IN THE PAGE'S OWN GUTTER, over the first tile, with the gap a row of tiles keeps. */
   .page-filters {
     padding: var(--sp-3) var(--gutter) 0;
-    max-inline-size: var(--page-max);
   }
 
-  /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter and cap, so it sits where the
-     page would have. */
+  /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter, so it sits where the page
+     would have, and at the measure a sentence is read at. */
   .said {
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
+    max-inline-size: calc(var(--measure) + 2 * var(--gutter));
   }
 
   .preview {

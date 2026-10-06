@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import '../record/fixtures/fill.ts';
 import { ACTS, COMMANDS, UNDO_LAST, admits, commands, type Command } from './admit.ts';
-import { QUIET_HREF, customise, type Here, type Offer, type Place } from './customise.ts';
+import { QUIET_HREF, customise, lookSaid, type Here, type Offer, type Place } from './customise.ts';
 import { BINDINGS, type Binding } from '../a11y/bindings.ts';
 import { copy } from '../copy.ts';
 import { METRICS } from '../record/declared.ts';
@@ -421,4 +421,33 @@ test('every customise row is named in words a person reads, and says where the c
     /* AND TEST 3 OF `admit.ts`: typing a row's own title finds the row. A rename's sentence is typed, not found. */
     if (o.complete !== undefined) assert.equal(admits({ ...good, title: o.title }), null, `${o.title} is not a name anybody could type`);
   }
+});
+
+test('a look row and its toast say where the change is kept: this record, this device for now, or this device', () => {
+  const where = (kept: Here['kept']) => customise('dark', { ...fresh, ...(kept ? { kept } : {}) })[0]?.detail;
+  assert.equal(where('record'), 'Yours in this record, on every device');
+  assert.equal(where('pending'), 'On this device for now');
+  assert.equal(where('device'), 'On this device');
+  /* NOTHING SAID IS THE CLAIM THAT IS NEVER WRONG. */
+  assert.equal(where(undefined), 'On this device');
+  /* AND ONLY THE LOOK ROWS: a page's place in the nav is the person's on the record whatever the look does. */
+  assert.equal(customise('hide inbox', { ...fresh, kept: 'record' })[0]?.detail, 'From your nav. Nothing is deleted.');
+
+  assert.equal(lookSaid({ from: 'kept' }, 'Dark mode'), 'Dark mode, in this record on every device you open it on.');
+  assert.equal(lookSaid({ from: 'pending' }, 'Dark mode'), 'Dark mode, on this device for now. It reaches this record the next time it can.');
+  assert.equal(lookSaid({ from: 'device' }, 'Dark mode'), 'Dark mode, on this device.');
+  assert.equal(lookSaid({ from: 'refused', fix: 'key is one of nav.order.' }, 'Dark mode'), 'Dark mode, on this device.');
+  for (const s of [where('record'), lookSaid({ from: 'kept' }, 'Dark mode'), lookSaid({ from: 'pending' }, 'Dark mode')])
+    assert.doesNotMatch(s ?? '', /\u2014/u, 'an em dash in a look line');
+});
+
+test("the palette's glass is given to Safari in a block of its own, and taken away again on a phone", () => {
+  const code = readFileSync(new URL('./Palette.svelte', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
+  const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
+  const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)\s*\{\s*\.palette\s*\{\s*-webkit-backdrop-filter: blur\(/gu)?.length ?? 0;
+  assert.ok(glass > 0, 'the palette has no glass to check');
+  assert.ok(safari >= glass, `${glass} glass rules and ${safari} Safari blocks`);
+  /* THE PHONE'S SHEET IS SOLID, so Safari's own property is taken off there too. */
+  const phone = code.slice(code.indexOf('@media (width < 640px)'));
+  assert.match(phone, /-webkit-backdrop-filter: none;/u);
 });

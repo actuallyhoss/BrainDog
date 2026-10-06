@@ -127,11 +127,22 @@ export function groupsOf(rows: readonly JobRow[], now: number): Group[] {
   return [...out, ...days];
 }
 
+/**
+ * THE MACHINE BY ITS NAME, NOT ITS ADDRESS: a runner that reported `Sam-MacBook-Pro.local` or `build-box.lan` is said as
+ * the part a person named it, and a bare network address is not a name at all, so it reads as an unnamed machine.
+ */
+export function machineOf(runner: string | null | undefined): string | null {
+  const name = (runner ?? '').trim();
+  if (name === '') return null;
+  if (/^[\d.]+$|:/u.test(name)) return words.aMachine;
+  return name.split('.')[0] || words.aMachine;
+}
+
 /** A run's meta line after its status: the machine, when it started, and its turns once it has any. */
 export function detailOf(r: Pick<JobRow, 'runner' | 'status' | 'claimed_at' | 'created_at' | 'turns'>): string[] {
   const t = ms(startedAt(r));
   const when = t === null ? null : r.status === 'queued' ? words.askedAt(clockOf(t)) : clockOf(t);
-  return [r.runner ?? words.noMachine, when, r.turns === null ? null : words.turns(r.turns)].filter((p): p is string => p !== null);
+  return [machineOf(r.runner) ?? words.noMachine, when, r.turns === null ? null : words.turns(r.turns)].filter((p): p is string => p !== null);
 }
 
 /* ── the title row's sentence ───────────────────────────────────────────── */
@@ -203,7 +214,7 @@ function intervalOf(r: JobRow, now: number): Interval | null {
   }
   const from = ms(r.claimed_at);
   if (from === null) return null;
-  const lane = r.runner ?? words.noMachine;
+  const lane = machineOf(r.runner) ?? words.noMachine;
   if (r.status === 'claimed') return { lane, from, to: now, live: true, row: r };
   return { lane, from, to: from + (r.ms ?? 0), live: false, row: r };
 }
@@ -380,7 +391,8 @@ export function toolsSaid(tally: Tally): string {
  * where and in how many turns once it has ended. "Done" then " in 6m on claude-mac, 14 turns."
  */
 export function runTail(status: JobRow['status'], lost: boolean, row: Pick<JobRow, 'runner' | 'turns' | 'ms' | 'claimed_at' | 'created_at'> | null): string {
-  const on = row?.runner ? ` on ${row.runner}` : '';
+  const machine = machineOf(row?.runner);
+  const on = machine ? ` on ${machine === words.aMachine ? 'an unnamed machine' : machine}` : '';
   if (status === 'queued') {
     const t = row ? ms(row.created_at) : null;
     return t === null ? '.' : `, ${words.askedAt(clockOf(t))}.`;
@@ -405,6 +417,7 @@ export const words = {
   yesterday: 'Yesterday',
   undated: 'No date',
   noMachine: 'No machine yet',
+  aMachine: 'Unnamed machine',
   askedAt: (at: string) => `asked for at ${at}`,
   turns: (n: number) => plural(n, 'turn', 'turns'),
   runs: (n: number) => plural(n, 'run', 'runs'),

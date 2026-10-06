@@ -2651,6 +2651,23 @@
     }
   }
 
+  /* THE HEAD'S KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `v` on Display and `n` on New show under the pointer
+     or with keyboard focus, never as standing chrome. Without its cap a pill takes its even padding back. */
+  :is(.tb-display, .new-row) :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
+    display: none;
+  }
+
+  :is(.tb-display, .new-row) :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
+    padding-inline-end: var(--sp-4);
+  }
+
+  /* BUT NOT ON THE PHONE'S CIRCLE: the even padding above outweighs its zero and pushed the glyph off centre. */
+  @media (width < 640px) {
+    .tb-display :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
+      padding-inline: 0;
+    }
+  }
+
   .page {
     display: flex;
     flex-direction: column;

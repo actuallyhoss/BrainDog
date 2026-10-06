@@ -1508,6 +1508,26 @@
     margin-inline-end: 0;
   }
 
+  /* THE KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): while the conversation is pointed at or has focus, and never
+     as standing chrome over the one question. Hidden and not removed, so the head does not move when they come. */
+  :global(.tile:not(:hover, :focus-within)) .keys {
+    visibility: hidden;
+  }
+
+  /* AND A BUTTON'S OWN CAP the same way: under the pointer or with keyboard focus. Without its cap a pill takes its
+     even padding back, so it reads as every other pill on the screen. */
+  .frame :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
+    display: none;
+  }
+
+  .frame :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
+    padding-inline-end: var(--sp-4);
+  }
+
+  .frame :global(.btn[data-size='sm']:not(:hover, :focus-visible):has(> .btn-kbd)) {
+    padding-inline-end: var(--sp-3);
+  }
+
   /* ── the build ─────────────────────────────────────────────────────────── */
 
   /* THE PARTS, EACH A WELL OVER ITS NAME, as many to a row as fit: six across the build at 1440, three on a phone. A part
@@ -1639,6 +1659,13 @@
       background: var(--glass);
       box-shadow: var(--glass-edge);
       backdrop-filter: var(--glass-blur);
+    }
+
+    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+    @supports (-webkit-backdrop-filter: none) {
+      .make-bar {
+        -webkit-backdrop-filter: var(--glass-blur);
+      }
     }
 
     .make-bar :global(.btn) {

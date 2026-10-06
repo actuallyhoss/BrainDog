@@ -24,12 +24,13 @@
   change: the root loses it the moment the element closes or goes. The shell is to give the panel a track of its own,
   and the panel slides into it by transform, so nothing about it moves but the panel.
 
-  IT MOVES THE SAME WAY OUT AS IN, AND FASTER. In from past the end edge, `translateX(100% + 16px)`, over 240ms on the
-  sheet curve, with no fade; out along the same path in 180ms. The sheet rises from below the screen and goes back down
-  it. `@starting-style` draws the first frame and `display` and `overlay` are held for the close, so `[open]` still
+  IT MOVES THE SAME WAY OUT AS IN, AND FASTER. In from past the end edge, `translateX(100% + 16px)`, over `--d-panel`
+  on `--ease-sheet`, with no fade; out along the same path in `--d-panel-out`. The sheet rises from below the screen and
+  goes back down it. `@starting-style` draws the first frame and `display` and `overlay` are held for the close, so `[open]` still
   drops the moment it closes. Reduced motion fades instead of moving.
 
-  SWITCHING WHAT IT SHOWS IS A FADE, 160ms with a 2px settle, so a press on another row reads as the panel answering it.
+  SWITCHING WHAT IT SHOWS IS A FADE, a swap on the skin's scale (`--d-menu`, `--ease-fade`) with a 2px settle, so a
+  press on another row reads as the panel answering it.
   Not from a key: `j` and `k` walk the list with the panel following, and nothing moves on a key (`SYSTEM.md` §8).
 
   ESC CLOSES IT. The sheet form has the `<dialog>`'s own cancel; the docked form is not modal and gets none, so a press
@@ -38,6 +39,9 @@
   THE SHEET PULLS DOWN BY ITS HEAD, and past a third of its height, or on a flick, it closes (`Pull` in `panel.ts`).
 
   `onclose` FIRES ONCE PER CLOSE, from the element's own `close` event, for the reason `Sheet.svelte` gives.
+
+  THE SHEET FORM LAYS A SCRIM (`scrims` in `panel.ts`) from its opening to the end of its close, and the toast stack
+  holds while it is up. The docked form lays none: the stack already ends where the panel begins.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -45,7 +49,7 @@
   import { overlays } from '../a11y/keys.svelte.ts';
   import { copy } from '../copy.ts';
   import Icon from './Icon.svelte';
-  import { NARROW, Pull, formOf, step, unstall } from './panel.ts';
+  import { NARROW, Pull, formOf, scrims, settled, step, unstall } from './panel.ts';
 
   let {
     open = $bindable(false),
@@ -86,8 +90,16 @@
 
   /** Whether the sheet form holds the overlay lock, so closing or being destroyed gives it back once. */
   let held = false;
+  /** The sheet form's scrim, lifted once its close has played, or at once when the panel goes. */
+  let lift: (() => void) | null = null;
 
-  function release() {
+  function release(now = false) {
+    if (lift) {
+      const go = lift;
+      lift = null;
+      if (now || !el) go();
+      else settled(el, go);
+    }
     if (!held) return;
     overlays.close();
     held = false;
@@ -118,6 +130,7 @@
       el.showModal();
       overlays.open();
       held = true;
+      lift ??= scrims.lay();
     } else {
       /* `show()` RUNS THE DIALOG'S FOCUSING STEPS TOO, which would take the keyboard from the list that opened it. The
          docked panel is beside the list, not over it, so focus goes back to where it was. */
@@ -129,7 +142,7 @@
     if (todo !== 'reopen') unstall(el);
   });
 
-  $effect(() => () => release());
+  $effect(() => () => release(true));
 
   /* ── switching what it shows ─────────────────────────────────────────── */
 
@@ -277,12 +290,13 @@
 
   /* DOCKED. Every UA default a `<dialog>` brings (centred, `fit-content`, a border, `Canvas`) is taken back here. */
   .dock {
-    /* THE MOTION: in over 240ms on the sheet curve, out along the same path in 180ms, from wherever `--dock-off` puts
-       it out of sight. Both opacities are 1, so it slides and does not fade, until reduced motion fades it in from a
-       state that is still readable and out to nothing. */
-    --dock-curve: cubic-bezier(0.32, 0.72, 0, 1);
-    --dock-in: 240ms;
-    --dock-out: 180ms;
+    /* THE MOTION: in over the panel's step on the sheet curve, out along the same path a step quicker, from wherever
+       `--dock-off` puts it out of sight. Both opacities are 1, so it slides and does not fade, until reduced motion
+       fades it in from a state that is still readable and out to nothing. `--d-panel-out` is the skin's; until it is
+       declared there the leaving step is the one under the panel's, which is the same 180. */
+    --dock-curve: var(--ease-sheet);
+    --dock-in: var(--d-panel);
+    --dock-out: var(--d-panel-out, var(--d-rows));
     --dock-off: translateX(calc(100% + 16px));
     --dock-from-opacity: 1;
     --dock-gone-opacity: 1;
@@ -357,6 +371,15 @@
     border-block-end: 1px solid var(--line);
   }
 
+  /* SAFARI DROPS A `backdrop-filter` WHOSE VALUE IS A `var()`, and the build folds a prefixed and an unprefixed
+     declaration in one rule into one value, so the glass is given to it in so many words in a block of its own
+     (`blocks-charts.css` has the measurement). The other browsers skip this block and keep the theme's value. */
+  @supports (-webkit-backdrop-filter: none) {
+    .dock-head {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+  }
+
   .dock-close {
     flex: none;
     display: grid;
@@ -414,14 +437,15 @@
     background: var(--bg);
   }
 
-  /* A SWITCH: what the panel shows fades in and settles 2px, over 160ms. `backwards`, never `both`, because the body
-     can hold glass and a fill that outlives the fade would cut that glass off from what is behind it. */
+  /* A SWITCH: what the panel shows fades in and settles 2px, a swap on the scale (`--d-menu`, which the skin names for
+     what a panel shows changing in place) on the cross-fade curve. `backwards`, never `both`, because the body can
+     hold glass and a fill that outlives the fade would cut that glass off from what is behind it. */
   .dock-body[data-swap='a'] {
-    animation: dock-swap-a 160ms cubic-bezier(0.2, 0, 0, 1) backwards;
+    animation: dock-swap-a var(--d-menu) var(--ease-fade) backwards;
   }
 
   .dock-body[data-swap='b'] {
-    animation: dock-swap-b 160ms cubic-bezier(0.2, 0, 0, 1) backwards;
+    animation: dock-swap-b var(--d-menu) var(--ease-fade) backwards;
   }
 
   @keyframes dock-swap-a {

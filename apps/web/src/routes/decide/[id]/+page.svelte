@@ -960,14 +960,13 @@
 {/if}
 
 <style>
-  /* THE GATE IS ONE COLUMN OF TILES ON THE GROUND, 12 apart, capped where a card of options still reads as one row. */
+  /* THE GATE IS ONE COLUMN OF TILES ON THE GROUND, 12 apart, running the window's width; prose inside keeps `--measure`. */
   .page {
     container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* ── what accepting does, one tile folded shut ─────────────────────────── */

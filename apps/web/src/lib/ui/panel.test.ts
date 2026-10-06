@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-import { EXIT_MOST, FLICK, FLICK_MIN, FLICK_WINDOW, LET_GO, Pull, STALL, formOf, letGo, settled, step, unstall } from './panel.ts';
+import { EXIT_MOST, FLICK, FLICK_MIN, FLICK_WINDOW, LET_GO, Pull, STALL, Scrims, formOf, letGo, settled, step, unstall } from './panel.ts';
 
 /** Every promise the code under test has settled, handled. */
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -212,4 +213,73 @@ test('AN EXIT CALLED OFF NEVER LETS THE ELEMENT GO, which is a menu opened again
   ends[0]!.resolve();
   await settle();
   assert.equal(done, 0, 'an exit that was taken back still took the element off the page');
+});
+
+/* ── a scrim over the window ─────────────────────────────────────────────── */
+
+test('A SCRIM IS UP FROM THE FIRST LAYING TO THE LAST LIFT, and the watcher hears each change once', () => {
+  const scrims = new Scrims();
+  const heard: boolean[] = [];
+  const stop = scrims.watch((up) => heard.push(up));
+  assert.deepEqual(heard, [false], 'a watcher was not told where things stand when it started');
+
+  const sheet = scrims.lay();
+  const menu = scrims.lay();
+  assert.equal(scrims.up, true);
+  assert.deepEqual(heard, [false, true], 'a second sheet over the first was told as a change');
+
+  /* The first one laid goes first: the second is still over the window. */
+  sheet();
+  assert.equal(scrims.up, true, 'the scrim lifted while a sheet was still up');
+  menu();
+  assert.equal(scrims.up, false);
+  assert.deepEqual(heard, [false, true, false]);
+
+  stop();
+  scrims.lay();
+  assert.deepEqual(heard, [false, true, false], 'a watcher that stopped was still told');
+});
+
+test('a lift called twice lifts once, so a close and a destroy cannot take down somebody else\'s scrim', () => {
+  const scrims = new Scrims();
+  const mine = scrims.lay();
+  const theirs = scrims.lay();
+  mine();
+  mine();
+  assert.equal(scrims.up, true, 'a second lift of one laying took the other sheet\'s scrim with it');
+  theirs();
+  assert.equal(scrims.up, false);
+});
+
+/* ── one scale of motion ─────────────────────────────────────────────────── */
+
+/**
+ * EVERY OVERLAY AND EVERY PIECE OF CHROME MOVES ON THE SKIN'S SCALE, so a duration or a curve written out by hand here
+ * is a step the scale cannot still, shorten or keep in step with the rest. Comments are taken out first: a sentence
+ * may say "240ms" to explain what a token is.
+ */
+test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
+  const files = ['Panel.svelte', 'Sheet.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', 'TabBar.svelte', 'Sidebar.svelte', 'TopBar.svelte'];
+  for (const file of files) {
+    const text = readFileSync(new URL(file, import.meta.url), 'utf8');
+    const style = file.endsWith('.css') ? text : (text.match(/<style>([\s\S]*)<\/style>/u)?.[1] ?? '');
+    const code = style.replace(/\/\*[\s\S]*?\*\//gu, '');
+    assert.doesNotMatch(code, /\b\d+(\.\d+)?m?s\b/u, `${file} writes a duration of its own`);
+    assert.doesNotMatch(code, /cubic-bezier\(|linear\(/u, `${file} writes a curve of its own`);
+  }
+});
+
+/**
+ * AND EVERY GLASS IS GIVEN TO SAFARI IN A BLOCK OF ITS OWN: the build folds a prefixed and an unprefixed declaration in
+ * one rule into one value, and a Safari that knows only the prefixed one drew the chrome unblurred.
+ */
+test('every glass in the overlays and the chrome has a Safari block after it', () => {
+  const files = ['Panel.svelte', 'Menu.svelte', 'RowMenu.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', 'TabBar.svelte', 'Sidebar.svelte'];
+  for (const file of files) {
+    const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
+    const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
+    const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)/gu)?.length ?? 0;
+    assert.ok(glass > 0, `${file} has no glass to check`);
+    assert.ok(safari >= glass, `${file} has ${glass} glass rules and ${safari} Safari blocks`);
+  }
 });

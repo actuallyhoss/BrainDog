@@ -229,5 +229,5 @@ export const words = {
   /** Under a page's title on its card, where it has no section of its own. */
   home: 'Home',
   /** Where the record cannot draw the pages: the rail above still says what is made. */
-  undrawn: 'These pages could not be drawn here. They are made as the list above says.',
+  undrawn: 'These pages could not be drawn here. They are made as shown above.',
 } as const;

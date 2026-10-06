@@ -19,8 +19,9 @@
   scrim, as a popover in the top layer, in 48px rows at 16px with a Cancel row. A panel pinned to a
   row's rect is a panel under the finger that long-pressed the row.
 
-  IT OPENS AND CLOSES AS `Menu.svelte` DOES: a pop from .96 at the row in 120ms, a close to .985
-  as it fades in 90ms, and as a sheet up from below the screen and back down it. The menu stays on
+  IT OPENS AND CLOSES AS `Menu.svelte` DOES: a pop from .96 at the row over `--d-menu`, a close to
+  .985 as it fades over `--d-exit`, and as a sheet up from below the screen and back down it, laying
+  a scrim the toast stack waits for (`scrims` in `panel.ts`). The menu stays on
   the page, inert, until its close has played, where it was opened, even when its caller forgets
   the row's rect the moment it closes.
 
@@ -37,7 +38,7 @@
   import { may } from '../record/may.ts';
   import type { Entry, RegisterDecl } from '../record/schema.ts';
   import Icon from './Icon.svelte';
-  import { settled } from './panel.ts';
+  import { scrims, settled } from './panel.ts';
 
   type Handed = { register: string; row: Entry; decl: RegisterDecl; onhanded?: ((entry: Entry) => void) | undefined };
 
@@ -88,6 +89,8 @@
   let leaving = $state(false);
   let exits = 0;
   let stay: (() => void) | null = null;
+  /** The action sheet's scrim, from its rise to the end of its fall. */
+  let lift: (() => void) | null = null;
 
   /** WHERE IT WAS OPENED, kept for the close: the list page forgets the rect as the menu closes. */
   let kept = $state.raw<{ x: number; y: number; height: number } | null>(null);
@@ -115,6 +118,8 @@
           stay = null;
           shown = false;
           leaving = false;
+          lift?.();
+          lift = null;
         };
         if (list) stay = settled(list, gone);
         else gone();
@@ -137,9 +142,16 @@
   $effect(() => {
     if (!open || !list) return;
     if (sheet && typeof list.showPopover === 'function' && !list.matches(':popover-open')) list.showPopover();
+    if (sheet) lift ??= scrims.lay();
     void tick().then(() => {
       if (open && !leaving) items()[0]?.focus();
     });
+  });
+
+  /* A menu that goes with its sheet still up gives the scrim back with it. */
+  $effect(() => () => {
+    lift?.();
+    lift = null;
   });
 
   /* ONCE PER OPENING. A press on the sheet's scrim can reach both the list's click and the window's,
@@ -263,7 +275,7 @@
 
 <style>
   /* `Menu.svelte`'s surface: the strong glass at level 2, radius `--r-md`, and its motion: in from .96
-     over 120ms on the arriving curve, and out to .985 as it fades in 90ms on the leaving one. */
+     over the menu's step on the arriving curve, and out to .985 as it fades over the exit's on the leaving one. */
   .row-menu {
     --row-menu-from: 0%;
     --row-menu-pop: scale(0.96);
@@ -283,8 +295,15 @@
     box-shadow: var(--glass-edge), var(--e2);
     transform-origin: 0% var(--row-menu-from);
     transition-property: transform, opacity;
-    transition-duration: 120ms;
+    transition-duration: var(--d-menu);
     transition-timing-function: var(--ease-out);
+  }
+
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  @supports (-webkit-backdrop-filter: none) {
+    .row-menu {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
   }
 
   /* No fade on the way in, for `Menu.svelte`'s reason: a menu at .96 of its size is readable. */
@@ -299,7 +318,7 @@
     transform: var(--row-menu-gone);
     opacity: 0;
     pointer-events: none;
-    transition-duration: 90ms;
+    transition-duration: var(--d-exit);
     transition-timing-function: var(--ease-in);
   }
 
@@ -331,10 +350,17 @@
     cursor: pointer;
   }
 
-  .row-menu-hand:hover,
   .row-menu-hand:focus-visible {
     background: var(--hover-wash);
     color: var(--ink);
+  }
+
+  /* Hover only where there is one: a phone keeps `:hover` on the last row tapped. */
+  @media (hover: hover) and (pointer: fine) {
+    .row-menu-hand:hover {
+      background: var(--hover-wash);
+      color: var(--ink);
+    }
   }
 
   /* Rendered only for a sheet; the sheet's rule below draws it. */
@@ -345,7 +371,7 @@
   /* THE ACTION SHEET, `Menu.svelte`'s form: every UA default for a popover is taken back, and from
      640px up, which only a coarse pointer reaches, it is 560px wide in the middle of the bottom edge.
      A sheet, not glass: a tile's surface at radius `--r-lg`, the third level, over the scrim, and it
-     moves as one: up from below the screen in 240ms on the sheet curve, back down it in 180ms. */
+     moves as one: up from below the screen over `--d-panel` on the sheet curve, back down it in `--d-panel-out`. */
   .row-menu[popover] {
     --row-menu-pop: translateY(calc(100% + var(--kb)));
     --row-menu-gone: translateY(calc(100% + var(--kb)));
@@ -362,6 +388,7 @@
     overscroll-behavior: contain;
     padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
     background: var(--bg);
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     border: 0;
     border-start-start-radius: var(--r-lg);
@@ -370,19 +397,19 @@
     border-end-end-radius: 0;
     color: var(--ink);
     box-shadow: var(--e3);
-    transition-duration: 240ms;
-    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    transition-duration: var(--d-panel);
+    transition-timing-function: var(--ease-sheet);
   }
 
   .row-menu[popover][data-leaving] {
     opacity: var(--row-menu-gone-opacity);
-    transition-duration: 180ms;
-    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    transition-duration: var(--d-panel-out, var(--d-rows));
+    transition-timing-function: var(--ease-sheet);
   }
 
   .row-menu[popover]::backdrop {
     background: var(--scrim);
-    transition: opacity 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition: opacity var(--d-panel) var(--ease-sheet);
   }
 
   @starting-style {
@@ -394,7 +421,7 @@
   .row-menu[popover][data-leaving]::backdrop {
     opacity: 0;
     pointer-events: none;
-    transition-duration: 180ms;
+    transition-duration: var(--d-panel-out, var(--d-rows));
   }
 
   /* 48px rows at 16px, whatever class the caller gave its items. */

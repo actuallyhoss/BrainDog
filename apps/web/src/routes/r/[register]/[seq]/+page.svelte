@@ -2065,10 +2065,23 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .head-more {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
+  }
+
   :global(.head[data-under]) .head-more {
     background: transparent;
     box-shadow: none;
     backdrop-filter: none;
+  }
+
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .head-more {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   /* Pointed at, through the menu's own button, which this page does not draw: so the selector is the whole of it. */

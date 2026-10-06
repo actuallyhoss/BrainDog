@@ -9,11 +9,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord } from '@braindog/kernel';
 
 import '../record/fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { VOICE_LINES, type VoiceKey } from '../voice.ts';
-import { holdsOf, keptAs, previewedBody, readToArrange, unkeep, voiceOf } from './home-arrange.ts';
+import { heldTo, holdsOf, inVoice, keptAs, previewedBody, readToArrange, unkeep, voiceOf, whileHeld } from './home-arrange.ts';
 
 const BASE = 'http://record.test';
 
@@ -64,14 +67,81 @@ test('the headings are asked of the voice that speaks', () => {
 
 test('the previews are the bodies their screens draw, as plain copies', async () => {
   const holds = { tasks: true, adds: true, money: false };
-  const voice = voiceOf((key: VoiceKey) => VOICE_LINES[key]);
-  const today = await previewedBody('today', holds, voice);
+  const today = await previewedBody('today', holds);
   assert.equal(today?.page, 'today');
   assert.ok((today?.blocks.length ?? 0) > 0);
-  const decide = await previewedBody('decide', holds, voice);
+  const decide = await previewedBody('decide', holds);
   assert.equal(decide?.page, 'decide');
-  assert.notEqual(decide, await previewedBody('decide', holds, voice), 'each opening arranges its own copy');
-  assert.equal(await previewedBody('money', holds, voice), null);
+  assert.notEqual(decide, await previewedBody('decide', holds), 'each opening arranges its own copy');
+  assert.equal(await previewedBody('money', holds), null);
+});
+
+/* FINDING 3 OF THE AUDIT OF BATCHES 11 TO 13: the first Done froze Today as the arranger saw it that minute. */
+
+test('the body a first Done keeps is the house words, not the voice the arranger spoke in that minute', async () => {
+  const kept = await previewedBody('today', { tasks: true, adds: true, money: true });
+  const headings = (kept?.blocks ?? []).map((b) => b.heading).filter((h): h is string => typeof h === 'string');
+  assert.ok(headings.includes(VOICE_LINES.needs_you));
+  assert.ok(headings.includes(VOICE_LINES.coming_up));
+  const queue = kept?.blocks.find((b) => b.kind === 'queue');
+  assert.equal(queue?.empty, VOICE_LINES.nothing_waiting);
+});
+
+test("the kept body carries no block of the arranger's own: the capture line goes with tasks, and cash waits for Money", async () => {
+  /* An arranger who may not add a task still keeps the line for those who may; the reader decides who sees it. */
+  const kept = await previewedBody('today', { tasks: true, adds: false, money: false });
+  const capture = kept?.blocks.find((b) => b.kind === 'capture');
+  assert.ok(capture, 'the capture line is kept wherever the record keeps tasks');
+  /* The cash tile is kept on a record without Money, drawn only once the record has the figure. */
+  const cash = kept?.blocks.find((b) => b.kind === 'stat') as { when?: { metric: string; gte?: number } } | undefined;
+  assert.ok(cash, 'the cash tile is kept whether or not Money is on yet');
+  assert.equal(cash?.when?.metric, 'cash-now');
+  assert.ok(typeof cash?.when?.gte === 'number' && cash.when.gte < -1e15, 'any figure at all draws it');
+  /* A record with no tasks keeps no block over the list it does not hold, which the record would refuse. */
+  const bare = await previewedBody('today', { tasks: false, adds: false, money: true });
+  assert.ok(!bare?.blocks.some((b) => b.kind === 'capture' || b.source === 'register.tasks'));
+});
+
+test('a stat that already says when it draws keeps its own when, and a block with no figure is left alone', () => {
+  const body = {
+    page: 'p',
+    title: 'P',
+    blocks: [
+      { kind: 'stat', cells: [{ metric: 'owed' }], when: { metric: 'owed', gt: 0 } },
+      { kind: 'stat', cells: [{ label: 'Typed' }] },
+      { kind: 'note', body: 'Hello' },
+    ],
+  };
+  assert.deepEqual(whileHeld(body).blocks, body.blocks);
+});
+
+test('a kept heading is said in the voice that speaks, and words somebody wrote are left as written', () => {
+  const said = (key: VoiceKey) => (key === 'needs_you' ? 'Waiting on you' : key === 'nothing_due' ? 'Clear ahead.' : VOICE_LINES[key]);
+  const blocks = [
+    { kind: 'queue', heading: VOICE_LINES.needs_you, empty: VOICE_LINES.nothing_waiting },
+    { kind: 'timeline', heading: 'Next at the kiln', empty: VOICE_LINES.nothing_due },
+    { kind: 'note' },
+  ];
+  const out = inVoice(blocks, said);
+  assert.equal(out[0]?.heading, 'Waiting on you');
+  assert.equal(out[0]?.empty, VOICE_LINES.nothing_waiting);
+  assert.equal(out[1]?.heading, 'Next at the kiln');
+  assert.equal(out[1]?.empty, 'Clear ahead.');
+  assert.equal(out[2], blocks[2], 'a block with nothing to say again is the same block');
+  assert.deepEqual(inVoice(out, said), out, 'twice is once');
+});
+
+test('the line to add a task is not drawn for a reader who may not add one, and stays at its place', () => {
+  const blocks = [
+    { kind: 'note', drawn: true },
+    { kind: 'capture', register: 'tasks', drawn: true },
+    { kind: 'capture', source: 'register.notes', drawn: true },
+  ];
+  const out = heldTo(blocks, (list) => list === 'notes');
+  assert.equal(out.length, 3);
+  assert.equal(out[1]?.drawn, false);
+  assert.equal(out[2]?.drawn, true);
+  assert.equal(out[0], blocks[0]);
 });
 
 test('a preview is arranged under the id it will be kept as, and installs that body', async () => {
@@ -108,4 +178,66 @@ test('Put back retires the page the first Done installed, and says a refusal in 
   const fix = 'Only an owner can change what this record declares.';
   const refused = host(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix } }));
   assert.deepEqual(await unkeep(BASE, 'decide', refused.io as never), { ok: false, fix });
+});
+
+/* ── through the record ───────────────────────────────────────────────── */
+
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  return {
+    exec: (text: string, ...params: unknown[]) => (params.length === 0 ? db.exec(text) : void db.prepare(text).run(...(params as never[]))),
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  } as unknown as Parameters<typeof openRecord>[0];
+}
+
+test('the kept cash tile installs on a record without Money, waits unseen, and draws once the record has the figure', async () => {
+  const k = await openRecord(openSqlite(), { now: () => Date.parse('2026-10-06T09:00:00Z') });
+  const body = whileHeld({
+    page: 'home',
+    title: 'Today',
+    blocks: [
+      { kind: 'note', body: 'Nothing needs you right now.' },
+      { kind: 'stat', heading: 'Money', cells: [{ metric: 'cash-now', label: 'Cash now' }] },
+    ],
+  });
+  const put = await k.install([
+    { id: 'register.accounts', kind: 'register', body: { id: 'accounts', name: 'Accounts', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } },
+    { id: 'page.home', kind: 'page', body },
+  ] as never);
+  assert.ok(put.ok, JSON.stringify(put));
+  const before = k.page('home');
+  assert.ok(before.ok, JSON.stringify(before));
+  assert.equal((before.value.blocks as { drawn: boolean }[])[1]?.drawn, false, 'no figure yet, so no tile');
+
+  const money = await k.install([
+    {
+      id: 'metric.cash-now',
+      kind: 'metric',
+      body: { metric: 'cash-now', name: 'Cash now', source: 'register.accounts', value: { count: 'id' }, target: { gte: 0 }, window: '30d', compare: 'none', format: 'int' },
+    },
+  ] as never);
+  assert.ok(money.ok, JSON.stringify(money));
+  const after = k.page('home');
+  assert.ok(after.ok, JSON.stringify(after));
+  /* THE RECORD MARKS ONLY A BLOCK IT LEAVES OUT; one it draws carries no `drawn` at all. */
+  const tile = (after.value.blocks as { drawn?: boolean; readings?: unknown[] }[])[1];
+  assert.notEqual(tile?.drawn, false, 'the figure is there, so the tile is');
+  assert.equal(tile?.readings?.length, 1);
 });

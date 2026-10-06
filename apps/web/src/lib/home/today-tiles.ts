@@ -90,16 +90,20 @@ export function lateBy(due: string, today: string): string {
  * nothing late the count is the line, and with nothing needing him it says who is working, in ink, because a calm
  * morning is not an alarm. Counts are words to ten, as a person writes them.
  *
- * `late` is the late work, oldest first, as `YYYY-MM-DD`; `agents` the runs working now.
+ * `late` is the late work drawn, oldest first, as `YYYY-MM-DD`; `lateCount` how much is late in all, the rows a late
+ * block holds past its limit included, so twenty late tasks drawn eight at a time read "Twenty things are late" and not
+ * "Eight things are late. Twelve more need you." It is never fewer than the days drawn, and with no day drawn nothing
+ * is said to be late, since the oldest could not be named. `agents` is the runs working now.
  */
-export function sentenceOf(needing: number, late: readonly string[], agents: number, today: string): Sentence {
+export function sentenceOf(needing: number, late: readonly string[], agents: number, today: string, lateCount = late.length): Sentence {
   const working = agents === 0 ? 'no agent is working' : agents === 1 ? 'one agent is working' : `${counted(agents)} agents are working`;
-  if (needing === 0 && late.length === 0) return { text: `Nothing needs you, and ${working}.`, needs: '' };
-  if (late.length > 0) {
+  const lates = late.length === 0 ? 0 : Math.max(lateCount, late.length);
+  if (needing === 0 && lates === 0) return { text: `Nothing needs you, and ${working}.`, needs: '' };
+  if (lates > 0) {
     const how = lateBy(late[0]!, today);
-    const red = late.length === 1 ? `${how} late` : `${opening(late.length)} things are late`;
-    const lead = late.length === 1 ? `One thing is ${red}.` : `${red}, the oldest by ${how}.`;
-    const rest = Math.max(0, needing - late.length);
+    const red = lates === 1 ? `${how} late` : `${opening(lates)} things are late`;
+    const lead = lates === 1 ? `One thing is ${red}.` : `${red}, the oldest by ${how}.`;
+    const rest = Math.max(0, needing - lates);
     const more = rest === 0 ? '' : rest === 1 ? ' One more needs you.' : ` ${opening(rest)} more need you.`;
     return { text: `${lead}${more}`, needs: red };
   }

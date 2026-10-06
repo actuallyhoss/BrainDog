@@ -14,6 +14,15 @@
  *
  * NOTHING HERE IS ANYBODY'S RECORD (§27): the two bodies are the ones every record draws, built from what the shell says
  * the record holds, and an installed home is arranged like any other page.
+ *
+ * AND NOTHING THE FIRST DONE INSTALLS IS THE ARRANGER'S OWN, or Today froze as the owner saw it on the day they arranged
+ * it (`loop/research-audit-11-13.md`, finding 3). The body kept is the one any reader of the record would be drawn:
+ * - ITS HEADINGS ARE THE HOUSE LINES, which the page reader says in the voice that speaks (`inVoice`), so a line changed
+ *   in Settings › Words, or another use case speaking, still reaches Today once it is kept.
+ * - THE LINE A TASK IS TYPED INTO IS KEPT wherever the record keeps tasks, and the reader draws it only for somebody who
+ *   may add one (`heldTo`), so a member who cannot is not handed the owner's field.
+ * - A FIGURE IS DRAWN WHILE THE RECORD HAS IT (`whileHeld`): the cash tile is kept with a `when:` on its own figure, so
+ *   turning Money on later draws it, and turning it off takes it away.
  */
 
 import { createClient } from '@braindog/client';
@@ -23,7 +32,7 @@ import type { Shell } from '../record/boot-live.ts';
 import { may } from '../record/may.ts';
 import type { LiveBlock, LivePageDecl } from '../record/page-live.ts';
 import type { PageBody } from '../record/pages-live.ts';
-import type { VoiceKey } from '../voice.ts';
+import { VOICE_LINES, type VoiceKey } from '../voice.ts';
 import { TASKS } from '../work/list.ts';
 
 type Fetch = NonNullable<Parameters<typeof createClient>[0]['fetch']>;
@@ -67,12 +76,79 @@ export function voiceOf(said: (key: VoiceKey) => string): HomeVoice {
 /** A body as the record is sent it, a plain copy, so arranging it never touches the one a screen keeps. */
 const plainBody = (body: unknown): PageBody => JSON.parse(JSON.stringify(body)) as PageBody;
 
+/** Today's headings as the house says them, which a kept body carries and the reader says in the voice that speaks. */
+export const HOUSE_VOICE: HomeVoice = voiceOf((key) => VOICE_LINES[key]);
+
+/** The voice keys a kept heading may be, and the keys a kept empty line may be: the ones `todayHome` asks the voice for. */
+const HEADINGS: readonly VoiceKey[] = ['right_now', 'needs_you', 'since_away', 'working_now', 'coming_up', 'overdue'];
+const EMPTIES: readonly VoiceKey[] = ['nothing_waiting', 'nothing_due'];
+
+/** The key whose house line `line` is, among `keys`, or `null`. */
+const keyOf = (line: unknown, keys: readonly VoiceKey[]): VoiceKey | null =>
+  typeof line === 'string' ? (keys.find((k) => VOICE_LINES[k] === line) ?? null) : null;
+
 /**
- * The body a preview drawn at `slug` was drawn from, or `null` for one this does not know. Read only as the mode opens,
- * so a screen that is never arranged loads neither builder.
+ * THE BLOCKS IN THE VOICE THAT SPEAKS: a heading or an empty line that is a house line Today asks the voice for is said
+ * the voice's way. A heading somebody wrote in words of their own is not a house line and is left as they wrote it, and
+ * a block already in the voice is unchanged, so this may run on a page twice.
  */
-export async function previewedBody(slug: string, holds: Holds, voice: HomeVoice): Promise<PageBody | null> {
-  if (slug === 'today') return plainBody((await import('../home/default-home.ts')).todayHome(holds, voice));
+export function inVoice<B extends { heading?: string | undefined; empty?: string | undefined }>(blocks: readonly B[], said: (key: VoiceKey) => string): B[] {
+  return blocks.map((b) => {
+    const h = keyOf(b.heading, HEADINGS);
+    const e = keyOf(b.empty, EMPTIES);
+    if (h === null && e === null) return b;
+    return { ...b, ...(h !== null ? { heading: said(h) } : {}), ...(e !== null ? { empty: said(e) } : {}) };
+  });
+}
+
+/**
+ * THE BLOCKS AS THIS READER IS DRAWN THEM: a line to type a row into, over a list this reader may not add to, is not
+ * drawn. It would only be refused on Enter. Marked not drawn and left at its place, as every block a page hides is, so
+ * each write still finds its block by index.
+ */
+export function heldTo<B extends { kind: string; drawn: boolean; register?: string | undefined; source?: string | undefined }>(
+  blocks: readonly B[],
+  mayAdd: (list: string) => boolean,
+): B[] {
+  return blocks.map((b) => {
+    if (b.kind !== 'capture' || !b.drawn) return b;
+    const list = b.register ?? (b.source?.startsWith('register.') ? b.source.slice('register.'.length) : null);
+    return list !== null && !mayAdd(list) ? { ...b, drawn: false } : b;
+  });
+}
+
+/** Any figure at all: what a `when:` asks of a figure to say only that the record has it. */
+const ANY = -Number.MAX_SAFE_INTEGER;
+
+/**
+ * A KEPT BODY'S FIGURES ARE DRAWN WHILE THE RECORD HAS THEM. A row of figures with no `when:` of its own is given one on
+ * its first figure, which the record answers only where that figure is declared (`pages.ts` `drawnWhen`: a figure that
+ * cannot be read does not draw the block), so the cash tile kept on a record without Money waits, unseen, for Money.
+ */
+export function whileHeld(body: PageBody): PageBody {
+  const blocks = body.blocks.map((b) => {
+    const block = b as { kind?: unknown; when?: unknown; cells?: unknown };
+    if (block.kind !== 'stat' || block.when !== undefined || !Array.isArray(block.cells)) return b;
+    const first = block.cells.find((c): c is { metric: string } => c !== null && typeof c === 'object' && typeof (c as { metric?: unknown }).metric === 'string');
+    return first ? ({ ...b, when: { metric: first.metric, gte: ANY } } as typeof b) : b;
+  });
+  return { ...body, blocks };
+}
+
+/**
+ * The body a preview drawn at `slug` was drawn from, as its first Done keeps it, or `null` for one this does not know.
+ * Read only as the mode opens, so a screen that is never arranged loads neither builder.
+ *
+ * TODAY IS BUILT FOR THE RECORD, NOT FOR THE ARRANGER: in the house's words, with the line a task is typed into wherever
+ * the record keeps tasks and with the cash tile whether or not Money is on yet, each drawn for whoever may see it (the
+ * header of this file). What the record keeps (`holds.tasks`) still decides the work blocks, because a block over a list
+ * the record does not hold is a page the record refuses.
+ */
+export async function previewedBody(slug: string, holds: Holds): Promise<PageBody | null> {
+  if (slug === 'today') {
+    const { todayHome } = await import('../home/default-home.ts');
+    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true }, HOUSE_VOICE)));
+  }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
   return null;
 }

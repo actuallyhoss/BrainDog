@@ -16,12 +16,13 @@
  *
  * THIS FILE DECIDES, AND WRITES NOTHING. It answers which rows a query makes, out of what the screen holds now (`Here`),
  * so `palette.test.ts` can run every rule. The writes are the existing writers', called by `customise-apply.ts`:
- * `pref.ts` for how it looks on this device, `navPrefs` for the person's own nav.
+ * `pref.ts` for the person's look, kept by the record with this device's first-paint copy, `navPrefs` for their nav.
  */
 
 import { copy } from '../copy.ts';
 import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
+import type { Kept } from '../pref.ts';
 
 const w = copy.customise;
 
@@ -55,6 +56,8 @@ export type Here = {
   home: string | null;
   /** Whether the screen behind the palette has a page menu to open (`ChangePage.svelte`). */
   pageMenu: boolean;
+  /** Where a look change is kept now, as `pref.whereKept` answers; absent is this device, the claim that is never wrong. */
+  kept?: 'record' | 'pending' | 'device';
 };
 
 export type LookKey = 'scheme' | 'text' | 'density';
@@ -159,16 +162,26 @@ export function customise(query: string, here: Here): Offer[] {
     return out;
   }
 
+  /* EACH LOOK ROW SAYS WHERE IT WILL BE KEPT, since the record keeps the look now and "On this device" was a claim it
+     outgrew: the record for a person it is following, this device for now while a change waits to be sent, else here. */
+  const kept = here.kept === 'record' ? w.inRecord : here.kept === 'pending' ? w.thisDeviceNow : w.thisDevice;
   for (const row of LOOKS) {
     if ((here.look[row.key] ?? DEFAULTS[row.key]) === row.value) continue;
     if (!names(said, `${row.title} ${row.also}`)) continue;
-    out.push({ id: `cz-${row.key}-${row.value}`, title: row.title, detail: w.thisDevice, icon: row.icon, change: { kind: 'look', key: row.key, value: row.value, name: row.title }, complete: row.title });
+    out.push({ id: `cz-${row.key}-${row.value}`, title: row.title, detail: kept, icon: row.icon, change: { kind: 'look', key: row.key, value: row.value, name: row.title }, complete: row.title });
   }
   if (here.pageMenu && names(said, `${w.page} ${PAGE_ALSO}`))
     out.push({ id: 'cz-page', title: w.page, detail: w.pageDetail, icon: 'grid', change: { kind: 'page' }, complete: w.page });
   if (names(said, `${w.quiet} ${QUIET_ALSO}`))
     out.push({ id: 'cz-quiet', title: w.quiet, detail: w.quietDetail, icon: 'bell', change: { kind: 'go', href: QUIET_HREF }, complete: w.quiet });
   return out;
+}
+
+/** The toast for a look change, by where the record said it was kept: the record, this device for now, or this one alone. */
+export function lookSaid(kept: Kept, name: string): string {
+  if (kept.from === 'kept') return w.lookKept(name);
+  if (kept.from === 'pending') return w.lookPending(name);
+  return w.lookSet(name);
 }
 
 /** Where quiet hours are set: one area, so the palette goes there rather than keeping a second control. */

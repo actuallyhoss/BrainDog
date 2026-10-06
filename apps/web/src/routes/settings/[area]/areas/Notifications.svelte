@@ -17,6 +17,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import { untrack } from 'svelte';
   import { forget } from '$lib/record/boot-live.ts';
+  import { said } from '$lib/voice.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
   import { actorOf, mutedAfter, mutedOf, tellsQuietly } from '../muted.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
@@ -31,7 +32,9 @@
     notHereYet: 'Not on this record yet',
     urgentAre: 'Keys about to expire, runs held back, and anything a rule marks urgent.',
     tellers: 'Rules that tell you',
-    tellersWhy: 'Turn one off and its notices leave your digest. Only yours: anything urgent still reaches you.',
+    /* WHERE A MUTED RULE'S NOTICES STOP SHOWING, BY THE NAMES THIS RECORD GIVES THEM: Today's feed, which the record now
+       reads without them (`unmuted` in `packages/record`). It said "your digest", and no digest carries a rule's notices. */
+    tellersWhy: (feed: string, home: string) => `Turn one off and its notices leave “${feed}” on ${home}. Only for you: anything urgent still reaches you.`,
     tells: (name: string) => `${name} tells you`,
     muted: 'Off for you',
   } as const;
@@ -168,7 +171,7 @@
 
 {#if tellers.length > 0}
   <Section title={words.tellers}>
-    <p class="hint">{words.tellersWhy}</p>
+    <p class="hint">{words.tellersWhy(said('since_away'), said('home'))}</p>
     {#each tellers as t (t.actor)}
       {@const tells = !muted.includes(t.actor)}
       <StateRow icon="bell" title={t.name} line={tells ? undefined : words.muted}>

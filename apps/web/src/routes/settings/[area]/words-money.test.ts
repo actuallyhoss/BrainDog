@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import type { PackConfig, PackState } from '../../../lib/record/packs.ts';
 import { AREAS, DEFAULT_GROUPS } from './place.ts';
-import { HOME_CURRENCY, changesOf, currencyIn, currencyPackOf, oneFor, undoOf, wordsOf, type Read } from './words-money.ts';
+import { HOME_CURRENCY, changesOf, currencyIn, currencyPackOf, listed, oneFor, strandedBy, undoOf, wordsOf, type Read } from './words-money.ts';
 
 const team: PackConfig = {
   id: 'usecase-team',
@@ -69,6 +69,77 @@ test('Undo sends each word as it was held, and null where it held its default', 
 test('renaming a list offers its singular', () => {
   assert.equal(oneFor('Bakes '), 'bake');
   assert.equal(oneFor('Deliveries'), 'delivery');
+});
+
+test('the singular keeps the case it was typed in, and knows -es, -ies and the words that do not change', () => {
+  /* THE AUDIT'S THREE: "HSBC cards" was "hsbc card", "Boxes" "boxe", "Series" "sery". */
+  assert.equal(oneFor('HSBC cards'), 'HSBC card');
+  assert.equal(oneFor('Boxes'), 'box');
+  assert.equal(oneFor('Series'), 'series');
+  const cases: [string, string][] = [
+    ['Churches', 'church'],
+    ['Addresses', 'address'],
+    ['Taxes', 'tax'],
+    ['Wishes', 'wish'],
+    ['Statuses', 'status'],
+    ['Houses', 'house'],
+    ['Prizes', 'prize'],
+    ['Sizes', 'size'],
+    ['Movies', 'movie'],
+    ['Client companies', 'Client company'],
+    ['Acme orders', 'Acme order'],
+    ['DELIVERIES', 'DELIVERIES'.slice(0, -3) + 'Y'],
+    ['iPhones', 'iPhone'],
+    ['People', 'person'],
+    ['Key People', 'Key Person'],
+    ['Status', 'status'],
+    ['Campus', 'campus'],
+    ['bake', 'bake'],
+    ['   ', ''],
+  ];
+  for (const [name, one] of cases) assert.equal(oneFor(name), one, name);
+});
+
+const limits = (id: string, values: Record<string, unknown>, off = false): Read => ({
+  state: state(id, off),
+  settings: {
+    id,
+    version: '1.0.0',
+    config: {
+      most_a_month: { type: 'money', label: 'Most to keep everything running a month' },
+      most_a_year: { type: 'money', label: 'Most to keep everything running a year' },
+      most_lapsing: { type: 'number', label: 'Most lapsing at once' },
+      cap: { type: 'money' },
+    },
+    values,
+  },
+});
+
+test('a change of home currency names the limits typed in the old one, which would stop counting', () => {
+  const packs = [
+    limits('estate', {
+      most_a_month: { amount: 50000, currency: 'GBP' },
+      most_a_year: { amount: 90000, currency: 'USD' },
+      most_lapsing: 3,
+      cap: { amount: 100, currency: 'GBP' },
+    }),
+    limits('switched-off', { most_a_month: { amount: 1, currency: 'GBP' } }, true),
+  ];
+  assert.deepEqual(strandedBy(packs, 'GBP', 'USD'), ['Most to keep everything running a month', 'Cap']);
+  /* NOTHING STOPS FOR A CHOICE THAT IS NO CHANGE, OR FROM NO CURRENCY AT ALL. */
+  assert.deepEqual(strandedBy(packs, 'GBP', 'GBP'), []);
+  assert.deepEqual(strandedBy(packs, '', 'USD'), []);
+  /* TAKING THE HOME CURRENCY AWAY STRANDS THEM TOO. */
+  assert.equal(strandedBy(packs, 'GBP', '').length, 2);
+  assert.deepEqual(strandedBy([{ state: state('x'), settings: null }], 'GBP', 'USD'), []);
+});
+
+test('names are listed as a sentence says them', () => {
+  assert.equal(listed([]), '');
+  assert.equal(listed(['A']), 'A');
+  assert.equal(listed(['A', 'B']), 'A and B');
+  assert.equal(listed(['A', 'B', 'C', 'D']), 'A, B, C and D');
+  assert.equal(listed(['A', 'B', 'C', 'D', 'E']), 'A, B, C and 2 more');
 });
 
 const state = (id: string, off = false): PackState => ({ id, version: '1.0.0', disabled_at: off ? '2026-10-01' : null, registers: [] });

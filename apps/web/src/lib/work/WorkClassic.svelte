@@ -102,11 +102,13 @@
   const words = {
     title: 'Work',
     capture: 'Add a task',
+    untitled: 'Untitled task',
     captureHint: 'Type a task and press Enter. "tomorrow", "!urgent" or "#project" at the end files it, if you like.',
     add: 'Add',
     yours: 'yours',
     allProjects: 'All projects',
     noProject: 'No project',
+    unnamedProject: 'Unnamed project',
     project: 'Project',
     projects: 'Filter by project',
     projectsTile: 'Projects',
@@ -296,10 +298,13 @@
   const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
   const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const titleOfRow = (r: { seq: number; fields: Fields }): string => (shape ? text(r.fields[shape.title]) : '') || `#${r.seq}`;
+  /* A TASK WITH NO TITLE IS SAID AS ONE, never as its number: `#12` is the record's handle, not a name. A project not
+     read yet is left out rather than printed as its number. */
+  const rawTitle = (r: { fields: Fields }): string => (shape ? text(r.fields[shape.title]) : '');
+  const titleOfRow = (r: { seq: number; fields: Fields }): string => rawTitle(r) || words.untitled;
   const projectOfRow = (r: { fields: Fields }): string => {
     const p = shape ? projectOf(r.fields, shape) : null;
-    return p === null ? '' : (projectName.get(p) ?? `#${p}`);
+    return p === null ? '' : (projectName.get(p) ?? '');
   };
   /** Who holds it: the agent that took it, or the person it is given to. Nobody named is you, and says nothing. */
   const holderOf = (r: { fields: Fields }): string => {
@@ -386,9 +391,9 @@
     }
     const out = [...n]
       .filter(([key]) => key !== NONE)
-      .map(([key, count]) => ({ key, label: projectName.get(Number(key)) ?? `#${key}`, count }))
+      .map(([key, count]) => ({ key, label: projectName.get(Number(key)) ?? words.unnamedProject, count }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-    if (pick !== ALL && pick !== NONE && !n.has(pick)) out.push({ key: pick, label: projectName.get(Number(pick)) ?? `#${pick}`, count: 0 });
+    if (pick !== ALL && pick !== NONE && !n.has(pick)) out.push({ key: pick, label: projectName.get(Number(pick)) ?? words.unnamedProject, count: 0 });
     return [
       { key: ALL, label: words.allProjects, count: all },
       ...out,
@@ -626,7 +631,7 @@
   function setProject(seq: number, project: number | null) {
     const r = rowOf(seq);
     if (!r || !shape?.project) return;
-    const name = project === null ? words.noProject : (projectName.get(project) ?? `#${project}`);
+    const name = project === null ? words.noProject : (projectName.get(project) ?? words.unnamedProject);
     write(seq, { [shape.project.field]: project }, words.marks.filed(name), words.said.filed(titleOfRow(r), name));
   }
 
@@ -639,7 +644,7 @@
 
   type Form = { title: string; project: string; due: string; tier: string; who: string };
   const formOf = (r: Entry): Form => ({
-    title: titleOfRow(r),
+    title: rawTitle(r),
     project: shape ? String(projectOf(r.fields, shape) ?? '') : '',
     due: shape?.due ? dayIn(r.fields[shape.due]) : '',
     tier: shape?.priority ? text(r.fields[shape.priority.field]) : '',
@@ -708,7 +713,7 @@
     if (seq === null || !r || !s || !mayWrite) return;
     const patch: Fields = {};
     const title = form.title.trim();
-    if (title !== '' && title !== titleOfRow(r)) patch[s.title] = title;
+    if (title !== '' && title !== rawTitle(r)) patch[s.title] = title;
     if (s.project) {
       const want = form.project === '' ? null : Number(form.project);
       if (want !== projectOf(r.fields, s)) patch[s.project.field] = want;
@@ -740,7 +745,7 @@
     const p = projectOf(openRow.fields, s);
     if (p === null) return null;
     const list = present.filter((r) => r.seq > 0 && r.seq !== openRow.seq && !isDone(r.fields, s) && projectOf(r.fields, s) === p).sort(byDue(s));
-    return { project: p, to: s.project.to, name: projectName.get(p) ?? `#${p}`, n: list.length, rows: list.slice(0, 3) };
+    return { project: p, to: s.project.to, name: projectName.get(p) ?? words.unnamedProject, n: list.length, rows: list.slice(0, 3) };
   });
 
   /* ── the capture line ───────────────────────────────────────────────────── */
@@ -1377,7 +1382,7 @@
       {#if openRow && opened !== null}
         {@const seq = opened}
         {#if mayWrite && shape?.state && shape.tickTo}
-          <Button size="sm" kbd="x" onclick={() => toggle(seq)}>{isDone(openRow.fields, shape) ? words.panel.reopen : words.marks.done}</Button>
+          <span class="p-done"><Button size="sm" kbd="x" onclick={() => toggle(seq)}>{isDone(openRow.fields, shape) ? words.panel.reopen : words.marks.done}</Button></span>
         {/if}
         <button
           type="button"
@@ -1579,7 +1584,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
     min-inline-size: 0;
   }
@@ -1646,6 +1650,14 @@
     box-shadow: none;
   }
 
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .seg,
+    :global(.head[data-under]) .circle {
+      -webkit-backdrop-filter: none;
+    }
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .circle:hover {
       background: var(--hover-wash);
@@ -1694,6 +1706,20 @@
 
   .capture-box::placeholder {
     color: var(--dim);
+  }
+
+  /* THE PANEL'S KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `x`, Esc and Enter show on their pill under the
+     pointer or with keyboard focus, never as standing chrome. Without its cap a pill takes its even padding back. */
+  .p-done {
+    display: contents;
+  }
+
+  :is(.p-done, .p-foot) :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
+    display: none;
+  }
+
+  :is(.p-done, .p-foot) :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
+    padding-inline-end: var(--sp-3);
   }
 
   /* THE ENTER KEY SHOWS ON THE ADD BUTTON ONLY WHILE THE LINE IS BEING TYPED IN, which is when it is the key to press. */

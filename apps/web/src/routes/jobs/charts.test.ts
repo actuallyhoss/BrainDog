@@ -16,6 +16,7 @@ import {
   lanesOf,
   lanesSaid,
   lanesSummary,
+  machineOf,
   laneTime,
   outcomeOf,
   plain,
@@ -238,4 +239,16 @@ test('the title row says where a run is and since when, and how it ended, and ne
   assert.equal(runTail('claimed', true, row), '. It was running on claude-mac since 09:12.');
   assert.equal(runTail('queued', false, run({ status: 'queued', claimed_at: null, runner: null, created_at: iso(at(29, 9, 50)) })), ', asked for at 09:50.');
   assert.equal(runTail('error', false, null), '.');
+});
+
+test('a machine is said by its name and never by its network address', () => {
+  assert.equal(machineOf('claude-mac'), 'claude-mac');
+  assert.equal(machineOf('Sam-MacBook-Pro.local'), 'Sam-MacBook-Pro');
+  assert.equal(machineOf('build-box.lan'), 'build-box');
+  assert.equal(machineOf('192.168.1.20'), 'Unnamed machine');
+  assert.equal(machineOf('fe80::1'), 'Unnamed machine');
+  assert.equal(machineOf(null), null);
+  assert.equal(machineOf('  '), null);
+  assert.deepEqual(detailOf(run({ at: at(29, 9, 12), runner: 'studio.local' })), ['studio', '09:12', '6 turns']);
+  assert.equal(runTail('claimed', false, run({ runner: '10.0.0.4', at: at(29, 9, 12) })), ' on an unnamed machine since 09:12.');
 });

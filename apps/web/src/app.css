@@ -13,8 +13,9 @@
  */
 
 @layer components {
-  /* The window is THE BOARD: flat `--sunk`, no light and no gradient. The top bar sits straight on
-     it and the work is white tiles laid on it.
+  /* THE WINDOW IS THE GROUND, and `base.css` paints it on `body` with its one soft light from the top (DIRECTION 37).
+     This sheet used to paint `body` flat `--sunk` over that, from the days of the board, and so took the light away on
+     every screen. `html` carries the plain ground, for the frame before `body` has a size.
 
      And the shell's `.body` is the ONE scroll container. Without this the document scrolls too and
      the window shows two scrollbars: the work's, and an outer one for a page that has nowhere to go.
@@ -24,14 +25,37 @@
   body {
     block-size: 100%;
     overflow: hidden;
+  }
+
+  html {
     background: var(--sunk);
   }
 
-  /* THE BOARD IS WIDE: the tiles run to 1440 before they stop, and the top bar and every head stop with them. */
+  /* THE PAGE IS AS WIDE AS THE WINDOW (DIRECTION 36 and 38). It stopped at 1440, so a 1,728 laptop drew the work as a
+     column with a band of empty ground beside it. Nothing caps it now: the skin's fluid `--gutter` keeps it off the
+     edges, and a reading measure is kept inside a tile, never by starving the page. A `calc()` over this goes invalid
+     and falls back to `none` with it, which is the same answer. */
   :root {
-    --page-max: 1440px;
-  /* How tall a page's head row is where it rides over the top of the lead tile (`PageHead`'s `over`). */
-  --head-over: 56px;
+    --page-max: none;
+    /* How tall a page's head row is where it rides over the top of the lead tile (`PageHead`'s `over`). */
+    --head-over: 56px;
+  }
+
+  /* A NEW SCREEN CROSS-FADES IN THE WORK'S PLACE AND NOWHERE ELSE. The shell names the work `page` (`+layout.svelte`)
+     and wraps a navigation in a view transition where the browser has one; the rest of the window is the root, which
+     is told not to animate, so the rail and the docked panel stay where they are. `normal`, because the browser blends
+     the two halves of a pair by adding their light, and a root that does not fade would flash white. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-group(page),
+  ::view-transition-old(page),
+  ::view-transition-new(page) {
+    animation-duration: var(--d-page);
+    animation-timing-function: var(--ease-fade);
   }
 
   /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the

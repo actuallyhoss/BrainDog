@@ -22,12 +22,13 @@ import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import { currencyFor, display, labelOf } from './api.ts';
-import { REGISTERS } from './held.ts';
+import { REGISTERS, TITLES } from './held.ts';
 import { currencyOf } from './money.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap, type Refs } from './remote.ts';
 import type { Fetch } from './row-live.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue } from './where.ts';
+import { singularOf } from '../voice.ts';
 
 export type Wrote =
   | { ok: true; entry: Entry }
@@ -97,7 +98,29 @@ const words = {
   /* A WHOLE-NUMBER FIELD IS NOT OFFERED `3.5` AS ITS EXAMPLE, because the record would refuse that next. */
   notDigits: (label: string, typed: string, whole: boolean): string =>
     `${label} takes a number written in digits, such as ${whole ? '1,200' : '1,200 or 3.5'}, and "${typed}" is not one, so nothing was written.`,
+  /** A row nobody named, as the sentence that names it opens: "This task". */
+  thisOne: (one: string): string => `This ${one}`,
+  /** A row by its name inside a sentence, marked off so a name that is itself a phrase still reads as one. */
+  quoted: (name: string): string => `“${name}”`,
 } as const;
+
+/**
+ * THE ROW A SENTENCE ABOUT A WRITE NAMES, as a person reads it: its title as the record holds it now (`row`, the copy
+ * the conflict handed back or the one read again), else the name this tab last walked for that number, else "This task"
+ * in the list's own singular. It was `obligations#2`, which is an agent's handle and never what a person reads
+ * (DIRECTION §37). A write with no row yet (an add the record raced) names the list.
+ */
+export function rowSaid(register: string, seq: number | null, row: unknown = null): string {
+  const decl = REGISTERS[register];
+  if (seq === null) return decl?.name?.trim() || words.thisOne(singularOf(register.replace(/_/g, ' ')));
+  const held = isRow(row) && decl?.title ? row.fields[decl.title] : undefined;
+  const name = (typeof held === 'string' ? held.trim() : '') || (TITLES.get(register)?.get(seq)?.trim() ?? '');
+  if (name !== '') return words.quoted(name);
+  const one = decl?.one?.trim() || singularOf(register.replace(/_/g, ' '));
+  /* A SINGULAR WRITTEN WITH ITS CAPITAL ("Task") IS LOWERED after "This", as `unnamed` lowers it after "Unnamed"; one in
+     capitals throughout ("HSBC card") keeps them. */
+  return words.thisOne(/^[A-Z][a-z]/u.test(one) ? one.charAt(0).toLowerCase() + one.slice(1) : one);
+}
 
 /**
  * A NUMBER BOX HOLDING SOMETHING THAT IS NOT A NUMBER IS REFUSED HERE, with the field's sentence, before anything goes.
@@ -345,7 +368,6 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
   }
 
   async function failed(register: string, seq: number | null, out: Failed, refs: Map<string, RefMap>): Promise<Wrote> {
-    const spoken = seq === null ? register : `${register}#${seq}`;
     const stale = 'conflict' in out || out.refusal.code === 'VERSION_STALE';
     if (stale && seq !== null) {
       let current = 'conflict' in out ? out.conflict.current : null;
@@ -354,9 +376,10 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
         const again = await client.get(register, seq);
         current = again.ok ? again.value : null;
       }
-      return { ok: false, why: 'conflict', fix: copy.writeConflict(spoken), entry: isRow(current) ? entryOf(register, current, refs) : null };
+      /* NAMED AS IT STANDS NOW, the name somebody else may just have given it, which is the row the screen then draws. */
+      return { ok: false, why: 'conflict', fix: copy.writeConflict(rowSaid(register, seq, current)), entry: isRow(current) ? entryOf(register, current, refs) : null };
     }
-    if ('conflict' in out) return { ok: false, why: 'refused', fix: copy.writeConflict(spoken) };
+    if ('conflict' in out) return { ok: false, why: 'refused', fix: copy.writeConflict(rowSaid(register, seq, out.conflict.current)) };
     if (out.refusal.code === 'UNREACHABLE') return { ok: false, why: 'unreachable', fix: copy.writeNotReached };
     return { ok: false, why: 'refused', fix: out.refusal.fix };
   }
@@ -425,7 +448,7 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
       const out = await client.log({ register, seq, note });
       if (out.ok) return { ok: true };
       if ('refusal' in out && out.refusal.code === 'UNREACHABLE') return { ok: false, why: 'unreachable', fix: copy.writeNotReached };
-      return { ok: false, why: 'refused', fix: 'refusal' in out ? out.refusal.fix : copy.writeConflict(`${register}#${seq}`) };
+      return { ok: false, why: 'refused', fix: 'refusal' in out ? out.refusal.fix : copy.writeConflict(rowSaid(register, seq)) };
     },
   };
 }

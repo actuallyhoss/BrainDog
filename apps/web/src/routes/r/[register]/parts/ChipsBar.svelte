@@ -383,9 +383,15 @@
    */
   .segmented {
     background: var(--hover-wash);
-    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     box-shadow: none;
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .segmented {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   .segment {

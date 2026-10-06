@@ -226,11 +226,19 @@
     gap: 2px;
     padding: 3px;
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border: 0;
     border-radius: calc(var(--ctl-h) / 2);
     box-shadow: var(--glass-edge);
+  }
+
+  /* SAFARI'S GLASS, in a block of its own and in so many words: Safari drops a `backdrop-filter` whose value is a
+     `var()`, and a prefixed line in the rule above was folded into the unprefixed one by the build. The rule inside a
+     tile below outranks this one, so a track there stays solid. */
+  @supports (-webkit-backdrop-filter: none) {
+    .segmented {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
   }
 
   :is(.tile, .sheet, [data-surface='tile']) .segmented {

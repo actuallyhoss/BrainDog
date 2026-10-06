@@ -19,9 +19,12 @@
  * A PLAIN MODULE, so the body and the reshaping below are read by a test without a component.
  */
 
+import { clausesOf, resolveDay } from '@braindog/where';
+
 import type { PageBlock } from '../record/schema.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import { bare, emptyHidden, says } from '../page/home.ts';
+import { lists } from '../copy/lists.ts';
 import { lateSaid, sentenceOf, type Sentence } from './today-tiles.ts';
 import { words } from './words.ts';
 /* THE LIST A TASK IS KEPT IN, named once for every work screen (`lib/work/list.ts`), never again here. */
@@ -77,7 +80,18 @@ export type Holds = {
   adds: boolean;
   /** The record has the Money page, whose cash figure and its weeks Today shows. */
   money: boolean;
+  /**
+   * One of the tasks list as the record words it ("task", "job", a label the voice gives it), which the line a task is
+   * typed into is named by. The house word when left out.
+   */
+  one?: string;
 };
+
+/**
+ * THE LINE A TASK IS TYPED INTO, named by the list's own singular as every list's capture line is ("Add a job" on a
+ * record that calls its tasks jobs), with the article the house's one helper chooses (`captureIn`).
+ */
+export const captureHeading = (one: string | undefined): string => lists.captureIn(one?.trim() || words.task);
 
 /** A page body as `previewPage` takes it: the main column and a rail four twelfths wide. */
 export type HomeBody = { page: string; title: string; layout: { rail: number; sticky: boolean }; blocks: PageBlock[] };
@@ -160,7 +174,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
          and a record's own `home` page that writes its own line keeps it. */
       { kind: 'note', lead: true, body: TODAY_LEAD },
       /* THE LINE A TASK IS TYPED INTO, with the light syntax ("tomorrow !urgent #Kiln") the page reader reads. */
-      ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: words.addTask, icon: 'plus', register: TASKS } as PageBlock] : []),
+      ...(holds.tasks && holds.adds ? [{ kind: 'capture', heading: captureHeading(holds.one), icon: 'plus', register: TASKS } as PageBlock] : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
       { kind: 'queue', heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
       ...(holds.tasks ? work : [lateMoney]),
@@ -334,7 +348,7 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  * task ticked) must not move the blocks after it into its place. The lifted line stays at its place, and what falls
  * due is always two blocks, Late and the rest, either of them not drawn when it holds nothing.
  */
-export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE): HomeDrawn {
+export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: HomeVoice = HOUSE, one?: string): HomeDrawn {
   const today = dayOf(now);
   let lead: string | null = null;
   let slash: unknown;
@@ -342,7 +356,7 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
   const shaped: LiveBlock[] = [];
   /* WHERE EACH LATE PART OF WHAT FALLS DUE LANDED, which may join the late tasks before it. */
   const lateAt: number[] = [];
-  for (const b of blocks) {
+  for (const b of blocks.map((x) => revoiced(x, voice, one))) {
     /* A BLOCK ITS `when:` LEFT OUT holds no row anybody saw, so it neither takes a row from the next nor counts. */
     if (says(b) || !b.drawn) {
       shaped.push(b);
@@ -393,6 +407,33 @@ export function homeDrawn(blocks: readonly LiveBlock[], now: number, voice: Home
   const out = emptyHidden(fed);
   for (const at of lateAt) lateTile(out, at, today, voice);
   return { blocks: out, lead, sentence: sentenceFrom(shaped, today), slash };
+}
+
+/** Each house line Today's body writes that a voice may say its own way, by its key. */
+const VOICED = Object.keys(HOUSE) as (keyof HomeVoice)[];
+
+/** The voice's line for a house line Today's body writes, or the words as they are. */
+function voicedLine(said: string | undefined, voice: HomeVoice): string | undefined {
+  if (said === undefined) return said;
+  const key = VOICED.find((k) => HOUSE[k] === said);
+  return key === undefined ? said : voice[key];
+}
+
+/**
+ * A HOME INSTALLED FROM TODAY'S BODY KEEPS SPEAKING IN THE VOICE. The arrange mode's first Done installs the body as it
+ * was built that minute, so its headings and empty lines are fixed words: a heading still reading a house line ("What
+ * needs you", "Late") is said in the voice that speaks now, and the line a task is typed into still reading the house
+ * word is named by the list's own singular, so Settings › Words and a renamed list reach Today. Words that differ from
+ * the house line are somebody's own (the author's, or a voice of the day it was kept), and are left as written.
+ *
+ * A NEW OBJECT ONLY WHERE A WORD CHANGES, so a page in the house voice is the blocks it was handed.
+ */
+function revoiced(b: LiveBlock, voice: HomeVoice, one: string | undefined): LiveBlock {
+  const heading =
+    b.kind === 'capture' && listOf(b) === TASKS && b.heading === captureHeading(undefined) ? captureHeading(one) : voicedLine(b.heading, voice);
+  const empty = voicedLine(b.empty, voice);
+  if (heading === b.heading && empty === b.empty) return b;
+  return { ...b, ...(heading === undefined ? {} : { heading }), ...(empty === undefined ? {} : { empty }) };
 }
 
 /**
@@ -475,16 +516,81 @@ function lateTile(blocks: LiveBlock[], at: number, today: string, voice: HomeVoi
   blocks[at] = { ...rest, joins: true } as LiveBlock;
 }
 
+/** A clause that keeps a day column before a day: `by before +1d`, `day before today`. */
+const BEFORE = /^\s*([a-z][a-z0-9_]*)\s+before\s+(\S+)\s*$/u;
+
+/**
+ * THE DAY A BLOCK'S OWN `where:` KEEPS EVERY ROW BEFORE, on a column it draws (or, over what falls due, its `day`),
+ * read as the record reads it (`resolveDay` at noon of the reader's day), or `null` where it keeps none. `by before
+ * +1d` is tomorrow: every row it holds, drawn or past its limit, fell due today or earlier. A clause with `or` in it
+ * bounds nothing and is not read as one.
+ */
+function keptBefore(b: LiveBlock, today: string): string | null {
+  if (typeof b.where !== 'string') return null;
+  const noon = Date.parse(`${today}T12:00:00Z`);
+  let first: string | null = null;
+  for (const clause of clausesOf(b.where)) {
+    const m = BEFORE.exec(clause);
+    if (!m || !(b.columns.some((c) => c.field === m[1]) || (isDue(b) && m[1] === 'day'))) continue;
+    const day = resolveDay(m[2]!, noon);
+    if (day !== null && (first === null || day < first)) first = day;
+  }
+  return first;
+}
+
+/** The day a row of what falls due is due, `YYYY-MM-DD`, or `null`. */
+const dueDay = (fields: Record<string, unknown>): string | null => (typeof fields.day === 'string' && DAY.test(fields.day) ? fields.day.slice(0, 10) : null);
+
+/**
+ * HOW MANY OF A BLOCK'S ROWS PAST ITS LIMIT ARE LATE TOO. The line counts the late work a block holds, not the rows it
+ * draws: twenty late tasks drawn eight at a time are twenty late, never "eight late and twelve more". Only a block whose
+ * every drawn row is late says it, and only one whose own `where:` keeps every row before tomorrow (Today's `by before
+ * +1d`, Late money's `day before today`), so what it holds past the limit is late, or at the most due today. A block
+ * with no such bound may hold next month's work past its limit: Urgent's is counted as needing the reader, not as late,
+ * and what falls due in the next fortnight (a `deadlines` block reads 14 days ahead when it names no bound) as neither.
+ */
+function lateBeyond(b: LiveBlock, today: string): number {
+  const beyond = Math.max(0, b.total - b.entries.length);
+  if (beyond === 0 || b.entries.length === 0) return 0;
+  const due = isDue(b);
+  const allLate = b.entries.every((e) => {
+    const fields = e.fields as Record<string, unknown>;
+    const day = due ? dueDay(fields) : dayIn(b, fields);
+    return day !== null && day < today;
+  });
+  if (!allLate) return 0;
+  const before = keptBefore(b, today);
+  return before !== null && before <= (resolveDay('+1d', Date.parse(`${today}T12:00:00Z`)) ?? before) ? beyond : 0;
+}
+
 /**
  * THE PAGE'S LINE, worked out from the blocks drawn: what needs the reader is the questions waiting, every row of a
- * work block, and what falls due today or already fell due; what is late is the days those late rows were due; who is
- * working is the runs drawn. `null` when the page holds none of those blocks, so a page of figures says its own line.
+ * work block, and what falls due today or already fell due; what is late is the late rows drawn and the late rows
+ * their blocks hold past their limits (`lateBeyond`), the oldest day said; who is working is the runs drawn. `null`
+ * when the page holds none of those blocks, so a page of figures says its own line.
+ *
+ * A LATE ROW IS COUNTED ONCE. Twenty late tasks drawn eight at a time leave twelve counted past Late's limit, and those
+ * twelve are what a later block over the same list draws when it draws a late one (Urgent's oldest, a deadline that is
+ * a task): such a row is one of the twelve, and is not counted again, late or as needing the reader.
  */
 function sentenceFrom(blocks: readonly LiveBlock[], today: string): Sentence | null {
   let counts = false;
   let needing = 0;
   let agents = 0;
+  let lateCount = 0;
   const late: string[] = [];
+  /* THE LATE ROWS EACH LIST'S BLOCKS HOLD PAST THEIR LIMITS AND NO BLOCK HAS DRAWN YET, by list. */
+  const owed = new Map<string, number>();
+  const lateRow = (list: string | null, day: string): void => {
+    late.push(day);
+    const left = list === null ? 0 : (owed.get(list) ?? 0);
+    if (left === 0) {
+      lateCount += 1;
+      return;
+    }
+    owed.set(list!, left - 1);
+    needing -= 1;
+  };
   for (const b of blocks) {
     if (says(b) || !b.drawn) continue;
     if (isQueue(b)) {
@@ -492,25 +598,34 @@ function sentenceFrom(blocks: readonly LiveBlock[], today: string): Sentence | n
       needing += asked(b);
     } else if (isTodo(b)) {
       counts = true;
+      const list = listOf(b);
+      /* THE BLOCK'S TOTAL already holds the rows past its limit, the late ones among them. */
       needing += b.total;
       for (const e of b.entries) {
         const day = dayIn(b, e.fields as Record<string, unknown>);
-        if (day !== null && day < today) late.push(day);
+        if (day !== null && day < today) lateRow(list, day);
       }
+      const beyond = lateBeyond(b, today);
+      lateCount += beyond;
+      if (list !== null && beyond > 0) owed.set(list, (owed.get(list) ?? 0) + beyond);
     } else if (isDue(b)) {
       counts = true;
       for (const e of b.entries) {
-        const day = typeof e.fields.day === 'string' ? e.fields.day.slice(0, 10) : '';
-        if (day === '' || day > today) continue;
+        const fields = e.fields as Record<string, unknown>;
+        const day = dueDay(fields);
+        if (day === null || day > today) continue;
         needing += 1;
-        if (day < today) late.push(day);
+        if (day < today) lateRow(typeof fields.row === 'string' ? fields.row.split('#')[0]! : null, day);
       }
+      const beyond = lateBeyond(b, today);
+      needing += beyond;
+      lateCount += beyond;
     } else if (isRuns(b)) {
       counts = true;
       agents += b.entries.length;
     }
   }
-  return counts ? sentenceOf(needing, late.sort(), agents, today) : null;
+  return counts ? sentenceOf(Math.max(0, needing), late.sort(), agents, today, lateCount) : null;
 }
 
 /**

@@ -47,7 +47,7 @@ test('what still waits never counts the question on the screen', () => {
 });
 
 test('the sentences say where it went and what is left, in words and not a count alone', () => {
-  assert.match(words.where, /Decide lists it under Decided\.$/u);
+  assert.match(words.where, /Decide keeps it under Decided\.$/u);
   assert.equal(words.left(0), 'Nothing else waits on you.');
   assert.equal(words.left(1), 'One more question waits on Decide.');
   assert.equal(words.left(3), '3 more questions wait on Decide.');

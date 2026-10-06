@@ -290,6 +290,9 @@
   }
 
   const typed = (e: Event): string => (e.currentTarget as HTMLInputElement | HTMLSelectElement).value;
+
+  /* A LIST OR PAGE THIS TAB HAS NOT READ YET IS ITS ADDRESS PUT IN WORDS, never the bare `money_overview`. */
+  const inWords = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1).replaceAll(/[-_]/g, ' ');
 </script>
 
 <svelte:window {onkeydown} />
@@ -558,7 +561,7 @@
             <li>
               <a class="line added" href={at(`/r/${r}`)}>
                 <span class="line-mark"><IconWell name="rows" size="l" /></span>
-                <span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? r}</span>
+                <span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? inWords(r)}</span>
                 <span class="added-go"><Icon name="chevron" size="s" /></span>
               </a>
             </li>
@@ -567,7 +570,7 @@
             <li>
               <a class="line added" href={at(`/p/${p}`)}>
                 <span class="line-mark"><IconWell name="doc" size="l" /></span>
-                <span class="line-title">{PAGES[p]?.title ?? p}</span>
+                <span class="line-title">{PAGES[p]?.title ?? inWords(p)}</span>
                 <span class="added-go"><Icon name="chevron" size="s" /></span>
               </a>
             </li>
@@ -584,7 +587,6 @@
     flex-direction: column;
     gap: var(--sp-6);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
-    max-inline-size: calc(var(--measure) + 2 * var(--gutter));
   }
 
   .lead {
@@ -619,10 +621,13 @@
     font-size: var(--t-sm);
   }
 
+  /* THE FORM KEEPS THE READING MEASURE, not the page: the page runs the window's width with the rest, and a switch
+     stays within reach of the label it answers. */
   .settings {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
+    max-inline-size: var(--measure);
   }
 
   .when {

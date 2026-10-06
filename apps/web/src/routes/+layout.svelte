@@ -47,7 +47,6 @@
 
   import { named } from '$lib/env.ts';
   import TabBar from '$lib/ui/TabBar.svelte';
-  import TopBar from '$lib/ui/TopBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
@@ -59,6 +58,7 @@
   /* Named as types, which the compiler erases: the layout still reaches both, as `dead-copy` reads it. */
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
+  import type TopBarView from '$lib/ui/TopBar.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
@@ -71,8 +71,8 @@
   import Icon, { type IconName } from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import Pull from '$lib/ui/Pull.svelte';
-  import { untrack } from 'svelte';
-  import { beforeNavigate, goto } from '$app/navigation';
+  import { tick, untrack } from 'svelte';
+  import { beforeNavigate, goto, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
 
   let { data, children } = $props();
@@ -84,6 +84,20 @@
   $effect(() => {
     void import('$lib/palette/Palette.svelte').then((m) => (Palette = m.default));
     void import('$lib/ui/Keymap.svelte').then((m) => (Keymap = m.default));
+  });
+
+  /* THE TOP BAR TOO, AND ONLY FOR SOMEBODY WHO CHOSE IT. The rail is the shell (DIRECTION 37) and the strip is one
+     choice away in Settings, so its script and its styles rode in the entry every visit loads, for the few who pick
+     it, and the entry stylesheet has a budget (`tools/gates/budgets.json`). Asked for once the shape says `bar`; its
+     slot holds the strip's height while it comes, so the work under it does not jump.
+
+     AND THE SCREEN IS NOT SETTLED UNTIL IT IS THERE. `data-screen` is what a gate waits for before it reads the window,
+     and a screen that computes its content at once settles on its first frame, before the strip's chunk can land: the
+     `prefs` gate's shape probe counts `nav.topbar` at that moment. So the claim waits for the strip, as it would for a
+     call the screen made. */
+  let TopBar = $state<typeof TopBarView | null>(null);
+  $effect(() => {
+    if (shape === 'bar' && TopBar === null) void import('$lib/ui/TopBar.svelte').then((m) => (TopBar = m.default));
   });
 
   /* These surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
@@ -353,6 +367,95 @@
     switching = false;
   });
 
+  /**
+   * A NEW SCREEN CROSS-FADES IN, AND ONLY THE WORK MOVES (DIRECTION 38: the shell holds still, what fills it recomposes).
+   *
+   * Where the browser has the View Transitions API, a navigation to another screen is wrapped in one: the browser
+   * takes a picture of the work as it was, Kit draws the new screen, and the two cross-fade over `--d-page`. `#main` is
+   * named `page` for as long as that takes and the root is told not to animate (`app.css`), so the rail, the strip and
+   * a docked panel do not take part. A browser without it gets the cut it always had, with `arrive`'s settle.
+   *
+   * THE NAME IS WORN ONLY WHILE A TRANSITION RUNS (`data-moving` on the root). A named element is a stacking context
+   * and a backdrop root, and worn all the time that would put the docked panel inside the work's stacking order and cut
+   * its glass off from the ground. The newest transition takes the name off, so one that is skipped for a second
+   * navigation does not take it from the one that replaced it.
+   *
+   * ONLY WHEN THE SCREEN CHANGES. `{#key}` redraws the work on a new path and nothing else, and a filter written to
+   * the query is the same screen answering, which a fade would make look like a page load.
+   *
+   * NOTHING IS LEFT TO REJECT. A navigation that fails, or a transition the browser skips (a hidden tab, a second
+   * navigation before the first one drew), ends the transition and says nothing on the console.
+   */
+  let crossing: ViewTransition | null = null;
+  onNavigate((nav) => {
+    if (typeof document.startViewTransition !== 'function') return;
+    if (nav.from === null || nav.to === null || nav.from.url.pathname === nav.to.url.pathname) return;
+    const root = document.documentElement;
+    return new Promise<void>((done) => {
+      root.dataset.moving = '';
+      const moving = document.startViewTransition(async () => {
+        done();
+        await nav.complete.catch(() => undefined);
+      });
+      crossing = moving;
+      moving.ready.catch(() => undefined);
+      void moving.finished
+        .catch(() => undefined)
+        .then(() => {
+          if (crossing !== moving) return;
+          crossing = null;
+          delete root.dataset.moving;
+        });
+    });
+  });
+
+  /**
+   * THE WORK SLIDES WITH THE RAIL (DIRECTION 38's fluid shell).
+   *
+   * The rail card takes its new width in one frame and its glass is scaled from the old width to the new one
+   * (`Sidebar.svelte`), so without this the work jumped 156 pixels sideways at the start of a movement the rail then
+   * made smoothly. This is the same movement told from the other side, FLIP: read where the work's edge was, let the
+   * grid take the new width, and play the work from where it was to where it is on `translate`, over `--d-move` on
+   * `--ease-out`, which are the rail's own timing, so the two edges travel together. Nothing is laid out again while it
+   * moves.
+   *
+   * A FADE INSTEAD OF A MOVE, two times over. For somebody who asked for less motion, the work fades up from 0.6
+   * over 120ms and does not travel; the a11y layer stills the tokens themselves to 1ms, so that one number is
+   * written here, and it is `--d-menu`'s. And for a screen holding something placed on the window (a docked panel,
+   * the bar of picked items), because a `translate` on `#main` is the box a fixed descendant is placed against, and
+   * that would carry the panel along with the work.
+   */
+  let sliding: Animation | null = null;
+  const STILL_FADE = 120;
+
+  function holdsFixed(el: HTMLElement): boolean {
+    /* Drawn, and not merely declared: a closed panel is `position: fixed` and `display: none`, and has no box. */
+    for (const n of el.querySelectorAll('*')) if (getComputedStyle(n).position === 'fixed' && n.getClientRects().length > 0) return true;
+    return false;
+  }
+
+  /* THE EDGE BESIDE THE RAIL, which is the right one under `dir="rtl"`: the work's far edge stays where it is. */
+  const railEdge = (el: HTMLElement): number => {
+    const r = el.getBoundingClientRect();
+    return getComputedStyle(el).direction === 'rtl' ? r.right : r.left;
+  };
+
+  function slide(el: HTMLElement, was: number) {
+    const dx = was - railEdge(el);
+    if (Math.abs(dx) < 1) return;
+    const style = getComputedStyle(el);
+    const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try {
+      sliding =
+        still || holdsFixed(el)
+          ? el.animate({ opacity: [0.6, 1] }, { duration: STILL_FADE, easing: token('--ease-fade', 'ease-out') })
+          : el.animate({ translate: [`${dx}px 0`, '0 0'] }, { duration: Number.parseFloat(token('--rail-d', '240')), easing: token('--rail-ease', 'ease-out') });
+    } catch {
+      /* A timing the browser cannot read is the old jump, and nothing worse. */
+    }
+  }
+
   /* One function, because the chord and the restore control are the same act and a second copy of
      two lines is a second place for the preference to be written differently. */
   function toggleRail() {
@@ -360,8 +463,14 @@
        shapes it wrote a preference that nothing on screen could show, so the one feedback the chord
        gives was that nothing happened. It does nothing where there is no rail to narrow. */
     if (shape !== 'rail') return;
+    /* A slide still running ends first, so the edge is read where it stands and not mid-flight. */
+    sliding?.cancel();
+    sliding = null;
+    const el = document.getElementById('main');
+    const was = el ? railEdge(el) : undefined;
     railIcons = !railIcons;
     pref.write({ sidebar: !railIcons });
+    if (el && was !== undefined) void tick().then(() => slide(el, was));
   }
   const go = new GoPrefix();
 
@@ -543,14 +652,16 @@
     {:else}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          <TopBar
-            entries={flat.main}
-            {behind}
-            record={data.index.name || personName}
-            person={personName}
-            onmore={() => (moreOpen = true)}
-            onfind={() => (palette.open = true)}
-          />
+          {#if TopBar}
+            <TopBar
+              entries={flat.main}
+              {behind}
+              record={data.index.name || personName}
+              person={personName}
+              onmore={() => (moreOpen = true)}
+              onfind={() => (palette.open = true)}
+            />
+          {/if}
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -585,7 +696,7 @@
       that carried meaning by moving would have to say it another way as well.
     -->
     {#key page.url.pathname}
-    <main id="main" class="body" data-screen={settled()}>
+    <main id="main" class="body" data-screen={shape === 'bar' && TopBar === null ? undefined : settled()}>
       <Pull />
       <LapseBanner shell={data} />
       {@render children()}
@@ -841,12 +952,14 @@
    * THE GROUND, AND ON IT A FLOATING RAIL AND THE WORK.
    *
    * The work no longer sits in a lifted panel: the page IS the ground (`--sunk` with `--ground-light`, painted on
-   * `body` in `app.css`), the rail is a glass card floating 12 in from the window, and the content sits straight on the
-   * ground 20 from the rail and 28 from the right. `.body` is still the ONE scroll container, so the rail never moves
-   * and the window shows exactly one scrollbar.
+   * `body` in the skin's `base.css`), the rail is a glass card floating 12 in from the window, and the content sits
+   * straight on the ground, the skin's fluid `--gutter` from the rail and from the window. `.body` is still the ONE
+   * scroll container, so the rail never moves and the window shows exactly one scrollbar.
    *
    * ONE COLUMN THAT SIZES TO THE RAIL, AT BOTH OF THE RAIL'S WIDTHS. `auto` measures whatever the rail says it is, so
    * the narrow width is the rail's own declaration and this grid never has to know which state it is in.
+   *
+   * AND FROM 1,280 UP, A THIRD COLUMN FOR THE DOCKED PANEL, further down. Nothing is in it until a panel opens.
    */
   .shell {
     display: grid;
@@ -877,17 +990,24 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  /* The strip sits on the board, lined up with the work under it. */
+  /* The strip sits on the ground, lined up with the work under it: the same fluid gutter, so the two share an edge at
+     every width. */
   .bar-slot {
     box-sizing: border-box;
     inline-size: 100%;
     max-inline-size: var(--page-max);
     min-inline-size: 0;
-    padding: var(--sp-4) 28px var(--sp-2);
+    padding: var(--sp-4) var(--gutter) var(--sp-2);
   }
 
   .shell[data-shape='menu'] .bar-slot {
     padding: var(--inset) var(--inset) 0;
+  }
+
+  /* THE STRIP'S HEIGHT, HELD WHILE IT ARRIVES. The top bar is asked for after the shell (`TopBar` above), and an empty
+     slot would let the work sit 44 higher for a moment and then drop. 44 is the strip's own floor (`TopBar.svelte`). */
+  .shell[data-shape='bar'] .bar-slot {
+    min-block-size: calc(var(--tap) + var(--sp-4) + var(--sp-2));
   }
 
   /* One glass pill, at the start of the strip, at the size every other target in the shell is. */
@@ -925,6 +1045,15 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives: Safari drops a
+     `backdrop-filter` whose value is a `var()`, and the build folds a prefixed and an unprefixed pair in one rule. */
+  @supports (-webkit-backdrop-filter: none) {
+    .menu-open::before,
+    .launcher::before {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+  }
+
   .menu-open:hover::before,
   .launcher:hover::before {
     background: var(--glass-strong);
@@ -954,29 +1083,28 @@
   /**
    * THE WORK, ON THE GROUND. No fill, no hairline, no radius: the tiles in it are the only raised things.
    *
-   * THE GUTTER IS SET HERE, ONCE, for every screen under it. Screens pad their content by `--gutter`, so 20 here puts
-   * the content 20 from the rail card, and the 8 at the end makes it 28 from the window's right edge. On the other two
-   * shapes nothing is at the start, so the content sits 28 in on both sides.
+   * THE GUTTER IS THE SKIN'S, AND IT IS FLUID (`--gutter` in `tokens.css`): 16 on a phone, about 22 at 900, 36 at
+   * 1,512 and 40 from 1,667 up. Screens pad their content by it, so the work fills the window edge to edge at every
+   * width with the same air either side, and grows with the window instead of stepping. It was a fixed 20 from the
+   * rail and 28 from the window, set here over the skin's, which made a 1,728 laptop's page the same tight frame as a
+   * 1,280 one's.
+   *
+   * NAMED `page` WHILE ONE SCREEN CROSS-FADES TO THE NEXT (`onNavigate` above, `app.css`): the work is the one part of
+   * the window that takes part in it, and only for as long as it does.
    */
-  .body {
-    --gutter: 20px;
+  :global(html[data-moving]) .body {
+    view-transition-name: page;
+  }
 
+  .body {
     animation: arrive var(--d-move) var(--ease-out) backwards;
     min-inline-size: 0;
-    padding-inline-end: 8px;
     overflow-y: auto;
     overscroll-behavior: contain;
     /* THE PAGE'S FOOT, and on the top bar and menu shapes the room the search button in the bottom
        corner needs: a floating button over the last row of a list hides exactly the thing a long
        list is scrolled to the bottom to see. */
     padding-block-end: calc(var(--tap) + var(--sp-5));
-  }
-
-  .shell[data-shape='bar'] .body,
-  .shell[data-shape='menu'] .body {
-    --gutter: 28px;
-
-    padding-inline-end: 0;
   }
 
   /* Below 900px the rail becomes a tab bar; above it, the tab bar does not exist. */
@@ -1025,13 +1153,7 @@
       grid-template-rows: minmax(0, 1fr);
     }
 
-    /* THE PHONE'S OWN GUTTER, 16, whatever the shape. */
-    .body,
-    .shell[data-shape='bar'] .body,
-    .shell[data-shape='menu'] .body {
-      --gutter: var(--sp-4);
-
-      padding-inline-end: 0;
+    .body {
       /* THE LAST ROW ENDS 16px ABOVE THE TAB BAR (design 6.6). `--tabbar` is the bar and the home
          indicator under it, summed once in `tokens.css`; the bar floats `--inset` above that. */
       padding-block-end: calc(var(--tabbar) + var(--inset) + var(--sp-4));
@@ -1045,6 +1167,50 @@
        carries search, so the corner button goes with the strip it stood in for. */
     .launcher {
       display: none;
+    }
+  }
+
+  /**
+   * THE DOCKED PANEL'S OWN COLUMN, FROM 1,280 UP (DIRECTION 37: a docked right panel).
+   *
+   * `Panel.svelte` is a fixed card at the window's end edge, and it writes `--dock-w` on the root while it is open
+   * docked: its width and the inset either side, `0px` otherwise. Here that is the width of a third column, so opening
+   * a task or a question narrows the work beside it rather than drawing over it, and the work's scrollbar, a sticky head
+   * and anything full width all stop where the panel starts, which page padding could not do. The panel slides into
+   * the empty column on its own transform, so the work reflows once and nothing moves but the panel.
+   *
+   * THE WORK THEN PADS NOTHING EXTRA. A screen that draws a panel pads its end by `max(var(--gutter), var(--dock-w))`,
+   * which was how it kept clear before the panel had a column; inside `#main` that is `0px` here, so the space is given
+   * up once and not twice. The root keeps the real width, for the toasts that centre beside it.
+   *
+   * BELOW 1,280 THE PANEL KEEPS THE PAGE'S PADDING TO STAND ON, and below 900 it is a sheet over the screen
+   * (`panel.ts`). A window that narrow has no width to give a column.
+   *
+   * ON THE OTHER TWO SHAPES the strip sits over the work's column only, so both are placed by hand: left to the grid,
+   * the work would take the second column of the strip's row.
+   */
+  @media (width >= 1280px) {
+    .shell {
+      grid-template-columns: auto minmax(0, 1fr) var(--dock-w, 0px);
+    }
+
+    .shell[data-shape='bar'],
+    .shell[data-shape='menu'] {
+      grid-template-columns: minmax(0, 1fr) var(--dock-w, 0px);
+    }
+
+    .shell[data-shape='bar'] .bar-slot,
+    .shell[data-shape='menu'] .bar-slot {
+      grid-area: 1 / 1;
+    }
+
+    .shell[data-shape='bar'] .body,
+    .shell[data-shape='menu'] .body {
+      grid-area: 2 / 1;
+    }
+
+    .body {
+      --dock-w: 0px;
     }
   }
 

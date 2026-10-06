@@ -66,7 +66,7 @@
   import { commands, type Act, type Creation } from './admit.ts';
   import { addRow, creation, offered, words as createWords } from './create.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
-  import { apply as applyChange, lookNow, pageMenu } from './customise-apply.ts';
+  import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
   import { said as voiced } from '../voice.svelte.ts';
   import { spineOf, type SpineCounts } from '../spine.ts';
@@ -286,6 +286,8 @@
   /** How it looks on this device and whether the screen behind has a page menu, read each time the palette opens. */
   let look = $state<Look>({});
   let pageHere = $state(false);
+  /* WHERE A LOOK ROW'S CHANGE WOULD BE KEPT, read with the look each time the palette opens. */
+  let lookKept = $state<'record' | 'pending' | 'device'>('device');
 
   let reading: Promise<Reader> | null = null;
   const reader = (): Promise<Reader> =>
@@ -425,7 +427,7 @@
     /* THE CHANGES THE QUERY NAMES, in the same modes, and none with nothing typed: an empty palette is as it was. */
     customise:
       parsed.prefix === null || parsed.prefix === '>'
-        ? customise(parsed.text, { look, places, hidden: navPrefs.hidden, home: navPrefs.home, pageMenu: pageHere })
+        ? customise(parsed.text, { look, places, hidden: navPrefs.hidden, home: navPrefs.home, pageMenu: pageHere, kept: lookKept })
         : [],
   });
 
@@ -890,6 +892,7 @@
       cursor = 0;
       slash = null;
       look = lookNow();
+      lookKept = keptNow();
       pageHere = pageMenu() !== null;
       if (slashHere) warm();
       queueMicrotask(() => input?.focus());
@@ -1280,6 +1283,15 @@
     overflow: hidden;
   }
 
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives: Safari drops a
+     `backdrop-filter` whose value is a `var()`, and the build folds a prefixed line beside the one above into it. The
+     other browsers skip this block and keep the theme's value. The phone's sheet below takes it away again. */
+  @supports (-webkit-backdrop-filter: none) {
+    .palette {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+  }
+
   /* NO ENTRANCE. It is opened from the keyboard far more often than from anything else, and nothing
      moves on a keyboard action. It is there on the frame the key is pressed. */
   .palette:not([open]) {
@@ -1566,6 +1578,7 @@
       max-block-size: 100dvh;
       padding-block-start: env(safe-area-inset-top, 0px);
       background: var(--bg);
+      -webkit-backdrop-filter: none;
       backdrop-filter: none;
       border-radius: 0;
       box-shadow: none;

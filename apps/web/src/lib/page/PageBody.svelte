@@ -12,7 +12,7 @@
   out what it answered.
 -->
 <script lang="ts">
-  import { tick, type Snippet } from 'svelte';
+  import { tick, untrack, type Snippet } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -29,7 +29,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { boxesOf, layoutOf, mainSpan, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
+  import { boxesOf, layoutOf, mainSpan, PAIR_FROM, paired, slotOf, splitAreas, sticks, widened, type Run } from './layout.ts';
   import { emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -37,6 +37,7 @@
   import { rowOfKey } from './row-verbs.ts';
   import JustChanged from './JustChanged.svelte';
   import { leadIndex } from './lead.ts';
+  import { blockKeys, recomposer } from './recompose.ts';
 
   let {
     mode,
@@ -167,17 +168,47 @@
    */
   const runsOf = (list: Laid[]): Run<Laid>[] => (arranging ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
 
+  /** Whether each column draws anything: a column whose every block said no to `when:` is not drawn, as an empty one is not. */
+  const mainShown = $derived(mainRest.some((x) => x.block.drawn));
+  const railShown = $derived(railRest.some((x) => x.block.drawn));
+
+  /**
+   * WHETHER THE PAGE IS TWO COLUMNS OF BLOCKS: from 1,440px, on a page whose one flow has the whole width, because no
+   * rail is declared or the rail draws nothing (`layout.ts` `paired`). A page with a rail is already a lead column and a
+   * side column. Not in a preview, which is drawn inside another screen at half its width.
+   */
+  const roomy = new MediaQuery(`(width >= ${PAIR_FROM}px)`, false);
+  const twoUp = $derived(roomy.current && mode !== 'preview' && (!layout || !railShown));
+
+  /** Whether a block leads the page (its line, a lead figure row, a lead queue), which keeps the whole row. */
+  const isLead = (b: LiveBlock): boolean => (b as { lead?: unknown }).lead === true;
+
   /**
    * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
    * (`layout.ts` `widened`): a half whose partner's `when:` said no takes the whole row rather than sitting beside a
    * hole. Each twelve-column flow on its own: the main column (or the page, with no rail) and each box in it. The rail
    * is one stack and has no rows. NOT WHILE ARRANGING, where the bar names a block's own width and that is what is drawn.
+   *
+   * AND ON A WIDE SCREEN, TWO WHOLE-ROW BLOCKS ONE AFTER THE OTHER ARE TWO HALVES (`twoUp`), so a 1,728 window is used
+   * rather than drawn as lines across it.
    */
   const spans = $derived.by(() => {
     const out = new Map<number, number>();
     if (arranging) return out;
     for (const run of runsOf(layout ? mainRest : pairs)) {
-      const got = widened(run.items.map((x) => ({ span: x === lifted ? COLUMNS : x.slot.span, drawn: x.block.drawn })));
+      let got = widened(run.items.map((x) => ({ span: x === lifted ? COLUMNS : x.slot.span, drawn: x.block.drawn })));
+      if (twoUp) {
+        const now = got;
+        got = paired(
+          run.items.map((x, n) => ({
+            kind: x.block.kind,
+            span: now[n]!,
+            drawn: x.block.drawn,
+            lead: x === lifted || isLead(x.block),
+            columns: x.block.columns.length,
+          })),
+        );
+      }
       run.items.forEach((x, n) => {
         if (x !== lifted && got[n] !== x.slot.span) out.set(x.slot.i, got[n]!);
       });
@@ -185,9 +216,32 @@
     return out;
   });
 
-  /** Whether each column draws anything: a column whose every block said no to `when:` is not drawn, as an empty one is not. */
-  const mainShown = $derived(mainRest.some((x) => x.block.drawn));
-  const railShown = $derived(railRest.some((x) => x.block.drawn));
+  /* ── recomposing in place ──────────────────────────────────────────────────
+     A NEW ANSWER MOVES THE PAGE, IT DOES NOT REDRAW IT (DIRECTION §38, `recompose.ts`): each block is measured before
+     the page draws the answer and played from where it was to where it is, a new block fades and rises in, and one
+     that left fades out where it stood. Never on the first draw of a page, never on a page that is another page, never
+     as the arrange mode opens or shuts (every block takes a bar, which is the mode and not the record moving), and
+     never in a preview. */
+  const keys = $derived(blockKeys(blocks));
+  const motion = recomposer();
+  let drewFor: string | null = null;
+  let wasArranging = false;
+  $effect.pre(() => {
+    void spans;
+    const next = new Set(laid.filter((x) => x.block.drawn).map((x) => keys[x.slot.i]!));
+    const on = page.page;
+    const moving = arranging;
+    untrack(() => {
+      const el = pageEl;
+      const same = drewFor === on && wasArranging === moving;
+      drewFor = on;
+      wasArranging = moving;
+      if (mode === 'preview' || !el || !same) return motion.stop();
+      const play = motion.before(el, next);
+      if (play) void tick().then(play);
+    });
+  });
+  $effect(() => () => motion.stop());
 
   /* WHETHER THE RAIL STAYS IN VIEW, measured, since `sticky: true` is honoured only while the rail fits (`sticks`). The
      room is the scrolling column's height under the page head, the same `--sticky` offset the rail sticks at. */
@@ -391,7 +445,8 @@
   /** Every row the page draws now, in reading order, each with the key the cursor holds it by. */
   function rowsNow(): { el: HTMLElement; key: string; whole?: true }[] {
     if (!pageEl) return [];
-    const all = [...pageEl.querySelectorAll<HTMLElement>(ROW)];
+    /* A BLOCK FADING OUT (`recompose.ts`) has left the page, and its rows with it. */
+    const all = [...pageEl.querySelectorAll<HTMLElement>(ROW)].filter((el) => !el.closest('[data-leaving]'));
     const outer = all.filter((el) => !all.some((o) => o !== el && o.contains(el)));
     const keys = rowKeys(outer.map((el) => ({ slot: el.closest('.block-slot')?.id ?? '', row: el.dataset.row })));
     const rows: { el: HTMLElement; key: string; whole?: true }[] = outer.map((el, i) => ({ el, key: keys[i]! }));
@@ -647,6 +702,7 @@
     <div
       class="block-slot"
       id="{ids}b-{slot.i + 1}"
+      data-key={keys[slot.i]}
       aria-labelledby={arranging || block.heading ? `${ids}h-${slot.i + 1}` : undefined}
       style="--span:{spans.get(slot.i) ?? slot.span}"
       data-arranging={arranging ? '' : undefined}
@@ -813,15 +869,18 @@
      tiles of one row stretch to one height, so a row reads as a row of tiles rather than a skyline. The page has no
      surface of its own; the ground and its light are the shell's.
 
-     THE CAP IS FOR THE PROSE, NOT FOR THE PAGE. The page gets the width a dashboard can use, `--page-max`, and running
-     text keeps its own 72ch measure inside the block that has it. */
+     NO CAP ON THE PAGE, ONLY ON THE PROSE (DIRECTION §36, §38). The page is as wide as the window, inside the fluid
+     gutters, and from 1,440px its full-width blocks pair into two columns (`twoUp`) rather than stretching into lines
+     nobody reads to the end; running text keeps its own measure (`--measure`, 72ch) inside the block that has it.
+
+     `position: relative` IS FOR A BLOCK FADING OUT, which is laid over the place it held (`recompose.ts`). */
   .page {
     --tile-pad: 20px;
+    position: relative;
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--sp-3);
     padding: var(--sp-3) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* THE ROW CURSOR'S RING, drawn only once a key has moved it: the focus ink, round the row, never the brand's red. */
@@ -832,11 +891,10 @@
   }
 
   /* INSIDE ANOTHER SCREEN THE PAGE TAKES THAT SCREEN'S COLUMN: Home's body and a preview already sit inside a gutter and
-     a cap of their own, and a second one inside it would indent the blocks twice. */
+     the width of their own, and a second gutter inside it would indent the blocks twice. */
   .page[data-mode='home'],
   .page[data-mode='preview'] {
     padding: 0;
-    max-inline-size: none;
   }
 
   /* ── the main column and the rail ─────────────────────────────────────────

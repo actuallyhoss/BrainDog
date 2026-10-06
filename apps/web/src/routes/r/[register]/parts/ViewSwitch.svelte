@@ -66,9 +66,15 @@
   /* IN THE COMPACT BAR THE TRACK DROPS ITS OWN GLASS, because the bar is glass already and glass never holds glass. */
   :global(.head[data-under]) .view-switch {
     background: var(--hover-wash);
-    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     box-shadow: none;
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .view-switch {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   @media (width < 900px) {

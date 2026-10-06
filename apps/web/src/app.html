@@ -74,21 +74,42 @@
       So the two names are written apart in prose here, `sveltekit` and `body` in separate words,
       and the only complete spellings in this file are the two that are meant to be replaced.
     -->
+    <!--
+      THE GROUND AND THE RAIL CARD, as the shell draws them (DIRECTION 37): the ground with its one soft light, and the
+      glass card floating 12 in from the window. It drew a solid band the rail's colour and a white page beside it, which
+      was the shell before the card, so the first frame was a different product from the second. Every value falls back
+      to something that draws, because the tokens may not have arrived yet. The card is the default shape's; a narrow
+      rail or a top bar is drawn right the moment the app is there.
+    -->
     <style>
-      body::before {
+      body::before,
+      body::after {
         content: "";
         position: fixed;
+      }
+
+      body::before {
         inset: 0;
-        background: linear-gradient(90deg, var(--sunk, Canvas) 0 var(--rail, 232px), var(--bg, Canvas) var(--rail, 232px));
+        background: var(--ground-light, none), var(--sunk, Canvas);
+      }
+
+      body::after {
+        inset-block: var(--inset, 12px);
+        inset-inline-start: var(--inset, 12px);
+        inline-size: var(--rail, 216px);
+        background: var(--glass, transparent);
+        border-radius: var(--r-lg, 22px);
+        box-shadow: var(--glass-edge, none);
       }
 
       @media (width < 900px) {
-        body::before {
-          background: var(--bg, Canvas);
+        body::after {
+          content: none;
         }
       }
 
-      body:has(#main)::before {
+      body:has(#main)::before,
+      body:has(#main)::after {
         content: none;
       }
     </style>

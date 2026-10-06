@@ -114,10 +114,16 @@
     z-index: -1;
     border-radius: inherit;
     background: var(--glass-strong);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     box-shadow: var(--glass-edge), var(--e2);
     pointer-events: none;
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .picked-bar::before {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   @keyframes picked-in {

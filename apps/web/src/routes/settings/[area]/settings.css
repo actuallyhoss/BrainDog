@@ -200,9 +200,17 @@
 
 .settings-place .segmented:not(:is(.tile, .sheet, dialog, [data-surface='tile']) .segmented) {
   background: var(--hover-wash);
-  -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
+}
+
+/* AND SAFARI'S GLASS TAKEN OFF IN A BLOCK OF ITS OWN. `controls.css` gives Safari the track's blur inside
+   `@supports (-webkit-backdrop-filter: none)`, and a prefixed line beside the unprefixed one above is folded into it by
+   the build (`Panel.svelte` has why), so the only `none` Safari's own property was sure to meet is this one. */
+@supports (-webkit-backdrop-filter: none) {
+  .settings-place .segmented:not(:is(.tile, .sheet, dialog, [data-surface='tile']) .segmented) {
+    -webkit-backdrop-filter: none;
+  }
 }
 
 /* A LIST LED BY A 32px WELL KEEPS IT BESIDE THE TITLE ON A PHONE. `rows.css` turns a row into a two-line card below

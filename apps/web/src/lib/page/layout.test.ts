@@ -19,7 +19,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import { blockOf } from '../record/page-live.ts';
-import { boxesOf, layoutOf, mainSpan, splitAreas, sticks, widened, type Layout } from './layout.ts';
+import { boxesOf, paired, layoutOf, mainSpan, splitAreas, sticks, widened, type Layout } from './layout.ts';
 
 const RAIL: Layout = { rail: 4, sticky: false };
 
@@ -261,4 +261,27 @@ test('A ROW THAT WAS NEVER WHOLE IS LEFT AS IT WAS, and a row with nothing drawn
   assert.deepEqual(widened([shown(6), shown(12)]), [6, 12]);
   assert.deepEqual(widened([shown(8), hidden(6), shown(6)]), [8, 6, 12]);
   assert.deepEqual(widened([hidden(6), hidden(6), shown(6)]), [6, 6, 6]);
+});
+
+/* ON A WIDE SCREEN A FLOW OF FULL-WIDTH LISTS IS TWO COLUMNS (DIRECTION §36, §38). */
+const k = (kind: string, span = 12, more: { drawn?: boolean; lead?: boolean; columns?: number } = {}) => ({ kind, span, drawn: more.drawn ?? true, ...more });
+
+test('TWO WHOLE-ROW LISTS ONE AFTER THE OTHER ARE TWO HALVES, and one left over keeps the whole row', () => {
+  assert.deepEqual(paired([k('todo'), k('feed'), k('timeline')]), [6, 6, 12]);
+  assert.deepEqual(paired([k('todo'), k('feed'), k('timeline'), k('note')]), [6, 6, 6, 6]);
+});
+
+test('A BLOCK THAT MAY NOT BE HALVED STANDS ALONE and the pairing starts again after it, in declared order', () => {
+  /* The page's line, a heading, a table and a forecast each keep the row; the lists either side of them pair among themselves. */
+  assert.deepEqual(paired([k('note', 12, { lead: true }), k('todo'), k('feed')]), [12, 6, 6]);
+  assert.deepEqual(paired([k('todo'), k('section'), k('feed'), k('timeline')]), [12, 12, 6, 6]);
+  assert.deepEqual(paired([k('todo'), k('table'), k('feed')]), [12, 12, 12]);
+  assert.deepEqual(paired([k('forecast'), k('todo'), k('capture'), k('feed')]), [12, 12, 12, 12]);
+  /* A spec of five columns is laid out in tracks that need the row. */
+  assert.deepEqual(paired([k('spec', 12, { columns: 5 }), k('todo')]), [12, 12]);
+});
+
+test('AN AUTHOR`S OWN WIDTH IS KEPT, and a hidden block takes no place between two that pair', () => {
+  assert.deepEqual(paired([k('todo', 6), k('feed', 6), k('timeline')]), [6, 6, 12]);
+  assert.deepEqual(paired([k('todo'), k('stat', 12, { drawn: false }), k('feed')]), [6, 12, 6]);
 });

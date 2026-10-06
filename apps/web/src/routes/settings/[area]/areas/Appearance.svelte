@@ -2,8 +2,10 @@
   Settings > Appearance: how BrainDog looks to this person, in one section, and the record's own look under it.
 
   THE PERSON'S LOOK FOLLOWS THEM (`35`). Scheme, text size, density, contrast and accent are kept by the record as their
-  own `look.*` prefs, so every device they sign in on looks the same; the cookie is only the first-paint copy
-  (`pref.ts`). A record too old to keep them leaves them on the device, and the hint says which.
+  own `look.*` prefs, so every device they open this record on looks the same; the cookie is only the first-paint copy
+  (`pref.ts`). EACH RECORD KEEPS ITS OWN: a person in two records has a look in each, and the hint says "this record"
+  rather than promising every device everywhere. A record too old to keep them leaves them on the device, a change the
+  record has not received yet waits on this one, and the hint says which.
 
   ONE SECTION, FOUR CHOICES AND THE THING THEY CHANGE (DIRECTION §35: calm, few controls per screen). The scheme, the
   text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
@@ -43,7 +45,9 @@
   /* THIS AREA'S OWN WORDS, the ones the copy modules do not already hold. */
   const words = {
     looks: 'How it looks',
-    hint: 'Yours, on every device you sign in on.',
+    /* PER RECORD, by the record's name: the look is kept in each record a person opens, not once for the whole account. */
+    hint: (record: string) => (record ? `Yours in ${record}, on every device you open it on.` : 'Yours in this record, on every device you open it on.'),
+    hintPending: 'On this device for now. It reaches this record the next time it can.',
     hintDevice: 'Kept on this device.',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
     said: 'Three things need you today,',
@@ -67,16 +71,17 @@
 
   /* THE RECORD'S WORD FIRST, when this screen is the first a tab opens: the root layout's `draw` adopts it behind a
      dynamic import that can land after this runs, and these controls and the hint would then be the cookie's. Once per
-     tab, so it is nothing when the layout got there first. */
-  follow({ me: untrack(() => props.shell.me) });
+     person and record, so it is nothing when the layout got there first; the slug is the shell's, as `boot` named it. */
+  follow(untrack(() => ({ me: props.shell.me, record: { slug: props.shell.index.slug } })));
 
   /* SEEDED FROM WHAT IS REMEMBERED, so the controls show the state the page is already in rather
      than the default the state happens to start at. */
   const held = pref.read();
-  /* WHERE A CHOICE IS KEPT, said in the hint: the record, or this device when there is no record or it refused a key.
-     Read again after each choice settles, so a host that refuses one is not left claiming "every device". */
-  let follows = $state(pref.follows());
-  const settle = () => void pref.settled().then(() => (follows = pref.follows()));
+  /* WHERE A CHOICE IS KEPT, said in the hint: the record, this device until the record hears of it, or this device when
+     there is no record or it refused a key. Read again after each choice settles, so a host that refuses one, or a send
+     that did not arrive, is not left claiming "every device". */
+  let kept = $state(pref.whereKept());
+  const settle = () => void pref.settled().then(() => (kept = pref.whereKept()));
   let scheme = $state<'light' | 'system' | 'dark'>(held.scheme ?? 'system');
   let text = $state<'sm' | 'base' | 'md'>(held.text ?? 'base');
   let density = $state<'compact' | 'comfortable' | 'roomy'>(held.density ?? 'comfortable');
@@ -168,7 +173,7 @@
   was known, written down, and applied to one group.
 -->
 <Section title={words.looks}>
-  <p class="hint">{follows ? words.hint : words.hintDevice}</p>
+  <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
   <div class="looks">
     <div class="choices">
       <div class="choice">

@@ -79,6 +79,8 @@
     REGISTERS[r]?.name ??
     ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ??
     r.charAt(0).toUpperCase() + r.slice(1).replaceAll('_', ' ');
+  /* A PAGE BY ITS TITLE, and one this tab has not read yet by its address put in words, never `money-overview`. */
+  const pageName = (p: string): string => PAGES[p]?.title ?? p.charAt(0).toUpperCase() + p.slice(1).replaceAll(/[-_]/g, ' ');
   /**
    * What the plan sheet names: a declaration id (`register.money`, `page.home`, `metric.cash`, `rule.chase`) by the name
    * this record gives it, and anything else as a pack. The sheet puts the id in words when this knows nothing better.
@@ -636,7 +638,7 @@
             <li><a class="line adds-row" href={at(`/r/${r}`)}><span class="line-mark"><IconWell name="rows" size="l" /></span><span class="line-title">{listName(r)}</span></a></li>
           {/each}
           {#each pages as p (p)}
-            <li><a class="line adds-row" href={at(`/p/${p}`)}><span class="line-mark"><IconWell name="doc" size="l" /></span><span class="line-title">{PAGES[p]?.title ?? p}</span></a></li>
+            <li><a class="line adds-row" href={at(`/p/${p}`)}><span class="line-mark"><IconWell name="doc" size="l" /></span><span class="line-title">{pageName(p)}</span></a></li>
           {/each}
         </ul>
       {/if}
@@ -692,7 +694,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
   }
 
   /* NOT `.panel`, which `blocks.css` draws as a page block's box: the tab's content sits straight on the ground. */
@@ -721,8 +722,14 @@
     :global(.head[data-under]) .tabs {
       background: transparent;
       box-shadow: none;
-      -webkit-backdrop-filter: none;
       backdrop-filter: none;
+    }
+
+    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+    @supports (-webkit-backdrop-filter: none) {
+      :global(.head[data-under]) .tabs {
+        -webkit-backdrop-filter: none;
+      }
     }
   }
 

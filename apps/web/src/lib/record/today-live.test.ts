@@ -6,7 +6,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { byAgent, comingOf, forecastOf, hostOf, sessionsOf, sinceWho, tasksOf } from './today-live.ts';
+import { byAgent, comingOf, forecastOf, hostOf, sessionsOf, sinceWho, tasksOf, untitled } from './today-live.ts';
+import { REGISTERS } from './held.ts';
+import type { RegisterDecl } from './schema.ts';
 
 const TODAY = '2026-09-29';
 const row = (seq: number, fields: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ id: `r${seq}`, seq, fields, ...extra });
@@ -22,6 +24,28 @@ test('WHAT WAS HANDED BACK TO BE CHECKED COMES AFTER THE LATE WORK, and each tas
   );
   assert.deepEqual(out.map((t) => [t.seq, t.why]), [[1, 'late'], [2, 'review'], [3, 'urgent']]);
   assert.deepEqual([out[0]!.version, out[0]!.priority, out[0]!.hue, out[1]!.state], [4, 'high', 30, 'review']);
+});
+
+test('A TASK NOBODY NAMED IS "Untitled task" in the list`s own singular, never its number', () => {
+  const blank = [row(7, { what: '', by: '2026-09-27' }), row(8, { by: '2026-09-28' })];
+  assert.deepEqual(tasksOf(blank, [], TODAY, new Map()).map((t) => t.what), ['Untitled task', 'Untitled task']);
+  assert.deepEqual(comingOf([row(9, { what: '  ', by: '2026-10-01' })], TODAY, '2026-10-13', new Map()).map((t) => t.what), ['Untitled task']);
+  /* THE WORD THE RECORD GIVES THE LIST, a label the voice drew over it included, and its capitals where it has them. */
+  const had = { tasks: REGISTERS.tasks, obligations: REGISTERS.obligations };
+  REGISTERS.tasks = { id: 'tasks', name: 'Jobs', one: 'Job' } as unknown as RegisterDecl;
+  REGISTERS.obligations = { id: 'obligations', name: 'Bills', one: 'HSBC bill' } as unknown as RegisterDecl;
+  try {
+    assert.deepEqual(tasksOf(blank, [], TODAY, new Map()).map((t) => t.what), ['Untitled job', 'Untitled job']);
+    assert.equal(untitled('obligations'), 'Untitled HSBC bill');
+  } finally {
+    for (const [id, decl] of Object.entries(had)) {
+      if (decl === undefined) delete REGISTERS[id];
+      else REGISTERS[id] = decl;
+    }
+  }
+  /* A LIST NOT LEARNT YET says its id made singular. */
+  assert.equal(untitled('course_notes'), 'Untitled course note');
+  for (const t of tasksOf(blank, [], TODAY, new Map())) assert.doesNotMatch(t.what, /#|\d/u);
 });
 
 test('THE NEXT TWO WEEKS: after today, inside the window, soonest first, and never a task already in what needs you', () => {

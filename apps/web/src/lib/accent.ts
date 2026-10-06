@@ -47,7 +47,7 @@ type Applied = { ok: true } | { ok: false; refusals: string[]; codes: string[] }
  * The record's word for a colour: a swatch's name, or `House`. `undefined` is a colour no swatch wears, which the
  * record has no word for, so it stays on this device.
  */
-const nameOf = (accent: string | null): string | undefined =>
+export const nameOf = (accent: string | null): string | undefined =>
   accent === null ? 'House' : ACCENTS.find((a) => a.hex.toLowerCase() === accent.toLowerCase())?.name;
 
 /**

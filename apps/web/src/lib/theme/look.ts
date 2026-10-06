@@ -87,8 +87,25 @@ export const CORNERS: Record<Corners, { sm: number; md: number; lg: number }> = 
   round: { sm: 10, md: 14, lg: 20 },
 };
 
-/** `tokens.css`'s row heights by density, for the specimen, which draws the rows the saved look will draw. */
-export const ROW_H: Record<Density, number> = { compact: 32, comfortable: 36, roomy: 44 };
+/**
+ * `tokens.css`'s row heights by density, for the specimen, which draws the rows the saved look will draw.
+ *
+ * THE TOKENS ARE 36, 44 AND 52 (`--row-h` on `:root` and under `data-density`), and this said 32, 36 and 44, so a look
+ * saved at Comfortable drew every row 8 pixels shorter than the house does, and the specimen showed rows nobody else
+ * saw. `look.test.ts` holds the two equal by reading `tokens.css`.
+ */
+export const ROW_H: Record<Density, number> = { compact: 36, comfortable: 44, roomy: 52 };
+
+/**
+ * The density a saved row height is nearest to. A look saved before `ROW_H` met the tokens holds 32, 36 or 44, and is
+ * read by the height it draws, so saving it again changes no row by more than the 4 pixels 32 moves.
+ */
+export function densityOf(row: number | null): Density {
+  if (row === null) return 'comfortable';
+  if (row < (ROW_H.compact + ROW_H.comfortable) / 2) return 'compact';
+  if (row > (ROW_H.comfortable + ROW_H.roomy) / 2) return 'roomy';
+  return 'comfortable';
+}
 
 export type Draft = {
   /** The seed's accent: a colour code or an `oklch(...)`, as the declaration will carry it. */
@@ -417,7 +434,7 @@ export function draftFrom(look: Look | null): Draft {
   const md = px(look?.light['r-md']);
   const corners: Corners = md === null ? 'soft' : md <= CORNERS.square.md ? 'square' : md >= CORNERS.round.md ? 'round' : 'soft';
   const row = px(look?.light['row-h']);
-  const density: Density = row === ROW_H.compact ? 'compact' : row === ROW_H.roomy ? 'roomy' : 'comfortable';
+  const density = densityOf(row);
   return { accent, neutralHue: HOUSE_SEED.neutralHue, roles: { light: {}, dark: {} }, corners, density };
 }
 

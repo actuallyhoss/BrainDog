@@ -150,8 +150,15 @@ export const palette = {
     compact: 'Compact spacing',
     comfortable: 'Comfortable spacing',
     roomy: 'Roomy spacing',
+    /* WHERE A LOOK CHANGE IS KEPT, under its title (`pref.whereKept`): the record keeps each person's look, per record,
+       so it is on every device they open it on; a device with no record, or a record that cannot keep it, holds it alone;
+       and a change the record has not heard of yet waits here until it can be sent. */
+    inRecord: 'Yours in this record, on every device',
+    thisDeviceNow: 'On this device for now',
     thisDevice: 'On this device',
-    /* THE TOAST AFTER A LOOK CHANGES, which has nothing to add but where it was kept. */
+    /* THE TOAST AFTER A LOOK CHANGES, which has nothing to add but where it was kept, as the record answered. */
+    lookKept: (name: string) => `${name}, in this record on every device you open it on.`,
+    lookPending: (name: string) => `${name}, on this device for now. It reaches this record the next time it can.`,
     lookSet: (name: string) => `${name}, on this device.`,
     openOn: (name: string) => `Open on ${name}`,
     openOnDetail: 'The page BrainDog opens first',

@@ -82,6 +82,13 @@
     pointer-events: none;
   }
 
+  /* SAFARI'S GLASS, in a block of its own and in so many words, for the reason `Panel.svelte` gives. */
+  @supports (-webkit-backdrop-filter: none) {
+    .tabs::before {
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    }
+  }
+
   /* THE KEYBOARD TAKES THE BOTTOM OF THE SCREEN AND THIS WAS DRAWN ON TOP OF IT: four dead targets
      over the keys somebody is using, and `--z-sheet` puts them above the sheet being typed into.
      There is no length that means "not on screen", which is why this reads the attribute rather

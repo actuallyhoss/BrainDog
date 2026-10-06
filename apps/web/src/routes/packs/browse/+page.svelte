@@ -139,7 +139,6 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
     min-inline-size: 0;
   }
 
@@ -157,11 +156,17 @@
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-md);
     box-shadow: var(--glass-edge);
     color: var(--dim);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .find {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   .find:focus-within {
@@ -204,8 +209,14 @@
     :global(.head[data-under]) .order {
       background: var(--hover-wash);
       box-shadow: none;
-      -webkit-backdrop-filter: none;
       backdrop-filter: none;
+    }
+
+    @supports (-webkit-backdrop-filter: none) {
+      :global(.head[data-under]) .find,
+      :global(.head[data-under]) .order {
+        -webkit-backdrop-filter: none;
+      }
     }
   }
 

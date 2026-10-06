@@ -66,18 +66,29 @@
   /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the control in it drops its own. */
   :global(.head[data-under]) .hub-tabs {
     background: transparent;
-    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     box-shadow: none;
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.head[data-under]) .hub-tabs {
+      -webkit-backdrop-filter: none;
+    }
   }
 
   /* A PHONE'S HEAD IS NEVER THE GLASS BAR (`PageHead`), so there the control keeps its own glass. */
   @media (width < 900px) {
     :global(.head[data-under]) .hub-tabs {
       background: var(--glass);
-      -webkit-backdrop-filter: var(--glass-blur);
       backdrop-filter: var(--glass-blur);
       box-shadow: var(--glass-edge);
+    }
+
+    @supports (-webkit-backdrop-filter: none) {
+      :global(.head[data-under]) .hub-tabs {
+        -webkit-backdrop-filter: var(--glass-blur);
+      }
     }
   }
 

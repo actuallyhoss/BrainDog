@@ -152,7 +152,7 @@ export function captureOf(typed: string, ctx: CaptureContext): Capture {
 export function captureSaid(c: Capture, ctx: CaptureContext): string[] {
   const out: string[] = [];
   if (c.due) out.push(`Due ${daySaid(c.due)}`);
-  if (c.project !== null) out.push(ctx.projects.find((p) => p.seq === c.project)?.name ?? `#${c.project}`);
+  if (c.project !== null) out.push(ctx.projects.find((p) => p.seq === c.project)?.name ?? 'Unnamed project');
   if (c.priority) out.push(ctx.priorities?.find((p) => p.value === c.priority)?.said ?? c.priority);
   if (c.agent) out.push(c.agent.charAt(0).toUpperCase() + c.agent.slice(1));
   return out;

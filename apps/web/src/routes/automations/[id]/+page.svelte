@@ -636,7 +636,7 @@
       </div>
 
       {#if tab === 'steps'}
-        <div class="column">
+        <div class="column flow">
           <div class="canvas">
             <!-- A FAULT ABOUT THE WHOLE AUTOMATION IS READ WITH THE TRIGGER, the card it sits under, so a screen reader
                  that lands on the trigger hears what is wrong before it presses anything (`aria-describedby`). -->
@@ -812,7 +812,9 @@
         {/if}
       {:else}
         <div class="column">
-          <Tile icon="code" title={words.written}>
+          <!-- NO HEADING OVER IT: the tab it sits under already says "As written", and the same words twice is a heading
+               nobody needs. The tile is named for a screen reader instead. -->
+          <Tile aria-label={words.written}>
             <!-- A SCROLLING BOX A KEYBOARD CAN REACH, for `Sheet.svelte`'s reason: a long body scrolls sideways and down,
                  and a box with no focusable node in it cannot be scrolled without a pointer. -->
             <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -864,7 +866,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
-    max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
@@ -875,13 +876,18 @@
     max-inline-size: 100%;
   }
 
-  /* ONE COLUMN OF 720 for the flow and everything that goes with it: the try tile, the calls, the footer and the bar
-     are the cards' width, so at 1440 Save never sits out on its own to the right of what it saves. */
+  /* RUNS, VERSIONS AND AS WRITTEN RUN THE PAGE'S WIDTH, like every other list in the record. */
   .column {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+  }
+
+  /* THE FLOW KEEPS A MEASURE OF 720, and only the flow: it is one card under another, read top to bottom, and the try
+     tile, the calls, the footer and the bar are the cards' width, so Save never sits out on its own across the window
+     from what it saves. The docked inspector takes the room beside it once a card is open. */
+  .flow {
     max-inline-size: 720px;
   }
 
@@ -1025,6 +1031,16 @@
     margin-inline-start: auto;
   }
 
+  /* UNDO AND REDO PRINT THEIR KEYS WHEN ASKED FOR (DIRECTION 35): under the pointer or with keyboard focus. Without its
+     cap a pill takes its even padding back. */
+  .foot-actions :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
+    display: none;
+  }
+
+  .foot-actions :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
+    padding-inline-end: var(--sp-4);
+  }
+
   /**
    * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a glass bar at the foot of the column (chrome is glass). A
    * flow of twenty cards puts them two screens down, and they are the two things the page is for.
@@ -1045,10 +1061,16 @@
     align-self: flex-end;
     padding: var(--sp-1);
     background: var(--glass);
-    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border-radius: var(--r-pill);
     box-shadow: var(--glass-edge), var(--e2);
+  }
+
+  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
+  @supports (-webkit-backdrop-filter: none) {
+    .bar {
+      -webkit-backdrop-filter: var(--glass-blur);
+    }
   }
 
   @media (width < 900px) {
