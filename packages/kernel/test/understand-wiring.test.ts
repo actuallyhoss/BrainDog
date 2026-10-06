@@ -163,6 +163,26 @@ test('A meet STEP TAKES kind AND keys: a payee meets one organisation, and a key
   sql.close();
 });
 
+test('A RULE THAT SAYS only: known ADDS NOBODY NEW, meets who it knows, and any other word is refused at install', async () => {
+  const { k, sql } = await record(
+    rule({
+      rule: 'meet-known',
+      on: { arrival: { channel: 'email' } },
+      steps: [{ meet: { email: '{{trigger.body.from_address}}', name: '{{trigger.body.from_name}}', where: 'mail', source: 'mail', only: 'known' } }],
+    }),
+  );
+  value(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  value(k.arrive({ channel: 'email', headers: { from: '"Sam Stranger" <sam@nowhere.example>' }, body: 'Buy now.', sha256: 'k1', verified: true }));
+  value(k.arrive({ channel: 'email', headers: { from: '"Ada Lovelace" <ada@example.com>' }, body: 'Hello.', sha256: 'k2', verified: true }));
+  await k.drain();
+  const people = k.list({ register: 'people' });
+  assert.ok(people.ok);
+  assert.deepEqual(people.value.rows.map((r) => r.fields.name), ['Ada Lovelace'], 'a stranger is a sighting, never a person');
+  const odd = await k.install([rule({ rule: 'maybe', on: { arrival: { channel: 'email' } }, steps: [{ meet: { email: 'a@b.example', where: 'x', only: 'maybe' } }] })]);
+  assert.equal((odd as { refusal?: { at?: string } }).refusal?.at, 'steps[0].meet.only');
+  sql.close();
+});
+
 test('A SUBAGENT’S RUN IS PLACED WHERE ITS PARENT IS, once, when nothing else places it', async () => {
   const { k, sql } = await record();
   const project = value<Entry>(k.create('things', { name: 'BrainDog', repos: ['github.com/acme/braindog'] }, OWNER));

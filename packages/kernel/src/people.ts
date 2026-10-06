@@ -28,6 +28,15 @@
  * person of their own, and one who looks like somebody known is kept as a mention with one question for the owner. A row
  * every meeting of which was such text is never folded on the strong rules either, whichever order the two arrived in.
  *
+ * AND THAT IS EVERY SOURCE BUT A NAMED FEW (research-audit-19 M1). The owner typing, a note, and an agent session's own
+ * run are believed; anything else, however a caller words it, is text anybody could have written. A COMMIT sits between
+ * (audit 19 H1): anyone who can push may sign one with any name and address, so a commit by a key somebody already holds
+ * is that person's, and one by a key nobody holds is a person of their own. A commit folds somebody met in commits alone
+ * only into somebody else met in commits alone; one who looks like a person typed, noted or mailed is asked about.
+ *
+ * `only: 'known'` IS A RULE'S WAY OF SAYING "NOBODY NEW FROM THIS": it writes only on a key somebody holds, an address at
+ * an organisation the record keeps, or one the record's own person has written to, and is a mention otherwise.
+ *
  * NEVER: a person merged with an organisation (they live in two lists, and a key belongs to one row of one list); a row
  * another member made merged by anybody but its maker's say; a merge made without asking while money rows point at
  * both. A shared inbox or a machine sender (`info@`, `noreply@`) is an organisation speaking and never makes a person.
@@ -46,6 +55,7 @@ import { no, ok } from '@braindog/ports';
 import { instant } from './coerce.ts';
 import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
 import type { Proposal } from './govern.ts';
+import { UNVERIFIED } from './ingest.ts';
 import { githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
 import { LEGACY, PARTS, plays, type MeetsFields, type OrgFields, type Role } from './roles.ts';
 
@@ -95,10 +105,16 @@ export type MeetArgs = {
   where?: string;
   source?: string;
   /**
-   * Read from text anybody could have written: a mail, a bank text, an import, any arrival. A source that says so
-   * (`mail from …`, `bank text`, `import`) is read as untrusted without it, and `false` never lifts that.
+   * Read from text anybody could have written: a mail, a bank text, an import, any arrival. Every source is read so
+   * unless it is one `TRUSTED` names or the owner typed it (`PeopleDeps.typed`), and `false` never lifts that.
    */
   untrusted?: boolean;
+  /**
+   * `known`: meet only somebody the record has reason to know. A key somebody holds, an address at a domain a kept
+   * organisation holds, or one the record's own person has written to is met as ever; anybody else is a mention, with
+   * no row, no fold and no key carried.
+   */
+  only?: 'known';
 };
 
 /** The row met, as a person reads it: its list, its id, its number and its name. */
@@ -156,6 +172,12 @@ export type PeopleDeps = {
   moneyAt?: (id: string) => boolean;
   /** Run writes so a refusal takes back every one of them (`tx.ts`'s `attempt`). */
   attempt?: <T>(fn: () => Result<T>) => Result<T>;
+  /**
+   * Whether a member is meeting somebody at their own keyboard, signed in as themselves and not through a token. What
+   * they type is believed whatever its source says, unless it says it arrived (`mail from …`). Left out, only the
+   * sources `TRUSTED` names are.
+   */
+  typed?: boolean;
 };
 
 /** Where a part lives in a row's JSON, for a bound `json_extract` path. */
@@ -217,6 +239,36 @@ function shortForms(name: string): string[] {
  */
 const ARRIVED = /^\s*(?:(?:e-?)?mail\s*(?::|from\b)|bank\b|import(?:ed)?\b|sms\b|(?:text\s+)?message\s+from\b|text\s+from\b|whatsapp\b|arrival\b|arrived\s+in\b|inbox\b|forwarded\b)/iu;
 
+/**
+ * THE SOURCES THAT ARE BELIEVED, and the only ones (audit 19 M1): a note the owner wrote, and an agent session's own run
+ * (`session in braindog`, `run handoff on Fanline`). Everything else is text anybody could have written, so a caller
+ * relaying a Slack message, a calendar invite or a pasted transcript is held to the arrival rules however it words it.
+ */
+const TRUSTED = /^\s*(?:(?:a|an|the|this|that|my|his|her|their|our)\s+)?(?:notes?|sessions?|runs?|handoffs?)\b/iu;
+
+/** Words anywhere in a source that say a believed one is relaying somebody else's text: `a run reading the inbox`. */
+const RELAYED =
+  /\b(?:e-?mails?|mail|inbox|forwarded|bank|imports?|imported|sms|texts?|messages?|whatsapp|slack|dms?|discord|telegram|calendar|invites?|issues?|pull\s+requests?|prs?|tickets?|transcripts?|pasted|paste|arrival|arrived|webhook|tweets?|linkedin)\b/iu;
+
+/** A commit, whose author anybody who can push may write as anyone (audit 19 H1). */
+const COMMIT = /^\s*commits?\b/iu;
+
+/**
+ * What a meeting's source may prove. `trusted` folds and carries, `untrusted` does neither, and `commit` is believed
+ * on a key somebody holds and is otherwise a person of their own, folded only into somebody met in commits alone.
+ */
+type Trust = 'trusted' | 'commit' | 'untrusted';
+
+function trustOf(source: string | undefined, where: string | undefined, flagged: boolean, typed: boolean): Trust {
+  if (flagged) return 'untrusted';
+  const given = source ?? where ?? '';
+  const said = [source, where].filter((t): t is string => t !== undefined);
+  if (said.some((t) => ARRIVED.test(t))) return 'untrusted';
+  if (COMMIT.test(given)) return 'commit';
+  if (typed) return 'trusted';
+  return TRUSTED.test(given) && !said.some((t) => RELAYED.test(t)) ? 'trusted' : 'untrusted';
+}
+
 /** An address anywhere in a text, with its domain as the first group. */
 const ADDRESS = /[^\s<>()[\]"',;:]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)/giu;
 
@@ -256,9 +308,13 @@ type Said = {
   source: string;
   /** Text anybody could have written: no strong merge, no key carried onto anybody, no address folded into anybody. */
   untrusted: boolean;
+  /** A commit: believed on a key somebody holds, and otherwise folded only into somebody met in commits alone. */
+  commit: boolean;
+  /** Meet only somebody the record has reason to know (`MeetArgs.only`). */
+  only?: 'known';
 };
 
-function normalise(args: MeetArgs): Result<Said> {
+function normalise(args: MeetArgs, typed = false): Result<Said> {
   const text = (v: unknown, at: string): Result<string | undefined> =>
     v === undefined || v === null ? ok(undefined) : typeof v === 'string' ? ok(v.trim() || undefined) : no('VALUE_MALFORMED', `${at} takes a string.`, { at });
 
@@ -276,7 +332,10 @@ function normalise(args: MeetArgs): Result<Said> {
   const source = clip(unaddressed(given));
   if (args.untrusted !== undefined && typeof args.untrusted !== 'boolean')
     return no('VALUE_MALFORMED', 'untrusted is true or false.', { at: 'untrusted' });
-  const untrusted = args.untrusted === true || [read.source, read.where].some((t) => t !== undefined && ARRIVED.test(t));
+  const trust = trustOf(read.source, read.where, args.untrusted === true, typed);
+  const only = (args as { only?: unknown }).only;
+  if (only !== undefined && only !== null && only !== 'known')
+    return no('VALUE_MALFORMED', "only takes known, to meet nobody the record has no reason to know.", { at: 'only', allowed: ['known'] });
 
   const kind = args.kind ?? 'person';
   if (kind !== 'person' && kind !== 'organisation')
@@ -323,7 +382,9 @@ function normalise(args: MeetArgs): Result<Said> {
 
   return ok({
     source,
-    untrusted,
+    untrusted: trust === 'untrusted',
+    commit: trust === 'commit',
+    ...(only === 'known' ? { only } : {}),
     kind,
     keys,
     ...(name === undefined ? {} : { name }),
@@ -379,7 +440,7 @@ const mention = (): Met => ({ row: null, created: false, matched_by: 'none', men
 
 export function meet(deps: PeopleDeps, args: MeetArgs): Result<Met> {
   const list = deps.list;
-  const said = normalise(args);
+  const said = normalise(args, deps.typed === true);
   /* WHICH LIST, FIRST: a person's, unless they said organisation or the address is a shared inbox or a machine. */
   const toOrg = said.ok && (said.value.kind === 'organisation' || (said.value.email !== undefined && isOrganisationAddress(said.value.email)));
   if (!toOrg) {
@@ -419,6 +480,12 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
 
   const found = holders(deps.sql, list.register, keys);
   const hit = found[0] ? rowById(deps.sql, found[0].id) : null;
+  /* NOBODY NEW FROM A RULE THAT SAID `only: 'known'`: a sender the record has no reason to know is a sighting, not a
+     person, and nothing about them is written onto anybody. */
+  if (!hit && s.only === 'known' && !knownAddress(deps, list, keys)) {
+    noteMention(deps.sql, { name: s.name ?? nameFromKeys(keys), kind: 'person', project, source: s.source, at: instant(deps.nowMs) });
+    return ok(mention());
+  }
   /* AN ARRIVAL NOBODY ANSWERS TO THAT LOOKS LIKE SOMEBODY KNOWN (H1): `From: "Rohan Mehta" <rohanmehta@evil.test>`
      made a row the strong rules folded into the real Rohan, and his keys then answered for whoever sent it. */
   if (!hit && s.untrusted) {
@@ -468,7 +535,11 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   /* THE MEETING BRIDGED TWO PEOPLE THE RECORD HELD APART: one key was one row's and another key another's. Never
      joined on its own, since one wrong key would fold two people; asked. */
   const bridged = found.slice(1).map((h) => rowById(deps.sql, h.id)).filter((r): r is Row => r !== null);
-  const settled = settle(deps, list, person, bridged, !s.untrusted);
+  /* A COMMIT FOLDS ONLY SOMEBODY MET IN COMMITS ALONE INTO SOMEBODY MET IN COMMITS ALONE (audit 19 H1): two commits as
+     `Rohan Mehta` are one author's spellings, but one forged as him beside the Rohan the owner typed is asked about.
+     A key the other row already holds would have been a key match, never a fold. */
+  const folds: Folds = s.untrusted ? 'none' : s.commit ? 'commits' : 'any';
+  const settled = settle(deps, list, person, bridged, folds);
   if (!settled.ok) return settled as Result<Met>;
   const { kept, undo, question, touched } = settled.value;
   /* EVERY QUESTION NAMING SOMEBODY THIS MEETING MOVED IS BROUGHT UP TO THEM, so a later commit of the same person never
@@ -581,7 +652,7 @@ function orgFor(deps: PeopleDeps, s: Said, keys: readonly string[]): string | nu
   const orgs = deps.orgs;
   if (!orgs || deps.list?.fields.org === undefined) return null;
   if (s.domain !== undefined || s.org !== undefined) {
-    const met = meetOrg(deps, { kind: 'organisation', keys: [], source: s.source, untrusted: s.untrusted, ...(s.org === undefined ? {} : { name: s.org }), ...(s.domain === undefined ? {} : { domain: s.domain }) }, false);
+    const met = meetOrg(deps, { kind: 'organisation', keys: [], source: s.source, untrusted: s.untrusted, commit: s.commit, ...(s.only === undefined ? {} : { only: s.only }), ...(s.org === undefined ? {} : { name: s.org }), ...(s.domain === undefined ? {} : { domain: s.domain }) }, false);
     if (met.ok && met.value.row) return met.value.row.id;
   }
   const mail = keys.find((k) => kindOfKey(k) === 'email');
@@ -645,7 +716,8 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
   } else {
     const stored = keys.filter((k) => !(k === `domain:${domain}` && at.domain !== undefined));
     const keepable = (at.domain !== undefined && domain !== undefined) || (at.keys !== undefined && stored.length > 0);
-    if (!keepable || name === undefined) {
+    /* `only: 'known'` ADDS NO ORGANISATION EITHER: one the record keeps is met above, by a key or its name. */
+    if (!keepable || name === undefined || s.only === 'known') {
       noteMention(deps.sql, { name: name ?? '', kind: 'organisation', project, source: s.source, at: instant(deps.nowMs) });
       return ok(mention());
     }
@@ -716,10 +788,16 @@ function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string): Row |
 
 /* ── who else they might be ──────────────────────────────────────────── */
 
+/** Every key a person's row answers to: its address, its handles and its keys. */
+const keysOfRow = (list: DeclaredList<MeetsFields>, row: Row): string[] => {
+  const at = list.fields;
+  return keysOf({ email: textOf(row.fields[at.email]), handles: at.handles === undefined ? [] : listOf(row.fields[at.handles]), keys: at.keys === undefined ? [] : listOf(row.fields[at.keys]) });
+};
+
 /** A person's identifiers, read off the row: emails as `{local, domain}`, logins, and the org they are with. */
 function identity(list: DeclaredList<MeetsFields>, row: Row): { emails: { local: string; domain: string }[]; logins: string[]; org: string | null } {
   const at = list.fields;
-  const keys = keysOf({ email: textOf(row.fields[at.email]), handles: at.handles === undefined ? [] : listOf(row.fields[at.handles]), keys: at.keys === undefined ? [] : listOf(row.fields[at.keys]) });
+  const keys = keysOfRow(list, row);
   const emails = keys
     .filter((k) => kindOfKey(k) === 'email')
     .map((k) => {
@@ -758,14 +836,95 @@ function stemsOf(list: DeclaredList<MeetsFields>, row: Row): Set<string> {
 function vouched(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row): boolean {
   const lines = listOf(row.fields[list.fields.met]);
   if (lines.some((l) => !ARRIVED.test(sourceOfLine(l)))) return true;
-  /* WHAT THE ROW WAS MADE WITH, from its create line in the log: the fields whole. One that cannot be read vouches only
-     for a row nobody met. */
+  /* ONE WHOSE CREATE LINE CANNOT BE READ vouches only for a row nobody met. */
+  const made = madeLines(deps, list, row);
+  return made === null ? lines.length === 0 : !made.some((l) => ARRIVED.test(sourceOfLine(l)));
+}
+
+/** The met lines a row was made with, from its create line in the log (the fields whole), or `null` when it cannot be read. */
+function madeLines(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row): string[] | null {
   const made = deps.sql.one<{ to_v: string | null }>("SELECT to_v FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${row.id}`)?.to_v;
   try {
-    return !listOf((JSON.parse(made ?? '') as Record<string, unknown>)[list.fields.met]).some((l) => ARRIVED.test(sourceOfLine(l)));
+    return listOf((JSON.parse(made ?? '') as Record<string, unknown>)[list.fields.met]);
   } catch {
-    return lines.length === 0;
+    return null;
   }
+}
+
+/**
+ * Whether somebody was only ever met in commits: made by a meeting, met in one commit at least, and every line that
+ * vouches for them, then and since, a commit's. A commit by a key nobody held folds only into such a person, never into
+ * one the owner typed or noted (audit 19 H1).
+ *
+ * A LINE ANYBODY COULD HAVE WRITTEN SAYS NOTHING EITHER WAY: a forged author who then mails in from the address he
+ * signed with is still only a commit author, and never becomes somebody the next commit may fold into the real person.
+ */
+function commitsOnly(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, row: Row): boolean {
+  const believed = (ls: string[]) => ls.map(sourceOfLine).filter((l) => !ARRIVED.test(l));
+  const lines = believed(listOf(row.fields[list.fields.met]));
+  if (lines.length === 0 || !lines.every((l) => COMMIT.test(l))) return false;
+  const made = madeLines(deps, list, row);
+  return made !== null && made.length > 0 && believed(made).every((l) => COMMIT.test(l));
+}
+
+/**
+ * Whether the record has reason to know somebody by an address nobody holds yet (`only: 'known'`): it is at a domain an
+ * organisation the record keeps holds, or the record's own person has written to it. A handle or a bank key says neither.
+ */
+function knownAddress(deps: PeopleDeps, list: DeclaredList<MeetsFields>, keys: readonly string[]): boolean {
+  const mails = keys.filter((k) => kindOfKey(k) === 'email').map(valueOfKey);
+  if (mails.length === 0) return false;
+  const orgs = deps.orgs?.register;
+  for (const mail of mails) {
+    const domain = orgs === undefined ? null : registrable(mail);
+    const held = domain === null ? null : holderOf(deps.sql, `domain:${domain}`);
+    if (held !== null && held.register === orgs) return true;
+  }
+  return wroteTo(deps, list, mails);
+}
+
+/** The most mails naming one address that `wroteTo` reads, newest first. */
+const WROTE_READ = 50;
+
+/**
+ * Whether the record's own person has written to one of these addresses: a mail that reached the record, that something
+ * verified (`UNVERIFIED`), from an address his own row holds, with the address among its recipients. A forged `From`
+ * is what the verification is for, so an unverified mail says nothing.
+ */
+function wroteTo(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, mails: readonly string[]): boolean {
+  const self = list.fields.self;
+  if (self === undefined) return false;
+  const own = deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} AND json_extract(fields, ?) = 1`,
+      ...live(list.register, list.fields.merged_into),
+      path(self),
+    )
+    .map(hydrate);
+  const mine = new Set(own.flatMap((r) => keysOfRow(list, r)).filter((k) => kindOfKey(k) === 'email'));
+  if (mine.size === 0) return false;
+  const wanted = new Set(mails.map((m) => keyOf('email', m)).filter((k): k is string => k !== null));
+  for (const mail of mails) {
+    const sent = deps.sql.all<{ headers: string | null }>(
+      "SELECT headers FROM inbox_raw WHERE channel = 'email' AND state <> 'erased' AND (reason IS NULL OR reason <> ?) AND instr(lower(headers), ?) > 0 ORDER BY ts DESC LIMIT ?",
+      UNVERIFIED,
+      mail.toLowerCase(),
+      WROTE_READ,
+    );
+    for (const { headers } of sent) {
+      let head: Record<string, unknown>;
+      try {
+        head = JSON.parse(headers ?? '{}') as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const from = typeof head.from === 'string' ? parseFrom(head.from) : null;
+      if (from === null || !mine.has(keyOf('email', from.address) ?? '')) continue;
+      const to = ['to', 'cc', 'bcc'].map((h) => (typeof head[h] === 'string' ? (head[h] as string) : '')).join(', ');
+      if ([...to.matchAll(ADDRESS)].some((m) => wanted.has(keyOf('email', m[0]) ?? ''))) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -852,25 +1011,32 @@ function candidates(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsField
     .filter((r) => similar(list, person, r));
 }
 
+/**
+ * Which strong folds a meeting may make: `any` for a believed source, `commits` for a commit, which never folds somebody
+ * met in commits alone with somebody met otherwise (`kindsMeet`), and `none` for text anybody could have written.
+ */
+type Folds = 'any' | 'commits' | 'none';
+
 /** What `settle` did: the row a strong rule folded this meeting into, the batch that undoes it, the question, the rows moved. */
 type Settled = { kept: Row | null; undo: string | null; question: string | null; touched: string[] };
 
 /**
  * After a person is met: fold them into the one the strong rules say they are, or ask once about the doubtful rest.
  *
- * `bridged` ARE ROWS THIS MEETING'S OWN KEYS FOUND BESIDE THE ONE IT MATCHED, always asked, never folded. `trusted` is
- * false for text anybody could have written, which folds nothing (H1).
+ * `bridged` ARE ROWS THIS MEETING'S OWN KEYS FOUND BESIDE THE ONE IT MATCHED, always asked, never folded. `folds` is
+ * `none` for text anybody could have written, which folds nothing (H1), and `commits` for a commit by a key nobody held,
+ * which folds only into somebody met in commits alone (audit 19 H1); the rest is asked.
  *
  * A FOLD MAY MAKE THE KEPT ROW ONE ANOTHER ROW'S STRONG MATCH (it now holds the fold's handle), so the rules run again on
  * it, a few times at most, all in one batch, so one Undo takes back everything this meeting folded.
  */
-function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, bridged: Row[], trusted: boolean): Result<Settled> {
+function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, bridged: Row[], folds: Folds): Result<Settled> {
   const mine = (r: Row) => deps.othersRow?.(r.id) === true;
   const apart = new Set(bridged.map((b) => b.id));
   const touched: string[] = [];
   let fresh = rowById(deps.sql, person.id) ?? person;
   let batch: string | null = null;
-  for (let hop = 0; trusted && !mine(fresh) && hop < STRONG_HOPS; hop++) {
+  for (let hop = 0; folds !== 'none' && !mine(fresh) && hop < STRONG_HOPS; hop++) {
     const now = fresh;
     const other = candidates(deps, list, now).find(
       (o) =>
@@ -879,6 +1045,7 @@ function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, 
         strong(list, now, o) &&
         vouched(deps, list, now) &&
         vouched(deps, list, o) &&
+        kindsMeet(deps, list, now, o, folds, person.id) &&
         !(deps.moneyAt?.(now.id) && deps.moneyAt?.(o.id)) &&
         !refused(deps, list, now, o, false),
     );
@@ -914,6 +1081,22 @@ function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, 
   if (doubtful.length === 0) return ok({ kept, undo: batch, question: null, touched });
   const asked = askOrExtend(deps, list, [fresh, ...doubtful]);
   return asked.ok ? ok({ kept, undo: batch, question: asked.value, touched }) : (asked as Result<never>);
+}
+
+/**
+ * Whether the strong rules may fold these two as far as where each was met goes (audit 19 H1). Two people met in commits
+ * alone may be one author's spellings, and so may two met anywhere else. Somebody met in commits alone beside somebody
+ * met otherwise is a commit author anybody could have signed as: a commit never folds the two, by a key nobody held or
+ * by one its own author's row already held (two commits as `Rohan Mehta <rohanmehta@evil.test>` are the same forger
+ * twice). A believed source folds them only when the commit-made row is the one this very meeting found by its key,
+ * never a step later down the chain, where a forged author would be folded in on the real person's next meeting.
+ *
+ * A KEY THE OTHER ROW ALREADY HOLDS IS NOT A FOLD AT ALL: the meeting is that person's, by the key, before any rule runs.
+ */
+function kindsMeet(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, a: Row, b: Row, folds: Folds, met: string): boolean {
+  const [ca, cb] = [commitsOnly(deps, list, a), commitsOnly(deps, list, b)];
+  if (ca === cb) return true;
+  return folds === 'any' && (ca ? a : b).id === met;
 }
 
 /** Which of two is kept: the record's own person always, then the older. */

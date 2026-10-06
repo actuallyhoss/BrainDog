@@ -116,3 +116,178 @@ test('A TOKEN SAYS WHICH APP HOLDS IT, when its host said so, and a bad one is r
   assert.equal(sql.all('SELECT id FROM token').length, before);
   sql.close();
 });
+
+/* ── research-audit-19: H2, M3 and M4 ──────────────────────────────────── */
+
+import { kindOfEvent, kindsOfWrite, shapeIn, type ListShape } from '../src/change-kind.ts';
+import { SLASH } from '../src/slash.ts';
+import type { Kernel } from '../src/index.ts';
+
+const PEOPLE: Declaration = {
+  id: 'register.people',
+  kind: 'register',
+  body: {
+    id: 'people',
+    name: 'People',
+    title: 'name',
+    meets: { name: 'name', email: 'email', handles: 'handles', met: 'met', merged_into: 'merged_into', keys: 'keys', self: 'self' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'email', type: 'email' },
+      { id: 'handles', type: 'list', of: 'text' },
+      { id: 'met', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'people' },
+      { id: 'keys', type: 'list', of: 'text' },
+      { id: 'self', type: 'bool' },
+      { id: 'note', type: 'text' },
+    ],
+  } as never,
+};
+const ORGS: Declaration = {
+  id: 'register.organisations',
+  kind: 'register',
+  body: {
+    id: 'organisations',
+    name: 'Organisations',
+    title: 'name',
+    org: { name: 'name', keys: 'keys', domain: 'domain', merged_into: 'merged_into' },
+    fields: [
+      { id: 'name', type: 'text', required: true },
+      { id: 'domain', type: 'text' },
+      { id: 'keys', type: 'list', of: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'organisations' },
+    ],
+  } as never,
+};
+const NOTED: Declaration = {
+  ...TASKS,
+  body: { ...(TASKS.body as object), fields: [...(TASKS.body as { fields: object[] }).fields, { id: 'note', type: 'text' }, { id: 'tags', type: 'list', of: 'text' }] } as never,
+};
+
+const AGENT = as('t_1', 'cc-1');
+const tell = (sql: NodeSql, agent: string, ...kinds: string[]) => {
+  for (const kind of kinds) sql.exec("INSERT INTO ladder (agent, kind, rung, since) VALUES (?, ?, 'tell', ?)", agent, kind, new Date(NOW).toISOString());
+};
+const ask = (k: Kernel, rows: unknown[], register: string, by: Parameters<Kernel['propose']>[1] = AGENT) =>
+  value<{ id: string }>(k.propose({ question: 'Change it?', body_kind: 'rowset', body: { register, rows } }, by)).id;
+const ladderSays = (k: Kernel, id: string): string | null => {
+  const out = k.decide(id, { rule: 'ladder' }, 'p_owner');
+  return out.ok ? null : fixOf(out as never);
+};
+
+async function people(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install([NOTED, PEOPLE, ORGS]));
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_1', 'p_owner', 'h', 'write', '2026-10-01T00:00:00.000Z')");
+  value(k.create('people', { name: 'Ada Vine', email: 'ada@vine.test' }, AGENT));
+  value(k.create('people', { name: 'A. Vine' }, AGENT));
+  value(k.create('organisations', { name: 'Vine Ltd' }, AGENT));
+  value(k.create('organisations', { name: 'Vine Limited' }, AGENT));
+  value(k.create('tasks', { name: 'Ship the floor' }, AGENT));
+  return { k, sql };
+}
+
+test('WHO A PERSON OR AN ORGANISATION IS IS READ FROM THE ROLES THEIR LIST PLAYS, never from its name', async () => {
+  const { sql } = await people();
+  assert.deepEqual(shapeIn(sql, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self']);
+  assert.deepEqual(shapeIn(sql, 'organisations')?.identity, ['merged_into', 'keys']);
+  assert.equal(shapeIn(sql, 'tasks')?.identity, undefined);
+  sql.close();
+
+  /* A `contacts` LIST DECLARING THE ROLE IS FLOORED THE SAME, and a keyless `people` from before the keys by its names. */
+  const other = openSqlite();
+  const k = await openRecord(other, fixedClock(NOW));
+  const body = PEOPLE.body as { fields: { id: string; to?: string }[] };
+  const fields = body.fields.map((f) => (f.id === 'merged_into' ? { ...f, to: 'contacts' } : f));
+  value(await k.install([{ id: 'register.contacts', kind: 'register', body: { ...body, id: 'contacts', name: 'Contacts', fields } as never }]));
+  assert.deepEqual(shapeIn(other, 'contacts')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self']);
+  other.close();
+  const legacy = openSqlite();
+  const old = await openRecord(legacy, fixedClock(NOW));
+  const { meets: _meets, ...keyless } = PEOPLE.body as unknown as Record<string, unknown>;
+  value(await old.install([{ id: 'register.people', kind: 'register', body: keyless as never }]));
+  assert.deepEqual(shapeIn(legacy, 'people')?.identity, ['merged_into', 'email', 'handles', 'keys', 'self']);
+  legacy.close();
+});
+
+test('H2. A MERGE OR AN IDENTITY KEY IS ON THE FLOOR, and the ladder never answers it', async () => {
+  const { k, sql } = await people();
+  tell(sql, 't_1', 'people:edit', 'people:tag', 'organisations:edit', 'organisations:tag');
+  /* ONLY `merged_into`, which no field marks `by: 'decide'`, was a plain edit the ladder let through. */
+  assert.match(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { merged_into: 'people#1' } }], 'people'))!, /people:edit, which always asks \(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { email: 'ada@evil.test' } }], 'people'))!, /\(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'people#1', version: 1, patch: { keys: ['email:ada@vine.test', 'github:ada'] } }], 'people'))!, /people:tag, which always asks \(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'people#1', version: 1, patch: { handles: ['@ada'] } }], 'people'))!, /\(identity\)/);
+  /* AND WHICH PERSON IS THE RECORD'S OWN, which decides the row a merge keeps and whose mail counts as his. */
+  assert.match(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { self: true } }], 'people'))!, /\(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'organisations#2', version: 1, patch: { merged_into: 'organisations#1' } }], 'organisations'))!, /\(identity\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'organisations#1', version: 1, patch: { keys: ['domain:vine.test'] } }], 'organisations'))!, /\(identity\)/);
+  assert.equal(k.get('people#2')?.fields.merged_into ?? null, null, 'the merge was written');
+
+  /* THE REST OF A PERSON STILL CLIMBS: a note, a meeting, a new name, and the email sent back as it already was. */
+  assert.equal(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { note: 'Ada’s initials, from a commit' } }], 'people')), null);
+  assert.equal(ladderSays(k, ask(k, [{ at: 'people#1', version: 1, patch: { met: ['2026-10-06 in braindog'] } }], 'people')), null);
+  assert.equal(ladderSays(k, ask(k, [{ at: 'people#1', version: 2, patch: { name: 'Ada R. Vine', email: 'ada@vine.test' } }], 'people')), null);
+  assert.equal(k.get('people#1')?.fields.name, 'Ada R. Vine');
+  sql.close();
+});
+
+test('M3. A WRITER WHO ACTS FOR NOBODY MEETS EVERY ROW A PERSON MADE AS SOMEBODY ELSE’S: Slash, and a run no token opened', async () => {
+  const { k, sql } = await people();
+  tell(sql, SLASH, 'tasks:edit');
+  /* A ROW A MEMBER MADE ALWAYS ASKS SLASH, which is nobody's person; the floor used to need a person on both sides. */
+  value(k.create('tasks', { name: 'Ada’s task' }, { actor: 'p_ada' }));
+  assert.match(ladderSays(k, ask(k, [{ at: 'tasks#2', version: 1, patch: { name: 'Ada’s, renamed' } }], 'tasks', SLASH))!, /tasks:edit, which always asks \(others\)/);
+  /* AND SO DOES THE OWNER'S, until he is one: Slash works for whoever owns the record, read from its members. */
+  assert.match(ladderSays(k, ask(k, [{ at: 'tasks#1', version: 1, patch: { name: 'Ship it' } }], 'tasks', SLASH))!, /\(others\)/);
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', 'owner@studio.test', 'Olu Owner')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  assert.equal(ladderSays(k, ask(k, [{ at: 'tasks#1', version: 1, patch: { name: 'Ship it' } }], 'tasks', SLASH)), null);
+  /* A ROW NOBODY MADE AS A PERSON, such as one a rule wrote, climbs too. */
+  value(k.create('tasks', { name: 'From a rule' }, { actor: 'rule:capture' }));
+  assert.equal(ladderSays(k, ask(k, [{ at: 'tasks#3', version: 1, patch: { name: 'From a rule, renamed' } }], 'tasks', SLASH)), null);
+
+  /* A RUN WITH NO TOKEN, read as the write says it. */
+  const shape = shapeIn(sql, 'tasks');
+  const orphan = kindsOfWrite({ list: 'tasks', op: 'update', patch: { name: 'x' }, shape, madeBy: 'p_owner', person: null });
+  assert.equal(orphan[0]?.floor, 'others');
+  assert.equal(kindsOfWrite({ list: 'tasks', op: 'update', patch: { name: 'x' }, shape, madeBy: null, person: null })[0]?.floor, null);
+  assert.equal(kindsOfWrite({ list: 'tasks', op: 'update', patch: { name: 'x' }, shape, madeBy: 'p_owner', person: 'p_owner' })[0]?.floor, null);
+  sql.close();
+});
+
+test('M4. A FIELD SENT EMPTY IS THE DELETE FLOOR, and one sent back empty as it was is not', async () => {
+  const TAGGED: ListShape = { fields: [{ id: 'name', type: 'text' }, { id: 'note', type: 'text' }, { id: 'tags', type: 'list', of: 'text' }, { id: 'cost', type: 'money' }] };
+  const floor = (patch: Record<string, unknown>, was?: Record<string, unknown>) =>
+    Object.fromEntries(kindsOfWrite({ list: 'tasks', op: 'update', patch, shape: TAGGED, ...(was ? { was } : {}) }).map((k) => [k.key, k.floor]));
+  assert.deepEqual(floor({ note: null }), { 'tasks:edit': 'delete' });
+  /* AN EMPTY TEXT IS THE THIRD WAY THE WRITE PATH REMOVES A FIELD (`isAbsent`), and was a plain edit. */
+  assert.deepEqual(floor({ note: '' }), { 'tasks:edit': 'delete' });
+  assert.deepEqual(floor({ note: '' }, { name: 'x' }), { 'tasks:edit': null });
+  assert.deepEqual(floor({ tags: [] }), { 'tasks:tag': 'delete' });
+  assert.deepEqual(floor({ tags: ['late'] }), { 'tasks:tag': null });
+  assert.deepEqual(floor({ name: 'x', note: null }), { 'tasks:edit': 'delete' });
+  /* A CLEARED AMOUNT IS STILL MONEY, the narrower sentence. */
+  assert.deepEqual(floor({ cost: null }), { 'tasks:edit': 'money' });
+  /* NOTHING SENT AS NOTHING, when the row is known. */
+  assert.deepEqual(floor({ note: null, tags: [] }, { name: 'x' }), { 'tasks:tag': null, 'tasks:edit': null });
+  assert.deepEqual(floor({ note: null }, { note: 'kept' }), { 'tasks:edit': 'delete' });
+
+  /* THE LOG READS A CLEARING BACK AS ONE, and an untag, one word off a list, as a tag. */
+  const line = (kind: string, field: string, to_v: string | null) => kindOfEvent({ list: 'tasks', kind, field, to_v }, TAGGED)?.floor;
+  assert.equal(line('edit', 'note', 'null'), 'delete');
+  assert.equal(line('edit', 'note', '"kept"'), null);
+  assert.equal(line('untag', 'tags', null), null);
+
+  const { k, sql } = await people();
+  tell(sql, 't_1', 'tasks:edit', 'tasks:tag');
+  value(k.update('tasks', 'tasks#1', { note: 'Before Friday', tags: ['late'] }, { ...AGENT, version: 1 }));
+  assert.match(ladderSays(k, ask(k, [{ at: 'tasks#1', version: 2, patch: { note: null } }], 'tasks'))!, /tasks:edit, which always asks \(delete\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'tasks#1', version: 2, patch: { note: '' } }], 'tasks'))!, /tasks:edit, which always asks \(delete\)/);
+  assert.match(ladderSays(k, ask(k, [{ at: 'tasks#1', version: 2, patch: { tags: [] } }], 'tasks'))!, /tasks:tag, which always asks \(delete\)/);
+  /* AN AGENT SENDING THE PEOPLE ROW BACK WHOLE, nulls and all, is not clearing what was never there. */
+  tell(sql, 't_1', 'people:edit', 'people:tag');
+  assert.equal(ladderSays(k, ask(k, [{ at: 'people#2', version: 1, patch: { name: 'Ada Vine (initials)', merged_into: null, keys: [] } }], 'people')), null);
+  sql.close();
+});

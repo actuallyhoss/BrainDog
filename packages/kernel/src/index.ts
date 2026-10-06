@@ -120,9 +120,9 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
-import { COST_RANK_SQL, COST_SQL, costOf, costRank, type Cost } from './weigh.ts';
+import { COST_SQL, COSTS, costOf, costRank, type Cost } from './weigh.ts';
 import { evaluateMetric, predicateOf, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type PageResult, type QueueCandidate, type QueueQuestion } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -225,7 +225,7 @@ import { answeredOnly, fileVerdicts, meet as meetPerson, resolveJob, type MeetAr
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure } from './built-in-figures.ts';
-import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, shapeIn } from './change-kind.ts';
+import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import {
@@ -458,7 +458,7 @@ export type { Arrival, Arrived, Confidence, Extracted, Extractor, FieldOutcome, 
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, QueueCandidate, QueueOption, QueueQuestion } from './pages.ts';
+export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
@@ -518,6 +518,33 @@ export type ViewRow = {
   created_at: string;
   updated_at: string;
 };
+
+/**
+ * A rowset whose rows write a money value (`{ amount, currency }` with an integer amount), as SQL over a `suggestion`
+ * row: what `cardFacts` reads as the money a question moves, one row's write at a time (an update's `patch`, a new row
+ * itself). Each value is guarded before `json_each` reads it, which throws on text that is not JSON.
+ */
+const MONEY_ROWS_SQL = `(body_kind = 'rowset' AND json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.rows') = 'array'
+  AND EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
+      WHEN r.type <> 'object' THEN NULL
+      WHEN json_type(r.value, '$.at') IS NULL THEN r.value
+      WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
+    WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
+      AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3))`;
+
+/**
+ * THE BAND A QUEUE RANKS AND COUNTS BY: `costOf`'s, except that a question that moves money is always hard to undo
+ * (audit 19, H3), so it never sits in a cheap band where Enter would accept it. `questionFrom` says the same of the
+ * question it draws.
+ */
+const BAND_SQL = `(CASE WHEN ${MONEY_ROWS_SQL} THEN 'undo' ELSE ${COST_SQL} END)`;
+const BAND_RANK_SQL = `(CASE ${BAND_SQL} ${COSTS.map((c, i) => `WHEN '${c}' THEN ${i}`).join(' ')} ELSE ${COSTS.length} END)`;
+
+/** How many of its writes a dry walk over the past says, in names (`kernel.backfill({ dry: true })`). */
+const BACKFILL_PLANNED = 10;
+
+/** One write a dry walk would make: the list's name, the row's title (`null` for a new row), and each field by its label. */
+export type BackfillPlanned = { list: string; row: string | null; fields: Record<string, Json> };
 
 /** The columns a view is read back from, in one place, because three statements select them. */
 const VIEW_SELECT = 'SELECT register, id, name, filter, search, sort, columns, created_by, created_at, updated_at';
@@ -658,6 +685,8 @@ export type Entry = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** On a write's answer only: the batch it was written under, which `undoPlan`/`undoApply` take to put it back. */
+  batch?: string;
 };
 
 export type Patch = Record<string, unknown>;
@@ -3757,6 +3786,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* STAMPED AFTER VALIDATION, because these are the kernel's own fields and no declaration
          describes them — running them through the field loop would refuse every one. */
       if (w.stamp) Object.assign(merged, w.stamp);
+      /* A run placed through a stamp writes its move as a line of its own, with `project` from and to, so the server's
+         undo can put it back like any other edit. */
+      if (register === SESSION && current && w.stamp?.project !== undefined && !touched.includes('project')) touched.push('project');
       /* A run a key makes by hand is that key's, as one the ladder opens is: otherwise it would be a
          person's, and any key could name it. */
       if (register === SESSION && !current && w.principal?.kind === 'token' && w.principal.token !== undefined)
@@ -3806,7 +3838,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const paired = settlePairs(entry, null, decl, w.batch ?? batch, now) ? byId(entry.id, true) : null;
         const changed = Object.keys(merged);
         if (paired && decl.pairs && !changed.includes(decl.pairs.mark)) changed.push(decl.pairs.mark);
-        return ok(rules(paired ?? entry, register, w, batch, { op: 'create', changed }));
+        return ok({ ...rules(paired ?? entry, register, w, batch, { op: 'create', changed }), batch: w.batch ?? batch });
       }
 
       sql.exec(
@@ -3911,7 +3943,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         sql.exec('UPDATE event SET rowid = (SELECT MAX(rowid) + 1 FROM event), to_v = ? WHERE id = ?', written(shape), made.id);
         const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
         handedNotice(decl, entry, changed, w.actor);
-        return ok(rules(entry, register, w, w.batch ?? made.batch ?? made.id, { op: 'update', changed }));
+        const folded = w.batch ?? made.batch ?? made.id;
+        return ok({ ...rules(entry, register, w, folded, { op: 'update', changed }), batch: folded });
       }
 
       /* ONE ROW PER CHANGED FIELD, and this is the difference between a history and an activity
@@ -4026,7 +4059,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && paired.fields[decl.pairs.mark] !== current.fields[decl.pairs.mark])
         changed.push(decl.pairs.mark);
       if (!deleting) handedNotice(decl, paired ?? entry, changed, w.actor);
-      return ok(rules(paired ?? entry, register, w, batch, { op: first === 'delete' ? 'delete' : 'update', changed }));
+      /* THE ANSWER CARRIES ITS BATCH, so a receipt's Undo can ask the record to put back this write and all it caused. */
+      return ok({ ...rules(paired ?? entry, register, w, batch, { op: first === 'delete' ? 'delete' : 'update', changed }), batch });
     });
   }
 
@@ -4869,11 +4903,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /**
    * Whether a member other than an owner made this row: then no merge folds it without asking them, and `meet` leaves
-   * it out of every question it opens. A row made by a run, a rule or an import is the record's.
+   * it out of every question it opens. A row a member's agent made through its run is that member's, as the ladder reads
+   * it (`personOf`); a row made by a rule, an import or a run no member's key opened is the record's.
    */
   function othersRow(id: string): boolean {
-    const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${id}`)?.actor;
-    if (by === undefined || !by.startsWith('p_')) return false;
+    const by = madeByIn(sql, id);
+    if (by === null) return false;
     const levels = sql.all<{ level: string }>('SELECT level FROM member WHERE person_id = ?', by).map((m) => m.level);
     return levels.length > 0 && !levels.includes('owner');
   }
@@ -5351,6 +5386,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const seen = Array.isArray(one.seen) ? one.seen.filter((w): w is string => typeof w === 'string').slice(0, 5) : [];
       return [{ at: one.at, name: one.name, seen, ...(one.kept === true ? { kept: true as const } : {}) }];
     });
+    const facts = cardFacts(r, kind, body);
     return {
       id: String(r.id),
       who: String(r.opened_by ?? ''),
@@ -5358,16 +5394,24 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       kind,
       question: questionOf(sql, String(r.id)) ?? '',
       why: typeof body.context === 'string' ? body.context : '',
-      cost: costOf(kind, body),
+      /* MONEY IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL` ranks it so). */
+      cost: facts.money !== undefined || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body),
       options,
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
       body_kind: kind,
       ...(does ? { does } : {}),
       ...(candidates.length > 0 ? { candidates } : {}),
       ...(Array.isArray(body.rows) ? { held: body.rows.length } : {}),
-      ...cardFacts(r, kind, body),
+      ...facts,
     };
   };
+
+  /**
+   * Whether accepting this proposal hits the money floor (`change-kind.ts`), read as the ladder reads it for whoever
+   * opened it: a money amount set, changed or cleared. Only a rowset writes rows, so only one is read.
+   */
+  const movesMoney = (r: Record<string, unknown>, kind: string, body: Record<string, unknown>): boolean =>
+    kind === 'rowset' && kindsOfProposal(kind, body, recordReader(sql, String(r.opened_by ?? ''))).some((k) => k.floor === 'money');
 
   /** A value that is money: a whole number of minor units with a three-letter currency. */
   const moneyIn = (v: unknown): { amount: number; currency: string } | null => {
@@ -5565,6 +5609,38 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (!entry) return no('VALUE_MALFORMED', `${row} is not a row of ${register}.`, { at: 'row' });
       return ok(history(entry.id).map((e) => ({ ts: e.ts, actor: e.actor, kind: e.kind, field: e.field, to: e.to })));
     },
+    /* EACH ROW'S NEWEST LINE IN ONE READ, for a block's bylines: its batch as `undo.ts` keys one (its own id when it was
+       given none), and for a run its agent, the app it ran in and the person its key acts for. */
+    lastChanges: (ids) => {
+      const out = new Map<string, LastChange>();
+      if (ids.length === 0) return out;
+      const lines = sql.all<{ target: string; actor: string; ts: string; batch: string }>(
+        `SELECT target, actor, ts, coalesce(batch, id) AS batch FROM event
+         WHERE rowid IN (SELECT MAX(rowid) FROM event WHERE target IN (SELECT 'entry:' || value FROM json_each(?)) GROUP BY target)`,
+        JSON.stringify(ids),
+      );
+      const runs = new Map<string, Pick<LastChange, 'agent' | 'app' | 'for'>>();
+      const runOf = (actor: string): Pick<LastChange, 'agent' | 'app' | 'for'> => {
+        const known = runs.get(actor);
+        if (known) return known;
+        const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+        const run = isRunName(actor) ? bySeq(SESSION, Number(actor.slice(prefix.length)), true) : null;
+        const agent = run && typeof run.fields.agent === 'string' && run.fields.agent !== '' ? run.fields.agent : undefined;
+        const hints = {
+          ...(agent === undefined ? {} : { agent }),
+          ...(run && typeof run.fields.client === 'string' ? { client: run.fields.client } : {}),
+        };
+        const person = run ? personOf(sql, actor) : null;
+        const said = { ...(agent === undefined ? {} : { agent }), ...(run ? { app: runAgentOf(hints).name } : {}), ...(person ? { for: person } : {}) };
+        runs.set(actor, said);
+        return said;
+      };
+      for (const l of lines) {
+        const agent = l.actor.startsWith('agent:') ? { agent: l.actor.slice('agent:'.length) } : {};
+        out.set(l.target.slice('entry:'.length), { actor: l.actor, ts: l.ts, batch: l.batch, ...agent, ...(isRunName(l.actor) ? runOf(l.actor) : {}) });
+      }
+      return out;
+    },
     /* THE RUNS NOT FINISHED, the most recently heard from first. The block applies its own `where` and `limit`. */
     sessionsLive: () =>
       sql
@@ -5606,7 +5682,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const staleBefore = instant(nowMs - STALE_DAYS * 86_400_000);
       const OPEN = "status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
       /* ONLY THE QUESTIONS DRAWN ARE READ WHOLE (`questionFrom`). Every other one is ranked and counted by its band in SQL
-         (`COST_SQL`), so no body is read into this process to be counted (audit 16, M5): before, the newest past two
+         (`BAND_SQL`), so no body is read into this process to be counted (audit 16, M5): before, the newest past two
          thousand were dropped, and the counts beside the queue were counts of the two thousand. */
       const whole = (ids: readonly string[]): Map<string, Record<string, unknown>> =>
         new Map(
@@ -5624,7 +5700,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* A STABLE ORDER: the band, then the oldest first within it, since the expensive question that has been sitting is
            the one worth meeting, and the id when two were asked in the same millisecond, so two reads never swap them. */
         const ids = sql
-          .all<{ id: string }>(`SELECT id FROM suggestion WHERE ${OPEN} ORDER BY ${COST_RANK_SQL} ASC, opened_at ASC, id ASC LIMIT ?`, now, drawn)
+          .all<{ id: string }>(`SELECT id FROM suggestion WHERE ${OPEN} ORDER BY ${BAND_RANK_SQL} ASC, opened_at ASC, id ASC LIMIT ?`, now, drawn)
           .map((r) => r.id);
         const rows = whole(ids);
         const questions = ids.flatMap((id) => {
@@ -5632,7 +5708,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           return r ? [questionFrom(r)] : [];
         });
         const counted = sql.one<{ stale: number; hard: number }>(
-          `SELECT COALESCE(SUM(opened_at < ?), 0) AS stale, COALESCE(SUM(${COST_SQL} = 'undo'), 0) AS hard FROM suggestion WHERE ${OPEN}`,
+          `SELECT COALESCE(SUM(opened_at < ?), 0) AS stale, COALESCE(SUM(${BAND_SQL} = 'undo'), 0) AS hard FROM suggestion WHERE ${OPEN}`,
           staleBefore,
           now,
         );
@@ -5642,7 +5718,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          and what it is about. */
       const lean = sql
         .all<{ id: string; body_kind: string | null; opened_by: string | null; opened_at: string | null; cost: string; about: string | null }>(
-          `SELECT id, body_kind, opened_by, opened_at, ${COST_SQL} AS cost,
+          `SELECT id, body_kind, opened_by, opened_at, ${BAND_SQL} AS cost,
              CASE WHEN json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END AS about
            FROM suggestion WHERE ${OPEN}`,
           now,
@@ -8147,12 +8223,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (theirs) return theirs;
       /* THE LISTS DECLARING meets: AND org:, or `people` and `organisations` on a record older than the keys (`roles.ts`). */
       return attempt(sql, transaction, () => {
+        /* ONLY A PERSON AT THEIR OWN KEYBOARD IS BELIEVED whatever the source says; a token or the system is read by it. */
         const met = meetPerson(
-          peopleDeps(
-            as,
-            () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
-            (p) => openSuggestion(governDeps(), () => signedBy(as), p),
-          ),
+          {
+            ...peopleDeps(
+              as,
+              () => (as.principal?.kind === 'token' ? (locateRun(as).project?.id ?? null) : null),
+              (p) => openSuggestion(governDeps(), () => signedBy(as), p),
+            ),
+            typed: as.principal?.kind === 'person',
+          },
           args,
         );
         /* A STRONG MERGE KEEPS WHAT THE TWO DISAGREED ON too, in its own batch, so Undo takes it back with the rest. */
@@ -9299,8 +9379,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return applyUndo(parts, scope, hash, actor, opts);
     },
 
-    /** One bounded slice of the walk over what the record already holds: payees, runs and services linked (`backfill.ts`). */
-    backfill: (opts: BackfillOptions = {}): Backfilled => understandBackfill(backfillDeps(), opts),
+    /**
+     * One bounded slice of the walk over what the record already holds: payees, runs and services linked (`backfill.ts`).
+     * `dry: true` walks the same slice and writes nothing: the counts as the walk would leave them, and its first few
+     * writes in names (`BackfillPlanned`), every one rolled back.
+     */
+    backfill: (opts: BackfillOptions & { dry?: boolean } = {}): Backfilled & { dry?: true; planned?: BackfillPlanned[] } => {
+      const { dry, ...walk } = opts;
+      return dry === true ? dryBackfill(walk) : understandBackfill(backfillDeps(), walk);
+    },
 
     /** Put back one batch the walk wrote; a second undo of the same batch puts nothing back. */
     undoBackfill: (batch: string, by: string): Result<{ undone: number; batch: string | null }> => {
@@ -9312,6 +9399,52 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /** What the walk over the past writes through: this record's parts and its live lists. */
   const backfillDeps = (): BackfillDeps => ({ sql, clock, mint, transaction, write: kernel.write, registers: () => registers });
+
+  /**
+   * THE WALK, WRITING NOTHING. It runs whole inside one attempt that then refuses (`tx.ts`), so every write it made to
+   * count is rolled back on every host, and the first few are said in names while the rows they made are still there to
+   * be named. A batch it minted names nothing once rolled back, so none is answered.
+   */
+  function dryBackfill(opts: BackfillOptions): Backfilled & { dry: true; planned: BackfillPlanned[] } {
+    const deps = backfillDeps();
+    const planned: BackfillPlanned[] = [];
+    let walked: Backfilled | null = null;
+    const write: BackfillDeps['write'] = (register, ref, patch, w) => {
+      const was = ref === null ? null : titleOfRow(ref);
+      const done = deps.write(register, ref, patch, w);
+      if (done.ok && planned.length < BACKFILL_PLANNED) planned.push(plannedOf(register, ref === null ? null : (was ?? titleOfRow(done.value.id)), patch));
+      return done;
+    };
+    attempt(sql, transaction, () => {
+      walked = understandBackfill({ ...deps, write }, opts);
+      return no('VALUE_MALFORMED', 'A dry walk writes nothing.');
+    });
+    const out = walked as Backfilled | null;
+    if (out === null) throw new TypeError('the dry walk answered nothing');
+    const unbatched = <S extends { batch: string | null }>(slice: S): S => ({ ...slice, batch: null });
+    return { ...out, ledger: unbatched(out.ledger), runs: unbatched(out.runs), services: unbatched(out.services), dry: true, planned };
+  }
+
+  /**
+   * One write the walk would make, as a person reads it: the list by its name, the row by its title (`null` for a new
+   * one), and each field by its label with a link said as the title of the row it points at. A secret, a file and the
+   * identity keys a person or an organisation is joined on (`identity-keys.ts`) are never said.
+   */
+  function plannedOf(register: string, row: string | null, patch: Patch): BackfillPlanned {
+    const decl = registers.get(register);
+    const lists = [...registers.values()];
+    const keyed = [meetsRole(lists), orgRole(lists)].flatMap((r) => (r?.register === register && r.fields.keys !== undefined ? [r.fields.keys] : []));
+    const fields: Record<string, Json> = {};
+    for (const [id, value] of Object.entries(patch)) {
+      const spec = decl?.fields.find((f) => f.id === id);
+      const type = spec?.type === 'list' ? spec.of : spec?.type;
+      if (type === 'secret' || type === 'file' || keyed.includes(id)) continue;
+      const label = typeof spec?.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : id;
+      const named = (v: unknown): Json => (type === 'ref' && typeof v === 'string' ? (titleOfRow(v) ?? null) : ((v ?? null) as Json));
+      fields[label] = Array.isArray(value) ? value.map(named) : named(value);
+    }
+    return { list: decl?.name ?? register, row, fields };
+  }
 
   /**
    * The closure's own functions, for the methods written under `api/` (`parts.ts` says why each is there).

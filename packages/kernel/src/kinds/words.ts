@@ -18,12 +18,13 @@ export type Raw = Readonly<Record<string, unknown>>;
 
 /**
  * The host panels a `section` may name with `panel:`, drawn by the host for the page's row under the section's
- * heading: what the row's work runs on and is scheduled to do, and where its numbers are sent.
+ * heading: what the row's work runs on and is scheduled to do, where its numbers are sent, and, on a run's own page,
+ * what that run did (`run`, drawn only when the page is for a run).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
  */
-export const PANELS = ['actions', 'reporting'] as const;
+export const PANELS = ['actions', 'reporting', 'run'] as const;
 
 /** The most bytes a path's short view is named in, which is the width of the switch it is drawn on. */
 export const SHORT_LABEL_BYTES = 24;
@@ -47,7 +48,7 @@ const invalid = (fix: string, at: string, allowed?: readonly string[]): Refusal 
 export function panelFault(panel: unknown, onTemplate: boolean | null): Refusal | null {
   if (panel === undefined) return null;
   if (typeof panel !== 'string' || !(PANELS as readonly string[]).includes(panel))
-    return invalid(`panel: is ${PANELS.join(' or ')}, the part of the row's page the host draws under this section's heading, and ${JSON.stringify(panel)} is neither.`, 'panel', PANELS);
+    return invalid(`panel: is one of ${PANELS.join(', ')}, the part of the row's page the host draws under this section's heading, and ${JSON.stringify(panel)} is none of them.`, 'panel', PANELS);
   if (onTemplate === false)
     return invalid(`panel: ${panel} draws a part of one row's page, and this page is about no row. Make it a page per row with for: { register }, or take panel: off.`, 'panel');
   return null;

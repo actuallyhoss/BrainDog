@@ -161,3 +161,17 @@ test('A RUN IS NAMED BY THE TITLE ITS AGENT GIVES A QUESTION, never by the quest
   assert.equal(run(), 'Tidying the contacts');
   sql.close();
 });
+
+test('A ROW A MEMBER’S AGENT MADE IS THAT MEMBER’S: a stranger who looks like that person asks the owner nothing about it', async () => {
+  const { k, sql } = await record();
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_ana', '*', 'write')");
+  sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_ana', 'p_ana', 'h', 'write', '2026-10-01T00:00:00.000Z')");
+  const ana: WriteContext = { actor: 'p_ana', principal: { kind: 'token', token: 't_ana' }, session: { client_id: 'cc', host: 'h', repo: 'encore' } };
+  const made = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohan.m@encore.example' }, ana));
+  assert.match(sql.one<{ a: string }>("SELECT actor AS a FROM event WHERE target = ? AND kind = 'create'", `entry:${made.id}`)?.a ?? '', /^S\d+$/, 'her agent’s run made it');
+  value(k.meet({ name: 'Rohan Mehta', email: 'rohan@elsewhere.example', where: 'a mail', untrusted: true }, OWNER));
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open'")?.n, 0, 'her row is hers, as one she made by hand would be');
+  assert.deepEqual(k.get(made.id)?.fields.email, 'rohan.m@encore.example', 'and nothing is carried onto it');
+  sql.close();
+});

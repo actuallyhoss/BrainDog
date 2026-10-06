@@ -17,10 +17,13 @@
  *
  * THE FLOOR IS FIXED RULES AND NOTHING ELSE, the way `costOf` is. A kind on the floor is Ask for every agent, every
  * grant and every rung, Slash included, and no setting lifts it:
- *   - `delete`: taking a row, or a field, away
+ *   - `delete`: taking a row, or a field, away, which is also sending a field empty
  *   - `money`: a money amount set or changed
  *   - `keys`: anything in a list that holds a sealed value, which is where keys live
  *   - `sharing`: where a row applies, which is who can see it
+ *   - `identity`: who a person or an organisation is: folding one into another, the addresses, handles and keys
+ *     `meet` knows them by, since a key added to the wrong row files everything that arrives under it there, or which
+ *     person is the record's own
  *   - `addons`: installing, turning on or off, or setting up an add-on
  *   - `outside`: anything that runs unattended or sends something out of the record, or a list the record does not have
  *   - `others`: a row another person made.
@@ -30,6 +33,7 @@
 
 import type { Sql } from '@braindog/ports';
 
+import { meetsRole, orgRole, type RoleField } from './roles.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH } from './slash.ts';
 
@@ -38,7 +42,7 @@ export const RUNGS = ['ask', 'tell', 'quiet'] as const;
 export type Rung = (typeof RUNGS)[number];
 
 /** The floor, dearest first, which is also the order a kind that hits two is named by. */
-export const FLOORS = ['delete', 'keys', 'money', 'sharing', 'others', 'addons', 'outside'] as const;
+export const FLOORS = ['delete', 'keys', 'money', 'sharing', 'identity', 'others', 'addons', 'outside'] as const;
 export type Floor = (typeof FLOORS)[number];
 
 /** A kind of change: its key, the list it is about when it is about one, its verb, and the floor it hits or `null`. */
@@ -53,16 +57,26 @@ export const AUTOMATION = 'automation';
 export const KEPT_DAYS = 30;
 
 /**
- * What this file needs of a list: its fields, with their types, and which field is its state.
+ * What this file needs of a list: its fields, with their types, which field is its state, and which fields say who a
+ * row is (`identity`).
  *
  * STRUCTURAL, so a `RegisterDecl`, a declaration's parsed body and a test's literal are all one.
+ *
+ * `identity` IS READ FROM THE ROLES THE LIST PLAYS (`roles.ts`), never from its name or a field's: the fields playing
+ * `merged_into`, `email`, `handles`, `keys` or `self` in the people `meet` writes, or `merged_into` or `keys` in its
+ * organisations. Any record's People, and any pack's list that declares the role, get the same floor.
  */
 export type ListShape = {
   fields: readonly { id: string; type?: string; of?: string; scope?: unknown; by?: unknown; transitions?: unknown }[];
   state?: string;
+  identity?: readonly string[];
 };
 
-/** What a write says about itself. `madeBy` is the person who made the row, and `person` the one the writer acts for. */
+/**
+ * What a write says about itself. `madeBy` is the person who made the row, and `person` the one the writer acts for.
+ * `was` is the row's fields as they stand, when the caller has them, so a field sent back as it already was is not
+ * read as clearing it or as changing who the row is.
+ */
 export type WriteSaid = {
   list: string;
   op: 'create' | 'update' | 'delete' | 'note';
@@ -70,12 +84,14 @@ export type WriteSaid = {
   shape: ListShape | null;
   madeBy?: string | null;
   person?: string | null;
+  was?: Record<string, unknown> | null;
 };
 
-/** What reading a proposal needs from the record: a list's shape, who made a row, and who the filer acts for. */
+/** What reading a proposal needs from the record: a list's shape, who made a row, its fields now, and who the filer acts for. */
 export type KindReader = {
   shape: (list: string) => ListShape | null;
   madeBy?: (list: string, at: string) => string | null;
+  fieldsOf?: (list: string, at: string) => Record<string, unknown> | null;
   person?: string | null;
 };
 
@@ -112,13 +128,26 @@ const kind = (list: string | null, verb: string, floor: Floor | null): ChangeKin
  *
  * A LIST THE RECORD DOES NOT HAVE IS OUTSIDE IT. The write path refuses one anyway; the floor says so first, so nothing
  * climbs on a list nobody can read the shape of.
+ *
+ * A WRITER WHO IS NOBODY'S IS NOT THE MAKER EITHER. `person` is `null` for Slash and for a run no token opened, and the
+ * floor used to need both names, so either could edit a member's row at Do and tell. A row a person made is another
+ * person's to every writer that is not that person.
  */
 function rowFloor(w: Pick<WriteSaid, 'op' | 'shape' | 'madeBy' | 'person'>): Floor | null {
   if (w.shape === null) return 'outside';
   if (w.shape.fields.some(sealed)) return 'keys';
-  if (w.op !== 'create' && w.madeBy && w.person && w.madeBy !== w.person) return 'others';
+  if (w.op !== 'create' && w.madeBy && w.madeBy !== (w.person ?? null)) return 'others';
   return null;
 }
+
+/**
+ * Whether a value sent for a field empties it: nothing, an empty text or a list with nothing in it, the three the write
+ * path removes the field for (`isAbsent`, K2). `''` was missed, and a note sent as `''` cleared it as a plain edit.
+ */
+const emptied = (v: unknown): boolean => v === null || v === '' || (Array.isArray(v) && v.length === 0);
+
+/** Whether two field values are the same value, as the write path compares them before it logs a change, an empty list being no value. */
+const same = (a: unknown, b: unknown): boolean => (emptied(a ?? null) && emptied(b ?? null)) || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
  * The kinds one write is: one per verb it carries, each with its floor.
@@ -131,6 +160,13 @@ function rowFloor(w: Pick<WriteSaid, 'op' | 'shape' | 'madeBy' | 'person'>): Flo
  * field sent with a value is the `money` floor on the add or the edit that carries it, and a field that says where rows
  * apply is `sharing` on the edit that moves it. Where a row is put when it is made is not sharing: it is where it was
  * made.
+ *
+ * WHO A ROW IS, AND A FIELD SENT EMPTY, ARE ON THE FLOOR TOO. A field playing `merged_into`, `email`, `handles`,
+ * `keys` or `self` (`ListShape.identity`) is `identity` on the edit or the tag that changes it, since one key moved
+ * onto the wrong person files every mail and commit that arrives under it there, and a merge folds a person away. A
+ * field sent as `null` or `''`, or a list sent with nothing in it, is `delete` on its kind: the floor is "a row, or a
+ * field, away", and a cleared field is a field away. Money, then sharing, then identity name a key that is two of these at once,
+ * since the narrower power is the truer sentence. A field sent back as it already was (`was`) is neither.
  */
 export function kindsOfWrite(w: WriteSaid): ChangeKind[] {
   const floor = rowFloor(w);
@@ -144,20 +180,27 @@ export function kindsOfWrite(w: WriteSaid): ChangeKind[] {
     keys.some((k) => fields.get(k)?.type === 'money' && patch[k] !== undefined && (clearing || patch[k] !== null));
   if (w.op === 'create') return [kind(w.list, 'add', dearerFloor(money(Object.keys(patch), false) ? 'money' : null, floor))];
 
+  const identity = new Set(w.shape?.identity ?? []);
+  const moved = (key: string): boolean => !w.was || !same(w.was[key], patch[key]);
+  /* THE FLOOR ONE FIELD'S CHANGE HITS ON ITS OWN, before the row's. */
+  const fieldFloor = (key: string): Floor | null => {
+    if (money([key], true)) return 'money';
+    if (fields.get(key)?.scope !== undefined) return 'sharing';
+    if (!moved(key)) return null;
+    if (identity.has(key)) return 'identity';
+    return emptied(patch[key]) ? 'delete' : null;
+  };
   const out: ChangeKind[] = [];
-  const edited: string[] = [];
-  let tags = false;
+  let edit: Floor | null | undefined;
+  let tag: Floor | null | undefined;
   for (const key of Object.keys(patch)) {
     if (key === 'deleted_at') out.push(kind(w.list, 'delete', dearerFloor('delete', floor)));
     else if (w.shape?.state !== undefined && key === w.shape.state && typeof patch[key] === 'string') out.push(kind(w.list, `move:${String(patch[key])}`, floor));
-    else if (tagged(fields.get(key))) tags = true;
-    else edited.push(key);
+    else if (tagged(fields.get(key))) tag = dearerFloor(tag ?? null, fieldFloor(key));
+    else edit = dearerFloor(edit ?? null, fieldFloor(key));
   }
-  if (tags) out.push(kind(w.list, 'tag', floor));
-  if (edited.length > 0) {
-    const own = money(edited, true) ? 'money' : edited.some((k) => fields.get(k)?.scope !== undefined) ? 'sharing' : null;
-    out.push(kind(w.list, 'edit', dearerFloor(own, floor)));
-  }
+  if (tag !== undefined) out.push(kind(w.list, 'tag', dearerFloor(tag, floor)));
+  if (edit !== undefined) out.push(kind(w.list, 'edit', dearerFloor(edit, floor)));
   /* A PATCH THAT NAMES NOTHING is still a write somebody made, and the write path logs it as an edit. */
   return out.length > 0 ? out : [kind(w.list, 'edit', floor)];
 }
@@ -189,10 +232,12 @@ export function kindOfEvent(
     case 'link':
     case 'tag':
     case 'untag':
-      /* THE VALUE IS NOT NEEDED: a money field is redacted in the log, and what makes it the floor is its type. */
+      /* THE VALUE IS NOT NEEDED: a money field is redacted in the log, and what makes it the floor is its type. Only
+         an edit to nothing is read off it, as the clearing it was; an untag takes one word off a list, which is not
+         emptying it. */
       return e.field === null
         ? kind(e.list, 'edit', rowFloor({ op: 'update', ...said }))
-        : kindOfWrite({ list: e.list, op: 'update', patch: { [e.field]: e.kind === 'untag' ? [] : true }, ...said });
+        : kindOfWrite({ list: e.list, op: 'update', patch: { [e.field]: e.kind === 'edit' && e.to_v === 'null' ? null : true }, ...said });
     case 'note':
       return kindOfWrite({ list: e.list, op: 'note', ...said });
     case 'delete':
@@ -262,7 +307,15 @@ export function kindsOfProposal(bodyKind: string, body: unknown, read: KindReade
         arr(b.rows).flatMap((raw) => {
           const r = obj(raw);
           if (typeof r.at !== 'string') return kindsOfWrite({ list, op: 'create', patch: r, shape });
-          return kindsOfWrite({ list, op: 'update', patch: obj(r.patch), shape, madeBy: read.madeBy?.(list, r.at) ?? null, person: read.person ?? null });
+          return kindsOfWrite({
+            list,
+            op: 'update',
+            patch: obj(r.patch),
+            shape,
+            madeBy: read.madeBy?.(list, r.at) ?? null,
+            person: read.person ?? null,
+            was: read.fieldsOf?.(list, r.at) ?? null,
+          });
         }),
       );
     }
@@ -332,10 +385,34 @@ export function shapeIn(sql: Sql, list: string): ListShape | null {
   );
   if (!row) return null;
   const body = parsed(row.body);
+  const fields = arr(body.fields).map(obj).filter((f) => typeof f.id === 'string') as unknown as ListShape['fields'];
+  const identity = identityOf(list, body, fields);
   return {
-    fields: arr(body.fields).map(obj).filter((f) => typeof f.id === 'string') as unknown as ListShape['fields'],
+    fields,
     ...(typeof body.state === 'string' ? { state: body.state } : {}),
+    ...(identity.length > 0 ? { identity } : {}),
   };
+}
+
+/**
+ * The parts of a person or an organisation that say who they are, which `identity` is read from.
+ *
+ * `self` TOO, which says which person is the record's own: the row a merge keeps (`people.ts`'s fold order), and
+ * whose addresses count as the owner's when a stranger's mail is weighed (`wroteTo`). Set on the wrong row it is the
+ * same harm as a key moved there.
+ */
+const IDENTITY_PARTS = ['merged_into', 'email', 'handles', 'keys', 'self'] as const;
+
+/**
+ * The fields of one list that say who its rows are: those playing an identity part of the people or the
+ * organisations `meet` writes, read with `roles.ts`'s own rule, so a list that declares `meets:` or `org:` and a
+ * keyless `people` from before the keys are read the same way `meet` reads them.
+ */
+function identityOf(list: string, body: Record<string, unknown>, fields: ListShape['fields']): string[] {
+  const one = [{ id: list, fields: fields as readonly RoleField[], meets: body.meets, org: body.org }];
+  const played = { ...orgRole(one)?.fields, ...meetsRole(one)?.fields } as Record<string, string | undefined>;
+  const held = new Set(fields.map((f) => f.id));
+  return [...new Set(IDENTITY_PARTS.map((p) => played[p]).filter((f): f is string => f !== undefined && held.has(f)))];
 }
 
 /** A run's spoken name as its writes are signed, `S42`, and nothing else. */
@@ -374,20 +451,38 @@ export function madeByIn(sql: Sql, rowId: string): string | null {
   return actor === undefined ? null : personOf(sql, actor);
 }
 
+/** Whether a person keeps the whole record: an owner of every list, not suspended, as `members.ts` counts one. */
+const ownerIn = (sql: Sql, person: string): boolean =>
+  sql.one(
+    "SELECT 1 AS y FROM member m JOIN person p ON p.id = m.person_id WHERE m.person_id = ? AND m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL",
+    person,
+  ) !== undefined;
+
 /**
  * A reader over the record for `kindsOfProposal`, filing as `actor`. A row is named by its spoken id (`tasks#4`) or its
  * row id, as a rowset names one.
+ *
+ * SLASH WORKS FOR THE RECORD'S OWNERS, whoever they are on any record, and for nobody else. It is no person, so a row
+ * a person made is somebody else's to it (`rowFloor`), except a row one of its owners made, which is the work it was
+ * given: a row a member made always asks, and the owners' rows climb as any agent's own do (DIRECTION §37).
  */
 export function recordReader(sql: Sql, actor: string): KindReader {
+  const rowAt = (list: string, at: string): { id: string; fields: string } | undefined => {
+    const hash = at.lastIndexOf('#');
+    return hash > 0
+      ? sql.one<{ id: string; fields: string }>('SELECT id, fields FROM entry WHERE register = ? AND seq = ?', at.slice(0, hash), Number(at.slice(hash + 1)))
+      : sql.one<{ id: string; fields: string }>('SELECT id, fields FROM entry WHERE id = ? AND register = ?', at, list);
+  };
   return {
     shape: (list) => shapeIn(sql, list),
     madeBy: (list, at) => {
-      const hash = at.lastIndexOf('#');
-      const id =
-        hash > 0
-          ? sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', at.slice(0, hash), Number(at.slice(hash + 1)))?.id
-          : sql.one<{ id: string }>('SELECT id FROM entry WHERE id = ? AND register = ?', at, list)?.id;
-      return id === undefined ? null : madeByIn(sql, id);
+      const row = rowAt(list, at);
+      const maker = row === undefined ? null : madeByIn(sql, row.id);
+      return actor === SLASH && maker !== null && ownerIn(sql, maker) ? null : maker;
+    },
+    fieldsOf: (list, at) => {
+      const row = rowAt(list, at);
+      return row === undefined ? null : parsed(row.fields);
     },
     person: personOf(sql, actor),
   };

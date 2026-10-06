@@ -115,7 +115,7 @@ const NAME = /^[a-z][a-z0-9_]{0,31}$/;
  * The keys of a `meet` step: `people.ts`'s `MeetArgs`, always `where`, and something saying who: a name, an email, a
  * handle or `keys`, or for an organisation its domain. Every one is text but `keys`, a template or a list of them.
  */
-const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where', 'kind', 'keys', 'org', 'domain', 'role', 'source'];
+const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where', 'kind', 'keys', 'org', 'domain', 'role', 'source', 'only'];
 /** The keys of a `run_job` step. */
 const RUN_JOB_KEYS: readonly string[] = ['kind', 'args', 'as'];
 /** A kind of job by its declaration id, as `jobs.ts`'s `KIND_ID` reads one, so the lint refuses no id the queue takes. */
@@ -1634,6 +1634,10 @@ function stepFault(
         return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.keys is a list of text, each kind:value, like bank:{{trigger.row.counterparty_text}}.`, `${at}.meet.keys`);
       if (spec.kind !== undefined && spec.kind !== 'person' && spec.kind !== 'organisation')
         return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.kind is person or organisation.`, `${at}.meet.kind`, ['person', 'organisation']);
+      /* `only: known` OR NOTHING: a rule that says some other word would be met as if it said none, and strangers would
+         be added as people from a trigger its author meant to keep them out of. */
+      if (spec.only !== undefined && spec.only !== 'known')
+        return bad('DECLARATION_INVALID', `${id}'s ${at}.meet.only is known, which meets only somebody the record has reason to know, or is left out.`, `${at}.meet.only`, ['known']);
       const org = spec.kind === 'organisation';
       if (spec.name === undefined && spec.email === undefined && spec.handle === undefined && keys === undefined && !(org && spec.domain !== undefined))
         return bad(

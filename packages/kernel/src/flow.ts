@@ -155,8 +155,11 @@ export const RUN_JOB_LOOK_MS = 5 * 60_000;
 const JOB_ANSWERS: Readonly<Record<string, string>> = { ok: 'ok', needs_decision: 'needs_decision' };
 /** A job still going, whose run keeps waiting on it. */
 const JOB_GOING: readonly string[] = ['queued', 'claimed'];
-/** The text keys of a `meet` step, which are `people.ts`'s `MeetArgs`. `keys` is the one list beside them. */
-const MEET_KEYS = ['name', 'email', 'handle', 'where', 'kind', 'org', 'domain', 'role', 'source'] as const;
+/**
+ * The text keys of a `meet` step, which are `people.ts`'s `MeetArgs`. `keys` is the one list beside them. `only` is
+ * `known` or absent (`flow-lint.ts` refuses any other), and says nobody new is made from this rule's trigger.
+ */
+const MEET_KEYS = ['name', 'email', 'handle', 'where', 'kind', 'org', 'domain', 'role', 'source', 'only'] as const;
 
 /** The keys of the two kinds of `rule` schedule row this file owns. A rule's own reminders are `<rule>:<row>`. */
 export const runKey = (run: string): string => `flow.run:${run}`;
@@ -1859,11 +1862,13 @@ function meetOne(
   if (named.kind !== undefined && named.kind !== 'person' && !organisation)
     return { ok: false, say: `rule.${rule}'s meet at step ${n + 1} met nobody: kind is person or organisation, and it filled with ${named.kind}.` };
   if (!deps.meet) return { ok: false, say: `rule.${rule} reached a meet step, and this host wired no way to meet a person (NOT_IN_THIS_BUILD). The steps before it were taken.` };
-  const { kind, ...rest } = named;
+  const { kind, only, ...rest } = named;
   const met = deps.meet(
     {
       ...rest,
       ...(kind === undefined ? {} : { kind: organisation ? 'organisation' : 'person' }),
+      /* NOBODY NEW FROM THIS RULE when it says so, which only `known` does: anything else filled in is no promise. */
+      ...(only === 'known' ? { only } : {}),
       ...(keys.length === 0 ? {} : { keys }),
       where: named.where ?? `rule.${rule}`,
       /* UNTRUSTED ALWAYS (H1): a rule's meet reads its trigger's text, a mail's or a bank text's or an import's, so the

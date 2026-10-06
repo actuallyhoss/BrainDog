@@ -174,14 +174,106 @@ test('SAID TO BE UNTRUSTED, IT STAYS SO ON THE LINE: a forged sender met that wa
   sql.close();
 });
 
-test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same name and handle in a commit fold into them', async () => {
+test('A PERSON THE OWNER TYPED IS STILL HIS AFTER THEIR MAIL IS READ: the same name and handle in a note fold into them', async () => {
   const { k, sql } = await record();
   const typed = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
   value(k.meet({ email: 'rohanmehta@encore.example', source: 'mail from encore.example' }, AGENT));
-  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan.mehta@gmail.com', where: 'commit 1 in encore' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohan.mehta@gmail.com', where: 'a note about the launch' }, AGENT));
   assert.equal(met.matched_by, 'strong');
   assert.equal(met.row?.id, typed.id);
   assert.equal(k.count('people'), 1);
+  sql.close();
+});
+
+/* ── audit 19 H1: a commit's author is whoever signed it ──────────────── */
+
+test('A COMMIT BY AN ADDRESS NOBODY HOLDS NEVER FOLDS INTO A PERSON THE OWNER TYPED: a person of their own, and one question', async () => {
+  const { k, sql } = await record();
+  const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
+  const forged = { name: 'Rohan Mehta', email: 'rohanmehta@evil.test', where: 'commit 1 in encore' };
+
+  const met = value<Met>(k.meet(forged, AGENT));
+  assert.equal(met.matched_by, 'none', 'a forged author was folded into the real person');
+  assert.equal(met.created, true);
+  assert.ok(met.question, 'the lookalike was neither folded nor asked about');
+  assert.equal(k.count('people'), 2);
+  assert.equal(k.get(real.id)!.fields.keys, undefined, 'the forged address was carried onto the real person');
+  assert.equal(k.get(real.id)!.fields.handles, undefined, 'the forged address was carried onto the real person');
+
+  /* A second commit from it is a key match on the forged row, and still asks nothing new and folds nothing. */
+  const again = value<Met>(k.meet({ ...forged, where: 'commit 2 in encore' }, AGENT));
+  assert.equal(again.row?.id, met.row?.id);
+  assert.equal(k.count('people'), 2);
+  assert.equal(questions(sql), 1);
+  sql.close();
+});
+
+test('TWO COMMITS BY ONE AUTHOR UNDER TWO ADDRESSES STILL FOLD, and the real person met later is not taken in by either', async () => {
+  const { k, sql } = await record();
+  const first = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmi.vadlamudi@brightloom.example', where: 'commit 1 in braindog' }, AGENT));
+  const second = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi@gmail.com', where: 'commit 2 in braindog' }, AGENT));
+  assert.equal(second.matched_by, 'strong');
+  assert.equal(second.row?.id, first.row?.id);
+
+  /* The owner types her in, and a note meets her under a third address: the note folds into the row he typed, and the
+     commit-made row is not folded in a step later, since whoever pushed signed it. He is asked once instead. */
+  const typed = value<Entry>(k.create('people', { name: 'Lakshmi Vadlamudi', email: 'lv@brightloom.example', handles: ['github:lakshmi-vadlamudi'] }, OWNER));
+  const noted = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi@outlook.com', where: 'a note on the launch' }, AGENT));
+  assert.equal(noted.matched_by, 'strong');
+  assert.equal(noted.row?.id, typed.id);
+  assert.equal(k.get(first.row!.id)!.fields.merged_into, undefined, 'a commit author was folded in on the real person’s next meeting');
+  assert.ok(noted.question, 'the commit author beside her was not asked about');
+  assert.equal(open(sql).length, 1);
+  sql.close();
+});
+
+test('A FORGED COMMIT AUTHOR WHO THEN MAILS IN FROM THE SAME ADDRESS IS STILL ONLY A COMMIT AUTHOR, and never folds into the real person', async () => {
+  const { k, sql } = await record();
+  const real = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanmehta@encore.example' }, OWNER));
+  const forged = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@evil.test', where: 'commit 1 in encore' }, AGENT));
+  /* A mail from the forged address is a key match, and its line is one anybody could have written. */
+  value(k.meet({ email: 'rohanmehta@evil.test', source: 'mail from evil.test' }, AGENT));
+  const again = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanmehta@evil.test', where: 'commit 2 in encore' }, AGENT));
+  assert.equal(again.row?.id, forged.row?.id);
+  assert.equal(k.get(forged.row!.id)!.fields.merged_into, undefined, 'a mail line let the forged author fold into the real person');
+  assert.equal(k.get(real.id)!.fields.keys, undefined);
+  assert.equal(k.count('people'), 2);
+  sql.close();
+});
+
+test('A COMMIT BY A KEY SOMEBODY HOLDS IS THEIRS, and what it carries joins them as before', async () => {
+  const { k, sql } = await record();
+  const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  const met = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', handle: 'github:ada', where: 'commit 1 in braindog' }, AGENT));
+  assert.equal(met.matched_by, 'key');
+  assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
+  sql.close();
+});
+
+/* ── audit 19 M1: believed only when the source is one that is ────────── */
+
+test('EVERY SOURCE BUT A NOTE, A SESSION’S OWN RUN AND A COMMIT IS TEXT ANYBODY COULD HAVE WRITTEN, however it is worded', async () => {
+  const { k, sql } = await record();
+  const ada = value<Entry>(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
+  for (const where of ['issue 12 in braindog', 'a slack DM', 'a call with her', 'the calendar invite', 'a pasted transcript', 'a note from the inbox', 'a run reading her mail']) {
+    const met = value<Met>(k.meet({ name: 'The Countess', email: 'ada@example.com', handle: `github:${where.replace(/\W/g, '')}`, where }, AGENT));
+    assert.equal(met.row?.id, ada.id);
+    assert.equal(k.get(ada.id)!.fields.handles, undefined, `${where} carried a handle onto her`);
+    assert.equal(k.get(ada.id)!.fields.aliases, undefined, `${where} kept a name as hers`);
+  }
+  /* The line says what it was, so it never vouches for her later. */
+  assert.ok((k.get(ada.id)!.fields.met as string[]).every((l) => l.includes(' · arrived in ')), 'a line read as believed');
+
+  /* A forged lookalike from any of them makes nobody, as a mail's would. */
+  const slack = value<Met>(k.meet({ name: 'Ada Lovelace', email: 'ada@evil.test', where: 'a slack DM' }, AGENT));
+  assert.equal(slack.row, null);
+  assert.equal(slack.mention, true);
+
+  /* A note and the session's own run are believed. */
+  value(k.meet({ email: 'ada@example.com', handle: 'github:ada', where: 'a note about the launch' }, AGENT));
+  assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada']);
+  value(k.meet({ email: 'ada@example.com', handle: 'github:countess', where: 'session in braindog' }, AGENT));
+  assert.deepEqual(k.get(ada.id)!.fields.handles, ['github:ada', 'github:countess']);
   sql.close();
 });
 
@@ -217,7 +309,7 @@ test('TWO COLLEAGUES WITH ONE NAME AND ONE COMPANY ARE ASKED ABOUT, never folded
 
 test('ONE HANDLE IS ONE HANDLE PAST ITS DOTS AND ITS NUMBER: the same name and handle fold on their own', async () => {
   const { k, sql } = await record();
-  const first = value<Entry>(k.create('people', { name: 'Lakshmi Vadlamudi', email: 'lakshmi.vadlamudi@brightloom.example' }, OWNER));
+  const first = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmi.vadlamudi@brightloom.example', where: 'commit 0 in braindog' }, AGENT)).row!;
   const met = value<Met>(k.meet({ name: 'Lakshmi Vadlamudi', email: 'lakshmivadlamudi24@gmail.com', where: 'commit 1 in braindog' }, AGENT));
   assert.equal(met.matched_by, 'strong');
   assert.equal(met.row?.id, first.id);
@@ -248,7 +340,8 @@ test('THE SOURCE WINS OVER WHERE, CLIPPED, AND AN ADDRESS IS NEVER A NAME OR A L
   const addressed = value<Met>(k.meet({ name: 'grace@navy.example', email: 'grace@navy.example', source: 'a call with grace@navy.example' }, AGENT));
   const grace = k.get(addressed.row!.id)!;
   assert.equal(grace.fields.name, 'grace');
-  assert.deepEqual(grace.fields.met, [`${DAY} · a call with navy.example`]);
+  /* A call an agent relays is text anybody could have written (audit 19 M1), and its line says so. */
+  assert.deepEqual(grace.fields.met, [`${DAY} · arrived in a call with navy.example`]);
   sql.close();
 });
 
@@ -320,10 +413,16 @@ test('THE RECORD’S OWN PERSON KEEPS EVERY SPELLING OF THEM: a name their handl
   assert.equal(k.get(second.id, { includeDeleted: true })!.fields.merged_into, self.id);
   assert.deepEqual(k.get(self.id)!.fields.aliases, ['Karim Assaf']);
 
-  /* Now that the record knows the name, the same name and the same handle fold on their own, into the owner's row. */
-  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in bake' }, AGENT));
+  /* Now that the record knows the name, a commit with the same name and handle is still asked about: anybody can sign
+     a commit as the owner (audit 19 H1). The same from a session's own run folds on its own, into the owner's row, and
+     never takes the commit author in with it. */
+  const committed = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@driftwind.example', where: 'commit 2 in bake' }, AGENT));
+  assert.equal(committed.matched_by, 'none');
+  assert.ok(committed.question);
+  const folded = value<Met>(k.meet({ name: 'Karim Assaf', email: 'karimassaf@tidepool.example', where: 'session in bake' }, AGENT));
   assert.equal(folded.matched_by, 'strong');
   assert.equal(folded.row?.id, self.id);
+  assert.equal(k.get(committed.row!.id)!.fields.merged_into, undefined, 'the commit author was folded in down the chain');
   sql.close();
 });
 
@@ -332,9 +431,9 @@ test('A QUESTION WHOSE PEOPLE BECAME ONE IS TAKEN OFF THE LIST', async () => {
   value(k.create('people', { name: 'Owen Hartley', email: 'owen@fanline.example', keys: ['email:ohartley@old.example'] }, OWNER));
   const asked = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', where: 'commit 1 in fanline' }, AGENT));
   assert.ok(asked.question);
-  /* The second row is met again with a handle the first holds too: the strong rules fold it, and the question has
-     nobody left to ask about. */
-  const last = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', handle: 'github:ohartley', where: 'commit 2 in fanline' }, AGENT));
+  /* The second row is met again by its own address, in the session's own run, with a handle the first holds too: the
+     strong rules fold it, and the question has nobody left to ask about. A commit never would (audit 19 H1). */
+  const last = value<Met>(k.meet({ name: 'Owen Hartley', email: 'owenh@fanline.example', handle: 'github:ohartley', where: 'session in fanline' }, AGENT));
   assert.equal(last.row?.seq, 1);
   assert.equal(k.count('people'), 1);
   assert.equal(k.governanceRow('suggestion', asked.question!)?.status, 'resolved');

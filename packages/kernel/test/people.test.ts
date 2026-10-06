@@ -152,7 +152,7 @@ test('WITH NO EMAIL MATCH, A HANDLE MATCHES, and the missing email is filled', a
   const { k, sql } = await record();
   const grace = value<Entry>(k.create('people', { name: 'Grace Hopper', handles: ['github:ghopper'] }, OWNER));
 
-  const met = value<Met>(k.meet({ name: 'G. Hopper', email: 'grace@example.com', handle: 'github:GHopper', where: 'issue 12 in braindog' }, AGENT));
+  const met = value<Met>(k.meet({ name: 'G. Hopper', email: 'grace@example.com', handle: 'github:GHopper', where: 'commit 12ab34c in braindog' }, AGENT));
   assert.equal(met.person, 'people#1');
   assert.equal(met.created, false);
   assert.equal(met.matched_by, 'key');
@@ -222,7 +222,7 @@ test('GMAIL’S DOTS AND +TAGS FOLD, and googlemail is gmail, so one mailbox is 
   }
   /* Another host's dots are not folded: two colleagues stay two. */
   value(k.create('people', { name: 'Bo Chen', email: 'bo.chen@encore.example' }, OWNER));
-  assert.equal(value<Met>(k.meet({ email: 'bochen@encore.example', name: 'Bob Chen', where: 'mail' }, AGENT)).created, true);
+  assert.equal(value<Met>(k.meet({ email: 'bochen@encore.example', name: 'Bob Chen', where: 'commit 1 in encore' }, AGENT)).created, true);
   assert.equal(k.count('people'), 3);
   sql.close();
 });
@@ -369,7 +369,8 @@ test('A MERGE DRAWN BEFORE SOMEBODY EDITED THE ROW IS STALE, and accepting it ch
 
 test('THE STRONG RULES MERGE ON THEIR OWN, as one batch, and Undo puts both back and never merges them again', async () => {
   const { k, sql } = await record();
-  const first = value<Entry>(k.create('people', { name: 'Rohan Mehta', email: 'rohanm@encore.example' }, OWNER));
+  /* Met in a commit first: a commit folds only into somebody met in commits alone (audit 19 H1). */
+  const first = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanm@encore.example', where: 'commit 0 in encore' }, AGENT)).row!;
 
   const met = value<Met>(k.meet({ name: 'Rohan Mehta', email: 'rohanm@brightloom.com', where: 'commit 1 in encore' }, AGENT));
   assert.equal(met.matched_by, 'strong');

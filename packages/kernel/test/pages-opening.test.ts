@@ -266,7 +266,14 @@ test('A TABLE SAYS WHO CHANGED EACH ROW LAST, and a sign is read from an enum or
   assert.equal(out.changes?.length, 1);
   assert.equal(out.changes?.[0]?.by, 'rule');
   assert.equal(out.changes?.[0]?.who, 'rule:rename');
-  assert.equal(k.block({ kind: 'table', source: 'register.bills', columns: [{ field: 'what' }], empty: 'None.' }).changes, undefined, 'nobody asked');
+  /* WITHOUT THE COLUMN, A ROW A RULE CHANGED THIS WEEK STILL SAYS SO, for its byline and its Undo, with the batch. */
+  const plain = { kind: 'table', source: 'register.bills', columns: [{ field: 'what' }], empty: 'None.' };
+  const byline = k.block(plain).changes?.[0];
+  assert.equal(byline?.who, 'rule:rename');
+  assert.equal(typeof byline?.batch, 'string');
+  value(k.update('bills', 'bills#1', { what: 'Rent' }, { actor: 'p_owner' }));
+  assert.equal(k.block(plain).changes, undefined, 'a person’s own change wears no byline');
+  assert.equal(k.block(table).changes?.[0]?.who, 'p_owner', 'and the column still names whoever it was');
   const signed = k.block({ ...table, columns: [{ field: 'amount', sign: { field: 'what', minus: 'Rent' } }] });
   assert.equal(signed.refusals[0]?.code, 'DECLARATION_INVALID');
   assert.equal(signed.refusals[0]?.at, 'columns');

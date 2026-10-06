@@ -176,6 +176,9 @@ test('THE LADDER ASKS AGAIN ONCE THE GRANT HAS RUN OUT, and holds a move only a 
 
 test('SLASH CLIMBS TOO, and the rows of a question it filed are signed by the ladder, never by a model', async () => {
   const { k, sql } = await record();
+  /* SLASH WORKS FOR THE RECORD'S OWNERS, so the task one of them made is its to move (`recordReader`). */
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_owner', 'owner@studio.test', 'Olu Owner')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_owner', '*', 'owner')");
   sql.exec("INSERT INTO ladder (agent, kind, rung, since) VALUES ('slash', 'tasks:move:done', 'tell', ?)", new Date(NOW).toISOString());
   const asked = value<{ id: string }>(k.propose(markDone, 'slash'));
   const done = value<{ batch?: string }>(k.decide(asked.id, { rule: 'ladder' }, 'p_owner'));

@@ -361,8 +361,12 @@ export type BlockResult = PageBlock & {
   latest?: MeasureLatest[];
   /** A walk's `recorded:` series over the ninety days before today, oldest first, a day with no point absent. */
   past?: { at: string; value: number }[];
-  /** Aligned with `rows`, when a column is `changed`: who changed each row last, as a kind of actor and by name, and when. */
-  changes?: ({ by: FeedBy; who: string; at: string } | null)[];
+  /**
+   * Aligned with `rows`: who changed each row last (`RowChange`). When a column is `changed`, every row that has a history;
+   * otherwise only a row an agent, Slash, a rule or an import changed in the last week, for the byline and its Undo, and
+   * absent when no row is one.
+   */
+  changes?: (RowChange | null)[];
   /** Aligned with `rows`, when the block set `working: true`: whether an agent is on each row right now. */
   working_now?: boolean[];
   /**
@@ -482,7 +486,10 @@ export type QueueQuestion = {
    */
   run?: { id: string; name?: string; app?: string };
   drafted_by?: string;
-  /** The money accepting writes, one value a row it writes: integer minor units with a currency, never added up here. */
+  /**
+   * The money accepting writes, one value a row it writes: integer minor units with a currency, never added up here. A
+   * question that moves money, or hits the ladder's money floor, is always `cost: undo`, so Enter never accepts it.
+   */
   money?: { amount: number; currency: string }[];
   /** What accepting changes on the one row a question updates: each field, its name, what it holds now and what it will. */
   changes?: { field: string; label?: string; before: Json | null; after: Json | null }[];
@@ -531,6 +538,26 @@ export type PageFilter = {
 
 /** One event, as the activity source reads it. */
 export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
+
+/**
+ * Who changed a row last, for the byline a page draws under it: the kind of actor and who it was, when, and the batch
+ * that puts the change back (`undoPlan`). For a run, its handle (`S42`), its agent (`claude`), the app it ran in and the
+ * person it acts for; and whether the reader has seen it, against their read mark, when the host knows it.
+ */
+export type RowChange = {
+  by: FeedBy;
+  who: string;
+  at: string;
+  batch?: string;
+  run?: string;
+  agent?: string;
+  app?: string;
+  for?: string;
+  unseen?: boolean;
+};
+
+/** A row's newest event, as `PageDeps.lastChanges` reads it: who, when, its batch, and for a run what the run says it is. */
+export type LastChange = { actor: string; ts: string; batch: string | null; agent?: string; app?: string; for?: string };
 
 /** One event about a row, oldest first. A create carries every field in `to` and `field: null`. */
 export type RowEvent = { ts: string; actor: string; kind: string; field: string | null; to: Json | null };
@@ -586,6 +613,11 @@ export type PageDeps = {
   inScope?: (register: string, project: string, opts: { limit?: number; open?: boolean }) => Result<{ rows: Entry[]; inherited: Entry[] }>;
   /** Every event about one row of `register`, oldest first. `row` is a spoken id or a row id. */
   history?: (register: string, row: string) => Result<RowEvent[]>;
+  /**
+   * The newest event of each row, by row id, in one read: what a block's `changes` answer. Absent, only a `changed`
+   * column says who changed a row, read from `history` row by row, and no batch is said.
+   */
+  lastChanges?: (ids: readonly string[]) => ReadonlyMap<string, LastChange>;
   /** The newest `limit` events, newest first, and the reader's read mark. */
   activity?: (limit: number) => { events: ActivityEvent[]; seen: string | null };
   /** Every run of the kernel's `session` register not in one of its `done` states, the most recently seen first. */
@@ -2202,7 +2234,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
       }),
     };
   const asksChanged = (block.columns ?? []).some((c) => c.field === CHANGED) && !Object.hasOwn(schema.fields, CHANGED);
-  if (asksChanged && !deps.history)
+  if (asksChanged && !deps.history && !deps.lastChanges)
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read who changed a row onto a page yet.', at: 'columns' }) };
   /* `working: true` NEEDS BOTH HALVES OR NEITHER. It is one question asked of two reads, and a record
      wired for one of them would answer `false` for every row, which is a block quietly saying nobody
@@ -2255,7 +2287,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...spent,
     rows,
     ...(held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {}),
-    ...(asksChanged ? { changes: changesOf(deps, register, rows) } : {}),
+    ...changesOf(deps, register, rows, asksChanged),
     ...(block.working === true ? { working_now: workingOf(deps, register, rows) } : {}),
     matched: whole.value.matched,
     /* THE OPEN STEPS, which the short view's read already counted: it asked for the open rows alone. */
@@ -2898,13 +2930,49 @@ function spentOf(deps: PageDeps, id: unknown, at = 'spent'): { readings: NonNull
 /** The column that says who changed a row last. A register's own field of that name wins. */
 const CHANGED = 'changed';
 
-/** Who changed each row last, from its history: the newest event, its kind of actor, and when. */
-function changesOf(deps: PageDeps, register: string, rows: readonly Entry[]): ({ by: FeedBy; who: string; at: string } | null)[] {
-  return rows.map((r) => {
-    const events = r.seq === null ? undefined : deps.history?.(register, `${register}#${r.seq}`);
-    const last = events?.ok ? events.value.at(-1) : undefined;
-    return last ? { by: byOf(last.actor), who: last.actor, at: last.ts } : null;
+/** How long a change made for the reader wears its byline on a page: a week. */
+const BYLINE_MS = 7 * 86_400_000;
+
+/** A change somebody made for the reader rather than by their own hand: a run, an agent, Slash, a rule or an import. */
+const madeFor = (actor: string): boolean =>
+  /^S\d+$/.test(actor) || actor.startsWith('agent:') || actor === 'slash' || actor.startsWith('rule:') || actor.startsWith('ingest:');
+
+/**
+ * Who changed each row last, aligned with `rows`: the newest event, its kind of actor, and when, with the batch Undo puts
+ * back and, for a run, what the run is.
+ *
+ * ON EVERY BLOCK OF A LIST, for the byline (DIRECTION §37, trust): a row changed for the reader in the last week carries
+ * its change and every other row is `null`, and a block with none answers no `changes`. A `changed` column asked for
+ * every row's, whoever made it, and gets them.
+ */
+function changesOf(deps: PageDeps, register: string, rows: readonly Entry[], every: boolean): { changes?: (RowChange | null)[] } {
+  /* A HOST WITHOUT THE ONE-QUERY READ pays a history read a row only where a `changed` column asked for one. */
+  if (!deps.lastChanges && (!deps.history || !every)) return {};
+  const read = deps.lastChanges?.(rows.map((r) => r.id));
+  const seen = deps.reader?.seen;
+  const since = deps.ctx.nowMs - BYLINE_MS;
+  const changes = rows.map((r): RowChange | null => {
+    let last: LastChange | undefined = read?.get(r.id);
+    if (!read) {
+      const events = r.seq === null ? undefined : deps.history?.(register, `${register}#${r.seq}`);
+      const newest = events?.ok ? events.value.at(-1) : undefined;
+      last = newest ? { actor: newest.actor, ts: newest.ts, batch: null } : undefined;
+    }
+    if (!last) return null;
+    if (!every && !(madeFor(last.actor) && Date.parse(last.ts) >= since)) return null;
+    return {
+      by: byOf(last.actor),
+      who: last.actor,
+      at: last.ts,
+      ...(last.batch ? { batch: last.batch } : {}),
+      ...(/^S\d+$/.test(last.actor) ? { run: last.actor } : {}),
+      ...(last.agent ? { agent: last.agent } : {}),
+      ...(last.app ? { app: last.app } : {}),
+      ...(last.for ? { for: last.for } : {}),
+      ...(typeof seen === 'string' ? { unseen: last.ts > seen } : {}),
+    };
   });
+  return every || changes.some((c) => c !== null) ? { changes } : {};
 }
 
 /**

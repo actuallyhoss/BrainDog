@@ -224,3 +224,32 @@ test('isMachineIdentity KNOWS EVERY MACHINE THE CLI’S HARVEST LEAVES OUT, so t
   ])
     assert.equal(isMachineIdentity({ name, email }), false, `${name!} <${email!}>`);
 });
+
+test('A TEAM’S JOB ON GITHUB’S PRIVATE ADDRESS IS A MACHINE, a coding agent is one, and the surnames Ci and Runner are people', () => {
+  for (const [name, email] of [
+    ['Brightloom Repos', '101799195+BrightloomGit@users.noreply.github.com'],
+    ['Docs Sync', 'docs-sync@users.noreply.github.com'],
+    ['Claude', 'claude@acme.example'],
+    ['Claude Opus 5.5 (1M context)', 'claude@acme.example'],
+    ['Cursor Agent', 'cursoragent@cursor.com'],
+    ['Copilot', '198982749+Copilot@users.noreply.github.com'],
+    ['Codex', 'codex@openai.example'],
+    ['Gemini Code Assist', 'gemini@acme.example'],
+    ['Devin AI', 'devin@cognition.example'],
+    ['Ada Lovelace (aider)', 'ada@encore.example'],
+    ['Acme CI', 'ci@acme.example'],
+    ['Acme CI/CD', 'jobs@acme.example'],
+    ['GitLab Runner', 'gitlab-runner@acme.example'],
+    ['Self-hosted Runner', 'jobs@acme.example'],
+  ])
+    assert.equal(isMachineIdentity({ name, email }), true, `${name!} <${email!}>`);
+  for (const [name, email] of [
+    ['Li Ci', 'li.ci@acme.example'],
+    ['Jane Runner', 'jane@acme.example'],
+    ['Claude Monet', 'claude@giverny.example'],
+    ['Devin Park', 'devin@acme.example'],
+    ['Ada Sync', 'ada.sync@gmail.com'],
+    ['Octo Cat', '583231+octo-cat@users.noreply.github.com'],
+  ])
+    assert.equal(isMachineIdentity({ name, email }), false, `${name!} <${email!}>`);
+});

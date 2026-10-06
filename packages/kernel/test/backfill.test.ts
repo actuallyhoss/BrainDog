@@ -353,15 +353,40 @@ test('A SERVICE NAMED FOR ITS PROJECT’S DOMAIN IS LINKED BY THE LETTERS OF THE
   sql.close();
 });
 
-test('UNDO LEAVES A RUN THAT WAS WRITTEN TO SINCE WHERE IT IS', async () => {
+test('UNDO LEAVES A RUN THAT WAS MOVED SINCE WHERE IT IS, and its placement is a line saying project from and to', async () => {
   const { k, sql, deps, ids } = await record();
   const done = understandBackfill(deps);
   const quarry = runs(k).find((r) => r.seq === 1)!;
   assert.equal(quarry.fields.project, k.nameOf(ids.quarry!));
-  value(k.update('session', quarry.id, { next: 'Ship the fix' }, { actor: 'p_owner', version: quarry.version }));
+  /* THE WALK'S PLACEMENT NAMES ITS FIELD, so the server's own undo (`undo.ts`) can put it back as any other edit. */
+  const line = sql.one<{ field: string | null; to_v: string | null }>("SELECT field, to_v FROM event WHERE target = ? AND batch = ? AND kind = 'edit'", `entry:${quarry.id}`, done.runs.batch!);
+  assert.equal(line?.field, 'project');
+  value(k.update('session', quarry.id, { next: 'Ship the fix' }, { actor: 'p_owner', version: quarry.version, stamp: { project: k.nameOf(ids.lantern!) } }));
   value(undoBackfill(deps, done.runs.batch!, 'p_owner'));
-  assert.equal(k.get(quarry.id)?.fields.project, k.nameOf(ids.quarry!), 'the run somebody wrote to keeps its project');
+  assert.equal(k.get(quarry.id)?.fields.project, k.nameOf(ids.lantern!), 'the run somebody moved keeps where they put it');
   assert.equal(runs(k).filter((r) => r.fields.project).length, 1, 'every other run is unplaced');
+  sql.close();
+});
+
+test('A DRY WALK WRITES NOTHING, and answers the counts and its first writes in names', async () => {
+  const { k, sql, ids } = await record();
+  const events = (): number => sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')?.n ?? 0;
+  const before = events();
+  const dry = k.backfill({ dry: true });
+  assert.equal(events(), before, 'not one line written');
+  assert.equal(dry.dry, true);
+  assert.equal(partyOf(k, ids.fenwickLine!), null, 'the line is still nobody’s');
+  assert.ok(dry.ledger.wrote > 0 && dry.runs.wrote > 0, 'the counts are the walk’s');
+  assert.deepEqual([dry.ledger.batch, dry.runs.batch, dry.services.batch], [null, null, null], 'a batch rolled back names nothing');
+  assert.ok((dry.planned ?? []).length > 0 && (dry.planned ?? []).length <= 10);
+  const said = JSON.stringify(dry.planned);
+  for (const id of Object.values(ids)) assert.ok(!said.includes(id), 'a row is named, never its id');
+  assert.ok(!said.includes('bank:'), 'an identity key is never said');
+  assert.ok((dry.planned ?? []).some((p) => p.list === 'Transactions' && typeof p.row === 'string' && p.fields.party === 'Bridge St Coffee'), said);
+  assert.ok((dry.planned ?? []).some((p) => p.list === 'Organisations' && p.row === null && p.fields.name === 'Bridge St Coffee'), said);
+  /* And the walk itself, run after, writes what the dry one said. */
+  const real = k.backfill();
+  assert.deepEqual([real.ledger.wrote, real.runs.wrote, real.services.wrote], [dry.ledger.wrote, dry.runs.wrote, dry.services.wrote]);
   sql.close();
 });
 

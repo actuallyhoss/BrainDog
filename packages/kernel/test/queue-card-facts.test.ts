@@ -138,3 +138,26 @@ test('A LINK THAT CHANGES IS SAID BY THE ROW IT POINTS AT, and an enum by its la
   assert.ok(!JSON.stringify(q?.changes).includes(fire.id), 'a row id is never said');
   sql.close();
 });
+
+test('A QUESTION THAT MOVES MONEY IS HARD TO UNDO, ranked and counted so, and one that moves none keeps its band', async () => {
+  const { k, sql } = await record();
+  /* Two new rows, which alone would be the cheap `rows` band: one carries money, the other none. */
+  value(k.propose({ question: 'Add the kiln bill?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: 'Kiln bill', cost: { amount: 4200, currency: 'GBP' } }] } } as never, OWNER));
+  value(k.propose({ question: 'Add the glaze run?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: 'Glaze run' }] } } as never, OWNER));
+  const block = k.block({ kind: 'queue', source: 'governance.open' } as PageBlock) as unknown as { queue?: QueueQuestion[]; waiting?: { hardToUndo: number } };
+  const queue = block.queue ?? [];
+  assert.deepEqual(
+    queue.map((q) => [q.question, q.cost]),
+    [
+      ['Add the kiln bill?', 'undo'],
+      ['Add the glaze run?', 'rows'],
+    ],
+    'the money moves first, as hard to undo',
+  );
+  assert.deepEqual(queue[0]?.money, [{ amount: 4200, currency: 'GBP' }]);
+  assert.equal(block.waiting?.hardToUndo, 1);
+  /* A queue with a where: reads the same band. */
+  const hard = k.block({ kind: 'queue', source: 'governance.open', where: 'cost is undo' } as PageBlock) as unknown as { queue?: QueueQuestion[] };
+  assert.deepEqual((hard.queue ?? []).map((q) => q.question), ['Add the kiln bill?']);
+  sql.close();
+});

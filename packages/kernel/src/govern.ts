@@ -1066,7 +1066,8 @@ export function additiveFault(body: Record<string, unknown> | null): string | nu
 export const LADDER_RULE = 'rule:ladder';
 
 /** What the decision says when the ladder answered it. */
-const LADDER_REASON = 'Changes like this were kept unchanged often enough that they no longer ask. None is money, a key, sharing, a delete, an add-on or somebody else\'s.';
+const LADDER_REASON =
+  'Changes like this were kept unchanged often enough that they no longer ask. None is money, a key, sharing, a delete, who someone is, an add-on or somebody else\'s.';
 
 /**
  * Why a question cannot be answered by the ladder, or `null` when it can. Checked at the gate whoever sends the verdict,
@@ -1079,6 +1080,12 @@ const LADDER_REASON = 'Changes like this were kept unchanged often enough that t
  * question was filed, and the floor is what it is now. The grant is read now too, so a token revoked, expired or taken
  * down to Suggest since stops here. The rung is the ladder's for the agent the question was filed by, and every kind
  * must stand at Do and tell or Do quietly, none on the floor.
+ *
+ * THE FLOOR READ HERE IS THE WHOLE OF IT (`change-kind.ts`), and two parts of it were missing until research-audit-19:
+ * a merge or an identity key (`merged_into`, `email`, `handles`, `keys` or `self` on the people or organisations
+ * `meet` writes) was a plain edit, so a rowset setting only `merged_into` was let through at Do and tell; and a field
+ * sent empty was an edit and not a delete. Both are on the floor now, and a filer that acts for nobody (Slash, a run no token opened)
+ * meets every row a person made as somebody else's.
  *
  * AND A FIELD ONLY A DECISION CHANGES (`by: 'decide'`, on the field or on the move) still waits for a person, because
  * a rung is not a person deciding.

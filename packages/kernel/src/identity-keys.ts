@@ -131,7 +131,8 @@ const MACHINE = /(?:^|[._+-])(?:no[._-]?reply|do[._-]?not[._-]?reply|notificatio
 const MACHINE_LOCALS = new Set([
   'root', 'ubuntu', 'runner', 'ec2-user', 'centos', 'debian', 'vagrant', 'jenkins', 'git', 'www-data', 'nobody',
   'github-actions', 'actions-user', 'dependabot', 'renovate', 'mergify', 'greenkeeper', 'buildbot', 'ci', 'build',
-  'builder', 'deploy', 'deployer', 'automation', 'gitlab-runner', 'circleci', 'codecov',
+  'builder', 'deploy', 'deployer', 'automation', 'gitlab-runner', 'circleci', 'codecov', 'cursoragent', 'copilot',
+  'codex', 'aider', 'devin-ai-integration',
 ]);
 
 /** Names a machine goes by in a commit or a header: a server's default user, a CI system, a forge's bot. */
@@ -149,8 +150,21 @@ const MACHINE_NAMES = new Set([
  */
 const BOT_NAME = /\[bot\]$|(?:^|[\s_-])bot$|github-actions|dependabot|greenkeeper|snyk-bot|semantic-release|pre-commit-ci|imgbot|allcontributors|mergify|^renovate$/i;
 
-/** A name that ends in what a service is, never what a person is called: `Acme CI`, `GitLab Runner`. */
-const SERVICE_NAME = /(?:^|\s)(?:ci|ci\/cd|automation|runner)$/i;
+/**
+ * A name that ends in what a service is, never what a person is called: `Acme CI`, `GitLab Runner`. CI AND RUNNER ARE
+ * SURNAMES TOO, so `CI` counts only in capitals and `Runner` only after a CI's own name: `Li Ci` and `Jane Runner` are
+ * people.
+ */
+const SERVICE_CI = /(?:^|\s)CI(?:\/CD)?$/;
+const SERVICE_WORDS = /(?:^|\s)(?:automation|(?:gitlab|github|actions|azure|build|self-hosted|ci)\s+runner)$/i;
+
+/**
+ * The coding agents, by the names they commit and sign with: `Claude`, `Claude Code`, `Cursor Agent`, `Copilot`,
+ * `Codex`, `Gemini Code Assist`, `Devin AI`, and aider's `Ada (aider)`. A bare `Devin` is a person, so Devin only with
+ * its `AI`; its bot login is a `[bot]` already.
+ */
+const AGENT_NAME =
+  /^(?:claude(?:\s+(?:code|opus|sonnet|haiku)\b.*)?|cursor\s?agent|(?:github\s+)?copilot(?:\s+swe\s+agent)?|(?:openai\s+)?codex|gemini(?:\s+code\s+assist)?|devin\s+ai|aider)$|\(aider\)$/i;
 
 /**
  * GitHub's private commit address: `<id>+<login>@users.noreply.github.com`, or the older `<login>@…`. An app's
@@ -305,7 +319,8 @@ export type IdentitySaid = {
  */
 export function isMachineIdentity(said: IdentitySaid): boolean {
   const name = typeof said.name === 'string' ? said.name.trim().replace(/\s+/g, ' ') : '';
-  if (name !== '' && (MACHINE_NAMES.has(name.toLowerCase()) || BOT_NAME.test(name) || SERVICE_NAME.test(name))) return true;
+  if (name !== '' && (MACHINE_NAMES.has(name.toLowerCase()) || BOT_NAME.test(name) || SERVICE_CI.test(name) || SERVICE_WORDS.test(name) || AGENT_NAME.test(name)))
+    return true;
   if (typeof said.handle === 'string' && said.handle.trim() !== '') {
     const login = lower(said.handle).replace(/^[a-z][a-z0-9.-]*:/, '').replace(/^@/, '');
     if (isBotLogin(login)) return true;
@@ -316,10 +331,12 @@ export function isMachineIdentity(said: IdentitySaid): boolean {
   /* A HOST WITH NO DOT OR ON A PRIVATE NETWORK is a machine's own name, as git writes `ada@Adas-MacBook.local`. */
   if (!loose.host.includes('.') || NOT_REGISTERED.test(loose.host)) return true;
   const login = githubOfAddress(`${loose.local}@${loose.host}`);
+  /* A CI JOB NAMED FOR WHAT IT DOES, `Jenkins Schema Sync`, `Acme Repos` or `Docs Mirror`, at an organisation's domain,
+     or signing with GitHub's private address as a team's job does (`Brightloom Repos <…@users.noreply.github.com>`).
+     Asked before the login is, which would let that job through as a person. A public mail host is nobody's job. */
+  if (/(?:^|\s)(?:sync|repos|mirror)$/i.test(name) && (login !== null || registrable(loose.host) !== null)) return true;
   if (login !== null) return isBotLogin(login);
-  if (isMachineLocal(loose.local)) return true;
-  /* A CI JOB NAMED FOR WHAT IT DOES, `Jenkins Schema Sync`, `Acme Repos` or `Docs Mirror`, at an organisation's domain. */
-  return /(?:^|\s)(?:sync|repos|mirror)$/i.test(name) && registrable(loose.host) !== null;
+  return isMachineLocal(loose.local);
 }
 
 /** The login inside GitHub's private commit address, or `null`. */

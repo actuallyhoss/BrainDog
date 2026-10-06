@@ -215,3 +215,13 @@ test('a roadmap over a list that names no columns is refused, naming the three i
   assert.deepEqual(drawn.refusals, []);
   sql.close();
 });
+
+test('A SECTION MAY NAME THE RUN PANEL, drawn on a run’s own page, and any other word is refused naming the three', async () => {
+  const { panelFault, PANELS } = await import('./words.ts');
+  assert.deepEqual([...PANELS], ['actions', 'reporting', 'run']);
+  assert.equal(panelFault('run', true), null);
+  const odd = panelFault('runs', true);
+  assert.equal(odd?.at, 'panel');
+  assert.match(odd?.fix ?? '', /actions, reporting, run/);
+  assert.equal(panelFault('run', false)?.at, 'panel', 'a page about no row has no run to draw');
+});
